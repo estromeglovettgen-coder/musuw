@@ -345,6 +345,21 @@ func TestScheduler_InvalidCron(t *testing.T) {
 	}
 }
 
+func TestScheduler_StartReturnsRegistrationErrorsForWorkerReadiness(t *testing.T) {
+	repo := newFakeDataSourceRepo()
+	_ = repo.Create(context.Background(), &types.DataSource{
+		ID:           "ds-bad-startup",
+		TenantID:     1,
+		Status:       types.DataSourceStatusActive,
+		SyncSchedule: "not a cron",
+	})
+	scheduler := NewScheduler(repo, newFakeSyncLogRepo(), &fakeTaskEnqueuer{})
+	if err := scheduler.Start(context.Background()); err == nil {
+		t.Fatal("Start() error = nil for invalid persisted schedule")
+	}
+	scheduler.Stop()
+}
+
 func TestScheduler_TriggerSync_InactiveSkipped(t *testing.T) {
 	repo := newFakeDataSourceRepo()
 	// Create a data source that is paused

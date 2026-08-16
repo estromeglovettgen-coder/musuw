@@ -108,6 +108,14 @@ expect_reject 'sh -c id'
 expect_reject 'musuw-gate preflight update ../release deadbeef 1'
 expect_reject 'musuw-gate preflight update safe-id 0123456789012345678901234567890123456789 1;id'
 expect_reject 'musuw-gate preflight update low-capacity 0123456789012345678901234567890123456789 1'
+cat > "$bin_dir/accept-wrapper" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$bin_dir/accept-wrapper"
+export MUSUW_DEPLOY_GATE_WRAPPER="$bin_dir/accept-wrapper"
+expect_reject 'musuw-gate preflight update digest-shaped 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef 12582912'
+unset MUSUW_DEPLOY_GATE_WRAPPER
 expect_reject 'rsync --server --sender -l . /etc/'
 expect_reject 'rsync --server -l --delete . /var/lib/musuw-deploy/incoming/safe/source/weknora/'
 expect_reject 'rsync --server -l --rsync-path=/bin/sh . /var/lib/musuw-deploy/incoming/safe/source/weknora/'

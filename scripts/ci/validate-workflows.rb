@@ -100,6 +100,14 @@ fail_contract "tracked publish-boundary scanner is missing" unless File.file?(tr
 fail_contract "tracked publish-boundary scanner is not executable" unless File.executable?(tracked_scan_path)
 fail_contract "repository contracts do not run the tracked publish-boundary scanner" unless ci_text.include?("node scripts/ci/tracked-source-scan.mjs")
 fail_contract "repository contracts reference excluded legacy architecture tests" if ci_text.include?("tests/architecture/")
+release_transaction_checks = %w[
+  release-transaction-contract.test.sh
+  release-transaction-simulation.test.sh
+  release-transaction-actual.test.sh
+]
+release_transaction_checks.each do |check|
+  fail_contract "canonical CI omits #{check}" unless ci_text.include?("bash scripts/weknora-production/#{check}")
+end
 tracked_scan_text = File.read(tracked_scan_path)
 %w[server desktop dist node_modules .runtime keys].each do |sentinel|
   fail_contract "tracked publish-boundary scanner does not cover #{sentinel}" unless tracked_scan_text.include?(sentinel)
@@ -176,9 +184,12 @@ fail_contract "production deploy must prove the revision belongs to origin/main"
 fail_contract "production tag releases must require annotated semver tags" unless production_text.include?("git cat-file -t") && production_text.include?("refs/tags/") && production_text.include?("v[0-9]+\\.[0-9]+\\.[0-9]+")
 fail_contract "production deploy must require a successful CI run for the revision" unless production_text.include?("actions/runs") && production_text.include?("CI") && production_text.include?("conclusion")
 fail_contract "production deploy must pin checkout to the resolved SHA" unless production_text.include?("ref: ${{ steps.resolve.outputs.release_sha }}") || production_text.include?("ref: ${{ needs.rebuild.outputs.release_sha }}")
-fail_contract "production deploy must verify the formal public GET/rollback seam" unless production_text.include?("https://app.musuw.com/health") && production_text.include?("rollback.sh")
+fail_contract "production deploy must verify transaction-owned public revision probes and rollback" unless production_text.include?("https://app.musuw.com/readyz") && production_text.include?("rollback_transaction")
 fail_contract "production rebuild must use the committed auth lockfile" unless production_text.include?("npm ci --prefix auth") && File.file?(File.join(ROOT, "auth", "package-lock.json"))
 fail_contract "production rebuild must run the real static/release contracts" unless production_text.include?("scripts/weknora-production/verify-static.sh") && production_text.include?("deploy-ci-seams-contract.test.sh") && production_text.include?("compose.sh")
+release_transaction_checks.each do |check|
+  fail_contract "production rebuild omits #{check}" unless production_text.include?("bash scripts/weknora-production/#{check}")
+end
 fail_contract "production deploy must assert the formal staged rollback seam" unless production_text.include?("release-ci.sh") && production_text.include?("rollback.sh")
 fail_contract "production deploy must retain release manifest/checksum evidence" unless production_text.include?("upload-artifact") && production_text.include?("sha256sum") && production_text.include?("source_manifest") && production_text.include?("source_bundle_sha256")
 fail_contract "production success manifest must fail closed without server identity/checksum" unless production_text.include?("RELEASE_PROBE_OUTCOME") && production_text.include?("test \"$server_release_id\" = \"$expected_release_id\"") && production_text.include?("=~ ^[0-9a-fA-F]{64}$")

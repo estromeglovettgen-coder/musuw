@@ -1,217 +1,303 @@
 ## Context
 
-The working tree is a Musuw product composition rather than a single upstream
-checkout. The active product source is split into `weknora/` (Go API, document
-processing, workspace UI, and product runtime), `auth/` (the Google/email-OTP
-entry shell), `storefront/` (the public `musuw-site` Worker),
-`integration/` (runtime composition), and `scripts/` (local, release, and
-verification entry points). The current Git remote is named `knowledge`, while
-the desired product repository is the private
-`estromeglovettgen-coder/musuw` repository.
+Musuw is a product composition rather than a single upstream checkout. The
+active source is split across `weknora/` (Go API, document processing,
+workspace UI, and runtime), `auth/` (the Google/email-OTP entry shell),
+`storefront/` (the public `musuw-site` Worker), `integration/` (runtime
+composition), and `scripts/` (release and verification entry points). The
+private `estromeglovettgen-coder/musuw` repository is now the only source and
+release identity.
 
-There are already two different production boundaries:
+There are two intentionally separate delivery boundaries:
 
 1. `storefront/wrangler.jsonc` owns the static `musuw-site` Worker for
    `musuw.com` and `www.musuw.com`.
-2. The authenticated app/auth/backend stack is served from the existing server
-   through a Docker release, loopback staging ports, an explicit edge cutover,
-   and an idempotent rollback seam under `scripts/weknora-production/`.
+2. The authenticated app/auth/backend stack remains on the existing server,
+   with server-owned volumes and secrets, a loopback staging boundary, and an
+   explicit edge cutover.
 
-The delivery design must preserve those boundaries. It must not turn the
-storefront Worker into an account, payment, or product API, and it must not
-move server-owned databases, volumes, or credentials into GitHub.
+The old M35-era one-shot handoff is not a production protocol. It did not
+provide a repeatable source/config/image snapshot for a new SHA, did not make
+background-worker state part of the rollback unit, and depended on a current
+edge identity that is no longer reliably recoverable. The replacement is a
+dynamic, per-SHA Docker Compose transaction with explicit runtime roles and a
+single transaction manifest.
+
+The latest external evidence is deliberately recorded separately from the
+design: commit
+`2d9091b98b90cb0e4ce6bde081027a0f61af7949` (B) passed CI run
+`31933653091`, and the dependent storefront run `31933748281` attempt 2
+published Worker version `20d7ad96-2a01-4437-93d7-3ba7d0995d14` at 100%
+traffic (artifact `9260177059`). No production tag or server release exists.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Make the private `estromeglovettgen-coder/musuw` monorepo the only source of
-  truth for the clean active source and release metadata.
-- Make every merge auditable through deterministic PR checks and make every
-  production artifact addressable by an immutable commit SHA and release tag.
-- Automatically deploy the existing storefront Worker from the verified
-  GitHub source after the agreed CI gate, with an observable health check and a
-  documented previous-version rollback.
-- Deliver app/auth/backend releases to the existing server from a selected SHA
-  through a restricted workflow seam, staged health checks, a serialized edge
-  cutover, and the existing rollback procedure.
-- Keep runtime secrets server-owned and scoped Cloudflare credentials in the
-  GitHub environment; prevent secrets, generated output, binaries, and local
-  state from entering the source repository or artifacts.
-- Preserve upstream licenses and Musuw/WeKnora source provenance records.
+- Keep GitHub as the immutable source of truth and bind every server artifact
+  to one full SHA, rendered Compose/config digest, and image digests.
+- Replace the one-shot M35 handoff with a dynamic per-SHA Compose transaction
+  invoked through only the fixed restricted `preflight`, `promote`, and `run`
+  verbs.
+- Keep runtime-role selection inside the transaction: every `run` internally
+  orchestrates `prepare` → `web` → `worker`; neither the workflow nor the SSH
+  caller can request a role-specific or partial release.
+- Ensure no two full release transactions overlap. Stage and verify each
+  internal role before its ownership change, then make rollback restore source,
+  rendered configuration, images, background-worker ownership, and the public
+  edge as one release unit.
+- Permit only forward-only additive migrations, and separately gate one
+  idempotent native live-ledger normalization before the first production
+  transaction.
+- Require two successive release transactions with complete manifests and
+  health evidence before calling the server delivery path production-ready.
+- Keep the fixed capacity reserve and bounded unused-Docker cleanup as a
+  fail-closed preflight; never delete volumes, secrets, the current release, or
+  user data to make room.
+- Preserve the existing storefront Worker boundary and keep the Cloudflare
+  product app-edge migration in the separate `cloudflare-product-edge` change.
 
 **Non-Goals:**
 
-- Migrating the authenticated app or auth shell to a Cloudflare Worker. That is
-  a separate Phase 2 change with its own runtime, OIDC, SSRF, and rollback
-  review.
-- Changing product behavior, authentication contracts, knowledge-base logic,
-  billing, data schemas, or graph behavior.
-- Replacing the existing server cutover/rollback seam, Docker topology, or
-  server-owned data volumes.
-- Giving CI a general-purpose remote shell, copying `.env`/secret files, or
-  making local dirty-tree deployment an accepted release path.
-- Automatically running destructive migrations or deleting the previous
-  release as part of a normal publish.
+- Migrating the authenticated app or auth shell to a Cloudflare Worker. That
+  remains a separate Phase 2 change with its own OIDC, SSRF, streaming, and
+  rollback review.
+- Changing product behavior, billing, graph behavior, or business data
+  semantics. A schema change is permitted only when it is additive,
+  compatibility-reviewed, and explicitly recorded in the release manifest.
+- Replacing server-owned databases, object/object-store volumes, Redis/Neo4j
+  state, runtime secrets, or tunnel credentials.
+- Treating historical M35 files, a mutable branch, a dirty checkout, or a
+  direct `docker compose` command as a production release authority.
+- Exposing `prepare`, `all`, `web`, or `worker` as a workflow input, SSH verb,
+  or independently publishable production transaction.
+- Silently claiming production readiness from local simulations or a
+  successful storefront deployment; the new server transaction and its
+  evidence gates are not yet complete.
 
 ## Decisions
 
-### 1. GitHub private monorepo is the authority
+### 1. GitHub identity and target separation
 
-The implementation SHALL create/use the private
-`estromeglovettgen-coder/musuw` repository and migrate a clean active-source
-baseline. The baseline keeps source, lockfiles, deployment scripts, test
-fixtures that are intentionally part of the product, documentation, license
-notices, and provenance records. It excludes `.env` values, credentials and
-keys, `node_modules`, generated `dist`/build output, runtime directories,
-database/object-store dumps, local logs, and generated/binary artifacts.
+The root workflows remain the only product CI/release authority. Every server
+transaction starts from a full SHA that is present on `main` and has a
+successful CI run. The storefront workflow continues to select
+`workflow_run.head_sha` only after CI completes successfully; it never receives
+server SSH credentials. The app-edge Worker design and its staging/OIDC
+requirements remain in `cloudflare-product-edge` and are not folded into this
+server transaction.
 
-The root workflow is the only supported product CI entry point. Existing
-vendored upstream workflow files must be disabled, relocated, or otherwise
-prevented from creating duplicate product releases; their upstream provenance
-is retained as documentation rather than becoming a second delivery authority.
+### 2. Per-SHA Compose transaction
 
-### 2. Pull request gates and release identity
+The workflow resolves its immutable ref to a full SHA and the server adapter
+receives an immutable transaction tuple:
 
-Every pull request and every push to the release branch runs the same checks:
+| Field | Contract |
+| --- | --- |
+| `revision` | 40-character Git SHA selected by the workflow |
+| `release_id` | safe identifier derived from the SHA and transaction attempt |
+| `source_bundle_sha256` | checksum of the transferred allowlisted source |
+| `compose_digest` | digest of the rendered base/overlay Compose configuration |
+| `image_digests` | immutable digest for every image used by the full transaction |
+| `runtime_snapshot` | references (not values) to server-owned env, secrets, and volumes |
 
-- frontend, auth, and storefront tests plus production builds;
-- Go/backend and document-reader tests appropriate to the changed paths;
-- Compose/static topology rendering and existing source/provenance checks;
-- secret and tracked-file boundary scans; and
-- a release-manifest dry run that records the candidate commit SHA.
+The server renders Compose from the selected checkout and protected runtime
+configuration at transaction time. The project name, container names, image
+references, and release directory are derived from `release_id`; no mutable
+`latest`/branch tag or checked-in M35 compose file is accepted. The rendered
+configuration is hashed before the first container starts and is retained with
+the transaction manifest. A rerun of the same SHA creates a new attempt and
+must not silently reuse a stale project or image tag.
 
-Merges are permitted only after the checks succeed. A product release is an
-annotated `vMAJOR.MINOR.PATCH` tag pointing at a reviewed commit; the workflow
-also records the full SHA because a tag name alone can be moved. The first
-server workflow remains `workflow_dispatch` with an explicit SHA/tag input and
-one concurrency group. GitHub Free private-repository environments cannot be
-assumed to enforce an approval gate, so that limitation is documented and
-compensated with required CI, an immutable SHA input, an operator runbook, and
-the existing serialized cutover/rollback checks.
+The caller-facing protocol is fixed: `preflight` validates the immutable
+candidate and fail-closed gates, `promote` moves the verified spool into its
+immutable release directory, and `run` starts one complete transaction. Extra
+verbs, role arguments, partial-release modes, and command suffixes are rejected
+before mutation.
 
-### 3. Cloudflare storefront delivery
+After `run` acquires the one production transaction lock, it executes:
 
-The existing `storefront/` package is built with its lockfile and deployed by a
-GitHub Actions workflow using the existing `storefront/wrangler.jsonc` project
-name `musuw-site`. The automatic production trigger is a `workflow_run` for the
-`CI` workflow after it completes on `main`; the workflow guards the canonical
-repository and `success` conclusion before selecting `workflow_run.head_sha`.
-A manual dispatch remains available for a full SHA and independently queries
-the Actions API for a successful `CI` run with that exact SHA. No
-workstation `wrangler deploy` is part of the supported path. This explicit
-completion edge means an initial push into an empty repository runs CI before
-the storefront follow-up can mutate Cloudflare.
+1. **Prepare** — assign the internal `prepare` role; verify SHA, source
+   allowlist, secrets boundary, capacity, migration plan, Compose render, image
+   set, and complete rollback snapshot without taking traffic;
+2. **Build** — build or pull only digest-pinned images and record their digests;
+   never build into the current release in place;
+3. **Web stage/verify** — assign the internal `web` role, start HTTP surfaces on
+   loopback/private networks, and verify app/static/auth, OIDC, migration,
+   provenance, port, and topology gates;
+4. **Public cutover** — switch the public alias only after the web candidate and
+   predecessor snapshot are complete, then probe public health;
+5. **Worker stage/verify** — assign the internal `worker` role, start queue and
+   document-processing ownership, verify it, and stop the predecessor worker
+   only as part of this same transaction;
+6. **Observe/commit** — record all internal phase evidence and retain the
+   predecessor until the observation window closes; or
+7. **Rollback** — execute the idempotent full rollback when any phase after the
+   snapshot fails.
 
-The Cloudflare credential is a Worker-scoped API token stored in the GitHub
-environment. The workflow does not receive server runtime secrets, Supabase
-service keys, model keys, Paddle secrets, or an SSH key. The Worker smoke test
-checks both custom domains, the static entry, expected product handoff, and a
-locale signal without exercising account or payment operations. The previous
-Worker version remains available for an explicit rollback.
+### 3. Internal runtime roles and one transaction lock
 
-### 4. Server delivery from an exact SHA
+Runtime roles are an implementation detail owned by the transaction:
 
-The server workflow packages only the active source and approved release
-configuration from the selected Git SHA, computes a checksum manifest, and
-transfers it to a new immutable release directory. It invokes a restricted
-server-side command that accepts the release identity and an allowlisted mode;
-it cannot execute arbitrary commands or replace `/opt/.../secrets`, database
-volumes, or the current symlink directly.
+| Internal role | Scope | Public edge |
+| --- | --- | --- |
+| `prepare` | validate/render/snapshot/migration preparation; no serving ownership | untouched |
+| `web` | frontend/app/HTTP surfaces using the transaction's SHA/config/images | cut over only after private verification |
+| `worker` | document processing, queue consumers, and background ownership | never independently mutates the edge |
+| `all` | compatibility/default mode for the predecessor native process | not a new-transaction phase and never caller-selectable |
 
-The existing sequence remains authoritative:
+Every production `run` performs the complete `prepare` → `web` → `worker`
+sequence. There is no role-specific production transaction or compatibility
+matrix exposed to callers. One exclusive target lock covers the sequence from
+the first snapshot through commit or rollback; a second `run` is rejected or
+queued and cannot overlap any phase. Every lock acquisition, wait, rejection,
+and release is written to the audit manifest.
 
-1. validate the SHA, manifest, known-host fingerprint, release ID, capacity,
-   and source allowlist;
-2. build the staged app/frontend/auth images and static assets;
-3. run loopback-only health, static entry, OIDC-PKCE, migration, and topology
-   checks using the existing `verify-runtime.sh` seam;
-4. acquire the existing cutover lock and hand the public edge alias to the
-   verified stack; and
-5. retain the previous release and state file until post-cutover checks pass.
+### 4. Full rollback is one release unit
 
-Any failed handoff runs the idempotent rollback seam, restoring the prior edge
-alias without touching data volumes. A rollback is itself serialized and
-logged. Database migrations remain forward-only and require a separately
-reviewed migration plan; the delivery workflow never assumes that reverting
-application code reverts data.
+The prepare phase snapshots the prior release identity and the exact
+source/config/image/background/edge owners:
 
-### 5. Secret ownership and provenance
+- immutable source bundle and current release pointer;
+- rendered Compose/config references and public env overlay checksums (never
+  secret values);
+- image digests and tags used by each service;
+- background worker/queue ownership, scheduler state, and container IDs; and
+- the edge alias, public endpoint, and cutover state.
 
-GitHub Actions stores only the minimum deployment credentials: a Worker-scoped
-Cloudflare token, a restricted deployment SSH key, and the exact server
-`known_hosts` entry. The server owns runtime secret files and public runtime
-configuration under its existing protected directories. Public build variables
-are generated from non-secret repository/environment variables and are never
-used as a channel for private runtime credentials.
+Rollback restores all of those surfaces in dependency order, stops or
+disconnects candidate web and worker services, and re-probes the restored
+public edge. It is idempotent and serialized by the same transaction lock. A
+rollback must not delete or rewrite server-owned data volumes, secrets,
+forward-applied migrations, or the predecessor manifest. If a snapshot is
+missing (for example, the old edge ID or an old image digest cannot be
+captured), the transaction fails before cutover and is a NO-GO rather than
+guessing a predecessor.
 
-Every release produces a machine-readable manifest containing repository,
-commit SHA, release tag (when present), source allowlist/version, lockfile
-hashes, artifact SHA-256 values, workflow run, test/build results, target,
-deployment time, and resulting health status. The manifest and logs are
-retained with the GitHub release and a copy is retained with the server release
-directory. A scanner fails a run if a tracked file or release artifact contains
-an excluded credential, private key, local runtime volume, or unexpected binary.
+### 5. Forward-only migrations and one-time native ledger normalization
+
+Every release declares its migration class in the transaction manifest. Only
+forward-only additive changes are eligible: new nullable columns/tables,
+indexes, or compatibility fields that old and new code can both read. A
+destructive, rename-in-place, incompatible constraint, or unbounded backfill
+requires a separate reviewed change and cannot be smuggled into a normal
+release. Code/config rollback never pretends to undo an applied migration; a
+forward repair or compatibility release is required.
+
+Before the first production transaction, the operator must run one dedicated
+native live-ledger normalization. It is a one-time, idempotent operation on
+the live native stack, preceded by a dry-run count/checksum, backup/restore
+proof, maintenance lock, and explicit before/after ledger evidence. It is not
+run during every release and is not rolled back by reverting containers; any
+failure leaves the transaction NO-GO until a reviewed forward repair is
+available. The normalization run ID and ledger evidence are prerequisites for
+the first two-successive-release gate.
+
+### 6. Capacity preflight and bounded cleanup
+
+The fixed minimum production reserve is 12 GiB (`12,582,912` KiB). `prepare`
+checks free capacity before source transfer, release-directory creation, or
+image work. If capacity is below the reserve, the server may perform exactly
+one bounded cleanup of unused Docker build cache/dangling images, then
+re-check. The cleanup must be recorded and must not touch named volumes,
+runtime/secret files, current or predecessor releases, or user data. If the
+reserve is still not met or capacity cannot be determined, the transaction
+fails closed before mutation.
+
+At the time of this revision the server reports approximately `8,939,456` KiB
+free, below the required `12,582,912` KiB. This is a current production NO-GO,
+not permission to lower the floor.
+
+### 7. Provenance, secrets, and evidence
+
+The transaction manifest records repository/SHA/tag, release and attempt IDs,
+the ordered internal phase/role evidence, source/config/image digests, runtime snapshot references,
+migration class, ledger-normalization evidence, capacity/cleanup result,
+lock/cutover phases, health probes, rollback predecessor, and workflow run.
+Secrets remain server-owned; logs contain names and checksums only. A
+successful server release requires two successive transactions on distinct
+reviewed SHAs under this protocol, each with complete manifests and public
+health evidence. The second success must not rely on an unrecorded mutable
+current state from the first.
+
+### 8. Storefront and app-edge boundaries
+
+The storefront Worker continues to deploy only `storefront/` and its static
+marketing routes. Its B success is evidence for the Cloudflare storefront
+target only; it is not evidence that the server transaction or app-edge
+migration is complete. Any future `app.musuw.com` Worker cutover remains gated
+by the separate `cloudflare-product-edge` change, independent staging origin,
+Access/OIDC setup, streaming/upload tests, cookie isolation, and edge rollback.
 
 ## Risks / Trade-offs
 
-- **Private GitHub Free does not guarantee environment approvals or branch
-  protection.** → Keep production server publishing manual and SHA-pinned,
-  require the full PR CI gate, serialize the workflow, document the human
-  two-person review convention, and schedule a repository-plan upgrade before
-  removing the compensating controls.
-- **A Cloudflare deploy can succeed while a route or asset is wrong.** → Run
-  post-deploy checks against both custom domains and retain the previous Worker
-  version for immediate rollback; do not report success from `wrangler` alone.
-- **Server transfer or cutover can fail after files arrive.** → Use resumable
-  checksum-verified transfer into a new release directory, never mutate the
-  current source, stage on loopback, acquire the existing lock, and invoke the
-  idempotent rollback path on any failed handoff.
-- **A secret or generated artifact can leak through the monorepo migration.** →
-  Start with an allowlisted active-source baseline, run secret/tracked-file
-  scans before the first push and on every PR, and keep runtime values only in
-  server/Cloudflare secret stores.
-- **Duplicated upstream workflows can publish an unintended image or Worker.**
-  → Consolidate product automation at the repository root, disable nested
-  product release workflows, and make the target/name/commit checks mandatory.
-- **Forward-only schema migrations limit code rollback.** → Require an
-  explicit migration compatibility review and data backup before a release
-  that changes schema; rollback restores code and edge routing only.
-- **This change leaves app/auth on the server.** → Keep the boundary explicit in
-  workflow names, manifests, and docs; track a separate Phase 2 change before
-  any Worker migration is attempted.
+- **A dynamic Compose render can drift from the tested source.** → Hash the
+  rendered config, source allowlist, and every image digest before staging and
+  bind all later phases to the same transaction manifest.
+- **A caller-selected partial release could split web and worker versions.** →
+  Reject role/mode arguments at the workflow and restricted SSH boundaries and
+  serialize every complete internal `prepare` → `web` → `worker` transaction.
+- **Rollback can be incomplete when the predecessor is not observable.** →
+  Snapshot source/config/images/background/edge before mutation and fail closed
+  when any predecessor identity is missing; never infer the old state from
+  container names or a mutable tag.
+- **Forward-only migrations limit an immediate code rollback.** → Require
+  additive compatibility, backup/restore evidence, and a forward repair plan;
+  keep migration state in the manifest and never delete data during rollback.
+- **Native ledger normalization can alter live state.** → Run it once under a
+  maintenance lock with dry-run, counts, checksums, backup, and idempotence
+  evidence; block all production releases until its evidence is complete.
+- **Low disk capacity can recur during image builds.** → Keep the 12 GiB
+  reserve, allow one bounded unused-cache cleanup, re-check before build, and
+  retain the old release/volumes even when cleanup is attempted.
+- **GitHub Free does not provide dependable environment approvals.** → Keep
+  production dispatch manual and SHA-pinned, require CI, serialize the server
+  lock, and require two-successive-release evidence before declaring the path
+  ready.
+- **The app-edge Worker may be mistaken for a server release.** → Keep the
+  app-edge change and its staging/prod decisions separate in manifests,
+  workflows, and runbooks.
 
 ## Migration Plan
 
-1. Inventory the current working tree and produce a clean active-source
-   baseline in the private `musuw` repository, preserving license/provenance
-   records and recording the baseline SHA.
-2. Add root PR CI and run it against the baseline and a no-op change. Verify
-   that no nested workflow can publish a product artifact and that scans reject
-   synthetic secrets/binaries.
-3. Configure the scoped Cloudflare token, connect `musuw-site`, deploy the
-   baseline commit, and verify both custom domains and rollback to the previous
-   Worker version.
-4. Configure the restricted server deploy seam, known-host pin, and server
-   environment. Dispatch a baseline SHA to staging only, verify the complete
-   health contract, and rehearse rollback without changing production data.
-5. Dispatch one reviewed release SHA through staged health and cutover. Retain
-   the previous release, manifest, and cutover state until the observation
-   window closes; then adopt annotated tags for subsequent releases.
-6. If a gate fails, stop before cutover. If a post-cutover health check fails,
-   run the target-specific rollback (previous Worker version or server edge
-   alias) and attach the manifest/logs to the release record.
+1. Keep the B GitHub/Cloudflare evidence recorded, but do not create a
+   production tag or dispatch while the server is below the capacity floor and
+   predecessor/image snapshots are incomplete.
+2. Implement the per-SHA transaction adapter behind only `preflight`, `promote`,
+   and `run`. Add internal `prepare` → `web` → `worker` orchestration, dynamic
+   Compose rendering, one full-transaction lock, digest manifests, and negative
+   tests for role/mode injection, extra command grammar, stale refs, and
+   overlapping `run` transactions.
+3. Add the full rollback snapshot/restore path and rehearse source,
+   config, image, background, and edge failures with server-owned volumes and
+   secrets unchanged. Previous static/M35-era rollback simulations do not
+   satisfy this step.
+4. Restore capacity above 12,582,912 KiB using only the bounded unused-Docker
+   cleanup; if it remains low, stop without upload/build/cutover.
+5. Run the one-time native live-ledger normalization with the required
+   backup/restore and idempotence evidence. Keep it outside ordinary release
+   migrations and record its run ID in the manifest.
+6. Rehearse a selected SHA through the fixed `preflight`/`promote`/`run`
+   protocol and internal `prepare` → `web` → `worker` sequence through rollback,
+   then run two successive reviewed-SHA transactions through commit and public
+   health. Retain both manifests, predecessor links, image digests, and rollback
+   evidence.
+7. Only after those gates pass may a maintainer create an annotated release
+   tag and dispatch production. A failed gate stops before cutover; a
+   post-cutover failure restores the complete predecessor unit and records a
+   linked audit event.
 
 ## Open Questions
 
-- Confirm the GitHub repository is private, writable by the automation identity,
-  and that the desired default/release branch is `main`.
-- Confirm the Cloudflare account/zone and the exact Worker-scoped API token
-  permissions for `musuw-site`; no token value belongs in the repository.
-- Confirm the production SSH user, host, port, and immutable `known_hosts`
-  fingerprint for the restricted deploy seam.
-- Decide whether release tags are created by a maintainer or by a successful
-  release workflow; the workflow must reject unannotated/moved tags either way.
-- Decide how long release artifacts/manifests and Cloudflare/server rollback
-  versions are retained; the first implementation should choose a bounded
-  default and document it.
+- Which concrete service names and dependencies belong to the internally
+  assigned `prepare`, `web`, and `worker` phases in the production Compose
+  topology?
+- What server path and lock owner will hold the transaction lock across SSH
+  reconnects and operator retries?
+- What exact native ledger rows/fields and backup checksum constitute the
+  one-time normalization acceptance evidence?
+- What observation-window duration and retention period will be used for the
+  two successive release manifests and their rollback predecessors?
+- Which independent origin and Cloudflare Access/OIDC setup will be used by
+  the separate `cloudflare-product-edge` change? That decision is intentionally
+  not made here.

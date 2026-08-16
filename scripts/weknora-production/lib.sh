@@ -110,6 +110,67 @@ weknora_production_image_tag() {
     weknora_production_revision
 }
 
+# Transactional releases deliberately never reuse the fixed native Compose
+# project or its mutable image aliases.  The project identity is derived from
+# the full Git revision at this seam; callers only provide the already
+# validated revision through WEKNORA_PRODUCTION_REVISION/GITHUB_SHA.
+weknora_production_revision_short() {
+    local revision
+    revision="$(weknora_production_revision)"
+    [ "$revision" != local ] || weknora_production_die 'transactional release requires a full Git revision'
+    printf '%s' "$revision" | tr '[:upper:]' '[:lower:]' | cut -c1-12
+}
+
+weknora_production_release_project() {
+    printf 'musuw-r-%s' "$(weknora_production_revision_short)"
+}
+
+weknora_production_release_container() {
+    local role="$1"
+    case "$role" in
+        prepare|web|frontend|worker) ;;
+        *) weknora_production_die 'transactional release role is invalid' ;;
+    esac
+    printf '%s-%s' "$(weknora_production_release_project)" "$role"
+}
+
+weknora_production_release_image() {
+    local role="$1"
+    case "$role" in
+        web|frontend) ;;
+        *) weknora_production_die 'transactional release image role is invalid' ;;
+    esac
+    printf '%s-%s:%s' "$(weknora_production_release_project)" "$role" "$(weknora_production_revision)"
+}
+
+# Keep candidate listeners loopback-only and deterministic.  Deriving ports
+# from the revision allows a second candidate to stage beside the live stack
+# without ever reusing the fixed production listener before cutover.
+weknora_production_release_port() {
+    local kind="$1"
+    local short value offset base
+    short="$(weknora_production_revision_short)"
+    case "$kind" in
+        app) base=30000 ;;
+        frontend) base=40000 ;;
+        *) weknora_production_die 'transactional release port kind is invalid' ;;
+    esac
+    # The first eight hexadecimal digits are stable across shells and provide
+    # enough spread for the short-lived private listeners.  Keep the result in
+    # the unprivileged high port range.
+    value=$((16#${short:0:8} % 10000))
+    offset=$((value + base))
+    printf '%s' "$offset"
+}
+
+weknora_production_release_internal_network() {
+    local network="${WEKNORA_PRODUCTION_INTERNAL_NETWORK:-weknora-v072-production-internal}"
+    case "$network" in
+        ''|*[!A-Za-z0-9_.-]*) weknora_production_die 'transactional release internal network is unsafe' ;;
+    esac
+    printf '%s' "$network"
+}
+
 weknora_production_release_id() {
     local candidate="${WEKNORA_PRODUCTION_RELEASE_ID:-${WEKNORA_DEPLOY_RELEASE_ID:-}}"
     [ -n "$candidate" ] || candidate='weknora-v072-production'
@@ -143,8 +204,8 @@ weknora_production_revision() {
             weknora_production_die 'production revision is unsafe'
         fi
         case "${#candidate}" in
-            40|64) ;;
-            *) weknora_production_die 'production revision must be a full 40- or 64-character SHA' ;;
+            40) ;;
+            *) weknora_production_die 'production revision must be a full 40-character Git SHA' ;;
         esac
     fi
     printf '%s' "$candidate"
@@ -170,8 +231,8 @@ weknora_production_require_clean_checkout() {
         ''|local|*[!0-9a-fA-F]*) weknora_production_die 'production release requires a full Git revision' ;;
     esac
     case "${#expected_revision}" in
-        40|64) ;;
-        *) weknora_production_die 'production release revision is not a full Git SHA' ;;
+        40) ;;
+        *) weknora_production_die 'production release revision is not a full 40-character Git SHA' ;;
     esac
     head="$(git -C "$repo_root" rev-parse --verify HEAD 2>/dev/null || true)"
     [ -n "$head" ] || weknora_production_die 'production Git checkout has no HEAD'

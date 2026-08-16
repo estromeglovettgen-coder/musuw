@@ -84,6 +84,28 @@ func NewCosFileServiceWithTempBucket(bucketName, region, secretId, secretKey, co
 	return svc, nil
 }
 
+// NewCosFileServiceWithTempBucketExisting verifies both configured buckets.
+// COS construction itself never provisions buckets; this variant adds the
+// read-only readiness checks required by split runtimes.
+func NewCosFileServiceWithTempBucketExisting(bucketName, region, secretId, secretKey, cosPathPrefix, tempBucketName, tempRegion string) (interfaces.FileService, error) {
+	service, err := NewCosFileServiceWithTempBucket(bucketName, region, secretId, secretKey, cosPathPrefix, tempBucketName, tempRegion)
+	if err != nil {
+		return nil, err
+	}
+	svc := service.(*cosFileService)
+	if err := svc.CheckConnectivity(context.Background()); err != nil {
+		return nil, fmt.Errorf("COS bucket prerequisite: %w", err)
+	}
+	if svc.tempClient != nil {
+		checkCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if _, err := svc.tempClient.Bucket.Head(checkCtx); err != nil {
+			return nil, fmt.Errorf("COS temp bucket prerequisite: %w", err)
+		}
+	}
+	return svc, nil
+}
+
 // CheckConnectivity verifies COS is reachable by performing a HEAD request on the bucket.
 func (s *cosFileService) CheckConnectivity(ctx context.Context) error {
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

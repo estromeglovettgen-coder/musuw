@@ -1,0 +1,180 @@
+# Immutable per-revision candidate topology.  This file intentionally contains
+# only the four release roles.  PostgreSQL, Redis, DocReader, Neo4j and the
+# existing data volumes live in the stable production topology and are joined
+# through an already-created external network; this candidate never creates or
+# removes a sidecar, volume, or secret.
+services:
+  prepare:
+    platform: linux/amd64
+    image: ${WEKNORA_RELEASE_APP_IMAGE:?set WEKNORA_RELEASE_APP_IMAGE}
+    container_name: ${WEKNORA_RELEASE_PROJECT:?set WEKNORA_RELEASE_PROJECT}-prepare
+    env_file:
+      - ${WEKNORA_RELEASE_RUNTIME_DIR:?set WEKNORA_RELEASE_RUNTIME_DIR}/production.env
+    environment:
+      WEKNORA_RUNTIME_ROLE: prepare
+      WEKNORA_PRODUCTION_REVISION: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+      WEKNORA_RELEASE_MARKER: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:?set DB_USER}
+      DB_NAME: ${DB_NAME:?set DB_NAME}
+    entrypoint: ["/bin/sh", "/opt/weknora-production/app-entrypoint.sh"]
+    command: ["./WeKnora"]
+    volumes:
+      - ${WEKNORA_RELEASE_SOURCE_ROOT:?set WEKNORA_RELEASE_SOURCE_ROOT}/integration/weknora-production/app-entrypoint.sh:/opt/weknora-production/app-entrypoint.sh:ro
+      - data-files:/data/files
+      - docreader-tmp:/tmp/docreader:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/db_password:/run/secrets/db_password:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/redis_password:/run/secrets/redis_password:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/system_aes_key:/run/secrets/system_aes_key:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/jwt_secret:/run/secrets/jwt_secret:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/neo4j_auth:/run/secrets/neo4j_auth:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/oidc_client_id:/run/secrets/oidc_client_id:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/oidc_client_secret:/run/secrets/oidc_client_secret:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/deepseek_api_key:/run/secrets/deepseek_api_key:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/openrouter_api_key:/run/secrets/openrouter_api_key:ro
+    networks:
+      data: {}
+    restart: "no"
+
+  web:
+    platform: linux/amd64
+    image: ${WEKNORA_RELEASE_APP_IMAGE:?set WEKNORA_RELEASE_APP_IMAGE}
+    build:
+      context: ../../weknora
+      dockerfile: ../integration/weknora-production/Dockerfile.app.runtime
+      args:
+        VERSION_ARG: "0.7.2"
+        COMMIT_ID_ARG: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+        BUILD_TIME_ARG: production-source-build
+        GO_VERSION_ARG: go1.26
+    container_name: ${WEKNORA_RELEASE_PROJECT:?set WEKNORA_RELEASE_PROJECT}-web
+    env_file:
+      - ${WEKNORA_RELEASE_RUNTIME_DIR:?set WEKNORA_RELEASE_RUNTIME_DIR}/production.env
+    environment:
+      WEKNORA_RUNTIME_ROLE: web
+      WEKNORA_PRODUCTION_REVISION: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+      WEKNORA_RELEASE_MARKER: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+      APP_EXTERNAL_URL: ${APP_EXTERNAL_URL:?set APP_EXTERNAL_URL}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL}
+    entrypoint: ["/bin/sh", "/opt/weknora-production/app-entrypoint.sh"]
+    command: ["./WeKnora"]
+    ports:
+      - "127.0.0.1:${WEKNORA_RELEASE_APP_PORT:?set WEKNORA_RELEASE_APP_PORT}:8080"
+    volumes:
+      - ${WEKNORA_RELEASE_SOURCE_ROOT:?set WEKNORA_RELEASE_SOURCE_ROOT}/integration/weknora-production/app-entrypoint.sh:/opt/weknora-production/app-entrypoint.sh:ro
+      - data-files:/data/files
+      - docreader-tmp:/tmp/docreader:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/db_password:/run/secrets/db_password:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/redis_password:/run/secrets/redis_password:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/system_aes_key:/run/secrets/system_aes_key:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/jwt_secret:/run/secrets/jwt_secret:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/neo4j_auth:/run/secrets/neo4j_auth:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/oidc_client_id:/run/secrets/oidc_client_id:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/oidc_client_secret:/run/secrets/oidc_client_secret:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/deepseek_api_key:/run/secrets/deepseek_api_key:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/openrouter_api_key:/run/secrets/openrouter_api_key:ro
+    networks:
+      release: {}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/readyz | grep -q '\"accepting_traffic\":true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    platform: linux/amd64
+    image: ${WEKNORA_RELEASE_FRONTEND_IMAGE:?set WEKNORA_RELEASE_FRONTEND_IMAGE}
+    build:
+      context: ../..
+      dockerfile: integration/weknora-production/Dockerfile.frontend
+      args:
+        VERSION_ARG: "0.7.2"
+        REVISION_ARG: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+    container_name: ${WEKNORA_RELEASE_PROJECT:?set WEKNORA_RELEASE_PROJECT}-frontend
+    environment:
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+      APP_HOST: ${WEKNORA_RELEASE_WEB_CONTAINER:?set WEKNORA_RELEASE_WEB_CONTAINER}
+      APP_PORT: "8080"
+      APP_SCHEME: http
+      WEKNORA_PRODUCTION_REVISION: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+    ports:
+      - "127.0.0.1:${WEKNORA_RELEASE_FRONTEND_PORT:?set WEKNORA_RELEASE_FRONTEND_PORT}:8080"
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      release: {}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz | grep -q '\"accepting_traffic\":true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    platform: linux/amd64
+    image: ${WEKNORA_RELEASE_APP_IMAGE:?set WEKNORA_RELEASE_APP_IMAGE}
+    container_name: ${WEKNORA_RELEASE_PROJECT:?set WEKNORA_RELEASE_PROJECT}-worker
+    env_file:
+      - ${WEKNORA_RELEASE_RUNTIME_DIR:?set WEKNORA_RELEASE_RUNTIME_DIR}/production.env
+    environment:
+      WEKNORA_RUNTIME_ROLE: worker
+      WEKNORA_PRODUCTION_REVISION: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+      WEKNORA_RELEASE_MARKER: ${WEKNORA_PRODUCTION_REVISION:?set WEKNORA_PRODUCTION_REVISION}
+      APP_EXTERNAL_URL: ${APP_EXTERNAL_URL:?set APP_EXTERNAL_URL}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL}
+    entrypoint: ["/bin/sh", "/opt/weknora-production/app-entrypoint.sh"]
+    command: ["./WeKnora"]
+    volumes:
+      - ${WEKNORA_RELEASE_SOURCE_ROOT:?set WEKNORA_RELEASE_SOURCE_ROOT}/integration/weknora-production/app-entrypoint.sh:/opt/weknora-production/app-entrypoint.sh:ro
+      - data-files:/data/files
+      - docreader-tmp:/tmp/docreader:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/db_password:/run/secrets/db_password:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/redis_password:/run/secrets/redis_password:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/system_aes_key:/run/secrets/system_aes_key:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/jwt_secret:/run/secrets/jwt_secret:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/neo4j_auth:/run/secrets/neo4j_auth:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/oidc_client_id:/run/secrets/oidc_client_id:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/oidc_client_secret:/run/secrets/oidc_client_secret:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/deepseek_api_key:/run/secrets/deepseek_api_key:ro
+      - ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR}/openrouter_api_key:/run/secrets/openrouter_api_key:ro
+    # The transaction creates this container without networking, attaches the
+    # exact per-revision identity to the stable data network, and only then
+    # starts it. This prevents an automatic shared `worker` DNS alias too.
+    network_mode: none
+    healthcheck:
+      # Worker has no public HTTP listener. The runtime exposes only its
+      # fixed loopback readiness probe on 8081 for this healthcheck.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/readyz | grep -q '\"status\":\"ready\"'"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  # Web/frontend share only their per-revision private network. Compose may
+  # add the service alias `web` here, but no other release project can join it.
+  release:
+    name: ${WEKNORA_RELEASE_PROJECT:?set WEKNORA_RELEASE_PROJECT}-private
+    driver: bridge
+    internal: true
+  # Prepare is one-shot. Long-lived web/worker containers are attached to this
+  # stable sidecar network explicitly by the transaction with exact names.
+  data:
+    external: true
+    name: ${WEKNORA_PRODUCTION_INTERNAL_NETWORK:?set WEKNORA_PRODUCTION_INTERNAL_NETWORK}
+
+volumes:
+  # External is essential: Compose must refuse to create a per-project copy
+  # of the customer file store during a candidate release.
+  data-files:
+    external: true
+    name: ${WEKNORA_PRODUCTION_FILES_VOLUME:?set WEKNORA_PRODUCTION_FILES_VOLUME}
+  docreader-tmp:
+    external: true
+    name: ${WEKNORA_PRODUCTION_DOCREADER_TMP_VOLUME:?set WEKNORA_PRODUCTION_DOCREADER_TMP_VOLUME}

@@ -129,8 +129,8 @@ generate_manifest() {
     if [ "$revision" != 'local' ]; then
         [[ "$revision" =~ ^[0-9a-fA-F]+$ ]] || fail 'source manifest revision is unsafe'
         case "${#revision}" in
-            40|64) ;;
-            *) fail 'source manifest revision must be a full 40- or 64-character SHA' ;;
+            40) ;;
+            *) fail 'source manifest revision must be a full 40-character Git SHA' ;;
         esac
     fi
     case "$mode" in update|update-ui) ;; *) fail 'source manifest mode is unsafe' ;; esac

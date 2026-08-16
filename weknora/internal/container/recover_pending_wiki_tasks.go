@@ -29,11 +29,12 @@ type pendingWikiScope struct {
 // may also be absent after an interrupted Redis enqueue. Running this after all
 // handlers are registered closes that gap. Duplicate triggers are harmless:
 // ingest claims/peeks disjoint rows and finalize coalesces its pending lane.
-func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) {
+func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) error {
 	if db == nil || task == nil {
-		return
+		return errors.New("wiki recovery requires database and task enqueuer")
 	}
 	ctx := context.Background()
+	var errs error
 	const activeKnowledgeBase = `EXISTS (
 		SELECT 1 FROM knowledge_bases kb
 		WHERE kb.id = task_pending_ops.scope_id
@@ -50,7 +51,7 @@ func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) {
 		Delete(&types.TaskPendingOp{})
 	if cleanup.Error != nil {
 		logger.Warnf(ctx, "[WikiRecovery] failed to clear deleted KB queues: %v", cleanup.Error)
-		return
+		return cleanup.Error
 	}
 	if cleanup.RowsAffected > 0 {
 		logger.Infof(ctx, "[WikiRecovery] removed %d pending row(s) for deleted knowledge bases", cleanup.RowsAffected)
@@ -64,7 +65,7 @@ func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) {
 		Where(activeKnowledgeBase).
 		Find(&scopes).Error; err != nil {
 		logger.Warnf(ctx, "[WikiRecovery] failed to list pending queues: %v", err)
-		return
+		return err
 	}
 
 	recovered := 0
@@ -78,6 +79,7 @@ func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) {
 		})
 		if err != nil {
 			logger.Warnf(ctx, "[WikiRecovery] marshal trigger for KB %s failed: %v", scope.ScopeID, err)
+			errs = errors.Join(errs, err)
 			continue
 		}
 		opts := []asynq.Option{
@@ -99,6 +101,7 @@ func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) {
 			}
 			logger.Warnf(ctx, "[WikiRecovery] enqueue %s trigger for KB %s failed: %v",
 				scope.TaskType, scope.ScopeID, err)
+			errs = errors.Join(errs, err)
 			continue
 		}
 		recovered++
@@ -106,4 +109,5 @@ func recoverPendingWikiTasks(db *gorm.DB, task interfaces.TaskEnqueuer) {
 	if recovered > 0 {
 		logger.Infof(ctx, "[WikiRecovery] recreated %d trigger(s) from durable pending queues", recovered)
 	}
+	return errs
 }

@@ -61,6 +61,21 @@ func NewMinioFileService(endpoint,
 	return svc, nil
 }
 
+// NewMinioFileServiceExisting is the split-runtime constructor. It performs a
+// read-only existence/connectivity check and never provisions a bucket.
+func NewMinioFileServiceExisting(endpoint,
+	accessKeyID, secretAccessKey, bucketName string, useSSL bool,
+) (interfaces.FileService, error) {
+	svc, err := newMinioClient(endpoint, accessKeyID, secretAccessKey, bucketName, useSSL)
+	if err != nil {
+		return nil, err
+	}
+	if err := svc.CheckConnectivity(context.Background()); err != nil {
+		return nil, fmt.Errorf("MinIO bucket prerequisite: %w", err)
+	}
+	return svc, nil
+}
+
 // CheckConnectivity verifies MinIO is reachable and, if a bucket is configured,
 // that the bucket exists. This is a read-only probe — it never creates a bucket.
 func (s *minioFileService) CheckConnectivity(ctx context.Context) error {

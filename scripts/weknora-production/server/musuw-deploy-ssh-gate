@@ -28,7 +28,7 @@ safe_id() {
 
 safe_revision() {
     [[ "$1" =~ ^[0-9a-fA-F]+$ ]] || return 1
-    case "${#1}" in 40|64) return 0 ;; *) return 1 ;; esac
+    [ "${#1}" -eq 40 ]
 }
 
 minimum_capacity_floor_kib='12582912'

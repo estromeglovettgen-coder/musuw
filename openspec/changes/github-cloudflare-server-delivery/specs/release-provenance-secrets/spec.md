@@ -6,8 +6,15 @@ Each Cloudflare and server release SHALL produce a machine-readable manifest
 that records the private repository, full source SHA, release tag when present,
 active-source/provenance version, lockfile hashes, artifact SHA-256 values,
 workflow run, target, deployment time, test/build results, health result, and
-rollback predecessor. The manifest SHALL be retained with the GitHub release
-and with the target release/version record.
+rollback predecessor. A server transaction manifest SHALL additionally record
+the transaction/attempt ID, ordered internal `prepare`/`web`/`worker` phase and
+role evidence, source-bundle checksum, rendered Compose/config digest, image
+digests, capacity/cleanup result, migration class, native-ledger normalization
+run ID, lock/cutover phases, and background-worker predecessor/owner. `all` MAY
+appear only when describing the predecessor native process's compatibility/
+default runtime mode; it MUST NOT identify a caller-selected transaction. The
+manifest SHALL be retained with the GitHub release and with the target release/
+version record.
 
 #### Scenario: Running version can be traced to a reviewed commit
 
@@ -16,6 +23,16 @@ and with the target release/version record.
 - **THEN** the target record resolves to one manifest, the manifest resolves to
   one full Git SHA in `estromeglovettgen-coder/musuw`, and the recorded checks
   and artifact hashes match the published release
+
+#### Scenario: Server transaction provenance is complete
+
+- **WHEN** an operator inspects a complete server transaction
+- **THEN** its manifest resolves the ordered internal phase/role results,
+  rendered Compose/config digest, image digests, source bundle, capacity check,
+  migration class, lock phases, background owner, and exact rollback
+  predecessor
+- **AND** a missing predecessor or digest prevents the transaction from being
+  reported healthy
 
 #### Scenario: Incomplete provenance blocks release
 
@@ -71,3 +88,29 @@ part of normal cleanup.
 - **THEN** it preserves the currently serving manifest, its immediate rollback
   predecessor, release tags, and all provenance needed to reproduce either
   version
+
+### Requirement: Two successive server transactions are required for readiness
+
+The server delivery authority SHALL retain evidence for two successive
+distinct-SHA transactions before declaring the path production-ready. Each
+transaction SHALL have an independent manifest, public health result,
+predecessor link, and complete internal-phase/config/image/migration/capacity
+evidence;
+the second transaction MUST NOT rely on an unrecorded mutable current state
+from the first.
+
+#### Scenario: Successive evidence unlocks a production tag
+
+- **WHEN** two successive reviewed-SHA server transactions satisfy the complete
+  manifest and health contract
+- **THEN** the operator may mark the delivery path ready for an annotated
+  production tag
+- **AND** both manifests and rollback predecessors remain retained
+
+#### Scenario: A single or incomplete run remains NO-GO
+
+- **WHEN** no server transaction has run, only one is green, or either manifest
+  lacks internal-phase/config/image/rollback/capacity/migration evidence
+- **THEN** production readiness and server cutover remain blocked
+- **AND** a storefront Worker success cannot substitute for the missing server
+  evidence

@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -93,6 +94,20 @@ func interpolateBuiltinModelEnv(s string) string {
 //     the "current YAML id set" so the sweep won't delete its existing
 //     row either (treats the failure as "leave alone")
 func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string) error {
+	return loadBuiltinModelsConfig(ctx, db, configDir, false)
+}
+
+// LoadBuiltinModelsConfigStrict performs the same reconciliation as
+// LoadBuiltinModelsConfig, but treats an absent/unreadable/invalid catalog and
+// every database operation failure as a startup error. The prepare role uses
+// this mode so a release cannot be marked ready with a partially applied
+// built-in model catalog. The legacy loader intentionally remains best effort
+// for the all role's compatibility contract.
+func LoadBuiltinModelsConfigStrict(ctx context.Context, db *gorm.DB, configDir string) error {
+	return loadBuiltinModelsConfig(ctx, db, configDir, true)
+}
+
+func loadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string, strict bool) error {
 	path := os.Getenv("BUILTIN_MODELS_CONFIG")
 	if path == "" {
 		path = filepath.Join(configDir, "builtin_models.yaml")
@@ -103,12 +118,21 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 	// substitutes a directory; we don't want that to spam WARN logs.
 	info, statErr := os.Stat(path)
 	if statErr != nil || !info.Mode().IsRegular() {
+		if strict {
+			if statErr != nil {
+				return fmt.Errorf("builtin models config %s: stat: %w", path, statErr)
+			}
+			return fmt.Errorf("builtin models config %s is not a regular file", path)
+		}
 		log.Printf("[builtin-models] config not present at %s; skipping", path)
 		return nil
 	}
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
+		if strict {
+			return fmt.Errorf("builtin models config %s: read: %w", path, err)
+		}
 		log.Printf("[builtin-models] WARN: read config %s failed: %v; skipping", path, err)
 		return nil
 	}
@@ -117,6 +141,9 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 
 	var file builtinModelsFile
 	if err := yaml.Unmarshal([]byte(expanded), &file); err != nil {
+		if strict {
+			return fmt.Errorf("builtin models config %s: parse: %w", path, err)
+		}
 		log.Printf("[builtin-models] WARN: parse config %s failed: %v; skipping reconcile", path, err)
 		return nil
 	}
@@ -126,11 +153,25 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 	// have disappeared and should be retired.
 	yamlIDs := make([]string, 0, len(file.BuiltinModels))
 	applied := 0
+	var loadErrs []error
+	addLoadErr := func(err error) {
+		if strict && err != nil {
+			loadErrs = append(loadErrs, err)
+		}
+	}
 
 	for i := range file.BuiltinModels {
 		e := &file.BuiltinModels[i]
+		// Presence in the operator catalog protects an existing managed row from
+		// the drift sweep even when this run cannot validate or update it. Strict
+		// prepare will fail, and a best-effort all startup will leave the last
+		// known-good row intact instead of turning a transient error into deletion.
+		if e.ID != "" {
+			yamlIDs = append(yamlIDs, e.ID)
+		}
 		if err := validateBuiltinModelEntry(e, i); err != nil {
 			log.Printf("[builtin-models] WARN: %v; skipping", err)
+			addLoadErr(fmt.Errorf("builtin models config %s: validate entry %d: %w", path, i, err))
 			continue
 		}
 		m := e.toModel()
@@ -148,8 +189,9 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 			log.Printf("[builtin-models] preserving runtime override: id=%s", m.ID)
 			continue
 		}
-		if lookupErr != nil && lookupErr != gorm.ErrRecordNotFound {
+		if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
 			log.Printf("[builtin-models] WARN: inspect existing model %s failed: %v; skipping", m.ID, lookupErr)
+			addLoadErr(fmt.Errorf("builtin models config %s: inspect model %s: %w", path, m.ID, lookupErr))
 			continue
 		}
 
@@ -164,6 +206,7 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 				Update("is_default", false).Error; err != nil {
 				log.Printf("[builtin-models] WARN: clear existing default for tenant=%d type=%s failed: %v; continuing",
 					m.TenantID, m.Type, err)
+				addLoadErr(fmt.Errorf("builtin models config %s: clear default for tenant=%d type=%s: %w", path, m.TenantID, m.Type, err))
 			}
 		}
 
@@ -177,10 +220,10 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 		}).Create(&m)
 		if res.Error != nil {
 			log.Printf("[builtin-models] WARN: upsert %s failed: %v; continuing", e.ID, res.Error)
+			addLoadErr(fmt.Errorf("builtin models config %s: upsert model %s: %w", path, e.ID, res.Error))
 			continue
 		}
 		applied++
-		yamlIDs = append(yamlIDs, e.ID)
 		log.Printf("[builtin-models] upserted: id=%s name=%s type=%s", e.ID, e.Name, e.Type)
 	}
 
@@ -190,10 +233,11 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 	pruned, sweepErr := pruneOrphanYAMLManagedModels(ctx, db, yamlIDs)
 	if sweepErr != nil {
 		log.Printf("[builtin-models] WARN: drift sweep failed: %v; continuing", sweepErr)
+		addLoadErr(fmt.Errorf("builtin models config %s: drift sweep: %w", path, sweepErr))
 	}
 
 	log.Printf("[builtin-models] applied: %d upserted, %d pruned from %s", applied, pruned, path)
-	return nil
+	return errors.Join(loadErrs...)
 }
 
 // pruneOrphanYAMLManagedModels soft-deletes rows where managed_by='yaml'

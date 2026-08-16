@@ -18,6 +18,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/handler/session"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/middleware"
+	weknoraRuntime "github.com/Tencent/WeKnora/internal/runtime"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 
@@ -76,7 +77,7 @@ type RouterParams struct {
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
 	SkillHandler                 *handler.SkillHandler
 	OrganizationHandler          *handler.OrganizationHandler
-	IMHandler                    *handler.IMHandler
+	IMHandler                    *handler.IMHandler `optional:"true"`
 	EmbedChannelHandler          *handler.EmbedChannelHandler
 	EmbedChannelService          interfaces.EmbedChannelService
 	RedisClient                  *redis.Client
@@ -84,6 +85,7 @@ type RouterParams struct {
 	DataSourceCredentialsHandler *handler.DataSourceCredentialsHandler
 	WeKnoraCloudHandler          *handler.WeKnoraCloudHandler
 	WikiPageHandler              *handler.WikiPageHandler
+	Readiness                    *weknoraRuntime.Readiness `optional:"true"`
 }
 
 // NewRouter 创建新的路由
@@ -127,6 +129,17 @@ func NewRouter(params RouterParams) *gin.Engine {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+	readiness := params.Readiness
+	if readiness == nil {
+		readiness = weknoraRuntime.ProcessReadiness()
+	}
+	if readiness == nil {
+		// Keep the endpoint present for embedded/test callers that construct a
+		// router without the process entrypoint. It is intentionally not ready
+		// until the caller supplies dependency state.
+		readiness = weknoraRuntime.NewReadiness(weknoraRuntime.RoleAll, "", "")
+	}
+	r.GET("/readyz", gin.WrapH(readiness.ReadyzHandler()))
 
 	// Swagger API 文档（仅在非生产环境下启用）
 	// 通过 GIN_MODE 环境变量判断：release 模式下禁用 Swagger
@@ -154,7 +167,9 @@ func NewRouter(params RouterParams) *gin.Engine {
 	}
 
 	// IM 回调路由（在认证中间件之前注册，使用各平台自身的签名验证）
-	RegisterIMRoutes(r, params.IMHandler)
+	if params.IMHandler != nil {
+		RegisterIMRoutes(r, params.IMHandler)
+	}
 
 	// Web embed 公开路由（使用 publish token 鉴权，不走全局 Auth）
 	RegisterEmbedPublicRoutes(
@@ -261,7 +276,9 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterUserFavoriteRoutes(v1, params.UserFavoriteHandler, rbacGuards)
 		RegisterSkillRoutes(v1, params.SkillHandler, rbacGuards)
 		RegisterOrganizationRoutes(v1, params.OrganizationHandler, rbacGuards)
-		RegisterIMChannelRoutes(v1, params.IMHandler, rbacGuards)
+		if params.IMHandler != nil {
+			RegisterIMChannelRoutes(v1, params.IMHandler, rbacGuards)
+		}
 		RegisterEmbedChannelRoutes(v1, params.EmbedChannelHandler, rbacGuards)
 		RegisterDataSourceRoutes(v1, params.DataSourceHandler, params.DataSourceCredentialsHandler, rbacGuards)
 		RegisterWeKnoraCloudRoutes(v1, params.WeKnoraCloudHandler, rbacGuards)

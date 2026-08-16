@@ -1,107 +1,235 @@
 ## ADDED Requirements
 
-### Requirement: Server releases are SHA-pinned and transferred through a restricted seam
+### Requirement: Server releases use a dynamic per-SHA Compose transaction
 
-The production server workflow SHALL accept an exact full Git SHA (and optional
-verified release tag), package only the approved active source/configuration,
-verify a checksum manifest, and transfer it into a new immutable release
-directory. The remote operation MUST use the restricted deploy seam and
-strictly pinned `known_hosts`; it MUST NOT execute arbitrary operator shell
-input, deploy a dirty checkout, or mutate the current release in place.
+The production server workflow SHALL accept only an immutable ref that resolves
+to an exact full Git SHA and SHALL invoke the restricted SSH boundary through
+only the fixed `preflight`, `promote`, and `run` verbs. `run` SHALL render one
+new Docker Compose transaction for that SHA and SHALL internally orchestrate
+`prepare` → `web` → `worker`; the workflow and SSH caller MUST NOT select a
+runtime role or partial release. The transaction SHALL record a safe release/
+attempt ID, source bundle checksum, rendered Compose/config digest, image
+digests, ordered internal phase/role evidence, and references to server-owned
+runtime state. Historical M35 one-shot handoffs, mutable refs, dirty checkouts,
+implicit current projects, and caller-selected roles MUST be rejected.
 
-#### Scenario: Approved SHA creates an isolated release
+#### Scenario: A selected SHA creates an isolated transaction
 
-- **WHEN** an operator dispatches the server workflow for a commit that passed
-  required CI and whose tag/manifest resolves to that SHA
-- **THEN** the workflow transfers a checksum-verified source bundle to a new
-  release directory and invokes only the allowlisted release mode
-- **AND** the existing current release, runtime secrets, and data volumes remain
-  unchanged before staging
+- **WHEN** an operator dispatches a reviewed immutable ref with no role or
+  partial-release input and it resolves to a CI-green full SHA
+- **THEN** the workflow invokes the fixed `preflight` → `promote` → `run`
+  protocol and the server renders one complete per-SHA Compose project
+- **AND** it hashes source and configuration and records immutable image
+  references before the internal `web` stage
+- **AND** the current release, server-owned secrets, and named data volumes
+  remain unchanged before cutover
 
-#### Scenario: Unsafe server invocation is rejected
+#### Scenario: An unsafe ref or caller-selected role is rejected
 
-- **WHEN** the workflow is given a mutable ref, unsafe release ID, unknown host
-  fingerprint, dirty source, or arbitrary remote command argument
-- **THEN** it fails before transfer or server mutation
+- **WHEN** the workflow receives a branch name, mutable image tag, dirty source,
+  unsafe release ID, or unverified SHA, or a caller attempts a role argument,
+  partial-release mode, non-fixed SSH verb, or extra command grammar
+- **THEN** it fails before source transfer, Compose invocation, or server
+  mutation
 
-### Requirement: Every server release is staged and health-gated before cutover
+### Requirement: Runtime roles are internal and full transactions do not overlap
 
-The release workflow SHALL build the selected app, auth, and frontend release
-and run the existing loopback-only staged verification before public routing
-changes. The health gate MUST cover app health, static root/auth entry points,
-OIDC S256 URL construction, migration cleanliness, image/source provenance,
-approved ports, and the production topology.
+The transaction SHALL assign `prepare` for validation, capacity, rendering,
+migration preparation, and rollback snapshot work without public ownership;
+`web` for frontend/app HTTP surfaces; and `worker` for background/queue
+ownership. `all` MAY remain only as the compatibility/default mode of the
+predecessor native process and MUST NOT be a new-transaction phase or caller
+input. One production lock SHALL cover the complete internal sequence from
+snapshot through commit or rollback and SHALL prevent any two full transactions
+from overlapping. Lock and internal phase events SHALL be retained in the
+transaction manifest.
+
+#### Scenario: Concurrent full releases are serialized
+
+- **WHEN** a second `run` starts while another full transaction is preparing,
+  staging, cutting over, handing off workers, observing, or rolling back
+- **THEN** the second transaction is rejected or queued by the single target
+  lock
+- **AND** it cannot mutate the edge alias, current pointer, containers, images,
+  or data volumes
+
+#### Scenario: A caller cannot start a role-specific update
+
+- **WHEN** a workflow or SSH caller requests `prepare`, `all`, `web`, `worker`,
+  or any other partial-release mode
+- **THEN** the fixed protocol rejects the request before transaction mutation
+- **AND** only `run` may assign the internal phase roles under the one target
+  lock and one source/config/image manifest
+
+### Requirement: Every transaction is staged and health-gated before cutover
+
+The transaction SHALL internally execute `prepare` → build → `web` stage/
+verify → public cutover/probe → `worker` start/verify/background handoff →
+observe/commit, or enter rollback. Web staging SHALL use private/loopback
+routing and server-owned volumes without attaching the public edge.
+Verification SHALL cover app/static/auth health, OIDC construction, worker
+queue/processing health, migration compatibility, source and image provenance,
+ports, and topology at their assigned internal phases.
 
 #### Scenario: Staged health failure prevents public change
 
-- **WHEN** any staged build or health check fails
-- **THEN** the workflow stops before edge cutover, preserves the current public
-  release, records the failing check, and leaves the new release available only
-  for diagnosis or removal by the server runbook
+- **WHEN** any build, provenance, migration, role health, or topology check
+  fails before cutover
+- **THEN** the workflow preserves the current public release, records the
+  failing phase and check, and leaves no candidate attached to the public edge
+- **AND** it does not report the transaction as successful
 
-#### Scenario: Staged release passes the complete gate
+#### Scenario: A complete staged transaction may cut over
 
-- **WHEN** the loopback stack passes every required check for the selected SHA
-- **THEN** the workflow records a green staged result and is allowed to request
-  the serialized cutover
+- **WHEN** all required pre-cutover checks for the selected SHA and internal
+  `prepare`/`web` phases pass against the rendered Compose transaction
+- **THEN** the workflow records a green staged result and may request the
+  serialized edge cutover with the same source/config/image digests
+- **AND** it still cannot commit until the internal `worker` handoff and
+  post-cutover observation pass
 
-### Requirement: Cutover is serialized and rollback is idempotent
+### Requirement: Rollback restores the complete release unit
 
-The public edge handoff SHALL acquire the existing cutover lock, preserve the
-old edge alias/container/release identity, and switch routing only after the
-new stack is healthy. Any failed handoff or post-cutover health check SHALL
-invoke the idempotent rollback seam, restore the previous edge alias, and retain
-both release manifests until the incident is closed.
+Before mutation, the transaction SHALL snapshot the predecessor source pointer,
+rendered configuration and public env overlay checksums, image digests,
+background-worker/queue ownership, and edge alias/cutover state. A failure in
+build, stage, verify, cutover, or post-cutover observation SHALL invoke an
+idempotent, serialized rollback that restores those predecessor surfaces and
+re-probes public health. Missing predecessor identity (including a missing old
+edge ID or old image digest) SHALL fail closed before cutover. Rollback MUST
+NOT delete or rewrite data volumes, secrets, or forward-applied migrations.
 
-#### Scenario: Concurrent production releases are serialized
+#### Scenario: Cutover or public health failure restores all predecessors
 
-- **WHEN** a second server deployment starts while staging, cutover, or
-  rollback already holds the release lock
-- **THEN** the second deployment is rejected or queued by the workflow
-- **AND** it cannot mutate the edge alias, current symlink, or data volumes
+- **WHEN** the candidate fails during edge handoff or its post-cutover public
+  probe
+- **THEN** rollback stops/disconnects candidate web and worker services,
+  restores the exact source/config/image/background/edge predecessors, and
+  records the restored health result
+- **AND** the workflow reports failure and retains both manifests
 
-#### Scenario: Failed cutover restores the previous service
+#### Scenario: An incomplete snapshot blocks release
 
-- **WHEN** the new container fails during alias handoff or its post-cutover
-  probe fails
-- **THEN** rollback disconnects the new edge endpoint, restores the exact old
-  alias/edge owner, records the rollback phase, and leaves the old service
-  serving
-- **AND** the workflow reports failure rather than success
+- **WHEN** the old edge owner, source/config digest, image digest, or background
+  owner cannot be captured deterministically
+- **THEN** the transaction stops before cutover and reports a production NO-GO
+- **AND** it does not guess from a mutable tag, container name, or current
+  symlink
 
-### Requirement: Runtime secrets and data are server-owned
+### Requirement: Server migrations are forward-only and ledger normalization is one-time
 
-The server release workflow MUST NOT upload, overwrite, print, or delete
-server-owned runtime secret files, databases, object-store data, Redis/Neo4j
-volumes, or tunnel credentials. Release configuration SHALL reference those
-values through the existing protected server runtime directory and file-backed
-secret mounts.
+The transaction SHALL accept only separately reviewed forward-only additive
+migrations that preserve a compatibility window for the predecessor code.
+Destructive, rename-in-place, incompatible-constraint, or unbounded backfill
+work MUST be handled by a separate migration plan. The release workflow MUST
+NOT claim that code rollback reverses an applied migration.
 
-#### Scenario: Release updates code without replacing runtime state
+Before the first production transaction, a dedicated native live-ledger
+normalization SHALL run exactly once under a maintenance lock with dry-run
+counts, checksum/backup evidence, restore proof, and an idempotent run ID. Its
+evidence SHALL be referenced by the first release manifest and it SHALL NOT be
+silently repeated during ordinary releases.
 
-- **WHEN** a new application release is staged or cut over
-- **THEN** the server continues using the pre-existing protected secret files
-  and named data volumes
-- **AND** checksums/logs contain paths and identities but never secret values
+#### Scenario: Additive migration is eligible
 
-### Requirement: Production server publishing starts as explicit workflow dispatch
+- **WHEN** a reviewed release declares nullable columns, new tables, indexes,
+  or compatibility fields and supplies rollback/forward-repair notes
+- **THEN** `prepare` records the migration class and allows staging to proceed
+- **AND** rollback restores code/config/edge only while preserving the new
+  schema
 
-Until a repository plan with enforceable environment approvals is available,
-production server delivery SHALL require a manual `workflow_dispatch` selecting
-the exact SHA/tag and SHALL use one concurrency group per production target.
-The workflow MUST expose the GitHub Free private-repository approval limitation
-and the compensating review/runbook controls rather than implying that an
-approval gate exists.
+#### Scenario: Non-additive migration or missing ledger evidence blocks release
 
-#### Scenario: Operator selects a reviewed SHA
+- **WHEN** a release declares destructive/incompatible migration work or the
+  one-time native-ledger evidence is absent, incomplete, or already reused
+- **THEN** the workflow fails before cutover
+- **AND** it requires a separately reviewed forward repair or normalization
+  evidence rather than silently mutating production
 
-- **WHEN** an operator dispatches a production release with a full SHA/tag and
-  confirms the target and release mode
-- **THEN** the workflow displays the selected identity, runs required checks,
-  stages it, and requests cutover only after the explicit gates pass
+### Requirement: Capacity preflight is fixed-floor and bounded
 
-#### Scenario: Unapproved automatic production trigger is absent
+Before source transfer, release-directory creation, or image work, `prepare`
+SHALL verify at least 12 GiB (`12,582,912` KiB) of production free capacity.
+When below the floor, the server MAY perform exactly one logged cleanup of
+unused Docker build cache/dangling images, then SHALL re-check. The cleanup
+MUST NOT delete named volumes, runtime/secret files, current or predecessor
+releases, or user data. Indeterminate or persistently low capacity SHALL fail
+closed.
 
-- **WHEN** a normal pull request or ordinary branch push occurs
-- **THEN** no server production workflow starts and no server credential is
-  exposed to that CI job
+#### Scenario: Capacity remains below the floor
+
+- **WHEN** free capacity is below `12,582,912` KiB after the single bounded
+  cleanup, or cannot be determined
+- **THEN** the transaction exits before source upload, Compose build, or edge
+  mutation
+- **AND** the workflow records the measured value and cleanup result
+
+#### Scenario: Capacity meets the floor
+
+- **WHEN** the preflight measures at least `12,582,912` KiB without destructive
+  cleanup
+- **THEN** the transaction may continue to source verification and staging
+- **AND** the predecessor release and data volumes remain retained
+
+### Requirement: Runtime secrets and data remain server-owned
+
+The server workflow MUST NOT upload, overwrite, print, or delete server-owned
+runtime secret files, databases, object storage, Redis/Neo4j volumes, or tunnel
+credentials. The Compose transaction SHALL reference protected server paths and
+record only non-secret path identities/checksums in manifests and logs.
+
+#### Scenario: A full release updates code without replacing state
+
+- **WHEN** the full transaction stages its internal `web` and `worker` roles
+- **THEN** the candidate uses the existing protected secret mounts and named
+  volumes without copying their values into the release bundle
+- **AND** rollback leaves those mounts and volumes intact
+
+### Requirement: Production readiness requires two successive release evidences
+
+The server delivery path SHALL remain NO-GO until two successive transactions
+for distinct reviewed SHAs complete the same prepare/stage/verify/cutover/
+observe protocol with complete manifests, public health evidence, predecessor
+links, and recorded lock/capacity/migration/image data. A storefront Worker
+success SHALL NOT count as server evidence.
+
+#### Scenario: Two complete transactions unlock readiness
+
+- **WHEN** two successive reviewed-SHA transactions complete with independent
+  manifests and public health probes
+- **THEN** the operator may mark the server delivery path production-ready and
+  create an annotated release tag
+- **AND** each transaction remains independently traceable and rollbackable
+
+#### Scenario: Missing successive evidence keeps production blocked
+
+- **WHEN** no production transaction has run, only one transaction is green, or
+  either manifest lacks predecessor/image/internal-phase/capacity/migration
+  evidence
+- **THEN** no production tag or cutover is authorized
+- **AND** the workflow reports the missing evidence instead of claiming
+  completion
+
+### Requirement: Production publishing is explicit and SHA-pinned
+
+Until enforceable repository/environment approvals are available, production
+server delivery SHALL require a manual `workflow_dispatch` selecting only an
+exact immutable SHA/tag that resolves to one full SHA and one target concurrency
+group. Pull requests, ordinary pushes, and
+storefront workflow success MUST NOT expose server credentials or start a
+production transaction.
+
+#### Scenario: Operator selects only a reviewed immutable ref
+
+- **WHEN** an operator dispatches from `main` with a full SHA or annotated tag
+- **THEN** the workflow verifies the exact SHA's successful CI run, records the
+  selected identity, and begins the fixed complete transaction
+- **AND** the dispatch exposes no runtime-role or partial-release input
+- **AND** it refuses a mutable ref or missing CI evidence before credentials
+  reach the server job
+
+#### Scenario: Ordinary source activity cannot publish the server
+
+- **WHEN** a pull request, branch push, or storefront-only workflow completes
+- **THEN** no server production transaction starts and no server credential is
+  available to that job

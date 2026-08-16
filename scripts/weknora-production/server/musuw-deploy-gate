@@ -30,7 +30,7 @@ safe_id() {
 
 safe_revision() {
     [[ "$1" =~ ^[0-9a-fA-F]+$ ]] || return 1
-    case "${#1}" in 40|64) return 0 ;; *) return 1 ;; esac
+    [ "${#1}" -eq 40 ]
 }
 
 minimum_capacity_floor_kib='12582912'
@@ -60,7 +60,6 @@ current_link="${root_prefix}/opt/weknora/current"
 runtime_dir="${root_prefix}/opt/weknora/runtime"
 spool_root="${root_prefix}/var/lib/musuw-deploy/incoming"
 deploy_user='musuw-deploy'
-runtime_release_id='weknora-v072-production'
 
 if [ "$test_mode" = true ]; then
     stat_bin="${MUSUW_DEPLOY_GATE_STAT_BIN:-$(command -v stat || true)}"
@@ -306,7 +305,7 @@ run_release() {
     env \
         WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
         WEKNORA_PRODUCTION_REVISION="$revision" \
-        WEKNORA_PRODUCTION_RELEASE_ID="$runtime_release_id" \
+        WEKNORA_PRODUCTION_RELEASE_ID="$release_id" \
         WEKNORA_PRODUCTION_MIN_FREE_KIB="$minimum_free_kib" \
         "$helper"
 }

@@ -238,6 +238,8 @@ run_update() {
         -e PATH='/opt/weknora/test-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
         -e WEKNORA_PRODUCTION_RUNTIME_DIR=/opt/weknora/runtime \
         -e WEKNORA_PRODUCTION_REVISION="$test_revision" \
+        -e MUSUW_DEPLOY_GATE_TEST_MODE=1 \
+        -e WEKNORA_PRODUCTION_TRANSACTION_TEST_FALLBACK=1 \
         -e SIM_FAIL_PUBLIC="${SIM_FAIL_PUBLIC:-0}" \
         -e SIM_LOW_CAPACITY="${SIM_LOW_CAPACITY:-0}" \
         -e SIM_MODEL_CATALOG_COUNT="${SIM_MODEL_CATALOG_COUNT:-6}" \

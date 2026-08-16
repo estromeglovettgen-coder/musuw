@@ -54,6 +54,12 @@ type AsynqTaskParams struct {
 // raise the default to 500ms while still allowing operators to tune via env.
 const defaultRedisOpTimeoutMs = 500
 
+// Keep the real server drain strictly inside the process cleanup budget used
+// by the lifecycle owner. Asynq requeues any handler still active at this
+// deadline before Shutdown returns, so dependent resources remain valid for
+// the entire handler lifetime.
+const asynqServerShutdownTimeout = 25 * time.Second
+
 // readRedisOpTimeoutMs reads WEKNORA_REDIS_OP_TIMEOUT_MS, falling back to
 // defaultRedisOpTimeoutMs on missing/invalid input. Kept as a separate helper
 // so both ReadTimeout and WriteTimeout share the same source of truth.
@@ -135,9 +141,10 @@ func newAsynqServer(concurrency int, queues map[string]int) *asynq.Server {
 	return asynq.NewServer(
 		opt,
 		asynq.Config{
-			Concurrency:    concurrency,
-			Queues:         queues,
-			RetryDelayFunc: asynqRetryDelayFunc,
+			Concurrency:     concurrency,
+			Queues:          queues,
+			RetryDelayFunc:  asynqRetryDelayFunc,
+			ShutdownTimeout: asynqServerShutdownTimeout,
 		},
 	)
 }
@@ -223,7 +230,7 @@ func NewWikiAsynqServer(svc interfaces.SystemSettingService) *asynq.Server {
 	return newAsynqServer(concurrency, types.QueueWeightsForPool(types.WorkerPoolWiki))
 }
 
-func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
+func NewAsynqRuntime(params AsynqTaskParams) *AsynqRuntime {
 	// Create a new mux and register all handlers
 	mux := asynq.NewServeMux()
 
@@ -310,22 +317,16 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 	mux.HandleFunc(types.TypeWikiIngest, params.WikiIngest.Handle)
 	mux.HandleFunc(types.TypeWikiFinalize, params.WikiIngest.Handle)
 
-	// Run the same mux on every pool. Shared and dedicated servers intentionally
-	// overlap, but Redis dequeue is atomic, so each task still executes once.
-	runPool := func(name string, srv *asynq.Server) {
-		go func() {
-			if err := srv.Run(mux); err != nil {
-				log.Fatalf("could not run %s asynq server: %v", name, err)
-			}
-		}()
-	}
-	runPool("core-pool", params.CoreServer)
-	runPool("postprocess-pool", params.PostProcessServer)
-	runPool("enrichment-pool", params.EnrichmentServer)
-	runPool("maintenance-pool", params.MaintenanceServer)
-	runPool("shared-pool", params.SharedServer)
-	runPool("wiki-pool", params.WikiServer)
-	return mux
+	// Every pool shares the same mux. Asynq's Redis dequeue is atomic, so the
+	// deliberate queue overlap still processes each task exactly once.
+	return newAsynqRuntime(mux, []namedAsynqServer{
+		{name: "core-pool", server: params.CoreServer},
+		{name: "postprocess-pool", server: params.PostProcessServer},
+		{name: "enrichment-pool", server: params.EnrichmentServer},
+		{name: "maintenance-pool", server: params.MaintenanceServer},
+		{name: "shared-pool", server: params.SharedServer},
+		{name: "wiki-pool", server: params.WikiServer},
+	})
 }
 
 // deadLetterKnowledgePayload extracts only the field we need from any

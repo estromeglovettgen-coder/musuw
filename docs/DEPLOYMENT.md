@@ -36,13 +36,22 @@ WeKnora application under `weknora/`:
    storefront build or Cloudflare credential-bearing step starts.
 5. The application production release is intentionally a second gate. Run
    `Deploy production` manually from the protected `main` branch with a full
-   commit SHA or `v*` tag in `immutable_ref`, or push an approved `v*` tag. It
-   checks that the selected immutable SHA is an ancestor of `origin/main` and
-   has a successful `CI` run for that exact SHA, rebuilds it, then invokes the
-   existing `scripts/weknora-deploy.sh update` seam. That seam owns immutable
-   release staging, server-side image build, health-gated activation and
-   rollback. The workflow never edits databases, volumes or runtime secrets
-   directly.
+   commit SHA or annotated `v*` tag as the only release-selection input. It
+   resolves the ref to a full SHA, checks that SHA is an ancestor of
+   `origin/main`, and requires a successful `CI` run for that exact SHA. It then
+   invokes only the restricted `preflight`, `promote`, and `run` protocol; the
+   caller cannot select a runtime role or partial release. `run` owns the
+   internal `prepare` → `web` → `worker` orchestration described below.
+   A production tag or cutover is not authorized until the transaction has
+   complete predecessor snapshots, the capacity/ledger gates pass, and two
+   successive reviewed-SHA transactions have produced independent evidence.
+   The workflow never edits databases, volumes or runtime secrets directly.
+
+   This is the target release contract. The currently published workflow's
+   absence of a role input is intentional, not an implementation gap. The
+   dynamic transaction and its live evidence are still incomplete, so the
+   production path remains NO-GO until the unchecked transaction tasks and
+   their live evidence are complete.
 
 The storefront dispatch has the same immutable-ref discipline (full SHA only)
 and is restricted to `main`; its Actions API CI check is independent of the
@@ -61,7 +70,9 @@ calling `wrangler deploy`.
 
 This separation keeps routine public-site changes fast while preventing a
 normal UI merge from silently changing the production application or data
-plane. No deployment was performed while adding these workflow definitions.
+plane. The successful B storefront deployment is evidence for the public site
+only; it is not evidence that the server transaction or app-edge migration is
+production-ready.
 
 The full application path is valid only from a clean Git checkout. The
 checkout `HEAD` must equal `WEKNORA_DEPLOY_REVISION`; staged, modified or
@@ -70,6 +81,69 @@ untracked allowlisted source fails before any build or upload. Generated
 check, while the source manifest enumerates only tracked files with
 `git ls-files`. A dirty local `knowledge` worktree therefore must not be used
 as a production release input; use the immutable GitHub checkout instead.
+
+## Server production transaction (current status: NO-GO)
+
+The server release is a dynamic, per-SHA Docker Compose transaction. Historical
+M35 compose files and a one-shot handoff are not a supported release authority.
+The transaction manifest binds the full SHA to a safe attempt ID, source
+bundle checksum, rendered Compose/config digest, immutable image digests,
+ordered internal phase/role evidence, and references to server-owned runtime
+state.
+
+Runtime roles are internal process modes, not workflow inputs or SSH commands:
+
+| Internal role | Scope | Edge behavior |
+| --- | --- | --- |
+| `prepare` | validate SHA/source/config, check capacity and migrations, capture rollback state, and prepare the candidate | never owns the public edge |
+| `web` | frontend/app/HTTP surfaces from the same source/config/image contract | web-only cutover after web verification |
+| `worker` | document processing, queue consumers, and other background ownership | no independent public edge mutation |
+| `all` | compatibility/default mode for the predecessor native process | not a new-transaction phase and never caller-selectable |
+
+Every `run` acquires one exclusive lock for the complete release; a second
+`run` is rejected or queued, and there is no role-specific production
+transaction. Under that lock the adapter performs internal `prepare`, builds
+digest-pinned images, stages and verifies `web` privately, cuts over and probes
+the public edge, starts/verifies `worker` and hands off background ownership,
+then observes and commits—or enters full rollback. Neither GitHub nor the SSH
+caller can skip, reorder, or independently request those roles.
+
+Before cutover, the transaction must snapshot and hash the predecessor source,
+rendered config/public overlay, image digests, background-worker ownership,
+current release pointer, and edge alias. A failure restores all of those
+surfaces, stops/disconnects candidate web and worker services, re-probes the
+public edge, and retains both manifests. Missing old edge/image identity is a
+fail-closed NO-GO; the system must not guess from a mutable tag or container
+name. Volumes, secrets, and forward-applied migrations are never deleted or
+rewritten by rollback.
+
+Only forward-only additive migrations are eligible for a normal release. The
+one-time native live-ledger normalization is a separate prerequisite with
+dry-run counts, backup/restore proof, maintenance lock, idempotence evidence,
+and before/after checksums; it is not repeated or undone by code rollback.
+
+`prepare` enforces the fixed 12 GiB (`12,582,912` KiB) free-capacity reserve.
+If the reserve is low, it may perform exactly one logged cleanup of unused
+Docker build cache/dangling images and re-check. It never deletes volumes,
+runtime/secret files, current or predecessor releases, or user data.
+
+As of 2026-08-16, the server reports approximately `8,939,456` KiB free,
+below the floor. No production tag or server workflow run exists. The current
+cutover state lacks the old M35 predecessor ID; native containers/state are
+not deterministically repeatable, and new-SHA old-image capture plus complete
+source/config/image/background/edge rollback has not been rehearsed. These
+facts keep production NO-GO.
+
+The latest successful external evidence is:
+
+- B commit `2d9091b98b90cb0e4ce6bde081027a0f61af7949`;
+- [`CI` run 31933653091](https://github.com/estromeglovettgen-coder/musuw/actions/runs/31933653091), all required jobs green;
+- [`Deploy storefront` run 31933748281 attempt 2](https://github.com/estromeglovettgen-coder/musuw/actions/runs/31933748281), Worker version `20d7ad96-2a01-4437-93d7-3ba7d0995d14` at 100%, artifact `9260177059`.
+
+This evidence does not satisfy the server's two-successive-release gate. Do
+not create a production tag or dispatch until the dynamic transaction,
+one-time ledger evidence, capacity floor, predecessor snapshot, full rollback,
+and two successive release manifests are all green.
 
 ## Required GitHub configuration
 
@@ -163,6 +237,17 @@ runs with a fixed system `PATH`; the sudo rule pins the same `secure_path` and
 permits only the wrapper. The caller-supplied capacity hint cannot be lower
 than the fixed 12 GiB (`12582912` KiB) reserve.
 
+This restricted SSH gate is the transport boundary, not by itself proof of a
+safe production release. Its staged adapter must implement the dynamic
+per-SHA Compose transaction, one full-transaction lock, and internally assigned
+`prepare` → `web` → `worker` sequence above. The gate rejects any extra role,
+mode, verb, or command suffix; `all` remains only a native-process compatibility
+mode and is not part of the caller grammar. Until the adapter captures the
+predecessor source/config/image/background/edge state and passes fresh
+rehearsals, the existing `update` path remains a transport-capable but
+production-NO-GO seam; do not treat its historical static or M35-era
+simulations as current rollback evidence.
+
 Bootstrap is a one-time operator action over the existing root channel:
 
 ```text
@@ -203,12 +288,15 @@ Protect `main` against direct pushes and require the `CI` workflow to pass
 before merging. Keep the production workflow available only to the small set of
 maintainers who can create approved tags or run the manual dispatch.
 
-For a failed production update, the release seam keeps the prior immutable
-release and performs its own health-gated rollback; the workflow records the
-release log and rollback evidence as an artifact. An operator can use the
-existing server-side `scripts/weknora-production/rollback.sh` procedure over
-the approved SSH path. Do not delete `/opt/weknora/runtime`, named volumes or
-the previous release while diagnosing an incident. For the storefront, the
+For a failed production update, the future dynamic transaction must keep the
+prior immutable release and perform a health-gated rollback across source,
+config, images, background ownership, and edge. The workflow must record the
+rollback evidence as an artifact; a missing predecessor identity is a
+fail-closed NO-GO, not a reason to guess. An operator can use the existing
+server-side `scripts/weknora-production/rollback.sh` procedure over the
+approved SSH path only after the new snapshot contract is verified. Do not
+delete `/opt/weknora/runtime`, named volumes, forward-applied migration state,
+or the previous release while diagnosing an incident. For the storefront, the
 workflow records Wrangler's previous/current deployment snapshots and smoke
 results in a checksum'd release manifest; select the prior Worker version in
 Cloudflare's deployment/version history and redeploy it through the normal

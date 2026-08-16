@@ -24,10 +24,19 @@ the normal path—merge, verify, publish, health-check—repeatable.
   the storefront is built and deployed from an exact verified commit. The
   Worker remains limited to `musuw.com` and `www.musuw.com` static marketing
   routes and hands product actions to `app.musuw.com`.
-- Add an explicit production server workflow that accepts an exact Git SHA,
-  transfers only a verified release, and uses the existing staged health,
-  cutover, and rollback seam. It uses a workflow dispatch trigger and a
-  concurrency lock until repository/environment approvals are available.
+- Add an explicit production server workflow that accepts only an immutable ref,
+  resolves it to an exact Git SHA, and invokes only the fixed restricted
+  `preflight`/`promote`/`run` protocol. The
+  per-SHA Compose transaction internally orchestrates `prepare` → `web` →
+  `worker`; callers cannot select a runtime role or a partial release. The
+  transaction is staged, health-gated, serialized, and reversible across
+  source/configuration, images, background workers, and the public edge. It
+  uses a workflow dispatch trigger and one transaction lock until repository/
+  environment approvals are available.
+- Require forward-only additive migrations and a separately evidenced,
+  one-time native live-ledger normalization before the first production
+  transaction. A release is not production-ready until two successive release
+  transactions produce complete provenance and health evidence.
 - Keep runtime secrets, database/data volumes, and server-owned configuration
   on the server; keep Cloudflare credentials scoped to the Worker; never put
   either class of secret in GitHub source or release artifacts.
@@ -65,8 +74,9 @@ the normal path—merge, verify, publish, health-check—repeatable.
 - Cloudflare: the existing `musuw-site` Worker and its custom-domain routes;
   no new account, payment, auth, or product API is introduced.
 - Server: the existing `/opt/weknora`/production release directories,
-  server-owned secrets, Docker volumes, SSH deploy seam, staged verification,
-  edge cutover, and rollback scripts.
+  server-owned secrets, Docker volumes, fixed SSH deploy seam, dynamic per-SHA
+  Compose transaction, single transaction lock, internal runtime-role
+  orchestration, staged verification, edge cutover, and full rollback evidence.
 - Operators: production server publishing becomes an explicit SHA-selected
   workflow rather than a local dirty-tree command; storefront publishing is
   automated only after CI succeeds.

@@ -25,6 +25,18 @@ server {
         proxy_set_header X-Forwarded-Proto https;
     }
 
+    # The release transaction uses this same-origin marker after edge
+    # cutover.  The native runtime returns 503 until its role and revision are
+    # ready, so a public 200 proves the exact candidate—not merely Nginx—is
+    # serving traffic.
+    location = /readyz {
+        proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/readyz;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_buffering off;
+    }
+
     location = /weknora-widget.js {
         root /usr/share/nginx/html;
         add_header Cache-Control "public, max-age=3600" always;

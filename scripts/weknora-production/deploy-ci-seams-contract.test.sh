@@ -13,6 +13,7 @@ app_dockerfile="$repo_root/integration/weknora-production/Dockerfile.app.runtime
 frontend_dockerfile="$repo_root/integration/weknora-production/Dockerfile.frontend"
 build_static="$script_dir/build-static.sh"
 release_ci="$script_dir/release-ci.sh"
+release_transaction="$script_dir/release-transaction.sh"
 update_current="$script_dir/update-current.sh"
 source_manifest="$script_dir/source-manifest.sh"
 ssh_gate="$script_dir/server/musuw-deploy-ssh-gate"
@@ -89,7 +90,12 @@ grep -Fq "WEKNORA_PRODUCTION_RELEASE_PROTOCOL='staged'" "$release_ci" || fail 'C
 grep -Fq 'start-staged.sh' "$update_current" || fail 'staged release does not invoke start-staged'
 grep -Fq 'cutover.sh' "$update_current" || fail 'staged release does not invoke serialized cutover'
 grep -Fq 'rollback.sh' "$release_ci" "$update_current" || fail 'staged release does not expose idempotent rollback'
-grep -Fq 'https://app.musuw.com/health' "$release_ci" || fail 'CI release adapter has no public post-cutover probe'
+grep -Fq 'https://app.musuw.com/readyz' "$release_transaction" || fail 'release transaction has no rollbackable public revision probe'
+grep -Fq 'rollback_transaction' "$release_transaction" || fail 'release transaction does not own public-probe rollback'
+transaction_line="$(grep -n '"$transaction_script"' "$release_ci" | tail -n 1 | cut -d: -f1)"
+if tail -n "+$((transaction_line + 1))" "$release_ci" | grep -Fq 'curl '; then
+    fail 'CI release adapter has an unrollbackable post-transaction probe'
+fi
 grep -Fq 'source-manifest.sh' "$deploy_script" || fail 'full deploy does not generate an allowlisted source checksum manifest'
 grep -Fq 'source-manifest.sh" materialize' "$deploy_script" || fail 'full/UI deploy does not materialize a manifest-backed temporary tree'
 grep -Fq 'deploy_tree/' "$deploy_script" || fail 'deploy seam does not rsync the materialized tree'

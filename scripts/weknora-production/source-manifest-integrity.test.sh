@@ -90,6 +90,11 @@ expect_reject 'clean-check accepted a revision mismatch' \
 # generated browser overlays, never by a mutable worktree-wide find. The
 # ignored debug file must not appear, while generated dist files are hashed.
 mkdir -p "$output"
+revision_64='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+expect_reject 'source manifest accepted a 64-hex digest that the production runtime rejects' \
+    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
+    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
+    "$fixture" "$runtime" fixture-release "$revision_64" update "$output-64"
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
     "$fixture/scripts/weknora-production/source-manifest.sh" generate \
     "$fixture" "$runtime" fixture-release local update "$output" >/dev/null

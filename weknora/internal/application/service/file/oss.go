@@ -112,6 +112,54 @@ func NewOssFileServiceWithTempBucket(endpoint, region, accessKey, secretKey, buc
 	}, nil
 }
 
+// NewOssFileServiceWithTempBucketExisting performs read-only bucket existence
+// checks for both the primary and optional temporary bucket.
+func NewOssFileServiceWithTempBucketExisting(endpoint, region, accessKey, secretKey, bucketName, pathPrefix, tempBucketName, tempRegion string) (interfaces.FileService, error) {
+	client, err := newOSSClient(endpoint, region, accessKey, secretKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := ossCheckBucket(context.Background(), client, bucketName); err != nil {
+		return nil, err
+	}
+	var tempClient *oss.Client
+	if tempBucketName != "" {
+		if tempRegion == "" {
+			tempRegion = region
+		}
+		tempClient, err = newOSSClient(endpoint, tempRegion, accessKey, secretKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize OSS temp client: %w", err)
+		}
+		if err := ossCheckBucket(context.Background(), tempClient, tempBucketName); err != nil {
+			return nil, fmt.Errorf("OSS temp bucket prerequisite: %w", err)
+		}
+	}
+	if pathPrefix != "" && !strings.HasSuffix(pathPrefix, "/") {
+		pathPrefix += "/"
+	}
+	return &ossFileService{
+		client:         client,
+		tempClient:     tempClient,
+		pathPrefix:     pathPrefix,
+		bucketName:     bucketName,
+		tempBucketName: tempBucketName,
+	}, nil
+}
+
+func ossCheckBucket(ctx context.Context, client *oss.Client, bucketName string) error {
+	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	exists, err := client.IsBucketExist(checkCtx, bucketName)
+	if err != nil {
+		return fmt.Errorf("failed to check OSS bucket: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("OSS bucket %q does not exist", bucketName)
+	}
+	return nil
+}
+
 // CheckOssConnectivity tests OSS connectivity using the provided credentials.
 func CheckOssConnectivity(ctx context.Context, endpoint, region, accessKey, secretKey, bucketName string) error {
 	client, err := newOSSClient(endpoint, region, accessKey, secretKey)

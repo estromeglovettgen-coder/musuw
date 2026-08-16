@@ -82,6 +82,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/models/limiter"
 	"github.com/Tencent/WeKnora/internal/models/utils/ollama"
 	"github.com/Tencent/WeKnora/internal/router"
+	weknoraRuntime "github.com/Tencent/WeKnora/internal/runtime"
 	"github.com/Tencent/WeKnora/internal/storageallowlist"
 	"github.com/Tencent/WeKnora/internal/stream"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
@@ -103,6 +104,48 @@ import (
 // Returns:
 //   - Configured container with all application dependencies registered
 func BuildContainer(container *dig.Container) *dig.Container {
+	role, err := weknoraRuntime.ResolveRuntimeRole()
+	if err != nil {
+		panic(err)
+	}
+	return BuildContainerForRole(container, weknoraRuntime.NewLifecyclePlan(role))
+}
+
+// BuildContainerForRole wires the application according to one authoritative
+// lifecycle plan. Providers remain available for shared business code, while
+// role-owned Invokes (listeners, worker loops, schedulers and IM adapters) are
+// installed only by their owning process class.
+func BuildContainerForRole(container *dig.Container, plan weknoraRuntime.LifecyclePlan) *dig.Container {
+	built, err := BuildContainerForRoleStrict(container, plan)
+	if err != nil {
+		panic(err)
+	}
+	return built
+}
+
+// BuildContainerForRoleStrict converts wiring/startup panics from legacy
+// must(...) calls into an error so the process entrypoint can run cleanup for
+// every subsystem that started before a later barrier failed.
+func BuildContainerForRoleStrict(container *dig.Container, plan weknoraRuntime.LifecyclePlan) (built *dig.Container, err error) {
+	built = container
+	if err := weknoraRuntime.ValidateRoleConfiguration(plan, os.Getenv); err != nil {
+		return built, err
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			switch value := recovered.(type) {
+			case error:
+				err = value
+			default:
+				err = fmt.Errorf("container startup panic: %v", value)
+			}
+		}
+	}()
+	buildContainerForRole(container, plan)
+	return built, nil
+}
+
+func buildContainerForRole(container *dig.Container, plan weknoraRuntime.LifecyclePlan) {
 	ctx := context.Background()
 	logger.Debugf(ctx, "[Container] Starting container initialization...")
 
@@ -113,15 +156,41 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Registering core infrastructure...")
 	must(container.Provide(config.LoadConfig))
 	must(container.Provide(initLangfuse))
-	must(container.Provide(initDatabase))
-	must(container.Provide(initFileService))
-	must(container.Provide(initRedisClient))
+	must(container.Provide(func(cfg *config.Config) (*gorm.DB, error) {
+		db, err := initDatabaseWithPlan(cfg, plan)
+		if barrierErr := finishStartupBarrier(plan, weknoraRuntime.DependencyDatabase, err); barrierErr != nil {
+			return nil, barrierErr
+		}
+		return db, err
+	}))
+	must(container.Provide(func(cfg *config.Config, catalog interfaces.ResourceCatalog) (interfaces.FileService, error) {
+		fileService, err := initFileServiceWithPlan(cfg, catalog, plan)
+		if barrierErr := finishStartupBarrier(plan, weknoraRuntime.DependencyStorage, err); barrierErr != nil {
+			return nil, barrierErr
+		}
+		return fileService, err
+	}))
+	must(container.Provide(func() (*redis.Client, error) {
+		client, err := initRedisClient()
+		if barrierErr := finishStartupBarrier(plan, weknoraRuntime.DependencyRedis, err); barrierErr != nil {
+			return nil, barrierErr
+		}
+		if client == nil {
+			if readiness := weknoraRuntime.ProcessReadiness(); readiness != nil {
+				readiness.MarkDependency(weknoraRuntime.DependencyRedis, weknoraRuntime.DependencyDisabled)
+			}
+		}
+		return client, err
+	}))
 	must(container.Provide(initAntsPool))
 
-	must(container.Invoke(registerLangfuseCleanup))
+	if !plan.IsPrepare() {
+		must(container.Invoke(registerLangfuseCleanup))
 
-	// Register goroutine pool cleanup handler
-	must(container.Invoke(registerPoolCleanup))
+		// Register goroutine pool cleanup handler. Prepare exits immediately and
+		// deliberately owns no shutdown/cleanup lifecycle.
+		must(container.Invoke(registerPoolCleanup))
+	}
 
 	// Initialize retrieval engine registry for search capabilities
 	logger.Debugf(ctx, "[Container] Registering retrieval engine registry...")
@@ -135,8 +204,19 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(initNeo4jClient))
 	must(container.Provide(stream.NewStreamManager))
 	logger.Debugf(ctx, "[Container] Initializing DuckDB...")
-	must(container.Provide(NewDuckDB))
+	must(container.Provide(func() (*sql.DB, error) {
+		duckDB, err := NewDuckDBForPlan(plan)
+		if barrierErr := finishStartupBarrier(plan, weknoraRuntime.DependencyDuckDB, err); barrierErr != nil {
+			return nil, barrierErr
+		}
+		return duckDB, err
+	}))
 	logger.Debugf(ctx, "[Container] DuckDB registered")
+	if plan.Role == weknoraRuntime.RolePrepare || plan.Role == weknoraRuntime.RoleWeb || plan.Role == weknoraRuntime.RoleWorker {
+		must(container.Invoke(func(*gorm.DB, *sql.DB) {}))
+		must(container.Invoke(registerDatabaseCleanup))
+		must(container.Invoke(registerDuckDBCleanup))
+	}
 
 	// Data repositories layer
 	logger.Debugf(ctx, "[Container] Registering repositories...")
@@ -224,7 +304,9 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	// Web search service (needed by AgentService)
 	logger.Debugf(ctx, "[Container] Registering web search registry and providers...")
 	must(container.Provide(infra_web_search.NewRegistry))
-	must(container.Invoke(registerWebSearchProviders))
+	if plan.ServesHTTP {
+		must(container.Invoke(registerWebSearchProviders))
+	}
 	must(container.Provide(repository.NewWebSearchProviderRepository))
 	must(container.Provide(repository.NewVectorStoreRepository))
 	must(container.Provide(repository.NewStorageBackendRepository))
@@ -269,39 +351,49 @@ func BuildContainer(container *dig.Container) *dig.Container {
 
 	logger.Debugf(ctx, "[Container] Registering task enqueuer...")
 	redisAvailable := os.Getenv("REDIS_ADDR") != ""
-	if redisAvailable {
+	if redisAvailable && plan.EnqueuesInteractive {
 		must(container.Provide(router.NewAsyncqClient, dig.As(new(interfaces.TaskEnqueuer))))
-		// Dedicated pools guarantee capacity for each stage. The shared pool
-		// additionally subscribes to core/enrichment queues to provide elastic
-		// borrowing while post-process and maintenance remain hard-isolated.
-		must(container.Provide(router.NewCoreAsynqServer, dig.Name("coreAsynqServer")))
-		must(container.Provide(router.NewPostProcessAsynqServer, dig.Name("postProcessAsynqServer")))
-		must(container.Provide(router.NewEnrichmentAsynqServer, dig.Name("enrichmentAsynqServer")))
-		must(container.Provide(router.NewMaintenanceAsynqServer, dig.Name("maintenanceAsynqServer")))
-		must(container.Provide(router.NewSharedAsynqServer, dig.Name("sharedAsynqServer")))
-		must(container.Provide(router.NewWikiAsynqServer, dig.Name("wikiAsynqServer")))
-		// Asynq inspector for cancel-by-knowledge-id (best-effort
-		// dequeue of pending/scheduled/retry tasks + active-task cancel).
-		must(container.Provide(router.NewAsynqInspector))
-		must(container.Provide(router.NewAsynqTaskInspector))
-		// Install the distributed per-model chat concurrency governor. Only
-		// available with Redis (the shared semaphore backend); Lite mode is
-		// single-process and low-volume, so it runs ungated.
-		must(container.Invoke(registerModelConcurrencyLimiter))
+		if plan.RunsWorkers {
+			// Dedicated pools guarantee capacity for each stage. The shared pool
+			// additionally subscribes to core/enrichment queues to provide elastic
+			// borrowing while post-process and maintenance remain hard-isolated.
+			must(container.Provide(router.NewCoreAsynqServer, dig.Name("coreAsynqServer")))
+			must(container.Provide(router.NewPostProcessAsynqServer, dig.Name("postProcessAsynqServer")))
+			must(container.Provide(router.NewEnrichmentAsynqServer, dig.Name("enrichmentAsynqServer")))
+			must(container.Provide(router.NewMaintenanceAsynqServer, dig.Name("maintenanceAsynqServer")))
+			must(container.Provide(router.NewSharedAsynqServer, dig.Name("sharedAsynqServer")))
+			must(container.Provide(router.NewWikiAsynqServer, dig.Name("wikiAsynqServer")))
+			// Install the distributed per-model chat concurrency governor. Only
+			// available with Redis (the shared semaphore backend).
+			must(container.Invoke(registerModelConcurrencyLimiter))
+		}
+		if plan.EnqueuesInteractive {
+			// Queue inspection is a request-facing capability (for example,
+			// cancelling a knowledge task) and is not itself a worker loop.
+			must(container.Provide(router.NewAsynqInspector))
+			must(container.Provide(router.NewAsynqTaskInspector))
+		}
 	} else {
 		syncExec := router.NewSyncTaskExecutor()
 		must(container.Provide(func() interfaces.TaskEnqueuer { return syncExec }))
 		must(container.Provide(func() *router.SyncTaskExecutor { return syncExec }))
-		// Lite mode: no Redis means no asynq inspector. SyncTaskExecutor
-		// dispatches inline goroutines that the checkpoint-based abort
-		// already handles.
+		// Lite mode (or prepare mode with Redis deliberately unused): no
+		// Redis-backed inspector is created. SyncTaskExecutor dispatches inline
+		// goroutines only when a caller explicitly enqueues a task.
 		must(container.Provide(router.NewNoopTaskInspector))
 		// Even without Redis, background ingestion/enrichment can burst the
 		// worker pool against one provider, so install an in-process governor.
-		must(container.Invoke(registerLiteModelConcurrencyLimiter))
+		if plan.RunsWorkers {
+			must(container.Invoke(registerLiteModelConcurrencyLimiter))
+		}
 	}
 	must(container.Provide(service.NewTemporaryDocumentService))
-	must(container.Invoke(startTemporaryDocumentCleanup))
+	if plan.RunsTemporaryCleanup {
+		must(container.Invoke(func(svc interfaces.TemporaryDocumentService, cleaner interfaces.ResourceCleaner) error {
+			startTemporaryDocumentCleanup(svc, cleaner)
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyTemporaryCleanup, nil)
+		}))
+	}
 
 	// Chat pipeline components for processing chat requests
 	logger.Debugf(ctx, "[Container] Registering chat pipeline plugins...")
@@ -311,29 +403,47 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(initConnectorRegistry))
 	must(container.Provide(datasource.NewScheduler))
 	must(container.Provide(service.NewDataSourceService))
-	must(container.Invoke(startDataSourceScheduler))
+	if plan.RunsDataSourceScheduler {
+		must(container.Invoke(func(scheduler *datasource.Scheduler, cleaner interfaces.ResourceCleaner) error {
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyDataSourceScheduler, startDataSourceScheduler(scheduler, cleaner))
+		}))
+	}
 	logger.Debugf(ctx, "[Container] Data source sync framework registered")
-	must(container.Invoke(startAuditLogRetention))
+	if plan.RunsAuditRetention {
+		must(container.Invoke(func(runner *service.AuditLogRetentionRunner, cleaner interfaces.ResourceCleaner) error {
+			startAuditLogRetention(runner, cleaner)
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyAuditRetention, nil)
+		}))
+	}
 	logger.Debugf(ctx, "[Container] Audit log retention runner registered")
 	must(container.Provide(service.NewHousekeepingService))
-	must(container.Invoke(startHousekeepingService))
+	if plan.RunsHousekeeping {
+		must(container.Invoke(func(svc *service.HousekeepingService, cleaner interfaces.ResourceCleaner) error {
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyHousekeeping, startHousekeepingService(svc, cleaner))
+		}))
+	}
 	logger.Debugf(ctx, "[Container] Knowledge housekeeping runner registered")
-	must(container.Provide(chatpipeline.NewEventManager))
-	must(container.Invoke(chatpipeline.NewPluginSearch))
-	must(container.Invoke(chatpipeline.NewPluginRerank))
-	must(container.Invoke(chatpipeline.NewPluginWebFetch))
-	must(container.Invoke(chatpipeline.NewPluginMerge))
-	must(container.Invoke(chatpipeline.NewPluginDataAnalysis))
-	must(container.Invoke(chatpipeline.NewPluginIntoChatMessage))
-	must(container.Invoke(chatpipeline.NewPluginChatCompletion))
-	must(container.Invoke(chatpipeline.NewPluginChatCompletionStream))
-	must(container.Invoke(chatpipeline.NewPluginFilterTopK))
-	must(container.Invoke(chatpipeline.NewPluginQueryUnderstand))
-	must(container.Invoke(chatpipeline.NewPluginLoadHistory))
-	must(container.Invoke(chatpipeline.NewPluginExtractEntity))
-	must(container.Invoke(chatpipeline.NewPluginSearchEntity))
-	must(container.Invoke(chatpipeline.NewPluginSearchParallel))
-	must(container.Invoke(chatpipeline.NewPluginWikiBoost))
+	if plan.ServesHTTP {
+		// The interactive chat pipeline is web-owned. Worker and prepare roles
+		// must not instantiate request-scoped plugins while wiring background or
+		// database-only lifecycles.
+		must(container.Provide(chatpipeline.NewEventManager))
+		must(container.Invoke(chatpipeline.NewPluginSearch))
+		must(container.Invoke(chatpipeline.NewPluginRerank))
+		must(container.Invoke(chatpipeline.NewPluginWebFetch))
+		must(container.Invoke(chatpipeline.NewPluginMerge))
+		must(container.Invoke(chatpipeline.NewPluginDataAnalysis))
+		must(container.Invoke(chatpipeline.NewPluginIntoChatMessage))
+		must(container.Invoke(chatpipeline.NewPluginChatCompletion))
+		must(container.Invoke(chatpipeline.NewPluginChatCompletionStream))
+		must(container.Invoke(chatpipeline.NewPluginFilterTopK))
+		must(container.Invoke(chatpipeline.NewPluginQueryUnderstand))
+		must(container.Invoke(chatpipeline.NewPluginLoadHistory))
+		must(container.Invoke(chatpipeline.NewPluginExtractEntity))
+		must(container.Invoke(chatpipeline.NewPluginSearchEntity))
+		must(container.Invoke(chatpipeline.NewPluginSearchParallel))
+		must(container.Invoke(chatpipeline.NewPluginWikiBoost))
+	}
 	logger.Debugf(ctx, "[Container] Chat pipeline plugins registered")
 
 	// HTTP handlers layer
@@ -377,9 +487,22 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewWikiPageHandler))
 	// IM integration
 	logger.Debugf(ctx, "[Container] Registering IM integration...")
-	must(container.Provide(imPkg.NewService))
-	must(container.Invoke(registerIMService))
-	must(container.Provide(handler.NewIMHandler))
+	if plan.ProvidesIMRequestRoutes || plan.RunsIMBackground {
+		must(container.Provide(imPkg.NewService))
+		must(container.Invoke(registerIMAdapterFactories))
+		must(container.Invoke(registerIMCleanup))
+	}
+	if plan.RunsIMBackground {
+		must(container.Invoke(func(imService *imPkg.Service) error {
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyIM, startIMBackground(imService))
+		}))
+	}
+	if plan.ProvidesIMRequestRoutes {
+		must(container.Provide(handler.NewIMHandler))
+		must(container.Invoke(func(*handler.IMHandler) error {
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyIMRoutes, nil)
+		}))
+	}
 	must(container.Provide(handler.NewEmbedChannelHandler))
 	must(container.Provide(handler.NewWeKnoraCloudHandler))
 	logger.Debugf(ctx, "[Container] HTTP handlers registered")
@@ -387,24 +510,71 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	// Wire the chat package's local image resolver so multimodal chat can read
 	// local:// images that live under a tenant's configured storage PathPrefix
 	// (which is not encoded in the local:// URL).
-	must(container.Invoke(registerChatLocalImageResolver))
+	if plan.ServesHTTP {
+		must(container.Invoke(registerChatLocalImageResolver))
+	}
 
 	// Router configuration
 	logger.Debugf(ctx, "[Container] Registering router and starting task server...")
-	must(container.Provide(router.NewRouter))
-	if redisAvailable {
-		must(container.Invoke(router.RunAsynqServer))
-	} else {
-		must(container.Invoke(router.RegisterSyncHandlers))
+	if plan.ServesHTTP {
+		must(container.Provide(router.NewRouter))
+	}
+	if plan.RunsWorkers {
+		if redisAvailable {
+			must(container.Provide(router.NewAsynqRuntime))
+			must(container.Invoke(func(asynqRuntime *router.AsynqRuntime, cleaner interfaces.ResourceCleaner) error {
+				if err := asynqRuntime.Start(); err != nil {
+					return finishStartupBarrier(plan, weknoraRuntime.DependencyAsynq, err)
+				}
+				cleaner.RegisterWithName("AsynqRuntime", func() error {
+					return asynqRuntime.ShutdownWithin(30 * time.Second)
+				})
+				return finishStartupBarrier(plan, weknoraRuntime.DependencyAsynq, nil)
+			}))
+		} else {
+			must(container.Invoke(router.RegisterSyncHandlers))
+			if readiness := weknoraRuntime.ProcessReadiness(); readiness != nil {
+				readiness.MarkDependency(weknoraRuntime.DependencyAsynq, weknoraRuntime.DependencyDisabled)
+			}
+		}
+	}
+	if plan.ResetsInterruptedTasks {
+		must(container.Invoke(func(db *gorm.DB) error {
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyInterruptedTaskReset, resetPendingTasks(db))
+		}))
 	}
 	// Wiki operation rows are durable, while their wake-up triggers may be
 	// lost across a process restart (always in Lite mode, and in Redis mode if
 	// persistence succeeded immediately before trigger enqueue failed). Re-arm
 	// them only after the matching handlers are ready.
-	must(container.Invoke(recoverPendingWikiTasks))
+	if plan.RecoversWikiTasks {
+		must(container.Invoke(func(db *gorm.DB, task interfaces.TaskEnqueuer) error {
+			return finishStartupBarrier(plan, weknoraRuntime.DependencyWikiRecovery, recoverPendingWikiTasks(db, task))
+		}))
+	}
+
+	// Split roles must prove storage (and Redis where required) even when a
+	// lazily wired handler would not instantiate them during construction.
+	if plan.Role == weknoraRuntime.RolePrepare {
+		must(container.Invoke(func(interfaces.FileService) {}))
+	} else if plan.Role == weknoraRuntime.RoleWeb || plan.Role == weknoraRuntime.RoleWorker {
+		must(container.Invoke(func(interfaces.FileService, *redis.Client) {}))
+	}
 
 	logger.Infof(ctx, "[Container] Container initialization completed successfully")
-	return container
+}
+
+func registerDatabaseCleanup(db *gorm.DB, cleaner interfaces.ResourceCleaner) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	cleaner.RegisterWithName("Database", sqlDB.Close)
+	return nil
+}
+
+func registerDuckDBCleanup(db *sql.DB, cleaner interfaces.ResourceCleaner) {
+	cleaner.RegisterWithName("DuckDB", db.Close)
 }
 
 // registerChatLocalImageResolver wires the chat package's LocalImageResolver
@@ -571,6 +741,10 @@ func initRedisClient() (*redis.Client, error) {
 //   - Configured database connection
 //   - Error if connection fails
 func initDatabase(cfg *config.Config) (*gorm.DB, error) {
+	return initDatabaseWithPlan(cfg, weknoraRuntime.NewLifecyclePlan(weknoraRuntime.RoleAll))
+}
+
+func initDatabaseWithPlan(cfg *config.Config, plan weknoraRuntime.LifecyclePlan) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 	var migrateDSN string
 	var sqliteDBPath string
@@ -624,8 +798,17 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 			dbPath = "./data/weknora.db"
 		}
 		if dir := filepath.Dir(dbPath); dir != "." && dir != "" {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, fmt.Errorf("failed to create SQLite data directory %s: %w", dir, err)
+			if plan.OwnsDatabaseBootstrap {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					return nil, fmt.Errorf("failed to create SQLite data directory %s: %w", dir, err)
+				}
+			} else if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+				return nil, fmt.Errorf("SQLite data directory must already exist for %s role: %s", plan.Role, dir)
+			}
+		}
+		if !plan.OwnsDatabaseBootstrap {
+			if info, err := os.Stat(dbPath); err != nil || !info.Mode().IsRegular() {
+				return nil, fmt.Errorf("SQLite database must already exist for %s role: %s", plan.Role, dbPath)
 			}
 		}
 		sqlite_vec.Auto()
@@ -668,43 +851,36 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 		}
 	}
 
-	// Run database migrations automatically (optional, can be disabled via env var)
-	// To disable auto-migration, set AUTO_MIGRATE=false
-	// To enable auto-recovery from dirty state, set AUTO_RECOVER_DIRTY=true
-	if os.Getenv("AUTO_MIGRATE") != "false" {
-		logger.Infof(context.Background(), "Running database migrations...")
-
+	if plan.OwnsDatabaseBootstrap {
+		autoMigrate := os.Getenv("AUTO_MIGRATE") != "false"
+		if autoMigrate {
+			logger.Infof(context.Background(), "Running database migrations...")
+		} else {
+			logger.Infof(context.Background(), "Auto-migration is disabled (AUTO_MIGRATE=false)")
+		}
 		autoRecover := os.Getenv("AUTO_RECOVER_DIRTY") != "false"
-		migrationOpts := database.MigrationOptions{
-			AutoRecoverDirty: autoRecover,
-			SQLiteDBPath:     sqliteDBPath,
+		migrationOpts := database.MigrationOptions{AutoRecoverDirty: autoRecover, SQLiteDBPath: sqliteDBPath}
+		catalogLoader := types.LoadBuiltinModelsConfig
+		if plan.Role == weknoraRuntime.RolePrepare {
+			catalogLoader = types.LoadBuiltinModelsConfigStrict
 		}
-
-		// Run base migrations (all versioned migrations including embeddings)
-		// The embeddings migration will be conditionally executed based on skip_embedding parameter in DSN
-		if err := database.RunMigrationsWithOptions(migrateDSN, migrationOpts); err != nil {
-			// Log warning but don't fail startup - migrations might be handled externally
-			logger.Warnf(context.Background(), "Database migration failed: %v", err)
-			logger.Warnf(
-				context.Background(),
-				"Continuing with application startup. Please run migrations manually if needed.",
-			)
+		if err := runDatabasePreparation(plan, autoMigrate, databasePreparationHooks{
+			Migrate: func() error {
+				return database.RunMigrationsWithOptions(migrateDSN, migrationOpts)
+			},
+			ResolveStoragePending: func() error {
+				return resolveStorageProviderPendingWithPlan(db, plan)
+			},
+			MigrateLegacyStorage: func() error { return migrateLegacyStorageBackends(db) },
+			LoadModelCatalog: func() error {
+				return catalogLoader(context.Background(), db, config.ConfigDir())
+			},
+		}); err != nil {
+			if sqlDB, sqlErr := db.DB(); sqlErr == nil {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("strict database preparation failed: %w", err)
 		}
-
-		// Post-migration: resolve __pending_env__ storage provider markers for historical KBs.
-		// The SQL migration marks KBs that have documents but no provider with "__pending_env__";
-		// we replace that with the actual STORAGE_TYPE from the environment.
-		resolveStorageProviderPending(db)
-		migrateLegacyStorageBackends(db)
-
-	} else {
-		logger.Infof(context.Background(), "Auto-migration is disabled (AUTO_MIGRATE=false)")
-	}
-
-	// Built-in models are runtime configuration, not a migration. Reconcile
-	// them whenever the database is ready, including externally migrated runs.
-	if err := types.LoadBuiltinModelsConfig(context.Background(), db, config.ConfigDir()); err != nil {
-		logger.Warnf(context.Background(), "Load builtin models config failed: %v", err)
 	}
 
 	// Get underlying SQL DB object
@@ -731,6 +907,10 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 // knowledge_bases.storage_provider_config with the actual STORAGE_TYPE from the environment.
 // This runs once after SQL migrations to bind historical KBs to their real storage provider.
 func resolveStorageProviderPending(db *gorm.DB) {
+	resolveStorageProviderPendingWithPlan(db, weknoraRuntime.NewLifecyclePlan(weknoraRuntime.RoleAll))
+}
+
+func resolveStorageProviderPendingWithPlan(db *gorm.DB, _ weknoraRuntime.LifecyclePlan) error {
 	storageType := strings.TrimSpace(os.Getenv("STORAGE_TYPE"))
 	if storageType == "" {
 		storageType = "local"
@@ -750,10 +930,7 @@ func resolveStorageProviderPending(db *gorm.DB) {
 	// Sync PostgreSQL sequences with actual MAX values to prevent duplicate key
 	// errors. The old code assigned seq_id via SELECT MAX()+1 in application
 	// code, which could push values past the DB sequence counter.
-	syncSequences(db)
-
-	// Reset any pending tasks left over from previous aborted runs (Lite App mode)
-	resetPendingTasks(db)
+	return errors.Join(result.Error, syncSequences(db))
 }
 
 // migrateLegacyStorageBackends backfills the storage_backends table from each
@@ -766,14 +943,15 @@ func resolveStorageProviderPending(db *gorm.DB) {
 // SQL: environment snapshots, JSON→config mapping, AES-encrypted credentials,
 // UUID generation and the per-startup refresh of env-backed aliases.
 // The migration is idempotent: one legacy_alias row per tenant/provider.
-func migrateLegacyStorageBackends(db *gorm.DB) {
+func migrateLegacyStorageBackends(db *gorm.DB) error {
+	var errs error
 	var tenants []*types.Tenant
 	if err := db.Find(&tenants).Error; err != nil {
 		logger.Warnf(context.Background(), "Failed to load workspaces for storage backend migration: %v", err)
-		return
+		return err
 	}
 	if len(tenants) == 0 {
-		return
+		return nil
 	}
 
 	// Load every alias in a single query. Probing each tenant/provider pair with
@@ -782,7 +960,7 @@ func migrateLegacyStorageBackends(db *gorm.DB) {
 	var aliases []*types.StorageBackend
 	if err := db.Where("legacy_alias = ?", true).Find(&aliases).Error; err != nil {
 		logger.Warnf(context.Background(), "Failed to load legacy storage aliases: %v", err)
-		return
+		return err
 	}
 	existingAliases := make(map[uint64]map[string]*types.StorageBackend, len(aliases))
 	for _, alias := range aliases {
@@ -821,9 +999,11 @@ func migrateLegacyStorageBackends(db *gorm.DB) {
 						desired = types.StorageBackendFromEnvironment(tenant.ID)
 					}
 					if desired != nil && desired.Provider == provider {
-						_ = db.Model(&types.StorageBackend{}).Where("id = ?", existing.ID).Updates(map[string]interface{}{
+						if err := db.Model(&types.StorageBackend{}).Where("id = ?", existing.ID).Updates(map[string]interface{}{
 							"name": desired.Name, "config": desired.Config, "source": desired.Source, "status": desired.Status, "updated_at": time.Now(),
-						}).Error
+						}).Error; err != nil {
+							errs = errors.Join(errs, fmt.Errorf("refresh %s legacy storage for workspace %d: %w", provider, tenant.ID, err))
+						}
 					}
 				}
 				backendIDs[provider] = existing.ID
@@ -838,6 +1018,7 @@ func migrateLegacyStorageBackends(db *gorm.DB) {
 			}
 			if err := db.Create(backend).Error; err != nil {
 				logger.Warnf(context.Background(), "Failed to migrate %s storage for workspace %d: %v", provider, tenant.ID, err)
+				errs = errors.Join(errs, fmt.Errorf("migrate %s storage for workspace %d: %w", provider, tenant.ID, err))
 				continue
 			}
 			backendIDs[provider] = backend.ID
@@ -846,12 +1027,14 @@ func migrateLegacyStorageBackends(db *gorm.DB) {
 			if id := backendIDs[defaultProvider]; id != "" {
 				if err := db.Model(&types.Tenant{}).Where("id = ?", tenant.ID).Update("default_storage_backend_id", id).Error; err != nil {
 					logger.Warnf(context.Background(), "Failed to set default storage backend for workspace %d: %v", tenant.ID, err)
+					errs = errors.Join(errs, fmt.Errorf("set default storage backend for workspace %d: %w", tenant.ID, err))
 				}
 			}
 		}
 
 		var kbs []*types.KnowledgeBase
 		if err := db.Where("tenant_id = ? AND storage_backend_id IS NULL", tenant.ID).Find(&kbs).Error; err != nil {
+			errs = errors.Join(errs, fmt.Errorf("load knowledge bases for workspace %d: %w", tenant.ID, err))
 			continue
 		}
 		for _, kb := range kbs {
@@ -860,20 +1043,24 @@ func migrateLegacyStorageBackends(db *gorm.DB) {
 				provider = defaultProvider
 			}
 			if id := backendIDs[provider]; id != "" {
-				_ = db.Model(&types.KnowledgeBase{}).Where("id = ? AND storage_backend_id IS NULL", kb.ID).Update("storage_backend_id", id).Error
+				if err := db.Model(&types.KnowledgeBase{}).Where("id = ? AND storage_backend_id IS NULL", kb.ID).Update("storage_backend_id", id).Error; err != nil {
+					errs = errors.Join(errs, fmt.Errorf("bind knowledge base %s to storage backend: %w", kb.ID, err))
+				}
 			}
 		}
 	}
+	return errs
 }
 
 // syncSequences ensures PostgreSQL sequences for auto-increment columns (seq_id)
 // are at least as high as the current MAX value in each table. This is needed
 // because older code assigned seq_id via application-level MAX()+1, which could
 // advance values past the DB sequence counter and cause duplicate key errors.
-func syncSequences(db *gorm.DB) {
+func syncSequences(db *gorm.DB) error {
 	if db.Dialector.Name() != "postgres" {
-		return
+		return nil
 	}
+	var errs error
 	pairs := [][2]string{
 		{"chunks", "chunks_seq_id_seq"},
 		{"knowledge_tags", "knowledge_tags_seq_id_seq"},
@@ -886,10 +1073,12 @@ func syncSequences(db *gorm.DB) {
 		)
 		if err := db.Exec(sql).Error; err != nil {
 			logger.Warnf(context.Background(), "Failed to sync sequence %s: %v", seq, err)
+			errs = errors.Join(errs, fmt.Errorf("sync sequence %s: %w", seq, err))
 		} else {
 			logger.Infof(context.Background(), "Synced sequence %s with table %s", seq, table)
 		}
 	}
+	return errs
 }
 
 // initFileService initializes file storage service
@@ -902,7 +1091,11 @@ func syncSequences(db *gorm.DB) {
 //   - Configured file service implementation
 //   - Error if initialization fails
 func initFileService(cfg *config.Config, catalog interfaces.ResourceCatalog) (interfaces.FileService, error) {
-	inner, err := initRawFileService(cfg)
+	return initFileServiceWithPlan(cfg, catalog, weknoraRuntime.NewLifecyclePlan(weknoraRuntime.RoleAll))
+}
+
+func initFileServiceWithPlan(cfg *config.Config, catalog interfaces.ResourceCatalog, plan weknoraRuntime.LifecyclePlan) (interfaces.FileService, error) {
+	inner, err := initRawFileServiceWithPlan(cfg, plan)
 	if err != nil {
 		return nil, err
 	}
@@ -910,6 +1103,21 @@ func initFileService(cfg *config.Config, catalog interfaces.ResourceCatalog) (in
 }
 
 func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
+	return initRawFileServiceWithPlan(nil, weknoraRuntime.NewLifecyclePlan(weknoraRuntime.RoleAll))
+}
+
+func initRawFileServiceWithPlan(_ *config.Config, plan weknoraRuntime.LifecyclePlan) (interfaces.FileService, error) {
+	verifyPrepared := func(service interfaces.FileService, err error) (interfaces.FileService, error) {
+		if err != nil {
+			return nil, err
+		}
+		if plan.Role == weknoraRuntime.RolePrepare {
+			if err := service.CheckConnectivity(context.Background()); err != nil {
+				return nil, fmt.Errorf("prepared storage connectivity: %w", err)
+			}
+		}
+		return service, nil
+	}
 	storageType := strings.TrimSpace(os.Getenv("STORAGE_TYPE"))
 	if storageType == "" {
 		storageType = "local"
@@ -922,13 +1130,17 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 			os.Getenv("MINIO_BUCKET_NAME") == "" {
 			return nil, fmt.Errorf("missing MinIO configuration")
 		}
-		return file.NewMinioFileService(
+		constructor := file.NewMinioFileService
+		if !plan.OwnsDatabaseBootstrap {
+			constructor = file.NewMinioFileServiceExisting
+		}
+		return verifyPrepared(constructor(
 			os.Getenv("MINIO_ENDPOINT"),
 			os.Getenv("MINIO_ACCESS_KEY_ID"),
 			os.Getenv("MINIO_SECRET_ACCESS_KEY"),
 			os.Getenv("MINIO_BUCKET_NAME"),
 			strings.EqualFold(os.Getenv("MINIO_USE_SSL"), "true"),
-		)
+		))
 	case "cos":
 		if os.Getenv("COS_BUCKET_NAME") == "" ||
 			os.Getenv("COS_REGION") == "" ||
@@ -937,7 +1149,11 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 			os.Getenv("COS_PATH_PREFIX") == "" {
 			return nil, fmt.Errorf("missing COS configuration")
 		}
-		return file.NewCosFileServiceWithTempBucket(
+		constructor := file.NewCosFileServiceWithTempBucket
+		if !plan.OwnsDatabaseBootstrap || plan.Role == weknoraRuntime.RolePrepare {
+			constructor = file.NewCosFileServiceWithTempBucketExisting
+		}
+		return verifyPrepared(constructor(
 			os.Getenv("COS_BUCKET_NAME"),
 			os.Getenv("COS_REGION"),
 			os.Getenv("COS_SECRET_ID"),
@@ -945,7 +1161,7 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 			os.Getenv("COS_PATH_PREFIX"),
 			os.Getenv("COS_TEMP_BUCKET_NAME"),
 			os.Getenv("COS_TEMP_REGION"),
-		)
+		))
 	case "tos":
 		if os.Getenv("TOS_ENDPOINT") == "" ||
 			os.Getenv("TOS_REGION") == "" ||
@@ -954,7 +1170,11 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 			os.Getenv("TOS_BUCKET_NAME") == "" {
 			return nil, fmt.Errorf("missing TOS configuration")
 		}
-		return file.NewTosFileServiceWithTempBucket(
+		constructor := file.NewTosFileServiceWithTempBucket
+		if !plan.OwnsDatabaseBootstrap {
+			constructor = file.NewTosFileServiceWithTempBucketExisting
+		}
+		return verifyPrepared(constructor(
 			os.Getenv("TOS_ENDPOINT"),
 			os.Getenv("TOS_REGION"),
 			os.Getenv("TOS_ACCESS_KEY"),
@@ -963,7 +1183,7 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 			os.Getenv("TOS_PATH_PREFIX"),
 			os.Getenv("TOS_TEMP_BUCKET_NAME"), // 可选：临时桶名称（桶需配置生命周期规则自动过期）
 			os.Getenv("TOS_TEMP_REGION"),      // 可选：临时桶 region，默认与主桶相同
-		)
+		))
 	case "s3":
 		accessKey, secretKey := os.Getenv("S3_ACCESS_KEY"), os.Getenv("S3_SECRET_KEY")
 		if os.Getenv("S3_REGION") == "" ||
@@ -975,14 +1195,18 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 		if pathPrefix == "" {
 			pathPrefix = "weknora/"
 		}
-		return file.NewS3FileService(
+		constructor := file.NewS3FileService
+		if !plan.OwnsDatabaseBootstrap {
+			constructor = file.NewS3FileServiceExisting
+		}
+		return verifyPrepared(constructor(
 			os.Getenv("S3_ENDPOINT"),
 			accessKey,
 			secretKey,
 			os.Getenv("S3_BUCKET_NAME"),
 			os.Getenv("S3_REGION"),
 			pathPrefix,
-		)
+		))
 	case "obs":
 		if os.Getenv("OBS_ENDPOINT") == "" ||
 			os.Getenv("OBS_ACCESS_KEY") == "" ||
@@ -995,14 +1219,18 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 		if obsPathPrefix == "" {
 			obsPathPrefix = "weknora/"
 		}
-		return file.NewObsFileService(
+		constructor := file.NewObsFileService
+		if !plan.OwnsDatabaseBootstrap {
+			constructor = file.NewObsFileServiceExisting
+		}
+		return verifyPrepared(constructor(
 			os.Getenv("OBS_ENDPOINT"),
 			obsRegion,
 			os.Getenv("OBS_ACCESS_KEY"),
 			os.Getenv("OBS_SECRET_KEY"),
 			os.Getenv("OBS_BUCKET_NAME"),
 			obsPathPrefix,
-		)
+		))
 	case "oss":
 		if os.Getenv("OSS_ENDPOINT") == "" ||
 			os.Getenv("OSS_REGION") == "" ||
@@ -1015,7 +1243,11 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 		if pathPrefix == "" {
 			pathPrefix = "weknora/"
 		}
-		return file.NewOssFileServiceWithTempBucket(
+		constructor := file.NewOssFileServiceWithTempBucket
+		if !plan.OwnsDatabaseBootstrap {
+			constructor = file.NewOssFileServiceWithTempBucketExisting
+		}
+		return verifyPrepared(constructor(
 			os.Getenv("OSS_ENDPOINT"),
 			os.Getenv("OSS_REGION"),
 			os.Getenv("OSS_ACCESS_KEY"),
@@ -1024,16 +1256,29 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 			pathPrefix,
 			os.Getenv("OSS_TEMP_BUCKET_NAME"),
 			os.Getenv("OSS_TEMP_REGION"),
-		)
+		))
 	case "local":
 		baseDir := os.Getenv("LOCAL_STORAGE_BASE_DIR")
 		if baseDir == "" {
 			baseDir = "/data/files"
 		}
+		if plan.Role == weknoraRuntime.RolePrepare {
+			if err := os.MkdirAll(baseDir, 0o755); err != nil {
+				return nil, fmt.Errorf("prepare local storage directory %s: %w", baseDir, err)
+			}
+		} else if plan.Role == weknoraRuntime.RoleWeb || plan.Role == weknoraRuntime.RoleWorker {
+			info, err := os.Stat(baseDir)
+			if err != nil {
+				return nil, fmt.Errorf("local storage directory must already exist for %s role: %w", plan.Role, err)
+			}
+			if !info.IsDir() {
+				return nil, fmt.Errorf("local storage path is not a directory for %s role: %s", plan.Role, baseDir)
+			}
+		}
 		externalURL := strings.TrimSpace(os.Getenv("APP_EXTERNAL_URL"))
-		return file.NewLocalFileService(baseDir, externalURL), nil
+		return verifyPrepared(file.NewLocalFileService(baseDir, externalURL), nil)
 	case "dummy":
-		return file.NewDummyFileService(), nil
+		return verifyPrepared(file.NewDummyFileService(), nil)
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", storageType)
 	}
@@ -1520,6 +1765,26 @@ func initNeo4jClient() (neo4j.Driver, error) {
 }
 
 func NewDuckDB() (*sql.DB, error) {
+	return NewDuckDBForPlan(weknoraRuntime.NewLifecyclePlan(weknoraRuntime.RoleAll))
+}
+
+func duckDBExtensionStatements(plan weknoraRuntime.LifecyclePlan) []string {
+	statements := make([]string, 0, 5)
+	if !plan.OwnsDatabaseBootstrap {
+		// DuckDB may otherwise auto-install a known extension in response to
+		// LOAD, which would turn a read-only split-role check into mutation.
+		statements = append(statements, "SET autoinstall_known_extensions = false;")
+	}
+	for _, ext := range []string{"spatial", "excel"} {
+		if plan.OwnsDatabaseBootstrap {
+			statements = append(statements, fmt.Sprintf("INSTALL %s;", ext))
+		}
+		statements = append(statements, fmt.Sprintf("LOAD %s;", ext))
+	}
+	return statements
+}
+
+func NewDuckDBForPlan(plan weknoraRuntime.LifecyclePlan) (*sql.DB, error) {
 	sqlDB, err := sql.Open("duckdb", ":memory:")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open duckdb: %w", err)
@@ -1534,17 +1799,22 @@ func NewDuckDB() (*sql.DB, error) {
 	// startup hang; xlsx/xls ingest may fail later without these extensions.
 	if strings.EqualFold(os.Getenv("DUCKDB_SKIP_EXTENSION_LOAD"), "true") ||
 		os.Getenv("DUCKDB_SKIP_EXTENSION_LOAD") == "1" {
+		if plan.Role != weknoraRuntime.RoleAll {
+			_ = sqlDB.Close()
+			return nil, fmt.Errorf("DUCKDB_SKIP_EXTENSION_LOAD cannot bypass DuckDB prerequisite verification for %s role", plan.Role)
+		}
 		logger.Infof(context.Background(),
 			"[DuckDB] Skipping spatial/excel extension install/load "+
 				"(DUCKDB_SKIP_EXTENSION_LOAD is set; xlsx ingest may fail without them)")
 	} else {
 		bgCtx := context.Background()
-		for _, ext := range []string{"spatial", "excel"} {
-			if _, err := sqlDB.ExecContext(bgCtx, fmt.Sprintf("INSTALL %s;", ext)); err != nil {
-				logger.Warnf(bgCtx, "[DuckDB] Failed to install %s extension: %v", ext, err)
-			}
-			if _, err := sqlDB.ExecContext(bgCtx, fmt.Sprintf("LOAD %s;", ext)); err != nil {
-				logger.Warnf(bgCtx, "[DuckDB] Failed to load %s extension: %v", ext, err)
+		for _, statement := range duckDBExtensionStatements(plan) {
+			if _, err := sqlDB.ExecContext(bgCtx, statement); err != nil {
+				if plan.Role != weknoraRuntime.RoleAll {
+					_ = sqlDB.Close()
+					return nil, fmt.Errorf("DuckDB prerequisite %q failed for %s role: %w", statement, plan.Role, err)
+				}
+				logger.Warnf(bgCtx, "[DuckDB] Prerequisite %q failed: %v", statement, err)
 			}
 		}
 	}
@@ -1567,10 +1837,9 @@ func registerWebSearchProviders(registry *infra_web_search.Registry) {
 	registry.Register("zhipu", infra_web_search.NewZhipuProvider)
 }
 
-// registerIMService registers adapter factories, loads enabled channels, and
-// wires the process-lifetime shutdown hook. Each platform's factory lives in
-// its own subpackage to keep this file focused on wiring.
-func registerIMService(imService *imPkg.Service, cleaner interfaces.ResourceCleaner) {
+// registerIMAdapterFactories is request-safe wiring shared by web and worker.
+// It registers constructors only; it does not load channels or start loops.
+func registerIMAdapterFactories(imService *imPkg.Service) {
 	imService.RegisterAdapterFactory("wecom", wecom.NewFactory())
 	imService.RegisterAdapterFactory("feishu", feishu.NewFactory(feishu.RegionFeishu))
 	// Lark is Feishu's international cloud: same adapter, different host/tenant.
@@ -1583,15 +1852,17 @@ func registerIMService(imService *imPkg.Service, cleaner interfaces.ResourceClea
 	imService.RegisterAdapterFactory("qqbot", qqbot.NewFactory())
 	imService.RegisterAdapterFactory("yunzhijia", yunzhijia.NewFactory())
 
-	// Load and start all enabled channels from database
-	if err := imService.LoadAndStartChannels(); err != nil {
-		logger.Warnf(context.Background(), "[IM] Failed to load channels from database: %v", err)
-	}
+}
 
+func registerIMCleanup(imService *imPkg.Service, cleaner interfaces.ResourceCleaner) {
 	cleaner.RegisterWithName("IMService", func() error {
 		imService.Stop()
 		return nil
 	})
+}
+
+func startIMBackground(imService *imPkg.Service) error {
+	return imService.LoadAndStartChannels()
 }
 
 // initConnectorRegistry creates and populates the connector registry with all available connectors.
@@ -1638,8 +1909,9 @@ func initConnectorRegistry() (*datasource.ConnectorRegistry, error) {
 }
 
 // startDataSourceScheduler starts the data source cron scheduler and registers cleanup.
-func startDataSourceScheduler(scheduler *datasource.Scheduler, cleaner interfaces.ResourceCleaner) {
-	if err := scheduler.Start(context.Background()); err != nil {
+func startDataSourceScheduler(scheduler *datasource.Scheduler, cleaner interfaces.ResourceCleaner) error {
+	err := scheduler.Start(context.Background())
+	if err != nil {
 		logger.Warnf(context.Background(), "[Container] data source scheduler start failed: %v", err)
 	}
 
@@ -1647,6 +1919,7 @@ func startDataSourceScheduler(scheduler *datasource.Scheduler, cleaner interface
 		scheduler.Stop()
 		return nil
 	})
+	return err
 }
 
 // startHousekeepingService starts the knowledge housekeeping cron and registers
@@ -1654,17 +1927,19 @@ func startDataSourceScheduler(scheduler *datasource.Scheduler, cleaner interface
 // "processing" past a configurable threshold (see HousekeepingService for
 // rationale). Best-effort: a startup error is logged but does NOT abort the
 // container — the rest of the system stays usable.
-func startHousekeepingService(svc *service.HousekeepingService, cleaner interfaces.ResourceCleaner) {
+func startHousekeepingService(svc *service.HousekeepingService, cleaner interfaces.ResourceCleaner) error {
 	if svc == nil {
-		return
+		return errors.New("housekeeping service is nil")
 	}
 	if err := svc.Start(context.Background()); err != nil {
 		logger.Warnf(context.Background(), "[Container] housekeeping start failed: %v", err)
+		return err
 	}
 	cleaner.RegisterWithName("KnowledgeHousekeeping", func() error {
 		svc.Stop()
 		return nil
 	})
+	return nil
 }
 
 // startTemporaryDocumentCleanup removes expired session attachments and their
