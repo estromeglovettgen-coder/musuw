@@ -51,6 +51,11 @@ func TestRemoteAPIVLMPredictVideoUsesOpenRouterVideoURL(t *testing.T) {
 	if requestBody["model"] != "google/gemini-2.5-flash" {
 		t.Fatalf("model = %#v", requestBody["model"])
 	}
+	providerRouting := requestBody["provider"].(map[string]any)
+	providerOrder := providerRouting["order"].([]any)
+	if len(providerOrder) != 1 || providerOrder[0] != "google-vertex/global" {
+		t.Fatalf("provider order = %#v", providerOrder)
+	}
 	messages := requestBody["messages"].([]any)
 	content := messages[0].(map[string]any)["content"].([]any)
 	videoPart := content[1].(map[string]any)

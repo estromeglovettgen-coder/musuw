@@ -199,7 +199,8 @@ func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mime
 
 	dataURI := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(videoBytes)
 	payload := map[string]any{
-		"model": v.modelName,
+		"model":    v.modelName,
+		"provider": map[string]any{"order": []string{"google-vertex/global"}},
 		"messages": []map[string]any{{
 			"role": "user",
 			"content": []map[string]any{
