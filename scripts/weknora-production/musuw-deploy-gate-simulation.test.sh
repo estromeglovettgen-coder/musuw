@@ -15,6 +15,7 @@ fail() {
 
 [ -x "$ssh_gate" ] || fail 'restricted SSH gate is not executable'
 [ -x "$root_gate" ] || fail 'privileged deploy gate is not executable'
+grep -Fq '"$spool/source"' "$root_gate" || fail 'create_spool does not grant deploy ownership of the source root'
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/musuw-deploy-gate.XXXXXX")"
 root_dir="$tmp_dir/remote"

@@ -184,6 +184,7 @@ create_spool() {
     if [ "$test_mode" = false ]; then
         id "$deploy_user" >/dev/null 2>&1 || die 'dedicated deployment account is unavailable'
         chown "$deploy_user:$deploy_user" \
+            "$spool/source" \
             "$spool/source/weknora" \
             "$spool/source/auth" \
             "$spool/source/integration" \
