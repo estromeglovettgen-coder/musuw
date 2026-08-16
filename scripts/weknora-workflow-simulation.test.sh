@@ -173,6 +173,7 @@ git -C "$fake_repo" config user.email fixture@example.test
 git -C "$fake_repo" config user.name fixture
 git -C "$fake_repo" add -A
 git -C "$fake_repo" commit -qm fixture
+fixture_revision="$(git -C "$fake_repo" rev-parse HEAD)"
 
 export WEKNORA_TEST_CALL_LOG="$call_log"
 export PATH="$bin_dir:$PATH"
@@ -180,6 +181,10 @@ export WEKNORA_TEST_REMOTE_ROOT="$remote_root"
 export WEKNORA_TEST_REMOTE_BIN="$remote_bin"
 export WEKNORA_TEST_REMOTE_DOCKER_ROOT="$remote_docker_root"
 export WEKNORA_TEST_REMOTE_CAPACITY_STATE="$remote_capacity_state"
+# CI's GITHUB_SHA identifies the outer checkout, not this isolated fixture.
+# Pin the deploy seam to the fixture commit so its clean-checkout gate remains
+# exercised without weakening the production revision contract.
+export WEKNORA_DEPLOY_REVISION="$fixture_revision"
 # Keep the simulation independent from a developer or hosted runner's SSH home.
 # This is a pinned fixture only; production still fails closed when the caller
 # does not provide WEKNORA_DEPLOY_KNOWN_HOSTS_FILE.
