@@ -77,7 +77,7 @@ func (s *knowledgeService) convertVideo(
 	if err != nil {
 		logger.Errorf(ctx, "[Video] Gemini understanding failed for %s: %v", knowledge.ID, err)
 		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "video understanding failed", err)
+			werrors.ErrCodeDocReaderParseFailed, "video understanding failed: "+err.Error(), err)
 		return s.failKnowledge(ctx, knowledge, isLastRetry, "video understanding failed: %v", err)
 	}
 	markdown = strings.TrimSpace(markdown)
