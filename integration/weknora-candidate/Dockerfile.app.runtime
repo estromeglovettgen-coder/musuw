@@ -1,0 +1,57 @@
+# Candidate-only build: compile the local official WeKnora v0.7.2 source, then
+# reuse the already pinned official v0.7.1 runtime OS layer. This deliberately
+# avoids recreating the upstream final-stage apt/pip/uv install surface.
+FROM golang:1.26-bookworm AS builder
+
+WORKDIR /src
+
+ARG VERSION_ARG=0.7.2
+ARG COMMIT_ID_ARG=3d5d8bfcdfeeea266b292b71cea616847af28d0f
+ARG BUILD_TIME_ARG=candidate-local
+ARG GO_VERSION_ARG=go1.26
+
+# Only compiler and SQLite headers are needed to produce the official binary.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY cmd/download ./cmd/download
+RUN go run cmd/download/duckdb/duckdb.go
+
+COPY . ./
+
+# Keep the same artifact set as the upstream Dockerfile.app, but inject the
+# known local v0.7.2 version rather than requiring a Git checkout in context.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    VERSION="$VERSION_ARG" \
+    COMMIT_ID="$COMMIT_ID_ARG" \
+    BUILD_TIME="$BUILD_TIME_ARG" \
+    GO_VERSION="$GO_VERSION_ARG" \
+    make build-prod \
+    && cp -a /go/pkg/mod/github.com/yanyiwu /src/yanyiwu
+
+# Pin the known-local official arm64 v0.7.1 runtime image by digest.  The
+# application binary and every versioned runtime artifact below are replaced
+# from local v0.7.2 source; no v0.7.1 business binary remains executable.
+FROM wechatopenai/weknora-app@sha256:d88bef9912f6abb8bc7c22144ee7f314016055b8075bda4ea8fbb28af41c3bcf
+
+WORKDIR /app
+
+LABEL org.opencontainers.image.version="v0.7.2" \
+      org.opencontainers.image.revision="3d5d8bfcdfeeea266b292b71cea616847af28d0f"
+
+COPY --from=builder /src/yanyiwu/ /go/pkg/mod/github.com/yanyiwu/
+COPY --from=builder /src/config/ ./config/
+COPY --from=builder /src/scripts/ ./scripts/
+COPY --from=builder /src/migrations/ ./migrations/
+COPY --from=builder /src/dataset/samples/ ./dataset/samples/
+COPY --from=builder /src/skills/preloaded/ ./skills/preloaded/
+COPY --from=builder /src/skills/preloaded/ ./skills/_builtin/
+COPY --from=builder /root/.duckdb /home/appuser/.duckdb
+COPY --from=builder /src/WeKnora ./WeKnora
+
+RUN chmod +x ./WeKnora ./scripts/*.sh \
+    && chown -R appuser:appuser /home/appuser/.duckdb

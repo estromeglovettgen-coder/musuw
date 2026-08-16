@@ -1,0 +1,207 @@
+package service
+
+import (
+	"context"
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestResolveChatModelIDRequiresConfiguredAgentModel(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				"builtin-chat": {
+					ID:   "builtin-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: "agent-1",
+		},
+		// Even a valid request-level model must not hide incomplete agent config.
+		SummaryModelID: "builtin-chat",
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.Error(t, err)
+	assert.Empty(t, modelID)
+	assert.Contains(t, err.Error(), "model_id")
+}
+
+func TestResolveChatModelIDRejectsUnavailableConfiguredAgentModel(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{modelsByID: map[string]*types.Model{}},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: "agent-1",
+			Config: types.CustomAgentConfig{
+				ModelID: "deleted-model",
+			},
+		},
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.Error(t, err)
+	assert.Empty(t, modelID)
+	assert.Contains(t, err.Error(), "unavailable")
+}
+
+func TestResolveChatModelIDUsesValidConfiguredAgentModel(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				"agent-chat": {
+					ID:   "agent-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: "agent-1",
+			Config: types.CustomAgentConfig{
+				ModelID: "agent-chat",
+			},
+		},
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "agent-chat", modelID)
+}
+
+func TestResolveChatModelIDRejectsNonChatSummaryModelOverride(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				"agent-chat": {
+					ID:   "agent-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+				"rerank-only": {
+					ID:   "rerank-only",
+					Type: types.ModelTypeRerank,
+				},
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: "agent-1",
+			Config: types.CustomAgentConfig{
+				ModelID: "agent-chat",
+			},
+		},
+		SummaryModelID: "rerank-only",
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "agent-chat", modelID)
+}
+
+func TestResolveChatModelIDUsesValidSummaryModelOverride(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				"agent-chat": {
+					ID:   "agent-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+				"override-chat": {
+					ID:   "override-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: "agent-1",
+			Config: types.CustomAgentConfig{
+				ModelID: "agent-chat",
+			},
+		},
+		SummaryModelID: "override-chat",
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "override-chat", modelID)
+}
+
+func TestResolveChatModelIDKeepsPlatformModeModelAuthoritative(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				types.PlatformKnowledgeBaseChatModelID: {
+					ID:   types.PlatformKnowledgeBaseChatModelID,
+					Type: types.ModelTypeKnowledgeQA,
+				},
+				"builtin-deepseek-v4-flash": {
+					ID:   "builtin-deepseek-v4-flash",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+	}
+
+	for _, tc := range []struct {
+		name          string
+		agentID       string
+		configuredID  string
+		requestModel  string
+		expectedModel string
+	}{
+		{
+			name:          "flash ignores a forged Pro override",
+			agentID:       types.BuiltinQuickAnswerID,
+			configuredID:  "builtin-deepseek-v4-flash",
+			requestModel:  types.PlatformKnowledgeBaseChatModelID,
+			expectedModel: "builtin-deepseek-v4-flash",
+		},
+		{
+			name:          "pro ignores a forged Flash override",
+			agentID:       types.BuiltinSmartReasoningID,
+			configuredID:  types.PlatformKnowledgeBaseChatModelID,
+			requestModel:  "builtin-deepseek-v4-flash",
+			expectedModel: types.PlatformKnowledgeBaseChatModelID,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &types.QARequest{
+				Session:        &types.Session{},
+				SummaryModelID: tc.requestModel,
+				CustomAgent: &types.CustomAgent{
+					ID: tc.agentID,
+					Config: types.CustomAgentConfig{
+						ModelID: tc.configuredID,
+					},
+				},
+			}
+
+			modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedModel, modelID)
+		})
+	}
+}

@@ -1,0 +1,176 @@
+:root {
+  color-scheme: light;
+  color: #171717;
+  background: #ffffff;
+  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.auth-page {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 32px 24px;
+}
+
+.auth-panel {
+  max-width: 380px;
+  width: 100%;
+}
+
+.auth-panel h1 {
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.auth-intro {
+  color: #5d5d5d;
+  line-height: 1.5;
+  margin: 12px 0 24px;
+}
+
+.auth-google,
+.auth-form button:not(.auth-link) {
+  appearance: none;
+  background: #171717;
+  border: 1px solid #171717;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 550;
+  min-height: 44px;
+  padding: 0 16px;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  width: 100%;
+}
+
+.auth-google:hover,
+.auth-form button:not(.auth-link):hover {
+  background: #303030;
+  border-color: #303030;
+}
+
+.auth-google:active,
+.auth-form button:not(.auth-link):active {
+  transform: translateY(1px);
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.auth-form label {
+  color: #444444;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.auth-form input {
+  appearance: none;
+  background: #ffffff;
+  border: 1px solid #c7c7c7;
+  border-radius: 8px;
+  color: #171717;
+  min-height: 44px;
+  padding: 0 12px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+  width: 100%;
+}
+
+.auth-form input::placeholder {
+  color: #767676;
+  opacity: 1;
+}
+
+.auth-form input:focus {
+  border-color: #0b57d0;
+  box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.16);
+  outline: none;
+}
+
+.auth-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #0b57d0;
+  cursor: pointer;
+  justify-self: start;
+  line-height: 1.4;
+  padding: 6px 8px;
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.auth-link:hover {
+  background: rgba(11, 87, 208, 0.06);
+  color: #0a4ebc;
+}
+
+.auth-error {
+  color: #912018;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 16px 0 0;
+}
+
+.auth-status {
+  color: #5d5d5d;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+
+:is(.auth-google, .auth-form button, .auth-form input):focus-visible,
+.auth-link:focus-visible {
+  outline: 2px solid #0b57d0;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .auth-page {
+    padding: 24px 16px;
+  }
+
+  .auth-panel h1 {
+    font-size: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-google,
+  .auth-form button:not(.auth-link),
+  .auth-form input,
+  .auth-link {
+    transition: none;
+  }
+}

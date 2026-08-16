@@ -1,0 +1,232 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.nvmrc'
+      - 'auth/**'
+      - 'storefront/**'
+      - 'app-edge/**'
+      - 'weknora/**'
+      - 'scripts/**'
+      - 'integration/weknora-production/**'
+      - 'third_party/weknora/**'
+      - 'openspec/**'
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'SOURCE_MANIFEST*'
+      - '*PROVENANCE*'
+      - 'docs/**'
+      - 'docs/DEPLOYMENT.md'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - '.nvmrc'
+      - 'auth/**'
+      - 'storefront/**'
+      - 'app-edge/**'
+      - 'weknora/**'
+      - 'scripts/**'
+      - 'integration/weknora-production/**'
+      - 'third_party/weknora/**'
+      - 'openspec/**'
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'SOURCE_MANIFEST*'
+      - '*PROVENANCE*'
+      - 'docs/**'
+      - 'docs/DEPLOYMENT.md'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-contract:
+    name: Workflow contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate workflow syntax and policy
+        run: ruby scripts/ci/validate-workflows.rb
+
+  frontend:
+    name: Frontend tests, types and build
+    needs: workflow-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: weknora/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix weknora/frontend --ignore-scripts
+      - name: Run frontend tests
+        run: npm --prefix weknora/frontend test
+      - name: Run frontend type-check
+        run: npm --prefix weknora/frontend run type-check
+      - name: Audit locale keys
+        run: npm --prefix weknora/frontend run check-i18n
+      - name: Build frontend
+        run: npm --prefix weknora/frontend run build
+
+  auth:
+    name: Auth shell tests, types and build
+    needs: workflow-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Public-only placeholders make the build contract executable without
+      # putting a Supabase project credential in CI logs or repository files.
+      VITE_AUTH_PUBLIC_ORIGIN: https://app.musuw.com
+      VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ci-public-placeholder
+      VITE_WEKNORA_OAUTH_CLIENT_ID: ci-native-client
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: auth/package-lock.json
+      - name: Install auth dependencies
+        run: npm ci --prefix auth --ignore-scripts
+      - name: Run auth tests
+        run: npm --prefix auth test
+      - name: Run auth type-check
+        run: npm --prefix auth run typecheck
+      - name: Build auth shell
+        run: npm --prefix auth run build
+
+  storefront:
+    name: Storefront tests and build
+    needs: workflow-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+      - name: Install storefront dependencies
+        run: npm ci --prefix storefront --ignore-scripts
+      - name: Run storefront tests (includes build)
+        run: npm --prefix storefront test
+      - name: Validate Wrangler bundle without uploading
+        working-directory: storefront
+        run: npx wrangler deploy --dry-run --config wrangler.jsonc
+
+  go:
+    name: Active WeKnora Go tests and build
+    needs: workflow-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: weknora
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: weknora/go.mod
+          cache: true
+          cache-dependency-path: weknora/go.sum
+      - name: Run Go tests
+        run: go test ./...
+      - name: Build the native server
+        run: go build ./cmd/server
+
+  docreader:
+    name: Active DocReader tests
+    needs: workflow-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: weknora/docreader/uv.lock
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: weknora/docreader/uv.lock
+      - name: Install the locked DocReader environment
+        run: uv sync --frozen --project weknora/docreader --no-install-project
+      - name: Run the active DocReader suite
+        run: uv run --project weknora/docreader python scripts/ci/run-docreader-tests.py
+
+  repository-contracts:
+    name: Release, provenance and secret contracts
+    needs: workflow-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install repository tooling
+        run: npm ci --ignore-scripts
+      - name: Validate tracked publish boundary
+        run: node scripts/ci/tracked-source-scan.mjs
+      - name: Validate source manifest
+        run: node scripts/ci/source-manifest.mjs
+      - name: Scan checked-in source for credentials
+        run: bash scripts/ci/secret-scan.sh
+      - name: Run release workflow simulation
+        run: bash scripts/weknora-workflow-simulation.test.sh
+      - name: Run production static and CI seam contracts
+        run: |
+          bash scripts/weknora-production/verify-static.sh
+          bash scripts/weknora-production/deploy-ci-seams-contract.test.sh
+          # verify-static.sh renders both base and edge scripts/weknora-production/compose.sh config.

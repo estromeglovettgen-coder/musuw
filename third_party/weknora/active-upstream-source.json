@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "recordedDate": "2026-08-14",
+  "repository": "https://github.com/Tencent/WeKnora.git",
+  "tag": "v0.7.2",
+  "commit": "3d5d8bfcdfeeea266b292b71cea616847af28d0f",
+  "release": "https://github.com/Tencent/WeKnora/releases/tag/v0.7.2",
+  "sourceDirectory": "weknora",
+  "import": {
+    "method": "complete tag checkout copied without nested Git metadata",
+    "regularFileCount": 2798,
+    "version": "0.7.2",
+    "latestMigration": 79
+  },
+  "policy": {
+    "businessAuthority": "upstream_weknora",
+    "product": "musuw",
+    "retainedLocalSurface": "Musuw branding, Supabase Google/email-OTP entry, and a zero-configuration consumer workspace"
+  }
+}

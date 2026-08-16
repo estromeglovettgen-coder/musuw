@@ -1,0 +1,46 @@
+#!/bin/sh
+# The upstream entrypoint remains responsible for migration and privilege
+# dropping. This wrapper only reads Docker secret files immediately before it
+# execs the native WeKnora process.
+set -eu
+
+read_required_secret() {
+    secret_path="$1"
+    secret_name="$2"
+    if [ ! -r "$secret_path" ]; then
+        printf '%s\n' "required ${secret_name} secret file is unavailable" >&2
+        exit 1
+    fi
+    secret_value=$(tr -d '\r\n' < "$secret_path")
+    if [ -z "$secret_value" ]; then
+        printf '%s\n' "required ${secret_name} secret file is empty" >&2
+        exit 1
+    fi
+    printf '%s' "$secret_value"
+}
+
+export DB_PASSWORD="$(read_required_secret /run/secrets/db_password database-password)"
+export REDIS_PASSWORD="$(read_required_secret /run/secrets/redis_password redis-password)"
+export SYSTEM_AES_KEY="$(read_required_secret /run/secrets/system_aes_key system-aes-key)"
+export JWT_SECRET="$(read_required_secret /run/secrets/jwt_secret jwt-secret)"
+export OIDC_AUTH_CLIENT_ID="$(read_required_secret /run/secrets/oidc_client_id oidc-client-id)"
+export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_secret oidc-client-secret)"
+export DEEPSEEK_API_KEY="$(read_required_secret /run/secrets/deepseek_api_key deepseek-api-key)"
+export OPENROUTER_API_KEY="$(read_required_secret /run/secrets/openrouter_api_key openrouter-api-key)"
+
+if [ "${#SYSTEM_AES_KEY}" -ne 32 ]; then
+    printf '%s\n' 'required system-aes-key has an invalid length' >&2
+    exit 1
+fi
+
+neo4j_auth="$(read_required_secret /run/secrets/neo4j_auth neo4j-auth)"
+case "$neo4j_auth" in
+    neo4j/?*) export NEO4J_PASSWORD="${neo4j_auth#neo4j/}" ;;
+    *)
+        printf '%s\n' 'required neo4j-auth secret has an invalid account format' >&2
+        exit 1
+        ;;
+esac
+unset neo4j_auth
+
+exec /app/scripts/docker-entrypoint.sh "$@"

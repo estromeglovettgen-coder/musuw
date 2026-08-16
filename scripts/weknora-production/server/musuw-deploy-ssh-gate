@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# ForcedCommand entry point for the dedicated musuw-deploy SSH key.
+set -euo pipefail
+
+reject() {
+    printf '%s\n' 'deployment SSH command rejected' >&2
+    exit 2
+}
+
+original_command="${SSH_ORIGINAL_COMMAND:-}"
+[ -n "$original_command" ] || reject
+
+# No shell syntax is part of the protocol. Reject it before tokenisation.
+case "$original_command" in
+    *';'*|*'|'*|*'&'*|*'$('*|*')'*|*'{'*|*'}'*|*'<'*|*'>'*|*'`'*|*'\\'*|*'"'*|*"'"*) reject ;;
+esac
+
+read -r -a command_words <<< "$original_command"
+[ "${#command_words[@]}" -gt 0 ] || reject
+
+safe_id() {
+    case "$1" in
+        ''|*[!A-Za-z0-9._-]*|.*|*-|*.) return 1 ;;
+        *..*) return 1 ;;
+        *) [ "${#1}" -le 128 ] ;;
+    esac
+}
+
+safe_revision() {
+    [[ "$1" =~ ^[0-9a-fA-F]+$ ]] || return 1
+    case "${#1}" in 40|64) return 0 ;; *) return 1 ;; esac
+}
+
+minimum_capacity_floor_kib='12582912'
+
+safe_capacity() {
+    case "$1" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$1" -ge "$minimum_capacity_floor_kib" ]
+}
+
+test_mode=false
+if [ "${MUSUW_DEPLOY_GATE_TEST_MODE:-0}" = 1 ] && [ "${EUID:-1}" -ne 0 ]; then
+    test_mode=true
+fi
+root_prefix=''
+if [ "$test_mode" = true ]; then
+    root_prefix="${MUSUW_DEPLOY_GATE_ROOT:-}"
+    [ -n "$root_prefix" ] || reject
+fi
+ # The SSH protocol carries the real server path even in local tests; the
+ # privileged wrapper alone applies its test-root prefix to filesystem calls.
+spool_root='/var/lib/musuw-deploy/incoming'
+if [ "$test_mode" = true ]; then
+    wrapper="${MUSUW_DEPLOY_GATE_WRAPPER:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/musuw-deploy-gate}"
+    rsync_bin="${MUSUW_DEPLOY_GATE_RSYNC_BIN:-$(command -v rsync || true)}"
+else
+    wrapper='/usr/local/sbin/musuw-deploy-gate'
+    rsync_bin='/usr/bin/rsync'
+fi
+
+invoke_wrapper() {
+    [ -x "$wrapper" ] || reject
+    if [ "$test_mode" = true ]; then
+        exec "$wrapper" "$@"
+    fi
+    [ -x /usr/bin/sudo ] || reject
+    exec /usr/bin/sudo -n -- "$wrapper" "$@"
+}
+
+if [ "${command_words[0]}" = 'musuw-gate' ]; then
+    case "${command_words[1]:-}" in
+        preflight)
+            [ "${#command_words[@]}" -eq 6 ] || reject
+            [ "${command_words[2]}" = update ] || reject
+            safe_id "${command_words[3]}" || reject
+            safe_revision "${command_words[4]}" || reject
+            safe_capacity "${command_words[5]}" || reject
+            invoke_wrapper preflight update "${command_words[3]}" "${command_words[4]}" "${command_words[5]}"
+            ;;
+        promote)
+            [ "${#command_words[@]}" -eq 5 ] || reject
+            [ "${command_words[2]}" = update ] || reject
+            safe_id "${command_words[3]}" || reject
+            safe_revision "${command_words[4]}" || reject
+            invoke_wrapper promote update "${command_words[3]}" "${command_words[4]}"
+            ;;
+        run)
+            [ "${#command_words[@]}" -eq 5 ] || reject
+            [ "${command_words[2]}" = update ] || reject
+            safe_id "${command_words[3]}" || reject
+            safe_revision "${command_words[4]}" || reject
+            invoke_wrapper run update "${command_words[3]}" "${command_words[4]}"
+            ;;
+        *) reject ;;
+    esac
+fi
+
+# rsync invokes the remote side as `rsync --server ... . DEST`. Only push mode
+# is useful here: sender/read mode, deletion, alternate roots and command hooks
+# are all rejected. The final destination is the only path-bearing token.
+[ "${command_words[0]}" = rsync ] || reject
+[ "${command_words[1]:-}" = --server ] || reject
+[ "${#command_words[@]}" -ge 5 ] || reject
+[ "${command_words[${#command_words[@]}-2]}" = . ] || reject
+
+last_index=$((${#command_words[@]} - 1))
+destination="${command_words[$last_index]}"
+case "$destination" in
+    "$spool_root"/*) ;;
+    *) reject ;;
+esac
+relative_destination="${destination#"$spool_root"/}"
+relative_destination="${relative_destination%/}"
+IFS=/ read -r release_id component remainder <<< "$relative_destination"
+safe_id "$release_id" || reject
+destination_scope="$component"
+[ -z "$remainder" ] || destination_scope="$component/$remainder"
+case "$destination_scope" in
+    source|source/weknora|source/auth|source/integration/weknora-production|\
+    source/scripts/weknora-production|source/deploy) ;;
+    *) reject ;;
+esac
+
+for ((index = 2; index < last_index - 1; index += 1)); do
+    token="${command_words[$index]}"
+    case "$token" in
+        --sender|--delete|--delete-*|--remove-*|--rsync-path=*|-e|-f|-R|-K|-L|-b) reject ;;
+        --partial|--dirs|--timeout=120) ;;
+        # macOS openrsync emits these options separately for the fixed local
+        # transfer (`-a --partial --no-owner --no-group`). Ubuntu rsync 3.2.7
+        # combines its server flags; the leading `v` is optional depending on
+        # the local rsync build, while every other character in the captured
+        # protocol shape is required.
+        -[vlDtpre.iLsfxCIu]* )
+            short_flags="${token#-}"
+            if [[ "$token" =~ ^-[lprtD]+$ ]]; then
+                :
+            elif [[ "$token" =~ ^-[vlDtpre.iLsfxCIu]+$ ]]; then
+                for required_flag in l D t p r e . i L s f x C I u; do
+                    case "$short_flags" in
+                        *"$required_flag"*) ;;
+                        *) reject ;;
+                    esac
+                done
+            else
+                reject
+            fi
+            ;;
+        --*) reject ;;
+        *) reject ;;
+    esac
+done
+
+[ -x "$rsync_bin" ] || reject
+exec "$rsync_bin" "${command_words[@]:1}"

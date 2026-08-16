@@ -1,0 +1,109 @@
+# Thin candidate overlay. Invoke only with the official base:
+#   docker compose --project-name weknora-v072-candidate --env-file \
+#     .runtime/weknora/candidate.env -f weknora/docker-compose.yml \
+#     -f integration/weknora-candidate/compose.yaml --profile neo4j \
+#     --profile searxng up -d --build
+#
+# It intentionally does not declare a new gateway or a business service.
+services:
+  frontend:
+    image: weknora-v072-candidate-ui:local
+    build:
+      context: ..
+      dockerfile: integration/weknora-candidate/Dockerfile.frontend
+    container_name: weknora-v072-candidate-frontend
+    ports: !override
+      - "127.0.0.1:${WEKNORA_CANDIDATE_FRONTEND_PORT:-4190}:80"
+
+  app:
+    # Never reuse a mutable candidate tag: this immutable suffix makes a
+    # stale interrupted build impossible to start by accident.
+    image: weknora-v072-candidate-app:3d5d8bf
+    build:
+      # Scope this build to the official source root. Its upstream
+      # .dockerignore excludes local data, frontend node_modules, and VCS
+      # state before Docker ever receives a build context.
+      context: ../weknora
+      dockerfile: ../integration/weknora-candidate/Dockerfile.app.runtime
+      args:
+        VERSION_ARG: "0.7.2"
+        COMMIT_ID_ARG: "3d5d8bfcdfeeea266b292b71cea616847af28d0f"
+        BUILD_TIME_ARG: "candidate-local"
+        GO_VERSION_ARG: "go1.26"
+    container_name: weknora-v072-candidate-app
+    ports: !override
+      - "127.0.0.1:${WEKNORA_CANDIDATE_APP_PORT:-18090}:8080"
+    env_file: !override
+      - ../.runtime/weknora/candidate.env
+    entrypoint: ["/bin/sh", "/opt/weknora-candidate/app-entrypoint.sh"]
+    # Compose clears an image CMD when entrypoint is overridden. Restore the
+    # exact upstream command so the native entrypoint ultimately execs v0.7.2.
+    command: ["./WeKnora"]
+    # The host network currently returns Clash's RFC 5737-style fake address
+    # (198.18.0.0/15) for external model hosts. Keep the application SSRF
+    # guard enabled, but pin only this local candidate container to public A
+    # records resolved by prepare-runtime.sh. Production compose has no such
+    # override and therefore keeps its normal resolver path unchanged.
+    extra_hosts:
+      - "api.deepseek.com:${WEKNORA_CANDIDATE_DEEPSEEK_IP:?run prepare-runtime.sh to resolve api.deepseek.com}"
+      - "openrouter.ai:${WEKNORA_CANDIDATE_OPENROUTER_IP:?run prepare-runtime.sh to resolve openrouter.ai}"
+    volumes:
+      - ../integration/weknora-candidate/app-entrypoint.sh:/opt/weknora-candidate/app-entrypoint.sh:ro
+    secrets:
+      - source: oidc_client_id
+        target: oidc_client_id
+        mode: 0400
+      - source: oidc_client_secret
+        target: oidc_client_secret
+        mode: 0400
+      - source: deepseek_api_key
+        target: deepseek_api_key
+        mode: 0400
+      - source: openrouter_api_key
+        target: openrouter_api_key
+        mode: 0400
+
+  docreader:
+    image: wechatopenai/weknora-docreader@sha256:b9c4636b65b5d4947d5e09cd311ba6cf37f1f2da37c51d4be2b911d432f12abe
+    build: !reset null
+    container_name: weknora-v072-candidate-docreader
+
+  postgres:
+    container_name: weknora-v072-candidate-postgres
+
+  redis:
+    container_name: weknora-v072-candidate-redis
+
+  neo4j:
+    container_name: weknora-v072-candidate-neo4j
+    ports: !override []
+
+  searxng-init:
+    container_name: weknora-v072-candidate-searxng-init
+
+  searxng:
+    container_name: weknora-v072-candidate-searxng
+    ports: !override
+      - "127.0.0.1:${WEKNORA_CANDIDATE_SEARXNG_PORT:-8890}:8080"
+
+volumes:
+  postgres-data:
+    name: ${WEKNORA_CANDIDATE_POSTGRES_VOLUME:-weknora-v072-candidate-postgres-data}
+  data-files:
+    name: ${WEKNORA_CANDIDATE_FILES_VOLUME:-weknora-v072-candidate-data-files}
+  docreader-tmp:
+    name: ${WEKNORA_CANDIDATE_DOCREADER_TMP_VOLUME:-weknora-v072-candidate-docreader-tmp}
+  neo4j-data:
+    name: ${WEKNORA_CANDIDATE_NEO4J_VOLUME:-weknora-v072-candidate-neo4j-data}
+  searxng_config:
+    name: ${WEKNORA_CANDIDATE_SEARXNG_CONFIG_VOLUME:-weknora-v072-candidate-searxng-config}
+
+secrets:
+  oidc_client_id:
+    file: ../.runtime/weknora/secrets/oidc_client_id
+  oidc_client_secret:
+    file: ../.runtime/weknora/secrets/oidc_client_secret
+  deepseek_api_key:
+    file: ../.runtime/weknora/secrets/deepseek_api_key
+  openrouter_api_key:
+    file: ../.runtime/weknora/secrets/openrouter_api_key

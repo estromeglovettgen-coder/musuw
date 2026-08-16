@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sourceDirectory": "weknora",
+  "upstream": {
+    "remote": "https://github.com/Tencent/WeKnora.git",
+    "tag": "v0.7.2",
+    "commit": "3d5d8bfcdfeeea266b292b71cea616847af28d0f",
+    "tree": "7251449b3d71ef5d7d157874c2c705c58a210202"
+  },
+  "officialTrackedPathCount": 2798,
+  "localAdaptation": "Musuw retains the complete upstream source and makes product-specific changes for branding, its Supabase Google/email-OTP entry, server-side model configuration, and a simplified consumer UI. The repository diff is the current local-delta inventory.",
+  "generatedArtifactExclusions": [
+    "desktop",
+    "server",
+    "frontend/dist/**",
+    "frontend/node_modules/**"
+  ]
+}

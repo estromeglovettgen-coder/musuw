@@ -1,0 +1,90 @@
+import { ref } from 'vue'
+import {
+  loadPreference,
+  savePreference,
+  migratePreferencesIntoUser,
+} from './preferenceStorage'
+
+export type ThemeMode = 'light' | 'dark' | 'system'
+
+const THEME_KEY = 'theme'
+
+function loadTheme(): ThemeMode {
+  const v = loadPreference(THEME_KEY)
+  if (v === 'light' || v === 'dark' || v === 'system') return v
+  return 'light'
+}
+
+// Shared reactive state across all consumers
+const currentTheme = ref<ThemeMode>(loadTheme())
+
+let lastEffective: 'light' | 'dark' | null = null
+
+function getSystemTheme(): 'light' | 'dark' {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+/** Keep the native Wails window in step with the CSS canvas without writing
+ * inline DOM backgrounds. Browser surfaces must remain controlled by the
+ * shared theme tokens so a normal web launch renders the approved palette. */
+function syncWailsNativeChrome(effective: 'light' | 'dark') {
+  const w = (window as unknown as {
+    runtime?: {
+      WindowSetDarkTheme?: () => void
+      WindowSetLightTheme?: () => void
+      WindowSetBackgroundColour?: (r: number, g: number, b: number, a: number) => void
+    }
+  }).runtime
+  if (!w?.WindowSetBackgroundColour) return
+  try {
+    if (effective === 'dark') {
+      w.WindowSetDarkTheme?.()
+      w.WindowSetBackgroundColour(21, 22, 25, 255)
+    } else {
+      w.WindowSetLightTheme?.()
+      w.WindowSetBackgroundColour(251, 252, 254, 255)
+    }
+  } catch {
+    /* 非桌面壳或未注入 runtime */
+  }
+}
+
+function applyTheme(mode: ThemeMode) {
+  const effective = mode === 'system' ? getSystemTheme() : mode
+  if (lastEffective === effective) return
+  lastEffective = effective
+  document.documentElement.setAttribute('theme-mode', effective)
+  syncWailsNativeChrome(effective)
+}
+
+export function useTheme() {
+  function setTheme(mode: ThemeMode): boolean {
+    if (mode !== 'light' && mode !== 'dark' && mode !== 'system') return false
+    currentTheme.value = mode
+    savePreference(THEME_KEY, mode)
+    applyTheme(mode)
+    return true
+  }
+
+  return { currentTheme, setTheme }
+}
+
+/** Call once in main.ts to initialise theme and listen for OS changes. */
+export function initTheme() {
+  currentTheme.value = loadTheme()
+  applyTheme(currentTheme.value)
+
+  // React to OS theme changes when user chose "system"
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (currentTheme.value === 'system') {
+      applyTheme('system')
+    }
+  })
+}
+
+/** Re-read preferences from storage (call after login / logout). */
+export function reloadThemeFromStorage() {
+  migratePreferencesIntoUser()
+  currentTheme.value = loadTheme()
+  applyTheme(currentTheme.value)
+}

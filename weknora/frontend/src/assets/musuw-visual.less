@@ -1,0 +1,902 @@
+/*
+ * Musuw consumer visual layer.
+ *
+ * This file deliberately changes only presentation.  It sits after the
+ * upstream theme so the knowledge, search, and agent runtime keep their
+ * original component contracts and behaviour. The Wiki graph intentionally
+ * has no selectors in this layer.
+ */
+
+html,
+body,
+#app {
+  background: var(--musuw-page);
+  color: var(--musuw-ink);
+  font-family: var(--app-font-family);
+}
+
+/* The upstream component library remains in place. These neutral defaults
+   remove the bright-green product skin without changing any control API.
+   Drawer and dialog entries are intentionally repeated because TDesign
+   teleports those trees outside #app. */
+#app .t-button--theme-primary,
+#app .t-button.t-button--theme-primary,
+.t-dialog__ctx .t-button--theme-primary,
+.t-dialog__ctx .t-button.t-button--theme-primary,
+.t-drawer:not(.wiki-graph-drawer) .t-button--theme-primary,
+.t-drawer:not(.wiki-graph-drawer) .t-button.t-button--theme-primary {
+  background: var(--musuw-ink);
+  border-color: var(--musuw-ink);
+}
+
+#app .t-button--theme-primary:hover,
+#app .t-button.t-button--theme-primary:hover,
+.t-dialog__ctx .t-button--theme-primary:hover,
+.t-dialog__ctx .t-button.t-button--theme-primary:hover,
+.t-drawer:not(.wiki-graph-drawer) .t-button--theme-primary:hover,
+.t-drawer:not(.wiki-graph-drawer) .t-button.t-button--theme-primary:hover {
+  background: var(--musuw-muted);
+  border-color: var(--musuw-muted);
+}
+
+#app .t-button--variant-outline,
+#app .t-button--variant-text,
+.t-dialog__ctx .t-button--variant-outline,
+.t-dialog__ctx .t-button--variant-text,
+.t-drawer:not(.wiki-graph-drawer) .t-button--variant-outline,
+.t-drawer:not(.wiki-graph-drawer) .t-button--variant-text {
+  color: var(--musuw-muted);
+}
+
+#app .t-input,
+#app .t-textarea,
+#app .t-select__wrap,
+#app .t-select-input,
+.t-dialog__ctx .t-input,
+.t-dialog__ctx .t-textarea,
+.t-dialog__ctx .t-select__wrap,
+.t-dialog__ctx .t-select-input,
+.t-drawer:not(.wiki-graph-drawer) .t-input,
+.t-drawer:not(.wiki-graph-drawer) .t-textarea,
+.t-drawer:not(.wiki-graph-drawer) .t-select__wrap,
+.t-drawer:not(.wiki-graph-drawer) .t-select-input {
+  border-color: var(--musuw-line);
+  box-shadow: none;
+}
+
+#app .t-input:hover,
+#app .t-textarea:hover,
+#app .t-input.t-is-focused,
+#app .t-textarea.t-is-focused,
+#app .t-select.t-is-focused .t-select-input,
+.t-dialog__ctx .t-input:hover,
+.t-dialog__ctx .t-textarea:hover,
+.t-dialog__ctx .t-input.t-is-focused,
+.t-dialog__ctx .t-textarea.t-is-focused,
+.t-dialog__ctx .t-select.t-is-focused .t-select-input,
+.t-drawer:not(.wiki-graph-drawer) .t-input:hover,
+.t-drawer:not(.wiki-graph-drawer) .t-textarea:hover,
+.t-drawer:not(.wiki-graph-drawer) .t-input.t-is-focused,
+.t-drawer:not(.wiki-graph-drawer) .t-textarea.t-is-focused,
+.t-drawer:not(.wiki-graph-drawer) .t-select.t-is-focused .t-select-input {
+  border-color: var(--musuw-line-strong);
+  box-shadow: none;
+}
+
+#app .t-tag--theme-primary.t-tag--variant-light,
+#app .t-tag--theme-primary.t-tag--variant-light-outline,
+.t-dialog__ctx .t-tag--theme-primary.t-tag--variant-light,
+.t-dialog__ctx .t-tag--theme-primary.t-tag--variant-light-outline,
+.t-drawer:not(.wiki-graph-drawer) .t-tag--theme-primary.t-tag--variant-light,
+.t-drawer:not(.wiki-graph-drawer) .t-tag--theme-primary.t-tag--variant-light-outline {
+  background: var(--musuw-blue-soft);
+  border-color: color-mix(in srgb, var(--musuw-blue) 17%, var(--musuw-line));
+  color: var(--musuw-blue);
+}
+
+/* Conversation: preserve the upstream chat tree and stream contracts, but
+   arrange it like the archived Musuw reading surface: one quiet 56px header,
+   a 640px reading column, and a single compact composer. */
+#app .chat {
+  background: var(--musuw-panel);
+  min-width: 0;
+  padding: 0;
+}
+
+#app .chat:not(.is-embedded) {
+  min-width: 0;
+  padding: 0;
+}
+
+@media (min-width: 960px) {
+  #app .chat.has-references-panel:not(.is-embedded) {
+    padding-right: 400px;
+  }
+}
+
+#app .chat .chat-header {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: 6;
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  min-height: 56px;
+  height: 56px;
+  margin: 0;
+  padding: 0 32px;
+  border: 0;
+  border-bottom: 1px solid var(--musuw-line);
+  border-radius: 0;
+  background: var(--musuw-panel);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-sizing: border-box;
+}
+
+#app .chat .chat-header.is-editing {
+  max-width: none;
+  padding: 0 32px;
+}
+
+#app .chat .chat-header__title {
+  color: var(--musuw-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#app .chat .chat-header__menu-btn {
+  border-radius: var(--musuw-radius-control);
+  color: var(--musuw-faint);
+}
+
+#app .chat .chat_scroll_box {
+  padding-top: 0;
+  background: var(--musuw-panel);
+}
+
+#app .chat .msg_list,
+#app .chat .input-container,
+#app .chat .msg-skeleton-list {
+  max-width: 640px;
+  width: min(640px, calc(100% - 48px));
+}
+
+#app .chat .msg_list {
+  gap: 24px;
+  padding: 28px 0 24px;
+}
+
+#app .chat .msg-skeleton-list {
+  padding: 28px 0 24px;
+}
+
+#app .chat .msg-item-wrapper {
+  contain: none;
+}
+
+#app .chat .bot_msg,
+#app .chat .agent-stream-display {
+  color: var(--musuw-ink);
+  font-size: 15px;
+  line-height: 23px;
+}
+
+#app .chat .content-wrapper {
+  padding: 0;
+}
+
+#app .chat .markdown-content,
+#app .chat .answer-content {
+  color: var(--musuw-ink);
+  line-height: 23px;
+}
+
+#app .chat .markdown-content a,
+#app .chat .answer-content a,
+#app .chat .citation-wiki,
+#app .chat .citation-link {
+  color: var(--musuw-blue);
+}
+
+#app .chat .user_msg_container {
+  gap: 8px;
+}
+
+#app .chat .user_msg {
+  max-width: 77%;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--musuw-ink);
+  font-size: 15px;
+  line-height: 23px;
+  padding: 9px 12px;
+}
+
+#app .chat .answer-toolbar {
+  margin-top: 8px;
+}
+
+#app .chat .answer-toolbar .t-button {
+  background: transparent;
+  border-color: var(--musuw-line);
+  color: var(--musuw-muted);
+  box-shadow: none;
+}
+
+#app .chat .action-card,
+#app .chat .plan-task-change-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#app .chat .action-card:hover {
+  background: var(--musuw-hover);
+}
+
+#app .chat .action-header,
+#app .chat .action-title {
+  color: var(--musuw-muted);
+}
+
+#app .chat .action-name,
+#app .chat .action-summary {
+  color: var(--musuw-muted);
+}
+
+#app .chat .action-details {
+  border-left-color: var(--musuw-line);
+  background: transparent;
+}
+
+#app .chat .rich-input-container {
+  max-width: 640px;
+  background: var(--td-bg-color-secondarycontainer);
+  border-color: var(--musuw-line);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(38, 38, 38, 0.035);
+}
+
+#app .chat .rich-input-container:focus-within {
+  border-color: var(--musuw-line-strong);
+}
+
+#app .chat .control-bar,
+#app .chat .control-right {
+  color: var(--musuw-muted);
+}
+
+#app .chat .input-container {
+  min-height: 116px;
+  padding: 0 0 18px;
+}
+
+#app .chat .rich-input-container .t-textarea__inner {
+  min-height: 84px !important;
+  padding: 12px 14px 48px;
+  color: var(--musuw-ink);
+  font-size: 15px;
+  line-height: 23px;
+}
+
+#app .chat .rich-input-container .t-textarea__inner::placeholder {
+  color: var(--musuw-faint);
+  font-size: 15px;
+}
+
+#app .chat .control-bar {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--td-bg-color-secondarycontainer) 0%, transparent) 0%,
+    var(--td-bg-color-secondarycontainer) 40%,
+    var(--td-bg-color-secondarycontainer) 100%
+  );
+}
+
+#app .chat .send-btn,
+#app .chat .control-btn.send-btn {
+  background: var(--musuw-ink);
+  color: var(--musuw-panel);
+  border-radius: var(--musuw-radius-control);
+}
+
+#app .chat .send-btn.disabled,
+#app .chat .control-btn.send-btn.disabled {
+  background: var(--musuw-line-strong);
+  color: var(--musuw-panel);
+}
+
+#app .chat .suggested-questions-inner {
+  max-width: 640px;
+  border-top: 1px solid var(--musuw-line);
+  padding-top: 18px;
+}
+
+#app .chat .suggested-question-card {
+  background: transparent;
+  border: 1px solid var(--musuw-line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+#app .chat .suggested-question-card:hover {
+  background: var(--musuw-hover);
+  border-color: var(--musuw-line-strong);
+}
+
+:root[theme-mode="dark"] #app .chat .user_msg {
+  background: #292c31;
+}
+
+:root[theme-mode="dark"] #app .chat .rich-input-container {
+  background: #202227;
+}
+
+:root[theme-mode="dark"] #app .chat .control-bar {
+  background: linear-gradient(
+    to bottom,
+    rgba(32, 34, 39, 0) 0%,
+    #202227 40%,
+    #202227 100%
+  );
+}
+
+/* New conversations use the same reading column as a session. The existing
+   create-chat component keeps its handlers and responsive media queries; the
+   stronger shell selector only neutralises its former 960px/absolute layout. */
+#app .dialogue-wrap {
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  padding: 24px;
+  background: var(--musuw-panel);
+  box-sizing: border-box;
+}
+
+#app .dialogue-answers {
+  width: min(640px, 100%);
+  max-width: 640px;
+  gap: 16px;
+}
+
+#app .dialogue-title {
+  align-self: stretch;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--musuw-line);
+  color: var(--musuw-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#app .dialogue-answers .suggested-questions-container,
+#app .chat .suggested-questions-container {
+  width: 100%;
+  max-width: 640px;
+  margin: 0;
+  padding: 0;
+}
+
+#app .dialogue-answers .suggested-questions-title-row,
+#app .chat .suggested-questions-title-row {
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+#app .dialogue-answers .suggested-questions-grid,
+#app .chat .suggested-questions-grid {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+#app .dialogue-answers .suggested-question-card,
+#app .chat .suggested-question-card {
+  border-color: var(--musuw-line);
+  border-radius: 8px;
+  background: var(--musuw-panel);
+  box-shadow: none;
+}
+
+#app .dialogue-answers .suggested-question-card:hover,
+#app .chat .suggested-question-card:hover {
+  border-color: var(--musuw-line-strong);
+  background: var(--musuw-hover);
+  box-shadow: none;
+}
+
+#app .dialogue-answers .answers-input {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  transform: none !important;
+}
+
+#app .dialogue-answers .rich-input-container {
+  width: 100%;
+  max-width: 640px;
+  border-color: var(--musuw-line);
+  border-radius: 12px;
+  background: var(--td-bg-color-secondarycontainer);
+  box-shadow: 0 6px 18px rgba(38, 38, 38, 0.035);
+}
+
+#app .dialogue-answers .rich-input-container:focus-within {
+  border-color: var(--musuw-line-strong);
+}
+
+#app .dialogue-answers .t-textarea__inner {
+  width: 100% !important;
+  min-height: 84px !important;
+  padding: 12px 14px 48px !important;
+  color: var(--musuw-ink);
+  font-size: 15px;
+  line-height: 23px;
+}
+
+#app .dialogue-answers .control-bar {
+  right: 14px;
+  bottom: 10px;
+  left: 14px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--td-bg-color-secondarycontainer) 0%, transparent) 0%,
+    var(--td-bg-color-secondarycontainer) 40%,
+    var(--td-bg-color-secondarycontainer) 100%
+  );
+}
+
+#app .dialogue-answers .send-btn,
+#app .dialogue-answers .control-btn.send-btn {
+  border-radius: 8px;
+  background: var(--musuw-ink);
+  color: var(--musuw-panel);
+}
+
+#app .dialogue-answers .send-btn.disabled,
+#app .dialogue-answers .control-btn.send-btn.disabled {
+  background: var(--musuw-line-strong);
+  color: var(--musuw-panel);
+}
+
+/* Knowledge library: a document-like canvas with a quiet thin-line header. */
+#app .kb-list-container,
+#app .knowledge-layout {
+  background: var(--musuw-page);
+}
+
+#app .kb-list-content {
+  padding: 32px 32px 0;
+}
+
+#app .kb-list-container .header,
+#app .knowledge-layout .document-header {
+  min-height: 56px;
+  margin-bottom: 20px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--musuw-line);
+}
+
+#app .kb-list-container .header h2,
+#app .knowledge-layout .document-breadcrumb,
+#app .knowledge-layout .document-title-row h2 {
+  color: var(--musuw-ink);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+#app .kb-list-container .header-subtitle,
+#app .knowledge-layout .document-subtitle {
+  color: var(--musuw-muted);
+}
+
+#app .kb-list-main {
+  padding-right: 0;
+  padding-bottom: 32px;
+}
+
+#app .kb-card-wrap {
+  gap: 14px;
+}
+
+#app .kb-card,
+#app .knowledge-card {
+  background: var(--musuw-panel);
+  border: 1px solid var(--musuw-line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+#app .kb-card:hover,
+#app .knowledge-card:hover {
+  border-color: var(--musuw-line-strong);
+  box-shadow: var(--musuw-shadow);
+  transform: none;
+}
+
+/* The creator tile is intentionally an affordance, not another document
+   surface.  Keep its dashed outline after the broad `.kb-card` shell rules
+   above (and after the component's scoped stylesheet) without changing the
+   solid treatment of regular cards. */
+#app .kb-card.kb-create-card {
+  border: 1px dashed var(--musuw-line);
+  background: transparent;
+  color: var(--musuw-muted);
+  box-shadow: none;
+}
+
+#app .kb-card.kb-create-card:hover,
+#app .kb-card.kb-create-card:focus,
+#app .kb-card.kb-create-card:focus-visible,
+#app .kb-card.kb-create-card:active {
+  border: 1px dashed var(--musuw-line-strong);
+  background: var(--musuw-hover);
+  color: var(--musuw-ink);
+  box-shadow: none;
+  transform: none;
+}
+
+#app .kb-card .card-title,
+#app .kb-card .card-title-text,
+#app .knowledge-card .knowledge-card-title {
+  color: var(--musuw-ink);
+}
+
+#app .kb-card .card-description,
+#app .kb-card .card-bottom,
+#app .knowledge-card .knowledge-card-desc {
+  color: var(--musuw-muted);
+}
+
+#app .kb-card .feature-badge,
+#app .kb-card .shared-by-me-badge,
+#app .kb-section-count {
+  background: transparent;
+  border-color: var(--musuw-line);
+  color: var(--musuw-muted);
+}
+
+#app .kb-list-container .kb-create-btn,
+#app .knowledge-layout .create-document-btn {
+  background: var(--musuw-ink);
+  border-color: var(--musuw-ink);
+  box-shadow: none;
+}
+
+#app .knowledge-layout .knowledge-main {
+  background: var(--musuw-panel);
+  border: 1px solid var(--musuw-line);
+  border-radius: 12px 12px 0 0;
+}
+
+#app .knowledge-layout .doc-list-view,
+#app .knowledge-layout .doc-list-header,
+#app .knowledge-layout .doc-list-row,
+#app .knowledge-layout .folder-card {
+  border-color: var(--musuw-line);
+}
+
+#app .knowledge-layout .doc-list-header {
+  min-height: 44px;
+  background: var(--td-bg-color-secondarycontainer);
+}
+
+#app .knowledge-layout .doc-list-row:hover,
+#app .knowledge-layout .folder-card:hover {
+  background: var(--musuw-hover);
+}
+
+#app .knowledge-layout .folder-card {
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+/* TDesign moves these surfaces to body. Keep their document-workspace
+   treatment global rather than relying on an #app ancestor that is absent
+   after teleport. */
+.t-dialog__ctx .t-dialog,
+.t-drawer:not(.wiki-graph-drawer) .t-drawer__content,
+.t-select__dropdown:not(.wiki-graph-search-dropdown),
+.t-cascader__dropdown:not(.wiki-graph-search-dropdown),
+.t-dropdown__menu:not(.wiki-graph-search-dropdown) {
+  background: var(--musuw-panel);
+  color: var(--musuw-ink);
+  border-color: var(--musuw-line);
+  box-shadow: var(--musuw-shadow);
+}
+
+.t-dialog__ctx .t-dialog {
+  border: 1px solid var(--musuw-line);
+  border-radius: 12px;
+}
+
+.t-dialog__ctx .t-dialog__header,
+.t-drawer:not(.wiki-graph-drawer) .t-drawer__header {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--musuw-line);
+  color: var(--musuw-ink);
+}
+
+.t-dialog__ctx .t-dialog__body,
+.t-drawer:not(.wiki-graph-drawer) .t-drawer__body {
+  color: var(--musuw-ink);
+}
+
+.t-dialog__ctx .t-dialog__footer,
+.t-drawer:not(.wiki-graph-drawer) .t-drawer__footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--musuw-line);
+}
+
+.t-dialog__ctx .t-dialog__close,
+.t-drawer:not(.wiki-graph-drawer) .t-drawer__close {
+  border-radius: var(--musuw-radius-control);
+  color: var(--musuw-faint);
+}
+
+.t-dialog__ctx .t-dialog__close:hover,
+.t-drawer:not(.wiki-graph-drawer) .t-drawer__close:hover {
+  background: var(--musuw-hover);
+  color: var(--musuw-ink);
+}
+
+.t-drawer.doc-main-drawer .t-drawer__header,
+.t-drawer.chat-attachment-preview-drawer .t-drawer__header {
+  min-height: 56px;
+  padding: 0 18px;
+}
+
+.t-drawer.doc-main-drawer .doc-drawer-header-icon,
+.t-drawer.chat-attachment-preview-drawer .chat-attachment-drawer-header-icon {
+  border-radius: var(--musuw-radius-control);
+  background: var(--musuw-blue-soft);
+  color: var(--musuw-blue);
+}
+
+.t-drawer.doc-main-drawer .doc-drawer-header-title,
+.t-drawer.chat-attachment-preview-drawer .chat-attachment-drawer-header-title {
+  color: var(--musuw-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.t-drawer.doc-main-drawer .doc-drawer-body .setting-drawer__section {
+  border-bottom-color: var(--musuw-line);
+}
+
+.t-drawer.doc-main-drawer .doc-drawer-body .setting-drawer__section-title,
+.t-drawer.doc-main-drawer .doc-detail-value {
+  color: var(--musuw-ink);
+}
+
+.t-drawer.doc-main-drawer .doc-detail-label,
+.t-drawer.doc-main-drawer .metadata-item-key {
+  color: var(--musuw-muted);
+}
+
+.t-drawer.doc-main-drawer .summary_wrapper,
+.t-drawer.doc-main-drawer .document-preview {
+  border-color: var(--musuw-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.knowledge-card-hover-popover {
+  border: 1px solid var(--musuw-line);
+  border-radius: 8px;
+  background: var(--musuw-panel);
+  box-shadow: var(--musuw-shadow);
+}
+
+/* References use the old Musuw blue compact citation treatment rather than
+   a competing product-green badge. */
+#app .chat .citation-pill,
+#app .chat .citation-link,
+#app .chat .reference-citation,
+#app .chat .citation-kb,
+#app .chat .citation-web,
+#app .chat .citation-wiki {
+  background: var(--musuw-blue-soft);
+  border-color: color-mix(in srgb, var(--musuw-blue) 17%, var(--musuw-line));
+  color: var(--musuw-blue);
+}
+
+#app .chat .citation-kb,
+#app .chat .citation-web {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--musuw-blue) 17%, var(--musuw-line));
+}
+
+#app .chat .citation-kb:hover,
+#app .chat .citation-web:hover,
+#app .chat .citation-wiki:hover {
+  background: color-mix(in srgb, var(--musuw-blue) 11%, var(--musuw-panel));
+  color: var(--musuw-blue);
+}
+
+/* Citation previews and the reference panel are teleported to body. */
+.chat-citation-float {
+  border: 1px solid var(--musuw-line);
+  border-radius: 8px;
+  background: var(--musuw-panel);
+  box-shadow: var(--musuw-shadow);
+  color: var(--musuw-ink);
+}
+
+.chat-citation-float__title,
+.chat-citation-float__link {
+  color: var(--musuw-blue);
+}
+
+.chat-citation-float__muted {
+  color: var(--musuw-muted);
+}
+
+body .chat-references-panel.chat-references-panel {
+  width: min(400px, 100vw);
+  background: var(--musuw-panel);
+  border-left-color: var(--musuw-line);
+  box-shadow: -10px 0 28px rgba(38, 38, 38, 0.08);
+}
+
+body .chat-references-panel.is-overlay {
+  box-shadow: -10px 0 28px rgba(38, 38, 38, 0.1);
+}
+
+body .chat-references-panel .chat-references-panel__header {
+  min-height: 56px;
+  padding: 0 16px;
+  border-bottom-color: var(--musuw-line);
+}
+
+body .chat-references-panel .chat-references-panel__title {
+  color: var(--musuw-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body .chat-references-panel .chat-references-panel__count,
+body .chat-references-panel .chat-references-panel__section-title,
+body .chat-references-panel .reference-item__domain,
+body .chat-references-panel .reference-item__snippet,
+body .chat-references-panel .reference-item__content {
+  color: var(--musuw-muted);
+}
+
+body .chat-references-panel .chat-references-panel__close {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--musuw-radius-control);
+  background: transparent;
+  color: var(--musuw-faint);
+}
+
+body .chat-references-panel .chat-references-panel__close:hover {
+  background: var(--musuw-hover);
+  color: var(--musuw-ink);
+}
+
+body .chat-references-panel .reference-item {
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+body .chat-references-panel .reference-item:hover,
+body .chat-references-panel .reference-item.is-highlighted {
+  border-color: var(--musuw-line);
+  background: var(--musuw-hover);
+}
+
+body .chat-references-panel .reference-item__body {
+  padding: 10px;
+}
+
+body .chat-references-panel .reference-item__title {
+  color: var(--musuw-ink);
+  font-size: 14px;
+}
+
+body .chat-references-panel .reference-item__doc-icon,
+body .chat-references-panel .reference-item__open,
+body .chat-references-panel .reference-item__open:hover {
+  color: var(--musuw-blue);
+}
+
+/* The @-mention knowledge selector is another body teleport. It keeps the
+   compact document-control geometry and blue selection state in both modes. */
+body .kb-dropdown.kb-dropdown {
+  border: 1px solid var(--musuw-line);
+  border-radius: 8px;
+  background: var(--musuw-panel);
+  box-shadow: var(--musuw-shadow);
+}
+
+body .kb-dropdown .kb-search,
+body .kb-dropdown .kb-actions {
+  border-color: var(--musuw-line);
+  background: var(--td-bg-color-secondarycontainer);
+}
+
+body .kb-dropdown .kb-search-input,
+body .kb-dropdown .kb-btn {
+  border-color: var(--musuw-line);
+  background: var(--musuw-panel);
+  color: var(--musuw-ink);
+}
+
+body .kb-dropdown .kb-search-input:focus,
+body .kb-dropdown .kb-btn:hover {
+  border-color: var(--musuw-blue);
+  color: var(--musuw-blue);
+}
+
+body .kb-dropdown .kb-item:hover,
+body .kb-dropdown .kb-item.highlighted {
+  background: var(--musuw-hover);
+}
+
+body .kb-dropdown .kb-item.selected {
+  background: var(--musuw-blue-soft);
+}
+
+body .kb-dropdown .checkbox.checked {
+  background: var(--musuw-blue);
+  border-color: var(--musuw-blue);
+}
+
+@media (max-width: 760px) {
+  #app .chat {
+    min-width: 0;
+    padding: 0;
+  }
+
+  #app .chat .chat-header,
+  #app .chat .chat-header.is-editing {
+    padding: 0 16px;
+  }
+
+  #app .chat .msg_list,
+  #app .chat .input-container,
+  #app .chat .rich-input-container {
+    max-width: 100%;
+  }
+
+  #app .chat .msg_list,
+  #app .chat .input-container {
+    width: calc(100% - 32px);
+  }
+
+  #app .chat .input-container {
+    min-height: 112px;
+    padding-bottom: 14px;
+  }
+
+  #app .dialogue-wrap {
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  #app .dialogue-title {
+    min-height: 52px;
+  }
+
+  #app .kb-list-content {
+    padding: 20px 16px 0;
+  }
+
+  #app .knowledge-layout .knowledge-main {
+    border-radius: 0;
+    border-right: 0;
+    border-left: 0;
+  }
+}

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Explicit server build/upload/update path. It intentionally stays separate
+# from host development and delegates to the existing verified release flow.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$repo_root/scripts/weknora-deploy.sh" update "$@"

@@ -1,0 +1,93 @@
+# Platform-managed models are visible to every existing and future workspace.
+# Credentials are expanded from backend-only environment variables at startup
+# and encrypted before the model rows are persisted.
+builtin_models:
+  - id: builtin-deepseek-v4-pro
+    tenant_id: 10000
+    name: deepseek-v4-pro
+    type: KnowledgeQA
+    source: remote
+    description: DeepSeek V4 Pro · default high-quality conversation model
+    is_default: true
+    status: active
+    parameters:
+      base_url: https://api.deepseek.com/v1
+      api_key: ${DEEPSEEK_API_KEY}
+      provider: deepseek
+      supports_vision: false
+      extra_config:
+        thinking_control: thinking_type
+
+  - id: builtin-deepseek-v4-flash
+    tenant_id: 10000
+    name: deepseek-v4-flash
+    type: KnowledgeQA
+    source: remote
+    description: DeepSeek V4 Flash · lower-latency conversation option
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://api.deepseek.com/v1
+      api_key: ${DEEPSEEK_API_KEY}
+      provider: deepseek
+      supports_vision: false
+      extra_config:
+        thinking_control: thinking_type
+
+  - id: builtin-openrouter-embedding
+    tenant_id: 10000
+    name: qwen/qwen3-embedding-8b
+    type: Embedding
+    source: remote
+    description: Qwen3 Embedding 8B · multilingual document and query vectors
+    is_default: true
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      embedding_parameters:
+        dimension: 4096
+        truncate_prompt_tokens: 8192
+        supports_dimension_override: false
+
+  - id: builtin-openrouter-rerank
+    tenant_id: 10000
+    name: cohere/rerank-4-fast
+    type: Rerank
+    source: remote
+    description: Cohere Rerank 4 Fast · multilingual result reranking
+    is_default: true
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+
+  - id: builtin-openrouter-vlm
+    tenant_id: 10000
+    name: qwen/qwen3-vl-8b-instruct
+    type: VLLM
+    source: remote
+    description: Qwen3-VL 8B Instruct · document image understanding and OCR
+    is_default: true
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      interface_type: openai
+      supports_vision: true
+
+  - id: builtin-openrouter-asr
+    tenant_id: 10000
+    name: openai/whisper-large-v3
+    type: ASR
+    source: remote
+    description: Whisper Large V3 · multilingual speech transcription
+    is_default: true
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
