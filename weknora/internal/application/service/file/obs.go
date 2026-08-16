@@ -75,33 +75,6 @@ func NewObsFileService(
 	}, nil
 }
 
-// NewObsFileServiceExisting verifies the configured bucket and never calls
-// CreateBucket. It is used by web/worker startup after prepare provisioned
-// infrastructure.
-func NewObsFileServiceExisting(
-	endpoint, region, accessKeyID, secretAccessKey, bucketName string,
-	pathPrefix string,
-) (interfaces.FileService, error) {
-	client := s3.New(s3.Options{
-		Region:           region,
-		EndpointResolver: &obsEndpointResolver{url: endpoint},
-		Credentials:      credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
-		UsePathStyle:     true,
-	})
-	svc := &obsFileService{
-		client:      client,
-		bucketName:  bucketName,
-		endpoint:    endpoint,
-		region:      region,
-		pathPrefix:  strings.Trim(pathPrefix, "/"),
-		proxyDomain: strings.TrimSuffix(os.Getenv("OBS_PROXY_DOMAIN"), "/"),
-	}
-	if err := svc.CheckConnectivity(context.Background()); err != nil {
-		return nil, err
-	}
-	return svc, nil
-}
-
 func CheckObsConnectivity(ctx context.Context, endpoint, region, accessKey, secretKey, bucketName string) error {
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

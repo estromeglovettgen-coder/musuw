@@ -11,7 +11,6 @@ repo_root="$(weknora_production_repo_root)"
 runtime_dir="$(weknora_production_runtime_dir)"
 production_env="$runtime_dir/production.env"
 revision="$(weknora_production_revision)"
-image_tag="$(weknora_production_image_tag)"
 use_edge=false
 
 if [ "${1:-}" = '--edge' ]; then
@@ -38,5 +37,4 @@ exec env \
     DOCKER_DEFAULT_PLATFORM=linux/amd64 \
     WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
     WEKNORA_PRODUCTION_REVISION="$revision" \
-    WEKNORA_PRODUCTION_IMAGE_TAG="$image_tag" \
     docker compose "${compose_args[@]}" "$@"

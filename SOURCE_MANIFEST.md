@@ -18,12 +18,10 @@ together before each publication.
 - `auth/`: the Musuw Google/email-OTP login shell source and tests.
 - `storefront/`: the `musuw-site` Worker source, public assets, tests, and
   lockfile.
-- `app-edge/`: the app-edge Worker source, tests, deployment contract, and
-  safe configuration examples; generated Wrangler output is excluded.
 - `integration/`: the candidate and production composition files used by the
   app/auth/backend release seam.
-- `.github/workflows/`: the root CI, storefront, app-edge staging, and
-  production delivery authorities. Nested upstream workflows remain excluded.
+- `.github/workflows/`: the root CI, storefront, and production delivery
+  authorities. Nested upstream workflows remain excluded.
 - `docs/`: release and deployment runbooks.
 - `scripts/`: the Musuw local/preview/release entry points, CI scanners,
   candidate and production release scripts, and release simulation checks.

@@ -104,25 +104,6 @@ func NewS3FileService(endpoint,
 	return svc, nil
 }
 
-// NewS3FileServiceExisting builds a client and verifies the bucket without
-// invoking CreateBucket.
-func NewS3FileServiceExisting(endpoint,
-	accessKey, secretKey, bucketName, region, pathPrefix string,
-) (interfaces.FileService, error) {
-	return NewS3FileServiceExistingWithOptions(endpoint, accessKey, secretKey, bucketName, region, pathPrefix, false)
-}
-
-func NewS3FileServiceExistingWithOptions(endpoint, accessKey, secretKey, bucketName, region, pathPrefix string, forcePathStyle bool) (interfaces.FileService, error) {
-	svc, err := newS3Client(endpoint, accessKey, secretKey, bucketName, region, pathPrefix, forcePathStyle)
-	if err != nil {
-		return nil, err
-	}
-	if err := svc.CheckConnectivity(context.Background()); err != nil {
-		return nil, fmt.Errorf("S3 bucket prerequisite: %w", err)
-	}
-	return svc, nil
-}
-
 // NewS3FileServiceWithOptions is the instance-aware S3 constructor. Existing
 // callers keep the historical endpoint-based path-style inference.
 func NewS3FileServiceWithOptions(endpoint, accessKey, secretKey, bucketName, region, pathPrefix string, forcePathStyle bool) (interfaces.FileService, error) {

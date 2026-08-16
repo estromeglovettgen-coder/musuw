@@ -15,7 +15,6 @@
     "weknora/",
     "auth/",
     "storefront/",
-    "app-edge/",
     "integration/",
     "scripts/musuw-*",
     "scripts/weknora-*",

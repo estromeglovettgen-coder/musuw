@@ -14,11 +14,12 @@ on:
 permissions:
   contents: read
   actions: read
+  packages: write
 
 concurrency:
   group: production-release
-  # A release must finish or fail and roll back through the server seam before
-  # another release can start. Never cancel an in-flight production update.
+  # Never cancel an in-flight release; the fixed server seam either completes
+  # or exits non-zero before another release may start.
   cancel-in-progress: false
 
 jobs:
@@ -117,13 +118,12 @@ jobs:
           bash scripts/weknora-production/verify-static.sh
           bash scripts/weknora-production/deploy-ci-seams-contract.test.sh
           bash scripts/weknora-production/source-manifest-integrity.test.sh
-          bash scripts/weknora-production/release-transaction-contract.test.sh
+          bash scripts/weknora-production/musuw-deploy-gate-simulation.test.sh
+          docker buildx build --call=check --platform linux/amd64 \
+            -f integration/weknora-production/Dockerfile.app.runtime weknora
+          docker buildx build --call=check --platform linux/amd64 \
+            -f integration/weknora-production/Dockerfile.frontend .
           # verify-static.sh renders both base and edge scripts/weknora-production/compose.sh config.
-      - name: Run the release lifecycle simulation
-        run: |
-          bash scripts/weknora-workflow-simulation.test.sh
-          bash scripts/weknora-production/release-transaction-simulation.test.sh
-          bash scripts/weknora-production/release-transaction-actual.test.sh
 
   deploy:
     name: Execute the approved production release
@@ -191,19 +191,85 @@ jobs:
           test -s "$known_hosts_path"
           test -s "$runtime_dir/production.public.env"
           test -s "$runtime_dir/auth-public.env"
-      - name: Assert the formal staged release rollback seam
+      - name: Build production browser bundles on GitHub
+        env:
+          RUNTIME_DIR: ${{ steps.prepare.outputs.runtime_dir }}
+          RELEASE_SHA: ${{ needs.rebuild.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          WEKNORA_PRODUCTION_RUNTIME_DIR="$RUNTIME_DIR" \
+          WEKNORA_PRODUCTION_REVISION="$RELEASE_SHA" \
+            bash scripts/weknora-production/build-static.sh
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and push immutable application image
+        id: build_app
+        uses: docker/build-push-action@v6
+        with:
+          context: ./weknora
+          file: ./integration/weknora-production/Dockerfile.app.runtime
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/estromeglovettgen-coder/musuw-app:${{ needs.rebuild.outputs.release_sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.rebuild.outputs.release_sha }}
+          build-args: |
+            VERSION_ARG=0.7.2
+            COMMIT_ID_ARG=${{ needs.rebuild.outputs.release_sha }}
+            BUILD_TIME_ARG=production-github-actions
+            GO_VERSION_ARG=go1.26
+      - name: Build and push immutable frontend image
+        id: build_frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integration/weknora-production/Dockerfile.frontend
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/estromeglovettgen-coder/musuw-frontend:${{ needs.rebuild.outputs.release_sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.rebuild.outputs.release_sha }}
+          build-args: |
+            VERSION_ARG=0.7.2
+            REVISION_ARG=${{ needs.rebuild.outputs.release_sha }}
+      - name: Pin GHCR image digests in the server input
+        env:
+          RUNTIME_DIR: ${{ steps.prepare.outputs.runtime_dir }}
+          RELEASE_SHA: ${{ needs.rebuild.outputs.release_sha }}
+          APP_DIGEST: ${{ steps.build_app.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.build_frontend.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$APP_DIGEST" =~ ^sha256:[0-9a-fA-F]{64}$ ]]
+          [[ "$FRONTEND_DIGEST" =~ ^sha256:[0-9a-fA-F]{64}$ ]]
+          tmp="$RUNTIME_DIR/production.public.env.$$"
+          awk '!/^(WEKNORA_PRODUCTION_REVISION|WEKNORA_PRODUCTION_APP_IMAGE|WEKNORA_PRODUCTION_FRONTEND_IMAGE)=/' \
+            "$RUNTIME_DIR/production.public.env" > "$tmp"
+          printf '%s\n' \
+            "WEKNORA_PRODUCTION_REVISION=$RELEASE_SHA" \
+            "WEKNORA_PRODUCTION_APP_IMAGE=ghcr.io/estromeglovettgen-coder/musuw-app@$APP_DIGEST" \
+            "WEKNORA_PRODUCTION_FRONTEND_IMAGE=ghcr.io/estromeglovettgen-coder/musuw-frontend@$FRONTEND_DIGEST" >> "$tmp"
+          chmod 600 "$tmp"
+          mv -f "$tmp" "$RUNTIME_DIR/production.public.env"
+      - name: Assert the direct SHA-only release seam
         run: |
           set -euo pipefail
           grep -Fq 'release-ci.sh' scripts/weknora-deploy.sh
-          grep -Fq 'remote_gate preflight update' scripts/weknora-deploy.sh
-          grep -Fq 'remote_gate promote update' scripts/weknora-deploy.sh
-          grep -Fq 'remote_gate run update' scripts/weknora-deploy.sh
+          grep -Fq 'remote_gate prepare' scripts/weknora-deploy.sh
+          grep -Fq 'remote_gate deploy' scripts/weknora-deploy.sh
+          grep -Fq 'Usage: scripts/weknora-deploy.sh <full-sha>' scripts/weknora-deploy.sh
           test -x scripts/weknora-production/server/musuw-deploy-ssh-gate
           test -x scripts/weknora-production/server/musuw-deploy-gate
-          grep -Fq 'rollback.sh' scripts/weknora-production/release-ci.sh
-          grep -Fq 'release-transaction.sh' scripts/weknora-production/release-ci.sh
-          grep -Fq 'public_probes' scripts/weknora-production/release-transaction.sh
-      - name: Execute the existing WeKnora release seam
+      - name: Execute the direct SHA-only WeKnora release seam
+        id: deploy_release
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           WEKNORA_DEPLOY_RUNTIME_DIR: ${{ steps.prepare.outputs.runtime_dir }}
@@ -212,29 +278,17 @@ jobs:
           WEKNORA_DEPLOY_REMOTE: ${{ secrets.MUSUW_PRODUCTION_SSH_REMOTE }}
           WEKNORA_DEPLOY_SSH_PORT: ${{ secrets.MUSUW_PRODUCTION_SSH_PORT }}
           WEKNORA_DEPLOY_REVISION: ${{ needs.rebuild.outputs.release_sha }}
-          WEKNORA_DEPLOY_RELEASE_ID: musuw-${{ needs.rebuild.outputs.release_sha }}
+          WEKNORA_DEPLOY_GHCR_USERNAME: ${{ github.actor }}
+          WEKNORA_DEPLOY_GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          bash scripts/weknora-deploy.sh update 2>&1 | tee "$RUNNER_TEMP/musuw-production-release.log"
-      - name: Confirm the transaction owns the rollbackable public probes
-        id: public_health
-        run: |
-          set -euo pipefail
-          # The server transaction probes the public revision before commit.
-          # The runner must not add a post-commit probe without rollback scope.
-          grep -Fq 'https://app.musuw.com/readyz' scripts/weknora-production/release-transaction.sh
-          grep -Fq 'public_probes' scripts/weknora-production/release-transaction.sh
-          grep -Fq 'rollback_transaction' scripts/weknora-production/release-transaction.sh
-          if awk '/"\$transaction_script"/{seen=1; next} seen && /curl /{found=1} END{exit(found ? 0 : 1)}' scripts/weknora-production/release-ci.sh; then
-            printf '%s\n' 'release-ci contains an unrollbackable post-transaction curl' >&2
-            exit 1
-          fi
+          bash scripts/weknora-deploy.sh "$WEKNORA_DEPLOY_REVISION" 2>&1 | tee "$RUNNER_TEMP/musuw-production-release.log"
       - name: Write production release manifest and checksum
         if: always()
         env:
           RELEASE_SHA: ${{ needs.rebuild.outputs.release_sha }}
           WORKFLOW_RUN: ${{ github.run_id }}
-          RELEASE_PROBE_OUTCOME: ${{ steps.public_health.outcome }}
+          RELEASE_OUTCOME: ${{ steps.deploy_release.outcome }}
         run: |
           set -euo pipefail
           source_manifest='third_party/weknora/active-upstream-source.json'
@@ -245,16 +299,13 @@ jobs:
           expected_release_id="musuw-$RELEASE_SHA"
           server_release_id=''
           if [ -f "$RUNNER_TEMP/musuw-production-release.log" ]; then
-            server_release_id="$(grep -Eo 'production (update|update-ui) green: [^ ]+' "$RUNNER_TEMP/musuw-production-release.log" | tail -n 1 | sed -E 's/.*green: ([^ ]+).*/\1/' || true)"
-          fi
-          if [ -z "$server_release_id" ] && [ -f "$RUNNER_TEMP/musuw-production-release.log" ] && grep -Fq 'CI staged release green:' "$RUNNER_TEMP/musuw-production-release.log"; then
-            server_release_id="$expected_release_id"
+            server_release_id="$(grep -Eo 'simple release green: [^ ]+' "$RUNNER_TEMP/musuw-production-release.log" | tail -n 1 | sed -E 's/.*green: ([^ ]+).*/\1/' || true)"
           fi
           server_source_bundle_sha256=''
           if [ -f "$RUNNER_TEMP/musuw-production-release.log" ]; then
             server_source_bundle_sha256="$(grep -Eo 'source_bundle_sha256=[0-9a-fA-F]{64}' "$RUNNER_TEMP/musuw-production-release.log" | tail -n 1 | cut -d= -f2 || true)"
           fi
-          if [ "$RELEASE_PROBE_OUTCOME" = success ]; then
+          if [ "$RELEASE_OUTCOME" = success ]; then
             test "$server_release_id" = "$expected_release_id"
             [[ "$server_source_bundle_sha256" =~ ^[0-9a-fA-F]{64}$ ]]
           fi
@@ -280,7 +331,6 @@ jobs:
             ${{ runner.temp }}/musuw-production-release.log
             ${{ runner.temp }}/musuw-production-release-manifest.json
             ${{ runner.temp }}/musuw-production-release-manifest.json.sha256
-            ${{ runner.temp }}/musuw-production-rollback-evidence.txt
           if-no-files-found: warn
           retention-days: 30
       - name: Remove temporary deployment inputs

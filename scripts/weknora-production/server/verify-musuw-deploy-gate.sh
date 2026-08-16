@@ -80,11 +80,19 @@ grep -Fq 'SSH_ORIGINAL_COMMAND' "$ssh_gate" || die 'SSH gate does not parse SSH_
 grep -Fq -- '--sender' "$ssh_gate" || die 'SSH gate does not reject rsync sender mode'
 grep -Fq -- '--rsync-path=' "$ssh_gate" || die 'SSH gate does not reject rsync command hooks'
 grep -Fq 'source/deploy' "$ssh_gate" || die 'SSH gate has no destination allowlist'
-grep -Fq "minimum_capacity_floor_kib='12582912'" "$ssh_gate" || die 'SSH gate does not enforce the production capacity floor'
+grep -Fq 'prepare|deploy' "$ssh_gate" || die 'SSH gate does not expose prepare/deploy'
+grep -Fq 'musuw-gate' "$ssh_gate" || die 'SSH gate does not parse the fixed gate command'
 grep -Fq "PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'" "$root_gate" || die 'root gate does not pin a safe command path'
 grep -Fq 'WEKNORA_PRODUCTION_RUNTIME_DIR' "$root_gate" || die 'root gate does not pin the server runtime directory'
 grep -Fq 'release source contains a symbolic link' "$root_gate" || die 'root gate does not reject release symlinks'
-grep -Fq "minimum_capacity_floor_kib='12582912'" "$root_gate" || die 'root gate does not enforce the production capacity floor'
+grep -Fq 'prepare)' "$root_gate" || die 'root gate does not expose prepare'
+grep -Fq 'deploy)' "$root_gate" || die 'root gate does not expose deploy'
+grep -Fq 'source-manifest.sh' "$root_gate" || die 'root gate does not verify the transferred manifest'
+grep -Fq 'release-ci.sh' "$root_gate" || die 'root gate does not invoke the fixed release helper'
+
+if grep -Eq 'musuw-gate (preflight|promote|run)|minimum_capacity_floor_kib|minimum_free_kib' "$ssh_gate" "$root_gate"; then
+    die 'installed gate retains the removed capacity or three-verb protocol'
+fi
 
 if [ "$test_mode" = false ]; then
     [ "$(stat -c '%U' "$ssh_gate")" = root ] || die 'SSH gate is not root-owned'

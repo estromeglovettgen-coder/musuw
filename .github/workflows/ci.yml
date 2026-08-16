@@ -7,7 +7,6 @@ on:
       - '.nvmrc'
       - 'auth/**'
       - 'storefront/**'
-      - 'app-edge/**'
       - 'weknora/**'
       - 'scripts/**'
       - 'integration/weknora-production/**'
@@ -30,7 +29,6 @@ on:
       - '.nvmrc'
       - 'auth/**'
       - 'storefront/**'
-      - 'app-edge/**'
       - 'weknora/**'
       - 'scripts/**'
       - 'integration/weknora-production/**'
@@ -225,11 +223,9 @@ jobs:
         run: bash scripts/ci/secret-scan.sh
       - name: Run release workflow simulation
         run: bash scripts/weknora-workflow-simulation.test.sh
-      - name: Run production static and release transaction contracts
+      - name: Run production static and direct deployment contracts
         run: |
           bash scripts/weknora-production/verify-static.sh
           bash scripts/weknora-production/deploy-ci-seams-contract.test.sh
-          bash scripts/weknora-production/release-transaction-contract.test.sh
-          bash scripts/weknora-production/release-transaction-simulation.test.sh
-          bash scripts/weknora-production/release-transaction-actual.test.sh
+          bash scripts/weknora-production/musuw-deploy-gate-simulation.test.sh
           # verify-static.sh renders both base and edge scripts/weknora-production/compose.sh config.

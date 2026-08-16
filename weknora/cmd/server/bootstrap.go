@@ -8,17 +8,12 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"strings"
 
 	"go.uber.org/dig"
-	"gorm.io/gorm"
 
-	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 )
 
@@ -42,52 +37,33 @@ const bootstrapEnvVar = "WEKNORA_BOOTSTRAP_SYSTEM_ADMIN_EMAIL"
 // future bootstrap steps (default model seeding, etc.) can be added
 // here as additional dig.Invoke calls.
 func runStartupBootstrap(c *dig.Container) {
-	if err := runStartupBootstrapStrict(c); err != nil {
-		logger.Warnf(context.Background(), "[bootstrap] startup bootstrap failed: %v", err)
-	}
-}
-
-// runStartupBootstrapStrict executes every independent bootstrap step and
-// returns the aggregate error. Prepare uses this contract so a partial
-// bootstrap can never be reported as a successful release preparation; the
-// historical all role calls the best-effort wrapper above.
-func runStartupBootstrapStrict(c *dig.Container) error {
 	ctx := context.Background()
-	var errs error
 
 	// Legacy hash repair for migration 000065 placeholder rows. Invoked each
 	// startup but short-circuits with a cheap EXISTS once every row is
 	// backfilled (no api_key decryption on the steady-state path).
-	if err := c.Invoke(func(apiKeySvc interfaces.TenantAPIKeyService) error {
+	if err := c.Invoke(func(apiKeySvc interfaces.TenantAPIKeyService) {
 		if n, err := apiKeySvc.BackfillMissingKeyHashes(ctx); err != nil {
-			return fmt.Errorf("tenant api key hash backfill: %w", err)
+			logger.Warnf(ctx, "[bootstrap] tenant api key hash backfill failed: %v", err)
 		} else if n > 0 {
 			logger.Infof(ctx, "[bootstrap] backfilled %d legacy tenant api key hash(es)", n)
 		}
-		return nil
 	}); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("resolve/backfill TenantAPIKeyService: %w", err))
+		logger.Warnf(ctx, "[bootstrap] failed to resolve TenantAPIKeyService: %v", err)
 	}
 
 	email := strings.TrimSpace(os.Getenv(bootstrapEnvVar))
 	if email == "" {
-		return errs
+		return
 	}
 	// dig.Invoke resolves UserService from the container; if user
 	// service registration is broken we want to know loudly, but still
 	// not abort startup — bootstrap is best-effort.
-	if err := c.Invoke(func(userSvc interfaces.UserService) error {
-		return bootstrapSystemAdminStrict(ctx, userSvc, email)
+	if err := c.Invoke(func(userSvc interfaces.UserService) {
+		bootstrapSystemAdmin(ctx, userSvc, email)
 	}); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("resolve/bootstrap UserService: %w", err))
+		logger.Warnf(ctx, "[bootstrap] failed to resolve UserService: %v", err)
 	}
-	return errs
-}
-
-type bootstrapUserService interface {
-	GetUserByEmail(ctx context.Context, email string) (*types.User, error)
-	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
-	UpdateUser(ctx context.Context, user *types.User) error
 }
 
 // bootstrapSystemAdmin promotes the user identified by `email` to system
@@ -101,57 +77,49 @@ type bootstrapUserService interface {
 // short-circuit. Operators should sign up normally first, then set the
 // env var on the next restart.
 func bootstrapSystemAdmin(ctx context.Context, userSvc interfaces.UserService, email string) {
-	if err := bootstrapSystemAdminStrict(ctx, userSvc, email); err != nil {
-		logger.Warnf(ctx, "[bootstrap] %s=%s failed: %v", bootstrapEnvVar, email, err)
-	}
-}
-
-func bootstrapSystemAdminStrict(ctx context.Context, userSvc bootstrapUserService, email string) error {
 	user, err := userSvc.GetUserByEmail(ctx, email)
 	if err != nil {
-		// The only explicit non-fatal strict-bootstrap error is a user that
-		// has not registered yet. Every infrastructure/query error must fail
-		// prepare rather than masquerade as this ordinary bootstrap state.
-		if errors.Is(err, apprepo.ErrUserNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Warnf(ctx, "[bootstrap] %s=%s: user is not registered; skipping promotion", bootstrapEnvVar, email)
-			return nil
-		}
-		return fmt.Errorf("lookup bootstrap user %s: %w", email, err)
+		// "not found" surfaces as an error in this codebase; treat it
+		// gently — operators commonly set the var before the user has
+		// signed up. The next restart after registration will succeed.
+		logger.Warnf(ctx,
+			"[bootstrap] %s=%s: user lookup failed (have they signed up yet?): %v",
+			bootstrapEnvVar, email, err)
+		return
 	}
 	if user == nil {
 		logger.Warnf(ctx,
 			"[bootstrap] %s=%s: no matching user (will retry on next restart)",
 			bootstrapEnvVar, email)
-		return nil
+		return
 	}
 	if user.IsSystemAdmin {
 		logger.Infof(ctx,
 			"[bootstrap] %s=%s: user %s is already a system admin (no-op)",
 			bootstrapEnvVar, email, user.ID)
-		return nil
+		return
 	}
 	_, total, err := userSvc.ListSystemAdmins(ctx, 0, 1)
 	if err != nil {
 		logger.Warnf(ctx,
 			"[bootstrap] %s=%s: cannot verify existing system admins, skipping promotion: %v",
 			bootstrapEnvVar, email, err)
-		return fmt.Errorf("verify existing system admins: %w", err)
+		return
 	}
 	if total > 0 {
 		logger.Infof(ctx,
 			"[bootstrap] %s=%s: %d system admin(s) already exist; not promoting user %s",
 			bootstrapEnvVar, email, total, user.ID)
-		return nil
+		return
 	}
 	user.IsSystemAdmin = true
 	if err := userSvc.UpdateUser(ctx, user); err != nil {
 		logger.Warnf(ctx,
 			"[bootstrap] %s=%s: failed to promote user %s: %v",
 			bootstrapEnvVar, email, user.ID, err)
-		return fmt.Errorf("promote user %s: %w", user.ID, err)
+		return
 	}
 	logger.Infof(ctx,
 		"[bootstrap] promoted user %s (%s) to system admin via %s",
 		user.ID, email, bootstrapEnvVar)
-	return nil
 }

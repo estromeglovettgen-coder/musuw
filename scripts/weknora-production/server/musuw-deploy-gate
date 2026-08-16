@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
-# Root-owned privileged half of the musuw-deploy protocol.
+# Root-owned half of the restricted two-verb deployment seam.
 #
-# The SSH account can write only an incoming release spool. This wrapper is the
-# sole process allowed to inspect capacity, promote a verified spool into
-# /opt/weknora/releases, and invoke the fixed staged release adapter.
+# The SSH account may only populate one exact incoming release directory.  This
+# wrapper is the only process that can verify that tree, move it into the
+# immutable release root, and invoke the fixed release helper.
 set -euo pipefail
 
-# In production this process is reached through sudo. Pin command lookup to a
-# system-only path so an attacker cannot influence helper resolution through
-# the deploy user's environment. Test mode keeps its fake command directory
-# for the local contract simulation.
 if [ "${MUSUW_DEPLOY_GATE_TEST_MODE:-0}" != 1 ] || [ "${EUID:-1}" -eq 0 ]; then
     PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     export PATH
@@ -20,24 +16,9 @@ die() {
     exit 1
 }
 
-safe_id() {
-    case "$1" in
-        ''|*[!A-Za-z0-9._-]*|.*|*-|*.) return 1 ;;
-        *..*) return 1 ;;
-        *) [ "${#1}" -le 128 ] ;;
-    esac
-}
-
 safe_revision() {
-    [[ "$1" =~ ^[0-9a-fA-F]+$ ]] || return 1
-    [ "${#1}" -eq 40 ]
-}
-
-minimum_capacity_floor_kib='12582912'
-
-safe_capacity() {
-    case "$1" in ''|*[!0-9]*) return 1 ;; esac
-    [ "$1" -ge "$minimum_capacity_floor_kib" ]
+    [ "$#" -eq 1 ] || return 1
+    [[ "$1" =~ ^[0-9a-fA-F]{40}$ ]]
 }
 
 test_mode=false
@@ -61,294 +42,226 @@ runtime_dir="${root_prefix}/opt/weknora/runtime"
 spool_root="${root_prefix}/var/lib/musuw-deploy/incoming"
 deploy_user='musuw-deploy'
 
-if [ "$test_mode" = true ]; then
-    stat_bin="${MUSUW_DEPLOY_GATE_STAT_BIN:-$(command -v stat || true)}"
-else
-    stat_bin='/usr/bin/stat'
-fi
-
-file_mode() {
-    if "$stat_bin" -c '%a' "$1" >/dev/null 2>&1; then
-        "$stat_bin" -c '%a' "$1"
-    else
-        "$stat_bin" -f '%Lp' "$1"
-    fi
-}
-
-file_owner_uid() {
-    if "$stat_bin" -c '%u' "$1" >/dev/null 2>&1; then
-        "$stat_bin" -c '%u' "$1"
-    else
-        "$stat_bin" -f '%u' "$1"
-    fi
-}
-
 require_command() {
     command -v "$1" >/dev/null 2>&1 || die "required gate command is unavailable: $1"
 }
 
-for command_name in awk df docker find install jq mv readlink sha256sum; do
+for command_name in bash cat find id install mv ps readlink; do
     require_command "$command_name"
 done
-[ -x "$stat_bin" ] || die 'stat command is unavailable'
 
-assert_runtime() {
-    [ -d "$runtime_dir" ] && [ ! -L "$runtime_dir" ] || die 'production runtime directory is unsafe'
-    [ -d "$runtime_dir/secrets" ] && [ ! -L "$runtime_dir/secrets" ] || die 'production secret directory is unsafe'
-    [ "$(file_mode "$runtime_dir")" = 700 ] || die 'production runtime directory permissions are unsafe'
-    [ "$(file_mode "$runtime_dir/secrets")" = 700 ] || die 'production secret directory permissions are unsafe'
-    if [ "$test_mode" = false ]; then
-        [ "$(file_owner_uid "$runtime_dir")" = 0 ] || die 'production runtime directory is not root-owned'
-        [ "$(file_owner_uid "$runtime_dir/secrets")" = 0 ] || die 'production secret directory is not root-owned'
-    fi
+safe_dir() {
+    local path="$1"
+    [ -d "$path" ] && [ ! -L "$path" ] || die "unsafe deployment directory: $path"
 }
 
-assert_current() {
-    [ -L "$current_link" ] || die 'production current release symlink is unavailable'
-    [ ! -L "$runtime_dir" ] && [ ! -L "$runtime_dir/secrets" ] || die 'production runtime symlink is unsafe'
-    current_target="$(readlink -f "$current_link")" || die 'production current release target is unavailable'
-    case "$current_target" in
+ensure_root_dirs() {
+    [ ! -e "$release_root" ] || [ -d "$release_root" ] || die 'production release root has an unsafe type'
+    [ ! -e "$spool_root" ] || [ -d "$spool_root" ] || die 'deployment spool root has an unsafe type'
+    install -d -m 755 "$release_root" "$spool_root"
+    safe_dir "$release_root"
+    safe_dir "$spool_root"
+}
+
+current_target() {
+    local target link_target link_dir
+    if [ ! -e "$current_link" ] && [ ! -L "$current_link" ]; then
+        printf '%s' ''
+        return 0
+    fi
+    [ -L "$current_link" ] || die 'production current path is not a symlink'
+    target="$(readlink -f "$current_link" 2>/dev/null || true)"
+    if [ -z "$target" ]; then
+        link_target="$(readlink "$current_link" 2>/dev/null || true)"
+        [ -n "$link_target" ] || die 'production current release target is unavailable'
+        case "$link_target" in
+            /*) target="$link_target" ;;
+            *) target="$(dirname "$current_link")/$link_target" ;;
+        esac
+        link_dir="$(cd "$target" 2>/dev/null && pwd -P || true)"
+        target="$link_dir"
+    fi
+    [ -n "$target" ] || die 'production current release target is unavailable'
+    case "$target" in
         "$release_root"/*/source) ;;
         *) die 'production current release target is outside the approved root' ;;
     esac
-    [ -d "$current_target" ] || die 'production current release target is unavailable'
+    [ -d "$target" ] && [ ! -L "$target" ] || die 'production current release target is unavailable'
+    printf '%s' "$target"
 }
 
-capacity_is_sufficient() {
-    local docker_root path available_kib
-    docker_root="$(docker info --format '{{.DockerRootDir}}')" || return 2
-    [ -n "$docker_root" ] || return 2
-    for path in / "$docker_root"; do
-        available_kib="$(df -Pk "$path" | awk 'NR == 2 { print $4 }')" || return 2
-        case "$available_kib" in ''|*[!0-9]*) return 2 ;; esac
-        [ "$available_kib" -ge "$minimum_free_kib" ] || return 1
-    done
-    return 0
+assert_not_current() {
+    local target="$1"
+    local current
+    current="$(current_target)"
+    [ "$target" != "$current" ] || die 'requested release is already current'
 }
 
-assert_capacity() {
-    if capacity_is_sufficient; then
-        return 0
+active_release_process() {
+    local process_list pid args
+    process_list="$(ps -eo pid=,args= 2>/dev/null || ps -eo pid=,command= 2>/dev/null)" || die 'active release processes could not be inspected'
+    while IFS=' ' read -r pid args; do
+        case "$pid" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        [ "$pid" = "$$" ] && continue
+        case "$args" in
+            *release-ci.sh*) return 0 ;;
+        esac
+    done <<< "$process_list"
+    return 1
+}
+
+assert_no_active_release() {
+    if active_release_process; then
+        die "release process is active for $release_id"
+    fi
+}
+
+clear_exact_tree() {
+    local directory="$1"
+    [ -d "$directory" ] && [ ! -L "$directory" ] || die "unsafe deployment tree: $directory"
+    find "$directory" -mindepth 1 -depth -delete
+}
+
+incoming_dir() {
+    printf '%s/%s' "$spool_root" "$release_id"
+}
+
+incoming_source() {
+    printf '%s/source' "$(incoming_dir)"
+}
+
+prepared_marker() {
+    printf '%s/.prepared' "$(incoming_dir)"
+}
+
+release_dir() {
+    printf '%s/%s' "$release_root" "$release_id"
+}
+
+prepare_incoming() {
+    local incoming source marker marker_tmp
+    ensure_root_dirs
+    assert_not_current "$(release_dir)/source"
+    assert_no_active_release
+    incoming="$(incoming_dir)"
+    if [ -e "$incoming" ] || [ -L "$incoming" ]; then
+        [ -d "$incoming" ] && [ ! -L "$incoming" ] || die 'release incoming directory has an unsafe type'
+        clear_exact_tree "$incoming"
     else
-        local capacity_status=$?
+        install -d -m 755 "$incoming"
     fi
-    if [ "$capacity_status" -ne 1 ]; then
-        die 'production free capacity could not be determined'
-    fi
-    printf '%s\n' 'production capacity is below the required reserve; pruning unused Docker build cache and images once' >&2
-    docker buildx prune --all --force
-    docker image prune --force
-    if capacity_is_sufficient; then
-        return 0
-    else
-        capacity_status=$?
-    fi
-    if [ "$capacity_status" -eq 1 ]; then
-        die "production capacity is below the required ${minimum_free_kib} KiB reserve after Docker cache cleanup"
-    fi
-    die 'production free capacity could not be determined after Docker cache cleanup'
-}
-
-request_file() {
-    printf '%s/%s/request' "$spool_root" "$release_id"
-}
-
-request_contents() {
-    printf 'mode=%s\nrelease_id=%s\nrevision=%s\nminimum_free_kib=%s\n' \
-        "$mode" "$release_id" "$revision" "$minimum_free_kib"
-}
-
-assert_request() {
-    local request
-    request="$(request_file)"
-    [ -f "$request" ] && [ ! -L "$request" ] || die 'release spool request is unavailable'
-    [ "$(cat "$request")" = "$(request_contents)" ] || die 'release spool request does not match the approved release'
-}
-
-create_spool() {
-    local spool="$spool_root/$release_id"
-    local request="$spool/request"
-    [ ! -L "$spool_root" ] || die 'deployment spool root is a symlink'
-    [ ! -L "$spool" ] || die 'release spool is a symlink'
-    if [ -e "$request" ]; then
-        assert_request
-        return 0
-    fi
-    [ ! -e "$spool" ] || [ -d "$spool" ] || die 'release spool has an unsafe type'
-    install -d -m 755 "$spool" \
-        "$spool/source/weknora" \
-        "$spool/source/auth" \
-        "$spool/source/integration/weknora-production" \
-        "$spool/source/scripts/weknora-production" \
-        "$spool/source/deploy"
+    install -d -m 755 \
+        "$incoming/source" \
+        "$incoming/source/weknora" \
+        "$incoming/source/auth" \
+        "$incoming/source/integration/weknora-production" \
+        "$incoming/source/scripts/weknora-production" \
+        "$incoming/source/deploy"
     if [ "$test_mode" = false ]; then
         id "$deploy_user" >/dev/null 2>&1 || die 'dedicated deployment account is unavailable'
         chown "$deploy_user:$deploy_user" \
-            "$spool/source" \
-            "$spool/source/weknora" \
-            "$spool/source/auth" \
-            "$spool/source/integration" \
-            "$spool/source/integration/weknora-production" \
-            "$spool/source/scripts" \
-            "$spool/source/scripts/weknora-production" \
-            "$spool/source/deploy"
+            "$incoming/source" \
+            "$incoming/source/weknora" \
+            "$incoming/source/auth" \
+            "$incoming/source/integration" \
+            "$incoming/source/integration/weknora-production" \
+            "$incoming/source/scripts" \
+            "$incoming/source/scripts/weknora-production" \
+            "$incoming/source/deploy"
     fi
-    request_tmp="$spool/.request.$$"
-    request_contents > "$request_tmp"
-    chmod 600 "$request_tmp"
+    marker="$(prepared_marker)"
+    marker_tmp="$incoming/.prepared.$$"
+    printf '%s\n' "$revision" > "$marker_tmp"
+    chmod 600 "$marker_tmp"
     if [ "$test_mode" = false ]; then
-        chown root:root "$request_tmp"
+        chown root:root "$marker_tmp"
     fi
-    mv -f "$request_tmp" "$request"
-    if [ "$test_mode" = false ]; then
-        chown root:root "$request"
-    fi
-}
-
-reject_unexpected_source_files() {
-    local source_root="$1" path relative listed
-    [ -d "$source_root" ] && [ ! -L "$source_root" ] || die 'release source spool is unavailable'
-    [ -z "$(find "$source_root" -type l -print -quit)" ] || die 'release source contains a symbolic link'
-    [ -z "$(find "$source_root" \( -type b -o -type c -o -type p -o -type s \) -print -quit)" ] || die 'release source contains a device, fifo or socket'
-    while IFS= read -r -d '' path; do
-        relative="${path#"$source_root/"}"
-        case "$relative" in
-            deploy/source-manifest.sha256|deploy/release-manifest.json|deploy/release-manifest.json.sha256) ;;
-            # Frontend bundles are generated from the clean tracked checkout
-            # after the runner integrity check; they are not Git source files.
-            weknora/frontend/dist/*|auth/dist/*) ;;
-            *)
-                listed=false
-                while read -r checksum manifest_path extra; do
-                    [ -n "${checksum:-}" ] && [ -n "${manifest_path:-}" ] && [ -z "${extra:-}" ] || continue
-                    if [ "$manifest_path" = "$relative" ]; then
-                        listed=true
-                        break
-                    fi
-                done < "$source_root/deploy/source-manifest.sha256"
-                [ "$listed" = true ] || die "release source contains an unmanifested file: $relative"
-                ;;
-        esac
-    done < <(find "$source_root" -type f -print0)
-    for forbidden in \
-        "$source_root/runtime" \
-        "$source_root/secrets" \
-        "$source_root/weknora/.env" \
-        "$source_root/auth/.env"; do
-        [ ! -e "$forbidden" ] || die 'release source contains a runtime or secret path'
-    done
-}
-
-verify_spool() {
-    local source_root="$spool_root/$release_id/source"
-    local manifest_script="$source_root/scripts/weknora-production/source-manifest.sh"
-    [ -f "$manifest_script" ] && [ ! -L "$manifest_script" ] || die 'release source manifest verifier is unavailable'
-    [ -f "$source_root/deploy/source-manifest.sha256" ] || die 'release source checksum manifest is unavailable'
-    reject_unexpected_source_files "$source_root"
-    WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-    WEKNORA_PRODUCTION_REVISION="$revision" \
-        bash "$manifest_script" verify "$source_root" >/dev/null
-}
-
-freeze_spool() {
-    local source_root="$spool_root/$release_id/source"
-    [ -d "$source_root" ] && [ ! -L "$source_root" ] || die 'release source spool is unavailable'
-    # Stop the unprivileged account from changing a file between manifest
-    # verification and the atomic promote. A failed verification intentionally
-    # leaves this release id frozen for operator inspection instead of allowing
-    # a second unreviewed upload to reuse it.
-    find "$source_root" -mindepth 1 -type d -exec chmod a-w {} +
-    find "$source_root" -type f -exec chmod a-w {} +
-    if [ "$test_mode" = false ]; then
-        chown -R root:root "$source_root"
-    fi
-}
-
-promote_release() {
-    local spool="$spool_root/$release_id"
-    local source_root="$spool/source"
-    local release_dir="$release_root/$release_id"
-    [ ! -e "$release_dir" ] || die 'production release directory already exists'
-    assert_request
-    freeze_spool
-    verify_spool
-    [ -d "$release_root" ] && [ ! -L "$release_root" ] || die 'production release root is unsafe'
-    spool_device="$($stat_bin -c '%d' "$spool_root" 2>/dev/null || $stat_bin -f '%d' "$spool_root")"
-    release_device="$($stat_bin -c '%d' "$release_root" 2>/dev/null || $stat_bin -f '%d' "$release_root")"
-    [ "$spool_device" = "$release_device" ] || die 'deployment spool and release root must share a filesystem'
-    install -d -m 755 "$release_dir"
-    mv "$source_root" "$release_dir/source"
-    if [ "$test_mode" = false ]; then
-        chown -R root:root "$release_dir/source"
-    fi
-    marker="$release_dir/.promoted"
-    request_contents > "$marker"
-    chmod 600 "$marker"
+    mv -f "$marker_tmp" "$marker"
     if [ "$test_mode" = false ]; then
         chown root:root "$marker"
     fi
-    rm -f "$spool/request"
-    rmdir "$spool" 2>/dev/null || die 'release spool contains unexpected files after promotion'
-    printf '%s\n' "release promoted: $release_id"
+    printf '%s\n' "release prepared: $release_id"
 }
 
-run_release() {
-    local release_dir="$release_root/$release_id"
-    local source_root="$release_dir/source"
-    local marker="$release_dir/.promoted"
-    local helper="$source_root/scripts/weknora-production/release-ci.sh"
-    [ -d "$source_root" ] && [ ! -L "$source_root" ] || die 'promoted release source is unavailable'
-    [ -f "$marker" ] && [ ! -L "$marker" ] || die 'promoted release marker is unavailable'
-    [ "$(cat "$marker")" = "$(request_contents)" ] || die 'promoted release marker does not match the requested release'
-    [ -x "$helper" ] || die 'promoted release CI helper is unavailable'
-    assert_runtime
-    assert_current
-    env \
-        WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-        WEKNORA_PRODUCTION_REVISION="$revision" \
-        WEKNORA_PRODUCTION_RELEASE_ID="$release_id" \
-        WEKNORA_PRODUCTION_MIN_FREE_KIB="$minimum_free_kib" \
-        "$helper"
+verify_prepared_source() {
+    local source="$1"
+    local manifest_script="$source/scripts/weknora-production/source-manifest.sh"
+    [ -d "$source" ] && [ ! -L "$source" ] || die 'release source spool is unavailable'
+    [ -z "$(find "$source" -type l -print -quit)" ] || die 'release source contains a symbolic link'
+    [ -z "$(find "$source" \( -type b -o -type c -o -type p -o -type s \) -print -quit)" ] || die 'release source contains a special file'
+    [ -f "$manifest_script" ] && [ ! -L "$manifest_script" ] || die 'release source manifest verifier is unavailable'
+    [ -f "$source/deploy/source-manifest.sha256" ] && [ ! -L "$source/deploy/source-manifest.sha256" ] || die 'release source checksum manifest is unavailable'
+    WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+    WEKNORA_PRODUCTION_REVISION="$revision" \
+        bash "$source/scripts/weknora-production/source-manifest.sh" verify "$source" >/dev/null
 }
 
-mode="${2:-}"
-release_id="${3:-}"
-revision="${4:-}"
-minimum_free_kib="${5:-}"
-case "${1:-}" in
-    preflight)
-        [ "$#" -eq 5 ] || die 'invalid preflight protocol'
-        [ "$mode" = update ] || die 'only full update is supported by the restricted gate'
-        safe_id "$release_id" || die 'release id is unsafe'
-        safe_revision "$revision" || die 'release revision is unsafe'
-        safe_capacity "$minimum_free_kib" || die 'minimum free capacity is invalid'
-        assert_runtime
-        assert_current
-        assert_capacity
-        [ ! -e "$release_root/$release_id" ] || die 'production release directory already exists'
-        create_spool
-        ;;
-    promote)
-        [ "$#" -eq 4 ] || die 'invalid promote protocol'
-        [ "$mode" = update ] || die 'only full update is supported by the restricted gate'
-        safe_id "$release_id" || die 'release id is unsafe'
-        safe_revision "$revision" || die 'release revision is unsafe'
-        request_path="$spool_root/$release_id/request"
-        [ -f "$request_path" ] || die 'release spool request is unavailable'
-        minimum_free_kib="$(awk -F= '$1 == "minimum_free_kib" { print $2 }' "$request_path")"
-        safe_capacity "$minimum_free_kib" || die 'release spool capacity record is invalid'
-        promote_release
-        ;;
-    run)
-        [ "$#" -eq 4 ] || die 'invalid run protocol'
-        [ "$mode" = update ] || die 'only full update is supported by the restricted gate'
-        safe_id "$release_id" || die 'release id is unsafe'
-        safe_revision "$revision" || die 'release revision is unsafe'
-        marker_path="$release_root/$release_id/.promoted"
-        [ -f "$marker_path" ] || die 'promoted release marker is unavailable'
-        minimum_free_kib="$(awk -F= '$1 == "minimum_free_kib" { print $2 }' "$marker_path")"
-        safe_capacity "$minimum_free_kib" || die 'promoted release capacity record is invalid'
-        run_release
-        ;;
+freeze_source() {
+    local source="$1"
+    find "$source" -mindepth 1 -type d -exec chmod a-w {} +
+    find "$source" -type f -exec chmod a-w {} +
+}
+
+deploy_release() {
+    local incoming source marker release target helper ghcr_username ghcr_token
+    IFS= read -r ghcr_username || die 'GHCR username is missing from the deploy stream'
+    IFS= read -r ghcr_token || die 'GHCR token is missing from the deploy stream'
+    case "$ghcr_username" in
+        ''|*[!A-Za-z0-9._-]*) die 'GHCR username is unsafe' ;;
+    esac
+    [ -n "$ghcr_token" ] || die 'GHCR token is empty'
+    ensure_root_dirs
+    release="$(release_dir)"
+    target="$release/source"
+    assert_not_current "$target"
+    assert_no_active_release
+    incoming="$(incoming_dir)"
+    source="$(incoming_source)"
+    marker="$(prepared_marker)"
+    [ -f "$marker" ] && [ ! -L "$marker" ] || die 'release incoming directory is not prepared'
+    [ "$(cat "$marker")" = "$revision" ] || die 'prepared release revision does not match the requested SHA'
+    verify_prepared_source "$source"
+    freeze_source "$source"
+    assert_not_current "$target"
+    if [ -e "$release" ] || [ -L "$release" ]; then
+        [ -d "$release" ] && [ ! -L "$release" ] || die 'production release directory has an unsafe type'
+        clear_exact_tree "$release"
+    else
+        install -d -m 755 "$release"
+    fi
+    mv "$source" "$target"
+    if [ "$test_mode" = false ]; then
+        chown -R root:root "$release"
+    fi
+    helper="$target/scripts/weknora-production/release-ci.sh"
+    [ -f "$helper" ] && [ ! -L "$helper" ] || die 'release CI helper is unavailable'
+    if [ "$test_mode" = false ]; then
+        printf '%s\n%s\n' "$ghcr_username" "$ghcr_token" |
+            WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+            WEKNORA_PRODUCTION_REVISION="$revision" \
+                bash "$helper" "$revision"
+    elif [ "${MUSUW_DEPLOY_GATE_SKIP_RELEASE_CI:-0}" != 1 ]; then
+        printf '%s\n%s\n' "$ghcr_username" "$ghcr_token" |
+            WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+            WEKNORA_PRODUCTION_REVISION="$revision" \
+                bash "$helper" "$revision"
+    fi
+    unset ghcr_username ghcr_token
+    clear_exact_tree "$incoming"
+    rmdir "$incoming" 2>/dev/null || true
+    printf '%s\n' "release deployed: $release_id"
+}
+
+[ "$#" -eq 2 ] || die 'usage: musuw-deploy-gate prepare|deploy <full-sha>'
+verb="$1"
+revision="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
+safe_revision "$revision" || die 'release revision is unsafe'
+release_id="musuw-$revision"
+
+case "$verb" in
+    prepare) prepare_incoming ;;
+    deploy) deploy_release ;;
     *) die 'unknown musuw deploy gate protocol' ;;
 esac

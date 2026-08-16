@@ -25,45 +25,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/dig"
 
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/container"
-	"github.com/Tencent/WeKnora/internal/handler"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/runtime"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 )
 
 func main() {
-	// Resolve and validate the role before touching Gin, logging, signals or
-	// dependency injection. A typo must fail closed before any side effect.
-	contract, err := resolveStartupContract(os.Getenv, handler.CommitID)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "WeKnora startup refused: %v\n", err)
-		os.Exit(2)
-	}
-	role, plan := contract.Role, contract.Plan
-	readiness := runtime.NewReadiness(
-		role,
-		contract.Revision,
-		os.Getenv("WEKNORA_RELEASE_MARKER"),
-	)
-	readiness.ConfigureForPlan(plan)
-	if contract.Revision == "unknown" {
-		readiness.MarkDependency(runtime.DependencyRevision, runtime.DependencyDisabled)
-	} else {
-		readiness.MarkDependencyReady(runtime.DependencyRevision)
-	}
-	runtime.SetProcessReadiness(readiness)
-
 	// Set Gin mode
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -79,89 +55,14 @@ func main() {
 	runtime.MarkServerStarted()
 
 	// Build dependency injection container
-	c, err := container.BuildContainerForRoleStrict(runtime.GetContainer(), plan)
-	if err != nil {
-		failStartup(c, fmt.Errorf("container startup failed: %w", err))
-	}
+	c := container.BuildContainer(runtime.GetContainer())
 
-	if plan.RunsStartupBootstrap {
-		if plan.IsPrepare() {
-			if err := runStartupBootstrapStrict(c); err != nil {
-				readiness.MarkDependency(runtime.DependencyBootstrap, runtime.DependencyFailed)
-				failStartup(c, fmt.Errorf("strict startup bootstrap failed: %w", err))
-			}
-			readiness.MarkDependencyReady(runtime.DependencyBootstrap)
-		} else {
-			// RoleAll preserves its historical best-effort bootstrap policy.
-			runStartupBootstrap(c)
-		}
-	}
-	if plan.IsPrepare() {
-		for _, dependency := range []string{
-			runtime.DependencyMigrations,
-			runtime.DependencyStoragePending,
-			runtime.DependencyLegacyStorage,
-			runtime.DependencyModelCatalog,
-		} {
-			readiness.MarkDependencyReady(dependency)
-		}
-		cleanupContainer(c, 30*time.Second)
-		logger.Infof(context.Background(), "[runtime] prepare completed; exiting without listener or background loops")
-		return
-	}
-
-	if !plan.ServesHTTP {
-		// Worker processes intentionally expose no business/public HTTP. A
-		// loopback-only probe is kept on a fixed internal port so the container
-		// supervisor can distinguish a live process from a registered worker;
-		// the production Compose topology never publishes this port.
-		err := c.Invoke(func(resourceCleaner interfaces.ResourceCleaner) error {
-			listener, err := net.Listen("tcp", runtime.WorkerReadinessAddr)
-			if err != nil {
-				readiness.MarkDependency(runtime.DependencyWorkerListener, runtime.DependencyFailed)
-				return fmt.Errorf("failed to start worker readiness listener on %s: %v", runtime.WorkerReadinessAddr, err)
-			}
-			readiness.MarkDependencyReady(runtime.DependencyWorkerListener)
-			probeServer := &http.Server{Handler: runtime.NewWorkerReadinessHandler(readiness)}
-			serveErrors := make(chan error, 1)
-			go func() {
-				if serveErr := probeServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
-					readiness.MarkDependency("worker_listener", runtime.DependencyFailed)
-					serveErrors <- serveErr
-				}
-				close(serveErrors)
-			}()
-
-			signals := make(chan os.Signal, 1)
-			signal.Notify(signals, shutdownSignals...)
-			defer signal.Stop(signals)
-			select {
-			case sig := <-signals:
-				logger.Infof(context.Background(), "Received signal: %v, stopping worker...", sig)
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				if err := probeServer.Shutdown(shutdownCtx); err != nil {
-					logger.Errorf(context.Background(), "Worker readiness listener shutdown error: %v", err)
-				}
-				errs := resourceCleaner.Cleanup(shutdownCtx)
-				if len(errs) > 0 {
-					logger.Errorf(context.Background(), "Worker cleanup errors: %v", errs)
-				}
-			case serveErr, ok := <-serveErrors:
-				if ok && serveErr != nil {
-					return fmt.Errorf("worker readiness listener failed: %v", serveErr)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			failStartup(c, fmt.Errorf("failed to run worker process: %w", err))
-		}
-		return
-	}
+	// One-shot bootstrap hooks (e.g. promote env-named user to system
+	// admin). Best-effort: never aborts startup — see bootstrap.go.
+	runStartupBootstrap(c)
 
 	// Run application
-	err = c.Invoke(func(
+	err := c.Invoke(func(
 		cfg *config.Config,
 		router *gin.Engine,
 		resourceCleaner interfaces.ResourceCleaner,
@@ -175,7 +76,6 @@ func main() {
 		addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 		listener, err := listenWithRetry(addr, 10, 300*time.Millisecond)
 		if err != nil {
-			readiness.MarkDependency(runtime.DependencyHTTPListener, runtime.DependencyFailed)
 			return fmt.Errorf("failed to start server: %v", err)
 		}
 
@@ -186,10 +86,8 @@ func main() {
 		// effort: an error here only warns (Redis may legitimately be
 		// disabled in lite-mode deployments — the service no-ops in
 		// that case anyway).
-		if err := startSystemSettingsSubscriber(ctx, plan, readiness, systemSettingSvc); err != nil {
-			listener.Close()
-			done()
-			return err
+		if err := systemSettingSvc.SubscribeRedis(ctx); err != nil {
+			logger.Warnf(ctx, "[system_settings] subscribe failed: %v", err)
 		}
 
 		signals := make(chan os.Signal, 1)
@@ -232,8 +130,6 @@ func main() {
 
 		runtime.LogGinRouteCount(context.Background())
 		logger.Infof(context.Background(), "Server is running at %s", addr)
-		readiness.MarkDependencyReady(runtime.DependencyHTTPListener)
-		readiness.MarkAcceptingTraffic()
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			return fmt.Errorf("server error: %v", err)
 		}
@@ -242,25 +138,6 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		failStartup(c, fmt.Errorf("failed to run application: %w", err))
+		logger.Fatalf(context.Background(), "Failed to run application: %v", err)
 	}
-}
-
-func cleanupContainer(c *dig.Container, timeout time.Duration) {
-	if c == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	_ = c.Invoke(func(cleaner interfaces.ResourceCleaner) {
-		if errs := cleaner.Cleanup(ctx); len(errs) > 0 {
-			logger.Errorf(context.Background(), "Startup cleanup errors: %v", errs)
-		}
-	})
-}
-
-func failStartup(c *dig.Container, err error) {
-	cleanupContainer(c, 30*time.Second)
-	fmt.Fprintf(os.Stderr, "WeKnora startup failed: %v\n", err)
-	os.Exit(1)
 }

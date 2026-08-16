@@ -72,6 +72,8 @@ printf '%s\n' \
 {
     printf '%s\n' \
         'WEKNORA_PRODUCTION_RELEASE_ID=weknora-v072-production' \
+        'WEKNORA_PRODUCTION_APP_IMAGE=ghcr.io/estromeglovettgen-coder/musuw-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+        'WEKNORA_PRODUCTION_FRONTEND_IMAGE=ghcr.io/estromeglovettgen-coder/musuw-frontend@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' \
         'WEKNORA_PRODUCTION_FRONTEND_PORT=4191' \
         'WEKNORA_PRODUCTION_APP_PORT=18091' \
         'WEKNORA_PRODUCTION_POSTGRES_VOLUME=weknora-v072-production-postgres-data' \
@@ -152,6 +154,10 @@ done
 
 jq -e '
   (.services.frontend.ports | length == 1) and
+  (.services.frontend.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$")) and
+  (.services.app.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$")) and
+  ((.services.frontend | has("build")) | not) and
+  ((.services.app | has("build")) | not) and
   (.services.frontend.ports[0].host_ip == "127.0.0.1") and
   (.services.frontend.ports[0].published == "4191") and
   (.services.frontend.ports[0].target == 8080) and

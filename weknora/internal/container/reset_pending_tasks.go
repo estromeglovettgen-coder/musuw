@@ -2,8 +2,6 @@ package container
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"time"
 
@@ -31,11 +29,10 @@ const restartInterruptedMessage = "Task interrupted due to application restart"
 // checks BOTH recent span activity and the real Asynq queue. Consequently this
 // hook never resets knowledge/summary rows in distributed mode; it only keeps
 // the separate sync-log cleanup below.
-func resetPendingTasks(db *gorm.DB) error {
+func resetPendingTasks(db *gorm.DB) {
 	distributed := os.Getenv("REDIS_ADDR") != ""
 	ctx := context.Background()
 	spanRepo := repository.NewKnowledgeSpanRepository(db)
-	var errs error
 
 	var staleCutoff time.Time
 	if distributed {
@@ -51,7 +48,6 @@ func resetPendingTasks(db *gorm.DB) error {
 		if err := stuckKnowledgeParseQuery(db).
 			Select("id").Find(&stuckKnowledge).Error; err != nil {
 			logger.Warnf(ctx, "resetPendingTasks: list stuck knowledge failed: %v", err)
-			errs = errors.Join(errs, fmt.Errorf("list stuck knowledge: %w", err))
 		}
 	}
 
@@ -77,7 +73,6 @@ func resetPendingTasks(db *gorm.DB) error {
 	}
 	if resetErr != nil {
 		logger.Warnf(context.Background(), "Failed to reset pending knowledge tasks: %v", resetErr)
-		errs = errors.Join(errs, fmt.Errorf("reset pending knowledge tasks: %w", resetErr))
 	} else if resetCount > 0 {
 		logger.Infof(context.Background(),
 			"Reset %d stuck knowledge parsing tasks to failed state (distributed=%v)",
@@ -94,21 +89,15 @@ func resetPendingTasks(db *gorm.DB) error {
 				stuckIDs, types.ParseStatusFailed, restartInterruptedMessage).
 			Find(&resetKnowledge).Error; err != nil {
 			logger.Warnf(ctx, "resetPendingTasks: list reset knowledge failed: %v", err)
-			errs = errors.Join(errs, fmt.Errorf("list reset knowledge: %w", err))
 		}
 		for _, k := range resetKnowledge {
 			attempt, err := spanRepo.LatestAttempt(ctx, k.ID)
-			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("latest span attempt for %s: %w", k.ID, err))
-				continue
-			}
-			if attempt <= 0 {
+			if err != nil || attempt <= 0 {
 				continue
 			}
 			if n, err := spanRepo.CancelAllOpenSpans(ctx, k.ID, attempt,
 				"SERVER_RESTART", restartInterruptedMessage); err != nil {
 				logger.Warnf(ctx, "resetPendingTasks: cancel spans for %s failed: %v", k.ID, err)
-				errs = errors.Join(errs, fmt.Errorf("cancel spans for %s: %w", k.ID, err))
 			} else if n > 0 {
 				logger.Infof(ctx, "resetPendingTasks: cancelled %d open span(s) for knowledge %s attempt %d",
 					n, k.ID, attempt)
@@ -124,7 +113,6 @@ func resetPendingTasks(db *gorm.DB) error {
 		})
 		if resultSummary.Error != nil {
 			logger.Warnf(context.Background(), "Failed to reset pending summary tasks: %v", resultSummary.Error)
-			errs = errors.Join(errs, fmt.Errorf("reset pending summary tasks: %w", resultSummary.Error))
 		} else if resultSummary.RowsAffected > 0 {
 			logger.Infof(context.Background(),
 				"Reset %d stuck summary generation tasks to failed state (distributed=false)",
@@ -141,13 +129,11 @@ func resetPendingTasks(db *gorm.DB) error {
 	})
 	if resultSync.Error != nil {
 		logger.Warnf(context.Background(), "Failed to reset pending data source sync tasks: %v", resultSync.Error)
-		errs = errors.Join(errs, fmt.Errorf("reset pending data source sync tasks: %w", resultSync.Error))
 	} else if resultSync.RowsAffected > 0 {
 		logger.Infof(context.Background(),
 			"Reset %d stuck data source sync tasks to failed state (distributed=%v)",
 			resultSync.RowsAffected, distributed)
 	}
-	return errs
 }
 
 func stuckKnowledgeParseQuery(db *gorm.DB) *gorm.DB {

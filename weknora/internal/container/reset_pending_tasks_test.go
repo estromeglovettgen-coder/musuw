@@ -2,7 +2,6 @@ package container
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -296,14 +295,10 @@ func TestStuckKnowledgeParseQuery_ReuseAfterFindDoesNotBreakUpdate(t *testing.T)
 
 type recordingTaskEnqueuer struct {
 	tasks []*asynq.Task
-	err   error
 }
 
 func (r *recordingTaskEnqueuer) Enqueue(task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
 	r.tasks = append(r.tasks, task)
-	if r.err != nil {
-		return nil, r.err
-	}
 	return &asynq.TaskInfo{ID: "test", Type: task.Type()}, nil
 }
 
@@ -355,30 +350,4 @@ func TestRecoverPendingWikiTasks_RecreatesOneTriggerPerLaneAndKB(t *testing.T) {
 		Where("scope_id IN ?", []string{"kb-deleted", "kb-missing"}).
 		Count(&orphaned).Error)
 	assert.Zero(t, orphaned)
-}
-
-func TestResetPendingTasksReturnsDatabaseErrorsForWorkerReadiness(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	t.Setenv("REDIS_ADDR", "redis:6379")
-	if err := resetPendingTasks(db); err == nil {
-		t.Fatal("resetPendingTasks() error = nil with missing tables")
-	}
-}
-
-func TestRecoverPendingWikiTasksReturnsEnqueueErrors(t *testing.T) {
-	db := setupResetPendingDB(t)
-	require.NoError(t, db.Exec(
-		`INSERT INTO knowledge_bases (id, tenant_id, deleted_at) VALUES ('kb-a', 7, NULL)`,
-	).Error)
-	require.NoError(t, db.Exec(
-		`INSERT INTO task_pending_ops
-		 (tenant_id, task_type, scope, scope_id, op, dedup_key, payload)
-		 VALUES (7, ?, ?, 'kb-a', 'ingest', 'k-1', '{}')`,
-		types.TypeWikiIngest, types.TaskScopeKnowledgeBase,
-	).Error)
-	want := errors.New("redis unavailable")
-	if err := recoverPendingWikiTasks(db, &recordingTaskEnqueuer{err: want}); !errors.Is(err, want) {
-		t.Fatalf("recoverPendingWikiTasks() error = %v, want wrapped %v", err, want)
-	}
 }

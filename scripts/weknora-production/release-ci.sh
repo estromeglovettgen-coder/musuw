@@ -1,69 +1,129 @@
 #!/usr/bin/env bash
-# Restricted GitHub Actions entry point for a full server release.  The
-# compatibility update-current.sh entry point remains available for the
-# server-local legacy path; CI is always forced through staged/cutover.
+# Fixed server-side release helper. The only caller-selected value is the
+# reviewed full Git SHA; source, runtime, Compose project and service names are
+# derived locally from this release tree and the fixed production adapters.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
 . "$script_dir/lib.sh"
 
-[ "$#" -eq 0 ] || weknora_production_die 'release-ci accepts no arguments'
+die() {
+    weknora_production_die "$1"
+}
 
-runtime_dir="$(weknora_production_runtime_dir)"
-transaction_script="$script_dir/release-transaction.sh"
-rollback_script="$script_dir/rollback.sh"
+[ "$#" -eq 1 ] || die 'usage: release-ci.sh <full-sha>'
+revision="$1"
+[[ "$revision" =~ ^[0-9a-fA-F]{40}$ ]] || die 'release revision must be a full 40-character Git SHA'
+revision="$(printf '%s' "$revision" | tr '[:upper:]' '[:lower:]')"
+
+repo_root="$(cd "$script_dir/../.." && pwd -P)"
+release_root='/opt/weknora/releases'
+runtime_dir="${WEKNORA_PRODUCTION_RUNTIME_DIR:-/opt/weknora/runtime}"
+current_link='/opt/weknora/current'
+release_id="musuw-$revision"
 manifest_script="$script_dir/source-manifest.sh"
-for required in "$rollback_script" "$manifest_script"; do
-    weknora_production_require_file "$required"
-done
-for command_name in jq sha256sum; do
+for command_name in awk bash curl date docker find jq sha256sum; do
     weknora_production_require_command "$command_name"
 done
+for required in \
+    "$manifest_script" \
+    "$script_dir/prepare-runtime.sh" \
+    "$script_dir/compose.sh" \
+    "$repo_root/deploy/production.public.env" \
+    "$repo_root/deploy/auth-public.env"; do
+    weknora_production_require_file "$required"
+done
 
-completed=false
+[ -d "$runtime_dir" ] && [ ! -L "$runtime_dir" ] || die 'production runtime directory is unavailable or unsafe'
+
+# The runner streams a short-lived GitHub token over the restricted SSH
+# connection. Keep it out of argv, logs and the persistent runtime directory;
+# Docker reads the credential only from this temporary config during pull.
+IFS= read -r ghcr_username || die 'GHCR username is missing from the deploy stream'
+IFS= read -r ghcr_token || die 'GHCR token is missing from the deploy stream'
+case "$ghcr_username" in
+    ''|*[!A-Za-z0-9._-]*) die 'GHCR username is unsafe' ;;
+esac
+[ -n "$ghcr_token" ] || die 'GHCR token is empty'
+docker_config="$(mktemp -d /run/musuw-ghcr.XXXXXX)"
+chmod 700 "$docker_config"
 cleanup() {
     local status=$?
     trap - EXIT
-    if [ "$status" -ne 0 ] && [ "$completed" = false ]; then
-        # The v2 transaction owns its full source/config/process/edge rollback.
-        # Keep the old rollback seam only for a legacy state left by an
-        # operator-local invocation; never replay it over a v2 transaction.
-        if [ ! -d "$runtime_dir/release-transactions" ]; then
-            WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$rollback_script" || \
-                printf '%s\n' 'release-ci rollback did not complete; inspect cutover-state.json' >&2
-        fi
+    if [ -n "${docker_config:-}" ] && [ -d "$docker_config" ]; then
+        DOCKER_CONFIG="$docker_config" docker logout ghcr.io >/dev/null 2>&1 || true
+        find "$docker_config" -depth -delete 2>/dev/null || true
     fi
+    unset ghcr_username ghcr_token docker_config
     exit "$status"
 }
 trap cleanup EXIT
 
-# Re-hash every allowlisted file after rsync, before any image build or edge
-# mutation. This binds the remote release to the runner's immutable bundle.
-source_bundle_sha256="$(WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$manifest_script" verify "$script_dir/../..")"
-
-# The release id/revision are inherited from the deploy seam. No shell command,
-# role, project, container or path is accepted from the workflow beyond this
-# fixed allowlisted mode.  release-transaction.sh derives the per-SHA Compose
-# project and performs the full snapshot/build/stage/cutover/worker/commit
-# transaction; rollback.sh remains the legacy edge compatibility seam and is
-# referenced here so an interrupted handoff can still be audited explicitly.
-if [ -f "$transaction_script" ]; then
+# The manifest is checked again after rsync and before touching server runtime
+# state. It binds the exact release directory to this caller-supplied SHA.
+source_bundle_sha256="$(
     WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-    WEKNORA_PRODUCTION_RELEASE_PROTOCOL='staged' \
-        "$transaction_script"
-elif [ "${WEKNORA_PRODUCTION_TRANSACTION_TEST_FALLBACK:-0}" = 1 ] && [ "${MUSUW_DEPLOY_GATE_TEST_MODE:-0}" = 1 ]; then
-    # Tiny legacy lifecycle fixtures intentionally copy only the original
-    # staged helpers. Production promoted releases always carry the v2
-    # transaction; this branch keeps those historical simulations useful.
-    update_script="$script_dir/update-current.sh"
-    weknora_production_require_file "$update_script"
-    WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-    WEKNORA_PRODUCTION_RELEASE_PROTOCOL='staged' \
-        "$update_script"
-else
-    weknora_production_die 'v2 release transaction helper is unavailable; refusing legacy production release'
-fi
+    WEKNORA_PRODUCTION_REVISION="$revision" \
+        bash "$manifest_script" verify "$repo_root"
+)"
 
-completed=true
-printf '%s\n' "CI staged release green: transactional public revision probes and atomic commit passed source_bundle_sha256=$source_bundle_sha256"
+install -m 600 "$repo_root/deploy/production.public.env" "$runtime_dir/production.public.env"
+install -m 600 "$repo_root/deploy/auth-public.env" "$runtime_dir/auth-public.env"
+
+WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+WEKNORA_PRODUCTION_REVISION="$revision" \
+    "$script_dir/prepare-runtime.sh"
+
+# Images are built and pushed by the GitHub Actions release job. The server
+# only pulls the exact digest references carried in production.env and never
+# invokes Docker build or a host-side build-cache cleanup.
+printf '%s\n' "$ghcr_token" |
+    DOCKER_CONFIG="$docker_config" docker login ghcr.io \
+        --username "$ghcr_username" --password-stdin >/dev/null
+DOCKER_CONFIG="$docker_config" WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+    "$script_dir/compose.sh" --edge pull app frontend
+
+# The fixed native Compose project replaces only the application/frontend
+# services; named data services and volumes remain authoritative on the host.
+DOCKER_CONFIG="$docker_config" WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+WEKNORA_PRODUCTION_REVISION="$revision" \
+    "$script_dir/compose.sh" --edge up -d --no-build --no-deps --force-recreate app frontend
+
+wait_for_healthy() {
+    local container="$1"
+    local deadline=$(( $(date +%s) + 240 ))
+    local status image_revision
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        status="$(docker inspect "$container" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+        case "$status" in
+            healthy) break ;;
+            unhealthy|exited|dead) die "production container is not healthy: $container" ;;
+        esac
+        sleep 2
+    done
+    status="$(docker inspect "$container" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+    [ "$status" = healthy ] || die "production container health timed out: $container"
+    image_revision="$(docker inspect "$container" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+    [ "$image_revision" = "$revision" ] || die "production image revision does not match requested SHA: $container"
+}
+
+wait_for_healthy weknora-v072-production-app
+wait_for_healthy weknora-v072-production-frontend
+
+app_port="$(weknora_production_require_env_value "$runtime_dir/production.env" WEKNORA_PRODUCTION_APP_PORT)"
+frontend_port="$(weknora_production_require_env_value "$runtime_dir/production.env" WEKNORA_PRODUCTION_FRONTEND_PORT)"
+curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 "http://127.0.0.1:${app_port}/health" >/dev/null
+curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 "http://127.0.0.1:${frontend_port}/health" >/dev/null
+curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 https://app.musuw.com/health >/dev/null
+curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 https://app.musuw.com/ >/dev/null
+curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 https://app.musuw.com/auth/start >/dev/null
+
+# Health and revision checks pass before the serving pointer changes. The
+# atomic current activation is the only source activation operation here.
+[ -L "$current_link" ] || [ ! -e "$current_link" ] || die 'current release path is not a symlink'
+next_link="$runtime_dir/current.next.$$"
+ln -s "$repo_root" "$next_link"
+mv -Tf "$next_link" "$current_link"
+
+printf '%s\n' "simple release green: $release_id source_bundle_sha256=$source_bundle_sha256"

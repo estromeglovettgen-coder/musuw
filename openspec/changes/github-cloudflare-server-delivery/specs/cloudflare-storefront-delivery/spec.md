@@ -53,18 +53,18 @@ Actions secrets or the environment secret store.
 - **AND** the job has no readable server secret file, SSH private key, or model,
   auth, or billing credential
 
-### Requirement: Worker health and rollback are observable
+### Requirement: Worker health is observable
 
 After deployment, the workflow SHALL probe both `musuw.com` and `www.musuw.com`
-for the static entry, expected product handoff, and locale signal. The previous
-known-good Worker version SHALL remain addressable for an explicit rollback;
-`wrangler` command success alone MUST NOT be reported as production success.
+for the static entry, expected product handoff, and locale signal. A Wrangler
+command succeeding without these probes MUST NOT be reported as production
+success.
 
-#### Scenario: Route or handoff failure triggers rollback readiness
+#### Scenario: Route or handoff failure is reported
 
 - **WHEN** either custom domain fails the static entry, handoff, or locale probe
-- **THEN** the workflow marks the deployment failed, records the deployed and
-  previous Worker versions, and leaves an operator-ready rollback command
+- **THEN** the workflow marks the deployment failed and reports the failing
+  probe
 - **AND** it does not claim the storefront release is healthy
 
 ### Requirement: Automatic storefront delivery waits for completed CI
@@ -84,15 +84,15 @@ credentials.
 - **WHEN** the canonical repository's `CI` workflow completes successfully for
   a push to `main`
 - **THEN** `Deploy storefront` selects `workflow_run.head_sha`, checks out that
-  exact commit, and may proceed to the existing build, Cloudflare deploy,
-  smoke, and rollback steps
+  exact commit, and may proceed to the existing build, Cloudflare deploy and
+  smoke steps
 
 #### Scenario: Failed or non-canonical CI cannot mutate Cloudflare
 
 - **WHEN** a completed `CI` run has a non-success conclusion, a non-main head
   branch, or a repository other than the canonical repository
-- **THEN** the storefront build/deploy jobs are skipped and no Worker mutation,
-  smoke probe, or rollback is attempted
+- **THEN** the storefront build/deploy jobs are skipped and no Worker mutation
+  or smoke probe is attempted
 
 #### Scenario: Manual storefront dispatch rechecks the exact SHA
 

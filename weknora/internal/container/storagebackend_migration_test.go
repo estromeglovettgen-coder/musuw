@@ -3,7 +3,6 @@ package container
 import (
 	"testing"
 
-	weknoraRuntime "github.com/Tencent/WeKnora/internal/runtime"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,15 +42,4 @@ func TestMigrateLegacyStorageBackends(t *testing.T) {
 	require.NoError(t, db.Raw("SELECT storage_backend_id FROM knowledge_bases WHERE id = 'kb-a'").Scan(&kbBackend).Error)
 	assert.Equal(t, backend.ID, tenantDefault)
 	assert.Equal(t, backend.ID, kbBackend)
-}
-
-func TestStrictPostMigrationHooksReturnDatabaseErrors(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	if err := resolveStorageProviderPendingWithPlan(db, weknoraRuntime.NewLifecyclePlan(weknoraRuntime.RolePrepare)); err == nil {
-		t.Fatal("resolveStorageProviderPendingWithPlan() error = nil with missing schema")
-	}
-	if err := migrateLegacyStorageBackends(db); err == nil {
-		t.Fatal("migrateLegacyStorageBackends() error = nil with missing schema")
-	}
 }

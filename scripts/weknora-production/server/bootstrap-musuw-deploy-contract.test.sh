@@ -39,9 +39,14 @@ grep -Fq 'authorized_keys mode is not 0644' "$verify" || fail 'verifier does not
 grep -Fq 'dedicated deployment account shell is not /bin/sh' "$verify" || fail 'verifier does not reject an interactive deploy shell'
 grep -Fq 'password is empty or locked' "$verify" || fail 'verifier does not reject empty or locked deploy passwords'
 grep -Fq 'retain the old root key' "$bootstrap" || fail 'bootstrap does not preserve the rollback key during migration'
-grep -Fq "minimum_capacity_floor_kib='12582912'" "$bootstrap" || fail 'bootstrap does not pin the production capacity floor'
-grep -Fq "minimum_capacity_floor_kib='12582912'" "$root_gate" || fail 'root gate does not pin the production capacity floor'
-grep -Fq "minimum_capacity_floor_kib='12582912'" "$ssh_gate" || fail 'SSH gate does not pin the production capacity floor'
+grep -Fq 'prepare' "$bootstrap" || fail 'bootstrap does not install the prepare protocol'
+grep -Fq 'deploy' "$bootstrap" || fail 'bootstrap does not install the deploy protocol'
+grep -Fq 'prepare)' "$root_gate" || fail 'root gate does not expose prepare'
+grep -Fq 'deploy)' "$root_gate" || fail 'root gate does not expose deploy'
+grep -Fq 'prepare|deploy' "$ssh_gate" || fail 'SSH gate does not expose prepare/deploy'
+if grep -Eq 'minimum_capacity_floor_kib|minimum_free_kib|musuw-gate (preflight|promote|run)' "$bootstrap" "$root_gate" "$ssh_gate"; then
+    fail 'bootstrap sources retain the removed capacity or three-verb protocol'
+fi
 if grep -Eq 'authorized_keys.*(rm|truncate)|ssh-keygen.*-R|sed[[:space:]]+-i' "$bootstrap"; then
     fail 'bootstrap contains an unreviewed destructive key-removal operation'
 fi

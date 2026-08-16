@@ -59,23 +59,23 @@ missing or failed.
 
 ### Requirement: Releases use immutable commit identity
 
-Production delivery SHALL require an exact full Git commit SHA and SHALL record
-an annotated `vMAJOR.MINOR.PATCH` tag when a product release is cut. A workflow
-MUST verify that the requested tag resolves to the requested SHA and MUST NOT
-deploy a branch name, mutable ref, or unverified working tree as the release
-identity.
+Production delivery SHALL require an exact full Git commit SHA. A workflow
+MUST verify that the requested SHA exists on `main`, build the production app
+and frontend images from that SHA, and publish only the returned immutable GHCR
+digests. It MUST NOT deploy a branch name, mutable ref or unverified working
+tree as the release identity.
 
 #### Scenario: Mutable ref is rejected
 
 - **WHEN** an operator dispatches a production workflow with only a branch name
-  or a tag that resolves to a different SHA than the requested manifest
+  or an unknown SHA
 - **THEN** the workflow fails before artifact transfer or target deployment
 
-#### Scenario: Tag and SHA are recorded together
+#### Scenario: SHA is recorded with the target
 
-- **WHEN** an annotated release tag is created for a reviewed commit
-- **THEN** the release manifest records repository, tag, full SHA, workflow run,
-  source/provenance version, and artifact checksums
+- **WHEN** a reviewed commit is selected for deployment
+- **THEN** the release record records the repository, full SHA, workflow run,
+  source/provenance version and artifact checksums
 
 ### Requirement: Product automation has one release authority
 

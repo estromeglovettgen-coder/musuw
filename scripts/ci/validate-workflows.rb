@@ -10,7 +10,7 @@ require "json"
 
 ROOT = File.expand_path("../..", __dir__)
 WORKFLOW_DIR = File.join(ROOT, ".github", "workflows")
-EXPECTED = %w[ci.yml deploy-storefront.yml deploy-production.yml deploy-app-edge-staging.yml].freeze
+EXPECTED = %w[ci.yml deploy-storefront.yml deploy-production.yml].freeze
 
 def fail_contract(message)
   warn "workflow contract: #{message}"
@@ -45,7 +45,7 @@ def walk_uses(value, result = [])
   when Array
     value.each { |child| walk_uses(child, result) }
   when String
-    result << value if value.start_with?("actions/", "astral-sh/", "cloudflare/") && value.include?("@")
+    result << value if value.start_with?("actions/", "astral-sh/", "cloudflare/", "docker/") && value.include?("@")
   end
   result
 end
@@ -60,8 +60,10 @@ documents.each do |name, document|
   permissions = document["permissions"]
   assert_hash(permissions, "#{name}.permissions")
   expected_permissions = case name
-  when "deploy-production.yml", "deploy-storefront.yml", "deploy-app-edge-staging.yml"
+  when "deploy-storefront.yml"
     { "contents" => "read", "actions" => "read" }
+  when "deploy-production.yml"
+    { "contents" => "read", "actions" => "read", "packages" => "write" }
   else
     { "contents" => "read" }
   end
@@ -77,7 +79,7 @@ ci_on = root_key(ci, "on")
 fail_contract "ci.yml must run on pull requests" unless ci_on.key?("pull_request")
 fail_contract "ci.yml must run on pushes to main" unless ci_on.dig("push", "branches") == ["main"]
 fail_contract "ci.yml must cancel superseded runs" unless ci.dig("concurrency", "cancel-in-progress") == true
-required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md app-edge/**]
+required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md]
 %w[pull_request push].each do |trigger|
   configured = Array(ci_on.dig(trigger, "paths"))
   missing = required_ci_paths.reject { |path| configured.include?(path) }
@@ -100,14 +102,8 @@ fail_contract "tracked publish-boundary scanner is missing" unless File.file?(tr
 fail_contract "tracked publish-boundary scanner is not executable" unless File.executable?(tracked_scan_path)
 fail_contract "repository contracts do not run the tracked publish-boundary scanner" unless ci_text.include?("node scripts/ci/tracked-source-scan.mjs")
 fail_contract "repository contracts reference excluded legacy architecture tests" if ci_text.include?("tests/architecture/")
-release_transaction_checks = %w[
-  release-transaction-contract.test.sh
-  release-transaction-simulation.test.sh
-  release-transaction-actual.test.sh
-]
-release_transaction_checks.each do |check|
-  fail_contract "canonical CI omits #{check}" unless ci_text.include?("bash scripts/weknora-production/#{check}")
-end
+fail_contract "canonical CI omits the direct deployment seam contract" unless ci_text.include?("bash scripts/weknora-production/deploy-ci-seams-contract.test.sh")
+fail_contract "canonical CI omits the restricted gate simulation" unless ci_text.include?("bash scripts/weknora-production/musuw-deploy-gate-simulation.test.sh")
 tracked_scan_text = File.read(tracked_scan_path)
 %w[server desktop dist node_modules .runtime keys].each do |sentinel|
   fail_contract "tracked publish-boundary scanner does not cover #{sentinel}" unless tracked_scan_text.include?(sentinel)
@@ -146,23 +142,6 @@ fail_contract "storefront deploy must capture a pre-deploy version" unless store
 fail_contract "storefront deploy/smoke failure must rollback and re-probe" unless storefront_text.include?("wrangler rollback") && storefront_text.include?("automatic Cloudflare rollback") && storefront_text.scan("https://musuw.com").length >= 2 && storefront_text.scan("https://www.musuw.com").length >= 2
 fail_contract "storefront smoke must verify the product auth handoff reachability" unless storefront_text.include?("https://app.musuw.com/auth/start")
 
-staging = documents.fetch("deploy-app-edge-staging.yml")
-staging_on = root_key(staging, "on")
-fail_contract "app-edge staging workflow must retain pull_request verification" unless staging_on.key?("pull_request")
-fail_contract "app-edge staging workflow must retain manual workflow_dispatch" unless staging_on.key?("workflow_dispatch")
-staging_dispatch = staging_on.fetch("workflow_dispatch")
-assert_hash(staging_dispatch, "deploy-app-edge-staging.yml.workflow_dispatch")
-staging_input = staging_dispatch.dig("inputs", "immutable_ref")
-assert_hash(staging_input, "deploy-app-edge-staging.yml.workflow_dispatch.inputs.immutable_ref")
-fail_contract "app-edge staging immutable_ref input must be required" unless staging_input["required"] == true && staging_input["type"] == "string"
-fail_contract "app-edge staging deploy must have a verify dependency" unless staging.dig("jobs", "deploy", "needs") == "verify"
-fail_contract "app-edge staging deploy must be canonical manual main only" unless staging.dig("jobs", "deploy", "if").to_s.include?("github.event_name == 'workflow_dispatch' && inputs.deploy == true") && staging.dig("jobs", "deploy", "if").to_s.include?("github.repository == 'estromeglovettgen-coder/musuw'") && staging.dig("jobs", "deploy", "if").to_s.include?("github.ref == 'refs/heads/main'")
-staging_text = File.read(File.join(WORKFLOW_DIR, "deploy-app-edge-staging.yml"))
-fail_contract "app-edge staging deploy must select the requested full SHA" unless staging_text.include?("inputs.immutable_ref") && staging_text.include?("git rev-parse HEAD") && staging_text.match?(/\[\[ \"\$REQUESTED_REF\" =~ \^\[0-9a-fA-F\]/)
-fail_contract "app-edge staging deploy must require successful CI for the same SHA" unless staging_text.include?("actions/runs") && staging_text.include?(".name == \"CI\"") && staging_text.include?(".head_sha == $sha") && staging_text.include?(".conclusion == \"success\"")
-fail_contract "app-edge staging CI gate must run before Cloudflare credentials" unless staging_text.index("actions/runs") && staging_text.index("actions/runs") < staging_text.index("CLOUDFLARE_API_TOKEN")
-fail_contract "app-edge staging workflow must never deploy production" if staging_text.include?("--env production")
-
 production = documents.fetch("deploy-production.yml")
 production_on = root_key(production, "on")
 fail_contract "production deploy must be manual or v* tag only" unless production_on.key?("workflow_dispatch") && production_on.dig("push", "tags") == ["v*"]
@@ -184,15 +163,14 @@ fail_contract "production deploy must prove the revision belongs to origin/main"
 fail_contract "production tag releases must require annotated semver tags" unless production_text.include?("git cat-file -t") && production_text.include?("refs/tags/") && production_text.include?("v[0-9]+\\.[0-9]+\\.[0-9]+")
 fail_contract "production deploy must require a successful CI run for the revision" unless production_text.include?("actions/runs") && production_text.include?("CI") && production_text.include?("conclusion")
 fail_contract "production deploy must pin checkout to the resolved SHA" unless production_text.include?("ref: ${{ steps.resolve.outputs.release_sha }}") || production_text.include?("ref: ${{ needs.rebuild.outputs.release_sha }}")
-fail_contract "production deploy must verify transaction-owned public revision probes and rollback" unless production_text.include?("https://app.musuw.com/readyz") && production_text.include?("rollback_transaction")
+fail_contract "production deploy must execute the direct SHA-only runner" unless production_text.include?("bash scripts/weknora-deploy.sh \"$WEKNORA_DEPLOY_REVISION\"") && production_text.include?("remote_gate prepare") && production_text.include?("remote_gate deploy")
+fail_contract "production deploy must build and push both immutable GHCR images" unless production_text.include?("docker/build-push-action@") && production_text.include?("musuw-app:") && production_text.include?("musuw-frontend:") && production_text.include?("steps.build_app.outputs.digest") && production_text.include?("steps.build_frontend.outputs.digest")
+fail_contract "production deploy must stream the short-lived GHCR token through the restricted runner" unless production_text.include?("WEKNORA_DEPLOY_GHCR_USERNAME") && production_text.include?("WEKNORA_DEPLOY_GHCR_TOKEN")
 fail_contract "production rebuild must use the committed auth lockfile" unless production_text.include?("npm ci --prefix auth") && File.file?(File.join(ROOT, "auth", "package-lock.json"))
 fail_contract "production rebuild must run the real static/release contracts" unless production_text.include?("scripts/weknora-production/verify-static.sh") && production_text.include?("deploy-ci-seams-contract.test.sh") && production_text.include?("compose.sh")
-release_transaction_checks.each do |check|
-  fail_contract "production rebuild omits #{check}" unless production_text.include?("bash scripts/weknora-production/#{check}")
-end
-fail_contract "production deploy must assert the formal staged rollback seam" unless production_text.include?("release-ci.sh") && production_text.include?("rollback.sh")
+fail_contract "production deploy must assert the fixed release helper" unless production_text.include?("release-ci.sh") && production_text.include?("musuw-deploy-gate")
 fail_contract "production deploy must retain release manifest/checksum evidence" unless production_text.include?("upload-artifact") && production_text.include?("sha256sum") && production_text.include?("source_manifest") && production_text.include?("source_bundle_sha256")
-fail_contract "production success manifest must fail closed without server identity/checksum" unless production_text.include?("RELEASE_PROBE_OUTCOME") && production_text.include?("test \"$server_release_id\" = \"$expected_release_id\"") && production_text.include?("=~ ^[0-9a-fA-F]{64}$")
+fail_contract "production success manifest must fail closed without server identity/checksum" unless production_text.include?("RELEASE_OUTCOME") && production_text.include?("test \"$server_release_id\" = \"$expected_release_id\"") && production_text.include?("=~ ^[0-9a-fA-F]{64}$")
 fail_contract "production workflow must not use write permissions" if production_text.include?("contents: write") || production_text.include?("actions: write")
 
 puts "workflow contract green: #{EXPECTED.join(", ")}"

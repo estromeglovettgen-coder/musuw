@@ -75,52 +75,6 @@ func NewTosFileServiceWithTempBucket(endpoint, region, accessKey, secretKey, buc
 	}, nil
 }
 
-// NewTosFileServiceWithTempBucketExisting performs HeadBucket checks only.
-func NewTosFileServiceWithTempBucketExisting(endpoint, region, accessKey, secretKey, bucketName, pathPrefix, tempBucketName, tempRegion string) (interfaces.FileService, error) {
-	client, err := tos.NewClientV2(
-		endpoint,
-		tos.WithRegion(region),
-		tos.WithCredentials(tos.NewStaticCredentials(accessKey, secretKey)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize TOS client: %w", err)
-	}
-	if err := checkTOSBucket(context.Background(), client, bucketName); err != nil {
-		return nil, err
-	}
-	if tempBucketName != "" {
-		if tempRegion == "" {
-			tempRegion = region
-		}
-		tempClient, err := tos.NewClientV2(
-			endpoint,
-			tos.WithRegion(tempRegion),
-			tos.WithCredentials(tos.NewStaticCredentials(accessKey, secretKey)),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize TOS temp client: %w", err)
-		}
-		if err := checkTOSBucket(context.Background(), tempClient, tempBucketName); err != nil {
-			return nil, fmt.Errorf("TOS temp bucket prerequisite: %w", err)
-		}
-	}
-	return &tosFileService{
-		client:         client,
-		pathPrefix:     strings.Trim(pathPrefix, "/"),
-		bucketName:     bucketName,
-		tempBucketName: tempBucketName,
-	}, nil
-}
-
-func checkTOSBucket(ctx context.Context, client *tos.ClientV2, bucketName string) error {
-	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if _, err := client.HeadBucket(checkCtx, &tos.HeadBucketInput{Bucket: bucketName}); err != nil {
-		return fmt.Errorf("TOS bucket %q prerequisite: %w", bucketName, err)
-	}
-	return nil
-}
-
 // CheckConnectivity verifies TOS is reachable by performing a HeadBucket request.
 func (s *tosFileService) CheckConnectivity(ctx context.Context) error {
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

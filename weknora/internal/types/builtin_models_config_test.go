@@ -65,24 +65,6 @@ func TestLoadBuiltinModelsConfig_FileMissing(t *testing.T) {
 	assert.Equal(t, int64(0), deleted)
 }
 
-func TestLoadBuiltinModelsConfigStrict_FileMissing(t *testing.T) {
-	db := setupBuiltinModelsDB(t)
-	err := LoadBuiltinModelsConfigStrict(context.Background(), db, t.TempDir())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "builtin models config")
-	assert.Contains(t, err.Error(), "stat")
-}
-
-func TestLoadBuiltinModelsConfigStrict_NonRegularFile(t *testing.T) {
-	db := setupBuiltinModelsDB(t)
-	dir := t.TempDir()
-	t.Setenv("BUILTIN_MODELS_CONFIG", dir)
-
-	err := LoadBuiltinModelsConfigStrict(context.Background(), db, t.TempDir())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not a regular file")
-}
-
 func TestLoadBuiltinModelsConfig_ParseError(t *testing.T) {
 	db := setupBuiltinModelsDB(t)
 	// Malformed YAML — should warn + return without sweeping.
@@ -99,51 +81,6 @@ func TestLoadBuiltinModelsConfig_ParseError(t *testing.T) {
 	live, deleted := countModels(t, db, "pre-existing-yaml")
 	assert.Equal(t, int64(1), live, "parse error must NOT trigger sweep")
 	assert.Equal(t, int64(0), deleted)
-}
-
-func TestLoadBuiltinModelsConfigStrict_ParseError(t *testing.T) {
-	db := setupBuiltinModelsDB(t)
-	dir := writeYAML(t, "builtin_models: [oops: : bad")
-
-	err := LoadBuiltinModelsConfigStrict(context.Background(), db, dir)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "parse")
-}
-
-func TestLoadBuiltinModelsConfigStrict_ValidationError(t *testing.T) {
-	db := setupBuiltinModelsDB(t)
-	require.NoError(t, db.Create(&Model{
-		ID: "invalid", Name: "last-known-good", Type: ModelTypeKnowledgeQA,
-		Source: ModelSourceRemote, Status: ModelStatusActive,
-		IsBuiltin: true, ManagedBy: BuiltinModelManagedBy,
-	}).Error)
-	dir := writeYAML(t, `builtin_models:
-  - id: invalid
-    type: not-a-model-type
-`)
-
-	err := LoadBuiltinModelsConfigStrict(context.Background(), db, dir)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validate entry")
-	live, _ := countModels(t, db, "invalid")
-	assert.Equal(t, int64(1), live, "a present but invalid catalog entry must not prune its last-known-good row")
-}
-
-func TestLoadBuiltinModelsConfigStrict_AggregatesDatabaseErrors(t *testing.T) {
-	// No models table: the strict loader must surface both the per-entry
-	// inspection failure and the final drift-sweep failure instead of silently
-	// reporting success after best-effort warnings.
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	dir := writeYAML(t, `builtin_models:
-  - id: builtin-llm
-    type: KnowledgeQA
-`)
-
-	err = LoadBuiltinModelsConfigStrict(context.Background(), db, dir)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "inspect model builtin-llm")
-	assert.Contains(t, err.Error(), "drift sweep")
 }
 
 func TestLoadBuiltinModelsConfig_BasicUpsert(t *testing.T) {

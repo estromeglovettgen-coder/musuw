@@ -41,6 +41,7 @@ FROM debian:12.12-slim
 
 WORKDIR /app
 
+ARG COMMIT_ID_ARG=local
 ARG APT_MIRROR_ARG
 
 RUN useradd -m -s /bin/bash appuser

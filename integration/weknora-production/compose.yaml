@@ -5,13 +5,8 @@
 services:
   frontend:
     platform: linux/amd64
-    image: weknora-v072-production-ui:${WEKNORA_PRODUCTION_IMAGE_TAG:-local}
-    build:
-      context: ..
-      dockerfile: integration/weknora-production/Dockerfile.frontend
-      args:
-        VERSION_ARG: "0.7.2"
-        REVISION_ARG: ${WEKNORA_PRODUCTION_REVISION:-local}
+    image: ${WEKNORA_PRODUCTION_FRONTEND_IMAGE:?set WEKNORA_PRODUCTION_FRONTEND_IMAGE in production.env}
+    build: !reset null
     container_name: weknora-v072-production-frontend
     ports: !override
       - "127.0.0.1:${WEKNORA_PRODUCTION_FRONTEND_PORT:-4191}:8080"
@@ -37,16 +32,8 @@ services:
 
   app:
     platform: linux/amd64
-    image: weknora-v072-production-app:${WEKNORA_PRODUCTION_IMAGE_TAG:-local}
-    build:
-      context: ../weknora
-      dockerfile: ../integration/weknora-production/Dockerfile.app.runtime
-      args:
-        VERSION_ARG: "0.7.2"
-        COMMIT_ID_ARG: ${WEKNORA_PRODUCTION_REVISION:-local}
-        BUILD_TIME_ARG: "production-source-build"
-        GO_VERSION_ARG: "go1.26"
-        APT_MIRROR_ARG: ${APT_MIRROR_ARG:-}
+    image: ${WEKNORA_PRODUCTION_APP_IMAGE:?set WEKNORA_PRODUCTION_APP_IMAGE in production.env}
+    build: !reset null
     container_name: weknora-v072-production-app
     ports: !override
       - "127.0.0.1:${WEKNORA_PRODUCTION_APP_PORT:-18091}:8080"

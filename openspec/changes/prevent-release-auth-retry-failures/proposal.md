@@ -40,6 +40,6 @@ Supabase session and turn one temporary outage into a refresh/nonce loop.
 - `weknora/frontend` native OIDC callback and external-auth handoff.
 - `weknora` authentication service, middleware, and callback handler.
 - `auth/` failure-page presentation.
-- `scripts/weknora-deploy.sh` and `scripts/weknora-production/build-images.sh`.
+- `scripts/weknora-deploy.sh` and the fixed production Compose/release seam.
 - Production deployment behavior only; no model, knowledge-base, or data
   contract changes.

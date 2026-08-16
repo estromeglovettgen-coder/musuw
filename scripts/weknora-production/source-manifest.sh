@@ -133,7 +133,7 @@ generate_manifest() {
             *) fail 'source manifest revision must be a full 40-character Git SHA' ;;
         esac
     fi
-    case "$mode" in update|update-ui) ;; *) fail 'source manifest mode is unsafe' ;; esac
+    [ "$mode" = update ] || fail 'source manifest mode is unsafe'
     [ -d "$repo_root" ] || fail 'source manifest repository root is unavailable'
     [ -d "$runner_runtime" ] || fail 'source manifest runner runtime directory is unavailable'
     [ "$(git -C "$repo_root" rev-parse --is-inside-work-tree 2>/dev/null || true)" = true ] || \
@@ -147,24 +147,16 @@ generate_manifest() {
     : > "$manifest_file"
     chmod 600 "$manifest_file"
 
-    if [ "$mode" = 'update' ]; then
-        append_tracked_paths weknora "$path_list"
-        append_tracked_paths auth "$path_list"
-        append_tracked_paths integration/weknora-production "$path_list"
-        append_tracked_paths scripts/weknora-production "$path_list"
-    else
-        append_tracked_paths weknora/frontend "$path_list"
-        append_tracked_paths auth "$path_list"
-        printf '%s\n' 'scripts/weknora-production/update-ui-current.sh' >> "$path_list"
-    fi
+    append_tracked_paths weknora "$path_list"
+    append_tracked_paths auth "$path_list"
+    append_tracked_paths integration/weknora-production "$path_list"
+    append_tracked_paths scripts/weknora-production "$path_list"
 
     # Generated assets are an explicit overlay.  They are not Git source and
     # therefore must be validated and hashed just like tracked inputs.
     append_generated_tree "$repo_root/weknora/frontend/dist" weknora/frontend/dist "$path_list"
     append_generated_tree "$repo_root/auth/dist" auth/dist "$path_list"
-    if [ "$mode" = update ]; then
-        printf '%s\n' deploy/production.public.env deploy/auth-public.env >> "$path_list"
-    fi
+    printf '%s\n' deploy/production.public.env deploy/auth-public.env >> "$path_list"
 
     while IFS= read -r relative; do
         [ -n "$relative" ] || continue
@@ -224,11 +216,8 @@ materialize_tree() {
     # A full release is defined by the immutable clean checkout, not by the
     # current mutable index/worktree. This catches modified/staged/revision
     # mismatch even when the helper is called directly in a test or workflow.
-    case "$mode" in
-        update) weknora_production_require_clean_checkout "$repo_root" "$revision" ;;
-        update-ui) ;;
-        *) fail 'unsupported source release materialization mode' ;;
-    esac
+    [ "$mode" = update ] || fail 'unsupported source release materialization mode'
+    weknora_production_require_clean_checkout "$repo_root" "$revision"
     mkdir -p "$tree_dir"
     chmod 700 "$tree_dir"
     generate_manifest "$repo_root" "$runner_runtime" "$release_id" "$revision" "$mode" "$output_dir" >/dev/null
@@ -245,18 +234,12 @@ materialize_tree() {
         [ -f "$destination" ] && [ ! -L "$destination" ] || fail "materialized source input is unsafe: $relative"
     done < "$output_dir/source-manifest.sha256"
 
-    if [ "$mode" = update ]; then
-        mkdir -p "$tree_dir/deploy"
-        cp -p "$output_dir/source-manifest.sha256" "$tree_dir/deploy/source-manifest.sha256"
-        cp -p "$output_dir/release-manifest.json" "$tree_dir/deploy/release-manifest.json"
-        cp -p "$output_dir/release-manifest.json.sha256" "$tree_dir/deploy/release-manifest.json.sha256"
-    fi
+    mkdir -p "$tree_dir/deploy"
+    cp -p "$output_dir/source-manifest.sha256" "$tree_dir/deploy/source-manifest.sha256"
+    cp -p "$output_dir/release-manifest.json" "$tree_dir/deploy/release-manifest.json"
+    cp -p "$output_dir/release-manifest.json.sha256" "$tree_dir/deploy/release-manifest.json.sha256"
     require_regular_tree "$tree_dir" 'materialized deploy tree'
-    if [ "$mode" = update ]; then
-        bundle_hash="$(sha256sum "$tree_dir/deploy/source-manifest.sha256" | awk '{print $1}')"
-    else
-        bundle_hash="$(sha256sum "$output_dir/source-manifest.sha256" | awk '{print $1}')"
-    fi
+    bundle_hash="$(sha256sum "$tree_dir/deploy/source-manifest.sha256" | awk '{print $1}')"
     printf '%s\n' "$bundle_hash"
 }
 

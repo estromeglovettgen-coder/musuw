@@ -3,7 +3,6 @@ package datasource
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -60,7 +59,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return fmt.Errorf("load active data sources: %w", err)
 	}
 
-	var errs error
 	for _, ds := range dataSources {
 		if ds.SyncSchedule == "" {
 			continue
@@ -68,13 +66,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		if err := s.addEntry(ds); err != nil {
 			logger.Warnf(ctx, "[Scheduler] failed to register cron for ds=%s schedule=%q: %v",
 				ds.ID, ds.SyncSchedule, err)
-			errs = errors.Join(errs, fmt.Errorf("register data source %s schedule: %w", ds.ID, err))
 		}
 	}
 
 	s.cron.Start()
 	logger.Infof(ctx, "[Scheduler] started with %d cron entries", len(s.entries))
-	return errs
+	return nil
 }
 
 // Stop gracefully stops the cron runner and waits for running jobs to finish.

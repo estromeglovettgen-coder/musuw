@@ -306,9 +306,7 @@ type Service struct {
 
 	stopCh         chan struct{}
 	stopOnce       sync.Once
-	runtimeOnce    sync.Once
 	subscriberOnce sync.Once
-	runtimeStarted atomic.Bool
 	stopped        atomic.Bool
 }
 
@@ -723,10 +721,17 @@ func NewService(
 		stopCh:           make(chan struct{}),
 	}
 
-	// Initialize the QA worker pool and bounded queue. Goroutines start lazily
-	// from LoadAndStartChannels (worker/all startup) or HandleMessage (a real
-	// web callback request), keeping web container construction side-effect free.
+	// Initialize the QA worker pool and bounded queue.
 	s.qaQueue = newQAQueue(workers, maxQueue, maxPerUser, globalMaxWorkers, s.executeQARequest, redisClient)
+	s.qaQueue.Start(s.stopCh)
+
+	// Start periodic cleanup loops.
+	// Dedup cleanup is only needed in single-instance mode (local sync.Map);
+	// when Redis handles dedup, the TTL on Redis keys handles expiry automatically.
+	if redisClient == nil {
+		go s.dedupCleanupLoop()
+	}
+	go s.rateLimiter.StartCleanup(s.stopCh)
 
 	if redisClient != nil {
 		globalInfo := "unlimited"
@@ -741,22 +746,6 @@ func NewService(
 	}
 
 	return s
-}
-
-func (s *Service) startRequestRuntime() {
-	if s == nil || s.stopped.Load() {
-		return
-	}
-	s.runtimeOnce.Do(func() {
-		s.runtimeStarted.Store(true)
-		s.qaQueue.Start(s.stopCh)
-		// Dedup cleanup is only needed in single-instance mode; Redis keys carry
-		// their own TTL in distributed deployments.
-		if s.redis == nil {
-			go s.dedupCleanupLoop()
-		}
-		go s.rateLimiter.StartCleanup(s.stopCh)
-	})
 }
 
 // RegisterAdapterFactory registers a factory for creating adapters for a given platform.
@@ -825,7 +814,6 @@ func imImageConfigWarning(activeChannels int, externalURL string) string {
 
 // LoadAndStartChannels loads all enabled channels from the database and starts them.
 func (s *Service) LoadAndStartChannels() error {
-	s.startRequestRuntime()
 	s.startChannelConfigSubscriber()
 
 	ctx := context.Background()
@@ -838,12 +826,10 @@ func (s *Service) LoadAndStartChannels() error {
 		logger.Warnf(ctx, "%s", msg)
 	}
 
-	var errs error
 	for i := range channels {
 		ch := channels[i]
 		if err := s.StartChannel(&ch); err != nil {
 			logger.Warnf(ctx, "[IM] Failed to start channel %s (%s/%s): %v", ch.ID, ch.Platform, ch.Name, err)
-			errs = errors.Join(errs, fmt.Errorf("start IM channel %s: %w", ch.ID, err))
 		} else if _, _, active := s.GetChannelAdapter(ch.ID); active {
 			// Adapter initialization can launch an asynchronous connection attempt.
 			// Do not claim network readiness here; platform connection logs report it.
@@ -856,7 +842,7 @@ func (s *Service) LoadAndStartChannels() error {
 	}
 
 	logger.Infof(ctx, "[IM] Loaded %d enabled channels", len(channels))
-	return errs
+	return nil
 }
 
 // startChannelConfigSubscriber listens for durable channel mutations made by
@@ -1514,7 +1500,6 @@ func (s *Service) isDuplicate(ctx context.Context, messageID string) bool {
 
 // HandleMessage processes an incoming IM message end-to-end using channel config.
 func (s *Service) HandleMessage(ctx context.Context, msg *IncomingMessage, channelID string) error {
-	s.startRequestRuntime()
 	// Dedup: skip if this message was already processed (IM platforms may retry)
 	if msg.MessageID != "" {
 		if s.isDuplicate(ctx, msg.MessageID) {

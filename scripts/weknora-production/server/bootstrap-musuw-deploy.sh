@@ -28,13 +28,13 @@ for required in "$ssh_gate_source" "$root_gate_source" "$verify_source"; do
     [ -f "$required" ] && [ -r "$required" ] || die "bootstrap source is unavailable: $required"
 done
 
-# The caller can supply a capacity hint, but it may never lower the production
-# reserve. Check both installed gate sources before changing the host.
-minimum_capacity_floor_kib='12582912'
-grep -Fq "minimum_capacity_floor_kib='$minimum_capacity_floor_kib'" "$ssh_gate_source" || \
-    die 'SSH gate source does not enforce the production capacity floor'
-grep -Fq "minimum_capacity_floor_kib='$minimum_capacity_floor_kib'" "$root_gate_source" || \
-    die 'root gate source does not enforce the production capacity floor'
+# Both installed wrappers expose only the reviewed prepare/deploy verbs. Check
+# the protocol before changing the host so an old three-step gate cannot be
+# installed accidentally.
+grep -Fq 'prepare' "$ssh_gate_source" || die 'SSH gate source does not expose prepare'
+grep -Fq 'deploy' "$ssh_gate_source" || die 'SSH gate source does not expose deploy'
+grep -Fq 'prepare' "$root_gate_source" || die 'root gate source does not expose prepare'
+grep -Fq 'deploy' "$root_gate_source" || die 'root gate source does not expose deploy'
 
 command -v ssh-keygen >/dev/null 2>&1 || die 'ssh-keygen is unavailable'
 command -v install >/dev/null 2>&1 || die 'install is unavailable'
