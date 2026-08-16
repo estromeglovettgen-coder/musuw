@@ -35,7 +35,7 @@ notices, and provenance records SHALL remain tracked.
 - **AND** they pass for the approved active-source baseline and its example
   configuration files
 
-### Requirement: Pull-request verification gates merges
+### Requirement: CI verification gates production publication
 
 The root GitHub Actions workflow SHALL run the frontend, auth shell,
 storefront, backend/document-reader, composition/topology, source provenance,
@@ -50,12 +50,12 @@ missing or failed.
 - **THEN** the workflow marks the candidate failed and no Cloudflare or server
   production job starts
 
-#### Scenario: Successful candidate is release-eligible
+#### Scenario: Successful CI run is release-eligible
 
 - **WHEN** every required check succeeds for a reviewed commit
-- **THEN** the workflow emits a candidate manifest containing the full commit
-  SHA and the exact check/run identifiers
-- **AND** the commit is eligible for the target-specific delivery workflow
+- **THEN** GitHub records the full commit SHA and immutable CI run identifier
+- **AND** that CI run is the only automatic input to the target-specific
+  delivery workflows
 
 ### Requirement: Releases use immutable commit identity
 

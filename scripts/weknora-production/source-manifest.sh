@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Generate, verify and materialise the allowlisted source bundle used by the
 # runner -> server release seam.  A full release never copies the worktree
-# directly: materialize() first creates a fresh tree from tracked Git files,
-# the two generated browser overlays and the two public runtime inputs.
+# directly: materialize() first creates a fresh tree from tracked Git files
+# and the two public runtime inputs. GitHub-built browser output stays in GHCR.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -31,21 +31,6 @@ line_path() {
 line_checksum() {
     local line="$1"
     printf '%s' "${line%%  *}"
-}
-
-path_has_secret_suffix() {
-    local path="$1"
-    local basename="${path##*/}"
-    case "/$path" in
-        */.env|*/.env.*|*.env|*.env.*|*/.dump|*.dump|*.key|*.pem|*.crt|*.p12|*.pfx|*.secret|*.log|*.sqlite|*.sqlite3|*.db|*password*|*secret*|*token*) return 0 ;;
-        esac
-    case "$basename" in
-        .*) return 0 ;;
-        # Public source maps are deliberately not part of this release
-        # overlay; shipping them would expose the complete source tree.
-        *.html|*.js|*.css|*.json|*.svg|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.avif|*.ico|*.woff|*.woff2|*.ttf|*.eot|*.xml|*.txt|*.webmanifest|*.wasm) return 1 ;;
-        *) return 0 ;;
-    esac
 }
 
 require_regular_file() {
@@ -86,26 +71,6 @@ append_tracked_paths() {
         require_regular_file "$source_path" 'tracked source input'
         printf '%s\n' "$relative" >> "$path_list"
     done < <(git -C "$repo_root" ls-files -z -- "$prefix")
-}
-
-append_generated_tree() {
-    local tree_root="$1"
-    local manifest_prefix="$2"
-    local path_list="$3"
-    local path relative
-
-    require_regular_tree "$tree_root" 'generated browser bundle'
-    require_regular_file "$tree_root/index.html" 'generated browser bundle index'
-    while IFS= read -r -d '' path; do
-        if [ -d "$path" ]; then
-            continue
-        fi
-        relative="${path#"$repo_root/"}"
-        case "$relative" in *$'\n'*) fail 'source manifest cannot encode a generated filename containing a newline' ;; esac
-        path_has_secret_suffix "$relative" && fail "generated browser bundle contains a secret-looking or unsupported file: $relative"
-        require_regular_file "$path" 'generated browser bundle input'
-        printf '%s\n' "$relative" >> "$path_list"
-    done < <(find "$tree_root" -mindepth 1 -print0)
 }
 
 source_path_for() {
@@ -152,10 +117,6 @@ generate_manifest() {
     append_tracked_paths integration/weknora-production "$path_list"
     append_tracked_paths scripts/weknora-production "$path_list"
 
-    # Generated assets are an explicit overlay.  They are not Git source and
-    # therefore must be validated and hashed just like tracked inputs.
-    append_generated_tree "$repo_root/weknora/frontend/dist" weknora/frontend/dist "$path_list"
-    append_generated_tree "$repo_root/auth/dist" auth/dist "$path_list"
     printf '%s\n' deploy/production.public.env deploy/auth-public.env >> "$path_list"
 
     while IFS= read -r relative; do

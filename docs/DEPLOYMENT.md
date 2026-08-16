@@ -16,16 +16,18 @@ The two delivery targets are deliberately small:
 
 1. Push a change to a branch and open a pull request. CI runs the required
    frontend, auth, storefront, Go, source-boundary and secret checks.
-2. Merge the reviewed change to `main`. Select the resulting full 40-character
-   SHA for a release; never release a branch name or a dirty local checkout.
-3. The storefront workflow checks that exact SHA has a successful CI run,
+2. Merge the reviewed change to `main`. The successful CI run identifies the
+   resulting full 40-character SHA; branch names and dirty checkouts are never
+   release identities.
+3. The storefront workflow receives that successful CI result, checks the
+   exact SHA,
    builds only `storefront/`, and deploys it to `musuw-site`. It then checks
    both public domains and the documented product handoff.
-4. The production workflow is started manually with the same full SHA. It
-   verifies the SHA and CI result, builds the static bundles and app/frontend
-   images on GitHub, pushes them to GHCR, pins their returned digests in the
-   deployment input, and uploads the allowlisted source bundle through the
-   restricted SSH gate.
+4. The production workflow receives the same successful CI result, builds the
+   static bundles and app/frontend images on GitHub, pushes them to GHCR, pins
+   their returned digests in the deployment input, and uploads the allowlisted
+   source bundle through the restricted SSH gate. A manual full-SHA dispatch is
+   retained for an exact rerun; tag and branch-name releases are rejected.
 5. The server receives a short-lived GitHub token over the restricted stdin
    channel, logs in to GHCR using a temporary Docker config, pulls the exact
    digests, recreates only `app` and `frontend` with `--no-build`, and checks
@@ -54,8 +56,9 @@ the upload never copies or prints their values.
 ## Cloudflare storefront
 
 The Worker-scoped `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are
-GitHub secrets. The storefront job receives no server, database, model, auth or
-billing credentials. `storefront/wrangler.jsonc` is the deployment
+secrets of the `storefront-production` GitHub Environment. The storefront job
+receives no server, database, model, auth or billing credentials.
+`storefront/wrangler.jsonc` is the deployment
 configuration and the Worker serves only the public static site. Product
 actions hand off to `https://app.musuw.com/auth/start`.
 
@@ -80,8 +83,9 @@ Useful checks after a release are:
 ```text
 curl -fsS https://musuw.com/
 curl -fsS https://www.musuw.com/
+curl -fsS https://app.musuw.com/
 curl -fsS https://app.musuw.com/health
-curl -fsS https://app.musuw.com/health
+curl -fsS https://app.musuw.com/auth/start
 ```
 
 The public storefront and the server release are independent: a green
@@ -90,8 +94,8 @@ changes the Cloudflare Worker.
 
 ## Required repository settings
 
-Keep the following values in GitHub Actions secrets or on the server, never in
-the repository:
+Keep the following values in the target-specific GitHub Environments or on the
+server, never in the repository:
 
 - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - workflow `GITHUB_TOKEN` package-write permission for the production job

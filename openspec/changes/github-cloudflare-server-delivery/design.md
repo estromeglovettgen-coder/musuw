@@ -18,12 +18,15 @@ Every release starts with a full 40-character Git SHA that exists on `main`
 and has a successful CI run. The two target jobs use that same SHA:
 
 1. CI checks the active packages, source allowlist, lockfiles and secret
-   boundary.
-2. The storefront job builds only `storefront/`, deploys `musuw-site`, and
+   boundary and emits its immutable run/SHA identity.
+2. The successful CI run starts the storefront job, which builds only
+   `storefront/`, deploys `musuw-site`, and
    probes `musuw.com` and `www.musuw.com`.
-3. The production job builds and pushes the app/frontend images from that SHA
-   to GHCR, records their returned digests, then materializes and uploads the
-   allowlisted source with the restricted SSH key and pinned host keys.
+3. The same successful CI run starts the production job, which builds and
+   pushes the app/frontend images from that SHA to GHCR, records their returned
+   digests, then materializes and uploads the allowlisted source with the
+   restricted SSH key and pinned host keys. Manual full-SHA reruns use the same
+   checks and path.
 4. The server gate verifies the SHA and manifest, receives the short-lived
    GHCR token over stdin, and invokes the one checked-in Compose file.
 5. The server logs in with a temporary Docker config, pulls the exact digests,

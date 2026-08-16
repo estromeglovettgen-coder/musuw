@@ -86,9 +86,9 @@ git -C "$fixture" restore --staged --worktree weknora/app.go
 expect_reject 'clean-check accepted a revision mismatch' \
     run_clean_check "$fixture" 0000000000000000000000000000000000000000
 
-# Manifest generation is driven by tracked Git paths plus the two explicit
-# generated browser overlays, never by a mutable worktree-wide find. The
-# ignored debug file must not appear, while generated dist files are hashed.
+# Manifest generation is driven only by tracked Git paths and the two public
+# runtime inputs, never by a mutable worktree-wide find. Generated browser
+# output and ignored debug files must not enter the server source bundle.
 mkdir -p "$output"
 revision_64='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 expect_reject 'source manifest accepted a 64-hex digest that the production runtime rejects' \
@@ -99,51 +99,14 @@ WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
     "$fixture/scripts/weknora-production/source-manifest.sh" generate \
     "$fixture" "$runtime" fixture-release local update "$output" >/dev/null
 grep -Fq 'weknora/app.go' "$output/source-manifest.sha256"
-grep -Fq 'weknora/frontend/dist/index.html' "$output/source-manifest.sha256"
-grep -Fq 'auth/dist/index.html' "$output/source-manifest.sha256"
+if grep -Eq '(^|/)(dist|node_modules)/' "$output/source-manifest.sha256"; then
+    printf '%s\n' 'source manifest included generated browser or dependency output' >&2
+    exit 1
+fi
 if grep -Fq 'debug.dump' "$output/source-manifest.sha256"; then
     printf '%s\n' 'source manifest included ignored debug/secret worktree content' >&2
     exit 1
 fi
-
-# Generated overlays are fail-closed inputs: missing roots, symlinks and
-# special files are never silently omitted from a release.
-mv "$fixture/auth/dist" "$fixture/auth/dist.missing"
-expect_reject 'source manifest accepted a missing generated dist root' \
-    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
-    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
-    "$fixture" "$runtime" fixture-release local update "$output"
-mv "$fixture/auth/dist.missing" "$fixture/auth/dist"
-ln -s "$fixture/weknora/app.go" "$fixture/auth/dist/escape"
-expect_reject 'source manifest accepted a generated dist symlink' \
-    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
-    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
-    "$fixture" "$runtime" fixture-release local update "$output"
-rm "$fixture/auth/dist/escape"
-mkfifo "$fixture/auth/dist/pipe"
-expect_reject 'source manifest accepted a generated dist special file' \
-    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
-    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
-    "$fixture" "$runtime" fixture-release local update "$output"
-rm "$fixture/auth/dist/pipe"
-printf '%s\n' 'secret' > "$fixture/auth/dist/.env.local"
-expect_reject 'source manifest accepted a generated dist env file' \
-    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
-    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
-    "$fixture" "$runtime" fixture-release local update "$output"
-rm "$fixture/auth/dist/.env.local"
-printf '%s\n' 'secret' > "$fixture/auth/dist/debug.dump"
-expect_reject 'source manifest accepted a generated dist dump file' \
-    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
-    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
-    "$fixture" "$runtime" fixture-release local update "$output"
-rm "$fixture/auth/dist/debug.dump"
-printf '%s\n' 'unknown' > "$fixture/auth/dist/debug.bin"
-expect_reject 'source manifest accepted a generated dist unknown extension' \
-    env WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
-    "$fixture/scripts/weknora-production/source-manifest.sh" generate \
-    "$fixture" "$runtime" fixture-release local update "$output"
-rm "$fixture/auth/dist/debug.bin"
 
 # Materialization copies only manifest-listed files into a fresh release tree;
 # ignored nested env/dump material never reaches the upload source.
@@ -156,8 +119,8 @@ WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
     "$fixture/scripts/weknora-production/source-manifest.sh" materialize \
     "$fixture" "$runtime" fixture-release "$revision" update \
     "$materialized_manifest" "$materialized_tree" >/dev/null
-[ -f "$materialized_tree/weknora/frontend/dist/index.html" ]
-[ -f "$materialized_tree/auth/dist/index.html" ]
+[ ! -e "$materialized_tree/weknora/frontend/dist" ]
+[ ! -e "$materialized_tree/auth/dist" ]
 [ ! -e "$materialized_tree/weknora/frontend/.env.local" ]
 [ ! -e "$materialized_tree/auth/debug.dump" ]
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" WEKNORA_PRODUCTION_REVISION="$revision" \

@@ -24,8 +24,9 @@ done
 
 grep -Fq 'Usage: scripts/weknora-deploy.sh <full-sha>' "$deploy_script" || fail 'runner interface is not SHA-only'
 grep -Fq 'source-manifest.sh" materialize' "$deploy_script" || fail 'runner does not materialize the manifest-backed tree'
-grep -Fq 'GitHub frontend bundle is unavailable' "$deploy_script" || fail 'runner does not require the GitHub-built frontend bundle'
-grep -Fq 'GitHub auth bundle is unavailable' "$deploy_script" || fail 'runner does not require the GitHub-built auth bundle'
+if grep -Eq 'weknora/frontend/dist|auth/dist|append_generated_tree' "$deploy_script" "$source_manifest"; then
+    fail 'server source upload still contains GitHub-built browser output'
+fi
 grep -Fq '/var/lib/musuw-deploy/incoming' "$deploy_script" || fail 'runner does not upload through the fixed incoming spool'
 grep -Fq 'remote_gate prepare' "$deploy_script" || fail 'runner does not invoke the prepare gate verb'
 grep -Fq 'remote_gate deploy' "$deploy_script" || fail 'runner does not invoke the deploy gate verb'

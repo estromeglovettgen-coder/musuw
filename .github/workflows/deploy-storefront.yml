@@ -46,6 +46,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       release_sha: ${{ steps.resolve.outputs.release_sha }}
+      ci_workflow_run: ${{ steps.resolve.outputs.ci_workflow_run }}
     steps:
       - name: Check out the exact revision
         uses: actions/checkout@v4
@@ -66,6 +67,7 @@ jobs:
           EVENT_WORKFLOW_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           EVENT_WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           EVENT_WORKFLOW_REPOSITORY: ${{ github.event.workflow_run.repository.full_name }}
+          EVENT_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           EVENT_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -78,10 +80,12 @@ jobs:
             test "$EVENT_WORKFLOW_CONCLUSION" = success
             test "$EVENT_WORKFLOW_HEAD_BRANCH" = main
             test "$requested" = "$EVENT_WORKFLOW_HEAD_SHA"
-            [[ "$requested" =~ ^[0-9a-fA-F]{40}$ || "$requested" =~ ^[0-9a-fA-F]{64}$ ]]
+            [[ "$requested" =~ ^[0-9a-fA-F]{40}$ ]]
+            [[ "$EVENT_WORKFLOW_RUN_ID" =~ ^[0-9]+$ ]]
+            ci_workflow_run="$EVENT_WORKFLOW_RUN_ID"
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
             test "$EVENT_REF" = refs/heads/main
-            [[ "$requested" =~ ^[0-9a-fA-F]{40}$ || "$requested" =~ ^[0-9a-fA-F]{64}$ ]]
+            [[ "$requested" =~ ^[0-9a-fA-F]{40}$ ]]
           else
             echo "unsupported deploy event: $EVENT_NAME" >&2
             exit 1
@@ -96,12 +100,15 @@ jobs:
               -H "Authorization: Bearer $GH_TOKEN" \
               -H 'Accept: application/vnd.github+json' \
               "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$actual&per_page=100")"
-            jq -e --arg sha "$actual" '
-              [.workflow_runs[]? | select(.name == "CI" and .head_sha == $sha and .conclusion == "success")] | length > 0
-            ' <<<"$runs" >/dev/null
+            ci_workflow_run="$(jq -er --arg sha "$actual" '
+              [.workflow_runs[]? | select(.name == "CI" and .head_sha == $sha and .conclusion == "success")]
+              | sort_by(.created_at) | last | .id
+            ' <<<"$runs")"
+            [[ "$ci_workflow_run" =~ ^[0-9]+$ ]]
           fi
           {
             printf 'release_sha=%s\n' "$actual"
+            printf 'ci_workflow_run=%s\n' "$ci_workflow_run"
           } >> "$GITHUB_OUTPUT"
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -127,6 +134,7 @@ jobs:
   deploy:
     name: Deploy storefront Worker
     needs: build
+    environment: storefront-production
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -261,11 +269,20 @@ jobs:
           RELEASE_SHA: ${{ needs.build.outputs.release_sha }}
           SOURCE_EVENT_SHA: ${{ needs.build.outputs.release_sha }}
           WORKFLOW_RUN: ${{ github.run_id }}
+          CI_WORKFLOW_RUN: ${{ needs.build.outputs.ci_workflow_run }}
+          DEPLOY_OUTCOME: ${{ steps.deploy_worker.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
         run: |
           set -euo pipefail
-          source_manifest='third_party/weknora/active-upstream-source.json'
+          repository_provenance='third_party/weknora/active-upstream-source.json'
+          repository_provenance_sha256=''
+          if [ -f "$repository_provenance" ]; then
+            repository_provenance_sha256="$(sha256sum "$repository_provenance" | awk '{print $1}')"
+          fi
+          source_manifest="$RUNNER_TEMP/musuw-storefront-source-manifest.sha256"
           source_checksum=''
-          if [ -f "$source_manifest" ]; then
+          if [ -d storefront/dist ]; then
+            find storefront/dist -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum > "$source_manifest"
             source_checksum="$(sha256sum "$source_manifest" | awk '{print $1}')"
           fi
           wrangler_version=''
@@ -274,6 +291,22 @@ jobs:
           current_json='[]'
           [ -s "$RUNNER_TEMP/musuw-storefront-previous-deployments.json" ] && previous_json="$(cat "$RUNNER_TEMP/musuw-storefront-previous-deployments.json")"
           [ -s "$RUNNER_TEMP/musuw-storefront-current-deployments.json" ] && current_json="$(cat "$RUNNER_TEMP/musuw-storefront-current-deployments.json")"
+          deployed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          health_result=failed
+          auth_handoff=failed
+          worker_version_id=''
+          if [ "$DEPLOY_OUTCOME" = success ] && [ "$SMOKE_OUTCOME" = success ]; then
+            health_result=healthy
+            auth_handoff=reachable
+            [[ "$CI_WORKFLOW_RUN" =~ ^[0-9]+$ ]]
+            [[ "$source_checksum" =~ ^[0-9a-fA-F]{64}$ ]]
+            worker_version_id="$(jq -er '
+              [ .[] | select((.versions // []) | length > 0) ]
+              | sort_by(.created_on) | last | .versions[]
+              | select((.percentage // 0) == 100) | .version_id
+            ' <<<"$current_json")"
+            [[ "$worker_version_id" =~ ^[0-9a-fA-F-]{36}$ ]]
+          fi
           jq -n \
             --arg schema_version 'musuw.release.v1' \
             --arg commit_sha "$RELEASE_SHA" \
@@ -281,12 +314,20 @@ jobs:
             --arg repository "$GITHUB_REPOSITORY" \
             --arg workflow_run "$WORKFLOW_RUN" \
             --arg workflow_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg ci_workflow_run "$CI_WORKFLOW_RUN" \
             --arg wrangler_version "$wrangler_version" \
-            --arg source_manifest "$source_manifest" \
+            --arg source_manifest 'musuw-storefront-source-manifest.sha256' \
             --arg source_manifest_sha256 "$source_checksum" \
+            --arg repository_provenance "$repository_provenance" \
+            --arg repository_provenance_sha256 "$repository_provenance_sha256" \
+            --arg target 'cloudflare:musuw-site' \
+            --arg deployed_at "$deployed_at" \
+            --arg health_result "$health_result" \
+            --arg worker_version_id "$worker_version_id" \
+            --arg auth_handoff "$auth_handoff" \
             --argjson previous "$previous_json" \
             --argjson current "$current_json" \
-            '{schema_version:$schema_version,commit_sha:$commit_sha,source_event_sha:$source_event_sha,repository:$repository,workflow:"Deploy storefront",workflow_run:$workflow_run,workflow_attempt:$workflow_attempt,wrangler_version:$wrangler_version,source_manifest:$source_manifest,source_manifest_sha256:$source_manifest_sha256,cloudflare_previous_deployments:$previous,cloudflare_current_deployments:$current,server_release_id:null,server_source_bundle_sha256:null}' \
+            '{schema_version:$schema_version,commit_sha:$commit_sha,source_event_sha:$source_event_sha,repository:$repository,workflow:"Deploy storefront",workflow_run:$workflow_run,workflow_attempt:$workflow_attempt,ci_workflow_run:$ci_workflow_run,target:$target,deployed_at:$deployed_at,health_result:$health_result,worker_version_id:(if $worker_version_id == "" then null else $worker_version_id end),auth_handoff:$auth_handoff,wrangler_version:$wrangler_version,source_manifest:$source_manifest,source_manifest_sha256:(if $source_manifest_sha256 == "" then null else $source_manifest_sha256 end),repository_provenance:$repository_provenance,repository_provenance_sha256:$repository_provenance_sha256,cloudflare_previous_deployments:$previous,cloudflare_current_deployments:$current,server_release_id:null,server_source_bundle_sha256:null}' \
             > "$RUNNER_TEMP/musuw-storefront-release-manifest.json"
           sha256sum "$RUNNER_TEMP/musuw-storefront-release-manifest.json" > "$RUNNER_TEMP/musuw-storefront-release-manifest.json.sha256"
       - name: Upload storefront release evidence
@@ -301,6 +342,7 @@ jobs:
             ${{ runner.temp }}/musuw-storefront-deploy.log
             ${{ runner.temp }}/musuw-storefront-smoke.txt
             ${{ runner.temp }}/musuw-storefront-rollback-evidence.txt
+            ${{ runner.temp }}/musuw-storefront-source-manifest.sha256
             ${{ runner.temp }}/musuw-storefront-release-manifest.json
             ${{ runner.temp }}/musuw-storefront-release-manifest.json.sha256
           if-no-files-found: warn

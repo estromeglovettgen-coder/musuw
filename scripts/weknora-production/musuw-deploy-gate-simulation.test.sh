@@ -41,6 +41,8 @@ MUSUW_DEPLOY_GATE_TEST_WRAPPER_LOG="$wrapper_log" \
 grep -Fx "prepare $revision" "$wrapper_log" >/dev/null || fail 'SSH gate did not forward prepare'
 expect_reject "musuw-gate invalid $revision"
 expect_reject "musuw-gate deploy $revision;id"
+expect_reject $'musuw-gate prepare 0123456789abcdef0123456789abcdef01234567\nid'
+expect_reject $'musuw-gate prepare 0123456789abcdef0123456789abcdef01234567\rid'
 expect_reject "rsync --server --sender -logDtpre.iLsfxC . /var/lib/musuw-deploy/incoming/$release_id/source/"
 expect_reject "rsync --server -logDtpre.iLsfxC --delete . /var/lib/musuw-deploy/incoming/$release_id/source/"
 expect_reject 'sh -c id'

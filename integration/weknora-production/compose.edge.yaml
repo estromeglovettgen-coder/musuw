@@ -1,6 +1,5 @@
-# Apply only during cutover. The existing Cloudflare tunnel already resolves
-# `web:8080` on this external network, so the native frontend Nginx becomes the
-# route surface directly; no replacement Caddy/business gateway is introduced.
+# The existing Cloudflare tunnel resolves `web:8080` on this external network,
+# so the fixed frontend Nginx is the route surface; no extra proxy is needed.
 services:
   frontend:
     networks:

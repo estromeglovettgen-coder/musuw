@@ -6,10 +6,9 @@ The production workflow SHALL accept a full 40-character Git SHA that exists
 on `main` and has a successful CI run. It MUST reject a branch name, mutable
 tag, dirty checkout or unverified source before uploading anything.
 
-#### Scenario: A CI-green SHA is selected
+#### Scenario: A CI-green SHA is selected automatically
 
-- **WHEN** an operator starts the production workflow with a full SHA from
-  `main`
+- **WHEN** canonical CI succeeds for a full SHA on `main`
 - **THEN** the workflow verifies the exact SHA and its successful CI run
 - **AND** it builds/pushes the app and frontend images from that SHA to GHCR,
   records their immutable digests, and uploads only the allowlisted source at
@@ -77,16 +76,22 @@ volumes and application data remain untouched.
   volumes
 - **AND** no secret value or data volume is present in the upload
 
-### Requirement: Production publishing is explicit
+### Requirement: Production publishing follows canonical CI
 
-Pull requests, ordinary branch pushes and the storefront workflow MUST NOT
-start a server deployment or expose the server SSH key. Until repository
-policy provides an equivalent gate, the production workflow SHALL be a manual
-dispatch from `main` with the exact SHA input.
+Pull requests, failed CI runs, mutable tags and the storefront workflow MUST
+NOT start a server deployment or expose the server SSH key. A successful
+canonical CI run for `main` SHALL start the production workflow with its exact
+head SHA. A manual dispatch from `main` SHALL remain available only for an
+exact full-SHA rerun that already has successful CI.
 
-#### Scenario: Only the manual exact-SHA path can publish
+#### Scenario: Only a successful canonical CI identity can publish
 
-- **WHEN** a pull request, branch push or storefront workflow completes
-- **THEN** no server job starts and no server credential is available
-- **AND** a manual dispatch with a verified SHA is the only path that invokes
-  the restricted upload
+- **WHEN** canonical CI succeeds for a full SHA on `main`
+- **THEN** the production workflow receives that CI run ID and exact head SHA
+- **AND** a failed or non-canonical run cannot access the server environment
+
+#### Scenario: Exact SHA can be rerun manually
+
+- **WHEN** an operator dispatches the workflow from `main` with a full SHA
+- **THEN** the workflow rechecks that SHA is on `main` and has successful CI
+- **AND** it uses the same build, upload and health path as automatic delivery

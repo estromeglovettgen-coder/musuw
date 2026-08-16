@@ -37,5 +37,6 @@ separate change.
 - Server: the existing production Compose services pull exact GHCR digests and
   start in place through the restricted upload path; no server image build is
   performed.
-- Operators: the normal release is merge → CI → Cloudflare storefront → exact
-  SHA server upload → health checks.
+- Operators: the normal release is merge → CI → Cloudflare storefront and
+  exact-SHA server upload → health checks. Manual full-SHA reruns use the same
+  path.

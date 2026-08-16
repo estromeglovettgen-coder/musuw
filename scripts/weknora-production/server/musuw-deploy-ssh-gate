@@ -10,9 +10,10 @@ reject() {
 original_command="${SSH_ORIGINAL_COMMAND:-}"
 [ -n "$original_command" ] || reject
 
-# No shell syntax is part of the protocol. Reject it before tokenisation.
+# No shell syntax or multi-line payload is part of the protocol. Reject it
+# before tokenisation so `read` cannot silently ignore a trailing command.
 case "$original_command" in
-    *';'*|*'|'*|*'&'*|*'$('*|*')'*|*'{'*|*'}'*|*'<'*|*'>'*|*'`'*|*'\\'*|*'"'*|*"'"*) reject ;;
+    *$'\n'*|*$'\r'*|*';'*|*'|'*|*'&'*|*'$('*|*')'*|*'{'*|*'}'*|*'<'*|*'>'*|*'`'*|*'\\'*|*'"'*|*"'"*) reject ;;
 esac
 
 read -r -a command_words <<< "$original_command"

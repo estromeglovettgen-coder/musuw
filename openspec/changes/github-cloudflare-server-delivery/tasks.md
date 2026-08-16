@@ -47,7 +47,7 @@
 
 - [x] 5.1 Document merge → CI → exact SHA → Cloudflare/server deployment in
   `docs/DEPLOYMENT.md`.
-- [ ] 5.2 Configure the production GitHub secrets and restricted server key in
+- [x] 5.2 Configure the production GitHub secrets and restricted server key in
   the deployment environment.
 - [ ] 5.3 Run one final production release from a CI-green SHA and record the
   storefront/server health results.

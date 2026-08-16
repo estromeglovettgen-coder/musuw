@@ -71,15 +71,12 @@ for required in \
     [ -f "$required" ] && [ -r "$required" ] || die "required deployment input is unavailable: $required"
 done
 
-# The runner builds only from the immutable clean checkout. Browser bundles are
-# then copied by source-manifest.sh materialize; the mutable worktree is never
-# an rsync source.
+# The runner builds only from the immutable clean checkout. Browser bundles
+# live in the GHCR images; the server source upload contains tracked source and
+# public runtime inputs only.
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runner_runtime" \
 WEKNORA_PRODUCTION_REVISION="$revision" \
     "$production_dir/verify-static.sh"
-[ -f "$repo_root/weknora/frontend/dist/index.html" ] || die 'GitHub frontend bundle is unavailable'
-[ -f "$repo_root/auth/dist/index.html" ] || die 'GitHub auth bundle is unavailable'
-
 ssh_args=(
     -F /dev/null
     -o BatchMode=yes

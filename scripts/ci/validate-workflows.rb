@@ -63,7 +63,7 @@ documents.each do |name, document|
   when "deploy-storefront.yml"
     { "contents" => "read", "actions" => "read" }
   when "deploy-production.yml"
-    { "contents" => "read", "actions" => "read", "packages" => "write" }
+    { "contents" => "read", "actions" => "read" }
   else
     { "contents" => "read" }
   end
@@ -118,7 +118,7 @@ fail_contract "storefront deploy must listen for completed CI workflow runs on m
 fail_contract "storefront deploy must retain a manual workflow_dispatch" unless storefront_on.key?("workflow_dispatch")
 fail_contract "storefront deploy must have a build dependency" unless storefront.dig("jobs", "deploy", "needs") == "build"
 fail_contract "storefront deploy must not cancel after Cloudflare mutation" unless storefront.dig("concurrency", "cancel-in-progress") == false
-fail_contract "storefront deploy must use repository/org secrets, not environment-scoped secrets" if storefront.dig("jobs", "deploy", "environment")
+fail_contract "storefront deploy must use its isolated production environment" unless storefront.dig("jobs", "deploy", "environment") == "storefront-production"
 storefront_dispatch = storefront_on.fetch("workflow_dispatch")
 assert_hash(storefront_dispatch, "deploy-storefront.yml.workflow_dispatch")
 storefront_input = storefront_dispatch.dig("inputs", "immutable_ref")
@@ -138,16 +138,24 @@ fail_contract "storefront dispatch must select an immutable checkout ref" unless
 fail_contract "storefront dispatch must require successful CI for the selected SHA" unless storefront_text.include?("actions/runs") && storefront_text.include?("workflow_dispatch") && storefront_text.include?(".name == \"CI\"") && storefront_text.include?(".conclusion == \"success\"")
 fail_contract "storefront deploy must smoke-test both public aliases and locale" unless storefront_text.include?("https://musuw.com") && storefront_text.include?("https://www.musuw.com") && storefront_text.match?(/content-language/i) && storefront_text.include?("__MUSUW_LOCALE__")
 fail_contract "storefront deploy must retain release evidence" unless storefront_text.include?("wrangler deployments list") && storefront_text.include?("upload-artifact") && storefront_text.include?("sha256")
+%w[target deployed_at health_result worker_version_id auth_handoff ci_workflow_run].each do |field|
+  fail_contract "storefront release evidence omits #{field}" unless storefront_text.include?(field)
+end
 fail_contract "storefront deploy must capture a pre-deploy version" unless storefront_text.include?("previous_version_id") && storefront_text.include?("versions")
 fail_contract "storefront deploy/smoke failure must rollback and re-probe" unless storefront_text.include?("wrangler rollback") && storefront_text.include?("automatic Cloudflare rollback") && storefront_text.scan("https://musuw.com").length >= 2 && storefront_text.scan("https://www.musuw.com").length >= 2
 fail_contract "storefront smoke must verify the product auth handoff reachability" unless storefront_text.include?("https://app.musuw.com/auth/start")
 
 production = documents.fetch("deploy-production.yml")
 production_on = root_key(production, "on")
-fail_contract "production deploy must be manual or v* tag only" unless production_on.key?("workflow_dispatch") && production_on.dig("push", "tags") == ["v*"]
-fail_contract "production deploy must have a rebuild dependency" unless production.dig("jobs", "deploy", "needs") == "rebuild"
+production_workflow_run = production_on.fetch("workflow_run", {})
+fail_contract "production deploy must listen for completed CI workflow runs on main" unless production_workflow_run.dig("workflows") == ["CI"] && production_workflow_run.dig("types") == ["completed"] && production_workflow_run.dig("branches") == ["main"]
+fail_contract "production deploy must retain a manual exact-SHA dispatch" unless production_on.key?("workflow_dispatch")
+fail_contract "production deploy must not publish from a tag or ordinary push trigger" if production_on.key?("push")
+fail_contract "production deploy must have an authorization dependency" unless production.dig("jobs", "deploy", "needs") == "authorize"
 fail_contract "production deploy must not cancel an active release" unless production.dig("concurrency", "cancel-in-progress") == false
-fail_contract "production deploy must use repository/org secrets, not environment-scoped secrets" if production.dig("jobs", "deploy", "environment")
+fail_contract "production deploy must use its isolated server environment" unless production.dig("jobs", "deploy", "environment") == "server-production"
+fail_contract "production deploy package write must be scoped to the deploy job" unless production.dig("jobs", "deploy", "permissions") == { "contents" => "read", "actions" => "read", "packages" => "write" }
+fail_contract "production authorization must not receive package write" if production.dig("jobs", "authorize", "permissions", "packages") == "write"
 production_dispatch = production_on.fetch("workflow_dispatch")
 assert_hash(production_dispatch, "deploy-production.yml.workflow_dispatch")
 production_input = production_dispatch.dig("inputs", "immutable_ref")
@@ -160,19 +168,22 @@ fail_contract "production browser build must pin NODE_OPTIONS to a 4096 MiB heap
 %w[WEKNORA_DEPLOY_KNOWN_HOSTS_FILE WEKNORA_DEPLOY_SSH_KEY WEKNORA_DEPLOY_REMOTE WEKNORA_DEPLOY_REVISION].each do |name|
   fail_contract "production deploy missing #{name} seam" unless production_text.include?(name)
 end
+fail_contract "production workflow_run must select the successful canonical CI head SHA" unless production_text.include?("github.event.workflow_run.head_sha") && production_text.include?("github.event.workflow_run.conclusion == 'success'") && production_text.include?("github.event.workflow_run.repository.full_name == 'estromeglovettgen-coder/musuw'")
 fail_contract "production dispatch must be restricted to main" unless (production_text.include?("EVENT_REF") || production_text.include?("GITHUB_REF")) && production_text.include?("refs/heads/main") && production_text.include?("workflow_dispatch")
 fail_contract "production deploy must resolve an immutable checkout input" unless production_text.include?("inputs.immutable_ref") && production_text.include?("git rev-parse HEAD")
 fail_contract "production deploy must prove the revision belongs to origin/main" unless production_text.include?("origin/main") && production_text.include?("merge-base")
-fail_contract "production tag releases must require annotated semver tags" unless production_text.include?("git cat-file -t") && production_text.include?("refs/tags/") && production_text.include?("v[0-9]+\\.[0-9]+\\.[0-9]+")
+fail_contract "production release input must be a full 40-character SHA only" unless production_text.include?("^[0-9a-fA-F]{40}$") && !production_text.include?("refs/tags/") && !production_text.include?("git cat-file -t")
 fail_contract "production deploy must require a successful CI run for the revision" unless production_text.include?("actions/runs") && production_text.include?("CI") && production_text.include?("conclusion")
-fail_contract "production deploy must pin checkout to the resolved SHA" unless production_text.include?("ref: ${{ steps.resolve.outputs.release_sha }}") || production_text.include?("ref: ${{ needs.rebuild.outputs.release_sha }}")
+fail_contract "production deploy must pin checkout to the resolved SHA" unless production_text.include?("ref: ${{ needs.authorize.outputs.release_sha }}")
 fail_contract "production deploy must execute the direct SHA-only runner" unless production_text.include?("bash scripts/weknora-deploy.sh \"$WEKNORA_DEPLOY_REVISION\"") && production_text.include?("remote_gate prepare") && production_text.include?("remote_gate deploy")
 fail_contract "production deploy must build and push both immutable GHCR images" unless production_text.include?("docker/build-push-action@") && production_text.include?("musuw-app:") && production_text.include?("musuw-frontend:") && production_text.include?("steps.build_app.outputs.digest") && production_text.include?("steps.build_frontend.outputs.digest")
 fail_contract "production deploy must stream the short-lived GHCR token through the restricted runner" unless production_text.include?("WEKNORA_DEPLOY_GHCR_USERNAME") && production_text.include?("WEKNORA_DEPLOY_GHCR_TOKEN")
-fail_contract "production rebuild must use the committed auth lockfile" unless production_text.include?("npm ci --prefix auth") && File.file?(File.join(ROOT, "auth", "package-lock.json"))
-fail_contract "production rebuild must run the real static/release contracts" unless production_text.include?("scripts/weknora-production/verify-static.sh") && production_text.include?("deploy-ci-seams-contract.test.sh") && production_text.include?("compose.sh")
+fail_contract "production image build must use the committed auth lockfile" unless production_text.include?("npm ci --prefix auth") && File.file?(File.join(ROOT, "auth", "package-lock.json"))
 fail_contract "production deploy must assert the fixed release helper" unless production_text.include?("release-ci.sh") && production_text.include?("musuw-deploy-gate")
 fail_contract "production deploy must retain release manifest/checksum evidence" unless production_text.include?("upload-artifact") && production_text.include?("sha256sum") && production_text.include?("source_manifest") && production_text.include?("source_bundle_sha256")
+%w[target deployed_at health_result app_image frontend_image ci_workflow_run].each do |field|
+  fail_contract "production release evidence omits #{field}" unless production_text.include?(field)
+end
 fail_contract "production success manifest must fail closed without server identity/checksum" unless production_text.include?("RELEASE_OUTCOME") && production_text.include?("test \"$server_release_id\" = \"$expected_release_id\"") && production_text.include?("=~ ^[0-9a-fA-F]{64}$")
 fail_contract "production workflow must not use write permissions" if production_text.include?("contents: write") || production_text.include?("actions: write")
 
