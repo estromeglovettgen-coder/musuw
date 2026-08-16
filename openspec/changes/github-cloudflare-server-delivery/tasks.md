@@ -21,7 +21,8 @@
 
 ## 3. Cloudflare storefront
 
-- [x] 3.1 Keep a Worker-scoped Cloudflare token in GitHub secrets.
+- [x] 3.1 Keep a Worker-scoped Cloudflare token in the
+  `storefront-production` GitHub Environment.
 - [x] 3.2 Build only `storefront/` from the selected SHA and deploy `musuw-site`
   from GitHub Actions.
 - [x] 3.3 Probe `musuw.com`, `www.musuw.com`, locale output and the documented
@@ -47,10 +48,13 @@
 
 - [x] 5.1 Document merge → CI → exact SHA → Cloudflare/server deployment in
   `docs/DEPLOYMENT.md`.
-- [x] 5.2 Configure the production GitHub secrets and restricted server key in
-  the deployment environment.
-- [ ] 5.3 Run one final production release from a CI-green SHA and record the
-  storefront/server health results.
+- [x] 5.2 Configure the production GitHub Environment secrets and restricted
+  server key; keep storefront and server credentials isolated.
+- [x] 5.3 Run one final production release from a CI-green SHA and record the
+  storefront/server health results. Verified commit:
+  `e85c95abe5041f80107983fef4387449a4b647e4`; CI run `31968180478`, storefront
+  run `31968398025`, and production run `31968398026` all succeeded, with
+  public storefront, app, health, and auth-handoff probes healthy.
 
 ## Scope guard
 

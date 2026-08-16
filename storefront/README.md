@@ -21,8 +21,9 @@ npm test
 npm run preview:worker
 ```
 
-The Worker preview defaults to `127.0.0.1:8791`. Production deployment remains
-an explicit release action; no deploy command runs as part of local tests.
+The Worker preview defaults to `127.0.0.1:8791`. A successful `main` CI run
+deploys production through GitHub Actions; local tests never run a deploy
+command.
 
 See [`SOURCE_PROVENANCE.md`](SOURCE_PROVENANCE.md) for the retained source
 record.

@@ -39,7 +39,7 @@ notices, and provenance records SHALL remain tracked.
 
 The root GitHub Actions workflow SHALL run the frontend, auth shell,
 storefront, backend/document-reader, composition/topology, source provenance,
-and secret-boundary checks for every pull request and release-branch push. A
+and secret-boundary checks for every pull request and `main` push. A
 release workflow MUST refuse to publish a commit whose required checks are
 missing or failed.
 

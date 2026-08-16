@@ -46,8 +46,7 @@ file in the existing project. The update is in place: receive the short-lived
 workflow token over the restricted stdin channel, log in with a temporary
 Docker config, pull the exact GHCR digests, run `docker compose up -d
 --no-build --force-recreate app frontend`, and check the application health
-endpoints. The deployment MUST NOT create a second project or require a
-caller-selected component mode.
+endpoints. The deployment MUST stay in the existing server project.
 
 #### Scenario: In-place Compose update is healthy
 
@@ -75,6 +74,19 @@ volumes and application data remain untouched.
 - **THEN** they use the existing server-owned environment files and named
   volumes
 - **AND** no secret value or data volume is present in the upload
+
+### Requirement: The public app hostname remains server-bound
+
+`app.musuw.com` SHALL continue to enter through the existing Cloudflare Tunnel
+and reach the server's production Compose services. The storefront Worker
+MUST NOT proxy authenticated app, API, upload, or event-stream traffic.
+
+#### Scenario: App traffic uses the server path
+
+- **WHEN** a user opens `app.musuw.com` or the storefront hands off to
+  `/auth/start`
+- **THEN** Cloudflare Tunnel routes the request to the server
+- **AND** no app or auth surface is added to the `musuw-site` Worker
 
 ### Requirement: Production publishing follows canonical CI
 

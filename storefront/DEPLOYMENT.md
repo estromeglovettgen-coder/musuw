@@ -9,12 +9,15 @@ only a bounded local plan and billing period. The product origin owns Google
 login, the opaque musuw session, backend-created Paddle transactions, signed
 Webhook billing state, and Customer Portal links.
 
-Before a production release, verify the authorized Worker version, custom
-domains, app host, Google redirect allowlist, Paddle environment/catalog, and
-the Go reverse proxy separately. If rollback is required, restore the previous
-Cloudflare Worker version; the untouched source directory named in
-`SOURCE_PROVENANCE.md` remains the original visual rollback source.
+After a successful `main` CI run, GitHub Actions builds this package, deploys
+the exact commit to `musuw-site`, and probes both public domains plus the app
+handoff. A failed smoke check is reported and may restore the immediately
+previous Worker version; rerun a known-good full SHA through the same workflow.
+Local workstations are not a production deployment path.
 
 The application release owns the authenticated product origin separately from
 this static homepage. Keep homepage deployment free of authentication,
 provider, and payment credentials.
+
+See [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for the canonical end-to-end
+delivery path and production evidence fields.

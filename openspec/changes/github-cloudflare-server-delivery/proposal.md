@@ -23,11 +23,13 @@ several layers around that path and made a normal release difficult to run.
 
 This change keeps one server project and one short deployment path. The server
 is updated in place during a short maintenance window. A failed release is
-simply reported and can be rerun after the source is corrected.
+simply reported and can be rerun with an exact full SHA after the deployment
+issue is corrected. The authenticated application is reached at `app.musuw.com` through
+the existing Cloudflare Tunnel to the server; it is not moved into the
+storefront Worker.
 
 The authenticated application and auth shell remain served by the production
-frontend container. A future move of those surfaces to Cloudflare would be a
-separate change.
+frontend container.
 
 ## Impact
 
@@ -40,3 +42,15 @@ separate change.
 - Operators: the normal release is merge → CI → Cloudflare storefront and
   exact-SHA server upload → health checks. Manual full-SHA reruns use the same
   path.
+
+## Verified release
+
+The current path was exercised from commit
+`e85c95abe5041f80107983fef4387449a4b647e4`:
+
+- CI: `31968180478`
+- Cloudflare storefront: `31968398025`
+- Production server: `31968398026`
+
+All three runs completed successfully and the storefront, app, health, and
+auth-handoff probes were healthy.

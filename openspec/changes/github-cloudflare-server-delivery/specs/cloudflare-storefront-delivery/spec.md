@@ -18,7 +18,7 @@ checkout, payment, model, or authenticated product API.
 
 ### Requirement: Storefront deploys automatically from verified GitHub source
 
-After the root required checks succeed, a merge to the release branch SHALL
+After the root required checks succeed, a merge to `main` SHALL
 build the `storefront/` package from its lockfile and deploy the exact commit
 to the existing `musuw-site` Worker through GitHub Actions. Local workstation
 `wrangler deploy` SHALL NOT be the supported production path. The workflow MUST
@@ -110,8 +110,8 @@ credentials.
 ### Requirement: Authenticated app and auth remain server-delivered
 
 This capability SHALL NOT deploy `weknora/frontend` or `auth/` as a Cloudflare
-Worker. Those surfaces SHALL continue to follow the server release contract
-until a separately approved Phase 2 Worker migration exists.
+Worker. Those surfaces SHALL continue to follow the server release contract;
+`app.musuw.com` SHALL remain the Cloudflare Tunnel entry point to the server.
 
 #### Scenario: App boundary is not moved accidentally
 

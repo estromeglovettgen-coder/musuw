@@ -7,15 +7,24 @@ The two delivery targets are deliberately small:
 
 - `storefront/` is the public marketing site and is deployed to the existing
   Cloudflare Worker `musuw-site` (`musuw.com` and `www.musuw.com`).
-- GitHub Actions builds the `weknora/frontend/`, `auth/` and Go application
-  production images, pushes the two app images to GHCR, and records their
-  immutable digests. The production server only pulls those digests and runs
-  the checked-in Compose file.
+- GitHub Actions builds the `weknora/frontend/` and `auth/` browser bundles,
+  builds the Go application and frontend runtime images, pushes those two
+  images to GHCR, and records their immutable digests. The production server
+  only pulls those digests and runs the checked-in Compose file.
+
+## Runtime topology
+
+- `musuw.com` and `www.musuw.com` → Cloudflare Worker `musuw-site` (the
+  `storefront/` static site built by GitHub).
+- `app.musuw.com` → Cloudflare Tunnel → the server's Nginx → the GitHub-built
+  GHCR `frontend` and `app` images. This keeps API, login, uploads, and
+  streaming responses on the existing server path instead of adding a Worker
+  proxy.
 
 ## Normal path
 
 1. Push a change to a branch and open a pull request. CI runs the required
-   frontend, auth, storefront, Go, source-boundary and secret checks.
+   frontend, auth, storefront, Go, DocReader, source-boundary and secret checks.
 2. Merge the reviewed change to `main`. The successful CI run identifies the
    resulting full 40-character SHA; branch names and dirty checkouts are never
    release identities.
@@ -38,6 +47,12 @@ The two delivery targets are deliberately small:
 There is one server Compose project and one source path. Do not add parallel
 projects, temporary runtime modes, extra release state, or a second deployment
 protocol.
+
+The delivery intentionally has no release-transaction ledger, backup
+choreography, blue/green stack, secondary edge/readiness path, or server-side
+build. A failed release is reported as failed; recovery is a manual dispatch
+of the exact full SHA that passed CI. The server keeps its existing data,
+runtime secrets, and named volumes in place.
 
 ## Source and upload boundary
 
@@ -102,6 +117,16 @@ server, never in the repository:
 - the restricted production SSH key and pinned `known_hosts`
 - public build environment files for the application and auth shell
 - all database, object-store, model, OIDC, Supabase service and tunnel secrets
+
+The target-specific split is intentionally narrow:
+
+| GitHub Environment | Allowed production inputs |
+| --- | --- |
+| `storefront-production` | Cloudflare account ID and Worker-scoped API token only. |
+| `server-production` | Restricted SSH key/host settings, public build environment files, and the job-only `GITHUB_TOKEN` package permission. |
+
+Private runtime credentials remain on the server; they are not copied into the
+repository, Cloudflare Worker, or browser bundles.
 
 The checked-in lockfiles are used by CI (`npm ci`). When a dependency changes,
 regenerate its lockfile in the same change.

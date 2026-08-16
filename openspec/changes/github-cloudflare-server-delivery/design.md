@@ -33,8 +33,8 @@ and has a successful CI run. The two target jobs use that same SHA:
    runs `docker compose up -d --no-build --force-recreate app frontend` in the
    existing project, and checks `/health`.
 
-The release is intentionally in place. There is no second project, temporary
-runtime mode, caller-selected component, or additional handoff protocol.
+The release is intentionally in place in the existing server project and uses
+the one checked-in deployment handoff.
 
 ## Source bundle
 
@@ -42,7 +42,9 @@ The source manifest is generated with Git from the selected commit. It lists
 tracked application code, lockfiles, Compose files, scripts, documentation,
 licenses and provenance. The upload excludes credentials, `.env` values,
 private keys, dependencies, generated output, logs, volumes, database dumps
-and server runtime directories. The restricted gate accepts only the expected
+and server runtime directories. Browser bundles are built in GitHub and remain
+inside the GHCR images; generated build output is not uploaded as source. The
+restricted gate accepts only the expected
 source path and the selected SHA.
 
 ## Server state
@@ -63,3 +65,8 @@ The target jobs fail when their health probes fail. The operator checks:
 
 The release record needs only the SHA, target, workflow run, source-manifest
 hash and health result so that an operator can identify what is serving.
+
+The verified release is commit `e85c95abe5041f80107983fef4387449a4b647e4`,
+with CI run `31968180478`, storefront run `31968398025`, and production run
+`31968398026`. `app.musuw.com` remains the Cloudflare Tunnel entry point to
+the server; it is not a Worker deployment target.

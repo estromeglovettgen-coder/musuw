@@ -18,13 +18,14 @@ together before each publication.
 - `auth/`: the Musuw Google/email-OTP login shell source and tests.
 - `storefront/`: the `musuw-site` Worker source, public assets, tests, and
   lockfile.
-- `integration/`: the candidate and production composition files used by the
-  app/auth/backend release seam.
+- `integration/`: the local host-mode and production composition files used by
+  the app/auth/backend release seam.
 - `.github/workflows/`: the root CI, storefront, and production delivery
   authorities. Nested upstream workflows remain excluded.
 - `docs/`: release and deployment runbooks.
 - `scripts/`: the Musuw local/preview/release entry points, CI scanners,
-  candidate and production release scripts, and release simulation checks.
+  local development and production release scripts, and release simulation
+  checks.
 - `openspec/`: the reviewed product and delivery change records.
 - `third_party/`: upstream source and license provenance records.
 
@@ -58,8 +59,6 @@ in `THIRD_PARTY_NOTICES.md`.
 
 The baseline count scope is all Git-tracked regular files selected by this
 allowlist, excluding the dynamic `SOURCE_MANIFEST.json` publication metadata
-and generated output. The A-stage baseline records `commit: null`,
-`pushed: false`, and no remote/ref; after the first push, only those identity
-fields are updated in the B-stage publication commit. Because the dynamic JSON
-is excluded from this count, the B-stage metadata update does not change the
-recorded file count or byte total.
+and generated output. `SOURCE_MANIFEST.json` records the current baseline
+commit, remote/ref, file count, and byte total. Updating that publication
+metadata does not change the selected-file scope or its recorded totals.
