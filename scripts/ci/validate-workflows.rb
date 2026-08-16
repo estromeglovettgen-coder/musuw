@@ -84,6 +84,17 @@ required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SO
   fail_contract "ci.yml #{trigger} paths omit delivery authority: #{missing.join(", ")}" unless missing.empty?
 end
 ci_text = File.read(File.join(WORKFLOW_DIR, "ci.yml"))
+frontend_steps = Array(ci.dig("jobs", "frontend", "steps"))
+frontend_build = frontend_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build frontend" }
+fail_contract "frontend build must pin NODE_OPTIONS to a 4096 MiB heap" unless frontend_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
+fail_contract "frontend tests must not inherit the build-only NODE_OPTIONS override" if ci.dig("jobs", "frontend", "env", "NODE_OPTIONS")
+
+docreader_steps = Array(ci.dig("jobs", "docreader", "steps"))
+setup_python = docreader_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-python@") }
+fail_contract "DocReader setup-python must not request the unavailable pip cache" if setup_python&.dig("with", "cache") == "pip"
+fail_contract "DocReader setup-python must not retain a pip cache dependency path" if setup_python&.dig("with", "cache-dependency-path")
+setup_uv = docreader_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("astral-sh/setup-uv@") }
+fail_contract "DocReader must use setup-uv's cache instead of setup-python pip cache" unless setup_uv&.dig("with", "enable-cache") == true
 tracked_scan_path = File.join(ROOT, "scripts", "ci", "tracked-source-scan.mjs")
 fail_contract "tracked publish-boundary scanner is missing" unless File.file?(tracked_scan_path)
 fail_contract "tracked publish-boundary scanner is not executable" unless File.executable?(tracked_scan_path)

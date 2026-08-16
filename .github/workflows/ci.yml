@@ -91,6 +91,8 @@ jobs:
       - name: Audit locale keys
         run: npm --prefix weknora/frontend run check-i18n
       - name: Build frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm --prefix weknora/frontend run build
 
   auth:
@@ -187,8 +189,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: weknora/docreader/uv.lock
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:

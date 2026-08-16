@@ -14,6 +14,8 @@ remote_root="$tmp_dir/remote-opt-weknora"
 remote_bin="$tmp_dir/remote-bin"
 remote_docker_root="$tmp_dir/remote-docker-root"
 remote_capacity_state="$tmp_dir/remote-capacity-state"
+test_key="$tmp_dir/test-key"
+known_hosts_file="$tmp_dir/known-hosts"
 mkdir -p \
     "$fake_repo/scripts/weknora-candidate" \
     "$fake_repo/scripts/weknora-production" \
@@ -178,6 +180,14 @@ export WEKNORA_TEST_REMOTE_ROOT="$remote_root"
 export WEKNORA_TEST_REMOTE_BIN="$remote_bin"
 export WEKNORA_TEST_REMOTE_DOCKER_ROOT="$remote_docker_root"
 export WEKNORA_TEST_REMOTE_CAPACITY_STATE="$remote_capacity_state"
+# Keep the simulation independent from a developer or hosted runner's SSH home.
+# This is a pinned fixture only; production still fails closed when the caller
+# does not provide WEKNORA_DEPLOY_KNOWN_HOSTS_FILE.
+umask 077
+: > "$test_key"
+printf '%s\n' 'example.test ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA simulation-fixture' > "$known_hosts_file"
+chmod 600 "$test_key" "$known_hosts_file"
+export WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file"
 
 assert_capacity_cleanup_sequence() {
     local first_df_line buildx_line image_line last_df_line
@@ -217,12 +227,11 @@ grep -Fx 'candidate:compose.sh:logs --follow --tail=200 app' "$call_log" >/dev/n
 grep -Fx 'candidate:compose.sh:stop' "$call_log" >/dev/null
 
 : > "$call_log"
-touch "$tmp_dir/test-key"
-chmod 600 "$tmp_dir/test-key"
 if WEKNORA_DEPLOY_MIN_FREE_KIB=1 \
     WEKNORA_DEPLOY_RELEASE_ID=weknora-update-below-floor \
     WEKNORA_DEPLOY_REMOTE=musuw-deploy@example.test \
-    WEKNORA_DEPLOY_SSH_KEY="$tmp_dir/test-key" \
+    WEKNORA_DEPLOY_SSH_KEY="$test_key" \
+    WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/weknora-deploy.sh" update >/dev/null 2>&1; then
     printf '%s\n' 'expected runner to reject a capacity reserve below the production floor' >&2
     exit 1
@@ -236,7 +245,8 @@ printf '%s\n' low > "$remote_capacity_state"
 if WEKNORA_TEST_CAPACITY_MODE=exhausted \
     WEKNORA_DEPLOY_RELEASE_ID=weknora-update-low-capacity \
     WEKNORA_DEPLOY_REMOTE=musuw-deploy@example.test \
-    WEKNORA_DEPLOY_SSH_KEY="$tmp_dir/test-key" \
+    WEKNORA_DEPLOY_SSH_KEY="$test_key" \
+    WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/weknora-deploy.sh" update >/dev/null 2>&1; then
     printf '%s\n' 'expected persistently low production capacity to reject a full release before transfer' >&2
     exit 1
@@ -255,7 +265,8 @@ fi
 printf '%s\n' invalid > "$remote_capacity_state"
 if WEKNORA_DEPLOY_RELEASE_ID=weknora-update-invalid-capacity \
     WEKNORA_DEPLOY_REMOTE=musuw-deploy@example.test \
-    WEKNORA_DEPLOY_SSH_KEY="$tmp_dir/test-key" \
+    WEKNORA_DEPLOY_SSH_KEY="$test_key" \
+    WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/weknora-deploy.sh" update >/dev/null 2>&1; then
     printf '%s\n' 'expected indeterminate production capacity to reject a full release before transfer' >&2
     exit 1
@@ -271,7 +282,8 @@ printf '%s\n' low > "$remote_capacity_state"
 WEKNORA_TEST_CAPACITY_MODE=recover \
 WEKNORA_DEPLOY_RELEASE_ID=weknora-update-recovered-capacity \
 WEKNORA_DEPLOY_REMOTE=musuw-deploy@example.test \
-WEKNORA_DEPLOY_SSH_KEY="$tmp_dir/test-key" \
+WEKNORA_DEPLOY_SSH_KEY="$test_key" \
+WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/weknora-deploy.sh" update
 
 grep -Fx 'production:verify-static' "$call_log" >/dev/null
@@ -306,7 +318,8 @@ fi
 printf '%s\n' high > "$remote_capacity_state"
 WEKNORA_DEPLOY_RELEASE_ID=weknora-update-normal-capacity \
 WEKNORA_DEPLOY_REMOTE=musuw-deploy@example.test \
-WEKNORA_DEPLOY_SSH_KEY="$tmp_dir/test-key" \
+WEKNORA_DEPLOY_SSH_KEY="$test_key" \
+WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/weknora-deploy.sh" update
 
 [ "$(grep -c '^df:' "$call_log")" -ge 2 ]
@@ -321,7 +334,8 @@ printf '%s\n' high > "$remote_capacity_state"
 # target. Supplying only those variables fails before any build or SSH effect.
 if WEKNORA_DEPLOY_RELEASE_ID=weknora-ui-missing-legacy-inputs \
     WEKNORA_DEPLOY_REMOTE=musuw-deploy@example.test \
-    WEKNORA_DEPLOY_SSH_KEY="$tmp_dir/test-key" \
+    WEKNORA_DEPLOY_SSH_KEY="$test_key" \
+    WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/musuw-release-ui" >/dev/null 2>&1; then
     printf '%s\n' 'legacy UI path reused restricted SSH inputs' >&2
     exit 1
@@ -333,7 +347,8 @@ fi
 
 WEKNORA_DEPLOY_RELEASE_ID=weknora-ui-test \
 WEKNORA_DEPLOY_LEGACY_ROOT_REMOTE=root@example.test \
-WEKNORA_DEPLOY_LEGACY_ROOT_SSH_KEY="$tmp_dir/test-key" \
+WEKNORA_DEPLOY_LEGACY_ROOT_SSH_KEY="$test_key" \
+WEKNORA_DEPLOY_KNOWN_HOSTS_FILE="$known_hosts_file" \
     "$fake_repo/scripts/musuw-release-ui"
 
 grep -q '/opt/weknora/releases/weknora-ui-test/source' "$call_log"

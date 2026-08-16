@@ -5,7 +5,7 @@
     "recordedAt": "2026-08-15",
     "countScope": "Git-tracked regular files selected by the active-source allowlist, excluding this dynamic SOURCE_MANIFEST.json publication metadata and generated output",
     "regularFileCount": 3068,
-    "regularFileBytes": 69136640,
+    "regularFileBytes": 69138622,
     "commit": null,
     "pushed": false,
     "remote": null,
