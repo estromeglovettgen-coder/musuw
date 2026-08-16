@@ -23,7 +23,7 @@ for required in \
     fi
 done
 
-for tool in docker jq rg; do
+for tool in docker jq; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         printf '%s\n' 'production static verification requires docker and jq' >&2
         exit 1
@@ -37,7 +37,7 @@ for model_id in \
     builtin-openrouter-rerank \
     builtin-openrouter-vlm \
     builtin-openrouter-asr; do
-    rg -Fq "id: $model_id" "$builtin_models_config" || {
+    grep -Fq "id: $model_id" "$builtin_models_config" || {
         printf '%s\n' 'production builtin model catalog is incomplete' >&2
         exit 1
     }
@@ -110,7 +110,7 @@ printf '%s\n' \
 } > "$runtime_dir/production.public.env"
 
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null
-if rg -q '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET)=' "$runtime_dir/production.env"; then
+if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET)=' "$runtime_dir/production.env"; then
     printf '%s\n' 'production runtime env contains a credential value instead of only a file path' >&2
     exit 1
 fi

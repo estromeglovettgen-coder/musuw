@@ -133,8 +133,9 @@ for required in \
 done
 
 # Keep development/build-only tooling on the workstation. In particular,
-# verify-static uses rg, which is deliberately not a production-host runtime
-# dependency. Both browser bundles copied by the production frontend image
+# verify-static uses Docker and jq (with baseline grep), which are deliberately
+# not production-host runtime dependencies. Both browser bundles copied by the
+# production frontend image
 # then come from the verified current local source.
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
 WEKNORA_PRODUCTION_REVISION="$revision" \
