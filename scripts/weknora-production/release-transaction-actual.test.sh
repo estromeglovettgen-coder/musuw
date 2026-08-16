@@ -560,7 +560,14 @@ done
 for command_name in docker curl mv; do ln -s "$fake_bin/$command_name" "$lock_only_bin/$command_name"; done
 cat > "$lock_only_bin/flock" <<'EOF'
 #!/bin/sh
-exec /usr/bin/lockf -s -t 0 9
+if [ -x /usr/bin/flock ]; then
+    exec /usr/bin/flock "$@"
+fi
+if [ -x /usr/bin/lockf ] && [ "$(/usr/bin/uname -s 2>/dev/null || true)" = Darwin ]; then
+    exec /usr/bin/lockf -s -t 0 9
+fi
+printf '%s\n' 'no portable kernel flock implementation is available' >&2
+exit 127
 EOF
 chmod +x "$lock_only_bin/flock"
 

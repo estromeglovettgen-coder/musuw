@@ -90,10 +90,10 @@ transaction_line="$(grep -n '"$transaction_script"' "$repo_root/scripts/weknora-
 if tail -n "+$((transaction_line + 1))" "$repo_root/scripts/weknora-production/release-ci.sh" | grep -Fq 'curl '; then
     fail 'release-ci performs a post-commit public probe outside the transaction rollback scope'
 fi
-if rg -n 'WEKNORA_PRODUCTION_TRANSACTION_TEST_(FAULT|FALLBACK)' "$production_workflow" "$repo_root/scripts/weknora-production/server/musuw-deploy-gate" >/dev/null; then
+if grep -En 'WEKNORA_PRODUCTION_TRANSACTION_TEST_(FAULT|FALLBACK)' "$production_workflow" "$repo_root/scripts/weknora-production/server/musuw-deploy-gate" >/dev/null; then
     fail 'production workflow/server exposes a transaction test-only control'
 fi
-if rg -n 'WEKNORA_ENTRYPOINT_TEST_ROOT' "$production_workflow" "$repo_root/scripts/weknora-production/server/musuw-deploy-gate" "$repo_root/scripts/weknora-production/server/musuw-deploy-ssh-gate" >/dev/null; then
+if grep -En 'WEKNORA_ENTRYPOINT_TEST_ROOT' "$production_workflow" "$repo_root/scripts/weknora-production/server/musuw-deploy-gate" "$repo_root/scripts/weknora-production/server/musuw-deploy-ssh-gate" >/dev/null; then
     fail 'production workflow/server exposes the entrypoint test-root control'
 fi
 
