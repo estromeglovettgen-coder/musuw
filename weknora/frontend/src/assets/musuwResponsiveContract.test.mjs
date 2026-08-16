@@ -11,7 +11,7 @@ const input = read("../components/Input-field.vue");
 test("create knowledge-base action matches the compact dark reference control", () => {
   assert.match(
     visual,
-    /#app\s+\.kb-card\.kb-create-card\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px[^}]*background:\s*var\(--musuw-ink-strong\)/i,
+    /#app\s+\.kb-card\.kb-create-card\s*\{[^}]*position:\s*fixed[^}]*height:\s*40px[^}]*background:\s*var\(--musuw-ink-strong\)/i,
     "desktop uses the native create action as the compact reference button",
   );
   assert.match(
