@@ -68,6 +68,7 @@ import {
 import { useI18n } from 'vue-i18n';
 import { useMarqueeSelect } from '@/hooks/useMarqueeSelect';
 import type { ParserEngineInfo } from '@/api/system';
+import { UPLOAD_VIDEO_EXTENSIONS } from './utils/uploadSources';
 const route = useRoute();
 const { t } = useI18n();
 const kbId = computed(() => (route.params as any).kbId as string || '');
@@ -176,7 +177,7 @@ const parserEngines = computed<ParserEngineInfo[]>(() => editorResources.parserE
 
 const supportedFileTypes = computed<Set<string>>(() => {
   const engines = parserEngines.value
-  if (!engines.length) return new Set<string>()
+  if (!engines.length) return new Set<string>(UPLOAD_VIDEO_EXTENSIONS)
 
   const rules: { file_types: string[]; engine: string }[] =
     kbInfo.value?.chunking_config?.parser_engine_rules || []
@@ -203,6 +204,7 @@ const supportedFileTypes = computed<Set<string>>(() => {
       }
     }
   }
+  for (const fileType of UPLOAD_VIDEO_EXTENSIONS) available.add(fileType)
   return available
 })
 

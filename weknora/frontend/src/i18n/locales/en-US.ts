@@ -2563,12 +2563,12 @@ export default {
       }
     },
     multimodal: {
-      title: 'Image Processing Configuration',
-      description: 'Configure image content understanding for parsing and retrieving non-text content like images'
+      title: 'Image and Video Processing',
+      description: 'Configure visual understanding for parsing and retrieving image and supported video content'
     },
     asr: {
       title: 'Audio Speech Recognition',
-      description: 'Configure ASR (speech-to-text). When enabled, you can upload audio files and transcribe them to text (e.g. mp3, wav, m4a, flac, ogg). Video upload is not supported.',
+      description: 'Configure ASR (speech-to-text) for uploaded audio files such as mp3, wav, m4a, flac, and ogg.',
       label: 'Enable audio speech recognition',
       desc: 'When enabled, audio can be uploaded to the knowledge base; speech is transcribed to text for parsing and retrieval.',
       modelLabel: 'ASR Model',

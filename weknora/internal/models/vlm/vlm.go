@@ -20,6 +20,22 @@ type VLM interface {
 	GetModelID() string
 }
 
+// VideoPredictor is an optional capability implemented by VLM transports that
+// can accept a complete video. Keeping it separate preserves existing image
+// adapters while allowing the document pipeline to use native video input.
+type VideoPredictor interface {
+	PredictVideo(ctx context.Context, videoBytes []byte, mimeType, prompt string) (string, error)
+}
+
+// PredictVideo invokes the optional video capability through any decorators.
+func PredictVideo(ctx context.Context, model VLM, videoBytes []byte, mimeType, prompt string) (string, error) {
+	predictor, ok := model.(VideoPredictor)
+	if !ok {
+		return "", fmt.Errorf("VLM %q does not support video input", model.GetModelName())
+	}
+	return predictor.PredictVideo(ctx, videoBytes, mimeType, prompt)
+}
+
 // Config holds the configuration needed to create a VLM instance.
 type Config struct {
 	Source        types.ModelSource

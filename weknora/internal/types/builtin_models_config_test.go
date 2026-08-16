@@ -423,7 +423,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, "openrouter-test-key", embedding.Parameters.APIKey)
 
 	assert.Equal(t, "cohere/rerank-4-fast", byID["builtin-openrouter-rerank"].Name)
-	assert.Equal(t, "qwen/qwen3-vl-8b-instruct", byID["builtin-openrouter-vlm"].Name)
+	assert.Equal(t, "google/gemini-2.5-flash", byID["builtin-openrouter-vlm"].Name)
 	assert.True(t, byID["builtin-openrouter-vlm"].Parameters.SupportsVision)
 	assert.Equal(t, "openai", byID["builtin-openrouter-vlm"].Parameters.InterfaceType)
 	assert.Equal(t, "openai/whisper-large-v3", byID["builtin-openrouter-asr"].Name)
