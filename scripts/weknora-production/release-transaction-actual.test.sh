@@ -856,7 +856,6 @@ jq -e '
     (.predecessor_provenance.digest | test("^[0-9a-f]{64}$")) and
     (.predecessor_provenance.file_count > 0) and
     (.predecessor_provenance.bytes > 0) and
-    (.predecessor_provenance.paths | index("weknora/migrations/versioned/000001_fixture.up.sql") != null) and
     (.source_manifest_sha == null)
 ' "$commit_snapshot" >/dev/null || fail 'legacy predecessor snapshot did not record content-only provenance without a fabricated source bundle'
 [ ! -e "$commit_root/opt/weknora/runtime/release-ledger-v2.json" ] || fail 'commit rollback retained an uncommitted v2 ledger'
@@ -884,8 +883,9 @@ if grep -Fq "docker:start $old_worker_id" "$stop_fail_root/docker.log"; then
 fi
 [ "$(cat "$stop_fail_root/fake-docker/edge_owner")" != "$old_edge_id" ] || fail 'edge restored despite candidate worker stop failure'
 
-# A legacy predecessor digest is rechecked before rollback is claimed. A
-# changed tree leaves the transaction recoverable and fail-closed.
+# A legacy predecessor digest includes paths and is rechecked before rollback
+# is claimed. A path-only tree change leaves the transaction recoverable and
+# fail-closed.
 legacy_drift_root="$(init_case legacy-tree-drift)"
 legacy_drift_release='release-legacy-tree-drift'
 make_release_source "$legacy_drift_root/opt/weknora/releases/$legacy_drift_release/source" 99

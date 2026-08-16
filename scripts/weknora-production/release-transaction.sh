@@ -73,7 +73,7 @@ transaction_test_legacy_tree_drift() {
        [ -n "${MUSUW_DEPLOY_GATE_ROOT:-}" ] && \
        [ "${WEKNORA_PRODUCTION_TRANSACTION_TEST_FAULT:-}" = legacy_tree_drift ]; then
         old_source="$(jq -r '.source_target' "$snapshot_file")"
-        printf '%s\n' test-only-legacy-tree-drift >> "$old_source/weknora/migrations/versioned/000001_fixture.up.sql"
+        printf '%s\n' test-only-legacy-tree-drift > "$old_source/weknora/migrations/versioned/test-only-legacy-tree-drift.up.sql"
         weknora_production_die 'test-only legacy predecessor tree drift'
     fi
 }
@@ -139,7 +139,7 @@ has_any_predecessor_manifest() {
 
 legacy_tree_snapshot_json() {
     local root="$1" records sorted path relative kind mode bytes content_sha record
-    local file_count=0 total_bytes=0 entry_count=0 digest records_json paths_json
+    local file_count=0 total_bytes=0 entry_count=0 digest
     records="$snapshot_dir/legacy-tree.records"
     sorted="$snapshot_dir/legacy-tree.records.sorted"
     : > "$records"
@@ -170,11 +170,9 @@ legacy_tree_snapshot_json() {
     [ "$entry_count" -gt 0 ] || weknora_production_die 'legacy predecessor source tree is empty'
     LC_ALL=C sort -z "$records" > "$sorted"
     digest="$(sha256sum "$sorted" | awk '{print $1}')"
-    records_json="$(jq -Rs 'split("\u0000") | map(select(length > 0) | fromjson)' "$sorted")"
-    paths_json="$(jq -c '[.[].path]' <<<"$records_json")"
     jq -cn --arg status 'legacy_content_digest_only' --arg digest "$digest" \
-        --argjson file_count "$file_count" --argjson bytes "$total_bytes" --argjson paths "$paths_json" \
-        '{status:$status,digest:$digest,file_count:$file_count,bytes:$bytes,paths:$paths}'
+        --argjson file_count "$file_count" --argjson bytes "$total_bytes" \
+        '{status:$status,digest:$digest,file_count:$file_count,bytes:$bytes}'
 }
 
 verify_strict_predecessor_manifests() {
@@ -501,7 +499,7 @@ write_snapshot() {
     if [ "$ledger_present" = true ]; then
         verify_strict_predecessor_manifests "$old_source" "$old_revision"
         predecessor_tree_json="$(legacy_tree_snapshot_json "$old_source")"
-        predecessor_tree="$(jq -c '{digest,file_count,bytes,paths}' <<<"$predecessor_tree_json")"
+        predecessor_tree="$(jq -c '{digest,file_count,bytes}' <<<"$predecessor_tree_json")"
         ledger_tree_json="$(jq -c '.current.source_tree // empty' "$ledger_file")"
         [ -n "$ledger_tree_json" ] || weknora_production_die 'v2 release ledger source tree digest is unavailable'
         jq -n -e --argjson expected "$ledger_tree_json" --argjson actual "$predecessor_tree" \
@@ -1062,7 +1060,7 @@ write_ledger() {
     ' <<<"$candidate_image_json" >/dev/null || weknora_production_die 'candidate image provenance is incomplete or does not identify the requested SHA'
     predecessor_image_json="$(jq -c '[.old_containers[] | {id:.id,name:.name,service:.service,project:.project,image:.image,image_state:.image_state}]' "$snapshot_file")"
     source_tree_json="$(legacy_tree_snapshot_json "$repo_root")"
-    source_tree="$(jq -c '{digest,file_count,bytes,paths}' <<<"$source_tree_json")"
+    source_tree="$(jq -c '{digest,file_count,bytes}' <<<"$source_tree_json")"
     source_sha="$(weknora_production_sha256_file "$repo_root/deploy/source-manifest.sha256" 2>/dev/null || true)"
     config_sha_json="$(jq -n \
         --arg production_public_env "$(weknora_production_sha256_file "$runtime_dir/production.public.env")" \
@@ -1211,8 +1209,7 @@ verify_predecessor_snapshot() {
             jq -n -e --argjson expected "$expected" --argjson actual "$actual" \
                 '($expected.digest == $actual.digest) and
                  ($expected.file_count == $actual.file_count) and
-                 ($expected.bytes == $actual.bytes) and
-                 (($expected.paths | sort) == ($actual.paths | sort))' >/dev/null || return 1
+                 ($expected.bytes == $actual.bytes)' >/dev/null || return 1
             ;;
         v2_manifest_verified)
             # The strict verifier uses the production fail-closed die helper
@@ -1225,7 +1222,7 @@ verify_predecessor_snapshot() {
             fi
             expected_tree="$(jq -c '.predecessor_provenance.tree // empty' "$snapshot_file")"
             [ -n "$expected_tree" ] || return 1
-            actual_tree="$(legacy_tree_snapshot_json "$old_source" | jq -c '{digest,file_count,bytes,paths}')"
+            actual_tree="$(legacy_tree_snapshot_json "$old_source" | jq -c '{digest,file_count,bytes}')"
             jq -n -e --argjson expected "$expected_tree" --argjson actual "$actual_tree" '$expected == $actual' >/dev/null || return 1
             ;;
         *) return 1 ;;
