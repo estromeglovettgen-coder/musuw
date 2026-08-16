@@ -101,6 +101,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefix weknora/frontend --ignore-scripts
       - name: Rebuild and type-check frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm --prefix weknora/frontend run build-with-types
       - name: Install auth shell dependencies
         run: npm ci --prefix auth --ignore-scripts

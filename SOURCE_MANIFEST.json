@@ -5,7 +5,7 @@
     "recordedAt": "2026-08-16",
     "countScope": "Git-tracked regular files selected by the active-source allowlist, excluding this dynamic SOURCE_MANIFEST.json publication metadata and generated output",
     "regularFileCount": 3093,
-    "regularFileBytes": 69407853,
+    "regularFileBytes": 69407916,
     "commit": "2d9091b98b90cb0e4ce6bde081027a0f61af7949",
     "pushed": true,
     "remote": "https://github.com/estromeglovettgen-coder/musuw.git",
