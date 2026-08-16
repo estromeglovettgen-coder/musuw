@@ -19,5 +19,5 @@
 ## 4. Verification and release
 
 - [x] 4.1 Run focused frontend tests, type checks, production builds, and visual regression checks for changed surfaces.
-- [ ] 4.2 Exercise the local application in a browser as a consumer across login, chat, knowledge-base, settings, and logout flows; confirm the graph remains unchanged.
-- [ ] 4.3 Run deployment preflight, publish the verified release, and verify the production consumer journey in a browser.
+- [x] 4.2 Exercise the local application in a browser as a consumer across login, chat, knowledge-base, settings, and logout flows; confirm the graph remains unchanged.
+- [x] 4.3 Run deployment preflight, publish the verified release, and verify the production consumer journey in a browser.

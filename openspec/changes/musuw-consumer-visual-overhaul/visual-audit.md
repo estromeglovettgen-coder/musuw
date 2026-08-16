@@ -17,3 +17,10 @@ Authority: `/Users/yangdi/Desktop/musnow-ai-workspace (2).zip`, exported from Go
 - Do not add or remove user actions. Existing actions may move within the same page composition.
 - Do not change graph rendering or graph-specific styles. Do not change agent trace rendering.
 - Reference-only sample content, decorative account fields, and prototype-only actions are not copied.
+
+## Verification
+
+- Local/reference browser review covered the shell, chat composition, knowledge-base cards, document/Wiki rails, settings modal, and excluded graph surface. The fresh checkout had no untracked authenticated runtime secrets, so the authenticated journey was exercised against the equivalent deployed application rather than fabricating a local account.
+- Frontend tests, type checking, locale audit, production build, release contracts, auth shell, Go, and DocReader checks passed in CI run `31974092001` for revision `ccc83c2cca31bc366aa13e33967feb53b8805145`.
+- Storefront Worker release `31974305937` and immutable application release `31974305854` both completed successfully.
+- Production browser acceptance covered chat, knowledge-base list/detail, document/Wiki layouts, settings, and graph. The graph retained its native renderer. The corrected knowledge-base action measured 204x40 at the top-right, was visible and hit-testable, opened the native creation dialog, and canceled without creating data.
