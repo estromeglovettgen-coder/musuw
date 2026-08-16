@@ -18,20 +18,20 @@
   --musuw-radius-pill: 999px;
 
   /* Archived Musuw visual language: neutral ink, paper, and one blue accent. */
-  --musuw-ink: #262626;
-  --musuw-ink-strong: #171717;
-  --musuw-muted: #5d5d5d;
-  --musuw-muted-strong: #444444;
-  --musuw-faint: #767676;
-  --musuw-canvas: #fbfcfe;
-  --musuw-sidebar: #ffffff;
+  --musuw-ink: #1f2937;
+  --musuw-ink-strong: #111827;
+  --musuw-muted: #6b7280;
+  --musuw-muted-strong: #4b5563;
+  --musuw-faint: #9ca3af;
+  --musuw-canvas: #ffffff;
+  --musuw-sidebar: #fbfbfb;
   --musuw-surface: #ffffff;
-  --musuw-surface-hover: #f5f6f8;
-  --musuw-accent: #0b57d0;
-  --musuw-accent-hover: #0a4ebc;
-  --musuw-accent-soft: rgba(11, 87, 208, 0.06);
-  --musuw-line: #e7e7e7;
-  --musuw-line-strong: #c7c7c7;
+  --musuw-surface-hover: #f3f4f6;
+  --musuw-accent: #2563eb;
+  --musuw-accent-hover: #1d4ed8;
+  --musuw-accent-soft: rgba(37, 99, 235, 0.07);
+  --musuw-line: #e5e7eb;
+  --musuw-line-strong: #d1d5db;
   --musuw-shadow-subtle: 0 1px 2px rgba(38, 38, 38, 0.045);
   --musuw-shadow-raised: 0 12px 32px rgba(38, 38, 38, 0.06);
 

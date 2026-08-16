@@ -8,21 +8,21 @@ const visual = read("./musuw-visual.less");
 const menu = read("../components/menu.vue");
 const input = read("../components/Input-field.vue");
 
-test("create knowledge-base tile keeps a dashed neutral presentation after shell overrides", () => {
+test("create knowledge-base action matches the compact dark reference control", () => {
   assert.match(
     visual,
-    /#app\s+\.kb-card\.kb-create-card\s*\{[^}]*border:\s*1px\s+dashed/i,
-    "create tile needs a higher-specificity dashed base rule",
+    /#app\s+\.kb-card\.kb-create-card\s*\{[^}]*position:\s*absolute[^}]*height:\s*40px[^}]*background:\s*var\(--musuw-ink-strong\)/i,
+    "desktop uses the native create action as the compact reference button",
   );
   assert.match(
     visual,
-    /#app\s+\.kb-card\.kb-create-card:hover[^}]*border(?:-style)?:\s*(?:1px\s+)?dashed/i,
-    "create tile hover must stay dashed",
+    /#app\s+\.kb-card\.kb-create-card:hover[^}]*background:\s*var\(--musuw-ink\)/i,
+    "create action retains a visible interactive state",
   );
   assert.match(
     visual,
-    /#app\s+\.kb-card\.kb-create-card:focus-visible[^}]*border(?:-style)?:\s*(?:1px\s+)?dashed/i,
-    "create tile focus must stay dashed",
+    /@media\s*\(max-width:\s*760px\)[\s\S]*?#app\s+\.kb-card\.kb-create-card\s*\{[^}]*position:\s*static[^}]*width:\s*100%/i,
+    "narrow layouts keep the existing action reachable in document flow",
   );
   assert.doesNotMatch(
     visual,

@@ -105,7 +105,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: 1100;
-  background: rgba(23, 23, 23, 0.48);
+  background: rgba(23, 23, 23, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,8 +116,8 @@ onUnmounted(() => {
 .settings-modal {
   position: relative;
   width: 100%;
-  max-width: 1080px;
-  height: 780px;
+  max-width: 896px;
+  height: 520px;
   max-height: calc(100dvh - 48px);
   background: var(--td-bg-color-container);
   border-radius: 12px;
@@ -165,15 +165,15 @@ onUnmounted(() => {
 }
 
 .settings-sidebar {
-  width: 216px;
+  width: 224px;
   background-color: var(--td-bg-color-settings-modal);
   border-right: 1px solid var(--td-component-stroke);
   flex-shrink: 0;
 }
 
 .sidebar-header {
-  padding: 24px 16px 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
+  padding: 28px 24px 16px;
+  border-bottom: 0;
 }
 
 .sidebar-title {
@@ -184,7 +184,7 @@ onUnmounted(() => {
 }
 
 .settings-nav {
-  padding: 16px 12px 16px;
+  padding: 8px 24px 16px;
 }
 
 .nav-item {

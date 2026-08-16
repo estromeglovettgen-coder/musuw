@@ -2,9 +2,9 @@
   <div class="aside_box" :class="{ 'aside_box--collapsed': uiStore.sidebarCollapsed }">
     <!-- 展开时：保留轻量品牌标识、搜索和收起操作。 -->
     <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
-      <div class="musuw-wordmark" aria-label="Musuw">
+      <div class="musuw-wordmark" aria-label="Musuw 穆苏瓦">
         <span class="musuw-wordmark__mark" aria-hidden="true">↯</span>
-        <span class="musuw-wordmark__label">Musuw</span>
+        <span class="musuw-wordmark__label">Musuw 穆苏瓦</span>
       </div>
       <div class="logo_actions">
         <t-tooltip placement="bottom">
