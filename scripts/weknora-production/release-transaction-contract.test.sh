@@ -96,6 +96,9 @@ fi
 if grep -En 'WEKNORA_ENTRYPOINT_TEST_ROOT' "$production_workflow" "$repo_root/scripts/weknora-production/server/musuw-deploy-gate" "$repo_root/scripts/weknora-production/server/musuw-deploy-ssh-gate" >/dev/null; then
     fail 'production workflow/server exposes the entrypoint test-root control'
 fi
+if ! grep -A12 -F '      - name: Execute the existing WeKnora release seam' "$production_workflow" | grep -Fq 'NODE_OPTIONS: --max-old-space-size=4096'; then
+    fail 'production release seam does not pin the build-static Node heap'
+fi
 
 if grep -Eq 'docker[[:space:]]+(volume|secret)[[:space:]]+(create|rm|remove|prune)|docker compose.*(down|rm.*-v)' "$transaction" "$compose"; then
     fail 'transaction contains destructive volume/secret lifecycle calls'

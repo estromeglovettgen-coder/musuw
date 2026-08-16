@@ -205,6 +205,7 @@ jobs:
           grep -Fq 'public_probes' scripts/weknora-production/release-transaction.sh
       - name: Execute the existing WeKnora release seam
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           WEKNORA_DEPLOY_RUNTIME_DIR: ${{ steps.prepare.outputs.runtime_dir }}
           WEKNORA_DEPLOY_KNOWN_HOSTS_FILE: ${{ steps.prepare.outputs.known_hosts_path }}
           WEKNORA_DEPLOY_SSH_KEY: ${{ steps.prepare.outputs.key_path }}
