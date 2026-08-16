@@ -154,6 +154,9 @@ production_input = production_dispatch.dig("inputs", "immutable_ref")
 assert_hash(production_input, "deploy-production.yml.workflow_dispatch.inputs.immutable_ref")
 fail_contract "production immutable_ref input must be required" unless production_input["required"] == true && production_input["type"] == "string"
 production_text = File.read(File.join(WORKFLOW_DIR, "deploy-production.yml"))
+production_steps = Array(production.dig("jobs", "deploy", "steps"))
+production_static_build = production_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build production browser bundles on GitHub" }
+fail_contract "production browser build must pin NODE_OPTIONS to a 4096 MiB heap" unless production_static_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
 %w[WEKNORA_DEPLOY_KNOWN_HOSTS_FILE WEKNORA_DEPLOY_SSH_KEY WEKNORA_DEPLOY_REMOTE WEKNORA_DEPLOY_REVISION].each do |name|
   fail_contract "production deploy missing #{name} seam" unless production_text.include?(name)
 end

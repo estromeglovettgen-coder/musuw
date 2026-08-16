@@ -193,6 +193,7 @@ jobs:
           test -s "$runtime_dir/auth-public.env"
       - name: Build production browser bundles on GitHub
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           RUNTIME_DIR: ${{ steps.prepare.outputs.runtime_dir }}
           RELEASE_SHA: ${{ needs.rebuild.outputs.release_sha }}
         run: |
