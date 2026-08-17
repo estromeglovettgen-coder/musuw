@@ -2,20 +2,37 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(new URL("./KnowledgeBase.vue", import.meta.url), "utf8");
+const entry = readFileSync(new URL("./KnowledgeBase.vue", import.meta.url), "utf8");
+const source = readFileSync(new URL("./KnowledgeBaseReference.vue", import.meta.url), "utf8");
 
-test("knowledge detail keeps every filter and action in the two-level toolbar", () => {
-  assert.match(source, /class="doc-filter-bar"[\s\S]*?doc-filter-bar__filters/);
-  assert.match(source, /data-guide="kb-detail-add-doc"/);
-  assert.match(source, /doc-filter-bar__filters[\s\S]*?doc-filter-bar__trailing/);
-  assert.match(source, /class="doc-date-range/);
+test("knowledge detail entry contains no legacy page UI", () => {
+  assert.match(entry, /<KnowledgeBaseReference\s*\/>/);
+  assert.doesNotMatch(entry, /doc-filter-bar|knowledge-main|document-breadcrumb|knowledge-card/);
 });
 
-test("knowledge detail uses the restrained document empty state component", () => {
-  assert.match(source, /<EmptyKnowledge\s+v-else\s*\/>/);
+test("knowledge detail uses the copied reference page hierarchy", () => {
+  assert.match(source, /class="ref-kb-header"/);
+  assert.match(source, /class="ref-tabs"/);
+  assert.match(source, /class="ref-doc-stage"/);
+  assert.match(source, /class="ref-directory"/);
+  assert.match(source, /class="ref-toolbar"/);
+  assert.match(source, /class="ref-document-workspace"/);
+  assert.match(source, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
 });
 
-test("graph view keeps the original layout chrome instead of inheriting document-only spacing", () => {
-  assert.match(source, /class="knowledge-layout"[\s\S]*?documents-layout/);
-  assert.match(source, /isWiki && \(activeKbTab === 'wiki' \|\| activeKbTab === 'graph'\)/);
+test("knowledge detail keeps real project controls while using the reference shell", () => {
+  assert.match(source, /KbUploadSourceDropdown/);
+  assert.match(source, /@files="uploadFiles"/);
+  assert.match(source, /@url="importUrl"/);
+  assert.match(source, /@manual="createManual"/);
+  assert.match(source, /v-model="selectedParseStatus"/);
+  assert.match(source, /v-model="selectedSource"/);
+  assert.match(source, /v-model="updatedTimeRange"/);
+});
+
+test("folder visibility and graph renderer remain product-owned", () => {
+  assert.match(source, /showFolderTree && !folderTreeCollapsed/);
+  assert.match(source, /activeKbTab !== 'documents'/);
+  assert.match(source, /<WikiBrowser/);
+  assert.doesNotMatch(source, /wiki-graph-canvas|tree-container/);
 });
