@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import DocContent from '@/components/doc-content.vue'
 import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue'
+import ReferenceIcon from '@/components/ReferenceIcon.vue'
 import useKnowledgeBase from '@/hooks/useKnowledgeBase'
 import { useAuthStore } from '@/stores/auth'
 import { useChatResourcesStore } from '@/stores/chatResources'
@@ -260,23 +261,35 @@ const acceptFileTypes = computed(() => [...supportedFileTypes.value].map(x => `.
 const loadKnowledgeFiles = async () => {
   if (!kbId.value || isFAQ.value) return
   docListLoading.value = true
-  try { await getKnowled({ page: 1, page_size: 100, ...filterParams.value }, kbId.value) }
-  finally { docListLoading.value = false }
+  try {
+    await getKnowled({ page: 1, page_size: 100, ...filterParams.value }, kbId.value)
+  } finally {
+    docListLoading.value = false
+  }
 }
 const loadTags = async () => {
   if (!kbId.value) return
   tagLoading.value = true
   try {
-    const res: any = await listKnowledgeTags(kbId.value, { page: 1, page_size: 100, keyword: tagSearchQuery.value || undefined })
+    const res: any = await listKnowledgeTags(kbId.value, {
+      page: 1,
+      page_size: 100,
+      keyword: tagSearchQuery.value || undefined,
+    })
     const raw = res?.data?.data || res?.data || []
     tagList.value = Array.isArray(raw) ? raw.map((x: any) => ({ ...x, id: String(x.id) })) : []
-  } catch { tagList.value = [] }
-  finally { tagLoading.value = false }
+  } catch {
+    tagList.value = []
+  } finally {
+    tagLoading.value = false
+  }
 }
 const loadKnowledgeList = async () => {
   await chatResources.ensureKnowledgeBases()
   const own = chatResources.rawKnowledgeBases.map((x: any) => ({ id: String(x.id), name: x.name, type: x.type || 'document' }))
-  const shared = (orgStore.sharedKnowledgeBases || []).filter(x => x.knowledge_base).map(x => ({ id: String(x.knowledge_base.id), name: x.knowledge_base.name, type: x.knowledge_base.type || 'document' }))
+  const shared = (orgStore.sharedKnowledgeBases || [])
+    .filter(x => x.knowledge_base)
+    .map(x => ({ id: String(x.knowledge_base.id), name: x.knowledge_base.name, type: x.knowledge_base.type || 'document' }))
   const ids = new Set(own.map(x => x.id))
   knowledgeList.value = [...own, ...shared.filter(x => !ids.has(x.id))]
 }
@@ -286,7 +299,9 @@ const loadPage = async () => {
   try {
     kbInfo.value = await chatResources.fetchKnowledgeBaseById(kbId.value, true)
     await Promise.all([loadKnowledgeFiles(), loadFolderTree(), loadTags(), refreshWikiStats()])
-  } finally { kbLoading.value = false }
+  } finally {
+    kbLoading.value = false
+  }
 }
 let searchTimer: number | undefined
 watch(docSearchKeyword, () => {
@@ -307,10 +322,15 @@ const uploadFiles = async (files: File[]) => {
   for (const file of files) {
     const payload: any = { file, tag_ids: selectedTagIds.value.length ? [...selectedTagIds.value] : undefined }
     const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || ''
-    const fileName = rel ? buildUploadFileName(file, selectedFolderPath.value) : (selectedFolderPath.value ? `${selectedFolderPath.value}/${file.name}` : file.name)
+    const fileName = rel
+      ? buildUploadFileName(file, selectedFolderPath.value)
+      : (selectedFolderPath.value ? `${selectedFolderPath.value}/${file.name}` : file.name)
     if (fileName) payload.fileName = fileName
-    try { await uploadKnowledgeFile(kbId.value, payload) }
-    catch (e: any) { MessagePlugin.error(e?.message || t('knowledgeBase.uploadFailed')) }
+    try {
+      await uploadKnowledgeFile(kbId.value, payload)
+    } catch (e: any) {
+      MessagePlugin.error(e?.message || t('knowledgeBase.uploadFailed'))
+    }
   }
   await Promise.all([loadKnowledgeFiles(), loadFolderTree(), refreshWikiStats()])
 }
@@ -318,20 +338,33 @@ const importUrl = async (url: string) => {
   try {
     await createKnowledgeFromURL(kbId.value, { url, tag_ids: selectedTagIds.value.length ? [...selectedTagIds.value] : undefined })
     await loadKnowledgeFiles()
-  } catch (e: any) { MessagePlugin.error(e?.message || t('knowledgeBase.urlImportFailed')) }
+  } catch (e: any) {
+    MessagePlugin.error(e?.message || t('knowledgeBase.urlImportFailed'))
+  }
 }
-const createManual = () => uiStore.openManualEditor({ mode: 'create', kbId: kbId.value, status: 'draft', onSuccess: () => void loadKnowledgeFiles() })
+const createManual = () => {
+  uiStore.openManualEditor({ mode: 'create', kbId: kbId.value, status: 'draft', onSuccess: () => void loadKnowledgeFiles() })
+}
 
+// ---------------------------------------------------------------------------
+// Document actions. Existing child menus emit into these production APIs.
+// ---------------------------------------------------------------------------
 const traceAvailableById = reactive<Record<string, boolean>>({})
 const probeTraceAvailable = async (item: any) => {
   if (!item?.id || Object.prototype.hasOwnProperty.call(traceAvailableById, item.id)) return
-  if (isKnowledgeParseInFlight(item.parse_status)) { traceAvailableById[item.id] = true; return }
+  if (isKnowledgeParseInFlight(item.parse_status)) {
+    traceAvailableById[item.id] = true
+    return
+  }
   try {
     const res: any = await getKnowledgeSpans(item.id)
     traceAvailableById[item.id] = Boolean(res?.success && knowledgeSpansPayloadHasTrace(res.data))
   } catch { traceAvailableById[item.id] = false }
 }
-const openKnowledgeItem = (item: any) => { isCardDetails.value = true; getCardDetails(item) }
+const openKnowledgeItem = (item: any) => {
+  isCardDetails.value = true
+  getCardDetails(item)
+}
 const closeDoc = () => { isCardDetails.value = false }
 const getDoc = (page: number) => getfDetails(details.id, page)
 const openTrace = (item: any) => {
@@ -346,14 +379,24 @@ const deleteItem = async (item: any) => {
   await delKnowledge(idx, item, () => void loadKnowledgeFiles())
   await loadFolderTree()
 }
-const editManual = (item: any) => uiStore.openManualEditor({ mode: 'edit', kbId: item.knowledge_base_id || kbId.value, knowledgeId: item.id, onSuccess: () => void loadKnowledgeFiles() })
-const reparseItem = async (item: any) => {
-  if (isKnowledgeParseInFlight(item.parse_status)) { MessagePlugin.info(t('knowledgeBase.rebuildInProgress')); return }
-  await reparseKnowledge(item.id)
-  await Promise.all([loadKnowledgeFiles(), refreshWikiStats()])
+const editManual = (item: any) => {
+  uiStore.openManualEditor({ mode: 'edit', kbId: item.knowledge_base_id || kbId.value, knowledgeId: item.id, onSuccess: () => void loadKnowledgeFiles() })
 }
-const cancelParseItem = async (item: any) => { await cancelKnowledgeParse(item.id); await loadKnowledgeFiles() }
+const reparseItem = async (item: any) => {
+  if (isKnowledgeParseInFlight(item.parse_status)) {
+    MessagePlugin.info(t('knowledgeBase.rebuildInProgress'))
+    return
+  }
+  await reparseKnowledge(item.id)
+  await loadKnowledgeFiles()
+  await refreshWikiStats()
+}
+const cancelParseItem = async (item: any) => {
+  await cancelKnowledgeParse(item.id)
+  await loadKnowledgeFiles()
+}
 
+// Move-to-KB sub-flow expected by DocumentCardView.
 const moveMenuMode = ref<'normal' | 'targets' | 'confirm'>('normal')
 const moveKnowledgeId = ref('')
 const moveTargetKbs = ref<any[]>([])
@@ -367,8 +410,10 @@ const handleMoveKnowledge = async (item: any) => {
   moveKnowledgeId.value = item.id
   moveMenuMode.value = 'targets'
   moveTargetsLoading.value = true
-  try { const res: any = await listMoveTargets(kbId.value); moveTargetKbs.value = res?.data || [] }
-  finally { moveTargetsLoading.value = false }
+  try {
+    const res: any = await listMoveTargets(kbId.value)
+    moveTargetKbs.value = res?.data || []
+  } finally { moveTargetsLoading.value = false }
 }
 const handleMoveSelectTarget = (kb: any) => {
   moveSelectedTargetId.value = kb.id
@@ -385,17 +430,24 @@ const handleMoveConfirm = async () => {
     const res: any = await moveKnowledge({ knowledge_ids: [moveKnowledgeId.value], source_kb_id: kbId.value, target_kb_id: moveSelectedTargetId.value, mode: moveMode.value })
     const taskId = res?.data?.task_id
     moveMenuMode.value = 'normal'
-    if (!taskId) { await Promise.all([loadKnowledgeFiles(), loadFolderTree()]); return }
+    if (!taskId) {
+      await Promise.all([loadKnowledgeFiles(), loadFolderTree()])
+      return
+    }
     stopMovePoll()
     movePollTimer = window.setInterval(async () => {
       const p: any = await getKnowledgeMoveProgress(taskId)
       if (p?.data?.status === 'completed' || p?.data?.status === 'failed') {
-        stopMovePoll(); moveSubmitting.value = false
+        stopMovePoll()
+        moveSubmitting.value = false
         await Promise.all([loadKnowledgeFiles(), loadFolderTree()])
       }
     }, 2000)
-  } catch (e: any) { MessagePlugin.error(e?.message || t('knowledgeBase.moveFailed')) }
-  finally { if (!movePollTimer) moveSubmitting.value = false }
+  } catch (e: any) {
+    MessagePlugin.error(e?.message || t('knowledgeBase.moveFailed'))
+  } finally {
+    if (!movePollTimer) moveSubmitting.value = false
+  }
 }
 const moveKnowledgeIntoFolder = async (ids: string[], path: string) => {
   if (!ids.length) return
@@ -404,6 +456,7 @@ const moveKnowledgeIntoFolder = async (ids: string[], path: string) => {
   await Promise.all([loadKnowledgeFiles(), loadFolderTree()])
 }
 
+// Batch mode.
 const viewMode = ref<'grid' | 'list'>('grid')
 const selectedIds = ref<Set<string>>(new Set())
 const batchMode = ref(false)
@@ -420,7 +473,7 @@ const deleteBatch = async () => {
   const ids = [...selectedIds.value]
   if (!ids.length) return
   batchDeleting.value = true
-  try { await batchDeleteKnowledge(kbId.value, ids); cancelBatch(); await Promise.all([loadKnowledgeFiles(), loadFolderTree()]) }
+  try { await batchDeleteKnowledge(kbId.value, ids); cancelBatch(); await loadKnowledgeFiles(); await loadFolderTree() }
   finally { batchDeleting.value = false }
 }
 const reparseBatch = async () => {
@@ -439,7 +492,8 @@ const onTagEditConfirm = async (ids: string[]) => {
   await updateKnowledgeTagBatch({ updates: { [tagEditTarget.value.id]: ids } })
   await Promise.all([loadKnowledgeFiles(), loadTags()])
 }
-const batchTag = () => { batchTagging.value = false; MessagePlugin.info('请使用文档菜单编辑标签') }
+const batchTag = () => { batchTagging.value = false; MessagePlugin.info(t('knowledgeBase.batchTagHint') || '请从文档菜单逐项编辑标签') }
+
 const handleCardAction = (action: string, item: any) => {
   if (action === 'edit') return editManual(item)
   if (action === 'view-trace') return openTrace(item)
@@ -462,110 +516,679 @@ onMounted(async () => {
   await editorResources.ensureParserEngines()
   await loadPage()
 })
-onUnmounted(stopMovePoll)
+onUnmounted(() => stopMovePoll())
 </script>
 
 <template>
-  <div v-if="isFAQ" class="ref-faq-stage"><FAQEntryManager v-if="kbId" :kb-id="kbId" /></div>
+  <div v-if="isFAQ" class="ref-faq-stage">
+    <FAQEntryManager v-if="kbId" :kb-id="kbId" />
+  </div>
+
   <div v-else class="ref-kb-page">
     <header class="ref-kb-header">
       <div class="ref-kb-header-copy">
         <div class="ref-breadcrumb">
-          <button class="ref-crumb-link" type="button" @click="handleNavigateToKbList"><t-icon name="chevron-left" size="15px" /><span>{{ $t('menu.knowledgeBase') }}</span></button>
+          <button class="ref-crumb-link" type="button" @click="handleNavigateToKbList">
+            <ReferenceIcon name="arrow-left" :size="14" />
+            <span>{{ $t('menu.knowledgeBase') }}</span>
+          </button>
           <span class="ref-crumb-sep">/</span>
-          <KBSwitcherDropdown v-if="knowledgeList.length" :kb-list="knowledgeList" :current-kb-id="kbId" @select="handleKnowledgeDropdownSelect">
-            <button class="ref-kb-name" type="button"><span>{{ kbInfo?.name || '...' }}</span><t-icon name="chevron-down" size="14px" /></button>
+          <KBSwitcherDropdown
+            v-if="knowledgeList.length"
+            :kb-list="knowledgeList"
+            :current-kb-id="kbId"
+            @select="handleKnowledgeDropdownSelect"
+          >
+            <button class="ref-kb-name" type="button">
+              <span>{{ kbInfo?.name || '...' }}</span>
+              <ReferenceIcon name="chevron-down" :size="14" />
+            </button>
           </KBSwitcherDropdown>
           <span v-else class="ref-kb-name">{{ kbInfo?.name || '...' }}</span>
-          <span class="ref-crumb-sep">/</span><span class="ref-crumb-current">{{ $t('knowledgeEditor.document.title') }}</span>
+          <span class="ref-crumb-sep">/</span>
+          <span class="ref-crumb-current">{{ $t('knowledgeEditor.document.title') }}</span>
         </div>
         <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
       </div>
+
       <nav v-if="isWiki" class="ref-tabs" aria-label="knowledge views">
-        <button :class="{ active: activeKbTab === 'documents' }" @click="activeKbTab = 'documents'"><t-icon name="file" size="15px" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabDocuments') }} ({{ total }})</span></button>
-        <button :class="{ active: activeKbTab === 'wiki' }" @click="activeKbTab = 'wiki'"><t-icon name="book" size="15px" /><span>Wiki ({{ wikiCount }})</span><t-loading v-if="wikiIsIndexing" size="small" /></button>
-        <button :class="{ active: activeKbTab === 'graph' }" @click="activeKbTab = 'graph'"><t-icon name="git-branch" size="15px" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span></button>
+        <button :class="{ active: activeKbTab === 'documents' }" @click="activeKbTab = 'documents'">
+          <ReferenceIcon name="file-text" :size="14" />
+          <span>{{ $t('knowledgeEditor.wikiBrowser.tabDocuments') }} ({{ total }})</span>
+        </button>
+        <button :class="{ active: activeKbTab === 'wiki' }" @click="activeKbTab = 'wiki'">
+          <ReferenceIcon name="book-open" :size="14" />
+          <span>Wiki ({{ wikiCount }})</span>
+          <t-loading v-if="wikiIsIndexing" size="small" />
+        </button>
+        <button :class="{ active: activeKbTab === 'graph' }" @click="activeKbTab = 'graph'">
+          <ReferenceIcon name="network" :size="14" />
+          <span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>
+        </button>
       </nav>
     </header>
 
     <div v-if="isWiki && activeKbTab !== 'documents'" class="ref-wiki-stage">
-      <WikiBrowser v-if="kbId" :knowledge-base-id="kbId" :view="activeKbTab === 'graph' ? 'graph' : 'browser'" :can-edit="canEdit"
-        @open-source-doc="(id) => openKnowledgeItem({ id })" @status-change="refreshWikiStats" @view-graph="onViewWikiInGraph" />
+      <WikiBrowser
+        v-if="kbId"
+        :knowledge-base-id="kbId"
+        :view="activeKbTab === 'graph' ? 'graph' : 'browser'"
+        :can-edit="canEdit"
+        @open-source-doc="(id) => openKnowledgeItem({ id })"
+        @status-change="refreshWikiStats"
+        @view-graph="onViewWikiInGraph"
+      />
     </div>
 
     <main v-else class="ref-doc-stage">
-      <KbFolderTree v-if="showFolderTree && !folderTreeCollapsed" class="ref-directory" :tree="folderTree" :selected-path="selectedFolderPath"
-        :loading="folderTreeLoading" :can-edit="canEdit" @select="handleFolderSelect" @update:collapsed="handleFolderTreeCollapsedChange" @rename="handleFolderRename" />
+      <KbFolderTree
+        v-if="showFolderTree && !folderTreeCollapsed"
+        class="ref-directory"
+        :tree="folderTree"
+        :selected-path="selectedFolderPath"
+        :loading="folderTreeLoading"
+        :can-edit="canEdit"
+        @select="handleFolderSelect"
+        @update:collapsed="handleFolderTreeCollapsedChange"
+        @rename="handleFolderRename"
+      />
+
+      <div v-else-if="showFolderTree" class="ref-directory-collapsed">
+        <button type="button" title="展开目录" @click="handleFolderTreeCollapsedChange(false)">
+          <ReferenceIcon name="panel-left-open" :size="16" />
+          <span>目录</span>
+        </button>
+      </div>
 
       <section class="ref-document-workspace">
         <div class="ref-toolbar">
           <div class="ref-toolbar-left">
-            <button v-if="showFolderTree && folderTreeCollapsed" class="ref-root-pill" type="button" @click="handleFolderTreeCollapsedChange(false)"><t-icon name="folder" size="15px" /><span>{{ $t('knowledgeBase.folderTree.title') }}</span></button>
-            <div class="ref-root-pill"><t-icon name="folder-open" size="15px" /><span v-if="!folderBreadcrumbs.length">{{ $t('knowledgeBase.folderTree.rootRow') }}</span><span v-else>{{ folderBreadcrumbs[folderBreadcrumbs.length - 1]?.name }}</span></div>
-            <t-input v-model.trim="docSearchKeyword" clearable class="ref-search" :placeholder="$t('knowledgeBase.docSearchPlaceholder')"><template #prefix-icon><t-icon name="search" size="15px" /></template></t-input>
+            <div class="ref-root-pill">
+              <ReferenceIcon name="folder" :size="14" class="ref-root-icon" />
+              <button type="button" class="ref-root-link" @click="handleFolderSelect(ROOT_FOLDER_PATH)">
+                {{ $t('knowledgeBase.folderTree.rootRow') }}
+              </button>
+              <template v-for="crumb in folderBreadcrumbs" :key="crumb.path">
+                <ReferenceIcon name="chevron-right" :size="12" class="ref-root-chevron" />
+                <button type="button" class="ref-root-link ref-root-link--current" @click="handleFolderSelect(crumb.path)">
+                  {{ crumb.name }}
+                </button>
+              </template>
+            </div>
+
+            <t-input
+              v-model.trim="docSearchKeyword"
+              clearable
+              class="ref-search"
+              :placeholder="$t('knowledgeBase.docSearchPlaceholder')"
+            >
+              <template #prefix-icon><ReferenceIcon name="search" :size="14" /></template>
+            </t-input>
 
             <t-popup v-model:visible="tagFilterPanelVisible" trigger="click" placement="bottom-left">
-              <template #content><div class="ref-tag-popup"><t-input v-model.trim="tagSearchQuery" size="small" :placeholder="$t('knowledgeBase.tagSearchPlaceholder')" clearable />
-                <div class="ref-tag-list"><button v-for="tag in tagList" :key="tag.id" type="button" :class="{ active: selectedTagIds.includes(tag.id) }"
-                  @click="selectedTagIds = selectedTagIds.includes(tag.id) ? selectedTagIds.filter(id => id !== tag.id) : [...selectedTagIds, tag.id]"><span>{{ tag.name }}</span><small>{{ tag.knowledge_count || 0 }}</small></button></div>
-                <button v-if="canEdit" class="ref-manage-tags" @click="tagManageDrawerVisible = true; tagFilterPanelVisible = false">{{ $t('knowledgeBase.tagManageLink') }}</button></div></template>
-              <button class="ref-filter-button" type="button"><t-icon name="discount" size="15px" /><span>{{ selectedTagIds.length ? `${selectedTagIds.length} ${$t('knowledgeBase.tagFilterTitle')}` : $t('knowledgeBase.allTags') }}</span><t-icon name="chevron-down" size="14px" /></button>
+              <template #content>
+                <div class="ref-tag-popup">
+                  <t-input
+                    v-model.trim="tagSearchQuery"
+                    size="small"
+                    :placeholder="$t('knowledgeBase.tagSearchPlaceholder')"
+                    clearable
+                  />
+                  <div class="ref-tag-list">
+                    <button
+                      v-for="tag in tagList"
+                      :key="tag.id"
+                      type="button"
+                      :class="{ active: selectedTagIds.includes(tag.id) }"
+                      @click="selectedTagIds = selectedTagIds.includes(tag.id) ? selectedTagIds.filter(id => id !== tag.id) : [...selectedTagIds, tag.id]"
+                    >
+                      <span>{{ tag.name }}</span>
+                      <small>{{ tag.knowledge_count || 0 }}</small>
+                    </button>
+                  </div>
+                  <button
+                    v-if="canEdit"
+                    class="ref-manage-tags"
+                    @click="tagManageDrawerVisible = true; tagFilterPanelVisible = false"
+                  >
+                    {{ $t('knowledgeBase.tagManageLink') }}
+                  </button>
+                </div>
+              </template>
+              <button class="ref-filter-button" type="button">
+                <ReferenceIcon name="tag" :size="14" class="ref-filter-muted" />
+                <span>{{ selectedTagIds.length ? `${selectedTagIds.length} ${$t('knowledgeBase.tagFilterTitle')}` : $t('knowledgeBase.allTags') }}</span>
+                <ReferenceIcon name="chevron-down" :size="12" class="ref-filter-muted" />
+              </button>
             </t-popup>
-            <t-select v-model="selectedFileType" :options="fileTypeOptions" class="ref-select" clearable><template #prefixIcon><t-icon name="file" size="15px" /></template></t-select>
+
+            <t-select v-model="selectedFileType" :options="fileTypeOptions" class="ref-select" clearable>
+              <template #prefixIcon><ReferenceIcon name="file-text" :size="14" class="ref-filter-muted" /></template>
+            </t-select>
+
+            <t-select v-model="selectedParseStatus" :options="parseStatusOptions" class="ref-select ref-select-status" clearable>
+              <template #prefixIcon><ReferenceIcon name="check-circle-2" :size="14" class="ref-filter-muted" /></template>
+            </t-select>
           </div>
 
           <div class="ref-toolbar-right">
-            <div class="ref-view-toggle"><button :class="{ active: viewMode === 'grid' }" @click="viewMode = 'grid'"><t-icon name="view-module" size="16px" /></button><button :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'"><t-icon name="view-list" size="16px" /></button></div>
-            <KbUploadSourceDropdown v-if="canEdit" ref="uploadSourceRef" class="ref-add-document" :accept-file-types="acceptFileTypes" :supported-file-types="[...supportedFileTypes]"
-              include-manual trigger-icon="add" trigger-class="ref-add-document-trigger" :tooltip="$t('knowledgeBase.addDocument')" placement="bottom-right" @files="uploadFiles" @url="importUrl" @manual="createManual" />
-          </div>
-
-          <div class="ref-toolbar-secondary">
-            <t-select v-model="selectedParseStatus" :options="parseStatusOptions" class="ref-select ref-select-status" clearable><template #prefixIcon><t-icon name="check-circle" size="15px" /></template></t-select>
-            <t-select v-model="selectedSource" :options="sourceOptions" class="ref-select ref-product-only" clearable><template #prefixIcon><t-icon name="link" size="15px" /></template></t-select>
-            <t-date-range-picker v-model="updatedTimeRange" class="ref-date ref-product-only" :disable-date="disableFutureDate" :placeholder="[$t('knowledgeBase.updatedTimeFrom'), $t('knowledgeBase.updatedTimeTo')]" clearable><template #prefixIcon><t-icon name="time" size="15px" /></template></t-date-range-picker>
+            <div class="ref-view-toggle">
+              <button type="button" title="卡片网格视图" :class="{ active: viewMode === 'grid' }" @click="viewMode = 'grid'">
+                <ReferenceIcon name="layout-grid" :size="14" />
+              </button>
+              <button type="button" title="列表视图" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">
+                <ReferenceIcon name="list" :size="14" />
+              </button>
+            </div>
+            <KbUploadSourceDropdown
+              v-if="canEdit"
+              ref="uploadSourceRef"
+              class="ref-add-document"
+              :accept-file-types="acceptFileTypes"
+              :supported-file-types="[...supportedFileTypes]"
+              include-manual
+              trigger-icon="add"
+              trigger-class="ref-add-document-trigger"
+              :tooltip="$t('knowledgeBase.addDocument')"
+              placement="bottom-right"
+              @files="uploadFiles"
+              @url="importUrl"
+              @manual="createManual"
+            />
           </div>
         </div>
 
         <div class="ref-doc-scroll">
-          <div v-if="docListLoading && !cardList.length" class="ref-skeleton-grid"><div v-for="n in 8" :key="n" class="ref-skeleton-card"><t-skeleton animation="gradient" /></div></div>
-          <DocumentCardView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'grid'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions"
-            :selected-ids="selectedIds" :batch-mode="batchMode" :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge" :trace-available-by-id="traceAvailableById" :tag-list="tagList"
-            :move-menu-mode="moveMenuMode" :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode"
-            :move-submitting="moveSubmitting" :show-folder-path="showDocumentFolderPath" @open="openKnowledgeItem" @open-folder="handleFolderSelect" @move-to-folder="(item, path) => moveKnowledgeIntoFolder([item.id], path)"
-            @toggle-checkbox="(id, checked) => toggleRow(id, checked)" @menu-visible-change="(visible, item) => visible && probeTraceAvailable(item)" @action="handleCardAction" @tag-edit="openTagEditDialog"
-            @move-select-target="handleMoveSelectTarget" @move-back="handleMoveBack" @move-confirm="handleMoveConfirm" @update:move-mode="(mode) => moveMode = mode" />
-          <DocumentListView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'list'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions"
-            :selected-ids="selectedIds" :tag-list="tagList" :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge" :trace-visible-ids="traceAvailableById" :move-menu-mode="moveMenuMode"
-            :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode" :move-submitting="moveSubmitting"
-            :show-folder-path="showDocumentFolderPath" @open="openKnowledgeItem" @open-folder="handleFolderSelect" @move-to-folder="(item, path) => moveKnowledgeIntoFolder([item.id], path)" @toggle-row="toggleRow"
-            @toggle-all="toggleAll" @action="handleCardAction" @probe-trace="probeTraceAvailable" @tag-edit="openTagEditDialog" @move-select-target="handleMoveSelectTarget" @move-back="handleMoveBack"
-            @move-confirm="handleMoveConfirm" @update:move-mode="(mode) => moveMode = mode" @reset-move-state="moveMenuMode = 'normal'" />
-          <div v-else-if="!docListLoading" class="ref-empty"><t-icon name="file" size="38px" /><strong>暂无文档</strong></div>
+          <div v-if="docListLoading && !cardList.length" class="ref-skeleton-grid">
+            <div v-for="n in 8" :key="n" class="ref-skeleton-card"><t-skeleton animation="gradient" /></div>
+          </div>
+
+          <DocumentCardView
+            v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'grid'"
+            :items="cardList"
+            :folders="currentChildFolders"
+            :folder-options="folderOptions"
+            :selected-ids="selectedIds"
+            :batch-mode="batchMode"
+            :can-edit="canEdit"
+            :can-mutate-knowledge="canMutateKnowledge"
+            :trace-available-by-id="traceAvailableById"
+            :tag-list="tagList"
+            :move-menu-mode="moveMenuMode"
+            :move-target-kbs="moveTargetKbs"
+            :move-targets-loading="moveTargetsLoading"
+            :move-selected-target-name="moveSelectedTargetName"
+            :move-mode="moveMode"
+            :move-submitting="moveSubmitting"
+            :show-folder-path="showDocumentFolderPath"
+            @open="openKnowledgeItem"
+            @open-folder="handleFolderSelect"
+            @move-to-folder="(item, path) => moveKnowledgeIntoFolder([item.id], path)"
+            @toggle-checkbox="(id, checked) => toggleRow(id, checked)"
+            @menu-visible-change="(visible, item) => visible && probeTraceAvailable(item)"
+            @action="handleCardAction"
+            @tag-edit="openTagEditDialog"
+            @move-select-target="handleMoveSelectTarget"
+            @move-back="handleMoveBack"
+            @move-confirm="handleMoveConfirm"
+            @update:move-mode="(mode) => moveMode = mode"
+          />
+
+          <DocumentListView
+            v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'list'"
+            :items="cardList"
+            :folders="currentChildFolders"
+            :folder-options="folderOptions"
+            :selected-ids="selectedIds"
+            :tag-list="tagList"
+            :can-edit="canEdit"
+            :can-mutate-knowledge="canMutateKnowledge"
+            :trace-visible-ids="traceAvailableById"
+            :move-menu-mode="moveMenuMode"
+            :move-target-kbs="moveTargetKbs"
+            :move-targets-loading="moveTargetsLoading"
+            :move-selected-target-name="moveSelectedTargetName"
+            :move-mode="moveMode"
+            :move-submitting="moveSubmitting"
+            :show-folder-path="showDocumentFolderPath"
+            @open="openKnowledgeItem"
+            @open-folder="handleFolderSelect"
+            @move-to-folder="(item, path) => moveKnowledgeIntoFolder([item.id], path)"
+            @toggle-row="toggleRow"
+            @toggle-all="toggleAll"
+            @action="handleCardAction"
+            @probe-trace="probeTraceAvailable"
+            @tag-edit="openTagEditDialog"
+            @move-select-target="handleMoveSelectTarget"
+            @move-back="handleMoveBack"
+            @move-confirm="handleMoveConfirm"
+            @update:move-mode="(mode) => moveMode = mode"
+            @reset-move-state="moveMenuMode = 'normal'"
+          />
+
+          <div v-else-if="!docListLoading" class="ref-empty">
+            <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />
+            <strong>暂无文档</strong>
+          </div>
         </div>
 
-        <div class="ref-batch-anchor" v-show="batchMode || selectedIds.size"><DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting" :reparse-loading="batchReparsing" :tag-loading="batchTagging"
-          :visible="batchMode || selectedIds.size > 0" :show-move-to-folder="canEdit" :folder-options="folderOptions" @cancel="cancelBatch" @delete="deleteBatch" @reparse="reparseBatch" @batch-tag="batchTag"
-          @move-to-folder="(path) => moveKnowledgeIntoFolder([...selectedIds], path)" /></div>
+        <div class="ref-batch-anchor" v-show="batchMode || selectedIds.size">
+          <DocumentBatchBar
+            :count="selectedIds.size"
+            :delete-loading="batchDeleting"
+            :reparse-loading="batchReparsing"
+            :tag-loading="batchTagging"
+            :visible="batchMode || selectedIds.size > 0"
+            :show-move-to-folder="canEdit"
+            :folder-options="folderOptions"
+            @cancel="cancelBatch"
+            @delete="deleteBatch"
+            @reparse="reparseBatch"
+            @batch-tag="batchTag"
+            @move-to-folder="(path) => moveKnowledgeIntoFolder([...selectedIds], path)"
+          />
+        </div>
       </section>
     </main>
 
-    <DocContent ref="docContentRef" :visible="isCardDetails" :details="details" :canEditKB="canEdit" :canDownloadKB="canDownloadKnowledge" :kbId="kbId" @closeDoc="closeDoc" @getDoc="getDoc" />
-    <TagEditDialog :visible="tagEditDialogVisible" :knowledge-name="tagEditTarget?.display_name || tagEditTarget?.file_name || tagEditTarget?.title || ''" :kb-id="kbId" :tag-list="tagList"
-      :selected-tags="tagEditTarget?.tags || []" :can-manage="canEdit" @update:visible="tagEditDialogVisible = $event" @confirm="onTagEditConfirm" @tag-created="loadTags" @open-manage="tagManageDrawerVisible = true" />
-    <KbTagManageDrawer v-model:visible="tagManageDrawerVisible" :kb-id="kbId" :is-faq="false" @changed="() => { loadTags(); loadKnowledgeFiles() }" />
+    <DocContent
+      ref="docContentRef"
+      :visible="isCardDetails"
+      :details="details"
+      :canEditKB="canEdit"
+      :canDownloadKB="canDownloadKnowledge"
+      :kbId="kbId"
+      @closeDoc="closeDoc"
+      @getDoc="getDoc"
+    />
+
+    <TagEditDialog
+      :visible="tagEditDialogVisible"
+      :knowledge-name="tagEditTarget?.display_name || tagEditTarget?.file_name || tagEditTarget?.title || ''"
+      :kb-id="kbId"
+      :tag-list="tagList"
+      :selected-tags="tagEditTarget?.tags || []"
+      :can-manage="canEdit"
+      @update:visible="tagEditDialogVisible = $event"
+      @confirm="onTagEditConfirm"
+      @tag-created="loadTags"
+      @open-manage="tagManageDrawerVisible = true"
+    />
+    <KbTagManageDrawer
+      v-model:visible="tagManageDrawerVisible"
+      :kb-id="kbId"
+      :is-faq="false"
+      @changed="() => { loadTags(); loadKnowledgeFiles() }"
+    />
   </div>
 </template>
 
 <style scoped>
-.ref-faq-stage{height:100%;overflow:auto;padding:24px 32px;box-sizing:border-box}
-.ref-kb-page{height:100%;min-width:0;display:flex;flex-direction:column;padding:20px 28px 0;box-sizing:border-box;background:#fff;color:#111827;font-family:Inter,"Noto Sans SC",system-ui,sans-serif;overflow:hidden}
-.ref-kb-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb;flex:0 0 auto;min-height:58px}.ref-kb-header-copy{min-width:0}.ref-breadcrumb{display:flex;align-items:center;gap:7px;height:24px;font-size:12px;color:#6b7280;min-width:0}.ref-kb-header-copy p{margin:2px 0 0;font-size:12px;line-height:18px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ref-crumb-link,.ref-kb-name{border:0;background:transparent;padding:0;color:#4b5563;display:inline-flex;align-items:center;gap:5px;font:inherit;font-weight:600;cursor:pointer;max-width:440px}.ref-kb-name span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ref-crumb-current{color:#9ca3af}.ref-crumb-sep{color:#d1d5db}
-.ref-tabs{display:flex;align-items:center;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:14px;padding:4px;gap:2px;flex:0 0 auto}.ref-tabs button{height:30px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:#6b7280;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer}.ref-tabs button.active{background:#fff;color:#111827;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.ref-doc-stage{display:flex;gap:12px;min-height:0;flex:1;padding-top:20px;overflow:hidden}.ref-document-workspace{position:relative;min-width:0;min-height:0;flex:1;display:flex;flex-direction:column;gap:12px}.ref-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"left right" "secondary secondary";gap:8px 10px;background:#fff;padding:10px;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.025);flex:0 0 auto}.ref-toolbar-left{grid-area:left;display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}.ref-toolbar-right{grid-area:right;display:flex;align-items:center;gap:8px}.ref-toolbar-secondary{grid-area:secondary;display:flex;align-items:center;gap:8px;min-height:30px}.ref-root-pill,.ref-filter-button{height:30px;border:0;border-radius:10px;background:#f3f4f6;color:#374151;padding:0 10px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}.ref-filter-button{border:1px solid #e5e7eb;background:#fff;cursor:pointer}.ref-search{width:244px}.ref-select{width:140px}.ref-select-status{width:132px}.ref-product-only{width:148px}.ref-date{width:286px}.ref-view-toggle{display:flex;background:#f3f4f6;padding:2px;border:1px solid #e5e7eb;border-radius:11px}.ref-view-toggle button{width:30px;height:28px;border:0;background:transparent;color:#9ca3af;border-radius:8px;display:grid;place-items:center;cursor:pointer}.ref-view-toggle button.active{background:#fff;color:#111827;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.ref-doc-scroll{position:relative;min-height:0;flex:1;overflow:auto}.ref-empty{height:100%;min-height:260px;border:1px solid #e5e7eb;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#9ca3af;font-size:12px}.ref-empty strong{font-size:13px;color:#4b5563}.ref-skeleton-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ref-skeleton-card{height:192px;border:1px solid #e5e7eb;border-radius:16px;padding:16px;box-sizing:border-box}.ref-batch-anchor{position:absolute;left:0;right:0;bottom:14px;z-index:20;display:flex;justify-content:center;pointer-events:none}.ref-batch-anchor>*{pointer-events:auto}.ref-wiki-stage{min-height:0;flex:1;padding-top:14px;overflow:hidden}.ref-tag-popup{width:300px;padding:12px;background:#fff;border-radius:12px}.ref-tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;max-height:240px;overflow:auto}.ref-tag-list button{height:26px;border:1px solid #e5e7eb;border-radius:7px;background:#fff;padding:0 8px;font-size:11px;color:#4b5563;display:flex;gap:5px;align-items:center;cursor:pointer}.ref-tag-list button.active{background:#111827;border-color:#111827;color:#fff}.ref-tag-list small{opacity:.6}.ref-manage-tags{margin-top:10px;border:0;background:transparent;color:#4b5563;font-size:11px;cursor:pointer}
-:deep(.ref-directory.kb-folder-tree){width:224px!important;min-width:224px!important;margin:0!important;padding:0!important;border:1px solid #e5e7eb!important;border-radius:16px!important;background:#fff!important;overflow:hidden!important;box-shadow:0 1px 2px rgba(0,0,0,.025)!important}:deep(.ref-directory .kb-folder-tree__header){height:48px!important;padding:0 14px!important;border-bottom:1px solid #f3f4f6!important;background:rgba(249,250,251,.55)!important}:deep(.ref-directory .kb-folder-tree__body){padding:8px!important}.ref-kb-page :deep(.kb-folder-row){min-height:30px!important;border-radius:10px!important;font-size:12px!important}.ref-kb-page :deep(.kb-folder-row.active){background:#111827!important;color:#fff!important}.ref-kb-page :deep(.kb-folder-row.active .kb-folder-row__icon),.ref-kb-page :deep(.kb-folder-row.active .kb-folder-row__count){color:#fff!important}
-.ref-kb-page :deep(.doc-card-list){display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:16px!important;width:100%!important}.ref-kb-page :deep(.knowledge-card),.ref-kb-page :deep(.folder-card){min-width:0!important;height:192px!important;border:1px solid #e5e7eb!important;border-radius:16px!important;background:#fff!important;box-shadow:0 1px 2px rgba(0,0,0,.02)!important;overflow:hidden!important}.ref-kb-page :deep(.knowledge-card:hover),.ref-kb-page :deep(.folder-card:hover){border-color:#9ca3af!important;box-shadow:0 4px 12px rgba(0,0,0,.06)!important}.ref-kb-page :deep(.knowledge-card .card-content){padding:15px 16px 10px!important}.ref-kb-page :deep(.knowledge-card .card-content-nav){margin-bottom:12px!important}.ref-kb-page :deep(.knowledge-card .card-content-title){font-size:13px!important;font-weight:700!important;color:#111827!important}.ref-kb-page :deep(.knowledge-card .card-content-txt){font-size:12px!important;line-height:20px!important;color:#6b7280!important;-webkit-line-clamp:3!important;line-clamp:3!important}.ref-kb-page :deep(.knowledge-card .card-bottom){height:42px!important;padding:0 16px!important;border-top:1px solid #f3f4f6!important}.ref-kb-page :deep(.knowledge-card .card-time){font-family:"JetBrains Mono",monospace!important;font-size:10px!important;color:#9ca3af!important}.ref-kb-page :deep(.knowledge-card .card-type){background:#f3f4f6!important;border-radius:6px!important;padding:3px 7px!important;font-size:9px!important;font-weight:700!important;color:#6b7280!important}.ref-kb-page :deep(.folder-card__body){padding:18px 16px!important}.ref-kb-page :deep(.folder-card__footer){height:42px!important;padding:0 16px!important;display:flex!important;align-items:center!important;border-top:1px solid #f3f4f6!important;color:#9ca3af!important;font-size:11px!important}
-.ref-kb-page :deep(.ref-search .t-input),.ref-kb-page :deep(.ref-select .t-input),.ref-kb-page :deep(.ref-date .t-input){height:30px!important;border:1px solid #e5e7eb!important;border-radius:10px!important;background:#fff!important;box-shadow:none!important;font-size:12px!important;color:#374151!important}.ref-kb-page :deep(.ref-search .t-input){padding-left:8px!important}.ref-kb-page :deep(.ref-add-document .kb-upload-source-trigger){height:30px!important;min-width:112px!important;padding:0 12px!important;border-radius:10px!important;background:#111827!important;color:#fff!important;font-size:12px!important;font-weight:700!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important}.ref-kb-page :deep(.ref-add-document .kb-upload-source-trigger::after){content:"添加文档"}.ref-kb-page :deep(.ref-add-document .kb-upload-source-trigger:hover){background:#000!important;color:#fff!important}
-@media(max-width:1280px){.ref-kb-page :deep(.doc-card-list){grid-template-columns:repeat(3,minmax(0,1fr))!important}.ref-product-only{display:none}.ref-search{width:210px}}
+.ref-faq-stage {
+  height: 100%;
+  overflow: auto;
+  padding: 24px 32px;
+  box-sizing: border-box;
+}
+
+.ref-kb-page {
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 28px 0;
+  box-sizing: border-box;
+  background: rgb(249 250 251 / 0.3);
+  color: #1f2937;
+  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.ref-kb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgb(229 231 235 / 0.8);
+  flex: 0 0 auto;
+}
+
+.ref-kb-header-copy { min-width: 0; }
+.ref-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 24px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.ref-kb-header-copy p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ref-crumb-link,
+.ref-kb-name {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #4b5563;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 440px;
+}
+.ref-kb-name { font-weight: 700; color: #1f2937; }
+.ref-kb-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ref-crumb-current { color: #9ca3af; }
+.ref-crumb-sep { color: #d1d5db; }
+
+.ref-tabs {
+  display: flex;
+  align-items: center;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 4px;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.ref-tabs button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.ref-tabs button.active {
+  border-color: rgb(229 231 235 / 0.6);
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.ref-doc-stage {
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+  padding-top: 20px;
+  overflow: hidden;
+}
+.ref-document-workspace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ref-directory-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 6px;
+  background: #fff;
+  border: 1px solid rgb(229 231 235 / 0.9);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025);
+  flex: 0 0 auto;
+}
+.ref-directory-collapsed button {
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  color: #4b5563;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ref-directory-collapsed button:hover { background: #f3f4f6; }
+
+.ref-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fff;
+  padding: 10px;
+  border: 1px solid rgb(229 231 235 / 0.9);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025);
+  flex: 0 0 auto;
+}
+.ref-toolbar-left {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 280px;
+}
+.ref-toolbar-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.ref-root-pill {
+  min-height: 30px;
+  border: 0;
+  border-radius: 12px;
+  background: rgb(243 244 246 / 0.9);
+  color: #374151;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ref-root-icon { color: #6b7280; }
+.ref-root-chevron { color: #9ca3af; }
+.ref-root-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ref-root-link--current { color: #111827; }
+
+.ref-filter-button {
+  height: 30px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #374151;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ref-filter-button:hover { background: #f9fafb; }
+.ref-filter-muted { color: #9ca3af; }
+.ref-search { width: 220px; min-width: 160px; }
+.ref-select { width: 140px; }
+.ref-select-status { width: 132px; }
+
+.ref-view-toggle {
+  display: flex;
+  background: #f3f4f6;
+  padding: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+.ref-view-toggle button {
+  width: 30px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.ref-view-toggle button.active {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.ref-doc-scroll { position: relative; min-height: 0; flex: 1; overflow: auto; }
+.ref-empty {
+  height: 100%;
+  min-height: 260px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+.ref-empty strong { font-size: 13px; color: #4b5563; }
+.ref-skeleton-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.ref-skeleton-card { height: 192px; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px; box-sizing: border-box; }
+.ref-batch-anchor { position: absolute; left: 0; right: 0; bottom: 14px; z-index: 20; display: flex; justify-content: center; pointer-events: none; }
+.ref-batch-anchor > * { pointer-events: auto; }
+.ref-wiki-stage { min-height: 0; flex: 1; padding-top: 14px; overflow: hidden; }
+.ref-tag-popup { width: 300px; padding: 12px; background: #fff; border-radius: 12px; }
+.ref-tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 240px; overflow: auto; }
+.ref-tag-list button { height: 26px; border: 1px solid #e5e7eb; border-radius: 7px; background: #fff; padding: 0 8px; font-size: 11px; color: #4b5563; display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.ref-tag-list button.active { background: #111827; border-color: #111827; color: #fff; }
+.ref-tag-list small { opacity: .6; }
+.ref-manage-tags { margin-top: 10px; border: 0; background: transparent; color: #4b5563; font-size: 11px; cursor: pointer; }
+
+:deep(.ref-directory.kb-folder-tree) {
+  width: 224px !important;
+  min-width: 224px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgb(229 231 235 / 0.9) !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025) !important;
+}
+:deep(.ref-directory .kb-folder-tree__header) {
+  height: 48px !important;
+  padding: 0 14px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  background: rgb(249 250 251 / 0.5) !important;
+}
+:deep(.ref-directory .kb-folder-tree__body) { padding: 8px !important; }
+.ref-kb-page :deep(.kb-folder-row) { min-height: 30px !important; border-radius: 10px !important; font-size: 12px !important; }
+.ref-kb-page :deep(.kb-folder-row.active) { background: #111827 !important; color: #fff !important; }
+.ref-kb-page :deep(.kb-folder-row.active .kb-folder-row__icon),
+.ref-kb-page :deep(.kb-folder-row.active .kb-folder-row__count) { color: #fff !important; }
+
+.ref-kb-page :deep(.doc-card-list) {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  width: 100% !important;
+}
+.ref-kb-page :deep(.knowledge-card),
+.ref-kb-page :deep(.folder-card) {
+  min-width: 0 !important;
+  height: 192px !important;
+  border: 1px solid rgb(229 231 235 / 0.9) !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+.ref-kb-page :deep(.knowledge-card:hover),
+.ref-kb-page :deep(.folder-card:hover) {
+  border-color: #9ca3af !important;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.06) !important;
+}
+.ref-kb-page :deep(.knowledge-card .card-content) { padding: 16px !important; }
+.ref-kb-page :deep(.knowledge-card .card-content-title) { font-size: 12px !important; font-weight: 700 !important; color: #030712 !important; }
+.ref-kb-page :deep(.knowledge-card .card-content-txt) { font-size: 11px !important; line-height: 17px !important; color: #6b7280 !important; -webkit-line-clamp: 3 !important; line-clamp: 3 !important; }
+.ref-kb-page :deep(.knowledge-card .card-bottom) { padding: 10px 16px 16px !important; border-top: 1px solid #f3f4f6 !important; }
+.ref-kb-page :deep(.knowledge-card .card-time) { font-family: "JetBrains Mono", ui-monospace, monospace !important; font-size: 10px !important; color: #9ca3af !important; }
+.ref-kb-page :deep(.knowledge-card .card-type) { background: #f3f4f6 !important; border-radius: 6px !important; padding: 2px 8px !important; font-size: 9px !important; font-weight: 700 !important; color: #4b5563 !important; }
+
+/* TDesign remains only as the data/overlay engine. Strip its independent visual skin. */
+.ref-kb-page :deep(.ref-search .t-input),
+.ref-kb-page :deep(.ref-select .t-input) {
+  min-height: 30px !important;
+  height: 30px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  color: #374151 !important;
+}
+.ref-kb-page :deep(.ref-search .t-input) { background: rgb(249 250 251 / 0.8) !important; }
+.ref-kb-page :deep(.ref-add-document .kb-upload-source-trigger) {
+  height: 30px !important;
+  min-width: 126px !important;
+  padding: 0 28px 0 12px !important;
+  border-radius: 12px !important;
+  background: #111827 !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+.ref-kb-page :deep(.ref-add-document .kb-upload-source-trigger::after) { content: "添加文档"; }
+.ref-kb-page :deep(.ref-add-document .kb-upload-source-trigger:hover) { background: #000 !important; color: #fff !important; }
+
+@media (max-width: 1280px) {
+  .ref-kb-page :deep(.doc-card-list) { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .ref-search { width: 190px; }
+}
+
+@media (max-width: 767px) {
+  .ref-kb-page { padding: 20px 20px 0; }
+  .ref-kb-header { align-items: flex-start; flex-direction: column; }
+  .ref-tabs { align-self: stretch; }
+  .ref-tabs button { flex: 1 1 0; }
+  .ref-toolbar-left { min-width: 0; }
+  .ref-toolbar-right { margin-left: auto; }
+  .ref-kb-page :deep(.doc-card-list) { grid-template-columns: 1fr !important; }
+}
 </style>
