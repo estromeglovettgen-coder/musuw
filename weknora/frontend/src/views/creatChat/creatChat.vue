@@ -299,7 +299,7 @@ const handleKBEditorSuccess = (kbId: string) => navigateToKnowledgeBaseList(kbId
   padding: 0;
   border: 0;
   color: #111827;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   font-size: 24px;
   line-height: 32px;
   font-weight: 700;

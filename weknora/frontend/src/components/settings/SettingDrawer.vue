@@ -126,7 +126,7 @@ const handleCancel = () => { blurActiveElementBeforeClose(); emit('cancel'); emi
 </script>
 
 <style scoped>
-.reference-setting-drawer-backdrop{position:fixed;inset:0;z-index:2500;display:flex;justify-content:flex-end;background:rgb(17 24 39 / 22%);backdrop-filter:blur(1px);font-family:Inter,"Noto Sans SC",ui-sans-serif,system-ui,sans-serif}
+.reference-setting-drawer-backdrop{position:fixed;inset:0;z-index:2500;display:flex;justify-content:flex-end;background:rgb(17 24 39 / 22%);backdrop-filter:blur(1px);font-family:"Inter Variable",Inter,"Noto Sans SC Variable","Noto Sans SC",ui-sans-serif,system-ui,sans-serif}
 .reference-setting-drawer{position:relative;height:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden;background:#fff;color:#111827;border-left:1px solid #e5e7eb;box-shadow:-20px 0 45px rgb(0 0 0 / 10%);animation:reference-setting-drawer-in 180ms cubic-bezier(.2,.8,.2,1) both}
 @keyframes reference-setting-drawer-in{from{transform:translateX(28px);opacity:.8}to{transform:none;opacity:1}}
 .reference-setting-drawer--resizing{transition:none;animation:none}

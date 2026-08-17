@@ -329,7 +329,7 @@ watch(visible, (open) => {
   border-left: 1px solid rgb(229 231 235 / .8);
   background: #fff;
   color: #1f2937;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   user-select: none;
 }
 

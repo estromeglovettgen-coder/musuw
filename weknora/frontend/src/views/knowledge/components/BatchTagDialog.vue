@@ -236,7 +236,7 @@ function handleOpenManage() {
   box-sizing: border-box;
   background: rgb(17 24 39 / .28);
   backdrop-filter: blur(1px);
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-batch-tag-dialog {
   width: min(420px, calc(100vw - 32px));

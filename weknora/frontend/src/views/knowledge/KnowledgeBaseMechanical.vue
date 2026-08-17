@@ -1058,7 +1058,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   background: rgb(249 250 251 / .3);
   color: #1f2937;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   overflow: hidden;
 }
 .reference-kb-header {

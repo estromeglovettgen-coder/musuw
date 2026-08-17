@@ -502,7 +502,7 @@ onMounted(() => {
 .reference-model-tabs { display: flex; align-items: center; gap: 2px; max-width: 100%; margin-bottom: 16px; padding: 3px; overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 12px; background: #f3f4f6; scrollbar-width: none; }
 .reference-model-tabs::-webkit-scrollbar { display: none; }
 .reference-model-tabs button { height: 28px; flex: 0 0 auto; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: #6b7280; font-size: 10px; line-height: 14px; font-weight: 600; cursor: pointer; }
-.reference-model-tabs button span { margin-left: 3px; color: #9ca3af; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 9px; }
+.reference-model-tabs button span { margin-left: 3px; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 9px; }
 .reference-model-tabs button.active { background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .reference-model-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .reference-model-card { position: relative; min-width: 0; min-height: 82px; display: flex; align-items: flex-start; gap: 11px; padding: 13px 14px; box-sizing: border-box; border: 1px solid rgb(229 231 235 / 80%); border-radius: 16px; background: #fff; color: #111827; text-align: left; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }

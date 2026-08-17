@@ -293,7 +293,7 @@ defineExpose({
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 12px 4px;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 
 .attachment-preview-item {
@@ -347,7 +347,7 @@ defineExpose({
   align-items: center;
   gap: 4px;
   color: #9ca3af;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   font-size: 9px;
   line-height: 14px;
 }

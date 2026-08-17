@@ -251,7 +251,7 @@ const commitNewFolder = async () => {
   box-sizing: border-box;
   background: #fff;
   color: #374151;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-folder-picker__header {
   width: 100%;

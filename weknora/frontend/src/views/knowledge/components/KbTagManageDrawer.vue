@@ -368,7 +368,7 @@ watch(searchQuery, (newVal, oldVal) => {
   border-left: 1px solid #e5e7eb;
   box-shadow: -12px 0 40px rgb(0 0 0 / .10);
   color: #111827;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-tag-drawer__header {
   display: flex;

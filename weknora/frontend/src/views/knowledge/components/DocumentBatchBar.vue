@@ -154,7 +154,7 @@ const confirmTitle = computed(() =>
   width: max-content;
   max-width: min(760px, calc(100vw - 40px));
   margin: 0 auto;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-batch-bar__inner {
   position: relative;

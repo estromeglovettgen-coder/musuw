@@ -168,7 +168,7 @@ onUnmounted(() => {
   background: #fff;
   box-shadow: -12px 0 32px rgb(0 0 0 / .08);
   color: #1f2937;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 
 .chat-attachment-drawer-header {

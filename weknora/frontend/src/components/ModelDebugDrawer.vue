@@ -277,7 +277,7 @@ onBeforeUnmount(() => { if (document.activeElement instanceof HTMLElement) docum
 </script>
 
 <style scoped>
-.reference-model-debug{display:flex;flex-direction:column;gap:0;color:#111827;font-family:Inter,"Noto Sans SC",ui-sans-serif,system-ui,sans-serif}
+.reference-model-debug{display:flex;flex-direction:column;gap:0;color:#111827;font-family:"Inter Variable",Inter,"Noto Sans SC Variable","Noto Sans SC",ui-sans-serif,system-ui,sans-serif}
 .reference-debug-copy,.reference-debug-file-button{height:30px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 11px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#4b5563;font-size:10px;font-weight:700;cursor:pointer}.reference-debug-copy:hover,.reference-debug-file-button:hover{border-color:#d1d5db;color:#111827}.reference-debug-copy svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .reference-debug-type-grid{display:flex;flex-wrap:wrap;gap:7px}.reference-debug-type{height:31px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#6b7280;font-size:10px;font-weight:700;cursor:pointer}.reference-debug-type:hover{background:#f9fafb;color:#374151}.reference-debug-type.active{border-color:#111827;background:#111827;color:#fff}
 .reference-debug-field{display:flex;flex-direction:column;gap:6px;margin:0}.reference-debug-field>span{color:#374151;font-size:10px;line-height:14px;font-weight:700}.reference-debug-field>small,.reference-debug-toggle-row small{color:#9ca3af;font-size:9px;line-height:14px;font-weight:500}

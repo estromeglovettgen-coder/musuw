@@ -491,7 +491,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
   justify-content: space-between;
   gap: 8px;
   color: #9ca3af;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   font-size: 10px;
   line-height: 14px;
 }

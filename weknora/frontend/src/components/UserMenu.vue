@@ -78,7 +78,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 .reference-user-menu {
   position: relative;
   width: 100%;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-user-trigger {
   width: 100%;

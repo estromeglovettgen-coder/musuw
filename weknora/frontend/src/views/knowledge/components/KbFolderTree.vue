@@ -360,7 +360,7 @@ watch(
 .kb-folder-row__count {
   flex: 0 0 auto;
   color: #9ca3af !important;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   font-size: 10px;
   line-height: 14px;
 }

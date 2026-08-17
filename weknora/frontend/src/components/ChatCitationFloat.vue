@@ -67,7 +67,7 @@ const loadingText = t('common.loading')
   background: #fff;
   box-shadow: 0 10px 25px rgb(0 0 0 / .10);
   color: #1f2937;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   text-align: left;
 }
 

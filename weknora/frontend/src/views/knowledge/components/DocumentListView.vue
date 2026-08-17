@@ -540,7 +540,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
 .reference-list-tag-add:hover { border-color: #9ca3af; color: #111827; }
 .reference-list-source { display: flex; align-items: center; gap: 4px; color: #6b7280; font-size: 11px; }
 .reference-list-source :deep(.reference-icon) { color: #9ca3af; }
-.reference-mono { color: #6b7280; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
+.reference-mono { color: #6b7280; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
 .reference-col-time.reference-mono { color: #9ca3af; }
 .reference-list-status {
   display: inline-flex;

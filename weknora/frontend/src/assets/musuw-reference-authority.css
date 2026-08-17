@@ -9,8 +9,8 @@
  */
 
 :root {
-  --musuw-reference-font-sans: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
-  --musuw-reference-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --musuw-reference-font-sans: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  --musuw-reference-font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --app-font-family: var(--musuw-reference-font-sans);
   --app-font-family-mono: var(--musuw-reference-font-mono);
 }

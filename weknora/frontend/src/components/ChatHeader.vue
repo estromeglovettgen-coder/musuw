@@ -374,7 +374,7 @@ function handleMenuClick(data: { value: string }): void {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: #4b5563;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 
 .chat-header.is-editing { max-width: min(360px, calc(100% - 24px)); padding: 2px; }

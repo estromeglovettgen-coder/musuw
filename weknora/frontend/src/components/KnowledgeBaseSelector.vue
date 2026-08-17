@@ -226,7 +226,7 @@ watch(() => props.visible, async (v) => {
 
 <style scoped>
 .kb-overlay, .kb-overlay *, .kb-overlay *::before, .kb-overlay *::after { box-sizing: border-box; }
-.kb-overlay { position: fixed; inset: 0; z-index: 3000; background: transparent; font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
+.kb-overlay { position: fixed; inset: 0; z-index: 3000; background: transparent; font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
 .kb-dropdown { z-index: 3001; display: flex; flex-direction: column; min-height: 180px; overflow: hidden; border: 1px solid rgb(229 231 235 / .9); border-radius: 14px; background: #fff; box-shadow: 0 16px 32px -10px rgb(0 0 0 / .16), 0 4px 10px rgb(0 0 0 / .06); color: #1f2937; }
 .kb-search { margin: 8px 8px 6px; height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f9fafb; color: #9ca3af; }
 .kb-search svg, .kb-icon svg, .checkbox svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -244,7 +244,7 @@ watch(() => props.visible, async (v) => {
 .kb-icon.faq { color: #7c3aed; background: #f5f3ff; }
 .kb-icon svg { width: 14px; height: 14px; }
 .kb-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.kb-docs { flex: 0 0 auto; color: #9ca3af; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; font-size: 10px; }
+.kb-docs { flex: 0 0 auto; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; font-size: 10px; }
 .kb-empty { padding: 28px 12px; text-align: center; color: #9ca3af; font-size: 11px; }
 .kb-actions { min-height: 42px; padding: 6px 8px; border-top: 1px solid #f3f4f6; display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
 .kb-actions button { height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: #6b7280; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }

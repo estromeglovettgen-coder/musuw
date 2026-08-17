@@ -882,7 +882,7 @@ onBeforeUnmount(() => {
 }
 .reference-editor-input { padding-right: 64px; }
 .reference-editor-input:focus,.reference-editor-select:focus { border-color: #1677ff; box-shadow: 0 0 0 1px rgb(22 119 255 / 20%); }
-.reference-editor-count { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: #9ca3af; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; pointer-events: none; }
+.reference-editor-count { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 11px; pointer-events: none; }
 .reference-editor-select { appearance: none; padding-right: 36px; color: #374151; cursor: pointer; }
 .reference-editor-select:disabled { cursor: not-allowed; background: #f9fafb; color: #9ca3af; }
 .reference-editor-select-wrap > svg { position: absolute; top: 50%; right: 12px; width: 16px; height: 16px; transform: translateY(-50%); fill: none; stroke: #9ca3af; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
@@ -898,7 +898,7 @@ onBeforeUnmount(() => {
 .reference-editor-tool:disabled { opacity: .45; cursor: not-allowed; }
 .reference-editor-tool strong,.reference-editor-tool em,.reference-editor-tool s { font-size: 12px; line-height: 1; }
 .reference-editor-tool em { font-family: serif; }
-.reference-editor-tool code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10px; }
+.reference-editor-tool code { font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 10px; }
 .reference-editor-tool svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .reference-editor-tool.accent { color: #3b82f6; }
 .reference-editor-view-toggle { flex: 0 0 auto; height: 25px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 6px; background: #262626; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; }
@@ -906,12 +906,12 @@ onBeforeUnmount(() => {
 .reference-editor-view-toggle:hover:not(:disabled) { filter: brightness(.96); }
 .reference-editor-view-toggle:disabled { opacity: .45; cursor: not-allowed; }
 .reference-editor-view-toggle svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.reference-editor-textarea { width: 100%; min-height: 380px; max-height: 55vh; display: block; padding: 16px; border: 0; outline: 0; resize: none; overflow-y: auto; background: #fff; color: #1f2937; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.625; }
+.reference-editor-textarea { width: 100%; min-height: 380px; max-height: 55vh; display: block; padding: 16px; border: 0; outline: 0; resize: none; overflow-y: auto; background: #fff; color: #1f2937; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.625; }
 .reference-editor-preview { min-height: 380px; max-height: 55vh; padding: 20px; overflow-y: auto; background: #fff; color: #1f2937; font-size: 12px; line-height: 1.625; user-select: text; }
 .reference-editor-preview :deep(h1),.reference-editor-preview :deep(h2),.reference-editor-preview :deep(h3) { margin: 14px 0 6px; color: #111827; font-weight: 700; line-height: 1.35; }
 .reference-editor-preview :deep(h1){font-size:20px}.reference-editor-preview :deep(h2){font-size:17px}.reference-editor-preview :deep(h3){font-size:15px}
 .reference-editor-preview :deep(p),.reference-editor-preview :deep(ul),.reference-editor-preview :deep(ol),.reference-editor-preview :deep(blockquote),.reference-editor-preview :deep(pre),.reference-editor-preview :deep(table){margin:6px 0}
-.reference-editor-preview :deep(code){font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;background:#f3f4f6;border-radius:4px;padding:1px 4px}.reference-editor-preview :deep(pre){overflow:auto;padding:12px;border-radius:8px;background:#111827;color:#f9fafb}.reference-editor-preview :deep(pre code){padding:0;background:transparent;color:inherit}.reference-editor-preview :deep(table){width:100%;border-collapse:collapse}.reference-editor-preview :deep(th),.reference-editor-preview :deep(td){padding:6px;border:1px solid #e5e7eb;text-align:left}.reference-editor-preview :deep(blockquote){padding-left:10px;border-left:3px solid #d1d5db;color:#6b7280}
+.reference-editor-preview :deep(code){font-family:"JetBrains Mono Variable","JetBrains Mono",ui-monospace,monospace;font-size:11px;background:#f3f4f6;border-radius:4px;padding:1px 4px}.reference-editor-preview :deep(pre){overflow:auto;padding:12px;border-radius:8px;background:#111827;color:#f9fafb}.reference-editor-preview :deep(pre code){padding:0;background:transparent;color:inherit}.reference-editor-preview :deep(table){width:100%;border-collapse:collapse}.reference-editor-preview :deep(th),.reference-editor-preview :deep(td){padding:6px;border:1px solid #e5e7eb;text-align:left}.reference-editor-preview :deep(blockquote){padding-left:10px;border-left:3px solid #d1d5db;color:#6b7280}
 .reference-editor-loading { min-height: 380px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 12px; }
 .reference-editor-loading--page { min-height: 420px; }
 .reference-editor-status { display: inline-flex; align-items: center; gap: 6px; color: #f59e0b; font-size: 12px; line-height: 16px; font-weight: 500; }

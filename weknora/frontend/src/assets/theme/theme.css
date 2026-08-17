@@ -2,9 +2,9 @@
 :root[theme-mode="light"] {
   color-scheme: light;
   --app-font-family:
-    "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+    "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   --app-font-family-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* Musuw rhythm: every spacing decision resolves to an 8px unit.  Controls
      stay compact at 8px corners; cards and work surfaces use 12px. */

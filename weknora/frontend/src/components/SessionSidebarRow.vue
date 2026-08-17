@@ -241,7 +241,7 @@ const confirmDangerAction = () => {
 
 <style>
 .reference-session-backdrop { position: fixed; inset: 0; z-index: 4890; }
-.reference-session-menu { position: fixed; z-index: 4900; width: 176px; padding: 5px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 16px 30px rgb(0 0 0 / .12); font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
+.reference-session-menu { position: fixed; z-index: 4900; width: 176px; padding: 5px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 16px 30px rgb(0 0 0 / .12); font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
 .reference-session-menu.confirm { width: 260px; padding: 12px; }
 .reference-session-menu__item { width: 100%; min-height: 31px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: #374151; display: flex; align-items: center; gap: 8px; text-align: left; font-family: inherit; font-size: 11px; line-height: 16px; font-weight: 500; cursor: pointer; }
 .reference-session-menu__item:hover { background: #f3f4f6; color: #111827; }

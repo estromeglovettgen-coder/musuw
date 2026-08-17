@@ -162,7 +162,7 @@ onBeforeUnmount(removeListeners)
 <style scoped>
 .session-source-filter {
   padding: 2px 0 6px;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .session-source-filter--inline { padding: 0; min-width: 0; max-width: 100%; }
 .session-source-filter__trigger {
@@ -216,7 +216,7 @@ onBeforeUnmount(removeListeners)
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 16px 30px rgb(0 0 0 / .10);
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .session-source-filter__option {
   display: flex;

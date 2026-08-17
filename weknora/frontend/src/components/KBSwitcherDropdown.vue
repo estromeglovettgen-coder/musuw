@@ -75,7 +75,7 @@ const handleSelect = (id: string): void => {
   position: relative;
   display: inline-flex;
   min-width: 0;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-kb-switcher__trigger { display: inline-flex; min-width: 0; }
 .reference-kb-switcher__backdrop {

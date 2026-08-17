@@ -379,7 +379,7 @@ const scrollToItem = (index: number) => {
   background: #fff;
   box-shadow: 0 16px 32px -10px rgb(0 0 0 / .16), 0 4px 10px rgb(0 0 0 / .06);
   color: #1f2937;
-  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .mention-list { flex: 1; min-height: 0; max-height: 388px; overflow-y: auto; padding: 6px; }
 .mention-group-entry, .mention-back-row, .mention-item {
@@ -396,7 +396,7 @@ const scrollToItem = (index: number) => {
   width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 .mention-group-entry__label, .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.mention-group-entry__count, .count, .item-context { flex: 0 0 auto; color: #9ca3af; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10px; }
+.mention-group-entry__count, .count, .item-context { flex: 0 0 auto; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 10px; }
 .mention-group-entry__count { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: #f3f4f6; text-align: center; }
 .mention-group-entry__arrow { flex: 0 0 14px; color: #9ca3af; }
 .mention-back-row { margin-bottom: 4px; border-bottom: 1px solid #f3f4f6; border-radius: 0; color: #6b7280; }
