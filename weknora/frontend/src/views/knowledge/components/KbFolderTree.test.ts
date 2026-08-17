@@ -6,6 +6,7 @@ const tree = readFileSync(new URL('./KbFolderTree.vue', import.meta.url), 'utf8'
 const batchBar = readFileSync(new URL('./DocumentBatchBar.vue', import.meta.url), 'utf8')
 const cardView = readFileSync(new URL('./DocumentCardView.vue', import.meta.url), 'utf8')
 const listView = readFileSync(new URL('./DocumentListView.vue', import.meta.url), 'utf8')
+const folderPicker = readFileSync(new URL('./FolderPickerMenu.vue', import.meta.url), 'utf8')
 
 test('the rename sentinel cannot collide with the root folder path', () => {
   assert.match(tree, /const renamingPath = ref<string \| null>\(null\)/)
@@ -28,12 +29,15 @@ test('the directory shell uses the Lucide family from the visual authority', () 
   assert.doesNotMatch(tree, /<t-popup/)
 })
 
-// Picking a folder is a small, reversible action, so it stays inside the open
-// action popup. The batch bar keeps its existing behavior-only popup.
-test('the folder picker is a popup rather than a modal', () => {
+test('folder picking remains an inline reversible flow without legacy modal or popup UI', () => {
   assert.match(cardView, /folderPickerItemId === item\.id/)
   assert.match(listView, /folderPickerItemId === item\.id/)
-  assert.match(batchBar, /<t-popup[^>]*v-model:visible="folderPickerVisible"/)
+  assert.match(batchBar, /folderPickerVisible/)
+  assert.match(batchBar, /class="reference-batch-folder__menu"/)
+  assert.match(folderPicker, /class="reference-folder-picker"/)
+  assert.match(folderPicker, /ReferenceIcon/)
+  assert.doesNotMatch(batchBar, /<t-popup/)
+  assert.doesNotMatch(folderPicker, /<t-icon/)
   for (const source of [cardView, listView, batchBar]) {
     assert.doesNotMatch(source, /MoveToFolderDialog/)
   }
@@ -42,7 +46,7 @@ test('the folder picker is a popup rather than a modal', () => {
 test('the folder picker is rendered before move-target and normal action menus', () => {
   for (const source of [cardView, listView]) {
     const pickerIdx = source.indexOf('v-if="folderPickerItemId === item.id"')
-    const targetIdx = source.indexOf('moveMenuMode === \'targets\'')
+    const targetIdx = source.indexOf("moveMenuMode === 'targets'")
     const normalIdx = source.indexOf('v-else class="reference-')
     assert.ok(pickerIdx >= 0)
     assert.ok(targetIdx >= 0)
