@@ -32,22 +32,6 @@ installTDesignIconOfflineGuard();
 initTheme();
 initFont();
 
-// Task 1 visual-reference v2 changes the default knowledge workbench back to
-// the reference's expanded 224px directory panel. Reset only once for this
-// visual version so stale local preference from the old layout cannot make the
-// freshly deployed page look structurally different; later user collapses are
-// respected normally.
-try {
-  const layoutVersionKey = "musuw.referenceLayoutVersion";
-  const layoutVersion = "knowledge-v2-2026-08-17";
-  if (localStorage.getItem(layoutVersionKey) !== layoutVersion) {
-    localStorage.setItem("weknora.kbFolderTreeCollapsed", "false");
-    localStorage.setItem(layoutVersionKey, layoutVersion);
-  }
-} catch {
-  // Storage can be unavailable in private/restricted browser contexts.
-}
-
 const app = createApp(App);
 
 // 全局错误处理：捕获未处理的组件错误，防止白屏
