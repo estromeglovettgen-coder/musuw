@@ -698,8 +698,8 @@ onBeforeUnmount(() => {
   <SettingDrawer
     :visible="visible"
     class="manual-editor-reference-drawer"
-    title="在线编辑 Markdown 知识"
-    description="使用 Markdown 编写知识内容，支持实时预览"
+    :title="dialogTitle"
+    :description="$t('manualEditor.description')"
     width="672px"
     :min-width="560"
     :max-width="1280"
@@ -714,7 +714,7 @@ onBeforeUnmount(() => {
     <template #footer-left>
       <div class="reference-editor-status" :class="{ published: form.status === 'publish' }">
         <span class="reference-editor-status__dot" />
-        <span>当前状态: {{ form.status === 'draft' ? '草稿' : '已发布' }}</span>
+        <span>{{ form.status === 'draft' ? $t('manualEditor.status.draftTag') : $t('manualEditor.status.publishedTag') }}</span>
       </div>
     </template>
 
