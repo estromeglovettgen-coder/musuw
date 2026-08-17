@@ -11,19 +11,18 @@ const main = read("../main.ts");
 
 const withoutComments = pixel.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("loads the pixel-authority layer after the broad Musuw skin", () => {
+test("loads the mechanical pixel-authority layer after the broad Musuw skin", () => {
   const base = main.indexOf('import "@/assets/musuw-visual.less"');
   const dropdown = main.indexOf('import "@/assets/dropdown-menu.less"');
   const chatSyntax = main.indexOf('import "@/components/css/chat-hljs-dark.less"');
-  const coreIndex = main.indexOf('import "@/assets/musuw-reference-core.less"');
-  const workbenchIndex = main.indexOf('import "@/assets/musuw-reference-workbench.less"');
-  const headerIndex = main.indexOf('import "@/assets/musuw-reference-header.less"');
+  const mechanical = main.indexOf('import "@/assets/musuw-reference-mechanical.css"');
   assert.ok(base >= 0, "base Musuw presentation layer stays loaded");
-  assert.ok(coreIndex > base, "pixel reference must load after the base presentation layer");
-  assert.ok(coreIndex > dropdown, "pixel reference must win over shared dropdown chrome");
-  assert.ok(coreIndex > chatSyntax, "reference core must load after shared product chrome");
-  assert.ok(workbenchIndex > coreIndex, "workbench reference must load after the core reference layer");
-  assert.ok(headerIndex > workbenchIndex, "knowledge header translation must be the final reference override");
+  assert.ok(mechanical > base, "mechanical pixel reference must load after the base presentation layer");
+  assert.ok(mechanical > dropdown, "mechanical pixel reference must win over shared dropdown chrome");
+  assert.ok(mechanical > chatSyntax, "mechanical pixel reference must load after shared product chrome");
+  assert.equal(main.includes('import "@/assets/musuw-reference-core.less"'), false, "legacy hand-authored reference core is not loaded");
+  assert.equal(main.includes('import "@/assets/musuw-reference-workbench.less"'), false, "legacy hand-authored workbench is not loaded");
+  assert.equal(main.includes('import "@/assets/musuw-reference-header.less"'), false, "legacy hand-authored header patch is not loaded");
 });
 
 test("matches the exported reference shell and conversation geometry", () => {
