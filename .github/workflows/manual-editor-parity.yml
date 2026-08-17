@@ -1,0 +1,52 @@
+name: One-shot manual editor semantic parity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/manual-editor-parity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Restore dynamic and localized editor labels
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('weknora/frontend/src/components/manual-knowledge-editor.vue')
+          s = p.read_text()
+          pairs = [
+            ('    title="在线编辑 Markdown 知识"', '    :title="dialogTitle"'),
+            ('    description="使用 Markdown 编写知识内容，支持实时预览"', '    :description="$t(\'manualEditor.description\')"'),
+            ("        <span>当前状态: {{ form.status === 'draft' ? '草稿' : '已发布' }}</span>", "        <span>{{ form.status === 'draft' ? $t('manualEditor.status.draftTag') : $t('manualEditor.status.publishedTag') }}</span>"),
+          ]
+          for old, new in pairs:
+            if old not in s:
+              raise SystemExit(f'missing anchor: {old}')
+            s = s.replace(old, new, 1)
+          for bad in ['title="在线编辑 Markdown 知识"', 'description="使用 Markdown 编写知识内容，支持实时预览"', '当前状态:']:
+            if bad in s:
+              raise SystemExit(f'stale hardcoded editor label: {bad}')
+          for good in [':title="dialogTitle"', "manualEditor.description", 'manualEditor.status.draftTag', 'manualEditor.status.publishedTag']:
+            if good not in s:
+              raise SystemExit(f'missing restored editor semantic: {good}')
+          p.write_text(s)
+          PY
+      - name: Commit repair
+        shell: bash
+        run: |
+          git config user.name "musuw-business-parity"
+          git config user.email "actions@users.noreply.github.com"
+          git add weknora/frontend/src/components/manual-knowledge-editor.vue
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: restore manual editor localized semantics"
+          git push origin HEAD:main
