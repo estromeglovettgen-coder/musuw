@@ -3,56 +3,78 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
-const core = read("./musuw-reference-core.less");
-const workbench = read("./musuw-reference-workbench.less");
-const header = read("./musuw-reference-header.less");
-const pixel = core + "\n" + workbench + "\n" + header;
 const main = read("../main.ts");
+const manifest = read("./musuw-reference-mechanical.css");
 
-const withoutComments = pixel.replace(/\/\*[\s\S]*?\*\//g, "");
+const importNames = [...manifest.matchAll(/@import\s+"\.\/(musuw-reference-[^"]+\.css)";/g)].map(
+  (match) => match[1],
+);
+const mechanical = importNames.map((name) => read(`./${name}`)).join("\n");
+const withoutComments = mechanical.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("loads the mechanical pixel-authority layer after the broad Musuw skin", () => {
-  const base = main.indexOf('import "@/assets/musuw-visual.less"');
+test("uses only the mechanical reference layer for Task 1 overrides", () => {
   const dropdown = main.indexOf('import "@/assets/dropdown-menu.less"');
   const chatSyntax = main.indexOf('import "@/components/css/chat-hljs-dark.less"');
-  const mechanical = main.indexOf('import "@/assets/musuw-reference-mechanical.css"');
-  assert.ok(base >= 0, "base Musuw presentation layer stays loaded");
-  assert.ok(mechanical > base, "mechanical pixel reference must load after the base presentation layer");
-  assert.ok(mechanical > dropdown, "mechanical pixel reference must win over shared dropdown chrome");
-  assert.ok(mechanical > chatSyntax, "mechanical pixel reference must load after shared product chrome");
-  assert.equal(main.includes('import "@/assets/musuw-reference-core.less"'), false, "legacy hand-authored reference core is not loaded");
-  assert.equal(main.includes('import "@/assets/musuw-reference-workbench.less"'), false, "legacy hand-authored workbench is not loaded");
-  assert.equal(main.includes('import "@/assets/musuw-reference-header.less"'), false, "legacy hand-authored header patch is not loaded");
+  const reference = main.indexOf('import "@/assets/musuw-reference-mechanical.css"');
+
+  assert.equal(
+    main.includes('import "@/assets/musuw-visual.less"'),
+    false,
+    "legacy hand-authored Musuw visual skin must not compete with the copied reference UI",
+  );
+  assert.ok(reference > dropdown, "reference UI must win over shared dropdown chrome");
+  assert.ok(reference > chatSyntax, "reference UI must load after shared chat syntax chrome");
+  assert.equal(main.includes('import "@/assets/musuw-reference-core.less"'), false);
+  assert.equal(main.includes('import "@/assets/musuw-reference-workbench.less"'), false);
+  assert.equal(main.includes('import "@/assets/musuw-reference-header.less"'), false);
+  assert.equal(main.includes('import "@/assets/musuw-reference-knowledge-v2.less"'), false);
+  assert.equal(main.includes('import "@/assets/musuw-reference-knowledge-v3.less"'), false);
+  assert.equal(main.includes('import "@/assets/musuw-reference-knowledge-v4.less"'), false);
 });
 
-test("matches the exported reference shell and conversation geometry", () => {
-  assert.match(pixel, /\.aside_box\s*\{[\s\S]*?min-width:\s*256px;[\s\S]*?width:\s*256px;[\s\S]*?padding:\s*12px;/);
-  assert.match(pixel, /\.aside_box\.aside_box--collapsed\s*\{[\s\S]*?width:\s*56px;/);
-  assert.match(pixel, /\.dialogue-answers\s*\{[\s\S]*?max-width:\s*768px;/);
-  assert.match(pixel, /\.rich-input-container[\s\S]*?border-radius:\s*20px;[\s\S]*?background:\s*#f4f5f7;/);
-  assert.match(pixel, /\.t-textarea__inner[\s\S]*?min-height:\s*44px\s*!important;[\s\S]*?max-height:\s*180px\s*!important;/);
-  assert.match(pixel, /\.user_msg\s*\{[\s\S]*?max-width:\s*85%;[\s\S]*?padding:\s*10px\s+18px;[\s\S]*?border-radius:\s*18px;/);
+test("loads every mechanical reference shard and only a minimal DOM bridge", () => {
+  for (const shard of [
+    "musuw-reference-mechanical-01.css",
+    "musuw-reference-mechanical-02.css",
+    "musuw-reference-mechanical-03.css",
+    "musuw-reference-mechanical-04.css",
+    "musuw-reference-mechanical-05.css",
+    "musuw-reference-mechanical-06.css",
+    "musuw-reference-mechanical-07.css",
+    "musuw-reference-mechanical-08.css",
+    "musuw-reference-mechanical-09a.css",
+    "musuw-reference-mechanical-09b.css",
+    "musuw-reference-mechanical-09c.css",
+    "musuw-reference-mechanical-10a.css",
+    "musuw-reference-mechanical-10b.css",
+    "musuw-reference-mechanical-10c.css",
+    "musuw-reference-mechanical-11a.css",
+    "musuw-reference-mechanical-11b.css",
+    "musuw-reference-mechanical-12.css",
+    "musuw-reference-dom-bridge.css",
+  ]) {
+    assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
+  }
 });
 
-test("matches the exported reference knowledge and settings geometry", () => {
-  assert.match(pixel, /\.kb-card-wrap\s*\{[\s\S]*?gap:\s*18px;/);
-  assert.match(pixel, /@media\s*\(min-width:\s*1024px\)[\s\S]*?\.kb-card-wrap\s*\{[\s\S]*?repeat\(3,/);
-  assert.match(pixel, /\.kb-card\s*\{[\s\S]*?height:\s*136px;[\s\S]*?padding:\s*18px;[\s\S]*?border-radius:\s*12px;/);
-  assert.match(pixel, /\.kb-card\.kb-create-card\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*32px;[\s\S]*?right:\s*32px;/);
-  assert.match(pixel, /\.knowledge-main\s*\{[\s\S]*?gap:\s*12px;[\s\S]*?border:\s*0;/);
-  assert.match(pixel, /\.kb-folder-tree\s*\{[\s\S]*?width:\s*224px;[\s\S]*?border-radius:\s*16px;/);
-  assert.match(pixel, /\.doc-filter-bar\s*\{[\s\S]*?padding:\s*10px\s+10px\s+10px\s+102px;[\s\S]*?border-radius:\s*16px;/);
-  assert.match(pixel, /\.doc-card-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
-  assert.match(pixel, /\.knowledge-card,[\s\S]*?\.folder-card\s*\{[\s\S]*?height:\s*192px;[\s\S]*?border-radius:\s*16px;/);
-  assert.match(header, /document-breadcrumb:has\(\.breadcrumb-tab\)::after[\s\S]*?width:\s*224px;[\s\S]*?height:\s*38px;[\s\S]*?border-radius:\s*12px;/);
-  assert.match(header, /\.breadcrumb-tab\s*\{[\s\S]*?min-height:\s*30px;[\s\S]*?padding:\s*6px\s+14px;[\s\S]*?border-radius:\s*8px;/);
-  assert.match(pixel, /\.settings-modal\s*\{[\s\S]*?max-width:\s*896px;[\s\S]*?height:\s*520px;[\s\S]*?border-radius:\s*24px;/);
-  assert.match(pixel, /\.settings-sidebar\s*\{[\s\S]*?width:\s*224px;[\s\S]*?padding:\s*24px;/);
+test("matches the copied reference shell, conversation and knowledge geometry", () => {
+  assert.match(mechanical, /html #app \.aside_box\{[\s\S]*?width:calc\(var\(--spacing\) \* 64\) !important/);
+  assert.match(mechanical, /html #app \.aside_box\.aside_box--collapsed\{[\s\S]*?width:calc\(var\(--spacing\) \* 14\) !important/);
+  assert.match(mechanical, /html #app \.dialogue-answers\{[\s\S]*?max-width:var\(--container-3xl\) !important/);
+  assert.match(mechanical, /html #app \.chat \.rich-input-container,[\s\S]*?background-color:#f4f5f7 !important/);
+  assert.match(mechanical, /\.rich-input-container \.t-textarea__inner[\s\S]*?min-height:44px !important[\s\S]*?max-height:180px !important/);
+  assert.match(mechanical, /\.kb-folder-tree:not\(\.is-collapsed\)\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/);
+  assert.match(mechanical, /\.doc-card-list\{[\s\S]*?grid-template-columns:repeat\(4,minmax\(0,1fr\)\) !important/);
+  assert.match(mechanical, /\.knowledge-card\{[\s\S]*?height:calc\(var\(--spacing\) \* 48\) !important/);
+  assert.match(mechanical, /body \.settings-overlay \.settings-modal\{[\s\S]*?height:520px !important[\s\S]*?max-width:var\(--container-4xl\) !important/);
+  assert.match(mechanical, /body \.settings-overlay \.settings-sidebar\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/);
 });
 
-test("does not restyle the two task-excluded renderers", () => {
+test("preserves project conditional rendering and does not restyle task-excluded renderers", () => {
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.agent-stream-display(?=[\s.{:#>+~]|$)/m);
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.streaming-steps-container(?=[\s.{:#>+~]|$)/m);
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.tree-container(?=[\s.{:#>+~]|$)/m);
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.wiki-graph(?:-canvas|-legend|-search-container)?(?=[\s.{:#>+~]|$)/m);
+  assert.equal(mechanical.includes("showFolderTree"), false, "presentation CSS must not own folder visibility state");
+  assert.equal(mechanical.includes("localStorage"), false, "presentation CSS must not mutate persisted product state");
 });
