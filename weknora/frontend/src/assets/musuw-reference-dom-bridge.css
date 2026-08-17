@@ -7,4 +7,7 @@ html #app .knowledge-layout .document-breadcrumb > * { position: relative; z-ind
 html #app .knowledge-layout .doc-card-area { position: relative !important; }
 html #app .knowledge-layout .doc-folder-path { position: absolute !important; top: 10px !important; left: 10px !important; z-index: 4 !important; width: max-content !important; max-width: 112px !important; height: 30px !important; margin: 0 !important; overflow: hidden !important; }
 html #app .knowledge-layout .doc-filter-bar { padding-left: 132px !important; }
+/* QAPanel uses a parent `.group` class; the Vue answer component keeps the same native handlers but not that structural utility class. */
+html #app .chat .bot_msg:hover > div > .answer-toolbar { opacity: 1 !important; }
+html #app .chat .bot_msg > div > .answer-toolbar .t-button { min-width: 0 !important; width: auto !important; height: auto !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
 @media (max-width: 900px) { html #app .knowledge-layout .doc-folder-path { position: static !important; max-width: none !important; height: auto !important; } html #app .knowledge-layout .doc-filter-bar { padding-left: 10px !important; } }
