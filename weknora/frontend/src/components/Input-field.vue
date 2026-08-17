@@ -1564,6 +1564,9 @@ const onInput = (val: string | InputEvent) => {
     return;
   }
 
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+
   const cursor = textarea.selectionStart;
   const textBeforeCursor = inputVal.slice(0, cursor);
 
@@ -2649,31 +2652,31 @@ defineExpose({
 </script>
 <template>
   <div
-    class="answers-input"
+    class="answers-input reference-composer-host"
     :class="{ 'is-embedded': embeddedMode }"
     @drop="onDrop"
     @dragover="onDragOver"
   >
-    <!-- Hidden file input for image upload -->
     <input
       ref="imageInputRef"
       type="file"
       accept="image/jpeg,image/png,image/gif,image/webp"
       multiple
-      style="display: none"
+      class="reference-hidden-input"
       @change="handleImageSelect"
     />
-    <!-- 富文本输入框容器 -->
-    <div class="rich-input-container" data-guide="chat-input">
-      <!-- 图片预览区域 -->
-      <div v-if="uploadedImages.length > 0" class="image-preview-bar">
-        <div v-for="(img, idx) in uploadedImages" :key="idx" class="image-preview-item">
-          <img :src="img.preview" class="image-preview-thumb" />
-          <span class="image-preview-remove" @click="removeImage(idx)">×</span>
+
+    <div class="rich-input-container reference-composer" data-guide="chat-input">
+      <div v-if="uploadedImages.length > 0" class="reference-composer-chips">
+        <div v-for="(img, idx) in uploadedImages" :key="idx" class="reference-composer-chip reference-composer-chip--image">
+          <img :src="img.preview" alt="" />
+          <span class="reference-composer-chip__name">{{ img.file.name }}</span>
+          <button type="button" :aria-label="$t('common.remove')" @click="removeImage(idx)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
       </div>
 
-      <!-- 附件列表区域 (由 AttachmentUpload 组件渲染) -->
       <AttachmentUpload
         ref="attachmentUploadRef"
         :max-files="5"
@@ -2683,48 +2686,27 @@ defineExpose({
         @update:files="uploadedAttachments = $event"
       />
 
-      <!-- 选中的知识库和文件标签（显示在输入框内顶部） -->
-      <div v-if="allSelectedItems.length > 0" class="selected-tags-inline">
-        <span
-          v-for="item in allSelectedItems"
-          :key="`${item.type}:${item.id}`"
-          class="mention-chip"
-          :class="[getMentionChipClass(item), { 'mention-chip--agent': item.isAgentConfigured }]"
-        >
-          <span class="mention-chip__icon-wrap" :class="{ 'has-org': item.org_name }">
-            <span class="mention-chip__icon">
-              <t-icon
-                v-if="item.type === 'kb'"
-                :name="item.kbType === 'faq' ? 'chat-bubble-help' : 'folder'"
-              />
-              <t-icon v-else :name="getMentionIcon(item)" />
-            </span>
-            <span v-if="item.org_name" class="mention-chip__org-badge">
-              <img
-                :src="getOrganizationBadgeSrc(item.type)"
-                class="mention-chip__org-img"
-                alt=""
-                aria-hidden="true"
-              />
-            </span>
+      <div v-if="allSelectedItems.length > 0" class="reference-composer-chips reference-composer-mentions">
+        <span v-for="item in allSelectedItems" :key="`${item.type}:${item.id}`" class="reference-composer-chip reference-mention-chip">
+          <span class="reference-mention-icon-wrap" :class="{ 'has-org': item.org_name }">
+            <svg v-if="item.type === 'kb'" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span v-if="item.org_name" class="reference-mention-org"><img :src="getOrganizationBadgeSrc(item.type)" alt="" aria-hidden="true" /></span>
           </span>
-          <span class="mention-chip__name" :title="item.name">{{ item.name }}</span>
-          <span
-            class="mention-chip__remove"
-            @click.stop="removeSelectedItem(item)"
-            :aria-label="$t('common.remove')"
-            >×</span
-          >
+          <span class="reference-composer-chip__name" :title="item.name">{{ item.name }}</span>
+          <button type="button" :aria-label="$t('common.remove')" @click.stop="removeSelectedItem(item)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </span>
       </div>
 
-      <!-- 实际输入框 -->
-      <t-textarea
+      <textarea
         ref="textareaRef"
         v-model="query"
         :placeholder="inputPlaceholder"
         name="description"
-        :autosize="true"
+        rows="1"
+        class="reference-composer-textarea"
         @keydown="onKeydown"
         @input="onInput"
         @compositionstart="onCompositionStart"
@@ -2732,288 +2714,130 @@ defineExpose({
         @paste="onPaste"
       />
 
-      <!-- 控制栏（放在 rich-input-container 内，相对输入框边框定位） -->
-      <div class="control-bar" :class="{ 'is-embedded': embeddedMode }">
-        <!-- 左侧控制按钮 -->
-        <div class="control-left" v-if="!embeddedMode">
-          <!-- 图片上传按钮（智能体未启用时不显示） -->
-          <t-tooltip
+      <div class="reference-composer-toolbar" :class="{ 'is-embedded': embeddedMode }">
+        <div v-if="!embeddedMode" class="reference-composer-left">
+          <button
             v-if="showImageUploadButton"
-            placement="top"
-            theme="light"
-            :popupProps="{ overlayClassName: 'input-field-tooltip' }"
+            type="button"
+            class="reference-icon-action"
+            :class="{ active: uploadedImages.length > 0 }"
+            :title="$t('chat.imageUploadTooltip')"
+            @click.stop="triggerImageUpload()"
           >
-            <template #content>
-              <span>{{ $t("chat.imageUploadTooltip") }}</span>
-            </template>
-            <div
-              class="control-btn image-upload-btn"
-              :class="{
-                active: uploadedImages.length > 0,
-              }"
-              @click.stop="triggerImageUpload()"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 1024 1024"
-                fill="currentColor"
-                class="control-icon"
-              >
-                <path
-                  d="M896 128H128c-35.3 0-64 28.7-64 64v640c0 35.3 28.7 64 64 64h768c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zM128 832V192h768l0.1 640H128z"
-                />
-                <path d="M352 448a96 96 0 1 0 0-192 96 96 0 0 0 0 192z" />
-                <path d="M128 768l224-288 160 160 192-256L896 640v128H128z" />
-              </svg>
-              <span v-if="uploadedImages.length > 0" class="image-count">{{
-                uploadedImages.length
-              }}</span>
-            </div>
-          </t-tooltip>
-
-          <!-- 附件上传按钮 -->
-          <t-tooltip
-            placement="top"
-            theme="light"
-            :popupProps="{ overlayClassName: 'input-field-tooltip' }"
-          >
-            <template #content>
-              <span>{{
-                uploadedAttachments.length > 0
-                  ? $t("chat.attachmentWithCount", {
-                      count: uploadedAttachments.length,
-                    })
-                  : $t("chat.attachmentUploadTooltip")
-              }}</span>
-            </template>
-            <div
-              class="control-btn attachment-upload-btn"
-              :class="{ active: uploadedAttachments.length > 0 }"
-              @click.stop="attachmentUploadRef?.triggerFileSelect()"
-            >
-              <!-- 回形针图标 -->
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="control-icon"
-              >
-                <path
-                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
-                />
-              </svg>
-              <span v-if="uploadedAttachments.length > 0" class="attachment-count">{{
-                uploadedAttachments.length
-              }}</span>
-            </div>
-          </t-tooltip>
-
-          <!-- @ 知识库/文件选择按钮 -->
-          <t-tooltip
-            placement="top"
-            theme="light"
-            :popupProps="{ overlayClassName: 'input-field-tooltip' }"
-          >
-            <template #content>
-              <div
-                v-if="isMentionDisabled && isKnowledgeBaseDisabledByAgent"
-                class="tooltip-with-link"
-              >
-                <span>{{ $t("input.kbDisabledByAgent") }}</span>
-                <a href="#" @click.prevent="handleGoToAgentSettings('knowledge')">{{
-                  $t("input.goToAgentSettings")
-                }}</a>
-              </div>
-              <span v-else>{{
-                allSelectedItems.length > 0
-                  ? $t("input.knowledgeBaseWithCount", {
-                      count: allSelectedItems.length,
-                    })
-                  : $t("input.knowledgeBase")
-              }}</span>
-            </template>
-            <div
-              ref="atButtonRef"
-              class="control-btn kb-btn"
-              data-guide="chat-kb-mention"
-              :class="{
-                active: allSelectedItems.length > 0,
-                disabled: isMentionDisabled,
-              }"
-              @click.stop
-              @mousedown.prevent="triggerMention"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 20 20"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                class="control-icon at-icon"
-              >
-                <circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.8" />
-                <path
-                  d="M13.5 10V11.5C13.5 12.163 13.7634 12.7989 14.2322 13.2678C14.7011 13.7366 15.337 14 16 14C16.663 14 17.2989 13.7366 17.7678 13.2678C18.2366 12.7989 18.5 12.163 18.5 11.5V10C18.5 7.74566 17.6045 5.58365 16.0104 3.98959C14.4163 2.39553 12.2543 1.5 10 1.5C7.74566 1.5 5.58365 2.39553 3.98959 3.98959C2.39553 5.58365 1.5 7.74566 1.5 10C1.5 12.2543 2.39553 14.4163 3.98959 16.0104C5.58365 17.6045 7.74566 18.5 10 18.5H12"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              <span v-if="allSelectedItems.length > 0" class="kb-count">{{
-                allSelectedItems.length
-              }}</span>
-            </div>
-          </t-tooltip>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+            <span v-if="uploadedImages.length" class="reference-action-count">{{ uploadedImages.length }}</span>
+          </button>
 
           <button
-            ref="agentModeButtonRef"
             type="button"
-            class="agent-mode-trigger"
-            :aria-expanded="showAgentModeSelector"
-            @click.stop="toggleAgentModeSelector"
+            class="reference-icon-action"
+            :class="{ active: uploadedAttachments.length > 0 }"
+            :title="uploadedAttachments.length > 0 ? $t('chat.attachmentWithCount', { count: uploadedAttachments.length }) : $t('chat.attachmentUploadTooltip')"
+            @click.stop="attachmentUploadRef?.triggerFileSelect()"
           >
-            <span>{{ isProMode ? "V4 Pro" : "V4 Flash" }}</span>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="currentColor"
-              :class="{ rotate: showAgentModeSelector }"
-            >
-              <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
-            </svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            <span v-if="uploadedAttachments.length" class="reference-action-count">{{ uploadedAttachments.length }}</span>
           </button>
-          <label v-if="isProMode" class="thinking-toggle" @click.stop>
-            <span>{{ $t("agent.editor.thinking") }}</span>
-            <t-switch v-model="thinkingEnabled" size="small" />
+
+          <button
+            ref="atButtonRef"
+            type="button"
+            class="reference-icon-action"
+            :class="{ active: allSelectedItems.length > 0, disabled: isMentionDisabled }"
+            data-guide="chat-kb-mention"
+            :title="$t('input.knowledgeBase')"
+            :disabled="isMentionDisabled"
+            @click.stop
+            @mousedown.prevent="triggerMention"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1"/></svg>
+            <span v-if="allSelectedItems.length" class="reference-action-count">{{ allSelectedItems.length }}</span>
+          </button>
+
+          <div class="reference-mode-anchor">
+            <button
+              ref="agentModeButtonRef"
+              type="button"
+              class="reference-mode-pill"
+              :aria-expanded="showAgentModeSelector"
+              @click.stop="toggleAgentModeSelector"
+            >
+              <span>{{ isProMode ? 'V4 Pro' : 'V4 Flash' }}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" :class="{ rotate: showAgentModeSelector }"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+
+          <label v-if="isProMode" class="reference-thinking-toggle" @click.stop>
+            <span>{{ $t('agent.editor.thinking') }}</span>
+            <input v-model="thinkingEnabled" type="checkbox" />
+            <span class="reference-thinking-switch"><i /></span>
           </label>
-          <div class="model-display">
-            <div ref="modelButtonRef" class="model-selector-trigger" @click.stop="toggleModelSelector">
-              <span class="model-selector-name">{{ selectedModelDisplayName }}</span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="currentColor"
-                class="model-dropdown-arrow"
-                :class="{ rotate: showModelSelector }"
-              >
-                <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
-              </svg>
-            </div>
+
+          <div class="reference-model-anchor">
+            <button ref="modelButtonRef" type="button" class="reference-model-pill" @click.stop="toggleModelSelector">
+              <span>{{ selectedModelDisplayName }}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" :class="{ rotate: showModelSelector }"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
           </div>
         </div>
 
-        <Teleport to="body">
-          <div
-            v-if="showAgentModeSelector"
-            class="agent-mode-selector-overlay"
-            @click="closeAgentModeSelector"
-          >
-            <div class="agent-mode-selector-dropdown" :style="agentModeDropdownStyle" @click.stop>
-              <button
-                type="button"
-                class="agent-mode-option"
-                :class="{ selected: !isProMode }"
-                @click="selectAgentMode('quick-answer')"
-              >
-                <span class="agent-mode-option-main">
-                  <span class="agent-mode-option-name">V4 Flash</span>
-                  <span class="agent-mode-option-desc">快速模式</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                class="agent-mode-option"
-                :class="{ selected: isProMode }"
-                @click="selectAgentMode('smart-reasoning')"
-              >
-                <span class="agent-mode-option-main">
-                  <span class="agent-mode-option-name">V4 Pro</span>
-                  <span class="agent-mode-option-desc">全功能模式</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </Teleport>
-
-        <Teleport to="body">
-          <div
-            v-if="showModelSelector"
-            class="model-selector-overlay"
-            @click="closeModelSelector"
-          >
-            <div class="model-selector-dropdown" :style="modelDropdownStyle" @click.stop>
-              <div class="model-selector-header">
-                <span>{{ $t("conversationSettings.models.chatGroupLabel") }}</span>
-                <button
-                  class="model-selector-add"
-                  type="button"
-                  @click="handleModelChange('__add_model__')"
-                >
-                  <span class="add-icon">+</span>
-                  <span class="add-text">{{ $t("input.addModel") }}</span>
-                </button>
-              </div>
-              <div class="model-selector-content">
-                <div
-                  v-for="model in availableModels"
-                  :key="model.id"
-                  class="model-option"
-                  :class="{ selected: model.id === selectedModelId }"
-                  @click="handleModelChange(model.id || '')"
-                >
-                  <div class="model-option-left">
-                    <div class="model-option-icon">
-                      <t-icon name="chat" size="14px" />
-                    </div>
-                    <div class="model-option-name-wrap">
-                      <span class="model-option-name">{{ modelDisplayName(model) }}</span>
-                      <span v-if="model.display_name" class="model-option-raw-name">{{ model.name }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="availableModels.length === 0" class="model-option empty">
-                  {{ $t("input.noModel") }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </Teleport>
-
-        <!-- 右侧控制按钮组 -->
-        <div class="control-right">
-          <!-- 停止按钮（仅在回复中时显示） -->
-          <t-tooltip v-if="isReplying" :content="$t('input.stopGeneration')" placement="top">
-            <div @click="handleStop" class="control-btn stop-btn">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <rect x="5" y="5" width="6" height="6" rx="1" />
-              </svg>
-            </div>
-          </t-tooltip>
-
-          <!-- 发送按钮 -->
-          <div
-            v-if="!isReplying"
-            @click="createSession(query)"
-            class="control-btn send-btn"
+        <div class="reference-composer-right">
+          <button v-if="isReplying" type="button" class="reference-send-button reference-stop-button" :title="$t('input.stopGeneration')" @click="handleStop">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+          </button>
+          <button
+            v-else
+            type="button"
+            class="reference-send-button"
             data-guide="chat-send"
-            :class="{ disabled: !query.length }"
+            :disabled="!query.trim() && uploadedImages.length === 0 && uploadedAttachments.length === 0"
+            :title="$t('input.send')"
+            @click="createSession(query)"
           >
-            <img src="../assets/img/sending-aircraft.svg" :alt="$t('input.send')" />
-          </div>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Mention Selector -->
+    <Teleport to="body">
+      <div v-if="showAgentModeSelector" class="reference-popover-overlay" @click="closeAgentModeSelector">
+        <div class="reference-mode-menu" :style="agentModeDropdownStyle" @click.stop>
+          <button type="button" :class="{ selected: !isProMode }" @click="selectAgentMode('quick-answer')">
+            <strong>V4 Flash</strong><span>快速模式</span>
+          </button>
+          <button type="button" :class="{ selected: isProMode }" @click="selectAgentMode('smart-reasoning')">
+            <strong>V4 Pro</strong><span>全功能模式</span>
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showModelSelector" class="reference-popover-overlay" @click="closeModelSelector">
+        <div class="reference-model-menu" :style="modelDropdownStyle" @click.stop>
+          <div class="reference-model-menu__header">
+            <span>{{ $t('conversationSettings.models.chatGroupLabel') }}</span>
+            <button type="button" @click="handleModelChange('__add_model__')">+ {{ $t('input.addModel') }}</button>
+          </div>
+          <div class="reference-model-menu__list">
+            <button
+              v-for="model in availableModels"
+              :key="model.id"
+              type="button"
+              :class="{ selected: model.id === selectedModelId }"
+              @click="handleModelChange(model.id || '')"
+            >
+              <span class="reference-model-menu__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              <span class="reference-model-menu__copy"><strong>{{ modelDisplayName(model) }}</strong><small v-if="model.display_name">{{ model.name }}</small></span>
+              <svg v-if="model.id === selectedModelId" class="reference-model-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+            </button>
+            <div v-if="availableModels.length === 0" class="reference-model-menu__empty">{{ $t('input.noModel') }}</div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <Teleport to="body">
       <MentionSelector
         ref="mentionSelectorRef"
@@ -3031,7 +2855,6 @@ defineExpose({
       />
     </Teleport>
 
-    <!-- 知识库选择下拉（使用 Teleport 传送到 body，避免父容器定位影响） -->
     <Teleport to="body">
       <KnowledgeBaseSelector
         v-model:visible="showKbSelector"
@@ -3041,1196 +2864,90 @@ defineExpose({
     </Teleport>
   </div>
 </template>
-<style scoped lang="less">
-@import "./css/chat-resource-chips.less";
 
-.answers-input {
+<style scoped>
+.reference-composer-host {
   position: absolute;
   z-index: 99;
   bottom: 60px;
   left: 50%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
   transform: translateX(-50%);
-  width: 100%;
-  display: flex;
-  justify-content: center;
-
-  &.is-embedded {
-    position: relative;
-    bottom: auto;
-    left: auto;
-    transform: none;
-    z-index: auto;
-
-    .rich-input-container {
-      max-width: 100%;
-    }
-  }
-}
-
-/* 富文本输入框容器 */
-.rich-input-container {
-  position: relative;
-  width: 100%;
-  max-width: 640px;
-  background: var(--td-bg-color-container, #fff);
-  border-radius: 12px;
-  border: 1px solid var(--td-component-stroke, #dcdcdc);
-  box-shadow:
-    0 1px 2px rgba(38, 38, 38, 0.045),
-    0 8px 20px -12px rgba(38, 38, 38, 0.12);
-
-  &:focus-within {
-    border-color: var(--td-brand-color, #0b57d0);
-    box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--td-brand-color, #0b57d0) 12%, transparent),
-      0 1px 2px rgba(38, 38, 38, 0.045);
-  }
-}
-
-/* 选中的知识库/文件标签（mention list 已选项） */
-.selected-tags-inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 12px 6px;
-  border-bottom: 1px solid var(--td-component-stroke, #dcdcdc);
-  background: var(--td-bg-color-secondarycontainer, #f5f6f8);
-  border-radius: 11px 11px 0 0;
-  /* 与 .rich-input-container 内缘上边圆角一致（12px - 1px 边框） */
-}
-
-.mention-chip {
-  .chat-resource-chip-surface();
-
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 26px;
-  padding: 3px 7px 3px 6px;
-  border-radius: var(--musuw-radius-control, 8px);
+  padding: 0 16px;
   box-sizing: border-box;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: default;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-  line-height: 18px;
-
-  &:hover {
-    .chat-resource-chip-hover();
-  }
+  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
-
-.mention-chip__icon-wrap {
+.reference-composer-host.is-embedded { position: relative; inset: auto; z-index: auto; padding: 0; transform: none; }
+.reference-hidden-input { display: none; }
+.reference-composer {
   position: relative;
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  flex: 0 1 auto;
-  min-width: 0;
-  align-items: center;
-  justify-content: center;
-}
-
-.mention-chip__icon {
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: inherit;
-}
-
-.mention-chip__org-badge {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--td-bg-color-secondarycontainer, #f0f2f5);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.mention-chip__org-img {
-  width: 5px;
-  height: 5px;
-  object-fit: contain;
-}
-
-.mention-chip__name {
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: currentColor;
-}
-
-.mention-chip__remove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  margin-left: 1px;
-  border-radius: 50%;
-  font-size: 14px;
-  line-height: 1;
-  font-weight: 400;
-  cursor: pointer;
-  opacity: 0.5;
-  transition:
-    opacity 0.15s,
-    background 0.15s,
-    color 0.15s;
-  color: currentColor;
-  flex-shrink: 0;
-}
-
-.mention-chip:hover .mention-chip__remove {
-  opacity: 0.85;
-}
-
-.mention-chip__remove:hover {
-  opacity: 1;
-  background: var(--td-bg-color-component);
-  color: var(--td-text-color-primary, #1f2937);
-}
-
-/* 标签表面保持中性，仅用图标颜色表达资源类型。 */
-.mention-chip--kb {
-  color: var(--td-text-color-primary);
-}
-
-.mention-chip--kb .mention-chip__icon-wrap {
-  color: var(--td-brand-color, #0b57d0);
-}
-
-.mention-chip--faq {
-  color: var(--td-text-color-primary);
-}
-
-.mention-chip--faq .mention-chip__icon-wrap {
-  color: var(--weknora-faq-color, #0052d9);
-}
-
-.mention-chip--file {
-  color: var(--td-text-color-primary);
-}
-
-.mention-chip--file .mention-chip__icon-wrap {
-  color: var(--td-text-color-secondary, #6b7280);
-}
-
-.mention-chip--tag,
-.mention-chip--mcp,
-.mention-chip--tool {
-  color: var(--td-text-color-primary);
-}
-
-.mention-chip--tag .mention-chip__icon-wrap {
-  color: var(--td-text-color-secondary);
-}
-
-.mention-chip--mcp .mention-chip__icon-wrap {
-  color: var(--td-text-color-secondary);
-}
-
-.mention-chip--tool .mention-chip__icon-wrap {
-  color: var(--td-text-color-secondary);
-}
-
-/* 智能体预配置：虚线边框区分 */
-.mention-chip--agent {
-  border-style: dashed;
-  border-color: var(--td-component-border);
-}
-
-:deep(.t-textarea__inner) {
   width: 100%;
-  max-height: 208px !important;
-  min-height: 112px !important;
-  resize: none;
-  color: var(--td-text-color-primary, #000000e6);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 23px;
-  font-family: var(--app-font-family);
-  padding: 14px 16px 56px 16px;
-  border-radius: 0 0 12px 12px;
-  border: none;
+  max-width: 768px;
+  padding: 16px;
   box-sizing: border-box;
-  background: transparent;
-  box-shadow: none;
-
-  &:focus {
-    border: none;
-    box-shadow: none;
-  }
-
-  &::placeholder {
-    color: var(--td-text-color-placeholder, #00000066);
-    font-family: var(--app-font-family);
-    font-size: 15px;
-    font-weight: 400;
-    line-height: 23px;
-  }
-}
-
-/* 当没有选中标签时，textarea 样式 */
-.rich-input-container:not(:has(.selected-tags-inline)) :deep(.t-textarea__inner) {
-  border-radius: 12px;
-  padding-top: 14px;
-}
-
-/* 控制栏 */
-.control-bar {
-  position: absolute;
-  bottom: 12px;
-  left: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  max-height: 56px;
-  z-index: 10;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0) 0%,
-    var(--td-bg-color-container, #fff) 40%,
-    var(--td-bg-color-container, #fff) 100%
-  );
-  pointer-events: auto;
-  padding-top: 8px;
-
-  &.is-embedded {
-    justify-content: flex-end;
-  }
-}
-
-.control-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.control-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 10px;
-  min-height: 28px;
-  border-radius: var(--musuw-radius-control, 8px);
-  color: var(--td-text-color-secondary, #666);
-  cursor: pointer;
-  transition:
-    background 0.12s,
-    color 0.12s;
-  user-select: none;
-  flex-shrink: 0;
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #e6e6e6);
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer, #f5f5f5);
-    }
-  }
-}
-
-.agent-mode-btn {
-  height: 28px;
-  padding: 0 10px;
-  min-width: auto;
-  font-weight: 500;
-  position: relative;
-  border: 0.5px solid var(--td-component-border, #e7e7e7);
-}
-
-.agent-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
-
-.agent-btn-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary, #666);
-}
-
-.agent-mode-text {
-  font-size: 13px;
-  color: var(--td-text-color-secondary, #666);
-  font-weight: 500;
-  white-space: nowrap;
-  margin: 0 4px;
-}
-
-.control-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.kb-btn {
-  height: 28px;
-  width: 30px;
-  padding: 0;
-  min-width: 30px;
-  position: relative;
-
-  &.active {
-    background: var(--td-bg-color-secondarycontainer);
-    color: var(--td-brand-color);
-    box-shadow: inset 0 0 0 1px var(--td-component-stroke);
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer-hover);
-    }
-  }
-
-  &.agent-controlled {
-    cursor: not-allowed;
-    opacity: 0.85;
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer, #f5f5f5);
-    }
-
-    &.active:hover {
-      background: var(--td-bg-color-secondarycontainer);
-    }
-  }
-}
-
-.kb-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  background: var(--td-brand-color);
-  color: var(--td-text-color-anti, #fff);
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 15px;
-  border: 2px solid var(--td-bg-color-container);
-  border-radius: var(--td-radius-round, 999px);
-  box-sizing: content-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.kb-btn-text {
-  font-size: 13px;
-  color: var(--td-text-color-secondary, #666);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.kb-btn.active .kb-btn-text {
-  color: var(--td-brand-color);
-}
-
-/* Image upload */
-.image-upload-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  min-width: auto;
-  border-radius: var(--musuw-radius-control, 8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  color: var(--td-text-color-secondary, #666);
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #f0f0f0);
-    color: var(--td-text-color-primary, #333);
-  }
-
-  &.active {
-    background: rgb(11 87 208 / 8%);
-    color: #0b57d0;
-  }
-
-  .image-count {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    background: #0b57d0;
-    color: #fff;
-    font-size: 10px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-  }
-}
-
-/* Attachment upload */
-.attachment-upload-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  min-width: auto;
-  border-radius: var(--musuw-radius-control, 8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  color: var(--td-text-color-secondary, #666);
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #f0f0f0);
-    color: var(--td-text-color-primary, #333);
-  }
-
-  &.active {
-    background: rgb(11 87 208 / 8%);
-    color: #0b57d0;
-  }
-
-  .attachment-count {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    background: #0b57d0;
-    color: #fff;
-    font-size: 10px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-  }
-}
-
-.image-preview-bar {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px 4px;
-  flex-wrap: wrap;
-}
-
-.image-preview-item {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--td-border-level-1-color, #e7e7e7);
-
-  .image-preview-thumb {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .image-preview-remove {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    background: rgba(0, 0, 0, 0.5);
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    cursor: pointer;
-    line-height: 1;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.7);
-    }
-  }
-}
-
-.websearch-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  min-width: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-
-  &.active {
-    background: rgb(11 87 208 / 8%);
-
-    .websearch-icon {
-      color: var(--td-brand-color);
-    }
-
-    &:hover {
-      background: rgb(11 87 208 / 12%);
-    }
-  }
-
-  &:not(.active) {
-    .websearch-icon {
-      color: var(--td-text-color-secondary, #666);
-    }
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer-hover, #f0f0f0);
-
-      .websearch-icon {
-        color: var(--td-text-color-primary, #333);
-      }
-    }
-  }
-
-  &.agent-controlled {
-    cursor: not-allowed;
-    opacity: 0.85;
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer, #f5f5f5);
-    }
-
-    &.active:hover {
-      background: rgb(11 87 208 / 8%);
-    }
-  }
-}
-
-:global(.input-field-tooltip) {
-  .t-popup__content {
-    box-shadow: var(--td-shadow-2);
-    border: 0.5px solid var(--td-component-border, #e7e7e7);
-  }
-}
-
-:global(.tooltip-with-link) {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 220px;
-  font-size: 12px;
-  color: var(--td-text-color-primary, #333);
-}
-
-:global(.tooltip-with-link a) {
-  color: var(--td-brand-color);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-:global(.tooltip-with-link a:hover) {
-  text-decoration: underline;
-}
-
-.websearch-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.dropdown-arrow {
-  width: 10px;
-  height: 10px;
-  margin-left: 2px;
-  transition: transform 0.12s;
-
-  &.rotate {
-    transform: rotate(180deg);
-  }
-}
-
-.control-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.stop-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: rgb(11 87 208 / 6%);
-  color: var(--td-brand-color);
-  border: 1px solid rgb(11 87 208 / 17%);
-  border-radius: var(--musuw-radius-control, 8px);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: rgb(11 87 208 / 10%);
-    border-color: var(--td-brand-color);
-  }
-
-  &:active {
-    background: rgb(11 87 208 / 12%);
-  }
-
-  svg {
-    display: block;
-  }
-
-  &::before {
-    content: none;
-  }
-}
-
-.send-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: var(--musuw-radius-control, 8px);
-  background-color: var(--musuw-accent, var(--td-brand-color));
-
-  &:hover:not(.disabled) {
-    background-color: var(--musuw-accent-hover, var(--td-brand-color-active));
-  }
-
-  &.disabled {
-    background-color: var(--td-bg-color-component-disabled, #f5f6f8);
-    color: var(--td-text-color-disabled);
-  }
-
-  img {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-/* 模型显示样式 */
-.model-display {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  flex-shrink: 0;
-
-  &.agent-controlled {
-    .model-selector-trigger {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-  }
-}
-
-.thinking-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.model-selector-trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  min-width: 100px;
-  height: 22px;
-  border-radius: 6px;
-  border: 0.5px solid var(--td-component-border, #e7e7e7);
-  transition:
-    background 0.12s,
-    border-color 0.12s;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #e6e6e6);
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer, #f5f5f5);
-    }
-  }
-}
-
-.model-selector-name {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-text-color-secondary, #666);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.model-dropdown-arrow {
-  width: 10px;
-  height: 10px;
-  color: var(--td-text-color-placeholder, #999);
-  flex-shrink: 0;
-  transition: transform 0.12s;
-
-  &.rotate {
-    transform: rotate(180deg);
-  }
-}
-
-.model-selector-trigger.disabled .model-dropdown-arrow {
-  color: var(--td-text-color-placeholder, #999);
-}
-
-.model-selector-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: transparent;
-  touch-action: none;
-}
-
-.model-selector-dropdown {
-  position: fixed !important;
-  z-index: 10000;
-  background: var(--td-bg-color-container);
-  border: 0.5px solid var(--td-component-border);
-  border-radius: 10px;
-  box-shadow: var(--td-shadow-2);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: none !important;
-  transform-origin: top left;
-  animation: modelSelectorFadeIn 0.15s ease-out;
-}
-
-@keyframes modelSelectorFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.model-selector-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 0.5px solid var(--td-component-stroke);
-  background: var(--td-bg-color-container);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-text-color-secondary);
-}
-
-.model-selector-content {
-  flex: 1;
-  min-height: 0;
-  max-height: 260px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding: 6px 8px;
-}
-
-.model-selector-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 0.5px solid transparent;
-  background: transparent;
-  color: var(--td-brand-color);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.12s;
-
-  .add-icon {
-    font-size: 14px;
-    line-height: 1;
-    font-weight: 400;
-  }
-
-  &:hover {
-    color: var(--td-brand-color-hover);
-    background: var(--td-bg-color-secondarycontainer);
-  }
-}
-
-.model-option {
-  display: flex;
-  align-items: center;
-  padding: 6px 8px;
-  cursor: pointer;
-  transition: background 0.12s;
-  border-radius: 6px;
-  margin-bottom: 4px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &:hover,
-  &.selected {
-    background: var(--td-bg-color-secondarycontainer);
-  }
-
-  &.empty {
-    color: var(--td-text-color-placeholder);
-    cursor: default;
-    text-align: center;
-    padding: 20px 8px;
-
-    &:hover {
-      background: transparent;
-    }
-  }
-}
-
-.model-option-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-}
-
-.model-option-icon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-}
-
-.model-option-name-wrap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
-}
-
-.model-option-name {
-  font-size: 12px;
-  color: var(--td-text-color-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
-}
-
-.model-option-raw-name {
-  font-size: 11px;
-  color: var(--td-text-color-placeholder);
-  flex-shrink: 0;
-}
-
-.agent-mode-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 100px;
-  height: 22px;
-  padding: 2px 8px;
-  border: 0.5px solid var(--td-component-border, #e7e7e7);
-  border-radius: var(--musuw-radius-control, 8px);
-  background: transparent;
-  color: var(--td-text-color-secondary, #666);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #e6e6e6);
-  }
-
-  svg {
-    width: 10px;
-    height: 10px;
-    color: var(--td-text-color-placeholder, #999);
-    transition: transform 0.12s;
-
-    &.rotate {
-      transform: rotate(180deg);
-    }
-  }
-}
-
-/* Agent 模式选择下拉菜单 */
-.agent-mode-selector-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  background: transparent;
-  touch-action: none;
-}
-
-.agent-mode-selector-dropdown {
-  position: fixed !important;
-  z-index: 9999;
-  background: var(--td-bg-color-container, #fff);
-  border-radius: 10px;
-  box-shadow: var(--td-shadow-2, 0 6px 28px rgba(15, 23, 42, 0.08));
-  border: 1px solid var(--td-component-border, #e7e9eb);
-  overflow: hidden;
-  padding: 6px 8px;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: none !important;
-}
-
-.agent-mode-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  transition: background 0.12s;
-  border-radius: var(--musuw-radius-control, 8px);
-  position: relative;
-  margin: 4px 6px;
-
-  &:hover:not(.disabled) {
-    background: var(--td-bg-color-container-hover, #f6f8f7);
-  }
-
-  &.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-
-    &:hover {
-      background: transparent;
-    }
-  }
-
-  &.selected {
-    background: var(--td-brand-color-light, #eefdf5);
-
-    .agent-mode-option-name {
-      color: var(--musuw-accent, var(--td-brand-color));
-      font-weight: 600;
-    }
-  }
-}
-
-.agent-mode-option-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex: 1;
-  min-width: 0;
-}
-
-.agent-mode-option-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--td-text-color-primary, #222);
-  line-height: 1.4;
-  transition: color 0.12s;
-}
-
-.agent-mode-option-desc {
-  font-size: 11px;
-  color: var(--td-text-color-secondary, #8b9196);
-  line-height: 1.3;
-}
-
-.check-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--td-success-color);
-  flex-shrink: 0;
-  margin-left: 6px;
-}
-
-.agent-mode-warning {
-  display: flex;
-  align-items: center;
-  margin-left: 6px;
-
-  .warning-icon {
-    color: var(--td-warning-color);
-    font-size: 14px;
-  }
-}
-
-.agent-mode-footer {
-  padding: 6px 10px;
-  border-top: 1px solid var(--td-component-border, #f2f4f5);
-  margin-top: 2px;
-  background: var(--td-bg-color-secondarycontainer, #fafcfc);
-}
-
-.agent-mode-link {
-  color: var(--musuw-accent, var(--td-brand-color));
-  text-decoration: none;
-  font-size: 11px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  transition: all 0.12s;
-
-  &:hover {
-    color: var(--musuw-accent-hover, var(--td-brand-color-active));
-    text-decoration: underline;
-  }
-}
-
-/* At phone widths keep every composer action in the document flow.  The
-   desktop toolbar overlays the textarea for a compact 56px footer, but that
-   geometry leaves too little room for the agent/thinking controls around
-   390px.  A wrapped, two-row footer grows with its contents instead of
-   allowing controls to paint over one another. */
-@media (max-width: 420px) {
-  .answers-input,
-  .rich-input-container {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .rich-input-container {
-    overflow: hidden;
-  }
-
-  :deep(.t-textarea__inner) {
-    min-height: 84px !important;
-  }
-
-  .control-bar {
-    position: static;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    max-height: none;
-    min-height: 0;
-    padding: 8px 12px 10px;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 6px;
-    background: var(--td-bg-color-container, #fff);
-  }
-
-  .control-left {
-    order: 1;
-    width: 100%;
-    flex: 1 1 100%;
-    min-width: 0;
-    gap: 6px;
-  }
-
-  .control-right {
-    order: 2;
-    flex: 0 0 auto;
-    margin-left: auto;
-    gap: 6px;
-  }
-
-  .agent-mode-trigger {
-    min-width: 0;
-    max-width: 100%;
-    flex: 0 1 auto;
-  }
-
-  .thinking-toggle {
-    flex: 0 1 auto;
-    white-space: nowrap;
-  }
-}
-
-:global(#app .rich-input-container) {
-  max-width: 640px;
-  border-color: var(--musuw-line, var(--td-component-stroke));
-  border-radius: var(--musuw-radius-card, 12px);
-  background: var(--td-bg-color-secondarycontainer, #f5f6f8);
-  box-shadow:
-    0 1px 2px rgba(38, 38, 38, 0.045),
-    0 8px 20px -12px rgba(38, 38, 38, 0.12);
-}
-
-:global(#app .rich-input-container:focus-within) {
-  border-color: var(--musuw-accent, var(--td-brand-color));
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--musuw-accent, var(--td-brand-color)) 12%, transparent),
-    0 1px 2px rgba(38, 38, 38, 0.045);
-}
-
-:global(#app .rich-input-container .control-bar) {
-  color: var(--musuw-muted, var(--td-text-color-secondary));
-}
-
-:global(#app .rich-input-container .send-btn),
-:global(#app .rich-input-container .control-btn.send-btn) {
-  border-radius: var(--musuw-radius-control, 8px);
-  background: var(--musuw-accent, var(--td-brand-color));
-}
-
-:global(#app .rich-input-container .send-btn:hover:not(.disabled)),
-:global(#app .rich-input-container .control-btn.send-btn:hover:not(.disabled)) {
-  background: var(--musuw-accent-hover, var(--td-brand-color-active));
-}
-
-:global(#app .rich-input-container .send-btn.disabled),
-:global(#app .rich-input-container .control-btn.send-btn.disabled) {
-  background: var(--musuw-line-strong, var(--td-bg-color-component-disabled));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rich-input-container,
-  .control-btn,
-  .agent-mode-trigger,
-  .agent-mode-option,
-  .stop-btn,
-  .send-btn {
-    transition: none !important;
-  }
-}
+  border: 1px solid rgb(229 231 235 / 60%);
+  border-radius: 20px;
+  background: #f4f5f7;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.reference-composer:hover { border-color: #d1d5db; }
+.reference-composer:focus-within { border-color: #d1d5db; background: #fff; box-shadow: 0 4px 12px rgb(0 0 0 / 8%); }
+.reference-composer-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgb(229 231 235 / 60%); }
+.reference-composer-mentions { margin-top: -2px; }
+.reference-composer-chip { min-width: 0; height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 4px 6px 4px 8px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #374151; box-shadow: 0 1px 2px rgb(0 0 0 / 3%); font-size: 12px; line-height: 16px; }
+.reference-composer-chip--image img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
+.reference-composer-chip__name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.reference-composer-chip button { width: 18px; height: 18px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: transparent; color: #9ca3af; cursor: pointer; }
+.reference-composer-chip button:hover { color: #374151; background: #f3f4f6; }
+.reference-composer-chip button svg { width: 14px; height: 14px; }
+.reference-mention-icon-wrap { position: relative; width: 16px; height: 16px; display: grid; place-items: center; color: #6b7280; }
+.reference-mention-icon-wrap > svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.reference-mention-org { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; display: grid; place-items: center; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / 6%); }
+.reference-mention-org img { width: 6px; height: 6px; object-fit: contain; }
+.reference-composer-textarea { width: 100%; min-height: 44px; max-height: 180px; display: block; padding: 0; overflow-y: auto; border: 0; outline: 0; resize: none; background: transparent; color: #1f2937; font: inherit; font-size: 15px; line-height: 1.625; }
+.reference-composer-textarea::placeholder { color: #9ca3af; }
+.reference-composer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; padding-top: 4px; user-select: none; }
+.reference-composer-left { min-width: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.reference-composer-right { flex: 0 0 auto; display: flex; align-items: center; }
+.reference-icon-action { position: relative; width: 20px; height: 20px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #6b7280; cursor: pointer; }
+.reference-icon-action:hover,.reference-icon-action.active { color: #1f2937; }
+.reference-icon-action.disabled { color: #d1d5db; cursor: not-allowed; }
+.reference-icon-action > svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.reference-action-count { position: absolute; top: -7px; right: -8px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #111827; color: #fff; font-size: 8px; line-height: 14px; font-weight: 800; text-align: center; }
+.reference-mode-pill,.reference-model-pill { height: 24px; display: inline-flex; align-items: center; gap: 4px; padding: 0 10px; border: 0; border-radius: 999px; background: rgb(229 231 235 / 80%); color: #374151; font: inherit; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; }
+.reference-mode-pill:hover,.reference-model-pill:hover { background: #dcdfe4; }
+.reference-mode-pill svg,.reference-model-pill svg { width: 12px; height: 12px; fill: none; stroke: #6b7280; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 150ms ease; }
+.reference-mode-pill svg.rotate,.reference-model-pill svg.rotate { transform: rotate(180deg); }
+.reference-thinking-toggle { display: inline-flex; align-items: center; gap: 6px; color: #4b5563; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; }
+.reference-thinking-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.reference-thinking-switch { width: 32px; height: 18px; display: flex; align-items: center; padding: 2px; box-sizing: border-box; border-radius: 999px; background: #d1d5db; transition: background-color 150ms ease; }
+.reference-thinking-switch i { width: 14px; height: 14px; display: block; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 14%); transition: transform 150ms ease; }
+.reference-thinking-toggle input:checked + .reference-thinking-switch { background: #111827; }
+.reference-thinking-toggle input:checked + .reference-thinking-switch i { transform: translateX(14px); }
+.reference-send-button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: #111827; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); cursor: pointer; transition: background-color 150ms ease, transform 100ms ease; }
+.reference-send-button:hover:not(:disabled) { background: #000; }.reference-send-button:active:not(:disabled){transform:scale(.95)}
+.reference-send-button:disabled { background: #e2e4e8; color: #9ca3af; cursor: not-allowed; }
+.reference-send-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.reference-stop-button svg { fill: currentColor; stroke: none; }
+.reference-popover-overlay { position: fixed; inset: 0; z-index: 9998; background: transparent; }
+.reference-mode-menu,.reference-model-menu { position: fixed; z-index: 9999; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 10px 20px rgb(0 0 0 / 10%); }
+.reference-mode-menu { width: 200px; padding: 6px; }
+.reference-mode-menu button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 0; border-radius: 8px; background: #fff; color: #374151; cursor: pointer; text-align: left; }
+.reference-mode-menu button:hover { background: #f9fafb; }.reference-mode-menu button.selected{background:#f3f4f6;color:#111827}
+.reference-mode-menu strong { font-size: 12px; }.reference-mode-menu span { color:#9ca3af;font-size:10px; }
+.reference-model-menu { width: 250px; overflow: hidden; }
+.reference-model-menu__header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #f3f4f6; color: #9ca3af; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.reference-model-menu__header button { border: 0; background: transparent; color: #4b5563; font-size: 10px; font-weight: 700; cursor: pointer; }
+.reference-model-menu__list { max-height: 300px; overflow-y: auto; padding: 5px; }
+.reference-model-menu__list > button { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 9px; padding: 6px 8px; border: 0; border-radius: 8px; background: #fff; color: #374151; text-align: left; cursor: pointer; }
+.reference-model-menu__list > button:hover{background:#f9fafb}.reference-model-menu__list > button.selected{background:#f3f4f6;color:#111827}
+.reference-model-menu__icon { width: 25px; height: 25px; flex: 0 0 25px; display: grid; place-items: center; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #6b7280; }
+.reference-model-menu__icon svg { width: 13px; height: 13px; fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+.reference-model-menu__copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }.reference-model-menu__copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600}.reference-model-menu__copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9ca3af;font-size:9px}
+.reference-model-check { width: 14px; height: 14px; flex:0 0 14px; fill:none;stroke:#111827;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
+.reference-model-menu__empty { padding: 16px 10px; color: #9ca3af; font-size: 11px; text-align: center; }
+@media (max-width: 720px) { .reference-composer-host{bottom:16px;padding:0 10px}.reference-composer{padding:12px;border-radius:16px}.reference-composer-left{gap:10px}.reference-model-pill{max-width:130px}.reference-model-pill>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reference-thinking-toggle>span:first-child{display:none}.reference-composer-textarea{font-size:14px} }
 </style>
