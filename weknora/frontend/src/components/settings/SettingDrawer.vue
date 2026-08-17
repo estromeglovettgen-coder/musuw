@@ -6,6 +6,7 @@
       @mousedown.self="handleOverlayClose"
     >
       <aside
+        ref="drawerElement"
         v-bind="drawerPassthroughAttrs"
         :class="drawerClass"
         :style="{ width: effectiveWidth }"
@@ -66,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, useAttrs, onMounted, onUnmounted } from 'vue'
+import { ref, computed, useAttrs, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface Props {
@@ -97,6 +98,7 @@ const { t } = useI18n()
 const attrs = useAttrs()
 const drawerPassthroughAttrs = computed(() => { const { class: _class, ...rest } = attrs; return rest })
 const drawerVisible = computed({ get: () => props.visible, set: (val) => emit('update:visible', val) })
+const drawerElement = ref<HTMLElement | null>(null)
 const resolvedStorageKey = computed(() => props.storageKey || `setting-drawer:width:${props.title || 'default'}`)
 const clampWidth = (n: number) => Math.max(props.minWidth, Math.min(props.maxWidth, Math.round(n)))
 const parseWidthToPx = (width: string) => { const n = parseInt(width, 10); return Number.isFinite(n) ? n : 560 }
@@ -112,17 +114,72 @@ const drawerResizing = ref(false)
 const drawerClass = computed(() => ['reference-setting-drawer', attrs.class, { 'reference-setting-drawer--resizing': drawerResizing.value }])
 let resizeStartX = 0
 let resizeStartWidth = 0
+let previouslyFocused: HTMLElement | null = null
+let previousBodyOverflow = ''
+
 function onResizeStart(e: MouseEvent) { drawerResizing.value = true; resizeStartX = e.clientX; resizeStartWidth = drawerWidthPx.value; document.addEventListener('mousemove', onResizeMove); document.addEventListener('mouseup', onResizeEnd); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }
 function onResizeMove(e: MouseEvent) { userWidthPx.value = clampWidth(resizeStartWidth + (resizeStartX - e.clientX)) }
 function onResizeEnd() { document.removeEventListener('mousemove', onResizeMove); document.removeEventListener('mouseup', onResizeEnd); document.body.style.cursor = ''; document.body.style.userSelect = ''; drawerResizing.value = false; persistWidth(drawerWidthPx.value) }
 function cleanupResize() { document.removeEventListener('mousemove', onResizeMove); document.removeEventListener('mouseup', onResizeEnd); document.body.style.cursor = ''; document.body.style.userSelect = ''; drawerResizing.value = false }
 function onWindowResize() { if (userWidthPx.value != null) userWidthPx.value = clampWidth(userWidthPx.value) }
-onMounted(() => window.addEventListener('resize', onWindowResize, { passive: true }))
-onUnmounted(() => { window.removeEventListener('resize', onWindowResize); cleanupResize() })
 function blurActiveElementBeforeClose() { if (document.activeElement instanceof HTMLElement) document.activeElement.blur() }
 const handleOverlayClose = () => { blurActiveElementBeforeClose(); emit('update:visible', false) }
 const handleConfirm = () => emit('confirm')
 const handleCancel = () => { blurActiveElementBeforeClose(); emit('cancel'); emit('update:visible', false) }
+
+function getFocusableElements(): HTMLElement[] {
+  if (!drawerElement.value) return []
+  return Array.from(drawerElement.value.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+  )).filter(el => !el.hasAttribute('aria-hidden') && el.getAttribute('aria-disabled') !== 'true')
+}
+
+function handleDrawerKeydown(event: KeyboardEvent) {
+  if (!drawerVisible.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    handleOverlayClose()
+    return
+  }
+  if (event.key !== 'Tab') return
+  const focusable = getFocusableElements()
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+watch(drawerVisible, async (visible) => {
+  if (typeof document === 'undefined') return
+  if (visible) {
+    previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    await nextTick()
+    getFocusableElements()[0]?.focus({ preventScroll: true })
+  } else {
+    document.body.style.overflow = previousBodyOverflow
+    previouslyFocused?.focus({ preventScroll: true })
+    previouslyFocused = null
+  }
+})
+
+onMounted(() => {
+  window.addEventListener('resize', onWindowResize, { passive: true })
+  window.addEventListener('keydown', handleDrawerKeydown)
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', onWindowResize)
+  window.removeEventListener('keydown', handleDrawerKeydown)
+  if (typeof document !== 'undefined') document.body.style.overflow = previousBodyOverflow
+  cleanupResize()
+})
 </script>
 
 <style scoped>
