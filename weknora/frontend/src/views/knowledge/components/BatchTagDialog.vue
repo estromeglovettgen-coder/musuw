@@ -1,526 +1,374 @@
 <template>
-  <t-dialog :visible="visible" :footer="false" width="420px" dialog-class-name="batch-tag-dialog"
-    :close-on-overlay-click="false" destroy-on-close @close="handleClose">
-    <template #header>
-      <div class="batch-tag-heading">
-        <div class="batch-tag-heading-row">
-          <t-icon name="discount" size="16px" class="batch-tag-heading-icon" aria-hidden="true" />
-          <span class="batch-tag-title">{{ $t('knowledgeBase.batchTagDialogHeading') }}</span>
-        </div>
-        <p class="batch-tag-subtitle">{{ $t('knowledgeBase.batchTagSubtitle', { count }) }}</p>
+  <Teleport to="body">
+    <template v-if="visible">
+      <div class="reference-modal-backdrop" @click.self="handleClose">
+        <section class="reference-batch-tag-dialog" role="dialog" aria-modal="true" :aria-label="$t('knowledgeBase.batchTagDialogHeading')">
+          <header class="reference-batch-tag-dialog__header">
+            <div>
+              <div class="reference-batch-tag-dialog__title-row">
+                <ReferenceIcon name="tag" :size="16" />
+                <h3>{{ $t('knowledgeBase.batchTagDialogHeading') }}</h3>
+              </div>
+              <p>{{ $t('knowledgeBase.batchTagSubtitle', { count }) }}</p>
+            </div>
+            <button type="button" class="reference-batch-tag-dialog__close" aria-label="关闭" @click="handleClose">×</button>
+          </header>
+
+          <div class="reference-batch-tag-dialog__body">
+            <section class="reference-batch-tag-section">
+              <div class="reference-batch-tag-section__head">
+                <h4>{{ $t('knowledgeBase.batchTagSelectedSection') }}</h4>
+                <button v-if="selectedSet.size > 0" type="button" @click="clearAll">
+                  {{ $t('knowledgeBase.tagClearAction') }}
+                </button>
+              </div>
+              <div v-if="selectedTagsList.length" class="reference-batch-tag-chips">
+                <button
+                  v-for="tag in selectedTagsList"
+                  :key="tag.id"
+                  type="button"
+                  class="reference-batch-tag-chip selected"
+                  :title="tag.name"
+                  @click="toggleTag(tag.id)"
+                >{{ tag.name }}</button>
+              </div>
+              <p v-else class="reference-batch-tag-empty">{{ $t('knowledgeBase.batchTagNoSelected') }}</p>
+            </section>
+
+            <section class="reference-batch-tag-section">
+              <div class="reference-batch-tag-section__head">
+                <h4>{{ $t('knowledgeBase.batchTagAvailableSection') }}</h4>
+                <button v-if="canManage" type="button" @click="handleOpenManage">
+                  {{ $t('knowledgeBase.tagManageLink') }}
+                </button>
+              </div>
+
+              <label class="reference-batch-tag-search">
+                <ReferenceIcon name="search" :size="14" />
+                <input v-model="searchQuery" :placeholder="$t('knowledgeBase.tagEditSearch')" />
+                <button v-if="searchQuery" type="button" aria-label="清空" @click="searchQuery = ''">×</button>
+              </label>
+
+              <div v-if="availableTagsList.length" class="reference-batch-tag-chips reference-batch-tag-chips--available">
+                <button
+                  v-for="tag in availableTagsList"
+                  :key="tag.id"
+                  type="button"
+                  class="reference-batch-tag-chip"
+                  :title="tag.knowledge_count !== undefined ? `${tag.name} (${tag.knowledge_count})` : tag.name"
+                  @click="toggleTag(tag.id)"
+                >{{ tag.name }}</button>
+              </div>
+              <div v-else class="reference-batch-tag-empty reference-batch-tag-empty--row">
+                <span>{{ searchQuery.trim() ? $t('knowledgeBase.tagEmptyResult') : $t('knowledgeBase.noTags') }}</span>
+                <button v-if="searchQuery.trim()" type="button" :disabled="creatingTag" @click="handleCreateTag">
+                  {{ $t('knowledgeBase.tagCreateAction') }} “{{ searchQuery.trim() }}”
+                </button>
+              </div>
+
+              <label class="reference-batch-new-tag">
+                <ReferenceIcon name="plus" :size="14" />
+                <input
+                  v-model="newTagName"
+                  :placeholder="$t('knowledgeBase.tagNewPlaceholder')"
+                  maxlength="40"
+                  :disabled="creatingTag"
+                  @keydown.enter.prevent="handleAddNewTag"
+                />
+              </label>
+            </section>
+          </div>
+
+          <footer class="reference-batch-tag-dialog__footer">
+            <span>{{ $t('knowledgeBase.tagSelectedCount', { count: selectedSet.size }) }}</span>
+            <div>
+              <button type="button" class="reference-batch-tag-dialog__cancel" :disabled="confirmLoading" @click="handleClose">
+                {{ $t('common.cancel') }}
+              </button>
+              <button type="button" class="reference-batch-tag-dialog__confirm" :disabled="confirmLoading" @click="handleConfirm">
+                {{ confirmLoading ? '...' : $t('common.confirm') }}
+              </button>
+            </div>
+          </footer>
+        </section>
       </div>
     </template>
-
-    <div class="batch-tag-body">
-      <section class="setting-drawer__section">
-        <div class="batch-tag-section-head">
-          <h4 class="setting-drawer__section-title">{{ $t('knowledgeBase.batchTagSelectedSection') }}</h4>
-          <t-button v-if="selectedSet.size > 0" variant="text" size="small" theme="default" @click="clearAll">
-            {{ $t('knowledgeBase.tagClearAction') }}
-          </t-button>
-        </div>
-        <div v-if="selectedTagsList.length > 0" class="batch-tag-chips">
-          <button v-for="tag in selectedTagsList" :key="tag.id" type="button" class="batch-tag-chip is-selected"
-            :title="tag.name" @click="toggleTag(tag.id)">
-            {{ tag.name }}
-          </button>
-        </div>
-        <p v-else class="batch-tag-section-empty">{{ $t('knowledgeBase.batchTagNoSelected') }}</p>
-      </section>
-
-      <section class="setting-drawer__section">
-        <div class="batch-tag-section-head">
-          <h4 class="setting-drawer__section-title">{{ $t('knowledgeBase.batchTagAvailableSection') }}</h4>
-          <t-button
-            v-if="canManage"
-            variant="text"
-            size="small"
-            theme="default"
-            class="batch-tag-manage-link"
-            @click="handleOpenManage"
-          >
-            {{ $t('knowledgeBase.tagManageLink') }}
-          </t-button>
-        </div>
-        <div class="batch-tag-search-bar">
-          <t-input v-model="searchQuery" :placeholder="$t('knowledgeBase.tagEditSearch')" clearable size="small">
-            <template #prefix-icon>
-              <t-icon name="search" size="14px" />
-            </template>
-          </t-input>
-        </div>
-        <div v-if="availableTagsList.length > 0" class="batch-tag-chips">
-          <button v-for="tag in availableTagsList" :key="tag.id" type="button" class="batch-tag-chip"
-            :title="tag.knowledge_count !== undefined ? `${tag.name} (${tag.knowledge_count})` : tag.name"
-            @click="toggleTag(tag.id)">
-            {{ tag.name }}
-          </button>
-        </div>
-        <div v-else class="batch-tag-section-empty batch-tag-section-empty--row">
-          <span>{{ searchQuery.trim() ? $t('knowledgeBase.tagEmptyResult') : $t('knowledgeBase.noTags') }}</span>
-          <t-button v-if="searchQuery.trim()" variant="text" theme="default" size="small" :loading="creatingTag"
-            @click="handleCreateTag">
-            {{ $t('knowledgeBase.tagCreateAction') }} "{{ searchQuery.trim() }}"
-          </t-button>
-        </div>
-        <div class="batch-tag-create-row">
-          <t-input v-model="newTagName" :placeholder="$t('knowledgeBase.tagNewPlaceholder')" size="small"
-            :maxlength="40" :disabled="creatingTag" @enter="handleAddNewTag" />
-        </div>
-      </section>
-    </div>
-
-    <div class="batch-tag-footer">
-      <span class="batch-tag-selected-count">
-        {{ $t('knowledgeBase.tagSelectedCount', { count: selectedSet.size }) }}
-      </span>
-      <div class="batch-tag-footer-right">
-        <t-button variant="outline" size="small" :disabled="confirmLoading" @click="handleClose">
-          {{ $t('common.cancel') }}
-        </t-button>
-        <t-button theme="primary" size="small" :loading="confirmLoading" @click="handleConfirm">
-          {{ $t('common.confirm') }}
-        </t-button>
-      </div>
-    </div>
-  </t-dialog>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { MessagePlugin } from 'tdesign-vue-next';
-import { createKnowledgeBaseTag } from '@/api/knowledge-base';
+import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { MessagePlugin } from 'tdesign-vue-next'
+import { createKnowledgeBaseTag } from '@/api/knowledge-base'
+import ReferenceIcon from '@/components/ReferenceIcon.vue'
 
 interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-  knowledge_count?: number;
+  id: string
+  name: string
+  color?: string
+  knowledge_count?: number
 }
 
 const props = defineProps<{
-  visible: boolean;
-  count: number;
-  kbId: string;
-  tagList: Tag[];
-  preSelectedTagIds?: string[];
-  canManage?: boolean;
-  confirmLoading?: boolean;
-}>();
-
+  visible: boolean
+  count: number
+  kbId: string
+  tagList: Tag[]
+  preSelectedTagIds?: string[]
+  canManage?: boolean
+  confirmLoading?: boolean
+}>()
 const emit = defineEmits<{
-  (e: 'update:visible', value: boolean): void;
-  (e: 'confirm', tagIds: string[]): void;
-  (e: 'tag-created'): void;
-  (e: 'open-manage'): void;
-}>();
+  (e: 'update:visible', value: boolean): void
+  (e: 'confirm', tagIds: string[]): void
+  (e: 'tag-created'): void
+  (e: 'open-manage'): void
+}>()
+const { t } = useI18n()
 
-const { t } = useI18n();
-
-const searchQuery = ref('');
-const selectedSet = ref<Set<string>>(new Set());
-const creatingTag = ref(false);
-const newTagName = ref('');
+const searchQuery = ref('')
+const selectedSet = ref<Set<string>>(new Set())
+const creatingTag = ref(false)
+const newTagName = ref('')
 
 watch(
   () => props.visible,
   (val) => {
     if (val) {
-      selectedSet.value = new Set(props.preSelectedTagIds ?? []);
-      searchQuery.value = '';
-      newTagName.value = '';
+      selectedSet.value = new Set(props.preSelectedTagIds ?? [])
+      searchQuery.value = ''
+      newTagName.value = ''
     }
   },
-);
+)
 
-const tagMap = computed(() => new Map(props.tagList.map((tag) => [tag.id, tag])));
-
-const selectedTagsList = computed(() => {
-  return Array.from(selectedSet.value)
+const tagMap = computed(() => new Map(props.tagList.map((tag) => [tag.id, tag])))
+const selectedTagsList = computed(() =>
+  Array.from(selectedSet.value)
     .map((id) => tagMap.value.get(id))
-    .filter((tag): tag is Tag => Boolean(tag));
-});
-
+    .filter((tag): tag is Tag => Boolean(tag)),
+)
 const availableTagsList = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase();
+  const query = searchQuery.value.trim().toLowerCase()
   return props.tagList.filter((tag) => {
-    if (selectedSet.value.has(tag.id)) return false;
-    if (query && !(tag.name || '').toLowerCase().includes(query)) return false;
-    return true;
-  });
-});
+    if (selectedSet.value.has(tag.id)) return false
+    if (query && !(tag.name || '').toLowerCase().includes(query)) return false
+    return true
+  })
+})
 
 function toggleTag(tagId: string) {
-  const next = new Set(selectedSet.value);
-  if (next.has(tagId)) {
-    next.delete(tagId);
-  } else {
-    next.add(tagId);
-  }
-  selectedSet.value = next;
+  const next = new Set(selectedSet.value)
+  if (next.has(tagId)) next.delete(tagId)
+  else next.add(tagId)
+  selectedSet.value = next
 }
-
-function clearAll() {
-  selectedSet.value = new Set();
-}
+function clearAll() { selectedSet.value = new Set() }
 
 async function handleCreateTag() {
-  const name = searchQuery.value.trim();
-  if (!name) return;
-  creatingTag.value = true;
+  const name = searchQuery.value.trim()
+  if (!name) return
+  creatingTag.value = true
   try {
-    const res: any = await createKnowledgeBaseTag(props.kbId, { name });
-    const newTag = res?.data || res;
-    const next = new Set(selectedSet.value);
-    next.add(newTag.id);
-    selectedSet.value = next;
-    searchQuery.value = '';
-    emit('tag-created');
-    MessagePlugin.success(t('knowledgeBase.tagCreateSuccess'));
+    const res: any = await createKnowledgeBaseTag(props.kbId, { name })
+    const newTag = res?.data || res
+    const next = new Set(selectedSet.value)
+    next.add(newTag.id)
+    selectedSet.value = next
+    searchQuery.value = ''
+    emit('tag-created')
+    MessagePlugin.success(t('knowledgeBase.tagCreateSuccess'))
   } catch (error: any) {
-    MessagePlugin.error(error?.message || t('common.operationFailed'));
+    MessagePlugin.error(error?.message || t('common.operationFailed'))
   } finally {
-    creatingTag.value = false;
+    creatingTag.value = false
   }
 }
 
 async function handleAddNewTag() {
-  const name = newTagName.value.trim();
-  if (!name) return;
-  const exists = props.tagList.find((t) => t.name === name);
+  const name = newTagName.value.trim()
+  if (!name) return
+  const exists = props.tagList.find((tag) => tag.name === name)
   if (exists) {
-    const next = new Set(selectedSet.value);
-    next.add(exists.id);
-    selectedSet.value = next;
-    newTagName.value = '';
-    return;
+    const next = new Set(selectedSet.value)
+    next.add(exists.id)
+    selectedSet.value = next
+    newTagName.value = ''
+    return
   }
-  creatingTag.value = true;
+  creatingTag.value = true
   try {
-    const res: any = await createKnowledgeBaseTag(props.kbId, { name });
-    const newTag = res?.data || res;
-    const next = new Set(selectedSet.value);
-    next.add(newTag.id);
-    selectedSet.value = next;
-    newTagName.value = '';
-    emit('tag-created');
-    MessagePlugin.success(t('knowledgeBase.tagCreateSuccess'));
+    const res: any = await createKnowledgeBaseTag(props.kbId, { name })
+    const newTag = res?.data || res
+    const next = new Set(selectedSet.value)
+    next.add(newTag.id)
+    selectedSet.value = next
+    newTagName.value = ''
+    emit('tag-created')
+    MessagePlugin.success(t('knowledgeBase.tagCreateSuccess'))
   } catch (error: any) {
-    MessagePlugin.error(error?.message || t('common.operationFailed'));
+    MessagePlugin.error(error?.message || t('common.operationFailed'))
   } finally {
-    creatingTag.value = false;
+    creatingTag.value = false
   }
 }
 
 function handleConfirm() {
-  if (props.confirmLoading) return;
-  emit('confirm', Array.from(selectedSet.value));
+  if (props.confirmLoading) return
+  emit('confirm', Array.from(selectedSet.value))
 }
-
-function handleClose() {
-  emit('update:visible', false);
-}
-
+function handleClose() { emit('update:visible', false) }
 function handleOpenManage() {
-  emit('update:visible', false);
-  emit('open-manage');
+  emit('update:visible', false)
+  emit('open-manage')
 }
 </script>
 
-<style>
-.batch-tag-dialog {
+<style scoped>
+.reference-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4600;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+  background: rgb(17 24 39 / .28);
+  backdrop-filter: blur(1px);
+  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+}
+.reference-batch-tag-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  padding: 0;
-  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgb(0 0 0 / .18);
 }
-
-.batch-tag-dialog .t-dialog__header {
-  min-height: auto;
-  padding: 20px 20px 0;
+.reference-batch-tag-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid #f3f4f6;
 }
-
-.batch-tag-dialog .t-dialog__body {
-  padding: 0 20px 20px;
-}
-
-.batch-tag-dialog .t-dialog__close {
-  top: 16px;
-  right: 16px;
+.reference-batch-tag-dialog__title-row { display: flex; align-items: center; gap: 8px; color: #111827; }
+.reference-batch-tag-dialog__title-row h3 { margin: 0; font-size: 14px; line-height: 20px; font-weight: 700; }
+.reference-batch-tag-dialog__header p { margin: 4px 0 0 24px; color: #9ca3af; font-size: 11px; line-height: 16px; }
+.reference-batch-tag-dialog__close {
   width: 28px;
   height: 28px;
-  border-radius: 4px;
-  color: var(--td-text-color-secondary);
-  transition: background 0.18s ease;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 20px;
+  line-height: 24px;
+  cursor: pointer;
 }
-
-.batch-tag-dialog .t-dialog__close:hover {
-  color: var(--td-text-color-primary);
-  background: var(--td-bg-color-container-hover);
-}
-
-@media (max-width: 480px) {
-  .batch-tag-dialog {
-    width: calc(100vw - 24px) !important;
-  }
-}
-</style>
-
-<style scoped>
-.batch-tag-heading {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding-right: 28px;
-}
-
-.batch-tag-heading-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.batch-tag-heading-icon {
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-}
-
-.batch-tag-title {
-  color: var(--td-text-color-primary);
-  font-size: 15px;
+.reference-batch-tag-dialog__close:hover { background: #f3f4f6; color: #374151; }
+.reference-batch-tag-dialog__body { min-height: 0; overflow: auto; padding: 4px 18px; }
+.reference-batch-tag-section { padding: 14px 0; border-bottom: 1px solid #f3f4f6; }
+.reference-batch-tag-section:last-child { border-bottom: 0; }
+.reference-batch-tag-section__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.reference-batch-tag-section__head h4 { margin: 0; color: #374151; font-size: 11px; line-height: 16px; font-weight: 700; }
+.reference-batch-tag-section__head button,
+.reference-batch-tag-empty--row button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  font-family: inherit;
+  font-size: 10px;
   font-weight: 600;
-  line-height: 22px;
-  letter-spacing: 0.2px;
+  cursor: pointer;
 }
-
-.batch-tag-subtitle {
-  margin: 0;
-  min-width: 0;
+.reference-batch-tag-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 116px; overflow: auto; }
+.reference-batch-tag-chips--available { max-height: 150px; }
+.reference-batch-tag-chip {
+  max-width: 100%;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b7280;
   overflow: hidden;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.batch-tag-body {
-  display: flex;
-  flex-direction: column;
-  margin-top: 16px;
-}
-
-.batch-tag-body .setting-drawer__section {
-  padding: 12px 0 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.batch-tag-body .setting-drawer__section:first-child {
-  padding-top: 0;
-}
-
-.batch-tag-body .setting-drawer__section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.batch-tag-body .setting-drawer__section-title {
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 24px;
   font-weight: 600;
-  color: var(--td-text-color-primary);
-  margin: 0 0 4px;
-  user-select: none;
+  cursor: pointer;
+}
+.reference-batch-tag-chip:hover { background: #f9fafb; color: #111827; }
+.reference-batch-tag-chip.selected { border-color: #111827; background: #111827; color: #fff; }
+.reference-batch-tag-search,
+.reference-batch-new-tag {
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #9ca3af;
 }
-
-.batch-tag-body .setting-drawer__section-title::before {
-  content: '';
-  width: 3px;
-  height: 14px;
-  background: var(--td-brand-color);
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.batch-tag-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.batch-tag-section-head .setting-drawer__section-title {
-  margin-bottom: 0;
+.reference-batch-tag-search { margin-bottom: 10px; }
+.reference-batch-new-tag { margin-top: 10px; }
+.reference-batch-tag-search input,
+.reference-batch-new-tag input {
   flex: 1;
   min-width: 0;
-}
-
-.batch-tag-section-head :deep(.t-button) {
-  height: auto;
-  padding: 0;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  flex-shrink: 0;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  transition: color 0.15s ease;
-}
-
-.batch-tag-section-head :deep(.batch-tag-manage-link.t-button:hover),
-.batch-tag-section-head :deep(.batch-tag-manage-link.t-button:focus-visible) {
-  color: var(--td-brand-color) !important;
-  background: transparent !important;
-  border-color: transparent !important;
-  text-decoration: none;
-}
-
-.batch-tag-search-bar {
-  margin: 0;
-}
-
-.batch-tag-search-bar :deep(.t-input) {
-  font-size: 12px;
-  background-color: var(--td-bg-color-secondarycontainer);
-  border-color: transparent;
-  border-radius: 4px;
-  box-shadow: none !important;
-}
-
-.batch-tag-search-bar :deep(.t-input:hover),
-.batch-tag-search-bar :deep(.t-input.t-is-focused) {
-  border-color: var(--td-component-border);
-  background-color: var(--td-bg-color-container);
-  box-shadow: none !important;
-}
-
-.batch-tag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: min(120px, 24vh);
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.batch-tag-chips::-webkit-scrollbar {
-  width: 4px;
-}
-
-.batch-tag-chips::-webkit-scrollbar-thumb {
-  border-radius: 2px;
-  background: var(--td-scrollbar-color);
-}
-
-.batch-tag-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 100%;
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 4px;
+  border: 0;
+  outline: 0;
   background: transparent;
-  color: var(--td-text-color-secondary);
-  font-family: var(--app-font-family);
+  color: #111827;
+  font-family: inherit;
   font-size: 11px;
-  line-height: 22px;
-  text-align: center;
+}
+.reference-batch-tag-search > button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #9ca3af;
   cursor: pointer;
-  outline: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-  -webkit-font-smoothing: antialiased;
 }
-
-.batch-tag-chip:hover {
-  border-color: var(--td-component-stroke);
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-primary);
-}
-
-.batch-tag-chip:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--td-component-stroke) 60%, transparent);
-}
-
-.batch-tag-chip.is-selected {
-  border-color: transparent;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-primary);
-  font-weight: 500;
-}
-
-.batch-tag-chip.is-selected:hover {
-  background: color-mix(in srgb, var(--td-bg-color-secondarycontainer) 70%, var(--td-bg-color-container));
-}
-
-.batch-tag-section-empty {
-  margin: 0;
-  min-height: 22px;
-  font-size: 12px;
-  line-height: 22px;
-  color: var(--td-text-color-placeholder);
-}
-
-.batch-tag-section-empty--row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.batch-tag-create-row {
-  margin-top: 0;
-}
-
-.batch-tag-create-row :deep(.t-input) {
-  font-size: 12px;
-  background-color: transparent;
-  border-style: dashed;
-  border-color: var(--td-component-stroke);
-  border-radius: 4px;
-  box-shadow: none !important;
-}
-
-.batch-tag-create-row :deep(.t-input:hover),
-.batch-tag-create-row :deep(.t-input.t-is-focused) {
-  border-color: var(--td-component-border);
-  border-style: dashed;
-  background-color: var(--td-bg-color-secondarycontainer);
-  box-shadow: none !important;
-}
-
-.batch-tag-footer {
+.reference-batch-tag-empty { margin: 0; min-height: 26px; color: #9ca3af; font-size: 10px; line-height: 18px; }
+.reference-batch-tag-empty--row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.reference-batch-tag-dialog__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--td-component-stroke);
+  padding: 12px 18px;
+  border-top: 1px solid #f3f4f6;
+  color: #9ca3af;
+  font-size: 10px;
 }
-
-.batch-tag-selected-count {
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  white-space: nowrap;
+.reference-batch-tag-dialog__footer > div { display: flex; gap: 7px; }
+.reference-batch-tag-dialog__footer button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
 }
-
-.batch-tag-footer-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
+.reference-batch-tag-dialog__cancel { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; }
+.reference-batch-tag-dialog__confirm { border: 1px solid #111827; background: #111827; color: #fff; }
+.reference-batch-tag-dialog__confirm:disabled,
+.reference-batch-tag-dialog__cancel:disabled { opacity: .5; cursor: default; }
 </style>
