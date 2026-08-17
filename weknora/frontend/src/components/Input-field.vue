@@ -2303,10 +2303,14 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
 };
 
 const clearvalue = () => {
-  // Guard: only clear when the textarea DOM element is still mounted,
-  // otherwise TDesign's autosize will call getComputedStyle on a non-Element.
-  if (!getTextareaEl()) return;
+  const textarea = getTextareaEl();
+  if (!textarea) return;
   query.value = "";
+  // Native textarea replacement must reset its own inline autosize state.
+  nextTick(() => {
+    const el = getTextareaEl();
+    if (el) el.style.height = "auto";
+  });
 };
 
 // Drop any pending images/attachments and stop their status polling. Used when
@@ -2321,41 +2325,42 @@ const clearPendingUploads = () => {
 };
 
 const onKeydown = (
-  val: string,
-  event: { e: { preventDefault(): unknown; keyCode: number; shiftKey: any; ctrlKey: any } },
+  valOrEvent: string | KeyboardEvent,
+  context?: { e?: KeyboardEvent },
 ) => {
+  // Preserve both the original TDesign callback contract and the
+  // visual-reference native textarea DOM event contract.
+  const keyEvent = valOrEvent instanceof KeyboardEvent ? valOrEvent : context?.e;
+  const value = typeof valOrEvent === "string" ? valOrEvent : query.value;
+  if (!keyEvent) return;
+
+  // Do not treat the Enter used to commit a CJK IME composition as Send.
+  if (isComposing.value || keyEvent.isComposing || keyEvent.keyCode === 229) return;
+
   if (showMention.value) {
-    if (event.e.keyCode === 38) {
-      // Up
-      event.e.preventDefault();
+    if (keyEvent.keyCode === 38) {
+      keyEvent.preventDefault();
       mentionSelectorRef.value?.moveActive(-1);
       return;
     }
-    if (event.e.keyCode === 40) {
-      // Down
-      event.e.preventDefault();
+    if (keyEvent.keyCode === 40) {
+      keyEvent.preventDefault();
       mentionSelectorRef.value?.moveActive(1);
       return;
     }
-    if (event.e.keyCode === 13) {
-      // Enter
-      event.e.preventDefault();
+    if (keyEvent.keyCode === 13) {
+      keyEvent.preventDefault();
       mentionSelectorRef.value?.confirmActive();
       return;
     }
-    if (event.e.keyCode === 27) {
-      // Esc
-      if (mentionSelectorRef.value?.leaveGroup()) {
-        return;
-      }
+    if (keyEvent.keyCode === 27) {
+      if (mentionSelectorRef.value?.leaveGroup()) return;
       showMention.value = false;
       return;
     }
   }
 
-  // 退格键：当输入框为空且有选中项时，删除最后一个选中项
-  if (event.e.keyCode === 8) {
-    // Backspace
+  if (keyEvent.keyCode === 8) {
     const textarea = getTextareaEl();
     if (
       textarea &&
@@ -2365,20 +2370,19 @@ const onKeydown = (
     ) {
       const items = allSelectedItems.value;
       if (items.length > 0) {
-        event.e.preventDefault();
-        const lastItem = items[items.length - 1];
-        removeSelectedItem(lastItem);
+        keyEvent.preventDefault();
+        removeSelectedItem(items[items.length - 1]);
         return;
       }
     }
   }
 
-  if ((event.e.keyCode == 13 && event.e.shiftKey) || (event.e.keyCode == 13 && event.e.ctrlKey)) {
+  if ((keyEvent.keyCode === 13 && keyEvent.shiftKey) || (keyEvent.keyCode === 13 && keyEvent.ctrlKey)) {
     return;
   }
-  if (event.e.keyCode == 13) {
-    event.e.preventDefault();
-    createSession(val);
+  if (keyEvent.keyCode === 13) {
+    keyEvent.preventDefault();
+    createSession(value);
   }
 };
 
@@ -2790,7 +2794,7 @@ defineExpose({
             type="button"
             class="reference-send-button"
             data-guide="chat-send"
-            :disabled="!query.trim() && uploadedImages.length === 0 && uploadedAttachments.length === 0"
+            :disabled="!query.length"
             :title="$t('input.send')"
             @click="createSession(query)"
           >
