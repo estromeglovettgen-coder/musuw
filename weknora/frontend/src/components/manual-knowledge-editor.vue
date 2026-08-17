@@ -856,7 +856,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 24px;
   color: #1f2937;
-  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-online-editor :deep(*) { box-sizing: border-box; }
 .reference-editor-section { display: flex; flex-direction: column; gap: 16px; }

@@ -2881,7 +2881,7 @@ defineExpose({
   transform: translateX(-50%);
   padding: 0 16px;
   box-sizing: border-box;
-  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-composer-host.is-embedded { position: relative; inset: auto; z-index: auto; padding: 0; transform: none; }
 .reference-hidden-input { display: none; }

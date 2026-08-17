@@ -189,7 +189,7 @@ onUnmounted(() => {
   background: rgb(0 0 0 / 45%);
   backdrop-filter: blur(4px);
   user-select: none;
-  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .settings-reference-dialog {
   position: relative;

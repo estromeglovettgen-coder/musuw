@@ -203,7 +203,7 @@ const selectTheme = (value: ThemeMode) => {
 .general-settings-reference {
   width: 100%;
   color: #111827;
-  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 .reference-plan-card {
   margin-bottom: 24px;

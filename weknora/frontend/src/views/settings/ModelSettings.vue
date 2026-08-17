@@ -484,7 +484,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.reference-model-settings { width: 100%; color: #111827; font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
+.reference-model-settings { width: 100%; color: #111827; font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
 .reference-model-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
 .reference-model-note { min-width: 0; flex: 1; display: flex; gap: 10px; padding: 12px; border: 1px solid #f3f4f6; border-radius: 16px; background: rgb(249 250 251 / 65%); }
 .reference-model-note__icon { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 9px; background: #fff; color: #4b5563; border: 1px solid #e5e7eb; }
