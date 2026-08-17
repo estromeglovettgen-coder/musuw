@@ -64,6 +64,13 @@ func (s *knowledgeService) checkCreateKnowledgeEntitlement(ctx context.Context, 
 }
 
 func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types.Model) (bool, error) {
+	// Platform administrators manage the shared builtin catalog. Consumer-plan
+	// filtering is a C-end entitlement boundary and must not hide paid models
+	// from the only role allowed to maintain that catalog.
+	if types.IsSystemAdminFromContext(ctx) {
+		return true, nil
+	}
+
 	plan, ok := effectivePlanFromContext(ctx)
 	if ok {
 		return types.ConsumerPlanAllowsModel(plan, model), nil
