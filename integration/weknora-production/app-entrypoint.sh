@@ -27,6 +27,8 @@ export OIDC_AUTH_CLIENT_ID="$(read_required_secret /run/secrets/oidc_client_id o
 export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_secret oidc-client-secret)"
 export DEEPSEEK_API_KEY="$(read_required_secret /run/secrets/deepseek_api_key deepseek-api-key)"
 export OPENROUTER_API_KEY="$(read_required_secret /run/secrets/openrouter_api_key openrouter-api-key)"
+export S3_ACCESS_KEY="$(read_required_secret /run/secrets/r2_access_key_id r2-access-key-id)"
+export S3_SECRET_KEY="$(read_required_secret /run/secrets/r2_secret_access_key r2-secret-access-key)"
 
 if [ "${#SYSTEM_AES_KEY}" -ne 32 ]; then
     printf '%s\n' 'required system-aes-key has an invalid length' >&2

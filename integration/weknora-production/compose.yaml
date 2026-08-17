@@ -58,7 +58,13 @@ services:
       WEKNORA_REDIS_NAMESPACE: ${WEKNORA_REDIS_NAMESPACE:?set WEKNORA_REDIS_NAMESPACE in production.env}
       DOCREADER_ADDR: ${DOCREADER_ADDR:-docreader:50051}
       DOCREADER_TRANSPORT: ${DOCREADER_TRANSPORT:-grpc}
-      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_TYPE: s3
+      S3_ENDPOINT: https://c692db4757e1454b71880ec6c431db9c.r2.cloudflarestorage.com
+      S3_REGION: auto
+      S3_BUCKET_NAME: musuw-production
+      S3_PATH_PREFIX: weknora
+      S3_USE_SSL: "true"
+      S3_FORCE_PATH_STYLE: "true"
       LOCAL_STORAGE_BASE_DIR: /data/files
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
       APP_EXTERNAL_URL: ${APP_EXTERNAL_URL:?set APP_EXTERNAL_URL in production.env}
@@ -110,6 +116,12 @@ services:
         mode: 0400
       - source: openrouter_api_key
         target: openrouter_api_key
+        mode: 0400
+      - source: r2_access_key_id
+        target: r2_access_key_id
+        mode: 0400
+      - source: r2_secret_access_key
+        target: r2_secret_access_key
         mode: 0400
     depends_on: !override
       redis:
@@ -296,3 +308,7 @@ secrets:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/deepseek_api_key
   openrouter_api_key:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/openrouter_api_key
+  r2_access_key_id:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/r2_access_key_id
+  r2_secret_access_key:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/r2_secret_access_key

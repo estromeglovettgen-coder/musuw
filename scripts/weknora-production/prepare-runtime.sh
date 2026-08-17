@@ -23,7 +23,7 @@ install -d -m 700 "$runtime_dir"
 [ -d "$secret_dir" ] || weknora_production_die 'production secret directory is unavailable'
 [ "$(weknora_production_file_mode "$secret_dir")" = '700' ] || weknora_production_die 'production secret directory permissions are unsafe'
 
-for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret deepseek_api_key openrouter_api_key; do
+for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret deepseek_api_key openrouter_api_key r2_access_key_id r2_secret_access_key; do
     weknora_production_require_secret_file "$secret_dir/$secret"
 done
 

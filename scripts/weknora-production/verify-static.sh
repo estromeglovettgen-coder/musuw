@@ -53,7 +53,7 @@ mkdir -m 700 "$secret_dir"
 
 # Deliberately synthetic values: this test proves file mounts and interpolation
 # only. It never reads an operator credential or prints a secret value.
-for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret deepseek_api_key openrouter_api_key; do
+for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret deepseek_api_key openrouter_api_key r2_access_key_id r2_secret_access_key; do
     printf '%s\n' 'static-verification-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -168,6 +168,12 @@ jq -e '
   (.services.app.environment.RETRIEVE_DRIVER == "postgres") and
   (.services.app.environment.STREAM_MANAGER_TYPE == "redis") and
   (.services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-production") and
+  (.services.app.environment.STORAGE_TYPE == "s3") and
+  (.services.app.environment.S3_ENDPOINT == "https://c692db4757e1454b71880ec6c431db9c.r2.cloudflarestorage.com") and
+  (.services.app.environment.S3_REGION == "auto") and
+  (.services.app.environment.S3_BUCKET_NAME == "musuw-production") and
+  (.services.app.environment.S3_PATH_PREFIX == "weknora") and
+  (.services.app.environment.S3_FORCE_PATH_STYLE == "true") and
   (.services.app.environment.SSRF_WHITELIST_EXTRA == "searxng,qdrant,milvus,weaviate,doris-fe,doris-be,identity.example") and
   (.services.searxng.ports | length == 1) and
   (.services.searxng.ports[0].host_ip == "127.0.0.1") and
@@ -187,14 +193,14 @@ jq -e '
     exit 1
 }
 
-for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret deepseek_api_key openrouter_api_key; do
+for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret deepseek_api_key openrouter_api_key r2_access_key_id r2_secret_access_key; do
     jq -e --arg secret "$secret" '.secrets[$secret].file | type == "string"' "$config_json" >/dev/null || {
         printf '%s\n' 'production Compose does not use a file-backed required secret' >&2
         exit 1
     }
 done
 
-for secret in deepseek_api_key openrouter_api_key; do
+for secret in deepseek_api_key openrouter_api_key r2_access_key_id r2_secret_access_key; do
     jq -e --arg secret "$secret" \
         '[.services.app.secrets[]?.source] | index($secret) != null' "$config_json" >/dev/null || {
         printf '%s\n' 'production app does not mount a required platform model secret' >&2

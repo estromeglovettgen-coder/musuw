@@ -77,7 +77,7 @@ WEKNORA_PRODUCTION_REVISION="$revision" \
 
 # Images are built and pushed by the GitHub Actions release job. The server
 # only pulls the exact digest references carried in production.env and never
-# invokes Docker build or a host-side build-cache cleanup.
+# invokes Docker build.
 printf '%s\n' "$ghcr_token" |
     DOCKER_CONFIG="$docker_config" docker login ghcr.io \
         --username "$ghcr_username" --password-stdin >/dev/null
@@ -125,5 +125,9 @@ curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 https://app.musuw.com/a
 next_link="$runtime_dir/current.next.$$"
 ln -s "$repo_root" "$next_link"
 mv -Tf "$next_link" "$current_link"
+
+# Immutable releases leave old app/frontend images behind. Reclaim only images
+# that no running container uses; named volumes and live images are untouched.
+docker image prune -a -f >/dev/null
 
 printf '%s\n' "simple release green: $release_id source_bundle_sha256=$source_bundle_sha256"
