@@ -9,7 +9,6 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "@fontsource-variable/noto-sans-sc";
 import "@/assets/theme/theme.css";
-import "@/assets/musuw-visual.less";
 import "@/assets/dropdown-menu.less";
 import "@/components/css/chat-hljs-dark.less";
 // Task 1 visual authority: mechanically compiled from the reference TSX/Tailwind utilities.
