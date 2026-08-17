@@ -3,12 +3,9 @@
  * Source of truth:
  *   visual_ref/src/index.css
  *   visual_ref/src/components/Sidebar.tsx
- *   visual_ref/src/components/KnowledgeBase.tsx
- *   visual_ref/src/components/DocumentListView.tsx
  *
- * This file only maps the existing production DOM to geometry and Lucide icon
- * shapes that exist in the exported visual authority. No new visual language is
- * introduced here.
+ * KnowledgeBaseReference.vue now carries the reference DOM/icons directly, so
+ * this file no longer paints replacement knowledge controls with pseudo-elements.
  */
 
 :root {
@@ -37,9 +34,9 @@ body,
   font-family: var(--musuw-reference-font-sans) !important;
 }
 
-/* --------------------------------------------------------------------------
- * Sidebar — exact Lucide icon family used by visual_ref/Sidebar.tsx.
- * -------------------------------------------------------------------------- */
+/* Sidebar — temporary compatibility bridge until menu.vue itself is replaced
+ * with the visual_ref/Sidebar.tsx DOM. The shapes below are the exact Lucide
+ * family used by that source; no TDesign glyph is left visible for these nodes. */
 #app .aside_box .musuw-wordmark__mark {
   font-size: 0 !important;
   color: #fff !important;
@@ -63,7 +60,6 @@ body,
   mask-size: contain;
 }
 
-/* Zap — reference: w-3.5 h-3.5 text-white fill-current. */
 #app .aside_box .musuw-wordmark__mark::before {
   width: 14px;
   height: 14px;
@@ -80,7 +76,6 @@ body,
   display: none !important;
 }
 
-/* Search — reference: w-3.5 h-3.5 stroke-[2]. */
 #app .aside_box .header-icon-btn::before {
   width: 14px;
   height: 14px;
@@ -88,7 +83,6 @@ body,
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
 }
 
-/* ChevronLeft — reference: w-4 h-4 stroke-[1.8]. */
 #app .aside_box .sidebar-toggle::before {
   width: 16px;
   height: 16px;
@@ -96,7 +90,6 @@ body,
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
 }
 
-/* ChevronRight for the collapsed sidebar expand control. */
 #app .aside_box .sidebar-toggle-item .menu_icon::before {
   width: 16px;
   height: 16px;
@@ -104,308 +97,16 @@ body,
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
 }
 
-/* MessageSquarePlus — exact reference primary action. */
 #app .aside_box [data-guide="nav-creatChat"] .menu_icon::before {
   width: 16px;
   height: 16px;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v6'/%3E%3Cpath d='M9 10h6'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v6'/%3E%3Cpath d='M9 10h6'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2 2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v6'/%3E%3Cpath d='M9 10h6'/%3E%3C/svg%3E");
 }
 
-/* Folder — exact reference KB primary action. */
 #app .aside_box [data-guide="nav-knowledge-bases"] .menu_icon::before {
   width: 16px;
   height: 16px;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
-}
-
-/* --------------------------------------------------------------------------
- * Knowledge detail — restore the exported DocumentListView topology.
- * -------------------------------------------------------------------------- */
-#app .ref-kb-page {
-  background: rgb(249 250 251 / 0.3) !important;
-  font-family: var(--musuw-reference-font-sans) !important;
-}
-
-/* The reference toolbar is a single flex-wrap row. The previous Vue bridge
- * created a product-only second row; remove that visual invention. */
-#app .ref-kb-page .ref-toolbar {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 10px !important;
-  padding: 10px !important;
-  grid-template-columns: none !important;
-  grid-template-areas: none !important;
-}
-
-#app .ref-kb-page .ref-toolbar-left {
-  order: 1 !important;
-  display: flex !important;
-  flex: 1 1 auto !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  gap: 8px !important;
-  min-width: 280px !important;
-}
-
-#app .ref-kb-page .ref-toolbar-secondary {
-  order: 2 !important;
-  display: flex !important;
-  flex: 0 0 auto !important;
-  align-items: center !important;
-  gap: 8px !important;
-  min-height: 0 !important;
-}
-
-/* Source/date controls do not exist in visual_ref/DocumentListView.tsx. */
-#app .ref-kb-page .ref-toolbar-secondary .ref-product-only {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-toolbar-right {
-  order: 3 !important;
-  display: flex !important;
-  flex: 0 0 auto !important;
-  align-items: center !important;
-  gap: 8px !important;
-  margin-left: auto !important;
-}
-
-#app .ref-kb-page .ref-select-status {
-  width: auto !important;
-  min-width: 132px !important;
-}
-
-/* When the directory is collapsed, the reference renders a dedicated narrow
- * panel to the left of the document area. Reuse the existing real collapse
- * button, but place it where the reference does instead of inside the toolbar. */
-#app .ref-kb-page .ref-document-workspace:has(.ref-toolbar-left > button.ref-root-pill:first-child) {
-  margin-left: 48px !important;
-}
-
-#app .ref-kb-page .ref-toolbar-left > button.ref-root-pill:first-child {
-  position: absolute !important;
-  top: 0 !important;
-  bottom: 0 !important;
-  left: -48px !important;
-  z-index: 3 !important;
-  width: 36px !important;
-  height: auto !important;
-  min-height: 100% !important;
-  box-sizing: border-box !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 5px !important;
-  padding: 13px 4px !important;
-  border: 1px solid rgb(229 231 235 / 0.9) !important;
-  border-radius: 16px !important;
-  background: #fff !important;
-  color: #4b5563 !important;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025) !important;
-  font-size: 10px !important;
-  line-height: 12px !important;
-}
-
-#app .ref-kb-page .ref-toolbar-left > button.ref-root-pill:first-child > .t-icon {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-toolbar-left > button.ref-root-pill:first-child::before {
-  content: "";
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  background-color: currentColor;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M9 3v18'/%3E%3Cpath d='m16 15-3-3 3-3'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M9 3v18'/%3E%3Cpath d='m16 15-3-3 3-3'/%3E%3C/svg%3E");
-}
-
-/* Header icons: ArrowLeft / ChevronDown / FileText / BookOpen / Network. */
-#app .ref-kb-page .ref-crumb-link > .t-icon,
-#app .ref-kb-page .ref-kb-name > .t-icon,
-#app .ref-kb-page .ref-tabs button > .t-icon {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-crumb-link::before,
-#app .ref-kb-page .ref-kb-name::after,
-#app .ref-kb-page .ref-tabs button::before,
-#app .ref-kb-page .ref-filter-button::before,
-#app .ref-kb-page .ref-filter-button::after,
-#app .ref-kb-page .ref-view-toggle button::before {
-  content: "";
-  display: block;
-  flex: 0 0 auto;
-  background-color: currentColor;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-#app .ref-kb-page .ref-crumb-link::before {
-  width: 14px;
-  height: 14px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 19-7-7 7-7'/%3E%3Cpath d='M19 12H5'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 19-7-7 7-7'/%3E%3Cpath d='M19 12H5'/%3E%3C/svg%3E");
-}
-
-#app .ref-kb-page .ref-kb-name::after {
-  width: 14px;
-  height: 14px;
-  color: #9ca3af;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-
-#app .ref-kb-page .ref-tabs button::before {
-  width: 14px;
-  height: 14px;
-  color: #374151;
-}
-
-#app .ref-kb-page .ref-tabs button:nth-child(1)::before {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cpath d='M8 13h8M8 17h8M8 9h2'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cpath d='M8 13h8M8 17h8M8 9h2'/%3E%3C/svg%3E");
-}
-
-#app .ref-kb-page .ref-tabs button:nth-child(2)::before {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v15a3 3 0 0 0-3-3Z'/%3E%3Cpath d='M21 18a1 1 0 0 0 1-1V5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v15a3 3 0 0 1 3-3Z'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v15a3 3 0 0 0-3-3Z'/%3E%3Cpath d='M21 18a1 1 0 0 0 1-1V5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v15a3 3 0 0 1 3-3Z'/%3E%3C/svg%3E");
-}
-
-#app .ref-kb-page .ref-tabs button:nth-child(3)::before {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='16' y='16' width='6' height='6' rx='1'/%3E%3Crect x='2' y='16' width='6' height='6' rx='1'/%3E%3Crect x='9' y='2' width='6' height='6' rx='1'/%3E%3Cpath d='M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='16' y='16' width='6' height='6' rx='1'/%3E%3Crect x='2' y='16' width='6' height='6' rx='1'/%3E%3Crect x='9' y='2' width='6' height='6' rx='1'/%3E%3Cpath d='M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8'/%3E%3C/svg%3E");
-}
-
-/* Root pill uses Folder, matching DocumentListView.tsx (not FolderOpen). */
-#app .ref-kb-page .ref-toolbar-left > div.ref-root-pill > .t-icon {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-toolbar-left > div.ref-root-pill::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  background-color: #6b7280;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
-}
-
-/* Tag control — Tag + ChevronDown. */
-#app .ref-kb-page .ref-filter-button > .t-icon {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-filter-button::before {
-  width: 14px;
-  height: 14px;
-  color: #9ca3af;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z'/%3E%3Ccircle cx='7.5' cy='7.5' r='.5' fill='black'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z'/%3E%3Ccircle cx='7.5' cy='7.5' r='.5' fill='black'/%3E%3C/svg%3E");
-}
-
-#app .ref-kb-page .ref-filter-button::after {
-  width: 12px;
-  height: 12px;
-  color: #9ca3af;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-
-/* View toggle — LayoutGrid / List. */
-#app .ref-kb-page .ref-view-toggle button > .t-icon {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-view-toggle button::before {
-  width: 14px;
-  height: 14px;
-}
-
-#app .ref-kb-page .ref-view-toggle button:first-child::before {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1'/%3E%3C/svg%3E");
-}
-
-#app .ref-kb-page .ref-view-toggle button:last-child::before {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13'/%3E%3C/svg%3E");
-}
-
-/* Add document — exact dark button rhythm and Plus/ChevronDown icon family. */
-#app .ref-kb-page .ref-add-document .kb-upload-source-trigger {
-  min-width: 126px !important;
-  height: 30px !important;
-  padding: 0 28px 0 12px !important;
-  gap: 6px !important;
-  border-radius: 12px !important;
-  background-color: #111827 !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 10px center !important;
-}
-
-#app .ref-kb-page .ref-add-document .kb-upload-source-trigger > .t-icon {
-  display: none !important;
-}
-
-#app .ref-kb-page .ref-add-document .kb-upload-source-trigger::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  background-color: #fff;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E");
-}
-
-/* Force TDesign behavior-shell controls to the same 12px type scale used by
- * the reference React inputs/dropdowns. */
-#app .ref-kb-page .t-input,
-#app .ref-kb-page .t-select,
-#app .ref-kb-page .t-range-input,
-#app .ref-kb-page .t-date-range-picker,
-#app .ref-kb-page .t-popup,
-#app .ref-kb-page .t-dropdown {
-  font-family: var(--musuw-reference-font-sans) !important;
-  font-size: 12px !important;
-}
-
-@media (max-width: 1180px) {
-  #app .ref-kb-page .ref-toolbar-left {
-    min-width: 0 !important;
-  }
-
-  #app .ref-kb-page .ref-toolbar-secondary {
-    order: 4 !important;
-    width: 100% !important;
-  }
 }
