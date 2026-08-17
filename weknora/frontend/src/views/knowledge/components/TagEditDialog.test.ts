@@ -8,14 +8,12 @@ const enUS = readFileSync(new URL('../../../i18n/locales/en-US.ts', import.meta.
 const koKR = readFileSync(new URL('../../../i18n/locales/ko-KR.ts', import.meta.url), 'utf8')
 const ruRU = readFileSync(new URL('../../../i18n/locales/ru-RU.ts', import.meta.url), 'utf8')
 
-test('uses a compact flat dialog with selected and available sections', () => {
-  assert.match(component, /dialog-class-name="tag-edit-dialog"/)
-  assert.match(component, /width="400px"/)
-  assert.match(component, /<template #header>/)
-  assert.match(component, /class="tag-edit-heading-icon"/)
-  assert.match(component, /name="discount"/)
-  assert.match(component, /class="setting-drawer__section"/)
-  assert.match(component, /class="setting-drawer__section-title"/)
+test('uses the visual-reference native tag modal rather than the legacy TDesign dialog', () => {
+  assert.match(component, /class="reference-modal-backdrop"/)
+  assert.match(component, /class="reference-tag-dialog"/)
+  assert.match(component, /ReferenceIcon name="tag"/)
+  assert.match(component, /ReferenceIcon name="search"/)
+  assert.match(component, /ReferenceIcon name="plus"/)
   assert.match(component, /tagEditSelectedSection/)
   assert.match(component, /tagEditAvailableSection/)
   assert.match(component, /canManage/)
@@ -23,13 +21,20 @@ test('uses a compact flat dialog with selected and available sections', () => {
   assert.match(component, /open-manage/)
   assert.match(component, /selectedTagsList/)
   assert.match(component, /availableTagsList/)
-  assert.match(component, /class="tag-edit-chip"/)
-  assert.match(component, /class="tag-edit-create-row"/)
-  assert.match(component, /class="tag-edit-footer"/)
-  assert.doesNotMatch(component, /class="tag-edit-create"/)
-  assert.doesNotMatch(component, /class="tag-edit-count"/)
-  assert.doesNotMatch(component, /:header="title"/)
-  assert.doesNotMatch(component, /<t-checkbox/)
+  assert.match(component, /class="reference-tag-chip selected"/)
+  assert.match(component, /class="reference-new-tag"/)
+  assert.match(component, /class="reference-tag-dialog__footer"/)
+  assert.doesNotMatch(component, /<t-dialog/)
+  assert.doesNotMatch(component, /<t-button/)
+  assert.doesNotMatch(component, /<t-input/)
+  assert.doesNotMatch(component, /<t-icon/)
+})
+
+test('keeps the existing tag data and mutation behavior', () => {
+  assert.match(component, /createKnowledgeBaseTag/)
+  assert.match(component, /emit\('confirm', Array\.from\(selectedSet\.value\)\)/)
+  assert.match(component, /emit\('tag-created'\)/)
+  assert.match(component, /emit\('open-manage'\)/)
 })
 
 test('defines the short dialog heading in every supported locale', () => {
