@@ -14,6 +14,7 @@ import "@/assets/dropdown-menu.less";
 import "@/components/css/chat-hljs-dark.less";
 import "@/assets/musuw-reference-core.less";
 import "@/assets/musuw-reference-workbench.less";
+import "@/assets/musuw-reference-header.less";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
