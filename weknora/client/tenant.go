@@ -39,7 +39,7 @@ type Tenant struct {
 	// Business/department information
 	Business string `yaml:"business"          json:"business"`
 	// Storage quota (Bytes), default is 10GB
-	StorageQuota int64 `yaml:"storage_quota"     json:"storage_quota"     gorm:"default:10737418240"`
+	StorageQuota int64 `yaml:"storage_quota"     json:"storage_quota"     gorm:"default:5368709120"`
 	// Storage used (Bytes)
 	StorageUsed int64 `yaml:"storage_used"      json:"storage_used"      gorm:"default:0"`
 	// APIKey is only populated by CreateTenant when the server has
@@ -84,10 +84,10 @@ type TenantAPIKey struct {
 	APIKey           string           `json:"api_key"`
 	Role             TenantAPIKeyRole `json:"role"`
 	KnowledgeBaseIDs []string         `json:"knowledge_base_ids"`
-	LastUsedAt       *time.Time          `json:"last_used_at,omitempty"`
-	ExpiresAt        *time.Time          `json:"expires_at,omitempty"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
+	LastUsedAt       *time.Time       `json:"last_used_at,omitempty"`
+	ExpiresAt        *time.Time       `json:"expires_at,omitempty"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
 }
 
 // CreateTenantAPIKeyRequest creates a revocable tenant API key.

@@ -24,7 +24,7 @@ builtin_models:
     type: KnowledgeQA
     source: remote
     description: DeepSeek V4 Flash through OpenRouter · lower-cost conversation model
-    is_default: true
+    is_default: false
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
@@ -39,7 +39,7 @@ builtin_models:
     type: KnowledgeQA
     source: remote
     description: Qwen 3.7 Flash through OpenRouter · fast multimodal conversation
-    is_default: false
+    is_default: true
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1

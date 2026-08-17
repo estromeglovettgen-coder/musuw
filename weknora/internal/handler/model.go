@@ -156,6 +156,10 @@ func (h *ModelHandler) GetModel(c *gin.Context) {
 			c.Error(errors.NewNotFoundError("Model not found"))
 			return
 		}
+		if appErr, ok := errors.IsAppError(err); ok {
+			_ = c.Error(appErr)
+			return
+		}
 		logger.ErrorWithFields(ctx, err, nil)
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
@@ -359,6 +363,10 @@ func (h *ModelHandler) DebugModel(c *gin.Context) {
 	if err != nil {
 		if err == service.ErrModelNotFound {
 			c.Error(errors.NewNotFoundError("Model not found"))
+			return
+		}
+		if appErr, ok := errors.IsAppError(err); ok {
+			_ = c.Error(appErr)
 			return
 		}
 		c.Error(errors.NewInternalServerError(err.Error()))

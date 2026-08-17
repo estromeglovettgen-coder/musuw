@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 	openai "github.com/sashabaranov/go-openai"
@@ -78,6 +79,9 @@ func NewRemoteAPIVLM(config *Config) (*RemoteAPIVLM, error) {
 		}
 	}
 	httpClient := newVLMHTTPClient(vlmHTTPTimeout())
+	if providerName == provider.ProviderOpenRouter && config.OpenRouterMeter != nil {
+		httpClient = modelopenrouter.WrapHTTPClient(httpClient, config.OpenRouterMeter)
+	}
 
 	// 注入用户自定义 HTTP header（类似 OpenAI Python SDK 的 extra_headers）
 	if len(config.CustomHeaders) > 0 {

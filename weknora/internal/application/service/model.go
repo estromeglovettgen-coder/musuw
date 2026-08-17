@@ -30,6 +30,7 @@ type modelService struct {
 	ollamaService *ollama.OllamaService
 	pooler        embedding.EmbedderPooler
 	tenantService interfaces.TenantService
+	entitlement   interfaces.EntitlementService
 }
 
 // NewModelService creates a new model service instance
@@ -40,6 +41,28 @@ func NewModelService(repo interfaces.ModelRepository,
 	pooler embedding.EmbedderPooler,
 	tenantService interfaces.TenantService,
 ) interfaces.ModelService {
+	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, nil)
+}
+
+func NewModelServiceWithEntitlement(repo interfaces.ModelRepository,
+	kbRepo interfaces.KnowledgeBaseRepository,
+	agentRepo interfaces.CustomAgentRepository,
+	ollamaService *ollama.OllamaService,
+	pooler embedding.EmbedderPooler,
+	tenantService interfaces.TenantService,
+	entitlement interfaces.EntitlementService,
+) interfaces.ModelService {
+	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, entitlement)
+}
+
+func newModelService(repo interfaces.ModelRepository,
+	kbRepo interfaces.KnowledgeBaseRepository,
+	agentRepo interfaces.CustomAgentRepository,
+	ollamaService *ollama.OllamaService,
+	pooler embedding.EmbedderPooler,
+	tenantService interfaces.TenantService,
+	entitlement interfaces.EntitlementService,
+) interfaces.ModelService {
 	return &modelService{
 		repo:          repo,
 		kbRepo:        kbRepo,
@@ -47,6 +70,7 @@ func NewModelService(repo interfaces.ModelRepository,
 		ollamaService: ollamaService,
 		pooler:        pooler,
 		tenantService: tenantService,
+		entitlement:   entitlement,
 	}
 }
 
@@ -185,6 +209,13 @@ func (s *modelService) GetModelByID(ctx context.Context, id string) (*types.Mode
 		logger.Error(ctx, "Model not found")
 		return nil, ErrModelNotFound
 	}
+	allowed, err := s.consumerPlanAllowsModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, apperrors.NewForbiddenError("This model requires a paid plan")
+	}
 
 	logger.Infof(ctx, "Model found, name: %s, status: %s", model.Name, model.Status)
 
@@ -222,6 +253,17 @@ func (s *modelService) ListModels(ctx context.Context) ([]*types.Model, error) {
 		})
 		return nil, err
 	}
+	allowedModels := models[:0]
+	for _, model := range models {
+		allowed, allowErr := s.consumerPlanAllowsModel(ctx, model)
+		if allowErr != nil {
+			return nil, allowErr
+		}
+		if allowed {
+			allowedModels = append(allowedModels, model)
+		}
+	}
+	models = allowedModels
 
 	logger.Infof(ctx, "Retrieved %d models successfully", len(models))
 	return models, nil
@@ -433,7 +475,9 @@ func (s *modelService) GetEmbeddingModel(ctx context.Context, modelId string) (e
 
 	appID, appSecret := s.resolveWeKnoraCloudCredentials(ctx, &model.Parameters)
 
-	embedder, err := embedding.NewEmbedder(embedding.ConfigFromModel(model, appID, appSecret), s.pooler, s.ollamaService)
+	embedConfig := embedding.ConfigFromModel(model, appID, appSecret)
+	embedConfig.OpenRouterMeter = s.entitlement
+	embedder, err := embedding.NewEmbedder(embedConfig, s.pooler, s.ollamaService)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"model_id":   model.ID,
@@ -475,12 +519,21 @@ func (s *modelService) GetEmbeddingModelForTenant(ctx context.Context, modelId s
 		logger.Errorf(ctx, "Model is not active, status: %s", model.Status)
 		return nil, errors.New("model is not active")
 	}
+	allowed, err := s.consumerPlanAllowsModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, apperrors.NewForbiddenError("This model requires a paid plan")
+	}
 
 	logger.Infof(ctx, "Getting cross-tenant embedding model: %s, source: %s, tenant: %d", model.Name, model.Source, tenantID)
 
 	appID, appSecret := s.resolveWeKnoraCloudCredentials(ctx, &model.Parameters)
 
-	embedder, err := embedding.NewEmbedder(embedding.ConfigFromModel(model, appID, appSecret), s.pooler, s.ollamaService)
+	embedConfig := embedding.ConfigFromModel(model, appID, appSecret)
+	embedConfig.OpenRouterMeter = s.entitlement
+	embedder, err := embedding.NewEmbedder(embedConfig, s.pooler, s.ollamaService)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"model_id":   model.ID,
@@ -510,7 +563,9 @@ func (s *modelService) GetRerankModel(ctx context.Context, modelId string) (rera
 
 	appID, appSecret := s.resolveWeKnoraCloudCredentials(ctx, &model.Parameters)
 
-	reranker, err := rerank.NewReranker(rerank.ConfigFromModel(model, appID, appSecret))
+	rerankConfig := rerank.ConfigFromModel(model, appID, appSecret)
+	rerankConfig.OpenRouterMeter = s.entitlement
+	reranker, err := rerank.NewReranker(rerankConfig)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"model_id":   model.ID,
@@ -548,12 +603,21 @@ func (s *modelService) GetChatModel(ctx context.Context, modelId string) (chat.C
 		logger.Error(ctx, "Chat model not found")
 		return nil, ErrModelNotFound
 	}
+	allowed, err := s.consumerPlanAllowsModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, apperrors.NewForbiddenError("This model requires a paid plan")
+	}
 
 	logger.Infof(ctx, "Getting chat model: %s, source: %s", model.Name, model.Source)
 
 	appID, appSecret := s.resolveWeKnoraCloudCredentials(ctx, &model.Parameters)
 
-	chatModel, err := chat.NewChat(chat.ConfigFromModel(model, appID, appSecret), s.ollamaService)
+	chatConfig := chat.ConfigFromModel(model, appID, appSecret)
+	chatConfig.OpenRouterMeter = s.entitlement
+	chatModel, err := chat.NewChat(chatConfig, s.ollamaService)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"model_id":   model.ID,
@@ -585,12 +649,21 @@ func (s *modelService) GetVLMModel(ctx context.Context, modelId string) (vlm.VLM
 	if model == nil {
 		return nil, ErrModelNotFound
 	}
+	allowed, err := s.consumerPlanAllowsModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, apperrors.NewForbiddenError("This model requires a paid plan")
+	}
 
 	logger.Infof(ctx, "Getting VLM model: %s, source: %s", model.Name, model.Source)
 
 	appID, appSecret := s.resolveWeKnoraCloudCredentials(ctx, &model.Parameters)
 
-	vlmModel, err := vlm.NewVLM(vlm.ConfigFromModel(model, appID, appSecret), s.ollamaService)
+	vlmConfig := vlm.ConfigFromModel(model, appID, appSecret)
+	vlmConfig.OpenRouterMeter = s.entitlement
+	vlmModel, err := vlm.NewVLM(vlmConfig, s.ollamaService)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"model_id":   model.ID,
@@ -625,10 +698,19 @@ func (s *modelService) GetASRModel(ctx context.Context, modelId string) (asr.ASR
 	if model == nil {
 		return nil, ErrModelNotFound
 	}
+	allowed, err := s.consumerPlanAllowsModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, apperrors.NewForbiddenError("This model requires a paid plan")
+	}
 
 	logger.Infof(ctx, "Getting ASR model: %s, source: %s", model.Name, model.Source)
 
-	sttModel, err := asr.NewASR(asr.ConfigFromModel(model))
+	asrConfig := asr.ConfigFromModel(model)
+	asrConfig.OpenRouterMeter = s.entitlement
+	sttModel, err := asr.NewASR(asrConfig)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"model_id":   model.ID,

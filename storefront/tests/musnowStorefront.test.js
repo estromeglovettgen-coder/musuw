@@ -86,25 +86,24 @@ test("public capability copy matches the simplified Query, Knowledge Base, and W
   assert.match(chinese, /精确(?:证据)?引用/);
 });
 
-test("first-release pricing does not lock existing knowledge capabilities behind a plan", () => {
+test("consumer pricing matches the enforced storage and OpenRouter allowances", () => {
   for (const locale of ["en", "zh-CN"]) {
     const pricing = getStorefrontCopy(locale).pricing;
     assert.match(
       pricing.intro.body,
-      locale === "zh-CN" ? /免费体验.*全部知识能力|首版不设置功能门槛/ : /free experience.*every current knowledge capability|no feature gates/i,
+      locale === "zh-CN" ? /四种方案.*存储空间.*OpenRouter 额度/ : /four enforced plans.*storage.*OpenRouter allowance/i,
     );
-    const personalFeatures = pricing.plans[0].features.join(" ");
-    assert.match(personalFeatures, locale === "zh-CN" ? /知识维基.*知识图谱/ : /Wiki.*knowledge graph/i);
+    assert.equal(pricing.plans.length, 4);
+    const freeFeatures = pricing.plans[0].features.join(" ");
+    assert.match(freeFeatures, locale === "zh-CN" ? /5 GB.*\$1.*1 个知识库.*10 篇文档/ : /5 GB.*\$1.*1 knowledge base.*10 documents/i);
   }
 
-  assert.match(plans[0].features.join(" "), /Wiki.*knowledge graph/i);
-  for (const capability of ["Advanced knowledge tools", "Living Wiki", "Knowledge graph", "Graph view inside Wiki"]) {
-    const row = comparisonGroups.flatMap((group) => group.rows).find(([name]) => name === capability);
-    assert.deepEqual(row?.slice(1, 3), [true, true], `${capability} must be available in the free experience`);
-  }
+  assert.match(plans[1].features.join(" "), /20 GB.*\$1\.25.*All configured models/i);
+  assert.match(plans[2].features.join(" "), /40 GB.*\$2\.50.*All configured models/i);
+  assert.match(plans[3].features.join(" "), /80 GB.*\$5.*All configured models/i);
 });
 
-test("regional price books expose exact monthly and annual totals without enabling Max", () => {
+test("regional price books expose exact monthly and annual totals for all four plans", () => {
   assert.deepEqual(priceBooks.USD, [
     { monthly: 0, yearlyTotal: 0 },
     { monthly: 5, yearlyTotal: 49 },
@@ -119,7 +118,7 @@ test("regional price books expose exact monthly and annual totals without enabli
   ]);
   assert.equal(plans[0].key, "free");
   assert.equal(plans[3].key, "max");
-  assert.equal(plans[3].available, false);
+  assert.notEqual(plans[3].available, false);
 });
 
 test("existing homepage structure points only to real musuw product evidence", () => {

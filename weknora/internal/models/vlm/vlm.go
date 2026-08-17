@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/models/utils/ollama"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -34,9 +35,10 @@ type Config struct {
 	MaxConcurrency int
 	Extra          map[string]any
 	// CustomHeaders 允许在调用远程 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
-	CustomHeaders map[string]string
-	AppID         string
-	AppSecret     string
+	CustomHeaders   map[string]string
+	AppID           string
+	AppSecret       string
+	OpenRouterMeter modelopenrouter.Meter
 }
 
 // ConfigFromModel 根据 types.Model 构造 vlm.Config。

@@ -159,50 +159,49 @@ export const plans = [
     key: "free",
     label: "Free",
     name: "Free",
-    description: "Start using the current musuw experience at no cost",
+    description: "A bounded plan for a personal knowledge base",
     features: [
-      "All current musuw knowledge capabilities",
-      "Sources, history, Wiki, and knowledge graph",
-      "Upload, parsing, retrieval, and exact citations",
-      "No payment required"
+      "5 GB storage",
+      "$1 monthly OpenRouter credit",
+      "1 knowledge base · 10 documents",
+      "Lowest-cost model set"
     ]
   },
   {
-    key: "personal",
-    label: "Personal billing",
-    name: "Personal Plus",
-    description: "Personal Plus billing for the current musuw experience",
+    key: "plus",
+    label: "Plus",
+    name: "Plus",
+    description: "More room and every configured model",
     features: [
-      "All current musuw knowledge capabilities",
-      "Sources, history, Wiki, and knowledge graph",
-      "Upload, parsing, retrieval, and exact citations",
-      "Free experience remains available"
+      "20 GB storage",
+      "$1.25 monthly OpenRouter credit",
+      "No plan cap on knowledge bases or documents",
+      "All configured models"
     ]
   },
   {
     key: "pro",
-    label: "Pro billing",
+    label: "Pro",
     name: "Pro",
-    description: "Pro billing for the current musuw experience",
+    description: "Higher storage and model allowance",
     featured: true,
     features: [
-      "All current musuw knowledge capabilities",
-      "Sources, history, Wiki, and knowledge graph",
-      "Upload, parsing, retrieval, and exact citations",
-      "Server-verified Pro billing status"
+      "40 GB storage",
+      "$2.50 monthly OpenRouter credit",
+      "No plan cap on knowledge bases or documents",
+      "All configured models"
     ]
   },
   {
     key: "max",
-    label: "Planned",
+    label: "Max",
     name: "Max",
-    description: "For future shared knowledge workspaces",
-    available: false,
+    description: "The largest current personal allowance",
     features: [
-      "Everything in Pro",
-      "Shared workspace administration",
-      "Role-based access controls",
-      "Organization support"
+      "80 GB storage",
+      "$5 monthly OpenRouter credit",
+      "No plan cap on knowledge bases or documents",
+      "All configured models"
     ]
   }
 ];
@@ -213,7 +212,7 @@ export const comparisonGroups = [
     rows: [
       ["Personal source library", true, true, true, true],
       ["Topics and source history", true, true, true, true],
-      ["Shared workspace administration", false, false, false, true]
+      ["Shared workspace administration", false, false, false, false]
     ]
   },
   {
@@ -372,7 +371,7 @@ export const faqs = [
   {
     question: "How does paid access become active?",
     answer:
-      "Personal and Pro open Paddle Checkout after Google sign-in. musuw displays billing status only after its server verifies Paddle's signed confirmation; returning from checkout is not proof of payment."
+      "Upgrades remain unavailable until Paddle is configured. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access."
   }
 ];
 

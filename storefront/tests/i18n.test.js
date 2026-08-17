@@ -29,7 +29,7 @@ test("English and Chinese storefront dictionaries have identical complete struct
 
 test("getStorefrontCopy never mixes locales and defaults unknown input to English", () => {
   assert.equal(getStorefrontCopy("zh-CN").nav.items[0].label, "功能");
-  assert.equal(getStorefrontCopy("zh-CN").pricing.checkout.action, "选择套餐");
+  assert.equal(getStorefrontCopy("zh-CN").pricing.checkout.action, "查看方案");
   assert.equal(getStorefrontCopy("en").nav.items[0].label, "Features");
   assert.equal(getStorefrontCopy("fr").nav.items[0].label, "Features");
 });
@@ -53,17 +53,17 @@ test("the public header offers localized login and free-start actions", () => {
   assert.equal(getStorefrontCopy("zh-CN").nav.openApp, "打开 musuw");
 });
 
-test("Paddle handoff and authoritative confirmation copy is present in both locales", () => {
+test("Paddle availability and authoritative confirmation copy is present in both locales", () => {
   for (const locale of ["en", "zh-CN"]) {
     const copy = getStorefrontCopy(locale);
     assert.ok(copy.meta.title);
     assert.ok(copy.meta.description);
     assert.ok(copy.pricing.checkout.action);
-    assert.match(copy.pricing.checkout.note, locale === "zh-CN" ? /自动续费/ : /renew/i);
+    assert.match(copy.pricing.checkout.note, locale === "zh-CN" ? /暂不开放升级/ : /upgrades remain unavailable/i);
     assert.match(copy.pricing.checkout.providerNote, /Paddle/);
     assert.match(
       copy.pricing.checkout.providerNote,
-      locale === "zh-CN" ? /服务器验证|签名确认/ : /server verifies|signed confirmation/i,
+      locale === "zh-CN" ? /服务器签名事件|验证 Paddle/ : /signed server event|verifies Paddle/i,
     );
   }
 });

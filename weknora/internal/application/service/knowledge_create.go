@@ -46,6 +46,9 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 	logger.Infof(ctx, "Knowledge base ID: %s, file: %s", kbID, fileName)
 
 	if IsVideoType(getFileType(fileName)) {
+		if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, getFileType(fileName), file.Size); err != nil {
+			return nil, err
+		}
 		logger.Error(ctx, "Video file upload is not supported")
 		return nil, werrors.NewBadRequestError("暂不支持上传视频文件")
 	}
@@ -106,6 +109,9 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 			return nil, err
 		}
 		return existingKnowledge, types.NewDuplicateFileError(existingKnowledge)
+	}
+	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, getFileType(fileName), file.Size); err != nil {
+		return nil, err
 	}
 
 	// Check storage quota
@@ -358,6 +364,9 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		}
 		return existingKnowledge, types.NewDuplicateURLError(existingKnowledge)
 	}
+	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, "html", 1024*1024); err != nil {
+		return nil, err
+	}
 
 	// Check storage quota
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
@@ -594,6 +603,9 @@ func (s *knowledgeService) createKnowledgeFromFileURL(
 		}
 		return existingKnowledge, types.NewDuplicateURLError(existingKnowledge)
 	}
+	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, fileType, maxFileURLSize); err != nil {
+		return nil, err
+	}
 
 	// Check storage quota
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
@@ -763,6 +775,9 @@ func (s *knowledgeService) CreateKnowledgeFromManual(ctx context.Context,
 	if err := s.checkStorageEngineConfigured(ctx, kb); err != nil {
 		return nil, err
 	}
+	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, types.KnowledgeTypeManual, int64(len(cleanContent))); err != nil {
+		return nil, err
+	}
 
 	tenantID := ctx.Value(types.TenantIDContextKey).(uint64)
 	now := time.Now()
@@ -875,6 +890,13 @@ func (s *knowledgeService) createKnowledgeFromPassageInternal(ctx context.Contex
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, kbID)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to get knowledge base: %v", err)
+		return nil, err
+	}
+	totalBytes := int64(0)
+	for _, item := range safePassages {
+		totalBytes += int64(len(item))
+	}
+	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, "passage", totalBytes); err != nil {
 		return nil, err
 	}
 

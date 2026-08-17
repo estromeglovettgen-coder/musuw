@@ -1,7 +1,7 @@
 export const APP_URL = "https://app.musuw.com/";
 export const APP_LOGIN_URL = "https://app.musuw.com/auth/start";
 
-const plans = new Set(["personal", "pro"]);
+const plans = new Set(["plus", "pro", "max"]);
 const billingPeriods = new Set(["monthly", "yearly"]);
 
 export function createProductLoginUrl(intent) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -87,9 +88,10 @@ type RerankerConfig struct {
 	Provider    string // Provider identifier: openai, aliyun, zhipu, siliconflow, jina, generic
 	ExtraConfig map[string]string
 	// CustomHeaders 允许在调用远程 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
-	CustomHeaders map[string]string
-	AppID         string
-	AppSecret     string // 加密值，工厂函数调用方传入，使用前已解密
+	CustomHeaders   map[string]string
+	AppID           string
+	AppSecret       string // 加密值，工厂函数调用方传入，使用前已解密
+	OpenRouterMeter modelopenrouter.Meter
 }
 
 // ConfigFromModel 根据 types.Model 构造 RerankerConfig。
@@ -164,6 +166,11 @@ func newReranker(config *RerankerConfig) (Reranker, error) {
 	}
 	if setter, ok := reranker.(customHeaderSetter); ok {
 		setter.SetCustomHeaders(config.CustomHeaders)
+	}
+	if providerName == provider.ProviderOpenRouter && config.OpenRouterMeter != nil {
+		if setter, ok := reranker.(interface{ SetOpenRouterMeter(modelopenrouter.Meter) }); ok {
+			setter.SetOpenRouterMeter(config.OpenRouterMeter)
+		}
 	}
 	return reranker, nil
 }

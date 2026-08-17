@@ -3210,7 +3210,7 @@ export default {
         tenant: {
           max_owned_per_user: 'Maximum number of workspaces a non-superuser may own via self-service creation. Read on every workspace creation and takes effect immediately after saving. 0 uses the built-in default of 10; a negative value disables the cap entirely (not recommended on public deployments).',
           self_service_creation_enabled: 'Whether non-superusers may create workspaces themselves. When disabled, regular users can only join existing workspaces by invitation; cross-workspace superusers remain exempt. Takes effect immediately.',
-          default_storage_quota_gb: 'Default storage quota (GB) assigned when a new workspace is created, covering vectors, originals, text, indexes, and related data. Read only at creation time — changes apply to newly created workspaces only and do not retroactively update existing workspaces. 0 or a negative value uses the built-in default of 10 GB.',
+          default_storage_quota_gb: 'Default storage quota (GB) assigned when a new workspace is created, covering vectors, originals, text, indexes, and related data. Read only at creation time — changes apply to newly created workspaces only and do not retroactively update existing workspaces. 0 or a negative value uses the built-in default of 5 GB.',
           auto_create_api_key: 'Automatically creates a full_access API key for a new workspace and returns its plaintext token in the create response. Use only for integrations that depend on the legacy behavior; it is disabled by default and explicit API-key creation is recommended.'
         },
         asynq: {
@@ -3699,6 +3699,20 @@ export default {
     description: 'Configure language, appearance and other basic options',
     settings: 'Settings',
     close: 'Close Settings'
+  },
+  entitlement: {
+    currentPlan: 'Current plan',
+    active: 'active',
+    storage: 'Storage',
+    monthlyCredits: 'Monthly OpenRouter credits',
+    knowledgeBases: 'Knowledge bases',
+    documentsPerKb: 'Documents per knowledge base',
+    unlimited: 'Unlimited by plan',
+    videoPlanAllowed: 'Your plan permits video when the product supports it',
+    videoFreeBlocked: 'Video upload is not included in Free',
+    renewsMonthly: 'Credit period {month} (UTC)',
+    billingUnavailable: 'Upgrades are unavailable until Paddle billing is configured.',
+    plans: { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' }
   },
   theme: {
     theme: 'Theme',

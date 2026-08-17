@@ -37,7 +37,7 @@ const (
 	// Platform knowledge-base defaults mirror config/builtin_models.yaml.
 	// Keeping the stable IDs here lets every create API (including name-only
 	// clients) receive the same server-owned capabilities as the web UI.
-	PlatformKnowledgeBaseChatModelID      = "builtin-deepseek-v4-pro"
+	PlatformKnowledgeBaseChatModelID      = CheapestChatModelID
 	PlatformKnowledgeBaseEmbeddingModelID = "builtin-openrouter-embedding"
 	PlatformKnowledgeBaseVLMModelID       = "builtin-openrouter-vlm"
 	PlatformKnowledgeBaseASRModelID       = "builtin-openrouter-asr"

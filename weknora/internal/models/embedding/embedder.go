@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/models/utils/ollama"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
@@ -55,9 +56,10 @@ type Config struct {
 	MaxConcurrency int               `json:"max_concurrency"`
 	ExtraConfig    map[string]string `json:"extra_config"`
 	// CustomHeaders 允许在调用远程 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
-	CustomHeaders map[string]string `json:"custom_headers"`
-	AppID         string
-	AppSecret     string // 加密值，工厂函数调用方传入，使用前已解密
+	CustomHeaders   map[string]string `json:"custom_headers"`
+	AppID           string
+	AppSecret       string // 加密值，工厂函数调用方传入，使用前已解密
+	OpenRouterMeter modelopenrouter.Meter
 }
 
 // ConfigFromModel 根据 types.Model 构造 embedding.Config。
@@ -271,6 +273,9 @@ func newEmbedder(config Config, pooler EmbedderPooler, ollamaService *ollama.Oll
 				pooler)
 			if openaiEmb != nil {
 				openaiEmb.SetCustomHeaders(config.CustomHeaders)
+				if providerName == provider.ProviderOpenRouter && config.OpenRouterMeter != nil {
+					openaiEmb.SetOpenRouterMeter(config.OpenRouterMeter)
+				}
 			}
 			embedder, err = openaiEmb, oErr
 			return embedder, err

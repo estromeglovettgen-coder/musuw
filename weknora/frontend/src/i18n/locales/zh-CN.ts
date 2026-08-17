@@ -2198,6 +2198,20 @@ export default {
     settings: '设置',
     close: '关闭设置'
   },
+  entitlement: {
+    currentPlan: '当前方案',
+    active: '生效中',
+    storage: '存储空间',
+    monthlyCredits: '每月 OpenRouter 额度',
+    knowledgeBases: '知识库数量',
+    documentsPerKb: '每个知识库文档数',
+    unlimited: '方案不限制',
+    videoPlanAllowed: '产品支持视频后，此方案可使用视频功能',
+    videoFreeBlocked: '免费版不支持视频上传',
+    renewsMonthly: '额度周期 {month}（UTC）',
+    billingUnavailable: 'Paddle 计费尚未配置，暂时无法升级。',
+    plans: { free: '免费版', plus: 'Plus', pro: 'Pro', max: 'Max' }
+  },
   language: {
     zhCN: '简体中文',
     enUS: 'English',
@@ -2728,7 +2742,7 @@ export default {
         tenant: {
           max_owned_per_user: '每个非超管用户通过自助创建可拥有的最大空间数。每次创建空间时实时读取，修改后立即生效。0 表示使用内置默认值 10；负数表示完全关闭限制（不建议在公开部署使用）。',
           self_service_creation_enabled: '是否允许非超管用户主动创建空间。关闭后，普通用户只能通过邀请加入已有空间；跨空间超管仍可创建。修改后立即生效。',
-          default_storage_quota_gb: '新建空间时默认分配的存储配额（GB），包含向量、原文、文本、索引等。仅在创建时读取，修改后只对之后新建的空间生效，不会回写已存在的空间。0 或负数表示使用内置默认值 10GB。',
+          default_storage_quota_gb: '新建空间时默认分配的存储配额（GB），包含向量、原文、文本、索引等。仅在创建时读取，修改后只对之后新建的空间生效，不会回写已存在的空间。0 或负数表示使用内置默认值 5GB。',
           auto_create_api_key: '为新空间自动生成 full_access API Key，并在创建响应中返回明文 token。仅用于兼容依赖旧行为的集成；默认关闭，建议通过 API Key 管理显式创建。'
         },
         ssrf: {

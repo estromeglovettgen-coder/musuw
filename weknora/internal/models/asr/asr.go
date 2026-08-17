@@ -3,6 +3,7 @@ package asr
 import (
 	"context"
 
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
@@ -36,8 +37,10 @@ type Config struct {
 	APIKey    string
 	ModelID   string
 	Language  string // optional: specify language for transcription
+	Provider  string
 	// CustomHeaders 允许在调用远程 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
-	CustomHeaders map[string]string
+	CustomHeaders   map[string]string
+	OpenRouterMeter modelopenrouter.Meter
 }
 
 // ConfigFromModel 根据 types.Model 构造 asr.Config。
@@ -53,6 +56,7 @@ func ConfigFromModel(m *types.Model) *Config {
 		BaseURL:       m.Parameters.BaseURL,
 		ModelName:     m.Name,
 		Source:        m.Source,
+		Provider:      m.Parameters.Provider,
 		CustomHeaders: m.Parameters.CustomHeaders,
 	}
 }

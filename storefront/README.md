@@ -4,14 +4,14 @@ This tracked package is the approved public marketing, localization, pricing,
 trust, and legal surface for `musuw.com`. It preserves the imported React/Vite
 visual composition while handing product authority to `app.musuw.com`.
 
-General actions open `https://app.musuw.com/auth/start`. Personal and Pro pricing
-actions append only `plan=personal|pro` and `period=monthly|yearly`. The
+General actions open `https://app.musuw.com/auth/start`. Plus, Pro, and Max pricing
+actions append only a bounded `plan` and `period=monthly|yearly`. The
 storefront Worker serves and localizes static assets; it has no account,
 checkout, billing, or entitlement endpoint.
 
-Paddle Checkout runs only in the authenticated musuw React application. The
-musuw backend validates the bounded plan intent, creates the transaction, and
-mirrors billing state only from verified Paddle Webhooks.
+Until Paddle is configured, the authenticated application reports upgrades as
+unavailable. A paid plan can be mirrored only from a signature-verified Paddle
+Webhook; URL parameters and checkout returns never grant entitlements.
 
 ## Local verification
 

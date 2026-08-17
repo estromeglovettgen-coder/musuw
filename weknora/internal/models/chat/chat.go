@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/models/utils/ollama"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -110,9 +111,10 @@ type ChatConfig struct {
 	MaxConcurrency int
 	ExtraConfig    map[string]string
 	// CustomHeaders 允许在调用远程 OpenAI 兼容 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
-	CustomHeaders map[string]string
-	AppID         string
-	AppSecret     string // 加密值，由工厂函数调用方传入，在 NewWeKnoraCloudChat 中使用前已解密
+	CustomHeaders   map[string]string
+	AppID           string
+	AppSecret       string // 加密值，由工厂函数调用方传入，在 NewWeKnoraCloudChat 中使用前已解密
+	OpenRouterMeter modelopenrouter.Meter
 }
 
 // ConfigFromModel 根据 types.Model 构造 ChatConfig。

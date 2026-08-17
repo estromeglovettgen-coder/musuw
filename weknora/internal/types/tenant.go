@@ -96,10 +96,21 @@ type Tenant struct {
 	RetrieverEngines RetrieverEngines `yaml:"retriever_engines"   json:"retriever_engines"   gorm:"type:json"`
 	// Business
 	Business string `yaml:"business"            json:"business"`
-	// Storage quota (Bytes), default is 10GB, including vector, original file, text, index, etc.
-	StorageQuota int64 `yaml:"storage_quota"       json:"storage_quota"       gorm:"default:10737418240"`
+	// Storage quota (Bytes), default is the consumer Free plan's 5 GiB.
+	StorageQuota int64 `yaml:"storage_quota"       json:"storage_quota"       gorm:"default:5368709120"`
 	// Storage used (Bytes)
 	StorageUsed int64 `yaml:"storage_used"        json:"storage_used"        gorm:"default:0"`
+	// Consumer entitlement. Billing identifiers and provider spend are never
+	// serialized through the generic tenant API; the dedicated entitlement DTO
+	// exposes only effective limits and aggregate usage.
+	Plan                   ConsumerPlan `yaml:"plan" json:"-" gorm:"type:varchar(16);default:'free'"`
+	PlanStatus             string       `yaml:"plan_status" json:"-" gorm:"type:varchar(16);default:'active'"`
+	OpenRouterUsageMonth   string       `yaml:"openrouter_usage_month" json:"-" gorm:"type:varchar(7);default:''"`
+	OpenRouterUsedMicrousd int64        `yaml:"openrouter_used_microusd" json:"-" gorm:"default:0"`
+	PaddleCustomerID       string       `yaml:"paddle_customer_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleSubscriptionID   string       `yaml:"paddle_subscription_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleLastEventID      string       `yaml:"paddle_last_event_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleLastEventAt      *time.Time   `yaml:"paddle_last_event_at" json:"-"`
 	// Global Context configuration for this workspace (default for all sessions)
 	ContextConfig *ContextConfig `yaml:"context_config"      json:"context_config"      gorm:"type:jsonb"`
 	// Global WebSearch configuration for this workspace
@@ -144,6 +155,11 @@ func (t *Tenant) BeforeCreate(tx *gorm.DB) error {
 	if t.RetrieverEngines.Engines == nil {
 		t.RetrieverEngines.Engines = []RetrieverEngineParams{}
 	}
+	t.Plan = NormalizeConsumerPlan(t.Plan)
+	if t.PlanStatus == "" {
+		t.PlanStatus = "active"
+	}
+	t.StorageQuota = LimitsForConsumerPlan(t.Plan).StorageBytes
 	return nil
 }
 

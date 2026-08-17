@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
@@ -86,6 +87,10 @@ func NewOpenAIEmbedder(apiKey, baseURL, modelName string,
 // 保留头（Authorization、Content-Type 等）会在发送时被自动跳过。
 func (e *OpenAIEmbedder) SetCustomHeaders(headers map[string]string) {
 	e.customHeaders = headers
+}
+
+func (e *OpenAIEmbedder) SetOpenRouterMeter(meter modelopenrouter.Meter) {
+	e.httpClient = modelopenrouter.WrapHTTPClient(e.httpClient, meter)
 }
 
 func (e *OpenAIEmbedder) SetSupportsDimensionOverride(supported bool) {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
@@ -36,6 +37,7 @@ type RemoteAPIChat struct {
 	adapter providerAdapter
 	// thinkingOverride 来自 extra_config.thinking_control，非 nil 时覆盖 adapter.Thinking()。
 	thinkingOverride ThinkingStrategy
+	httpClient       *http.Client
 }
 
 // NewRemoteAPIChat 创建远程 API 聊天实例
@@ -82,6 +84,15 @@ func NewRemoteAPIChat(chatConfig *ChatConfig) (*RemoteAPIChat, error) {
 			config.HTTPClient = secutils.WrapHTTPClientWithHeaders(nil, chatConfig.CustomHeaders)
 		}
 	}
+	var meteredHTTPClient *http.Client
+	if providerName == provider.ProviderOpenRouter && chatConfig.OpenRouterMeter != nil {
+		baseClient := rawHTTPClient
+		if len(chatConfig.CustomHeaders) > 0 {
+			baseClient = secutils.WrapHTTPClientWithHeaders(rawHTTPClient, chatConfig.CustomHeaders)
+		}
+		meteredHTTPClient = modelopenrouter.WrapHTTPClient(baseClient, chatConfig.OpenRouterMeter)
+		config.HTTPClient = meteredHTTPClient
+	}
 
 	modelName := chatConfig.ModelName
 	if chatConfig.ExtraConfig != nil {
@@ -110,6 +121,7 @@ func NewRemoteAPIChat(chatConfig *ChatConfig) (*RemoteAPIChat, error) {
 		customHeaders:    chatConfig.CustomHeaders,
 		adapter:          resolveProvider(providerName, modelName),
 		thinkingOverride: parseThinkingOverride(chatConfig.ExtraConfig),
+		httpClient:       meteredHTTPClient,
 	}, nil
 }
 
@@ -225,7 +237,11 @@ func (c *RemoteAPIChat) chatWithRawHTTP(ctx context.Context, endpoint string, cu
 	logger.Infof(ctx, "[LLM Request] Remote HTTP, endpoint=%s, model=%s",
 		endpoint, c.modelName)
 
-	resp, err := rawHTTPClient.Do(httpReq)
+	client := c.httpClient
+	if client == nil {
+		client = rawHTTPClient
+	}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
@@ -353,7 +369,11 @@ func (c *RemoteAPIChat) chatStreamWithRawHTTP(ctx context.Context, endpoint stri
 	// 注入用户自定义 header（保留头会在工具内部自动跳过）
 	secutils.ApplyCustomHeaders(httpReq, c.customHeaders)
 
-	resp, err := rawHTTPClient.Do(httpReq)
+	client := c.httpClient
+	if client == nil {
+		client = rawHTTPClient
+	}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}

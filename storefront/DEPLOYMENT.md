@@ -6,8 +6,9 @@ must not receive payment credentials or expose an `/api/checkout` route.
 
 Product actions cross to `https://app.musuw.com/auth/start`. Pricing actions carry
 only a bounded local plan and billing period. The product origin owns Google
-login, the opaque musuw session, backend-created Paddle transactions, signed
-Webhook billing state, and Customer Portal links.
+login, the opaque musuw session, enforced entitlement state, and optional signed
+Paddle Webhook billing state. When Paddle is not configured, upgrades remain
+unavailable.
 
 After a successful `main` CI run, GitHub Actions builds this package, deploys
 the exact commit to `musuw-site`, and probes both public domains plus the app

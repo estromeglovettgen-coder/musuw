@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
@@ -33,6 +34,10 @@ type OpenAIReranker struct {
 // SetCustomHeaders 设置用户自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
 func (r *OpenAIReranker) SetCustomHeaders(headers map[string]string) {
 	r.customHeaders = headers
+}
+
+func (r *OpenAIReranker) SetOpenRouterMeter(meter modelopenrouter.Meter) {
+	r.client = modelopenrouter.WrapHTTPClient(r.client, meter)
 }
 
 // RerankRequest represents a request to rerank documents based on relevance to a query

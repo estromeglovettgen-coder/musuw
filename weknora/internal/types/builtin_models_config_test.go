@@ -408,7 +408,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, 1, defaultByType[ModelTypeVLLM])
 	assert.Equal(t, 1, defaultByType[ModelTypeASR])
 
-	assert.True(t, byID["builtin-deepseek-v4-flash"].IsDefault)
+	assert.False(t, byID["builtin-deepseek-v4-flash"].IsDefault)
 	assert.Equal(t, "deepseek/deepseek-v4-flash", byID["builtin-deepseek-v4-flash"].Name)
 	assert.Equal(t, "openrouter", byID["builtin-deepseek-v4-flash"].Parameters.Provider)
 	assert.Equal(t, "openrouter-test-key", byID["builtin-deepseek-v4-flash"].Parameters.APIKey)
@@ -416,6 +416,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.False(t, pro.IsDefault)
 	assert.Equal(t, "deepseek/deepseek-v4-pro", pro.Name)
 	assert.Equal(t, "openrouter", pro.Parameters.Provider)
+	assert.True(t, byID["builtin-openrouter-qwen-flash"].IsDefault)
 	assert.Equal(t, "qwen/qwen3.7-flash", byID["builtin-openrouter-qwen-flash"].Name)
 	assert.Equal(t, "moonshotai/kimi-k2.6", byID["builtin-openrouter-kimi"].Name)
 	assert.Equal(t, "mistralai/mistral-small-2603", byID["builtin-openrouter-mistral"].Name)
