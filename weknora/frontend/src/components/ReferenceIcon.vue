@@ -1,12 +1,16 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   name:
+    | 'activity'
     | 'arrow-left'
+    | 'arrow-right-left'
     | 'book-open'
     | 'check-circle-2'
+    | 'check-square'
     | 'chevron-down'
     | 'chevron-left'
     | 'chevron-right'
+    | 'edit-3'
     | 'file-text'
     | 'folder'
     | 'folder-plus'
@@ -14,12 +18,16 @@ withDefaults(defineProps<{
     | 'layout-grid'
     | 'list'
     | 'message-square-plus'
+    | 'more-horizontal'
     | 'network'
     | 'panel-left-open'
     | 'pen-line'
     | 'plus'
+    | 'rotate-cw'
     | 'search'
+    | 'stop-circle'
     | 'tag'
+    | 'trash-2'
     | 'upload'
     | 'zap'
   size?: number
@@ -45,9 +53,18 @@ withDefaults(defineProps<{
     aria-hidden="true"
     class="reference-icon"
   >
-    <template v-if="name === 'arrow-left'">
+    <template v-if="name === 'activity'">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </template>
+    <template v-else-if="name === 'arrow-left'">
       <path d="m12 19-7-7 7-7" />
       <path d="M19 12H5" />
+    </template>
+    <template v-else-if="name === 'arrow-right-left'">
+      <path d="m16 3 4 4-4 4" />
+      <path d="M20 7H4" />
+      <path d="m8 21-4-4 4-4" />
+      <path d="M4 17h16" />
     </template>
     <template v-else-if="name === 'book-open'">
       <path d="M12 7v14" />
@@ -58,6 +75,10 @@ withDefaults(defineProps<{
       <path d="M21.801 10A10 10 0 1 1 17 3.335" />
       <path d="m9 11 3 3L22 4" />
     </template>
+    <template v-else-if="name === 'check-square'">
+      <path d="m9 11 3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </template>
     <template v-else-if="name === 'chevron-down'">
       <path d="m6 9 6 6 6-6" />
     </template>
@@ -66,6 +87,10 @@ withDefaults(defineProps<{
     </template>
     <template v-else-if="name === 'chevron-right'">
       <path d="m9 18 6-6-6-6" />
+    </template>
+    <template v-else-if="name === 'edit-3'">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </template>
     <template v-else-if="name === 'file-text'">
       <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -106,6 +131,11 @@ withDefaults(defineProps<{
       <path d="M12 7v6" />
       <path d="M9 10h6" />
     </template>
+    <template v-else-if="name === 'more-horizontal'">
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+    </template>
     <template v-else-if="name === 'network'">
       <rect x="16" y="16" width="6" height="6" rx="1" />
       <rect x="2" y="16" width="6" height="6" rx="1" />
@@ -126,13 +156,30 @@ withDefaults(defineProps<{
       <path d="M5 12h14" />
       <path d="M12 5v14" />
     </template>
+    <template v-else-if="name === 'rotate-cw'">
+      <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" />
+      <path d="M3 21v-5h5" />
+      <path d="M3 12A9 9 0 0 1 18.5 5.8L21 8" />
+      <path d="M21 3v5h-5" />
+    </template>
     <template v-else-if="name === 'search'">
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
     </template>
+    <template v-else-if="name === 'stop-circle'">
+      <circle cx="12" cy="12" r="10" />
+      <rect x="9" y="9" width="6" height="6" rx="1" />
+    </template>
     <template v-else-if="name === 'tag'">
       <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
       <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" stroke="none" />
+    </template>
+    <template v-else-if="name === 'trash-2'">
+      <path d="M3 6h18" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M8 6V4h8v2" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
     </template>
     <template v-else-if="name === 'upload'">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
