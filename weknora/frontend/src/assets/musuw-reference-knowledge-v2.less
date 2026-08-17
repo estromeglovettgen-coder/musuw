@@ -1,0 +1,650 @@
+/*
+ * Task 1 — mechanical knowledge-workbench port, v2.
+ *
+ * Visual authority:
+ *   visual_ref/src/components/KnowledgeBase.tsx
+ *   visual_ref/src/components/DocumentListView.tsx
+ *
+ * This file deliberately changes presentation only. It reuses the native Vue
+ * controls/data paths already present in KnowledgeBase.vue and does not touch
+ * the graph renderer or trace/stream renderers excluded by the task.
+ */
+
+/* --------------------------------------------------------------------------
+ * Knowledge-base detail shell / header
+ * Reference: p-5 md:p-7, space-y-5, border-b pb-4, right segmented switcher.
+ * -------------------------------------------------------------------------- */
+html #app .knowledge-layout.documents-layout {
+  margin: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  padding: 20px 28px 24px !important;
+  gap: 20px !important;
+  box-sizing: border-box !important;
+  background: rgb(249 250 251 / 0.3) !important;
+}
+
+html #app .knowledge-layout .document-header {
+  width: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 0 16px !important;
+  border-bottom: 1px solid rgb(229 231 235 / 0.8) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html #app .knowledge-layout .document-header-title,
+html #app .knowledge-layout .document-title-row,
+html #app .knowledge-layout .document-breadcrumb {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+html #app .knowledge-layout .document-header-title {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+html #app .knowledge-layout .document-breadcrumb {
+  position: relative !important;
+  isolation: isolate;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  min-height: 38px !important;
+  margin: 0 !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600 !important;
+}
+
+/* The current Vue DOM already contains the three real tab controls. Move that
+ * existing group to the reference location instead of drawing replacement
+ * controls or introducing mock state. */
+html #app .knowledge-layout .breadcrumb-separator + .breadcrumb-tab {
+  margin-left: auto !important;
+}
+
+html #app .knowledge-layout .document-breadcrumb:has(.breadcrumb-tab)::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 0;
+  width: 320px;
+  height: 38px;
+  box-sizing: border-box;
+  border: 1px solid rgb(229 231 235 / 0.8);
+  border-radius: 12px;
+  background: rgb(243 244 246 / 0.9);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+html #app .knowledge-layout .document-breadcrumb > * {
+  position: relative;
+  z-index: 1;
+}
+
+html #app .knowledge-layout .breadcrumb-separator {
+  color: #d1d5db !important;
+}
+
+html #app .knowledge-layout .breadcrumb-link {
+  min-width: 0 !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600 !important;
+}
+
+html #app .knowledge-layout .breadcrumb-link:hover,
+html #app .knowledge-layout .breadcrumb-link.dropdown {
+  color: #111827 !important;
+}
+
+html #app .knowledge-layout .breadcrumb-link.dropdown {
+  max-width: 360px !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  font-weight: 700 !important;
+}
+
+html #app .knowledge-layout .breadcrumb-link.dropdown:hover {
+  background: #f3f4f6 !important;
+}
+
+html #app .knowledge-layout .breadcrumb-tab-sep {
+  display: none !important;
+}
+
+html #app .knowledge-layout .breadcrumb-tab {
+  min-width: 88px !important;
+  min-height: 30px !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+html #app .knowledge-layout .breadcrumb-tab:hover {
+  background: rgb(249 250 251 / 0.6) !important;
+  color: #111827 !important;
+}
+
+html #app .knowledge-layout .breadcrumb-tab.active {
+  border-color: rgb(229 231 235 / 0.6) !important;
+  background: #fff !important;
+  color: #111827 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04) !important;
+}
+
+html #app .knowledge-layout .document-subtitle {
+  max-width: 760px !important;
+  margin: 0 !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 400 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Document workbench topology
+ * Reference: 224px directory panel + 12px gap + one right document workspace.
+ * -------------------------------------------------------------------------- */
+html #app .knowledge-layout .knowledge-main {
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+html #app .knowledge-layout .kb-folder-tree:not(.is-collapsed) {
+  width: 224px !important;
+  min-width: 224px !important;
+  flex: 0 0 224px !important;
+  align-self: stretch !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgb(229 231 235 / 0.9) !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04) !important;
+  overflow: hidden !important;
+}
+
+html #app .knowledge-layout .kb-folder-tree:not(.is-collapsed) .kb-folder-tree__header {
+  height: 43px !important;
+  min-height: 43px !important;
+  padding: 0 14px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  background: rgb(249 250 251 / 0.5) !important;
+}
+
+html #app .knowledge-layout .kb-folder-tree__title {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  color: #1f2937 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+}
+
+/* Reference header has a 14px folder glyph. The source project has the title
+ * but no icon node, so this is presentation-only decoration, not a new button. */
+html #app .knowledge-layout .kb-folder-tree__title::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 14px 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E");
+}
+
+html #app .knowledge-layout .kb-folder-tree__icon-btn {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #6b7280 !important;
+}
+
+html #app .knowledge-layout .kb-folder-tree__icon-btn:hover {
+  background: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+html #app .knowledge-layout .kb-folder-tree__body {
+  padding: 8px !important;
+}
+
+html #app .knowledge-layout .kb-folder-row {
+  min-height: 30px !important;
+  height: 30px !important;
+  padding-right: 9px !important;
+  border-radius: 12px !important;
+  color: #4b5563 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+html #app .knowledge-layout .kb-folder-row:hover {
+  background: #f3f4f6 !important;
+  color: #030712 !important;
+}
+
+html #app .knowledge-layout .kb-folder-row.active.is-root {
+  background: #111827 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04) !important;
+}
+
+html #app .knowledge-layout .kb-folder-row.active.is-root :is(.kb-folder-row__label, .kb-folder-row__icon, .kb-folder-row__count, .kb-folder-row__toggle) {
+  color: #fff !important;
+}
+
+html #app .knowledge-layout .kb-folder-row.active:not(.is-root) {
+  background: #e5e7eb !important;
+  color: #030712 !important;
+  font-weight: 700 !important;
+}
+
+html #app .knowledge-layout .tag-content,
+html #app .knowledge-layout .doc-card-area {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+html #app .knowledge-layout .doc-card-area {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Reference toolbar. The project has two extra native filters (source + date).
+ * Keep them — the task forbids removing exposed controls — but place them on a
+ * compact second row in the same component language instead of letting them
+ * inflate the reference toolbar into a 3–4-row panel.
+ * -------------------------------------------------------------------------- */
+html #app .knowledge-layout .doc-folder-path {
+  position: absolute !important;
+  top: 12px !important;
+  left: 12px !important;
+  z-index: 4 !important;
+  width: 92px !important;
+  max-width: 92px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: rgb(243 244 246 / 0.9) !important;
+  color: #374151 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+  overflow: hidden !important;
+}
+
+html #app .knowledge-layout .doc-folder-path__crumb {
+  max-width: 66px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: inherit !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+html #app .knowledge-layout .doc-folder-path__scope {
+  display: none !important;
+}
+
+@media (min-width: 1180px) {
+  html #app .knowledge-layout .doc-filter-bar {
+    min-height: 98px !important;
+    display: grid !important;
+    grid-template-columns: 92px minmax(180px, 244px) 130px 140px minmax(190px, 1fr) auto !important;
+    grid-template-rows: 32px 32px !important;
+    column-gap: 10px !important;
+    row-gap: 10px !important;
+    align-items: center !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    border: 1px solid rgb(229 231 235 / 0.9) !important;
+    border-radius: 16px !important;
+    background: #fff !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04) !important;
+  }
+
+  html #app .knowledge-layout .doc-search-input {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: 244px !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters {
+    display: contents !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters > :nth-child(1) {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters > :nth-child(2) {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters > :nth-child(3) {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters > :nth-child(4) {
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters > :nth-child(5) {
+    grid-column: 4 / span 2 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__trailing {
+    grid-column: 6 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    align-self: center !important;
+    margin: 0 !important;
+  }
+}
+
+html #app .knowledge-layout .doc-search-input .t-input,
+html #app .knowledge-layout .doc-filter-field__control,
+html #app .knowledge-layout .doc-date-range {
+  min-height: 32px !important;
+  height: 32px !important;
+  box-sizing: border-box !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: rgb(249 250 251 / 0.8) !important;
+  color: #374151 !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+html #app .knowledge-layout .doc-filter-field {
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+html #app .knowledge-layout .doc-filter-field:not(.doc-filter-field--wide) {
+  width: 130px !important;
+}
+
+html #app .knowledge-layout .doc-filter-field--wide {
+  width: 250px !important;
+  min-width: 250px !important;
+}
+
+html #app .knowledge-layout .doc-filter-bar__trailing {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+html #app .knowledge-layout .doc-view-toggle {
+  display: flex !important;
+  align-items: center !important;
+  padding: 2px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #f3f4f6 !important;
+}
+
+html #app .knowledge-layout .doc-view-toggle-btn {
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #9ca3af !important;
+  box-shadow: none !important;
+}
+
+html #app .knowledge-layout .doc-view-toggle-btn.active {
+  background: #fff !important;
+  color: #111827 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04) !important;
+}
+
+/* Native add-document dropdown, same real handlers; add the reference text
+ * label to the existing icon trigger rather than introducing another button. */
+html #app .knowledge-layout .content-bar-icon-btn {
+  width: auto !important;
+  min-width: 132px !important;
+  height: 34px !important;
+  padding: 0 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #111827 !important;
+  color: #fff !important;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+}
+
+html #app .knowledge-layout .content-bar-icon-btn:hover {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+html #app .knowledge-layout .content-bar-icon-btn::after {
+  content: "添加文档⌄";
+  display: inline-block;
+  color: #fff;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+ * Grid cards — direct translation of h-48 / rounded-2xl / gap-4 reference.
+ * -------------------------------------------------------------------------- */
+html #app .knowledge-layout .doc-scroll-container {
+  min-height: 0 !important;
+  padding: 0 0 16px !important;
+}
+
+html #app .knowledge-layout .doc-card-view {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+html #app .knowledge-layout .doc-card-list {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  align-content: flex-start !important;
+}
+
+html #app .knowledge-layout .knowledge-card,
+html #app .knowledge-layout .folder-card {
+  min-width: 0 !important;
+  height: 192px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgb(229 231 235 / 0.9) !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+html #app .knowledge-layout .knowledge-card:hover,
+html #app .knowledge-layout .folder-card:hover {
+  border-color: #9ca3af !important;
+  background: #fff !important;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 0.08) !important;
+}
+
+html #app .knowledge-layout .knowledge-card .card-content {
+  padding: 16px 18px 10px !important;
+}
+
+html #app .knowledge-layout .knowledge-card .card-content-nav {
+  margin-bottom: 8px !important;
+}
+
+html #app .knowledge-layout .knowledge-card .card-content-title {
+  height: 20px !important;
+  line-height: 20px !important;
+  color: #030712 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+html #app .knowledge-layout .knowledge-card :is(.card-content-txt, .card-analyze-txt, .card-draft-tip) {
+  color: #6b7280 !important;
+  font-size: 11px !important;
+  line-height: 17px !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  overflow: hidden !important;
+}
+
+html #app .knowledge-layout .knowledge-card .card-bottom {
+  padding: 10px 18px 16px !important;
+  border-top: 1px solid #f3f4f6 !important;
+  color: #9ca3af !important;
+  font-size: 10px !important;
+  font-family: var(--app-font-family-mono) !important;
+}
+
+html #app .knowledge-layout .knowledge-card .card-type {
+  padding: 2px 8px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+}
+
+/* Keep the reference four-column rhythm at the desktop width used by the
+ * authority screenshot, while retaining a sane collapse path below it. */
+@media (max-width: 1320px) {
+  html #app .knowledge-layout .doc-card-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1040px) {
+  html #app .knowledge-layout .doc-card-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  html #app .knowledge-layout.documents-layout {
+    padding: 16px !important;
+  }
+
+  html #app .knowledge-layout .document-breadcrumb {
+    flex-wrap: wrap !important;
+  }
+
+  html #app .knowledge-layout .document-breadcrumb:has(.breadcrumb-tab)::after {
+    display: none !important;
+  }
+
+  html #app .knowledge-layout .breadcrumb-separator + .breadcrumb-tab {
+    margin-left: 0 !important;
+  }
+
+  html #app .knowledge-layout .knowledge-main {
+    flex-direction: column !important;
+  }
+
+  html #app .knowledge-layout .kb-folder-tree:not(.is-collapsed) {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex-basis: auto !important;
+    max-height: 260px !important;
+  }
+
+  html #app .knowledge-layout .doc-folder-path {
+    position: static !important;
+    width: max-content !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    min-height: 0 !important;
+    padding: 10px !important;
+  }
+
+  html #app .knowledge-layout .doc-filter-bar__filters {
+    display: flex !important;
+    flex-wrap: wrap !important;
+  }
+
+  html #app .knowledge-layout .doc-card-list {
+    grid-template-columns: 1fr !important;
+  }
+}
