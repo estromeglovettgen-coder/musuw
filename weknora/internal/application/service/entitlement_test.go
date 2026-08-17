@@ -70,12 +70,13 @@ func TestEntitlementServiceOpenRouterUserIDIsStableAndOpaque(t *testing.T) {
 	assert.Contains(t, a, "musuw_")
 }
 
-func TestOpenRouterUserIDIsStableAcrossTenants(t *testing.T) {
+func TestEntitlementServiceOpenRouterUserIDIsStableAcrossTenants(t *testing.T) {
+	svc := NewEntitlementService(&entitlementRepoStub{tenant: &types.Tenant{ID: 7}})
 	const userID = "same-user"
-	a := OpenRouterUserID(7, userID)
-	b := OpenRouterUserID(99, userID)
+	a := svc.OpenRouterUserID(entitlementContext(7, userID))
+	b := svc.OpenRouterUserID(entitlementContext(99, userID))
 
 	assert.NotEmpty(t, a)
 	assert.Equal(t, a, b)
-	assert.Empty(t, OpenRouterUserID(7, "  "))
+	assert.Empty(t, svc.OpenRouterUserID(entitlementContext(7, "")))
 }
