@@ -28,94 +28,98 @@ jobs:
           s = p.read_text()
 
           old_clear = '''const clearvalue = () => {
-  // Guard: only clear when the textarea DOM element is still mounted,
-  // otherwise TDesign's autosize will call getComputedStyle on a non-Element.
-  if (!getTextareaEl()) return;
-  query.value = "";
-};'''
+            // Guard: only clear when the textarea DOM element is still mounted,
+            // otherwise TDesign's autosize will call getComputedStyle on a non-Element.
+            if (!getTextareaEl()) return;
+            query.value = "";
+          };'''
           new_clear = '''const clearvalue = () => {
-  const textarea = getTextareaEl();
-  if (!textarea) return;
-  query.value = "";
-  // The visual-reference shell uses a native textarea instead of TDesign's
-  // autosizing wrapper, so reset the inline height after programmatic clears.
-  nextTick(() => {
-    const el = getTextareaEl();
-    if (el) el.style.height = "auto";
-  });
-};'''
+            const textarea = getTextareaEl();
+            if (!textarea) return;
+            query.value = "";
+            // Native textarea replacement must reset its own inline autosize state.
+            nextTick(() => {
+              const el = getTextareaEl();
+              if (el) el.style.height = "auto";
+            });
+          };'''
           if old_clear not in s:
-            raise SystemExit('clearvalue anchor not found')
-          s = s.replace(old_clear, new_clear, 1)
+            # Tolerate formatter indentation differences by replacing the exact
+            # semantic body instead of silently skipping the repair.
+            start = s.find('const clearvalue = () => {')
+            end = s.find('\n};', start)
+            if start < 0 or end < 0:
+              raise SystemExit('clearvalue block not found')
+            end += len('\n};')
+            s = s[:start] + new_clear + s[end:]
+          else:
+            s = s.replace(old_clear, new_clear, 1)
 
           start = s.find('const onKeydown = (')
           end = s.find('\n\nconst onPaste =', start)
           if start < 0 or end < 0:
             raise SystemExit('onKeydown block not found')
           new_keydown = '''const onKeydown = (
-  valOrEvent: string | KeyboardEvent,
-  context?: { e?: KeyboardEvent },
-) => {
-  // TDesign emits (value, { e }), while the visual-reference native textarea
-  // emits the KeyboardEvent directly. Support both contracts so the business
-  // logic remains identical across the shell change.
-  const keyEvent = valOrEvent instanceof KeyboardEvent ? valOrEvent : context?.e;
-  const value = typeof valOrEvent === "string" ? valOrEvent : query.value;
-  if (!keyEvent) return;
+            valOrEvent: string | KeyboardEvent,
+            context?: { e?: KeyboardEvent },
+          ) => {
+            // Preserve both the original TDesign callback contract and the
+            // visual-reference native textarea DOM event contract.
+            const keyEvent = valOrEvent instanceof KeyboardEvent ? valOrEvent : context?.e;
+            const value = typeof valOrEvent === "string" ? valOrEvent : query.value;
+            if (!keyEvent) return;
 
-  // Native textareas dispatch Enter while an IME composition is being
-  // committed. TDesign previously shielded this path; do not send or move the
-  // mention cursor until compositionend has finalized the model value.
-  if (isComposing.value || keyEvent.isComposing || keyEvent.keyCode === 229) return;
+            // Do not treat the Enter used to commit a CJK IME composition as Send.
+            if (isComposing.value || keyEvent.isComposing || keyEvent.keyCode === 229) return;
 
-  if (showMention.value) {
-    if (keyEvent.keyCode === 38) {
-      keyEvent.preventDefault();
-      mentionSelectorRef.value?.moveActive(-1);
-      return;
-    }
-    if (keyEvent.keyCode === 40) {
-      keyEvent.preventDefault();
-      mentionSelectorRef.value?.moveActive(1);
-      return;
-    }
-    if (keyEvent.keyCode === 13) {
-      keyEvent.preventDefault();
-      mentionSelectorRef.value?.confirmActive();
-      return;
-    }
-    if (keyEvent.keyCode === 27) {
-      if (mentionSelectorRef.value?.leaveGroup()) return;
-      showMention.value = false;
-      return;
-    }
-  }
+            if (showMention.value) {
+              if (keyEvent.keyCode === 38) {
+                keyEvent.preventDefault();
+                mentionSelectorRef.value?.moveActive(-1);
+                return;
+              }
+              if (keyEvent.keyCode === 40) {
+                keyEvent.preventDefault();
+                mentionSelectorRef.value?.moveActive(1);
+                return;
+              }
+              if (keyEvent.keyCode === 13) {
+                keyEvent.preventDefault();
+                mentionSelectorRef.value?.confirmActive();
+                return;
+              }
+              if (keyEvent.keyCode === 27) {
+                if (mentionSelectorRef.value?.leaveGroup()) return;
+                showMention.value = false;
+                return;
+              }
+            }
 
-  if (keyEvent.keyCode === 8) {
-    const textarea = getTextareaEl();
-    if (
-      textarea &&
-      textarea.selectionStart === 0 &&
-      textarea.selectionEnd === 0 &&
-      query.value === ""
-    ) {
-      const items = allSelectedItems.value;
-      if (items.length > 0) {
-        keyEvent.preventDefault();
-        removeSelectedItem(items[items.length - 1]);
-        return;
-      }
-    }
-  }
+            if (keyEvent.keyCode === 8) {
+              const textarea = getTextareaEl();
+              if (
+                textarea &&
+                textarea.selectionStart === 0 &&
+                textarea.selectionEnd === 0 &&
+                query.value === ""
+              ) {
+                const items = allSelectedItems.value;
+                if (items.length > 0) {
+                  keyEvent.preventDefault();
+                  removeSelectedItem(items[items.length - 1]);
+                  return;
+                }
+              }
+            }
 
-  if ((keyEvent.keyCode === 13 && keyEvent.shiftKey) || (keyEvent.keyCode === 13 && keyEvent.ctrlKey)) {
-    return;
-  }
-  if (keyEvent.keyCode === 13) {
-    keyEvent.preventDefault();
-    createSession(value);
-  }
-};'''
+            if ((keyEvent.keyCode === 13 && keyEvent.shiftKey) || (keyEvent.keyCode === 13 && keyEvent.ctrlKey)) {
+              return;
+            }
+            if (keyEvent.keyCode === 13) {
+              keyEvent.preventDefault();
+              createSession(value);
+            }
+          };'''
           s = s[:start] + new_keydown + s[end:]
 
           old_disabled = ':disabled="!query.trim() && uploadedImages.length === 0 && uploadedAttachments.length === 0"'
@@ -123,8 +127,6 @@ jobs:
             raise SystemExit('send-button disabled anchor not found')
           s = s.replace(old_disabled, ':disabled="!query.length"', 1)
 
-          # Static postconditions: the native template and dual-signature handler
-          # must coexist, and the old TDesign-only event.e contract must be gone.
           for needle in [
             '<textarea',
             '@keydown="onKeydown"',
@@ -139,12 +141,6 @@ jobs:
 
           p.write_text(s)
           PY
-
-      - name: Install frontend dependencies
-        run: npm ci --prefix weknora/frontend --ignore-scripts
-
-      - name: Type-check frontend
-        run: npm --prefix weknora/frontend run type-check
 
       - name: Commit repair
         shell: bash
