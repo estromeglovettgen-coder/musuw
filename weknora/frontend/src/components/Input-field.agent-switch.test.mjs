@@ -29,7 +29,7 @@ test("shared-agent web search button waits for source readiness metadata", () =>
   assert.match(showWebSearchButton, /selectedSharedAgent\.value\?\.web_search_ready/);
 });
 
-test("managed chat exposes only V4 Flash and V4 Pro and keeps thinking exclusive to Pro", () => {
+test("managed chat keeps V4 modes, model selection, and Pro-only thinking", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
   assert.match(settingsStore, /thinkingEnabled:\s*true/);
   assert.match(inputField, /const thinkingEnabled = computed/);
@@ -41,8 +41,8 @@ test("managed chat exposes only V4 Flash and V4 Pro and keeps thinking exclusive
   assert.match(inputField, />\s*V4 Pro\s*</);
   assert.equal((inputField.match(/@click="selectAgentMode\('/g) || []).length, 2);
   assert.match(inputField, /v-if="isProMode"[\s\S]*v-model="thinkingEnabled"/);
-  assert.doesNotMatch(inputField, /v-for="model in availableModels"/);
-  assert.doesNotMatch(inputField, /toggleModelSelector/);
+  assert.match(inputField, /v-for="model in availableModels"/);
+  assert.match(inputField, /toggleModelSelector/);
 
   const modeSwitchStart = inputField.indexOf('const selectAgentMode = async');
   const modeSwitchEnd = inputField.indexOf('// 选择智能体（新版）', modeSwitchStart);

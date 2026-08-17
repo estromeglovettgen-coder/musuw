@@ -28,15 +28,15 @@ test("agent management and selection are absent from the managed user experience
   assert.doesNotMatch(newUserGuide, /key:\s*'agents'/);
 });
 
-test("chat exposes exactly two managed modes and only Pro exposes deep thinking", () => {
+test("chat keeps exactly two managed modes and exposes the configured model selector", () => {
   assert.match(inputField, /V4 Flash/);
   assert.match(inputField, /V4 Pro/);
   assert.equal((inputField.match(/@click="selectAgentMode\('/g) || []).length, 2);
   assert.match(inputField, /@click="selectAgentMode\('quick-answer'\)"/);
   assert.match(inputField, /@click="selectAgentMode\('smart-reasoning'\)"/);
   assert.match(inputField, /v-if="isProMode"[\s\S]*v-model="thinkingEnabled"/);
-  assert.doesNotMatch(inputField, /v-for="model in availableModels"/);
-  assert.doesNotMatch(inputField, /toggleModelSelector/);
+  assert.match(inputField, /v-for="model in availableModels"/);
+  assert.match(inputField, /toggleModelSelector/);
   assert.match(inputField, /class="control-btn image-upload-btn"/);
   assert.match(inputField, /class="control-btn attachment-upload-btn"/);
   assert.doesNotMatch(userMenu, /handleQuickNav\('models'\)/);
@@ -48,13 +48,17 @@ test("managed chat keeps web search enabled without exposing a per-user switch",
   assert.doesNotMatch(inputField, /class="control-btn websearch-btn"/);
 });
 
-test("settings expose only language and theme and normalize every deep link to general", () => {
-  assert.match(settingsView, /const normalizeSettingsSection = \([^)]*\) => ['"]general['"]/);
-  assert.match(settingsView, /section:\s*['"]general['"]/);
+test("settings expose only general preferences and native model management", () => {
+  assert.match(
+    settingsView,
+    /section === ['"]models['"] \? ['"]models['"] : ['"]general['"]/,
+  );
+  assert.match(settingsView, /ref<SettingsSection>\(['"]general['"]\)/);
   assert.match(settingsView, /<GeneralSettings\s*\/>/);
+  assert.match(settingsView, /<ModelSettings\b/);
   assert.doesNotMatch(
     settingsView,
-    /<ModelSettings\b|<TenantInfo\b|<UserProfile\b|<TenantMembers\b/,
+    /<TenantInfo\b|<UserProfile\b|<TenantMembers\b/,
   );
   assert.doesNotMatch(
     settingsView,
