@@ -1,0 +1,110 @@
+name: One-shot shared drawer interaction parity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/setting-drawer-parity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Restore escape, focus and scroll semantics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('weknora/frontend/src/components/settings/SettingDrawer.vue')
+          s = p.read_text()
+          s = s.replace(
+            "import { ref, computed, useAttrs, onMounted, onUnmounted } from 'vue'",
+            "import { ref, computed, useAttrs, onMounted, onUnmounted, watch, nextTick } from 'vue'",
+            1,
+          )
+          s = s.replace(
+            '      <aside\n        v-bind="drawerPassthroughAttrs"',
+            '      <aside\n        ref="drawerElement"\n        v-bind="drawerPassthroughAttrs"',
+            1,
+          )
+          anchor = "const drawerVisible = computed({ get: () => props.visible, set: (val) => emit('update:visible', val) })\n"
+          if anchor not in s:
+            raise SystemExit('drawer visibility anchor missing')
+          insert = anchor + "const drawerElement = ref<HTMLElement | null>(null)\nlet previouslyFocused: HTMLElement | null = null\nlet previousBodyOverflow = ''\n\n"
+          s = s.replace(anchor, insert, 1)
+
+          old_lifecycle = "onMounted(() => window.addEventListener('resize', onWindowResize, { passive: true }))\nonUnmounted(() => { window.removeEventListener('resize', onWindowResize); cleanupResize() })"
+          if old_lifecycle not in s:
+            raise SystemExit('drawer lifecycle anchor missing')
+          new_lifecycle = '''function handleDrawerKeydown(event: KeyboardEvent) {
+  if (!drawerVisible.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    handleOverlayClose()
+    return
+  }
+  if (event.key !== 'Tab' || !drawerElement.value) return
+  const focusable = Array.from(drawerElement.value.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+  )).filter(el => !el.hasAttribute('aria-hidden'))
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+watch(drawerVisible, async (visible) => {
+  if (visible) {
+    previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    await nextTick()
+    const first = drawerElement.value?.querySelector<HTMLElement>(
+      'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )
+    first?.focus({ preventScroll: true })
+  } else {
+    document.body.style.overflow = previousBodyOverflow
+    previouslyFocused?.focus({ preventScroll: true })
+    previouslyFocused = null
+  }
+}, { immediate: true })
+
+onMounted(() => {
+  window.addEventListener('resize', onWindowResize, { passive: true })
+  window.addEventListener('keydown', handleDrawerKeydown)
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', onWindowResize)
+  window.removeEventListener('keydown', handleDrawerKeydown)
+  document.body.style.overflow = previousBodyOverflow
+  cleanupResize()
+})'''
+          s = s.replace(old_lifecycle, new_lifecycle, 1)
+          for needle in ['handleDrawerKeydown', "event.key === 'Escape'", "document.body.style.overflow = 'hidden'", 'previouslyFocused?.focus']:
+            if needle not in s:
+              raise SystemExit(f'missing restored drawer behavior: {needle}')
+          p.write_text(s)
+          PY
+      - name: Commit repair
+        shell: bash
+        run: |
+          git config user.name "musuw-business-parity"
+          git config user.email "actions@users.noreply.github.com"
+          git add weknora/frontend/src/components/settings/SettingDrawer.vue
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: restore shared drawer interaction semantics"
+          git push origin HEAD:main
