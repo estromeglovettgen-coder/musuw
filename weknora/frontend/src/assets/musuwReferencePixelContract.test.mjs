@@ -51,6 +51,7 @@ test("loads every mechanical reference shard and only a minimal DOM bridge", () 
     "musuw-reference-mechanical-11a.css",
     "musuw-reference-mechanical-11b.css",
     "musuw-reference-mechanical-12.css",
+    "musuw-reference-mechanical-13.css",
     "musuw-reference-dom-bridge.css",
   ]) {
     assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
@@ -68,6 +69,9 @@ test("matches the copied reference shell, conversation and knowledge geometry", 
   assert.match(mechanical, /\.knowledge-card\{[\s\S]*?height:calc\(var\(--spacing\) \* 48\) !important/);
   assert.match(mechanical, /body \.settings-overlay \.settings-modal\{[\s\S]*?height:520px !important[\s\S]*?max-width:var\(--container-4xl\) !important/);
   assert.match(mechanical, /body \.settings-overlay \.settings-sidebar\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/);
+  assert.match(mechanical, /\.ai-markdown-template\.markdown-content h1\{[\s\S]*?font-size:var\(--text-lg\) !important/);
+  assert.match(mechanical, /\.ai-markdown-template\.markdown-content h2\{[\s\S]*?font-size:var\(--text-base\) !important/);
+  assert.match(mechanical, /\.ai-markdown-template\.markdown-content h3\{[\s\S]*?font-size:var\(--text-sm\) !important/);
 });
 
 test("preserves project conditional rendering and does not restyle task-excluded renderers", () => {
