@@ -12,15 +12,18 @@
 
     <div ref="listRef" class="reference-folder-picker__list">
       <template v-for="row in renderRows" :key="row.key">
-        <button
+        <div
           v-if="row.kind === 'folder'"
-          type="button"
           :data-folder-path="row.path || undefined"
           class="reference-folder-picker__item"
           :class="{ current: effectiveCurrentPath === row.path }"
           :style="{ '--reference-folder-depth': row.depth }"
           :title="row.path || undefined"
+          role="button"
+          tabindex="0"
           @click.stop="choose(row.path)"
+          @keydown.enter.stop="choose(row.path)"
+          @keydown.space.prevent.stop="choose(row.path)"
         >
           <ReferenceIcon
             :name="row.isRoot ? 'folder-open' : 'folder'"
@@ -49,7 +52,7 @@
               class="reference-folder-picker__current"
             />
           </span>
-        </button>
+        </div>
 
         <div
           v-else
