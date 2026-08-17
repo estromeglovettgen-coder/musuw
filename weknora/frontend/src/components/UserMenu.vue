@@ -16,13 +16,13 @@
 
     <Transition name="reference-user-popover">
       <div v-if="menuVisible" class="reference-user-popover" @click.stop>
-        <button type="button" @click="handleSettings">
-          <ReferenceIcon name="settings" :size="15" />
+        <button type="button" class="menu-item" @click="handleSettings">
+          <ReferenceIcon name="settings" :size="16" />
           <span>{{ $t('general.settings') }}</span>
         </button>
         <div class="reference-user-popover__divider" />
-        <button type="button" class="danger" @click="handleLogout">
-          <ReferenceIcon name="log-out" :size="15" />
+        <button type="button" class="menu-item danger" @click="handleLogout">
+          <ReferenceIcon name="log-out" :size="16" />
           <span>{{ $t('auth.logout') }}</span>
         </button>
       </div>
@@ -83,21 +83,23 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 .reference-user-trigger {
   width: 100%;
   min-height: 42px;
-  padding: 5px 6px;
+  padding: 6px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
-  color: #111827;
+  color: #374151;
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: space-between;
+  gap: 10px;
   text-align: left;
   font-family: inherit;
   cursor: pointer;
-  transition: background-color 150ms ease;
+  transition: background-color 150ms ease, color 150ms ease;
 }
-.reference-user-trigger:hover { background: #f3f4f6; }
-.reference-user-menu.collapsed .reference-user-trigger { justify-content: center; padding: 5px 0; }
+.reference-user-trigger:hover { background: rgb(229 231 235 / .5); }
+.reference-user-menu:has(.reference-user-popover) .reference-user-trigger { background: rgb(229 231 235 / .9); color: #111827; }
+.reference-user-menu.collapsed .reference-user-trigger { justify-content: center; padding: 6px 0; }
 .reference-user-avatar {
   width: 30px;
   height: 30px;
@@ -108,55 +110,57 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
   font-weight: 700;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05);
 }
 .reference-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.reference-user-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.reference-user-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; line-height: 1.15; }
 .reference-user-copy strong,
 .reference-user-copy small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reference-user-copy strong { color: #111827; font-size: 11px; line-height: 15px; font-weight: 700; }
-.reference-user-copy small { color: #9ca3af; font-size: 9px; line-height: 13px; font-weight: 400; }
+.reference-user-copy strong { color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
+.reference-user-copy small { max-width: 130px; color: #9ca3af; font-size: 10px; line-height: 14px; font-weight: 400; }
 .reference-user-chevron { flex: 0 0 auto; color: #9ca3af; }
 .reference-user-popover {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 8px);
+  bottom: 56px;
+  left: 0;
   z-index: 1000;
-  width: 190px;
-  padding: 6px;
+  padding: 8px;
   box-sizing: border-box;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / .10), 0 8px 10px -6px rgb(0 0 0 / .10);
 }
-.reference-user-menu.collapsed .reference-user-popover { left: calc(100% + 8px); right: auto; bottom: 0; }
-.reference-user-popover button {
+.reference-user-menu.collapsed .reference-user-popover { left: calc(100% + 8px); right: auto; bottom: 0; width: 190px; }
+.reference-user-popover .menu-item {
   width: 100%;
-  height: 32px;
-  padding: 0 9px;
+  min-height: 32px;
+  padding: 8px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: transparent;
   color: #374151;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   text-align: left;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 500;
   cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
-.reference-user-popover button:hover { background: #f3f4f6; color: #111827; }
-.reference-user-popover button.danger { color: #dc2626; }
-.reference-user-popover button.danger:hover { background: #fef2f2; color: #b91c1c; }
-.reference-user-popover__divider { height: 1px; margin: 4px 5px; background: #f3f4f6; }
+.reference-user-popover .menu-item:hover { background: #f3f4f6; color: #111827; }
+.reference-user-popover .menu-item.danger { color: #dc2626; }
+.reference-user-popover .menu-item.danger:hover { background: #fef2f2; color: #b91c1c; }
+.reference-user-popover__divider { height: 1px; margin: 4px 0; background: #f3f4f6; }
 .reference-user-popover-enter-active,
-.reference-user-popover-leave-active { transition: opacity 120ms ease, transform 120ms ease; }
+.reference-user-popover-leave-active { transition: opacity 100ms ease, transform 100ms ease; }
 .reference-user-popover-enter-from,
-.reference-user-popover-leave-to { opacity: 0; transform: translateY(4px); }
+.reference-user-popover-leave-to { opacity: 0; transform: scale(.95); transform-origin: bottom left; }
 </style>
