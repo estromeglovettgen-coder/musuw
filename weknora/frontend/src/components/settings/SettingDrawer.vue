@@ -1,59 +1,68 @@
 <template>
   <teleport to="body">
-    <div v-if="drawerVisible && resizable" class="setting-drawer-resize-handle"
-      :class="{ 'setting-drawer-resize-handle--active': drawerResizing }"
-      :style="{ right: `${drawerWidthPx}px`, '--setting-drawer-travel': `${drawerWidthPx}px` }"
-      role="separator" aria-orientation="vertical" @mousedown.prevent="onResizeStart">
-      <div class="setting-drawer-resize-line" />
+    <div
+      v-if="drawerVisible"
+      class="reference-setting-drawer-backdrop"
+      @mousedown.self="handleOverlayClose"
+    >
+      <aside
+        v-bind="drawerPassthroughAttrs"
+        :class="drawerClass"
+        :style="{ width: effectiveWidth }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="title"
+      >
+        <button
+          v-if="resizable"
+          type="button"
+          class="reference-setting-drawer__resize"
+          :class="{ active: drawerResizing }"
+          aria-label="Resize drawer"
+          @mousedown.prevent="onResizeStart"
+        >
+          <span />
+        </button>
+
+        <header class="reference-setting-drawer__header">
+          <div v-if="$slots.headerIcon || icon" class="reference-setting-drawer__header-icon" aria-hidden="true">
+            <slot name="headerIcon">
+              <svg v-if="icon === 'chat'" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
+              <svg v-else-if="icon === 'chart-bubble'" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="m7.7 7 3.2 8"/><path d="m16.3 7-3.2 8"/><path d="M8 6h8"/></svg>
+              <svg v-else-if="icon === 'filter-sort'" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M10 18h4"/></svg>
+              <svg v-else-if="icon === 'image'" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3-3a2 2 0 0 0-3 0l-6 6"/></svg>
+              <svg v-else-if="icon === 'sound'" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+              <svg v-else viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.96 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.96a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.96 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.62.62 1.1 1.56 1.03H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+            </slot>
+          </div>
+
+          <div class="reference-setting-drawer__header-copy">
+            <h3>{{ title }}</h3>
+            <p v-if="description || $slots.subtitle"><slot name="subtitle">{{ description }}</slot></p>
+          </div>
+
+          <button type="button" class="reference-setting-drawer__close" :aria-label="t('common.close')" @click="handleOverlayClose">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </header>
+
+        <div class="reference-setting-drawer__body"><slot /></div>
+
+        <footer v-if="!hideFooter" class="reference-setting-drawer__footer">
+          <div class="reference-setting-drawer__footer-left"><slot name="footer-left" /></div>
+          <div class="reference-setting-drawer__footer-right">
+            <slot name="footer-right">
+              <button type="button" class="reference-setting-drawer__secondary" @click="handleCancel">{{ cancelText || t('common.cancel') }}</button>
+              <button type="button" class="reference-setting-drawer__primary" :disabled="confirmDisabled || confirmLoading" @click="handleConfirm">
+                <svg v-if="confirmLoading" class="reference-setting-drawer__spinner" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>
+                {{ confirmText || t('common.save') }}
+              </button>
+            </slot>
+          </div>
+        </footer>
+      </aside>
     </div>
   </teleport>
-  <t-drawer v-model:visible="drawerVisible" v-bind="drawerPassthroughAttrs" :size="effectiveWidth" :z-index="2500" placement="right"
-    attach="body" destroy-on-close :footer="!hideFooter"
-    :class="drawerClass" @before-close="blurActiveElementBeforeClose">
-    <!--
-      Custom header. We replace TDesign's default header so we can put a leading
-      icon badge and an optional subtitle (description) right next to the title,
-      keeping the body uncluttered. The close affordance is the slide-out drawer
-      itself + the underlying overlay click — TDesign already wires those up,
-      so we don't need a redundant X button.
-    -->
-    <template #header>
-      <div class="setting-drawer__header">
-        <div v-if="$slots.headerIcon || icon" class="setting-drawer__header-icon">
-          <slot name="headerIcon">
-            <t-icon v-if="icon" :name="icon" />
-          </slot>
-        </div>
-        <div class="setting-drawer__header-text">
-          <div class="setting-drawer__title">{{ title }}</div>
-          <div v-if="description || $slots.subtitle" class="setting-drawer__subtitle">
-            <slot name="subtitle">{{ description }}</slot>
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <div class="setting-drawer__body">
-      <slot />
-    </div>
-    <template v-if="!hideFooter" #footer>
-      <div class="setting-drawer__footer">
-        <div class="setting-drawer__footer-left">
-          <slot name="footer-left" />
-        </div>
-        <div class="setting-drawer__footer-right">
-          <slot name="footer-right">
-            <t-button theme="default" variant="outline" @click="handleCancel">
-              {{ cancelText || t('common.cancel') }}
-            </t-button>
-            <t-button theme="primary" :loading="confirmLoading" :disabled="confirmDisabled" @click="handleConfirm">
-              {{ confirmText || t('common.save') }}
-            </t-button>
-          </slot>
-        </div>
-      </div>
-    </template>
-  </t-drawer>
 </template>
 
 <script setup lang="ts">
@@ -64,26 +73,11 @@ interface Props {
   visible: boolean
   title: string
   description?: string
-  /** Optional TDesign icon name shown as a leading badge in the header. */
   icon?: string
-  /**
-   * Initial width when the user has no persisted preference. Accepts any
-   * CSS length string (e.g. "560px", "40%").
-   */
   width?: string
-  /**
-   * Whether the drawer can be horizontally resized by dragging the visible
-   * handle on its left edge (same affordance as doc-content drawer).
-   */
   resizable?: boolean
-  /** Min/max bounds for the drag-resize, in px. */
   minWidth?: number
   maxWidth?: number
-  /**
-   * localStorage key used to remember the user's chosen width. Set to '' to
-   * disable persistence. Default key is namespaced per-consumer using the
-   * drawer title.
-   */
   storageKey?: string
   confirmLoading?: boolean
   confirmDisabled?: boolean
@@ -95,431 +89,55 @@ interface Props {
 defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<Props>(), {
-  description: '',
-  icon: '',
-  width: '560px',
-  resizable: true,
-  minWidth: 480,
-  maxWidth: 1200,
-  storageKey: '',
-  confirmLoading: false,
-  confirmDisabled: false,
-  confirmText: '',
-  cancelText: '',
-  hideFooter: false
+  description: '', icon: '', width: '560px', resizable: true, minWidth: 480, maxWidth: 1200,
+  storageKey: '', confirmLoading: false, confirmDisabled: false, confirmText: '', cancelText: '', hideFooter: false
 })
-
-const emit = defineEmits<{
-  (e: 'update:visible', value: boolean): void
-  (e: 'confirm'): void
-  (e: 'cancel'): void
-}>()
-
+const emit = defineEmits<{ (e: 'update:visible', value: boolean): void; (e: 'confirm'): void; (e: 'cancel'): void }>()
 const { t } = useI18n()
 const attrs = useAttrs()
-
-const drawerPassthroughAttrs = computed(() => {
-  const { class: _class, ...rest } = attrs
-  return rest
-})
-
-// ---------- visibility ----------
-const drawerVisible = computed({
-  get: () => props.visible,
-  set: (val) => emit('update:visible', val)
-})
-
-// ---------- width state ----------
-// Storage key derives from the drawer title so different drawers (model
-// editor vs MCP service vs web search provider) get independent widths.
-// Callers can override via the `storageKey` prop when titles collide.
-const resolvedStorageKey = computed(
-  () => props.storageKey || `setting-drawer:width:${props.title || 'default'}`
-)
-
-const clampWidth = (n: number) =>
-  Math.max(props.minWidth, Math.min(props.maxWidth, Math.round(n)))
-
-const parseWidthToPx = (width: string) => {
-  const n = parseInt(width, 10)
-  return Number.isFinite(n) ? n : 560
-}
-
+const drawerPassthroughAttrs = computed(() => { const { class: _class, ...rest } = attrs; return rest })
+const drawerVisible = computed({ get: () => props.visible, set: (val) => emit('update:visible', val) })
+const resolvedStorageKey = computed(() => props.storageKey || `setting-drawer:width:${props.title || 'default'}`)
+const clampWidth = (n: number) => Math.max(props.minWidth, Math.min(props.maxWidth, Math.round(n)))
+const parseWidthToPx = (width: string) => { const n = parseInt(width, 10); return Number.isFinite(n) ? n : 560 }
 const loadStoredWidth = (): number | null => {
   if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(resolvedStorageKey.value)
-    if (!raw) return null
-    const n = Number(raw)
-    if (!Number.isFinite(n)) return null
-    return clampWidth(n)
-  } catch {
-    return null
-  }
+  try { const raw = window.localStorage.getItem(resolvedStorageKey.value); if (!raw) return null; const n = Number(raw); return Number.isFinite(n) ? clampWidth(n) : null } catch { return null }
 }
-
-// User's persisted width (px) wins over the prop default.
 const userWidthPx = ref<number | null>(loadStoredWidth())
-
-const effectiveWidth = computed(() =>
-  userWidthPx.value != null ? `${userWidthPx.value}px` : props.width
-)
-
-const drawerWidthPx = computed(() =>
-  userWidthPx.value ?? parseWidthToPx(props.width)
-)
-
-const persistWidth = (width: number) => {
-  const next = clampWidth(width)
-  userWidthPx.value = next
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(resolvedStorageKey.value, String(next))
-  } catch {
-    // localStorage can throw in private mode / quota errors.
-  }
-}
-
-// ---------- Custom drag-resize (visible handle, same as doc-content) ----------
+const effectiveWidth = computed(() => userWidthPx.value != null ? `${userWidthPx.value}px` : props.width)
+const drawerWidthPx = computed(() => userWidthPx.value ?? parseWidthToPx(props.width))
+const persistWidth = (width: number) => { const next = clampWidth(width); userWidthPx.value = next; if (typeof window === 'undefined') return; try { window.localStorage.setItem(resolvedStorageKey.value, String(next)) } catch { /* ignore */ } }
 const drawerResizing = ref(false)
-
-const drawerClass = computed(() => [
-  'setting-drawer',
-  attrs.class,
-  { 'setting-drawer--resizing': drawerResizing.value },
-])
-
+const drawerClass = computed(() => ['reference-setting-drawer', attrs.class, { 'reference-setting-drawer--resizing': drawerResizing.value }])
 let resizeStartX = 0
 let resizeStartWidth = 0
-
-function onResizeStart(e: MouseEvent) {
-  drawerResizing.value = true
-  resizeStartX = e.clientX
-  resizeStartWidth = drawerWidthPx.value
-  document.addEventListener('mousemove', onResizeMove)
-  document.addEventListener('mouseup', onResizeEnd)
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-}
-
-function onResizeMove(e: MouseEvent) {
-  const delta = resizeStartX - e.clientX
-  userWidthPx.value = clampWidth(resizeStartWidth + delta)
-}
-
-function onResizeEnd() {
-  document.removeEventListener('mousemove', onResizeMove)
-  document.removeEventListener('mouseup', onResizeEnd)
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
-  drawerResizing.value = false
-  persistWidth(drawerWidthPx.value)
-}
-
-function cleanupResize() {
-  document.removeEventListener('mousemove', onResizeMove)
-  document.removeEventListener('mouseup', onResizeEnd)
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
-  drawerResizing.value = false
-}
-
-function onWindowResize() {
-  if (userWidthPx.value != null) {
-    userWidthPx.value = clampWidth(userWidthPx.value)
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('resize', onWindowResize, { passive: true })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onWindowResize)
-  cleanupResize()
-})
-
-function blurActiveElementBeforeClose() {
-  // TDesign textarea autosize calls getComputedStyle on blur/resize; if the
-  // drawer is already tearing down (destroy-on-close), that node may no longer
-  // be an Element and the promise rejects uncaught.
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur()
-  }
-}
-
+function onResizeStart(e: MouseEvent) { drawerResizing.value = true; resizeStartX = e.clientX; resizeStartWidth = drawerWidthPx.value; document.addEventListener('mousemove', onResizeMove); document.addEventListener('mouseup', onResizeEnd); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }
+function onResizeMove(e: MouseEvent) { userWidthPx.value = clampWidth(resizeStartWidth + (resizeStartX - e.clientX)) }
+function onResizeEnd() { document.removeEventListener('mousemove', onResizeMove); document.removeEventListener('mouseup', onResizeEnd); document.body.style.cursor = ''; document.body.style.userSelect = ''; drawerResizing.value = false; persistWidth(drawerWidthPx.value) }
+function cleanupResize() { document.removeEventListener('mousemove', onResizeMove); document.removeEventListener('mouseup', onResizeEnd); document.body.style.cursor = ''; document.body.style.userSelect = ''; drawerResizing.value = false }
+function onWindowResize() { if (userWidthPx.value != null) userWidthPx.value = clampWidth(userWidthPx.value) }
+onMounted(() => window.addEventListener('resize', onWindowResize, { passive: true }))
+onUnmounted(() => { window.removeEventListener('resize', onWindowResize); cleanupResize() })
+function blurActiveElementBeforeClose() { if (document.activeElement instanceof HTMLElement) document.activeElement.blur() }
+const handleOverlayClose = () => { blurActiveElementBeforeClose(); emit('update:visible', false) }
 const handleConfirm = () => emit('confirm')
-const handleCancel = () => {
-  blurActiveElementBeforeClose()
-  emit('cancel')
-  emit('update:visible', false)
-}
+const handleCancel = () => { blurActiveElementBeforeClose(); emit('cancel'); emit('update:visible', false) }
 </script>
 
-<style lang="less" scoped>
-/* ---------- Header ---------- */
-.setting-drawer__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-  padding: 2px 0;
-}
-
-.setting-drawer__header-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--td-brand-color-light);
-  color: var(--td-brand-color);
-  font-size: 16px;
-  transition: background 0.2s ease;
-}
-
-.setting-drawer__header-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.setting-drawer__title {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--td-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.setting-drawer__subtitle {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--td-text-color-secondary);
-}
-
-/* ---------- Body ---------- */
-.setting-drawer__body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* The Body is the entry-animation host. Children (.form-item) get
-     a subtle staggered slide-in to echo the model-card hover transform. */
-  animation: setting-drawer-body-in 0.28s ease both;
-}
-
-@keyframes setting-drawer-body-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ---------- Sections (consumed by ModelEditorDialog & friends) ---------- */
-.setting-drawer__body :deep(.setting-drawer__section) {
-  padding: 16px 0 24px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  animation: setting-drawer-section-in 0.32s ease both;
-
-  &:first-child {
-    padding-top: 0;
-    animation-delay: 0.04s;
-  }
-
-  &:nth-child(2) {
-    animation-delay: 0.08s;
-  }
-
-  &:nth-child(3) {
-    animation-delay: 0.12s;
-  }
-
-  &:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-}
-
-@keyframes setting-drawer-section-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.setting-drawer__body :deep(.setting-drawer__section-title) {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  margin: 0 0 8px;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  /* A subtle leading bar — replaces the previous all-caps + letter-spacing
-     trick (which mangles Chinese). Gives the section title a consistent
-     visual anchor without yelling at the user. */
-  &::before {
-    content: '';
-    width: 3px;
-    height: 14px;
-    background: var(--td-brand-color);
-    border-radius: 2px;
-  }
-}
-
-/* ---------- Footer ---------- */
-.setting-drawer__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-}
-
-.setting-drawer__footer-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.setting-drawer__footer-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .setting-drawer__header-icon,
-  .setting-drawer__body {
-    animation: none;
-    transition: none;
-  }
-
-  .setting-drawer__body :deep(.setting-drawer__section) {
-    animation: none;
-  }
-}
-</style>
-
-<!--
-  Non-scoped block: t-drawer renders header/footer wrappers outside the
-  scoped style boundary in some TDesign builds, so we tweak chrome (border,
-  padding) at the global level — namespaced under `.setting-drawer` to avoid
-  bleeding into other drawers in the app.
--->
-<style lang="less">
-.setting-drawer {
-  max-width: 100vw;
-
-  .t-drawer__header {
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--td-component-stroke);
-  }
-
-  .t-drawer__body {
-    padding: 24px;
-  }
-
-  .t-drawer__footer {
-    padding: 16px 24px;
-    border-top: 1px solid var(--td-component-stroke);
-    box-shadow: 0 -1px 0 var(--td-component-stroke);
-  }
-}
-
-/* Visible resize handle — teleported to body, aligned with drawer left edge. */
-.setting-drawer-resize-handle {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  width: 12px;
-  margin-left: -6px;
-  cursor: col-resize;
-  z-index: 2501;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* The handle is teleported separately from TDesign's sliding panel. Move it
-     along the same path instead of letting it flash at the panel's final left
-     edge while the drawer is still entering from the right. */
-  animation: setting-drawer-resize-handle-in 0.28s cubic-bezier(0.38, 0, 0.24, 1) both;
-}
-
-@keyframes setting-drawer-resize-handle-in {
-  from {
-    transform: translateX(var(--setting-drawer-travel));
-  }
-
-  to {
-    transform: translateX(0);
-  }
-}
-
-.setting-drawer-resize-line {
-  width: 2px;
-  height: 48px;
-  border-radius: 1px;
-  background: var(--td-component-border);
-  opacity: 0.55;
-  transition: opacity 0.15s ease, background 0.15s ease;
-}
-
-.setting-drawer-resize-handle:hover .setting-drawer-resize-line,
-.setting-drawer-resize-handle--active .setting-drawer-resize-line {
-  opacity: 1;
-  background: var(--td-brand-color);
-}
-
-.t-drawer.setting-drawer--resizing .t-drawer__content {
-  transition: none !important;
-}
-
-@media (max-width: 560px) {
-  .setting-drawer {
-    .t-drawer__header,
-    .t-drawer__body,
-    .t-drawer__footer {
-      padding-left: 16px;
-      padding-right: 16px;
-    }
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .setting-drawer__header-icon,
-  .setting-drawer__body,
-  .setting-drawer-resize-handle,
-  .setting-drawer-resize-line {
-    animation: none;
-    transition: none;
-  }
-
-  .t-drawer.setting-drawer--resizing .t-drawer__content {
-    transition: none !important;
-  }
-}
+<style scoped>
+.reference-setting-drawer-backdrop{position:fixed;inset:0;z-index:2500;display:flex;justify-content:flex-end;background:rgb(17 24 39 / 22%);backdrop-filter:blur(1px);font-family:Inter,"Noto Sans SC",ui-sans-serif,system-ui,sans-serif}
+.reference-setting-drawer{position:relative;height:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden;background:#fff;color:#111827;border-left:1px solid #e5e7eb;box-shadow:-20px 0 45px rgb(0 0 0 / 10%);animation:reference-setting-drawer-in 180ms cubic-bezier(.2,.8,.2,1) both}
+@keyframes reference-setting-drawer-in{from{transform:translateX(28px);opacity:.8}to{transform:none;opacity:1}}
+.reference-setting-drawer--resizing{transition:none;animation:none}
+.reference-setting-drawer__resize{position:absolute;top:0;bottom:0;left:0;z-index:3;width:12px;transform:translateX(-50%);padding:0;border:0;background:transparent;cursor:col-resize;display:flex;align-items:center;justify-content:center}
+.reference-setting-drawer__resize span{width:2px;height:44px;border-radius:2px;background:#d1d5db;opacity:.55}.reference-setting-drawer__resize:hover span,.reference-setting-drawer__resize.active span{background:#6b7280;opacity:1}
+.reference-setting-drawer__header{min-height:67px;flex:0 0 auto;display:flex;align-items:center;gap:11px;padding:13px 16px 13px 20px;border-bottom:1px solid #f3f4f6;box-sizing:border-box}
+.reference-setting-drawer__header-icon{width:32px;height:32px;flex:0 0 32px;display:grid;place-items:center;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;color:#4b5563}.reference-setting-drawer__header-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.reference-setting-drawer__header-copy{min-width:0;flex:1}.reference-setting-drawer__header-copy h3{margin:0;color:#111827;font-size:13px;line-height:18px;font-weight:700}.reference-setting-drawer__header-copy p{margin:2px 0 0;color:#9ca3af;font-size:10px;line-height:15px}
+.reference-setting-drawer__close{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;padding:0;border:0;border-radius:9px;background:transparent;color:#9ca3af;cursor:pointer}.reference-setting-drawer__close:hover{background:#f3f4f6;color:#374151}.reference-setting-drawer__close svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.reference-setting-drawer__body{min-height:0;flex:1;overflow:auto;padding:18px 20px 24px}.reference-setting-drawer__body :deep(.setting-drawer__section){padding:0 0 20px;margin:0 0 20px;border-bottom:1px solid #f3f4f6;display:flex;flex-direction:column;gap:14px}.reference-setting-drawer__body :deep(.setting-drawer__section:last-child){margin-bottom:0;padding-bottom:0;border-bottom:0}.reference-setting-drawer__body :deep(.setting-drawer__section-title){margin:0;color:#374151;font-size:10px;line-height:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.reference-setting-drawer__footer{min-height:62px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid #f3f4f6;background:rgb(249 250 251 / 55%);box-sizing:border-box}.reference-setting-drawer__footer-left{min-width:0;flex:1;display:flex;align-items:center;gap:8px}.reference-setting-drawer__footer-right{display:flex;align-items:center;gap:8px}
+.reference-setting-drawer__secondary,.reference-setting-drawer__primary{height:32px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 13px;border-radius:10px;font-size:11px;line-height:15px;font-weight:700;cursor:pointer}.reference-setting-drawer__secondary{border:1px solid #e5e7eb;background:#fff;color:#4b5563}.reference-setting-drawer__secondary:hover{border-color:#d1d5db;color:#111827}.reference-setting-drawer__primary{border:1px solid #111827;background:#111827;color:#fff}.reference-setting-drawer__primary:hover:not(:disabled){background:#000}.reference-setting-drawer__primary:disabled{opacity:.45;cursor:not-allowed}.reference-setting-drawer__spinner{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;animation:reference-setting-spin .8s linear infinite}@keyframes reference-setting-spin{to{transform:rotate(360deg)}}
+@media(max-width:560px){.reference-setting-drawer{width:100vw!important}.reference-setting-drawer__body{padding:16px}.reference-setting-drawer__footer{padding-inline:16px}}
 </style>
