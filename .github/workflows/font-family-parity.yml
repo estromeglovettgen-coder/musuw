@@ -1,0 +1,79 @@
+name: One-shot Fontsource variable family parity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/font-family-parity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Use actual Fontsource variable family names
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('weknora/frontend/src')
+          allowed = {'.vue', '.css', '.less', '.ts', '.tsx'}
+          replacements = [
+            ('"Inter", "Noto Sans SC", ui-sans-serif', '"Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif'),
+            ("'Inter', 'Noto Sans SC', ui-sans-serif", "'Inter Variable', 'Inter', 'Noto Sans SC Variable', 'Noto Sans SC', ui-sans-serif"),
+            ('font-family:Inter,"Noto Sans SC",ui-sans-serif', 'font-family:"Inter Variable",Inter,"Noto Sans SC Variable","Noto Sans SC",ui-sans-serif'),
+            ('"JetBrains Mono", ui-monospace', '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace'),
+            ("'JetBrains Mono', ui-monospace", "'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace"),
+            ('font-family:"JetBrains Mono",ui-monospace', 'font-family:"JetBrains Mono Variable","JetBrains Mono",ui-monospace'),
+          ]
+          touched = []
+          for p in root.rglob('*'):
+            if not p.is_file() or p.suffix not in allowed:
+              continue
+            try:
+              s = p.read_text()
+            except UnicodeDecodeError:
+              continue
+            original = s
+            for old, new in replacements:
+              s = s.replace(old, new)
+            if s != original:
+              p.write_text(s)
+              touched.append(str(p))
+
+          if not touched:
+            raise SystemExit('no font-family declarations were updated')
+
+          authority = Path('weknora/frontend/src/assets/musuw-reference-authority.css').read_text()
+          theme = Path('weknora/frontend/src/assets/theme/theme.css').read_text()
+          manual = Path('weknora/frontend/src/components/manual-knowledge-editor.vue').read_text()
+          required = [
+            ('authority Inter', 'Inter Variable', authority),
+            ('authority Noto', 'Noto Sans SC Variable', authority),
+            ('authority mono', 'JetBrains Mono Variable', authority),
+            ('theme Inter', 'Inter Variable', theme),
+            ('theme Noto', 'Noto Sans SC Variable', theme),
+            ('theme mono', 'JetBrains Mono Variable', theme),
+            ('manual mono', 'JetBrains Mono Variable', manual),
+          ]
+          for label, needle, text in required:
+            if needle not in text:
+              raise SystemExit(f'missing {label}')
+          print('\n'.join(touched))
+          PY
+      - name: Commit repair
+        shell: bash
+        run: |
+          git config user.name "musuw-visual-parity"
+          git config user.email "actions@users.noreply.github.com"
+          git add weknora/frontend/src
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: use Fontsource variable family names"
+          git push origin HEAD:main
