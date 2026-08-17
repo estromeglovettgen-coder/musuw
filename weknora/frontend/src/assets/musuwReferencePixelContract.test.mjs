@@ -62,7 +62,7 @@ test("matches the copied reference shell, conversation and knowledge geometry", 
   assert.match(mechanical, /html #app \.aside_box\.aside_box--collapsed\{[\s\S]*?width:calc\(var\(--spacing\) \* 14\) !important/);
   assert.match(mechanical, /html #app \.dialogue-answers\{[\s\S]*?max-width:var\(--container-3xl\) !important/);
   assert.match(mechanical, /html #app \.chat \.rich-input-container,[\s\S]*?background-color:#f4f5f7 !important/);
-  assert.match(mechanical, /\.rich-input-container \.t-textarea__inner[\s\S]*?min-height:44px !important[\s\S]*?max-height:180px !important/);
+  assert.match(mechanical, /\.rich-input-container \.t-textarea__inner[\s\S]*?max-height:180px !important[\s\S]*?min-height:44px !important/);
   assert.match(mechanical, /\.kb-folder-tree:not\(\.is-collapsed\)\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/);
   assert.match(mechanical, /\.doc-card-list\{[\s\S]*?grid-template-columns:repeat\(4,minmax\(0,1fr\)\) !important/);
   assert.match(mechanical, /\.knowledge-card\{[\s\S]*?height:calc\(var\(--spacing\) \* 48\) !important/);
