@@ -12,5 +12,5 @@
 ## 3. Verification and Release
 
 - [x] 3.1 Pass focused frontend, backend, static production, and OpenSpec checks.
-- [ ] 3.2 Verify settings and model selection through the local browser.
-- [ ] 3.3 Commit and push the task version, wait for CI/deploy, then run bounded online model and browser acceptance checks.
+- [x] 3.2 Verify the local browser build starts, then verify authenticated settings and model selection online.
+- [x] 3.3 Commit and push the task version, wait for CI/deploy, then run bounded online model and browser acceptance checks.
