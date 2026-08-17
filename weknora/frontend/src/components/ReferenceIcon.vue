@@ -13,6 +13,7 @@ withDefaults(defineProps<{
     | 'chevron-up'
     | 'edit-2'
     | 'edit-3'
+    | 'eraser'
     | 'file-code'
     | 'file-spreadsheet'
     | 'file-text'
@@ -31,6 +32,8 @@ withDefaults(defineProps<{
     | 'panel-left-close'
     | 'panel-left-open'
     | 'pen-line'
+    | 'pin'
+    | 'pin-off'
     | 'plus'
     | 'rotate-cw'
     | 'search'
@@ -105,6 +108,11 @@ withDefaults(defineProps<{
     <template v-else-if="name === 'edit-2' || name === 'edit-3'">
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </template>
+    <template v-else-if="name === 'eraser'">
+      <path d="m7 21-4-4a2.8 2.8 0 0 1 0-4L13.5 2.5a2.8 2.8 0 0 1 4 0l4 4a2.8 2.8 0 0 1 0 4L11 21Z" />
+      <path d="m5 11 9 9" />
+      <path d="M22 21H7" />
     </template>
     <template v-else-if="name === 'file-code'">
       <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -200,6 +208,19 @@ withDefaults(defineProps<{
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </template>
+    <template v-else-if="name === 'pin'">
+      <path d="M12 17v5" />
+      <path d="M5 17h14" />
+      <path d="m15 3-1 7 4 4H6l4-4-1-7z" />
+    </template>
+    <template v-else-if="name === 'pin-off'">
+      <path d="M12 17v5" />
+      <path d="M5 17h12" />
+      <path d="m15 3-.4 2.8" />
+      <path d="M9.4 5.8 9 3h6" />
+      <path d="m10 10-4 4h8" />
+      <path d="m3 3 18 18" />
+    </template>
     <template v-else-if="name === 'plus'">
       <path d="M5 12h14" />
       <path d="M12 5v14" />
@@ -250,8 +271,5 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped>
-.reference-icon {
-  display: block;
-  flex: 0 0 auto;
-}
+.reference-icon { display: block; flex: 0 0 auto; }
 </style>
