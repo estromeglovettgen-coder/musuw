@@ -69,3 +69,13 @@ func TestEntitlementServiceOpenRouterUserIDIsStableAndOpaque(t *testing.T) {
 	assert.NotContains(t, a, "user@example.com")
 	assert.Contains(t, a, "musuw_")
 }
+
+func TestOpenRouterUserIDIsStableAcrossTenants(t *testing.T) {
+	const userID = "same-user"
+	a := OpenRouterUserID(7, userID)
+	b := OpenRouterUserID(99, userID)
+
+	assert.NotEmpty(t, a)
+	assert.Equal(t, a, b)
+	assert.Empty(t, OpenRouterUserID(7, "  "))
+}
