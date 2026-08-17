@@ -15,6 +15,7 @@ import "@/components/css/chat-hljs-dark.less";
 import "@/assets/musuw-reference-core.less";
 import "@/assets/musuw-reference-workbench.less";
 import "@/assets/musuw-reference-header.less";
+import "@/assets/musuw-reference-knowledge-v2.less";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
@@ -30,6 +31,22 @@ installTDesignIconOfflineGuard();
 
 initTheme();
 initFont();
+
+// Task 1 visual-reference v2 changes the default knowledge workbench back to
+// the reference's expanded 224px directory panel. Reset only once for this
+// visual version so stale local preference from the old layout cannot make the
+// freshly deployed page look structurally different; later user collapses are
+// respected normally.
+try {
+  const layoutVersionKey = "musuw.referenceLayoutVersion";
+  const layoutVersion = "knowledge-v2-2026-08-17";
+  if (localStorage.getItem(layoutVersionKey) !== layoutVersion) {
+    localStorage.setItem("weknora.kbFolderTreeCollapsed", "false");
+    localStorage.setItem(layoutVersionKey, layoutVersion);
+  }
+} catch {
+  // Storage can be unavailable in private/restricted browser contexts.
+}
 
 const app = createApp(App);
 
