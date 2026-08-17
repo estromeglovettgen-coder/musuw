@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import KnowledgeBaseReference from './KnowledgeBaseReference.vue'
+import KnowledgeBaseMechanical from './KnowledgeBaseMechanical.vue'
 </script>
 
 <template>
-  <KnowledgeBaseReference />
+  <KnowledgeBaseMechanical />
 </template>
