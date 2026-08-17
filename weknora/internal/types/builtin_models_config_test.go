@@ -388,7 +388,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	var models []Model
 	require.NoError(t, db.Order("id").Find(&models).Error)
-	require.Len(t, models, 6)
+	require.Len(t, models, 10)
 
 	byID := make(map[string]Model, len(models))
 	defaultByType := make(map[ModelType]int)
@@ -408,14 +408,18 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, 1, defaultByType[ModelTypeVLLM])
 	assert.Equal(t, 1, defaultByType[ModelTypeASR])
 
-	assert.False(t, byID["builtin-deepseek-v4-flash"].IsDefault)
-	assert.Equal(t, "deepseek-v4-flash", byID["builtin-deepseek-v4-flash"].Name)
-	assert.Equal(t, "deepseek", byID["builtin-deepseek-v4-flash"].Parameters.Provider)
-	assert.Equal(t, "deepseek-test-key", byID["builtin-deepseek-v4-flash"].Parameters.APIKey)
+	assert.True(t, byID["builtin-deepseek-v4-flash"].IsDefault)
+	assert.Equal(t, "deepseek/deepseek-v4-flash", byID["builtin-deepseek-v4-flash"].Name)
+	assert.Equal(t, "openrouter", byID["builtin-deepseek-v4-flash"].Parameters.Provider)
+	assert.Equal(t, "openrouter-test-key", byID["builtin-deepseek-v4-flash"].Parameters.APIKey)
 	pro := byID["builtin-deepseek-v4-pro"]
-	assert.True(t, pro.IsDefault)
-	assert.Equal(t, "deepseek-v4-pro", pro.Name)
-	assert.Equal(t, "thinking_type", pro.Parameters.ExtraConfig["thinking_control"])
+	assert.False(t, pro.IsDefault)
+	assert.Equal(t, "deepseek/deepseek-v4-pro", pro.Name)
+	assert.Equal(t, "openrouter", pro.Parameters.Provider)
+	assert.Equal(t, "qwen/qwen3.7-flash", byID["builtin-openrouter-qwen-flash"].Name)
+	assert.Equal(t, "moonshotai/kimi-k2.6", byID["builtin-openrouter-kimi"].Name)
+	assert.Equal(t, "mistralai/mistral-small-2603", byID["builtin-openrouter-mistral"].Name)
+	assert.Equal(t, "z-ai/glm-5.1", byID["builtin-openrouter-glm"].Name)
 
 	embedding := byID["builtin-openrouter-embedding"]
 	assert.Equal(t, "qwen/qwen3-embedding-8b", embedding.Name)

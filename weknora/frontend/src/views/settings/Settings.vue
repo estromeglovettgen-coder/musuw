@@ -15,17 +15,36 @@
                 <h2 class="sidebar-title">{{ $t('general.settings') }}</h2>
               </div>
               <div class="settings-nav">
-                <div class="nav-item active" aria-current="page">
+                <button
+                  type="button"
+                  class="nav-item"
+                  :class="{ active: currentSection === 'general' }"
+                  :aria-current="currentSection === 'general' ? 'page' : undefined"
+                  @click="selectSection('general')"
+                >
                   <t-icon name="setting" class="nav-icon" />
                   <span class="nav-label">{{ $t('general.title') }}</span>
-                </div>
+                </button>
+                <button
+                  type="button"
+                  class="nav-item"
+                  :class="{ active: currentSection === 'models' }"
+                  :aria-current="currentSection === 'models' ? 'page' : undefined"
+                  @click="selectSection('models')"
+                >
+                  <t-icon name="chat" class="nav-icon" />
+                  <span class="nav-label">{{ $t('settings.modelManagement') }}</span>
+                </button>
               </div>
             </div>
 
             <div class="settings-content">
               <div class="content-wrapper">
-                <div class="section">
+                <div v-if="currentSection === 'general'" class="section">
                   <GeneralSettings />
+                </div>
+                <div v-else class="section">
+                  <ModelSettings :initial-type="currentModelType" />
                 </div>
               </div>
             </div>
@@ -37,25 +56,65 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import GeneralSettings from './GeneralSettings.vue'
+import ModelSettings from './ModelSettings.vue'
 
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUIStore()
 
-const normalizeSettingsSection = (_section?: string) => 'general'
+type SettingsSection = 'general' | 'models'
+
+const normalizeSettingsSection = (section?: string | null): SettingsSection =>
+  section === 'models' ? 'models' : 'general'
+
+const modalSection = ref<SettingsSection>('general')
+const modalSubSection = ref<string | null>(null)
 
 const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
+const currentSection = computed<SettingsSection>(() =>
+  route.path === '/platform/settings'
+    ? normalizeSettingsSection(typeof route.query.section === 'string' ? route.query.section : null)
+    : modalSection.value,
+)
+const currentModelType = computed(() => {
+  if (route.path === '/platform/settings') {
+    return typeof route.query.tab === 'string' ? route.query.tab : null
+  }
+  return modalSubSection.value
+})
 
-const normalizeSettingsRoute = () => {
-  if (route.path !== '/platform/settings') return
-  const section = route.query.section
-  if (typeof section === 'string' && section !== normalizeSettingsSection(section)) {
-    const { tab: _tab, ...query } = route.query
-    void router.replace({ path: '/platform/settings', query: { ...query, section: 'general' } })
+const syncSettingsSection = (event?: Event) => {
+  const detail = event instanceof CustomEvent ? event.detail : null
+  const requestedSection = detail?.section
+    ?? (route.path === '/platform/settings' ? route.query.section : uiStore.settingsInitialSection)
+  const requestedSubSection = detail?.subsection
+    ?? (route.path === '/platform/settings' ? route.query.tab : uiStore.settingsInitialSubSection)
+  const section = normalizeSettingsSection(
+    typeof requestedSection === 'string' ? requestedSection : null,
+  )
+  modalSection.value = section
+  modalSubSection.value = typeof requestedSubSection === 'string' ? requestedSubSection : null
+
+  if (route.path === '/platform/settings') {
+    const nextQuery: Record<string, string> = { section }
+    if (section === 'models' && modalSubSection.value) {
+      nextQuery.tab = modalSubSection.value
+    }
+    if (route.query.section !== nextQuery.section || route.query.tab !== nextQuery.tab) {
+      void router.replace({ path: '/platform/settings', query: nextQuery })
+    }
+  }
+}
+
+const selectSection = (section: SettingsSection) => {
+  modalSection.value = section
+  modalSubSection.value = null
+  if (route.path === '/platform/settings') {
+    void router.replace({ path: '/platform/settings', query: { section } })
   }
 }
 
@@ -72,19 +131,19 @@ const handleClose = () => {
 watch(
   () => [visible.value, route.query.section, route.query.tab],
   ([isVisible]) => {
-    if (isVisible) normalizeSettingsRoute()
+    if (isVisible) syncSettingsSection()
   },
   { immediate: true },
 )
 
 watch(
-  () => uiStore.settingsInitialSection,
+  () => [uiStore.settingsInitialSection, uiStore.settingsInitialSubSection],
   () => {
-    if (visible.value) normalizeSettingsRoute()
+    if (visible.value) syncSettingsSection()
   },
 )
 
-const handleSettingsNav = () => normalizeSettingsRoute()
+const handleSettingsNav = (event: Event) => syncSettingsSection(event)
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && visible.value) handleClose()
 }
@@ -190,14 +249,32 @@ onUnmounted(() => {
 .nav-item {
   display: flex;
   align-items: center;
+  width: 100%;
   min-height: 40px;
   padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: var(--td-brand-color);
-  background-color: var(--td-brand-color-light);
+  color: var(--td-text-color-secondary);
+  background: transparent;
   font-size: 14px;
   font-weight: 500;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--td-bg-color-container-hover);
+    color: var(--td-text-color-primary);
+  }
+
+  &.active {
+    color: var(--td-brand-color);
+    background-color: var(--td-brand-color-light);
+  }
+
+  & + & {
+    margin-top: 4px;
+  }
 }
 
 .nav-icon {

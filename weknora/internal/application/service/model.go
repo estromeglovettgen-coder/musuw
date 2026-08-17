@@ -97,6 +97,11 @@ func (s *modelService) resolveWeKnoraCloudCredentials(ctx context.Context, param
 // Remote models are immediately set to active status
 func (s *modelService) CreateModel(ctx context.Context, model *types.Model) error {
 	logger.Infof(ctx, "Creating model: %s, type: %s, source: %s", model.Name, model.Type, model.Source)
+	if model.IsDefault {
+		if err := s.repo.ClearDefaultByType(ctx, uint(model.TenantID), model.Type, ""); err != nil {
+			return err
+		}
+	}
 
 	// Handle remote models (e.g., OpenAI, Azure)
 	if model.Source == types.ModelSourceRemote {
@@ -247,6 +252,11 @@ func (s *modelService) UpdateModel(ctx context.Context, model *types.Model) erro
 		model.TenantID = existingModel.TenantID
 		model.IsBuiltin = true
 		model.ManagedBy = ""
+	}
+	if model.IsDefault {
+		if err := s.repo.ClearDefaultByType(ctx, uint(model.TenantID), model.Type, model.ID); err != nil {
+			return err
+		}
 	}
 
 	// Update model in repository

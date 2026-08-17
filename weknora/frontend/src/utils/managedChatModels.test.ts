@@ -1,28 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  MANAGED_CHAT_MODEL_IDS,
-  filterManagedChatModels,
-  resolveManagedChatModelId,
-} from './managedChatModels'
+import { resolveChatModelId } from './managedChatModels'
 
 const models = [
-  { id: 'custom-chat-model', type: 'KnowledgeQA', name: 'custom' },
-  { id: 'builtin-deepseek-v4-pro', type: 'KnowledgeQA', name: 'deepseek-v4-pro' },
-  { id: 'builtin-deepseek-v4-flash', type: 'KnowledgeQA', name: 'deepseek-v4-flash' },
+  { id: 'custom-chat-model', is_default: true, is_builtin: false },
+  { id: 'builtin-deepseek-v4-pro', is_default: true, is_builtin: true },
+  { id: 'builtin-deepseek-v4-flash', is_default: false, is_builtin: true },
 ]
 
-test('managed chat exposes only Flash and Pro in the product order', () => {
-  assert.deepEqual(
-    filterManagedChatModels(models).map((model) => model.id),
-    [...MANAGED_CHAT_MODEL_IDS],
-  )
+test('keeps any valid user-selected chat model', () => {
+  assert.equal(resolveChatModelId('builtin-deepseek-v4-pro', models), 'builtin-deepseek-v4-pro')
 })
 
-test('managed chat rejects stale model selections and falls back to Flash', () => {
-  const available = filterManagedChatModels(models)
+test('falls back to a tenant default before the shared platform default', () => {
+  assert.equal(resolveChatModelId('removed-model', models), 'custom-chat-model')
+})
 
-  assert.equal(resolveManagedChatModelId('custom-chat-model', available), 'builtin-deepseek-v4-flash')
-  assert.equal(resolveManagedChatModelId('builtin-deepseek-v4-flash', available), 'builtin-deepseek-v4-flash')
+test('falls back to Flash when no model is marked default', () => {
+  const withoutDefault = models.map((model) => ({ ...model, is_default: false }))
+  assert.equal(resolveChatModelId('', withoutDefault), 'builtin-deepseek-v4-flash')
 })

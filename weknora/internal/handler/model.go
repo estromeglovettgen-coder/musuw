@@ -49,6 +49,7 @@ type CreateModelRequest struct {
 	Source      types.ModelSource     `json:"source"      binding:"required"`
 	Description string                `json:"description"`
 	Parameters  types.ModelParameters `json:"parameters"  binding:"required"`
+	IsDefault   bool                  `json:"is_default"`
 }
 
 // CreateModel godoc
@@ -101,6 +102,7 @@ func (h *ModelHandler) CreateModel(c *gin.Context) {
 		Source:      req.Source,
 		Description: secutils.SanitizeForLog(req.Description),
 		Parameters:  req.Parameters,
+		IsDefault:   req.IsDefault,
 	}
 
 	if err := h.service.CreateModel(ctx, model); err != nil {
@@ -530,6 +532,7 @@ type UpdateModelRequest struct {
 	Parameters  types.ModelParameters `json:"parameters"`
 	Source      types.ModelSource     `json:"source"`
 	Type        types.ModelType       `json:"type"`
+	IsDefault   *bool                 `json:"is_default"`
 }
 
 // UpdateModel godoc
@@ -627,6 +630,9 @@ func (h *ModelHandler) UpdateModel(c *gin.Context) {
 
 	model.Source = req.Source
 	model.Type = req.Type
+	if req.IsDefault != nil {
+		model.IsDefault = *req.IsDefault
+	}
 
 	logger.Infof(ctx, "Updating model, ID: %s, Name: %s", id, model.Name)
 	if err := h.service.UpdateModel(ctx, model); err != nil {

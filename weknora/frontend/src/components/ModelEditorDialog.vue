@@ -317,6 +317,13 @@
         <h4 class="setting-drawer__section-title">{{ $t('model.editor.sectionAdvanced') }}</h4>
 
         <!-- Embedding 专用：维度 -->
+        <div class="form-item">
+          <label class="form-label">{{ $t('model.defaultTag') }}</label>
+          <div class="vision-toggle">
+            <t-switch v-model="formData.isDefault" />
+          </div>
+        </div>
+
         <div v-if="activeModelType === 'embedding'" class="form-item">
           <label class="form-label">{{ $t('model.editor.dimensionLabel') }}</label>
           <div class="dimension-control">

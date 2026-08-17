@@ -66,6 +66,9 @@
           <div class="model-card__body">
             <div class="model-card__header">
               <h3 class="model-card__title">{{ modelDisplayName(model) }}</h3>
+              <t-tag v-if="model.isDefault" size="small" theme="success" variant="light">
+                {{ $t('model.defaultTag') }}
+              </t-tag>
               <span v-if="model.isBuiltin" class="model-card__lock" :title="$t('modelSettings.builtinTag')"
                 :aria-label="$t('modelSettings.builtinTag')">
                 <t-icon :name="authStore.isSystemAdmin ? 'edit-1' : 'lock-on'" />
@@ -141,7 +144,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { AddIcon, PlayCircleIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -152,6 +155,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const { t, te } = useI18n()
 const authStore = useAuthStore()
+const props = defineProps<{ initialType?: string | null }>()
 type ModelType = 'chat' | 'embedding' | 'rerank' | 'vllm' | 'asr'
 type FilterType = 'all' | ModelType
 
@@ -161,6 +165,17 @@ const currentModelType = ref<ModelType>('chat')
 const editingModel = ref<any>(null)
 const loading = ref(true)
 const activeTypeFilter = ref<FilterType>('all')
+
+const normalizeInitialType = (value?: string | null): FilterType => {
+  const key = (value || '').toLowerCase()
+  if (key === 'knowledgeqa' || key === 'chat') return 'chat'
+  if (key === 'embedding' || key === 'rerank' || key === 'vllm' || key === 'asr') return key
+  return 'all'
+}
+
+watch(() => props.initialType, value => {
+  activeTypeFilter.value = normalizeInitialType(value)
+}, { immediate: true })
 
 // 模型列表数据
 const allModels = ref<ModelConfig[]>([])
@@ -192,6 +207,7 @@ function convertToLegacyFormat(model: ModelConfig) {
     dimension: model.parameters.embedding_parameters?.dimension,
     supportsDimensionOverride: model.parameters.embedding_parameters?.supports_dimension_override || false,
     isBuiltin: model.is_builtin || false,
+    isDefault: model.is_default || false,
     supportsVision: model.parameters.supports_vision || false,
     maxConcurrency: model.parameters.max_concurrency,
     customHeaders: model.parameters.custom_headers
@@ -438,6 +454,7 @@ const handleModelSave = async (modelData: any) => {
       type: getModelType(saveType),
       source: modelData.source,
       description: '',
+      is_default: modelData.isDefault ?? false,
       parameters: {
         base_url: modelData.baseUrl?.trim() || '',
         ...apiKeyFields,
@@ -576,6 +593,7 @@ const copyModel = async (_type: ModelType, modelId: string) => {
       type: source.type,
       source: source.source,
       description: source.description || '',
+      is_default: false,
       parameters: JSON.parse(JSON.stringify(source.parameters || {}))
     }
 

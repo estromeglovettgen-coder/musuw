@@ -33,6 +33,10 @@ done
 for model_id in \
     builtin-deepseek-v4-pro \
     builtin-deepseek-v4-flash \
+    builtin-openrouter-qwen-flash \
+    builtin-openrouter-kimi \
+    builtin-openrouter-mistral \
+    builtin-openrouter-glm \
     builtin-openrouter-embedding \
     builtin-openrouter-rerank \
     builtin-openrouter-vlm \

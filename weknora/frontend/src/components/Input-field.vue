@@ -46,7 +46,7 @@ import {
 } from "@/utils/agent-readiness";
 import { formatLocalizedList } from "@/utils/format-list";
 import type { MentionItem, MentionItemType, MentionRequestItem } from "@/types/mention";
-import { filterManagedChatModels, resolveManagedChatModelId } from "@/utils/managedChatModels";
+import { resolveChatModelId } from "@/utils/managedChatModels";
 import organizationGreyIcon from "@/assets/img/organization-grey.svg";
 import organizationGreenIcon from "@/assets/img/organization-green.svg";
 
@@ -68,7 +68,9 @@ const {
   chatModels: rawAvailableModels,
   webSearchProviders,
 } = storeToRefs(chatResources);
-const availableModels = computed(() => filterManagedChatModels(rawAvailableModels.value));
+const availableModels = computed(() =>
+  rawAvailableModels.value.filter((model) => !model.status || model.status === "active"),
+);
 const { t, locale } = useI18n();
 
 let query = ref("");
@@ -983,20 +985,9 @@ const writeLastChatModelID = (id: string) => {
   }
 };
 
-// The managed entry modes own their model choice. Existing custom/shared sessions
-// keep their restored model state so opening historical conversations is unchanged.
 const initChatModelSelection = () => {
-  const isManagedMode =
-    selectedAgentId.value === BUILTIN_QUICK_ANSWER_ID ||
-    selectedAgentId.value === BUILTIN_SMART_REASONING_ID;
-  const initialSelection = isManagedMode
-    ? isProMode.value
-      ? V4_PRO_MODEL_ID
-      : V4_FLASH_MODEL_ID
-    : resolveManagedChatModelId(
-        readLastChatModelID() || settingsStore.conversationModels.selectedChatModelId,
-        availableModels.value,
-      );
+  const initialSelection =
+    readLastChatModelID() || settingsStore.conversationModels.selectedChatModelId || "";
   settingsStore.updateConversationModels({
     summaryModelId: initialSelection,
     selectedChatModelId: initialSelection,
@@ -1023,17 +1014,15 @@ const loadChatModels = async (force = false) => {
 };
 
 const ensureModelSelection = () => {
-  if (
-    selectedAgentId.value !== BUILTIN_QUICK_ANSWER_ID &&
-    selectedAgentId.value !== BUILTIN_SMART_REASONING_ID
-  ) {
-    return;
-  }
-  const modelId = isProMode.value ? V4_PRO_MODEL_ID : V4_FLASH_MODEL_ID;
+  if (!availableModels.value.length) return;
   if (!isProMode.value && thinkingEnabled.value) {
     thinkingEnabled.value = false;
   }
-  if (selectedModelId.value === modelId) return;
+  const modelId = resolveChatModelId(
+    selectedModelId.value || readLastChatModelID(),
+    availableModels.value,
+  );
+  if (!modelId || selectedModelId.value === modelId) return;
   settingsStore.updateConversationModels({
     summaryModelId: modelId,
     selectedChatModelId: modelId,
@@ -1043,6 +1032,33 @@ const ensureModelSelection = () => {
 
 watch([availableModels, selectedModelId, selectedAgentId], ensureModelSelection, { immediate: true });
 
+// Keep an agent's configured model unless this browser has an explicit valid override.
+watch(
+  [selectedAgentId, () => settingsStore.selectedAgentSourceTenantId, agentModelId],
+  ([, sourceTenantId, newModelId]) => {
+    if (!newModelId || newModelId.trim() === "") return;
+    const lastPick = readLastChatModelID();
+    const agentModelInList = availableModels.value.some((model) => model.id === newModelId);
+    if (
+      lastPick &&
+      selectedModelId.value === lastPick &&
+      lastPick !== newModelId &&
+      (!sourceTenantId || agentModelInList)
+    ) {
+      return;
+    }
+    if (newModelId !== selectedModelId.value) {
+      selectedModelId.value = newModelId;
+    }
+  },
+  { immediate: true },
+);
+
+const handleGoToConversationModels = () => {
+  showModelSelector.value = false;
+  uiStore.openSettings("models", "chat");
+};
+
 const handleModelChange = (value: string | number | Array<string | number> | undefined) => {
   const normalized = Array.isArray(value) ? value[0] : value;
   const val = normalized !== undefined && normalized !== null ? String(normalized) : "";
@@ -1051,7 +1067,11 @@ const handleModelChange = (value: string | number | Array<string | number> | und
     selectedModelId.value = "";
     return;
   }
-  if (resolveManagedChatModelId(val, availableModels.value) !== val) return;
+  if (val === "__add_model__") {
+    handleGoToConversationModels();
+    return;
+  }
+  if (!availableModels.value.some((model) => model.id === val)) return;
 
   // The chat-level model picker now persists per-user-per-browser via
   // localStorage instead of writing to the tenant-shared KV. This is what
@@ -1779,6 +1799,20 @@ const removeFile = (id: string) => {
   delete fileIdToKbId.value[id];
 };
 
+const toggleModelSelector = () => {
+  showMention.value = false;
+  showAgentModeSelector.value = false;
+  showModelSelector.value = !showModelSelector.value;
+  if (!showModelSelector.value) return;
+  if (!availableModels.value.length) {
+    void loadChatModels();
+  }
+  nextTick(() => {
+    updateModelDropdownPosition();
+    requestAnimationFrame(() => updateModelDropdownPosition());
+  });
+};
+
 const closeModelSelector = () => {
   showModelSelector.value = false;
 };
@@ -2179,6 +2213,7 @@ const selectAgentMode = async (mode: "quick-answer" | "smart-reasoning") => {
   }
   selectedModelId.value =
     mode === "smart-reasoning" ? V4_PRO_MODEL_ID : V4_FLASH_MODEL_ID;
+  writeLastChatModelID(selectedModelId.value);
   settingsStore.updateConversationModels({
     summaryModelId: selectedModelId.value,
     selectedChatModelId: selectedModelId.value,
@@ -2859,6 +2894,21 @@ defineExpose({
             <span>{{ $t("agent.editor.thinking") }}</span>
             <t-switch v-model="thinkingEnabled" size="small" />
           </label>
+          <div class="model-display">
+            <div ref="modelButtonRef" class="model-selector-trigger" @click.stop="toggleModelSelector">
+              <span class="model-selector-name">{{ selectedModelDisplayName }}</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="currentColor"
+                class="model-dropdown-arrow"
+                :class="{ rotate: showModelSelector }"
+              >
+                <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         <Teleport to="body">
@@ -2890,6 +2940,50 @@ defineExpose({
                   <span class="agent-mode-option-desc">全功能模式</span>
                 </span>
               </button>
+            </div>
+          </div>
+        </Teleport>
+
+        <Teleport to="body">
+          <div
+            v-if="showModelSelector"
+            class="model-selector-overlay"
+            @click="closeModelSelector"
+          >
+            <div class="model-selector-dropdown" :style="modelDropdownStyle" @click.stop>
+              <div class="model-selector-header">
+                <span>{{ $t("conversationSettings.models.chatGroupLabel") }}</span>
+                <button
+                  class="model-selector-add"
+                  type="button"
+                  @click="handleModelChange('__add_model__')"
+                >
+                  <span class="add-icon">+</span>
+                  <span class="add-text">{{ $t("input.addModel") }}</span>
+                </button>
+              </div>
+              <div class="model-selector-content">
+                <div
+                  v-for="model in availableModels"
+                  :key="model.id"
+                  class="model-option"
+                  :class="{ selected: model.id === selectedModelId }"
+                  @click="handleModelChange(model.id || '')"
+                >
+                  <div class="model-option-left">
+                    <div class="model-option-icon">
+                      <t-icon name="chat" size="14px" />
+                    </div>
+                    <div class="model-option-name-wrap">
+                      <span class="model-option-name">{{ modelDisplayName(model) }}</span>
+                      <span v-if="model.display_name" class="model-option-raw-name">{{ model.name }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="availableModels.length === 0" class="model-option empty">
+                  {{ $t("input.noModel") }}
+                </div>
+              </div>
             </div>
           </div>
         </Teleport>

@@ -4,35 +4,93 @@
 builtin_models:
   - id: builtin-deepseek-v4-pro
     tenant_id: 10000
-    name: deepseek-v4-pro
+    name: deepseek/deepseek-v4-pro
+    display_name: V4 Pro
     type: KnowledgeQA
     source: remote
-    description: DeepSeek V4 Pro · default high-quality conversation model
-    is_default: true
-    status: active
-    parameters:
-      base_url: https://api.deepseek.com/v1
-      api_key: ${DEEPSEEK_API_KEY}
-      provider: deepseek
-      supports_vision: false
-      extra_config:
-        thinking_control: thinking_type
-
-  - id: builtin-deepseek-v4-flash
-    tenant_id: 10000
-    name: deepseek-v4-flash
-    type: KnowledgeQA
-    source: remote
-    description: DeepSeek V4 Flash · lower-latency conversation option
+    description: DeepSeek V4 Pro through OpenRouter · high-quality conversation model
     is_default: false
     status: active
     parameters:
-      base_url: https://api.deepseek.com/v1
-      api_key: ${DEEPSEEK_API_KEY}
-      provider: deepseek
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
       supports_vision: false
-      extra_config:
-        thinking_control: thinking_type
+
+  - id: builtin-deepseek-v4-flash
+    tenant_id: 10000
+    name: deepseek/deepseek-v4-flash
+    display_name: V4 Flash
+    type: KnowledgeQA
+    source: remote
+    description: DeepSeek V4 Flash through OpenRouter · lower-cost conversation model
+    is_default: true
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      supports_vision: false
+
+  - id: builtin-openrouter-qwen-flash
+    tenant_id: 10000
+    name: qwen/qwen3.7-flash
+    display_name: Qwen 3.7 Flash
+    type: KnowledgeQA
+    source: remote
+    description: Qwen 3.7 Flash through OpenRouter · fast multimodal conversation
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      supports_vision: true
+
+  - id: builtin-openrouter-kimi
+    tenant_id: 10000
+    name: moonshotai/kimi-k2.6
+    display_name: Kimi K2.6
+    type: KnowledgeQA
+    source: remote
+    description: Kimi K2.6 through OpenRouter · multimodal long-context conversation
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      supports_vision: true
+
+  - id: builtin-openrouter-mistral
+    tenant_id: 10000
+    name: mistralai/mistral-small-2603
+    display_name: Mistral Small 2603
+    type: KnowledgeQA
+    source: remote
+    description: Mistral Small 2603 through OpenRouter · efficient multimodal conversation
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      supports_vision: true
+
+  - id: builtin-openrouter-glm
+    tenant_id: 10000
+    name: z-ai/glm-5.1
+    display_name: GLM 5.1
+    type: KnowledgeQA
+    source: remote
+    description: GLM 5.1 through OpenRouter · general conversation model
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      api_key: ${OPENROUTER_API_KEY}
+      provider: openrouter
+      supports_vision: false
 
   - id: builtin-openrouter-embedding
     tenant_id: 10000
