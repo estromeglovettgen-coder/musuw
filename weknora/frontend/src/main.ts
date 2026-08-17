@@ -17,6 +17,7 @@ import "@/assets/musuw-reference-workbench.less";
 import "@/assets/musuw-reference-header.less";
 import "@/assets/musuw-reference-knowledge-v2.less";
 import "@/assets/musuw-reference-knowledge-v3.less";
+import "@/assets/musuw-reference-knowledge-v4.less";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
