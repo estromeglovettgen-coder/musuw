@@ -12,12 +12,9 @@ import "@/assets/theme/theme.css";
 import "@/assets/musuw-visual.less";
 import "@/assets/dropdown-menu.less";
 import "@/components/css/chat-hljs-dark.less";
-import "@/assets/musuw-reference-core.less";
-import "@/assets/musuw-reference-workbench.less";
-import "@/assets/musuw-reference-header.less";
-import "@/assets/musuw-reference-knowledge-v2.less";
-import "@/assets/musuw-reference-knowledge-v3.less";
-import "@/assets/musuw-reference-knowledge-v4.less";
+// Task 1 visual authority: mechanically compiled from the reference TSX/Tailwind utilities.
+// This is presentation-only; Vue data/handlers/permissions/conditional rendering remain authoritative.
+import "@/assets/musuw-reference-mechanical.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
