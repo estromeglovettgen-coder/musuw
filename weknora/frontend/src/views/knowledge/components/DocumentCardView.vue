@@ -38,6 +38,7 @@ const props = defineProps<{
   selectedIds: Set<string>
   batchMode: boolean
   canEdit: boolean
+  canDownload: boolean
   canMutateKnowledge: boolean
   traceAvailableById: Record<string, boolean>
   tagList: Tag[]
@@ -56,7 +57,7 @@ const emit = defineEmits<{
   (e: 'open', item: KnowledgeCard): void
   (e: 'toggle-checkbox', id: string, checked: boolean, ctx?: { e?: Event }): void
   (e: 'menu-visible-change', visible: boolean, item: KnowledgeCard): void
-  (e: 'action', action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void
+  (e: 'action', action: 'download' | 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void
   (e: 'tag-edit', item: KnowledgeCard): void
   (e: 'open-folder', path: string): void
   (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void
@@ -136,7 +137,7 @@ const onCardClick = (item: KnowledgeCard) => {
   emit('open', item)
 }
 
-const runAction = (action: 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
+const runAction = (action: 'download' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
   if (action === 'delete') {
     if (!window.confirm(`确定删除文档 "${cardTitle(item)}" 吗？`)) return
   }
@@ -194,7 +195,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
             <h4 :title="cardTitle(item)">{{ cardTitle(item) }}</h4>
           </div>
 
-          <div v-if="canEdit" class="reference-document-card__menu-anchor">
+          <div v-if="canEdit || canDownload" class="reference-document-card__menu-anchor">
             <button
               type="button"
               class="reference-document-card__more"
@@ -285,7 +286,16 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
 
               <div v-else class="reference-document-card__menu" @click.stop>
                 <button
-                  v-if="isTraceVisible(item)"
+                  v-if="canDownload && (item.type === 'file' || item.type === 'manual')"
+                  type="button"
+                  class="reference-menu-item"
+                  @click="runAction('download', item)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="reference-menu-inline-icon"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                  <span>{{ t('common.download') }}</span>
+                </button>
+                <button
+                  v-if="canEdit && isTraceVisible(item)"
                   type="button"
                   class="reference-menu-item"
                   @click="runAction('view-trace', item)"
@@ -293,12 +303,12 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
                   <ReferenceIcon name="activity" :size="14" class="reference-menu-icon" />
                   <span>查看 Trace</span>
                 </button>
-                <button type="button" class="reference-menu-item" @click="runAction('reparse', item)">
+                <button v-if="canEdit" type="button" class="reference-menu-item" @click="runAction('reparse', item)">
                   <ReferenceIcon name="rotate-cw" :size="14" class="reference-menu-icon" />
                   <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
                 </button>
                 <button
-                  v-if="isParseInFlight(item.parse_status)"
+                  v-if="canEdit && isParseInFlight(item.parse_status)"
                   type="button"
                   class="reference-menu-item reference-menu-item--warning"
                   @click="runAction('cancel-parse', item)"
@@ -318,8 +328,8 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
                   <ReferenceIcon name="check-square" :size="14" class="reference-menu-icon" />
                   <span>{{ t('menu.batchManage') }}</span>
                 </button>
-                <div class="reference-menu-divider" />
-                <button type="button" class="reference-menu-item reference-menu-item--danger" @click="runAction('delete', item)">
+                <div v-if="canEdit" class="reference-menu-divider" />
+                <button v-if="canEdit" type="button" class="reference-menu-item reference-menu-item--danger" @click="runAction('delete', item)">
                   <ReferenceIcon name="trash-2" :size="14" />
                   <span>{{ t('knowledgeBase.deleteDocument') }}</span>
                 </button>

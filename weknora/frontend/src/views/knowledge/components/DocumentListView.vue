@@ -31,6 +31,7 @@ const props = defineProps<{
   items: KnowledgeItem[]
   selectedIds: Set<string>
   canEdit: boolean
+  canDownload: boolean
   canMutateKnowledge: boolean
   traceVisibleIds: Record<string, boolean>
   tagList: Tag[]
@@ -50,7 +51,7 @@ const emit = defineEmits<{
   (e: 'open', item: KnowledgeItem): void
   (e: 'toggle-row', id: string, checked: boolean, shiftKey: boolean): void
   (e: 'toggle-all', checked: boolean): void
-  (e: 'action', action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem): void
+  (e: 'action', action: 'download' | 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem): void
   (e: 'probe-trace', item: KnowledgeItem): void
   (e: 'tag-edit', item: KnowledgeItem): void
   (e: 'open-folder', path: string): void
@@ -131,7 +132,7 @@ const closeMenu = () => {
   folderPickerItemId.value = null
   emit('reset-move-state')
 }
-const runAction = (action: 'reparse' | 'cancel-parse' | 'move' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem) => {
+const runAction = (action: 'download' | 'reparse' | 'cancel-parse' | 'move' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem) => {
   if (action === 'delete' && !window.confirm(`确定删除文档 "${item.file_name}" 吗？`)) return
   if (action === 'move') {
     emit('action', action, item)
@@ -176,6 +177,33 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
         </thead>
 
         <tbody>
+          <tr
+            v-for="folder in folders || []"
+            :key="`folder-${folder.path}`"
+            class="reference-folder-table-row"
+            :title="folder.path"
+            @click="emit('open-folder', folder.path)"
+          >
+            <td class="reference-col-check" aria-hidden="true"></td>
+            <td class="reference-file-cell">
+              <div class="reference-file-cell__wrap">
+                <div class="reference-file-cell__icon reference-file-cell__icon--folder">
+                  <ReferenceIcon name="folder" :size="16" />
+                </div>
+                <div class="reference-file-cell__copy">
+                  <h5 :title="folder.path">{{ folder.name }}</h5>
+                  <p>{{ t('knowledgeBase.folderTree.folderCardCount', { count: folder.total_count }) }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="reference-col-tags"></td>
+            <td class="reference-col-source"></td>
+            <td class="reference-col-size"></td>
+            <td class="reference-col-status"></td>
+            <td class="reference-col-time"></td>
+            <td class="reference-col-action"></td>
+          </tr>
+
           <tr
             v-for="item in items"
             :key="item.id"
@@ -258,7 +286,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
             <td class="reference-col-action" @click.stop>
               <div class="reference-list-menu-anchor">
                 <button
-                  v-if="canEdit"
+                  v-if="canEdit || canDownload"
                   type="button"
                   class="reference-list-more"
                   :aria-label="t('knowledgeBase.moreOptions')"
@@ -267,7 +295,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                   <ReferenceIcon name="more-horizontal" :size="14" />
                 </button>
 
-                <template v-if="canEdit && activeMenuItemId === item.id">
+                <template v-if="(canEdit || canDownload) && activeMenuItemId === item.id">
                   <div class="reference-list-backdrop" @click="closeMenu" />
 
                   <div v-if="folderPickerItemId === item.id" class="reference-list-menu reference-list-submenu">
@@ -336,16 +364,25 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                   </div>
 
                   <div v-else class="reference-list-menu">
-                    <button v-if="isTraceVisible(item)" type="button" class="reference-list-menu-item" @click="runAction('view-trace', item)">
+                    <button
+                      v-if="canDownload && (item.type === 'file' || item.type === 'manual')"
+                      type="button"
+                      class="reference-list-menu-item"
+                      @click="runAction('download', item)"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="reference-list-menu-inline-icon"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                      <span>{{ t('common.download') }}</span>
+                    </button>
+                    <button v-if="canEdit && isTraceVisible(item)" type="button" class="reference-list-menu-item" @click="runAction('view-trace', item)">
                       <ReferenceIcon name="activity" :size="14" class="reference-list-menu-icon" />
                       <span>查看 Trace</span>
                     </button>
-                    <button type="button" class="reference-list-menu-item" @click="runAction('reparse', item)">
+                    <button v-if="canEdit" type="button" class="reference-list-menu-item" @click="runAction('reparse', item)">
                       <ReferenceIcon name="rotate-cw" :size="14" class="reference-list-menu-icon" />
                       <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
                     </button>
                     <button
-                      v-if="isParseInFlight(item.parse_status)"
+                      v-if="canEdit && isParseInFlight(item.parse_status)"
                       type="button"
                       class="reference-list-menu-item reference-list-menu-item--warning"
                       @click="runAction('cancel-parse', item)"
@@ -365,8 +402,8 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                       <ReferenceIcon name="check-square" :size="14" class="reference-list-menu-icon" />
                       <span>{{ t('menu.batchManage') }}</span>
                     </button>
-                    <div class="reference-list-menu-divider" />
-                    <button type="button" class="reference-list-menu-item reference-list-menu-item--danger" @click="runAction('delete', item)">
+                    <div v-if="canEdit" class="reference-list-menu-divider" />
+                    <button v-if="canEdit" type="button" class="reference-list-menu-item reference-list-menu-item--danger" @click="runAction('delete', item)">
                       <ReferenceIcon name="trash-2" :size="14" />
                       <span>{{ t('knowledgeBase.deleteDocument') }}</span>
                     </button>
@@ -461,6 +498,10 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
   font-size: 11px;
   line-height: 16px;
 }
+.reference-folder-table-row { background: rgb(249 250 251 / 0.35); }
+.reference-folder-table-row:hover { background: #f3f4f6 !important; }
+.reference-file-cell__icon--folder { color: #6b7280; background: #f3f4f6; }
+.reference-list-menu-inline-icon { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .reference-list-folder-path {
   max-width: 100%;
   margin-top: 2px;

@@ -32,6 +32,7 @@ import {
   batchDeleteKnowledge,
   batchReparseKnowledge,
   getKnowledgeSpans,
+  downKnowledgeDetails,
   listKnowledgeFolders,
   moveKnowledgeToFolder,
   renameKnowledgeFolder,
@@ -65,6 +66,7 @@ import {
   isFolderUpload,
   ROOT_FOLDER_PATH,
 } from './folderTree';
+import { resolveKnowledgeDownloadFileName } from './knowledgeDownloadFileName';
 import { useI18n } from 'vue-i18n';
 import { useMarqueeSelect } from '@/hooks/useMarqueeSelect';
 import type { ParserEngineInfo } from '@/api/system';
@@ -2047,12 +2049,33 @@ const confirmCancelParseKnowledge = async (item: KnowledgeCard) => {
   }
 };
 
+const downloadKnowledge = async (item: KnowledgeCard) => {
+  if (!item?.id) return;
+  try {
+    const file = await downKnowledgeDetails(item.id);
+    const objectUrl = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = objectUrl;
+    link.download = resolveKnowledgeDownloadFileName(item);
+    document.body.appendChild(link);
+    link.click();
+    nextTick(() => {
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    });
+  } catch {
+    MessagePlugin.error(t('file.downloadFailed'));
+  }
+};
+
 // Bridge card-view actions back to existing per-card handlers.
 const handleCardAction = (
-  action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
+  action: 'download' | 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
   item: KnowledgeCard,
 ) => {
   const idx = (cardList.value || []).findIndex((i: KnowledgeCard) => i.id === item.id);
+  if (action === 'download') return downloadKnowledge(item);
   if (action === 'edit') return handleManualEdit(idx, item);
   if (action === 'reparse') {
     if (isParseInFlight(item.parse_status)) return onReparseMenuClick(idx, item);
@@ -2067,10 +2090,11 @@ const handleCardAction = (
 
 // Bridge list-view actions back to existing per-card handlers.
 const handleListAction = (
-  action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
+  action: 'download' | 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
   item: KnowledgeCard,
 ) => {
   const idx = (cardList.value || []).findIndex((i: KnowledgeCard) => i.id === item.id);
+  if (action === 'download') return downloadKnowledge(item);
   if (action === 'edit') return handleManualEdit(idx, item);
   if (action === 'reparse') return confirmRebuildKnowledge(idx, item);
   if (action === 'cancel-parse') return confirmCancelParseKnowledge(item);
@@ -2464,6 +2488,7 @@ async function createNewSession(value: string): Promise<void> {
                     :selected-ids="selectedIds"
                     :batch-mode="batchMode"
                     :can-edit="canEdit"
+                    :can-download="canDownloadKnowledge"
                     :can-mutate-knowledge="canMutateKnowledge"
                     :trace-available-by-id="traceAvailableById"
                     :tag-list="tagList"
@@ -2490,7 +2515,7 @@ async function createNewSession(value: string): Promise<void> {
                 <template v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'list'">
                   <DocumentListView :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions"
                     :selected-ids="selectedIds" :tag-list="tagList"
-                    :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge"
+                    :can-edit="canEdit" :can-download="canDownloadKnowledge" :can-mutate-knowledge="canMutateKnowledge"
                     :trace-visible-ids="traceAvailableById"
                     :move-menu-mode="moveMenuMode"
                     :move-target-kbs="moveTargetKbs"
