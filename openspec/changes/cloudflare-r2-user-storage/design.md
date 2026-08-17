@@ -1,6 +1,6 @@
 ## Context
 
-Production stores user files in the `weknora-v072-production-data-files` volume and records stable `resource://` handles whose physical targets are `storage://<backend>/local://...`. WeKnora v0.7.2 already supports concrete per-tenant S3 backends, Cloudflare R2 exposes an S3 API, and only 39 files (about 10.3MB) require a one-time copy.
+Production stores user files in the `weknora-v072-production-data-files` volume and records stable `resource://` handles whose physical targets are `storage://<backend>/local://...`. WeKnora v0.7.2 already supports concrete per-tenant S3 backends, Cloudflare R2 exposes an S3 API, and only 38 active files (about 10.3MB) require a one-time copy.
 
 ## Goals / Non-Goals
 

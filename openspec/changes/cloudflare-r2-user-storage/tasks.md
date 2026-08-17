@@ -7,10 +7,10 @@
 ## 2. Cloud and Data Migration
 
 - [x] 2.1 Delete the obsolete R2 bucket, create the production bucket, and install a bounded read/write credential.
-- [ ] 2.2 Copy and verify existing server files, then transactionally switch tenant, knowledge-base, and resource bindings.
+- [x] 2.2 Copy and verify existing server files, then transactionally switch tenant, knowledge-base, and resource bindings.
 
 ## 3. Verification and Release
 
 - [x] 3.1 Pass focused local production-contract and OpenSpec validation.
-- [ ] 3.2 Commit and push the task version, wait for CI/deploy, and verify production health.
-- [ ] 3.3 Use the browser to read an existing object and upload/delete a new document through the real R2 path.
+- [x] 3.2 Commit and push the task version, wait for CI/deploy, and verify production health.
+- [x] 3.3 Use the browser to read an existing object and upload/delete a new document through the real R2 path.
