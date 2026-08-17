@@ -11,12 +11,16 @@ withDefaults(defineProps<{
     | 'chevron-left'
     | 'chevron-right'
     | 'edit-3'
+    | 'file-code'
+    | 'file-spreadsheet'
     | 'file-text'
     | 'folder'
     | 'folder-plus'
     | 'globe'
+    | 'image'
     | 'layout-grid'
     | 'list'
+    | 'loader-circle'
     | 'message-square-plus'
     | 'more-horizontal'
     | 'network'
@@ -29,6 +33,7 @@ withDefaults(defineProps<{
     | 'tag'
     | 'trash-2'
     | 'upload'
+    | 'volume-2'
     | 'zap'
   size?: number
   strokeWidth?: number
@@ -92,6 +97,19 @@ withDefaults(defineProps<{
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </template>
+    <template v-else-if="name === 'file-code'">
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="m10 13-2 2 2 2" />
+      <path d="m14 17 2-2-2-2" />
+    </template>
+    <template v-else-if="name === 'file-spreadsheet'">
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M8 13h8" />
+      <path d="M8 17h8" />
+      <path d="M11 13v4" />
+    </template>
     <template v-else-if="name === 'file-text'">
       <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
       <polyline points="14 2 14 8 20 8" />
@@ -112,6 +130,11 @@ withDefaults(defineProps<{
       <path d="M2 12h20" />
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" />
     </template>
+    <template v-else-if="name === 'image'">
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </template>
     <template v-else-if="name === 'layout-grid'">
       <rect width="7" height="7" x="3" y="3" rx="1" />
       <rect width="7" height="7" x="14" y="3" rx="1" />
@@ -125,6 +148,9 @@ withDefaults(defineProps<{
       <path d="M8 12h13" />
       <path d="M8 18h13" />
       <path d="M8 6h13" />
+    </template>
+    <template v-else-if="name === 'loader-circle'">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </template>
     <template v-else-if="name === 'message-square-plus'">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -185,6 +211,11 @@ withDefaults(defineProps<{
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="17 8 12 3 7 8" />
       <line x1="12" x2="12" y1="3" y2="15" />
+    </template>
+    <template v-else-if="name === 'volume-2'">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
     </template>
     <template v-else-if="name === 'zap'">
       <path d="M13 2 3 14h9l-1 8 10-12h-9Z" />
