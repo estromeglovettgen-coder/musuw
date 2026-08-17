@@ -31,7 +31,6 @@ const props = defineProps<{
   items: KnowledgeItem[]
   selectedIds: Set<string>
   canEdit: boolean
-  canDownload: boolean
   canMutateKnowledge: boolean
   traceVisibleIds: Record<string, boolean>
   tagList: Tag[]
@@ -51,7 +50,7 @@ const emit = defineEmits<{
   (e: 'open', item: KnowledgeItem): void
   (e: 'toggle-row', id: string, checked: boolean, shiftKey: boolean): void
   (e: 'toggle-all', checked: boolean): void
-  (e: 'action', action: 'download' | 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem): void
+  (e: 'action', action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem): void
   (e: 'probe-trace', item: KnowledgeItem): void
   (e: 'tag-edit', item: KnowledgeItem): void
   (e: 'open-folder', path: string): void
@@ -102,20 +101,43 @@ const formatTime = (time?: string) => {
   return `${yy}-${MM}-${dd} ${hh}:${mm}`
 }
 const sourceInfo = (item: KnowledgeItem): { icon: 'globe' | 'pen-line' | 'upload'; label: string } => {
-  if (item.type === 'url' || item.source === 'crawler') return { icon: 'globe', label: '抓取' }
-  if (item.type === 'manual' || item.source === 'online') return { icon: 'pen-line', label: '在线' }
-  if (item.channel === 'api' || item.source === 'api') return { icon: 'upload', label: 'API同步' }
-  return { icon: 'upload', label: '上传' }
+  const channelLabels: Record<string, string> = {
+    feishu: 'knowledgeBase.channelFeishu',
+    feishu_drive: 'knowledgeBase.channelFeishuDrive',
+    lark_drive: 'knowledgeBase.channelLarkDrive',
+    notion: 'knowledgeBase.channelNotion',
+    yuque: 'knowledgeBase.channelYuque',
+    wechat: 'knowledgeBase.channelWechat',
+    wecom: 'knowledgeBase.channelWecom',
+    dingtalk: 'knowledgeBase.channelDingtalk',
+    slack: 'knowledgeBase.channelSlack',
+    im: 'knowledgeBase.channelIm',
+  }
+  if (item.channel && channelLabels[item.channel]) {
+    return { icon: 'upload', label: t(channelLabels[item.channel]) }
+  }
+  if (item.type === 'url') return { icon: 'globe', label: t('knowledgeBase.channelUrl') }
+  if (item.type === 'manual') return { icon: 'pen-line', label: t('knowledgeBase.channelManual') }
+  return { icon: 'upload', label: t('knowledgeBase.channelUpload') }
 }
 const statusInfo = (item: KnowledgeItem) => {
-  if (item.parse_status === 'failed') return { tone: 'failed', label: '失败', spinning: false }
-  if (item.parse_status === 'pending' || item.parse_status === 'processing') return { tone: 'indexing', label: '索引中', spinning: true }
-  if (item.parse_status === 'finalizing' || (item.parse_status === 'completed' && ['pending', 'processing'].includes(String(item.summary_status || '')))) {
-    return { tone: 'optimizing', label: '优化中', spinning: true }
+  if (item.parse_status === 'pending' || item.parse_status === 'processing') {
+    return { tone: 'indexing', label: t('knowledgeBase.statusProcessing'), spinning: true }
   }
-  if (item.parse_status === 'cancelled') return { tone: 'failed', label: '已停止', spinning: false }
-  if (item.parse_status === 'draft') return { tone: 'optimizing', label: '草稿', spinning: false }
-  return { tone: 'completed', label: '已完成', spinning: false }
+  if (item.parse_status === 'finalizing') {
+    if (item.summary_status === 'pending' || item.summary_status === 'processing') {
+      return { tone: 'indexing', label: t('knowledgeBase.generatingSummary'), spinning: true }
+    }
+    return { tone: 'indexing', label: t('knowledgeBase.statusFinalizing'), spinning: true }
+  }
+  if (item.parse_status === 'failed') return { tone: 'failed', label: t('knowledgeBase.statusFailed'), spinning: false }
+  if (item.parse_status === 'cancelled') return { tone: 'optimizing', label: t('knowledgeBase.statusCancelled'), spinning: false }
+  if (item.parse_status === 'draft') return { tone: 'optimizing', label: t('knowledgeBase.statusDraft'), spinning: false }
+  if (item.parse_status === 'completed' && (item.summary_status === 'pending' || item.summary_status === 'processing')) {
+    return { tone: 'indexing', label: t('knowledgeBase.generatingSummary'), spinning: true }
+  }
+  if (item.parse_status === 'completed') return { tone: 'completed', label: t('knowledgeBase.statusCompleted'), spinning: false }
+  return { tone: 'neutral', label: '--', spinning: false }
 }
 
 const openMenu = (item: KnowledgeItem) => {
@@ -132,8 +154,10 @@ const closeMenu = () => {
   folderPickerItemId.value = null
   emit('reset-move-state')
 }
-const runAction = (action: 'download' | 'reparse' | 'cancel-parse' | 'move' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem) => {
-  if (action === 'delete' && !window.confirm(`确定删除文档 "${item.file_name}" 吗？`)) return
+const runAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem) => {
+  if (action === 'delete' && !window.confirm(t('knowledgeBase.confirmDeleteDocument', { fileName: item.file_name }))) return
+  if (action === 'cancel-parse' && !window.confirm(t('knowledgeBase.cancelParseConfirmBody', { title: item.file_name }))) return
+  if (action === 'reparse' && !isParseInFlight(item.parse_status) && !window.confirm(t('knowledgeBase.rebuildConfirm', { fileName: item.file_name }))) return
   if (action === 'move') {
     emit('action', action, item)
     return
@@ -162,17 +186,17 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                 type="checkbox"
                 :checked="allSelected"
                 :disabled="!items.length"
-                aria-label="全选"
+                :aria-label="t('knowledgeBase.selectAll')"
                 @change="emit('toggle-all', ($event.target as HTMLInputElement).checked)"
               />
             </th>
-            <th>文件名</th>
-            <th class="reference-col-tags">标签</th>
-            <th class="reference-col-source">来源</th>
-            <th class="reference-col-size">大小</th>
-            <th class="reference-col-status">状态</th>
-            <th class="reference-col-time">更新时间</th>
-            <th class="reference-col-action">操作</th>
+            <th>{{ t('knowledgeBase.columnName') }}</th>
+            <th class="reference-col-tags">{{ t('knowledgeBase.columnTag') }}</th>
+            <th class="reference-col-source">{{ t('knowledgeBase.columnSource') }}</th>
+            <th class="reference-col-size">{{ t('knowledgeBase.columnSize') }}</th>
+            <th class="reference-col-status">{{ t('knowledgeBase.columnStatus') }}</th>
+            <th class="reference-col-time">{{ t('knowledgeBase.columnUpdatedAt') }}</th>
+            <th class="reference-col-action">{{ t('knowledgeBase.columnActions') }}</th>
           </tr>
         </thead>
 
@@ -225,7 +249,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                 </div>
                 <div class="reference-file-cell__copy">
                   <h5 :title="item.file_name">{{ item.file_name }}</h5>
-                  <p>{{ item.description || '无提取文本' }}</p>
+                  <p v-if="item.description">{{ item.description }}</p>
                   <button
                     v-if="showFolderPath && item.folder_path"
                     type="button"
@@ -243,7 +267,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
             <td class="reference-col-tags" @click.stop>
               <div class="reference-list-tags">
                 <span v-for="tag in item.tags || []" :key="tag.id" class="reference-list-tag">{{ tag.name }}</span>
-                <button v-if="canEdit" type="button" class="reference-list-tag-add" @click="emit('tag-edit', item)">+ 标签</button>
+                <button v-if="canEdit" type="button" class="reference-list-tag-add" @click="emit('tag-edit', item)">+ {{ t('knowledgeBase.tagLabel') }}</button>
               </div>
             </td>
 
@@ -286,7 +310,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
             <td class="reference-col-action" @click.stop>
               <div class="reference-list-menu-anchor">
                 <button
-                  v-if="canEdit || canDownload"
+                  v-if="canEdit"
                   type="button"
                   class="reference-list-more"
                   :aria-label="t('knowledgeBase.moreOptions')"
@@ -295,7 +319,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                   <ReferenceIcon name="more-horizontal" :size="14" />
                 </button>
 
-                <template v-if="(canEdit || canDownload) && activeMenuItemId === item.id">
+                <template v-if="canEdit && activeMenuItemId === item.id">
                   <div class="reference-list-backdrop" @click="closeMenu" />
 
                   <div v-if="folderPickerItemId === item.id" class="reference-list-menu reference-list-submenu">
@@ -324,7 +348,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                       <span>{{ t('knowledgeBase.moveToKnowledgeBase') }}</span>
                     </button>
                     <div class="reference-list-menu-divider" />
-                    <div v-if="moveTargetsLoading" class="reference-list-menu-state">加载中...</div>
+                    <div v-if="moveTargetsLoading" class="reference-list-menu-state">{{ t('common.loading') }}</div>
                     <div v-else-if="!moveTargetKbs.length" class="reference-list-menu-state">{{ t('knowledgeBase.moveNoTargets') }}</div>
                     <template v-else>
                       <button
@@ -364,31 +388,26 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                   </div>
 
                   <div v-else class="reference-list-menu">
-                    <button
-                      v-if="canDownload && (item.type === 'file' || item.type === 'manual')"
-                      type="button"
-                      class="reference-list-menu-item"
-                      @click="runAction('download', item)"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true" class="reference-list-menu-inline-icon"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-                      <span>{{ t('common.download') }}</span>
+                    <button v-if="item.type === 'manual'" type="button" class="reference-list-menu-item" @click="runAction('edit', item)">
+                      <ReferenceIcon name="edit-2" :size="14" class="reference-list-menu-icon" />
+                      <span>{{ t('knowledgeBase.editDocument') }}</span>
                     </button>
-                    <button v-if="canEdit && isTraceVisible(item)" type="button" class="reference-list-menu-item" @click="runAction('view-trace', item)">
+                    <button v-if="isTraceVisible(item)" type="button" class="reference-list-menu-item" @click="runAction('view-trace', item)">
                       <ReferenceIcon name="activity" :size="14" class="reference-list-menu-icon" />
-                      <span>查看 Trace</span>
+                      <span>{{ t('knowledgeStages.viewTrace') }}</span>
                     </button>
-                    <button v-if="canEdit" type="button" class="reference-list-menu-item" @click="runAction('reparse', item)">
+                    <button type="button" class="reference-list-menu-item" @click="runAction('reparse', item)">
                       <ReferenceIcon name="rotate-cw" :size="14" class="reference-list-menu-icon" />
                       <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
                     </button>
                     <button
-                      v-if="canEdit && isParseInFlight(item.parse_status)"
+                      v-if="isParseInFlight(item.parse_status)"
                       type="button"
                       class="reference-list-menu-item reference-list-menu-item--warning"
                       @click="runAction('cancel-parse', item)"
                     >
                       <ReferenceIcon name="stop-circle" :size="14" />
-                      <span>停止解析</span>
+                      <span>{{ t('knowledgeBase.cancelParse') }}</span>
                     </button>
                     <button v-if="canMutateKnowledge" type="button" class="reference-list-menu-item" @click="folderPickerItemId = item.id">
                       <ReferenceIcon name="folder" :size="14" class="reference-list-menu-icon" />
@@ -396,14 +415,14 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
                     </button>
                     <button v-if="canMutateKnowledge" type="button" class="reference-list-menu-item" @click="runAction('move', item)">
                       <ReferenceIcon name="arrow-right-left" :size="14" class="reference-list-menu-icon" />
-                      <span>移动到...</span>
+                      <span>{{ t('knowledgeBase.moveDocument') }}</span>
                     </button>
                     <button v-if="canMutateKnowledge" type="button" class="reference-list-menu-item" @click="runAction('batch-manage', item)">
                       <ReferenceIcon name="check-square" :size="14" class="reference-list-menu-icon" />
                       <span>{{ t('menu.batchManage') }}</span>
                     </button>
-                    <div v-if="canEdit" class="reference-list-menu-divider" />
-                    <button v-if="canEdit" type="button" class="reference-list-menu-item reference-list-menu-item--danger" @click="runAction('delete', item)">
+                    <div class="reference-list-menu-divider" />
+                    <button type="button" class="reference-list-menu-item reference-list-menu-item--danger" @click="runAction('delete', item)">
                       <ReferenceIcon name="trash-2" :size="14" />
                       <span>{{ t('knowledgeBase.deleteDocument') }}</span>
                     </button>
@@ -501,7 +520,6 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
 .reference-folder-table-row { background: rgb(249 250 251 / 0.35); }
 .reference-folder-table-row:hover { background: #f3f4f6 !important; }
 .reference-file-cell__icon--folder { color: #6b7280; background: #f3f4f6; }
-.reference-list-menu-inline-icon { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .reference-list-folder-path {
   max-width: 100%;
   margin-top: 2px;
@@ -558,6 +576,7 @@ const toggleRow = (item: KnowledgeItem, event: MouseEvent) => {
 .reference-list-status--indexing { color: #1d4ed8; background: #eff6ff; border-color: rgb(191 219 254 / 0.8); }
 .reference-list-status--failed { color: #dc2626; background: #fef2f2; border-color: rgb(254 202 202 / 0.8); }
 .reference-list-status--completed { color: #047857; background: #ecfdf5; border-color: rgb(167 243 208 / 0.8); }
+.reference-list-status--neutral { color: #9ca3af; background: transparent; border-color: transparent; }
 .reference-spin { animation: reference-list-spin 1s linear infinite; }
 @keyframes reference-list-spin { to { transform: rotate(360deg); } }
 .reference-list-menu-anchor { position: relative; display: inline-block; }
