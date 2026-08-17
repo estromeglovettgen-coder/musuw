@@ -1,0 +1,285 @@
+name: One-shot corrected document parity repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/document-parity-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Restore pre-visual document behavior
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def require_replace(text, old, new, label, count=1):
+              found = text.count(old)
+              if found < count:
+                  raise SystemExit(f'{label}: expected >= {count}, found {found}')
+              return text.replace(old, new, count)
+
+          # Parent: remove the accidental download feature added during the audit.
+          p = Path('weknora/frontend/src/views/knowledge/KnowledgeBase.vue')
+          s = p.read_text()
+          s = s.replace('  downKnowledgeDetails,\n', '', 1)
+          s = s.replace("import { resolveKnowledgeDownloadFileName } from './knowledgeDownloadFileName';\n", '', 1)
+          s, n = re.subn(
+              r"\nconst downloadKnowledge = async \(item: KnowledgeCard\) => \{.*?\n\};\n\n// Bridge card-view actions",
+              '\n// Bridge card-view actions',
+              s,
+              count=1,
+              flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit('parent download function not found')
+          s = s.replace("action: 'download' | 'edit'", "action: 'edit'", 2)
+          s = s.replace("  if (action === 'download') return downloadKnowledge(item);\n", '', 2)
+          s = s.replace('                    :can-download="canDownloadKnowledge"\n', '', 1)
+          s = s.replace(' :can-download="canDownloadKnowledge"', '', 1)
+          p.write_text(s)
+
+          # List view: restore source/status semantics and original action behavior.
+          p = Path('weknora/frontend/src/views/knowledge/components/DocumentListView.vue')
+          s = p.read_text()
+          s = s.replace('  canDownload: boolean\n', '', 1)
+          s = s.replace("action: 'download' | 'edit'", "action: 'edit'", 1)
+
+          a = s.index('const sourceInfo =')
+          b = s.index('\n\nconst openMenu =', a)
+          helpers = '''const sourceInfo = (item: KnowledgeItem): { icon: 'globe' | 'pen-line' | 'upload'; label: string } => {
+  const ch = item.channel
+  if (ch === 'feishu') return { icon: 'upload', label: t('knowledgeBase.channelFeishu') }
+  if (ch === 'feishu_drive') return { icon: 'upload', label: t('knowledgeBase.channelFeishuDrive') }
+  if (ch === 'lark_drive') return { icon: 'upload', label: t('knowledgeBase.channelLarkDrive') }
+  if (ch === 'notion') return { icon: 'upload', label: t('knowledgeBase.channelNotion') }
+  if (ch === 'yuque') return { icon: 'upload', label: t('knowledgeBase.channelYuque') }
+  if (ch === 'wechat') return { icon: 'upload', label: t('knowledgeBase.channelWechat') }
+  if (ch === 'wecom') return { icon: 'upload', label: t('knowledgeBase.channelWecom') }
+  if (ch === 'dingtalk') return { icon: 'upload', label: t('knowledgeBase.channelDingtalk') }
+  if (ch === 'slack') return { icon: 'upload', label: t('knowledgeBase.channelSlack') }
+  if (ch === 'im') return { icon: 'upload', label: t('knowledgeBase.channelIm') }
+  if (item.type === 'url') return { icon: 'globe', label: t('knowledgeBase.channelUrl') }
+  if (item.type === 'manual') return { icon: 'pen-line', label: t('knowledgeBase.channelManual') }
+  return { icon: 'upload', label: t('knowledgeBase.channelUpload') }
+}
+const statusInfo = (item: KnowledgeItem) => {
+  if (item.parse_status === 'pending' || item.parse_status === 'processing') {
+    return { tone: 'indexing', label: t('knowledgeBase.statusProcessing'), spinning: true }
+  }
+  if (item.parse_status === 'finalizing') {
+    if (item.summary_status === 'pending' || item.summary_status === 'processing') {
+      return { tone: 'indexing', label: t('knowledgeBase.generatingSummary'), spinning: true }
+    }
+    return { tone: 'indexing', label: t('knowledgeBase.statusFinalizing'), spinning: true }
+  }
+  if (item.parse_status === 'failed') return { tone: 'failed', label: t('knowledgeBase.statusFailed'), spinning: false }
+  if (item.parse_status === 'cancelled') return { tone: 'optimizing', label: t('knowledgeBase.statusCancelled'), spinning: false }
+  if (item.parse_status === 'draft') return { tone: 'optimizing', label: t('knowledgeBase.statusDraft'), spinning: false }
+  if (item.parse_status === 'completed' && (item.summary_status === 'pending' || item.summary_status === 'processing')) {
+    return { tone: 'indexing', label: t('knowledgeBase.generatingSummary'), spinning: true }
+  }
+  if (item.parse_status === 'completed') return { tone: 'completed', label: t('knowledgeBase.statusCompleted'), spinning: false }
+  return { tone: 'neutral', label: '--', spinning: false }
+}'''
+          s = s[:a] + helpers + s[b:]
+
+          a = s.index('const runAction = (')
+          b = s.index('\nconst pickFolder =', a)
+          run = '''const runAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'delete' | 'view-trace' | 'batch-manage', item: KnowledgeItem) => {
+  if (action === 'delete' && !window.confirm(t('knowledgeBase.confirmDeleteDocument', { fileName: item.file_name }))) return
+  if (action === 'cancel-parse' && !window.confirm(t('knowledgeBase.cancelParseConfirmBody', { title: item.file_name }))) return
+  if (action === 'reparse' && !isParseInFlight(item.parse_status) && !window.confirm(t('knowledgeBase.rebuildConfirm', { fileName: item.file_name }))) return
+  if (action === 'move') {
+    emit('action', action, item)
+    return
+  }
+  emit('action', action, item)
+  closeMenu()
+}'''
+          s = s[:a] + run + s[b:]
+
+          replacements = {
+              'aria-label="全选"': ':aria-label="t(\'knowledgeBase.selectAll\')"',
+              '<th>文件名</th>': "<th>{{ t('knowledgeBase.columnName') }}</th>",
+              '<th class="reference-col-tags">标签</th>': "<th class=\"reference-col-tags\">{{ t('knowledgeBase.columnTag') }}</th>",
+              '<th class="reference-col-source">来源</th>': "<th class=\"reference-col-source\">{{ t('knowledgeBase.columnSource') }}</th>",
+              '<th class="reference-col-size">大小</th>': "<th class=\"reference-col-size\">{{ t('knowledgeBase.columnSize') }}</th>",
+              '<th class="reference-col-status">状态</th>': "<th class=\"reference-col-status\">{{ t('knowledgeBase.columnStatus') }}</th>",
+              '<th class="reference-col-time">更新时间</th>': "<th class=\"reference-col-time\">{{ t('knowledgeBase.columnUpdatedAt') }}</th>",
+              '<th class="reference-col-action">操作</th>': "<th class=\"reference-col-action\">{{ t('knowledgeBase.columnActions') }}</th>",
+              "<p>{{ item.description || '无提取文本' }}</p>": '<p v-if="item.description">{{ item.description }}</p>',
+              '>+ 标签</button>': ">+ {{ t('knowledgeBase.tagLabel') }}</button>",
+              '<span>查看 Trace</span>': "<span>{{ t('knowledgeStages.viewTrace') }}</span>",
+              '<span>停止解析</span>': "<span>{{ t('knowledgeBase.cancelParse') }}</span>",
+              '<span>移动到...</span>': "<span>{{ t('knowledgeBase.moveDocument') }}</span>",
+              '<div v-if="moveTargetsLoading" class="reference-list-menu-state">加载中...</div>': "<div v-if=\"moveTargetsLoading\" class=\"reference-list-menu-state\">{{ t('common.loading') }}</div>",
+          }
+          for old, new in replacements.items():
+              s = require_replace(s, old, new, f'list replace {old[:24]}')
+
+          s = require_replace(s, 'v-if="canEdit || canDownload"', 'v-if="canEdit"', 'list menu gate')
+          s = require_replace(s, '<template v-if="(canEdit || canDownload) && activeMenuItemId === item.id">', '<template v-if="canEdit && activeMenuItemId === item.id">', 'list active menu gate')
+          s, n = re.subn(
+              r'''\n\s*<button\n\s*v-if="canDownload && \(item\.type === 'file' \|\| item\.type === 'manual'\)".*?</button>''',
+              '', s, count=1, flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit('list download button not found')
+          trace = '''                    <button v-if="canEdit && isTraceVisible(item)" type="button" class="reference-list-menu-item" @click="runAction('view-trace', item)">'''
+          manual = '''                    <button v-if="item.type === 'manual'" type="button" class="reference-list-menu-item" @click="runAction('edit', item)">
+                      <ReferenceIcon name="edit-2" :size="14" class="reference-list-menu-icon" />
+                      <span>{{ t('knowledgeBase.editDocument') }}</span>
+                    </button>
+'''
+          s = require_replace(s, trace, manual + trace, 'list manual edit')
+          if 'reference-list-status--neutral' not in s:
+              s = require_replace(
+                  s,
+                  '.reference-list-status--completed { color: #047857; background: #ecfdf5; border-color: rgb(167 243 208 / 0.8); }',
+                  '.reference-list-status--completed { color: #047857; background: #ecfdf5; border-color: rgb(167 243 208 / 0.8); }\n.reference-list-status--neutral { color: #9ca3af; background: transparent; border-color: transparent; }',
+                  'list neutral css',
+              )
+          p.write_text(s)
+
+          # Card view.
+          p = Path('weknora/frontend/src/views/knowledge/components/DocumentCardView.vue')
+          s = p.read_text()
+          s = s.replace('  canDownload: boolean\n', '', 1)
+          s = s.replace("action: 'download' | 'edit'", "action: 'edit'", 1)
+          old = "const cardSummary = (item: KnowledgeCard) => item.description || item.metadata?.summary || item.metadata?.content || '暂无内容摘录...'"
+          new = """const cardSummary = (item: KnowledgeCard) => item.description || item.metadata?.summary || item.metadata?.content || ''
+const cardTypeLabel = (item: KnowledgeCard) => {
+  if (item.type === 'url') return t('knowledgeBase.typeURL') || 'URL'
+  if (item.type === 'manual') return t('knowledgeBase.typeManual')
+  if (item.file_type) return String(item.file_type).replace(/^\\./, '').toUpperCase()
+  return '--'
+}
+const inFlightStatusText = (item: KnowledgeCard) => {
+  if (item.parse_status === 'finalizing') {
+    if (item.summary_status === 'pending' || item.summary_status === 'processing') return t('knowledgeBase.generatingSummary')
+    return t('knowledgeBase.statusFinalizing')
+  }
+  return t('knowledgeBase.parsingInProgress')
+}"""
+          s = require_replace(s, old, new, 'card helper')
+
+          a = s.index('const runAction = (')
+          b = s.index('\n\nconst openFolderPicker', a)
+          run = '''const runAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
+  const fileName = item.file_name || cardTitle(item)
+  if (action === 'delete' && !window.confirm(t('knowledgeBase.confirmDeleteDocument', { fileName }))) return
+  if (action === 'cancel-parse' && !window.confirm(t('knowledgeBase.cancelParseConfirmBody', { title: fileName }))) return
+  if (action === 'reparse' && !isParseInFlight(item.parse_status) && !window.confirm(t('knowledgeBase.rebuildConfirm', { fileName }))) return
+  if (action === 'move') {
+    emit('action', 'move', item)
+    return
+  }
+  emit('action', action, item)
+  closeMenu(item)
+}'''
+          s = s[:a] + run + s[b:]
+          s = require_replace(s, 'v-if="canEdit || canDownload" class="reference-document-card__menu-anchor"', 'v-if="canEdit" class="reference-document-card__menu-anchor"', 'card menu gate')
+          s, n = re.subn(
+              r'''\n\s*<button\n\s*v-if="canDownload && \(item\.type === 'file' \|\| item\.type === 'manual'\)".*?</button>''',
+              '', s, count=1, flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit('card download button not found')
+          trace = '''                <button
+                  v-if="canEdit && isTraceVisible(item)"'''
+          manual = '''                <button
+                  v-if="item.type === 'manual'"
+                  type="button"
+                  class="reference-menu-item"
+                  @click="runAction('edit', item)"
+                >
+                  <ReferenceIcon name="edit-2" :size="14" class="reference-menu-icon" />
+                  <span>{{ t('knowledgeBase.editDocument') }}</span>
+                </button>
+'''
+          s = require_replace(s, trace, manual + trace, 'card manual edit')
+          for old, new in {
+              '<span>查看 Trace</span>': "<span>{{ t('knowledgeStages.viewTrace') }}</span>",
+              '<span>停止解析</span>': "<span>{{ t('knowledgeBase.cancelParse') }}</span>",
+              '<span>移动到...</span>': "<span>{{ t('knowledgeBase.moveDocument') }}</span>",
+              '<div v-if="moveTargetsLoading" class="reference-menu-state">加载中...</div>': "<div v-if=\"moveTargetsLoading\" class=\"reference-menu-state\">{{ t('common.loading') }}</div>",
+          }.items():
+              s = require_replace(s, old, new, f'card replace {old[:24]}')
+
+          old_status = '''        <p class="reference-document-card__summary">{{ cardSummary(item) }}</p>
+
+        <div v-if="isParseInFlight(item.parse_status)" class="reference-status-badge reference-status-badge--working">
+          <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
+          <span>{{ item.parse_status === 'finalizing' ? '优化中 📈' : '解析中' }}</span>
+        </div>
+        <div v-else-if="item.parse_status === 'failed'" class="reference-status-badge reference-status-badge--failed">
+          <span>解析失败</span>
+        </div>'''
+          new_status = '''        <p v-if="item.parse_status === 'completed' && !['pending', 'processing'].includes(String(item.summary_status || '')) && cardSummary(item)" class="reference-document-card__summary">{{ cardSummary(item) }}</p>
+
+        <button v-if="isParseInFlight(item.parse_status)" type="button" class="reference-status-badge reference-status-badge--working reference-status-action" @click.stop="runAction('view-trace', item)">
+          <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
+          <span>{{ inFlightStatusText(item) }}</span>
+        </button>
+        <button v-else-if="item.parse_status === 'failed'" type="button" class="reference-status-badge reference-status-badge--failed reference-status-action" @click.stop="runAction('view-trace', item)">
+          <span>{{ t('knowledgeBase.parsingFailed') }}</span>
+        </button>
+        <div v-else-if="item.parse_status === 'draft'" class="reference-status-badge reference-status-badge--draft">
+          <span>{{ t('knowledgeBase.draft') }}</span>
+        </div>
+        <div v-else-if="item.parse_status === 'completed' && ['pending', 'processing'].includes(String(item.summary_status || ''))" class="reference-status-badge reference-status-badge--working">
+          <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
+          <span>{{ t('knowledgeBase.generatingSummary') }}</span>
+        </div>'''
+          s = require_replace(s, old_status, new_status, 'card status lifecycle')
+          s = require_replace(s, '<span class="reference-document-card__extension">{{ getExtension(item) }}</span>', '<span class="reference-document-card__extension">{{ cardTypeLabel(item) }}</span>', 'card type label')
+          if 'reference-status-badge--draft' not in s:
+              s = require_replace(
+                  s,
+                  '.reference-status-badge--failed { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; }',
+                  '.reference-status-action { border: 0; cursor: pointer; text-align: left; font-family: inherit; }\n.reference-status-action:hover { filter: brightness(.96); }\n.reference-status-badge--draft { color: #b45309; background: #fffbeb; border: 1px solid rgb(253 230 138 / .8); }\n.reference-status-badge--failed { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; }',
+                  'card status css',
+              )
+          p.write_text(s)
+
+          # Delete the helper introduced only for the accidental download path.
+          Path('weknora/frontend/src/views/knowledge/knowledgeDownloadFileName.ts').unlink(missing_ok=True)
+
+          # Final static assertions.
+          parent = Path('weknora/frontend/src/views/knowledge/KnowledgeBase.vue').read_text()
+          lst = Path('weknora/frontend/src/views/knowledge/components/DocumentListView.vue').read_text()
+          card = Path('weknora/frontend/src/views/knowledge/components/DocumentCardView.vue').read_text()
+          combined = parent + lst + card
+          for bad in ['canDownload:', "action: 'download'", "runAction('download'", 'downloadKnowledge = async', 'resolveKnowledgeDownloadFileName']:
+              if bad in combined:
+                  raise SystemExit(f'stale accidental behavior: {bad}')
+          for needed in ['knowledgeBase.channelFeishuDrive', "tone: 'neutral'", "item.type === 'manual'", 'knowledgeBase.cancelParseConfirmBody', 'knowledgeBase.rebuildConfirm', 'knowledgeBase.statusFinalizing']:
+              if needed not in combined:
+                  raise SystemExit(f'missing restored behavior: {needed}')
+          PY
+
+      - name: Commit repair
+        shell: bash
+        run: |
+          git config user.name "musuw-business-parity"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A weknora/frontend/src/views/knowledge
+          if git diff --cached --quiet; then
+            echo "No repair required"
+            exit 0
+          fi
+          git commit -m "fix: restore pre-visual document business behavior"
+          git push origin HEAD:main
