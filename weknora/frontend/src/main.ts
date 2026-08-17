@@ -14,13 +14,15 @@ import "@/components/css/chat-hljs-dark.less";
 // Task 1 visual authority: mechanically compiled from the reference TSX/Tailwind utilities.
 // This is presentation-only; Vue data/handlers/permissions/conditional rendering remain authoritative.
 import "@/assets/musuw-reference-mechanical.css";
+// Final authority pass: exact reference font stack, Lucide icon family and
+// DocumentListView toolbar/collapsed-directory topology from the exported source.
+import "@/assets/musuw-reference-authority.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import i18n from "./i18n";
 import { initTheme } from "@/composables/useTheme";
-import { initFont } from "@/composables/useFont";
 import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
 import { installAutofillGuard } from "@/utils/disable-autofill";
 
@@ -28,7 +30,6 @@ import { installAutofillGuard } from "@/utils/disable-autofill";
 installTDesignIconOfflineGuard();
 
 initTheme();
-initFont();
 
 const app = createApp(App);
 
