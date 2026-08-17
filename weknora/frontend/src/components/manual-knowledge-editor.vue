@@ -92,6 +92,9 @@ const selectionEvents = ['select', 'keyup', 'click', 'mouseup', 'input']
 const resolveTextareaElement = (): HTMLTextAreaElement | null => {
   const component = textareaComponent.value as any
   if (!component) return null
+  if (typeof HTMLTextAreaElement !== 'undefined' && component instanceof HTMLTextAreaElement) {
+    return component
+  }
   if (component.textareaRef) {
     return component.textareaRef as HTMLTextAreaElement
   }
@@ -149,10 +152,6 @@ const setSelectionRange = (start: number, end: number) => {
     if (!textarea || activeTab.value !== 'edit') {
       return
     }
-    // Initialization can finish while the drawer is still sliding in. A plain
-    // focus() makes the browser scroll the transformed textarea into view,
-    // which intermittently shifts the drawer away from the right edge for a
-    // frame. Keep keyboard focus without letting it move the viewport.
     textarea.focus({ preventScroll: true })
     textarea.setSelectionRange(start, end)
   })
@@ -442,9 +441,6 @@ const loadKnowledgeBases = async () => {
       .filter((item: any) => isDocumentKb(item.type))
       .map((item: any) => ({ label: item.name, value: item.id }))
 
-    // Knowledge bases shared to the user with write access (editor/admin)
-    // also accept manually-added content, so they must appear in the picker;
-    // viewer-only shares are excluded since the backend would reject writes.
     const seen = new Set(list.map((o) => o.value))
     for (const share of sharedKbs) {
       const kb = share?.knowledge_base
@@ -701,506 +697,242 @@ onBeforeUnmount(() => {
 <template>
   <SettingDrawer
     :visible="visible"
-    :title="dialogTitle"
-    :description="$t('manualEditor.description')"
-    icon="edit-1"
-    width="760px"
+    class="manual-editor-reference-drawer"
+    title="在线编辑 Markdown 知识"
+    description="使用 Markdown 编写知识内容，支持实时预览"
+    width="672px"
     :min-width="560"
     :max-width="1280"
     storage-key="setting-drawer:width:manual-markdown-editor"
     :hide-footer="!initialLoaded"
     @update:visible="(v: boolean) => { visible = v }"
   >
+    <template #headerIcon>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </template>
+
     <template #footer-left>
-      <div class="manual-editor-footer-meta">
-        <t-tag size="small" theme="warning" variant="light" v-if="form.status === 'draft'">
-          {{ $t('manualEditor.status.draftTag') }}
-        </t-tag>
-        <t-tag size="small" theme="success" variant="light" v-else>
-          {{ $t('manualEditor.status.publishedTag') }}
-        </t-tag>
+      <div class="reference-editor-status" :class="{ published: form.status === 'publish' }">
+        <span class="reference-editor-status__dot" />
+        <span>当前状态: {{ form.status === 'draft' ? '草稿' : '已发布' }}</span>
       </div>
     </template>
 
     <template #footer-right>
-      <div class="manual-editor-footer-actions">
-        <t-button
-          theme="default"
-          variant="outline"
-          class="manual-editor-cancel-btn"
-          :disabled="saving"
-          @click="handleClose"
-        >
+      <div class="reference-editor-actions">
+        <button type="button" class="reference-editor-cancel" :disabled="saving" @click="handleClose">
           {{ $t('manualEditor.actions.cancel') }}
-        </t-button>
-        <t-button
-          variant="outline"
-          theme="default"
-          @click="handleSave('draft')"
-          :loading="saving && savingAction === 'draft'"
+        </button>
+        <button
+          type="button"
+          class="reference-editor-draft"
           :disabled="saving && savingAction !== 'draft'"
+          @click="handleSave('draft')"
         >
+          <span v-if="saving && savingAction === 'draft'" class="reference-editor-spinner" />
           {{ $t('manualEditor.actions.saveDraft') }}
-        </t-button>
-        <t-button
-          theme="primary"
+        </button>
+        <button
+          type="button"
+          class="reference-editor-publish"
+          :disabled="saving || !form.title.trim()"
           @click="handleSave('publish')"
-          :loading="saving && savingAction === 'publish'"
-          :disabled="saving && savingAction !== 'publish'"
         >
+          <span v-if="saving && savingAction === 'publish'" class="reference-editor-spinner" />
           {{ $t('manualEditor.actions.publish') }}
-        </t-button>
+        </button>
       </div>
     </template>
 
-    <div class="manual-editor" v-if="initialLoaded">
-      <section class="setting-drawer__section">
-        <h4 class="setting-drawer__section-title">{{ $t('manualEditor.section.basic') }}</h4>
+    <div v-if="initialLoaded" class="reference-online-editor">
+      <section class="reference-editor-section">
+        <div class="reference-editor-section-title"><span />{{ $t('manualEditor.section.basic') }}</div>
 
-        <div class="form-item">
-          <label class="form-label required">{{ $t('manualEditor.form.titleLabel') }}</label>
-          <t-input
-            v-model="form.title"
-            maxlength="100"
-            :placeholder="$t('manualEditor.form.titlePlaceholder')"
-            showLimitNumber
-          />
-        </div>
-
-        <div class="form-item">
-          <label class="form-label required">{{ $t('manualEditor.form.knowledgeBaseLabel') }}</label>
-          <div class="kb-row">
-            <t-select
-              v-model="form.kbId"
-              :disabled="kbDisabled"
-              :loading="kbLoading"
-              :options="kbOptions"
-              :placeholder="$t('manualEditor.form.knowledgeBasePlaceholder')"
-              :popup-props="{ attach: 'body', zIndex: 2600 }"
-            >
-              <template #empty>
-                <div style="padding: 20px; text-align: center; color: var(--td-text-color-placeholder);">
-                  {{ $t('manualEditor.noDocumentKnowledgeBases') }}
-                </div>
-              </template>
-            </t-select>
-            <div class="status-row" v-if="mode === 'edit'">
-              <t-tag size="small" theme="warning" variant="light" v-if="form.status === 'draft'">
-                {{ $t('manualEditor.status.draftTag') }}
-              </t-tag>
-              <t-tag size="small" theme="success" variant="light" v-else>
-                {{ $t('manualEditor.status.publishedTag') }}
-              </t-tag>
-            </div>
-          </div>
-          <p v-if="lastUpdatedText" class="form-desc">{{ lastUpdatedText }}</p>
-        </div>
-      </section>
-
-      <section class="setting-drawer__section editor-section">
-        <h4 class="setting-drawer__section-title">{{ $t('manualEditor.section.content') }}</h4>
-
-        <div class="editor-area">
-          <div class="editor-toolbar">
-            <div class="editor-toolbar__format">
-              <template v-for="(group, groupIndex) in toolbarGroups" :key="group.key">
-                <div class="toolbar-group">
-                  <template v-for="btn in group.buttons" :key="btn.key">
-                    <t-tooltip :content="btn.tooltip" placement="top">
-                      <button
-                        type="button"
-                        class="toolbar-btn"
-                        :class="`btn-${btn.key}`"
-                        @mousedown.prevent
-                        @click="handleToolbarAction(btn.action)"
-                      >
-                        <t-icon :name="btn.icon" size="18px" />
-                      </button>
-                    </t-tooltip>
-                  </template>
-                </div>
-                <div
-                  v-if="groupIndex < toolbarGroups.length - 1"
-                  class="toolbar-divider"
-                ></div>
-              </template>
-            </div>
-            <div class="editor-toolbar__view">
-              <t-button
-                variant="text"
-                theme="primary"
-                size="small"
-                :class="['toggle-view-btn', { 'is-preview': isPreviewMode }]"
-                :disabled="saving"
-                @click="toggleEditorView"
-              >
-                <template #icon><t-icon :name="viewToggleIcon" /></template>
-                {{ viewToggleLabel }}
-              </t-button>
-            </div>
-          </div>
-
-          <div class="editor-pane" v-show="activeTab === 'edit'">
-            <t-textarea
-              ref="textareaComponent"
-              v-if="!contentLoading"
-              v-model="form.content"
-              :placeholder="$t('manualEditor.form.contentPlaceholder')"
-              class="editor-textarea"
+        <div class="reference-editor-field">
+          <label>{{ $t('manualEditor.form.titleLabel') }} <b>*</b></label>
+          <div class="reference-editor-input-wrap">
+            <input
+              v-model="form.title"
+              type="text"
+              maxlength="100"
+              :placeholder="$t('manualEditor.form.titlePlaceholder')"
+              class="reference-editor-input"
             />
-            <div v-else class="loading-placeholder">
-              <t-loading size="small" :text="$t('manualEditor.loading.content')" />
+            <span class="reference-editor-count">{{ form.title.length }}/100</span>
+          </div>
+        </div>
+
+        <div class="reference-editor-field">
+          <label>{{ $t('manualEditor.form.knowledgeBaseLabel') }} <b>*</b></label>
+          <div class="reference-editor-select-wrap">
+            <select
+              v-model="form.kbId"
+              class="reference-editor-select"
+              :disabled="kbDisabled || kbLoading"
+            >
+              <option value="" disabled>{{ $t('manualEditor.form.knowledgeBasePlaceholder') }}</option>
+              <option v-for="option in kbOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+          <p v-if="lastUpdatedText" class="reference-editor-help">{{ lastUpdatedText }}</p>
+        </div>
+      </section>
+
+      <section class="reference-editor-section reference-editor-content-section">
+        <div class="reference-editor-section-title"><span />{{ $t('manualEditor.section.content') }}</div>
+
+        <div class="reference-editor-card">
+          <div class="reference-editor-toolbar">
+            <div class="reference-editor-toolbar__tools">
+              <template v-for="(group, groupIndex) in toolbarGroups" :key="group.key">
+                <div class="reference-editor-tool-group">
+                  <button
+                    v-for="btn in group.buttons"
+                    :key="btn.key"
+                    type="button"
+                    class="reference-editor-tool"
+                    :class="[`tool-${btn.key}`, { accent: btn.key === 'hr' }]"
+                    :title="btn.tooltip"
+                    :disabled="saving"
+                    @mousedown.prevent
+                    @click="handleToolbarAction(btn.action)"
+                  >
+                    <template v-if="btn.key === 'bold'"><strong>B</strong></template>
+                    <template v-else-if="btn.key === 'italic'"><em>I</em></template>
+                    <template v-else-if="btn.key === 'strike'"><s>S</s></template>
+                    <template v-else-if="btn.key === 'inline-code'"><code>&lt;/&gt;</code></template>
+                    <template v-else-if="btn.key === 'h1'"><strong>1</strong></template>
+                    <template v-else-if="btn.key === 'h2'"><strong>2</strong></template>
+                    <template v-else-if="btn.key === 'h3'"><strong>3</strong></template>
+                    <svg v-else-if="btn.key === 'ul'" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                    <svg v-else-if="btn.key === 'ol'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+                    <svg v-else-if="btn.key === 'task'" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m8 12 2 2 4-4"/></svg>
+                    <svg v-else-if="btn.key === 'quote'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2h4c0 4-2 6-5 6z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2h4c0 4-2 6-5 6z"/></svg>
+                    <svg v-else-if="btn.key === 'codeblock'" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                    <svg v-else-if="btn.key === 'link'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    <svg v-else-if="btn.key === 'image'" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+                    <svg v-else-if="btn.key === 'table'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+                  </button>
+                </div>
+                <div v-if="groupIndex < toolbarGroups.length - 1" class="reference-editor-divider" />
+              </template>
             </div>
+
+            <button
+              type="button"
+              class="reference-editor-view-toggle"
+              :class="{ preview: !isPreviewMode }"
+              :disabled="saving"
+              @click="toggleEditorView"
+            >
+              <svg v-if="isPreviewMode" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2.06 12.35a1 1 0 0 1 0-.7C3.67 7.8 7.33 5 12 5c4.67 0 8.33 2.8 9.94 6.65a1 1 0 0 1 0 .7C20.33 16.2 16.67 19 12 19c-4.67 0-8.33-2.8-9.94-6.65z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>{{ viewToggleLabel }}</span>
+            </button>
           </div>
-          <div class="editor-pane editor-pane--preview" v-show="activeTab === 'preview'">
-            <div class="preview-container" v-html="previewHTML" />
-          </div>
+
+          <div v-if="contentLoading" class="reference-editor-loading">{{ $t('manualEditor.loading.content') }}</div>
+          <textarea
+            v-else-if="activeTab === 'edit'"
+            ref="textareaComponent"
+            v-model="form.content"
+            :placeholder="$t('manualEditor.form.contentPlaceholder')"
+            class="reference-editor-textarea"
+          />
+          <div v-else class="reference-editor-preview" v-html="previewHTML" />
         </div>
       </section>
     </div>
-    <div v-else class="loading-wrapper">
-      <t-loading size="medium" :text="$t('manualEditor.loading.preparing')" />
-    </div>
+
+    <div v-else class="reference-editor-loading reference-editor-loading--page">{{ $t('manualEditor.loading.preparing') }}</div>
   </SettingDrawer>
 </template>
 
-<style scoped lang="less">
-/* 复用模型管理同款 SettingDrawer：分组 section / header 图标 / footer 按钮 / 拖拽调宽。
-   这里只负责本编辑器特有的内容样式。内容内联渲染（无 teleport），scoped 生效。 */
-.manual-editor {
+<style scoped>
+.reference-online-editor {
   display: flex;
   flex-direction: column;
-  --manual-editor-accent: var(--musuw-accent);
-  --manual-editor-accent-soft: var(--musuw-accent-soft);
+  gap: 24px;
+  color: #1f2937;
+  font-family: Inter, "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
-
-.manual-editor-footer-meta {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--td-text-color-placeholder);
-}
-
-.manual-editor-footer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-
-  :deep(.t-button) {
-    min-width: 88px;
-  }
-}
-
-.manual-editor-cancel-btn {
-  border-color: transparent;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-secondary);
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-
-  &:hover {
-    border-color: var(--td-component-stroke);
-    background: var(--td-bg-color-container-hover);
-    color: var(--td-text-color-primary);
-  }
-}
-
-.form-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--td-text-color-primary);
-
-  &.required::after {
-    content: '*';
-    margin-left: 4px;
-    color: var(--td-error-color);
-  }
-}
-
-.form-desc {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-}
-
-.kb-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  :deep(.t-select) {
-    flex: 1;
-    min-width: 0;
-  }
-}
-
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* 内容分组：让编辑区占满，无需依赖父级 flex 链路，直接用视口高度，稳健 */
-.editor-section {
-  flex: 1;
-  min-height: 0;
-}
-
-.editor-toolbar {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 8px;
-  background: var(--td-bg-color-secondarycontainer);
-  border-bottom: 1px solid var(--td-component-stroke);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.editor-toolbar__format {
-  min-width: 0;
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-
-  &::-webkit-scrollbar {
-    height: 0;
-  }
-}
-
-.editor-toolbar__view {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding-left: 8px;
-  border-left: 1px solid var(--td-component-stroke);
-}
-
-.toggle-view-btn {
-  min-width: 92px;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 7px;
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-secondary);
-  font-weight: 500;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-
-  &:hover {
-    border-color: var(--manual-editor-accent);
-    background: var(--manual-editor-accent-soft);
-    color: var(--manual-editor-accent);
-    box-shadow: none;
-  }
-
-  &.is-preview {
-    border-color: var(--manual-editor-accent);
-    background: var(--manual-editor-accent-soft);
-    color: var(--manual-editor-accent);
-  }
-
-  &:active {
-    transform: translateY(1px);
-    box-shadow: none;
-  }
-
-  :deep(.t-button__icon) {
-    margin-right: 5px;
-    font-size: 15px;
-  }
-}
-
-.toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--td-component-stroke);
-  margin: 0 4px;
-}
-
-.toolbar-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 6px;
-  color: var(--td-text-color-secondary);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  .t-icon {
-    color: var(--td-text-color-secondary);
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-  }
-}
-
-.toolbar-btn:hover {
-  background: var(--manual-editor-accent-soft);
-  color: var(--manual-editor-accent);
-  
-  .t-icon {
-    color: var(--manual-editor-accent);
-  }
-}
-
-.toolbar-btn.active {
-  background: var(--manual-editor-accent-soft);
-  color: var(--manual-editor-accent);
-  
-  .t-icon {
-    color: var(--manual-editor-accent);
-  }
-}
-
-.toolbar-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--manual-editor-accent) 24%, transparent);
-}
-
-.toolbar-btn:active {
-  background: var(--manual-editor-accent-soft);
-  transform: translateY(0.5px);
-}
-
-.editor-area {
-  /* 抽屉为整屏高，减去 header/footer/基本信息分组的大致高度，
-     让编辑区占据剩余空间且不必撑满父级 flex 链路。 */
-  height: calc(100vh - 360px);
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--td-component-stroke);
+.reference-online-editor :deep(*) { box-sizing: border-box; }
+.reference-editor-section { display: flex; flex-direction: column; gap: 16px; }
+.reference-editor-content-section { gap: 12px; }
+.reference-editor-section-title { display: flex; align-items: center; gap: 8px; color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
+.reference-editor-section-title > span { width: 4px; height: 14px; border-radius: 1px; background: #1677ff; }
+.reference-editor-field { display: flex; flex-direction: column; gap: 6px; }
+.reference-editor-field label { color: #374151; font-size: 12px; line-height: 16px; font-weight: 500; }
+.reference-editor-field label b { color: #ef4444; font-weight: 500; }
+.reference-editor-input-wrap,.reference-editor-select-wrap { position: relative; }
+.reference-editor-input,.reference-editor-select {
+  width: 100%;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  overflow: hidden;
-  background: var(--td-bg-color-container);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-
-  &:focus-within {
-    border-color: var(--manual-editor-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--manual-editor-accent) 12%, transparent);
-  }
+  outline: 0;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 12px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-
-.editor-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--td-bg-color-container);
-}
-
-:deep(.editor-textarea) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-
-  .t-textarea__inner {
-    flex: 1;
-    height: 100% !important;
-    resize: none;
-    border: none;
-    border-radius: 0;
-    padding: 14px 16px;
-    font-family: var(--app-font-family-mono);
-    font-size: 14px;
-    line-height: 1.7;
-    background: var(--td-bg-color-container);
-
-    &:focus {
-      box-shadow: none;
-    }
-  }
-}
-
-.editor-pane--preview {
-  background: var(--td-bg-color-container);
-}
-
-.preview-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 16px;
-  background: var(--td-bg-color-container);
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--td-text-color-primary);
-
-  :deep(h1),
-  :deep(h2),
-  :deep(h3),
-  :deep(h4) {
-    margin-top: 16px;
-    margin-bottom: 8px;
-  }
-
-  :deep(code) {
-    background: var(--td-bg-color-container-hover);
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-family: var(--app-font-family-mono);
-  }
-
-  :deep(pre) {
-    background: var(--td-bg-color-container-hover);
-    padding: 12px;
-    border-radius: 6px;
-    overflow: auto;
-  }
-
-  :deep(blockquote) {
-    border-left: 4px solid var(--manual-editor-accent);
-    padding-left: 12px;
-    color: var(--td-text-color-secondary);
-    margin: 16px 0;
-    background: var(--manual-editor-accent-soft);
-  }
-
-  :deep(a) {
-    color: var(--manual-editor-accent);
-  }
-}
-
-.loading-wrapper,
-.loading-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  min-height: 280px;
-  padding: 20px;
-}
-
-.empty-preview {
-  color: var(--td-text-color-placeholder);
-}
+.reference-editor-input { padding-right: 64px; }
+.reference-editor-input:focus,.reference-editor-select:focus { border-color: #1677ff; box-shadow: 0 0 0 1px rgb(22 119 255 / 20%); }
+.reference-editor-count { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: #9ca3af; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; pointer-events: none; }
+.reference-editor-select { appearance: none; padding-right: 36px; color: #374151; cursor: pointer; }
+.reference-editor-select:disabled { cursor: not-allowed; background: #f9fafb; color: #9ca3af; }
+.reference-editor-select-wrap > svg { position: absolute; top: 50%; right: 12px; width: 16px; height: 16px; transform: translateY(-50%); fill: none; stroke: #9ca3af; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.reference-editor-help { margin: 0; color: #9ca3af; font-size: 10px; line-height: 15px; }
+.reference-editor-card { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 3%); transition: border-color 150ms ease; }
+.reference-editor-card:focus-within { border-color: #1677ff; }
+.reference-editor-toolbar { min-height: 37px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border-bottom: 1px solid rgb(229 231 235 / 80%); background: #fafafa; user-select: none; }
+.reference-editor-toolbar__tools { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0; color: #4b5563; }
+.reference-editor-tool-group { display: flex; align-items: center; gap: 2px; }
+.reference-editor-divider { width: 1px; height: 14px; margin: 0 6px; background: #d1d5db; }
+.reference-editor-tool { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #1f2937; cursor: pointer; transition: background-color 150ms ease; }
+.reference-editor-tool:hover:not(:disabled) { background: rgb(229 231 235 / 80%); }
+.reference-editor-tool:disabled { opacity: .45; cursor: not-allowed; }
+.reference-editor-tool strong,.reference-editor-tool em,.reference-editor-tool s { font-size: 12px; line-height: 1; }
+.reference-editor-tool em { font-family: serif; }
+.reference-editor-tool code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10px; }
+.reference-editor-tool svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.reference-editor-tool.accent { color: #3b82f6; }
+.reference-editor-view-toggle { flex: 0 0 auto; height: 25px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 6px; background: #262626; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; }
+.reference-editor-view-toggle.preview { background: #eff6ff; color: #1677ff; box-shadow: none; }
+.reference-editor-view-toggle:hover:not(:disabled) { filter: brightness(.96); }
+.reference-editor-view-toggle:disabled { opacity: .45; cursor: not-allowed; }
+.reference-editor-view-toggle svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.reference-editor-textarea { width: 100%; min-height: 380px; max-height: 55vh; display: block; padding: 16px; border: 0; outline: 0; resize: none; overflow-y: auto; background: #fff; color: #1f2937; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.625; }
+.reference-editor-preview { min-height: 380px; max-height: 55vh; padding: 20px; overflow-y: auto; background: #fff; color: #1f2937; font-size: 12px; line-height: 1.625; user-select: text; }
+.reference-editor-preview :deep(h1),.reference-editor-preview :deep(h2),.reference-editor-preview :deep(h3) { margin: 14px 0 6px; color: #111827; font-weight: 700; line-height: 1.35; }
+.reference-editor-preview :deep(h1){font-size:20px}.reference-editor-preview :deep(h2){font-size:17px}.reference-editor-preview :deep(h3){font-size:15px}
+.reference-editor-preview :deep(p),.reference-editor-preview :deep(ul),.reference-editor-preview :deep(ol),.reference-editor-preview :deep(blockquote),.reference-editor-preview :deep(pre),.reference-editor-preview :deep(table){margin:6px 0}
+.reference-editor-preview :deep(code){font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;background:#f3f4f6;border-radius:4px;padding:1px 4px}.reference-editor-preview :deep(pre){overflow:auto;padding:12px;border-radius:8px;background:#111827;color:#f9fafb}.reference-editor-preview :deep(pre code){padding:0;background:transparent;color:inherit}.reference-editor-preview :deep(table){width:100%;border-collapse:collapse}.reference-editor-preview :deep(th),.reference-editor-preview :deep(td){padding:6px;border:1px solid #e5e7eb;text-align:left}.reference-editor-preview :deep(blockquote){padding-left:10px;border-left:3px solid #d1d5db;color:#6b7280}
+.reference-editor-loading { min-height: 380px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 12px; }
+.reference-editor-loading--page { min-height: 420px; }
+.reference-editor-status { display: inline-flex; align-items: center; gap: 6px; color: #f59e0b; font-size: 12px; line-height: 16px; font-weight: 500; }
+.reference-editor-status__dot { width: 6px; height: 6px; border-radius: 999px; background: #fbbf24; animation: reference-status-pulse 1.5s ease-in-out infinite; }
+.reference-editor-status.published { color: #16a34a; }.reference-editor-status.published .reference-editor-status__dot { background: #22c55e; animation: none; }
+@keyframes reference-status-pulse { 50% { opacity: .35; } }
+.reference-editor-actions { display: flex; align-items: center; gap: 10px; }
+.reference-editor-actions button { height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; border-radius: 8px; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease; }
+.reference-editor-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.reference-editor-cancel { border: 0; background: #f3f4f6; color: #4b5563; }.reference-editor-cancel:hover:not(:disabled){background:#e5e7eb;color:#111827}
+.reference-editor-draft { border: 1px solid #d1d5db; background: #fff; color: #374151; box-shadow: 0 1px 2px rgb(0 0 0 / 3%); }.reference-editor-draft:hover:not(:disabled){background:#f9fafb;color:#111827}
+.reference-editor-publish { min-width: 82px; border: 1px solid #1f2328; background: #1f2328; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }.reference-editor-publish:hover:not(:disabled){background:#000}.reference-editor-publish:disabled{border-color:#e5e7eb;background:#e5e7eb;color:#9ca3af}
+.reference-editor-spinner { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: reference-editor-spin .7s linear infinite; }
+@keyframes reference-editor-spin { to { transform: rotate(360deg); } }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__header) { min-height: 73px; padding: 16px 18px 16px 24px; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__header-icon) { width: 40px; height: 40px; flex-basis: 40px; border-radius: 999px; border-color: rgb(186 224 255 / 50%); background: #e6f4ff; color: #1677ff; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__header-icon svg) { width: 20px; height: 20px; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__header-copy h3) { font-size: 15px; line-height: 18px; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__header-copy p) { margin-top: 2px; font-size: 12px; line-height: 16px; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__close) { width: 30px; height: 30px; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__body) { padding: 20px 24px; }
+.manual-editor-reference-drawer :deep(.reference-setting-drawer__footer) { min-height: 58px; padding: 14px 24px; background: #fafafa; }
+@media (max-width: 680px) { .reference-editor-toolbar { align-items: flex-start; } .reference-editor-view-toggle { margin-top: 1px; } .reference-editor-actions { gap: 6px; }.reference-editor-actions button{padding-inline:10px}.reference-editor-status{font-size:10px} }
 </style>
