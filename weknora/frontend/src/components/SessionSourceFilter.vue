@@ -3,35 +3,62 @@
     'session-source-filter--inline': inline,
     'session-source-filter--emphasized': emphasized,
   }">
-    <button ref="triggerRef" type="button" class="session-source-filter__trigger" :aria-expanded="open"
-      aria-haspopup="listbox" @click.stop="toggleOpen">
+    <button
+      ref="triggerRef"
+      type="button"
+      class="session-source-filter__trigger"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
+      @click.stop="toggleOpen"
+    >
       <span class="session-source-filter__leading">
-        <img v-if="currentOption?.logo" :src="currentOption.logo" :alt="currentOption.label"
-          class="session-source-filter__logo" />
-        <t-icon v-else :name="iconFor(currentOption)" class="session-source-filter__icon" size="14px" />
+        <img
+          v-if="currentOption?.logo"
+          :src="currentOption.logo"
+          :alt="currentOption.label"
+          class="session-source-filter__logo"
+        />
+        <ReferenceIcon v-else :name="iconFor(currentOption)" :size="inline ? 12 : 14" class="session-source-filter__icon" />
         <span class="session-source-filter__label" :title="currentOption?.label">{{ currentOption?.label }}</span>
       </span>
-      <t-icon v-if="inline" name="chevron-down" class="session-source-filter__chevron"
-        :class="{ 'session-source-filter__chevron--open': open }" size="10px" />
-      <t-icon v-else name="chevron-down" class="session-source-filter__chevron"
-        :class="{ 'session-source-filter__chevron--open': open }" size="12px" />
+      <ReferenceIcon
+        name="chevron-down"
+        :size="inline ? 10 : 12"
+        class="session-source-filter__chevron"
+        :class="{ 'session-source-filter__chevron--open': open }"
+      />
     </button>
+
     <Teleport to="body">
-      <div v-if="open" class="session-source-filter__panel" role="listbox" :style="panelStyle" @click.stop>
-        <button v-for="item in sources" :key="item.value" type="button" class="session-source-filter__option"
-          :class="{ 'session-source-filter__option--active': item.value === current }" role="option"
-          :aria-selected="item.value === current" @click="handleSelect(item.value)">
+      <div
+        v-if="open"
+        class="session-source-filter__panel"
+        role="listbox"
+        :style="panelStyle"
+        @click.stop
+      >
+        <button
+          v-for="item in sources"
+          :key="item.value"
+          type="button"
+          class="session-source-filter__option"
+          :class="{ 'session-source-filter__option--active': item.value === current }"
+          role="option"
+          :aria-selected="item.value === current"
+          @click="handleSelect(item.value)"
+        >
           <span class="session-source-filter__option-leading">
             <img v-if="item.logo" :src="item.logo" :alt="item.label" class="session-source-filter__logo" />
-            <t-icon v-else :name="iconFor(item)" class="session-source-filter__icon" size="14px" />
+            <ReferenceIcon v-else :name="iconFor(item)" :size="14" class="session-source-filter__icon" />
             <span class="session-source-filter__option-label" :title="item.label">{{ item.label }}</span>
           </span>
-          <t-icon
-            name="check"
+          <ReferenceIcon
+            v-if="item.value === current"
+            name="check-circle-2"
+            :size="12"
             class="session-source-filter__check"
-            :class="{ 'session-source-filter__check--visible': item.value === current }"
-            size="13px"
           />
+          <span v-else class="session-source-filter__check-placeholder" aria-hidden="true" />
         </button>
       </div>
     </Teleport>
@@ -40,6 +67,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import ReferenceIcon from '@/components/ReferenceIcon.vue'
 import { DEFAULT_SESSION_BUCKET_KEY } from './sessionSidebarSourceFilter'
 
 interface SourceItem {
@@ -48,12 +76,12 @@ interface SourceItem {
   logo?: string
 }
 
+type SourceIconName = 'message-square-plus' | 'globe' | 'file-code' | 'arrow-right-left'
+
 const props = defineProps<{
   sources: SourceItem[]
   current: string
-  /** 列表顶部的轻量文字触发器（无图标，右对齐） */
   inline?: boolean
-  /** 非默认来源时始终显示（便于切回网页对话） */
   emphasized?: boolean
 }>()
 
@@ -72,12 +100,11 @@ const currentOption = computed(() =>
   props.sources.find((item) => item.value === props.current) ?? props.sources[0],
 )
 
-const iconFor = (item: SourceItem | undefined): string => {
-  if (!item) return 'chat'
-  if (item.value === DEFAULT_SESSION_BUCKET_KEY) return 'chat'
-  if (item.value === 'api') return 'server'
-  if (item.value.startsWith('embed:')) return 'code'
-  return 'link'
+const iconFor = (item: SourceItem | undefined): SourceIconName => {
+  if (!item || item.value === DEFAULT_SESSION_BUCKET_KEY) return 'message-square-plus'
+  if (item.value === 'api') return 'globe'
+  if (item.value.startsWith('embed:')) return 'file-code'
+  return 'arrow-right-left'
 }
 
 const updatePanelPosition = (): void => {
@@ -92,14 +119,8 @@ const updatePanelPosition = (): void => {
     }
     return
   }
-  const panelWidth = Math.min(
-    Math.max(rect.width, 108),
-    window.innerWidth - VIEWPORT_MARGIN * 2,
-  )
-  const left = Math.max(
-    VIEWPORT_MARGIN,
-    Math.min(rect.left, window.innerWidth - panelWidth - VIEWPORT_MARGIN),
-  )
+  const panelWidth = Math.min(Math.max(rect.width, 108), window.innerWidth - VIEWPORT_MARGIN * 2)
+  const left = Math.max(VIEWPORT_MARGIN, Math.min(rect.left, window.innerWidth - panelWidth - VIEWPORT_MARGIN))
   panelStyle.value = {
     top: `${rect.bottom + PANEL_GAP}px`,
     left: `${left}px`,
@@ -113,12 +134,10 @@ const removeListeners = (): void => {
   window.removeEventListener('resize', close)
   window.removeEventListener('scroll', close, true)
 }
-
 const close = (): void => {
   open.value = false
   removeListeners()
 }
-
 const toggleOpen = (): void => {
   if (open.value) {
     close()
@@ -132,34 +151,20 @@ const toggleOpen = (): void => {
     window.addEventListener('scroll', close, true)
   })
 }
-
 const handleSelect = (value: string): void => {
   close()
   if (value === props.current) return
   emit('select', value)
 }
-
-onBeforeUnmount(() => {
-  removeListeners()
-})
+onBeforeUnmount(removeListeners)
 </script>
 
-<style scoped lang="less">
+<style scoped>
 .session-source-filter {
   padding: 2px 0 6px;
-
-  &--inline {
-    padding: 0;
-    min-width: 0;
-    max-width: 100%;
-
-    .session-source-filter__leading {
-      gap: 4px;
-      flex: 0 1 auto;
-    }
-  }
+  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
-
+.session-source-filter--inline { padding: 0; min-width: 0; max-width: 100%; }
 .session-source-filter__trigger {
   display: flex;
   align-items: center;
@@ -169,172 +174,70 @@ onBeforeUnmount(() => {
   min-height: 28px;
   padding: 4px 10px 4px 14px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--td-text-color-secondary);
+  color: #9ca3af;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  font-family: var(--app-font-family);
+  font-family: inherit;
   text-align: left;
-
-  &:hover,
-  &[aria-expanded='true'] {
-    background: var(--td-bg-color-container-hover);
-    color: var(--td-text-color-primary);
-  }
-
-  .session-source-filter--inline & {
-    width: auto;
-    max-width: 100%;
-    min-height: 0;
-    gap: 2px;
-    padding: 0;
-    border-radius: 0;
-    color: var(--td-text-color-disabled);
-    justify-content: flex-end;
-
-    &:hover,
-    &[aria-expanded='true'] {
-      background: transparent;
-      color: var(--td-text-color-placeholder);
-    }
-  }
+  transition: background-color 150ms ease, color 150ms ease;
 }
-
+.session-source-filter__trigger:hover,
+.session-source-filter__trigger[aria-expanded='true'] { background: #f3f4f6; color: #374151; }
+.session-source-filter--inline .session-source-filter__trigger {
+  width: auto;
+  max-width: 100%;
+  min-height: 0;
+  gap: 3px;
+  padding: 0;
+  border-radius: 0;
+  color: #9ca3af;
+  justify-content: flex-end;
+}
+.session-source-filter--inline .session-source-filter__trigger:hover,
+.session-source-filter--inline .session-source-filter__trigger[aria-expanded='true'] { background: transparent; color: #6b7280; }
 .session-source-filter__leading,
-.session-source-filter__option-leading {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
+.session-source-filter__option-leading { display: inline-flex; align-items: center; gap: 5px; min-width: 0; flex: 1 1 auto; }
 .session-source-filter__label,
-.session-source-filter__option-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  letter-spacing: 0.01em;
-
-  .session-source-filter--inline .session-source-filter__trigger & {
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 16px;
-    color: inherit;
-  }
-}
-
-.session-source-filter__logo {
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-  opacity: 0.82;
-
-  .session-source-filter--inline & {
-    width: 12px;
-    height: 12px;
-    opacity: 0.7;
-  }
-}
-
-.session-source-filter__icon {
-  flex: 0 0 auto;
-  color: var(--td-text-color-placeholder);
-
-  .session-source-filter--inline & {
-    font-size: 12px !important;
-    color: var(--td-text-color-disabled);
-  }
-}
-
-.session-source-filter__chevron {
-  flex: 0 0 auto;
-  color: var(--td-text-color-placeholder);
-  transition: transform 0.18s ease, color 0.15s ease;
-
-  &--open {
-    transform: rotate(180deg);
-    color: var(--td-text-color-secondary);
-  }
-
-  .session-source-filter--inline & {
-    color: var(--td-text-color-disabled);
-    opacity: 0.85;
-    font-size: 10px !important;
-  }
-}
-
+.session-source-filter__option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; line-height: 16px; }
+.session-source-filter__logo { flex: 0 0 auto; width: 14px; height: 14px; object-fit: contain; opacity: .82; }
+.session-source-filter--inline .session-source-filter__logo { width: 12px; height: 12px; opacity: .7; }
+.session-source-filter__icon { flex: 0 0 auto; color: #9ca3af; }
+.session-source-filter__chevron { flex: 0 0 auto; color: #9ca3af; transition: transform 180ms ease; }
+.session-source-filter__chevron--open { transform: rotate(180deg); }
 .session-source-filter__panel {
   position: fixed;
-  z-index: 3000;
+  z-index: 4900;
   width: max-content;
-  min-width: 108px;
-  max-width: min(200px, calc(100vw - 16px));
-  padding: 3px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 7px;
-  background: var(--td-bg-color-sidebar, var(--td-bg-color-container));
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.04);
+  min-width: 118px;
+  max-width: min(220px, calc(100vw - 16px));
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 30px rgb(0 0 0 / .10);
+  font-family: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
-
 .session-source-filter__option {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
   width: 100%;
-  min-height: 28px;
-  padding: 4px 6px;
+  min-height: 30px;
+  padding: 4px 7px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--td-text-color-primary);
+  color: #4b5563;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  font-family: var(--app-font-family);
+  font-family: inherit;
   text-align: left;
   white-space: nowrap;
-
-  &:hover {
-    background: var(--td-bg-color-container-hover);
-  }
-
-  &--active {
-    background: var(--td-bg-color-secondarycontainer);
-    color: var(--td-text-color-primary);
-
-    .session-source-filter__icon {
-      color: var(--td-text-color-secondary);
-    }
-
-    .session-source-filter__logo {
-      opacity: 0.92;
-      filter: none;
-    }
-  }
 }
-
-.session-source-filter__option-label {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
-}
-
-.session-source-filter__check {
-  flex: 0 0 13px;
-  width: 13px;
-  margin-left: 2px;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px !important;
-  visibility: hidden;
-
-  &--visible {
-    visibility: visible;
-  }
-}
+.session-source-filter__option:hover { background: #f3f4f6; color: #111827; }
+.session-source-filter__option--active { background: #f9fafb; color: #111827; }
+.session-source-filter__option-label { font-size: 11px; font-weight: 500; }
+.session-source-filter__check,
+.session-source-filter__check-placeholder { flex: 0 0 12px; width: 12px; margin-left: 2px; color: #9ca3af; }
 </style>
