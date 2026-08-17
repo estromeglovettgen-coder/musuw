@@ -38,7 +38,6 @@ const props = defineProps<{
   selectedIds: Set<string>
   batchMode: boolean
   canEdit: boolean
-  canDownload: boolean
   canMutateKnowledge: boolean
   traceAvailableById: Record<string, boolean>
   tagList: Tag[]
@@ -57,7 +56,7 @@ const emit = defineEmits<{
   (e: 'open', item: KnowledgeCard): void
   (e: 'toggle-checkbox', id: string, checked: boolean, ctx?: { e?: Event }): void
   (e: 'menu-visible-change', visible: boolean, item: KnowledgeCard): void
-  (e: 'action', action: 'download' | 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void
+  (e: 'action', action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void
   (e: 'tag-edit', item: KnowledgeCard): void
   (e: 'open-folder', path: string): void
   (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void
@@ -80,7 +79,22 @@ const folderRows = computed(() => [
 const isParseInFlight = (status?: string) => CANCELABLE_PARSE_STATUSES.has(String(status || ''))
 const isTraceVisible = (item: KnowledgeCard) => isParseInFlight(item.parse_status) || props.traceAvailableById[item.id] === true
 const cardTitle = (item: KnowledgeCard) => item.display_name || item.file_name || item.title || item.original_file_name || item.id
-const cardSummary = (item: KnowledgeCard) => item.description || item.metadata?.summary || item.metadata?.content || '暂无内容摘录...'
+const cardSummary = (item: KnowledgeCard) => item.description || item.metadata?.summary || item.metadata?.content || ''
+const cardTypeLabel = (item: KnowledgeCard) => {
+  if (item.type === 'url') return t('knowledgeBase.typeURL') || 'URL'
+  if (item.type === 'manual') return t('knowledgeBase.typeManual')
+  if (item.file_type) return String(item.file_type).replace(/^\./, '').toUpperCase()
+  return '--'
+}
+const inFlightCardStatusText = (item: KnowledgeCard) => {
+  if (item.parse_status === 'finalizing') {
+    if (item.summary_status === 'pending' || item.summary_status === 'processing') {
+      return t('knowledgeBase.generatingSummary')
+    }
+    return t('knowledgeBase.statusFinalizing')
+  }
+  return t('knowledgeBase.parsingInProgress')
+}
 
 const getExtension = (item: KnowledgeCard) => {
   if (item.file_type) return String(item.file_type).replace(/^\./, '').toUpperCase()
@@ -88,7 +102,6 @@ const getExtension = (item: KnowledgeCard) => {
   const dot = name.lastIndexOf('.')
   if (dot > -1 && dot < name.length - 1) return name.slice(dot + 1).toUpperCase()
   if (item.type === 'url') return 'URL'
-  if (item.type === 'manual') return 'TXT'
   return 'TXT'
 }
 
@@ -137,16 +150,15 @@ const onCardClick = (item: KnowledgeCard) => {
   emit('open', item)
 }
 
-const runAction = (action: 'download' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
-  if (action === 'delete') {
-    if (!window.confirm(`确定删除文档 "${cardTitle(item)}" 吗？`)) return
-  }
-
+const runAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
+  const fileName = item.file_name || cardTitle(item)
+  if (action === 'delete' && !window.confirm(t('knowledgeBase.confirmDeleteDocument', { fileName }))) return
+  if (action === 'cancel-parse' && !window.confirm(t('knowledgeBase.cancelParseConfirmBody', { title: fileName }))) return
+  if (action === 'reparse' && !isParseInFlight(item.parse_status) && !window.confirm(t('knowledgeBase.rebuildConfirm', { fileName }))) return
   if (action === 'move') {
     emit('action', 'move', item)
     return
   }
-
   emit('action', action, item)
   closeMenu(item)
 }
@@ -195,7 +207,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
             <h4 :title="cardTitle(item)">{{ cardTitle(item) }}</h4>
           </div>
 
-          <div v-if="canEdit || canDownload" class="reference-document-card__menu-anchor">
+          <div v-if="canEdit" class="reference-document-card__menu-anchor">
             <button
               type="button"
               class="reference-document-card__more"
@@ -234,7 +246,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
                   <span>{{ t('knowledgeBase.moveToKnowledgeBase') }}</span>
                 </button>
                 <div class="reference-menu-divider" />
-                <div v-if="moveTargetsLoading" class="reference-menu-state">加载中...</div>
+                <div v-if="moveTargetsLoading" class="reference-menu-state">{{ t('common.loading') }}</div>
                 <div v-else-if="moveTargetKbs.length === 0" class="reference-menu-state">{{ t('knowledgeBase.moveNoTargets') }}</div>
                 <button
                   v-for="kb in moveTargetKbs"
@@ -286,35 +298,35 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
 
               <div v-else class="reference-document-card__menu" @click.stop>
                 <button
-                  v-if="canDownload && (item.type === 'file' || item.type === 'manual')"
+                  v-if="item.type === 'manual'"
                   type="button"
                   class="reference-menu-item"
-                  @click="runAction('download', item)"
+                  @click="runAction('edit', item)"
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" class="reference-menu-inline-icon"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-                  <span>{{ t('common.download') }}</span>
+                  <ReferenceIcon name="edit-2" :size="14" class="reference-menu-icon" />
+                  <span>{{ t('knowledgeBase.editDocument') }}</span>
                 </button>
                 <button
-                  v-if="canEdit && isTraceVisible(item)"
+                  v-if="isTraceVisible(item)"
                   type="button"
                   class="reference-menu-item"
                   @click="runAction('view-trace', item)"
                 >
                   <ReferenceIcon name="activity" :size="14" class="reference-menu-icon" />
-                  <span>查看 Trace</span>
+                  <span>{{ t('knowledgeStages.viewTrace') }}</span>
                 </button>
-                <button v-if="canEdit" type="button" class="reference-menu-item" @click="runAction('reparse', item)">
+                <button type="button" class="reference-menu-item" @click="runAction('reparse', item)">
                   <ReferenceIcon name="rotate-cw" :size="14" class="reference-menu-icon" />
                   <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
                 </button>
                 <button
-                  v-if="canEdit && isParseInFlight(item.parse_status)"
+                  v-if="isParseInFlight(item.parse_status)"
                   type="button"
                   class="reference-menu-item reference-menu-item--warning"
                   @click="runAction('cancel-parse', item)"
                 >
                   <ReferenceIcon name="stop-circle" :size="14" />
-                  <span>停止解析</span>
+                  <span>{{ t('knowledgeBase.cancelParse') }}</span>
                 </button>
                 <button v-if="canMutateKnowledge" type="button" class="reference-menu-item" @click="openFolderPicker(item)">
                   <ReferenceIcon name="folder" :size="14" class="reference-menu-icon" />
@@ -322,14 +334,14 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
                 </button>
                 <button v-if="canMutateKnowledge" type="button" class="reference-menu-item" @click="runAction('move', item)">
                   <ReferenceIcon name="arrow-right-left" :size="14" class="reference-menu-icon" />
-                  <span>移动到...</span>
+                  <span>{{ t('knowledgeBase.moveDocument') }}</span>
                 </button>
                 <button v-if="canMutateKnowledge" type="button" class="reference-menu-item" @click="runAction('batch-manage', item)">
                   <ReferenceIcon name="check-square" :size="14" class="reference-menu-icon" />
                   <span>{{ t('menu.batchManage') }}</span>
                 </button>
-                <div v-if="canEdit" class="reference-menu-divider" />
-                <button v-if="canEdit" type="button" class="reference-menu-item reference-menu-item--danger" @click="runAction('delete', item)">
+                <div class="reference-menu-divider" />
+                <button type="button" class="reference-menu-item reference-menu-item--danger" @click="runAction('delete', item)">
                   <ReferenceIcon name="trash-2" :size="14" />
                   <span>{{ t('knowledgeBase.deleteDocument') }}</span>
                 </button>
@@ -338,14 +350,40 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
           </div>
         </div>
 
-        <p class="reference-document-card__summary">{{ cardSummary(item) }}</p>
+        <p
+          v-if="item.parse_status === 'completed' && !['pending', 'processing'].includes(String(item.summary_status || '')) && cardSummary(item)"
+          class="reference-document-card__summary"
+        >{{ cardSummary(item) }}</p>
 
-        <div v-if="isParseInFlight(item.parse_status)" class="reference-status-badge reference-status-badge--working">
+        <button
+          v-if="isParseInFlight(item.parse_status)"
+          type="button"
+          class="reference-status-badge reference-status-badge--working reference-status-action"
+          :title="t('knowledgeStages.viewTrace')"
+          @click.stop="runAction('view-trace', item)"
+        >
           <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
-          <span>{{ item.parse_status === 'finalizing' ? '优化中 📈' : '解析中' }}</span>
+          <span>{{ inFlightCardStatusText(item) }}</span>
+        </button>
+        <button
+          v-else-if="item.parse_status === 'failed'"
+          type="button"
+          class="reference-status-badge reference-status-badge--failed reference-status-action"
+          :title="t('knowledgeStages.viewTrace')"
+          @click.stop="runAction('view-trace', item)"
+        >
+          <span>{{ t('knowledgeBase.parsingFailed') }}</span>
+        </button>
+        <div v-else-if="item.parse_status === 'draft'" class="reference-draft-row">
+          <span class="reference-status-badge reference-status-badge--draft">{{ t('knowledgeBase.draft') }}</span>
+          <span class="reference-draft-tip">{{ t('knowledgeBase.draftTip') }}</span>
         </div>
-        <div v-else-if="item.parse_status === 'failed'" class="reference-status-badge reference-status-badge--failed">
-          <span>解析失败</span>
+        <div
+          v-else-if="item.parse_status === 'completed' && ['pending', 'processing'].includes(String(item.summary_status || ''))"
+          class="reference-status-badge reference-status-badge--working"
+        >
+          <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
+          <span>{{ t('knowledgeBase.generatingSummary') }}</span>
         </div>
       </div>
 
@@ -361,7 +399,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
           <span>{{ item.folder_path }}</span>
         </button>
         <span v-else>{{ formatDocTime(item.updated_at) }}</span>
-        <span class="reference-document-card__extension">{{ getExtension(item) }}</span>
+        <span class="reference-document-card__extension">{{ cardTypeLabel(item) }}</span>
       </footer>
 
       <label v-if="batchMode && canEdit" class="reference-card-checkbox" @click.stop>
@@ -426,10 +464,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
   min-width: 0;
   flex: 1;
 }
-.reference-document-card__file-icon {
-  flex: 0 0 auto;
-  color: #4b5563;
-}
+.reference-document-card__file-icon { flex: 0 0 auto; color: #4b5563; }
 .reference-document-card__title-wrap h4 {
   min-width: 0;
   margin: 0;
@@ -479,8 +514,13 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
   line-height: 14px;
   font-weight: 700;
 }
+.reference-status-action { border: 0; cursor: pointer; text-align: left; font-family: inherit; }
+.reference-status-action:hover { filter: brightness(.96); }
 .reference-status-badge--working { color: #b45309; background: #fffbeb; border: 1px solid rgb(253 230 138 / 0.8); }
 .reference-status-badge--failed { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; }
+.reference-status-badge--draft { color: #b45309; background: #fffbeb; border: 1px solid rgb(253 230 138 / .8); }
+.reference-draft-row { margin-top: 6px; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.reference-draft-tip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9ca3af; font-size: 10px; line-height: 14px; }
 .reference-spin { animation: reference-spin 1s linear infinite; }
 @keyframes reference-spin { to { transform: rotate(360deg); } }
 .reference-document-card__footer {
@@ -533,12 +573,7 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 .reference-card-checkbox input { width: 13px; height: 13px; margin: 0; accent-color: #111827; cursor: pointer; }
-
-.reference-document-card__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
+.reference-document-card__backdrop { position: fixed; inset: 0; z-index: 20; }
 .reference-document-card__menu {
   position: absolute;
   right: 0;
@@ -594,7 +629,6 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
 .reference-move-cancel { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; }
 .reference-move-submit { border: 1px solid #111827; background: #111827; color: #fff; }
 .reference-move-submit:disabled { opacity: .55; cursor: default; }
-
 .reference-folder-card {
   padding: 0;
   overflow: hidden;
@@ -609,7 +643,6 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
 .reference-folder-card__top { padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; color: #2563eb; }
 .reference-folder-card__top span { color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
 .reference-folder-card__footer { padding: 10px 16px; border-top: 1px solid #f3f4f6; color: #9ca3af; font-size: 10px; line-height: 14px; }
-
 @media (max-width: 1279px) {
   .reference-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
