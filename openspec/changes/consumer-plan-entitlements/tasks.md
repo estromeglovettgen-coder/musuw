@@ -15,5 +15,5 @@
 
 ## 4. Verification and release
 
-- [ ] 4.1 Run focused and full backend/frontend/storefront checks plus strict OpenSpec validation
-- [ ] 4.2 Commit and push Task 5, wait for CI and production deployment, then browser-verify separate Free and paid Google accounts and bounded live OpenRouter usage
+- [x] 4.1 Run focused and full backend/frontend/storefront checks plus strict OpenSpec validation
+- [x] 4.2 Commit and push Task 5, wait for CI and production deployment, then browser-verify separate Free and paid Google accounts and bounded live OpenRouter usage
