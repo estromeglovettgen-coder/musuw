@@ -53,7 +53,6 @@
         <template v-if="menuOpen">
           <div class="reference-session-backdrop" @click="closeMenu" />
           <div
-            ref="menuPanelRef"
             class="reference-session-menu"
             :class="{ confirm: menuMode !== 'menu' }"
             :style="{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }"
@@ -111,7 +110,7 @@ interface SessionMenuOption {
 type MenuMode = 'menu' | 'clear' | 'delete'
 type SessionIconName = 'pin' | 'pin-off' | 'edit-3' | 'eraser' | 'check-square' | 'trash-2' | 'more-horizontal'
 
-defineProps<{
+const props = defineProps<{
   item: { id: string; path: string; title: string; is_pinned?: boolean }
   batchMode: boolean
   activePath: string
@@ -136,7 +135,6 @@ const titleEditing = ref(false)
 const titleDraft = ref('')
 const titleInputRef = ref<HTMLInputElement | null>(null)
 const menuButtonRef = ref<HTMLButtonElement | null>(null)
-const menuPanelRef = ref<HTMLElement | null>(null)
 const menuPosition = ref({ x: 0, y: 0 })
 
 const optionIcon = (value: string): SessionIconName => {
@@ -155,7 +153,7 @@ const positionMenu = async () => {
   if (!trigger) return
   const rect = trigger.getBoundingClientRect()
   const panelWidth = menuMode.value === 'menu' ? 176 : 260
-  const estimatedHeight = menuMode.value === 'menu' ? Math.max(44, menuOptions.length * 34 + 12) : 142
+  const estimatedHeight = menuMode.value === 'menu' ? Math.max(44, props.menuOptions.length * 34 + 12) : 142
   let x = rect.right - panelWidth
   let y = rect.bottom + 4
   if (x < 8) x = 8
@@ -189,15 +187,6 @@ const startTitleEdit = () => {
     titleInputRef.value?.select()
   })
 }
-
-const props = defineProps<{
-  item: { id: string; path: string; title: string; is_pinned?: boolean }
-  batchMode: boolean
-  activePath: string
-  selectedIds: string[]
-  menuOptions: SessionMenuOption[]
-  nested?: boolean
-}>()
 
 const cancelTitleEdit = () => {
   titleEditing.value = false
