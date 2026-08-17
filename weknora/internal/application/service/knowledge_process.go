@@ -3285,11 +3285,12 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 		return nil
 	}
 
-	if payload.FilePath != "" && IsVideoType(payload.FileType) && !eff.VLMConfig.IsEnabled() {
+	// 视频文件不再支持入库解析
+	if payload.FilePath != "" && IsVideoType(payload.FileType) {
 		logger.GetLogger(ctx).WithField("knowledge_id", knowledge.ID).
-			Errorf("processDocument video without VLM model configured")
+			Errorf("processDocument video not supported")
 		knowledge.ParseStatus = "failed"
-		knowledge.ErrorMessage = "上传视频文件需要设置VLM模型"
+		knowledge.ErrorMessage = "暂不支持视频文件"
 		knowledge.UpdatedAt = time.Now()
 		s.repo.UpdateKnowledge(ctx, knowledge)
 		return nil
@@ -3592,9 +3593,6 @@ func (s *knowledgeService) convert(
 	}
 	mergedOverrides := MergeParserEngineOverrides(tenantOverrides, uploadOverrides)
 	applyParserRuleOverrides(mergedOverrides, eff.ChunkingConfig, fileType)
-	if !isURL && videoMIMEType(fileType) != "" {
-		return s.convertVideo(ctx, payload, kb, knowledge, eff, isLastRetry)
-	}
 
 	if isURL {
 		if err := secutils.ValidateURLForSSRF(payload.URL); err != nil {

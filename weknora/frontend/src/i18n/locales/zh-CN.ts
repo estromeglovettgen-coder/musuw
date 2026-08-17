@@ -3315,7 +3315,7 @@ export default {
     },
     asr: {
       title: '音频语音识别',
-      description: '配置语音识别（ASR），启用后可上传 mp3、wav、m4a、flac、ogg 等音频文件并转写为文本。',
+      description: '配置语音识别（ASR），启用后可上传音频文件并整段转写为文本（常见格式：mp3、wav、m4a、flac、ogg 等）。暂不支持视频上传。',
       label: '启用音频语音识别',
       desc: '启用后可上传音频到知识库，系统自动将语音转写为文本并参与解析与检索',
       modelLabel: 'ASR 模型',
@@ -3326,8 +3326,8 @@ export default {
       languagePlaceholder: '例如 zh、en，留空自动检测'
     },
     multimodal: {
-      title: '图像与视频处理',
-      description: '配置视觉内容理解能力，启用后支持图像和已支持视频的解析与检索'
+      title: '图像处理配置',
+      description: '配置图像内容理解能力，启用后支持图片等非文本内容的解析和检索'
     },
     chunking: {
       title: '分块设置',

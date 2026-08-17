@@ -21,10 +21,6 @@ func (d *debugVLM) Predict(ctx context.Context, imgBytes [][]byte, prompt string
 	return result, err
 }
 
-func (d *debugVLM) PredictVideo(ctx context.Context, videoBytes []byte, mimeType, prompt string) (string, error) {
-	return PredictVideo(ctx, d.inner, videoBytes, mimeType, prompt)
-}
-
 func (d *debugVLM) GetModelName() string { return d.inner.GetModelName() }
 func (d *debugVLM) GetModelID() string   { return d.inner.GetModelID() }
 

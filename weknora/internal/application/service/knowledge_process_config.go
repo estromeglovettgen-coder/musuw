@@ -107,10 +107,6 @@ func validateDefaultFileImportRequirements(
 		logger.Error(ctx, "VLM model is not configured")
 		return werrors.NewBadRequestError("上传图片文件需要设置VLM模型")
 	}
-	if IsVideoType(fileType) && !eff.VLMConfig.IsEnabled() {
-		logger.Error(ctx, "VLM model is not configured for video")
-		return werrors.NewBadRequestError("上传视频文件需要设置VLM模型")
-	}
 	if IsAudioType(fileType) && !kb.ASRConfig.IsASREnabled() {
 		logger.Error(ctx, "ASR model is not configured")
 		return werrors.NewBadRequestError("上传音频文件需要设置ASR语音识别模型")
@@ -163,16 +159,12 @@ func ValidateProcessOverrides(
 
 	hasImage := false
 	hasAudio := false
-	hasVideo := false
 	for _, ft := range fileTypes {
 		if IsImageType(ft) {
 			hasImage = true
 		}
 		if IsAudioType(ft) {
 			hasAudio = true
-		}
-		if IsVideoType(ft) {
-			hasVideo = true
 		}
 	}
 
@@ -182,9 +174,6 @@ func ValidateProcessOverrides(
 		if !eff.VLMConfig.IsEnabled() {
 			return werrors.NewBadRequestError("上传图片文件需要设置VLM模型")
 		}
-	}
-	if hasVideo && !eff.VLMConfig.IsEnabled() {
-		return werrors.NewBadRequestError("上传视频文件需要设置VLM模型")
 	}
 
 	if hasAudio && !eff.ASRConfig.IsASREnabled() {

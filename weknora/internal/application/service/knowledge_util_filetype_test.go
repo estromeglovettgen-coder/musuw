@@ -37,11 +37,7 @@ func TestIsSupportedImportExtension(t *testing.T) {
 		{name: "surrounding space", ext: " xlsx ", want: true},
 		{name: "pdf", ext: "pdf", want: true},
 		{name: "unsupported", ext: "exe", want: false},
-		{name: "video mp4", ext: "mp4", want: true},
-		{name: "video mpeg", ext: "mpeg", want: true},
-		{name: "video mov", ext: "mov", want: true},
-		{name: "video webm", ext: "webm", want: true},
-		{name: "unsupported video container", ext: "mkv", want: false},
+		{name: "video", ext: "mp4", want: false},
 		{name: "empty", ext: "", want: false},
 		{name: "unknown sentinel", ext: unknownFileType, want: false},
 	}

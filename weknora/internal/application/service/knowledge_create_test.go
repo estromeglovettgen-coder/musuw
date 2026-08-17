@@ -192,42 +192,6 @@ func TestCreateKnowledgeFromFilePersistsStoredFilePathOnCreate(t *testing.T) {
 	require.Equal(t, 1, task.calls)
 }
 
-func TestCreateKnowledgeFromFileAcceptsSupportedVideo(t *testing.T) {
-	t.Parallel()
-
-	repo := &createKnowledgeFileRepoStub{}
-	fileSvc := &createKnowledgeFileServiceStub{}
-	task := &createKnowledgeTaskEnqueuerStub{}
-	svc := &knowledgeService{
-		repo: repo,
-		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{
-			ID:        "kb-1",
-			VLMConfig: types.VLMConfig{Enabled: true, ModelID: "builtin-openrouter-vlm"},
-		}},
-		fileSvc: fileSvc,
-		task:    task,
-	}
-
-	knowledge, err := svc.CreateKnowledgeFromFile(
-		newCreateKnowledgeFileContext(),
-		"kb-1",
-		newMultipartFileHeader(t, "clip.mp4", "tiny video"),
-		nil,
-		nil,
-		"",
-		nil,
-		"",
-		nil,
-	)
-
-	require.NoError(t, err)
-	require.NotNil(t, knowledge)
-	require.Equal(t, "mp4", knowledge.FileType)
-	require.Equal(t, 1, fileSvc.saveCalls)
-	require.Equal(t, 1, repo.createCalls)
-	require.Equal(t, 1, task.calls)
-}
-
 func TestCreateKnowledgeFromImageFallsBackWhenLegacyStorageConfigIsIncomplete(t *testing.T) {
 	t.Parallel()
 

@@ -45,6 +45,11 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 
 	logger.Infof(ctx, "Knowledge base ID: %s, file: %s", kbID, fileName)
 
+	if IsVideoType(getFileType(fileName)) {
+		logger.Error(ctx, "Video file upload is not supported")
+		return nil, werrors.NewBadRequestError("暂不支持上传视频文件")
+	}
+
 	// Get knowledge base configuration
 	logger.Info(ctx, "Getting knowledge base configuration")
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, kbID)

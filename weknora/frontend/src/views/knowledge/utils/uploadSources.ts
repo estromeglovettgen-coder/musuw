@@ -1,6 +1,12 @@
 import { kbFileTypeVerification } from '@/utils'
 
-export const UPLOAD_VIDEO_EXTENSIONS = ['mp4', 'mpeg', 'mov', 'webm']
+export const UPLOAD_VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv']
+
+export function getUploadFileExt(file: File): string {
+  const dot = file.name.lastIndexOf('.')
+  if (dot < 0) return ''
+  return file.name.substring(dot + 1).toLowerCase()
+}
 
 export function getUploadFileKey(file: File): string {
   const path = (file as File & { webkitRelativePath?: string }).webkitRelativePath || ''
@@ -16,6 +22,7 @@ export interface FilterUploadFilesOptions {
 export interface FilterUploadFilesResult {
   validFiles: File[]
   skippedCount: number
+  videoFilteredCount: number
   hiddenFileCount: number
 }
 
@@ -36,11 +43,9 @@ export function filterUploadFiles(
 
   const validFiles: File[] = []
   let skippedCount = 0
+  let videoFilteredCount = 0
   let hiddenFileCount = 0
   const multiFile = options.multiFile ?? list.length > 1
-  const acceptedTypes = dynamicTypes
-    ? new Set([...dynamicTypes, ...UPLOAD_VIDEO_EXTENSIONS])
-    : undefined
 
   for (const file of list) {
     if (options.fromFolder) {
@@ -51,7 +56,13 @@ export function filterUploadFiles(
       }
     }
 
-    if (kbFileTypeVerification(file, multiFile, acceptedTypes)) {
+    const fileExt = getUploadFileExt(file)
+    if (UPLOAD_VIDEO_EXTENSIONS.includes(fileExt)) {
+      videoFilteredCount++
+      continue
+    }
+
+    if (kbFileTypeVerification(file, multiFile, dynamicTypes)) {
       skippedCount++
       continue
     }
@@ -59,5 +70,5 @@ export function filterUploadFiles(
     validFiles.push(file)
   }
 
-  return { validFiles, skippedCount, hiddenFileCount }
+  return { validFiles, skippedCount, videoFilteredCount, hiddenFileCount }
 }
