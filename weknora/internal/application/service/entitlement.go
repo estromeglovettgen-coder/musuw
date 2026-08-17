@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"strconv"
 	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -62,9 +61,14 @@ func (s *entitlementService) RecordOpenRouterCost(ctx context.Context, at time.T
 }
 
 func (s *entitlementService) OpenRouterUserID(ctx context.Context) string {
-	tenantID := types.MustTenantIDFromContext(ctx)
+	// OpenRouter's `user` field is attribution, not the spend boundary.
+	// Keep it stable for the same human across workspaces. Tenant-level spend
+	// isolation is handled separately by the per-personal-tenant child key.
 	userID, _ := types.UserIDFromContext(ctx)
-	sum := sha256.Sum256([]byte(strconv.FormatUint(tenantID, 10) + ":" + userID))
+	if userID == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(userID))
 	return "musuw_" + hex.EncodeToString(sum[:12])
 }
 
