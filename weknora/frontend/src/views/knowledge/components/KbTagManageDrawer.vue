@@ -1,215 +1,160 @@
 <template>
-  <SettingDrawer
-    v-model:visible="drawerVisible"
-    :title="$t('knowledgeBase.tagManageTitle')"
-    :description="$t('knowledgeBase.tagManageDescription')"
-    icon="discount"
-    width="480px"
-    :min-width="420"
-    :max-width="640"
-    resizable
-    storage-key="setting-drawer:width:kb-tag-manage"
-    :hide-footer="true"
-  >
-    <section class="setting-drawer__section">
-      <h4 class="setting-drawer__section-title">{{ $t('knowledgeBase.tagManageListSection') }}</h4>
+  <Teleport to="body">
+    <Transition name="visual-tag-manage">
+      <div v-if="drawerVisible" class="visual-tag-manage__overlay" role="presentation" @click.self="drawerVisible = false">
+        <aside class="visual-tag-manage" role="dialog" aria-modal="true" :aria-label="$t('knowledgeBase.tagManageTitle')">
+          <header class="visual-tag-manage__header">
+            <div class="visual-tag-manage__heading">
+              <span class="visual-tag-manage__heading-icon" aria-hidden="true"><t-icon name="discount" /></span>
+              <div>
+                <h3>{{ $t('knowledgeBase.tagManageTitle') }}</h3>
+                <p>{{ $t('knowledgeBase.tagManageDescription') }}</p>
+              </div>
+            </div>
+            <button type="button" class="visual-tag-manage__close" :aria-label="$t('common.close')" @click="drawerVisible = false">
+              <t-icon name="close" />
+            </button>
+          </header>
 
-      <div class="tag-manage-toolbar">
-        <div class="tag-manage-search-wrap">
-          <t-input
-            v-model.trim="searchQuery"
-            size="small"
-            :placeholder="$t('knowledgeBase.tagSearchPlaceholder')"
-            clearable
-            class="tag-manage-search"
-          >
-            <template #prefix-icon>
-              <t-icon name="search" size="14px" />
-            </template>
-          </t-input>
-        </div>
-        <t-tooltip :content="$t('knowledgeBase.tagCreateAction')" placement="top">
-          <t-button
-            size="small"
-            variant="text"
-            class="tag-manage-create-btn"
-            :disabled="creatingTag"
-            :aria-label="$t('knowledgeBase.tagCreateAction')"
-            @click="startCreateTag"
-          >
-            <template #icon><t-icon name="add" size="16px" /></template>
-          </t-button>
-        </t-tooltip>
-      </div>
+          <div class="visual-tag-manage__content">
+            <div class="visual-tag-manage__section-head">
+              <h4>{{ $t('knowledgeBase.tagManageListSection') }}</h4>
+              <span>{{ total }}</span>
+            </div>
 
-      <t-loading :loading="loading && !tags.length" size="small" class="tag-manage-loading">
-        <div v-if="!loading && !tags.length && !creatingTag" class="tag-manage-empty">
-          <t-empty :description="$t('knowledgeBase.tagEmptyResult')" />
-        </div>
+            <div class="visual-tag-manage__toolbar">
+              <t-input
+                v-model.trim="searchQuery"
+                size="small"
+                :placeholder="$t('knowledgeBase.tagSearchPlaceholder')"
+                clearable
+                class="visual-tag-manage__search"
+              >
+                <template #prefix-icon><t-icon name="search" size="14px" /></template>
+              </t-input>
+              <button
+                type="button"
+                class="visual-tag-manage__create-trigger"
+                :disabled="creatingTag"
+                :aria-label="$t('knowledgeBase.tagCreateAction')"
+                :title="$t('knowledgeBase.tagCreateAction')"
+                @click="startCreateTag"
+              >
+                <t-icon name="add" />
+              </button>
+            </div>
 
-        <ul v-else class="tag-tile-grid">
-          <template v-if="loading && !tags.length">
-            <li v-for="n in 4" :key="'tag-skel-' + n" class="tag-tile tag-tile--skeleton">
-              <t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '44px', type: 'rect' }]" />
-            </li>
-          </template>
+            <div v-if="loading && !tags.length" class="visual-tag-manage__loading">
+              <div v-for="n in 6" :key="n" class="visual-tag-manage__skeleton">
+                <t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '48px', type: 'rect' }]" />
+              </div>
+            </div>
 
-          <template v-else>
-            <li v-if="creatingTag" class="tag-tile tag-tile--editing" @click.stop>
-              <div class="tag-tile__main tag-tile__main--editing">
-                <span class="tag-tile__badge" aria-hidden="true">
-                  <t-icon name="discount" size="15px" />
-                </span>
+            <div v-else-if="!tags.length && !creatingTag" class="visual-tag-manage__empty">
+              <t-empty :description="$t('knowledgeBase.tagEmptyResult')" />
+            </div>
+
+            <ul v-else class="visual-tag-manage__grid">
+              <li v-if="creatingTag" class="visual-tag-tile is-editing" @click.stop>
+                <span class="visual-tag-tile__badge"><t-icon name="discount" /></span>
                 <t-input
                   ref="newTagInputRef"
                   v-model="newTagName"
                   size="small"
                   :maxlength="40"
-                  class="tag-tile__input"
+                  class="visual-tag-tile__input"
                   :placeholder="$t('knowledgeBase.tagNamePlaceholder')"
                   @enter="submitCreateTag"
                   @keydown="(_v: string, ctx?: { e?: KeyboardEvent }) => onEditKeydown(ctx, cancelCreateTag)"
                 />
-              </div>
-              <div class="tag-tile__actions">
-                <t-button
-                  variant="text"
-                  shape="square"
-                  size="small"
-                  class="tag-tile__action-btn tag-tile__action-btn--confirm"
-                  :loading="creatingTagLoading"
-                  :title="$t('common.create')"
-                  @click.stop="submitCreateTag"
-                >
-                  <template #icon><t-icon name="check" size="14px" /></template>
-                </t-button>
-                <t-button
-                  variant="text"
-                  shape="square"
-                  size="small"
-                  class="tag-tile__action-btn"
-                  :title="$t('common.cancel')"
-                  @click.stop="cancelCreateTag"
-                >
-                  <template #icon><t-icon name="close" size="14px" /></template>
-                </t-button>
-              </div>
-            </li>
+                <div class="visual-tag-tile__actions">
+                  <button type="button" class="visual-tag-tile__action" :disabled="creatingTagLoading" :title="$t('common.create')" @click.stop="submitCreateTag">
+                    <t-loading v-if="creatingTagLoading" size="small" />
+                    <t-icon v-else name="check" />
+                  </button>
+                  <button type="button" class="visual-tag-tile__action" :title="$t('common.cancel')" @click.stop="cancelCreateTag">
+                    <t-icon name="close" />
+                  </button>
+                </div>
+              </li>
 
-            <li
-              v-for="tag in tags"
-              :key="tag.id"
-              class="tag-tile"
-              :class="{ 'tag-tile--editing': editingTagId === tag.id }"
-              @click.stop
-            >
-              <template v-if="editingTagId === tag.id">
-                <div class="tag-tile__main tag-tile__main--editing">
-                  <span class="tag-tile__badge" aria-hidden="true">
-                    <t-icon name="discount" size="15px" />
-                  </span>
+              <li
+                v-for="tag in tags"
+                :key="tag.id"
+                class="visual-tag-tile"
+                :class="{ 'is-editing': editingTagId === tag.id }"
+                @click.stop
+              >
+                <template v-if="editingTagId === tag.id">
+                  <span class="visual-tag-tile__badge"><t-icon name="discount" /></span>
                   <t-input
                     :ref="(el: any) => setEditingTagInputRef(el, tag.id)"
                     v-model="editingTagName"
                     size="small"
                     :maxlength="40"
-                    class="tag-tile__input"
+                    class="visual-tag-tile__input"
                     :placeholder="$t('knowledgeBase.tagNamePlaceholder')"
                     @enter="submitEditTag"
                     @keydown="(_v: string, ctx?: { e?: KeyboardEvent }) => onEditKeydown(ctx, cancelEditTag)"
                   />
-                </div>
-                <div class="tag-tile__actions">
-                  <t-button
-                    variant="text"
-                    shape="square"
-                    size="small"
-                    class="tag-tile__action-btn tag-tile__action-btn--confirm"
-                    :loading="editingTagSubmitting"
-                    :title="$t('common.save')"
-                    @click.stop="submitEditTag"
-                  >
-                    <template #icon><t-icon name="check" size="14px" /></template>
-                  </t-button>
-                  <t-button
-                    variant="text"
-                    shape="square"
-                    size="small"
-                    class="tag-tile__action-btn"
-                    :title="$t('common.cancel')"
-                    @click.stop="cancelEditTag"
-                  >
-                    <template #icon><t-icon name="close" size="14px" /></template>
-                  </t-button>
-                </div>
-              </template>
-              <template v-else>
-                <div class="tag-tile__main">
-                  <span class="tag-tile__badge" aria-hidden="true">
-                    <t-icon name="discount" size="15px" />
-                  </span>
-                  <span class="tag-tile__text">
-                    <span class="tag-tile__name" :title="tag.name">{{ tag.name }}</span>
-                    <span class="tag-tile__count">
-                      {{
-                        isFaq
-                          ? $t('knowledgeBase.tagManageFaqCount', { count: tag.chunk_count || 0 })
-                          : $t('knowledgeBase.tagManageDocCount', { count: tag.knowledge_count || 0 })
-                      }}
-                    </span>
-                  </span>
-                </div>
-                <div class="tag-tile__actions" @click.stop>
-                  <t-button
-                    variant="text"
-                    shape="square"
-                    size="small"
-                    class="tag-tile__action-btn"
-                    :title="$t('knowledgeBase.tagEditAction')"
-                    @click="startEditTag(tag)"
-                  >
-                    <template #icon><t-icon name="edit" size="14px" /></template>
-                  </t-button>
-                  <t-popconfirm
-                    :content="getDeleteConfirmContent(tag)"
-                    :confirm-btn="{ content: $t('common.delete'), theme: 'danger' }"
-                    :cancel-btn="{ content: $t('common.cancel') }"
-                    placement="bottom-right"
-                    @confirm="deleteTag(tag)"
-                  >
-                    <t-button
-                      theme="danger"
-                      shape="square"
-                      variant="text"
-                      size="small"
-                      class="tag-tile__action-btn"
-                      :title="$t('knowledgeBase.tagDeleteAction')"
-                      @click.stop
-                    >
-                      <template #icon><t-icon name="delete" size="14px" /></template>
-                    </t-button>
-                  </t-popconfirm>
-                </div>
-              </template>
-            </li>
-          </template>
-        </ul>
+                  <div class="visual-tag-tile__actions">
+                    <button type="button" class="visual-tag-tile__action" :disabled="editingTagSubmitting" :title="$t('common.save')" @click.stop="submitEditTag">
+                      <t-loading v-if="editingTagSubmitting" size="small" />
+                      <t-icon v-else name="check" />
+                    </button>
+                    <button type="button" class="visual-tag-tile__action" :title="$t('common.cancel')" @click.stop="cancelEditTag">
+                      <t-icon name="close" />
+                    </button>
+                  </div>
+                </template>
 
-        <div v-if="hasMore && tags.length" class="tag-load-more">
-          <t-button variant="text" size="small" :loading="loadingMore" @click="loadTags(false)">
-            {{ $t('tenant.loadMore') }}
-          </t-button>
-        </div>
-      </t-loading>
-    </section>
-  </SettingDrawer>
+                <template v-else>
+                  <span class="visual-tag-tile__badge"><t-icon name="discount" /></span>
+                  <span class="visual-tag-tile__copy">
+                    <strong :title="tag.name">{{ tag.name }}</strong>
+                    <small>
+                      {{ isFaq
+                        ? $t('knowledgeBase.tagManageFaqCount', { count: tag.chunk_count || 0 })
+                        : $t('knowledgeBase.tagManageDocCount', { count: tag.knowledge_count || 0 }) }}
+                    </small>
+                  </span>
+                  <div class="visual-tag-tile__actions">
+                    <button type="button" class="visual-tag-tile__action" :title="$t('knowledgeBase.tagEditAction')" @click="startEditTag(tag)">
+                      <t-icon name="edit" />
+                    </button>
+                    <t-popconfirm
+                      :content="getDeleteConfirmContent(tag)"
+                      :confirm-btn="{ content: $t('common.delete'), theme: 'danger' }"
+                      :cancel-btn="{ content: $t('common.cancel') }"
+                      placement="bottom-right"
+                      @confirm="deleteTag(tag)"
+                    >
+                      <button type="button" class="visual-tag-tile__action is-danger" :title="$t('knowledgeBase.tagDeleteAction')" @click.stop>
+                        <t-icon name="delete" />
+                      </button>
+                    </t-popconfirm>
+                  </div>
+                </template>
+              </li>
+            </ul>
+
+            <div v-if="hasMore && tags.length" class="visual-tag-manage__load-more">
+              <button type="button" :disabled="loadingMore" @click="loadTags(false)">
+                <t-loading v-if="loadingMore" size="small" />
+                <span>{{ $t('tenant.loadMore') }}</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, type ComponentPublicInstance } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { MessagePlugin } from 'tdesign-vue-next';
-import SettingDrawer from '@/components/settings/SettingDrawer.vue';
 import {
   listKnowledgeTags,
   createKnowledgeBaseTag,
@@ -459,248 +404,361 @@ watch(searchQuery, (newVal, oldVal) => {
 </script>
 
 <style scoped lang="less">
-.tag-manage-toolbar {
+.visual-tag-manage__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3050;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  justify-content: flex-end;
+  background: rgb(15 23 42 / 18%);
+  backdrop-filter: blur(2px);
 }
 
-.tag-manage-search-wrap {
-  flex: 1;
+.visual-tag-manage {
+  width: min(480px, 100vw);
   min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -18px 0 50px rgb(15 23 42 / 12%);
+  color: #1f2937;
 }
 
-.tag-manage-search {
-  width: 100%;
-
-  :deep(.t-input) {
-    font-size: 13px;
-    background-color: var(--td-bg-color-secondarycontainer);
-    border-color: transparent;
-    border-radius: 6px;
-    box-shadow: none !important;
-
-    &:hover,
-    &:focus,
-    &.t-is-focused {
-      border-color: var(--td-component-border);
-      background-color: var(--td-bg-color-container);
-      box-shadow: none !important;
-    }
-  }
-
-  :deep(.t-input__inner) {
-    font-size: 13px;
-  }
-
-  :deep(.t-input__prefix-icon) {
-    margin-right: 0;
-  }
+.visual-tag-manage__header {
+  flex: 0 0 auto;
+  padding: 20px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.tag-manage-create-btn {
-  flex-shrink: 0;
+.visual-tag-manage__heading {
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+}
+
+.visual-tag-manage__heading-icon {
+  flex: 0 0 32px;
   width: 32px;
   height: 32px;
-  padding: 0;
-  border-radius: 6px;
-  color: var(--td-text-color-secondary);
-
-  :deep(.t-icon) {
-    font-size: 16px;
-  }
-
-  &:hover:not(:disabled) {
-    background: var(--td-bg-color-secondarycontainer);
-    color: var(--td-text-color-primary);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-  }
-}
-
-.tag-manage-loading {
-  min-height: 80px;
-}
-
-.tag-manage-empty {
-  padding: 24px 0;
-}
-
-.tag-tile-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.tag-tile {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  min-height: 44px;
-  padding: 5px 6px 5px 8px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
-  background: var(--td-bg-color-container);
-  box-sizing: border-box;
-  transition: border-color 0.15s ease, background 0.15s ease;
-
-  &:hover:not(.tag-tile--editing):not(.tag-tile--skeleton) {
-    border-color: var(--td-component-border);
-    background: color-mix(in srgb, var(--td-bg-color-secondarycontainer) 40%, var(--td-bg-color-container));
-  }
-
-  &--skeleton {
-    padding: 0;
-    border: none;
-    background: transparent;
-  }
-
-  &--editing {
-    border-color: var(--td-component-border);
-    background: var(--td-bg-color-secondarycontainer);
-    box-shadow: none;
-
-    .tag-tile__actions {
-      opacity: 1;
-    }
-  }
-}
-
-.tag-tile__main {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.tag-tile__input {
-  flex: 1;
-  min-width: 0;
-
-  :deep(.t-input) {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  :deep(.t-input__wrap) {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  :deep(.t-input__inner) {
-    padding: 0;
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  :deep(.t-input:hover),
-  :deep(.t-input.t-is-focused),
-  :deep(.t-input__wrap:hover),
-  :deep(.t-input__wrap.t-is-focused) {
-    border-color: transparent !important;
-    box-shadow: none !important;
-    outline: none;
-  }
-
-  :deep(.t-input.t-is-focused .t-input__suffix),
-  :deep(.t-input.t-is-focused .t-input__prefix) {
-    box-shadow: none;
-  }
-}
-
-.tag-tile__badge {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-placeholder);
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
-.tag-tile__text {
+.visual-tag-manage__heading h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.visual-tag-manage__heading p {
+  margin: 3px 0 0;
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.visual-tag-manage__close,
+.visual-tag-manage__create-trigger,
+.visual-tag-tile__action {
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+}
+
+.visual-tag-manage__close {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border-radius: 8px;
+  color: #9ca3af;
+}
+
+.visual-tag-manage__close:hover,
+.visual-tag-manage__create-trigger:hover:not(:disabled),
+.visual-tag-tile__action:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-tag-manage__content {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 18px 20px 24px;
+}
+
+.visual-tag-manage__section-head {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.visual-tag-manage__section-head h4 {
+  margin: 0;
+  color: #374151;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.visual-tag-manage__toolbar {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visual-tag-manage__search {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.visual-tag-manage__search :deep(.t-input) {
+  min-height: 34px;
+  border-color: #e5e7eb;
+  border-radius: 9px;
+  background: #f9fafb;
+  box-shadow: none !important;
+  font-size: 12px;
+}
+
+.visual-tag-manage__search :deep(.t-input.t-is-focused) {
+  border-color: #d1d5db;
+  background: #fff;
+}
+
+.visual-tag-manage__create-trigger {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  background: #fff;
+  color: #6b7280;
+}
+
+.visual-tag-manage__create-trigger:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.visual-tag-manage__loading,
+.visual-tag-manage__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.visual-tag-manage__skeleton {
+  min-width: 0;
+}
+
+.visual-tag-manage__empty {
+  padding: 36px 0;
+}
+
+.visual-tag-manage__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.visual-tag-tile {
+  min-width: 0;
+  min-height: 50px;
+  padding: 7px 7px 7px 9px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.visual-tag-tile:hover:not(.is-editing) {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.visual-tag-tile.is-editing {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.visual-tag-tile__badge {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.visual-tag-tile__badge :deep(.t-icon) {
+  font-size: 13px;
+}
+
+.visual-tag-tile__copy {
+  min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+.visual-tag-tile__copy strong,
+.visual-tag-tile__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-tag-tile__copy strong {
+  color: #374151;
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 600;
+}
+
+.visual-tag-tile__copy small {
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.visual-tag-tile__input {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
 }
 
-.tag-tile__name {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.3;
-  color: var(--td-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tag-tile__count {
+.visual-tag-tile__input :deep(.t-input) {
+  min-height: 30px;
+  padding-inline: 6px;
+  border-color: #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: none !important;
   font-size: 11px;
-  line-height: 1.3;
-  color: var(--td-text-color-placeholder);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.tag-tile__actions {
+.visual-tag-tile__actions {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  gap: 2px;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity 120ms ease;
 }
 
-.tag-tile:hover .tag-tile__actions,
-.tag-tile:focus-within .tag-tile__actions,
-.tag-tile__actions:focus-within {
+.visual-tag-tile:hover .visual-tag-tile__actions,
+.visual-tag-tile:focus-within .visual-tag-tile__actions,
+.visual-tag-tile.is-editing .visual-tag-tile__actions {
   opacity: 1;
 }
 
-@media (hover: none) {
-  .tag-tile__actions {
-    opacity: 1;
-  }
+.visual-tag-tile__action {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
+  border-radius: 7px;
+  color: #9ca3af;
 }
 
-.tag-tile__action-btn {
-  padding: 0 2px;
-
-  &--confirm {
-    color: var(--td-text-color-secondary);
-
-    &:hover,
-    &:focus-visible {
-      color: var(--td-text-color-primary);
-      background: var(--td-bg-color-container);
-    }
-  }
+.visual-tag-tile__action.is-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
-.tag-load-more {
+.visual-tag-tile__action:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.visual-tag-tile__action :deep(.t-icon),
+.visual-tag-tile__action :deep(.t-loading) {
+  font-size: 13px;
+}
+
+.visual-tag-manage__load-more {
+  padding-top: 14px;
   display: flex;
   justify-content: center;
-  padding-top: 8px;
+}
 
-  :deep(.t-button) {
-    font-size: 12px;
-    color: var(--td-text-color-placeholder);
+.visual-tag-manage__load-more button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.visual-tag-manage__load-more button:hover:not(:disabled) {
+  background: #f9fafb;
+  color: #4b5563;
+}
+
+.visual-tag-manage-enter-active,
+.visual-tag-manage-leave-active {
+  transition: opacity 160ms ease;
+}
+
+.visual-tag-manage-enter-from,
+.visual-tag-manage-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 580px) {
+  .visual-tag-manage { width: 100%; }
+  .visual-tag-manage__loading,
+  .visual-tag-manage__grid { grid-template-columns: 1fr; }
+}
+
+@media (hover: none) {
+  .visual-tag-tile__actions { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-tag-manage-enter-active,
+  .visual-tag-manage-leave-active,
+  .visual-tag-tile,
+  .visual-tag-tile__actions {
+    transition: none !important;
   }
 }
 </style>
