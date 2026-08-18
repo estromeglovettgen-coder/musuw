@@ -1,3 +1,4 @@
+# trigger registered workflow
 name: Task1 temporary knowledge source transplant
 
 on:
@@ -28,46 +29,31 @@ jobs:
           donor_path = Path('weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue')
           if not target_path.exists() or not donor_path.exists():
               raise SystemExit('required target/donor missing')
-
           target = target_path.read_text()
           donor = donor_path.read_text()
           prefix = target[:target.index('<template>')]
-          donor_tail = donor[donor.index('<template>'):]
+          tail = donor[donor.index('<template>'):]
 
-          # Visual-only import. Keep the native script otherwise authoritative.
           if "@/components/ReferenceIcon.vue" not in prefix:
               anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
-              if anchor not in prefix:
-                  raise SystemExit('ReferenceIcon import anchor not found')
+              if anchor not in prefix: raise SystemExit('ReferenceIcon import anchor not found')
               prefix = prefix.replace(anchor, anchor + "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n", 1)
 
-          # Reference tab counters come from the existing getWikiStats request.
           if 'const wikiPageCount = ref(0);' not in prefix:
               state_anchor = "const wikiStatus = ref<{ pendingTasks: number; isActive: boolean; pendingIssues: number }>({\n"
-              if state_anchor not in prefix:
-                  raise SystemExit('wiki status state anchor not found')
+              if state_anchor not in prefix: raise SystemExit('wiki status state anchor not found')
               prefix = prefix.replace(state_anchor, "const wikiPageCount = ref(0);\nconst wikiLinkCount = ref(0);\n" + state_anchor, 1)
-
               data_anchor = "    const data = res?.data || res\n    if (!data) return\n"
-              if data_anchor not in prefix:
-                  raise SystemExit('wiki stats data anchor not found')
-              prefix = prefix.replace(
-                  data_anchor,
-                  data_anchor + "    wikiPageCount.value = Number(data.total_pages || 0)\n    wikiLinkCount.value = Number(data.total_links || 0)\n",
-                  1,
-              )
+              if data_anchor not in prefix: raise SystemExit('wiki stats data anchor not found')
+              prefix = prefix.replace(data_anchor, data_anchor + "    wikiPageCount.value = Number(data.total_pages || 0)\n    wikiLinkCount.value = Number(data.total_links || 0)\n", 1)
               reset_anchor = "  wikiStatus.value = { pendingTasks: 0, isActive: false, pendingIssues: 0 }\n"
               if reset_anchor in prefix:
                   prefix = prefix.replace(reset_anchor, reset_anchor + "  wikiPageCount.value = 0\n  wikiLinkCount.value = 0\n", 1)
 
-          tail = donor_tail
-
-          # Map visible reference controls to the exact native business handlers.
           replacements = {
               '@select="handleKnowledgeDropdownSelect"': '@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
               '@status-change="refreshWikiStats"': '@status-change="onWikiStatusChange"',
               '@open-source-doc="(id) => openKnowledgeItem({ id })"': '@open-source-doc="openSourceDoc"',
-              '@view-graph="onViewWikiInGraph"': '@view-graph="onViewWikiInGraph"',
               '<span>Wiki ({{ wikiCount }})</span>': '<span>Wiki ({{ wikiPageCount }})</span>',
               "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>": "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ wikiLinkCount }})</span>",
               '@files="uploadFiles"': '@files="handleUploadSourceFiles"',
@@ -87,28 +73,19 @@ jobs:
               '@changed="() => { loadTags(); loadKnowledgeFiles() }"': '@changed="onTagManageChanged"',
               'font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;': 'font-family: var(--app-font-family);',
           }
-          for old, new in replacements.items():
-              tail = tail.replace(old, new)
+          for old, new in replacements.items(): tail = tail.replace(old, new)
 
-          # Batch dialog uses its own manage bridge, not the single-document bridge.
-          batch_marker = '<BatchTagDialog'
-          if batch_marker in tail:
-              before, batch = tail.split(batch_marker, 1)
+          if '<BatchTagDialog' in tail:
+              before, batch = tail.split('<BatchTagDialog', 1)
               batch = batch.replace('@open-manage="openTagManageFromEditDialog"', '@open-manage="openTagManageFromBatchDialog"', 1)
-              tail = before + batch_marker + batch
+              tail = before + '<BatchTagDialog' + batch
 
-          # Preserve native tag-store sync and paging/reset behavior.
           tail = re.sub(
               r'@click="selectedTagIds = selectedTagIds\.includes\(tag\.id\)\s*\? selectedTagIds\.filter\(\(id\) => id !== tag\.id\)\s*:\s*\[\.\.\.selectedTagIds, tag\.id\]"',
-              '@click="handleTagRowClick(tag.id)"',
-              tail,
-              flags=re.S,
-          )
+              '@click="handleTagRowClick(tag.id)"', tail, flags=re.S)
 
-          # Keep native infinite-scroll and marquee-selection contracts on the new reference surface.
           scroll_needle = '<div class="reference-doc-scroll">'
-          if scroll_needle not in tail:
-              raise SystemExit('reference scroll host missing')
+          if scroll_needle not in tail: raise SystemExit('reference scroll host missing')
           tail = tail.replace(scroll_needle, '''<div
           class="reference-doc-scroll"
           ref="knowledgeScroll"
@@ -123,11 +100,9 @@ jobs:
             aria-hidden="true"
           />''', 1)
 
-          # Preserve real parser/storage warnings without resurrecting the old UI shell.
           header_needle = "        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
-          if header_needle not in tail:
-              raise SystemExit('reference header insertion point missing')
-          header_replacement = """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
+          if header_needle not in tail: raise SystemExit('reference header insertion point missing')
+          tail = tail.replace(header_needle, """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
         <button v-if="unsupportedFileTypes.length" type="button" class="reference-inline-warning" @click="goToParserSettings">
           <span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map((type) => '.' + type).join('、') }) }}</span>
           <strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong>
@@ -136,10 +111,8 @@ jobs:
           <span>{{ $t('knowledgeBase.missingStorageEngine') }}</span>
           <strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong>
         </button>
-      </div>"""
-          tail = tail.replace(header_needle, header_replacement, 1)
+      </div>""", 1)
 
-          # At KB root, retain the production upload/drop empty-state functionality.
           empty_old = """          <div v-else-if="!docListLoading" class="reference-empty-state">
             <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />
             <strong>暂无文档</strong>
@@ -151,14 +124,10 @@ jobs:
             </template>
             <EmptyKnowledge v-else />
           </div>"""
-          if empty_old not in tail:
-              raise SystemExit('reference empty state missing')
+          if empty_old not in tail: raise SystemExit('reference empty state missing')
           tail = tail.replace(empty_old, empty_new, 1)
-
-          # Preserve summary sync from the document detail drawer.
           tail = tail.replace('@getDoc="getDoc"\n    />', '@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />', 1)
 
-          # Preserve native KB settings/editor host outside the new visual shell.
           editor = """
     <KnowledgeBaseEditorModal
       :visible="uiStore.showKBEditorModal"
@@ -170,8 +139,7 @@ jobs:
     />
 """
           closing = "\n  </div>\n</template>\n\n<style scoped>"
-          if closing not in tail:
-              raise SystemExit('reference root closing point missing')
+          if closing not in tail: raise SystemExit('reference root closing point missing')
           tail = tail.replace(closing, editor + closing, 1)
 
           warning_css = """
@@ -182,12 +150,9 @@ jobs:
 """
           tail = tail.replace('\n.reference-kb-tabs {', warning_css + '\n.reference-kb-tabs {', 1)
 
-          # Guardrails: legacy detail DOM must be absent; protected internals remain external components.
           for forbidden in ['class="knowledge-layout"', 'class="doc-filter-bar"', 'class="document-header"']:
-              if forbidden in tail:
-                  raise SystemExit(f'legacy UI survived transplant: {forbidden}')
-          if '<WikiBrowser' not in tail or '<DocContent' not in tail:
-              raise SystemExit('protected graph/trace host missing')
+              if forbidden in tail: raise SystemExit(f'legacy UI survived transplant: {forbidden}')
+          if '<WikiBrowser' not in tail or '<DocContent' not in tail: raise SystemExit('protected graph/trace host missing')
 
           target_path.write_text(prefix + tail)
           donor_path.unlink()
