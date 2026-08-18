@@ -74,12 +74,8 @@
             </template>
 
             <div v-else class="reference-session-confirm">
-              <strong>
-                {{ menuMode === 'clear' ? t('chatHeader.clearConfirmTitle') : t('chatHeader.deleteConfirmTitle') }}
-              </strong>
-              <p>
-                {{ menuMode === 'clear' ? t('chatHeader.clearConfirmBody') : t('chatHeader.deleteConfirmBody') }}
-              </p>
+              <strong>{{ menuMode === 'clear' ? t('chatHeader.clearConfirmTitle') : t('chatHeader.deleteConfirmTitle') }}</strong>
+              <p>{{ menuMode === 'clear' ? t('chatHeader.clearConfirmBody') : t('chatHeader.deleteConfirmBody') }}</p>
               <div>
                 <button type="button" @click="backToMenu">{{ t('common.cancel') }}</button>
                 <button type="button" class="danger" @click="confirmDangerAction">
@@ -187,7 +183,6 @@ const startTitleEdit = () => {
     titleInputRef.value?.select()
   })
 }
-
 const cancelTitleEdit = () => {
   titleEditing.value = false
   titleDraft.value = ''
@@ -224,14 +219,39 @@ const confirmDangerAction = () => {
 </script>
 
 <style scoped>
-.submenu_item { position: relative; }
+.submenu_item {
+  position: relative;
+  width: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: var(--app-font-family);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.submenu_item:hover { color: #030712; background: rgb(229 231 235 / .5); }
+.submenu_item_active { color: #030712; background: rgb(229 231 235 / .9); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.submenu_item_selected { background: #f3f4f6; color: #111827; }
+.submenu_item_batch { gap: 8px; }
+.submenu_title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.submenu_title-text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 12.5px; line-height: 17px; }
+.submenu_title--batch { font-size: 12px; }
 .reference-session-checkbox { position: relative; width: 16px; height: 16px; flex: 0 0 16px; display: grid; place-items: center; cursor: pointer; }
 .reference-session-checkbox input { position: absolute; inset: 0; width: 16px; height: 16px; margin: 0; opacity: 0; cursor: pointer; }
 .reference-session-checkbox > span { width: 14px; height: 14px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #111827; display: grid; place-items: center; }
 .reference-session-checkbox input:checked + span { border-color: #111827; }
 .session-title-edit { flex: 1 1 auto; min-width: 0; }
-.session-title-edit__input { width: 100%; height: 26px; padding: 0 7px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; font-family: "Inter", "Noto Sans SC", sans-serif; font-size: 11px; outline: none; box-shadow: 0 0 0 2px rgb(17 24 39 / .04); }
-.reference-session-pin { flex: 0 0 auto; color: #9ca3af; }
+.session-title-edit__input { width: 100%; height: 26px; padding: 0 7px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; font-family: var(--app-font-family); font-size: 11px; outline: none; box-shadow: 0 0 0 2px rgb(17 24 39 / .04); }
+.reference-session-pin { flex: 0 0 auto; color: #f59e0b; }
 .session-row-menu-wrap { position: relative; flex: 0 0 auto; }
 .reference-session-more { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #9ca3af; display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease; }
 .submenu_item:hover .reference-session-more,
@@ -241,7 +261,7 @@ const confirmDangerAction = () => {
 
 <style>
 .reference-session-backdrop { position: fixed; inset: 0; z-index: 4890; }
-.reference-session-menu { position: fixed; z-index: 4900; width: 176px; padding: 5px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 16px 30px rgb(0 0 0 / .12); font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
+.reference-session-menu { position: fixed; z-index: 4900; width: 176px; padding: 5px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 16px 30px rgb(0 0 0 / .12); font-family: var(--app-font-family); }
 .reference-session-menu.confirm { width: 260px; padding: 12px; }
 .reference-session-menu__item { width: 100%; min-height: 31px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: #374151; display: flex; align-items: center; gap: 8px; text-align: left; font-family: inherit; font-size: 11px; line-height: 16px; font-weight: 500; cursor: pointer; }
 .reference-session-menu__item:hover { background: #f3f4f6; color: #111827; }
