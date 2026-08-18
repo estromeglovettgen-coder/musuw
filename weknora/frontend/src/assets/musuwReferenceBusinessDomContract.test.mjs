@@ -6,48 +6,48 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('unmigrated inline citation click surfaces stay byte-for-byte frozen', () => {
-  const sources = new Map([
-    ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
-    ['../composables/useChatCitationPopover.ts', 'b1142ec34ee9dec81600e6f3bda0c418cd478967'],
-  ])
-  for (const [path, sha] of sources) {
-    assert.equal(blobSha(read(path)), sha, `${path} changed before its citation view was migrated`)
+test('unmigrated inline citation parsing logic stays byte-for-byte frozen', () => {
+  const source = read('../composables/useChatCitationPopover.ts')
+  assert.equal(blobSha(source), 'b1142ec34ee9dec81600e6f3bda0c418cd478967')
+})
+
+test('rebuilt answer reference summary preserves grouping, web links, drawer handoff and KB navigation', () => {
+  const source = read('../views/chat/components/docInfo.vue')
+  for (const token of [
+    "referencesDrawer.open({ references: refs })",
+    "item.chunk_type === 'web_search'",
+    "item.chunk_type !== 'web_search'",
+    'const key = item.knowledge_id || item.knowledge_title || item.id',
+    'title: item.knowledge_title || item.knowledge_filename || key',
+    'knowledgeId: item.knowledge_id',
+    'knowledgeBaseId: item.knowledge_base_id',
+    'const sanitized = sanitizeHTML(content)',
+    'if (group.knowledgeId) query.knowledge_id = group.knowledgeId',
+    'path: `/platform/knowledge-bases/${group.knowledgeBaseId}`',
+    'return router.resolve({',
+    ':href="getDocumentHref(group)"',
+    'target="_blank"',
+    'rel="noopener noreferrer"',
+    'class="visual-answer-references"',
+  ]) assert.ok(source.includes(token), `docInfo lost reference contract: ${token}`)
+  for (const legacy of ['class="refer"', 'class="refer_header"', 'class="doc-group"', 'class="doc doc-web"']) {
+    assert.equal(source.includes(legacy), false, `docInfo still contains legacy shell ${legacy}`)
   }
 })
 
 test('rebuilt citation hover card preserves web and document state semantics', () => {
   const source = read('../components/ChatCitationFloat.vue')
-  for (const token of [
-    "float.type === 'web'",
-    ':href="float.url"',
-    'target="_blank"',
-    'rel="noopener noreferrer"',
-    'float.loading',
-    'float.error',
-    'float.content',
-    '@mouseenter="onEnter?.()"',
-    '@mouseleave="onLeave?.()"',
-    'class="visual-citation-float"',
-  ]) assert.ok(source.includes(token), `ChatCitationFloat lost citation state contract: ${token}`)
+  for (const token of ["float.type === 'web'",':href="float.url"','target="_blank"','rel="noopener noreferrer"','float.loading','float.error','float.content','@mouseenter="onEnter?.()"','@mouseleave="onLeave?.()"','class="visual-citation-float"']) {
+    assert.ok(source.includes(token), `ChatCitationFloat lost citation state contract: ${token}`)
+  }
   assert.equal(source.includes('class="chat-citation-float"'), false)
 })
 
 test('rebuilt references drawer preserves native citation grouping, highlight and KB navigation semantics', () => {
   const source = read('../components/ChatReferencesDrawer.vue')
-  for (const token of [
-    'buildReferenceSections(references.value)',
-    'resolveReferenceHighlightKey(references.value, highlight.value)',
-    'if (item.knowledgeId) query.knowledge_id = item.knowledgeId',
-    'path: `/platform/knowledge-bases/${item.knowledgeBaseId}`',
-    'return router.resolve({ path: `/platform/knowledge-bases/${item.knowledgeBaseId}`, query }).href',
-    "window.getSelection()?.toString().trim()",
-    'if (selectedText || pointerDownSelectionText.value)',
-    'watch(highlight, () => { void scrollToHighlight() })',
-    ':href="getDocumentHref(item)"',
-    'target="_blank"',
-    'class="visual-references-panel"',
-  ]) assert.ok(source.includes(token), `ChatReferencesDrawer lost citation contract: ${token}`)
+  for (const token of ['buildReferenceSections(references.value)','resolveReferenceHighlightKey(references.value, highlight.value)','if (item.knowledgeId) query.knowledge_id = item.knowledgeId','path: `/platform/knowledge-bases/${item.knowledgeBaseId}`','return router.resolve({ path: `/platform/knowledge-bases/${item.knowledgeBaseId}`, query }).href',"window.getSelection()?.toString().trim()",'if (selectedText || pointerDownSelectionText.value)','watch(highlight, () => { void scrollToHighlight() })',':href="getDocumentHref(item)"','target="_blank"','class="visual-references-panel"']) {
+    assert.ok(source.includes(token), `ChatReferencesDrawer lost citation contract: ${token}`)
+  }
   for (const legacy of ['class="chat-references-panel"', 'class="reference-item"', 'class="reference-item__body"']) {
     assert.equal(source.includes(legacy), false, `ChatReferencesDrawer still contains legacy shell ${legacy}`)
   }
