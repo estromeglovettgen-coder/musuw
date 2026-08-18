@@ -12,6 +12,7 @@ const withoutComments = mechanical.replace(/\/\*[\s\S]*?\*\//g, '')
 const migratedViewFiles = [
   '../views/creatChat/creatChat.vue',
   '../components/menu.vue',
+  '../components/Input-field.vue',
   '../components/UserMenu.vue',
   '../components/SessionSidebarRow.vue',
   '../components/SessionSourceFilter.vue',
@@ -46,7 +47,7 @@ const migratedViewFiles = [
   '../views/settings/ModelSettings.vue',
 ]
 
-test('transitional mechanical layer remains last only while mother views are still unmigrated', () => {
+test('transitional mechanical layer remains last only while KnowledgeBase mother view is unmigrated', () => {
   const reference = main.indexOf('import "@/assets/musuw-reference-mechanical.css"')
   assert.ok(reference > main.indexOf('import "@/assets/dropdown-menu.less"'))
   assert.ok(reference > main.indexOf('import "@/components/css/chat-hljs-dark.less"'))
@@ -68,10 +69,8 @@ test('global mechanical CSS never targets rebuilt visual roots', () => {
   assert.doesNotMatch(withoutComments, /\.visual-[a-z0-9_-]+/i)
 })
 
-test('remaining mechanical ownership is limited to still-unmigrated mother roots', () => {
-  for (const token of ['.rich-input-container', '.knowledge-layout']) {
-    assert.ok(mechanical.includes(token), `remaining mother root lost transitional styling: ${token}`)
-  }
+test('KnowledgeBase is the only remaining mechanical mother root', () => {
+  assert.ok(mechanical.includes('.knowledge-layout'))
 })
 
 test('mechanical layer never owns product logic or excluded graph and trace renderers', () => {
