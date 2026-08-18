@@ -18,9 +18,9 @@
           <span>{{ $t('entitlement.storage') }}</span>
           <strong>{{ formatBytes(entitlement.storage_used) }} / {{ formatBytes(entitlement.storage_bytes) }}</strong>
         </div>
-        <div class="plan-metric">
+        <div class="plan-metric" :class="{ 'plan-metric--unavailable': !creditsAvailable }">
           <span>{{ $t('entitlement.monthlyCredits') }}</span>
-          <strong>{{ formatCredits(entitlement.openrouter_used_microusd) }} / {{ formatCredits(entitlement.monthly_openrouter_microusd) }}</strong>
+          <strong>{{ creditsDisplay }}</strong>
         </div>
         <div class="plan-metric">
           <span>{{ $t('entitlement.knowledgeBases') }}</span>
@@ -33,7 +33,9 @@
       </div>
       <p class="plan-note">
         {{ entitlement.video_upload ? $t('entitlement.videoPlanAllowed') : $t('entitlement.videoFreeBlocked') }}
-        · {{ $t('entitlement.renewsMonthly', { month: entitlement.openrouter_usage_month }) }}
+        <template v-if="creditsAvailable">
+          · {{ $t('entitlement.renewsMonthly', { month: entitlement.openrouter_usage_month }) }}
+        </template>
       </p>
       <p v-if="!billingConfigured" class="billing-note">{{ $t('entitlement.billingUnavailable') }}</p>
     </div>
@@ -98,6 +100,7 @@ const entitlement = ref<ConsumerEntitlement | null>(null)
 const entitlementLoading = ref(true)
 const billingConfigured = ref(false)
 const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan || 'free'}`))
+const creditsAvailable = computed(() => entitlement.value?.openrouter_credits_status === 'available')
 
 watch(currentTheme, (value) => {
   localTheme.value = value
@@ -133,6 +136,10 @@ const formatBytes = (bytes: number) => {
 }
 
 const formatCredits = (microusd: number) => `$${(Math.max(0, microusd) / 1_000_000).toFixed(2)}`
+const creditsDisplay = computed(() => {
+  if (!entitlement.value || !creditsAvailable.value) return '—'
+  return `${formatCredits(entitlement.value.openrouter_used_microusd)} / ${formatCredits(entitlement.value.monthly_openrouter_microusd)}`
+})
 const formatLimit = (limit: number) => limit > 0 ? String(limit) : t('entitlement.unlimited')
 
 const handleLanguageChange = () => {
@@ -241,6 +248,10 @@ const handleThemeChange = (value: ThemeMode) => {
     color: var(--td-text-color-primary);
     font-size: 14px;
   }
+}
+
+.plan-metric--unavailable strong {
+  color: var(--td-text-color-placeholder);
 }
 
 .plan-note,
