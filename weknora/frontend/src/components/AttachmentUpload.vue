@@ -115,9 +115,7 @@ const addFiles = async (files: File[]) => {
     attachments.value.push(attachment);
     const reactiveAttachment = attachments.value[attachments.value.length - 1];
     emit('update:files', [...attachments.value]);
-    if (props.sessionId) {
-      void uploadAttachment(reactiveAttachment);
-    }
+    if (props.sessionId) void uploadAttachment(reactiveAttachment);
   }
 };
 
@@ -145,9 +143,7 @@ const uploadAttachment = async (attachment: AttachmentFile) => {
     attachment.status = response.data.status;
     attachment.progress = 100;
     emitFiles();
-    if (attachment.status !== 'ready' && attachment.status !== 'failed') {
-      scheduleStatusPoll(attachment);
-    }
+    if (attachment.status !== 'ready' && attachment.status !== 'failed') scheduleStatusPoll(attachment);
   } catch (error: any) {
     attachment.status = 'failed';
     attachment.error = error?.message || t('chat.attachmentUploadFailed');
@@ -189,9 +185,7 @@ const removeAttachment = (id: string) => {
     attachments.value.splice(index, 1);
     emitFiles();
     emit('remove', id);
-    if (props.sessionId && attachment.documentId) {
-      void deleteTemporaryAttachment(props.sessionId, attachment.documentId).catch(() => undefined);
-    }
+    if (props.sessionId && attachment.documentId) void deleteTemporaryAttachment(props.sessionId, attachment.documentId).catch(() => undefined);
   }
 };
 
@@ -202,7 +196,6 @@ const formatFileSize = (bytes: number): string => {
 };
 
 const getFileExt = (fileName: string): string => fileName.split('.').pop()?.toUpperCase() || 'FILE';
-
 const getFileIcon = (fileName: string): string => {
   const ext = fileName.split('.').pop()?.toLowerCase();
   if (['pdf'].includes(ext || '')) return 'file-pdf';
@@ -213,7 +206,6 @@ const getFileIcon = (fileName: string): string => {
   if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp'].includes(ext || '')) return 'image';
   return 'file';
 };
-
 const statusLabel = (attachment: AttachmentFile): string => {
   if (attachment.status === 'uploading') return t('chat.attachmentUploading', { progress: attachment.progress || 0 });
   if (attachment.status === 'uploaded' || attachment.status === 'processing') return t('chat.attachmentParsing');
@@ -221,9 +213,7 @@ const statusLabel = (attachment: AttachmentFile): string => {
   if (attachment.status === 'failed') return attachment.error || t('chat.attachmentParseFailed');
   return '';
 };
-
-const isPending = (attachment: AttachmentFile) =>
-  attachment.status === 'uploading' || attachment.status === 'uploaded' || attachment.status === 'processing';
+const isPending = (attachment: AttachmentFile) => attachment.status === 'uploading' || attachment.status === 'uploaded' || attachment.status === 'processing';
 
 onUnmounted(() => {
   disposed = true;
@@ -246,253 +236,50 @@ defineExpose({
 
 <template>
   <div class="visual-attachment-upload">
-    <input
-      ref="fileInputRef"
-      type="file"
-      :accept="supportedTypes.join(',')"
-      multiple
-      class="visual-attachment-upload__input"
-      @change="handleFileSelect"
-    />
-
+    <input ref="fileInputRef" type="file" :accept="supportedTypes.join(',')" multiple class="visual-attachment-upload__input" @change="handleFileSelect" />
     <div v-if="attachments.length > 0" class="visual-attachment-list" aria-live="polite">
-      <article
-        v-for="attachment in attachments"
-        :key="attachment.id"
-        class="visual-attachment-card"
-        :class="[`is-${attachment.status}`, { 'is-pending': isPending(attachment) }]"
-      >
-        <span class="visual-attachment-card__icon" aria-hidden="true">
-          <t-icon :name="getFileIcon(attachment.name)" />
-        </span>
-
+      <article v-for="attachment in attachments" :key="attachment.id" class="visual-attachment-card" :class="[`is-${attachment.status}`, { 'is-pending': isPending(attachment) }]">
+        <span class="visual-attachment-card__icon" aria-hidden="true"><t-icon :name="getFileIcon(attachment.name)" /></span>
         <span class="visual-attachment-card__copy">
           <strong :title="attachment.name">{{ attachment.name }}</strong>
-          <small>
-            <span>{{ getFileExt(attachment.name) }}</span>
-            <span aria-hidden="true">·</span>
-            <span>{{ formatFileSize(attachment.size) }}</span>
-          </small>
-          <span
-            v-if="attachment.status !== 'local'"
-            class="visual-attachment-card__status"
-            :title="statusLabel(attachment)"
-          >
+          <small><span>{{ getFileExt(attachment.name) }}</span><span aria-hidden="true">·</span><span>{{ formatFileSize(attachment.size) }}</span></small>
+          <span v-if="attachment.status !== 'local'" class="visual-attachment-card__status" :title="statusLabel(attachment)">
             <span v-if="isPending(attachment)" class="visual-attachment-card__spinner" aria-hidden="true" />
             <t-icon v-else-if="attachment.status === 'ready'" name="check-circle" aria-hidden="true" />
             <t-icon v-else-if="attachment.status === 'failed'" name="close-circle" aria-hidden="true" />
             <span>{{ statusLabel(attachment) }}</span>
           </span>
         </span>
-
-        <button
-          type="button"
-          class="visual-attachment-card__remove"
-          :aria-label="$t('common.remove')"
-          @click="removeAttachment(attachment.id)"
-        >
-          <t-icon name="close" />
-        </button>
-
-        <span
-          v-if="attachment.status === 'uploading'"
-          class="visual-attachment-card__progress"
-          aria-hidden="true"
-        >
-          <span :style="{ width: `${Math.max(0, Math.min(100, attachment.progress || 0))}%` }" />
-        </span>
+        <button type="button" class="visual-attachment-card__remove" :aria-label="$t('common.remove')" @click="removeAttachment(attachment.id)"><t-icon name="close" /></button>
+        <span v-if="attachment.status === 'uploading'" class="visual-attachment-card__progress" aria-hidden="true"><span :style="{ width: `${Math.max(0, Math.min(100, attachment.progress || 0))}%` }" /></span>
       </article>
     </div>
-
     <slot name="trigger" :trigger="triggerFileSelect" :count="attachments.length" />
   </div>
 </template>
 
 <style scoped lang="less">
-.visual-attachment-upload {
-  width: 100%;
-  min-width: 0;
-}
-
-.visual-attachment-upload__input {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.visual-attachment-list {
-  display: flex;
-  align-items: stretch;
-  gap: 7px;
-  padding: 8px 10px 2px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-}
-
-.visual-attachment-card {
-  position: relative;
-  flex: 0 0 224px;
-  min-width: 0;
-  min-height: 58px;
-  padding: 8px 30px 8px 9px;
-  box-sizing: border-box;
-  border: 1px solid #e5e7eb;
-  border-radius: 11px;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  overflow: hidden;
-  background: #fff;
-  color: #374151;
-}
-
-.visual-attachment-card.is-ready {
-  border-color: #e5e7eb;
-}
-
-.visual-attachment-card.is-failed {
-  border-color: #fecaca;
-  background: #fffafa;
-}
-
-.visual-attachment-card__icon {
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  margin-top: 1px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.visual-attachment-card__icon :deep(.t-icon) {
-  font-size: 15px;
-}
-
-.visual-attachment-card__copy {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.visual-attachment-card__copy strong {
-  overflow: hidden;
-  color: #374151;
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visual-attachment-card__copy small {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #9ca3af;
-  font-size: 9px;
-  line-height: 13px;
-}
-
-.visual-attachment-card__status {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  overflow: hidden;
-  color: #9ca3af;
-  font-size: 9px;
-  line-height: 13px;
-  white-space: nowrap;
-}
-
-.visual-attachment-card__status > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.visual-attachment-card.is-ready .visual-attachment-card__status {
-  color: #047857;
-}
-
-.visual-attachment-card.is-failed .visual-attachment-card__status {
-  color: #dc2626;
-}
-
-.visual-attachment-card__status :deep(.t-icon) {
-  flex: 0 0 10px;
-  width: 10px;
-  height: 10px;
-  font-size: 10px;
-}
-
-.visual-attachment-card__spinner {
-  flex: 0 0 9px;
-  width: 9px;
-  height: 9px;
-  border: 1px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: visual-attachment-spin .8s linear infinite;
-}
-
-.visual-attachment-card__remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  padding: 5px;
-  border: 0;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-}
-
-.visual-attachment-card__remove:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.visual-attachment-card__remove :deep(.t-icon) {
-  font-size: 11px;
-}
-
-.visual-attachment-card__progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  overflow: hidden;
-  background: #f3f4f6;
-}
-
-.visual-attachment-card__progress > span {
-  display: block;
-  height: 100%;
-  background: #9ca3af;
-  transition: width 120ms linear;
-}
-
-@keyframes visual-attachment-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visual-attachment-card__spinner { animation: none; }
-  .visual-attachment-card__progress > span { transition: none; }
-}
+.visual-attachment-upload { width: 100%; min-width: 0; }
+.visual-attachment-upload__input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+.visual-attachment-list { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgb(229 231 235 / 60%); }
+.visual-attachment-card { position: relative; flex: 0 1 auto; max-width: 270px; min-width: 150px; min-height: 30px; padding: 4px 28px 4px 8px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 8px; overflow: hidden; background: #fff; color: #374151; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-attachment-card.is-failed { border-color: #fecaca; background: #fffafa; }
+.visual-attachment-card__icon { flex: 0 0 18px; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: #6b7280; }
+.visual-attachment-card__icon :deep(.t-icon) { font-size: 16px; }
+.visual-attachment-card__copy { min-width: 0; flex: 1 1 auto; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: 'name meta' 'status status'; column-gap: 6px; align-items: center; }
+.visual-attachment-card__copy strong { grid-area: name; overflow: hidden; color: #374151; font-size: 12px; line-height: 18px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.visual-attachment-card__copy small { grid-area: meta; display: flex; align-items: center; gap: 3px; color: #9ca3af; font-size: 9px; line-height: 14px; white-space: nowrap; }
+.visual-attachment-card__status { grid-area: status; min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; color: #9ca3af; font-size: 9px; line-height: 14px; white-space: nowrap; }
+.visual-attachment-card__status > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.visual-attachment-card.is-ready .visual-attachment-card__status { color: #047857; }
+.visual-attachment-card.is-failed .visual-attachment-card__status { color: #dc2626; }
+.visual-attachment-card__status :deep(.t-icon) { flex: 0 0 10px; width: 10px; height: 10px; font-size: 10px; }
+.visual-attachment-card__spinner { flex: 0 0 9px; width: 9px; height: 9px; border: 1px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: visual-attachment-spin .8s linear infinite; }
+.visual-attachment-card__remove { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; padding: 3px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; }
+.visual-attachment-card__remove:hover { color: #374151; background: #f3f4f6; }
+.visual-attachment-card__remove :deep(.t-icon) { font-size: 11px; }
+.visual-attachment-card__progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; background: #f3f4f6; }
+.visual-attachment-card__progress > span { display: block; height: 100%; background: #9ca3af; transition: width 120ms linear; }
+@keyframes visual-attachment-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .visual-attachment-card__spinner { animation: none; } .visual-attachment-card__progress > span { transition: none; } }
 </style>
