@@ -1,0 +1,102 @@
+name: Audit round 1 business parity
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/_audit_round1_business.yml
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Compare visible UI business handlers to exact upstream
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import io, tarfile, re, json
+
+          sha='3d5d8bfcdfeeea266b292b71cea616847af28d0f'
+          data=urlopen(f'https://api.github.com/repos/Tencent/WeKnora/tarball/{sha}', timeout=60).read()
+          tf=tarfile.open(fileobj=io.BytesIO(data), mode='r:gz')
+          tmp=Path('/tmp/weknora-upstream'); tmp.mkdir(exist_ok=True)
+          tf.extractall(tmp)
+          top=next(tmp.iterdir())
+          upstream=top/'frontend/src'
+          current=Path('weknora/frontend/src')
+
+          mapped=[
+            'App.vue','components/menu.vue','components/UserMenu.vue','components/SessionSidebarRow.vue','components/SessionSourceFilter.vue',
+            'components/ChatHeader.vue','components/ChatCitationFloat.vue','components/ChatReferencesDrawer.vue','components/ChatRequestInfoButton.vue',
+            'components/manual-knowledge-editor.vue','components/ModelSelector.vue','components/SettingDrawer.vue',
+            'views/chat/index.vue','views/creatChat/creatChat.vue',
+            'views/knowledge/KnowledgeBase.vue','views/knowledge/KnowledgeBaseList.vue',
+            'views/knowledge/components/DocumentCardView.vue','views/knowledge/components/DocumentListView.vue',
+            'views/knowledge/components/KbFolderTree.vue','views/knowledge/components/KbUploadSourceDropdown.vue',
+            'views/knowledge/components/TagEditDialog.vue','views/knowledge/components/BatchTagDialog.vue',
+            'views/knowledge/components/KbTagManageDrawer.vue','views/knowledge/components/DocumentBatchBar.vue',
+            'views/knowledge/components/FolderPickerMenu.vue','views/knowledge/wiki/WikiBrowser.vue',
+            'views/settings/Settings.vue','views/settings/GeneralSettings.vue','views/settings/ModelSettings.vue',
+            'views/settings/ChatHistorySettings.vue','views/settings/RetrievalSettings.vue','views/settings/ParserEngineSettings.vue',
+            'views/settings/StorageBackendSettings.vue','views/settings/StorageEngineSettings.vue','views/settings/SystemInfo.vue',
+          ]
+          verb=re.compile(r'^(?:handle|on|open|close|confirm|cancel|create|delete|remove|move|rename|toggle|set|clear|load|fetch|get|save|update|upload|import|reparse|probe|sync|start|stop|switch|select|submit|apply|goTo|refresh|retry|download|duplicate|share|pin|unpin)', re.I)
+          def script_text(s):
+            if '<script' not in s: return s
+            m=re.search(r'<script[^>]*>([\s\S]*?)</script>',s)
+            return m.group(1) if m else s
+          def names(s):
+            s=script_text(s)
+            out=set()
+            for pat in [r'\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(', r'\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?[A-Za-z_$][\w$]*\s*=>', r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\(']:
+              out.update(re.findall(pat,s))
+            return {x for x in out if verb.search(x)}
+          def api_imports(s):
+            s=script_text(s); out=set()
+            for block,mod in re.findall(r'import\s*\{([\s\S]*?)\}\s*from\s*[\'\"](@/api/[^\'\"]+)[\'\"]',s):
+              for x in block.split(','):
+                x=x.strip().split(' as ')[0].strip()
+                x=re.sub(r'^type\s+','',x)
+                if x: out.add(mod+':'+x)
+            return out
+          rows=[]
+          for rel in mapped:
+            cp=current/rel; up=upstream/rel
+            if not cp.exists():
+              rows.append({'path':rel,'status':'CURRENT_MISSING'})
+              continue
+            if not up.exists():
+              rows.append({'path':rel,'status':'PROJECT_ONLY','current_handlers':sorted(names(cp.read_text(errors='ignore')))})
+              continue
+            cs=cp.read_text(errors='ignore'); us=up.read_text(errors='ignore')
+            cn,un=names(cs),names(us); ca,ua=api_imports(cs),api_imports(us)
+            rows.append({
+              'path':rel,'status':'COMPARE',
+              'missing_upstream_handlers':sorted(un-cn),
+              'extra_current_handlers':sorted(cn-un),
+              'missing_upstream_api_imports':sorted(ua-ca),
+              'extra_current_api_imports':sorted(ca-ua),
+            })
+          report={'upstream_commit':sha,'files':rows}
+          Path('docs/audits').mkdir(parents=True,exist_ok=True)
+          Path('docs/audits/round1-business-parity.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+          md=['# Round 1 — UI business parity adversary','',f'Upstream: `{sha}`','']
+          for r in rows:
+            if r['status']=='COMPARE' and (r['missing_upstream_handlers'] or r['missing_upstream_api_imports']):
+              md += [f"## {r['path']}",f"- Missing handlers: `{', '.join(r['missing_upstream_handlers']) or 'none'}`",f"- Missing API imports: `{', '.join(r['missing_upstream_api_imports']) or 'none'}`",'']
+          Path('docs/audits/round1-business-parity.md').write_text('\n'.join(md))
+          PY
+      - name: Commit report
+        run: |
+          git config user.name "musuw-adversary"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/audits/round1-business-parity.*
+          git commit -m "audit: record round 1 upstream business parity" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
