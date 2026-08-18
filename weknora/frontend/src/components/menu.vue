@@ -1,239 +1,103 @@
 <template>
-  <div class="aside_box" :class="{ 'aside_box--collapsed': uiStore.sidebarCollapsed }">
-    <!-- 展开时：保留轻量品牌标识、搜索和收起操作。 -->
-    <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
-      <div class="musuw-wordmark" aria-label="Musuw 穆苏瓦">
-        <span class="musuw-wordmark__mark" aria-hidden="true">↯</span>
-        <span class="musuw-wordmark__label">Musuw 穆苏瓦</span>
+  <aside class="reference-sidebar" :class="{ 'reference-sidebar--collapsed': uiStore.sidebarCollapsed }">
+    <template v-if="uiStore.sidebarCollapsed">
+      <div class="reference-sidebar-collapsed-top">
+        <button type="button" class="reference-sidebar-collapsed-logo" title="Musuw 穆苏瓦" @click="toggleSidebar">
+          <ReferenceIcon name="zap" :size="16" :filled="true" />
+        </button>
+        <button type="button" class="reference-sidebar-icon-button" :title="t('menu.expandSidebar')" @click="toggleSidebar">
+          <ReferenceIcon name="chevron-right" :size="16" :stroke-width="1.8" />
+        </button>
+        <button type="button" class="reference-sidebar-icon-button" :title="t('menu.search')" @click="commandPaletteStore.openPalette('')">
+          <ReferenceIcon name="search" :size="14" />
+        </button>
+        <div class="reference-sidebar-collapsed-rule" />
+        <button type="button" class="reference-sidebar-collapsed-primary" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')">
+          <ReferenceIcon name="message-square-plus" :size="16" :stroke-width="1.9" />
+        </button>
+        <button type="button" class="reference-sidebar-collapsed-nav" :class="{ active: isMenuItemActive('knowledge-bases') }" :title="t('menu.knowledgeBase')" @click="handleMenuClick('knowledge-bases')">
+          <ReferenceIcon name="folder" :size="16" :stroke-width="1.8" />
+        </button>
       </div>
-      <div class="logo_actions">
-        <t-tooltip placement="bottom">
-          <template #content>
-            <span class="cmdk-tip">
-              <span class="cmdk-tip-label">{{ t("menu.search") }}</span>
-              <span class="cmdk-tip-keys">{{ cmdModKeyLabel }}K</span>
-            </span>
-          </template>
-          <div
-            class="header-icon-btn"
-            @click="commandPaletteStore.openPalette('')"
-            :aria-label="t('menu.search')"
-          >
-            <t-icon name="search" class="header-icon-glyph" aria-hidden="true" />
-          </div>
-        </t-tooltip>
-        <div
-          class="sidebar-toggle"
-          @click="toggleSidebar"
-          :title="t('menu.collapseSidebar')"
-        >
-          <t-icon name="chevron-left" aria-hidden="true" />
+      <div class="reference-sidebar-collapsed-user"><UserMenu /></div>
+      <div class="reference-sidebar-drag-handle" @mousedown="onDragHandleMouseDown" />
+    </template>
+
+    <template v-else>
+      <header class="reference-sidebar-header">
+        <button type="button" class="reference-sidebar-brand" @click="handleMenuClick('creatChat')">
+          <span class="reference-sidebar-brand-mark"><ReferenceIcon name="zap" :size="14" :filled="true" /></span>
+          <span class="reference-sidebar-brand-name">Musuw 穆苏瓦</span>
+        </button>
+        <div class="reference-sidebar-header-actions">
+          <button type="button" class="reference-sidebar-icon-button" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')">
+            <ReferenceIcon name="search" :size="14" />
+          </button>
+          <button type="button" class="reference-sidebar-icon-button" :title="t('menu.collapseSidebar')" @click="toggleSidebar">
+            <ReferenceIcon name="chevron-left" :size="16" :stroke-width="1.8" />
+          </button>
         </div>
-      </div>
-    </div>
-    <!-- 折叠时：展开按钮 -->
-    <t-tooltip v-else :content="t('menu.expandSidebar')" placement="right">
-      <div class="menu_item sidebar-toggle-item" @click="toggleSidebar">
-        <div class="menu_item-box">
-          <div class="menu_icon">
-            <t-icon name="chevron-right" class="icon" aria-hidden="true" />
-          </div>
-        </div>
-      </div>
-    </t-tooltip>
+      </header>
 
-    <!-- 折叠时右侧拖拽展开手柄 -->
-    <div
-      v-if="uiStore.sidebarCollapsed"
-      class="sidebar-drag-handle"
-      @mousedown="onDragHandleMouseDown"
-    />
+      <nav class="reference-sidebar-primary-nav">
+        <template v-for="item in topMenuItems" :key="item.path">
+          <button v-if="item.path === 'creatChat'" type="button" class="reference-sidebar-new-chat" @click="handleMenuClick(item.path)">
+            <ReferenceIcon name="message-square-plus" :size="16" :stroke-width="1.9" />
+            <span>{{ item.title }}</span>
+          </button>
+          <button v-else type="button" class="reference-sidebar-kb" :class="{ active: isMenuItemActive(item.path) }" @click="handleMenuClick(item.path)">
+            <span class="reference-sidebar-kb-label"><ReferenceIcon name="folder" :size="16" :stroke-width="1.8" /><span>{{ item.title }}</span></span>
+          </button>
+        </template>
+      </nav>
 
-    <!-- 上半部分：新对话吸顶 + 知识库/智能体/共享空间/历史会话随滚动一起滚走 -->
-    <div class="menu_top" ref="scrollContainer" @scroll="handleScroll">
-      <!-- 全局搜索入口：点击打开命令面板（⌘K）。展开态移至顶部 logo_row 的图标按钮；
-                 折叠态在此处保留为图标项 + 深色 tooltip。 -->
-      <div class="menu_box menu_box--cmdk" v-if="uiStore.sidebarCollapsed">
-        <t-tooltip placement="right">
-          <template #content>
-            <span class="cmdk-tip">
-              <span class="cmdk-tip-label">{{ t("menu.search") }}</span>
-              <span class="cmdk-tip-keys">{{ cmdModKeyLabel }}K</span>
-            </span>
-          </template>
-          <div class="menu_item menu_item--cmdk" @click="commandPaletteStore.openPalette('')">
-            <div class="menu_item-box">
-              <div class="menu_icon">
-                <t-icon name="search" class="icon" aria-hidden="true" />
-              </div>
-            </div>
-          </div>
-        </t-tooltip>
-      </div>
-      <div
-        class="menu_box"
-        :class="{ 'menu_box--sticky': item.children && !uiStore.sidebarCollapsed }"
-        v-for="(item, index) in topMenuItems"
-        :key="index"
-      >
-        <t-tooltip :content="item.title" placement="right" :disabled="!uiStore.sidebarCollapsed">
-          <div
-            @click="handleMenuClick(item.path)"
-            @mouseenter="mouseenteMenu(item.path)"
-            @mouseleave="mouseleaveMenu(item.path)"
-            :data-guide="`nav-${item.path}`"
-            :class="[
-              'menu_item',
-              item.childrenPath && item.childrenPath == currentpath
-                ? 'menu_item_c_active'
-                : isMenuItemActive(item.path)
-                  ? 'menu_item_active'
-                  : '',
-            ]"
-          >
-            <div class="menu_item-box">
-              <div class="menu_icon">
-                <t-icon :name="menuIconName(item.path)" class="icon" aria-hidden="true" />
-              </div>
-              <template v-if="!uiStore.sidebarCollapsed">
-                <span class="menu_title" :title="item.title">{{ item.title }}</span>
-              </template>
-            </div>
-          </div>
-        </t-tooltip>
-      </div>
-
-      <!-- 历史会话：按来源筛选后统一按日期分组展示 -->
-      <div class="submenu" v-if="!uiStore.sidebarCollapsed">
-        <!-- Stable, always-mounted source filter: reserving its row here
-                     (instead of embedding it in the first date group, which
-                     appears/disappears while a bucket loads) prevents the
-                     top-right control from jumping when switching session type. -->
-        <div v-if="showSessionSourceFilter && !batchMode" class="session-list-scope-header">
-          <SessionSourceFilter
-            inline
-            :emphasized="sessionScopeFilterPinned"
-            :sources="sessionSourceOptions"
-            :current="activeSessionBucketKey"
-            @select="switchSessionBucket"
-          />
+      <section class="reference-sidebar-history" ref="scrollContainer" @scroll="handleScroll">
+        <div v-if="showSessionSourceFilter && !batchMode" class="reference-sidebar-source-filter">
+          <SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" />
         </div>
         <template v-if="sessionListBooting && !hasAnySession">
-          <div v-for="n in 4" :key="'skel-' + n" class="submenu_item_p session-chat-row">
-            <div class="session-list-row session-list-row--flat">
-              <t-skeleton
-                animation="gradient"
-                class="session-list-row__body"
-                :row-col="[{ width: '100%', height: '14px' }]"
-              />
-            </div>
-          </div>
+          <div v-for="n in 5" :key="'sidebar-skeleton-' + n" class="reference-sidebar-skeleton" />
         </template>
+        <div v-else-if="activeBucket?.loaded && filteredGroupedSessions.length === 0" class="reference-sidebar-empty">{{ t('menu.noSessions') }}</div>
+        <template v-else>
+          <section v-for="group in filteredGroupedSessions" :key="group.key" class="reference-sidebar-thread-group">
+            <div v-if="group.label" class="reference-sidebar-thread-label">{{ group.label }}</div>
+            <SessionSidebarRow
+              v-for="subitem in group.items"
+              :key="subitem.id"
+              :item="subitem"
+              :batch-mode="batchMode"
+              :active-path="currentSecondpath"
+              :selected-ids="batchSelectedIds"
+              :menu-options="buildSessionMenuOptions(subitem)"
+              @navigate="gotopage(subitem.path)"
+              @toggle-select="toggleBatchSelect(subitem.id)"
+              @menu-click="handleSessionMenuClick($event, subitem)"
+              @rename-submit="renameSessionTitle(subitem, $event.title)"
+              @hover-in="mouseenteBotDownr(subitem.id)"
+              @hover-out="mouseleaveBotDown"
+            />
+          </section>
+          <div v-if="activeBucket?.loading && filteredGroupedSessions.length > 0" class="reference-sidebar-loading"><ReferenceIcon name="loader-circle" :size="14" /></div>
+        </template>
+      </section>
 
-        <div v-else class="session-filtered-list">
-          <template
-            v-if="
-              activeBucket?.loading && !activeBucket.loaded && filteredGroupedSessions.length === 0
-            "
-          >
-            <div v-for="n in 4" :key="'bucket-skel-' + n" class="submenu_item_p session-chat-row">
-              <div class="session-list-row session-list-row--flat">
-                <t-skeleton
-                  animation="gradient"
-                  class="session-list-row__body"
-                  :row-col="[{ width: '100%', height: '14px' }]"
-                />
-              </div>
-            </div>
-          </template>
-          <template v-else-if="activeBucket?.loaded && filteredGroupedSessions.length === 0">
-            <div class="submenu_empty">{{ t("menu.noSessions") }}</div>
-          </template>
-          <template v-else>
-            <template v-for="group in filteredGroupedSessions" :key="group.key">
-              <div
-                v-if="group.label"
-                class="timeline_header session-list-row session-list-row--flat"
-              >
-                <span class="session-list-row__body">
-                  <span class="timeline_header-label">{{ group.label }}</span>
-                </span>
-              </div>
-              <div
-                v-for="subitem in group.items"
-                :key="subitem.id"
-                class="submenu_item_p session-chat-row"
-                :class="{
-                  'session-chat-row--active': !batchMode && subitem.path === currentSecondpath,
-                  'session-chat-row--selected': batchMode && batchSelectedIds.includes(subitem.id),
-                }"
-              >
-                <div class="session-list-row session-list-row--flat">
-                  <div class="session-list-row__body">
-                    <SessionSidebarRow
-                      :item="subitem"
-                      :batch-mode="batchMode"
-                      :active-path="currentSecondpath"
-                      :selected-ids="batchSelectedIds"
-                      :menu-options="buildSessionMenuOptions(subitem)"
-                      @navigate="gotopage(subitem.path)"
-                      @toggle-select="toggleBatchSelect(subitem.id)"
-                      @menu-click="handleSessionMenuClick($event, subitem)"
-                      @rename-submit="renameSessionTitle(subitem, $event.title)"
-                      @hover-in="mouseenteBotDownr(subitem.id)"
-                      @hover-out="mouseleaveBotDown"
-                    />
-                  </div>
-                </div>
-              </div>
-            </template>
-            <div
-              v-if="activeBucket?.loading && filteredGroupedSessions.length > 0"
-              class="session-list-loading session-list-row session-list-row--flat"
-            >
-              <span class="session-list-row__body">
-                <t-loading size="small" />
-              </span>
-            </div>
-          </template>
+      <div v-if="batchMode" class="reference-sidebar-batch-footer">
+        <label class="reference-sidebar-batch-select">
+          <input type="checkbox" :checked="isAllBatchSelected" :indeterminate.prop="isBatchIndeterminate" @change="toggleBatchSelectAll(($event.target as HTMLInputElement).checked)" />
+          <span>{{ t('batchManage.selectAll') }}</span>
+        </label>
+        <div class="reference-sidebar-batch-actions">
+          <button type="button" @click="exitBatchMode">{{ t('batchManage.cancel') }}</button>
+          <button type="button" class="danger" :disabled="batchSelectedIds.length === 0 || batchDeleting" @click="handleInlineBatchDelete">
+            {{ t('batchManage.delete') }}{{ batchSelectedIds.length > 0 ? `(${batchDisplayCount})` : '' }}
+          </button>
         </div>
       </div>
-    </div>
 
-    <!-- 批量管理底部操作条：固定在侧栏底部、用户头像上方 -->
-    <div v-if="batchMode && !uiStore.sidebarCollapsed" class="batch-inline-footer">
-      <div class="batch-footer-left">
-        <t-checkbox
-          :checked="isAllBatchSelected"
-          :indeterminate="isBatchIndeterminate"
-          @change="toggleBatchSelectAll"
-        >
-          {{ t("batchManage.selectAll") }}
-        </t-checkbox>
-      </div>
-      <div class="batch-footer-right">
-        <t-button size="small" variant="text" @click="exitBatchMode">
-          {{ t("batchManage.cancel") }}
-        </t-button>
-        <t-button
-          size="small"
-          theme="danger"
-          variant="base"
-          :disabled="batchSelectedIds.length === 0"
-          :loading="batchDeleting"
-          @click="handleInlineBatchDelete"
-        >
-          {{ t("batchManage.delete")
-          }}{{ batchSelectedIds.length > 0 ? `(${batchDisplayCount})` : "" }}
-        </t-button>
-      </div>
-    </div>
-
-    <!-- 下半部分：用户菜单 -->
-    <div class="menu_bottom">
-      <UserMenu />
-    </div>
-  </div>
+      <footer class="reference-sidebar-user"><UserMenu /></footer>
+    </template>
+  </aside>
 </template>
 
 <script setup lang="ts">
@@ -292,12 +156,11 @@ import { useUIStore } from "@/stores/ui";
 import { useCommandPaletteStore } from "@/stores/commandPalette";
 import { MessagePlugin, DialogPlugin, Icon as TIcon } from "tdesign-vue-next";
 import UserMenu from "@/components/UserMenu.vue";
+import ReferenceIcon from "@/components/ReferenceIcon.vue";
 import { useI18n } from "vue-i18n";
 import { getSystemInfo } from "@/api/system";
 
 const chatResources = useChatResourcesStore();
-// Platform logos reused from IMChannelsOverviewPanel — keeps the session list
-// visually consistent with the channels admin view.
 import wecomLogo from "@/assets/img/im/wecom.svg";
 import feishuLogo from "@/assets/img/im/feishu.svg";
 import larkLogo from "@/assets/img/im/lark.svg";
@@ -328,9 +191,6 @@ const authStore = useAuthStore();
 const uiStore = useUIStore();
 const commandPaletteStore = useCommandPaletteStore();
 
-// Platform-aware label for the ⌘K hint. navigator.platform is deprecated but
-// the alternatives (userAgentData.platform) aren't universally available yet;
-// this check is good enough for Mac vs. non-Mac.
 const isMacLike =
   typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform || "");
 const cmdModKeyLabel = isMacLike ? "⌘" : "Ctrl";
@@ -350,13 +210,6 @@ const SIDEBAR_NARROW_BREAKPOINT = 760;
 let sidebarWasNarrow = false;
 let sidebarPreferenceBeforeNarrow: boolean | null = null;
 
-/**
- * Narrow layouts start with the existing collapsed presentation so the route
- * keeps usable width.  This is deliberately a direct store assignment rather
- * than `collapseSidebar()`: automatic responsive presentation must not rewrite
- * the user's persisted desktop preference.  The preference is restored when
- * crossing back to desktop; the existing toggle remains available on mobile.
- */
 const syncSidebarWithViewport = () => {
   if (typeof window === "undefined") return;
   const isNarrow = window.innerWidth <= SIDEBAR_NARROW_BREAKPOINT;
@@ -366,10 +219,7 @@ const syncSidebarWithViewport = () => {
     let storedPreference: string | null = null;
     try {
       storedPreference = window.localStorage.getItem("sidebar_collapsed");
-    } catch {
-      // Sandboxed/private contexts may deny storage access; keep the live
-      // store value as the best available desktop preference in that case.
-    }
+    } catch {}
     sidebarPreferenceBeforeNarrow =
       storedPreference === null ? uiStore.sidebarCollapsed : storedPreference === "true";
     uiStore.sidebarCollapsed = true;
@@ -381,9 +231,6 @@ const syncSidebarWithViewport = () => {
   sidebarWasNarrow = isNarrow;
 };
 
-// Keep the existing toggle affordance usable on a phone without persisting a
-// temporary mobile override as the desktop preference.  Desktop clicks retain
-// the store action's original persistence behavior.
 const toggleSidebar = () => {
   if (sidebarWasNarrow) {
     uiStore.sidebarCollapsed = !uiStore.sidebarCollapsed;
@@ -431,7 +278,6 @@ type MenuItem = {
 };
 const { menuArr, visibleMenuArr } = storeToRefs(usemenuStore);
 let activeSubmenu = ref<string>("");
-// 批量管理状态
 const batchMode = ref(false);
 const batchSelectedIds = ref<string[]>([]);
 const batchDeleting = ref(false);
@@ -458,9 +304,6 @@ const batchDisplayCount = computed(() =>
   isAllBatchSelected.value ? total.value : batchSelectedIds.value.length,
 );
 
-// 是否可以访问所有空间
-
-// 是否处于知识库详情页（不包括全局聊天）
 const isInKnowledgeBase = computed<boolean>(() => {
   return (
     route.name === "knowledgeBaseDetail" ||
@@ -469,20 +312,16 @@ const isInKnowledgeBase = computed<boolean>(() => {
   );
 });
 
-// 是否在知识库列表页面
 const isInKnowledgeBaseList = computed<boolean>(() => {
   return route.name === "knowledgeBaseList";
 });
 
-// 是否在创建聊天页面
 const isInCreatChat = computed<boolean>(() => {
   return route.name === "globalCreatChat" || route.name === "kbCreatChat";
 });
 
-// 是否在对话详情页
 const isInChatDetail = computed<boolean>(() => route.name === "chat");
 
-// 统一的菜单项激活状态判断
 const isMenuItemActive = (itemPath: string): boolean => {
   const currentRoute = route.name;
 
@@ -502,7 +341,6 @@ const isMenuItemActive = (itemPath: string): boolean => {
   }
 };
 
-// 分离上下两部分菜单（使用 visibleMenuArr 以便 lite 模式过滤 logout）
 const topMenuItems = computed<MenuItem[]>(() => {
   return (visibleMenuArr.value as unknown as MenuItem[]).filter(
     (item: MenuItem) => item.path === "knowledge-bases" || item.path === "creatChat",
@@ -518,14 +356,10 @@ const bottomMenuItems = computed<MenuItem[]>(() => {
   });
 });
 
-// 当前知识库信息
 const currentKbName = ref<string>("");
 const currentKbInfo = ref<any>(null);
-
-// 进行中的置顶/取消置顶请求，避免重复点击
 const pinningIds = ref<Set<string>>(new Set());
 
-// 「聊天」区内按日期分组（当前筛选来源）
 const dateBucketLabels = computed<Record<DateBucketKey, string>>(() => ({
   pinned: t("time.pinned"),
   today: t("time.today"),
@@ -556,7 +390,6 @@ const refreshSessionListScrollability = async () => {
   sessionListCanScroll.value = !!container && container.scrollHeight > container.clientHeight + 1;
 };
 
-/** 列表未撑满滚动区时自动续页（按当前可见 DOM 测量，避免折叠导致误判） */
 const ensureBucketFillsViewport = async (key: string) => {
   const MAX_ITERATIONS = 20;
   for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -670,8 +503,6 @@ const handleSessionMenuClick = (data: { value: string }, item: any) => {
     togglePin(item, data.value === "pin");
   }
 };
-
-// Web 会话没有来源图标；带来源的会话继续使用其已有的平台标识。
 
 const buildSessionMenuOptions = (item: any) => {
   const options: any[] = [];
@@ -821,7 +652,6 @@ const sessionExistsInBuckets = (sessionId: string) =>
     bucket.items.some((row) => row.id === sessionId),
   );
 
-/** 创建会话后 menuStore 已乐观写入，但列表实际渲染自 sessionBuckets，需补齐。 */
 const ensureSessionInSidebar = (sessionId: string) => {
   if (!sessionId || sessionExistsInBuckets(sessionId)) return;
 
@@ -856,7 +686,6 @@ const rebuildBucketDefinitions = () =>
     { includeAdminChannelBuckets: authStore.hasRole("admin") },
   );
 
-/** 首屏轻量探测各渠道是否有会话（page_size=1 只取 total），避免展示空文件夹 */
 const probeChannelBucketCounts = async (keys: string[], token: number) => {
   const targets = keys.filter((key) => isChannelBucketKey(key));
   await Promise.all(
@@ -939,11 +768,6 @@ const syncActiveBucketFromChat = async (sessionId: string | undefined) => {
       bucketKey = originGroupKey(resolveSessionOrigin(menuChildToSessionRow(fromStore)));
     }
   }
-  // On a hard refresh only the web bucket is loaded, so a session opened from
-  // any other folder (IM, embed, or the admin-only API folder) isn't in any
-  // bucket or the menu store. Fetch its detail and classify its origin folder
-  // so the sidebar stays in sync with the chat pane instead of snapping back
-  // to "my chats". Only switch when that folder is actually present.
   if (!bucketKey) {
     try {
       const res: any = await getSession(sessionId);
@@ -958,9 +782,7 @@ const syncActiveBucketFromChat = async (sessionId: string | undefined) => {
       if (sessionBuckets.value[candidate]) {
         bucketKey = candidate;
       }
-    } catch {
-      // Fall through: leave the default bucket active on lookup failure.
-    }
+    } catch {}
   }
   if (!bucketKey || bucketKey === activeSessionBucketKey.value) return;
 
@@ -983,7 +805,6 @@ const initSessionBuckets = async () => {
   }
   sessionBuckets.value = buckets;
 
-  // 首屏：拉 web 会话 + 轻量探测各渠道 count（不拉完整列表）；有会话的渠道才展示文件夹
   const channelKeys = defs.map((def) => def.key).filter((key) => isChannelBucketKey(key));
   await Promise.all([
     loadBucketPage("web", 1, token),
@@ -1002,7 +823,6 @@ const getMessageList = async () => {
   await initSessionBuckets();
 };
 
-// 滚动到底时为当前筛选来源加载下一页
 const checkScrollBottom = async () => {
   const container = scrollContainer.value;
   const key = activeSessionBucketKey.value;
@@ -1129,15 +949,12 @@ watch([() => route.name, () => route.params], (newvalue, oldvalue) => {
     currentSecondpath.value = "";
   }
 
-  // 创建新会话时 creatChat 会先 updataMenuChildren，再跳转 chat/:id。
-  // 侧栏实际渲染 sessionBuckets，需按 buckets 判断是否缺失，不能把 menuStore 当真相来源。
   const newChatId = (newvalue[1] as any)?.chatid as string | undefined;
   if (nameStr === "chat" && newChatId) {
     ensureSessionInSidebar(newChatId);
     void syncActiveBucketFromChat(newChatId);
   }
 
-  // 如果切换了知识库，更新知识库名称但不重新加载对话列表
   if (newvalue[1].kbId !== oldvalue?.[1]?.kbId) {
     loadCurrentKbInfo((newvalue[1] as any)?.kbId as string);
   }
@@ -1159,7 +976,6 @@ const menuIconName = (path: string) => {
 };
 const handleMenuClick = async (path: string) => {
   if (path === "knowledge-bases") {
-    // 知识库菜单项：如果在知识库内部，跳转到当前知识库文件页；否则跳转到知识库列表
     const kbId = await getCurrentKbId();
     if (kbId) {
       router.push(`/platform/knowledge-bases/${kbId}`);
@@ -1167,7 +983,6 @@ const handleMenuClick = async (path: string) => {
       router.push("/platform/knowledge-bases");
     }
   } else if (path === "settings") {
-    // 设置菜单项：打开设置弹窗并跳转路由
     uiStore.openSettings();
     router.push("/platform/settings");
   } else {
@@ -1175,7 +990,6 @@ const handleMenuClick = async (path: string) => {
   }
 };
 
-// 处理退出登录确认
 const handleLogout = () => {
   gotopage("logout");
 };
@@ -1190,27 +1004,21 @@ const getCurrentKbId = async (): Promise<string | null> => {
 
 const gotopage = async (path: string) => {
   pathPrefix.value = path;
-  // 处理退出登录
   if (path === "logout") {
     try {
-      // 调用后端API注销
       await logoutApi();
     } catch (error) {
-      // 即使API调用失败，也继续执行本地清理
       console.error("注销API调用失败:", error);
     }
-    // 清理所有状态和本地存储
     authStore.logout();
     MessagePlugin.success(t("menu.logoutSuccess"));
     handoffToExternalAuth("logout");
     return;
   } else {
     if (path === "creatChat") {
-      // 如果在知识库详情页，跳转到全局对话创建页
       if (isInKnowledgeBase.value) {
         router.push("/platform/creatChat");
       } else {
-        // 如果不在知识库内，进入对话创建页
         router.push(`/platform/creatChat`);
       }
     } else {
@@ -1246,829 +1054,73 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
   document.addEventListener("mouseup", onMouseUp);
 };
 </script>
-<style lang="less" scoped>
-.aside_box {
-  // Musuw shell grid: the navigation and session rows share one calm, readable rail.
-  --sidebar-inset-x: 12px;
-  --sidebar-icon-size: 18px;
-  --sidebar-channel-icon: 14px;
-  --sidebar-icon-gap: 10px;
-  --sidebar-text-inset: calc(
-    var(--sidebar-inset-x) + var(--sidebar-icon-size) + var(--sidebar-icon-gap)
-  ); // 40px
 
-  min-width: 256px;
+<style scoped>
+.reference-sidebar {
   width: 256px;
-  padding: 10px 8px 8px;
-  background: var(--musuw-sidebar);
-  box-sizing: border-box;
-  /* Avoid 100vh because <html> carries a `zoom` multiplier for font-size
-       control; 100vh is evaluated against the unscaled viewport and then
-       scaled, so at "large" the sidebar would extend past the window. The
-       ancestor chain (html/body/#app/.main) is already height: 100%. */
   height: 100%;
-  overflow: hidden;
+  flex: 0 0 256px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--musuw-line);
-  box-shadow: none;
-  transition:
-    width 0.2s ease,
-    min-width 0.2s ease;
   position: relative;
-
-  // macOS Wails 桌面：红绿灯位于 HiddenInset 标题栏区域，需让出顶部空间
-  html.wails-desktop & {
-    padding-top: 30px;
-  }
-
-  &--collapsed {
-    min-width: 64px;
-    width: 64px;
-    padding: 10px 6px 8px;
-    overflow: visible;
-
-    .menu_item {
-      justify-content: center;
-      padding: 9px 0;
-
-      .menu_item-box {
-        justify-content: center;
-        width: auto;
-      }
-
-      .menu_icon {
-        margin-right: 0;
-      }
-    }
-
-    .menu_bottom {
-      align-items: center;
-    }
-
-    .menu_top {
-      margin-right: 0;
-      padding-right: 0;
-    }
-  }
-
-  .logo_row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 48px;
-    flex-shrink: 0;
-    padding: 0 4px 0 var(--sidebar-inset-x);
-  }
-
-  .sidebar-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    flex-shrink: 0;
-    cursor: pointer;
-    color: var(--td-text-color-secondary);
-    border: 1px solid transparent;
-    border-radius: 8px;
-    transition:
-      background-color 0.15s ease,
-      border-color 0.15s ease,
-      color 0.15s ease;
-    box-sizing: border-box;
-
-    &:hover {
-      background: var(--musuw-surface);
-      border-color: var(--musuw-line);
-      color: var(--td-text-color-primary);
-    }
-  }
-
-  .sidebar-drag-handle {
-    position: absolute;
-    top: 0;
-    right: -3px;
-    width: 6px;
-    height: 100%;
-    cursor: ew-resize;
-    z-index: 10;
-
-    &:hover {
-      background: var(--musuw-accent-soft);
-    }
-  }
-
-  .menu_top {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
-    min-height: 0;
-    // 抵消 .aside_box 的右内边距，让滚动条贴近面板右缘；
-    // 等量 padding 补回，保证列表文字位置不变。
-    margin-right: -2px;
-    padding-right: 2px;
-
-    // Claude 风格细滚动条：默认透明，悬浮时显示一条圆角细灰条
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-    transition: scrollbar-color 0.2s ease;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background-color: transparent;
-      border-radius: 6px;
-      transition: background-color 0.2s ease;
-    }
-
-    &:hover {
-      scrollbar-color: var(--td-scrollbar-color, rgba(0, 0, 0, 0.18)) transparent;
-
-      &::-webkit-scrollbar-thumb {
-        background-color: var(--td-scrollbar-color, rgba(0, 0, 0, 0.18));
-      }
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background-color: var(--td-scrollbar-hover-color, rgba(0, 0, 0, 0.32));
-    }
-  }
-
-  .menu_bottom {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    margin-top: 8px;
-    padding: 8px 2px 0;
-    border-top: 1px solid var(--musuw-line);
-  }
-
-  .menu_box {
-    display: flex;
-    flex-direction: column;
-
-    // 「新对话」吸顶：作为滚动容器(.menu_top)的直接子级，滚动时钉在顶部，
-    // 知识库/智能体/共享空间及历史列表一起从其下方滚走。背景遮挡滚动内容。
-    &--sticky {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      padding: 0 4px 8px;
-      background: var(--musuw-sidebar);
-    }
-  }
-
-  .menu_box--sticky .menu_item {
-    background: var(--musuw-surface);
-    border-color: var(--musuw-line);
-    border-radius: var(--musuw-radius-control);
-    box-shadow: none;
-
-    &:hover {
-      background: var(--musuw-surface);
-      border-color: var(--musuw-line-strong);
-    }
-
-    &.menu_item_active,
-    &.menu_item_c_active {
-      background: var(--musuw-accent-soft) !important;
-      border-color: transparent;
-      box-shadow: none;
-    }
-  }
-
-  .upload-file-wrap {
-    padding: 6px;
-    border-radius: 3px;
-    height: 32px;
-    width: 32px;
-    box-sizing: border-box;
-  }
-
-  .upload-file-wrap:hover {
-    background-color: var(--td-brand-color-light);
-    color: var(--td-brand-color);
-  }
-
-  .upload-file-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--td-text-color-secondary);
-  }
-
-  .active-upload {
-    color: var(--td-brand-color);
-  }
-
-  .menu_item_active {
-    border-radius: var(--musuw-radius-control);
-    background: var(--musuw-surface-hover) !important;
-
-    .menu_icon,
-    .menu_title {
-      color: var(--td-text-color-primary) !important;
-    }
-  }
-
-  .menu_item_c_active {
-    border-radius: var(--musuw-radius-control);
-    background: var(--musuw-surface-hover);
-    .menu_icon,
-    .menu_title {
-      color: var(--td-text-color-primary);
-    }
-  }
-
-  .menu_p {
-    height: 46px;
-    padding: 3px 0;
-    box-sizing: border-box;
-  }
-
-  .menu_item {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 42px;
-    height: 42px;
-    padding: 10px 12px;
-    box-sizing: border-box;
-    margin: 2px 0;
-    border: 1px solid transparent;
-    border-radius: var(--musuw-radius-control);
-    transition:
-      background-color 0.15s ease,
-      color 0.15s ease;
-
-    .menu_item-box {
-      display: flex;
-      align-items: center;
-    }
-
-    &:hover {
-      background: var(--musuw-surface-hover);
-
-      .menu_icon,
-      .menu_title {
-        color: var(--td-text-color-primary);
-      }
-    }
-  }
-
-  .menu_icon {
-    display: flex;
-    flex: 0 0 var(--sidebar-icon-size);
-    width: var(--sidebar-icon-size);
-    margin-right: var(--sidebar-icon-gap);
-    color: var(--td-text-color-secondary);
-
-    .icon {
-      width: 18px;
-      height: 18px;
-      font-size: 18px;
-      overflow: visible;
-    }
-  }
-
-  .menu_title {
-    color: var(--td-text-color-primary);
-    text-overflow: ellipsis;
-    font-family: var(--app-font-family);
-    font-size: 14px;
-    font-style: normal;
-    font-weight: 560;
-    line-height: 20px;
-    overflow: hidden;
-    white-space: nowrap;
-    max-width: 120px;
-    flex: 1;
-  }
-
-  .submenu {
-    position: relative;
-    font-family: var(--app-font-family);
-    font-size: 14px;
-    font-style: normal;
-    min-width: 0;
-    padding-top: 3px;
-  }
-
-  :deep(.submenu_pin_icon) {
-    color: inherit;
-    font-size: 12px;
-    margin-right: 4px;
-    vertical-align: middle;
-    flex-shrink: 0;
-  }
-
-  .submenu_source_icon {
-    width: 14px;
-    height: 14px;
-    margin-right: 0px;
-    vertical-align: middle;
-    object-fit: contain;
-    flex-shrink: 0;
-    // 默认淡化处理，避免未选中状态下彩色图标与灰色标题不协调；
-    // 悬浮或选中时恢复彩色，交互时才引人注意。
-    filter: grayscale(1);
-    opacity: 0.55;
-    transition:
-      filter 0.15s ease,
-      opacity 0.15s ease;
-  }
-
-  :deep(.submenu_item:hover .submenu_source_icon),
-  :deep(.submenu_item_active .submenu_source_icon) {
-    filter: none;
-    opacity: 1;
-  }
-
-  // 列表行统一栅格：左缘 inset-x + 图标槽 18px + 间距 8px → 文案列与主菜单文字对齐
-  .session-list-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sidebar-icon-gap);
-    padding: 0 10px 0 var(--sidebar-inset-x);
-    min-width: 0;
-    box-sizing: border-box;
-  }
-
-  .session-list-row__icon {
-    flex: 0 0 var(--sidebar-icon-size);
-    width: var(--sidebar-icon-size);
-    height: var(--sidebar-icon-size);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .session-list-row__body {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  // 聊天区分组标题 / 会话行：与「聊天」节标题同列左对齐，不再预留图标槽
-  .session-list-row--flat {
-    padding-left: var(--sidebar-inset-x);
-    gap: 0;
-  }
-
-  .session-list-loading {
-    display: flex;
-    align-items: center;
-    min-height: 26px;
-    color: var(--td-text-color-placeholder);
-  }
-
-  .timeline_header {
-    font-family: var(--app-font-family);
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--musuw-muted);
-    padding-top: 12px;
-    padding-bottom: 3px;
-    margin-top: 0;
-    line-height: 16px;
-    user-select: none;
-  }
-
-  .timeline_header-label {
-    white-space: nowrap;
-  }
-
-  // Stable filter control: always mounted and absolutely pinned to the list's
-  // top-right so it visually sits on the first row (e.g. beside "近30天") and
-  // never jumps when switching session type reloads a bucket. It overlays the
-  // empty right side of the first header row, so it needs no reserved height.
-  .session-list-scope-header {
-    position: absolute;
-    top: 4px;
-    right: 10px;
-    z-index: 2;
-    display: flex;
-    justify-content: flex-end;
-    max-width: calc(100% - var(--sidebar-inset-x) - 10px);
-
-    :deep(.session-source-filter--inline) {
-      flex: 0 1 auto;
-      min-width: 0;
-      max-width: 100%;
-      opacity: 0;
-      transition: opacity 0.15s ease;
-    }
-  }
-
-  .submenu:hover .session-list-scope-header :deep(.session-source-filter--inline),
-  .session-list-scope-header:hover :deep(.session-source-filter--inline),
-  .session-list-scope-header:focus-within :deep(.session-source-filter--inline),
-  .session-list-scope-header
-    :deep(.session-source-filter--inline.session-source-filter--emphasized) {
-    opacity: 1;
-  }
-
-  .submenu_item_p {
-    padding: 0;
-    box-sizing: border-box;
-    min-width: 0;
-    overflow: hidden;
-
-    &.session-chat-row .session-list-row {
-      min-height: 30px;
-      border-radius: 6px;
-      transition:
-        background 0.15s ease,
-        color 0.15s ease;
-    }
-
-    &.session-chat-row:hover .session-list-row {
-      background: var(--musuw-surface-hover);
-
-      :deep(.menu-more) {
-        color: var(--td-text-color-primary);
-      }
-
-      :deep(.menu-more-wrap) {
-        opacity: 1;
-      }
-    }
-
-    &.session-chat-row--active .session-list-row {
-      background: var(--musuw-accent-soft);
-
-      :deep(.submenu_item) {
-        color: var(--td-brand-color);
-      }
-
-      :deep(.menu-more) {
-        color: var(--td-text-color-primary);
-      }
-
-      :deep(.menu-more-wrap) {
-        opacity: 1;
-      }
-    }
-
-    &.session-chat-row--selected .session-list-row {
-      background: var(--musuw-accent-soft);
-    }
-  }
-
-  // SessionSidebarRow 为子组件，需 :deep 才能让标题省略号生效
-  :deep(.submenu_item) {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    color: var(--td-text-color-primary);
-    font-weight: 400;
-    font-size: 14px;
-    line-height: 20px;
-    height: 100%;
-    width: 100%;
-    padding: 6px 0;
-    position: relative;
-    min-width: 0;
-    background: transparent;
-
-    .submenu_title {
-      display: flex;
-      align-items: center;
-      flex: 1 1 auto;
-      min-width: 0;
-      overflow: hidden;
-    }
-
-    .submenu_title-text {
-      flex: 1 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-
-    .menu-more-wrap {
-      opacity: 0;
-      transition: opacity 0.2s ease;
-      flex-shrink: 0;
-    }
-
-    .menu-more {
-      display: inline-block;
-      font-weight: bold;
-      color: var(--td-brand-color);
-    }
-
-    .submenu_title--batch {
-      margin-left: 4px;
-    }
-
-    &.submenu_item_batch {
-      padding-left: 0;
-    }
-  }
-
-  :deep(.submenu_item_batch) {
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .batch-checkbox {
-    flex-shrink: 0;
-  }
-}
-
-.batch-inline-footer {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  border-top: 1px solid var(--td-component-stroke);
-  background: var(--td-bg-color-container);
-
-  .batch-footer-left {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    color: var(--td-text-color-placeholder);
-  }
-
-  .batch-footer-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-}
-
-/* 知识库下拉菜单样式 */
-.kb-dropdown-icon {
-  margin-left: auto;
-  color: var(--td-text-color-secondary);
-  transition:
-    transform 0.3s ease,
-    color 0.2s ease;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-
-  &.rotate-180 {
-    transform: rotate(180deg);
-  }
-
-  &:hover {
-    color: var(--td-brand-color);
-  }
-
-  &.active {
-    color: var(--td-brand-color);
-  }
-
-  &.active:hover {
-    color: var(--td-brand-color-active);
-  }
-
-  svg {
-    width: 12px;
-    height: 12px;
-    transition: inherit;
-  }
-}
-
-.kb-dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
-  box-shadow: var(--td-shadow-2);
-  z-index: 1000;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.kb-dropdown-item {
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-size: 14px;
-  color: var(--td-text-color-primary);
-
-  &:hover {
-    background-color: var(--td-bg-color-container-hover);
-  }
-
-  &.active {
-    background-color: var(--td-brand-color-light);
-    color: var(--td-brand-color);
-    font-weight: 500;
-  }
-
-  &:first-child {
-    border-radius: 6px 6px 0 0;
-  }
-
-  &:last-child {
-    border-radius: 0 0 6px 6px;
-  }
-}
-
-.menu_item-box {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  position: relative;
-}
-
-/* Empty state when there are no sessions. */
-.submenu_empty {
-  padding: 24px 14px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  user-select: none;
-}
-
-// 顶部操作组（搜索 + 收起）与侧栏控制保持同一视觉密度。
-.logo_actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.musuw-wordmark {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-  color: var(--td-text-color-primary);
-  font-family: var(--app-font-family);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1;
-  user-select: none;
-}
-
-.musuw-wordmark__mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: var(--musuw-ink);
-  color: var(--musuw-panel);
-  font-family: var(--app-font-family-mono);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.musuw-wordmark__label {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-right: 1px solid rgb(229 231 235 / .8);
+  background: #fbfbfb;
+  color: #374151;
+  font-family: var(--app-font-family);
+  user-select: none;
+  transition: width 200ms ease, flex-basis 200ms ease, padding 200ms ease;
 }
-
-.header-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  cursor: pointer;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--td-text-color-secondary);
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
-  box-sizing: border-box;
-
-  &:hover {
-    background: var(--musuw-surface);
-    border-color: var(--musuw-line);
-    color: var(--td-text-color-primary);
-  }
-
-  .header-icon-glyph {
-    font-size: 17px;
-  }
-}
-
-// 深色 tooltip 内容：标签 + 浅灰快捷键内联
-.cmdk-tip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-
-  .cmdk-tip-label {
-    font-size: 13px;
-  }
-
-  .cmdk-tip-keys {
-    font-size: 13px;
-    opacity: 0.6;
-    letter-spacing: 0.5px;
-  }
-}
-
-.menu-pending-badge {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  margin-left: 6px;
-  border-radius: 9px;
-  background: rgba(250, 173, 20, 0.2);
-  color: var(--td-warning-color);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.menu_box {
-  position: relative;
-}
-</style>
-<style lang="less">
-// Dark mode: the slim scrollbar remains visible against the ink rail.
-html[theme-mode="dark"] .aside_box .menu_top:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
-}
-
-html[theme-mode="dark"] .aside_box .menu_top:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.22);
-}
-
-html[theme-mode="dark"] .aside_box .menu_top::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.38);
-}
-
-// 下拉菜单样式已统一至 @/assets/dropdown-menu.less
-
-// 退出登录确认框样式
-:deep(.t-popconfirm) {
-  .t-popconfirm__content {
-    background: var(--td-bg-color-container);
-    border: 1px solid var(--td-component-stroke);
-    border-radius: 6px;
-    box-shadow: var(--td-shadow-3);
-    padding: 12px 16px;
-    font-size: 14px;
-    color: var(--td-text-color-primary);
-    max-width: 200px;
-  }
-
-  .t-popconfirm__arrow {
-    border-bottom-color: var(--td-component-stroke);
-  }
-
-  .t-popconfirm__arrow::after {
-    border-bottom-color: var(--td-bg-color-container);
-  }
-
-  .t-popconfirm__buttons {
-    margin-top: 8px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-
-  .t-button--variant-outline {
-    border-color: var(--td-component-border);
-    color: var(--td-text-color-secondary);
-  }
-
-  .t-button--theme-danger {
-    background-color: var(--td-error-color);
-    border-color: var(--td-error-color);
-  }
-
-  .t-button--theme-danger:hover {
-    background-color: var(--td-error-color);
-    border-color: var(--td-error-color);
-  }
-}
+html.wails-desktop .reference-sidebar { padding-top: 30px; }
+.reference-sidebar--collapsed { width: 56px; flex-basis: 56px; padding: 14px 8px; align-items: center; justify-content: space-between; }
+.reference-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px; margin-bottom: 10px; }
+.reference-sidebar-brand { min-width: 0; padding: 0; border: 0; background: transparent; display: flex; align-items: center; gap: 10px; color: #111827; cursor: pointer; }
+.reference-sidebar-brand-mark { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 8px; background: #000; color: #fff; display: grid; place-items: center; box-shadow: 0 1px 2px rgb(0 0 0 / .05); transition: transform 150ms ease; }
+.reference-sidebar-brand:hover .reference-sidebar-brand-mark { transform: scale(1.05); }
+.reference-sidebar-brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; }
+.reference-sidebar-header-actions { display: flex; align-items: center; gap: 2px; color: #9ca3af; }
+.reference-sidebar-icon-button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; display: grid; place-items: center; cursor: pointer; transition: color 150ms ease, background-color 150ms ease; }
+.reference-sidebar-icon-button:hover { color: #1f2937; background: rgb(229 231 235 / .6); }
+.reference-sidebar-primary-nav { display: flex; flex-direction: column; gap: 4px; padding: 0 2px; margin-bottom: 8px; }
+.reference-sidebar-new-chat, .reference-sidebar-kb { width: 100%; height: 34px; padding: 0 12px; border-radius: 12px; font-family: inherit; cursor: pointer; transition: all 150ms ease; }
+.reference-sidebar-new-chat { border: 1px solid rgb(229 231 235 / .8); background: #fff; color: #111827; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgb(0 0 0 / .04); font-size: 13px; font-weight: 600; }
+.reference-sidebar-new-chat:hover { background: #f3f4f6; }
+.reference-sidebar-kb { border: 0; background: transparent; color: #374151; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.reference-sidebar-kb:hover { color: #030712; background: rgb(229 231 235 / .5); }
+.reference-sidebar-kb.active { color: #030712; background: rgb(229 231 235 / .9); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.reference-sidebar-kb-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.reference-sidebar-history { flex: 1; min-height: 0; margin-top: 4px; padding: 4px 4px 4px 2px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
+.reference-sidebar-history::-webkit-scrollbar { width: 4px; }
+.reference-sidebar-history::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
+.reference-sidebar-source-filter { margin: 0 4px 8px; }
+.reference-sidebar-thread-group { margin-bottom: 12px; }
+.reference-sidebar-thread-label { padding: 4px 10px; color: #9ca3af; font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: .025em; }
+.reference-sidebar-skeleton { height: 28px; margin: 3px 6px; border-radius: 8px; background: linear-gradient(90deg,#f3f4f6,#fafafa,#f3f4f6); background-size: 200% 100%; animation: sidebar-shimmer 1.2s linear infinite; }
+.reference-sidebar-empty { padding: 28px 12px; color: #9ca3af; font-size: 12px; text-align: center; }
+.reference-sidebar-loading { height: 28px; display: grid; place-items: center; color: #9ca3af; }
+.reference-sidebar-loading :deep(.reference-icon) { animation: sidebar-spin .9s linear infinite; }
+.reference-sidebar-user { flex: 0 0 auto; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgb(229 231 235 / .7); }
+.reference-sidebar-batch-footer { flex: 0 0 auto; margin: 6px 2px 0; padding: 8px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 16px rgb(0 0 0 / .05); }
+.reference-sidebar-batch-select { display: flex; align-items: center; gap: 7px; color: #4b5563; font-size: 11px; font-weight: 600; }
+.reference-sidebar-batch-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.reference-sidebar-batch-actions button { height: 28px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; color: #4b5563; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.reference-sidebar-batch-actions button.danger { border-color: #dc2626; background: #dc2626; color: #fff; }
+.reference-sidebar-batch-actions button:disabled { opacity: .4; cursor: not-allowed; }
+.reference-sidebar-collapsed-top { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.reference-sidebar-collapsed-logo { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: #000; color: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / .05); transition: transform 150ms ease; }
+.reference-sidebar-collapsed-logo:hover { transform: scale(1.05); }
+.reference-sidebar-collapsed-rule { width: 32px; height: 1px; margin: 4px 0; background: rgb(229 231 235 / .8); }
+.reference-sidebar-collapsed-primary, .reference-sidebar-collapsed-nav { width: 36px; height: 36px; padding: 0; border: 0; border-radius: 12px; display: grid; place-items: center; cursor: pointer; transition: all 150ms ease; }
+.reference-sidebar-collapsed-primary { background: #f3f4f6; color: #111827; }
+.reference-sidebar-collapsed-primary:hover { background: #e5e7eb; }
+.reference-sidebar-collapsed-nav { background: transparent; color: #4b5563; }
+.reference-sidebar-collapsed-nav:hover { color: #111827; background: #f3f4f6; }
+.reference-sidebar-collapsed-nav.active { background: #111827; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .05); }
+.reference-sidebar-collapsed-user { width: 32px; min-height: 32px; overflow: visible; border-radius: 999px; }
+.reference-sidebar-drag-handle { position: absolute; right: -2px; top: 0; width: 5px; height: 100%; cursor: ew-resize; z-index: 2; }
+@keyframes sidebar-shimmer { to { background-position: -200% 0; } }
+@keyframes sidebar-spin { to { transform: rotate(360deg); } }
 </style>
