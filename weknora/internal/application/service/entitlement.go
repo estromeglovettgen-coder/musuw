@@ -13,6 +13,7 @@ import (
 	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/WeKnora/internal/utils"
 )
 
 type entitlementService struct {
@@ -100,6 +101,9 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 	}
 	if s.keys == nil {
 		return "", fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured")
+	}
+	if utils.GetAESKey() == nil {
+		return "", fmt.Errorf("SYSTEM_AES_KEY must contain exactly 32 bytes before provisioning OpenRouter tenant keys")
 	}
 
 	limit := types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
