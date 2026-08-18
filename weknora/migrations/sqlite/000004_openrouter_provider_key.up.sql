@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS openrouter_tenant_keys (
+    tenant_id INTEGER PRIMARY KEY,
+    key_hash VARCHAR(128) NOT NULL UNIQUE,
+    key_ciphertext TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
