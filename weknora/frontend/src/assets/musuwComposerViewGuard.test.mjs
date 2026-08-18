@@ -4,8 +4,9 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-test('migrated composer subviews use visual roots and no legacy presentation shells', () => {
+test('migrated composer surfaces use visual roots and no active legacy presentation shells', () => {
   const cases = [
+    ['../components/Input-field.vue', 'class="visual-chat-composer"', ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"', 'class="model-selector-trigger"']],
     ['../components/ModelSelector.vue', 'class="visual-model-selector"', ['class="model-selector"', 'class="model-option"', '<t-select']],
     ['../components/AttachmentUpload.vue', 'class="visual-attachment-upload"', ['class="attachment-upload"', 'class="attachment-preview-bar"', 'class="attachment-preview-item"']],
     ['../components/KnowledgeBaseSelector.vue', 'class="visual-kb-selector"', ['class="kb-overlay"', 'class="kb-dropdown"', 'class="kb-item"', 'class="kb-actions"']],
@@ -18,6 +19,27 @@ test('migrated composer subviews use visual roots and no legacy presentation she
     assert.ok(source.includes(root), `${path} lost ${root}`)
     for (const token of legacy) assert.equal(source.includes(token), false, `${path} still contains ${token}`)
   }
+})
+
+test('composer presents every native resource and generation control in the new View', () => {
+  const source = read('../components/Input-field.vue')
+  for (const token of [
+    'showImageUploadButton',
+    'attachmentUploadRef?.triggerFileSelect()',
+    'triggerMention',
+    'showWebSearchButton',
+    'toggleWebSearch',
+    "isProMode ? 'V4 Pro' : 'V4 Flash'",
+    'thinkingEnabled',
+    'selectedModelDisplayName',
+    'toggleModelSelector',
+    'isReplying',
+    'handleStop',
+    'createSession(query)',
+    'uploadedImages.length',
+    'uploadedAttachments.length',
+    'allSelectedItems.length',
+  ]) assert.ok(source.includes(token), `Input-field lost control surface: ${token}`)
 })
 
 test('attachment visual layer exposes every native upload/parse terminal state', () => {
