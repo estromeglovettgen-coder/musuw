@@ -1,0 +1,41 @@
+name: Task1 isolated current-main parity transplant
+
+on:
+  push:
+    branches: [task1-source-parity-final]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: task1-source-parity-final
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: task1-source-parity-final
+          fetch-depth: 0
+      - name: Fetch current main business authority
+        run: git fetch origin main --force
+      - name: Apply visual reference over current native business script
+        run: python3 scripts/task1_final_reference_business.py
+      - name: Validate frontend
+        working-directory: weknora/frontend
+        run: |
+          npm ci
+          npm test
+          npm run type-check
+          npm run check-i18n
+          npm run build
+      - name: Commit audited source replacement to isolated branch
+        run: |
+          git config user.name "musuw-task1-audit"
+          git config user.email "actions@users.noreply.github.com"
+          git add weknora/frontend/src
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix(ui): audited reference transplant over current native logic"
+          git push origin HEAD:task1-source-parity-final
