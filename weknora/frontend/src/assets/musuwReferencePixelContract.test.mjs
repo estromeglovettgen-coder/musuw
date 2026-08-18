@@ -35,7 +35,7 @@ test("uses the mechanically compiled reference layer instead of legacy UI skins"
   assert.equal(manifest.includes("musuw-reference-dom-bridge.css"), false);
 });
 
-test("loads every mechanically compiled visual-reference shard and no handwritten DOM bridge", () => {
+test("loads every mechanically compiled visual-reference shard and no legacy DOM bridge", () => {
   for (const shard of [
     "musuw-reference-mechanical-01.css",
     "musuw-reference-mechanical-02.css",
@@ -56,10 +56,11 @@ test("loads every mechanically compiled visual-reference shard and no handwritte
     "musuw-reference-mechanical-11b.css",
     "musuw-reference-mechanical-12.css",
     "musuw-reference-mechanical-13.css",
+    "musuw-reference-mechanical-13b.css",
   ]) {
     assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
   }
-  assert.equal(importNames.length, 19);
+  assert.equal(importNames.length, 20);
 });
 
 test("matches copied reference shell, conversation, knowledge and settings geometry", () => {
@@ -77,6 +78,7 @@ test("matches copied reference shell, conversation, knowledge and settings geome
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h1\{[\s\S]*?font-size:var\(--text-lg\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h2\{[\s\S]*?font-size:var\(--text-base\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h3\{[\s\S]*?font-size:var\(--text-sm\) !important/);
+  assert.match(mechanical, /\.bot_msg:hover > div > \.answer-toolbar\{opacity:100% !important/);
 });
 
 test("preserves product conditional rendering and task-excluded renderers", () => {
