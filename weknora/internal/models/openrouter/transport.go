@@ -4,11 +4,60 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 )
+
+const CreditExhaustedCode = "openrouter_credits_exhausted"
+
+// CreditExhaustedError is the provider-level hard monthly-spend boundary. It is
+// intentionally distinct from transient transport/provider failures so callers
+// can avoid retries and preserve any answer already streamed to the user.
+type CreditExhaustedError struct {
+	StatusCode int
+}
+
+func (e *CreditExhaustedError) Error() string {
+	return "OpenRouter monthly AI credits are exhausted"
+}
+
+func IsCreditExhausted(err error) bool {
+	if err == nil {
+		return false
+	}
+	var target *CreditExhaustedError
+	if errors.As(err, &target) {
+		return true
+	}
+	return textIndicatesCreditExhausted(err.Error())
+}
+
+// PayloadIndicatesCreditExhausted handles providers that start a successful SSE
+// response and later emit an error object when the key budget is reached.
+func PayloadIndicatesCreditExhausted(payload []byte) bool {
+	return textIndicatesCreditExhausted(string(payload))
+}
+
+func textIndicatesCreditExhausted(value string) bool {
+	lower := strings.ToLower(value)
+	for _, marker := range []string{
+		"payment_required",
+		"insufficient credits",
+		"insufficient credit",
+		"credit limit",
+		"credits exhausted",
+		"credit exhausted",
+		"spending limit",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return strings.Contains(lower, `"code":402`) || strings.Contains(lower, `"code":"402"`)
+}
 
 // Meter supplies the tenant-scoped provider key and stable end-user
 // attribution. OpenRouter itself enforces the monthly spend limit on the key.
@@ -65,7 +114,22 @@ func (t *trackingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 			restoreRequest(outbound, body)
 		}
 	}
-	return t.base.RoundTrip(outbound)
+
+	resp, err := t.base.RoundTrip(outbound)
+	if err != nil {
+		return nil, err
+	}
+	if resp != nil && resp.StatusCode == http.StatusPaymentRequired {
+		// Never pass a 402 into generic provider retry/fallback machinery. Drain a
+		// bounded body for connection reuse but do not surface provider text that
+		// may contain account metadata.
+		if resp.Body != nil {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64*1024))
+			_ = resp.Body.Close()
+		}
+		return nil, &CreditExhaustedError{StatusCode: resp.StatusCode}
+	}
+	return resp, nil
 }
 
 func isJSONRequest(req *http.Request) bool {
