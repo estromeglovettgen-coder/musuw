@@ -35,6 +35,7 @@ test('migrated views do not retain the legacy view shells they replaced', () => 
     ['../views/creatChat/creatChat.vue', ['class="dialogue-wrap"', 'class="dialogue-answers"']],
     ['../views/knowledge/components/DocumentCardView.vue', ['class="doc-card-view"', 'class="knowledge-card"', 'class="folder-card"']],
     ['../views/knowledge/components/KbFolderTree.vue', ['class="kb-folder-tree"', 'class="kb-folder-row"']],
+    ['../views/knowledge/components/KbUploadSourceDropdown.vue', ['class="kb-upload-source-dropdown"', 'class="kb-upload-source-trigger"', 'class="url-import-form"']],
     ['../views/settings/Settings.vue', ['class="settings-overlay"', 'class="settings-modal"', 'class="settings-sidebar"', 'class="settings-content"']],
     ['../views/settings/GeneralSettings.vue', ['class="general-settings"', 'class="settings-group"', 'class="setting-row"']],
   ])
@@ -45,6 +46,11 @@ test('migrated views do not retain the legacy view shells they replaced', () => 
       assert.equal(source.includes(token), false, `${path} still contains replaced legacy shell ${token}`)
     }
   }
+})
+
+test('migrated view roots do not re-attach parent-provided legacy presentation classes', () => {
+  const upload = read('../views/knowledge/components/KbUploadSourceDropdown.vue')
+  assert.equal(upload.includes(`:class="['visual-upload-source__trigger', triggerClass]"`), false)
 })
 
 test('source/index palette adapter cannot restyle the excluded processing timeline', () => {
