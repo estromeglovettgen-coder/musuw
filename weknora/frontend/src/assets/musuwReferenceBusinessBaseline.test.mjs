@@ -32,7 +32,6 @@ const baseline = new Map([
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
   ['../views/knowledge/components/DocumentListView.vue', 'dc553565d2c1818878c3c34631dc4d33010f96c6'],
-  ['../views/knowledge/components/KbFolderTree.vue', '7475054ca4afb6ebb133fb47c394e2f57c1d8aea'],
   ['../views/knowledge/components/KbUploadSourceDropdown.vue', 'e0e83fcb20897a205f9b6ee1f65b1ebe8ca1da68'],
   ['../views/knowledge/components/DocumentActionMenu.vue', '0d85aa2ab1ce2b5f85412427e9ee16530b6dab71'],
   ['../views/knowledge/components/BatchTagDialog.test.ts', '2cecdf2012ef924bfabe6f7fdbf3a3ab55c7ef8d'],
@@ -90,6 +89,17 @@ test('document-card view may replace markup and CSS but must preserve its event 
     "emit('action', action, item)",
     "folderPickerItemId.value = item.id",
     "props.traceAvailableById[item.id] === true",
+  ])
+})
+
+test('folder tree may replace markup and CSS but must preserve selection/rename/collapse behavior', () => {
+  assertContracts('../views/knowledge/components/KbFolderTree.vue', 'folder tree', [
+    "emit('rename', { from: row.path, to: joinFolderPath(parent, name) })",
+    "folderAncestorPaths(props.selectedPath).forEach((path) => next.add(path))",
+    "tree.folders.forEach((folder) => next.add(folder.path))",
+    'expanded.value = next',
+    'renamingPath.value = row.path',
+    'menuOpenPath.value = visible ? path : null',
   ])
 })
 
