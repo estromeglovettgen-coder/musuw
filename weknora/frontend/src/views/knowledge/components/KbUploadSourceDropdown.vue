@@ -26,12 +26,12 @@
     >
       <button
         type="button"
-        class="visual-upload-source__trigger"
+        :class="['visual-upload-source__trigger', triggerClass]"
         :data-guide="dataGuide || undefined"
         :aria-label="tooltipText"
         :title="tooltipText"
       >
-        <t-icon name="add" class="visual-upload-source__trigger-plus" />
+        <t-icon :name="triggerIcon" class="visual-upload-source__trigger-plus" />
         <span>{{ tooltipText }}</span>
         <t-icon name="chevron-down" class="visual-upload-source__trigger-caret" />
       </button>
