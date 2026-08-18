@@ -30,9 +30,7 @@ function loadMainDrawerWidth() {
   try {
     const raw = localStorage.getItem(MAIN_DRAWER_WIDTH_KEY)
     const parsed = raw ? parseInt(raw, 10) : NaN
-    if (!Number.isNaN(parsed)) {
-      mainDrawerWidth.value = clampMainDrawerWidth(parsed)
-    }
+    if (!Number.isNaN(parsed)) mainDrawerWidth.value = clampMainDrawerWidth(parsed)
   } catch {
     /* ignore */
   }
@@ -94,178 +92,202 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <teleport to="body">
-    <div
-      v-if="mainDrawerResizing"
-      class="chat-attachment-drawer-resize-overlay"
-      aria-hidden="true"
-    />
-    <div
-      v-if="visible"
-      class="chat-attachment-drawer-resize-handle"
-      :class="{ 'chat-attachment-drawer-resize-handle--active': mainDrawerResizing }"
-      :style="{ right: `${mainDrawerWidth}px` }"
-      role="separator"
-      aria-orientation="vertical"
-      @mousedown.prevent="onMainDrawerResizeStart"
-    >
-      <div class="chat-attachment-drawer-resize-line" />
-    </div>
-  </teleport>
+  <Teleport to="body">
+    <Transition name="visual-attachment-preview">
+      <div v-if="visible" class="visual-attachment-preview__overlay" @click.self="close">
+        <div
+          class="visual-attachment-preview__resize-handle"
+          :class="{ 'is-active': mainDrawerResizing }"
+          :style="{ right: `${mainDrawerWidth}px` }"
+          role="separator"
+          aria-orientation="vertical"
+          @mousedown.prevent="onMainDrawerResizeStart"
+        >
+          <span />
+        </div>
 
-  <t-drawer
-    :visible="visible"
-    :z-index="2000"
-    :size="`${mainDrawerWidth}px`"
-    attach="body"
-    :close-btn="true"
-    :footer="false"
-    :class="['chat-attachment-preview-drawer', { 'chat-attachment-preview-drawer--resizing': mainDrawerResizing }]"
-    @close="close"
-  >
-    <template #header>
-      <div class="chat-attachment-drawer-header">
-        <div class="chat-attachment-drawer-header-icon">
-          <t-icon name="file" />
-        </div>
-        <div class="chat-attachment-drawer-header-text">
-          <div class="chat-attachment-drawer-header-title">{{ target?.fileName || '' }}</div>
-        </div>
+        <aside
+          class="visual-attachment-preview"
+          :class="{ 'is-resizing': mainDrawerResizing }"
+          :style="{ width: `${mainDrawerWidth}px` }"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="target?.fileName || ''"
+        >
+          <header class="visual-attachment-preview__header">
+            <span class="visual-attachment-preview__icon" aria-hidden="true"><t-icon name="file" /></span>
+            <strong :title="target?.fileName || ''">{{ target?.fileName || '' }}</strong>
+            <button type="button" class="visual-attachment-preview__close" :aria-label="$t('common.close')" @click="close">
+              <t-icon name="close" />
+            </button>
+          </header>
+
+          <section v-if="target" class="visual-attachment-preview__body">
+            <DocumentPreview
+              :session-id="target.sessionId"
+              :attachment-id="target.attachmentId"
+              :file-type="target.fileType"
+              :file-name="target.fileName"
+              :active="visible"
+              fill-height
+            />
+          </section>
+        </aside>
+
+        <div v-if="mainDrawerResizing" class="visual-attachment-preview__resize-shield" aria-hidden="true" />
       </div>
-    </template>
-
-    <section v-if="target" class="chat-attachment-drawer-body">
-      <DocumentPreview
-        :session-id="target.sessionId"
-        :attachment-id="target.attachmentId"
-        :file-type="target.fileType"
-        :file-name="target.fileName"
-        :active="visible"
-        fill-height
-      />
-    </section>
-  </t-drawer>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped lang="less">
-:deep(.t-drawer__header) {
-  font-weight: normal;
+.visual-attachment-preview__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgb(15 23 42 / 14%);
 }
 
-.chat-attachment-drawer-header {
+.visual-attachment-preview {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 95vw;
+  min-width: 480px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: -18px 0 50px rgb(15 23 42 / 12%);
+}
+
+.visual-attachment-preview__header {
+  flex: 0 0 auto;
+  min-height: 58px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
-  width: 100%;
-  padding-right: 32px;
+  gap: 9px;
 }
 
-.chat-attachment-drawer-header-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--musuw-radius-control);
-  display: flex;
+.visual-attachment-preview__icon {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--musuw-accent-soft);
-  color: var(--musuw-accent);
-  font-size: 16px;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
-.chat-attachment-drawer-header-text {
-  flex: 1 1 auto;
+.visual-attachment-preview__icon :deep(.t-icon) { font-size: 14px; }
+
+.visual-attachment-preview__header strong {
   min-width: 0;
-}
-
-.chat-attachment-drawer-header-title {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--td-text-color-primary);
+  flex: 1 1 auto;
   overflow: hidden;
+  color: #111827;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-attachment-drawer-body {
-  flex: 1;
+.visual-attachment-preview__close {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.visual-attachment-preview__close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-attachment-preview__body {
   min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding: 10px 12px 12px;
+  box-sizing: border-box;
 }
 
-.chat-attachment-drawer-resize-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2001;
-  cursor: col-resize;
-}
-
-.chat-attachment-drawer-resize-handle {
-  position: fixed;
+.visual-attachment-preview__resize-handle {
+  position: absolute;
   top: 0;
   bottom: 0;
+  z-index: 2003;
   width: 12px;
-  margin-left: -6px;
-  z-index: 2002;
-  cursor: col-resize;
+  margin-right: -6px;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: col-resize;
 }
 
-.chat-attachment-drawer-resize-line {
+.visual-attachment-preview__resize-handle > span {
   width: 2px;
-  height: 48px;
-  border-radius: 1px;
-  background: var(--td-component-border);
-  opacity: 0.55;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  height: 46px;
+  border-radius: 999px;
+  background: #d1d5db;
+  opacity: .6;
 }
 
-.chat-attachment-drawer-resize-handle:hover .chat-attachment-drawer-resize-line,
-.chat-attachment-drawer-resize-handle--active .chat-attachment-drawer-resize-line {
+.visual-attachment-preview__resize-handle:hover > span,
+.visual-attachment-preview__resize-handle.is-active > span {
+  background: #6b7280;
   opacity: 1;
-  background: var(--musuw-accent);
-}
-</style>
-
-<style lang="less">
-.t-drawer.chat-attachment-preview-drawer {
-  .t-drawer__content-wrapper,
-  .t-drawer__content {
-    height: 100%;
-  }
-
-  .t-drawer__header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--td-component-stroke);
-    flex-shrink: 0;
-  }
-
-  .t-drawer__body {
-    flex: 1;
-    min-height: 0;
-    padding: 12px 16px 16px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
 }
 
-.t-drawer.chat-attachment-preview-drawer--resizing .t-drawer__content {
-  transition: none !important;
+.visual-attachment-preview__resize-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 2002;
+  cursor: col-resize;
 }
 
-.t-drawer.chat-attachment-preview-drawer--resizing {
-  .chat-attachment-drawer-body,
-  .document-preview,
-  iframe,
-  .pdf-iframe {
-    pointer-events: none;
-    user-select: none;
+.visual-attachment-preview.is-resizing .visual-attachment-preview__body {
+  pointer-events: none;
+  user-select: none;
+}
+
+.visual-attachment-preview-enter-active,
+.visual-attachment-preview-leave-active {
+  transition: opacity 150ms ease;
+}
+
+.visual-attachment-preview-enter-from,
+.visual-attachment-preview-leave-to { opacity: 0; }
+
+@media (max-width: 520px) {
+  .visual-attachment-preview {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
   }
+  .visual-attachment-preview__resize-handle { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-attachment-preview-enter-active,
+  .visual-attachment-preview-leave-active { transition: none !important; }
 }
 </style>
