@@ -1,26 +1,39 @@
 <template>
-  <div class="folder-picker">
-    <div v-if="showBack" class="folder-picker__header" @click.stop="emit('back')">
-      <t-icon name="chevron-left" size="16px" />
+  <section class="visual-folder-picker" :aria-label="t('knowledgeBase.moveToFolder.action')">
+    <button
+      v-if="showBack"
+      type="button"
+      class="visual-folder-picker__back"
+      @click.stop="emit('back')"
+    >
+      <t-icon name="chevron-left" />
       <span>{{ t('knowledgeBase.moveToFolder.action') }}</span>
-    </div>
+    </button>
 
-    <div ref="listRef" class="folder-picker__list">
+    <div ref="listRef" class="visual-folder-picker__list">
       <template v-for="row in renderRows" :key="row.key">
         <div
           v-if="row.kind === 'folder'"
           :data-folder-path="row.path || undefined"
-          class="folder-picker__item"
-          :class="{ current: effectiveCurrentPath === row.path }"
-          :style="{ '--folder-picker-depth': row.depth }"
+          class="visual-folder-picker__row"
+          :class="{ 'is-current': effectiveCurrentPath === row.path }"
+          :style="{ '--visual-folder-depth': row.depth }"
           :title="row.path || undefined"
-          @click.stop="choose(row.path)"
         >
-          <t-icon :name="row.isRoot ? 'folder-open' : 'folder'" class="folder-picker__icon" />
-          <span class="folder-picker__name">{{ row.label }}</span>
           <button
             type="button"
-            class="folder-picker__add"
+            class="visual-folder-picker__select"
+            :aria-current="effectiveCurrentPath === row.path ? 'true' : undefined"
+            @click.stop="choose(row.path)"
+          >
+            <t-icon :name="row.isRoot ? 'folder-open' : 'folder'" class="visual-folder-picker__folder-icon" />
+            <span class="visual-folder-picker__name">{{ row.label }}</span>
+            <t-icon v-if="effectiveCurrentPath === row.path" name="check" class="visual-folder-picker__check" />
+          </button>
+
+          <button
+            type="button"
+            class="visual-folder-picker__create-button"
             :title="row.isRoot
               ? t('knowledgeBase.moveToFolder.newFolderAddRoot')
               : t('knowledgeBase.moveToFolder.newFolderAddUnder', { folder: row.label })"
@@ -31,28 +44,35 @@
           >
             <t-icon name="folder-add" />
           </button>
-          <t-icon v-if="effectiveCurrentPath === row.path" name="check" class="folder-picker__current" />
         </div>
 
         <div
           v-else
-          class="folder-picker__item folder-picker__item--create"
-          :style="{ '--folder-picker-depth': row.depth }"
+          class="visual-folder-picker__create-row"
+          :style="{ '--visual-folder-depth': row.depth }"
           @click.stop
         >
-          <t-icon name="folder" class="folder-picker__icon" />
+          <t-icon name="folder" class="visual-folder-picker__folder-icon" />
           <input
             ref="newFolderInputRef"
             v-model.trim="newFolderName"
-            class="folder-picker__input"
+            class="visual-folder-picker__input"
             :placeholder="t('knowledgeBase.moveToFolder.newFolderPlaceholder')"
             @keydown.enter.stop="commitNewFolder"
             @keydown.esc.stop="cancelCreating"
           />
+          <button
+            type="button"
+            class="visual-folder-picker__cancel-create"
+            :aria-label="t('common.cancel')"
+            @click.stop="cancelCreating"
+          >
+            <t-icon name="close" />
+          </button>
         </div>
       </template>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -236,143 +256,183 @@ const commitNewFolder = async () => {
 </script>
 
 <style scoped lang="less">
-.folder-picker {
-  --folder-picker-indent: 12px;
-  min-width: 208px;
-  max-width: 280px;
-}
-
-.folder-picker__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  margin-bottom: 2px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  cursor: pointer;
-
-  &:hover {
-    color: var(--td-brand-color);
-  }
-}
-
-.folder-picker__list {
-  max-height: 260px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    border-radius: 2px;
-    background: var(--td-scrollbar-color);
-  }
-}
-
-.folder-picker__item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
+.visual-folder-picker {
+  --visual-folder-indent: 14px;
+  width: min(280px, calc(100vw - 32px));
+  min-width: 220px;
   box-sizing: border-box;
-  padding: 0 8px 0 calc(var(--folder-picker-depth, 0) * var(--folder-picker-indent) + 10px);
-  border-radius: 6px;
-  color: var(--td-text-color-primary);
-  font-size: 13px;
+}
+
+.visual-folder-picker__back {
+  width: 100%;
+  min-height: 34px;
+  margin: 0 0 4px;
+  padding: 7px 8px;
+  border: 0;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: #6b7280;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
-
-  &:hover {
-    background: var(--td-bg-color-container-hover);
-
-    .folder-picker__add {
-      opacity: 1;
-      pointer-events: auto;
-    }
-  }
-
-  &.current {
-    color: var(--td-text-color-placeholder);
-    cursor: default;
-
-    &:hover {
-      background: transparent;
-
-      .folder-picker__add {
-        opacity: 1;
-        pointer-events: auto;
-      }
-    }
-  }
-
-  &--create {
-    cursor: default;
-
-    &:hover {
-      background: transparent;
-    }
-  }
 }
 
-.folder-picker__icon {
-  flex: 0 0 auto;
-  font-size: 15px;
-  color: var(--td-text-color-placeholder);
+.visual-folder-picker__back:hover {
+  color: #111827;
 }
 
-.folder-picker__name {
-  flex: 1;
+.visual-folder-picker__back :deep(.t-icon) {
+  font-size: 14px;
+}
+
+.visual-folder-picker__list {
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px;
+  scrollbar-width: thin;
+}
+
+.visual-folder-picker__row,
+.visual-folder-picker__create-row {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
+  padding-left: calc(var(--visual-folder-depth, 0) * var(--visual-folder-indent));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.visual-folder-picker__row {
+  border-radius: 9px;
+}
+
+.visual-folder-picker__row:hover {
+  background: #f9fafb;
+}
+
+.visual-folder-picker__select {
   min-width: 0;
+  min-height: 34px;
+  flex: 1 1 auto;
+  padding: 7px 6px 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #4b5563;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.visual-folder-picker__row.is-current .visual-folder-picker__select {
+  color: #111827;
+  font-weight: 700;
+}
+
+.visual-folder-picker__folder-icon {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+  color: #9ca3af;
+}
+
+.visual-folder-picker__name {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.folder-picker__add {
-  flex: 0 0 auto;
+.visual-folder-picker__check {
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.visual-folder-picker__create-button,
+.visual-folder-picker__cancel-create {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border: 0;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-right: -2px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
   background: transparent;
-  color: var(--td-text-color-placeholder);
-  opacity: 0;
-  pointer-events: none;
+  color: #9ca3af;
   cursor: pointer;
-  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
-
-  &:hover {
-    color: var(--td-brand-color);
-    background: var(--td-bg-color-component);
-  }
+  opacity: 0;
+  transition: opacity 140ms ease, background-color 140ms ease, color 140ms ease;
 }
 
-.folder-picker__current {
-  flex: 0 0 auto;
-  font-size: 14px;
-  color: var(--td-text-color-placeholder);
+.visual-folder-picker__row:hover .visual-folder-picker__create-button,
+.visual-folder-picker__create-button:focus-visible {
+  opacity: 1;
 }
 
-.folder-picker__input {
-  flex: 1;
+.visual-folder-picker__create-button:hover,
+.visual-folder-picker__cancel-create:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-folder-picker__create-row {
+  padding-right: 4px;
+  padding-block: 4px;
+}
+
+.visual-folder-picker__create-row .visual-folder-picker__folder-icon {
+  margin-left: 8px;
+}
+
+.visual-folder-picker__input {
   min-width: 0;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid var(--td-brand-color);
-  border-radius: 4px;
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-primary);
-  font-family: var(--app-font-family);
-  font-size: 13px;
+  height: 30px;
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
   outline: none;
+}
+
+.visual-folder-picker__input:focus {
+  border-color: #9ca3af;
+  box-shadow: 0 0 0 2px rgb(17 24 39 / 6%);
+}
+
+.visual-folder-picker__create-row .visual-folder-picker__cancel-create {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-folder-picker__create-button,
+  .visual-folder-picker__cancel-create {
+    transition: none !important;
+  }
 }
 </style>
