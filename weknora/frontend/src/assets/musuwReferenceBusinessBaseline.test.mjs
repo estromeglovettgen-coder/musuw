@@ -181,6 +181,6 @@ test('model settings may replace markup and CSS but must preserve model lifecycl
     'await deleteModelAPI(modelId)',
     'await createModel(newModel)',
     'new URL(modelData.baseUrl.trim())',
-    'showDebugDrawer.value = true',
+    'const showDebugDrawer = ref(false)',
   ])
 })
