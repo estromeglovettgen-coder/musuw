@@ -1,17 +1,17 @@
 <template>
-    <main class="new-chat-view">
-        <section class="new-chat-stack" aria-labelledby="new-chat-title">
-            <h1 id="new-chat-title" class="new-chat-title" style="--wails-draggable: drag">
+    <main class="visual-new-chat-view">
+        <section class="visual-new-chat-stack" aria-labelledby="visual-new-chat-title">
+            <h1 id="visual-new-chat-title" class="visual-new-chat-title" style="--wails-draggable: drag">
                 {{ $t('createChat.title') }}
             </h1>
 
-            <div ref="sqContainerRef" class="new-chat-suggestions">
-                <div v-if="sqLoading && suggestedQuestions.length === 0" class="new-chat-suggestions__inner">
-                    <div class="new-chat-suggestions__heading">
+            <div ref="sqContainerRef" class="visual-new-chat-suggestions">
+                <div v-if="sqLoading && suggestedQuestions.length === 0" class="visual-new-chat-suggestions__inner">
+                    <div class="visual-new-chat-suggestions__heading">
                         <t-skeleton animation="gradient" :row-col="[{ width: '112px', height: '13px' }]" />
                     </div>
-                    <div class="new-chat-suggestions__list" aria-hidden="true">
-                        <div v-for="n in 6" :key="'sq-skel-' + n" class="new-chat-suggestion new-chat-suggestion--skeleton">
+                    <div class="visual-new-chat-suggestions__list" aria-hidden="true">
+                        <div v-for="n in 6" :key="'sq-skel-' + n" class="visual-new-chat-suggestion visual-new-chat-suggestion--skeleton">
                             <t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '13px', type: 'rect' }]" />
                         </div>
                     </div>
@@ -20,19 +20,19 @@
                 <transition
                     v-else
                     appear
-                    name="new-chat-suggestions"
+                    name="visual-new-chat-suggestions"
                     mode="out-in"
                     @before-leave="onBeforeLeave"
                     @after-leave="onAfterLeave"
                     @enter="onEnter"
                     @after-enter="onQuestionsEntered"
                 >
-                    <div v-if="suggestedQuestions.length > 0" :key="sqRenderKey" class="new-chat-suggestions__inner">
-                        <div class="new-chat-suggestions__heading">
+                    <div v-if="suggestedQuestions.length > 0" :key="sqRenderKey" class="visual-new-chat-suggestions__inner">
+                        <div class="visual-new-chat-suggestions__heading">
                             <span>{{ $t('chat.suggestedQuestions') }}</span>
                             <button
                                 type="button"
-                                class="new-chat-suggestions__refresh"
+                                class="visual-new-chat-suggestions__refresh"
                                 :disabled="sqLoading"
                                 :title="$t('chat.refreshSuggestedQuestions')"
                                 :aria-label="$t('chat.refreshSuggestedQuestions')"
@@ -42,25 +42,25 @@
                             </button>
                         </div>
 
-                        <div class="new-chat-suggestions__list">
+                        <div class="visual-new-chat-suggestions__list">
                             <button
                                 v-for="(item, index) in suggestedQuestions"
                                 :key="item.question"
                                 type="button"
-                                class="new-chat-suggestion"
+                                class="visual-new-chat-suggestion"
                                 :class="{ 'is-visible': sqCardsRevealed }"
                                 :style="{ transitionDelay: sqCardsRevealed ? `${index * 50}ms` : '0ms' }"
                                 @click="handleSuggestedQuestionClick(item.question)"
                             >
-                                <span class="new-chat-suggestion__text">{{ item.question }}</span>
-                                <span v-if="item.source === 'faq'" class="new-chat-suggestion__badge">FAQ</span>
+                                <span class="visual-new-chat-suggestion__text">{{ item.question }}</span>
+                                <span v-if="item.source === 'faq'" class="visual-new-chat-suggestion__badge">FAQ</span>
                             </button>
                         </div>
                     </div>
                 </transition>
             </div>
 
-            <div class="new-chat-composer">
+            <div class="visual-new-chat-composer">
                 <InputField ref="inputFieldRef" @send-msg="sendMsg" />
             </div>
         </section>
@@ -251,7 +251,7 @@ const handleKBEditorSuccess = (kbId: string) => {
 
 </script>
 <style lang="less" scoped>
-.new-chat-view {
+.visual-new-chat-view {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -262,7 +262,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     box-sizing: border-box;
 }
 
-.new-chat-stack {
+.visual-new-chat-stack {
     width: min(768px, calc(100% - 64px));
     min-height: 100%;
     margin: 0 auto;
@@ -275,7 +275,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     gap: 24px;
 }
 
-.new-chat-title {
+.visual-new-chat-title {
     margin: 0;
     padding: 0;
     text-align: center;
@@ -287,7 +287,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     color: #111827;
 }
 
-.new-chat-suggestions {
+.visual-new-chat-suggestions {
     width: 100%;
     min-height: 0;
     margin: 0;
@@ -295,14 +295,14 @@ const handleKBEditorSuccess = (kbId: string) => {
     transition: height 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.new-chat-suggestions__inner {
+.visual-new-chat-suggestions__inner {
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: stretch;
 }
 
-.new-chat-suggestions__heading {
+.visual-new-chat-suggestions__heading {
     min-height: 20px;
     margin: 0 0 12px;
     display: flex;
@@ -316,7 +316,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     letter-spacing: .01em;
 }
 
-.new-chat-suggestions__refresh {
+.visual-new-chat-suggestions__refresh {
     width: 20px;
     height: 20px;
     padding: 0;
@@ -346,10 +346,10 @@ const handleKBEditorSuccess = (kbId: string) => {
 }
 
 .is-spinning {
-    animation: new-chat-spin 800ms linear infinite;
+    animation: visual-new-chat-spin 800ms linear infinite;
 }
 
-.new-chat-suggestions__list {
+.visual-new-chat-suggestions__list {
     width: 100%;
     display: flex;
     flex-wrap: wrap;
@@ -357,7 +357,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     gap: 10px;
 }
 
-.new-chat-suggestion {
+.visual-new-chat-suggestion {
     appearance: none;
     min-width: 0;
     max-width: 100%;
@@ -388,18 +388,18 @@ const handleKBEditorSuccess = (kbId: string) => {
         transform: translateY(0) scale(1);
     }
 
-    &:hover:not(.new-chat-suggestion--skeleton) {
+    &:hover:not(.visual-new-chat-suggestion--skeleton) {
         border-color: #d1d5db;
         background: #f9fafb;
         box-shadow: 0 2px 6px rgb(0 0 0 / 5%);
     }
 
-    &:active:not(.new-chat-suggestion--skeleton) {
+    &:active:not(.visual-new-chat-suggestion--skeleton) {
         transform: scale(.98);
     }
 }
 
-.new-chat-suggestion--skeleton {
+.visual-new-chat-suggestion--skeleton {
     width: 180px;
     opacity: 1;
     transform: none;
@@ -413,7 +413,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     &:nth-child(5n) { width: 210px; }
 }
 
-.new-chat-suggestion__text {
+.visual-new-chat-suggestion__text {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -423,7 +423,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     font-weight: 400;
 }
 
-.new-chat-suggestion__badge {
+.visual-new-chat-suggestion__badge {
     flex: 0 0 auto;
     padding: 1px 5px;
     border-radius: 5px;
@@ -434,7 +434,7 @@ const handleKBEditorSuccess = (kbId: string) => {
     font-weight: 600;
 }
 
-.new-chat-composer {
+.visual-new-chat-composer {
     position: relative;
     width: 100%;
     min-width: 0;
@@ -443,7 +443,8 @@ const handleKBEditorSuccess = (kbId: string) => {
     z-index: 2;
 }
 
-.new-chat-composer :deep(.answers-input) {
+.visual-new-chat-composer :deep(.visual-chat-composer),
+.visual-new-chat-composer :deep(.visual-chat-composer__surface) {
     position: static !important;
     left: auto !important;
     right: auto !important;
@@ -457,64 +458,58 @@ const handleKBEditorSuccess = (kbId: string) => {
     z-index: auto !important;
 }
 
-.new-chat-composer :deep(.rich-input-container) {
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-}
-
-.new-chat-suggestions-enter-active,
-.new-chat-suggestions-leave-active {
+.visual-new-chat-suggestions-enter-active,
+.visual-new-chat-suggestions-leave-active {
     transition: opacity 120ms ease, transform 120ms ease;
 }
 
-.new-chat-suggestions-enter-from,
-.new-chat-suggestions-leave-to {
+.visual-new-chat-suggestions-enter-from,
+.visual-new-chat-suggestions-leave-to {
     opacity: 0;
     transform: translateY(4px);
 }
 
-@keyframes new-chat-spin {
+@keyframes visual-new-chat-spin {
     to { transform: rotate(360deg); }
 }
 
 @media (max-width: 720px) {
-    .new-chat-stack {
+    .visual-new-chat-stack {
         width: min(calc(100% - 32px), 768px);
         padding: 40px 0;
         gap: 20px;
     }
 
-    .new-chat-title {
+    .visual-new-chat-title {
         font-size: 28px;
     }
 }
 
 @media (max-width: 480px) {
-    .new-chat-stack {
+    .visual-new-chat-stack {
         width: calc(100% - 24px);
         padding: 28px 0;
     }
 
-    .new-chat-title {
+    .visual-new-chat-title {
         font-size: 24px;
     }
 
-    .new-chat-suggestions__list {
+    .visual-new-chat-suggestions__list {
         gap: 8px;
     }
 
-    .new-chat-suggestion {
+    .visual-new-chat-suggestion {
         max-width: 100%;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .new-chat-suggestions,
-    .new-chat-suggestion,
-    .new-chat-suggestions-enter-active,
-    .new-chat-suggestions-leave-active,
-    .new-chat-suggestions__refresh {
+    .visual-new-chat-suggestions,
+    .visual-new-chat-suggestion,
+    .visual-new-chat-suggestions-enter-active,
+    .visual-new-chat-suggestions-leave-active,
+    .visual-new-chat-suggestions__refresh {
         transition: none !important;
     }
 }
