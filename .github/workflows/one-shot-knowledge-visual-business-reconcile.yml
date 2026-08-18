@@ -1,0 +1,294 @@
+name: One-shot knowledge visual/business reconcile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-knowledge-visual-business-reconcile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Reconcile upstream behavior with mechanical reference UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import re
+
+          root = Path('weknora/frontend/src')
+          active_path = root / 'views/knowledge/KnowledgeBase.vue'
+          mechanical_path = root / 'views/knowledge/KnowledgeBaseMechanical.vue'
+          app_path = root / 'App.vue'
+          test_path = root / 'views/knowledge/KnowledgeBase.test.mjs'
+          upload_test_path = root / 'views/knowledge/components/UploadConfirmDialog.test.ts'
+
+          upstream_url = 'https://raw.githubusercontent.com/Tencent/WeKnora/3d5d8bfcdfeeea266b292b71cea616847af28d0f/frontend/src/views/knowledge/KnowledgeBase.vue'
+          upstream = urlopen(upstream_url, timeout=30).read().decode('utf-8')
+          if '</script>' not in upstream:
+              raise SystemExit('upstream knowledge source missing script boundary')
+          upstream_script = upstream[:upstream.index('</script>') + len('</script>')]
+
+          mechanical = mechanical_path.read_text()
+          template_pos = mechanical.find('<template>')
+          if template_pos < 0:
+              raise SystemExit('mechanical source missing template')
+          presentation = mechanical[template_pos:]
+
+          # The reference presentation uses Lucide-compatible ReferenceIcon.
+          anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
+          if anchor not in upstream_script:
+              raise SystemExit('KBSwitcher import anchor missing')
+          upstream_script = upstream_script.replace(
+              anchor,
+              anchor + "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n",
+              1,
+          )
+
+          # Visual-only counters shown by the reference tab strip. Reuse the same
+          # upstream getWikiStats response already fetched for status; no behavior
+          # branch or extra API is introduced.
+          counter_anchor = "const wikiIsIndexing = computed(() => wikiStatus.value.isActive || wikiStatus.value.pendingTasks > 0)\n"
+          if counter_anchor not in upstream_script:
+              raise SystemExit('wiki counter anchor missing')
+          upstream_script = upstream_script.replace(
+              counter_anchor,
+              "const wikiCount = ref(0)\nconst graphCount = ref(0)\n" + counter_anchor,
+              1,
+          )
+          data_anchor = "    const data = res?.data || res\n    if (!data) return\n"
+          if data_anchor not in upstream_script:
+              raise SystemExit('wiki stats data anchor missing')
+          upstream_script = upstream_script.replace(
+              data_anchor,
+              data_anchor + "    wikiCount.value = Number(data.total_pages || 0)\n    graphCount.value = Number(data.total_links || 0)\n",
+              1,
+          )
+
+          # Mechanical template event wiring must delegate to the exact upstream
+          # handlers rather than the simplified staging implementation.
+          replacements = {
+              '@select="handleKnowledgeDropdownSelect"': '@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
+              '@open-source-doc="(id) => openKnowledgeItem({ id })"': '@open-source-doc="openSourceDoc"',
+              '@status-change="refreshWikiStats"': '@status-change="onWikiStatusChange"',
+              '@files="uploadFiles"': '@files="handleUploadSourceFiles"',
+              '@url="importUrl"': '@url="handleUploadSourceUrl"',
+              '@manual="createManual"': '@manual="handleManualCreate"',
+              '@toggle-checkbox="(id, checked) => toggleRow(id, checked)"': '@toggle-checkbox="onCardGridCheckboxChange"',
+              '@menu-visible-change="(visible, item) => visible && probeTraceAvailable(item)"': '@menu-visible-change="onCardMoreVisibleChange"',
+              '@toggle-row="toggleRow"': '@toggle-row="toggleSelectRow"',
+              '@toggle-all="toggleAll"': '@toggle-all="toggleSelectAll"',
+              '@action="handleCardAction"\n            @probe-trace': '@action="handleListAction"\n            @probe-trace',
+              '@cancel="cancelBatch"': '@cancel="handleBatchCancel"',
+              '@delete="deleteBatch"': '@delete="confirmBatchDelete"',
+              '@reparse="reparseBatch"': '@reparse="confirmBatchReparse"',
+              '@batch-tag="batchTag"': '@batch-tag="handleBatchTag"',
+              '@tag-created="loadTags"': '@tag-created="() => loadTags(kbId, true)"',
+              '@open-manage="tagManageDrawerVisible = true"': '@open-manage="openTagManageFromEditDialog"',
+              '@changed="() => { loadTags(); loadKnowledgeFiles() }"': '@changed="onTagManageChanged"',
+          }
+          for old, new in replacements.items():
+              if old in presentation:
+                  presentation = presentation.replace(old, new)
+
+          # Tag selection must run upstream's store-sync/reset behavior, not mutate
+          # the ref directly as the staging component did.
+          presentation = presentation.replace(
+              ':class="{ active: selectedTagIds.includes(tag.id) }"\n                      @click="selectedTagIds = selectedTagIds.includes(tag.id)\n                        ? selectedTagIds.filter((id) => id !== tag.id)\n                        : [...selectedTagIds, tag.id]"',
+              ':class="{ active: isTagFilterActive(tag.id) }"\n                      @click="handleTagRowClick(tag.id)"',
+          )
+
+          # Preserve upstream summary-state synchronization from DocContent.
+          if '@summary-state-change="syncDocumentSummaryState"' not in presentation:
+              presentation = presentation.replace(
+                  '      @getDoc="getDoc"\n    />',
+                  '      @getDoc="getDoc"\n      @summary-state-change="syncDocumentSummaryState"\n    />',
+                  1,
+              )
+
+          # Preserve upstream-only information/settings affordances and warnings;
+          # they are real product actions, so visual parity may skin but never drop them.
+          header_marker = '        <p>{{ $t(\'knowledgeEditor.document.subtitle\') }}</p>\n      </div>'
+          if header_marker not in presentation:
+              raise SystemExit('reference header marker missing')
+          header_extra = '''        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n        <div class="reference-kb-project-actions">\n          <KBInfoPopover\n            v-if="kbInfo && !authStore.isLiteMode"\n            :kb-info="kbInfo"\n            :supported-file-types="[...supportedFileTypes]"\n          />\n          <button\n            v-if="canManage"\n            type="button"\n            class="reference-kb-project-action"\n            :title="$t('knowledgeBase.settings')"\n            :disabled="!kbId"\n            @click="handleOpenKBSettings"\n          >\n            <ReferenceIcon name="settings" :size="14" />\n          </button>\n        </div>\n        <button v-if="unsupportedFileTypes.length" type="button" class="reference-kb-inline-warning" @click="goToParserSettings">\n          <ReferenceIcon name="info" :size="13" />\n          <span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map(t => '.' + t).join('、') }) }}</span>\n          <strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong>\n        </button>\n        <button v-if="missingStorageEngine" type="button" class="reference-kb-inline-warning" @click="handleOpenKBSettings">\n          <ReferenceIcon name="info" :size="13" />\n          <span>{{ $t('knowledgeBase.missingStorageEngine') }}</span>\n          <strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong>\n        </button>\n      </div>'''
+          presentation = presentation.replace(header_marker, header_extra, 1)
+
+          # The visual authority includes a real empty-state upload CTA. It must
+          # enter the upstream upload-confirm path, not bypass it.
+          old_empty = '''          <div v-else-if="!docListLoading" class="reference-empty-state">\n            <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />\n            <strong>暂无文档</strong>\n          </div>'''
+          new_empty = '''          <div v-else-if="!docListLoading" class="reference-empty-state">\n            <ReferenceIcon name="file-text" :size="40" :stroke-width="1" />\n            <strong>未找到符合条件的文档</strong>\n            <p>当前目录下暂无匹配文档，可以点击右上角「添加文档」上传或导入新内容。</p>\n            <button v-if="canEdit" type="button" class="reference-empty-state__upload" @click="uploadSourceRef?.openFilePicker?.()">\n              <ReferenceIcon name="upload" :size="14" />\n              <span>立即上传文档</span>\n            </button>\n          </div>'''
+          if old_empty in presentation:
+              presentation = presentation.replace(old_empty, new_empty, 1)
+
+          # Mechanical CSS additions for retained upstream controls, expressed in
+          # the same reference component language.
+          style_close = presentation.rfind('</style>')
+          if style_close < 0:
+              raise SystemExit('reference style boundary missing')
+          extra_css = r'''
+.reference-kb-header__copy { position: relative; }
+.reference-kb-project-actions { position: absolute; left: calc(100% + 10px); top: 0; display: flex; align-items: center; gap: 4px; }
+.reference-kb-project-action { width: 28px; height: 28px; padding: 0; border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; color: #6b7280; display: grid; place-items: center; cursor: pointer; }
+.reference-kb-project-action:hover { background: #f3f4f6; color: #111827; }
+.reference-kb-inline-warning { max-width: 760px; margin: 5px 0 0; padding: 0; border: 0; background: transparent; color: #9ca3af; display: flex; align-items: center; gap: 5px; font: inherit; font-size: 10px; line-height: 14px; text-align: left; cursor: pointer; }
+.reference-kb-inline-warning strong { color: #6b7280; font-weight: 700; }
+.reference-empty-state p { max-width: 360px; margin: 0; color: #9ca3af; font-size: 12px; line-height: 18px; }
+.reference-empty-state__upload { margin-top: 8px; height: 32px; padding: 0 16px; border: 0; border-radius: 12px; background: #111827; color: #fff; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.reference-empty-state__upload:hover { background: #000; }
+'''
+          presentation = presentation[:style_close] + extra_css + presentation[style_close:]
+
+          # Ensure the current ReferenceIcon enum covers the retained upstream UI.
+          icon_path = root / 'components/ReferenceIcon.vue'
+          icon_source = icon_path.read_text()
+          for literal in ["| 'info'", "| 'settings'"]:
+              if literal not in icon_source:
+                  insert_at = icon_source.find("| 'upload'")
+                  if insert_at < 0:
+                      raise SystemExit('ReferenceIcon union insertion anchor missing')
+                  icon_source = icon_source[:insert_at] + literal + "\n    " + icon_source[insert_at:]
+          if "name === 'info'" not in icon_source:
+              icon_source = icon_source.replace(
+                  "    <template v-else-if=\"name === 'layout-grid'\">",
+                  "    <template v-else-if=\"name === 'info'\">\n      <circle cx=\"12\" cy=\"12\" r=\"10\" />\n      <path d=\"M12 16v-4\" />\n      <path d=\"M12 8h.01\" />\n    </template>\n    <template v-else-if=\"name === 'layout-grid'\">",
+                  1,
+              )
+          if "name === 'settings'" not in icon_source:
+              icon_source = icon_source.replace(
+                  "    <template v-else-if=\"name === 'search'\">",
+                  "    <template v-else-if=\"name === 'settings'\">\n      <path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\" />\n      <circle cx=\"12\" cy=\"12\" r=\"3\" />\n    </template>\n    <template v-else-if=\"name === 'search'\">",
+                  1,
+              )
+          icon_path.write_text(icon_source)
+
+          active_path.write_text(upstream_script + '\n\n' + presentation)
+
+          # Restore upstream upload-confirm host in the product App shell without
+          # disturbing Musuw's auth handoff adaptations.
+          app = app_path.read_text()
+          host_import = 'import UploadConfirmHost from "@/components/UploadConfirmHost.vue";\n'
+          manual_import = 'import ManualKnowledgeEditor from "@/components/manual-knowledge-editor.vue";\n'
+          if host_import not in app:
+              if manual_import not in app:
+                  raise SystemExit('App manual editor import anchor missing')
+              app = app.replace(manual_import, manual_import + host_import, 1)
+          if '<UploadConfirmHost />' not in app:
+              app = app.replace('      <ManualKnowledgeEditor />', '      <ManualKnowledgeEditor />\n      <UploadConfirmHost />', 1)
+          app_path.write_text(app)
+
+          # The upload dropdown's existing file input is the same real action used
+          # by the top-right add-document menu; expose it for the reference empty CTA.
+          upload_path = root / 'views/knowledge/components/KbUploadSourceDropdown.vue'
+          upload = upload_path.read_text()
+          if 'const openFilePicker = () =>' not in upload:
+              anchor = "const openUrlDialog = () => {\n"
+              if anchor not in upload:
+                  raise SystemExit('upload source expose anchor missing')
+              upload = upload.replace(anchor, "const openFilePicker = () => fileInputRef.value?.click()\n\n" + anchor, 1)
+          upload = upload.replace('defineExpose({ openUrlDialog })', 'defineExpose({ openUrlDialog, openFilePicker })')
+          upload_path.write_text(upload)
+
+          # Replace stale tests that enforced the removed simplified business path.
+          test_path.write_text(r'''import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const source = readFileSync(new URL("./KnowledgeBase.vue", import.meta.url), "utf8");
+const cards = readFileSync(new URL("./components/DocumentCardView.vue", import.meta.url), "utf8");
+
+test("knowledge detail uses the visual-reference page hierarchy", () => {
+  assert.match(source, /class="reference-kb-header"/);
+  assert.match(source, /class="reference-kb-tabs"/);
+  assert.match(source, /class="reference-doc-stage"/);
+  assert.match(source, /class="reference-directory"/);
+  assert.match(source, /class="reference-toolbar"/);
+  assert.match(source, /class="reference-document-workspace"/);
+  assert.match(cards, /class="reference-card-grid"/);
+});
+
+test("knowledge detail preserves upstream WeKnora business contracts", () => {
+  assert.match(source, /useUploadConfirmStore/);
+  assert.match(source, /openUploadConfirmDialog/);
+  assert.match(source, /handleUploadConfirmResult/);
+  assert.match(source, /process_config/);
+  assert.match(source, /confirmRebuildKnowledge/);
+  assert.match(source, /getKnowledgeDetails/);
+  assert.match(source, /weknora:knowledge-file-drop/);
+  assert.match(source, /openURLImportDialog/);
+  assert.match(source, /knowledgeFileUploaded/);
+  assert.match(source, /handleKnowledgeTagChange/);
+  assert.match(source, /confirmBatchReparse/);
+  assert.match(source, /confirmBatchDelete/);
+  assert.match(source, /handleBatchTag/);
+});
+
+test("graph and trace internals remain product-owned exclusions", () => {
+  assert.match(source, /<WikiBrowser/);
+  assert.match(source, /<DocContent/);
+  assert.doesNotMatch(source, /wiki-graph-canvas|tree-container/);
+});
+''')
+          upload_test_path.write_text(r'''import assert from 'node:assert/strict'
+import test from 'node:test'
+import { readFileSync } from 'node:fs'
+
+const knowledgeBase = readFileSync(new URL('../KnowledgeBase.vue', import.meta.url), 'utf8')
+const app = readFileSync(new URL('../../../App.vue', import.meta.url), 'utf8')
+
+test('knowledge detail restores upstream upload confirmation behavior', () => {
+  assert.match(knowledgeBase, /useUploadConfirmStore/)
+  assert.match(knowledgeBase, /openUploadConfirmDialog/)
+  assert.match(knowledgeBase, /handleUploadConfirmResult/)
+  assert.match(knowledgeBase, /process_config/)
+  assert.match(knowledgeBase, /@files="handleUploadSourceFiles"/)
+  assert.match(knowledgeBase, /@url="handleUploadSourceUrl"/)
+  assert.match(knowledgeBase, /@manual="handleManualCreate"/)
+  assert.match(app, /UploadConfirmHost/)
+})
+''')
+
+          # Guard against accidentally activating the staging business controller.
+          result = active_path.read_text()
+          for required in [
+              'useUploadConfirmStore', 'openUploadConfirmDialog', 'handleUploadConfirmResult',
+              'reference-kb-header', 'reference-toolbar', 'handleBatchTag',
+              '@toggle-checkbox="onCardGridCheckboxChange"', '@action="handleListAction"',
+          ]:
+              if required not in result:
+                  raise SystemExit(f'missing required knowledge contract: {required}')
+          for forbidden in ['const uploadFiles = async', 'const importUrl = async', 'const createManual =']:
+              if forbidden in result:
+                  raise SystemExit(f'staging business logic leaked into active page: {forbidden}')
+          PY
+      - name: Validate frontend
+        working-directory: weknora/frontend
+        run: |
+          npm ci
+          npm test
+          npm run type-check
+          npm run build
+      - name: Commit reconciled knowledge UI
+        shell: bash
+        run: |
+          git config user.name "musuw-parity"
+          git config user.email "actions@users.noreply.github.com"
+          git add weknora/frontend/src/App.vue \
+                  weknora/frontend/src/components/ReferenceIcon.vue \
+                  weknora/frontend/src/views/knowledge/KnowledgeBase.vue \
+                  weknora/frontend/src/views/knowledge/KnowledgeBase.test.mjs \
+                  weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue \
+                  weknora/frontend/src/views/knowledge/components/UploadConfirmDialog.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix(ui): combine upstream knowledge behavior with reference UI"
+          git pull --rebase origin main
+          git push origin HEAD:main
