@@ -11,10 +11,12 @@ const withoutComments = mechanical.replace(/\/\*[\s\S]*?\*\//g, '')
 
 const migratedViewFiles = [
   '../views/creatChat/creatChat.vue',
+  '../components/menu.vue',
   '../components/UserMenu.vue',
   '../components/SessionSidebarRow.vue',
   '../components/SessionSourceFilter.vue',
   '../components/ModelSelector.vue',
+  '../components/ModelDebugDrawer.vue',
   '../components/AttachmentUpload.vue',
   '../components/KnowledgeBaseSelector.vue',
   '../components/KBSwitcherDropdown.vue',
@@ -27,6 +29,8 @@ const migratedViewFiles = [
   '../views/chat/components/usermsg.vue',
   '../views/chat/components/botmsg.vue',
   '../views/chat/components/docInfo.vue',
+  '../views/chat/components/deepThink.vue',
+  '../views/chat/components/RagPipelineProgress.vue',
   '../views/knowledge/components/DocumentCardView.vue',
   '../views/knowledge/components/DocumentListView.vue',
   '../views/knowledge/components/DocumentActionMenu.vue',
@@ -46,9 +50,10 @@ test('transitional mechanical layer remains last only while mother views are sti
   const reference = main.indexOf('import "@/assets/musuw-reference-mechanical.css"')
   assert.ok(reference > main.indexOf('import "@/assets/dropdown-menu.less"'))
   assert.ok(reference > main.indexOf('import "@/components/css/chat-hljs-dark.less"'))
-  for (const legacy of ['musuw-visual.less','musuw-reference-core.less','musuw-reference-workbench.less','musuw-reference-header.less','musuw-reference-knowledge-v2.less','musuw-reference-knowledge-v3.less','musuw-reference-knowledge-v4.less','musuw-reference-dom-bridge.css']) {
-    assert.equal(main.includes(legacy) || manifest.includes(legacy), false, `${legacy} must not be active`)
-  }
+  for (const legacy of [
+    'musuw-visual.less','musuw-reference-core.less','musuw-reference-workbench.less','musuw-reference-header.less',
+    'musuw-reference-knowledge-v2.less','musuw-reference-knowledge-v3.less','musuw-reference-knowledge-v4.less','musuw-reference-dom-bridge.css',
+  ]) assert.equal(main.includes(legacy) || manifest.includes(legacy), false, `${legacy} must not be active`)
 })
 
 test('migrated views own their own visual-prefixed geometry', () => {
@@ -63,8 +68,8 @@ test('global mechanical CSS never targets rebuilt visual roots', () => {
   assert.doesNotMatch(withoutComments, /\.visual-[a-z0-9_-]+/i)
 })
 
-test('remaining mechanical ownership is limited to legacy mother-root vocabulary', () => {
-  for (const token of ['.aside_box', '.rich-input-container', '.knowledge-layout']) {
+test('remaining mechanical ownership is limited to still-unmigrated mother roots', () => {
+  for (const token of ['.rich-input-container', '.knowledge-layout']) {
     assert.ok(mechanical.includes(token), `remaining mother root lost transitional styling: ${token}`)
   }
 })
