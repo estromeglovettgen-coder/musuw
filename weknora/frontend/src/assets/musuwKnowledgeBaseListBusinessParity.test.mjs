@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
+
+test('frozen KnowledgeBaseList controller remains the original implementation', () => {
+  assert.equal(
+    blobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),
+    '4379ee2fa0a16a366801765bdaf9597aa93bb9bf',
+  )
+})
+
+test('rebuilt KnowledgeBaseList reuses normalized frozen setup', () => {
+  const source = read('../views/knowledge/KnowledgeBaseList.vue')
+  assert.match(source, /import LegacyKnowledgeBaseListBusiness from .*KnowledgeBaseList\.pre-view\.vue/)
+  assert.match(source, /const legacySetup = legacy\.setup/)
+  assert.match(source, /return \{ \.\.\.state \}/)
+  assert.match(source, /class="visual-kb-list"/)
+  for (const token of [
+    'class="kb-list-container"',
+    'class="kb-list-content"',
+    'class="kb-card-wrap"',
+    'class="kb-card"',
+    'class="card-header"',
+  ]) assert.equal(source.includes(token), false, `KnowledgeBaseList still exposes legacy shell ${token}`)
+})
+
+test('rebuilt list retains native upload, pin, favorite, duplicate, delete, create and origin states', () => {
+  const source = read('../views/knowledge/KnowledgeBaseList.vue')
+  for (const token of [
+    'uploadSummaries.length',
+    'summary.completed === summary.total',
+    'summary.hasError',
+    'isKbFavorited(kb.id)',
+    'toggleFavoriteKb(kb.id, $event)',
+    'handleTogglePin(kb)',
+    'canDuplicateKBCard(kb)',
+    'handleDuplicate(kb)',
+    'canManageKBCard(kb)',
+    'handleDelete(kb)',
+    'handleCreateKnowledgeBase',
+    'kb.isProcessing',
+    'kb.question_generation_config?.enabled',
+    '(kb.share_count ?? 0) > 0',
+    'showKbOriginBadge(kb)',
+    'ResourceOriginBadge',
+    'KnowledgeBaseEditorModal',
+    'ShareKnowledgeBaseDialog',
+    'sharedDetailPanelVisible',
+  ]) assert.ok(source.includes(token), `KnowledgeBaseList active View lost ${token}`)
+})
