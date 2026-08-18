@@ -32,8 +32,6 @@ const baseline = new Map([
   ['../views/knowledge/components/BatchTagDialog.vue', 'dde15cb2dd4c8019b2f5f7b03277039a4c5af0b0'],
   ['../views/knowledge/components/KbTagManageDrawer.vue', 'cc60b273a36ce031dc906cb3a680bb48496745b3'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
-  ['../views/knowledge/components/TagEditDialog.test.ts', '9c26837db390555b9a97372775b5738b19b0f1ce'],
-  ['../views/knowledge/components/TagEditDialog.vue', '9127b181a073395a3b2de2e3b527594ba0a7ec86'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],
   ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
@@ -186,6 +184,19 @@ test('upload source preserves file folder URL and manual creation behavior', () 
     "emit('url', url)",
     'new URL(url)',
     'defineExpose({ openUrlDialog })',
+  ])
+})
+
+test('tag edit preserves selection creation confirmation and manage handoff', () => {
+  assertContracts('../views/knowledge/components/TagEditDialog.vue', 'tag edit', [
+    'selectedSet.value = new Set(props.selectedTags.map((t) => t.id))',
+    'function toggleTag(tagId: string)',
+    'function clearAll()',
+    'await createKnowledgeBaseTag(props.kbId, { name })',
+    "emit('tag-created')",
+    "emit('confirm', Array.from(selectedSet.value))",
+    "emit('update:visible', false)",
+    "emit('open-manage')",
   ])
 })
 
