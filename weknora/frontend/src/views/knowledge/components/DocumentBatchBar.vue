@@ -1,160 +1,279 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue';
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue'
 
-defineProps<{
-  count: number;
-  deleteLoading?: boolean;
-  reparseLoading?: boolean;
-  tagLoading?: boolean;
-  // When true the bar stays visible even with 0 selections, so users can exit
-  // batch mode from here without selecting anything first.
-  visible?: boolean;
-  /** Hidden when the knowledge base has no folder structure to file into. */
-  showMoveToFolder?: boolean;
-  folderOptions?: FolderOption[];
-}>();
+const props = defineProps<{
+  count: number
+  deleteLoading?: boolean
+  reparseLoading?: boolean
+  tagLoading?: boolean
+  visible?: boolean
+  showMoveToFolder?: boolean
+  folderOptions?: FolderOption[]
+}>()
 
 const emit = defineEmits<{
-  (e: 'cancel'): void;
-  (e: 'delete'): void;
-  (e: 'reparse'): void;
-  (e: 'batchTag'): void;
-  (e: 'moveToFolder', folderPath: string): void;
-}>();
+  (e: 'cancel'): void
+  (e: 'delete'): void
+  (e: 'reparse'): void
+  (e: 'batchTag'): void
+  (e: 'moveToFolder', folderPath: string): void
+}>()
 
-const { t } = useI18n();
+const { t } = useI18n()
+const folderPickerVisible = ref(false)
 
-const folderPickerVisible = ref(false);
+const actionsDisabled = computed(() =>
+  props.count === 0 || !!props.deleteLoading || !!props.reparseLoading || !!props.tagLoading,
+)
+
+const handleFolderConfirm = (path: string) => {
+  folderPickerVisible.value = false
+  emit('moveToFolder', path)
+}
 </script>
 
 <template>
-  <transition name="batch-bar-fade">
-    <div v-if="visible || count > 0" class="doc-batch-bar" role="region"
-      :aria-label="t('knowledgeBase.selectedCount', { count })">
-      <div class="batch-bar-inner">
-        <div class="batch-bar-left">
-          <span class="batch-bar-count">{{ t('knowledgeBase.selectedCount', { count }) }}</span>
-          <t-button variant="text" theme="default" size="small" class="batch-bar-clear" @click="emit('cancel')">
-            {{ t('knowledgeBase.clearSelection') }}
-          </t-button>
-        </div>
-        <div class="batch-bar-actions">
-          <t-popconfirm theme="warning" :content="t('knowledgeBase.confirmBatchReparseDocument', { count })"
-            :confirm-btn="{ content: t('knowledgeBase.confirmBatchReparse'), theme: 'warning' }"
-            :cancel-btn="{ content: t('common.cancel') }" placement="top" @confirm="emit('reparse')">
-            <t-button theme="default" variant="outline" size="small"
-              :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading" :loading="reparseLoading" @click.stop>
-              <template #icon><t-icon name="refresh" size="14px" /></template>
-              {{ t('knowledgeBase.rebuildDocument') }}
-            </t-button>
-          </t-popconfirm>
-
-          <t-button theme="default" variant="outline" size="small"
-            :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading" :loading="tagLoading"
-            @click="emit('batchTag')">
-            <template #icon><t-icon name="discount" size="14px" /></template>
-            {{ t('knowledgeBase.batchTag') }}
-          </t-button>
-
-          <t-popup v-if="showMoveToFolder" v-model:visible="folderPickerVisible" trigger="click"
-            placement="top" overlay-class-name="card-more" destroy-on-close>
-            <t-button theme="default" variant="outline" size="small"
-              :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading">
-              <template #icon><t-icon name="folder" size="14px" /></template>
-              {{ t('knowledgeBase.moveToFolder.action') }}
-            </t-button>
-            <template #content>
-              <div class="card-menu">
-                <FolderPickerMenu :options="folderOptions || []"
-                  @confirm="(path: string) => { folderPickerVisible = false; emit('moveToFolder', path) }" />
-              </div>
-            </template>
-          </t-popup>
-
-          <t-popconfirm theme="warning" :content="t('knowledgeBase.confirmBatchDeleteDocument', { count })"
-            :confirm-btn="{ content: t('knowledgeBase.confirmDelete'), theme: 'danger' }"
-            :cancel-btn="{ content: t('common.cancel') }" placement="top" @confirm="emit('delete')">
-            <t-button theme="danger" variant="outline" size="small"
-              :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading" :loading="deleteLoading" @click.stop>
-              <template #icon><t-icon name="delete" size="14px" /></template>
-              {{ t('knowledgeBase.batchDelete') }}
-            </t-button>
-          </t-popconfirm>
-        </div>
+  <Transition name="visual-document-batch">
+    <aside
+      v-if="visible || count > 0"
+      class="visual-document-batch"
+      role="region"
+      :aria-label="t('knowledgeBase.selectedCount', { count })"
+    >
+      <div class="visual-document-batch__summary">
+        <span class="visual-document-batch__count">
+          {{ t('knowledgeBase.selectedCount', { count }) }}
+        </span>
+        <button type="button" class="visual-document-batch__clear" @click="emit('cancel')">
+          {{ t('knowledgeBase.clearSelection') }}
+        </button>
       </div>
-    </div>
-  </transition>
+
+      <div class="visual-document-batch__actions">
+        <t-popconfirm
+          theme="warning"
+          :content="t('knowledgeBase.confirmBatchReparseDocument', { count })"
+          :confirm-btn="{ content: t('knowledgeBase.confirmBatchReparse'), theme: 'warning' }"
+          :cancel-btn="{ content: t('common.cancel') }"
+          placement="top"
+          @confirm="emit('reparse')"
+        >
+          <button
+            type="button"
+            class="visual-document-batch__button"
+            :disabled="actionsDisabled"
+            @click.stop
+          >
+            <t-loading v-if="reparseLoading" size="small" />
+            <t-icon v-else name="refresh" />
+            <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
+          </button>
+        </t-popconfirm>
+
+        <button
+          type="button"
+          class="visual-document-batch__button"
+          :disabled="actionsDisabled"
+          @click="emit('batchTag')"
+        >
+          <t-loading v-if="tagLoading" size="small" />
+          <t-icon v-else name="discount" />
+          <span>{{ t('knowledgeBase.batchTag') }}</span>
+        </button>
+
+        <t-popup
+          v-if="showMoveToFolder"
+          v-model:visible="folderPickerVisible"
+          trigger="click"
+          placement="top"
+          destroy-on-close
+          :overlay-inner-style="{ padding: '6px' }"
+        >
+          <button
+            type="button"
+            class="visual-document-batch__button"
+            :disabled="actionsDisabled"
+          >
+            <t-icon name="folder" />
+            <span>{{ t('knowledgeBase.moveToFolder.action') }}</span>
+          </button>
+          <template #content>
+            <FolderPickerMenu
+              :options="folderOptions || []"
+              @confirm="handleFolderConfirm"
+            />
+          </template>
+        </t-popup>
+
+        <t-popconfirm
+          theme="warning"
+          :content="t('knowledgeBase.confirmBatchDeleteDocument', { count })"
+          :confirm-btn="{ content: t('knowledgeBase.confirmDelete'), theme: 'danger' }"
+          :cancel-btn="{ content: t('common.cancel') }"
+          placement="top"
+          @confirm="emit('delete')"
+        >
+          <button
+            type="button"
+            class="visual-document-batch__button is-danger"
+            :disabled="actionsDisabled"
+            @click.stop
+          >
+            <t-loading v-if="deleteLoading" size="small" />
+            <t-icon v-else name="delete" />
+            <span>{{ t('knowledgeBase.batchDelete') }}</span>
+          </button>
+        </t-popconfirm>
+      </div>
+    </aside>
+  </Transition>
 </template>
 
 <style scoped lang="less">
-.doc-batch-bar {
+.visual-document-batch {
   position: relative;
   z-index: 5;
-  width: 100%;
-  max-width: 560px;
+  width: min(760px, 100%);
+  min-width: 0;
   margin: 0 auto;
-  padding: 0 4px;
+  padding: 8px 10px;
   box-sizing: border-box;
-}
-
-.batch-bar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 10%);
+  backdrop-filter: blur(12px);
 }
 
-.batch-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.visual-document-batch__summary {
   min-width: 0;
-  flex: 1;
-}
-
-.batch-bar-count {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--td-text-color-secondary);
-  white-space: nowrap;
-}
-
-.batch-bar-clear {
-  flex-shrink: 0;
-  padding: 0 6px !important;
-  height: 28px !important;
-  font-size: 12px;
-  color: var(--td-text-color-secondary) !important;
-
-  &:hover {
-    color: var(--td-brand-color) !important;
-  }
-}
-
-.batch-bar-actions {
-  flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
 }
 
-.batch-bar-fade-enter-active,
-.batch-bar-fade-leave-active {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+.visual-document-batch__count {
+  color: #374151;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.batch-bar-fade-enter-from,
-.batch-bar-fade-leave-to {
+.visual-document-batch__clear {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.visual-document-batch__clear:hover {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.visual-document-batch__actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.visual-document-batch__button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 100ms ease;
+}
+
+.visual-document-batch__button:hover:not(:disabled) {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #111827;
+}
+
+.visual-document-batch__button:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.visual-document-batch__button:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.visual-document-batch__button.is-danger {
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.visual-document-batch__button.is-danger:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.visual-document-batch__button :deep(.t-icon),
+.visual-document-batch__button :deep(.t-loading) {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
+.visual-document-batch-enter-active,
+.visual-document-batch-leave-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.visual-document-batch-enter-from,
+.visual-document-batch-leave-to {
   opacity: 0;
   transform: translateY(6px);
+}
+
+@media (max-width: 700px) {
+  .visual-document-batch {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .visual-document-batch__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-document-batch-enter-active,
+  .visual-document-batch-leave-active,
+  .visual-document-batch__button {
+    transition: none !important;
+  }
 }
 </style>
