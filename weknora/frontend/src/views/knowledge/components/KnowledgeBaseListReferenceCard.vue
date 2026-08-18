@@ -1,0 +1,147 @@
+<script setup lang="ts">
+import KbWikiBadge from './KbWikiBadge.vue'
+import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
+
+const props = withDefaults(defineProps<{
+  kb: any
+  shared?: boolean
+  favorited?: boolean
+  canFavorite?: boolean
+  canDuplicate?: boolean
+  canManage?: boolean
+  showOriginBadge?: boolean
+  originVariant?: string
+  creatorName?: string
+  orgName?: string
+  highlighted?: boolean
+  showDetailsOnly?: boolean
+}>(), {
+  shared: false,
+  favorited: false,
+  canFavorite: true,
+  canDuplicate: false,
+  canManage: false,
+  showOriginBadge: false,
+  originVariant: '',
+  creatorName: '',
+  orgName: '',
+  highlighted: false,
+  showDetailsOnly: false,
+})
+
+const emit = defineEmits<{
+  open: []
+  favorite: [event: MouseEvent]
+  pin: []
+  duplicate: []
+  delete: []
+  details: []
+}>()
+</script>
+
+<template>
+  <article
+    class="visual-reference-kb-card group"
+    :class="{ 'is-shared': shared, 'is-faq': kb.type === 'faq', 'is-highlighted': highlighted }"
+    @click="emit('open')"
+  >
+    <button
+      v-if="canFavorite"
+      type="button"
+      class="visual-reference-kb-card__favorite"
+      :class="{ 'is-active': favorited }"
+      :aria-label="favorited ? $t('knowledgeList.favorites.remove') : $t('knowledgeList.favorites.add')"
+      @click.stop="emit('favorite', $event)"
+    >
+      <t-icon :name="favorited ? 'star-filled' : 'star'" />
+    </button>
+
+    <header class="visual-reference-kb-card__header">
+      <div class="visual-reference-kb-card__title" :title="kb.name">
+        <KbWikiBadge v-if="kb.indexing_strategy?.wiki_enabled" />
+        <strong>{{ kb.name }}</strong>
+      </div>
+
+      <t-tooltip v-if="showDetailsOnly" :content="$t('knowledgeList.menu.viewDetails')" placement="top">
+        <button type="button" class="visual-reference-kb-card__more" :aria-label="$t('knowledgeList.menu.viewDetails')" @click.stop="emit('details')">
+          <t-icon name="info-circle" />
+        </button>
+      </t-tooltip>
+
+      <t-popup v-else-if="canDuplicate || canManage || !shared" trigger="click" destroy-on-close placement="bottom-right">
+        <button type="button" class="visual-reference-kb-card__more" @click.stop><t-icon name="ellipsis" /></button>
+        <template #content>
+          <div class="visual-reference-kb-card-menu" @click.stop>
+            <button v-if="!shared" type="button" @click="emit('pin')"><t-icon :name="kb.is_pinned ? 'pin-filled' : 'pin'" /><span>{{ kb.is_pinned ? $t('knowledgeList.pin.unpin') : $t('knowledgeList.pin.pin') }}</span></button>
+            <button v-if="canDuplicate" type="button" @click="emit('duplicate')"><t-icon name="file-copy" /><span>{{ $t('knowledgeList.menu.duplicate') }}</span></button>
+            <button v-if="canManage" type="button" class="is-danger" @click="emit('delete')"><t-icon name="delete" /><span>{{ $t('common.delete') }}</span></button>
+          </div>
+        </template>
+      </t-popup>
+    </header>
+
+    <p class="visual-reference-kb-card__description">{{ kb.description || $t('knowledgeBase.noDescription') }}</p>
+
+    <footer class="visual-reference-kb-card__footer">
+      <span class="visual-reference-kb-card__badge">
+        <t-icon :name="kb.type === 'faq' ? 'chat-bubble-help' : 'file'" />
+        <span>{{ kb.type === 'faq' ? (kb.chunk_count ?? 0) : (kb.knowledge_count ?? 0) }} {{ kb.type === 'faq' ? 'Q&A' : $t('knowledgeBase.documentCount') }}</span>
+        <span v-if="kb.isProcessing" class="visual-reference-kb-card__spinner" />
+      </span>
+      <span class="visual-reference-kb-card__spacer" />
+      <ResourceOriginBadge v-if="showOriginBadge" :variant="originVariant" :creator-name="creatorName" />
+      <span v-else-if="orgName" class="visual-reference-kb-card__origin" :title="orgName"><t-icon name="usergroup" /><span>{{ orgName }}</span></span>
+    </footer>
+  </article>
+</template>
+
+<style scoped lang="less">
+.visual-reference-kb-card {
+  position: relative;
+  min-width: 0;
+  min-height: 154px;
+  padding: 18px;
+  box-sizing: border-box;
+  border: 1px solid rgb(229 231 235 / 90%);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.visual-reference-kb-card:hover { border-color: #d1d5db; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%),0 2px 4px -2px rgb(0 0 0 / 10%); }
+.visual-reference-kb-card.is-highlighted { border-color: #9ca3af; box-shadow: 0 0 0 2px rgb(17 24 39 / 8%),0 1px 2px rgb(0 0 0 / 5%); }
+.visual-reference-kb-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.visual-reference-kb-card__title { min-width: 0; flex: 1; padding-right: 50px; display: flex; align-items: center; gap: 6px; }
+.visual-reference-kb-card__title strong { min-width: 0; overflow: hidden; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.visual-reference-kb-card__favorite { position: absolute; top: 12px; right: 42px; z-index: 2; width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #d1d5db; opacity: 0; cursor: pointer; transition: opacity 150ms ease, color 150ms ease, background-color 150ms ease; }
+.visual-reference-kb-card:hover .visual-reference-kb-card__favorite,.visual-reference-kb-card__favorite.is-active { opacity: 1; }
+.visual-reference-kb-card__favorite.is-active { color: #d97706; }
+.visual-reference-kb-card__favorite:hover { background: #f3f4f6; }
+.visual-reference-kb-card__more { flex: 0 0 28px; width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; opacity: 0; cursor: pointer; transition: opacity 150ms ease, color 150ms ease, background-color 150ms ease; }
+.visual-reference-kb-card:hover .visual-reference-kb-card__more,.visual-reference-kb-card__more:focus-visible { opacity: 1; }
+.visual-reference-kb-card__more:hover { background: #f3f4f6; color: #374151; }
+.visual-reference-kb-card__more :deep(.t-icon) { font-size: 14px; }
+.visual-reference-kb-card__description { margin: 8px 0 0; overflow: hidden; color: #6b7280; font-size: 12px; line-height: 1.625; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.visual-reference-kb-card__footer { margin-top: auto; padding-top: 12px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 8px; }
+.visual-reference-kb-card__badge { min-height: 22px; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; background: #f3f4f6; color: #4b5563; font-size: 11px; line-height: 18px; font-weight: 600; }
+.visual-reference-kb-card__badge :deep(.t-icon) { font-size: 12px; }
+.visual-reference-kb-card__spinner { width: 9px; height: 9px; border: 1px solid #9ca3af; border-right-color: transparent; border-radius: 50%; animation: visual-kb-card-spin .8s linear infinite; }
+.visual-reference-kb-card__spacer { flex: 1; }
+.visual-reference-kb-card__origin { min-width: 0; max-width: 130px; display: inline-flex; align-items: center; gap: 4px; color: #9ca3af; font-size: 10px; line-height: 14px; }
+.visual-reference-kb-card__origin :deep(.t-icon) { flex: 0 0 12px; font-size: 12px; }
+.visual-reference-kb-card__origin span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes visual-kb-card-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .visual-reference-kb-card,.visual-reference-kb-card__favorite,.visual-reference-kb-card__more { transition: none !important; } .visual-reference-kb-card__spinner { animation: none; } }
+</style>
+
+<style lang="less">
+.visual-reference-kb-card-menu { min-width: 136px; padding: 4px; }
+.visual-reference-kb-card-menu button { width: 100%; min-height: 30px; padding: 6px 8px; border: 0; border-radius: 8px; display: flex; align-items: center; gap: 8px; background: transparent; color: #374151; font-size: 11px; text-align: left; cursor: pointer; }
+.visual-reference-kb-card-menu button:hover { background: #f9fafb; }
+.visual-reference-kb-card-menu button.is-danger { color: #dc2626; }
+.visual-reference-kb-card-menu button.is-danger:hover { background: #fef2f2; }
+</style>
