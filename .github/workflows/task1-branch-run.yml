@@ -1,15 +1,16 @@
-# trigger: current main supplies business logic; audited historical commits supply reference child UI
 name: Task1 isolated current-main parity transplant
 
 on:
   push:
     branches: [task1-source-parity-final]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: task1-source-parity-final
+  group: task1-source-parity-final-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -50,6 +51,7 @@ jobs:
         run: |
           grep -q 'reference-kb-header' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
           ! grep -q 'class="knowledge-layout"' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          ! grep -q 'class="doc-filter-bar"' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
           grep -q 'ReferenceIcon' weknora/frontend/src/views/knowledge/components/DocumentCardView.vue
           ! grep -q 'more.png' weknora/frontend/src/views/knowledge/components/DocumentCardView.vue
           grep -q 'ReferenceIcon' weknora/frontend/src/views/knowledge/components/DocumentListView.vue
@@ -58,6 +60,8 @@ jobs:
           grep -q 'showFolderTree && !folderTreeCollapsed' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
           grep -q '<WikiBrowser' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
           grep -q '<DocContent' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          ! grep -q 'const uploadFiles = async' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          ! grep -q 'const importUrl = async' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
       - name: Validate frontend
         working-directory: weknora/frontend
         run: |
@@ -67,6 +71,7 @@ jobs:
           npm run check-i18n
           npm run build
       - name: Commit audited source replacement to isolated branch
+        if: github.event_name == 'push'
         run: |
           git config user.name "musuw-task1-audit"
           git config user.email "actions@users.noreply.github.com"
