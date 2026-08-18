@@ -3,36 +3,27 @@
     trigger="click"
     placement="bottom-left"
     :overlay-style="{ padding: 0 }"
-    :overlay-inner-style="{ padding: 0 }"
+    :overlay-inner-style="{ padding: '5px' }"
   >
     <template #content>
-      <div class="kb-switcher-card">
-        <div class="kb-switcher-list">
-          <button
-            v-for="item in sortedList"
-            :key="item.id"
-            type="button"
-            class="kb-switcher-row"
-            :class="{ active: item.id === currentKbId }"
-            @click="handleSelect(item.id)"
-          >
-            <t-icon
-              :name="iconFor(item.type)"
-              class="kb-switcher-row-icon"
-              size="16px"
-            />
-            <span class="kb-switcher-row-name" :title="item.name">{{ item.name }}</span>
-            <t-icon
-              v-if="item.id === currentKbId"
-              name="check"
-              class="kb-switcher-row-check"
-              size="14px"
-            />
-          </button>
-          <div v-if="!sortedList.length" class="kb-switcher-empty">
-            {{ t('common.noData') }}
-          </div>
-        </div>
+      <div class="visual-kb-switcher" role="listbox">
+        <button
+          v-for="item in sortedList"
+          :key="item.id"
+          type="button"
+          class="visual-kb-switcher__row"
+          :class="{ 'is-current': item.id === currentKbId }"
+          role="option"
+          :aria-selected="item.id === currentKbId"
+          @click="handleSelect(item.id)"
+        >
+          <span class="visual-kb-switcher__icon" aria-hidden="true">
+            <t-icon :name="iconFor(item.type)" />
+          </span>
+          <span class="visual-kb-switcher__name" :title="item.name">{{ item.name }}</span>
+          <t-icon v-if="item.id === currentKbId" name="check" class="visual-kb-switcher__check" />
+        </button>
+        <div v-if="!sortedList.length" class="visual-kb-switcher__empty">{{ t('common.noData') }}</div>
       </div>
     </template>
     <slot />
@@ -60,11 +51,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-// Sort the list with the current KB pinned to the top so users always
-// see "where they are" without scrolling. The rest preserves the
-// caller's order (typically "mine first, then shared"); we don't
-// re-sort alphabetically because that loses the recency / share-source
-// signal embedded in the input order.
 const sortedList = computed<KBEntry[]>(() => {
   const all = props.kbList || []
   const current = all.find((kb) => kb.id === props.currentKbId)
@@ -72,10 +58,7 @@ const sortedList = computed<KBEntry[]>(() => {
   return [current, ...all.filter((kb) => kb.id !== props.currentKbId)]
 })
 
-const iconFor = (type?: string): string => {
-  if (type === 'faq') return 'chat-bubble-help'
-  return 'folder'
-}
+const iconFor = (type?: string): string => type === 'faq' ? 'chat-bubble-help' : 'folder'
 
 const handleSelect = (id: string): void => {
   if (id === props.currentKbId) return
@@ -84,77 +67,58 @@ const handleSelect = (id: string): void => {
 </script>
 
 <style scoped lang="less">
-.kb-switcher-card {
+.visual-kb-switcher {
+  width: min(300px, calc(100vw - 24px));
   min-width: 220px;
-  max-width: 320px;
-  /* Mirror the info popover's cap so both header surfaces stay inside
-     the viewport on shorter laptops. */
   max-height: min(60vh, 420px);
-  display: flex;
-  flex-direction: column;
-  padding: 6px;
-  overflow: hidden;
-}
-
-.kb-switcher-list {
-  flex: 1 1 auto;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
-.kb-switcher-row {
+.visual-kb-switcher__row {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
   background: transparent;
-  color: var(--td-text-color-primary);
-  font-size: 13px;
-  line-height: 1.4;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  color: #4b5563;
+  font: inherit;
+  font-size: 11px;
+  line-height: 17px;
   text-align: left;
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer);
-  }
-
-  &.active {
-    background: var(--td-brand-color-light, rgba(0, 82, 217, 0.08));
-    color: var(--td-brand-color);
-    font-weight: 500;
-  }
+  cursor: pointer;
 }
 
-.kb-switcher-row-icon {
-  flex: 0 0 auto;
-  color: var(--td-text-color-placeholder);
-
-  .kb-switcher-row.active & {
-    color: var(--td-brand-color);
-  }
+.visual-kb-switcher__row:hover,
+.visual-kb-switcher__row.is-current {
+  background: #f3f4f6;
+  color: #111827;
 }
 
-.kb-switcher-row-name {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.visual-kb-switcher__row.is-current {
+  font-weight: 650;
 }
 
-.kb-switcher-row-check {
-  flex: 0 0 auto;
-  color: var(--td-brand-color);
+.visual-kb-switcher__icon {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  color: #6b7280;
 }
 
-.kb-switcher-empty {
-  padding: 16px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-}
+.visual-kb-switcher__icon :deep(.t-icon) { font-size: 13px; }
+.visual-kb-switcher__name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-kb-switcher__check { flex: 0 0 12px; font-size: 12px; color: #4b5563; }
+.visual-kb-switcher__empty { padding: 18px 10px; color: #9ca3af; font-size: 11px; text-align: center; }
 </style>
