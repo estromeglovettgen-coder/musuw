@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - ci/mechanical-ui-frontend-verify
+  pull_request:
+    branches:
+      - ui/mechanical-visual-contract-final
+    paths:
+      - 'weknora/frontend/**'
+      - '.github/workflows/mechanical-ui-frontend-verify.yml'
 
 permissions:
   contents: read
