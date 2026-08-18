@@ -8,8 +8,6 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 
 const frozen = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
-  ['../components/ChatCitationFloat.vue', 'b2a42b84fc7a76ecbe8fb5f1c8079dddf6ef555b'],
-  ['../components/ChatRequestInfoButton.vue', '2919cfc635677812f2e407c06ebf0f5661952900'],
   ['../components/Input-field.vue', 'a34d09f5f9dbe44d4b3835213fdab662c4b7446a'],
   ['../components/ModelDebugDrawer.vue', '9a4e8055dd52f862edc19f4e703cf4e068852dc5'],
   ['../components/manual-knowledge-editor.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
@@ -41,6 +39,8 @@ const contracts = new Map([
   ['../components/ChatAttachmentPreviewDrawer.vue', ["const MAIN_DRAWER_WIDTH_KEY = 'weknora-chat-attachment-drawer-width'",'localStorage.getItem(MAIN_DRAWER_WIDTH_KEY)','localStorage.setItem(MAIN_DRAWER_WIDTH_KEY, String(mainDrawerWidth.value))','mainDrawerWidth.value = clampMainDrawerWidth(mainResizeStartWidth + delta)','drawer?.close()','cleanupMainDrawerResize()']],
   ['../components/MentionSelector.vue', ['props.items.filter((item) => item.type === "kb")','props.items.filter((item) => item.type === "file")','props.groupCounts?.[def.type] ?? loadedCount','if (group.type === "file" && props.hasMore)','const isFlatMode = computed','emit("update:activeIndex", group.offset)','defineExpose({ moveActive, confirmActive, leaveGroup })','agent_id: agentIdForDetail.value','agent_source_tenant_id: agentSourceTenantIdForDetail.value','await getKnowledgeBaseById(item.id, opts)','await getKnowledgeDetails(item.id, opts)','router.push(`/platform/knowledge-bases/${kbId}`)','router.push("/platform/organizations")','emit("loadMore")',"querySelectorAll(\".visual-mention-item\")"]],
   ['../components/ChatHeader.vue', ['normalizeSessionTitleDraft(titleDraft.value)','await renameSession(session.id, title, session.description || \'\')','await setSessionPinned(session.id, pinned)','await copyText(props.session.id)','await copyText(currentSessionLink())','collectAllSessionMessages','buildSessionMarkdown','await clearSession(session.id)','await removeSession(session.id)','window.open(currentSessionLink(), \'_blank\', \'noopener,noreferrer\')']],
+  ['../components/ChatRequestInfoButton.vue', ['buildChatRequestDebugPayload(debugInfo.value)','copyTextToClipboard','requestId: (s.request_id as string) || dr?.requestId','messageId: (s.id as string) || undefined','sessionId: props.sessionId || dr?.sessionId','visible.value = false']],
+  ['../components/ChatCitationFloat.vue', ["float.type === 'web'",'float.loading','float.error','float.content','const loadingText = t(\'common.loading\')']],
   ['../components/ChatReferencesDrawer.vue', ['buildReferenceSections(references.value)','resolveReferenceHighlightKey(references.value, highlight.value)','if (item.knowledgeId) query.knowledge_id = item.knowledgeId','path: `/platform/knowledge-bases/${item.knowledgeBaseId}`','watch(highlight, () => { void scrollToHighlight() })']],
   ['../views/knowledge/components/DocumentCardView.vue', ["emit('open', item)","emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))","emit('move-to-folder', item, path)","emit('action', action, item)",'props.traceAvailableById[item.id] === true']],
   ['../views/knowledge/components/DocumentListView.vue', ["emit('toggle-all', checked)","emit('toggle-row', item.id, checked, !!me?.shiftKey)","if (it) emit('probe-trace', it)","emit('reset-move-state')","emit('move-to-folder', item, path)"]],
