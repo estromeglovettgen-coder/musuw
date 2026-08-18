@@ -28,7 +28,6 @@ const baseline = new Map([
   ['../views/chat/components/usermsg.vue', '6dd0f2e44e4fc382d6f40702aa4b5eebc2467fea'],
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
-  ['../views/knowledge/components/DocumentListView.vue', 'dc553565d2c1818878c3c34631dc4d33010f96c6'],
   ['../views/knowledge/components/BatchTagDialog.test.ts', '2cecdf2012ef924bfabe6f7fdbf3a3ab55c7ef8d'],
   ['../views/knowledge/components/BatchTagDialog.vue', 'dde15cb2dd4c8019b2f5f7b03277039a4c5af0b0'],
   ['../views/knowledge/components/DocumentBatchBar.vue', 'de5e7b6ed2685b9754a4d7c1becbf574a27abdfe'],
@@ -119,6 +118,19 @@ test('document-card view may replace markup and CSS but must preserve its event 
     "emit('action', action, item)",
     "folderPickerItemId.value = item.id",
     "props.traceAvailableById[item.id] === true",
+  ])
+})
+
+test('document list view may replace markup and CSS but must preserve row selection, trace probing, folder move and move-state behavior', () => {
+  assertContracts('../views/knowledge/components/DocumentListView.vue', 'document list view', [
+    "emit('toggle-all', checked)",
+    "emit('toggle-row', item.id, checked, !!me?.shiftKey)",
+    "if (it) emit('probe-trace', it)",
+    "emit('reset-move-state')",
+    "emit('move-to-folder', item, path)",
+    "folderPickerItemId.value = item.id",
+    "emit('action', action, item)",
+    'stickyObserver.observe(stickySentinel.value)',
   ])
 })
 
