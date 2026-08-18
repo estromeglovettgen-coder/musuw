@@ -1,234 +1,91 @@
 <template>
-  <div v-if="visible" ref="rootElement" class="rag-pipeline-progress">
-    <!-- Announcements need a region that outlives each wait row, otherwise screen
-         readers miss a live region that appears together with its own text. -->
-    <div class="sr-only" role="status" aria-live="polite">{{ liveStatusText }}</div>
+  <section v-if="visible" ref="rootElement" class="visual-rag-pipeline">
+    <div class="visual-rag-pipeline__sr" role="status" aria-live="polite">{{ liveStatusText }}</div>
 
-    <div v-if="showPrePipelineWait" class="tree-children">
-      <div class="tree-child tree-child-last streaming-loading-node">
-        <div class="tree-branch" />
-        <div class="tree-child-content">
-          <div class="action-card action-pending">
-            <div class="action-header no-results">
-              <div class="action-title">
-                <t-icon class="action-title-icon" name="lightbulb" />
-                <span class="action-name">{{ t('chat.preparingAnswer') }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <button
+      v-if="showCollapsedRoot"
+      type="button"
+      class="visual-rag-pipeline__summary"
+      :aria-expanded="showExpandedTimeline"
+      :aria-label="collapsedStatusText"
+      @click="toggleExpanded"
+    >
+      <span>{{ collapsedStatusText }}</span>
+      <span v-if="referenceSummaryText" class="visual-rag-pipeline__reference-summary">{{ referenceSummaryText }}</span>
+      <t-icon :name="showExpandedTimeline ? 'chevron-down' : 'chevron-right'" />
+    </button>
 
-    <div v-else-if="!showCollapsedRoot" class="tree-children">
-      <div v-for="(step, index) in steps" :key="step.id" class="tree-child" :class="{
-        'tree-child-last':
-          !showDoneRow
-          && !showWaitStep
-          && !showThinkingStep
-          && index === steps.length - 1,
-      }">
-        <div class="tree-branch" />
-        <div class="tree-child-content">
-          <div class="tool-event">
-            <div
-              class="action-card"
-              :class="{ 'has-reference-trigger': step.canOpenReferences }"
-              :role="step.canOpenReferences ? 'button' : undefined"
-              :tabindex="step.canOpenReferences ? 0 : undefined"
-              @click="handleStepClick(step)"
-              @keydown.enter="handleStepClick(step)"
-              @keydown.space.prevent="handleStepClick(step)"
-            >
-              <div
-                class="action-header"
-                :class="{ 'no-results': !step.canOpenReferences }"
-              >
-                <div class="action-title">
-                  <t-icon class="action-title-icon" :name="step.iconName" />
-                  <span class="action-name" :class="{ 'is-running': step.pending }">{{ step.title }}</span>
-                </div>
-              </div>
-              <div v-if="step.summaryHtml" class="search-results-summary-fixed">
-                <div class="results-summary-text" v-html="step.summaryHtml" />
-              </div>
-            </div>
-          </div>
-        </div>
+    <div v-if="showExpandedTimeline" class="visual-rag-timeline">
+      <div v-if="showPrePipelineWait" class="visual-rag-step is-running">
+        <span class="visual-rag-step__rail" aria-hidden="true"><span class="visual-rag-step__spinner" /></span>
+        <div class="visual-rag-step__body"><strong>{{ t('chat.preparingAnswer') }}</strong></div>
       </div>
 
-      <div
-        v-if="showWaitStep"
-        class="tree-child tree-child-last streaming-loading-node rag-model-wait-step"
+      <button
+        v-for="step in steps"
+        :key="step.id"
+        type="button"
+        class="visual-rag-step"
+        :class="{ 'is-running': step.pending, 'is-clickable': step.canOpenReferences }"
+        :disabled="!step.canOpenReferences"
+        @click="handleStepClick(step)"
       >
-        <div class="tree-branch" />
-        <div class="tree-child-content">
-          <div class="tool-event">
-            <div class="action-card" :class="{ 'action-pending': !waitStepStalled }">
-              <div class="action-header no-results">
-                <div class="action-title">
-                  <t-icon class="action-title-icon" name="lightbulb" />
-                  <span class="action-name">{{ waitStepText }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <span class="visual-rag-step__rail" aria-hidden="true">
+          <span v-if="step.pending" class="visual-rag-step__spinner" />
+          <t-icon v-else :name="step.iconName" />
+        </span>
+        <span class="visual-rag-step__body">
+          <strong>{{ step.title }}</strong>
+          <span v-if="step.summaryHtml" class="visual-rag-step__summary" v-html="step.summaryHtml" />
+        </span>
+        <t-icon v-if="step.canOpenReferences" name="chevron-right" class="visual-rag-step__open" />
+      </button>
+
+      <div v-if="showWaitStep" class="visual-rag-step" :class="{ 'is-running': !waitStepStalled, 'is-stalled': waitStepStalled }">
+        <span class="visual-rag-step__rail" aria-hidden="true">
+          <span v-if="!waitStepStalled" class="visual-rag-step__spinner" />
+          <t-icon v-else name="time" />
+        </span>
+        <div class="visual-rag-step__body"><strong>{{ waitStepText }}</strong></div>
+      </div>
+
+      <div v-if="showThinkingStep" class="visual-rag-step visual-rag-thinking" :class="{ 'is-running': thinkingPending }">
+        <span class="visual-rag-step__rail" aria-hidden="true">
+          <span v-if="thinkingPending" class="visual-rag-step__spinner" />
+          <t-icon v-else name="lightbulb" />
+        </span>
+        <div class="visual-rag-step__body">
+          <button
+            type="button"
+            class="visual-rag-thinking__toggle"
+            :disabled="!thinkingContent"
+            @click="toggleThinking"
+          >
+            <strong>{{ t('agent.think') }}</strong>
+            <t-icon v-if="thinkingContent" :name="thinkingExpanded ? 'chevron-down' : 'chevron-right'" />
+          </button>
+          <div v-if="thinkingContent && thinkingExpanded" class="visual-rag-thinking__content">{{ thinkingContent }}</div>
         </div>
       </div>
 
-      <div v-if="showThinkingStep" class="tree-child rag-thinking-step"
-        :class="{ 'tree-child-last': !showDoneRow }">
-        <div class="tree-branch" />
-        <div class="tree-child-content">
-          <div class="tool-event">
-            <div class="action-card" :class="{ 'action-pending': thinkingPending }">
-              <div class="action-header" :class="{ 'no-results': !thinkingContent }" @click="toggleThinking">
-                <div class="action-title">
-                  <t-icon class="action-title-icon" name="lightbulb" />
-                  <span class="action-name">{{ t('agent.think') }}</span>
-                </div>
-              </div>
-              <div v-if="thinkingContent && thinkingExpanded" class="thinking-detail-content">
-                {{ thinkingContent }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="showDoneRow" class="tree-child agent-step-done tree-child-last">
-        <div class="tree-branch" />
-        <div class="tree-child-content">
-          <div class="tool-event">
-            <div class="action-card">
-              <div class="action-header no-results">
-                <div class="action-title">
-                  <t-icon class="action-title-icon" name="check-circle" />
-                  <span class="action-name">{{ t('common.finish') }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div v-if="showDoneRow" class="visual-rag-step is-done">
+        <span class="visual-rag-step__rail" aria-hidden="true"><t-icon name="check-circle" /></span>
+        <div class="visual-rag-step__body"><strong>{{ t('common.finish') }}</strong></div>
       </div>
     </div>
-
-    <div v-else class="tree-container">
-      <div class="tool-event">
-        <div class="action-card tree-root">
-          <div class="tree-root-toolbar">
-            <button
-              type="button"
-              class="tree-root-expand"
-              :aria-expanded="showExpandedTimeline"
-              :aria-label="collapsedStatusText"
-              @click="toggleExpanded"
-            >
-              <span class="tree-root-status">{{ collapsedStatusText }}</span>
-              <span
-                v-if="referenceSummaryText"
-                class="tree-root-reference"
-              >
-                {{ referenceSummaryText }}
-              </span>
-              <t-icon
-                class="tree-root-expand__icon"
-                :name="showExpandedTimeline ? 'chevron-down' : 'chevron-right'"
-              />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="showExpandedTimeline" class="tree-children tree-children-expanded">
-        <div v-for="(step, index) in steps" :key="step.id" class="tree-child"
-          :class="{ 'tree-child-last': index === steps.length - 1 && !showDoneRow && !showThinkingStep }">
-          <div class="tree-branch" />
-          <div class="tree-child-content">
-            <div class="tool-event">
-              <div
-                class="action-card"
-                :class="{ 'has-reference-trigger': step.canOpenReferences }"
-                :role="step.canOpenReferences ? 'button' : undefined"
-                :tabindex="step.canOpenReferences ? 0 : undefined"
-                @click="handleStepClick(step)"
-                @keydown.enter="handleStepClick(step)"
-                @keydown.space.prevent="handleStepClick(step)"
-              >
-                <div
-                  class="action-header"
-                  :class="{ 'no-results': !step.canOpenReferences }"
-                >
-                  <div class="action-title">
-                    <t-icon class="action-title-icon" :name="step.iconName" />
-                    <span class="action-name" :class="{ 'is-running': step.pending }">{{ step.title }}</span>
-                  </div>
-                </div>
-                <div v-if="step.summaryHtml" class="search-results-summary-fixed">
-                  <div class="results-summary-text" v-html="step.summaryHtml" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="showThinkingStep" class="tree-child rag-thinking-step" :class="{ 'tree-child-last': !showDoneRow }">
-          <div class="tree-branch" />
-          <div class="tree-child-content">
-            <div class="tool-event">
-              <div class="action-card" :class="{ 'action-pending': thinkingPending }">
-                <div class="action-header" :class="{ 'no-results': !thinkingContent }" @click="toggleThinking">
-                  <div class="action-title">
-                    <t-icon class="action-title-icon" name="lightbulb" />
-                    <span class="action-name">{{ t('agent.think') }}</span>
-                  </div>
-                </div>
-                <div v-if="thinkingContent && thinkingExpanded" class="thinking-detail-content">
-                  {{ thinkingContent }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="showDoneRow" class="tree-child agent-step-done tree-child-last">
-          <div class="tree-branch" />
-          <div class="tree-child-content">
-            <div class="tool-event">
-              <div class="action-card">
-                <div class="action-header no-results">
-                  <div class="action-title">
-                    <t-icon class="action-title-icon" name="check-circle" />
-                    <span class="action-name">{{ t('common.finish') }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getAgentToolIconName } from '@/utils/agent-tool-icons'
-import {
-  getKnowledgeSearchSummaryHtml,
-  getRagPipelineStepTitle,
-  getRetrievalSearchSource,
-} from '@/utils/agent-tool-display'
+import { getKnowledgeSearchSummaryHtml, getRagPipelineStepTitle, getRetrievalSearchSource } from '@/utils/agent-tool-display'
 import { getAttachmentParsingSummaryHtml } from '@/utils/attachmentParsingDisplay'
 import { RAG_RETRIEVAL_TOOL_NAMES, RAG_TIMELINE_TOOL_NAMES } from '@/utils/rag-pipeline-history'
 import { useChatReferencesDrawer } from '@/composables/useChatReferencesDrawer'
 import { buildReferenceSections } from '@/utils/referenceSources'
-import {
-  createRagWaitController,
-  getRagPipelineWaitKind,
-  type RagWaitView,
-} from '@/utils/rag-pipeline-state'
+import { createRagWaitController, getRagPipelineWaitKind, type RagWaitView } from '@/utils/rag-pipeline-state'
 
 const props = defineProps<{
   session?: {
@@ -247,31 +104,22 @@ const userExpanded = ref(false)
 const thinkingExpanded = ref(true)
 const rootElement = ref<HTMLElement | null>(null)
 const waitView = ref<RagWaitView>({ kind: 'none', stalled: false })
-const waitController = createRagWaitController((view) => {
-  waitView.value = view
-})
+const waitController = createRagWaitController((view) => { waitView.value = view })
 
 const thinkingContent = computed(() => {
   const stream = props.session?.agentEventStream
   if (!Array.isArray(stream)) return ''
-  return stream
-    .filter((event) => event.type === 'thinking')
-    .map((event) => String(event.content || ''))
-    .join('')
+  return stream.filter((event) => event.type === 'thinking').map((event) => String(event.content || '')).join('')
 })
-
 const hasThinking = computed(() => thinkingContent.value.trim().length > 0)
-
 const hasThinkingEvent = computed(() => {
   const stream = props.session?.agentEventStream
   if (!Array.isArray(stream)) return false
   return stream.some((event) => event.type === 'thinking')
 })
-
 const hasAnswer = computed(() => {
   const sessionContent = props.session?.content
   if (typeof sessionContent === 'string' && sessionContent.trim().length > 0) return true
-
   const stream = props.session?.agentEventStream
   if (!stream?.length) return false
   return stream.some((event) => {
@@ -280,46 +128,25 @@ const hasAnswer = computed(() => {
     return typeof content === 'string' && content.trim().length > 0
   })
 })
-
-const hasReferences = computed(
-  () => (props.session?.knowledge_references?.length ?? 0) > 0,
-)
-
+const hasReferences = computed(() => (props.session?.knowledge_references?.length ?? 0) > 0)
 const referenceSections = computed(() => buildReferenceSections(props.session?.knowledge_references))
 
 const steps = computed(() => {
   const stream = props.session?.agentEventStream
   if (!stream?.length) return []
-
   return stream
-    .filter((event) => {
-      return (
-        event.type === 'tool_call' &&
-        typeof event.tool_name === 'string' &&
-        RAG_TIMELINE_TOOL_NAMES.has(event.tool_name)
-      )
-    })
+    .filter((event) => event.type === 'tool_call' && typeof event.tool_name === 'string' && RAG_TIMELINE_TOOL_NAMES.has(event.tool_name))
     .map((event) => {
       const toolName = String(event.tool_name)
       const pending = event.pending === true
-      const toolData =
-        event.tool_data && typeof event.tool_data === 'object'
-          ? (event.tool_data as Record<string, unknown>)
-          : null
-
+      const toolData = event.tool_data && typeof event.tool_data === 'object' ? (event.tool_data as Record<string, unknown>) : null
       const isSearchTool = RAG_RETRIEVAL_TOOL_NAMES.has(toolName)
       const isAttachmentTool = toolName === 'attachment_parsing' || toolName === 'image_analysis'
-      const searchSource = isSearchTool
-        ? getRetrievalSearchSource(event.arguments, toolData)
-        : undefined
+      const searchSource = isSearchTool ? getRetrievalSearchSource(event.arguments, toolData) : undefined
       let summaryHtml = ''
-      if (!pending && isSearchTool && toolData) {
-        summaryHtml = getKnowledgeSearchSummaryHtml(t, toolData)
-      } else if (!pending && isAttachmentTool) {
-        summaryHtml = getAttachmentParsingSummaryHtml(t, event)
-      }
+      if (!pending && isSearchTool && toolData) summaryHtml = getKnowledgeSearchSummaryHtml(t, toolData)
+      else if (!pending && isAttachmentTool) summaryHtml = getAttachmentParsingSummaryHtml(t, event)
       const canOpenReferences = !pending && isSearchTool && hasReferences.value
-
       return {
         id: String(event.tool_call_id || `${toolName}-${event.timestamp || 0}`),
         toolName,
@@ -338,14 +165,8 @@ const steps = computed(() => {
     })
 })
 
-const allStepsDone = computed(
-  () => steps.value.length > 0 && steps.value.every((step) => !step.pending),
-)
-
-const hasCompletedRetrievalStep = computed(() => steps.value.some(
-  (step) => RAG_RETRIEVAL_TOOL_NAMES.has(step.toolName) && !step.pending,
-))
-
+const allStepsDone = computed(() => steps.value.length > 0 && steps.value.every((step) => !step.pending))
+const hasCompletedRetrievalStep = computed(() => steps.value.some((step) => RAG_RETRIEVAL_TOOL_NAMES.has(step.toolName) && !step.pending))
 const waitKind = computed(() => getRagPipelineWaitKind({
   isCompleted: Boolean(props.session?.is_completed),
   hasAnswer: hasAnswer.value,
@@ -354,94 +175,40 @@ const waitKind = computed(() => getRagPipelineWaitKind({
   allStepsDone: allStepsDone.value,
   hasCompletedRetrievalStep: hasCompletedRetrievalStep.value,
 }))
-
 const showWaitStep = computed(() => waitView.value.kind !== 'none')
-
 const waitStepStalled = computed(() => waitView.value.stalled)
-
 const waitStepText = computed(() => {
   if (waitView.value.stalled) return t('chat.modelStillResponding')
-  return waitView.value.kind === 'model'
-    ? t('chat.connectingModelAndGeneratingAnswer')
-    : t('chat.preparingAnswer')
+  return waitView.value.kind === 'model' ? t('chat.connectingModelAndGeneratingAnswer') : t('chat.preparingAnswer')
 })
-
-const showCollapsedRoot = computed(
-  () =>
-    (hasAnswer.value || Boolean(props.session?.is_completed)) &&
-    (steps.value.length > 0 || hasThinking.value),
-)
-
-const showExpandedTimeline = computed(() => {
-  if (!showCollapsedRoot.value) return true
-  return userExpanded.value
-})
-
+const showCollapsedRoot = computed(() => (hasAnswer.value || Boolean(props.session?.is_completed)) && (steps.value.length > 0 || hasThinking.value))
+const showExpandedTimeline = computed(() => !showCollapsedRoot.value || userExpanded.value)
 const showDoneRow = computed(() => {
   const turnDone = hasAnswer.value || Boolean(props.session?.is_completed)
   if (!turnDone) return false
   if (steps.value.length > 0 && !allStepsDone.value) return false
   return true
 })
-
-const showPrePipelineWait = computed(() => {
-  if (hasAnswer.value || props.session?.is_completed || steps.value.length > 0 || hasThinking.value) {
-    return false
-  }
-  return true
-})
-
-// Only show the thinking row once the backend actually streams thinking events.
-// Do not pre-empt during the model phase — that flashes "思考" even when thinking is disabled.
+const showPrePipelineWait = computed(() => !(hasAnswer.value || props.session?.is_completed || steps.value.length > 0 || hasThinking.value))
 const showThinkingStep = computed(() => hasThinkingEvent.value)
-
-const thinkingPending = computed(
-  () =>
-    showThinkingStep.value &&
-    !hasThinking.value &&
-    !hasAnswer.value &&
-    !props.session?.is_completed,
-)
-
-const isThinkingStreaming = computed(
-  () =>
-    showThinkingStep.value &&
-    thinkingExpanded.value &&
-    !hasAnswer.value &&
-    !props.session?.is_completed,
-)
-
-const visible = computed(
-  () => steps.value.length > 0 || showPrePipelineWait.value || showThinkingStep.value,
-)
-
+const thinkingPending = computed(() => showThinkingStep.value && !hasThinking.value && !hasAnswer.value && !props.session?.is_completed)
+const isThinkingStreaming = computed(() => showThinkingStep.value && thinkingExpanded.value && !hasAnswer.value && !props.session?.is_completed)
+const visible = computed(() => steps.value.length > 0 || showPrePipelineWait.value || showThinkingStep.value)
 const liveStatusText = computed(() => {
   if (showPrePipelineWait.value) return t('chat.preparingAnswer')
   if (showWaitStep.value) return waitStepText.value
   return ''
 })
-
 const collapsedStatusText = computed(() => {
-  if (steps.value.length === 0) {
-    return hasThinking.value ? t('agentStream.toolStatus.thinkingDone') : ''
-  }
+  if (steps.value.length === 0) return hasThinking.value ? t('agentStream.toolStatus.thinkingDone') : ''
   return t('agentStream.ragPipeline.searchDone')
 })
-
 const referenceSummaryText = computed(() => {
   const docCount = referenceSections.value.find((section) => section.id === 'documents')?.items.length ?? 0
   const webCount = referenceSections.value.find((section) => section.id === 'web')?.items.length ?? 0
-
-  if (docCount > 0 && webCount > 0) {
-    return t('chat.referencesDocAndWebCount', { docCount, webCount })
-  }
-  if (docCount > 0) {
-    return t('chat.referencesDocCount', { count: docCount })
-  }
-  if (webCount > 0) {
-    return t('chat.referencesWebCount', { count: webCount })
-  }
-
+  if (docCount > 0 && webCount > 0) return t('chat.referencesDocAndWebCount', { docCount, webCount })
+  if (docCount > 0) return t('chat.referencesDocCount', { count: docCount })
+  if (webCount > 0) return t('chat.referencesWebCount', { count: webCount })
   return ''
 })
 
@@ -455,315 +222,56 @@ function toggleReferencesDrawer() {
     sourceKey: `rag:${props.session?.id || refs.map((item) => item.knowledge_id || item.knowledge_title).join('|')}`,
   })
 }
-
-function handleStepClick(step: { canOpenReferences?: boolean }) {
-  if (!step.canOpenReferences) return
-  toggleReferencesDrawer()
-}
-
-function toggleExpanded() {
-  userExpanded.value = !userExpanded.value
-}
-
-function toggleThinking() {
-  if (!showThinkingStep.value || !thinkingContent.value) return
-  thinkingExpanded.value = !thinkingExpanded.value
-}
-
+function handleStepClick(step: { canOpenReferences?: boolean }) { if (step.canOpenReferences) toggleReferencesDrawer() }
+function toggleExpanded() { userExpanded.value = !userExpanded.value }
+function toggleThinking() { if (showThinkingStep.value && thinkingContent.value) thinkingExpanded.value = !thinkingExpanded.value }
 function scrollThinkingDetailToBottom() {
   nextTick(() => {
     if (!rootElement.value) return
-    rootElement.value.querySelectorAll('.thinking-detail-content').forEach((el) => {
+    rootElement.value.querySelectorAll('.visual-rag-thinking__content').forEach((el) => {
       const htmlEl = el as HTMLElement
       htmlEl.scrollTop = htmlEl.scrollHeight
     })
   })
 }
 
-watch(thinkingPending, (pending) => {
-  if (pending) {
-    thinkingExpanded.value = true
-  }
-})
-
+watch(thinkingPending, (pending) => { if (pending) thinkingExpanded.value = true })
 watch(waitKind, (kind) => waitController.update(kind), { immediate: true })
-
-watch(hasAnswer, (answered) => {
-  if (answered && hasThinking.value) {
-    thinkingExpanded.value = false
-  }
-})
-
-watch(thinkingContent, () => {
-  if (!isThinkingStreaming.value) return
-  scrollThinkingDetailToBottom()
-})
-
-watch(thinkingExpanded, (expanded) => {
-  if (!expanded || !isThinkingStreaming.value) return
-  scrollThinkingDetailToBottom()
-})
-
-onBeforeUnmount(() => {
-  waitController.dispose()
-})
+watch(hasAnswer, (answered) => { if (answered && hasThinking.value) thinkingExpanded.value = false })
+watch(thinkingContent, () => { if (isThinkingStreaming.value) scrollThinkingDetailToBottom() })
+watch(thinkingExpanded, (expanded) => { if (expanded && isThinkingStreaming.value) scrollThinkingDetailToBottom() })
+onBeforeUnmount(() => { waitController.dispose() })
 </script>
 
 <style scoped lang="less">
-@import '@/components/css/chat-timeline-loading.less';
-
-.rag-pipeline-progress {
-  --agent-step-text-size: 14px;
-  --agent-step-summary-size: 13px;
-  --agent-step-line-color: color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
-  --agent-step-icon-color: var(--td-text-color-placeholder);
-  --agent-step-rail-offset: 28px;
-  --agent-step-rail-x: 8px;
-
-  margin: 0;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.tree-container {
-  margin: 0 0 8px;
-  position: relative;
-}
-
-.tree-root {
-  margin-bottom: 0;
-
-  .tree-root-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .tree-root-expand {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--td-text-color-secondary);
-    font-size: 14px;
-    line-height: 22px;
-    cursor: pointer;
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 100%;
-
-    &:hover {
-      background: transparent;
-      color: var(--td-text-color-primary);
-    }
-  }
-
-  .tree-root-status,
-  .tree-root-reference {
-    flex: 0 1 auto;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .tree-root-reference {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-
-    &::before {
-      content: '';
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: currentColor;
-      opacity: 0.65;
-      flex-shrink: 0;
-    }
-  }
-
-  .tree-root-expand__icon {
-    flex-shrink: 0;
-    font-size: 14px;
-    color: currentColor;
-  }
-
-}
-
-.tree-children {
-  position: relative;
-  padding-left: 0;
-  margin-top: 0;
-  margin-left: 0;
-}
-
-.tree-children-expanded {
-  margin-top: 12px;
-}
-
-.tree-child {
-  position: relative;
-  padding-left: var(--agent-step-rail-offset);
-  padding-bottom: 0;
-  margin-bottom: 12px;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: var(--agent-step-rail-x);
-    top: 16px;
-    bottom: -12px;
-    width: 0;
-    border-left: 1px solid var(--agent-step-line-color);
-  }
-
-  .tree-branch {
-    display: none;
-  }
-
-  &.tree-child-last {
-    margin-bottom: 0;
-
-    &::before {
-      content: none;
-    }
-  }
-}
-
-.tool-event {
-  .action-card {
-    position: relative;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-
-    &.has-reference-trigger {
-      cursor: pointer;
-
-      &:hover {
-        .action-name,
-        .results-summary-text {
-          color: var(--td-text-color-primary);
-        }
-      }
-    }
-  }
-
-  .action-header {
-    display: flex;
-    align-items: center;
-    min-height: 22px;
-    padding: 0;
-    cursor: pointer;
-    user-select: none;
-
-    &.no-results {
-      cursor: default;
-    }
-  }
-
-  .action-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    position: relative;
-    flex: 0 1 auto;
-    min-width: 0;
-
-    .action-show-icon {
-      flex-shrink: 0;
-      margin-left: 2px;
-    }
-  }
-
-  .action-title-icon {
-    position: absolute;
-    left: calc(-1 * var(--agent-step-rail-offset));
-    top: 2px;
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    color: var(--agent-step-icon-color);
-  }
-
-  .action-name {
-    font-size: var(--agent-step-text-size);
-    line-height: 1.55;
-    font-weight: 400;
-    color: var(--td-text-color-secondary);
-    word-break: break-word;
-    max-width: min(820px, 100%);
-  }
-}
-
-.search-results-summary-fixed {
-  padding: 2px 0 0 0;
-
-  .results-summary-text {
-    font-size: var(--agent-step-summary-size);
-    font-weight: 400;
-    color: var(--td-text-color-secondary);
-    line-height: 1.5;
-
-    :deep(strong) {
-      color: var(--td-text-color-secondary);
-      font-weight: 500;
-    }
-  }
-}
-
-.rag-thinking-step {
-  .thinking-detail-content {
-    margin-top: 0;
-    padding: 0;
-    font-size: var(--agent-step-summary-size);
-    font-weight: 400;
-    color: var(--td-text-color-placeholder);
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .action-pending .action-name {
-    color: var(--td-text-color-secondary);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rag-pipeline-progress,
-  .rag-pipeline-progress * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .tree-root {
-    .tree-root-toolbar {
-      gap: 8px;
-    }
-
-    .tree-root-expand {
-      max-width: 100%;
-    }
-  }
-}
+.visual-rag-pipeline { width: 100%; margin: 0 0 8px; color: #6b7280; }
+.visual-rag-pipeline__sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.visual-rag-pipeline__summary { min-height: 30px; padding: 4px 7px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #6b7280; font: inherit; font-size: 10px; line-height: 16px; cursor: pointer; }
+.visual-rag-pipeline__summary:hover { background: #f9fafb; color: #374151; }
+.visual-rag-pipeline__reference-summary { display: inline-flex; align-items: center; gap: 5px; color: #9ca3af; }
+.visual-rag-pipeline__reference-summary::before { content: ''; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.visual-rag-pipeline__summary :deep(.t-icon) { font-size: 11px; color: #9ca3af; }
+.visual-rag-timeline { position: relative; margin-top: 3px; padding: 2px 0 2px 5px; }
+.visual-rag-timeline::before { content: ''; position: absolute; top: 17px; bottom: 17px; left: 13px; width: 1px; background: #e5e7eb; }
+.visual-rag-step { position: relative; width: 100%; min-height: 34px; padding: 5px 6px; border: 0; border-radius: 9px; display: flex; align-items: flex-start; gap: 8px; background: transparent; color: #6b7280; font: inherit; text-align: left; }
+button.visual-rag-step { cursor: default; }
+button.visual-rag-step.is-clickable { cursor: pointer; }
+button.visual-rag-step.is-clickable:hover { background: #f9fafb; color: #374151; }
+.visual-rag-step__rail { position: relative; z-index: 1; flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #9ca3af; }
+.visual-rag-step__rail :deep(.t-icon) { font-size: 12px; }
+.visual-rag-step__spinner { width: 9px; height: 9px; border: 1px solid #9ca3af; border-right-color: transparent; border-radius: 50%; animation: visual-rag-spin .8s linear infinite; }
+.visual-rag-step__body { min-width: 0; flex: 1; padding-top: 1px; display: flex; flex-direction: column; gap: 2px; }
+.visual-rag-step__body strong { color: #6b7280; font-size: 10px; line-height: 16px; font-weight: 500; }
+.visual-rag-step.is-running .visual-rag-step__body strong { color: #4b5563; }
+.visual-rag-step.is-stalled .visual-rag-step__body strong { color: #9ca3af; }
+.visual-rag-step.is-done .visual-rag-step__rail { color: #6b7280; }
+.visual-rag-step__summary { color: #9ca3af; font-size: 9px; line-height: 15px; }
+.visual-rag-step__summary :deep(strong) { color: #6b7280; font-size: inherit; font-weight: 600; }
+.visual-rag-step__open { flex: 0 0 11px; margin-top: 3px; font-size: 11px; color: #d1d5db; }
+.visual-rag-thinking__toggle { width: 100%; padding: 0; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.visual-rag-thinking__toggle:disabled { cursor: default; }
+.visual-rag-thinking__toggle :deep(.t-icon) { font-size: 10px; color: #9ca3af; }
+.visual-rag-thinking__content { max-height: 200px; overflow-y: auto; margin-top: 3px; padding: 7px 8px; border-left: 1px solid #e5e7eb; color: #9ca3af; font-size: 9px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+@keyframes visual-rag-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .visual-rag-step__spinner { animation: none; } }
 </style>
