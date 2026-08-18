@@ -1,0 +1,105 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const expectTokens = (path, tokens) => {
+  const source = read(path)
+  for (const token of tokens) assert.ok(source.includes(token), `${path} drifted from reference-source token: ${token}`)
+}
+
+test('Sidebar.tsx source tokens remain mechanically translated', () => {
+  expectTokens('../components/menu.vue', [
+    'width: 256px;', 'min-width: 256px;', 'padding: 12px;', 'background: #fbfbfb;',
+    'width: 56px;', 'min-width: 56px;', 'Musuw 穆苏瓦',
+    'border-radius: 12px;', 'font-size: 13px;',
+  ])
+  expectTokens('../components/SessionSidebarRow.vue', [
+    'padding: 6px 10px;', 'border-radius: 8px;', 'font-size: 12.5px;',
+  ])
+  expectTokens('../components/UserMenu.vue', [
+    'border-radius: 12px;', 'width: 30px;', 'height: 30px;', 'font-size: 12px;', 'font-size: 10px;',
+  ])
+})
+
+test('QAPanel.tsx composer tokens remain mechanically translated', () => {
+  expectTokens('../components/Input-field.vue', [
+    'padding: 16px;', 'border-radius: 20px;', 'background: #f4f5f7;',
+    'min-height: 44px !important;', 'max-height: 180px !important;', 'font-size: 15px;',
+    'gap: 12px;', 'gap: 16px;', 'width: 18px;', 'height: 18px;',
+    'width: 32px;', 'height: 32px;', 'border-radius: 8px;',
+  ])
+})
+
+test('QAPanel.tsx message stream tokens remain mechanically translated', () => {
+  expectTokens('../views/chat/index.vue', [
+    'width: min(768px,100%);', 'gap: 32px;', 'padding-bottom: 16px;',
+    'padding: 58px 16px 24px;',
+  ])
+  expectTokens('../views/chat/components/usermsg.vue', [
+    'max-width: 85%;', 'padding: 10px 18px;', 'border-radius: 18px;', 'background: #f4f4f4;', 'font-size: 14.5px;',
+  ])
+  expectTokens('../views/chat/components/botmsg.vue', [
+    'font-size: 14.5px;', 'gap: 6px;', 'padding-top: 6px;', 'opacity: 0;', 'font-size: 16px;',
+  ])
+  expectTokens('../views/chat/components/deepThink.vue', [
+    'margin-left: -6px;', 'padding: 4px 6px;', 'border-radius: 8px;', 'font-size: 12px;',
+  ])
+  expectTokens('../views/chat/components/RagPipelineProgress.vue', [
+    'gap: 14px;', 'padding: 0 0 14px;', 'width: 16px;', 'height: 16px;', 'font-size: 12.5px;', 'font-size: 11px;',
+  ])
+  expectTokens('../components/css/chat-citations.less', [
+    'padding: 2px 6px;', 'border-radius: 6px;', 'font-size: 10px;',
+  ])
+})
+
+test('KnowledgeBase.tsx and DocumentListView.tsx tokens remain mechanically translated', () => {
+  expectTokens('../views/knowledge/KnowledgeBase.vue', [
+    'padding: 20px 28px;', 'gap: 20px;', 'padding-bottom: 16px;',
+    'padding: 4px;', 'border-radius: 12px;', 'padding: 6px 14px;', 'font-size: 12px;',
+    'padding: 10px;', 'border-radius: 16px;', 'padding: 4px 10px;',
+  ])
+  expectTokens('../views/knowledge/components/KbFolderTree.vue', [
+    'flex-basis: 48px;', 'width: 48px;', 'flex: 0 0 224px;', 'width: 224px;',
+  ])
+  expectTokens('../views/knowledge/components/DocumentCardView.vue', [
+    'grid-template-columns: repeat(auto-fill,minmax(240px,1fr));', 'gap: 16px;',
+    'height: 192px;', 'padding: 16px;', 'border-radius: 16px;',
+    'font-size: 12px;', 'font-size: 11px;', 'font-size: 10px;',
+  ])
+})
+
+test('SourcesPanel.tsx tokens remain mechanically translated', () => {
+  expectTokens('../components/ChatReferencesDrawer.vue', [
+    'padding: 14px 16px;', 'font-size: 14px;', 'padding: 14px;',
+    'padding: 12px;', 'border-radius: 12px;', 'font-size: 12px;', 'font-size: 11px;',
+    'border-color: #3b82f6;',
+  ])
+})
+
+test('KnowledgeBase.tsx list tokens remain mechanically translated while native scopes stay wired', () => {
+  expectTokens('../views/knowledge/KnowledgeBaseList.vue', [
+    'padding: 24px;', 'gap: 24px;', 'padding-bottom: 20px;', 'font-size: 20px;',
+    'grid-template-columns: repeat(2,minmax(0,1fr));', 'grid-template-columns: repeat(3,minmax(0,1fr));', 'gap: 18px;',
+  ])
+  expectTokens('../views/knowledge/components/KnowledgeBaseListReferenceCard.vue', [
+    'min-height: 154px;', 'padding: 18px;', 'border-radius: 12px;',
+    'font-size: 14px;', 'font-size: 12px;', 'font-size: 11px;',
+  ])
+})
+
+test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
+  expectTokens('../views/settings/Settings.vue', [
+    'width: min(896px, 100%);', 'height: 520px;', 'border-radius: 24px;',
+    'flex: 0 0 224px;', 'padding: 24px;', 'padding: 32px;',
+  ])
+})
+
+test('BatchManageModal.tsx source geometry is used without inventing batch-pin business behavior', () => {
+  expectTokens('../components/SessionBatchManageModal.vue', [
+    'width: min(512px,100%);', 'border-radius: 16px;', 'padding: 16px 24px;',
+    'max-height: 380px;', 'padding: 16px;', 'padding: 10px 12px;', 'font-size: 12px;',
+  ])
+  const batch = read('../components/SessionBatchManageModal.vue')
+  assert.equal(batch.includes("emit('pin')"), false, 'visual reference must not invent unsupported batch-pin behavior')
+})
