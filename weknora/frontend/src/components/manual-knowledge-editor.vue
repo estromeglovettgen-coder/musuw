@@ -1,16 +1,96 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import LegacyManualEditorBusiness from '@/assets/business-baselines/manual-knowledge-editor.pre-view.vue'
 
 const legacy = LegacyManualEditorBusiness as any
 const legacySetup = legacy.setup
+const MANUAL_DRAWER_WIDTH_KEY = 'setting-drawer:width:manual-markdown-editor'
+const MANUAL_DRAWER_DEFAULT_WIDTH = 760
+const MANUAL_DRAWER_MIN_WIDTH = 560
+const MANUAL_DRAWER_MAX_WIDTH = 1280
+
+const clampDrawerWidth = (value: number) =>
+  Math.max(MANUAL_DRAWER_MIN_WIDTH, Math.min(MANUAL_DRAWER_MAX_WIDTH, Math.round(value)))
+
+const loadStoredDrawerWidth = () => {
+  if (typeof window === 'undefined') return MANUAL_DRAWER_DEFAULT_WIDTH
+  try {
+    const raw = window.localStorage.getItem(MANUAL_DRAWER_WIDTH_KEY)
+    const parsed = raw ? Number(raw) : NaN
+    return Number.isFinite(parsed) ? clampDrawerWidth(parsed) : MANUAL_DRAWER_DEFAULT_WIDTH
+  } catch {
+    return MANUAL_DRAWER_DEFAULT_WIDTH
+  }
+}
 
 export default defineComponent({
   ...legacy,
   name: 'ManualKnowledgeEditor',
   setup(props, context) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    const drawerWidthPx = ref(loadStoredDrawerWidth())
+    const drawerResizing = ref(false)
+    let resizeStartX = 0
+    let resizeStartWidth = MANUAL_DRAWER_DEFAULT_WIDTH
+
+    const persistDrawerWidth = () => {
+      if (typeof window === 'undefined') return
+      try {
+        window.localStorage.setItem(MANUAL_DRAWER_WIDTH_KEY, String(clampDrawerWidth(drawerWidthPx.value)))
+      } catch {
+        // Keep the live width when storage is unavailable.
+      }
+    }
+
+    const onResizeMove = (event: MouseEvent) => {
+      drawerWidthPx.value = clampDrawerWidth(resizeStartWidth + resizeStartX - event.clientX)
+    }
+
+    const cleanupResize = () => {
+      document.removeEventListener('mousemove', onResizeMove)
+      document.removeEventListener('mouseup', onResizeEnd)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      drawerResizing.value = false
+    }
+
+    function onResizeEnd() {
+      cleanupResize()
+      persistDrawerWidth()
+    }
+
+    const onResizeStart = (event: MouseEvent) => {
+      drawerResizing.value = true
+      resizeStartX = event.clientX
+      resizeStartWidth = drawerWidthPx.value
+      document.addEventListener('mousemove', onResizeMove)
+      document.addEventListener('mouseup', onResizeEnd)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    const onWindowResize = () => {
+      drawerWidthPx.value = clampDrawerWidth(drawerWidthPx.value)
+    }
+
+    onMounted(() => {
+      window.addEventListener('resize', onWindowResize, { passive: true })
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('resize', onWindowResize)
+      cleanupResize()
+    })
+
+    const adapterState = {
+      drawerWidthPx,
+      drawerResizing,
+      onResizeStart,
+    }
+
+    if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      return { ...state, ...adapterState }
+    }
     return state
   },
 })
@@ -20,7 +100,25 @@ export default defineComponent({
   <Teleport to="body">
     <Transition name="visual-manual-editor">
       <div v-if="visible" class="visual-manual-editor__overlay" @click.self="handleClose">
-        <aside class="visual-manual-editor" role="dialog" aria-modal="true" :aria-label="dialogTitle">
+        <div
+          class="visual-manual-editor__resize-handle"
+          :class="{ 'is-active': drawerResizing }"
+          :style="{ right: `${drawerWidthPx}px` }"
+          role="separator"
+          aria-orientation="vertical"
+          @mousedown.prevent="onResizeStart"
+        >
+          <span />
+        </div>
+
+        <aside
+          class="visual-manual-editor"
+          :class="{ 'is-resizing': drawerResizing }"
+          :style="{ width: `${drawerWidthPx}px` }"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="dialogTitle"
+        >
           <header class="visual-manual-editor__header">
             <div class="visual-manual-editor__heading">
               <span class="visual-manual-editor__heading-icon"><t-icon name="edit-1" /></span>
@@ -165,6 +263,8 @@ export default defineComponent({
             </div>
           </footer>
         </aside>
+
+        <div v-if="drawerResizing" class="visual-manual-editor__resize-shield" aria-hidden="true" />
       </div>
     </Transition>
   </Teleport>
@@ -172,7 +272,7 @@ export default defineComponent({
 
 <style scoped lang="less">
 .visual-manual-editor__overlay { position: fixed; inset: 0; z-index: 3300; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 18%); backdrop-filter: blur(2px); }
-.visual-manual-editor { width: min(760px, 100vw); height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
+.visual-manual-editor { max-width: 100vw; height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
 .visual-manual-editor__header { flex: 0 0 auto; padding: 18px 20px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .visual-manual-editor__heading { min-width: 0; display: flex; gap: 10px; }
 .visual-manual-editor__heading-icon { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #6b7280; }
@@ -221,8 +321,13 @@ export default defineComponent({
 .visual-manual-editor__button { min-height: 34px; padding: 6px 11px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
 .visual-manual-editor__button.is-primary { border-color: #111827; background: #111827; color: #fff; }
 .visual-manual-editor__button:disabled { opacity: .5; cursor: default; }
+.visual-manual-editor__resize-handle { position: fixed; top: 0; bottom: 0; z-index: 3302; width: 12px; margin-right: -6px; display: flex; align-items: center; justify-content: center; cursor: col-resize; }
+.visual-manual-editor__resize-handle > span { width: 2px; height: 48px; border-radius: 1px; background: #d1d5db; opacity: .55; transition: opacity 150ms ease, background-color 150ms ease; }
+.visual-manual-editor__resize-handle:hover > span,.visual-manual-editor__resize-handle.is-active > span { background: #6b7280; opacity: 1; }
+.visual-manual-editor__resize-shield { position: fixed; inset: 0; z-index: 3301; cursor: col-resize; }
+.visual-manual-editor.is-resizing .visual-manual-editor__content { pointer-events: none; user-select: none; }
 .visual-manual-editor-enter-active,.visual-manual-editor-leave-active { transition: opacity 160ms ease; }
 .visual-manual-editor-enter-from,.visual-manual-editor-leave-to { opacity: 0; }
-@media (max-width: 760px) { .visual-manual-editor { width: 100%; } .visual-manual-editor__content { padding-inline: 14px; } .visual-manual-editor__footer { padding-inline: 14px; } }
-@media (prefers-reduced-motion: reduce) { .visual-manual-editor-enter-active,.visual-manual-editor-leave-active { transition: none !important; } }
+@media (max-width: 760px) { .visual-manual-editor { width: 100% !important; } .visual-manual-editor__resize-handle { display: none; } .visual-manual-editor__content { padding-inline: 14px; } .visual-manual-editor__footer { padding-inline: 14px; } }
+@media (prefers-reduced-motion: reduce) { .visual-manual-editor-enter-active,.visual-manual-editor-leave-active,.visual-manual-editor__resize-handle > span { transition: none !important; } }
 </style>
