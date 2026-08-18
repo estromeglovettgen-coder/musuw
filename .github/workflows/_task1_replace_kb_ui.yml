@@ -1,0 +1,172 @@
+name: Task1 one-shot knowledge UI transplant
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_task1_replace_kb_ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  transplant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Replace legacy KnowledgeBase template/style with reference DOM
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          target_path = Path('weknora/frontend/src/views/knowledge/KnowledgeBase.vue')
+          donor_path = Path('weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue')
+          target = target_path.read_text()
+          donor = donor_path.read_text()
+
+          # Preserve the production business script exactly; only add the visual-authority icon adapter import.
+          prefix = target[:target.index('<template>')]
+          if "@/components/ReferenceIcon.vue" not in prefix:
+              anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
+              if anchor not in prefix:
+                  raise SystemExit('KBSwitcherDropdown import anchor not found')
+              prefix = prefix.replace(anchor, anchor + "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n", 1)
+
+          tail = donor[donor.index('<template>'):]
+
+          # Mechanical Vue syntax adaptation only: wire reference DOM to the original, richer handlers.
+          replacements = {
+              '@select="handleKnowledgeDropdownSelect"': '@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
+              '@status-change="refreshWikiStats"': '@status-change="onWikiStatusChange"',
+              '@open-source-doc="(id) => openKnowledgeItem({ id })"': '@open-source-doc="openSourceDoc"',
+              '@files="uploadFiles"': '@files="handleUploadSourceFiles"',
+              '@url="importUrl"': '@url="handleUploadSourceUrl"',
+              '@manual="createManual"': '@manual="handleManualCreate"',
+              '@toggle-checkbox="(id, checked) => toggleRow(id, checked)"': '@toggle-checkbox="onCardGridCheckboxChange"',
+              '@toggle-row="toggleRow"': '@toggle-row="toggleSelectRow"',
+              '@toggle-all="toggleAll"': '@toggle-all="toggleSelectAll"',
+              '@cancel="cancelBatch"': '@cancel="handleBatchCancel"',
+              '@delete="deleteBatch"': '@delete="confirmBatchDelete"',
+              '@reparse="reparseBatch"': '@reparse="confirmBatchReparse"',
+              '@batch-tag="batchTag"': '@batch-tag="handleBatchTag"',
+              '@tag-created="loadTags"': '@tag-created="loadTags(kbId, true)"',
+              '@changed="() => { loadTags(); loadKnowledgeFiles() }"': '@changed="onTagManageChanged"',
+              'font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;': 'font-family: var(--app-font-family);',
+          }
+          for old, new in replacements.items():
+              tail = tail.replace(old, new)
+
+          # Keep the existing tag-filter state contract instead of mutating only the local array.
+          tail = re.sub(
+              r'@click="selectedTagIds = selectedTagIds\.includes\(tag\.id\)\s*\? selectedTagIds\.filter\(\(id\) => id !== tag\.id\)\s*:\s*\[\.\.\.selectedTagIds, tag\.id\]"',
+              '@click="handleTagRowClick(tag.id)"',
+              tail,
+              flags=re.S,
+          )
+
+          # Original page does not expose fabricated Wiki/graph counters; preserve the real tab controls only.
+          tail = tail.replace("<span>Wiki ({{ wikiCount }})</span>", "<span>Wiki</span>")
+          tail = tail.replace("<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>", "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span>")
+
+          # Preserve project-only parser/storage warnings; restyle them as reference-language inline notices.
+          header_needle = "        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
+          header_insert = """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
+        <button
+          v-if="unsupportedFileTypes.length"
+          type="button"
+          class="reference-inline-warning"
+          @click="goToParserSettings"
+        >
+          <span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map((type) => '.' + type).join('、') }) }}</span>
+          <strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong>
+        </button>
+        <button
+          v-if="missingStorageEngine"
+          type="button"
+          class="reference-inline-warning"
+          @click="handleOpenKBSettings"
+        >
+          <span>{{ $t('knowledgeBase.missingStorageEngine') }}</span>
+          <strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong>
+        </button>
+      </div>"""
+          if header_needle not in tail:
+              raise SystemExit('reference header insertion point not found')
+          tail = tail.replace(header_needle, header_insert, 1)
+
+          # Preserve the original root empty-state upload affordance; folder/filter empties stay lightweight.
+          empty_old = """          <div v-else-if="!docListLoading" class="reference-empty-state">
+            <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />
+            <strong>暂无文档</strong>
+          </div>"""
+          empty_new = """          <div v-else-if="!docListLoading" class="reference-empty-state">
+            <template v-if="selectedFolderPath || isFiltering">
+              <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />
+              <strong>{{ isFiltering ? $t('knowledgeBase.folderTree.emptySearch') : $t('knowledgeBase.folderTree.emptyFolder') }}</strong>
+            </template>
+            <EmptyKnowledge v-else />
+          </div>"""
+          if empty_old not in tail:
+              raise SystemExit('reference empty state insertion point not found')
+          tail = tail.replace(empty_old, empty_new, 1)
+
+          # Keep document summary synchronization from the original drawer contract.
+          tail = tail.replace('@getDoc="getDoc"\n    />', '@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />', 1)
+
+          # Preserve the existing KB settings/editor surface while removing the old detail-page visual shell.
+          editor = """
+    <KnowledgeBaseEditorModal
+      :visible="uiStore.showKBEditorModal"
+      :mode="uiStore.kbEditorMode"
+      :kb-id="uiStore.currentKBId || undefined"
+      :initial-type="uiStore.kbEditorType"
+      @update:visible="(value) => value ? null : uiStore.closeKBEditor()"
+      @success="handleKBEditorSuccess"
+    />
+"""
+          closing = "\n  </div>\n</template>\n\n<style scoped>"
+          if closing not in tail:
+              raise SystemExit('reference root closing point not found')
+          tail = tail.replace(closing, editor + closing, 1)
+
+          # Match the authority default while still honoring the app's font-setting variable.
+          tail = tail.replace(
+              '.reference-kb-header__copy > p { margin: 3px 0 0; color: #6b7280;',
+              '.reference-kb-header__copy > p { margin: 3px 0 0; color: #6b7280;',
+          )
+          warning_css = """
+.reference-inline-warning {
+  width: fit-content;
+  max-width: 760px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.reference-inline-warning strong { color: #4b5563; font-weight: 700; white-space: nowrap; }
+"""
+          tail = tail.replace('\n.reference-kb-tabs {', warning_css + '\n.reference-kb-tabs {', 1)
+
+          # The donor is temporary. Final KnowledgeBase.vue has one source of truth: original business script + reference UI.
+          target_path.write_text(prefix + tail)
+          donor_path.unlink()
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add weknora/frontend/src/views/knowledge/KnowledgeBase.vue weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue
+          git commit -m "fix(ui): transplant reference knowledge DOM onto native logic"
+          git push origin HEAD:main
