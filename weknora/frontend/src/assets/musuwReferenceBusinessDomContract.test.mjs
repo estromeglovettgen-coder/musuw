@@ -34,19 +34,25 @@ test('rebuilt citation hover and drawer retain citation states and navigation', 
   ]) assert.ok(drawer.includes(token), `ChatReferencesDrawer lost ${token}`)
 })
 
-test('rebuilt sidebar and composer own their DOM while KnowledgeBase remains the only mechanical mother root', () => {
-  const menu = read('../components/menu.vue')
-  assert.match(menu, /class="visual-sidebar"/)
-  for (const token of ['class="aside_box"', 'class="menu_top"', 'class="menu_bottom"']) assert.equal(menu.includes(token), false)
-
-  const input = read('../components/Input-field.vue')
-  assert.match(input, /class="visual-chat-composer"/)
-  for (const token of ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"']) {
-    assert.equal(input.includes(token), false, `composer still exposes ${token}`)
+test('rebuilt mother Views own sidebar composer and knowledge DOM directly', () => {
+  const cases = [
+    ['../components/menu.vue', 'class="visual-sidebar"', ['class="aside_box"', 'class="menu_top"', 'class="menu_bottom"']],
+    ['../components/Input-field.vue', 'class="visual-chat-composer"', ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"']],
+    ['../views/knowledge/KnowledgeBase.vue', 'class="visual-knowledge-page"', ['class="knowledge-layout"', 'class="document-header"', 'class="doc-filter-bar"', 'class="doc-card-list"']],
+  ]
+  for (const [path, root, legacy] of cases) {
+    const source = read(path)
+    assert.ok(source.includes(root), `${path} lost ${root}`)
+    for (const token of legacy) assert.equal(source.includes(token), false, `${path} still exposes ${token}`)
   }
+})
 
-  const knowledge = read('../views/knowledge/KnowledgeBase.vue')
-  for (const token of ['knowledge-layout', 'document-header', 'document-breadcrumb', 'knowledge-main', 'doc-filter-bar', 'doc-card-list']) assert.ok(knowledge.includes(token))
+test('active KnowledgeBase keeps Graph as an untouched WikiBrowser-hosted business surface', () => {
+  const source = read('../views/knowledge/KnowledgeBase.vue')
+  assert.ok(source.includes(`:view="activeKbTab === 'graph' ? 'graph' : 'browser'"`))
+  assert.ok(source.includes('@open-source-doc="openSourceDoc"'))
+  assert.ok(source.includes('@status-change="onWikiStatusChange"'))
+  assert.ok(source.includes('@view-graph="onViewWikiInGraph"'))
 })
 
 test('source/index palette adapter cannot restyle the excluded processing timeline', () => {
