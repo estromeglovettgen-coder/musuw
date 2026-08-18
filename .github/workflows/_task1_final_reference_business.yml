@@ -1,3 +1,4 @@
+# trigger
 name: Task1 final reference/business transplant
 on:
   push:
@@ -14,136 +15,8 @@ jobs:
         with:
           ref: task1-source-parity-final
           fetch-depth: 0
-      - name: Restore source-level reference components
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show f3fd6f2470f0c31d04a783dff5c112352cbc5c6e:weknora/frontend/src/views/knowledge/components/DocumentCardView.vue > weknora/frontend/src/views/knowledge/components/DocumentCardView.vue
-          git show 811c927e1e0829fb0a87f8c55c93dd54bcac07b5:weknora/frontend/src/views/knowledge/components/DocumentListView.vue > weknora/frontend/src/views/knowledge/components/DocumentListView.vue
-          git show 04ef5c2eb333b93ac745b76540b7af4a3321b16d:weknora/frontend/src/views/knowledge/components/DocumentActionMenu.vue > weknora/frontend/src/views/knowledge/components/DocumentActionMenu.vue
-          git show 8a34824909daa1783fc989b27b1150d0bc56681a:weknora/frontend/src/views/knowledge/components/KbFolderTree.vue > weknora/frontend/src/views/knowledge/components/KbFolderTree.vue
-          git show f83f34e12f3a2ee7bc39f873f3a0dcc72672611e:weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue > weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue
-          git show f1fd4afaeba6edf6ac6ab5f2dc4f94f7234b049b:weknora/frontend/src/views/knowledge/components/DocumentBatchBar.vue > weknora/frontend/src/views/knowledge/components/DocumentBatchBar.vue
-          git show 51268abf3b9867aa4fb21c70a1cd4c359e2ff1d9:weknora/frontend/src/views/knowledge/components/TagEditDialog.vue > weknora/frontend/src/views/knowledge/components/TagEditDialog.vue
-          git show 06701cc139a8f07fdcc20ab79e6f7150d41d61c1:weknora/frontend/src/components/KBSwitcherDropdown.vue > weknora/frontend/src/components/KBSwitcherDropdown.vue
-      - name: Combine exact WeKnora business script with reference UI
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          from urllib.request import urlopen
-          import subprocess, re
-
-          root=Path('weknora/frontend/src')
-          kb=root/'views/knowledge/KnowledgeBase.vue'
-          upstream=urlopen('https://raw.githubusercontent.com/Tencent/WeKnora/3d5d8bfcdfeeea266b292b71cea616847af28d0f/frontend/src/views/knowledge/KnowledgeBase.vue',timeout=60).read().decode()
-          script=upstream[:upstream.index('</script>')+len('</script>')]
-          donor=subprocess.check_output(['git','show','e21dfccea851d6eafb7d5892f5dc990f66b11f48:weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue'],text=True)
-          presentation=donor[donor.index('<template>'):]
-
-          # Reference icons are presentation only.
-          anchor="import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
-          script=script.replace(anchor,anchor+"import ReferenceIcon from '@/components/ReferenceIcon.vue';\n",1)
-          # Visual reference displays real Wiki/graph counters. Reuse upstream stats request.
-          a="const wikiIsIndexing = computed(() => wikiStatus.value.isActive || wikiStatus.value.pendingTasks > 0)\n"
-          script=script.replace(a,"const wikiCount = ref(0)\nconst graphCount = ref(0)\n"+a,1)
-          d="    const data = res?.data || res\n    if (!data) return\n"
-          script=script.replace(d,d+"    wikiCount.value = Number(data.total_pages || 0)\n    graphCount.value = Number(data.total_links || 0)\n",1)
-
-          wiring={
-            '@select="handleKnowledgeDropdownSelect"':'@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
-            '@open-source-doc="(id) => openKnowledgeItem({ id })"':'@open-source-doc="openSourceDoc"',
-            '@status-change="refreshWikiStats"':'@status-change="onWikiStatusChange"',
-            '@files="uploadFiles"':'@files="handleUploadSourceFiles"',
-            '@url="importUrl"':'@url="handleUploadSourceUrl"',
-            '@manual="createManual"':'@manual="handleManualCreate"',
-            '@toggle-checkbox="(id, checked) => toggleRow(id, checked)"':'@toggle-checkbox="onCardGridCheckboxChange"',
-            '@menu-visible-change="(visible, item) => visible && probeTraceAvailable(item)"':'@menu-visible-change="onCardMoreVisibleChange"',
-            '@toggle-row="toggleRow"':'@toggle-row="toggleSelectRow"',
-            '@toggle-all="toggleAll"':'@toggle-all="toggleSelectAll"',
-            '@cancel="cancelBatch"':'@cancel="handleBatchCancel"',
-            '@delete="deleteBatch"':'@delete="confirmBatchDelete"',
-            '@reparse="reparseBatch"':'@reparse="confirmBatchReparse"',
-            '@batch-tag="batchTag"':'@batch-tag="handleBatchTag"',
-            '@tag-created="loadTags"':'@tag-created="() => loadTags(kbId, true)"',
-            '@open-manage="tagManageDrawerVisible = true"':'@open-manage="openTagManageFromEditDialog"',
-            '@changed="() => { loadTags(); loadKnowledgeFiles() }"':'@changed="onTagManageChanged"',
-          }
-          for x,y in wiring.items(): presentation=presentation.replace(x,y)
-          # List action has a distinct upstream handler.
-          probe='@probe-trace="probeTraceAvailable"'
-          pi=presentation.find(probe)
-          if pi>=0:
-            ai=presentation.rfind('@action="handleCardAction"',0,pi)
-            if ai>=0: presentation=presentation[:ai]+'@action="handleListAction"'+presentation[ai+len('@action="handleCardAction"'):]
-          presentation=re.sub(r'@click="selectedTagIds\s*=\s*selectedTagIds\.includes\(tag\.id\)[\s\S]*?\[\.\.\.selectedTagIds,\s*tag\.id\]"','@click="handleTagRowClick(tag.id)"',presentation)
-          presentation=presentation.replace(':class="{ active: selectedTagIds.includes(tag.id) }"',':class="{ active: isTagFilterActive(tag.id) }"')
-          # Preserve upstream document summary-state sync.
-          if 'syncDocumentSummaryState' not in presentation:
-            presentation=presentation.replace('@getDoc="getDoc"\n    />','@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />',1)
-          # Preserve product-only settings/info actions without changing reference hierarchy.
-          marker="        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
-          extra="""        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
-        <div class="reference-kb-extra-actions">
-          <KBInfoPopover v-if="kbInfo && !authStore.isLiteMode" :kb-info="kbInfo" :supported-file-types="[...supportedFileTypes]" />
-          <button v-if="canManage" type="button" class="reference-kb-extra-button" :title="$t('knowledgeBase.settings')" @click="handleOpenKBSettings"><ReferenceIcon name="settings" :size="14" /></button>
-        </div>
-        <button v-if="unsupportedFileTypes.length" type="button" class="reference-kb-warning" @click="goToParserSettings"><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map(t => '.' + t).join('、') }) }}</span><strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
-        <button v-if="missingStorageEngine" type="button" class="reference-kb-warning" @click="handleOpenKBSettings"><span>{{ $t('knowledgeBase.missingStorageEngine') }}</span><strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong></button>
-      </div>"""
-          if marker in presentation: presentation=presentation.replace(marker,extra,1)
-          # Preserve settings modal.
-          if '<KnowledgeBaseEditorModal' not in presentation:
-            close='\n  </div>\n</template>'
-            modal='''
-    <KnowledgeBaseEditorModal
-      :visible="uiStore.showKBEditorModal"
-      :mode="uiStore.kbEditorMode"
-      :kb-id="uiStore.currentKBId || undefined"
-      :initial-type="uiStore.kbEditorType"
-      @update:visible="(value) => value ? null : uiStore.closeKBEditor()"
-      @success="handleKBEditorSuccess"
-    />
-'''
-            pos=presentation.rfind(close)
-            presentation=presentation[:pos]+modal+presentation[pos:]
-          css='''
-.reference-kb-header__copy{position:relative}.reference-kb-extra-actions{position:absolute;left:calc(100% + 10px);top:0;display:flex;align-items:center;gap:4px}.reference-kb-extra-button{width:28px;height:28px;padding:0;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#6b7280;display:grid;place-items:center;cursor:pointer}.reference-kb-extra-button:hover{background:#f3f4f6;color:#111827}.reference-kb-warning{max-width:760px;margin:4px 0 0;padding:0;border:0;background:transparent;color:#9ca3af;display:flex;align-items:center;gap:5px;font:inherit;font-size:10px;line-height:14px;text-align:left;cursor:pointer}.reference-kb-warning strong{color:#6b7280;font-weight:700;white-space:nowrap}
-'''
-          s=presentation.rfind('</style>'); presentation=presentation[:s]+css+presentation[s:]
-          kb.write_text(script+'\n\n'+presentation)
-
-          # Restore upstream global upload confirmation host in Musuw App shell.
-          app=root/'App.vue'; a=app.read_text(); mi='import ManualKnowledgeEditor from "@/components/manual-knowledge-editor.vue";\n'; hi='import UploadConfirmHost from "@/components/UploadConfirmHost.vue";\n'
-          if hi not in a:a=a.replace(mi,mi+hi,1)
-          if '<UploadConfirmHost />' not in a:a=a.replace('      <ManualKnowledgeEditor />','      <ManualKnowledgeEditor />\n      <UploadConfirmHost />',1)
-          app.write_text(a)
-          # Reference empty/upload triggers may reuse the real file input.
-          up=root/'views/knowledge/components/KbUploadSourceDropdown.vue'; u=up.read_text()
-          if 'const openFilePicker' not in u:u=u.replace('const openUrlDialog = () => {','const openFilePicker = () => fileInputRef.value?.click()\n\nconst openUrlDialog = () => {',1)
-          u=u.replace('defineExpose({ openUrlDialog })','defineExpose({ openUrlDialog, openFilePicker })');up.write_text(u)
-          PY
-      - name: Assert business and visual contracts
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          s=Path('weknora/frontend/src/views/knowledge/KnowledgeBase.vue').read_text()
-          required=['useUploadConfirmStore','openUploadConfirmDialog','handleUploadConfirmResult','process_config','reference-kb-header','reference-kb-tabs','reference-doc-stage','reference-toolbar','reference-document-workspace','@files="handleUploadSourceFiles"','@url="handleUploadSourceUrl"','@manual="handleManualCreate"','@toggle-checkbox="onCardGridCheckboxChange"','@action="handleListAction"','confirmBatchDelete','confirmBatchReparse','handleBatchTag']
-          miss=[x for x in required if x not in s]
-          if miss: raise SystemExit('missing contracts: '+repr(miss))
-          for bad in ['const uploadFiles = async','const importUrl = async','const createManual =']:
-            if bad in s: raise SystemExit('staging business controller still active: '+bad)
-          for p,tokens in {
-            'weknora/frontend/src/views/knowledge/components/DocumentCardView.vue':['ReferenceIcon','reference-card-grid','reference-document-card'],
-            'weknora/frontend/src/views/knowledge/components/DocumentListView.vue':['ReferenceIcon'],
-            'weknora/frontend/src/views/knowledge/components/KbFolderTree.vue':['ReferenceIcon'],
-            'weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue':['ReferenceIcon'],
-          }.items():
-            text=Path(p).read_text();
-            for token in tokens:
-              if token not in text: raise SystemExit(f'{p} missing {token}')
-          PY
+      - name: Apply deterministic transplant
+        run: python3 scripts/task1_final_reference_business.py
       - name: Validate frontend
         working-directory: weknora/frontend
         run: |
@@ -153,7 +26,6 @@ jobs:
           npm run check-i18n
           npm run build
       - name: Commit branch changes
-        shell: bash
         run: |
           git config user.name "musuw-final-parity"
           git config user.email "actions@users.noreply.github.com"
