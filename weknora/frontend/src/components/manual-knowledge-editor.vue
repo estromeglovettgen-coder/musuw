@@ -1,1206 +1,228 @@
-<script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick, onBeforeUnmount } from 'vue'
-import SettingDrawer from '@/components/settings/SettingDrawer.vue'
-import { marked } from 'marked'
-import { MessagePlugin } from 'tdesign-vue-next'
-import { useUIStore } from '@/stores/ui'
-import {
-  listKnowledgeBases,
-  getKnowledgeDetails,
-  createManualKnowledge,
-  updateManualKnowledge,
-} from '@/api/knowledge-base'
-import { useOrganizationStore } from '@/stores/organization'
-import { sanitizeHTML, safeMarkdownToHTML } from '@/utils/security'
-import { useI18n } from 'vue-i18n'
+<script lang="ts">
+import { defineComponent } from 'vue'
+import LegacyManualEditorBusiness from '@/assets/business-baselines/manual-knowledge-editor.pre-view.vue'
 
-interface KnowledgeBaseOption {
-  label: string
-  value: string
-}
+const legacy = LegacyManualEditorBusiness as any
+const legacySetup = legacy.setup
 
-interface KnowledgeDetailResponse {
-  id: string
-  knowledge_base_id: string
-  title?: string
-  file_name?: string
-  metadata?: any
-  parse_status?: string
-  tags?: Array<{ id: string }>
-}
-
-type ManualStatus = 'draft' | 'publish'
-
-/** Derive editor status from metadata + parse_status (parse pipeline wins when indexed or in flight). */
-const resolveManualKnowledgeStatus = (
-  metaStatus: ManualStatus | undefined,
-  parseStatus?: string,
-): ManualStatus => {
-  if (!parseStatus || parseStatus === 'draft') {
-    return metaStatus === 'publish' ? 'publish' : 'draft'
-  }
-  if (
-    parseStatus === 'completed' ||
-    parseStatus === 'pending' ||
-    parseStatus === 'processing' ||
-    parseStatus === 'finalizing'
-  ) {
-    return 'publish'
-  }
-  return metaStatus === 'publish' ? 'publish' : 'draft'
-}
-
-const uiStore = useUIStore()
-const organizationStore = useOrganizationStore()
-const { t } = useI18n()
-
-const visible = computed({
-  get: () => uiStore.manualEditorVisible,
-  set: (val: boolean) => {
-    if (!val) {
-      handleClose()
-    }
+export default defineComponent({
+  ...legacy,
+  name: 'ManualKnowledgeEditor',
+  setup(props, context) {
+    const state = legacySetup?.(props, context)
+    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    return state
   },
-})
-
-const mode = computed(() => uiStore.manualEditorMode)
-const knowledgeId = computed(() => uiStore.manualEditorKnowledgeId)
-const currentKnowledgeId = ref<string | null>(null)
-const manualTagIds = ref<string[]>([])
-
-const form = reactive({
-  kbId: '' as string,
-  title: '',
-  content: '',
-  status: 'draft' as ManualStatus,
-})
-
-const initialLoaded = ref(false)
-const kbOptions = ref<KnowledgeBaseOption[]>([])
-const kbLoading = ref(false)
-const contentLoading = ref(false)
-const saving = ref(false)
-const savingAction = ref<ManualStatus>('draft')
-const activeTab = ref<'edit' | 'preview'>('edit')
-const lastUpdatedAt = ref<string>('')
-
-const textareaComponent = ref<any>(null)
-const textareaElement = ref<HTMLTextAreaElement | null>(null)
-const selectionRange = reactive({ start: 0, end: 0 })
-const selectionEvents = ['select', 'keyup', 'click', 'mouseup', 'input']
-
-const resolveTextareaElement = (): HTMLTextAreaElement | null => {
-  const component = textareaComponent.value as any
-  if (!component) return null
-  if (component.textareaRef) {
-    return component.textareaRef as HTMLTextAreaElement
-  }
-  if (component.$el) {
-    const el = component.$el.querySelector('textarea')
-    if (el) {
-      return el as HTMLTextAreaElement
-    }
-  }
-  return null
-}
-
-const handleTextareaSelectionEvent = () => {
-  const textarea = textareaElement.value ?? resolveTextareaElement()
-  if (!textarea) {
-    return
-  }
-  selectionRange.start = textarea.selectionStart ?? 0
-  selectionRange.end = textarea.selectionEnd ?? 0
-}
-
-const detachTextareaListeners = () => {
-  if (!textareaElement.value) {
-    return
-  }
-  selectionEvents.forEach((eventName) => {
-    textareaElement.value?.removeEventListener(eventName, handleTextareaSelectionEvent)
-  })
-  textareaElement.value = null
-}
-
-const attachTextareaListeners = () => {
-  nextTick(() => {
-    const textarea = resolveTextareaElement()
-    if (!textarea) {
-      return
-    }
-    if (textareaElement.value === textarea) {
-      return
-    }
-    detachTextareaListeners()
-    textareaElement.value = textarea
-    selectionEvents.forEach((eventName) => {
-      textarea.addEventListener(eventName, handleTextareaSelectionEvent)
-    })
-    handleTextareaSelectionEvent()
-  })
-}
-
-const setSelectionRange = (start: number, end: number) => {
-  selectionRange.start = start
-  selectionRange.end = end
-  nextTick(() => {
-    const textarea = resolveTextareaElement()
-    if (!textarea || activeTab.value !== 'edit') {
-      return
-    }
-    // Initialization can finish while the drawer is still sliding in. A plain
-    // focus() makes the browser scroll the transformed textarea into view,
-    // which intermittently shifts the drawer away from the right edge for a
-    // frame. Keep keyboard focus without letting it move the viewport.
-    textarea.focus({ preventScroll: true })
-    textarea.setSelectionRange(start, end)
-  })
-}
-
-const getSelectionRange = () => {
-  return {
-    start: selectionRange.start ?? 0,
-    end: selectionRange.end ?? 0,
-  }
-}
-
-const clampRange = (start: number, end: number, length: number) => {
-  let safeStart = Math.max(0, Math.min(start, length))
-  let safeEnd = Math.max(0, Math.min(end, length))
-  if (safeEnd < safeStart) {
-    ;[safeStart, safeEnd] = [safeEnd, safeStart]
-  }
-  return { safeStart, safeEnd }
-}
-
-const updateContentWithSelection = (content: string, start: number, end: number) => {
-  form.content = content
-  setSelectionRange(start, end)
-}
-
-const findLineStart = (value: string, index: number) => {
-  if (index <= 0) return 0
-  const lastNewline = value.lastIndexOf('\n', index - 1)
-  return lastNewline === -1 ? 0 : lastNewline + 1
-}
-
-const findLineEnd = (value: string, index: number) => {
-  if (index >= value.length) return value.length
-  const newlineIndex = value.indexOf('\n', index)
-  return newlineIndex === -1 ? value.length : newlineIndex
-}
-
-const transformSelectedLines = (transformer: (line: string, index: number) => string) => {
-  const value = form.content ?? ''
-  const { start, end } = getSelectionRange()
-  const { safeStart, safeEnd } = clampRange(start, end, value.length)
-  const lineStart = findLineStart(value, safeStart)
-  const lineEnd = findLineEnd(value, safeEnd)
-  const selected = value.slice(lineStart, lineEnd)
-  const lines = selected.split('\n')
-  const transformed = lines.map((line, index) => transformer(line, index))
-  const result = transformed.join('\n')
-  const newContent = value.slice(0, lineStart) + result + value.slice(lineEnd)
-  updateContentWithSelection(newContent, lineStart, lineStart + result.length)
-}
-
-const wrapSelection = (prefix: string, suffix: string, placeholder: string) => {
-  const value = form.content ?? ''
-  const { start, end } = getSelectionRange()
-  const { safeStart, safeEnd } = clampRange(start, end, value.length)
-  const hasSelection = safeEnd > safeStart
-  const selectedText = hasSelection ? value.slice(safeStart, safeEnd) : placeholder
-  const result =
-    value.slice(0, safeStart) + prefix + selectedText + suffix + value.slice(safeEnd)
-  const selectionStart = safeStart + prefix.length
-  const selectionEnd = selectionStart + selectedText.length
-  updateContentWithSelection(result, selectionStart, selectionEnd)
-}
-
-const insertBlock = (
-  text: string,
-  selectionStartOffset?: number,
-  selectionEndOffset?: number,
-) => {
-  const value = form.content ?? ''
-  const { start, end } = getSelectionRange()
-  const { safeStart, safeEnd } = clampRange(start, end, value.length)
-  const before = value.slice(0, safeStart)
-  const after = value.slice(safeEnd)
-  const result = before + text + after
-  const base = safeStart
-  const selectionStart =
-    selectionStartOffset !== undefined ? base + selectionStartOffset : base + text.length
-  const selectionEnd =
-    selectionEndOffset !== undefined ? base + selectionEndOffset : selectionStart
-  updateContentWithSelection(result, selectionStart, selectionEnd)
-}
-
-const applyHeading = (level: number) => {
-  const hashes = '#'.repeat(level)
-  transformSelectedLines((line) => {
-    const trimmed = line.replace(/^#+\s*/, '').trim()
-    const content = trimmed || t('manualEditor.placeholders.heading', { level })
-    return `${hashes} ${content}`
-  })
-}
-
-const listPrefixPattern =
-  /^(\s*(?:[-*+]|\d+\.)\s+|\s*-\s+\[[ xX]\]\s+)/
-
-const applyBulletList = () => {
-  transformSelectedLines((line) => {
-    const trimmed = line.trim()
-    const content = trimmed.replace(listPrefixPattern, '').trim()
-    return `- ${content || t('manualEditor.placeholders.listItem')}`
-  })
-}
-
-const applyOrderedList = () => {
-  transformSelectedLines((line, index) => {
-    const trimmed = line.trim()
-    const content = trimmed.replace(listPrefixPattern, '').trim()
-    return `${index + 1}. ${content || t('manualEditor.placeholders.listItem')}`
-  })
-}
-
-const applyTaskList = () => {
-  transformSelectedLines((line) => {
-    const trimmed = line.trim()
-    const content = trimmed.replace(listPrefixPattern, '').trim()
-    return `- [ ] ${content || t('manualEditor.placeholders.taskItem')}`
-  })
-}
-
-const applyBlockquote = () => {
-  transformSelectedLines((line) => {
-    const trimmed = line.trim().replace(/^>\s?/, '').trim()
-    return `> ${trimmed || t('manualEditor.placeholders.quote')}`
-  })
-}
-
-const insertCodeBlock = () => {
-  const placeholder = t('manualEditor.placeholders.code')
-  const block = `\n\`\`\`\n${placeholder}\n\`\`\`\n`
-  const startOffset = block.indexOf(placeholder)
-  insertBlock(block, startOffset, startOffset + placeholder.length)
-}
-
-const insertHorizontalRule = () => {
-  insertBlock('\n---\n\n')
-}
-
-const insertTable = () => {
-  const cell = t('manualEditor.table.cell')
-  const template = `\n| ${t('manualEditor.table.column1')} | ${t('manualEditor.table.column2')} |\n| --- | --- |\n| ${cell} | ${cell} |\n`
-  const placeholderIndex = template.indexOf(cell)
-  insertBlock(template, placeholderIndex, placeholderIndex + cell.length)
-}
-
-const insertLink = () => {
-  const value = form.content ?? ''
-  const { start, end } = getSelectionRange()
-  const { safeStart, safeEnd } = clampRange(start, end, value.length)
-  const selectedText =
-    safeEnd > safeStart ? value.slice(safeStart, safeEnd) : t('manualEditor.placeholders.linkText')
-  const urlPlaceholder = 'https://'
-  const result =
-    value.slice(0, safeStart) +
-    `[${selectedText}](${urlPlaceholder})` +
-    value.slice(safeEnd)
-  const urlStart = safeStart + selectedText.length + 3
-  const urlEnd = urlStart + urlPlaceholder.length
-  updateContentWithSelection(result, urlStart, urlEnd)
-}
-
-const insertImage = () => {
-  const value = form.content ?? ''
-  const { start, end } = getSelectionRange()
-  const { safeStart, safeEnd } = clampRange(start, end, value.length)
-  const altText = safeEnd > safeStart ? value.slice(safeStart, safeEnd) : t('manualEditor.placeholders.imageAlt')
-  const urlPlaceholder = 'https://'
-  const result =
-    value.slice(0, safeStart) +
-    `![${altText}](${urlPlaceholder})` +
-    value.slice(safeEnd)
-  const urlStart = safeStart + altText.length + 4
-  const urlEnd = urlStart + urlPlaceholder.length
-  updateContentWithSelection(result, urlStart, urlEnd)
-}
-
-type ToolbarAction = () => void
-type ToolbarButton = {
-  key: string
-  tooltip: string
-  action: ToolbarAction
-  icon: string
-}
-type ToolbarGroup = {
-  key: string
-  buttons: ToolbarButton[]
-}
-
-const toolbarGroups = computed<ToolbarGroup[]>(() => [
-  {
-    key: 'format',
-    buttons: [
-      { key: 'bold', icon: 'textformat-bold', tooltip: t('manualEditor.toolbar.bold'), action: () => wrapSelection('**', '**', t('manualEditor.placeholders.bold')) },
-      { key: 'italic', icon: 'textformat-italic', tooltip: t('manualEditor.toolbar.italic'), action: () => wrapSelection('*', '*', t('manualEditor.placeholders.italic')) },
-      { key: 'strike', icon: 'textformat-strikethrough', tooltip: t('manualEditor.toolbar.strike'), action: () => wrapSelection('~~', '~~', t('manualEditor.placeholders.strike')) },
-      { key: 'inline-code', icon: 'code', tooltip: t('manualEditor.toolbar.inlineCode'), action: () => wrapSelection('`', '`', t('manualEditor.placeholders.inlineCode')) },
-    ],
-  },
-  {
-    key: 'heading',
-    buttons: [
-      { key: 'h1', icon: 'numbers-1', tooltip: t('manualEditor.toolbar.heading1'), action: () => applyHeading(1) },
-      { key: 'h2', icon: 'numbers-2', tooltip: t('manualEditor.toolbar.heading2'), action: () => applyHeading(2) },
-      { key: 'h3', icon: 'numbers-3', tooltip: t('manualEditor.toolbar.heading3'), action: () => applyHeading(3) },
-    ],
-  },
-  {
-    key: 'list',
-    buttons: [
-      { key: 'ul', icon: 'view-list', tooltip: t('manualEditor.toolbar.bulletList'), action: applyBulletList },
-      { key: 'ol', icon: 'list-numbered', tooltip: t('manualEditor.toolbar.orderedList'), action: applyOrderedList },
-      { key: 'task', icon: 'check-rectangle', tooltip: t('manualEditor.toolbar.taskList'), action: applyTaskList },
-      { key: 'quote', icon: 'quote', tooltip: t('manualEditor.toolbar.blockquote'), action: applyBlockquote },
-    ],
-  },
-  {
-    key: 'insert',
-    buttons: [
-      { key: 'codeblock', icon: 'code-1', tooltip: t('manualEditor.toolbar.codeBlock'), action: insertCodeBlock },
-      { key: 'link', icon: 'link', tooltip: t('manualEditor.toolbar.link'), action: insertLink },
-      { key: 'image', icon: 'image', tooltip: t('manualEditor.toolbar.image'), action: insertImage },
-      { key: 'table', icon: 'table', tooltip: t('manualEditor.toolbar.table'), action: insertTable },
-      { key: 'hr', icon: 'component-divider-horizontal', tooltip: t('manualEditor.toolbar.horizontalRule'), action: insertHorizontalRule },
-    ],
-  },
-])
-
-const isPreviewMode = computed(() => activeTab.value === 'preview')
-const viewToggleIcon = computed(() => (isPreviewMode.value ? 'edit-1' : 'browse'))
-const viewToggleLabel = computed(() =>
-  isPreviewMode.value ? t('manualEditor.view.editLabel') : t('manualEditor.view.previewLabel'),
-)
-
-const handleToolbarAction = (action: ToolbarAction) => {
-  if (saving.value) {
-    return
-  }
-  if (activeTab.value !== 'edit') {
-    activeTab.value = 'edit'
-    nextTick(() => {
-      attachTextareaListeners()
-      action()
-    })
-  } else {
-    attachTextareaListeners()
-    action()
-  }
-}
-
-const toggleEditorView = () => {
-  activeTab.value = isPreviewMode.value ? 'edit' : 'preview'
-}
-
-marked.use({})
-
-const previewHTML = computed(() => {
-  if (!form.content) {
-    return `<p class="empty-preview">${t('manualEditor.preview.empty')}</p>`
-  }
-  const safeMarkdown = safeMarkdownToHTML(form.content)
-  const html = marked.parse(safeMarkdown, { async: false })
-  return sanitizeHTML(html)
-})
-
-const kbDisabled = computed(() => mode.value === 'edit' && !!form.kbId)
-
-const dialogTitle = computed(() =>
-  mode.value === 'edit' ? t('manualEditor.title.edit') : t('manualEditor.title.create'),
-)
-
-const lastUpdatedText = computed(() =>
-  lastUpdatedAt.value ? t('manualEditor.status.lastUpdated', { time: lastUpdatedAt.value }) : '',
-)
-
-const loadKnowledgeBases = async () => {
-  kbLoading.value = true
-  try {
-    const [ownRes, sharedKbs] = await Promise.all([
-      listKnowledgeBases() as Promise<any>,
-      organizationStore.fetchSharedKnowledgeBases().catch(() => []),
-    ])
-
-    const isDocumentKb = (type?: string) => !type || type === 'document'
-
-    const ownKbs = Array.isArray(ownRes?.data) ? ownRes.data : []
-    const list: KnowledgeBaseOption[] = ownKbs
-      .filter((item: any) => isDocumentKb(item.type))
-      .map((item: any) => ({ label: item.name, value: item.id }))
-
-    // Knowledge bases shared to the user with write access (editor/admin)
-    // also accept manually-added content, so they must appear in the picker;
-    // viewer-only shares are excluded since the backend would reject writes.
-    const seen = new Set(list.map((o) => o.value))
-    for (const share of sharedKbs) {
-      const kb = share?.knowledge_base
-      const canWrite = share?.permission === 'editor' || share?.permission === 'admin'
-      if (!kb || !canWrite || !isDocumentKb(kb.type) || seen.has(kb.id)) continue
-      seen.add(kb.id)
-      list.push({ label: kb.name, value: kb.id })
-    }
-
-    kbOptions.value = list
-
-    if (mode.value === 'create') {
-      const presetKbId = uiStore.manualEditorKBId
-      if (presetKbId) {
-        const exists = list.find((item) => item.value === presetKbId)
-        if (!exists) {
-          kbOptions.value.unshift({
-            label: t('manualEditor.labels.currentKnowledgeBase'),
-            value: presetKbId,
-          })
-        }
-        form.kbId = presetKbId
-      } else {
-        form.kbId = list[0]?.value ?? ''
-      }
-    }
-  } catch (error) {
-    console.error('[ManualEditor] Failed to load knowledge base list:', error)
-    kbOptions.value = []
-  } finally {
-    kbLoading.value = false
-  }
-}
-
-const parseManualMetadata = (
-  metadata: any,
-): { content: string; status: ManualStatus; updatedAt?: string } | null => {
-  if (!metadata) {
-    return null
-  }
-  try {
-    let parsed = metadata
-    if (typeof metadata === 'string') {
-      parsed = JSON.parse(metadata)
-    }
-    if (parsed && typeof parsed === 'object') {
-      const status = parsed.status === 'publish' ? 'publish' : 'draft'
-      return {
-        content: parsed.content || '',
-        status,
-        updatedAt: parsed.updated_at || parsed.updatedAt,
-      }
-    }
-  } catch (error) {
-    console.warn('[ManualEditor] Failed to parse manual metadata:', error)
-  }
-  return null
-}
-
-const loadKnowledgeContent = async () => {
-  if (!currentKnowledgeId.value) {
-    return
-  }
-  contentLoading.value = true
-  try {
-    const res: any = await getKnowledgeDetails(currentKnowledgeId.value)
-    const data: KnowledgeDetailResponse | undefined = res?.data
-    if (!data) {
-      MessagePlugin.error(t('manualEditor.error.fetchDetailFailed'))
-      return
-    }
-
-    form.kbId = data.knowledge_base_id || form.kbId
-    const meta = parseManualMetadata(data.metadata)
-    form.title =
-      data.title ||
-      data.file_name?.replace(/\.md$/i, '') ||
-      uiStore.manualEditorInitialTitle ||
-      ''
-    form.content = meta?.content || uiStore.manualEditorInitialContent || ''
-    form.status = resolveManualKnowledgeStatus(meta?.status, data.parse_status)
-    manualTagIds.value = (data.tags || []).map(tag => String(tag.id))
-    if (meta?.updatedAt) {
-      lastUpdatedAt.value = meta.updatedAt
-    }
-
-    if (form.kbId && !kbOptions.value.find((item) => item.value === form.kbId)) {
-      kbOptions.value.unshift({
-        label: t('manualEditor.labels.currentKnowledgeBase'),
-        value: form.kbId,
-      })
-    }
-  } catch (error) {
-    console.error('[ManualEditor] Failed to load manual knowledge:', error)
-    MessagePlugin.error(t('manualEditor.error.fetchDetailFailed'))
-  } finally {
-    contentLoading.value = false
-  }
-}
-
-const resetForm = () => {
-  currentKnowledgeId.value = knowledgeId.value || null
-  form.kbId = uiStore.manualEditorKBId || ''
-  form.title = uiStore.manualEditorInitialTitle || ''
-  form.content = uiStore.manualEditorInitialContent || ''
-  form.status = uiStore.manualEditorInitialStatus || 'draft'
-  activeTab.value = 'edit'
-  lastUpdatedAt.value = ''
-  initialLoaded.value = false
-  manualTagIds.value = mode.value === 'create' ? [...uiStore.selectedTagIds] : []
-  selectionRange.start = 0
-  selectionRange.end = 0
-}
-
-const generateDefaultTitle = () => {
-  if (uiStore.manualEditorInitialTitle) {
-    return uiStore.manualEditorInitialTitle
-  }
-  return `${t('manualEditor.defaultTitlePrefix')}-${new Date().toLocaleString()}`
-}
-
-const initialize = async () => {
-  resetForm()
-  await loadKnowledgeBases()
-
-  if (mode.value === 'edit') {
-    await loadKnowledgeContent()
-  } else {
-    const presetKbId = uiStore.manualEditorKBId
-    if (presetKbId) {
-      form.kbId = presetKbId
-    } else if (!form.kbId && kbOptions.value.length) {
-      form.kbId = kbOptions.value[0].value
-    }
-    form.title = form.title || generateDefaultTitle()
-    form.content = form.content || ''
-  }
-
-  initialLoaded.value = true
-}
-
-const validateForm = (targetStatus: ManualStatus): boolean => {
-  if (!form.kbId) {
-    MessagePlugin.warning(t('manualEditor.warning.selectKnowledgeBase'))
-    return false
-  }
-  if (!form.title || !form.title.trim()) {
-    MessagePlugin.warning(t('manualEditor.warning.enterTitle'))
-    return false
-  }
-  if (!form.content || !form.content.trim()) {
-    MessagePlugin.warning(t('manualEditor.warning.enterContent'))
-    return false
-  }
-  if (targetStatus === 'publish' && form.content.trim().length < 10) {
-    MessagePlugin.warning(t('manualEditor.warning.contentTooShort'))
-    return false
-  }
-  return true
-}
-
-const handleSave = async (targetStatus: ManualStatus) => {
-  if (saving.value || !validateForm(targetStatus)) {
-    return
-  }
-  saving.value = true
-  savingAction.value = targetStatus
-  try {
-    const payload: {
-      title: string
-      content: string
-      status: string
-      tag_ids?: string[]
-    } = {
-      title: form.title.trim(),
-      content: form.content,
-      status: targetStatus,
-    }
-    payload.tag_ids = [...manualTagIds.value]
-
-    let response: any
-    let knowledgeID = currentKnowledgeId.value
-    let kbId = form.kbId
-
-    if (mode.value === 'edit' && currentKnowledgeId.value) {
-      response = await updateManualKnowledge(currentKnowledgeId.value, payload)
-    } else {
-      response = await createManualKnowledge(form.kbId, payload)
-      knowledgeID = response?.data?.id || knowledgeID
-      currentKnowledgeId.value = knowledgeID || null
-      uiStore.manualEditorKnowledgeId = currentKnowledgeId.value
-      kbId = form.kbId
-    }
-
-    if (response?.success) {
-      MessagePlugin.success(
-        targetStatus === 'draft'
-          ? t('manualEditor.success.draftSaved')
-          : t('manualEditor.success.published'),
-      )
-      if (knowledgeID) {
-        uiStore.notifyManualEditorSuccess({
-          kbId,
-          knowledgeId: knowledgeID,
-          status: targetStatus,
-        })
-      }
-      uiStore.closeManualEditor()
-    } else {
-      const message = response?.message || t('manualEditor.error.saveFailed')
-      MessagePlugin.error(message)
-    }
-  } catch (error: any) {
-    const message = error?.error?.message || error?.message || t('manualEditor.error.saveFailed')
-    MessagePlugin.error(message)
-  } finally {
-    saving.value = false
-  }
-}
-
-const handleClose = () => {
-  uiStore.closeManualEditor()
-}
-
-watch(visible, async (val) => {
-  if (val) {
-    await nextTick()
-    await initialize()
-    await nextTick()
-    attachTextareaListeners()
-    const length = form.content ? form.content.length : 0
-    setSelectionRange(length, length)
-  } else {
-    detachTextareaListeners()
-    resetForm()
-  }
-})
-
-watch(activeTab, (val) => {
-  if (val === 'edit') {
-    nextTick(() => {
-      attachTextareaListeners()
-    })
-  } else {
-    detachTextareaListeners()
-  }
-})
-
-onBeforeUnmount(() => {
-  detachTextareaListeners()
 })
 </script>
 
 <template>
-  <SettingDrawer
-    :visible="visible"
-    :title="dialogTitle"
-    :description="$t('manualEditor.description')"
-    icon="edit-1"
-    width="760px"
-    :min-width="560"
-    :max-width="1280"
-    storage-key="setting-drawer:width:manual-markdown-editor"
-    :hide-footer="!initialLoaded"
-    @update:visible="(v: boolean) => { visible = v }"
-  >
-    <template #footer-left>
-      <div class="manual-editor-footer-meta">
-        <t-tag size="small" theme="warning" variant="light" v-if="form.status === 'draft'">
-          {{ $t('manualEditor.status.draftTag') }}
-        </t-tag>
-        <t-tag size="small" theme="success" variant="light" v-else>
-          {{ $t('manualEditor.status.publishedTag') }}
-        </t-tag>
-      </div>
-    </template>
+  <Teleport to="body">
+    <Transition name="visual-manual-editor">
+      <div v-if="visible" class="visual-manual-editor__overlay" @click.self="handleClose">
+        <aside class="visual-manual-editor" role="dialog" aria-modal="true" :aria-label="dialogTitle">
+          <header class="visual-manual-editor__header">
+            <div class="visual-manual-editor__heading">
+              <span class="visual-manual-editor__heading-icon"><t-icon name="edit-1" /></span>
+              <div>
+                <h3>{{ dialogTitle }}</h3>
+                <p>{{ $t('manualEditor.description') }}</p>
+              </div>
+            </div>
+            <button type="button" class="visual-manual-editor__close" :aria-label="$t('common.close')" @click="handleClose">
+              <t-icon name="close" />
+            </button>
+          </header>
 
-    <template #footer-right>
-      <div class="manual-editor-footer-actions">
-        <t-button
-          theme="default"
-          variant="outline"
-          class="manual-editor-cancel-btn"
-          :disabled="saving"
-          @click="handleClose"
-        >
-          {{ $t('manualEditor.actions.cancel') }}
-        </t-button>
-        <t-button
-          variant="outline"
-          theme="default"
-          @click="handleSave('draft')"
-          :loading="saving && savingAction === 'draft'"
-          :disabled="saving && savingAction !== 'draft'"
-        >
-          {{ $t('manualEditor.actions.saveDraft') }}
-        </t-button>
-        <t-button
-          theme="primary"
-          @click="handleSave('publish')"
-          :loading="saving && savingAction === 'publish'"
-          :disabled="saving && savingAction !== 'publish'"
-        >
-          {{ $t('manualEditor.actions.publish') }}
-        </t-button>
-      </div>
-    </template>
+          <div class="visual-manual-editor__content">
+            <div v-if="!initialLoaded" class="visual-manual-editor__loading">
+              <t-loading size="medium" :text="$t('manualEditor.loading.preparing')" />
+            </div>
 
-    <div class="manual-editor" v-if="initialLoaded">
-      <section class="setting-drawer__section">
-        <h4 class="setting-drawer__section-title">{{ $t('manualEditor.section.basic') }}</h4>
+            <template v-else>
+              <section class="visual-manual-editor__section">
+                <h4>{{ $t('manualEditor.section.basic') }}</h4>
+                <div class="visual-manual-editor__field">
+                  <label>{{ $t('manualEditor.form.titleLabel') }}</label>
+                  <t-input
+                    v-model="form.title"
+                    maxlength="100"
+                    :placeholder="$t('manualEditor.form.titlePlaceholder')"
+                    show-limit-number
+                  />
+                </div>
 
-        <div class="form-item">
-          <label class="form-label required">{{ $t('manualEditor.form.titleLabel') }}</label>
-          <t-input
-            v-model="form.title"
-            maxlength="100"
-            :placeholder="$t('manualEditor.form.titlePlaceholder')"
-            showLimitNumber
-          />
-        </div>
+                <div class="visual-manual-editor__field">
+                  <label>{{ $t('manualEditor.form.knowledgeBaseLabel') }}</label>
+                  <div class="visual-manual-editor__kb-row">
+                    <t-select
+                      v-model="form.kbId"
+                      :disabled="kbDisabled"
+                      :loading="kbLoading"
+                      :options="kbOptions"
+                      :placeholder="$t('manualEditor.form.knowledgeBasePlaceholder')"
+                      :popup-props="{ attach: 'body', zIndex: 3400 }"
+                    >
+                      <template #empty>
+                        <div class="visual-manual-editor__select-empty">{{ $t('manualEditor.noDocumentKnowledgeBases') }}</div>
+                      </template>
+                    </t-select>
+                    <span
+                      v-if="mode === 'edit'"
+                      class="visual-manual-editor__status"
+                      :class="form.status === 'draft' ? 'is-draft' : 'is-published'"
+                    >
+                      {{ form.status === 'draft' ? $t('manualEditor.status.draftTag') : $t('manualEditor.status.publishedTag') }}
+                    </span>
+                  </div>
+                  <p v-if="lastUpdatedText">{{ lastUpdatedText }}</p>
+                </div>
+              </section>
 
-        <div class="form-item">
-          <label class="form-label required">{{ $t('manualEditor.form.knowledgeBaseLabel') }}</label>
-          <div class="kb-row">
-            <t-select
-              v-model="form.kbId"
-              :disabled="kbDisabled"
-              :loading="kbLoading"
-              :options="kbOptions"
-              :placeholder="$t('manualEditor.form.knowledgeBasePlaceholder')"
-              :popup-props="{ attach: 'body', zIndex: 2600 }"
+              <section class="visual-manual-editor__section is-editor">
+                <h4>{{ $t('manualEditor.section.content') }}</h4>
+                <div class="visual-manual-editor__editor">
+                  <div class="visual-manual-editor__toolbar">
+                    <div class="visual-manual-editor__format-tools">
+                      <template v-for="(group, groupIndex) in toolbarGroups" :key="group.key">
+                        <div class="visual-manual-editor__tool-group">
+                          <t-tooltip v-for="btn in group.buttons" :key="btn.key" :content="btn.tooltip" placement="top">
+                            <button
+                              type="button"
+                              class="visual-manual-editor__tool"
+                              :aria-label="btn.tooltip"
+                              @mousedown.prevent
+                              @click="handleToolbarAction(btn.action)"
+                            >
+                              <t-icon :name="btn.icon" />
+                            </button>
+                          </t-tooltip>
+                        </div>
+                        <span v-if="groupIndex < toolbarGroups.length - 1" class="visual-manual-editor__divider" />
+                      </template>
+                    </div>
+                    <button
+                      type="button"
+                      class="visual-manual-editor__view-toggle"
+                      :disabled="saving"
+                      @click="toggleEditorView"
+                    >
+                      <t-icon :name="viewToggleIcon" />
+                      <span>{{ viewToggleLabel }}</span>
+                    </button>
+                  </div>
+
+                  <div v-show="activeTab === 'edit'" class="visual-manual-editor__pane">
+                    <t-textarea
+                      v-if="!contentLoading"
+                      ref="textareaComponent"
+                      v-model="form.content"
+                      :placeholder="$t('manualEditor.form.contentPlaceholder')"
+                      class="visual-manual-editor__textarea"
+                    />
+                    <div v-else class="visual-manual-editor__pane-loading">
+                      <t-loading size="small" :text="$t('manualEditor.loading.content')" />
+                    </div>
+                  </div>
+
+                  <div v-show="activeTab === 'preview'" class="visual-manual-editor__pane is-preview">
+                    <div class="visual-manual-editor__preview" v-html="previewHTML" />
+                  </div>
+                </div>
+              </section>
+            </template>
+          </div>
+
+          <footer v-if="initialLoaded" class="visual-manual-editor__footer">
+            <span
+              class="visual-manual-editor__status"
+              :class="form.status === 'draft' ? 'is-draft' : 'is-published'"
             >
-              <template #empty>
-                <div style="padding: 20px; text-align: center; color: var(--td-text-color-placeholder);">
-                  {{ $t('manualEditor.noDocumentKnowledgeBases') }}
-                </div>
-              </template>
-            </t-select>
-            <div class="status-row" v-if="mode === 'edit'">
-              <t-tag size="small" theme="warning" variant="light" v-if="form.status === 'draft'">
-                {{ $t('manualEditor.status.draftTag') }}
-              </t-tag>
-              <t-tag size="small" theme="success" variant="light" v-else>
-                {{ $t('manualEditor.status.publishedTag') }}
-              </t-tag>
-            </div>
-          </div>
-          <p v-if="lastUpdatedText" class="form-desc">{{ lastUpdatedText }}</p>
-        </div>
-      </section>
-
-      <section class="setting-drawer__section editor-section">
-        <h4 class="setting-drawer__section-title">{{ $t('manualEditor.section.content') }}</h4>
-
-        <div class="editor-area">
-          <div class="editor-toolbar">
-            <div class="editor-toolbar__format">
-              <template v-for="(group, groupIndex) in toolbarGroups" :key="group.key">
-                <div class="toolbar-group">
-                  <template v-for="btn in group.buttons" :key="btn.key">
-                    <t-tooltip :content="btn.tooltip" placement="top">
-                      <button
-                        type="button"
-                        class="toolbar-btn"
-                        :class="`btn-${btn.key}`"
-                        @mousedown.prevent
-                        @click="handleToolbarAction(btn.action)"
-                      >
-                        <t-icon :name="btn.icon" size="18px" />
-                      </button>
-                    </t-tooltip>
-                  </template>
-                </div>
-                <div
-                  v-if="groupIndex < toolbarGroups.length - 1"
-                  class="toolbar-divider"
-                ></div>
-              </template>
-            </div>
-            <div class="editor-toolbar__view">
-              <t-button
-                variant="text"
-                theme="primary"
-                size="small"
-                :class="['toggle-view-btn', { 'is-preview': isPreviewMode }]"
-                :disabled="saving"
-                @click="toggleEditorView"
+              {{ form.status === 'draft' ? $t('manualEditor.status.draftTag') : $t('manualEditor.status.publishedTag') }}
+            </span>
+            <div class="visual-manual-editor__footer-actions">
+              <button type="button" class="visual-manual-editor__button" :disabled="saving" @click="handleClose">
+                {{ $t('manualEditor.actions.cancel') }}
+              </button>
+              <button
+                type="button"
+                class="visual-manual-editor__button"
+                :disabled="saving && savingAction !== 'draft'"
+                @click="handleSave('draft')"
               >
-                <template #icon><t-icon :name="viewToggleIcon" /></template>
-                {{ viewToggleLabel }}
-              </t-button>
+                <t-loading v-if="saving && savingAction === 'draft'" size="small" />
+                <span>{{ $t('manualEditor.actions.saveDraft') }}</span>
+              </button>
+              <button
+                type="button"
+                class="visual-manual-editor__button is-primary"
+                :disabled="saving && savingAction !== 'publish'"
+                @click="handleSave('publish')"
+              >
+                <t-loading v-if="saving && savingAction === 'publish'" size="small" />
+                <span>{{ $t('manualEditor.actions.publish') }}</span>
+              </button>
             </div>
-          </div>
-
-          <div class="editor-pane" v-show="activeTab === 'edit'">
-            <t-textarea
-              ref="textareaComponent"
-              v-if="!contentLoading"
-              v-model="form.content"
-              :placeholder="$t('manualEditor.form.contentPlaceholder')"
-              class="editor-textarea"
-            />
-            <div v-else class="loading-placeholder">
-              <t-loading size="small" :text="$t('manualEditor.loading.content')" />
-            </div>
-          </div>
-          <div class="editor-pane editor-pane--preview" v-show="activeTab === 'preview'">
-            <div class="preview-container" v-html="previewHTML" />
-          </div>
-        </div>
-      </section>
-    </div>
-    <div v-else class="loading-wrapper">
-      <t-loading size="medium" :text="$t('manualEditor.loading.preparing')" />
-    </div>
-  </SettingDrawer>
+          </footer>
+        </aside>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped lang="less">
-/* 复用模型管理同款 SettingDrawer：分组 section / header 图标 / footer 按钮 / 拖拽调宽。
-   这里只负责本编辑器特有的内容样式。内容内联渲染（无 teleport），scoped 生效。 */
-.manual-editor {
-  display: flex;
-  flex-direction: column;
-  --manual-editor-accent: var(--musuw-accent);
-  --manual-editor-accent-soft: var(--musuw-accent-soft);
-}
-
-.manual-editor-footer-meta {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--td-text-color-placeholder);
-}
-
-.manual-editor-footer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-
-  :deep(.t-button) {
-    min-width: 88px;
-  }
-}
-
-.manual-editor-cancel-btn {
-  border-color: transparent;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-secondary);
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-
-  &:hover {
-    border-color: var(--td-component-stroke);
-    background: var(--td-bg-color-container-hover);
-    color: var(--td-text-color-primary);
-  }
-}
-
-.form-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--td-text-color-primary);
-
-  &.required::after {
-    content: '*';
-    margin-left: 4px;
-    color: var(--td-error-color);
-  }
-}
-
-.form-desc {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-}
-
-.kb-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  :deep(.t-select) {
-    flex: 1;
-    min-width: 0;
-  }
-}
-
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* 内容分组：让编辑区占满，无需依赖父级 flex 链路，直接用视口高度，稳健 */
-.editor-section {
-  flex: 1;
-  min-height: 0;
-}
-
-.editor-toolbar {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 8px;
-  background: var(--td-bg-color-secondarycontainer);
-  border-bottom: 1px solid var(--td-component-stroke);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.editor-toolbar__format {
-  min-width: 0;
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-
-  &::-webkit-scrollbar {
-    height: 0;
-  }
-}
-
-.editor-toolbar__view {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding-left: 8px;
-  border-left: 1px solid var(--td-component-stroke);
-}
-
-.toggle-view-btn {
-  min-width: 92px;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 7px;
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-secondary);
-  font-weight: 500;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-
-  &:hover {
-    border-color: var(--manual-editor-accent);
-    background: var(--manual-editor-accent-soft);
-    color: var(--manual-editor-accent);
-    box-shadow: none;
-  }
-
-  &.is-preview {
-    border-color: var(--manual-editor-accent);
-    background: var(--manual-editor-accent-soft);
-    color: var(--manual-editor-accent);
-  }
-
-  &:active {
-    transform: translateY(1px);
-    box-shadow: none;
-  }
-
-  :deep(.t-button__icon) {
-    margin-right: 5px;
-    font-size: 15px;
-  }
-}
-
-.toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--td-component-stroke);
-  margin: 0 4px;
-}
-
-.toolbar-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 6px;
-  color: var(--td-text-color-secondary);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  .t-icon {
-    color: var(--td-text-color-secondary);
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-  }
-}
-
-.toolbar-btn:hover {
-  background: var(--manual-editor-accent-soft);
-  color: var(--manual-editor-accent);
-  
-  .t-icon {
-    color: var(--manual-editor-accent);
-  }
-}
-
-.toolbar-btn.active {
-  background: var(--manual-editor-accent-soft);
-  color: var(--manual-editor-accent);
-  
-  .t-icon {
-    color: var(--manual-editor-accent);
-  }
-}
-
-.toolbar-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--manual-editor-accent) 24%, transparent);
-}
-
-.toolbar-btn:active {
-  background: var(--manual-editor-accent-soft);
-  transform: translateY(0.5px);
-}
-
-.editor-area {
-  /* 抽屉为整屏高，减去 header/footer/基本信息分组的大致高度，
-     让编辑区占据剩余空间且不必撑满父级 flex 链路。 */
-  height: calc(100vh - 360px);
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--td-bg-color-container);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-
-  &:focus-within {
-    border-color: var(--manual-editor-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--manual-editor-accent) 12%, transparent);
-  }
-}
-
-.editor-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--td-bg-color-container);
-}
-
-:deep(.editor-textarea) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-
-  .t-textarea__inner {
-    flex: 1;
-    height: 100% !important;
-    resize: none;
-    border: none;
-    border-radius: 0;
-    padding: 14px 16px;
-    font-family: var(--app-font-family-mono);
-    font-size: 14px;
-    line-height: 1.7;
-    background: var(--td-bg-color-container);
-
-    &:focus {
-      box-shadow: none;
-    }
-  }
-}
-
-.editor-pane--preview {
-  background: var(--td-bg-color-container);
-}
-
-.preview-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 16px;
-  background: var(--td-bg-color-container);
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--td-text-color-primary);
-
-  :deep(h1),
-  :deep(h2),
-  :deep(h3),
-  :deep(h4) {
-    margin-top: 16px;
-    margin-bottom: 8px;
-  }
-
-  :deep(code) {
-    background: var(--td-bg-color-container-hover);
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-family: var(--app-font-family-mono);
-  }
-
-  :deep(pre) {
-    background: var(--td-bg-color-container-hover);
-    padding: 12px;
-    border-radius: 6px;
-    overflow: auto;
-  }
-
-  :deep(blockquote) {
-    border-left: 4px solid var(--manual-editor-accent);
-    padding-left: 12px;
-    color: var(--td-text-color-secondary);
-    margin: 16px 0;
-    background: var(--manual-editor-accent-soft);
-  }
-
-  :deep(a) {
-    color: var(--manual-editor-accent);
-  }
-}
-
-.loading-wrapper,
-.loading-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  min-height: 280px;
-  padding: 20px;
-}
-
-.empty-preview {
-  color: var(--td-text-color-placeholder);
-}
+.visual-manual-editor__overlay { position: fixed; inset: 0; z-index: 3300; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 18%); backdrop-filter: blur(2px); }
+.visual-manual-editor { width: min(760px, 100vw); height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
+.visual-manual-editor__header { flex: 0 0 auto; padding: 18px 20px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.visual-manual-editor__heading { min-width: 0; display: flex; gap: 10px; }
+.visual-manual-editor__heading-icon { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #6b7280; }
+.visual-manual-editor__heading h3 { margin: 0; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; }
+.visual-manual-editor__heading p { margin: 3px 0 0; color: #9ca3af; font-size: 10px; line-height: 16px; }
+.visual-manual-editor__close { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; }
+.visual-manual-editor__close:hover { background: #f3f4f6; color: #374151; }
+.visual-manual-editor__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 0 20px; }
+.visual-manual-editor__loading { min-height: 260px; display: flex; align-items: center; justify-content: center; }
+.visual-manual-editor__section { padding: 16px 0; border-bottom: 1px solid #f3f4f6; display: flex; flex-direction: column; gap: 12px; }
+.visual-manual-editor__section.is-editor { border-bottom: 0; }
+.visual-manual-editor__section > h4 { margin: 0; color: #374151; font-size: 10px; line-height: 16px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.visual-manual-editor__field { display: flex; flex-direction: column; gap: 6px; }
+.visual-manual-editor__field > label { color: #4b5563; font-size: 10px; line-height: 15px; font-weight: 600; }
+.visual-manual-editor__field > label::after { content: ' *'; color: #dc2626; }
+.visual-manual-editor__field > p { margin: 0; color: #9ca3af; font-size: 9px; line-height: 14px; }
+.visual-manual-editor__field :deep(.t-input),.visual-manual-editor__field :deep(.t-select-input) { min-height: 34px; border-color: #e5e7eb; border-radius: 8px; background: #fff; box-shadow: none !important; font-size: 11px; }
+.visual-manual-editor__kb-row { display: flex; align-items: center; gap: 8px; }
+.visual-manual-editor__kb-row :deep(.t-select) { min-width: 0; flex: 1; }
+.visual-manual-editor__select-empty { padding: 18px; color: #9ca3af; font-size: 10px; text-align: center; }
+.visual-manual-editor__status { flex: 0 0 auto; padding: 2px 6px; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 9px; line-height: 14px; font-weight: 600; }
+.visual-manual-editor__status.is-published { background: #f0fdf4; color: #047857; }
+.visual-manual-editor__status.is-draft { background: #fffbeb; color: #b45309; }
+.visual-manual-editor__editor { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 11px; background: #fff; }
+.visual-manual-editor__editor:focus-within { border-color: #d1d5db; box-shadow: 0 0 0 2px rgb(17 24 39 / 5%); }
+.visual-manual-editor__toolbar { min-height: 40px; padding: 5px 7px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f9fafb; }
+.visual-manual-editor__format-tools { min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.visual-manual-editor__tool-group { display: flex; gap: 2px; }
+.visual-manual-editor__divider { flex: 0 0 1px; width: 1px; height: 18px; background: #e5e7eb; }
+.visual-manual-editor__tool { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #6b7280; cursor: pointer; }
+.visual-manual-editor__tool:hover { background: #eceef1; color: #111827; }
+.visual-manual-editor__tool :deep(.t-icon) { font-size: 13px; }
+.visual-manual-editor__view-toggle { min-height: 28px; padding: 5px 8px; border: 0; border-radius: 7px; display: inline-flex; align-items: center; gap: 5px; background: #2d3138; color: #fff; font: inherit; font-size: 9px; font-weight: 600; cursor: pointer; }
+.visual-manual-editor__view-toggle:hover:not(:disabled) { background: #111827; }
+.visual-manual-editor__pane { min-height: 390px; }
+.visual-manual-editor__textarea :deep(.t-textarea),.visual-manual-editor__textarea :deep(.t-textarea__inner) { border: 0 !important; border-radius: 0 !important; background: #fff !important; box-shadow: none !important; }
+.visual-manual-editor__textarea :deep(.t-textarea__inner) { width: 100%; min-height: 390px; max-height: 58vh; padding: 14px; box-sizing: border-box; resize: none; color: #374151; font: 11px/1.7 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+.visual-manual-editor__pane-loading { min-height: 390px; display: flex; align-items: center; justify-content: center; }
+.visual-manual-editor__pane.is-preview { overflow-y: auto; max-height: 58vh; padding: 16px; box-sizing: border-box; background: #fff; }
+.visual-manual-editor__preview { color: #374151; font-size: 12px; line-height: 1.75; word-break: break-word; }
+.visual-manual-editor__preview :deep(h1),.visual-manual-editor__preview :deep(h2),.visual-manual-editor__preview :deep(h3) { color: #111827; line-height: 1.35; }
+.visual-manual-editor__preview :deep(pre) { overflow-x: auto; padding: 10px; border-radius: 8px; background: #f3f4f6; }
+.visual-manual-editor__preview :deep(code) { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+.visual-manual-editor__footer { flex: 0 0 60px; min-height: 60px; padding: 11px 20px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f9fafb; }
+.visual-manual-editor__footer-actions { margin-left: auto; display: flex; gap: 7px; }
+.visual-manual-editor__button { min-height: 34px; padding: 6px 11px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.visual-manual-editor__button.is-primary { border-color: #111827; background: #111827; color: #fff; }
+.visual-manual-editor__button:disabled { opacity: .5; cursor: default; }
+.visual-manual-editor-enter-active,.visual-manual-editor-leave-active { transition: opacity 160ms ease; }
+.visual-manual-editor-enter-from,.visual-manual-editor-leave-to { opacity: 0; }
+@media (max-width: 760px) { .visual-manual-editor { width: 100%; } .visual-manual-editor__content { padding-inline: 14px; } .visual-manual-editor__footer { padding-inline: 14px; } }
+@media (prefers-reduced-motion: reduce) { .visual-manual-editor-enter-active,.visual-manual-editor-leave-active { transition: none !important; } }
 </style>
