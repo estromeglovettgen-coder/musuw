@@ -45,16 +45,9 @@ const props = defineProps<{
   canMutateKnowledge: boolean;
   traceAvailableById: Record<string, boolean>;
   tagList: Tag[];
-  /** Sub-folders of the folder currently being browsed. */
   folders?: Array<{ path: string; name: string; total_count: number }>;
-  /** Every folder of the knowledge base, for the "move to folder" picker. */
   folderOptions?: FolderOption[];
-  /**
-   * Replace the updated-at line with the card's folder. Only meaningful when
-   * the grid spans several folders, i.e. while filtering.
-   */
   showFolderPath?: boolean;
-  // Move sub-flow state
   moveMenuMode: 'normal' | 'targets' | 'confirm';
   moveTargetKbs: any[];
   moveTargetsLoading: boolean;
@@ -71,7 +64,6 @@ const emit = defineEmits<{
   (e: 'tag-edit', item: KnowledgeCard): void;
   (e: 'open-folder', path: string): void;
   (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void;
-  // Move sub-flow emits
   (e: 'move-select-target', kb: any): void;
   (e: 'move-back'): void;
   (e: 'move-confirm'): void;
@@ -87,12 +79,7 @@ const {
   getOverflowCount,
 } = useTagChipsOverflow('tagItemId');
 
-// Which row's action popup is currently showing the folder picker. Kept local so
-// picking a folder stays inside the menu the user already opened, exactly like
-// the "move to knowledge base" sub-menu next to it.
 const folderPickerItemId = ref<string | null>(null);
-
-// --- Menu index tracking ---
 const activeMenuIndex = ref(-1);
 const openMenu = (index: number) => {
   activeMenuIndex.value = index;
@@ -105,7 +92,6 @@ const onMenuVisibleChange = (visible: boolean, item: KnowledgeCard) => {
   emit('menu-visible-change', visible, item);
 };
 
-// --- Parse status helpers ---
 const CANCELABLE_PARSE_STATUSES = new Set(['pending', 'processing', 'finalizing']);
 const isParseInFlight = (status?: string): boolean =>
   CANCELABLE_PARSE_STATUSES.has(String(status ?? ''));
@@ -126,7 +112,6 @@ const inFlightCardStatusText = (item: KnowledgeCard): string => {
   return t('knowledgeBase.parsingInProgress');
 };
 
-// --- Display helpers ---
 const formatDocTime = (time?: string) => {
   if (!time) return '--';
   const d = new Date(time);
@@ -163,7 +148,6 @@ const getChannelLabel = (channel: string) => {
   return key ? t(key) : t('knowledgeBase.channelUnknown');
 };
 
-// --- Card click handler ---
 const onCardClick = (item: KnowledgeCard) => {
   if (props.batchMode) {
     emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id));
@@ -172,7 +156,6 @@ const onCardClick = (item: KnowledgeCard) => {
   emit('open', item);
 };
 
-// --- Hover popover ---
 const hoveredCardItem = ref<KnowledgeCard | null>(null);
 const cardPopoverPos = ref({ x: 0, y: 0 });
 const CARD_POPOVER_OFFSET = 12;
@@ -199,7 +182,6 @@ const calculatePopoverPositionFromCard = (cardElement: HTMLElement): { x: number
   let x = 0;
   let y = 0;
 
-  // Strategy 1: right side
   const rightX = cardRect.right + CARD_POPOVER_OFFSET;
   if (rightX + popoverWidth <= viewportWidth - 10) {
     x = rightX;
@@ -209,7 +191,6 @@ const calculatePopoverPositionFromCard = (cardElement: HTMLElement): { x: number
     return { x, y };
   }
 
-  // Strategy 2: left side
   const leftX = cardRect.left - popoverWidth - CARD_POPOVER_OFFSET;
   if (leftX >= 10) {
     x = leftX;
@@ -219,7 +200,6 @@ const calculatePopoverPositionFromCard = (cardElement: HTMLElement): { x: number
     return { x, y };
   }
 
-  // Strategy 3: below
   const bottomY = cardRect.bottom + CARD_POPOVER_OFFSET;
   if (bottomY + popoverHeight <= viewportHeight - 10) {
     y = bottomY;
@@ -229,7 +209,6 @@ const calculatePopoverPositionFromCard = (cardElement: HTMLElement): { x: number
     return { x, y };
   }
 
-  // Strategy 4: above
   const topY = cardRect.top - popoverHeight - CARD_POPOVER_OFFSET;
   y = Math.max(10, topY);
   x = cardRect.left;
@@ -250,7 +229,7 @@ const onCardMouseEnter = (ev: MouseEvent, item: KnowledgeCard) => {
     const pos = calculatePopoverPositionFromCard(cardElement);
     cardPopoverPos.value = pos;
     nextTick(() => {
-      cardPopoverElement = document.querySelector('.knowledge-card-hover-popover') as HTMLElement;
+      cardPopoverElement = document.querySelector('.visual-document-popover') as HTMLElement;
       if (cardPopoverElement) {
         const refinedPos = calculatePopoverPositionFromCard(cardElement);
         cardPopoverPos.value = refinedPos;
@@ -275,14 +254,11 @@ const onFolderPicked = (item: KnowledgeCard, path: string) => {
   emit('move-to-folder', item, path);
 };
 
-// --- Action handlers ---
 const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
-  // The folder picker opens inside this same popup, so keep the menu open.
   if (action === 'move-folder') {
     folderPickerItemId.value = item.id;
     return;
   }
-  // Don't close menu for move — it triggers the sub-flow
   if (action !== 'move') {
     if (item.isMore !== undefined) item.isMore = false;
     activeMenuIndex.value = -1;
@@ -532,7 +508,7 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
   <Teleport to="body">
     <div
       v-show="hoveredCardItem"
-      class="knowledge-card-hover-popover visual-document-popover"
+      class="visual-document-popover"
       :style="{ left: cardPopoverPos.x + 'px', top: cardPopoverPos.y + 'px' }"
     >
       <template v-if="hoveredCardItem">
@@ -680,19 +656,20 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
 }
 
 .visual-document-card.is-selected {
-  border-color: #6b7280;
-  box-shadow: 0 0 0 1px #6b7280;
+  border-color: #9ca3af;
+  box-shadow: 0 0 0 2px rgb(156 163 175 / 13%);
 }
 
 .visual-document-card__body {
   min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .visual-document-card__header {
   min-width: 0;
+  min-height: 28px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -706,39 +683,37 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
+  color: #4b5563;
   font-size: 16px;
-  color: #6b7280;
 }
 
 .visual-document-card__title {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
   margin: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #111827;
   font-size: 14px;
   line-height: 20px;
   font-weight: 700;
   letter-spacing: -.025em;
-  color: #111827;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .visual-document-card__more {
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  margin: -4px -4px -4px 0;
-  padding: 0;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   color: #9ca3af;
-  font-size: 11px;
-  letter-spacing: 1px;
+  font: inherit;
   cursor: pointer;
 }
 
@@ -748,27 +723,15 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
   color: #374151;
 }
 
-.visual-document-card__description {
-  margin: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  font-size: 12px;
-  line-height: 1.625;
-  font-weight: 500;
-  color: #6b7280;
-  user-select: text;
-}
-
 .visual-document-card__status {
-  min-height: 20px;
+  min-height: 22px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  line-height: 16px;
   color: #6b7280;
+  font-size: 10px;
+  line-height: 16px;
 }
 
 .visual-document-card__status button {
@@ -780,42 +743,57 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
   cursor: pointer;
 }
 
-.visual-document-card__status.is-failed { color: #b91c1c; }
-.visual-document-card__status.is-draft { color: #9a6700; }
-.visual-document-card__status.is-draft small { color: #9ca3af; }
+.visual-document-card__status.is-failed { color: #dc2626; }
+.visual-document-card__status.is-draft { align-items: baseline; color: #6b7280; }
+.visual-document-card__status.is-draft small { color: #9ca3af; font-size: 9px; }
+.visual-document-card__status .is-spinning { animation: visual-document-spin .8s linear infinite; }
 
-.is-spinning {
-  animation: visual-card-spin 900ms linear infinite;
+.visual-document-card__description {
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .visual-document-card__tags {
-  min-width: 0;
-  min-height: 18px;
+  min-height: 26px;
+  margin-top: auto;
+  padding-top: 8px;
+  overflow: hidden;
 }
 
 .visual-document-card__tag-list {
+  max-width: 100%;
   min-width: 0;
+  height: 24px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .visual-document-card__tag,
-.visual-document-card__tag-overflow {
+.visual-document-card__tag-overflow,
+.visual-document-card__add-tag {
   flex: 0 0 auto;
-  max-width: 120px;
-  padding: 2px 6px;
-  border: 1px solid #fed7aa;
-  border-radius: 7px;
+  max-width: 140px;
+  height: 24px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: #fff7ed;
-  color: #c2410c;
+  background: #fffbeb;
+  color: #b45309;
   font-size: 10px;
   line-height: 14px;
-  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .visual-document-card__tag-overflow {
@@ -825,245 +803,92 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
 }
 
 .visual-document-card__add-tag {
-  padding: 2px 6px;
-  border: 1px dashed #d1d5db;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: transparent;
+  border-color: #e5e7eb;
+  background: #fff;
   color: #9ca3af;
-  font-size: 10px;
-  line-height: 14px;
+  font: inherit;
   cursor: pointer;
 }
 
 .visual-document-card__folder {
   min-width: 0;
+  max-width: 72%;
   padding: 0;
   border: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  overflow: hidden;
   background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
+.visual-document-card__folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-document-card__folder :deep(.t-icon) { flex: 0 0 10px; font-size: 10px; }
+.visual-document-card__type { flex: 0 0 auto; min-width: 30px; padding: 2px 5px; border-radius: 5px; background: #f3f4f6; color: #6b7280; font-size: 9px; line-height: 13px; text-align: center; }
 
-.visual-document-card__folder span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visual-document-card__type {
-  flex: 0 0 auto;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: #f3f4f6;
-  color: #4b5563;
-  font-size: 10px;
-  line-height: 14px;
-  font-weight: 700;
-}
-
-.visual-card-menu {
-  min-width: 180px;
-}
-
-.visual-card-menu--move {
-  width: 300px;
-  padding: 6px;
-}
-
-.visual-card-menu__back,
-.visual-card-menu__target {
-  width: 100%;
-  min-height: 34px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: #374151;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.visual-card-menu__back:hover,
-.visual-card-menu__target:hover {
-  background: #f3f4f6;
-}
-
-.visual-card-menu__state {
-  padding: 16px 8px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 12px;
-}
-
-.visual-card-menu__target-name {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visual-card-menu__target-count { color: #9ca3af; font-size: 11px; }
-
-.visual-card-menu__confirm {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 6px 2px 2px;
-}
-
-.visual-card-menu__destination {
-  padding: 8px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: #f9fafb;
-  color: #374151;
-  font-size: 12px;
-}
-
-.visual-card-menu__mode {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.visual-card-menu__mode.is-active { border-color: #9ca3af; background: #f9fafb; }
-.visual-card-menu__mode span { display: flex; flex-direction: column; gap: 2px; }
-.visual-card-menu__mode strong { color: #1f2937; font-size: 12px; }
-.visual-card-menu__mode small { color: #9ca3af; font-size: 10px; line-height: 1.45; }
-
-.visual-card-menu__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 4px;
-}
+.visual-card-menu { width: 230px; max-width: calc(100vw - 24px); padding: 5px; box-sizing: border-box; }
+.visual-card-menu--move { max-height: 340px; overflow-y: auto; }
+.visual-card-menu__back { width: 100%; min-height: 32px; padding: 5px 7px; border: 0; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px; background: transparent; color: #6b7280; font: inherit; font-size: 10px; text-align: left; cursor: pointer; }
+.visual-card-menu__state { min-height: 80px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 10px; }
+.visual-card-menu__target { width: 100%; min-height: 34px; padding: 6px 7px; border: 0; border-radius: 7px; display: flex; align-items: center; gap: 6px; background: transparent; color: #4b5563; font: inherit; font-size: 10px; text-align: left; cursor: pointer; }
+.visual-card-menu__target:hover { background: #f3f4f6; color: #111827; }
+.visual-card-menu__target-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-card-menu__target-count { color: #9ca3af; font-size: 9px; }
+.visual-card-menu__confirm { padding: 7px; display: flex; flex-direction: column; gap: 7px; }
+.visual-card-menu__destination { min-height: 30px; padding: 5px 7px; border-radius: 7px; display: flex; align-items: center; gap: 6px; background: #f9fafb; color: #374151; font-size: 10px; }
+.visual-card-menu__mode { width: 100%; padding: 7px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: flex-start; gap: 7px; background: #fff; color: #4b5563; font: inherit; text-align: left; cursor: pointer; }
+.visual-card-menu__mode.is-active { border-color: #d1d5db; background: #f9fafb; }
+.visual-card-menu__mode > span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.visual-card-menu__mode strong { font-size: 10px; line-height: 15px; }
+.visual-card-menu__mode small { color: #9ca3af; font-size: 9px; line-height: 14px; }
+.visual-card-menu__actions { display: flex; justify-content: flex-end; gap: 5px; }
 
 .visual-document-popover {
   position: fixed;
-  z-index: 4000;
+  z-index: 10002;
   width: 360px;
   max-width: calc(100vw - 20px);
-  max-height: min(440px, calc(100vh - 20px));
-  overflow: auto;
-  padding: 16px;
+  max-height: min(420px, calc(100vh - 20px));
+  overflow-y: auto;
   box-sizing: border-box;
+  padding: 14px;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   background: #fff;
   color: #374151;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 12%);
+  box-shadow: 0 16px 38px rgb(15 23 42 / 14%);
   pointer-events: none;
 }
 
-.visual-document-popover__title {
-  margin: 0 0 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #111827;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 700;
-}
+.visual-document-popover__title { margin: 0 0 8px; overflow: hidden; color: #111827; font-size: 12px; line-height: 18px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.visual-document-popover__timeline { margin: 2px 0 5px; }
+.visual-document-popover__timeline.is-failed { color: #dc2626; }
+.visual-document-popover__draft { padding: 6px 0; color: #6b7280; font-size: 10px; }
+.visual-document-popover__description { margin: 0; overflow: hidden; color: #6b7280; font-size: 10px; line-height: 16px; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
+.visual-document-popover__source { margin: 8px 0 0; display: flex; align-items: center; gap: 5px; overflow: hidden; color: #9ca3af; font-size: 9px; line-height: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.visual-document-popover__extra { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px 10px; color: #9ca3af; font-size: 9px; line-height: 14px; }
+.visual-document-popover__meta { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; color: #9ca3af; font-size: 9px; line-height: 14px; }
+.visual-document-popover__meta strong { margin-left: auto; color: #6b7280; font-size: 9px; }
+.visual-document-popover__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.visual-document-popover__tags span { padding: 2px 5px; border-radius: 5px; background: #f3f4f6; color: #6b7280; }
+.visual-document-popover__hint { margin-top: 8px; color: #d1d5db; font-size: 8px; text-align: right; }
 
-.visual-document-popover__description,
-.visual-document-popover__source {
-  margin: 0 0 10px;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.6;
-}
+@keyframes visual-document-spin { to { transform: rotate(360deg); } }
 
-.visual-document-popover__source {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visual-document-popover__extra,
-.visual-document-popover__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  color: #9ca3af;
-  font-size: 10px;
-  line-height: 15px;
-}
-
-.visual-document-popover__meta {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #f3f4f6;
-}
-
-.visual-document-popover__tags {
-  display: flex;
-  gap: 4px;
-}
-
-.visual-document-popover__tags span {
-  padding: 1px 5px;
-  border-radius: 5px;
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.visual-document-popover__hint {
-  margin-top: 10px;
-  color: #9ca3af;
-  font-size: 10px;
-}
-
-.visual-document-popover__draft { color: #9a6700; font-size: 12px; }
-.visual-document-popover__timeline.is-failed { color: #b91c1c; }
-
-@keyframes visual-card-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (min-width: 640px) {
+@media (min-width: 860px) {
   .visual-document-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-@media (min-width: 768px) {
+@media (min-width: 1180px) {
   .visual-document-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-
-@media (min-width: 1024px) {
+@media (min-width: 1540px) {
   .visual-document-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .visual-folder-card,
   .visual-document-card,
-  .is-spinning {
-    transition: none !important;
-    animation: none !important;
-  }
+  .visual-document-card__status .is-spinning { transition: none !important; animation: none !important; }
 }
 </style>
