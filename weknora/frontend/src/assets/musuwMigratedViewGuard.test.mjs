@@ -27,7 +27,12 @@ test('migrated knowledge document views expose only their new visual roots', () 
   }
 })
 
-test('migrated upload control cannot reattach a parent-provided legacy trigger class', () => {
+test('upload component preserves its native trigger customization API while active callers do not reattach legacy classes', () => {
   const upload = read('../views/knowledge/components/KbUploadSourceDropdown.vue')
-  assert.equal(upload.includes(`:class="['visual-upload-source__trigger', triggerClass]"`), false)
+  const knowledge = read('../views/knowledge/KnowledgeBase.vue')
+  assert.ok(upload.includes(`:class="['visual-upload-source__trigger', triggerClass]"`))
+  assert.ok(upload.includes(':name="triggerIcon"'))
+  assert.ok(upload.includes('triggerClass?: string'))
+  assert.ok(upload.includes('triggerIcon?: string'))
+  assert.equal(knowledge.includes('trigger-class="content-bar-icon-btn"'), false)
 })
