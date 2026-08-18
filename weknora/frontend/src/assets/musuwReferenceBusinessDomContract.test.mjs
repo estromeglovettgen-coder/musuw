@@ -18,18 +18,33 @@ test('citation source and click surfaces stay on the pre-Task1 business baseline
   }
 })
 
-test('mechanical CSS selectors still map to the native WeKnora DOM', () => {
+test('unmigrated mechanical CSS selectors still map to native WeKnora DOM', () => {
   const menu = read('../components/menu.vue')
   const input = read('../components/Input-field.vue')
   const bot = read('../views/chat/components/botmsg.vue')
   const knowledge = read('../views/knowledge/KnowledgeBase.vue')
-  const settings = read('../views/settings/Settings.vue')
 
   for (const token of ['aside_box', 'menu_item', 'menu_top', 'menu_bottom']) assert.ok(menu.includes(token))
   for (const token of ['rich-input-container', '<t-textarea', 'model-selector-trigger', 'control-right']) assert.ok(input.includes(token))
   for (const token of ['bot_msg', 'content-wrapper', 'ai-markdown-template markdown-content', 'answer-toolbar']) assert.ok(bot.includes(token))
   for (const token of ['knowledge-layout', 'document-header', 'document-breadcrumb', 'knowledge-main', 'doc-filter-bar', 'doc-card-list']) assert.ok(knowledge.includes(token))
-  for (const token of ['settings-overlay', 'settings-modal', 'settings-sidebar', 'settings-content', 'content-wrapper']) assert.ok(settings.includes(token))
+})
+
+test('migrated views do not retain the legacy view shells they replaced', () => {
+  const migrated = new Map([
+    ['../views/creatChat/creatChat.vue', ['class="dialogue-wrap"', 'class="dialogue-answers"']],
+    ['../views/knowledge/components/DocumentCardView.vue', ['class="doc-card-view"', 'class="knowledge-card"', 'class="folder-card"']],
+    ['../views/knowledge/components/KbFolderTree.vue', ['class="kb-folder-tree"', 'class="kb-folder-row"']],
+    ['../views/settings/Settings.vue', ['class="settings-overlay"', 'class="settings-modal"', 'class="settings-sidebar"', 'class="settings-content"']],
+    ['../views/settings/GeneralSettings.vue', ['class="general-settings"', 'class="settings-group"', 'class="setting-row"']],
+  ])
+
+  for (const [path, legacyTokens] of migrated) {
+    const source = read(path)
+    for (const token of legacyTokens) {
+      assert.equal(source.includes(token), false, `${path} still contains replaced legacy shell ${token}`)
+    }
+  }
 })
 
 test('source/index palette adapter cannot restyle the excluded processing timeline', () => {
