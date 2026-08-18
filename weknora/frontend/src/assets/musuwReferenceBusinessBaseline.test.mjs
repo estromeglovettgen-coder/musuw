@@ -11,7 +11,6 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 const baseline = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
   ['../components/UserMenu.vue', 'f5c813ced2e0e7b98af86e814aa7b4f788661752'],
-  ['../components/SessionSidebarRow.vue', '0ff2076685ff1d4c779eaa002ea57ac1dc4cd798'],
   ['../components/SessionSourceFilter.vue', '4f307ffe65e4fc433dace9b69d32cda1cf94d2eb'],
   ['../components/ChatHeader.vue', '79aec898f1e90c21a9f63fa77bce0dca509750c4'],
   ['../components/ChatCitationFloat.vue', 'b2a42b84fc7a76ecbe8fb5f1c8079dddf6ef555b'],
@@ -75,6 +74,19 @@ test('new-chat view may replace markup and CSS but must preserve its business co
     'usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking)',
     'router.push(`/platform/chat/${sessionId}`)',
     'navigateToKnowledgeBaseList(kbId)',
+  ])
+})
+
+test('session row may replace markup and CSS but must preserve navigation/menu/rename behavior', () => {
+  assertContracts('../components/SessionSidebarRow.vue', 'session row', [
+    "emit('rename-submit', { title: nextTitle })",
+    "emit('menu-click', { value: option.value })",
+    "const value = menuMode.value === 'clear' ? 'clearMessages' : 'delete'",
+    "emit('menu-click', { value })",
+    'normalizeSessionTitleDraft(titleDraft.value)',
+    "if (option.value === 'rename')",
+    "if (option.value === 'clearMessages')",
+    "if (option.value === 'delete')",
   ])
 })
 
