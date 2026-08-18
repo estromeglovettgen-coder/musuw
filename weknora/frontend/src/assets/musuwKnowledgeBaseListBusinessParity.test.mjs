@@ -28,6 +28,34 @@ test('rebuilt KnowledgeBaseList reuses normalized frozen setup', () => {
   ]) assert.equal(source.includes(token), false, `KnowledgeBaseList still exposes legacy shell ${token}`)
 })
 
+test('rebuilt list retains every native scope and sharing group surface', () => {
+  const source = read('../views/knowledge/KnowledgeBaseList.vue')
+  for (const token of [
+    "spaceSelection === 'all'",
+    "spaceSelection === 'favorites'",
+    "spaceSelection === 'recents'",
+    "spaceSelection === 'mine'",
+    'spaceSelectionOrgId',
+    'filteredKnowledgeBases.length > 0',
+    'sortedMineKbs.length > 0',
+    'sortedSpaceKbsList.length > 0',
+    "toggleKbSection('pinned')",
+    "toggleKbSection('tenantOthers')",
+    "toggleKbSection('sharedByMe')",
+    "toggleKbSection('sharedEditable')",
+    "toggleKbSection('sharedReadonly')",
+    'isKbSectionCollapsed(kbSectionOf(kb))',
+    'isSpaceKbCollapsed(shared)',
+    'handleSharedKbClickFromAll(kb)',
+    'openSharedDetailFromAll(kb)',
+    'handleSharedKbClick(shared)',
+    'openSharedDetail(shared)',
+    'knowledgeList.empty.favoritesTitle',
+    'knowledgeList.empty.recentsTitle',
+    'knowledgeList.empty.sharedTitle',
+  ]) assert.ok(source.includes(token), `KnowledgeBaseList active View lost scope contract: ${token}`)
+})
+
 test('rebuilt list retains native upload, pin, favorite, duplicate, delete, create and origin states', () => {
   const source = read('../views/knowledge/KnowledgeBaseList.vue')
   for (const token of [
@@ -36,10 +64,13 @@ test('rebuilt list retains native upload, pin, favorite, duplicate, delete, crea
     'summary.hasError',
     'isKbFavorited(kb.id)',
     'toggleFavoriteKb(kb.id, $event)',
+    'handleTogglePinById(kb.id)',
     'handleTogglePin(kb)',
     'canDuplicateKBCard(kb)',
+    'handleDuplicateById(kb.id)',
     'handleDuplicate(kb)',
     'canManageKBCard(kb)',
+    'handleDeleteById(kb.id)',
     'handleDelete(kb)',
     'handleCreateKnowledgeBase',
     'kb.isProcessing',
