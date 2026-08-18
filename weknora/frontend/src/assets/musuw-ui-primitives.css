@@ -1,5 +1,9 @@
-:root,
-:host {
+/*
+ * Application Views own their presentation. Shared primitives are scoped only
+ * to rebuilt visual-* surfaces so Wiki/Graph and other excluded native surfaces
+ * remain outside this cascade.
+ */
+:where([class^="visual-"], [class*=" visual-"]) {
   --font-sans: var(
     --app-font-family,
     "Inter Variable",
@@ -18,14 +22,6 @@
     SFMono-Regular,
     monospace
   );
-}
-
-/*
- * Application Views own their presentation. Keep the only shared primitives
- * scoped to rebuilt visual-* surfaces so Wiki/Graph and other excluded native
- * surfaces remain byte-for-byte and cascade-for-cascade outside this layer.
- */
-:where([class^="visual-"], [class*=" visual-"]) {
   font-family: var(--font-sans);
   scrollbar-width: thin;
   scrollbar-color: #d1d5db transparent;
