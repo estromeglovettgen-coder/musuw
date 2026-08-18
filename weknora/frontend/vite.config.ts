@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
-import { resolve, dirname } from 'node:path'
+import { resolve, dirname, basename } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { createRequire } from 'node:module'
@@ -34,16 +34,23 @@ const FRONTEND_COMMIT = resolveFrontendCommit()
 /**
  * Compile frozen pre-rebuild SFCs as headless controller modules.
  *
- * The source import remains a normal `*.pre-view.vue`, so vue-tsc can use the
- * standard Vue module declaration. During Vite resolution this pre-plugin maps
- * that file to a same-directory virtual `.ts` id. Keeping the same directory is
- * important because relative imports inside the original `<script setup>` must
- * resolve exactly as before. The virtual `.ts` suffix also guarantees that
- * @vitejs/plugin-vue never tries to parse the compiled controller as an SFC.
+ * The baseline files live under src/assets/business-baselines only as immutable
+ * source snapshots, so their original relative imports must NOT resolve from
+ * that archive directory. Each baseline is therefore compiled as a virtual TS
+ * module located beside the original SFC it came from. This preserves the exact
+ * import semantics of the original business script while keeping the archived
+ * template/style out of the runtime module graph.
  */
 function businessControllerPlugin(): Plugin {
-  const baselineMarker = '/src/assets/business-baselines/'
   const virtualSuffix = '.business-controller.ts'
+  const virtualToBaseline = new Map<string, string>()
+  const originalSourceByBaseline = new Map<string, string>([
+    ['Input-field.pre-view.vue', resolve(__dirname, 'src/components/Input-field.vue')],
+    ['KnowledgeBase.pre-view.vue', resolve(__dirname, 'src/views/knowledge/KnowledgeBase.vue')],
+    ['KnowledgeBaseList.pre-view.vue', resolve(__dirname, 'src/views/knowledge/KnowledgeBaseList.vue')],
+    ['ChatIndex.pre-view.vue', resolve(__dirname, 'src/views/chat/index.vue')],
+    ['manual-knowledge-editor.pre-view.vue', resolve(__dirname, 'src/components/manual-knowledge-editor.vue')],
+  ])
 
   return {
     name: 'musuw-business-controller',
@@ -53,29 +60,39 @@ function businessControllerPlugin(): Plugin {
       if (!normalizedSource.includes('/business-baselines/') || !normalizedSource.endsWith('.pre-view.vue')) {
         return null
       }
-      const resolved = await this.resolve(source, importer, { skipSelf: true })
-      return resolved ? `${resolved.id}${virtualSuffix}` : null
+
+      const baseline = await this.resolve(source, importer, { skipSelf: true })
+      if (!baseline) return null
+
+      const originalSource = originalSourceByBaseline.get(basename(baseline.id))
+      if (!originalSource) {
+        throw new Error(`No original source mapping for frozen business baseline: ${baseline.id}`)
+      }
+
+      const virtualId = `${originalSource}${virtualSuffix}`
+      virtualToBaseline.set(virtualId, baseline.id)
+      return virtualId
     },
     async load(id) {
-      const normalizedId = id.replaceAll('\\', '/')
-      if (!normalizedId.includes(baselineMarker) || !id.endsWith(virtualSuffix)) return null
+      const baselinePath = virtualToBaseline.get(id)
+      if (!baselinePath || !id.endsWith(virtualSuffix)) return null
 
-      const filename = id.slice(0, -virtualSuffix.length)
-      const source = readFileSync(filename, 'utf8')
-      const { descriptor, errors } = parse(source, { filename })
+      const originalFilename = id.slice(0, -virtualSuffix.length)
+      const source = readFileSync(baselinePath, 'utf8')
+      const { descriptor, errors } = parse(source, { filename: originalFilename })
       if (errors.length) {
-        throw new Error(`Failed to parse business controller ${filename}: ${errors.join('\n')}`)
+        throw new Error(`Failed to parse business controller ${baselinePath}: ${errors.join('\n')}`)
       }
       if (!descriptor.scriptSetup) {
-        throw new Error(`Business controller ${filename} must contain <script setup>.`)
+        throw new Error(`Business controller ${baselinePath} must contain <script setup>.`)
       }
 
-      const scopeId = createHash('sha256').update(filename).digest('hex').slice(0, 8)
+      const scopeId = createHash('sha256').update(originalFilename).digest('hex').slice(0, 8)
       const compiled = compileScript(descriptor, {
         id: scopeId,
         inlineTemplate: false,
       })
-      const transformed = await transformWithEsbuild(compiled.content, filename, {
+      const transformed = await transformWithEsbuild(compiled.content, originalFilename, {
         loader: descriptor.scriptSetup.lang === 'ts' ? 'ts' : 'js',
         target: 'esnext',
         sourcemap: false,
