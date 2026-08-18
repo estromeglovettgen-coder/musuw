@@ -17,7 +17,7 @@ test('rebuilt manual editor reuses normalized frozen setup and has no active Set
   const source = read('../components/manual-knowledge-editor.vue')
   assert.match(source, /import LegacyManualEditorBusiness from .*manual-knowledge-editor\.pre-view\.vue/)
   assert.match(source, /const legacySetup = legacy\.setup/)
-  assert.match(source, /return \{ \.\.\.state \}/)
+  assert.match(source, /return \{ \.\.\.state, \.\.\.adapterState \}/)
   assert.match(source, /class="visual-manual-editor"/)
   for (const token of ['<SettingDrawer', 'class="manual-editor"', 'class="setting-drawer__section"']) {
     assert.equal(source.includes(token), false, `manual editor still exposes ${token}`)
@@ -40,4 +40,22 @@ test('rebuilt manual editor keeps edit preview markdown status and save workflow
     'savingAction',
     'lastUpdatedText',
   ]) assert.ok(source.includes(token), `manual editor active View lost ${token}`)
+})
+
+test('rebuilt manual editor keeps the native persistent resize contract', () => {
+  const source = read('../components/manual-knowledge-editor.vue')
+  for (const token of [
+    "'setting-drawer:width:manual-markdown-editor'",
+    'MANUAL_DRAWER_DEFAULT_WIDTH = 760',
+    'MANUAL_DRAWER_MIN_WIDTH = 560',
+    'MANUAL_DRAWER_MAX_WIDTH = 1280',
+    'clampDrawerWidth',
+    'loadStoredDrawerWidth',
+    'persistDrawerWidth',
+    'onResizeStart',
+    'onResizeMove',
+    'onResizeEnd',
+    'window.localStorage.setItem',
+    'visual-manual-editor__resize-handle',
+  ]) assert.ok(source.includes(token), `manual editor lost resize contract: ${token}`)
 })
