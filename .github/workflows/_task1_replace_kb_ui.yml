@@ -1,4 +1,4 @@
-# checkout main so the one-shot UI transplant cannot overwrite newer business fixes
+# adversarially hardened one-shot: preserve native logic, transplant only reference DOM/style
 name: Task1 one-shot knowledge UI transplant
 
 on:
@@ -27,9 +27,13 @@ jobs:
 
           target_path = Path('weknora/frontend/src/views/knowledge/KnowledgeBase.vue')
           donor_path = Path('weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue')
+          if not donor_path.exists():
+              raise SystemExit('mechanical donor already removed; refusing to rewrite business script')
           target = target_path.read_text()
           donor = donor_path.read_text()
 
+          # Preserve the complete current production script. Add only the visual icon
+          # adapter and two display counters populated by the existing wiki stats call.
           prefix = target[:target.index('<template>')]
           if "@/components/ReferenceIcon.vue" not in prefix:
               anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
@@ -37,44 +41,93 @@ jobs:
                   raise SystemExit('KBSwitcherDropdown import anchor not found')
               prefix = prefix.replace(anchor, anchor + "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n", 1)
 
+          if 'const wikiPageCount = ref(0);' not in prefix:
+              anchor = "const wikiStatus = ref<{ pendingTasks: number; isActive: boolean; pendingIssues: number }>({\n"
+              if anchor not in prefix:
+                  raise SystemExit('wiki status anchor not found')
+              prefix = prefix.replace(anchor, "const wikiPageCount = ref(0);\nconst wikiLinkCount = ref(0);\n" + anchor, 1)
+              data_anchor = "    const data = res?.data || res\n    if (!data) return\n"
+              if data_anchor not in prefix:
+                  raise SystemExit('wiki stats data anchor not found')
+              prefix = prefix.replace(
+                  data_anchor,
+                  data_anchor + "    wikiPageCount.value = Number(data.total_pages || 0)\n    wikiLinkCount.value = Number(data.total_links || 0)\n",
+                  1,
+              )
+
           tail = donor[donor.index('<template>'):]
+
           replacements = {
               '@select="handleKnowledgeDropdownSelect"': '@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
               '@status-change="refreshWikiStats"': '@status-change="onWikiStatusChange"',
               '@open-source-doc="(id) => openKnowledgeItem({ id })"': '@open-source-doc="openSourceDoc"',
+              '<span>Wiki ({{ wikiCount }})</span>': '<span>Wiki ({{ wikiPageCount }})</span>',
+              "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>": "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ wikiLinkCount }})</span>",
               '@files="uploadFiles"': '@files="handleUploadSourceFiles"',
               '@url="importUrl"': '@url="handleUploadSourceUrl"',
               '@manual="createManual"': '@manual="handleManualCreate"',
               '@toggle-checkbox="(id, checked) => toggleRow(id, checked)"': '@toggle-checkbox="onCardGridCheckboxChange"',
+              '@menu-visible-change="(visible, item) => visible && probeTraceAvailable(item)"': '@menu-visible-change="onCardMoreVisibleChange"',
               '@toggle-row="toggleRow"': '@toggle-row="toggleSelectRow"',
               '@toggle-all="toggleAll"': '@toggle-all="toggleSelectAll"',
+              '@action="handleCardAction"\n            @probe-trace': '@action="handleListAction"\n            @probe-trace',
               '@cancel="cancelBatch"': '@cancel="handleBatchCancel"',
               '@delete="deleteBatch"': '@delete="confirmBatchDelete"',
               '@reparse="reparseBatch"': '@reparse="confirmBatchReparse"',
               '@batch-tag="batchTag"': '@batch-tag="handleBatchTag"',
-              '@tag-created="loadTags"': '@tag-created="loadTags(kbId, true)"',
+              '@tag-created="loadTags"': '@tag-created="() => loadTags(kbId, true)"',
+              '@open-manage="tagManageDrawerVisible = true"': '@open-manage="openTagManageFromEditDialog"',
               '@changed="() => { loadTags(); loadKnowledgeFiles() }"': '@changed="onTagManageChanged"',
               'font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;': 'font-family: var(--app-font-family);',
           }
           for old, new in replacements.items():
               tail = tail.replace(old, new)
 
+          # Keep tag selection's production store synchronization and reload behavior.
           tail = re.sub(
               r'@click="selectedTagIds = selectedTagIds\.includes\(tag\.id\)\s*\? selectedTagIds\.filter\(\(id\) => id !== tag\.id\)\s*:\s*\[\.\.\.selectedTagIds, tag\.id\]"',
               '@click="handleTagRowClick(tag.id)"',
               tail,
               flags=re.S,
           )
-          tail = tail.replace("<span>Wiki ({{ wikiCount }})</span>", "<span>Wiki</span>")
-          tail = tail.replace("<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>", "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span>")
 
+          # The reference scroll surface replaces the old DOM, but native infinite
+          # scroll and marquee selection remain the source of behavior.
+          scroll_needle = '<div class="reference-doc-scroll">'
+          if scroll_needle not in tail:
+              raise SystemExit('reference scroll host not found')
+          tail = tail.replace(scroll_needle, '''<div
+          class="reference-doc-scroll"
+          ref="knowledgeScroll"
+          @scroll="handleScroll"
+          @mousedown="onDocMarqueeMouseDown"
+        >
+          <div
+            v-if="docMarqueeVisible"
+            class="doc-marquee-box"
+            :class="{ 'is-add': docMarqueeMode === 'add', 'is-subtract': docMarqueeMode === 'subtract' }"
+            :style="docMarqueeBoxStyle"
+            aria-hidden="true"
+          />''', 1)
+
+          # Retain real project-only warnings; presentation follows the reference shell.
           header_needle = "        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
           header_insert = """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
-        <button v-if="unsupportedFileTypes.length" type="button" class="reference-inline-warning" @click="goToParserSettings">
+        <button
+          v-if="unsupportedFileTypes.length"
+          type="button"
+          class="reference-inline-warning"
+          @click="goToParserSettings"
+        >
           <span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map((type) => '.' + type).join('、') }) }}</span>
           <strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong>
         </button>
-        <button v-if="missingStorageEngine" type="button" class="reference-inline-warning" @click="handleOpenKBSettings">
+        <button
+          v-if="missingStorageEngine"
+          type="button"
+          class="reference-inline-warning"
+          @click="handleOpenKBSettings"
+        >
           <span>{{ $t('knowledgeBase.missingStorageEngine') }}</span>
           <strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong>
         </button>
@@ -83,6 +136,8 @@ jobs:
               raise SystemExit('reference header insertion point not found')
           tail = tail.replace(header_needle, header_insert, 1)
 
+          # Root empty state keeps the production upload/drop affordance. Folder or
+          # filtered empty results use the compact reference state.
           empty_old = """          <div v-else-if="!docListLoading" class="reference-empty-state">
             <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />
             <strong>暂无文档</strong>
@@ -97,8 +152,10 @@ jobs:
           if empty_old not in tail:
               raise SystemExit('reference empty state insertion point not found')
           tail = tail.replace(empty_old, empty_new, 1)
+
           tail = tail.replace('@getDoc="getDoc"\n    />', '@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />', 1)
 
+          # Preserve the native KB settings/editor host outside the reference detail shell.
           editor = """
     <KnowledgeBaseEditorModal
       :visible="uiStore.showKBEditorModal"
@@ -115,10 +172,29 @@ jobs:
           tail = tail.replace(closing, editor + closing, 1)
 
           warning_css = """
-.reference-inline-warning { width: fit-content; max-width: 760px; margin: 4px 0 0; padding: 0; border: 0; background: transparent; color: #92400e; display: flex; align-items: center; gap: 6px; font: inherit; font-size: 10px; line-height: 15px; text-align: left; cursor: pointer; }
+.reference-inline-warning {
+  width: fit-content;
+  max-width: 760px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: left;
+  cursor: pointer;
+}
 .reference-inline-warning strong { color: #4b5563; font-weight: 700; white-space: nowrap; }
+.doc-marquee-box { position: absolute; z-index: 30; pointer-events: none; border: 1px solid rgb(17 24 39 / .45); background: rgb(17 24 39 / .06); }
+.doc-marquee-box.is-subtract { border-color: rgb(220 38 38 / .45); background: rgb(220 38 38 / .06); }
 """
           tail = tail.replace('\n.reference-kb-tabs {', warning_css + '\n.reference-kb-tabs {', 1)
+
           target_path.write_text(prefix + tail)
           donor_path.unlink()
           PY
@@ -127,5 +203,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add weknora/frontend/src/views/knowledge/KnowledgeBase.vue weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue
           git commit -m "fix(ui): transplant reference knowledge DOM onto native logic"
-          git pull --rebase origin main
           git push origin HEAD:main
