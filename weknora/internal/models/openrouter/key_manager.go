@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-const managementAPIBaseURL = "https://openrouter.ai/api/v1"
+const (
+	managementAPIBaseURL  = "https://openrouter.ai/api/v1"
+	managementKeyFilePath = "/run/secrets/openrouter_management_api_key"
+)
 
 // KeyManager is the small subset of OpenRouter's official Management API that
 // Musuw needs for one monthly-limited inference key per personal workspace.
@@ -30,10 +33,10 @@ type ManagedKey struct {
 }
 
 type KeyInfo struct {
-	Hash                    string
-	LimitMicrousd           int64
-	LimitRemainingMicrousd  int64
-	UsageMonthlyMicrousd    int64
+	Hash                   string
+	LimitMicrousd          int64
+	LimitRemainingMicrousd int64
+	UsageMonthlyMicrousd   int64
 }
 
 type httpKeyManager struct {
@@ -44,6 +47,11 @@ type httpKeyManager struct {
 
 func NewKeyManagerFromEnv() KeyManager {
 	key := strings.TrimSpace(os.Getenv("OPENROUTER_MANAGEMENT_API_KEY"))
+	if key == "" {
+		if value, err := os.ReadFile(managementKeyFilePath); err == nil {
+			key = strings.TrimSpace(string(value))
+		}
+	}
 	if key == "" {
 		return nil
 	}
