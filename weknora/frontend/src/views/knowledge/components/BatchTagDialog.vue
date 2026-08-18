@@ -21,7 +21,6 @@
             <button
               type="button"
               class="visual-batch-tag__close"
-              :disabled="confirmLoading"
               :aria-label="$t('common.cancel')"
               @click="handleClose"
             >
@@ -37,7 +36,6 @@
                   v-if="selectedSet.size > 0"
                   type="button"
                   class="visual-batch-tag__text-action"
-                  :disabled="confirmLoading"
                   @click="clearAll"
                 >
                   {{ $t('knowledgeBase.tagClearAction') }}
@@ -51,7 +49,6 @@
                   type="button"
                   class="visual-batch-tag__chip is-selected"
                   :title="tag.name"
-                  :disabled="confirmLoading"
                   @click="toggleTag(tag.id)"
                 >
                   <span>{{ tag.name }}</span>
@@ -68,7 +65,6 @@
                   v-if="canManage"
                   type="button"
                   class="visual-batch-tag__text-action"
-                  :disabled="confirmLoading"
                   @click="handleOpenManage"
                 >
                   {{ $t('knowledgeBase.tagManageLink') }}
@@ -81,7 +77,6 @@
                   :placeholder="$t('knowledgeBase.tagEditSearch')"
                   clearable
                   size="small"
-                  :disabled="confirmLoading"
                 >
                   <template #prefix-icon><t-icon name="search" size="14px" /></template>
                 </t-input>
@@ -94,7 +89,6 @@
                   type="button"
                   class="visual-batch-tag__chip"
                   :title="tag.knowledge_count !== undefined ? `${tag.name} (${tag.knowledge_count})` : tag.name"
-                  :disabled="confirmLoading"
                   @click="toggleTag(tag.id)"
                 >
                   {{ tag.name }}
@@ -107,7 +101,7 @@
                   v-if="searchQuery.trim()"
                   type="button"
                   class="visual-batch-tag__text-action"
-                  :disabled="creatingTag || confirmLoading"
+                  :disabled="creatingTag"
                   @click="handleCreateTag"
                 >
                   <t-loading v-if="creatingTag" size="small" />
@@ -121,13 +115,13 @@
                   :placeholder="$t('knowledgeBase.tagNewPlaceholder')"
                   size="small"
                   :maxlength="40"
-                  :disabled="creatingTag || confirmLoading"
+                  :disabled="creatingTag"
                   @enter="handleAddNewTag"
                 />
                 <button
                   type="button"
                   class="visual-batch-tag__create-button"
-                  :disabled="creatingTag || confirmLoading || !newTagName.trim()"
+                  :disabled="creatingTag || !newTagName.trim()"
                   @click="handleAddNewTag"
                 >
                   <t-loading v-if="creatingTag" size="small" />
@@ -299,12 +293,10 @@ function handleConfirm() {
 }
 
 function handleClose() {
-  if (props.confirmLoading) return;
   emit('update:visible', false);
 }
 
 function handleOpenManage() {
-  if (props.confirmLoading) return;
   emit('update:visible', false);
   emit('open-manage');
 }
