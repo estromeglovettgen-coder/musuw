@@ -74,7 +74,7 @@ export default defineComponent({
     </section>
 
     <section class="visual-kb-list__content">
-      <div v-if="loading && kbs.length === 0" class="visual-kb-grid" aria-hidden="true">
+      <div v-if="loading && kbs.length === 0 && !spaceSelectionOrgId" class="visual-kb-grid" aria-hidden="true">
         <article v-for="n in 8" :key="n" class="visual-kb-card is-skeleton">
           <t-skeleton animation="gradient" :row-col="[
             { width: '62%', height: '16px' },
@@ -84,7 +84,218 @@ export default defineComponent({
         </article>
       </div>
 
-      <div v-else-if="sortedMineKbs.length > 0" class="visual-kb-grid">
+      <div
+        v-else-if="
+          (spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') &&
+          filteredKnowledgeBases.length > 0
+        "
+        class="visual-kb-grid"
+      >
+        <button
+          v-if="filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned"
+          type="button"
+          class="visual-kb-section"
+          @click="toggleKbSection('pinned')"
+        >
+          <t-icon name="pin-filled" />
+          <span>{{ $t('knowledgeList.sections.pinned') }}</span>
+          <small>{{ filteredKbSectionCounts.pinned }}</small>
+          <t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" />
+        </button>
+
+        <template v-for="(kb, index) in filteredKnowledgeBases" :key="`${kb.isMine ? 'mine' : 'shared'}-${kb.id}`">
+          <button
+            v-if="
+              showShareGroupHeaders &&
+              kb.isMine &&
+              !isMyKb(kb) &&
+              !kb.is_pinned &&
+              (index === 0 || !filteredKnowledgeBases[index - 1].isMine || isMyKb(filteredKnowledgeBases[index - 1]) || filteredKnowledgeBases[index - 1].is_pinned)
+            "
+            type="button"
+            class="visual-kb-section"
+            @click="toggleKbSection('tenantOthers')"
+          >
+            <t-icon :name="tenantSectionIconName" />
+            <span>{{ $t(tenantSectionLabelKey) }}</span>
+            <small>{{ filteredKbSectionCounts.tenantOthers }}</small>
+            <t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" />
+          </button>
+
+          <button
+            v-if="
+              showShareGroupHeaders &&
+              !kb.isMine &&
+              isSharedKbEditable(kb.permission) &&
+              (index === 0 || filteredKnowledgeBases[index - 1].isMine)
+            "
+            type="button"
+            class="visual-kb-section"
+            @click="toggleKbSection('sharedEditable')"
+          >
+            <t-icon name="usergroup-add" />
+            <span>{{ $t('knowledgeList.sections.sharedEditable') }}</span>
+            <small>{{ filteredKbSectionCounts.sharedEditable }}</small>
+            <t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" />
+          </button>
+
+          <button
+            v-if="
+              showShareGroupHeaders &&
+              !kb.isMine &&
+              !isSharedKbEditable(kb.permission) &&
+              (index === 0 || filteredKnowledgeBases[index - 1].isMine || isSharedKbEditable(filteredKnowledgeBases[index - 1].permission))
+            "
+            type="button"
+            class="visual-kb-section"
+            @click="toggleKbSection('sharedReadonly')"
+          >
+            <t-icon name="browse" />
+            <span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span>
+            <small>{{ filteredKbSectionCounts.sharedReadonly }}</small>
+            <t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" />
+          </button>
+
+          <article
+            v-if="kb.isMine"
+            v-show="!isKbSectionCollapsed(kbSectionOf(kb))"
+            class="visual-kb-card"
+            :class="{
+              'is-faq': kb.type === 'faq',
+              'is-highlighted': highlightedKbId !== null && highlightedKbId === kb.id,
+            }"
+            :ref="(el) => {
+              if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement
+            }"
+            @click="handleCardClick(kb)"
+          >
+            <button
+              type="button"
+              class="visual-kb-card__favorite"
+              :class="{ 'is-active': isKbFavorited(kb.id) }"
+              :aria-label="isKbFavorited(kb.id) ? $t('knowledgeList.favorites.remove') : $t('knowledgeList.favorites.add')"
+              @click.stop="toggleFavoriteKb(kb.id, $event)"
+            >
+              <t-icon :name="isKbFavorited(kb.id) ? 'star-filled' : 'star'" />
+            </button>
+
+            <header class="visual-kb-card__header">
+              <div class="visual-kb-card__title" :title="kb.name">
+                <KbWikiBadge v-if="isWikiKb(kb)" />
+                <strong>{{ kb.name }}</strong>
+              </div>
+              <t-popup trigger="click" destroy-on-close placement="bottom-right">
+                <button type="button" class="visual-kb-card__more" @click.stop>
+                  <t-icon name="ellipsis" />
+                </button>
+                <template #content>
+                  <div class="visual-kb-card-menu" @click.stop>
+                    <button type="button" @click="handleTogglePinById(kb.id)">
+                      <t-icon :name="kb.is_pinned ? 'pin-filled' : 'pin'" />
+                      <span>{{ kb.is_pinned ? $t('knowledgeList.pin.unpin') : $t('knowledgeList.pin.pin') }}</span>
+                    </button>
+                    <button v-if="canDuplicateKBCard(kb)" type="button" @click="handleDuplicateById(kb.id)">
+                      <t-icon name="file-copy" />
+                      <span>{{ $t('knowledgeList.menu.duplicate') }}</span>
+                    </button>
+                    <button v-if="canManageKBCard(kb)" type="button" class="is-danger" @click="handleDeleteById(kb.id)">
+                      <t-icon name="delete" />
+                      <span>{{ $t('common.delete') }}</span>
+                    </button>
+                  </div>
+                </template>
+              </t-popup>
+            </header>
+
+            <p class="visual-kb-card__description">{{ kb.description || $t('knowledgeBase.noDescription') }}</p>
+
+            <footer class="visual-kb-card__footer">
+              <span class="visual-kb-card__metric">
+                <t-icon :name="kb.type === 'faq' ? 'chat-bubble-help' : 'folder'" />
+                <span>{{ kb.type === 'faq' ? kb.chunk_count || 0 : kb.knowledge_count || 0 }}</span>
+                <span v-if="kb.isProcessing" class="visual-kb-card__spinner" />
+              </span>
+              <t-tooltip v-if="kb.question_generation_config?.enabled" :content="$t('knowledgeList.features.questionGeneration')" placement="top">
+                <span class="visual-kb-card__feature"><t-icon name="help-circle" /></span>
+              </t-tooltip>
+              <t-tooltip v-if="(kb.share_count ?? 0) > 0" :content="$t('knowledgeList.sharedToOrgs', { count: kb.share_count ?? 0 })" placement="top">
+                <span class="visual-kb-card__feature"><t-icon name="share" /></span>
+              </t-tooltip>
+              <span class="visual-kb-card__spacer" />
+              <ResourceOriginBadge
+                v-if="!authStore.isLiteMode && showKbOriginBadge(kb)"
+                :variant="kbOriginVariant(kb)"
+                :creator-name="kb.creator_name"
+              />
+            </footer>
+          </article>
+
+          <article
+            v-else
+            v-show="!isKbSectionCollapsed(kbSectionOf(kb))"
+            class="visual-kb-card is-shared"
+            :class="{ 'is-faq': kb.type === 'faq' }"
+            @click="handleSharedKbClickFromAll(kb)"
+          >
+            <button
+              type="button"
+              class="visual-kb-card__favorite"
+              :class="{ 'is-active': isKbFavorited(kb.id) }"
+              :aria-label="isKbFavorited(kb.id) ? $t('knowledgeList.favorites.remove') : $t('knowledgeList.favorites.add')"
+              @click.stop="toggleFavoriteKb(kb.id, $event)"
+            >
+              <t-icon :name="isKbFavorited(kb.id) ? 'star-filled' : 'star'" />
+            </button>
+
+            <header class="visual-kb-card__header">
+              <div class="visual-kb-card__title" :title="kb.name">
+                <KbWikiBadge v-if="isWikiKb(kb)" />
+                <strong>{{ kb.name }}</strong>
+              </div>
+              <t-tooltip :content="$t('knowledgeList.menu.viewDetails')" placement="top">
+                <button
+                  type="button"
+                  class="visual-kb-card__more"
+                  :aria-label="$t('knowledgeList.menu.viewDetails')"
+                  @click.stop="openSharedDetailFromAll(kb)"
+                >
+                  <t-icon name="info-circle" />
+                </button>
+              </t-tooltip>
+            </header>
+
+            <p class="visual-kb-card__description">{{ kb.description || $t('knowledgeBase.noDescription') }}</p>
+
+            <footer class="visual-kb-card__footer">
+              <span class="visual-kb-card__metric">
+                <t-icon :name="kb.type === 'faq' ? 'chat-bubble-help' : 'folder'" />
+                <span>{{ kb.type === 'faq' ? kb.chunk_count ?? '-' : kb.knowledge_count ?? '-' }}</span>
+              </span>
+              <t-tooltip v-if="kb.question_generation_config?.enabled" :content="$t('knowledgeList.features.questionGeneration')" placement="top">
+                <span class="visual-kb-card__feature"><t-icon name="help-circle" /></span>
+              </t-tooltip>
+              <span class="visual-kb-card__spacer" />
+              <span v-if="kb.org_name" class="visual-kb-card__origin" :title="kb.org_name">
+                <t-icon name="usergroup" />
+                <span>{{ kb.org_name }}</span>
+              </span>
+            </footer>
+          </article>
+        </template>
+
+        <button
+          v-if="authStore.hasRole('contributor')"
+          type="button"
+          class="visual-kb-card visual-kb-card--create"
+          data-guide="kb-list-create"
+          @click="handleCreateKnowledgeBase"
+        >
+          <span><t-icon name="folder-add" /></span>
+          <strong>{{ $t('knowledgeList.create') }}</strong>
+        </button>
+      </div>
+
+      <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0" class="visual-kb-grid">
         <button
           v-if="sortedMineKbs[0]?.is_pinned"
           type="button"
@@ -142,8 +353,8 @@ export default defineComponent({
                 <KbWikiBadge v-if="isWikiKb(kb)" />
                 <strong>{{ kb.name }}</strong>
               </div>
-              <t-popup trigger="click" destroy-on-close placement="bottom-right">
-                <button type="button" class="visual-kb-card__more" @click.stop>
+              <t-popup v-model:visible="kb.showMore" trigger="click" destroy-on-close placement="bottom-right" :on-visible-change="onVisibleChange">
+                <button type="button" class="visual-kb-card__more" @click.stop="openMore(index)">
                   <t-icon name="ellipsis" />
                 </button>
                 <template #content>
@@ -201,19 +412,148 @@ export default defineComponent({
         </button>
       </div>
 
-      <section v-else-if="!loading" class="visual-kb-empty">
-        <t-icon name="folder" />
-        <strong>{{ $t('knowledgeList.empty.title') }}</strong>
-        <p>{{ $t('knowledgeList.empty.description') }}</p>
+      <div v-else-if="spaceSelectionOrgId && spaceKbsLoading" class="visual-kb-loading">
+        <t-loading size="medium" />
+      </div>
+
+      <div v-else-if="spaceSelectionOrgId && sortedSpaceKbsList.length > 0" class="visual-kb-grid">
+        <template
+          v-for="(shared, index) in sortedSpaceKbsList"
+          :key="'shared-' + (shared.share_id || `agent-${shared.knowledge_base?.id}-${shared.source_from_agent?.agent_id || ''}`)"
+        >
+          <button
+            v-if="showShareGroupHeaders && shared.is_mine && index === 0"
+            type="button"
+            class="visual-kb-section"
+            @click="toggleKbSection('sharedByMe')"
+          >
+            <t-icon name="share" />
+            <span>{{ $t('knowledgeList.sections.sharedByMe') }}</span>
+            <small>{{ spaceKbSectionCounts.sharedByMe }}</small>
+            <t-icon :name="isKbSectionCollapsed('sharedByMe') ? 'chevron-right' : 'chevron-down'" />
+          </button>
+
+          <button
+            v-if="
+              showShareGroupHeaders &&
+              !shared.is_mine &&
+              isSharedKbEditable(shared.permission) &&
+              (index === 0 || sortedSpaceKbsList[index - 1].is_mine)
+            "
+            type="button"
+            class="visual-kb-section"
+            @click="toggleKbSection('sharedEditable')"
+          >
+            <t-icon name="edit-1" />
+            <span>{{ $t('knowledgeList.sections.sharedEditable') }}</span>
+            <small>{{ spaceKbSectionCounts.sharedEditable }}</small>
+            <t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" />
+          </button>
+
+          <button
+            v-if="
+              showShareGroupHeaders &&
+              !shared.is_mine &&
+              !isSharedKbEditable(shared.permission) &&
+              (index === 0 || sortedSpaceKbsList[index - 1].is_mine || isSharedKbEditable(sortedSpaceKbsList[index - 1].permission))
+            "
+            type="button"
+            class="visual-kb-section"
+            @click="toggleKbSection('sharedReadonly')"
+          >
+            <t-icon name="browse" />
+            <span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span>
+            <small>{{ spaceKbSectionCounts.sharedReadonly }}</small>
+            <t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" />
+          </button>
+
+          <article
+            v-show="!isSpaceKbCollapsed(shared)"
+            class="visual-kb-card is-shared"
+            :class="{ 'is-faq': shared.knowledge_base.type === 'faq' }"
+            @click="handleSharedKbClick(shared)"
+          >
+            <header class="visual-kb-card__header">
+              <div class="visual-kb-card__title" :title="shared.knowledge_base.name">
+                <KbWikiBadge v-if="isWikiKb(shared.knowledge_base)" />
+                <strong>{{ shared.knowledge_base.name }}</strong>
+              </div>
+              <t-tooltip v-if="!shared.is_mine" :content="$t('knowledgeList.menu.viewDetails')" placement="top">
+                <button
+                  type="button"
+                  class="visual-kb-card__more"
+                  :aria-label="$t('knowledgeList.menu.viewDetails')"
+                  @click.stop="openSharedDetail(shared)"
+                >
+                  <t-icon name="info-circle" />
+                </button>
+              </t-tooltip>
+            </header>
+
+            <p class="visual-kb-card__description">{{ shared.knowledge_base.description || $t('knowledgeBase.noDescription') }}</p>
+
+            <footer class="visual-kb-card__footer">
+              <span class="visual-kb-card__metric">
+                <t-icon :name="shared.knowledge_base.type === 'faq' ? 'chat-bubble-help' : 'folder'" />
+                <span>{{ shared.knowledge_base.type === 'faq' ? shared.knowledge_base.chunk_count ?? '-' : shared.knowledge_base.knowledge_count ?? '-' }}</span>
+              </span>
+              <span class="visual-kb-card__spacer" />
+              <span v-if="shared.org_name" class="visual-kb-card__origin" :title="shared.org_name">
+                <t-icon name="usergroup" />
+                <span>{{ shared.org_name }}</span>
+              </span>
+            </footer>
+          </article>
+        </template>
+
         <button
           v-if="authStore.hasRole('contributor')"
           type="button"
+          class="visual-kb-card visual-kb-card--create"
           data-guide="kb-list-create"
           @click="handleCreateKnowledgeBase"
         >
+          <span><t-icon name="folder-add" /></span>
+          <strong>{{ $t('knowledgeList.create') }}</strong>
+        </button>
+      </div>
+
+      <section v-else-if="spaceSelection === 'all' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty">
+        <t-icon name="folder" />
+        <strong>{{ $t('knowledgeList.empty.title') }}</strong>
+        <p>{{ $t('knowledgeList.empty.description') }}</p>
+        <button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase">
           <t-icon name="folder-add" />
           <span>{{ $t('knowledgeList.create') }}</span>
         </button>
+      </section>
+
+      <section v-else-if="spaceSelection === 'favorites' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty">
+        <t-icon name="star" />
+        <strong>{{ $t('knowledgeList.empty.favoritesTitle') }}</strong>
+        <p>{{ $t('knowledgeList.empty.favoritesDescription') }}</p>
+      </section>
+
+      <section v-else-if="spaceSelection === 'recents' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty">
+        <t-icon name="history" />
+        <strong>{{ $t('knowledgeList.empty.recentsTitle') }}</strong>
+        <p>{{ $t('knowledgeList.empty.recentsDescription') }}</p>
+      </section>
+
+      <section v-else-if="spaceSelection === 'mine' && kbs.length === 0 && !loading" class="visual-kb-empty">
+        <t-icon name="folder" />
+        <strong>{{ $t('knowledgeList.empty.title') }}</strong>
+        <p>{{ $t('knowledgeList.empty.description') }}</p>
+        <button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase">
+          <t-icon name="folder-add" />
+          <span>{{ $t('knowledgeList.create') }}</span>
+        </button>
+      </section>
+
+      <section v-else-if="spaceSelectionOrgId && !spaceKbsLoading && spaceKbsList.length === 0" class="visual-kb-empty">
+        <t-icon name="usergroup" />
+        <strong>{{ $t('knowledgeList.empty.sharedTitle') }}</strong>
+        <p>{{ $t('knowledgeList.empty.sharedDescription') }}</p>
       </section>
     </section>
 
@@ -331,7 +671,7 @@ export default defineComponent({
 .visual-kb-card__title { min-width: 0; flex: 1; padding-right: 54px; display: flex; align-items: center; gap: 5px; }
 .visual-kb-card__title strong { min-width: 0; overflow: hidden; color: #111827; font-size: 12px; line-height: 18px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .visual-kb-card__more { position: absolute; top: 7px; right: 7px; width: 26px; height: 26px; padding: 6px; border: 0; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; opacity: 0; }
-.visual-kb-card:hover .visual-kb-card__more { opacity: 1; }
+.visual-kb-card:hover .visual-kb-card__more,.visual-kb-card__more:focus-visible { opacity: 1; }
 .visual-kb-card__more:hover { background: #f3f4f6; color: #374151; }
 .visual-kb-card__description { min-height: 38px; margin: 5px 0 10px; overflow: hidden; color: #6b7280; font-size: 10px; line-height: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .visual-kb-card__footer { margin-top: auto; min-height: 28px; padding-top: 7px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 5px; }
@@ -340,10 +680,14 @@ export default defineComponent({
 .visual-kb-card__spinner { width: 8px; height: 8px; border: 1px solid #9ca3af; border-right-color: transparent; border-radius: 50%; animation: visual-kb-spin .8s linear infinite; }
 .visual-kb-card__feature { width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #9ca3af; }
 .visual-kb-card__feature :deep(.t-icon) { font-size: 11px; }
+.visual-kb-card__origin { min-width: 0; max-width: 130px; display: inline-flex; align-items: center; gap: 4px; color: #9ca3af; font-size: 9px; line-height: 14px; }
+.visual-kb-card__origin :deep(.t-icon) { flex: 0 0 11px; font-size: 11px; }
+.visual-kb-card__origin span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .visual-kb-card__spacer { flex: 1; }
 .visual-kb-card--create { align-items: center; justify-content: center; gap: 8px; border-style: dashed; color: #9ca3af; text-align: center; }
 .visual-kb-card--create > span { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; }
 .visual-kb-card--create strong { color: #6b7280; font-size: 10px; font-weight: 600; }
+.visual-kb-loading { min-height: 280px; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
 .visual-kb-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #9ca3af; text-align: center; }
 .visual-kb-empty > :deep(.t-icon) { font-size: 34px; color: #d1d5db; }
 .visual-kb-empty strong { margin-top: 10px; color: #6b7280; font-size: 12px; }
