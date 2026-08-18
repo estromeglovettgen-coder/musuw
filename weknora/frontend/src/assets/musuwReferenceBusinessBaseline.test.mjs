@@ -11,17 +11,26 @@ const frozen = new Map([
   ['./business-baselines/Input-field.pre-view.vue', 'a34d09f5f9dbe44d4b3835213fdab662c4b7446a'],
   ['./business-baselines/KnowledgeBase.pre-view.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
-  ['../composables/useChatCitationPopover.ts', 'b1142ec34ee9dec81600e6f3bda0c418cd478967'],
+  ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],
   ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
 ])
 
-test('unmigrated controllers and excluded Graph/Wiki implementations stay byte-for-byte frozen', () => {
+test('protected controllers, compatibility bridges and excluded Graph/Wiki implementations stay byte-for-byte frozen', () => {
   for (const [path, sha] of frozen) {
-    assert.equal(blobSha(read(path)), sha, `${path} changed outside its allowed View migration boundary`)
+    assert.equal(blobSha(read(path)), sha, `${path} changed outside its allowed migration boundary`)
   }
+})
+
+test('citation hover bridge follows the rebuilt float class without restoring legacy float styling', () => {
+  const citation = read('../composables/useChatCitationPopover.ts')
+  const floatView = read('../components/ChatCitationFloat.vue')
+  assert.ok(citation.includes("document.querySelector('.visual-citation-float:hover')"))
+  assert.ok(citation.includes("closest?.('.citation-kb, .citation-web, .visual-citation-float')"))
+  assert.ok(floatView.includes('class="visual-citation-float"'))
+  assert.equal(floatView.includes('class="chat-citation-float"'), false)
 })
 
 const contracts = new Map([
