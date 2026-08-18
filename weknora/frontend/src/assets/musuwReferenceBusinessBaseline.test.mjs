@@ -28,8 +28,6 @@ const baseline = new Map([
   ['../views/chat/components/usermsg.vue', '6dd0f2e44e4fc382d6f40702aa4b5eebc2467fea'],
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
-  ['../views/knowledge/components/BatchTagDialog.test.ts', '2cecdf2012ef924bfabe6f7fdbf3a3ab55c7ef8d'],
-  ['../views/knowledge/components/BatchTagDialog.vue', 'dde15cb2dd4c8019b2f5f7b03277039a4c5af0b0'],
   ['../views/knowledge/components/KbTagManageDrawer.vue', 'cc60b273a36ce031dc906cb3a680bb48496745b3'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
@@ -194,6 +192,20 @@ test('tag edit preserves selection creation confirmation and manage handoff', ()
     'function clearAll()',
     'await createKnowledgeBaseTag(props.kbId, { name })',
     "emit('tag-created')",
+    "emit('confirm', Array.from(selectedSet.value))",
+    "emit('update:visible', false)",
+    "emit('open-manage')",
+  ])
+})
+
+test('batch tag preserves preselection creation confirmation loading and manage handoff', () => {
+  assertContracts('../views/knowledge/components/BatchTagDialog.vue', 'batch tag', [
+    'selectedSet.value = new Set(props.preSelectedTagIds ?? [])',
+    'function toggleTag(tagId: string)',
+    'function clearAll()',
+    'await createKnowledgeBaseTag(props.kbId, { name })',
+    "emit('tag-created')",
+    'if (props.confirmLoading) return',
     "emit('confirm', Array.from(selectedSet.value))",
     "emit('update:visible', false)",
     "emit('open-manage')",
