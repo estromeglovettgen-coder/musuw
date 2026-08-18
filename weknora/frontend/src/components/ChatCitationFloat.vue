@@ -40,7 +40,7 @@ const loadingText = t('common.loading')
 </script>
 
 <style scoped lang="less">
-.visual-citation-float { position: fixed; z-index: 10020; width: min(340px, calc(100vw - 24px)); max-height: 260px; overflow: auto; padding: 10px 11px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 11px; background: rgb(255 255 255 / 98%); color: #374151; box-shadow: 0 14px 34px rgb(15 23 42 / 14%); backdrop-filter: blur(8px); }
+.visual-citation-float { position: absolute; z-index: 10020; width: min(340px, calc(100vw - 24px)); max-height: 260px; overflow: auto; padding: 10px 11px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 11px; background: rgb(255 255 255 / 98%); color: #374151; box-shadow: 0 14px 34px rgb(15 23 42 / 14%); backdrop-filter: blur(8px); }
 .visual-citation-float__source { min-width: 0; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; color: #9ca3af; font-size: 9px; line-height: 14px; }
 .visual-citation-float__source :deep(.t-icon) { flex: 0 0 12px; font-size: 12px; }
 .visual-citation-float__source span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
