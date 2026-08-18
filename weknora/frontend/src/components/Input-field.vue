@@ -145,7 +145,12 @@ export default defineComponent({
 
           <t-tooltip placement="top" theme="light">
             <template #content>
-              <span v-if="isMentionDisabled && isKnowledgeBaseDisabledByAgent">{{ $t('input.kbDisabledByAgent') }}</span>
+              <span v-if="isMentionDisabled && isKnowledgeBaseDisabledByAgent" class="visual-chat-composer__disabled-hint">
+                <span>{{ $t('input.kbDisabledByAgent') }}</span>
+                <button type="button" @click.stop.prevent="handleGoToAgentSettings('knowledge')">
+                  {{ $t('input.goToAgentSettings') }}
+                </button>
+              </span>
               <span v-else>
                 {{ allSelectedItems.length > 0
                   ? $t('input.knowledgeBaseWithCount', { count: allSelectedItems.length })
@@ -158,8 +163,8 @@ export default defineComponent({
               class="visual-chat-composer__tool is-at"
               :class="{ 'is-active': allSelectedItems.length > 0, 'is-disabled': isMentionDisabled }"
               data-guide="chat-kb-mention"
-              :disabled="isMentionDisabled"
-              @mousedown.prevent="triggerMention"
+              :aria-disabled="isMentionDisabled"
+              @mousedown.prevent="!isMentionDisabled && triggerMention()"
             >
               <span class="visual-chat-composer__at">@</span>
               <span v-if="allSelectedItems.length > 0" class="visual-chat-composer__count">{{ allSelectedItems.length }}</span>
@@ -333,12 +338,14 @@ export default defineComponent({
 .visual-chat-composer__tools { min-width: 0; flex: 1 1 auto; display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
 .visual-chat-composer__submit { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
 .visual-chat-composer__tool { position: relative; flex: 0 0 30px; width: 30px; height: 30px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #858b95; cursor: pointer; }
-.visual-chat-composer__tool:hover:not(:disabled), .visual-chat-composer__tool.is-active { background: #e9eaec; color: #374151; }
-.visual-chat-composer__tool.is-disabled, .visual-chat-composer__tool:disabled { opacity: .38; cursor: default; }
+.visual-chat-composer__tool:hover, .visual-chat-composer__tool.is-active { background: #e9eaec; color: #374151; }
+.visual-chat-composer__tool.is-disabled { opacity: .38; cursor: default; }
 .visual-chat-composer__tool :deep(.t-icon) { font-size: 15px; }
 .visual-chat-composer__tool svg { width: 16px; height: 16px; }
 .visual-chat-composer__at { font-size: 17px; line-height: 1; font-weight: 500; }
 .visual-chat-composer__count { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border: 1px solid #fff; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #6b7280; color: #fff; font-size: 8px; line-height: 12px; font-variant-numeric: tabular-nums; }
+.visual-chat-composer__disabled-hint { display: inline-flex; align-items: center; gap: 8px; }
+.visual-chat-composer__disabled-hint button { padding: 0; border: 0; background: transparent; color: #2563eb; font: inherit; text-decoration: underline; cursor: pointer; }
 .visual-chat-composer__select, .visual-chat-composer__model { min-height: 30px; max-width: 170px; padding: 5px 8px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: transparent; color: #6b7280; font: inherit; font-size: 10px; line-height: 18px; font-weight: 550; cursor: pointer; }
 .visual-chat-composer__select:hover, .visual-chat-composer__model:hover { background: #e9eaec; color: #374151; }
 .visual-chat-composer__select :deep(.t-icon), .visual-chat-composer__model :deep(.t-icon) { flex: 0 0 11px; font-size: 11px; color: #9ca3af; transition: transform 120ms ease; }
