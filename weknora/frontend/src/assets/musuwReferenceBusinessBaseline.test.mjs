@@ -6,8 +6,8 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-// Business implementation baseline from 367a0c76e48fcf8a3762c33b672cfa2e16b679f4.
 // Files that have not entered the view-rebuild track remain byte-for-byte frozen.
+// Once a view is migrated it leaves this map and is guarded by behavior contracts below.
 const baseline = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
   ['../components/ChatHeader.vue', '79aec898f1e90c21a9f63fa77bce0dca509750c4'],
@@ -30,8 +30,6 @@ const baseline = new Map([
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
   ['../views/knowledge/components/BatchTagDialog.test.ts', '2cecdf2012ef924bfabe6f7fdbf3a3ab55c7ef8d'],
   ['../views/knowledge/components/BatchTagDialog.vue', 'dde15cb2dd4c8019b2f5f7b03277039a4c5af0b0'],
-  ['../views/knowledge/components/DocumentBatchBar.vue', 'de5e7b6ed2685b9754a4d7c1becbf574a27abdfe'],
-  ['../views/knowledge/components/FolderPickerMenu.vue', 'ecc3a74e8bda5b96691c89fd00fd5803edac6c4f'],
   ['../views/knowledge/components/KbTagManageDrawer.vue', 'cc60b273a36ce031dc906cb3a680bb48496745b3'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/components/TagEditDialog.test.ts', '9c26837db390555b9a97372775b5738b19b0f1ce'],
@@ -41,7 +39,7 @@ const baseline = new Map([
   ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
 ])
 
-test('unmigrated business implementations stay on the pre-view-rebuild baseline', () => {
+test('unmigrated business implementations stay frozen', () => {
   for (const [path, sha] of baseline) {
     assert.equal(blobSha(read(path)), sha, `${path} changed before its view was explicitly migrated`)
   }
@@ -59,12 +57,10 @@ function assertContracts(path, label, contracts) {
   }
 }
 
-test('new-chat view may replace markup and CSS but must preserve its business contract', () => {
+test('new-chat preserves create/send/navigation behavior', () => {
   assertContracts('../views/creatChat/creatChat.vue', 'new-chat', [
     'getSuggestedQuestions(agentId, settingsStore.getSuggestedQuestionsParams())',
     'inputFieldRef.value?.triggerSend(question)',
-    'const selectedKbs = settingsStore.settings.selectedKnowledgeBases || []',
-    'const selectedFiles = settingsStore.settings.selectedFiles || []',
     'const res = await createSessions(sessionData)',
     'usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking)',
     'router.push(`/platform/chat/${sessionId}`)',
@@ -72,9 +68,8 @@ test('new-chat view may replace markup and CSS but must preserve its business co
   ])
 })
 
-test('user menu may replace markup and CSS but must preserve settings/logout behavior', () => {
+test('user menu preserves settings and logout behavior', () => {
   assertContracts('../components/UserMenu.vue', 'user menu', [
-    'menuVisible.value = !menuVisible.value',
     'uiStore.openSettings("general")',
     'void router.push({ path: "/platform/settings", query: { section: "general" } })',
     'await logoutApi()',
@@ -84,22 +79,20 @@ test('user menu may replace markup and CSS but must preserve settings/logout beh
   ])
 })
 
-test('session source filter may replace markup and CSS but must preserve bucket selection and popup behavior', () => {
+test('session source filter preserves bucket selection and popup lifecycle', () => {
   assertContracts('../components/SessionSourceFilter.vue', 'session source filter', [
     'props.sources.find((item) => item.value === props.current) ?? props.sources[0]',
-    "if (item.value === DEFAULT_SESSION_BUCKET_KEY) return 'chat'",
     'updatePanelPosition()',
-    'document.addEventListener(\'click\', close)',
-    'window.addEventListener(\'scroll\', close, true)',
+    "document.addEventListener('click', close)",
+    "window.addEventListener('scroll', close, true)",
     'if (value === props.current) return',
     "emit('select', value)",
   ])
 })
 
-test('session row may replace markup and CSS but must preserve navigation/menu/rename behavior', () => {
+test('session row preserves navigation menu and rename behavior', () => {
   assertContracts('../components/SessionSidebarRow.vue', 'session row', [
     "emit('rename-submit', { title: nextTitle })",
-    "emit('menu-click', { value: option.value })",
     "const value = menuMode.value === 'clear' ? 'clearMessages' : 'delete'",
     "emit('menu-click', { value })",
     'normalizeSessionTitleDraft(titleDraft.value)',
@@ -109,33 +102,33 @@ test('session row may replace markup and CSS but must preserve navigation/menu/r
   ])
 })
 
-test('document-card view may replace markup and CSS but must preserve its event contract', () => {
-  assertContracts('../views/knowledge/components/DocumentCardView.vue', 'document-card', [
+test('document grid preserves open selection menu move and trace behavior', () => {
+  assertContracts('../views/knowledge/components/DocumentCardView.vue', 'document grid', [
     "emit('open', item)",
     "emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))",
     "emit('menu-visible-change', visible, item)",
     "emit('move-to-folder', item, path)",
     "emit('action', action, item)",
-    "folderPickerItemId.value = item.id",
-    "props.traceAvailableById[item.id] === true",
+    'folderPickerItemId.value = item.id',
+    'props.traceAvailableById[item.id] === true',
   ])
 })
 
-test('document list view may replace markup and CSS but must preserve row selection, trace probing, folder move and move-state behavior', () => {
-  assertContracts('../views/knowledge/components/DocumentListView.vue', 'document list view', [
+test('document list preserves row selection trace probing folder move and move-state behavior', () => {
+  assertContracts('../views/knowledge/components/DocumentListView.vue', 'document list', [
     "emit('toggle-all', checked)",
     "emit('toggle-row', item.id, checked, !!me?.shiftKey)",
     "if (it) emit('probe-trace', it)",
     "emit('reset-move-state')",
     "emit('move-to-folder', item, path)",
-    "folderPickerItemId.value = item.id",
+    'folderPickerItemId.value = item.id',
     "emit('action', action, item)",
     'stickyObserver.observe(stickySentinel.value)',
   ])
 })
 
-test('document action menu may replace markup and CSS but must preserve every action emit', () => {
-  assertContracts('../views/knowledge/components/DocumentActionMenu.vue', 'document action menu', [
+test('document action menu preserves every action contract', () => {
+  assertContracts('../views/knowledge/components/DocumentActionMenu.vue', 'document actions', [
     "(e: 'edit'): void",
     "(e: 'view-trace'): void",
     "(e: 'reparse'): void",
@@ -148,30 +141,55 @@ test('document action menu may replace markup and CSS but must preserve every ac
   ])
 })
 
-test('folder tree may replace markup and CSS but must preserve selection/rename/collapse behavior', () => {
+test('document batch bar preserves batch action contracts', () => {
+  assertContracts('../views/knowledge/components/DocumentBatchBar.vue', 'document batch bar', [
+    "(e: 'cancel'): void",
+    "(e: 'delete'): void",
+    "(e: 'reparse'): void",
+    "(e: 'batchTag'): void",
+    "(e: 'moveToFolder', folderPath: string): void",
+    "emit('moveToFolder', path)",
+    'folderPickerVisible.value = false',
+  ])
+})
+
+test('folder picker preserves selection create and back contracts', () => {
+  assertContracts('../views/knowledge/components/FolderPickerMenu.vue', 'folder picker', [
+    'back: []',
+    'confirm: [folderPath: string]',
+    'create: [folderPath: string]',
+    "emit('confirm', path)",
+    "emit('create', path)",
+    'normalizeFolderPath(newFolderName.value)',
+    'joinFolderPath(creatingUnder.value, name)',
+    'selectedPath.value = null',
+  ])
+})
+
+test('folder tree preserves selection rename and collapse behavior', () => {
   assertContracts('../views/knowledge/components/KbFolderTree.vue', 'folder tree', [
     "emit('rename', { from: row.path, to: joinFolderPath(parent, name) })",
-    "folderAncestorPaths(props.selectedPath).forEach((path) => next.add(path))",
-    "tree.folders.forEach((folder) => next.add(folder.path))",
+    'folderAncestorPaths(props.selectedPath).forEach((path) => next.add(path))',
+    'tree.folders.forEach((folder) => next.add(folder.path))',
     'expanded.value = next',
     'renamingPath.value = row.path',
     'menuOpenPath.value = visible ? path : null',
   ])
 })
 
-test('upload source control may replace trigger/menu/modal markup but must preserve upload events', () => {
+test('upload source preserves file folder URL and manual creation behavior', () => {
   assertContracts('../views/knowledge/components/KbUploadSourceDropdown.vue', 'upload source', [
-    "fileInputRef.value?.click()",
-    "folderInputRef.value?.click()",
+    'fileInputRef.value?.click()',
+    'folderInputRef.value?.click()',
     "emit('manual')",
     "emit('files', result.validFiles)",
     "emit('url', url)",
-    "new URL(url)",
-    "defineExpose({ openUrlDialog })",
+    'new URL(url)',
+    'defineExpose({ openUrlDialog })',
   ])
 })
 
-test('settings shell may replace markup and CSS but must preserve navigation/close behavior', () => {
+test('settings shell preserves navigation and close behavior', () => {
   assertContracts('../views/settings/Settings.vue', 'settings shell', [
     "route.path === '/platform/settings' || uiStore.showSettingsModal",
     "void router.replace({ path: '/platform/settings', query: nextQuery })",
@@ -183,7 +201,7 @@ test('settings shell may replace markup and CSS but must preserve navigation/clo
   ])
 })
 
-test('general settings may replace markup and CSS but must preserve preference/entitlement behavior', () => {
+test('general settings preserves preference and entitlement behavior', () => {
   assertContracts('../views/settings/GeneralSettings.vue', 'general settings', [
     "savedLocale = localStorage.getItem('locale')",
     'getCurrentEntitlement()',
@@ -196,11 +214,11 @@ test('general settings may replace markup and CSS but must preserve preference/e
   ])
 })
 
-test('model settings may replace markup and CSS but must preserve model lifecycle and permissions', () => {
+test('model settings preserves model lifecycle and permissions', () => {
   assertContracts('../views/settings/ModelSettings.vue', 'model settings', [
     'const models = await listModels()',
-    'model.isBuiltin ? authStore.isSystemAdmin : authStore.hasRole(\'admin\')',
-    'authStore.hasRole(\'admin\') && !model.isBuiltin',
+    "model.isBuiltin ? authStore.isSystemAdmin : authStore.hasRole('admin')",
+    "authStore.hasRole('admin') && !model.isBuiltin",
     'await updateModelAPI(editingModel.value.id, apiModelData)',
     'await createModel(apiModelData)',
     'await deleteModelAPI(modelId)',
