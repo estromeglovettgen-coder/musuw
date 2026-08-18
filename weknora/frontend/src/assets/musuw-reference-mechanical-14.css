@@ -1,0 +1,5 @@
+/* The exported reference uses --font-sans/--font-mono. Musuw already owns the
+ * user-selectable font behavior through --app-font-family variables. Bridge the
+ * reference tokens to those native variables so the default remains Inter while
+ * the original Settings font preference continues to work. */
+:root,:host{--font-sans:var(--app-font-family,"Inter Variable","Inter","Noto Sans SC Variable","Noto Sans SC",ui-sans-serif,system-ui,sans-serif);--font-mono:var(--app-font-family-mono,"JetBrains Mono Variable","JetBrains Mono",ui-monospace,SFMono-Regular,monospace);}
