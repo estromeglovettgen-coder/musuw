@@ -73,12 +73,13 @@ test('migrated views own their own visual-prefixed geometry', () => {
   }
 })
 
-test('vendor primitive layer contains only typography scrollbar popup and dialog primitives', () => {
-  for (const token of ['--font-sans', '--font-mono', 'scrollbar-width', '.t-popup .t-popup__content', '.t-dialog']) {
+test('shared primitive layer is scoped only to rebuilt visual surfaces', () => {
+  for (const token of ['--font-sans', '--font-mono', '[class^="visual-"]', 'scrollbar-width']) {
     assert.ok(primitives.includes(token), `primitive layer lost ${token}`)
   }
-  for (const legacySelector of [
-    '.aside_box', '.answers-input', '.rich-input-container', '.chat_scroll_box', '.kb-list-container',
-    '.knowledge-layout', '.settings-overlay', '.manual-editor', '.bot_msg', '.refer', '.wiki-graph',
-  ]) assert.equal(primitives.includes(legacySelector), false, `primitive layer owns product DOM: ${legacySelector}`)
+  for (const forbidden of [
+    'html,\nbody', '#app', '* {', '.t-popup', '.t-dialog', '.aside_box', '.answers-input',
+    '.rich-input-container', '.chat_scroll_box', '.kb-list-container', '.knowledge-layout',
+    '.settings-overlay', '.manual-editor', '.bot_msg', '.refer', '.wiki-graph',
+  ]) assert.equal(primitives.includes(forbidden), false, `primitive layer leaks outside rebuilt Views: ${forbidden}`)
 })
