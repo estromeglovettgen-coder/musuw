@@ -1,4 +1,4 @@
-# trigger: current main supplies business logic; isolated branch supplies visual donor
+# trigger: current main supplies business logic; audited historical commits supply reference child UI
 name: Task1 isolated current-main parity transplant
 
 on:
@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
       - name: Fetch current main business authority
         run: git fetch origin main --force
-      - name: Pin visual donor to isolated branch and apply transplant
+      - name: Pin visual donor to isolated branch and apply parent transplant
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -30,11 +30,34 @@ jobs:
           s = p.read_text()
           old = 'donor = git_text(MAIN, "weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue")'
           new = 'donor = Path("weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue").read_text()'
-          if old not in s:
-              raise SystemExit('donor source anchor missing')
-          p.write_text(s.replace(old, new, 1))
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
           PY
           python3 scripts/task1_final_reference_business.py
+      - name: Restore audited reference child implementations
+        shell: bash
+        run: |
+          git show f3fd6f2470f0c31d04a783dff5c112352cbc5c6e:weknora/frontend/src/views/knowledge/components/DocumentCardView.vue > weknora/frontend/src/views/knowledge/components/DocumentCardView.vue
+          git show 811c927e1e0829fb0a87f8c55c93dd54bcac07b5:weknora/frontend/src/views/knowledge/components/DocumentListView.vue > weknora/frontend/src/views/knowledge/components/DocumentListView.vue
+          git show 04ef5c2eb333b93ac745b76540b7af4a3321b16d:weknora/frontend/src/views/knowledge/components/DocumentActionMenu.vue > weknora/frontend/src/views/knowledge/components/DocumentActionMenu.vue
+          git show 8a34824909daa1783fc989b27b1150d0bc56681a:weknora/frontend/src/views/knowledge/components/KbFolderTree.vue > weknora/frontend/src/views/knowledge/components/KbFolderTree.vue
+          git show f83f34e12f3a2ee7bc39f873f3a0dcc72672611e:weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue > weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue
+          git show f1fd4afaeba6edf6ac6ab5f2dc4f94f7234b049b:weknora/frontend/src/views/knowledge/components/DocumentBatchBar.vue > weknora/frontend/src/views/knowledge/components/DocumentBatchBar.vue
+          git show 51268abf3b9867aa4fb21c70a1cd4c359e2ff1d9:weknora/frontend/src/views/knowledge/components/TagEditDialog.vue > weknora/frontend/src/views/knowledge/components/TagEditDialog.vue
+          git show 06701cc139a8f07fdcc20ab79e6f7150d41d61c1:weknora/frontend/src/components/KBSwitcherDropdown.vue > weknora/frontend/src/components/KBSwitcherDropdown.vue
+      - name: Adversarial source assertions
+        shell: bash
+        run: |
+          grep -q 'reference-kb-header' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          ! grep -q 'class="knowledge-layout"' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          grep -q 'ReferenceIcon' weknora/frontend/src/views/knowledge/components/DocumentCardView.vue
+          ! grep -q 'more.png' weknora/frontend/src/views/knowledge/components/DocumentCardView.vue
+          grep -q 'ReferenceIcon' weknora/frontend/src/views/knowledge/components/DocumentListView.vue
+          grep -q 'ReferenceIcon' weknora/frontend/src/views/knowledge/components/KbFolderTree.vue
+          grep -q 'ReferenceIcon' weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue
+          grep -q 'showFolderTree && !folderTreeCollapsed' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          grep -q '<WikiBrowser' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
+          grep -q '<DocContent' weknora/frontend/src/views/knowledge/KnowledgeBase.vue
       - name: Validate frontend
         working-directory: weknora/frontend
         run: |
