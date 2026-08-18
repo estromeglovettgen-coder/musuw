@@ -1,0 +1,4 @@
+/* Direct selector translation of QAPanel's `group-hover:opacity-100` for the
+ * unchanged WeKnora bot-message DOM. Presentation only; button handlers remain
+ * in botmsg.vue on the locked business baseline. */
+html #app .chat .bot_msg:hover > div > .answer-toolbar{opacity:100% !important;}
