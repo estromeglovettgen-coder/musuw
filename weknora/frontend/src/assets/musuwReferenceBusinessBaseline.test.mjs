@@ -46,7 +46,6 @@ const baseline = new Map([
   ['../views/knowledge/components/TagEditDialog.vue', '9127b181a073395a3b2de2e3b527594ba0a7ec86'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],
-  ['../views/settings/Settings.vue', 'bdc6871a99f8035950b114643de25b5cca3202d3'],
   ['../views/settings/GeneralSettings.vue', '056481068d56bfcb9f89a60285bbfead419fa352'],
   ['../views/settings/ModelSettings.vue', '6c6cd4255277e24d754b0017eac708148d92e935'],
   ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
@@ -58,10 +57,13 @@ test('unmigrated business implementations stay on the pre-view-rebuild baseline'
   }
 })
 
-test('new-chat view may replace markup and CSS but must preserve its business contract', () => {
-  const source = read('../views/creatChat/creatChat.vue')
-  const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1] || ''
+function scriptOf(path) {
+  const source = read(path)
+  return source.match(/<script setup(?: lang="ts")?>([\s\S]*?)<\/script>/)?.[1] || ''
+}
 
+test('new-chat view may replace markup and CSS but must preserve its business contract', () => {
+  const script = scriptOf('../views/creatChat/creatChat.vue')
   for (const contract of [
     'getSuggestedQuestions(agentId, settingsStore.getSuggestedQuestionsParams())',
     'inputFieldRef.value?.triggerSend(question)',
@@ -71,15 +73,11 @@ test('new-chat view may replace markup and CSS but must preserve its business co
     'usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking)',
     'router.push(`/platform/chat/${sessionId}`)',
     'navigateToKnowledgeBaseList(kbId)',
-  ]) {
-    assert.ok(script.includes(contract), `new-chat business contract changed: ${contract}`)
-  }
+  ]) assert.ok(script.includes(contract), `new-chat business contract changed: ${contract}`)
 })
 
 test('document-card view may replace markup and CSS but must preserve its event contract', () => {
-  const source = read('../views/knowledge/components/DocumentCardView.vue')
-  const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1] || ''
-
+  const script = scriptOf('../views/knowledge/components/DocumentCardView.vue')
   for (const contract of [
     "emit('open', item)",
     "emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))",
@@ -88,7 +86,19 @@ test('document-card view may replace markup and CSS but must preserve its event 
     "emit('action', action, item)",
     "folderPickerItemId.value = item.id",
     "props.traceAvailableById[item.id] === true",
-  ]) {
-    assert.ok(script.includes(contract), `document-card business contract changed: ${contract}`)
-  }
+  ]) assert.ok(script.includes(contract), `document-card business contract changed: ${contract}`)
+})
+
+test('settings shell may replace markup and CSS but must preserve navigation/close behavior', () => {
+  const script = scriptOf('../views/settings/Settings.vue')
+  for (const contract of [
+    "route.path === '/platform/settings' || uiStore.showSettingsModal",
+    "void router.replace({ path: '/platform/settings', query: nextQuery })",
+    "void router.replace({ path: '/platform/settings', query: { section } })",
+    'uiStore.closeSettings()',
+    "if (route.path === '/platform/settings')",
+    'router.back()',
+    "if (event.key === 'Escape' && visible.value) handleClose()",
+    "window.addEventListener('settings-nav', handleSettingsNav)",
+  ]) assert.ok(script.includes(contract), `settings business contract changed: ${contract}`)
 })
