@@ -23,9 +23,12 @@ import "@/assets/musuw-reference-lucide-precision.css";
 // Production-reachable native surfaces without direct reference counterparts
 // reuse the same geometry/chrome while retaining their original behavior.
 import "@/assets/musuw-reachable-surface-final.css";
-// TDesign teleports many menus/dialogs outside scoped view roots; this final
-// bridge changes only their paint so they cannot reintroduce legacy brand chrome.
+// TDesign teleports many menus/dialogs outside scoped view roots; this bridge
+// changes only their paint so they cannot reintroduce legacy brand chrome.
 import "@/assets/musuw-tdesign-overlay-bridge.css";
+// Tenantless onboarding and native image preview are also production-reachable
+// native behavior surfaces, so close their visual system last.
+import "@/assets/musuw-onboarding-native.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
