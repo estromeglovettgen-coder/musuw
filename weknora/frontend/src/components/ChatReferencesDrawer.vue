@@ -9,19 +9,18 @@
         :aria-label="panelTitle"
       >
         <header class="chat-references-panel__header">
-          <h3 class="chat-references-panel__title">
-            {{ panelTitle }}
-            <span v-if="totalCount" class="chat-references-panel__count">({{ totalCount }})</span>
-          </h3>
+          <div class="chat-references-panel__heading">
+            <h3 class="chat-references-panel__title">
+              {{ panelTitle }}<span v-if="totalCount" class="chat-references-panel__count"> · {{ totalCount }}</span>
+            </h3>
+          </div>
           <button
             type="button"
             class="chat-references-panel__close"
             :aria-label="t('common.close')"
             @click="close"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <t-icon name="close" size="20px" />
           </button>
         </header>
 
@@ -67,11 +66,7 @@
               >
                 <template v-if="item.kind === 'document'">
                   <div class="reference-item__document">
-                    <svg class="reference-item__doc-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <path d="M8 13h8M8 17h8M8 9h2" />
-                    </svg>
+                    <t-icon name="file" class="reference-item__doc-icon" />
                     <div class="reference-item__document-main">
                       <div class="reference-item__title-row">
                         <h5 class="reference-item__title">{{ item.title }}</h5>
@@ -84,9 +79,7 @@
                           :aria-label="t('chat.navigateToDocument')"
                           @click.stop
                         >
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                          </svg>
+                          <t-icon name="jump" size="14px" />
                         </a>
                       </div>
                       <p v-if="item.snippet && !expandedKeys.has(item.key)" class="reference-item__snippet">
@@ -98,7 +91,6 @@
                     </div>
                   </div>
                 </template>
-
                 <template v-else>
                   <div v-if="item.kind === 'web' && item.domain" class="reference-item__source">
                     <img
@@ -109,19 +101,15 @@
                       loading="lazy"
                       @error="onFaviconError"
                     />
-                    <span v-else class="reference-item__source-fallback" aria-hidden="true">
-                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>
-                    </span>
                     <span class="reference-item__domain">{{ item.domain }}</span>
                   </div>
                   <div v-else-if="item.kind === 'tool' && item.domain" class="reference-item__source">
-                    <span class="reference-item__source-fallback" aria-hidden="true">
-                      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0-1.4-1.4L10 8.2 8.6 6.8 11.9 3.5a1 1 0 0 0-1.4-1.4L7.2 5.4a2 2 0 0 0 0 2.8l1.4 1.4-6.3 6.3a2 2 0 1 0 2.8 2.8l6.3-6.3 1.4 1.4a2 2 0 0 0 2.8 0l3.3-3.3a1 1 0 0 0-1.4-1.4l-3.3 3.3-1.4-1.4 3.3-3.3a1 1 0 0 0-1.4-1.4Z"/></svg>
-                    </span>
+                    <t-icon name="tools" class="reference-item__source-mark" />
                     <span class="reference-item__domain">{{ item.domain }}</span>
                   </div>
 
                   <h5 v-if="shouldShowItemTitle(item)" class="reference-item__title">{{ item.title }}</h5>
+
                   <p v-if="item.kind !== 'tool' && item.snippet && !expandedKeys.has(item.key)" class="reference-item__snippet">
                     {{ formatReferenceSnippet(item.snippet) }}
                   </p>
@@ -185,16 +173,27 @@ const useOverlay = computed(() => {
 
 const sections = computed(() => buildReferenceSections(references.value))
 const totalCount = computed(() => sections.value.reduce((sum, section) => sum + section.items.length, 0))
-const activeHighlightKey = computed(() => resolveReferenceHighlightKey(references.value, highlight.value))
+
+const activeHighlightKey = computed(() =>
+  resolveReferenceHighlightKey(references.value, highlight.value),
+)
 
 const panelTitle = computed(() => {
   const webCount = sections.value.find((section) => section.id === 'web')?.items.length ?? 0
   const docCount = sections.value.find((section) => section.id === 'documents')?.items.length ?? 0
   const toolCount = sections.value.find((section) => section.id === 'tools')?.items.length ?? 0
-  if (toolCount > 0 && webCount === 0 && docCount === 0) return t('chat.referencesDrawerTitleTools')
-  if ([webCount, docCount, toolCount].filter((count) => count > 0).length > 1) return t('chat.referencesDrawerTitleMixed')
-  if (webCount > 0) return t('chat.referencesDrawerTitleWeb')
-  if (docCount > 0) return t('chat.referencesDrawerTitleDocs')
+  if (toolCount > 0 && webCount === 0 && docCount === 0) {
+    return t('chat.referencesDrawerTitleTools')
+  }
+  if ([webCount, docCount, toolCount].filter((count) => count > 0).length > 1) {
+    return t('chat.referencesDrawerTitleMixed')
+  }
+  if (webCount > 0) {
+    return t('chat.referencesDrawerTitleWeb')
+  }
+  if (docCount > 0) {
+    return t('chat.referencesDrawerTitleDocs')
+  }
   return t('chat.referencesDrawerTitle')
 })
 
@@ -264,7 +263,10 @@ function getDocumentHref(item: ReferenceListItem) {
   if (!item.knowledgeBaseId) return ''
   const query: Record<string, string> = {}
   if (item.knowledgeId) query.knowledge_id = item.knowledgeId
-  return router.resolve({ path: `/platform/knowledge-bases/${item.knowledgeBaseId}`, query }).href
+  return router.resolve({
+    path: `/platform/knowledge-bases/${item.knowledgeBaseId}`,
+    query,
+  }).href
 }
 
 function shouldShowItemTitle(item: ReferenceListItem) {
@@ -283,6 +285,9 @@ async function scrollToHighlight() {
   const container = listElement.value
   if (!el || !container) return
 
+  // Keep citation positioning inside the drawer. Native element scrolling may
+  // also adjust the outer chat viewport while the fixed panel is still
+  // entering, which makes the conversation column visibly jump sideways.
   const itemRect = el.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
   let nextTop: number | null = null
@@ -291,7 +296,9 @@ async function scrollToHighlight() {
   } else if (itemRect.bottom > containerRect.bottom) {
     nextTop = container.scrollTop + itemRect.bottom - containerRect.bottom + 8
   }
-  if (nextTop !== null) container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' })
+  if (nextTop !== null) {
+    container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' })
+  }
 }
 
 function handlePanelAfterEnter() {
@@ -299,22 +306,32 @@ function handlePanelAfterEnter() {
   void scrollToHighlight()
 }
 
-watch(activeHighlightKey, () => void scrollToHighlight())
-watch(highlight, () => void scrollToHighlight())
+watch(activeHighlightKey, () => {
+  void scrollToHighlight()
+})
+
+// A user may click the same citation again after manually scrolling the drawer
+// away from its card. The resolved key does not change in that case, but the
+// highlight target object does, so replay the scroll for every activation.
+watch(highlight, () => {
+  void scrollToHighlight()
+})
+
 watch(visible, (open) => {
   if (!open) {
     panelEntered.value = false
     expandedKeys.clear()
+    return
   }
 })
 </script>
 
-<style scoped>
+<style scoped lang="less">
 .chat-references-panel__backdrop {
   position: fixed;
   inset: 0;
+  background: rgba(0, 0, 0, 0.28);
   z-index: 1200;
-  background: rgb(0 0 0 / .22);
 }
 
 .chat-references-panel {
@@ -322,237 +339,266 @@ watch(visible, (open) => {
   top: 0;
   right: 0;
   bottom: 0;
+  width: min(420px, 100vw);
   z-index: 1201;
-  width: min(384px, 100vw);
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgb(229 231 235 / .8);
-  background: #fff;
-  color: #1f2937;
-  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
-  user-select: none;
-}
+  background: var(--td-bg-color-container);
+  border-left: 1px solid var(--td-component-stroke);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.06);
 
-.chat-references-panel.is-overlay {
-  box-shadow: -12px 0 32px rgb(0 0 0 / .10);
+  &.is-overlay {
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.12);
+  }
 }
 
 .chat-references-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  background: #fdfdfd;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.chat-references-panel__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .chat-references-panel__title {
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 14px;
-  line-height: 20px;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 500;
+  color: var(--td-text-color-secondary);
+  line-height: 1.4;
 }
 
 .chat-references-panel__count {
-  font-weight: 400;
-  color: #9ca3af;
+  color: var(--td-text-color-placeholder);
+  font-weight: 500;
 }
 
 .chat-references-panel__close {
-  width: 24px;
-  height: 24px;
-  padding: 4px;
   border: 0;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: #9ca3af;
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--td-text-color-secondary);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: color 150ms ease, background-color 150ms ease;
-}
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
 
-.chat-references-panel__close:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
+  :deep(.t-icon) {
+    font-size: 20px;
+  }
 
-.chat-references-panel__close svg,
-.reference-item svg,
-.reference-item__source-fallback svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  &:hover {
+    background: color-mix(in srgb, var(--td-text-color-primary) 8%, var(--td-bg-color-secondarycontainer));
+    color: var(--td-text-color-primary);
+  }
 }
 
 .chat-references-panel__body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px;
-  text-align: left;
+  padding: 4px 12px 24px;
 }
 
 .chat-references-panel__empty {
-  height: 100%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  padding: 24px 8px;
   text-align: center;
-  font-size: 12px;
-  line-height: 16px;
-  color: #9ca3af;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
 }
 
-.chat-references-panel__section + .chat-references-panel__section { margin-top: 16px; }
+.chat-references-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-references-panel__section + .chat-references-panel__section {
+  margin-top: 16px;
+}
+
 .chat-references-panel__section-title {
   margin: 0 0 8px;
   padding: 0 4px;
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 700;
-  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--td-text-color-placeholder);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .reference-item {
-  position: relative;
-  margin-bottom: 8px;
-  border: 1px solid rgb(229 231 235 / .8);
   border-radius: 12px;
-  background: #fff;
-  text-align: left;
-  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
-}
+  transition: background-color 0.15s ease;
 
-.reference-item:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 1px 2px rgb(0 0 0 / .05);
-}
+  &:hover:not(.is-highlighted) {
+    background: color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
+  }
 
-.reference-item.is-highlighted {
-  border-color: #3b82f6;
-  background: rgb(239 246 255 / .4);
-  box-shadow: 0 0 0 1px #3b82f6;
+  &.is-highlighted {
+    background: var(--td-bg-color-secondarycontainer);
+  }
 }
 
 .reference-item__body {
   display: block;
-  padding: 12px;
+  padding: 10px 12px;
   color: inherit;
   text-decoration: none;
-}
-.reference-item__body.is-expandable { cursor: pointer; }
-.reference-item__document { display: flex; align-items: flex-start; gap: 10px; }
-.reference-item__document-main { flex: 1; min-width: 0; }
 
-.reference-item__title-row {
-  margin-bottom: 6px;
+  &.is-expandable {
+    cursor: pointer;
+  }
+}
+
+.reference-item__document {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
 }
 
 .reference-item__doc-icon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  color: #374151;
+  flex-shrink: 0;
+  width: 18px;
+  margin-top: 3px;
+  font-size: 16px;
+  color: var(--td-text-color-primary);
 }
 
-.reference-item__title {
+.reference-item__document-main {
+  flex: 1;
   min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.reference-item__open {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  color: #9ca3af;
-  transition: color 150ms ease;
-}
-.reference-item__open:hover { color: #374151; }
-
-.reference-item__snippet {
-  margin: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  font-size: 11px;
-  line-height: 1.625;
-  color: #6b7280;
-}
-
-.reference-item__content {
-  margin-top: 6px;
-  max-height: 360px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  user-select: text;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-  padding: 14px;
-  font-size: 12px;
-  line-height: 1.625;
-  color: #1f2937;
-  word-break: break-word;
 }
 
 .reference-item__source {
-  margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  margin-bottom: 6px;
 }
-.reference-item__source-mark,
-.reference-item__source-fallback {
+
+.reference-item__source-mark {
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
-  flex: 0 0 16px;
   border-radius: 999px;
-  color: #9ca3af;
+  object-fit: cover;
+  font-size: 14px;
+  color: var(--td-text-color-placeholder);
 }
-.reference-item__source-mark { object-fit: cover; }
+
 .reference-item__domain {
-  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--td-text-color-placeholder);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
-  line-height: 15px;
-  font-weight: 500;
-  color: #6b7280;
 }
-.reference-item--web .reference-item__title,
-.reference-item--tool .reference-item__title { margin-bottom: 6px; }
 
-.references-panel-enter-active,
-.references-panel-leave-active { transition: transform 180ms ease, opacity 180ms ease; }
+.reference-item__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reference-item__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--td-text-color-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.reference-item__open {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--td-text-color-placeholder);
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.reference-item:hover .reference-item__open,
+.reference-item.is-highlighted .reference-item__open {
+  opacity: 1;
+}
+
+.reference-item__open:hover {
+  color: var(--td-text-color-primary);
+}
+
+.reference-item__snippet {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.reference-item__content {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--td-text-color-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.references-panel-enter-active {
+  transition:
+    transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 0.24s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.references-panel-leave-active {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
 .references-panel-enter-from,
-.references-panel-leave-to { transform: translateX(100%); opacity: .6; }
-.references-backdrop-enter-active,
-.references-backdrop-leave-active { transition: opacity 180ms ease; }
+.references-panel-leave-to {
+  transform: translateX(100%);
+  opacity: 0.6;
+}
+
+.references-backdrop-enter-active {
+  transition: opacity 0.24s ease;
+}
+
+.references-backdrop-leave-active {
+  transition: opacity 0.3s ease;
+}
+
 .references-backdrop-enter-from,
-.references-backdrop-leave-to { opacity: 0; }
+.references-backdrop-leave-to {
+  opacity: 0;
+}
 </style>
