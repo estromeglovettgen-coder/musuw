@@ -38,6 +38,7 @@ test("uses the mechanically compiled reference layer instead of legacy UI skins"
 test("loads every mechanically compiled visual-reference shard and no legacy DOM bridge", () => {
   for (const shard of [
     "musuw-reference-mechanical-01.css",
+    "musuw-reference-mechanical-01b.css",
     "musuw-reference-mechanical-02.css",
     "musuw-reference-mechanical-03.css",
     "musuw-reference-mechanical-04.css",
@@ -62,12 +63,13 @@ test("loads every mechanically compiled visual-reference shard and no legacy DOM
   ]) {
     assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
   }
-  assert.equal(importNames.length, 22);
+  assert.equal(importNames.length, 23);
 });
 
 test("matches copied reference shell, conversation, knowledge and settings geometry", () => {
   assert.match(mechanical, /html #app \.aside_box\{[\s\S]*?width:calc\(var\(--spacing\) \* 64\) !important/);
   assert.match(mechanical, /html #app \.aside_box\.aside_box--collapsed\{[\s\S]*?width:calc\(var\(--spacing\) \* 14\) !important/);
+  assert.match(mechanical, /\[data-guide="nav-creatChat"\] \.menu_icon::before/);
   assert.match(mechanical, /html #app \.dialogue-answers\{[\s\S]*?max-width:var\(--container-3xl\) !important/);
   assert.match(mechanical, /html #app \.chat \.rich-input-container,[\s\S]*?background-color:#f4f5f7 !important/);
   assert.match(mechanical, /\.rich-input-container \.t-textarea__inner[\s\S]*?max-height:180px !important[\s\S]*?min-height:44px !important/);
