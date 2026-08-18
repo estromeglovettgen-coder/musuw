@@ -164,7 +164,7 @@ export default defineComponent({
               :class="{ 'is-active': allSelectedItems.length > 0, 'is-disabled': isMentionDisabled }"
               data-guide="chat-kb-mention"
               :aria-disabled="isMentionDisabled"
-              @mousedown.prevent="!isMentionDisabled && triggerMention()"
+              @mousedown.prevent="triggerMention"
             >
               <span class="visual-chat-composer__at">@</span>
               <span v-if="allSelectedItems.length > 0" class="visual-chat-composer__count">{{ allSelectedItems.length }}</span>
