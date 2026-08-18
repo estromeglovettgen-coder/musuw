@@ -1,4 +1,4 @@
-# trigger registered branch workflow
+# trigger: current main supplies business logic; isolated branch supplies visual donor
 name: Task1 isolated current-main parity transplant
 
 on:
@@ -22,8 +22,19 @@ jobs:
           fetch-depth: 0
       - name: Fetch current main business authority
         run: git fetch origin main --force
-      - name: Apply visual reference over current native business script
-        run: python3 scripts/task1_final_reference_business.py
+      - name: Pin visual donor to isolated branch and apply transplant
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/task1_final_reference_business.py')
+          s = p.read_text()
+          old = 'donor = git_text(MAIN, "weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue")'
+          new = 'donor = Path("weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue").read_text()'
+          if old not in s:
+              raise SystemExit('donor source anchor missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          python3 scripts/task1_final_reference_business.py
       - name: Validate frontend
         working-directory: weknora/frontend
         run: |
