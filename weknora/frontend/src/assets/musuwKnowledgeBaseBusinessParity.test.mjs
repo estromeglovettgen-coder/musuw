@@ -67,11 +67,12 @@ test('rebuilt documents View retains every native filtering and document-operati
   ]) assert.ok(source.includes(token), `KnowledgeBase active View lost ${token}`)
 })
 
-test('rebuilt documents View retains folder, marquee, loading, empty and batch state machine surfaces', () => {
+test('rebuilt documents View retains folder, collapsed rail, marquee, loading, empty and batch state machine surfaces', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   for (const token of [
-    'showFolderTree && !folderTreeCollapsed',
-    'handleFolderTreeCollapsedChange(false)',
+    'v-if="showFolderTree"',
+    ':collapsed="folderTreeCollapsed"',
+    '@update:collapsed="handleFolderTreeCollapsedChange"',
     'folderBreadcrumbs',
     'handleFolderSelect',
     'handleFolderRename',
