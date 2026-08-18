@@ -1,55 +1,50 @@
 <template>
   <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="visible" class="settings-overlay">
-        <div class="settings-modal">
-          <button class="close-btn" @click="handleClose" :aria-label="$t('general.close')">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-            </svg>
+    <Transition name="visual-settings-fade">
+      <div v-if="visible" class="visual-settings-overlay">
+        <section class="visual-settings-modal" role="dialog" aria-modal="true" :aria-label="$t('general.settings')">
+          <aside class="visual-settings-sidebar">
+            <h2 class="visual-settings-title">{{ $t('general.settings') }}</h2>
+            <nav class="visual-settings-nav" :aria-label="$t('general.settings')">
+              <button
+                type="button"
+                class="visual-settings-nav__item"
+                :class="{ 'is-active': currentSection === 'general' }"
+                :aria-current="currentSection === 'general' ? 'page' : undefined"
+                @click="selectSection('general')"
+              >
+                <t-icon name="setting" />
+                <span>{{ $t('general.title') }}</span>
+              </button>
+              <button
+                type="button"
+                class="visual-settings-nav__item"
+                :class="{ 'is-active': currentSection === 'models' }"
+                :aria-current="currentSection === 'models' ? 'page' : undefined"
+                @click="selectSection('models')"
+              >
+                <t-icon name="cpu" />
+                <span>{{ $t('settings.modelManagement') }}</span>
+              </button>
+            </nav>
+          </aside>
+
+          <main class="visual-settings-content">
+            <div class="visual-settings-content__inner">
+              <GeneralSettings v-if="currentSection === 'general'" />
+              <ModelSettings v-else :initial-type="currentModelType" />
+            </div>
+          </main>
+
+          <button
+            type="button"
+            class="visual-settings-close"
+            :aria-label="$t('general.close')"
+            @click="handleClose"
+          >
+            <t-icon name="close" />
           </button>
-
-          <div class="settings-container">
-            <div class="settings-sidebar">
-              <div class="sidebar-header">
-                <h2 class="sidebar-title">{{ $t('general.settings') }}</h2>
-              </div>
-              <div class="settings-nav">
-                <button
-                  type="button"
-                  class="nav-item"
-                  :class="{ active: currentSection === 'general' }"
-                  :aria-current="currentSection === 'general' ? 'page' : undefined"
-                  @click="selectSection('general')"
-                >
-                  <t-icon name="setting" class="nav-icon" />
-                  <span class="nav-label">{{ $t('general.title') }}</span>
-                </button>
-                <button
-                  type="button"
-                  class="nav-item"
-                  :class="{ active: currentSection === 'models' }"
-                  :aria-current="currentSection === 'models' ? 'page' : undefined"
-                  @click="selectSection('models')"
-                >
-                  <t-icon name="chat" class="nav-icon" />
-                  <span class="nav-label">{{ $t('settings.modelManagement') }}</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="settings-content">
-              <div class="content-wrapper">
-                <div v-if="currentSection === 'general'" class="section">
-                  <GeneralSettings />
-                </div>
-                <div v-else class="section">
-                  <ModelSettings :initial-type="currentModelType" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
     </Transition>
   </Teleport>
@@ -159,249 +154,195 @@ onUnmounted(() => {
 })
 </script>
 
-<style lang="less" scoped>
-.settings-overlay {
+<style scoped lang="less">
+.visual-settings-overlay {
   position: fixed;
   inset: 0;
   z-index: 1100;
-  background: rgba(23, 23, 23, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  box-sizing: border-box;
+  padding: 16px;
+  background: rgb(0 0 0 / 45%);
   backdrop-filter: blur(4px);
+  user-select: none;
 }
 
-.settings-modal {
+.visual-settings-modal {
   position: relative;
-  width: 100%;
-  max-width: 896px;
+  width: min(896px, 100%);
   height: 520px;
-  max-height: calc(100dvh - 48px);
-  background: var(--td-bg-color-container);
-  border-radius: 12px;
-  border: 1px solid var(--td-component-stroke);
-  box-shadow: var(--musuw-shadow-raised, 0 12px 32px rgba(38, 38, 38, 0.06));
+  max-height: calc(100dvh - 32px);
+  min-width: 0;
+  display: flex;
   overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgb(229 231 235 / 90%);
+  border-radius: 24px;
+  background: #fff;
+  color: #1f2937;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%);
+  text-align: left;
+}
+
+.visual-settings-sidebar {
+  flex: 0 0 224px;
+  width: 224px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 24px;
+  border-right: 1px solid #f3f4f6;
+  background: #fff;
+}
+
+.visual-settings-title {
+  margin: 0 0 24px;
+  color: #111827;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.visual-settings-nav {
   display: flex;
   flex-direction: column;
-  isolation: isolate;
+  gap: 4px;
 }
 
-.close-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--td-text-color-secondary);
-  cursor: pointer;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-
-  &:hover {
-    background: var(--td-bg-color-container-hover);
-    color: var(--td-text-color-primary);
-  }
-
-  &:focus-visible {
-    border-color: var(--td-brand-color);
-    outline: 2px solid var(--td-brand-color);
-    outline-offset: 2px;
-  }
-}
-
-.settings-container {
-  display: flex;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-.settings-sidebar {
-  width: 224px;
-  background-color: var(--td-bg-color-settings-modal);
-  border-right: 1px solid var(--td-component-stroke);
-  flex-shrink: 0;
-}
-
-.sidebar-header {
-  padding: 28px 24px 16px;
-  border-bottom: 0;
-}
-
-.sidebar-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  margin: 0;
-}
-
-.settings-nav {
-  padding: 8px 24px 16px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
+.visual-settings-nav__item {
   width: 100%;
   min-height: 40px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--td-text-color-secondary);
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: transparent;
-  font-size: 14px;
+  color: #4b5563;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
   font-weight: 500;
-  font-family: inherit;
   text-align: left;
   cursor: pointer;
-
-  &:hover {
-    background-color: var(--td-bg-color-container-hover);
-    color: var(--td-text-color-primary);
-  }
-
-  &.active {
-    color: var(--td-brand-color);
-    background-color: var(--td-brand-color-light);
-  }
-
-  & + & {
-    margin-top: 4px;
-  }
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-.nav-icon {
-  margin-right: 9px;
+.visual-settings-nav__item :deep(.t-icon) {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
   font-size: 16px;
 }
 
-.settings-content {
-  flex: 1;
-  overflow-y: auto;
+.visual-settings-nav__item:hover {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.visual-settings-nav__item.is-active {
+  background: #f3f4f6;
+  color: #111827;
+  font-weight: 700;
+}
+
+.visual-settings-content {
   min-width: 0;
-  background-color: var(--td-bg-color-container);
+  flex: 1 1 auto;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: 32px;
+  background: #fff;
+  user-select: text;
 }
 
-.content-wrapper {
+.visual-settings-content__inner {
   width: 100%;
-  max-width: 760px;
-  padding: 40px 48px 48px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
+.visual-settings-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-.modal-enter-from,
-.modal-leave-to {
+.visual-settings-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-settings-close :deep(.t-icon) {
+  font-size: 16px;
+}
+
+.visual-settings-fade-enter-active,
+.visual-settings-fade-leave-active {
+  transition: opacity 160ms ease;
+}
+
+.visual-settings-fade-enter-from,
+.visual-settings-fade-leave-to {
   opacity: 0;
 }
 
 @media (max-width: 720px) {
-  .settings-overlay {
-    padding: 12px;
-  }
-
-  .settings-modal {
-    max-height: calc(100dvh - 24px);
-  }
-
-  .settings-sidebar {
-    width: 184px;
-  }
-
-  .sidebar-header {
-    padding: 16px 12px 12px;
-  }
-
-  .settings-nav {
-    padding: 12px 8px;
-  }
-
-  .content-wrapper {
-    padding: 32px 24px 40px;
-  }
-
-  /* Keep the shared shell usable on tablets without rewriting each settings
-     provider's row markup. */
-  .settings-content :deep(.setting-row) {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .settings-content :deep(.setting-info) {
-    max-width: none;
-    padding-right: 0;
-  }
-
-  .settings-content :deep(.setting-control) {
-    min-width: 0;
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .settings-content :deep(.setting-control .t-select) {
-    width: 100% !important;
-    max-width: 280px;
-  }
+  .visual-settings-overlay { padding: 12px; }
+  .visual-settings-modal { max-height: calc(100dvh - 24px); }
+  .visual-settings-sidebar { flex-basis: 184px; width: 184px; padding: 20px 12px; }
+  .visual-settings-content { padding: 28px 24px; }
+  .visual-settings-close { top: 18px; right: 18px; }
 }
 
 @media (max-width: 560px) {
-  .settings-overlay {
-    align-items: stretch;
-    padding: 0;
-  }
-
-  .settings-modal {
-    border-radius: 0;
-    border-width: 0;
+  .visual-settings-overlay { align-items: stretch; padding: 0; }
+  .visual-settings-modal {
+    width: 100%;
     height: 100%;
     max-height: none;
-  }
-
-  .settings-container {
     flex-direction: column;
+    border: 0;
+    border-radius: 0;
   }
-
-  .settings-sidebar {
-    width: auto;
+  .visual-settings-sidebar {
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 16px;
     border-right: 0;
-    border-bottom: 1px solid var(--td-component-stroke);
+    border-bottom: 1px solid #f3f4f6;
   }
-
-  .sidebar-header {
-    padding-bottom: 8px;
-    border-bottom: 0;
-  }
-
-  .settings-nav {
-    padding: 0 16px 12px;
-  }
-
-  .sidebar-title {
-    font-size: 15px;
-  }
-
-  .content-wrapper {
-    padding: 32px 16px 40px;
-  }
+  .visual-settings-title { margin-bottom: 12px; }
+  .visual-settings-nav { flex-direction: row; padding-right: 36px; }
+  .visual-settings-nav__item { width: auto; flex: 1 1 0; }
+  .visual-settings-content { padding: 24px 16px 32px; }
+  .visual-settings-close { top: 14px; right: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .settings-overlay,
-  .settings-modal,
-  .modal-enter-active,
-  .modal-leave-active,
-  .close-btn {
-    transition: none;
+  .visual-settings-fade-enter-active,
+  .visual-settings-fade-leave-active,
+  .visual-settings-nav__item,
+  .visual-settings-close {
+    transition: none !important;
   }
 }
 </style>
