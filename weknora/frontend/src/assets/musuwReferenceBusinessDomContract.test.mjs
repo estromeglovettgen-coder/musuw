@@ -32,6 +32,7 @@ test('unmigrated mechanical CSS selectors still map to native WeKnora DOM', () =
 
 test('migrated views do not retain the legacy view shells they replaced', () => {
   const migrated = new Map([
+    ['../components/UserMenu.vue', ['class="user-menu"', 'class="user-button"', 'class="user-avatar"', 'class="user-dropdown"', 'class="menu-item"']],
     ['../components/SessionSidebarRow.vue', ['class="submenu_item"', 'class="submenu_title"', 'class="session-row-menu-wrap"', 'class="menu-more-wrap"']],
     ['../views/creatChat/creatChat.vue', ['class="dialogue-wrap"', 'class="dialogue-answers"']],
     ['../views/knowledge/components/DocumentCardView.vue', ['class="doc-card-view"', 'class="knowledge-card"', 'class="folder-card"']],
