@@ -1,56 +1,79 @@
 <template>
-    <div class="dialogue-wrap">
-        <div class="dialogue-answers">
-            <div class="dialogue-title" style="--wails-draggable: drag">
-                <span style="--wails-draggable: drag">{{ $t('createChat.title') }}</span>
-            </div>
-            <!-- 推荐问题 -->
-            <div ref="sqContainerRef" class="suggested-questions-container">
-                <!-- 骨架屏占位 -->
-                <div v-if="sqLoading && suggestedQuestions.length === 0" class="suggested-questions-inner">
-                    <div class="suggested-questions-title"><t-skeleton animation="gradient"
-                            :row-col="[{ width: '120px', height: '14px' }]" /></div>
-                    <div class="suggested-questions-grid">
-                        <div v-for="n in 6" :key="'sq-skel-' + n" class="suggested-question-card sq-card-skeleton">
-                            <t-skeleton animation="gradient"
-                                :row-col="[{ width: '100%', height: '14px', type: 'rect' }]" />
+    <main class="new-chat-view">
+        <section class="new-chat-stack" aria-labelledby="new-chat-title">
+            <h1 id="new-chat-title" class="new-chat-title" style="--wails-draggable: drag">
+                {{ $t('createChat.title') }}
+            </h1>
+
+            <div ref="sqContainerRef" class="new-chat-suggestions">
+                <div v-if="sqLoading && suggestedQuestions.length === 0" class="new-chat-suggestions__inner">
+                    <div class="new-chat-suggestions__heading">
+                        <t-skeleton animation="gradient" :row-col="[{ width: '112px', height: '13px' }]" />
+                    </div>
+                    <div class="new-chat-suggestions__list" aria-hidden="true">
+                        <div v-for="n in 6" :key="'sq-skel-' + n" class="new-chat-suggestion new-chat-suggestion--skeleton">
+                            <t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '13px', type: 'rect' }]" />
                         </div>
                     </div>
                 </div>
-                <transition v-else appear name="sq-slide-fade" mode="out-in" @before-leave="onBeforeLeave"
-                    @after-leave="onAfterLeave" @enter="onEnter" @after-enter="onQuestionsEntered">
-                    <div v-if="suggestedQuestions.length > 0" :key="sqRenderKey" class="suggested-questions-inner">
-                        <div class="suggested-questions-title-row">
-                            <p class="suggested-questions-caption">
-                                <span class="suggested-questions-title">{{ $t('chat.suggestedQuestions') }}</span>
-                                <button type="button" class="suggested-questions-refresh" :disabled="sqLoading"
-                                    :title="$t('chat.refreshSuggestedQuestions')"
-                                    :aria-label="$t('chat.refreshSuggestedQuestions')" @click="fetchSuggestedQuestions">
-                                    <t-icon :name="sqLoading ? 'loading' : 'refresh'"
-                                        :class="{ 'sq-refresh-spin': sqLoading }" />
-                                </button>
-                            </p>
+
+                <transition
+                    v-else
+                    appear
+                    name="new-chat-suggestions"
+                    mode="out-in"
+                    @before-leave="onBeforeLeave"
+                    @after-leave="onAfterLeave"
+                    @enter="onEnter"
+                    @after-enter="onQuestionsEntered"
+                >
+                    <div v-if="suggestedQuestions.length > 0" :key="sqRenderKey" class="new-chat-suggestions__inner">
+                        <div class="new-chat-suggestions__heading">
+                            <span>{{ $t('chat.suggestedQuestions') }}</span>
+                            <button
+                                type="button"
+                                class="new-chat-suggestions__refresh"
+                                :disabled="sqLoading"
+                                :title="$t('chat.refreshSuggestedQuestions')"
+                                :aria-label="$t('chat.refreshSuggestedQuestions')"
+                                @click="fetchSuggestedQuestions"
+                            >
+                                <t-icon :name="sqLoading ? 'loading' : 'refresh'" :class="{ 'is-spinning': sqLoading }" />
+                            </button>
                         </div>
-                        <div class="suggested-questions-grid">
-                            <div v-for="(item, index) in suggestedQuestions" :key="item.question"
-                                class="suggested-question-card" :class="{ 'sq-card-visible': sqCardsRevealed }"
+
+                        <div class="new-chat-suggestions__list">
+                            <button
+                                v-for="(item, index) in suggestedQuestions"
+                                :key="item.question"
+                                type="button"
+                                class="new-chat-suggestion"
+                                :class="{ 'is-visible': sqCardsRevealed }"
                                 :style="{ transitionDelay: sqCardsRevealed ? `${index * 50}ms` : '0ms' }"
-                                @click="handleSuggestedQuestionClick(item.question)">
-                                <span class="suggested-question-text">{{ item.question }}</span>
-                                <span v-if="item.source === 'faq'" class="suggested-question-badge faq">FAQ</span>
-                            </div>
+                                @click="handleSuggestedQuestionClick(item.question)"
+                            >
+                                <span class="new-chat-suggestion__text">{{ item.question }}</span>
+                                <span v-if="item.source === 'faq'" class="new-chat-suggestion__badge">FAQ</span>
+                            </button>
                         </div>
                     </div>
                 </transition>
             </div>
-            <InputField ref="inputFieldRef" @send-msg="sendMsg"></InputField>
-        </div>
-    </div>
 
-    <!-- 知识库编辑器（创建/编辑统一组件） -->
-    <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode"
-        :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType"
-        @update:visible="(val) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
+            <div class="new-chat-composer">
+                <InputField ref="inputFieldRef" @send-msg="sendMsg" />
+            </div>
+        </section>
+    </main>
+
+    <KnowledgeBaseEditorModal
+        :visible="uiStore.showKBEditorModal"
+        :mode="uiStore.kbEditorMode"
+        :kb-id="uiStore.currentKBId || undefined"
+        :initial-type="uiStore.kbEditorType"
+        @update:visible="(val) => val ? null : uiStore.closeKBEditor()"
+        @success="handleKBEditorSuccess"
+    />
 </template>
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick, computed } from 'vue';
@@ -236,214 +259,289 @@ const handleKBEditorSuccess = (kbId: string) => {
 
 </script>
 <style lang="less" scoped>
-.dialogue-wrap {
+.new-chat-view {
     flex: 1;
     min-width: 0;
     min-height: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     width: 100%;
-    padding: 24px;
+    overflow-y: auto;
+    background: #fff;
+    color: #1f2937;
     box-sizing: border-box;
 }
 
-.dialogue-answers {
+.new-chat-stack {
+    width: min(768px, calc(100% - 64px));
+    min-height: 100%;
+    margin: 0 auto;
+    padding: 64px 0;
+    box-sizing: border-box;
     display: flex;
-    flex-flow: column;
+    flex-direction: column;
+    justify-content: center;
     align-items: stretch;
-    width: 100%;
-    max-width: 640px;
     gap: 24px;
-
-    :deep(.answers-input) {
-        position: static;
-        transform: translateX(0);
-    }
 }
 
-.dialogue-title {
-    display: flex;
-    color: var(--td-text-color-primary);
-    font-family: var(--app-font-family);
-    font-size: 24px;
-    line-height: 32px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    align-items: center;
-    margin-bottom: 0;
-    min-height: 0;
-    padding: 0 2px;
-    border-bottom: 0;
-
-    .icon {
-        display: flex;
-        width: 32px;
-        height: 32px;
-        justify-content: center;
-        align-items: center;
-        border-radius: 6px;
-        background: var(--td-bg-color-container);
-        box-shadow: var(--td-shadow-1);
-        margin-right: 12px;
-
-        .logo_img {
-            height: 24px;
-            width: 24px;
-        }
-    }
-}
-
-@import '../../components/css/suggested-questions.less';
-
-@keyframes skeletonFadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-.suggested-questions-container {
-    width: 100%;
-    max-width: 640px;
+.new-chat-title {
     margin: 0;
     padding: 0;
-    transition: height 0.16s @suggested-ease;
+    text-align: center;
+    font-family: var(--app-font-family);
+    font-size: 32px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #111827;
 }
 
-.suggested-questions-inner {
-    animation: skeletonFadeIn 0.16s ease-out;
+.new-chat-suggestions {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    transition: height 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.sq-slide-fade-enter-active {
-    transition: opacity 0.16s @suggested-ease, transform 0.16s @suggested-ease;
+.new-chat-suggestions__inner {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
 }
 
-.sq-slide-fade-leave-active {
-    transition: opacity 0.15s cubic-bezier(0.4, 0, 1, 1),
-        transform 0.15s cubic-bezier(0.4, 0, 1, 1);
+.new-chat-suggestions__heading {
+    min-height: 20px;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #9ca3af;
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 400;
+    letter-spacing: .01em;
 }
 
-.sq-slide-fade-enter-from {
-    opacity: 0;
-    transform: translateY(10px);
-}
+.new-chat-suggestions__refresh {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 150ms ease, background-color 150ms ease;
 
-.sq-slide-fade-leave-to {
-    opacity: 0;
-    transform: translateY(-4px);
-}
-
-.suggested-question-card {
-    opacity: 0;
-    transform: translateY(8px) scale(0.97);
-    transition:
-        opacity 0.16s @suggested-ease,
-        transform 0.16s @suggested-ease,
-        background 0.16s @suggested-ease,
-        border-color 0.16s @suggested-ease,
-        box-shadow 0.16s @suggested-ease;
-
-    &.sq-card-skeleton {
-        opacity: 1;
-        transform: none;
+    &:hover:not(:disabled) {
+        background: #f3f4f6;
+        color: #4b5563;
     }
 
-    &.sq-card-visible {
+    &:disabled {
+        cursor: default;
+        opacity: .7;
+    }
+
+    :deep(.t-icon) {
+        font-size: 12px;
+    }
+}
+
+.is-spinning {
+    animation: new-chat-spin 800ms linear infinite;
+}
+
+.new-chat-suggestions__list {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.new-chat-suggestion {
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    width: auto;
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    color: #374151;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    font: inherit;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(8px) scale(.97);
+    transition:
+        opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+        border-color 150ms ease,
+        background-color 150ms ease,
+        box-shadow 150ms ease;
+
+    &.is-visible {
         opacity: 1;
         transform: translateY(0) scale(1);
     }
 
-    &:not(.sq-card-skeleton):active {
-        transform: scale(0.98);
+    &:hover:not(.new-chat-suggestion--skeleton) {
+        border-color: #d1d5db;
+        background: #f9fafb;
+        box-shadow: 0 2px 6px rgb(0 0 0 / 5%);
     }
 
-    &.sq-card-visible:active {
-        transform: scale(0.98);
+    &:active:not(.new-chat-suggestion--skeleton) {
+        transform: scale(.98);
     }
 }
 
-// Keep the starter column and composer on one measured reading rail. The
-// global visual layer also targets these surfaces, so the #app anchor ensures
-// this component's compact geometry remains authoritative without changing
-// the questions or input event contracts.
-:global(#app .dialogue-answers) {
-    width: min(640px, 100%);
-    max-width: 640px;
+.new-chat-suggestion--skeleton {
+    width: 180px;
+    opacity: 1;
+    transform: none;
+    pointer-events: none;
+    border-color: transparent;
+    background: #f3f4f6;
+    box-shadow: none;
+
+    &:nth-child(2n) { width: 240px; }
+    &:nth-child(3n) { width: 150px; }
+    &:nth-child(5n) { width: 210px; }
 }
 
-:global(#app .dialogue-answers .dialogue-title) {
-    min-height: 0;
-    padding: 0 2px;
-    border-bottom: 0;
-    color: var(--musuw-ink-strong, var(--td-text-color-primary));
-    font-size: 24px;
-    line-height: 32px;
+.new-chat-suggestion__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 400;
+}
+
+.new-chat-suggestion__badge {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: #eef4ff;
+    color: #0b57d0;
+    font-size: 10px;
+    line-height: 16px;
     font-weight: 600;
+    letter-spacing: .04em;
 }
 
-:global(#app .dialogue-answers .suggested-questions-container),
-:global(#app .dialogue-answers .answers-input),
-:global(#app .dialogue-answers .rich-input-container) {
+.new-chat-composer {
     width: 100%;
-    max-width: 640px;
+    min-width: 0;
 }
 
-:global(#app .dialogue-answers .suggested-question-card) {
-    border-radius: var(--musuw-radius-card, 12px);
+/* Input-field keeps the business logic for this first migration step. Its old
+   page-positioning contract is intentionally neutralized here so this new view
+   owns the complete geometry. */
+.new-chat-composer :deep(.answers-input) {
+    position: static !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    display: block !important;
 }
 
-@media (max-width: 1250px) and (min-width: 1045px) {
-    :deep(.t-textarea__inner) {
-        width: 100% !important;
+.new-chat-composer :deep(.rich-input-container) {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 20px !important;
+    background: #f4f5f7 !important;
+    padding: 16px !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+
+.new-chat-composer :deep(.rich-input-container:focus-within) {
+    border-color: #d1d5db !important;
+    background: #fff !important;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%) !important;
+}
+
+.new-chat-composer :deep(.t-textarea__inner) {
+    width: 100% !important;
+    min-height: 44px !important;
+    max-height: 180px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    resize: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #1f2937 !important;
+    font-size: 15px !important;
+    line-height: 1.625 !important;
+}
+
+.new-chat-composer :deep(.control-bar) {
+    margin-top: 8px !important;
+    padding-top: 4px !important;
+}
+
+@keyframes new-chat-spin {
+    to { transform: rotate(360deg); }
+}
+
+.new-chat-suggestions-enter-active,
+.new-chat-suggestions-leave-active {
+    transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.new-chat-suggestions-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.new-chat-suggestions-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+@media (max-width: 767px) {
+    .new-chat-stack {
+        width: min(100% - 32px, 768px);
+        padding: 40px 0;
     }
-}
 
-@media (max-width: 1045px) {
-    :deep(.t-textarea__inner) {
-        width: 100% !important;
-    }
-}
-
-@media (max-width: 750px) {
-    :deep(.t-textarea__inner) {
-        width: 100% !important;
-    }
-}
-
-@media (max-width: 600px) {
-    .dialogue-wrap {
-        padding: 16px;
-    }
-
-    :deep(.t-textarea__inner) {
-        width: 100% !important;
+    .new-chat-title {
+        text-align: left;
+        font-size: 24px;
+        line-height: 32px;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .suggested-question-card,
-    .sq-slide-fade-enter-active,
-    .sq-slide-fade-leave-active {
-        transition-duration: 0.01ms !important;
-    }
-}
-</style>
-<style lang="less">
-.del-menu-popup {
-    z-index: 99 !important;
-
-    .t-popup__content {
-        width: 100px;
-        height: 40px;
-        line-height: 30px;
-        padding-left: 14px;
-        cursor: pointer;
-        margin-top: 4px !important;
-
+    .new-chat-suggestion,
+    .new-chat-suggestions-enter-active,
+    .new-chat-suggestions-leave-active,
+    .new-chat-suggestions__refresh {
+        transition: none !important;
+        animation: none !important;
     }
 }
 </style>
