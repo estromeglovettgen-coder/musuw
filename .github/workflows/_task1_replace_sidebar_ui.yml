@@ -1,4 +1,4 @@
-# checkout latest main; this is a one-shot visual-only transplant
+# second registration push intentionally triggers the one-shot on latest main
 name: Task1 one-shot sidebar UI transplant
 
 on:
@@ -47,6 +47,9 @@ jobs:
         <button type="button" class="reference-sidebar-icon-button" :title="t('menu.expandSidebar')" @click="toggleSidebar">
           <ReferenceIcon name="chevron-right" :size="16" :stroke-width="1.8" />
         </button>
+        <button type="button" class="reference-sidebar-icon-button" :title="t('menu.search')" @click="commandPaletteStore.openPalette('')">
+          <ReferenceIcon name="search" :size="14" />
+        </button>
         <div class="reference-sidebar-collapsed-rule" />
         <button type="button" class="reference-sidebar-collapsed-primary" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')">
           <ReferenceIcon name="message-square-plus" :size="16" :stroke-width="1.9" />
@@ -56,6 +59,7 @@ jobs:
         </button>
       </div>
       <div class="reference-sidebar-collapsed-user"><UserMenu /></div>
+      <div class="reference-sidebar-drag-handle" @mousedown="onDragHandleMouseDown" />
     </template>
 
     <template v-else>
@@ -164,6 +168,7 @@ jobs:
 .reference-sidebar-batch-select { display:flex;align-items:center;gap:7px;color:#4b5563;font-size:11px;font-weight:600; }.reference-sidebar-batch-actions { display:flex;align-items:center;justify-content:flex-end;gap:6px; }.reference-sidebar-batch-actions button { height:28px;padding:0 10px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#4b5563;font:inherit;font-size:11px;font-weight:600;cursor:pointer; }.reference-sidebar-batch-actions button.danger { border-color:#dc2626;background:#dc2626;color:#fff; }.reference-sidebar-batch-actions button:disabled { opacity:.4;cursor:not-allowed; }
 .reference-sidebar-collapsed-top { width:100%;display:flex;flex-direction:column;align-items:center;gap:16px; }.reference-sidebar-collapsed-logo { width:32px;height:32px;padding:0;border:0;border-radius:8px;background:#000;color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 1px 2px rgb(0 0 0 / .05);transition:transform 150ms ease; }.reference-sidebar-collapsed-logo:hover { transform:scale(1.05); }.reference-sidebar-collapsed-rule { width:32px;height:1px;margin:4px 0;background:rgb(229 231 235 / .8); }
 .reference-sidebar-collapsed-primary,.reference-sidebar-collapsed-nav { width:36px;height:36px;padding:0;border:0;border-radius:12px;display:grid;place-items:center;cursor:pointer;transition:all 150ms ease; }.reference-sidebar-collapsed-primary { background:#f3f4f6;color:#111827; }.reference-sidebar-collapsed-primary:hover { background:#e5e7eb; }.reference-sidebar-collapsed-nav { background:transparent;color:#4b5563; }.reference-sidebar-collapsed-nav:hover { color:#111827;background:#f3f4f6; }.reference-sidebar-collapsed-nav.active { background:#111827;color:#fff;box-shadow:0 1px 2px rgb(0 0 0 / .05); }.reference-sidebar-collapsed-user { width:32px;height:32px;overflow:visible;border-radius:999px; }
+.reference-sidebar-drag-handle { position:absolute;right:-2px;top:0;width:5px;height:100%;cursor:ew-resize;z-index:2; }
 @keyframes sidebar-shimmer { to { background-position:-200% 0; } } @keyframes sidebar-spin { to { transform:rotate(360deg); } }
 </style>'''
 
