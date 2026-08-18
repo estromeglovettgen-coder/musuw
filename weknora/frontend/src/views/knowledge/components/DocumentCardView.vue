@@ -1,663 +1,1234 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import ReferenceIcon from '@/components/ReferenceIcon.vue'
-import KnowledgeProcessingTimeline from '@/components/knowledge-processing-timeline.vue'
-import { formatFileSize } from '@/utils/files'
-import type { FolderOption } from './FolderPickerMenu.vue'
+import { ref, computed, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { formatFileSize } from '@/utils/files';
+import { useTagChipsOverflow } from '@/composables/useTagChipsOverflow';
+import DocumentActionMenu from './DocumentActionMenu.vue';
+import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue';
+import KnowledgeProcessingTimeline from '@/components/knowledge-processing-timeline.vue';
 
 interface Tag {
-  id: string
-  name: string
-  color?: string
+  id: string;
+  name: string;
+  color?: string;
 }
 
 interface KnowledgeCard {
-  id: string
-  knowledge_base_id?: string
-  parse_status: string
-  summary_status?: string
-  description?: string
-  file_name?: string
-  folder_path?: string
-  original_file_name?: string
-  display_name?: string
-  title?: string
-  type?: string
-  updated_at?: string
-  file_type?: string
-  metadata?: any
-  error_message?: string
-  tags?: Array<{ id: string; name: string; color?: string }>
-  source?: string
-  created_at?: string
-  file_size?: number | string
-  channel?: string
+  id: string;
+  knowledge_base_id?: string;
+  parse_status: string;
+  summary_status?: string;
+  description?: string;
+  file_name?: string;
+  folder_path?: string;
+  original_file_name?: string;
+  display_name?: string;
+  title?: string;
+  type?: string;
+  updated_at?: string;
+  file_type?: string;
+  isMore?: boolean;
+  metadata?: any;
+  error_message?: string;
+  tags?: Array<{ id: string; name: string; color?: string }>;
+  source?: string;
+  created_at?: string;
+  file_size?: number | string;
+  channel?: string;
 }
 
 const props = defineProps<{
-  items: KnowledgeCard[]
-  selectedIds: Set<string>
-  batchMode: boolean
-  canEdit: boolean
-  canMutateKnowledge: boolean
-  traceAvailableById: Record<string, boolean>
-  tagList: Tag[]
-  folders?: Array<{ path: string; name: string; total_count: number }>
-  folderOptions?: FolderOption[]
-  showFolderPath?: boolean
-  moveMenuMode: 'normal' | 'targets' | 'confirm'
-  moveTargetKbs: any[]
-  moveTargetsLoading: boolean
-  moveSelectedTargetName: string
-  moveMode: 'reuse_vectors' | 'reparse'
-  moveSubmitting: boolean
-}>()
+  items: KnowledgeCard[];
+  selectedIds: Set<string>;
+  batchMode: boolean;
+  canEdit: boolean;
+  canMutateKnowledge: boolean;
+  traceAvailableById: Record<string, boolean>;
+  tagList: Tag[];
+  /** Sub-folders of the folder currently being browsed. */
+  folders?: Array<{ path: string; name: string; total_count: number }>;
+  /** Every folder of the knowledge base, for the "move to folder" picker. */
+  folderOptions?: FolderOption[];
+  /**
+   * Replace the updated-at line with the card's folder. Only meaningful when
+   * the grid spans several folders, i.e. while filtering.
+   */
+  showFolderPath?: boolean;
+  // Move sub-flow state
+  moveMenuMode: 'normal' | 'targets' | 'confirm';
+  moveTargetKbs: any[];
+  moveTargetsLoading: boolean;
+  moveSelectedTargetName: string;
+  moveMode: 'reuse_vectors' | 'reparse';
+  moveSubmitting: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'open', item: KnowledgeCard): void
-  (e: 'toggle-checkbox', id: string, checked: boolean, ctx?: { e?: Event }): void
-  (e: 'menu-visible-change', visible: boolean, item: KnowledgeCard): void
-  (e: 'action', action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void
-  (e: 'tag-edit', item: KnowledgeCard): void
-  (e: 'open-folder', path: string): void
-  (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void
-  (e: 'move-select-target', kb: any): void
-  (e: 'move-back'): void
-  (e: 'move-confirm'): void
-  (e: 'update:moveMode', mode: 'reuse_vectors' | 'reparse'): void
-}>()
+  (e: 'open', item: KnowledgeCard): void;
+  (e: 'toggle-checkbox', id: string, checked: boolean, ctx?: { e?: Event }): void;
+  (e: 'menu-visible-change', visible: boolean, item: KnowledgeCard): void;
+  (e: 'action', action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void;
+  (e: 'tag-edit', item: KnowledgeCard): void;
+  (e: 'open-folder', path: string): void;
+  (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void;
+  // Move sub-flow emits
+  (e: 'move-select-target', kb: any): void;
+  (e: 'move-back'): void;
+  (e: 'move-confirm'): void;
+  (e: 'update:moveMode', mode: 'reuse_vectors' | 'reparse'): void;
+}>();
 
-const { t } = useI18n()
-const activeMenuItemId = ref<string | null>(null)
-const folderPickerItemId = ref<string | null>(null)
-const CANCELABLE_PARSE_STATUSES = new Set(['pending', 'processing', 'finalizing'])
+const { t } = useI18n();
 
-const folderRows = computed(() => [
-  { path: '', name: t('knowledgeBase.folderTree.rootRow'), depth: 0 },
-  ...(props.folderOptions || []),
-])
+const {
+  setupTagChipsObserver,
+  getTagLimit,
+  hasTagOverflow,
+  getOverflowCount,
+} = useTagChipsOverflow('tagItemId');
 
-const isParseInFlight = (status?: string) => CANCELABLE_PARSE_STATUSES.has(String(status || ''))
-const isTraceVisible = (item: KnowledgeCard) => isParseInFlight(item.parse_status) || props.traceAvailableById[item.id] === true
-const cardTitle = (item: KnowledgeCard) => item.display_name || item.file_name || item.title || item.original_file_name || item.id
-const cardSummary = (item: KnowledgeCard) => item.description || item.metadata?.summary || item.metadata?.content || ''
-const cardTypeLabel = (item: KnowledgeCard) => {
-  if (item.type === 'url') return 'URL'
-  if (item.type === 'manual') return t('knowledgeBase.typeManual')
-  if (item.file_type) return String(item.file_type).replace(/^\./, '').toUpperCase()
-  return '--'
-}
-const inFlightCardStatusText = (item: KnowledgeCard) => {
+// Which row's action popup is currently showing the folder picker. Kept local so
+// picking a folder stays inside the menu the user already opened, exactly like
+// the "move to knowledge base" sub-menu next to it.
+const folderPickerItemId = ref<string | null>(null);
+
+// --- Menu index tracking ---
+const activeMenuIndex = ref(-1);
+const openMenu = (index: number) => {
+  activeMenuIndex.value = index;
+};
+const onMenuVisibleChange = (visible: boolean, item: KnowledgeCard) => {
+  if (!visible) {
+    activeMenuIndex.value = -1;
+    folderPickerItemId.value = null;
+  }
+  emit('menu-visible-change', visible, item);
+};
+
+// --- Parse status helpers ---
+const CANCELABLE_PARSE_STATUSES = new Set(['pending', 'processing', 'finalizing']);
+const isParseInFlight = (status?: string): boolean =>
+  CANCELABLE_PARSE_STATUSES.has(String(status ?? ''));
+
+const isTraceMenuVisible = (item: KnowledgeCard): boolean => {
+  if (!item?.id) return false;
+  if (isParseInFlight(item.parse_status)) return true;
+  return props.traceAvailableById[item.id] === true;
+};
+
+const inFlightCardStatusText = (item: KnowledgeCard): string => {
   if (item.parse_status === 'finalizing') {
     if (item.summary_status === 'pending' || item.summary_status === 'processing') {
-      return t('knowledgeBase.generatingSummary')
+      return t('knowledgeBase.generatingSummary');
     }
-    return t('knowledgeBase.statusFinalizing')
+    return t('knowledgeBase.statusFinalizing');
   }
-  return t('knowledgeBase.parsingInProgress')
-}
+  return t('knowledgeBase.parsingInProgress');
+};
+
+// --- Display helpers ---
+const formatDocTime = (time?: string) => {
+  if (!time) return '--';
+  const d = new Date(time);
+  if (Number.isNaN(d.getTime())) return '--';
+  const yy = String(d.getFullYear()).slice(2);
+  const MM = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${yy}-${MM}-${dd} ${hh}:${mm}`;
+};
+
+const getKnowledgeType = (item: KnowledgeCard) => {
+  if (item.type === 'url') return t('knowledgeBase.typeURL') || 'URL';
+  if (item.type === 'manual') return t('knowledgeBase.typeManual');
+  if (item.file_type) return item.file_type.toUpperCase();
+  return '--';
+};
 
 const channelLabelMap: Record<string, string> = {
+  web: 'knowledgeBase.channelWeb',
   api: 'knowledgeBase.channelApi',
   browser_extension: 'knowledgeBase.channelBrowserExtension',
-  feishu: 'knowledgeBase.channelFeishu',
-  feishu_drive: 'knowledgeBase.channelFeishuDrive',
-  lark_drive: 'knowledgeBase.channelLarkDrive',
-  notion: 'knowledgeBase.channelNotion',
-  yuque: 'knowledgeBase.channelYuque',
   wechat: 'knowledgeBase.channelWechat',
   wecom: 'knowledgeBase.channelWecom',
+  feishu: 'knowledgeBase.channelFeishu',
   dingtalk: 'knowledgeBase.channelDingtalk',
   slack: 'knowledgeBase.channelSlack',
   im: 'knowledgeBase.channelIm',
-}
-const channelLabel = (channel?: string) => {
-  if (!channel || channel === 'web') return ''
-  return channelLabelMap[channel] ? t(channelLabelMap[channel]) : channel
-}
+};
 
-const getExtension = (item: KnowledgeCard) => {
-  if (item.file_type) return String(item.file_type).replace(/^\./, '').toUpperCase()
-  const name = cardTitle(item)
-  const dot = name.lastIndexOf('.')
-  if (dot > -1 && dot < name.length - 1) return name.slice(dot + 1).toUpperCase()
-  if (item.type === 'url') return 'URL'
-  return 'TXT'
-}
+const getChannelLabel = (channel: string) => {
+  const key = channelLabelMap[channel];
+  return key ? t(key) : t('knowledgeBase.channelUnknown');
+};
 
-const fileIconName = (item: KnowledgeCard): 'image' | 'volume-2' | 'file-spreadsheet' | 'file-code' | 'file-text' => {
-  const ext = getExtension(item)
-  if (['PNG', 'JPG', 'JPEG', 'WEBP', 'SVG'].includes(ext)) return 'image'
-  if (['WAV', 'MP3', 'OGG', 'M4A', 'FLAC'].includes(ext)) return 'volume-2'
-  if (['CSV', 'XLS', 'XLSX'].includes(ext)) return 'file-spreadsheet'
-  if (['MD', 'JSON', 'JS', 'TS', 'PY'].includes(ext)) return 'file-code'
-  return 'file-text'
-}
-
-const formatDocTime = (time?: string) => {
-  if (!time) return '--'
-  const d = new Date(time)
-  if (Number.isNaN(d.getTime())) return '--'
-  const yy = String(d.getFullYear()).slice(2)
-  const MM = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${yy}-${MM}-${dd} ${hh}:${mm}`
-}
-
-// Pre-visual Musuw exposed a delayed hover inspector for processing state and
-// document metadata. Keep that behavior while rendering it with reference UI.
-const hoveredCardItem = ref<KnowledgeCard | null>(null)
-const hoverPosition = ref({ left: 0, top: 0 })
-let hoverTimer: ReturnType<typeof setTimeout> | null = null
-let hoverCardElement: HTMLElement | null = null
-const HOVER_DELAY = 300
-const HOVER_GAP = 12
-const HOVER_WIDTH = 344
-const HOVER_ESTIMATED_HEIGHT = 300
-
-const computeHoverPosition = (card: HTMLElement, measuredHeight = HOVER_ESTIMATED_HEIGHT) => {
-  const rect = card.getBoundingClientRect()
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
-  let left = rect.right + HOVER_GAP
-  let top = rect.top
-
-  if (left + HOVER_WIDTH > viewportWidth - 10) {
-    const leftSide = rect.left - HOVER_WIDTH - HOVER_GAP
-    left = leftSide >= 10 ? leftSide : Math.max(10, Math.min(rect.left, viewportWidth - HOVER_WIDTH - 10))
-    if (leftSide < 10) {
-      const below = rect.bottom + HOVER_GAP
-      if (below + measuredHeight <= viewportHeight - 10) top = below
-      else top = Math.max(10, rect.top - measuredHeight - HOVER_GAP)
-    }
-  }
-  if (top + measuredHeight > viewportHeight - 10) top = Math.max(10, viewportHeight - measuredHeight - 10)
-  return { left: Math.round(left), top: Math.round(top) }
-}
-
-const showHoverInspector = (event: MouseEvent, item: KnowledgeCard) => {
-  if (props.batchMode || activeMenuItemId.value) return
-  if (hoverTimer) clearTimeout(hoverTimer)
-  const card = event.currentTarget as HTMLElement
-  hoverCardElement = card
-  hoverTimer = setTimeout(() => {
-    hoverTimer = null
-    hoveredCardItem.value = item
-    hoverPosition.value = computeHoverPosition(card)
-    nextTick(() => {
-      const popover = document.querySelector<HTMLElement>('.reference-card-hover-inspector')
-      if (popover && hoverCardElement === card) {
-        hoverPosition.value = computeHoverPosition(card, popover.getBoundingClientRect().height || HOVER_ESTIMATED_HEIGHT)
-      }
-    })
-  }, HOVER_DELAY)
-}
-
-const hideHoverInspector = () => {
-  if (hoverTimer) {
-    clearTimeout(hoverTimer)
-    hoverTimer = null
-  }
-  hoveredCardItem.value = null
-  hoverCardElement = null
-}
-
-onBeforeUnmount(hideHoverInspector)
-
-const openMenu = (item: KnowledgeCard) => {
-  hideHoverInspector()
-  if (activeMenuItemId.value === item.id) {
-    closeMenu(item)
-    return
-  }
-  activeMenuItemId.value = item.id
-  folderPickerItemId.value = null
-  emit('menu-visible-change', true, item)
-}
-
-const closeMenu = (item?: KnowledgeCard) => {
-  if (item) emit('menu-visible-change', false, item)
-  activeMenuItemId.value = null
-  folderPickerItemId.value = null
-}
-
+// --- Card click handler ---
 const onCardClick = (item: KnowledgeCard) => {
-  hideHoverInspector()
   if (props.batchMode) {
-    emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))
-    return
+    emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id));
+    return;
   }
-  emit('open', item)
-}
+  emit('open', item);
+};
 
-const runAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
-  const fileName = item.file_name || cardTitle(item)
-  if (action === 'delete' && !window.confirm(t('knowledgeBase.confirmDeleteDocument', { fileName }))) return
-  if (action === 'cancel-parse' && !window.confirm(t('knowledgeBase.cancelParseConfirmBody', { title: fileName }))) return
-  if (action === 'reparse' && !isParseInFlight(item.parse_status) && !window.confirm(t('knowledgeBase.rebuildConfirm', { fileName }))) return
-  if (action === 'move') {
-    emit('action', 'move', item)
-    return
+// --- Hover popover ---
+const hoveredCardItem = ref<KnowledgeCard | null>(null);
+const cardPopoverPos = ref({ x: 0, y: 0 });
+const CARD_POPOVER_OFFSET = 12;
+const CARD_POPOVER_ESTIMATED_WIDTH = 360;
+const CARD_POPOVER_ESTIMATED_HEIGHT = 300;
+const cardHoverShowDelay = 300;
+let cardHoverTimer: ReturnType<typeof setTimeout> | null = null;
+let cardPopoverElement: HTMLElement | null = null;
+
+const calculatePopoverPositionFromCard = (cardElement: HTMLElement): { x: number; y: number } => {
+  const cardRect = cardElement.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  let popoverWidth = CARD_POPOVER_ESTIMATED_WIDTH;
+  let popoverHeight = CARD_POPOVER_ESTIMATED_HEIGHT;
+
+  if (cardPopoverElement) {
+    const rect = cardPopoverElement.getBoundingClientRect();
+    if (rect.width > 0) popoverWidth = rect.width;
+    if (rect.height > 0) popoverHeight = rect.height;
   }
-  emit('action', action, item)
-  closeMenu(item)
-}
 
-const openFolderPicker = (item: KnowledgeCard) => {
-  folderPickerItemId.value = item.id
-}
+  let x = 0;
+  let y = 0;
 
-const pickFolder = (item: KnowledgeCard, path: string) => {
-  emit('move-to-folder', item, path)
-  closeMenu(item)
-}
+  // Strategy 1: right side
+  const rightX = cardRect.right + CARD_POPOVER_OFFSET;
+  if (rightX + popoverWidth <= viewportWidth - 10) {
+    x = rightX;
+    y = cardRect.top;
+    if (y + popoverHeight > viewportHeight - 10) y = viewportHeight - popoverHeight - 10;
+    y = Math.max(10, y);
+    return { x, y };
+  }
+
+  // Strategy 2: left side
+  const leftX = cardRect.left - popoverWidth - CARD_POPOVER_OFFSET;
+  if (leftX >= 10) {
+    x = leftX;
+    y = cardRect.top;
+    if (y + popoverHeight > viewportHeight - 10) y = viewportHeight - popoverHeight - 10;
+    y = Math.max(10, y);
+    return { x, y };
+  }
+
+  // Strategy 3: below
+  const bottomY = cardRect.bottom + CARD_POPOVER_OFFSET;
+  if (bottomY + popoverHeight <= viewportHeight - 10) {
+    y = bottomY;
+    x = cardRect.left;
+    if (x + popoverWidth > viewportWidth - 10) x = viewportWidth - popoverWidth - 10;
+    x = Math.max(10, x);
+    return { x, y };
+  }
+
+  // Strategy 4: above
+  const topY = cardRect.top - popoverHeight - CARD_POPOVER_OFFSET;
+  y = Math.max(10, topY);
+  x = cardRect.left;
+  if (x + popoverWidth > viewportWidth - 10) x = viewportWidth - popoverWidth - 10;
+  x = Math.max(10, x);
+  return { x, y };
+};
+
+const onCardMouseEnter = (ev: MouseEvent, item: KnowledgeCard) => {
+  if (cardHoverTimer) {
+    clearTimeout(cardHoverTimer);
+    cardHoverTimer = null;
+  }
+  const cardElement = (ev.currentTarget as HTMLElement);
+  cardHoverTimer = setTimeout(() => {
+    cardHoverTimer = null;
+    hoveredCardItem.value = item;
+    const pos = calculatePopoverPositionFromCard(cardElement);
+    cardPopoverPos.value = pos;
+    nextTick(() => {
+      cardPopoverElement = document.querySelector('.knowledge-card-hover-popover') as HTMLElement;
+      if (cardPopoverElement) {
+        const refinedPos = calculatePopoverPositionFromCard(cardElement);
+        cardPopoverPos.value = refinedPos;
+      }
+    });
+  }, cardHoverShowDelay);
+};
+
+const onCardMouseLeave = () => {
+  if (cardHoverTimer) {
+    clearTimeout(cardHoverTimer);
+    cardHoverTimer = null;
+  }
+  hoveredCardItem.value = null;
+  cardPopoverElement = null;
+};
+
+const onFolderPicked = (item: KnowledgeCard, path: string) => {
+  folderPickerItemId.value = null;
+  if (item.isMore !== undefined) item.isMore = false;
+  activeMenuIndex.value = -1;
+  emit('move-to-folder', item, path);
+};
+
+// --- Action handlers ---
+const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
+  // The folder picker opens inside this same popup, so keep the menu open.
+  if (action === 'move-folder') {
+    folderPickerItemId.value = item.id;
+    return;
+  }
+  // Don't close menu for move — it triggers the sub-flow
+  if (action !== 'move') {
+    if (item.isMore !== undefined) item.isMore = false;
+    activeMenuIndex.value = -1;
+  }
+  emit('action', action, item);
+};
 </script>
 
 <template>
-  <div class="reference-card-grid">
-    <button
-      v-for="folder in folders || []"
-      :key="`folder-${folder.path}`"
-      type="button"
-      class="reference-folder-card"
-      :title="folder.path"
-      @click="emit('open-folder', folder.path)"
-    >
-      <div class="reference-folder-card__top">
-        <ReferenceIcon name="folder" :size="18" :stroke-width="1.8" />
-        <span>{{ folder.name }}</span>
+  <div class="doc-card-view">
+    <div class="doc-card-list doc-card-list-animated">
+      <div
+        v-for="folder in folders"
+        :key="'folder-' + folder.path"
+        class="folder-card"
+        :title="folder.path"
+        role="button"
+        tabindex="0"
+        @click="emit('open-folder', folder.path)"
+        @keydown.enter="emit('open-folder', folder.path)"
+      >
+        <div class="folder-card__body">
+          <t-icon name="folder" class="folder-card__icon" />
+          <span class="folder-card__title">{{ folder.name }}</span>
+        </div>
+        <div class="folder-card__footer">
+          {{ t('knowledgeBase.folderTree.folderCardCount', { count: folder.total_count }) }}
+        </div>
       </div>
-      <div class="reference-folder-card__footer">
-        {{ t('knowledgeBase.folderTree.folderCardCount', { count: folder.total_count }) }}
-      </div>
-    </button>
 
-    <article
-      v-for="item in items"
-      :key="item.id"
-      class="reference-document-card"
-      :class="{ 'is-selected': selectedIds.has(item.id) }"
+    <div
+      class="knowledge-card"
+      :class="{ 'is-selected': selectedIds.has(item.id), 'batch-mode': batchMode }"
       :data-select-id="item.id"
+      v-for="(item, index) in items"
+      :key="item.id"
       @click="onCardClick(item)"
-      @mouseenter="showHoverInspector($event, item)"
-      @mouseleave="hideHoverInspector"
+      @mouseenter="onCardMouseEnter($event, item)"
+      @mouseleave="onCardMouseLeave"
     >
-      <div class="reference-document-card__body">
-        <div class="reference-document-card__header">
-          <div class="reference-document-card__title-wrap">
-            <ReferenceIcon :name="fileIconName(item)" :size="16" class="reference-document-card__file-icon" />
-            <h4 :title="cardTitle(item)">{{ cardTitle(item) }}</h4>
+      <div class="card-content">
+        <div class="card-content-nav">
+          <div v-if="canEdit && batchMode" class="card-nav-check" @click.stop>
+            <t-checkbox
+              class="card-select-checkbox"
+              size="small"
+              :checked="selectedIds.has(item.id)"
+              :title="item.file_name"
+              @change="(checked: boolean, ctx?: { e?: Event }) => emit('toggle-checkbox', item.id, checked, ctx)"
+            />
           </div>
-
-          <div v-if="canEdit" class="reference-document-card__menu-anchor">
-            <button
-              type="button"
-              class="reference-document-card__more"
-              :aria-label="t('knowledgeBase.moreOptions')"
-              @click.stop="openMenu(item)"
+          <span class="card-content-title" :title="item.file_name">{{ item.file_name }}</span>
+          <t-popup
+            v-if="canEdit"
+            v-model="item.isMore"
+            overlayClassName="card-more"
+            :on-visible-change="(v: boolean) => onMenuVisibleChange(v, item)"
+            trigger="click"
+            destroy-on-close
+            placement="bottom-right"
+          >
+            <div
+              variant="outline"
+              class="more-wrap"
+              @click.stop="openMenu(index)"
+              :class="[activeMenuIndex === index ? 'active-more' : '']"
             >
-              <ReferenceIcon name="more-horizontal" :size="14" />
-            </button>
-
-            <template v-if="activeMenuItemId === item.id">
-              <div class="reference-document-card__backdrop" @click.stop="closeMenu(item)" />
-
-              <div v-if="folderPickerItemId === item.id" class="reference-document-card__menu reference-folder-picker" @click.stop>
-                <button type="button" class="reference-menu-item reference-menu-back" @click="folderPickerItemId = null">
-                  <ReferenceIcon name="chevron-left" :size="14" />
-                  <span>{{ t('knowledgeBase.moveToFolder.action') }}</span>
-                </button>
-                <div class="reference-menu-divider" />
-                <button
-                  v-for="row in folderRows"
-                  :key="row.path || '__root__'"
-                  type="button"
-                  class="reference-menu-item"
-                  :class="{ current: (item.folder_path || '') === row.path }"
-                  :style="{ paddingLeft: `${12 + Math.min(row.depth, 5) * 10}px` }"
-                  @click="pickFolder(item, row.path)"
-                >
-                  <ReferenceIcon name="folder" :size="14" class="reference-menu-icon" />
-                  <span class="reference-menu-ellipsis">{{ row.name }}</span>
-                </button>
+              <img class="more-icon" src="@/assets/img/more.png" alt="" />
+            </div>
+            <template #content>
+              <!-- Move: folder picker (must win over the normal menu while open) -->
+              <div v-if="folderPickerItemId === item.id" class="card-menu move-menu">
+                <FolderPickerMenu
+                  :options="folderOptions || []"
+                  :current-path="item.folder_path || ''"
+                  show-back
+                  @back="folderPickerItemId = null"
+                  @confirm="(path: string) => onFolderPicked(item, path)"
+                />
               </div>
 
-              <div v-else-if="moveMenuMode === 'targets'" class="reference-document-card__menu reference-move-target-menu" @click.stop>
-                <button type="button" class="reference-menu-item reference-menu-back" @click="emit('move-back')">
-                  <ReferenceIcon name="chevron-left" :size="14" />
-                  <span>{{ t('knowledgeBase.moveToKnowledgeBase') }}</span>
-                </button>
-                <div class="reference-menu-divider" />
-                <div v-if="moveTargetsLoading" class="reference-menu-state">{{ t('common.loading') }}</div>
-                <div v-else-if="moveTargetKbs.length === 0" class="reference-menu-state">{{ t('knowledgeBase.moveNoTargets') }}</div>
+              <!-- Normal menu -->
+              <div v-else-if="moveMenuMode === 'normal'" class="card-menu">
+                <DocumentActionMenu
+                  :item="item"
+                  :can-mutate-knowledge="canMutateKnowledge"
+                  :trace-visible="isTraceMenuVisible(item)"
+                  @edit="handleAction('edit', item)"
+                  @view-trace="handleAction('view-trace', item)"
+                  @reparse="handleAction('reparse', item)"
+                  @cancel-parse="handleAction('cancel-parse', item)"
+                  @move="handleAction('move', item)"
+                  @move-folder="handleAction('move-folder', item)"
+                  @batch-manage="handleAction('batch-manage', item)"
+                  @delete="handleAction('delete', item)"
+                />
+              </div>
+
+              <!-- Move: target KB list -->
+              <div v-else-if="moveMenuMode === 'targets'" class="card-menu move-menu">
+                <div class="move-menu-header" @click.stop="emit('move-back')">
+                  <t-icon name="chevron-left" size="16px" />
+                  <span>{{ $t('knowledgeBase.moveToKnowledgeBase') }}</span>
+                </div>
+                <div v-if="moveTargetsLoading" class="move-menu-loading">
+                  <t-loading size="small" />
+                </div>
+                <div v-else-if="moveTargetKbs.length === 0" class="move-menu-empty">
+                  {{ $t('knowledgeBase.moveNoTargets') }}
+                </div>
                 <template v-else>
-                  <button
+                  <div
                     v-for="kb in moveTargetKbs"
                     :key="kb.id"
-                    type="button"
-                    class="reference-menu-item"
-                    @click="emit('move-select-target', kb)"
+                    class="card-menu-item"
+                    @click.stop="emit('move-select-target', kb)"
                   >
-                    <ReferenceIcon name="folder" :size="14" class="reference-menu-icon" />
-                    <span class="reference-menu-ellipsis">{{ kb.name }}</span>
-                  </button>
+                    <t-icon class="icon" name="root-list" />
+                    <span class="move-target-name">{{ kb.name }}</span>
+                    <span v-if="kb.knowledge_count !== undefined" class="move-target-count">{{ kb.knowledge_count }}</span>
+                  </div>
                 </template>
               </div>
 
-              <div v-else-if="moveMenuMode === 'confirm'" class="reference-document-card__menu reference-move-confirm" @click.stop>
-                <button type="button" class="reference-menu-item reference-menu-back" @click="emit('move-back')">
-                  <ReferenceIcon name="chevron-left" :size="14" />
-                  <span>{{ t('knowledgeBase.moveConfirmTitle') }}</span>
-                </button>
-                <div class="reference-menu-divider" />
-                <div class="reference-move-confirm__target">{{ moveSelectedTargetName }}</div>
-                <label class="reference-move-mode" :class="{ active: moveMode === 'reuse_vectors' }">
-                  <input
-                    type="radio"
-                    name="reference-card-move-mode"
-                    value="reuse_vectors"
-                    :checked="moveMode === 'reuse_vectors'"
-                    @change="emit('update:moveMode', 'reuse_vectors')"
-                  />
-                  <span>{{ t('knowledgeBase.moveModeReuseVectors') }}</span>
-                </label>
-                <label class="reference-move-mode" :class="{ active: moveMode === 'reparse' }">
-                  <input
-                    type="radio"
-                    name="reference-card-move-mode"
-                    value="reparse"
-                    :checked="moveMode === 'reparse'"
-                    @change="emit('update:moveMode', 'reparse')"
-                  />
-                  <span>{{ t('knowledgeBase.moveModeReparse') }}</span>
-                </label>
-                <div class="reference-move-confirm__actions">
-                  <button type="button" class="reference-move-cancel" @click="emit('move-back')">{{ t('common.cancel') }}</button>
-                  <button type="button" class="reference-move-submit" :disabled="moveSubmitting" @click="emit('move-confirm')">
-                    {{ moveSubmitting ? '...' : t('knowledgeBase.moveConfirm') }}
-                  </button>
+              <!-- Move: confirm -->
+              <div v-else-if="moveMenuMode === 'confirm'" class="card-menu move-menu">
+                <div class="move-menu-header" @click.stop="emit('move-back')">
+                  <t-icon name="chevron-left" size="16px" />
+                  <span>{{ $t('knowledgeBase.moveConfirmTitle') }}</span>
+                </div>
+                <div class="move-confirm-body">
+                  <div class="move-target-info">
+                    <t-icon name="arrow-right" size="14px" />
+                    <span>{{ moveSelectedTargetName }}</span>
+                  </div>
+                  <div
+                    class="move-mode-item"
+                    :class="{ active: moveMode === 'reuse_vectors' }"
+                    @click.stop="emit('update:moveMode', 'reuse_vectors')"
+                  >
+                    <t-radio :checked="moveMode === 'reuse_vectors'" />
+                    <div class="move-mode-text">
+                      <span class="move-mode-label">{{ $t('knowledgeBase.moveModeReuseVectors') }}</span>
+                      <span class="move-mode-desc">{{ $t('knowledgeBase.moveModeReuseVectorsDesc') }}</span>
+                    </div>
+                  </div>
+                  <div
+                    class="move-mode-item"
+                    :class="{ active: moveMode === 'reparse' }"
+                    @click.stop="emit('update:moveMode', 'reparse')"
+                  >
+                    <t-radio :checked="moveMode === 'reparse'" />
+                    <div class="move-mode-text">
+                      <span class="move-mode-label">{{ $t('knowledgeBase.moveModeReparse') }}</span>
+                      <span class="move-mode-desc">{{ $t('knowledgeBase.moveModeReparseDesc') }}</span>
+                    </div>
+                  </div>
+                  <div class="move-confirm-actions">
+                    <t-button size="small" variant="outline" @click.stop="emit('move-back')">{{
+                      $t('common.cancel')
+                    }}</t-button>
+                    <t-button size="small" theme="primary" :loading="moveSubmitting" @click.stop="emit('move-confirm')">{{
+                      $t('knowledgeBase.moveConfirm')
+                    }}</t-button>
+                  </div>
                 </div>
               </div>
+            </template>
+          </t-popup>
+        </div>
 
-              <div v-else class="reference-document-card__menu" @click.stop>
-                <button
-                  v-if="item.type === 'manual'"
-                  type="button"
-                  class="reference-menu-item"
-                  @click="runAction('edit', item)"
+        <!-- Parse status display -->
+        <div v-if="isParseInFlight(item.parse_status)" class="card-analyze card-analyze-trace">
+          <t-icon name="loading" class="card-analyze-loading"></t-icon>
+          <span
+            class="card-analyze-txt card-analyze-trace-link"
+            role="button"
+            tabindex="0"
+            :title="$t('knowledgeStages.viewTrace')"
+            @click.stop="handleAction('view-trace', item)"
+            @keydown.enter.stop="handleAction('view-trace', item)"
+            @keydown.space.prevent.stop="handleAction('view-trace', item)"
+          >{{ inFlightCardStatusText(item) }}</span>
+          <button
+            type="button"
+            class="card-analyze-trace-btn"
+            :title="$t('knowledgeStages.viewTrace')"
+            :aria-label="$t('knowledgeStages.viewTrace')"
+            @click.stop="handleAction('view-trace', item)"
+          >
+            <t-icon name="chart-line" />
+          </button>
+        </div>
+        <div v-else-if="item.parse_status === 'failed'" class="card-analyze failure card-analyze-trace">
+          <t-icon name="close-circle" class="card-analyze-loading failure"></t-icon>
+          <span
+            class="card-analyze-txt failure card-analyze-trace-link"
+            role="button"
+            tabindex="0"
+            :title="$t('knowledgeStages.viewTrace')"
+            @click.stop="handleAction('view-trace', item)"
+            @keydown.enter.stop="handleAction('view-trace', item)"
+            @keydown.space.prevent.stop="handleAction('view-trace', item)"
+          >{{ $t('knowledgeBase.parsingFailed') }}</span>
+          <button
+            type="button"
+            class="card-analyze-trace-btn"
+            :title="$t('knowledgeStages.viewTrace')"
+            :aria-label="$t('knowledgeStages.viewTrace')"
+            @click.stop="handleAction('view-trace', item)"
+          >
+            <t-icon name="chart-bar" />
+          </button>
+        </div>
+        <div v-else-if="item.parse_status === 'draft'" class="card-draft">
+          <t-tag size="small" theme="warning" variant="light-outline">{{ $t('knowledgeBase.draft') }}</t-tag>
+          <span class="card-draft-tip">{{ $t('knowledgeBase.draftTip') }}</span>
+        </div>
+        <div
+          v-else-if="item.parse_status === 'completed' && (item.summary_status === 'pending' || item.summary_status === 'processing')"
+          class="card-analyze"
+        >
+          <t-icon name="loading" class="card-analyze-loading"></t-icon>
+          <span class="card-analyze-txt">{{ $t('knowledgeBase.generatingSummary') }}</span>
+        </div>
+        <div v-else-if="item.parse_status === 'completed'" class="card-content-txt">
+          {{ item.description }}
+        </div>
+      </div>
+
+      <div class="card-bottom">
+        <button v-if="showFolderPath && item.folder_path" type="button" class="card-folder"
+          :title="item.folder_path" @click.stop="emit('open-folder', item.folder_path)">
+          <t-icon name="folder" />
+          <span>{{ item.folder_path }}</span>
+        </button>
+        <span v-else class="card-time">{{ formatDocTime(item.updated_at) }}</span>
+        <div class="card-bottom-right">
+          <div v-if="tagList.length" class="card-tag-selector" @click.stop>
+            <!-- Editable mode -->
+            <template v-if="canEdit">
+              <template v-if="(item.tags || []).length > 0">
+                <t-tooltip
+                  v-if="hasTagOverflow(item.id, (item.tags || []).length)"
+                  :content="(item.tags || []).map((t: any) => t.name).join(', ')"
+                  placement="top"
                 >
-                  <ReferenceIcon name="edit-2" :size="14" class="reference-menu-icon" />
-                  <span>{{ t('knowledgeBase.editDocument') }}</span>
-                </button>
-                <button
-                  v-if="isTraceVisible(item)"
-                  type="button"
-                  class="reference-menu-item"
-                  @click="runAction('view-trace', item)"
+                  <div
+                    class="card-tag-chips"
+                    :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
+                    @click="emit('tag-edit', item)"
+                  >
+                    <t-tag v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" size="small" variant="light-outline" class="card-tag-chip">
+                      <span class="tag-text">{{ tag.name }}</span>
+                    </t-tag>
+                    <span class="card-tag-overflow">+{{ getOverflowCount(item.id, (item.tags || []).length) }}</span>
+                  </div>
+                </t-tooltip>
+                <div
+                  v-else
+                  class="card-tag-chips"
+                  :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
+                  @click="emit('tag-edit', item)"
                 >
-                  <ReferenceIcon name="activity" :size="14" class="reference-menu-icon" />
-                  <span>{{ t('knowledgeStages.viewTrace') }}</span>
-                </button>
-                <button type="button" class="reference-menu-item" @click="runAction('reparse', item)">
-                  <ReferenceIcon name="rotate-cw" :size="14" class="reference-menu-icon" />
-                  <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
-                </button>
-                <button
-                  v-if="isParseInFlight(item.parse_status)"
-                  type="button"
-                  class="reference-menu-item reference-menu-item--warning"
-                  @click="runAction('cancel-parse', item)"
+                  <t-tag v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" size="small" variant="light-outline" class="card-tag-chip">
+                    <span class="tag-text">{{ tag.name }}</span>
+                  </t-tag>
+                </div>
+              </template>
+              <span v-else class="card-tag-add" @click="emit('tag-edit', item)">
+                <t-icon name="add" size="12px" />
+                <span>{{ $t('knowledgeBase.tagLabel') }}</span>
+              </span>
+            </template>
+            <!-- Read-only mode -->
+            <template v-else-if="(item.tags || []).length > 0">
+              <t-tooltip
+                v-if="hasTagOverflow(item.id, (item.tags || []).length)"
+                :content="(item.tags || []).map((t: any) => t.name).join(', ')"
+                placement="top"
+              >
+                <div
+                  class="card-tag-chips"
+                  :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
                 >
-                  <ReferenceIcon name="stop-circle" :size="14" />
-                  <span>{{ t('knowledgeBase.cancelParse') }}</span>
-                </button>
-                <button v-if="canMutateKnowledge" type="button" class="reference-menu-item" @click="openFolderPicker(item)">
-                  <ReferenceIcon name="folder" :size="14" class="reference-menu-icon" />
-                  <span>{{ t('knowledgeBase.moveToFolder.action') }}</span>
-                </button>
-                <button v-if="canMutateKnowledge" type="button" class="reference-menu-item" @click="runAction('move', item)">
-                  <ReferenceIcon name="arrow-right-left" :size="14" class="reference-menu-icon" />
-                  <span>{{ t('knowledgeBase.moveDocument') }}</span>
-                </button>
-                <button v-if="canMutateKnowledge" type="button" class="reference-menu-item" @click="runAction('batch-manage', item)">
-                  <ReferenceIcon name="check-square" :size="14" class="reference-menu-icon" />
-                  <span>{{ t('menu.batchManage') }}</span>
-                </button>
-                <div class="reference-menu-divider" />
-                <button type="button" class="reference-menu-item reference-menu-item--danger" @click="runAction('delete', item)">
-                  <ReferenceIcon name="trash-2" :size="14" />
-                  <span>{{ t('knowledgeBase.deleteDocument') }}</span>
-                </button>
+                  <t-tag v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" size="small" variant="light-outline" class="card-tag-chip">
+                    <span class="tag-text">{{ tag.name }}</span>
+                  </t-tag>
+                  <span class="card-tag-overflow">+{{ getOverflowCount(item.id, (item.tags || []).length) }}</span>
+                </div>
+              </t-tooltip>
+              <div
+                v-else
+                class="card-tag-chips"
+                :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
+              >
+                <t-tag v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" size="small" variant="light-outline" class="card-tag-chip">
+                  <span class="tag-text">{{ tag.name }}</span>
+                </t-tag>
               </div>
             </template>
           </div>
-        </div>
-
-        <p
-          v-if="item.parse_status === 'completed' && !['pending', 'processing'].includes(String(item.summary_status || '')) && cardSummary(item)"
-          class="reference-document-card__summary"
-        >{{ cardSummary(item) }}</p>
-
-        <button
-          v-if="isParseInFlight(item.parse_status)"
-          type="button"
-          class="reference-status-badge reference-status-badge--working reference-status-action"
-          :title="t('knowledgeStages.viewTrace')"
-          @click.stop="runAction('view-trace', item)"
-        >
-          <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
-          <span>{{ inFlightCardStatusText(item) }}</span>
-        </button>
-        <button
-          v-else-if="item.parse_status === 'failed'"
-          type="button"
-          class="reference-status-badge reference-status-badge--failed reference-status-action"
-          :title="t('knowledgeStages.viewTrace')"
-          @click.stop="runAction('view-trace', item)"
-        >
-          <span>{{ t('knowledgeBase.parsingFailed') }}</span>
-        </button>
-        <div v-else-if="item.parse_status === 'draft'" class="reference-draft-row">
-          <span class="reference-status-badge reference-status-badge--draft">{{ t('knowledgeBase.draft') }}</span>
-          <span class="reference-draft-tip">{{ t('knowledgeBase.draftTip') }}</span>
-        </div>
-        <div
-          v-else-if="item.parse_status === 'completed' && ['pending', 'processing'].includes(String(item.summary_status || ''))"
-          class="reference-status-badge reference-status-badge--working"
-        >
-          <ReferenceIcon name="loader-circle" :size="10" class="reference-spin" />
-          <span>{{ t('knowledgeBase.generatingSummary') }}</span>
+          <div class="card-type">
+            <span>{{ getKnowledgeType(item) }}</span>
+          </div>
         </div>
       </div>
-
-      <footer class="reference-document-card__footer">
-        <button
-          v-if="showFolderPath && item.folder_path"
-          type="button"
-          class="reference-card-folder-path"
-          :title="item.folder_path"
-          @click.stop="emit('open-folder', item.folder_path)"
-        >
-          <ReferenceIcon name="folder" :size="11" />
-          <span>{{ item.folder_path }}</span>
-        </button>
-        <span v-else>{{ formatDocTime(item.updated_at) }}</span>
-        <span class="reference-document-card__extension">{{ cardTypeLabel(item) }}</span>
-      </footer>
-
-      <label v-if="batchMode && canEdit" class="reference-card-checkbox" @click.stop>
-        <input
-          type="checkbox"
-          :checked="selectedIds.has(item.id)"
-          @change="emit('toggle-checkbox', item.id, ($event.target as HTMLInputElement).checked, { e: $event })"
-        />
-      </label>
-    </article>
+    </div>
+    </div>
   </div>
 
+  <!-- Hover popover -->
   <Teleport to="body">
-    <aside
-      v-if="hoveredCardItem"
-      class="reference-card-hover-inspector"
-      :style="{ left: `${hoverPosition.left}px`, top: `${hoverPosition.top}px` }"
-      @mouseenter="() => { if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null } }"
-      @mouseleave="hideHoverInspector"
+    <div
+      v-show="hoveredCardItem"
+      class="knowledge-card-hover-popover"
+      :style="{ left: cardPopoverPos.x + 'px', top: cardPopoverPos.y + 'px' }"
     >
-      <header class="reference-card-hover__header">
-        <ReferenceIcon :name="fileIconName(hoveredCardItem)" :size="15" />
-        <strong :title="cardTitle(hoveredCardItem)">{{ cardTitle(hoveredCardItem) }}</strong>
-        <span>{{ cardTypeLabel(hoveredCardItem) }}</span>
-      </header>
-
-      <div v-if="isParseInFlight(hoveredCardItem.parse_status) || hoveredCardItem.parse_status === 'failed'" class="reference-card-hover__timeline">
-        <KnowledgeProcessingTimeline
-          :knowledge-id="hoveredCardItem.id"
-          :parse-status="hoveredCardItem.parse_status"
-          :auto-poll="false"
-          :compact="true"
-        />
-      </div>
-      <div v-else-if="hoveredCardItem.parse_status === 'draft'" class="reference-card-hover__draft">
-        {{ t('knowledgeBase.draft') }} · {{ t('knowledgeBase.draftTip') }}
-      </div>
-      <template v-else>
-        <p v-if="cardSummary(hoveredCardItem)" class="reference-card-hover__summary">{{ cardSummary(hoveredCardItem) }}</p>
-        <div v-if="hoveredCardItem.source" class="reference-card-hover__source" :title="hoveredCardItem.source">
-          <ReferenceIcon name="globe" :size="12" />
-          <span>{{ hoveredCardItem.source }}</span>
+      <template v-if="hoveredCardItem">
+        <div class="card-popover-title">{{ hoveredCardItem.file_name }}</div>
+        <div v-if="isParseInFlight(hoveredCardItem.parse_status)" class="card-popover-status parsing">
+          <KnowledgeProcessingTimeline
+            :knowledge-id="hoveredCardItem.id"
+            :parse-status="hoveredCardItem.parse_status"
+            :auto-poll="false"
+            :compact="true"
+          />
         </div>
+        <div v-else-if="hoveredCardItem.parse_status === 'failed'" class="card-popover-status failure">
+          <KnowledgeProcessingTimeline
+            :knowledge-id="hoveredCardItem.id"
+            :parse-status="hoveredCardItem.parse_status"
+            :auto-poll="false"
+            :compact="true"
+          />
+        </div>
+        <div v-else-if="hoveredCardItem.parse_status === 'draft'" class="card-popover-status draft">
+          {{ $t('knowledgeBase.draft') }}
+        </div>
+        <template v-else>
+          <div v-if="hoveredCardItem.description" class="card-popover-desc">{{ hoveredCardItem.description }}</div>
+          <div v-if="(hoveredCardItem as any).source" class="card-popover-source" :title="(hoveredCardItem as any).source">
+            <t-icon name="link" size="12px" /> {{ (hoveredCardItem as any).source }}
+          </div>
+          <div class="card-popover-extra">
+            <span v-if="(hoveredCardItem as any).created_at" class="card-popover-created">
+              {{ $t('knowledgeBase.createdAt') }}：{{ formatDocTime((hoveredCardItem as any).created_at) }}
+            </span>
+            <span v-if="formatFileSize((hoveredCardItem as any).file_size)" class="card-popover-size">
+              {{ formatFileSize((hoveredCardItem as any).file_size) }}
+            </span>
+          </div>
+        </template>
+        <div class="card-popover-meta">
+          <span class="card-popover-time">{{ $t('knowledgeBase.updatedAt') }}：{{ formatDocTime(hoveredCardItem.updated_at) }}</span>
+          <span
+            v-if="(hoveredCardItem as any).channel && (hoveredCardItem as any).channel !== 'web'"
+            class="card-popover-channel"
+          >{{ getChannelLabel((hoveredCardItem as any).channel) }}</span>
+          <div v-if="(hoveredCardItem as any).tags && (hoveredCardItem as any).tags.length > 0" class="card-popover-tags">
+            <t-tag
+              v-for="tag in (hoveredCardItem as any).tags"
+              :key="tag.id"
+              size="small"
+              variant="light-outline"
+              class="card-popover-tag-chip"
+            >
+              <span class="tag-text">{{ tag.name }}</span>
+            </t-tag>
+          </div>
+          <span class="card-popover-type">{{ getKnowledgeType(hoveredCardItem) }}</span>
+        </div>
+        <div class="card-popover-hint">{{ $t('knowledgeBase.clickToViewFull') }}</div>
       </template>
-
-      <div class="reference-card-hover__meta">
-        <span v-if="hoveredCardItem.created_at">{{ t('knowledgeBase.createdAt') }} {{ formatDocTime(hoveredCardItem.created_at) }}</span>
-        <span v-if="Number(hoveredCardItem.file_size || 0) > 0">{{ formatFileSize(Number(hoveredCardItem.file_size)) }}</span>
-        <span>{{ t('knowledgeBase.updatedAt') }} {{ formatDocTime(hoveredCardItem.updated_at) }}</span>
-        <span v-if="channelLabel(hoveredCardItem.channel)" class="reference-card-hover__channel">{{ channelLabel(hoveredCardItem.channel) }}</span>
-      </div>
-
-      <div v-if="hoveredCardItem.tags?.length" class="reference-card-hover__tags">
-        <span v-for="tag in hoveredCardItem.tags" :key="tag.id">{{ tag.name }}</span>
-      </div>
-      <div class="reference-card-hover__hint">{{ t('knowledgeBase.clickToViewFull') }}</div>
-    </aside>
+    </div>
   </Teleport>
 </template>
 
-<style scoped>
-.reference-card-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  align-content: start;
-  grid-auto-rows: max-content;
-  min-height: 0;
-  padding-bottom: 16px;
+<style scoped lang="less">
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.reference-document-card,
-.reference-folder-card {
+
+.doc-card-view {
+  width: 100%;
+}
+
+.doc-card-list {
   box-sizing: border-box;
-  height: 192px;
-  border: 1px solid rgb(229 231 235 / 0.9);
-  border-radius: 16px;
-  background: #fff;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  align-content: flex-start;
+  width: 100%;
+
+  &.doc-card-list-animated {
+    animation: contentFadeIn 0.32s ease-out;
+  }
 }
-.reference-document-card {
-  position: relative;
+
+.folder-card {
+  min-width: 240px;
+  height: 136px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 16px;
-  color: #111827;
+  border: 1px solid var(--td-component-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--td-bg-color-container);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   cursor: pointer;
-  text-align: left;
-}
-.reference-document-card:hover {
-  border-color: #9ca3af;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
-}
-.reference-document-card.is-selected {
-  border-color: #111827;
-  box-shadow: 0 0 0 2px rgb(17 24 39 / 0.10), 0 1px 2px rgb(0 0 0 / 0.05);
-}
-.reference-document-card__body { min-width: 0; }
-.reference-document-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.reference-document-card__title-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
-.reference-document-card__file-icon { flex: 0 0 auto; color: #4b5563; }
-.reference-document-card__title-wrap h4 { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #030712; font-size: 12px; line-height: 16px; font-weight: 700; }
-.reference-document-card__menu-anchor { position: relative; flex: 0 0 auto; }
-.reference-document-card__more { width: 22px; height: 22px; margin: -3px -4px 0 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; display: grid; place-items: center; cursor: pointer; }
-.reference-document-card__more:hover { background: #f3f4f6; color: #374151; }
-.reference-document-card__summary { display: -webkit-box; margin: 8px 0 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; color: #6b7280; font-size: 11px; line-height: 17px; font-weight: 400; }
-.reference-status-badge { width: fit-content; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; line-height: 14px; font-weight: 700; }
-.reference-status-action { border: 0; cursor: pointer; text-align: left; font-family: inherit; }
-.reference-status-action:hover { filter: brightness(.96); }
-.reference-status-badge--working { color: #b45309; background: #fffbeb; border: 1px solid rgb(253 230 138 / 0.8); }
-.reference-status-badge--failed { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; }
-.reference-status-badge--draft { color: #b45309; background: #fffbeb; border: 1px solid rgb(253 230 138 / .8); }
-.reference-draft-row { margin-top: 6px; display: flex; align-items: center; gap: 6px; min-width: 0; }
-.reference-draft-tip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9ca3af; font-size: 10px; line-height: 14px; }
-.reference-spin { animation: reference-spin 1s linear infinite; }
-@keyframes reference-spin { to { transform: rotate(360deg); } }
-.reference-document-card__footer { padding-top: 10px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; font-size: 10px; line-height: 14px; }
-.reference-document-card__extension { flex: 0 0 auto; padding: 2px 8px; border-radius: 4px; background: #f3f4f6; color: #4b5563; font-size: 9px; line-height: 12px; font-weight: 700; text-transform: uppercase; }
-.reference-card-folder-path { min-width: 0; padding: 0; border: 0; background: transparent; color: #9ca3af; display: inline-flex; align-items: center; gap: 4px; font: inherit; cursor: pointer; }
-.reference-card-folder-path span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reference-card-checkbox { position: absolute; left: 8px; top: 8px; z-index: 5; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; background: rgb(255 255 255 / 0.94); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
-.reference-card-checkbox input { width: 13px; height: 13px; margin: 0; accent-color: #111827; cursor: pointer; }
-.reference-document-card__backdrop { position: fixed; inset: 0; z-index: 20; }
-.reference-document-card__menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: 144px; padding: 4px 0; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10); color: #374151; text-align: left; }
-.reference-folder-picker,
-.reference-move-target-menu,
-.reference-move-confirm { width: 190px; max-height: 300px; overflow-y: auto; }
-.reference-menu-item { width: 100%; min-height: 28px; padding: 6px 12px; border: 0; background: transparent; color: #374151; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; cursor: pointer; }
-.reference-menu-item:hover { background: #f9fafb; }
-.reference-menu-icon { color: #6b7280; }
-.reference-menu-item--warning { color: #b45309; }
-.reference-menu-item--warning:hover { background: #fffbeb; }
-.reference-menu-item--danger { color: #dc2626; }
-.reference-menu-item--danger:hover { background: #fef2f2; }
-.reference-menu-back { font-weight: 600; }
-.reference-menu-divider { height: 1px; margin: 2px 0; background: #f3f4f6; }
-.reference-menu-ellipsis { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reference-menu-state { padding: 10px 12px; color: #9ca3af; font-size: 11px; }
-.reference-menu-item.current { background: #f3f4f6; color: #111827; font-weight: 600; }
-.reference-move-confirm { padding-bottom: 8px; }
-.reference-move-confirm__target { padding: 8px 12px 4px; color: #111827; font-size: 12px; font-weight: 700; }
-.reference-move-mode { margin: 4px 8px; padding: 7px 8px; border: 1px solid #e5e7eb; border-radius: 9px; display: flex; align-items: center; gap: 7px; color: #4b5563; font-size: 11px; cursor: pointer; }
-.reference-move-mode.active { border-color: #9ca3af; background: #f9fafb; color: #111827; }
-.reference-move-mode input { margin: 0; accent-color: #111827; }
-.reference-move-confirm__actions { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 8px 0; }
-.reference-move-cancel,
-.reference-move-submit { height: 26px; padding: 0 9px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
-.reference-move-cancel { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; }
-.reference-move-submit { border: 1px solid #111827; background: #111827; color: #fff; }
-.reference-move-submit:disabled { opacity: .55; cursor: default; }
-.reference-folder-card { padding: 0; overflow: hidden; color: #111827; display: flex; flex-direction: column; justify-content: space-between; text-align: left; cursor: pointer; }
-.reference-folder-card:hover { border-color: #9ca3af; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.06); }
-.reference-folder-card__top { padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; color: #2563eb; }
-.reference-folder-card__top span { color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
-.reference-folder-card__footer { padding: 10px 16px; border-top: 1px solid #f3f4f6; color: #9ca3af; font-size: 10px; line-height: 14px; }
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 
-.reference-card-hover-inspector { position: fixed; z-index: 2400; width: 344px; max-height: min(430px, calc(100vh - 20px)); overflow: auto; padding: 14px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 16px; background: rgb(255 255 255 / .98); color: #374151; box-shadow: 0 20px 25px -5px rgb(0 0 0 / .10), 0 8px 10px -6px rgb(0 0 0 / .10); font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
-.reference-card-hover__header { display: flex; align-items: center; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
-.reference-card-hover__header strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
-.reference-card-hover__header > span { flex: 0 0 auto; padding: 2px 6px; border-radius: 5px; background: #f3f4f6; color: #6b7280; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 9px; font-weight: 700; }
-.reference-card-hover__timeline { margin-top: 10px; }
-.reference-card-hover__draft { margin-top: 10px; padding: 9px 10px; border-radius: 10px; background: #fffbeb; color: #b45309; font-size: 11px; line-height: 16px; }
-.reference-card-hover__summary { margin: 10px 0 0; color: #4b5563; font-size: 11px; line-height: 17px; white-space: pre-wrap; }
-.reference-card-hover__source { margin-top: 8px; display: flex; align-items: center; gap: 5px; min-width: 0; color: #6b7280; font-size: 10px; }
-.reference-card-hover__source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reference-card-hover__meta { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px 10px; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 9px; line-height: 14px; }
-.reference-card-hover__channel { color: #6b7280; }
-.reference-card-hover__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-.reference-card-hover__tags span { padding: 2px 6px; border-radius: 5px; background: #f3f4f6; color: #4b5563; font-size: 9px; line-height: 13px; }
-.reference-card-hover__hint { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f3f4f6; color: #9ca3af; font-size: 9px; line-height: 13px; text-align: right; }
+  &:hover {
+    border-color: color-mix(in srgb, var(--td-component-stroke) 55%, var(--td-brand-color));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+  }
 
-@media (max-width: 1279px) { .reference-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 1023px) { .reference-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 639px) { .reference-card-grid { grid-template-columns: 1fr; } .reference-card-hover-inspector { display: none; } }
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--td-brand-color) 30%, transparent);
+  }
+}
+
+.folder-card__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  overflow: hidden;
+}
+
+.folder-card__icon {
+  flex-shrink: 0;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--td-brand-color);
+  opacity: 0.88;
+}
+
+.folder-card__title {
+  flex: 1;
+  min-height: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  max-height: 40px;
+  color: var(--td-text-color-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.folder-card__footer {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-top: 1px solid var(--td-component-stroke);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--td-text-color-placeholder);
+}
+
+.knowledge-card {
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--td-component-border);
+  height: 136px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  background: var(--td-bg-color-container);
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--td-component-stroke) 55%, var(--td-brand-color));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+  }
+
+  .card-nav-check {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 29px;
+    margin-right: 8px;
+    cursor: pointer;
+
+    .card-select-checkbox {
+      margin: 0;
+      line-height: 0;
+
+      :deep(.t-checkbox) { align-items: center; }
+      :deep(.t-checkbox__label) { display: none !important; width: 0 !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
+      :deep(.t-checkbox__input) { margin: 0; }
+      :deep(.t-checkbox__input-wrapper) { margin: 0; }
+    }
+  }
+
+  .card-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 14px 8px;
+  }
+
+  .card-analyze {
+    flex-shrink: 0;
+    height: 52px;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .card-analyze-loading {
+    display: block;
+    color: var(--td-brand-color);
+    font-size: 14px;
+    margin-top: 2px;
+  }
+
+  .card-analyze-txt {
+    color: var(--td-brand-color);
+    font-family: var(--app-font-family);
+    font-size: 11px;
+    margin-left: 8px;
+  }
+
+  .card-analyze-trace {
+    height: auto;
+    min-height: 0;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .card-analyze-trace-link {
+    cursor: pointer;
+    &:hover { text-decoration: underline; }
+  }
+
+  .card-analyze-trace-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 2px;
+    border: none;
+    background: transparent;
+    color: var(--td-brand-color);
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 4px;
+
+    :deep(.t-icon) { font-size: 14px; }
+    &:hover { background: var(--td-bg-color-component-hover); }
+  }
+
+  .card-analyze.failure .card-analyze-trace-btn { color: var(--td-error-color); }
+
+  .failure { color: var(--td-error-color); }
+
+  .card-content-nav {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 6px;
+  }
+
+  .card-content-title {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    line-height: 24px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--td-text-color-primary);
+    font-family: var(--app-font-family);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin-right: 8px;
+  }
+
+  .more-wrap {
+    flex-shrink: 0;
+    display: flex;
+    width: 25px;
+    height: 25px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 5px;
+    cursor: pointer;
+
+    &:hover { background: var(--td-component-stroke); }
+  }
+
+  .more-icon { width: 14px; height: 14px; }
+  .active-more { background: var(--td-component-stroke); }
+
+  .card-content-txt {
+    flex: 1;
+    min-height: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    color: var(--td-text-color-secondary);
+    font-family: var(--app-font-family);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 19px;
+  }
+
+  .card-bottom {
+    flex-shrink: 0;
+    margin-top: auto;
+    padding: 0 14px;
+    box-sizing: border-box;
+    height: 32px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--td-bg-color-container);
+    border-top: 1px solid var(--td-component-stroke);
+  }
+
+  .card-time {
+    flex-shrink: 0;
+    color: var(--td-text-color-secondary);
+    font-family: var(--app-font-family);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .card-folder {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 60%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--td-text-color-secondary);
+    font-family: var(--app-font-family);
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--td-brand-color);
+    }
+
+    span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .t-icon {
+      flex: 0 0 auto;
+      font-size: 13px;
+    }
+  }
+
+  .card-type {
+    flex-shrink: 0;
+    color: var(--td-text-color-placeholder);
+    font-family: var(--app-font-family);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 0;
+    background: transparent;
+    letter-spacing: 0.02em;
+  }
+}
+
+.card-bottom-right {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: hidden;
+}
+
+// --- Card draft ---
+.card-draft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  flex-shrink: 0;
+}
+
+.card-draft-tip {
+  color: var(--td-warning-color);
+  font-size: 11px;
+}
+
+// --- Tag selector ---
+.card-tag-selector {
+  display: flex;
+  align-items: center;
+
+  .card-tag-chips {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    cursor: pointer;
+  }
+
+  .card-tag-overflow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    border: 1px solid var(--td-component-stroke);
+    color: var(--td-text-color-placeholder);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: var(--td-brand-color);
+      color: var(--td-brand-color);
+      background: var(--td-bg-color-secondarycontainer);
+    }
+  }
+
+  :deep(.t-tag) {
+    cursor: pointer;
+    max-width: 120px;
+    height: 18px;
+    line-height: 18px;
+    border-radius: 999px;
+    border-color: var(--td-component-stroke);
+    color: var(--td-text-color-secondary);
+    padding: 0 6px;
+    background: transparent;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: var(--td-brand-color);
+      color: var(--td-brand-color-active);
+      background: var(--td-bg-color-secondarycontainer);
+    }
+  }
+
+  .tag-text {
+    display: inline-block;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+    font-size: 11px;
+  }
+
+  .card-tag-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    border: 1px dashed var(--td-component-stroke);
+    color: var(--td-text-color-placeholder);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    .t-icon { font-size: 12px; }
+
+    &:hover {
+      border-color: var(--td-brand-color);
+      color: var(--td-brand-color-active);
+      background: var(--td-bg-color-secondarycontainer);
+      border-style: solid;
+    }
+  }
+}
+
+// --- Hover popover ---
+.knowledge-card-hover-popover {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  min-width: 220px;
+  max-width: 360px;
+  padding: 12px 14px;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-family: var(--app-font-family);
+  transition: opacity 0.15s ease;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+
+  .card-popover-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    margin-bottom: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-popover-status {
+    font-size: 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &.parsing { color: var(--td-brand-color); }
+    &.failure { color: var(--td-error-color); }
+    &.draft { color: var(--td-warning-color); }
+  }
+
+  .card-popover-desc {
+    font-size: 12px;
+    color: var(--td-text-color-secondary);
+    line-height: 1.5;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+  }
+
+  .card-popover-source {
+    font-size: 11px;
+    color: var(--td-brand-color);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .card-popover-extra {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--td-text-color-secondary);
+    margin-bottom: 6px;
+  }
+
+  .card-popover-created,
+  .card-popover-size { flex-shrink: 0; }
+
+  .card-popover-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--td-text-color-secondary);
+  }
+
+  .card-popover-channel {
+    padding: 1px 6px;
+    background: var(--td-warning-color-light);
+    color: var(--td-warning-color);
+    border-radius: 4px;
+  }
+
+  .card-popover-tags {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 100%;
+  }
+
+  .card-popover-tag-chip {
+    max-width: 120px;
+    height: 18px;
+    line-height: 18px;
+    border-radius: 999px;
+    border-color: var(--td-component-stroke);
+    color: var(--td-text-color-secondary);
+    padding: 0 6px;
+    background: transparent;
+
+    .tag-text {
+      display: inline-block;
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+      font-size: 11px;
+    }
+  }
+
+  .card-popover-type {
+    padding: 1px 6px;
+    background: var(--td-bg-color-secondarycontainer);
+    color: var(--td-text-color-secondary);
+    border-radius: 4px;
+  }
+
+  .card-popover-hint {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--td-component-stroke);
+    font-size: 11px;
+    color: var(--td-text-color-secondary);
+  }
+}
 </style>
