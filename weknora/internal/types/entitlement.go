@@ -5,11 +5,17 @@ import "time"
 // ConsumerPlan is the single persisted identifier for a tenant's current plan.
 type ConsumerPlan string
 
+type OpenRouterCreditsStatus string
+
 const (
 	ConsumerPlanFree ConsumerPlan = "free"
 	ConsumerPlanPlus ConsumerPlan = "plus"
 	ConsumerPlanPro  ConsumerPlan = "pro"
 	ConsumerPlanMax  ConsumerPlan = "max"
+
+	OpenRouterCreditsAvailable     OpenRouterCreditsStatus = "available"
+	OpenRouterCreditsUnavailable   OpenRouterCreditsStatus = "unavailable"
+	OpenRouterCreditsUnprovisioned OpenRouterCreditsStatus = "unprovisioned"
 
 	CheapestChatModelID            = "builtin-openrouter-qwen-flash"
 	CheapestEmbeddingModelID       = PlatformKnowledgeBaseEmbeddingModelID
@@ -33,11 +39,12 @@ type ConsumerPlanLimits struct {
 
 type ConsumerEntitlement struct {
 	ConsumerPlanLimits
-	PlanStatus                  string `json:"plan_status"`
-	StorageUsed                 int64  `json:"storage_used"`
-	OpenRouterUsedMicrousd      int64  `json:"openrouter_used_microusd"`
-	OpenRouterRemainingMicrousd int64  `json:"openrouter_remaining_microusd"`
-	OpenRouterUsageMonth        string `json:"openrouter_usage_month"`
+	PlanStatus                  string                  `json:"plan_status"`
+	StorageUsed                 int64                   `json:"storage_used"`
+	OpenRouterUsedMicrousd      int64                   `json:"openrouter_used_microusd"`
+	OpenRouterRemainingMicrousd int64                   `json:"openrouter_remaining_microusd"`
+	OpenRouterUsageMonth        string                  `json:"openrouter_usage_month"`
+	OpenRouterCreditsStatus     OpenRouterCreditsStatus `json:"openrouter_credits_status"`
 }
 
 func NormalizeConsumerPlan(plan ConsumerPlan) ConsumerPlan {
@@ -84,6 +91,9 @@ func EffectiveOpenRouterUsage(tenant *Tenant, at time.Time) int64 {
 	return tenant.OpenRouterUsedMicrousd
 }
 
+// EstimateParseMicrousd is retained only for compatibility with older tests and
+// rollback code. Active ingestion no longer uses request/file price estimates as
+// an admission or billing authority.
 func EstimateParseMicrousd(fileBytes int64) int64 {
 	if fileBytes <= 0 {
 		return 10_000
