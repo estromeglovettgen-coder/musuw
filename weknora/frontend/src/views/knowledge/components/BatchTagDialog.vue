@@ -1,89 +1,169 @@
 <template>
-  <t-dialog :visible="visible" :footer="false" width="420px" dialog-class-name="batch-tag-dialog"
-    :close-on-overlay-click="false" destroy-on-close @close="handleClose">
-    <template #header>
-      <div class="batch-tag-heading">
-        <div class="batch-tag-heading-row">
-          <t-icon name="discount" size="16px" class="batch-tag-heading-icon" aria-hidden="true" />
-          <span class="batch-tag-title">{{ $t('knowledgeBase.batchTagDialogHeading') }}</span>
-        </div>
-        <p class="batch-tag-subtitle">{{ $t('knowledgeBase.batchTagSubtitle', { count }) }}</p>
+  <Teleport to="body">
+    <Transition name="visual-batch-tag">
+      <div v-if="visible" class="visual-batch-tag__overlay" role="presentation">
+        <section
+          class="visual-batch-tag"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="$t('knowledgeBase.batchTagDialogHeading')"
+        >
+          <header class="visual-batch-tag__header">
+            <div class="visual-batch-tag__heading">
+              <span class="visual-batch-tag__heading-icon" aria-hidden="true">
+                <t-icon name="discount" />
+              </span>
+              <div class="visual-batch-tag__heading-copy">
+                <h3>{{ $t('knowledgeBase.batchTagDialogHeading') }}</h3>
+                <p>{{ $t('knowledgeBase.batchTagSubtitle', { count }) }}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="visual-batch-tag__close"
+              :disabled="confirmLoading"
+              :aria-label="$t('common.cancel')"
+              @click="handleClose"
+            >
+              <t-icon name="close" />
+            </button>
+          </header>
+
+          <div class="visual-batch-tag__body">
+            <section class="visual-batch-tag__section">
+              <div class="visual-batch-tag__section-head">
+                <h4>{{ $t('knowledgeBase.batchTagSelectedSection') }}</h4>
+                <button
+                  v-if="selectedSet.size > 0"
+                  type="button"
+                  class="visual-batch-tag__text-action"
+                  :disabled="confirmLoading"
+                  @click="clearAll"
+                >
+                  {{ $t('knowledgeBase.tagClearAction') }}
+                </button>
+              </div>
+
+              <div v-if="selectedTagsList.length > 0" class="visual-batch-tag__chips">
+                <button
+                  v-for="tag in selectedTagsList"
+                  :key="tag.id"
+                  type="button"
+                  class="visual-batch-tag__chip is-selected"
+                  :title="tag.name"
+                  :disabled="confirmLoading"
+                  @click="toggleTag(tag.id)"
+                >
+                  <span>{{ tag.name }}</span>
+                  <t-icon name="close" />
+                </button>
+              </div>
+              <p v-else class="visual-batch-tag__empty">{{ $t('knowledgeBase.batchTagNoSelected') }}</p>
+            </section>
+
+            <section class="visual-batch-tag__section">
+              <div class="visual-batch-tag__section-head">
+                <h4>{{ $t('knowledgeBase.batchTagAvailableSection') }}</h4>
+                <button
+                  v-if="canManage"
+                  type="button"
+                  class="visual-batch-tag__text-action"
+                  :disabled="confirmLoading"
+                  @click="handleOpenManage"
+                >
+                  {{ $t('knowledgeBase.tagManageLink') }}
+                </button>
+              </div>
+
+              <div class="visual-batch-tag__search">
+                <t-input
+                  v-model="searchQuery"
+                  :placeholder="$t('knowledgeBase.tagEditSearch')"
+                  clearable
+                  size="small"
+                  :disabled="confirmLoading"
+                >
+                  <template #prefix-icon><t-icon name="search" size="14px" /></template>
+                </t-input>
+              </div>
+
+              <div v-if="availableTagsList.length > 0" class="visual-batch-tag__chips is-scrollable">
+                <button
+                  v-for="tag in availableTagsList"
+                  :key="tag.id"
+                  type="button"
+                  class="visual-batch-tag__chip"
+                  :title="tag.knowledge_count !== undefined ? `${tag.name} (${tag.knowledge_count})` : tag.name"
+                  :disabled="confirmLoading"
+                  @click="toggleTag(tag.id)"
+                >
+                  {{ tag.name }}
+                </button>
+              </div>
+
+              <div v-else class="visual-batch-tag__empty-row">
+                <span>{{ searchQuery.trim() ? $t('knowledgeBase.tagEmptyResult') : $t('knowledgeBase.noTags') }}</span>
+                <button
+                  v-if="searchQuery.trim()"
+                  type="button"
+                  class="visual-batch-tag__text-action"
+                  :disabled="creatingTag || confirmLoading"
+                  @click="handleCreateTag"
+                >
+                  <t-loading v-if="creatingTag" size="small" />
+                  <span>{{ $t('knowledgeBase.tagCreateAction') }} “{{ searchQuery.trim() }}”</span>
+                </button>
+              </div>
+
+              <div class="visual-batch-tag__create-row">
+                <t-input
+                  v-model="newTagName"
+                  :placeholder="$t('knowledgeBase.tagNewPlaceholder')"
+                  size="small"
+                  :maxlength="40"
+                  :disabled="creatingTag || confirmLoading"
+                  @enter="handleAddNewTag"
+                />
+                <button
+                  type="button"
+                  class="visual-batch-tag__create-button"
+                  :disabled="creatingTag || confirmLoading || !newTagName.trim()"
+                  @click="handleAddNewTag"
+                >
+                  <t-loading v-if="creatingTag" size="small" />
+                  <t-icon v-else name="add" />
+                  <span>{{ $t('knowledgeBase.tagCreateAction') }}</span>
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <footer class="visual-batch-tag__footer">
+            <span>{{ $t('knowledgeBase.tagSelectedCount', { count: selectedSet.size }) }}</span>
+            <div class="visual-batch-tag__footer-actions">
+              <button
+                type="button"
+                class="visual-batch-tag__button"
+                :disabled="confirmLoading"
+                @click="handleClose"
+              >
+                {{ $t('common.cancel') }}
+              </button>
+              <button
+                type="button"
+                class="visual-batch-tag__button is-primary"
+                :disabled="confirmLoading"
+                @click="handleConfirm"
+              >
+                <t-loading v-if="confirmLoading" size="small" />
+                <span>{{ $t('common.confirm') }}</span>
+              </button>
+            </div>
+          </footer>
+        </section>
       </div>
-    </template>
-
-    <div class="batch-tag-body">
-      <section class="setting-drawer__section">
-        <div class="batch-tag-section-head">
-          <h4 class="setting-drawer__section-title">{{ $t('knowledgeBase.batchTagSelectedSection') }}</h4>
-          <t-button v-if="selectedSet.size > 0" variant="text" size="small" theme="default" @click="clearAll">
-            {{ $t('knowledgeBase.tagClearAction') }}
-          </t-button>
-        </div>
-        <div v-if="selectedTagsList.length > 0" class="batch-tag-chips">
-          <button v-for="tag in selectedTagsList" :key="tag.id" type="button" class="batch-tag-chip is-selected"
-            :title="tag.name" @click="toggleTag(tag.id)">
-            {{ tag.name }}
-          </button>
-        </div>
-        <p v-else class="batch-tag-section-empty">{{ $t('knowledgeBase.batchTagNoSelected') }}</p>
-      </section>
-
-      <section class="setting-drawer__section">
-        <div class="batch-tag-section-head">
-          <h4 class="setting-drawer__section-title">{{ $t('knowledgeBase.batchTagAvailableSection') }}</h4>
-          <t-button
-            v-if="canManage"
-            variant="text"
-            size="small"
-            theme="default"
-            class="batch-tag-manage-link"
-            @click="handleOpenManage"
-          >
-            {{ $t('knowledgeBase.tagManageLink') }}
-          </t-button>
-        </div>
-        <div class="batch-tag-search-bar">
-          <t-input v-model="searchQuery" :placeholder="$t('knowledgeBase.tagEditSearch')" clearable size="small">
-            <template #prefix-icon>
-              <t-icon name="search" size="14px" />
-            </template>
-          </t-input>
-        </div>
-        <div v-if="availableTagsList.length > 0" class="batch-tag-chips">
-          <button v-for="tag in availableTagsList" :key="tag.id" type="button" class="batch-tag-chip"
-            :title="tag.knowledge_count !== undefined ? `${tag.name} (${tag.knowledge_count})` : tag.name"
-            @click="toggleTag(tag.id)">
-            {{ tag.name }}
-          </button>
-        </div>
-        <div v-else class="batch-tag-section-empty batch-tag-section-empty--row">
-          <span>{{ searchQuery.trim() ? $t('knowledgeBase.tagEmptyResult') : $t('knowledgeBase.noTags') }}</span>
-          <t-button v-if="searchQuery.trim()" variant="text" theme="default" size="small" :loading="creatingTag"
-            @click="handleCreateTag">
-            {{ $t('knowledgeBase.tagCreateAction') }} "{{ searchQuery.trim() }}"
-          </t-button>
-        </div>
-        <div class="batch-tag-create-row">
-          <t-input v-model="newTagName" :placeholder="$t('knowledgeBase.tagNewPlaceholder')" size="small"
-            :maxlength="40" :disabled="creatingTag" @enter="handleAddNewTag" />
-        </div>
-      </section>
-    </div>
-
-    <div class="batch-tag-footer">
-      <span class="batch-tag-selected-count">
-        {{ $t('knowledgeBase.tagSelectedCount', { count: selectedSet.size }) }}
-      </span>
-      <div class="batch-tag-footer-right">
-        <t-button variant="outline" size="small" :disabled="confirmLoading" @click="handleClose">
-          {{ $t('common.cancel') }}
-        </t-button>
-        <t-button theme="primary" size="small" :loading="confirmLoading" @click="handleConfirm">
-          {{ $t('common.confirm') }}
-        </t-button>
-      </div>
-    </div>
-  </t-dialog>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -219,308 +299,359 @@ function handleConfirm() {
 }
 
 function handleClose() {
+  if (props.confirmLoading) return;
   emit('update:visible', false);
 }
 
 function handleOpenManage() {
+  if (props.confirmLoading) return;
   emit('update:visible', false);
   emit('open-manage');
 }
 </script>
 
-<style>
-.batch-tag-dialog {
-  overflow: hidden;
-  padding: 0;
-  border-radius: 4px;
-}
-
-.batch-tag-dialog .t-dialog__header {
-  min-height: auto;
-  padding: 20px 20px 0;
-}
-
-.batch-tag-dialog .t-dialog__body {
-  padding: 0 20px 20px;
-}
-
-.batch-tag-dialog .t-dialog__close {
-  top: 16px;
-  right: 16px;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  color: var(--td-text-color-secondary);
-  transition: background 0.18s ease;
-}
-
-.batch-tag-dialog .t-dialog__close:hover {
-  color: var(--td-text-color-primary);
-  background: var(--td-bg-color-container-hover);
-}
-
-@media (max-width: 480px) {
-  .batch-tag-dialog {
-    width: calc(100vw - 24px) !important;
-  }
-}
-</style>
-
 <style scoped>
-.batch-tag-heading {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding-right: 28px;
-}
-
-.batch-tag-heading-row {
+.visual-batch-tag__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3100;
+  padding: 20px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  background: rgb(0 0 0 / 34%);
+  backdrop-filter: blur(3px);
+}
+
+.visual-batch-tag {
+  width: min(460px, 100%);
+  max-height: min(720px, calc(100dvh - 40px));
   min-width: 0;
-}
-
-.batch-tag-heading-icon {
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-}
-
-.batch-tag-title {
-  color: var(--td-text-color-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 22px;
-  letter-spacing: 0.2px;
-}
-
-.batch-tag-subtitle {
-  margin: 0;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fff;
+  color: #1f2937;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 18%);
 }
 
-.batch-tag-body {
+.visual-batch-tag__header {
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid #f3f4f6;
   display: flex;
-  flex-direction: column;
-  margin-top: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.batch-tag-body .setting-drawer__section {
-  padding: 12px 0 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
+.visual-batch-tag__heading {
+  min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
 }
 
-.batch-tag-body .setting-drawer__section:first-child {
-  padding-top: 0;
-}
-
-.batch-tag-body .setting-drawer__section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.batch-tag-body .setting-drawer__section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  margin: 0 0 4px;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.batch-tag-body .setting-drawer__section-title::before {
-  content: '';
-  width: 3px;
-  height: 14px;
-  background: var(--td-brand-color);
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.batch-tag-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.batch-tag-section-head .setting-drawer__section-title {
-  margin-bottom: 0;
-  flex: 1;
-  min-width: 0;
-}
-
-.batch-tag-section-head :deep(.t-button) {
-  height: auto;
-  padding: 0;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  flex-shrink: 0;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  transition: color 0.15s ease;
-}
-
-.batch-tag-section-head :deep(.batch-tag-manage-link.t-button:hover),
-.batch-tag-section-head :deep(.batch-tag-manage-link.t-button:focus-visible) {
-  color: var(--td-brand-color) !important;
-  background: transparent !important;
-  border-color: transparent !important;
-  text-decoration: none;
-}
-
-.batch-tag-search-bar {
-  margin: 0;
-}
-
-.batch-tag-search-bar :deep(.t-input) {
-  font-size: 12px;
-  background-color: var(--td-bg-color-secondarycontainer);
-  border-color: transparent;
-  border-radius: 4px;
-  box-shadow: none !important;
-}
-
-.batch-tag-search-bar :deep(.t-input:hover),
-.batch-tag-search-bar :deep(.t-input.t-is-focused) {
-  border-color: var(--td-component-border);
-  background-color: var(--td-bg-color-container);
-  box-shadow: none !important;
-}
-
-.batch-tag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: min(120px, 24vh);
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.batch-tag-chips::-webkit-scrollbar {
-  width: 4px;
-}
-
-.batch-tag-chips::-webkit-scrollbar-thumb {
-  border-radius: 2px;
-  background: var(--td-scrollbar-color);
-}
-
-.batch-tag-chip {
+.visual-batch-tag__heading-icon {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: 100%;
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--td-text-color-secondary);
-  font-family: var(--app-font-family);
-  font-size: 11px;
-  line-height: 22px;
-  text-align: center;
-  cursor: pointer;
-  outline: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-  -webkit-font-smoothing: antialiased;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
-.batch-tag-chip:hover {
-  border-color: var(--td-component-stroke);
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-primary);
-}
-
-.batch-tag-chip:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--td-component-stroke) 60%, transparent);
-}
-
-.batch-tag-chip.is-selected {
-  border-color: transparent;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-primary);
-  font-weight: 500;
-}
-
-.batch-tag-chip.is-selected:hover {
-  background: color-mix(in srgb, var(--td-bg-color-secondarycontainer) 70%, var(--td-bg-color-container));
-}
-
-.batch-tag-section-empty {
+.visual-batch-tag__heading-copy h3 {
   margin: 0;
-  min-height: 22px;
-  font-size: 12px;
-  line-height: 22px;
-  color: var(--td-text-color-placeholder);
+  color: #111827;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
 }
 
-.batch-tag-section-empty--row {
+.visual-batch-tag__heading-copy p {
+  margin: 2px 0 0;
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.visual-batch-tag__close {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.visual-batch-tag__close:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-batch-tag__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 18px;
+}
+
+.visual-batch-tag__section {
+  padding: 16px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.visual-batch-tag__section:last-child {
+  border-bottom: 0;
+}
+
+.visual-batch-tag__section-head {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.visual-batch-tag__section-head h4 {
+  margin: 0;
+  color: #374151;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.visual-batch-tag__text-action {
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.visual-batch-tag__text-action:hover:not(:disabled) {
+  background: #f9fafb;
+  color: #4b5563;
+}
+
+.visual-batch-tag__text-action:disabled,
+.visual-batch-tag__close:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.visual-batch-tag__search {
+  margin-bottom: 10px;
+}
+
+.visual-batch-tag__search :deep(.t-input),
+.visual-batch-tag__create-row :deep(.t-input) {
+  min-height: 34px;
+  border-color: #e5e7eb;
+  border-radius: 9px;
+  background: #f9fafb;
+  box-shadow: none !important;
+  font-size: 12px;
+}
+
+.visual-batch-tag__search :deep(.t-input.t-is-focused),
+.visual-batch-tag__create-row :deep(.t-input.t-is-focused) {
+  border-color: #d1d5db;
+  background: #fff;
+}
+
+.visual-batch-tag__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.visual-batch-tag__chips.is-scrollable {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.visual-batch-tag__chip {
+  max-width: 100%;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  color: #6b7280;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.visual-batch-tag__chip:hover:not(:disabled) {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+}
+
+.visual-batch-tag__chip.is-selected {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
+  font-weight: 600;
+}
+
+.visual-batch-tag__chip:disabled {
+  cursor: default;
+  opacity: .58;
+}
+
+.visual-batch-tag__chip :deep(.t-icon) {
+  width: 11px;
+  height: 11px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.visual-batch-tag__empty,
+.visual-batch-tag__empty-row {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.visual-batch-tag__empty-row {
+  min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.batch-tag-create-row {
-  margin-top: 0;
+.visual-batch-tag__create-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.batch-tag-create-row :deep(.t-input) {
-  font-size: 12px;
-  background-color: transparent;
-  border-style: dashed;
-  border-color: var(--td-component-stroke);
-  border-radius: 4px;
-  box-shadow: none !important;
+.visual-batch-tag__create-row :deep(.t-input__wrap) {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.batch-tag-create-row :deep(.t-input:hover),
-.batch-tag-create-row :deep(.t-input.t-is-focused) {
-  border-color: var(--td-component-border);
-  border-style: dashed;
-  background-color: var(--td-bg-color-secondarycontainer);
-  box-shadow: none !important;
+.visual-batch-tag__create-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.batch-tag-footer {
+.visual-batch-tag__create-button:hover:not(:disabled) {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.visual-batch-tag__create-button:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.visual-batch-tag__footer {
+  padding: 13px 18px;
+  border-top: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--td-component-stroke);
+  background: #f9fafb;
+  color: #9ca3af;
+  font-size: 11px;
 }
 
-.batch-tag-selected-count {
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  white-space: nowrap;
-}
-
-.batch-tag-footer-right {
+.visual-batch-tag__footer-actions {
   display: flex;
+  gap: 7px;
+}
+
+.visual-batch-tag__button {
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 6px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.visual-batch-tag__button.is-primary {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.visual-batch-tag__button:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.visual-batch-tag-enter-active,
+.visual-batch-tag-leave-active {
+  transition: opacity 150ms ease;
+}
+
+.visual-batch-tag-enter-from,
+.visual-batch-tag-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 480px) {
+  .visual-batch-tag__overlay { padding: 12px; }
+  .visual-batch-tag { max-height: calc(100dvh - 24px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-batch-tag-enter-active,
+  .visual-batch-tag-leave-active {
+    transition: none !important;
+  }
 }
 </style>
