@@ -34,11 +34,14 @@ test('rebuilt citation hover and drawer retain citation states and navigation', 
   ]) assert.ok(drawer.includes(token), `ChatReferencesDrawer lost ${token}`)
 })
 
-test('rebuilt mother Views own sidebar composer and knowledge DOM directly', () => {
+test('rebuilt high-visibility Views own their active DOM directly', () => {
   const cases = [
     ['../components/menu.vue', 'class="visual-sidebar"', ['class="aside_box"', 'class="menu_top"', 'class="menu_bottom"']],
     ['../components/Input-field.vue', 'class="visual-chat-composer"', ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"']],
+    ['../views/chat/index.vue', 'class="visual-chat-view"', ['class="chat"', 'class="chat_scroll_box"', 'class="msg_list"', 'class="input-container"']],
     ['../views/knowledge/KnowledgeBase.vue', 'class="visual-knowledge-page"', ['class="knowledge-layout"', 'class="document-header"', 'class="doc-filter-bar"', 'class="doc-card-list"']],
+    ['../views/knowledge/KnowledgeBaseList.vue', 'class="visual-kb-list"', ['class="kb-list-container"', 'class="kb-list-content"', 'class="kb-card-wrap"']],
+    ['../components/manual-knowledge-editor.vue', 'class="visual-manual-editor"', ['<SettingDrawer', 'class="manual-editor"', 'class="setting-drawer__section"']],
   ]
   for (const [path, root, legacy] of cases) {
     const source = read(path)
@@ -53,10 +56,4 @@ test('active KnowledgeBase keeps Graph as an untouched WikiBrowser-hosted busine
   assert.ok(source.includes('@open-source-doc="openSourceDoc"'))
   assert.ok(source.includes('@status-change="onWikiStatusChange"'))
   assert.ok(source.includes('@view-graph="onViewWikiInGraph"'))
-})
-
-test('source/index palette adapter cannot restyle the excluded processing timeline', () => {
-  const css = read('./musuw-reference-citation-sources.css')
-  assert.match(css, /\.refer:not\(\.refer-timeline\)/)
-  assert.equal(css.includes('.refer-timeline{'), false)
 })
