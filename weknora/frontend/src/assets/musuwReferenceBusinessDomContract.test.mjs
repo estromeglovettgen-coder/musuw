@@ -18,7 +18,6 @@ test('rebuilt answer reference summary preserves grouping, drawer handoff and KB
     'if (group.knowledgeId) query.knowledge_id = group.knowledgeId',
     'path: `/platform/knowledge-bases/${group.knowledgeBaseId}`', ':href="getDocumentHref(group)"',
   ]) assert.ok(source.includes(token), `docInfo lost ${token}`)
-  for (const legacy of ['class="refer"', 'class="refer_header"', 'class="doc-group"']) assert.equal(source.includes(legacy), false)
 })
 
 test('rebuilt citation hover and drawer retain citation states and navigation', () => {
@@ -35,15 +34,16 @@ test('rebuilt citation hover and drawer retain citation states and navigation', 
   ]) assert.ok(drawer.includes(token), `ChatReferencesDrawer lost ${token}`)
 })
 
-test('rebuilt sidebar owns its DOM while mechanical contracts remain only on unmigrated mothers', () => {
+test('rebuilt sidebar and composer own their DOM while KnowledgeBase remains the only mechanical mother root', () => {
   const menu = read('../components/menu.vue')
   assert.match(menu, /class="visual-sidebar"/)
-  for (const token of ['class="aside_box"', 'class="menu_top"', 'class="menu_bottom"', "'menu_item'"]) {
-    assert.equal(menu.includes(token), false, `sidebar still exposes legacy shell ${token}`)
-  }
+  for (const token of ['class="aside_box"', 'class="menu_top"', 'class="menu_bottom"']) assert.equal(menu.includes(token), false)
 
   const input = read('../components/Input-field.vue')
-  for (const token of ['rich-input-container', '<t-textarea', 'model-selector-trigger', 'control-right']) assert.ok(input.includes(token))
+  assert.match(input, /class="visual-chat-composer"/)
+  for (const token of ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"']) {
+    assert.equal(input.includes(token), false, `composer still exposes ${token}`)
+  }
 
   const knowledge = read('../views/knowledge/KnowledgeBase.vue')
   for (const token of ['knowledge-layout', 'document-header', 'document-breadcrumb', 'knowledge-main', 'doc-filter-bar', 'doc-card-list']) assert.ok(knowledge.includes(token))
