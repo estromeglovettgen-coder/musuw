@@ -10,7 +10,6 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 // Files that have not entered the view-rebuild track remain byte-for-byte frozen.
 const baseline = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
-  ['../components/SessionSourceFilter.vue', '4f307ffe65e4fc433dace9b69d32cda1cf94d2eb'],
   ['../components/ChatHeader.vue', '79aec898f1e90c21a9f63fa77bce0dca509750c4'],
   ['../components/ChatCitationFloat.vue', 'b2a42b84fc7a76ecbe8fb5f1c8079dddf6ef555b'],
   ['../components/ChatReferencesDrawer.vue', '9001acea76aae131cc7420f3e1ffd275b58fce52'],
@@ -85,6 +84,18 @@ test('user menu may replace markup and CSS but must preserve settings/logout beh
     'authStore.logout()',
     'handoffToExternalAuth("logout")',
     'document.addEventListener("click", handleClickOutside)',
+  ])
+})
+
+test('session source filter may replace markup and CSS but must preserve bucket selection and popup behavior', () => {
+  assertContracts('../components/SessionSourceFilter.vue', 'session source filter', [
+    'props.sources.find((item) => item.value === props.current) ?? props.sources[0]',
+    "if (item.value === DEFAULT_SESSION_BUCKET_KEY) return 'chat'",
+    'updatePanelPosition()',
+    'document.addEventListener(\'click\', close)',
+    'window.addEventListener(\'scroll\', close, true)',
+    'if (value === props.current) return',
+    "emit('select', value)",
   ])
 })
 
