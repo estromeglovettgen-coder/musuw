@@ -15,6 +15,9 @@ import "@/assets/musuw-ui-primitives.css";
 // Final presentation-only convergence for native business surfaces that have no
 // direct reference component, plus exact reference Lucide glyph masks.
 import "@/assets/musuw-visual-contract-final.css";
+// Reference-source precision fixes load last so explicit TSX geometry wins over
+// vendor defaults without taking ownership of any business behavior.
+import "@/assets/musuw-reference-precision-fixes.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
