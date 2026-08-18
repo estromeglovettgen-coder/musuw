@@ -35,6 +35,9 @@ import "@/assets/musuw-document-preview-final.css";
 // KB editor sub-surfaces are native Musuw business forms. Keep their data/events
 // and normalize only card/table/slider/form paint inside the rebuilt modal shell.
 import "@/assets/musuw-kb-editor-inner-final.css";
+// ModelEditorDialog keeps its native SettingDrawer/API/validation behavior; this
+// last inner bridge removes the remaining non-semantic brand-blue controls.
+import "@/assets/musuw-model-editor-inner-final.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
