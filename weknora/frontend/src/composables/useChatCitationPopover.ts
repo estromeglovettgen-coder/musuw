@@ -140,7 +140,7 @@ export function useChatCitationPopover(
     if (closeTimer) window.clearTimeout(closeTimer)
     closeTimer = window.setTimeout(() => {
       const hoveredCitation = document.querySelector('.citation-kb:hover, .citation-web:hover')
-      const hoveredPopup = document.querySelector('.chat-citation-float:hover')
+      const hoveredPopup = document.querySelector('.visual-citation-float:hover')
       if (!hoveredCitation && !hoveredPopup) {
         float.value.visible = false
       }
@@ -169,7 +169,7 @@ export function useChatCitationPopover(
 
   const onMouseOut = (e: Event) => {
     const rt = (e as MouseEvent).relatedTarget as HTMLElement | null
-    if (rt?.closest?.('.citation-kb, .citation-web, .chat-citation-float')) return
+    if (rt?.closest?.('.citation-kb, .citation-web, .visual-citation-float')) return
     if (hoverTimer) {
       window.clearTimeout(hoverTimer)
       hoverTimer = null
