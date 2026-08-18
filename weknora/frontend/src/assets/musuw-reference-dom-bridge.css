@@ -1,6 +1,0 @@
-/* Remaining bridge rules apply only to surfaces not yet source-replaced. */
-html #app .kb-list-content { position: relative !important; }
-html #app .kb-card.kb-create-card { position: absolute !important; top: 32px !important; right: 32px !important; z-index: 6 !important; width: auto !important; min-width: 0 !important; height: 34px !important; min-height: 34px !important; }
-/* QAPanel uses a parent `.group` class; the Vue answer component keeps the same native handlers but not that structural utility class. */
-html #app .chat .bot_msg:hover > div > .answer-toolbar { opacity: 1 !important; }
-html #app .chat .bot_msg > div > .answer-toolbar .t-button { min-width: 0 !important; width: auto !important; height: auto !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
