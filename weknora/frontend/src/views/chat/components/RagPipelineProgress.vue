@@ -12,7 +12,7 @@
     >
       <span>{{ collapsedStatusText }}</span>
       <span v-if="referenceSummaryText" class="visual-rag-pipeline__reference-summary">{{ referenceSummaryText }}</span>
-      <t-icon :name="showExpandedTimeline ? 'chevron-down' : 'chevron-right'" />
+      <t-icon name="chevron-down" :class="{ 'is-folded': !showExpandedTimeline }" />
     </button>
 
     <div v-if="showExpandedTimeline" class="visual-rag-timeline">
@@ -62,7 +62,7 @@
             @click="toggleThinking"
           >
             <strong>{{ t('agent.think') }}</strong>
-            <t-icon v-if="thinkingContent" :name="thinkingExpanded ? 'chevron-down' : 'chevron-right'" />
+            <t-icon v-if="thinkingContent" name="chevron-down" :class="{ 'is-folded': !thinkingExpanded }" />
           </button>
           <div v-if="thinkingContent && thinkingExpanded" class="visual-rag-thinking__content">{{ thinkingContent }}</div>
         </div>
@@ -244,34 +244,38 @@ onBeforeUnmount(() => { waitController.dispose() })
 </script>
 
 <style scoped lang="less">
-.visual-rag-pipeline { width: 100%; margin: 0 0 8px; color: #6b7280; }
+.visual-rag-pipeline { width: 100%; margin: 0 0 12px; color: #6b7280; }
 .visual-rag-pipeline__sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.visual-rag-pipeline__summary { min-height: 30px; padding: 4px 7px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #6b7280; font: inherit; font-size: 10px; line-height: 16px; cursor: pointer; }
-.visual-rag-pipeline__summary:hover { background: #f9fafb; color: #374151; }
-.visual-rag-pipeline__reference-summary { display: inline-flex; align-items: center; gap: 5px; color: #9ca3af; }
+.visual-rag-pipeline__summary { margin-left: -6px; padding: 4px 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; background: transparent; color: #6b7280; font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; transition: color 150ms ease, background-color 150ms ease; }
+.visual-rag-pipeline__summary:hover { background: rgb(243 244 246 / 60%); color: #111827; }
+.visual-rag-pipeline__reference-summary { display: inline-flex; align-items: center; gap: 5px; color: #9ca3af; font-size: 11px; }
 .visual-rag-pipeline__reference-summary::before { content: ''; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
-.visual-rag-pipeline__summary :deep(.t-icon) { font-size: 11px; color: #9ca3af; }
-.visual-rag-timeline { position: relative; margin-top: 3px; padding: 2px 0 2px 5px; }
-.visual-rag-timeline::before { content: ''; position: absolute; top: 17px; bottom: 17px; left: 13px; width: 1px; background: #e5e7eb; }
-.visual-rag-step { position: relative; width: 100%; min-height: 34px; padding: 5px 6px; border: 0; border-radius: 9px; display: flex; align-items: flex-start; gap: 8px; background: transparent; color: #6b7280; font: inherit; text-align: left; }
+.visual-rag-pipeline__summary :deep(.t-icon) { flex: 0 0 14px; width: 14px; height: 14px; font-size: 14px; color: #9ca3af; transition: transform 200ms ease; }
+.visual-rag-pipeline__summary :deep(.t-icon).is-folded { transform: rotate(-90deg); }
+.visual-rag-timeline { position: relative; margin: 10px 0 8px; padding: 4px 0 0 4px; }
+.visual-rag-step { position: relative; width: 100%; min-height: 16px; padding: 0 0 14px; border: 0; display: flex; align-items: flex-start; gap: 14px; background: transparent; color: #6b7280; font: inherit; text-align: left; }
+.visual-rag-step:last-child { padding-bottom: 4px; }
 button.visual-rag-step { cursor: default; }
 button.visual-rag-step.is-clickable { cursor: pointer; }
-button.visual-rag-step.is-clickable:hover { background: #f9fafb; color: #374151; }
-.visual-rag-step__rail { position: relative; z-index: 1; flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #9ca3af; }
-.visual-rag-step__rail :deep(.t-icon) { font-size: 12px; }
-.visual-rag-step__spinner { width: 9px; height: 9px; border: 1px solid #9ca3af; border-right-color: transparent; border-radius: 50%; animation: visual-rag-spin .8s linear infinite; }
-.visual-rag-step__body { min-width: 0; flex: 1; padding-top: 1px; display: flex; flex-direction: column; gap: 2px; }
-.visual-rag-step__body strong { color: #6b7280; font-size: 10px; line-height: 16px; font-weight: 500; }
-.visual-rag-step.is-running .visual-rag-step__body strong { color: #4b5563; }
+button.visual-rag-step.is-clickable:hover .visual-rag-step__body strong { color: #111827; }
+.visual-rag-step__rail { position: relative; z-index: 1; flex: 0 0 16px; width: 16px; height: 16px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #9ca3af; transition: color 150ms ease; }
+.visual-rag-step:not(:last-child) .visual-rag-step__rail::after { content: ''; position: absolute; top: 18px; bottom: -14px; left: 50%; width: 1px; background: #e5e7eb; transform: translateX(-50%); }
+.visual-rag-step:hover .visual-rag-step__rail { color: #374151; }
+.visual-rag-step__rail :deep(.t-icon) { width: 14px; height: 14px; font-size: 14px; }
+.visual-rag-step__spinner { width: 12px; height: 12px; border: 1.5px solid #9ca3af; border-right-color: transparent; border-radius: 50%; animation: visual-rag-spin .8s linear infinite; }
+.visual-rag-step__body { min-width: 0; flex: 1 1 auto; padding-top: .5px; display: flex; flex-direction: column; gap: 2px; }
+.visual-rag-step__body strong { color: #374151; font-size: 12.5px; line-height: 1.625; font-weight: 500; transition: color 150ms ease; }
+.visual-rag-step.is-running .visual-rag-step__body strong { color: #6b7280; font-weight: 400; }
 .visual-rag-step.is-stalled .visual-rag-step__body strong { color: #9ca3af; }
-.visual-rag-step.is-done .visual-rag-step__rail { color: #6b7280; }
-.visual-rag-step__summary { color: #9ca3af; font-size: 9px; line-height: 15px; }
+.visual-rag-step.is-done .visual-rag-step__body strong { color: #1f2937; }
+.visual-rag-step__summary { color: #9ca3af; font-size: 11px; line-height: 1.375; letter-spacing: -.01em; }
 .visual-rag-step__summary :deep(strong) { color: #6b7280; font-size: inherit; font-weight: 600; }
-.visual-rag-step__open { flex: 0 0 11px; margin-top: 3px; font-size: 11px; color: #d1d5db; }
+.visual-rag-step__open { flex: 0 0 14px; margin-top: 1px; width: 14px; height: 14px; font-size: 14px; color: #9ca3af; }
 .visual-rag-thinking__toggle { width: 100%; padding: 0; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .visual-rag-thinking__toggle:disabled { cursor: default; }
-.visual-rag-thinking__toggle :deep(.t-icon) { font-size: 10px; color: #9ca3af; }
-.visual-rag-thinking__content { max-height: 200px; overflow-y: auto; margin-top: 3px; padding: 7px 8px; border-left: 1px solid #e5e7eb; color: #9ca3af; font-size: 9px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.visual-rag-thinking__toggle :deep(.t-icon) { flex: 0 0 14px; width: 14px; height: 14px; font-size: 14px; color: #9ca3af; transition: transform 200ms ease; }
+.visual-rag-thinking__toggle :deep(.t-icon).is-folded { transform: rotate(-90deg); }
+.visual-rag-thinking__content { max-height: 220px; overflow-y: auto; margin-top: 6px; padding: 0; color: #9ca3af; font-size: 11px; line-height: 1.375; letter-spacing: -.01em; white-space: pre-wrap; word-break: break-word; }
 @keyframes visual-rag-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .visual-rag-step__spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .visual-rag-step__spinner { animation: none; } .visual-rag-pipeline__summary,.visual-rag-step__body strong,.visual-rag-step__rail,.visual-rag-thinking__toggle :deep(.t-icon) { transition: none !important; } }
 </style>
