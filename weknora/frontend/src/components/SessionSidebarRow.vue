@@ -1,42 +1,45 @@
 <template>
   <div
-    :class="[
-      'submenu_item',
-      !batchMode && activePath === item.path ? 'submenu_item_active' : '',
-      batchMode && selectedIds.includes(item.id) ? 'submenu_item_selected' : '',
-      batchMode ? 'submenu_item_batch' : '',
-    ]"
+    class="visual-session-row"
+    :class="{
+      'is-active': !batchMode && activePath === item.path,
+      'is-selected': batchMode && selectedIds.includes(item.id),
+      'is-batch': batchMode,
+    }"
     @mouseenter="emit('hover-in')"
     @mouseleave="emit('hover-out')"
     @click="batchMode ? emit('toggle-select') : emit('navigate')"
   >
     <t-checkbox
       v-if="batchMode"
-      class="batch-checkbox"
+      class="visual-session-row__checkbox"
       :checked="selectedIds.includes(item.id)"
       @click.stop
       @change="emit('toggle-select')"
     />
+
     <form
       v-if="titleEditing"
-      class="session-title-edit"
+      class="visual-session-row__edit"
       @submit.prevent="submitTitleEdit"
       @click.stop
     >
       <input
         ref="titleInputRef"
         v-model="titleDraft"
-        class="session-title-edit__input"
+        class="visual-session-row__edit-input"
         :maxlength="SESSION_TITLE_MAX_LENGTH"
         @keydown.esc.prevent="cancelTitleEdit"
         @blur="submitTitleEdit"
       />
     </form>
-    <span v-else class="submenu_title" :class="batchMode ? 'submenu_title--batch' : ''" :title="item.title">
-      <t-icon v-if="item.is_pinned" name="pin" class="submenu_pin_icon" />
-      <span class="submenu_title-text">{{ item.title }}</span>
-    </span>
-    <div v-if="!batchMode" class="session-row-menu-wrap" @click.stop>
+
+    <div v-else class="visual-session-row__title" :title="item.title">
+      <t-icon v-if="item.is_pinned" name="pin" class="visual-session-row__pin" />
+      <span>{{ item.title }}</span>
+    </div>
+
+    <div v-if="!batchMode" class="visual-session-row__menu" @click.stop>
       <t-popup
         v-model:visible="menuOpen"
         :overlay-class-name="menuOverlayClass"
@@ -47,51 +50,52 @@
       >
         <button
           type="button"
-          class="menu-more-wrap"
+          class="visual-session-row__more"
           aria-haspopup="menu"
           :aria-expanded="menuOpen"
           @click.stop
         >
-          <t-icon name="ellipsis" class="menu-more" />
+          <t-icon name="ellipsis" />
         </button>
+
         <template #content>
-          <div class="session-action-menu" @click.stop>
+          <div class="visual-session-menu" @click.stop>
             <template v-if="menuMode === 'menu'">
               <template v-for="(option, index) in menuOptions" :key="option.value">
                 <div
                   v-if="shouldShowDividerBefore(option.value, index)"
-                  class="session-action-menu__divider"
+                  class="visual-session-menu__divider"
                 />
                 <button
                   type="button"
-                  class="session-action-menu__item"
+                  class="visual-session-menu__item"
                   :class="{ 'is-danger': option.theme === 'error' }"
                   @click="handleMenuClick(option)"
                 >
                   <component
                     :is="option.prefixIcon"
                     v-if="option.prefixIcon"
-                    class="session-action-menu__icon"
+                    class="visual-session-menu__icon"
                   />
                   <span>{{ option.content }}</span>
                 </button>
               </template>
             </template>
 
-            <div v-else class="session-action-confirm">
-              <div class="session-action-confirm__title">
+            <div v-else class="visual-session-confirm">
+              <h4>
                 {{ menuMode === 'clear' ? t('chatHeader.clearConfirmTitle') : t('chatHeader.deleteConfirmTitle') }}
-              </div>
-              <div class="session-action-confirm__body">
+              </h4>
+              <p>
                 {{ menuMode === 'clear' ? t('chatHeader.clearConfirmBody') : t('chatHeader.deleteConfirmBody') }}
-              </div>
-              <div class="session-action-confirm__footer">
-                <button type="button" class="session-action-confirm__btn" @click="backToMenu">
+              </p>
+              <div class="visual-session-confirm__actions">
+                <button type="button" class="visual-session-confirm__button" @click="backToMenu">
                   {{ t('common.cancel') }}
                 </button>
                 <button
                   type="button"
-                  class="session-action-confirm__btn is-danger"
+                  class="visual-session-confirm__button is-danger"
                   @click="confirmDangerAction"
                 >
                   {{ menuMode === 'clear' ? t('common.clear') : t('common.delete') }}
@@ -148,8 +152,8 @@ const titleInputRef = ref<HTMLInputElement | null>(null)
 
 const menuOverlayClass = computed(() => (
   menuMode.value === 'menu'
-    ? 'session-action-menu-popup'
-    : 'session-action-menu-popup is-confirm'
+    ? 'visual-session-menu-popup'
+    : 'visual-session-menu-popup is-confirm'
 ))
 
 const onMenuVisibleChange = (visible: boolean): void => {
@@ -219,199 +223,255 @@ const confirmDangerAction = (): void => {
 </script>
 
 <style scoped lang="less">
-.submenu_item {
+.visual-session-row {
   position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-.session-row-menu-wrap {
-  position: relative;
+.visual-session-row:hover {
+  background: rgb(243 244 246 / 80%);
+  color: #111827;
+}
+
+.visual-session-row.is-active,
+.visual-session-row.is-selected {
+  background: rgb(229 231 235 / 80%);
+  color: #111827;
+  font-weight: 500;
+}
+
+.visual-session-row__checkbox {
   flex: 0 0 auto;
 }
 
-.session-title-edit {
-  flex: 1 1 auto;
+.visual-session-row__title {
   min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.session-title-edit__input {
+.visual-session-row__title > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-session-row__pin {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.visual-session-row__edit {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.visual-session-row__edit-input {
   width: 100%;
   height: 26px;
-  padding: 0 8px;
-  border: 1px solid var(--td-brand-color);
-  border-radius: 5px;
-  color: var(--td-text-color-primary);
-  background: var(--td-bg-color-container);
-  font-size: 14px;
+  padding: 0 7px;
+  box-sizing: border-box;
+  border: 1px solid #9ca3af;
+  border-radius: 6px;
+  outline: 0;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 12px;
   line-height: 24px;
-  outline: none;
-  box-shadow: 0 0 0 2px var(--td-brand-color-light);
+  box-shadow: 0 0 0 2px rgb(156 163 175 / 12%);
 }
 
-.menu-more-wrap {
+.visual-session-row__menu {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.visual-session-row__more {
+  width: 24px;
+  height: 24px;
+  margin: -2px -4px -2px 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  color: inherit;
   background: transparent;
+  color: #9ca3af;
+  opacity: 0;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: opacity 120ms ease, background-color 150ms ease, color 150ms ease;
+}
 
-  &:hover {
-    background: var(--td-bg-color-container-hover);
-  }
+.visual-session-row:hover .visual-session-row__more,
+.visual-session-row__more[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.visual-session-row__more:hover {
+  background: #fff;
+  color: #374151;
+}
+
+.visual-session-row__more :deep(.t-icon) {
+  font-size: 14px;
 }
 </style>
 
 <style lang="less">
-.session-action-menu-popup {
+.visual-session-menu-popup {
   z-index: 3000 !important;
-
-  .t-popup__content {
-    padding: 4px !important;
-    margin-top: 2px !important;
-    min-width: 160px !important;
-    width: max-content !important;
-    border-radius: 8px !important;
-    background: var(--td-bg-color-container) !important;
-    border: 0.5px solid var(--td-component-stroke) !important;
-    box-shadow:
-      0 0 0 0.5px rgba(0, 0, 0, 0.03),
-      0 2px 6px rgba(0, 0, 0, 0.08) !important;
-    overflow: hidden;
-  }
-
-  &.is-confirm .t-popup__content {
-    padding: 12px !important;
-    width: 260px !important;
-    min-width: 260px !important;
-  }
 }
 
-.session-action-menu {
+.visual-session-menu-popup .t-popup__content {
+  min-width: 160px !important;
+  width: max-content !important;
+  margin-top: 2px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 12%) !important;
+}
+
+.visual-session-menu-popup.is-confirm .t-popup__content {
+  width: 260px !important;
+  min-width: 260px !important;
+}
+
+.visual-session-menu {
+  min-width: 158px;
+  padding: 5px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  min-width: 152px;
 }
 
-.session-action-menu__item {
+.visual-session-menu__item {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 5px;
-  color: var(--td-text-color-primary);
   background: transparent;
-  font-size: 14px;
-  line-height: 20px;
+  color: #374151;
+  font-size: 12px;
+  line-height: 18px;
   text-align: left;
   white-space: nowrap;
-  box-sizing: border-box;
   cursor: pointer;
-
-  &:hover {
-    background: var(--td-bg-color-container-hover);
-  }
-
-  &.is-danger {
-    color: var(--td-error-color-6);
-
-    .session-action-menu__icon {
-      color: var(--td-error-color-6);
-    }
-
-    &:hover {
-      background: var(--td-error-color-1);
-    }
-  }
 }
 
-.session-action-menu__icon {
-  flex: 0 0 auto;
-  display: inline-flex;
-  color: var(--td-text-color-secondary);
-
-  .t-icon {
-    font-size: 16px;
-  }
+.visual-session-menu__item:hover {
+  background: #f3f4f6;
+  color: #111827;
 }
 
-.session-action-menu__divider {
+.visual-session-menu__item.is-danger {
+  color: #b91c1c;
+}
+
+.visual-session-menu__item.is-danger:hover {
+  background: #fef2f2;
+}
+
+.visual-session-menu__icon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: #6b7280;
+}
+
+.visual-session-menu__item.is-danger .visual-session-menu__icon {
+  color: #b91c1c;
+}
+
+.visual-session-menu__divider {
   height: 1px;
-  margin: 2px 6px;
-  background: var(--td-component-stroke);
+  margin: 3px 6px;
+  background: #f3f4f6;
 }
 
-.session-action-confirm {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 236px;
+.visual-session-confirm {
+  width: 258px;
+  padding: 14px;
+  box-sizing: border-box;
 }
 
-.session-action-confirm__title {
+.visual-session-confirm h4 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 13px;
+  line-height: 19px;
+  font-weight: 700;
+}
+
+.visual-session-confirm p {
   margin: 0;
-  color: var(--td-text-color-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.session-action-confirm__body {
-  color: var(--td-text-color-secondary);
-  font-size: 14px;
+  color: #6b7280;
+  font-size: 12px;
   line-height: 1.5;
-  word-break: break-word;
 }
 
-.session-action-confirm__footer {
+.visual-session-confirm__actions {
+  margin-top: 14px;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 7px;
 }
 
-.session-action-confirm__btn {
-  min-width: 60px;
-  height: 30px;
-  padding: 0 12px;
-  border: 0.5px solid var(--td-component-stroke);
-  border-radius: 6px;
-  color: var(--td-text-color-primary);
-  background: var(--td-bg-color-container);
-  font-size: 14px;
-  line-height: 28px;
+.visual-session-confirm__button {
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background: var(--td-bg-color-container-hover);
-  }
-
-  &.is-danger {
-    border-color: transparent;
-    color: #fff;
-    background: var(--td-error-color-6);
-
-    &:hover:not(:disabled) {
-      background: var(--td-error-color-5);
-    }
-  }
 }
 
-:root[theme-mode='dark'] .session-action-menu-popup .t-popup__content {
-  background: rgba(36, 36, 36, 0.92) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  box-shadow:
-    0 0 0 0.5px rgba(255, 255, 255, 0.05),
-    0 2px 6px rgba(0, 0, 0, 0.2) !important;
+.visual-session-confirm__button:hover {
+  background: #f9fafb;
+}
+
+.visual-session-confirm__button.is-danger {
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #fff;
+}
+
+.visual-session-confirm__button.is-danger:hover {
+  background: #991b1b;
 }
 </style>
