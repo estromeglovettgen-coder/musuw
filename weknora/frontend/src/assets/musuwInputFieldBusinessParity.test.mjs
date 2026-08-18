@@ -11,12 +11,13 @@ test('frozen Input-field business controller remains the original implementation
   assert.equal(blobSha(controller), 'a34d09f5f9dbe44d4b3835213fdab662c4b7446a')
 })
 
-test('rebuilt Input-field reuses the frozen component setup and replaces only its active View', () => {
+test('rebuilt Input-field reuses the frozen component options and replaces only its active View', () => {
   const current = read('../components/Input-field.vue')
   assert.match(current, /import LegacyInputFieldBusiness from .*Input-field\.pre-view\.vue/)
-  assert.match(current, /\.\.\.LegacyInputFieldBusiness/)
+  assert.match(current, /const legacy = LegacyInputFieldBusiness as any/)
+  assert.match(current, /\.\.\.legacy,/)
   assert.match(current, /class="visual-chat-composer"/)
-  for (const legacy of ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"']) {
-    assert.equal(current.includes(legacy), false, `Input-field still exposes active legacy shell ${legacy}`)
+  for (const token of ['class="answers-input"', 'class="rich-input-container"', 'class="control-bar"', 'class="control-right"']) {
+    assert.equal(current.includes(token), false, `Input-field still exposes active legacy shell ${token}`)
   }
 })
