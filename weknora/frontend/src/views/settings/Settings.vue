@@ -59,7 +59,7 @@
               <h3>
                 {{ currentSection === 'general' ? $t('general.title') : $t('settings.modelManagement') }}
               </h3>
-              <p>{{ currentSection === 'general' ? '配置语言、外观等基础选项' : '管理可用模型、默认模型与模型连接配置' }}</p>
+              <p>{{ currentSection === 'general' ? $t('general.description') : $t('modelSettings.description') }}</p>
             </div>
 
             <div class="settings-reference-body">
@@ -189,7 +189,7 @@ onUnmounted(() => {
   background: rgb(0 0 0 / 45%);
   backdrop-filter: blur(4px);
   user-select: none;
-  font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--app-font-family, "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif);
 }
 .settings-reference-dialog {
   position: relative;
