@@ -29,6 +29,9 @@ import "@/assets/musuw-tdesign-overlay-bridge.css";
 // Tenantless onboarding and native image preview are also production-reachable
 // native behavior surfaces, so close their visual system last.
 import "@/assets/musuw-onboarding-native.css";
+// Rich document preview remains business/rendering-owned; normalize only its
+// toolbar, state cards, content containers and fullscreen chrome.
+import "@/assets/musuw-document-preview-final.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
