@@ -8,31 +8,31 @@ const enUS = readFileSync(new URL('../../../i18n/locales/en-US.ts', import.meta.
 const koKR = readFileSync(new URL('../../../i18n/locales/ko-KR.ts', import.meta.url), 'utf8')
 const ruRU = readFileSync(new URL('../../../i18n/locales/ru-RU.ts', import.meta.url), 'utf8')
 
-test('uses a compact flat dialog with selected and available sections', () => {
-  assert.match(component, /dialog-class-name="tag-edit-dialog"/)
-  assert.match(component, /width="400px"/)
-  assert.match(component, /<template #header>/)
-  assert.match(component, /class="tag-edit-heading-icon"/)
-  assert.match(component, /name="discount"/)
-  assert.match(component, /class="setting-drawer__section"/)
-  assert.match(component, /class="setting-drawer__section-title"/)
-  assert.match(component, /tagEditSelectedSection/)
-  assert.match(component, /tagEditAvailableSection/)
-  assert.match(component, /canManage/)
-  assert.match(component, /tagManageLink/)
-  assert.match(component, /open-manage/)
-  assert.match(component, /selectedTagsList/)
-  assert.match(component, /availableTagsList/)
-  assert.match(component, /class="tag-edit-chip"/)
-  assert.match(component, /class="tag-edit-create-row"/)
-  assert.match(component, /class="tag-edit-footer"/)
-  assert.doesNotMatch(component, /class="tag-edit-create"/)
-  assert.doesNotMatch(component, /class="tag-edit-count"/)
-  assert.doesNotMatch(component, /:header="title"/)
-  assert.doesNotMatch(component, /<t-checkbox/)
+test('tag edit view is rebuilt on the visual shell', () => {
+  assert.match(component, /class="visual-tag-edit"/)
+  assert.match(component, /class="visual-tag-edit__overlay"/)
+  assert.doesNotMatch(component, /dialog-class-name="tag-edit-dialog"/)
+  assert.doesNotMatch(component, /class="setting-drawer__section"/)
 })
 
-test('defines the short dialog heading in every supported locale', () => {
+test('tag edit preserves native selected available create and manage behavior', () => {
+  for (const token of [
+    'selectedSet.value = new Set(props.selectedTags.map((t) => t.id))',
+    'selectedTagsList',
+    'availableTagsList',
+    'function toggleTag(tagId: string)',
+    'function clearAll()',
+    'await createKnowledgeBaseTag(props.kbId, { name })',
+    "emit('tag-created')",
+    "emit('confirm', Array.from(selectedSet.value))",
+    "emit('update:visible', false)",
+    "emit('open-manage')",
+  ]) {
+    assert.ok(component.includes(token), `tag edit lost behavior contract: ${token}`)
+  }
+})
+
+test('defines tag edit copy in every supported locale', () => {
   for (const locale of [zhCN, enUS, koKR, ruRU]) {
     assert.match(locale, /tagEditDialogHeading:/)
     assert.match(locale, /tagEditSelectedSection:/)
