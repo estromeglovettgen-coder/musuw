@@ -76,7 +76,7 @@
     />
 </template>
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick, computed } from 'vue';
+import { ref, watch, onMounted, nextTick } from 'vue';
 import InputField from '@/components/Input-field.vue';
 import { createSessions } from "@/api/chat/index";
 import { getSuggestedQuestions } from "@/api/agent/index";
@@ -98,7 +98,6 @@ const uiStore = useUIStore();
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 
-// ===== 推荐问题 =====
 const suggestedQuestions = ref<SuggestedQuestion[]>([]);
 const sqLoading = ref(true);
 const sqCardsRevealed = ref(false);
@@ -107,7 +106,6 @@ const sqContainerRef = ref<HTMLElement | null>(null);
 let suggestedQuestionsFetchId = 0;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-// --- 高度平滑过渡钩子 ---
 const onBeforeLeave = () => {
     const c = sqContainerRef.value;
     if (!c) return;
@@ -127,7 +125,7 @@ const onAfterLeave = () => {
     }
 };
 
-const onEnter = (el: Element) => {
+const onEnter = () => {
     const c = sqContainerRef.value;
     if (!c) return;
     const startHeight = c.offsetHeight;
@@ -173,13 +171,11 @@ const fetchSuggestedQuestions = async () => {
     }
 };
 
-// 防抖包装，切换知识库/文件时300ms内不重复请求
 const debouncedFetch = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => { fetchSuggestedQuestions(); }, 300);
 };
 
-// 监听 Agent / 知识库 / 文件 / 标签 / MCP / Skill @mention
 watch(
     () => ({
         agentId: settingsStore.selectedAgentId,
@@ -208,17 +204,13 @@ const sendMsg = (value: string, modelId: string, mentionedItems: any[], imageFil
 async function createNewSession(value: string, modelId: string, mentionedItems: any[] = [], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) {
     const selectedKbs = settingsStore.settings.selectedKnowledgeBases || [];
     const selectedFiles = settingsStore.settings.selectedFiles || [];
-
-    // 构建 session 数据，包含 Agent 配置
     const sessionData: any = {};
-
-    // 添加 Agent 配置（知识库信息在 agent_config 中）
     sessionData.agent_config = {
         enabled: true,
         max_iterations: settingsStore.agentConfig.maxIterations,
         temperature: settingsStore.agentConfig.temperature,
-        knowledge_bases: selectedKbs,  // 所有选中的知识库
-        knowledge_ids: selectedFiles,  // 所有选中的普通知识/文件
+        knowledge_bases: selectedKbs,
+        knowledge_ids: selectedFiles,
         allowed_tools: settingsStore.agentConfig.allowedTools
     };
 
@@ -433,115 +425,97 @@ const handleKBEditorSuccess = (kbId: string) => {
 
 .new-chat-suggestion__badge {
     flex: 0 0 auto;
-    padding: 1px 6px;
-    border-radius: 6px;
-    background: #eef4ff;
-    color: #0b57d0;
-    font-size: 10px;
-    line-height: 16px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: #f3f4f6;
+    color: #9ca3af;
+    font-size: 9px;
+    line-height: 14px;
     font-weight: 600;
-    letter-spacing: .04em;
 }
 
 .new-chat-composer {
+    position: relative;
     width: 100%;
     min-width: 0;
+    margin: 0;
+    padding: 0;
+    z-index: 2;
 }
 
-/* Input-field keeps the business logic for this first migration step. Its old
-   page-positioning contract is intentionally neutralized here so this new view
-   owns the complete geometry. */
 .new-chat-composer :deep(.answers-input) {
     position: static !important;
-    inset: auto !important;
-    top: auto !important;
-    right: auto !important;
-    bottom: auto !important;
     left: auto !important;
-    z-index: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
     width: 100% !important;
+    min-width: 0 !important;
     max-width: none !important;
     margin: 0 !important;
-    transform: none !important;
-    display: block !important;
+    z-index: auto !important;
 }
 
 .new-chat-composer :deep(.rich-input-container) {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    box-sizing: border-box !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 20px !important;
-    background: #f4f5f7 !important;
-    padding: 16px !important;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
 }
 
-.new-chat-composer :deep(.rich-input-container:focus-within) {
-    border-color: #d1d5db !important;
-    background: #fff !important;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%) !important;
+.new-chat-suggestions-enter-active,
+.new-chat-suggestions-leave-active {
+    transition: opacity 120ms ease, transform 120ms ease;
 }
 
-.new-chat-composer :deep(.t-textarea__inner) {
-    width: 100% !important;
-    min-height: 44px !important;
-    max-height: 180px !important;
-    padding: 0 !important;
-    border: 0 !important;
-    resize: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: #1f2937 !important;
-    font-size: 15px !important;
-    line-height: 1.625 !important;
-}
-
-.new-chat-composer :deep(.control-bar) {
-    margin-top: 8px !important;
-    padding-top: 4px !important;
+.new-chat-suggestions-enter-from,
+.new-chat-suggestions-leave-to {
+    opacity: 0;
+    transform: translateY(4px);
 }
 
 @keyframes new-chat-spin {
     to { transform: rotate(360deg); }
 }
 
-.new-chat-suggestions-enter-active,
-.new-chat-suggestions-leave-active {
-    transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.new-chat-suggestions-enter-from {
-    opacity: 0;
-    transform: translateY(10px);
-}
-
-.new-chat-suggestions-leave-to {
-    opacity: 0;
-    transform: translateY(-4px);
-}
-
-@media (max-width: 767px) {
+@media (max-width: 720px) {
     .new-chat-stack {
-        width: min(100% - 32px, 768px);
+        width: min(calc(100% - 32px), 768px);
         padding: 40px 0;
+        gap: 20px;
     }
 
     .new-chat-title {
-        text-align: left;
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .new-chat-stack {
+        width: calc(100% - 24px);
+        padding: 28px 0;
+    }
+
+    .new-chat-title {
         font-size: 24px;
-        line-height: 32px;
+    }
+
+    .new-chat-suggestions__list {
+        gap: 8px;
+    }
+
+    .new-chat-suggestion {
+        max-width: 100%;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .new-chat-suggestions,
     .new-chat-suggestion,
     .new-chat-suggestions-enter-active,
     .new-chat-suggestions-leave-active,
     .new-chat-suggestions__refresh {
         transition: none !important;
-        animation: none !important;
     }
 }
 </style>
