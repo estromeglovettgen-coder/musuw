@@ -6,8 +6,6 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-// Files that have not entered the view-rebuild track remain byte-for-byte frozen.
-// Once a view is migrated it leaves this map and is guarded by behavior contracts below.
 const baseline = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
   ['../components/ChatHeader.vue', '79aec898f1e90c21a9f63fa77bce0dca509750c4'],
@@ -28,7 +26,6 @@ const baseline = new Map([
   ['../views/chat/components/usermsg.vue', '6dd0f2e44e4fc382d6f40702aa4b5eebc2467fea'],
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
-  ['../views/knowledge/components/KbTagManageDrawer.vue', 'cc60b273a36ce031dc906cb3a680bb48496745b3'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],
@@ -209,6 +206,21 @@ test('batch tag preserves preselection creation confirmation loading and manage 
     "emit('confirm', Array.from(selectedSet.value))",
     "emit('update:visible', false)",
     "emit('open-manage')",
+  ])
+})
+
+test('tag management preserves paging search create edit delete and delayed change notification', () => {
+  assertContracts('../views/knowledge/components/KbTagManageDrawer.vue', 'tag management', [
+    'const TAG_PAGE_SIZE = 50',
+    'await listKnowledgeTags(props.kbId',
+    'keyword: searchQuery.value || undefined',
+    'hasMore.value = tags.value.length < total.value',
+    'await createKnowledgeBaseTag(props.kbId, { name })',
+    'await updateKnowledgeBaseTag(props.kbId, editingTagId.value, { name })',
+    'await deleteKnowledgeBaseTag(props.kbId, tag.seq_id, { force: true })',
+    "emit('changed', { deletedTagId: tag.id })",
+    'setTimeout(resolve, 800)',
+    'searchDebounce = setTimeout(() =>',
   ])
 })
 
