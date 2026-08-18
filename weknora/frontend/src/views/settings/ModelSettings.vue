@@ -1,85 +1,116 @@
 <template>
-  <div class="model-settings">
-    <div class="section-header">
-      <div class="section-header__top">
+  <section class="visual-model-settings">
+    <header class="visual-model-settings__header">
+      <div class="visual-model-settings__heading">
         <div>
           <h2>{{ $t('modelSettings.title') }}</h2>
-          <p class="section-description">{{ $t('modelSettings.description') }}</p>
+          <p>{{ $t('modelSettings.description') }}</p>
         </div>
-        <t-button
+        <button
           v-if="authStore.hasRole('admin')"
           type="button"
-          theme="primary"
-          variant="text"
-          size="medium"
-          class="model-test-trigger"
+          class="visual-model-settings__debug"
           @click="showDebugDrawer = true"
         >
-          <template #icon><play-circle-icon /></template>
-          {{ $t('modelSettings.actions.debugModel') }}
-        </t-button>
+          <play-circle-icon />
+          <span>{{ $t('modelSettings.actions.debugModel') }}</span>
+        </button>
       </div>
 
-      <div class="builtin-models-hint" role="note">
-        <p class="builtin-hint-label">{{ $t('modelSettings.builtinModels.title') }}</p>
-        <p class="builtin-hint-text">
-          {{ $t(authStore.isSystemAdmin
-            ? 'modelSettings.builtinModels.descriptionAdmin'
-            : 'modelSettings.builtinModels.description') }}
-        </p>
-        <a class="doc-link" href="https://github.com/Tencent/WeKnora/blob/main/docs/BUILTIN_MODELS.md" target="_blank"
-          rel="noopener noreferrer">
+      <aside class="visual-model-settings__hint" role="note">
+        <div>
+          <strong>{{ $t('modelSettings.builtinModels.title') }}</strong>
+          <p>
+            {{ $t(authStore.isSystemAdmin
+              ? 'modelSettings.builtinModels.descriptionAdmin'
+              : 'modelSettings.builtinModels.description') }}
+          </p>
+        </div>
+        <a
+          href="https://github.com/Tencent/WeKnora/blob/main/docs/BUILTIN_MODELS.md"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {{ $t('modelSettings.builtinModels.viewGuide') }}
-          <t-icon name="link" class="link-icon" />
+          <t-icon name="link" />
         </a>
-      </div>
+      </aside>
+    </header>
+
+    <div class="visual-model-tabs" data-guide="settings-models" role="tablist">
+      <button
+        v-for="tab in ([
+          { value: 'all', label: $t('common.all'), count: allLegacyModels.length },
+          { value: 'chat', label: $t('modelSettings.typeShort.chat'), count: countByType('chat') },
+          { value: 'embedding', label: $t('modelSettings.typeShort.embedding'), count: countByType('embedding') },
+          { value: 'rerank', label: $t('modelSettings.typeShort.rerank'), count: countByType('rerank') },
+          { value: 'vllm', label: $t('modelSettings.typeShort.vllm'), count: countByType('vllm') },
+          { value: 'asr', label: $t('modelSettings.typeShort.asr'), count: countByType('asr') },
+        ] as const)"
+        :key="tab.value"
+        type="button"
+        role="tab"
+        class="visual-model-tabs__item"
+        :class="{ 'is-active': activeTypeFilter === tab.value }"
+        :aria-selected="activeTypeFilter === tab.value"
+        @click="activeTypeFilter = tab.value"
+      >
+        <span>{{ tab.label }}</span>
+        <small>{{ tab.count }}</small>
+      </button>
     </div>
 
-    <t-tabs v-model="activeTypeFilter" class="model-type-tabs" data-guide="settings-models">
-      <t-tab-panel value="all" :label="`${$t('common.all')}(${allLegacyModels.length})`" />
-      <t-tab-panel value="chat" :label="`${$t('modelSettings.typeShort.chat')}(${countByType('chat')})`" />
-      <t-tab-panel value="embedding"
-        :label="`${$t('modelSettings.typeShort.embedding')}(${countByType('embedding')})`" />
-      <t-tab-panel value="rerank" :label="`${$t('modelSettings.typeShort.rerank')}(${countByType('rerank')})`" />
-      <t-tab-panel value="vllm" :label="`${$t('modelSettings.typeShort.vllm')}(${countByType('vllm')})`" />
-      <t-tab-panel value="asr" :label="`${$t('modelSettings.typeShort.asr')}(${countByType('asr')})`" />
-    </t-tabs>
+    <div class="visual-model-settings__content">
+      <div v-if="loading" class="visual-model-settings__loading">
+        <t-loading size="small" />
+      </div>
 
-    <t-loading :loading="loading" size="small" class="model-list-loading">
-      <div v-if="!loading && filteredModels.length === 0 && !authStore.hasRole('admin')" class="empty-state">
+      <div v-else-if="filteredModels.length === 0 && !authStore.hasRole('admin')" class="visual-model-empty">
         <t-empty :description="emptyHint" />
       </div>
-      <div v-else-if="!loading" class="model-grid">
-        <div v-for="model in filteredModels" :key="`${model._modelType}-${model.id}`" class="model-card" :class="[
-          `model-card--${model._modelType}`,
-          {
-            'model-card--builtin': model.isBuiltin,
-            'model-card--clickable': isModelCardClickable(model),
-          },
-        ]" :role="isModelCardClickable(model) ? 'button' : undefined"
+
+      <div v-else class="visual-model-grid">
+        <article
+          v-for="model in filteredModels"
+          :key="`${model._modelType}-${model.id}`"
+          class="visual-model-card"
+          :class="{
+            'is-builtin': model.isBuiltin,
+            'is-clickable': isModelCardClickable(model),
+          }"
+          :role="isModelCardClickable(model) ? 'button' : undefined"
           :tabindex="isModelCardClickable(model) ? 0 : undefined"
           @click="onModelCardClick($event, model._modelType, model)"
-          @keydown.enter="onModelCardClick($event, model._modelType, model)">
-          <div class="model-card__badge" :aria-label="typeLabel(model._modelType)">
-            <t-icon :name="typeIcon(model._modelType)" size="18px" />
-          </div>
-          <div class="model-card__body">
-            <div class="model-card__header">
-              <h3 class="model-card__title">{{ modelDisplayName(model) }}</h3>
-              <t-tag v-if="model.isDefault" size="small" theme="success" variant="light">
-                {{ $t('model.defaultTag') }}
-              </t-tag>
-              <span v-if="model.isBuiltin" class="model-card__lock" :title="$t('modelSettings.builtinTag')"
-                :aria-label="$t('modelSettings.builtinTag')">
+          @keydown.enter="onModelCardClick($event, model._modelType, model)"
+        >
+          <span class="visual-model-card__icon" :aria-label="typeLabel(model._modelType)">
+            <t-icon :name="typeIcon(model._modelType)" />
+          </span>
+
+          <div class="visual-model-card__body">
+            <div class="visual-model-card__top">
+              <h3 :title="modelDisplayName(model)">{{ modelDisplayName(model) }}</h3>
+              <span v-if="model.isDefault" class="visual-model-card__default">{{ $t('model.defaultTag') }}</span>
+              <span
+                v-if="model.isBuiltin"
+                class="visual-model-card__lock"
+                :title="$t('modelSettings.builtinTag')"
+                :aria-label="$t('modelSettings.builtinTag')"
+              >
                 <t-icon :name="authStore.isSystemAdmin ? 'edit-1' : 'lock-on'" />
               </span>
-              <div v-if="canManageModel(model)" class="model-card__actions" @click.stop>
-                <t-dropdown :options="getModelOptions(model._modelType, model)" placement="bottom-right" attach="body"
+
+              <div v-if="canManageModel(model)" class="visual-model-card__actions" @click.stop>
+                <t-dropdown
+                  :options="getModelOptions(model._modelType, model)"
+                  placement="bottom-right"
+                  attach="body"
                   trigger="click"
-                  @click="(data: any) => handleMenuAction({ value: data.value }, model._modelType, model)">
-                  <t-button variant="text" shape="square" size="small" class="model-card__action-btn model-card__more">
+                  @click="(data: any) => handleMenuAction({ value: data.value }, model._modelType, model)"
+                >
+                  <button type="button" class="visual-model-card__action" :aria-label="$t('common.more')">
                     <t-icon name="ellipsis" />
-                  </t-button>
+                  </button>
                 </t-dropdown>
                 <t-popconfirm
                   v-if="canDeleteModel(model)"
@@ -89,58 +120,48 @@
                   placement="bottom-right"
                   @confirm="deleteModel(model._modelType, model.id)"
                 >
-                  <t-tooltip :content="$t('common.delete')" placement="top">
-                    <t-button
-                      theme="danger"
-                      shape="square"
-                      variant="text"
-                      size="small"
-                      class="model-card__action-btn model-card__delete"
-                      @click.stop
-                    >
-                      <template #icon><t-icon name="delete" /></template>
-                    </t-button>
-                  </t-tooltip>
+                  <button type="button" class="visual-model-card__action is-danger" :aria-label="$t('common.delete')" @click.stop>
+                    <t-icon name="delete" />
+                  </button>
                 </t-popconfirm>
               </div>
             </div>
-            <p class="model-card__subtitle">
+
+            <p class="visual-model-card__meta">
               <span>{{ vendorLabel(model) }}</span>
               <template v-if="model._modelType === 'embedding' && model.dimension">
-                <span class="model-card__sep">·</span>
+                <span aria-hidden="true">·</span>
                 <span>{{ $t('model.editor.dimensionLabel') }} {{ model.dimension }}</span>
               </template>
               <template v-if="model._modelType === 'chat' && model.supportsVision">
-                <span class="model-card__sep">·</span>
-                <span class="model-card__vision" :title="$t('model.editor.supportsVisionLabel')"
-                  :aria-label="$t('model.editor.supportsVisionLabel')">
-                  <t-icon name="image" size="12px" />
-                </span>
+                <span aria-hidden="true">·</span>
+                <t-icon name="image" :title="$t('model.editor.supportsVisionLabel')" />
               </template>
             </p>
           </div>
-        </div>
+        </article>
+
         <button
           v-if="authStore.hasRole('admin')"
           type="button"
-          class="model-card model-card--add"
+          class="visual-model-card visual-model-card--add"
           data-guide="settings-add-model"
           @click="openAddDialog"
         >
-          <span class="model-card--add__icon" aria-hidden="true">
-            <add-icon />
-          </span>
-          <span class="model-card--add__label">{{ $t('modelSettings.actions.addModel') }}</span>
+          <span class="visual-model-card--add__icon"><add-icon /></span>
+          <span>{{ $t('modelSettings.actions.addModel') }}</span>
         </button>
       </div>
-    </t-loading>
+    </div>
 
-    <!-- 模型编辑器抽屉 -->
-    <ModelEditorDialog v-model:visible="showDialog" :model-type="currentModelType" :model-data="editingModel"
-      @confirm="handleModelSave" />
+    <ModelEditorDialog
+      v-model:visible="showDialog"
+      :model-type="currentModelType"
+      :model-data="editingModel"
+      @confirm="handleModelSave"
+    />
     <ModelDebugDrawer v-model:visible="showDebugDrawer" :models="allModels" />
-
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -353,7 +374,7 @@ const onModelCardClick = (event: Event, type: ModelType, model: any) => {
     ke.preventDefault()
   }
   const target = event.target as HTMLElement | null
-  if (target?.closest('.model-card__actions')) return
+  if (target?.closest('.visual-model-card__actions')) return
   editModel(type, model)
 }
 
@@ -623,372 +644,398 @@ onMounted(() => {
 })
 </script>
 
-<style lang="less" scoped>
-.model-settings {
+<style scoped lang="less">
+.visual-model-settings {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: #1f2937;
 }
 
-.section-header {
-  margin-bottom: 28px;
-
-  h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0 0 8px 0;
-  }
-
-  .section-description {
-    font-size: 14px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.6;
-  }
+.visual-model-settings__header {
+  margin-bottom: 20px;
+  padding-right: 40px;
 }
 
-.section-header__top {
+.visual-model-settings__heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
 }
 
-.model-test-trigger {
-  --td-bg-color-container-hover: transparent;
-  flex-shrink: 0;
-  padding-left: 0;
-  padding-right: 0;
-  font-weight: 600;
-
-  &:hover,
-  &:focus,
-  &.t-is-active,
-  &:active {
-    background-color: transparent !important;
-    color: var(--td-brand-color-hover);
-  }
-
-  &:active {
-    color: var(--td-brand-color-active);
-  }
+.visual-model-settings__heading > div {
+  min-width: 0;
 }
 
-.builtin-models-hint {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
+.visual-model-settings__heading h2 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
 }
 
-.builtin-hint-label {
-  margin: 0 0 4px 0;
+.visual-model-settings__heading p {
+  margin: 0;
+  color: #9ca3af;
   font-size: 12px;
-  font-weight: 500;
-  color: var(--td-text-color-placeholder);
-  letter-spacing: 0.02em;
+  line-height: 18px;
 }
 
-.builtin-hint-text {
-  margin: 0 0 6px 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--td-text-color-secondary);
+.visual-model-settings__debug {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: #6b7280;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.builtin-models-hint .doc-link {
-  font-size: 13px;
+.visual-model-settings__debug:hover {
+  background: #f3f4f6;
+  color: #111827;
 }
 
-.model-list-loading {
-  min-height: 120px;
+.visual-model-settings__debug :deep(svg) {
+  width: 15px;
+  height: 15px;
 }
 
-.model-type-tabs {
-  margin-bottom: 16px;
-
-  :deep(.t-tabs__nav-item) {
-    font-size: 13px;
-  }
-
-  :deep(.t-tabs__nav-item-wrapper) {
-    padding: 0 12px;
-    margin: 0;
-  }
-
-  :deep(.t-tabs__operations) {
-    display: none;
-  }
-
-  :deep(.t-tabs__nav-scroll) {
-    overflow-x: auto;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  :deep(.t-tabs__content) {
-    display: none;
-  }
-}
-
-.model-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
-
-  .model-card--add {
-    width: 100%;
-    height: 100%;
-  }
-}
-
-// 模型卡片 —— 可选类型徽章（仅「全部」Tab）+ 标题 + 一行副标题
-.model-card {
-  position: relative;
+.visual-model-settings__hint {
+  margin-top: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 10px;
-  background: var(--td-bg-color-container);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
-  min-width: 0;
-
-  &:hover {
-    border-color: var(--td-brand-color-3, var(--td-brand-color));
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
-  }
-
-  &--add {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 68px;
-    border-style: dashed;
-    background: transparent;
-    color: var(--td-text-color-placeholder);
-    cursor: pointer;
-    font: inherit;
-    text-align: center;
-
-    &:hover,
-    &:focus-visible {
-      color: var(--td-brand-color);
-      border-color: var(--td-brand-color);
-      background: color-mix(in srgb, var(--td-brand-color) 6%, transparent);
-      box-shadow: none;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
-      outline-offset: 2px;
-    }
-
-    &__icon {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
-      color: var(--td-brand-color);
-      font-size: 18px;
-    }
-
-    &__label {
-      font-size: 13px;
-      font-weight: 500;
-      line-height: 1.4;
-    }
-  }
-
-  &--builtin {
-    background: var(--td-bg-color-secondarycontainer);
-
-    &:hover {
-      box-shadow: none;
-      border-color: var(--td-component-stroke);
-    }
-  }
-
-  &--clickable {
-    cursor: pointer;
-
-    &:hover {
-      border-color: var(--td-brand-color-3, var(--td-brand-color));
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
-      outline-offset: 2px;
-    }
-  }
+  justify-content: space-between;
+  gap: 14px;
+  background: rgb(249 250 251 / 70%);
 }
 
-.model-card__badge {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
+.visual-model-settings__hint > div {
+  min-width: 0;
+}
+
+.visual-model-settings__hint strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.visual-model-settings__hint p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.visual-model-settings__hint a {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #4b5563;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.visual-model-settings__hint a:hover {
+  color: #111827;
+}
+
+.visual-model-tabs {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #f3f4f6;
+  scrollbar-width: none;
+}
+
+.visual-model-tabs::-webkit-scrollbar { display: none; }
+
+.visual-model-tabs__item {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.visual-model-tabs__item small {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.visual-model-tabs__item:hover {
+  color: #4b5563;
+}
+
+.visual-model-tabs__item.is-active {
+  color: #111827;
+}
+
+.visual-model-tabs__item.is-active::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: -1px;
+  left: 8px;
+  height: 1px;
+  background: #111827;
+}
+
+.visual-model-settings__content {
+  min-height: 120px;
+  padding-top: 16px;
+}
+
+.visual-model-settings__loading,
+.visual-model-empty {
+  min-height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 1px;
-  // 默认底色，被 type 修饰覆盖
-  background: rgba(0, 82, 217, 0.1);
-  color: #0052D9;
 }
 
-// 5 种类型的徽章配色 —— 比原 tag 配色饱和度低一档，避免炫光
-.model-card--chat .model-card__badge {
-  background: rgba(0, 82, 217, 0.1);
-  color: #0052D9;
+.visual-model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.model-card--embedding .model-card__badge {
-  background: rgba(98, 53, 187, 0.1);
-  color: #6235BB;
-}
-
-.model-card--rerank .model-card__badge {
-  background: rgba(184, 92, 0, 0.1);
-  color: #B85C00;
-}
-
-.model-card--vllm .model-card__badge {
-  background: rgba(201, 62, 62, 0.1);
-  color: #C93E3E;
-}
-
-.model-card--asr .model-card__badge {
-  background: rgba(17, 128, 83, 0.1);
-  color: #118053;
-}
-
-.model-card__body {
-  flex: 1;
+.visual-model-card {
+  position: relative;
   min-width: 0;
+  min-height: 72px;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff;
+  color: #1f2937;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 
-.model-card__header {
+.visual-model-card:hover {
+  border-color: #d1d5db;
+  background: rgb(249 250 251 / 55%);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 4%);
+}
+
+.visual-model-card.is-builtin {
+  background: rgb(249 250 251 / 60%);
+}
+
+.visual-model-card.is-clickable {
+  cursor: pointer;
+}
+
+.visual-model-card.is-clickable:focus-visible {
+  outline: 2px solid #9ca3af;
+  outline-offset: 2px;
+}
+
+.visual-model-card__icon {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.visual-model-card__icon :deep(.t-icon) {
+  font-size: 16px;
+}
+
+.visual-model-card__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.visual-model-card__top {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
 }
 
-.model-card__title {
-  flex: 1;
+.visual-model-card__top h3 {
   min-width: 0;
+  flex: 1 1 auto;
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--td-text-color-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #111827;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
 }
 
-/*
-  Built-in lock indicator. Most cards in a typical install ARE built-in,
-  so loud styling everywhere becomes noise — instead the lock is muted
-  and small by default, and lights up on hover. The signal that matters
-  to users is "which models did I add" → user-added cards stand out by
-  the absence of the lock.
-*/
-.model-card__lock {
-  flex-shrink: 0;
+.visual-model-card__default {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 9px;
+  line-height: 14px;
+  font-weight: 600;
+}
+
+.visual-model-card__lock {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  color: var(--td-text-color-placeholder);
-  opacity: 0.6;
-  transition: color 0.15s ease, opacity 0.15s ease;
-
-  .t-icon {
-    font-size: 13px;
-  }
+  color: #9ca3af;
 }
 
-.model-card:hover .model-card__lock {
-  opacity: 1;
-  color: var(--td-text-color-secondary);
-}
+.visual-model-card__lock :deep(.t-icon) { font-size: 12px; }
 
-.model-card__subtitle {
+.visual-model-card__meta {
   margin: 2px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--td-text-color-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.model-card__sep {
-  margin: 0 4px;
-  color: var(--td-text-color-placeholder);
-}
-
-.model-card__vision {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 15px;
 }
 
-.model-card__actions {
-  flex-shrink: 0;
+.visual-model-card__meta :deep(.t-icon) { font-size: 11px; }
+
+.visual-model-card__actions {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.model-card__action-btn {
-  flex-shrink: 0;
-  padding: 2px;
+.visual-model-card__action {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #9ca3af;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  cursor: pointer;
 }
 
-.model-card__more {
-  color: var(--td-text-color-placeholder);
-
-  &:hover,
-  &:focus-visible {
-    background: var(--td-bg-color-secondarycontainer);
-    color: var(--td-text-color-primary);
-  }
-}
-
-// Hover / 键盘焦点 时显示操作按钮，避免静态卡片上有"杂物"。
-.model-card:hover .model-card__action-btn,
-.model-card:focus-within .model-card__action-btn,
-.model-card__actions:focus-within .model-card__action-btn {
+.visual-model-card:hover .visual-model-card__action,
+.visual-model-card:focus-within .visual-model-card__action {
   opacity: 1;
 }
 
-.empty-state {
-  padding: 64px 0;
-  text-align: center;
+.visual-model-card__action:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
 
-  :deep(.t-empty__description) {
-    font-size: 14px;
-    color: var(--td-text-color-placeholder);
-    margin-bottom: 16px;
-  }
+.visual-model-card__action.is-danger:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.visual-model-card--add {
+  width: 100%;
+  min-height: 72px;
+  border-style: dashed;
+  border-color: #d1d5db;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.visual-model-card--add:hover {
+  border-color: #9ca3af;
+  background: #f9fafb;
+  color: #374151;
+}
+
+.visual-model-card--add__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.visual-model-card--add__icon :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 760px) {
+  .visual-model-grid { grid-template-columns: 1fr; }
+  .visual-model-settings__hint { flex-direction: column; }
+}
+
+@media (max-width: 520px) {
+  .visual-model-settings__header { padding-right: 28px; }
+  .visual-model-settings__heading { flex-direction: column; gap: 10px; }
+  .visual-model-settings__debug { align-self: flex-start; }
 }
 </style>
