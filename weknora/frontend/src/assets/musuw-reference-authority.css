@@ -1,11 +1,9 @@
 /*
- * Visual authority layer.
- * Source of truth:
- *   visual_ref/src/index.css
- *   visual_ref/src/components/Sidebar.tsx
- *
- * KnowledgeBaseReference.vue now carries the reference DOM/icons directly, so
- * this file no longer paints replacement knowledge controls with pseudo-elements.
+ * Reference typography authority.
+ * Visible source-replaced UI owns its own DOM, icons and geometry; this file
+ * deliberately contains no pseudo-element icon painting or legacy DOM bridges.
+ * User font preferences written by initFont() remain authoritative because the
+ * inline --app-font-family value overrides these defaults.
  */
 
 :root {
@@ -19,7 +17,6 @@ html,
 body,
 #app,
 #app .main,
-#app .aside_box,
 #app .platform-route-outlet,
 #app button,
 #app input,
@@ -34,9 +31,8 @@ body,
   font-family: var(--app-font-family, var(--musuw-reference-font-sans)) !important;
 }
 
-/* Source-replaced components used to hardcode Inter in scoped CSS. Keep the
- * reference stack as the default, but never override the user's persisted
- * font preference restored by initFont(). */
+#app .reference-sidebar,
+#app .reference-kb-page,
 #app .reference-composer-host,
 #app .reference-model-settings,
 #app .mention-menu,
@@ -44,81 +40,4 @@ body .chat-references-panel,
 body .chat-citation-float,
 body .settings-overlay {
   font-family: var(--app-font-family, var(--musuw-reference-font-sans)) !important;
-}
-
-/* Sidebar — temporary compatibility bridge until menu.vue itself is replaced
- * with the visual_ref/Sidebar.tsx DOM. The shapes below are the exact Lucide
- * family used by that source; no TDesign glyph is left visible for these nodes. */
-#app .aside_box .musuw-wordmark__mark {
-  font-size: 0 !important;
-  color: #fff !important;
-}
-
-#app .aside_box .musuw-wordmark__mark::before,
-#app .aside_box .header-icon-btn::before,
-#app .aside_box .sidebar-toggle::before,
-#app .aside_box .sidebar-toggle-item .menu_icon::before,
-#app .aside_box [data-guide="nav-creatChat"] .menu_icon::before,
-#app .aside_box [data-guide="nav-knowledge-bases"] .menu_icon::before {
-  content: "";
-  display: block;
-  flex: 0 0 auto;
-  background-color: currentColor;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-#app .aside_box .musuw-wordmark__mark::before {
-  width: 14px;
-  height: 14px;
-  background-color: #fff;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M13 2 3 14h9l-1 8 10-12h-9z'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M13 2 3 14h9l-1 8 10-12h-9z'/%3E%3C/svg%3E");
-}
-
-#app .aside_box .header-icon-btn .t-icon,
-#app .aside_box .sidebar-toggle .t-icon,
-#app .aside_box .sidebar-toggle-item .t-icon,
-#app .aside_box [data-guide="nav-creatChat"] .menu_icon > .t-icon,
-#app .aside_box [data-guide="nav-knowledge-bases"] .menu_icon > .t-icon {
-  display: none !important;
-}
-
-#app .aside_box .header-icon-btn::before {
-  width: 14px;
-  height: 14px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
-}
-
-#app .aside_box .sidebar-toggle::before {
-  width: 16px;
-  height: 16px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
-}
-
-#app .aside_box .sidebar-toggle-item .menu_icon::before {
-  width: 16px;
-  height: 16px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
-}
-
-#app .aside_box [data-guide="nav-creatChat"] .menu_icon::before {
-  width: 16px;
-  height: 16px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v6'/%3E%3Cpath d='M9 10h6'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v6'/%3E%3Cpath d='M9 10h6'/%3E%3C/svg%3E");
-}
-
-#app .aside_box [data-guide="nav-knowledge-bases"] .menu_icon::before {
-  width: 16px;
-  height: 16px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'/%3E%3C/svg%3E");
 }
