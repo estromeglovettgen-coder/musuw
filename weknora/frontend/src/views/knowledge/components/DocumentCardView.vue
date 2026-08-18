@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ReferenceIcon from '@/components/ReferenceIcon.vue'
+import KnowledgeProcessingTimeline from '@/components/knowledge-processing-timeline.vue'
+import { formatFileSize } from '@/utils/files'
 import type { FolderOption } from './FolderPickerMenu.vue'
 
 interface Tag {
@@ -81,7 +83,7 @@ const isTraceVisible = (item: KnowledgeCard) => isParseInFlight(item.parse_statu
 const cardTitle = (item: KnowledgeCard) => item.display_name || item.file_name || item.title || item.original_file_name || item.id
 const cardSummary = (item: KnowledgeCard) => item.description || item.metadata?.summary || item.metadata?.content || ''
 const cardTypeLabel = (item: KnowledgeCard) => {
-  if (item.type === 'url') return t('knowledgeBase.typeURL') || 'URL'
+  if (item.type === 'url') return 'URL'
   if (item.type === 'manual') return t('knowledgeBase.typeManual')
   if (item.file_type) return String(item.file_type).replace(/^\./, '').toUpperCase()
   return '--'
@@ -94,6 +96,25 @@ const inFlightCardStatusText = (item: KnowledgeCard) => {
     return t('knowledgeBase.statusFinalizing')
   }
   return t('knowledgeBase.parsingInProgress')
+}
+
+const channelLabelMap: Record<string, string> = {
+  api: 'knowledgeBase.channelApi',
+  browser_extension: 'knowledgeBase.channelBrowserExtension',
+  feishu: 'knowledgeBase.channelFeishu',
+  feishu_drive: 'knowledgeBase.channelFeishuDrive',
+  lark_drive: 'knowledgeBase.channelLarkDrive',
+  notion: 'knowledgeBase.channelNotion',
+  yuque: 'knowledgeBase.channelYuque',
+  wechat: 'knowledgeBase.channelWechat',
+  wecom: 'knowledgeBase.channelWecom',
+  dingtalk: 'knowledgeBase.channelDingtalk',
+  slack: 'knowledgeBase.channelSlack',
+  im: 'knowledgeBase.channelIm',
+}
+const channelLabel = (channel?: string) => {
+  if (!channel || channel === 'web') return ''
+  return channelLabelMap[channel] ? t(channelLabelMap[channel]) : channel
 }
 
 const getExtension = (item: KnowledgeCard) => {
@@ -126,7 +147,68 @@ const formatDocTime = (time?: string) => {
   return `${yy}-${MM}-${dd} ${hh}:${mm}`
 }
 
+// Pre-visual Musuw exposed a delayed hover inspector for processing state and
+// document metadata. Keep that behavior while rendering it with reference UI.
+const hoveredCardItem = ref<KnowledgeCard | null>(null)
+const hoverPosition = ref({ left: 0, top: 0 })
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+let hoverCardElement: HTMLElement | null = null
+const HOVER_DELAY = 300
+const HOVER_GAP = 12
+const HOVER_WIDTH = 344
+const HOVER_ESTIMATED_HEIGHT = 300
+
+const computeHoverPosition = (card: HTMLElement, measuredHeight = HOVER_ESTIMATED_HEIGHT) => {
+  const rect = card.getBoundingClientRect()
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  let left = rect.right + HOVER_GAP
+  let top = rect.top
+
+  if (left + HOVER_WIDTH > viewportWidth - 10) {
+    const leftSide = rect.left - HOVER_WIDTH - HOVER_GAP
+    left = leftSide >= 10 ? leftSide : Math.max(10, Math.min(rect.left, viewportWidth - HOVER_WIDTH - 10))
+    if (leftSide < 10) {
+      const below = rect.bottom + HOVER_GAP
+      if (below + measuredHeight <= viewportHeight - 10) top = below
+      else top = Math.max(10, rect.top - measuredHeight - HOVER_GAP)
+    }
+  }
+  if (top + measuredHeight > viewportHeight - 10) top = Math.max(10, viewportHeight - measuredHeight - 10)
+  return { left: Math.round(left), top: Math.round(top) }
+}
+
+const showHoverInspector = (event: MouseEvent, item: KnowledgeCard) => {
+  if (props.batchMode || activeMenuItemId.value) return
+  if (hoverTimer) clearTimeout(hoverTimer)
+  const card = event.currentTarget as HTMLElement
+  hoverCardElement = card
+  hoverTimer = setTimeout(() => {
+    hoverTimer = null
+    hoveredCardItem.value = item
+    hoverPosition.value = computeHoverPosition(card)
+    nextTick(() => {
+      const popover = document.querySelector<HTMLElement>('.reference-card-hover-inspector')
+      if (popover && hoverCardElement === card) {
+        hoverPosition.value = computeHoverPosition(card, popover.getBoundingClientRect().height || HOVER_ESTIMATED_HEIGHT)
+      }
+    })
+  }, HOVER_DELAY)
+}
+
+const hideHoverInspector = () => {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer)
+    hoverTimer = null
+  }
+  hoveredCardItem.value = null
+  hoverCardElement = null
+}
+
+onBeforeUnmount(hideHoverInspector)
+
 const openMenu = (item: KnowledgeCard) => {
+  hideHoverInspector()
   if (activeMenuItemId.value === item.id) {
     closeMenu(item)
     return
@@ -143,6 +225,7 @@ const closeMenu = (item?: KnowledgeCard) => {
 }
 
 const onCardClick = (item: KnowledgeCard) => {
+  hideHoverInspector()
   if (props.batchMode) {
     emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))
     return
@@ -199,6 +282,8 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
       :class="{ 'is-selected': selectedIds.has(item.id) }"
       :data-select-id="item.id"
       @click="onCardClick(item)"
+      @mouseenter="showHoverInspector($event, item)"
+      @mouseleave="hideHoverInspector"
     >
       <div class="reference-document-card__body">
         <div class="reference-document-card__header">
@@ -248,17 +333,18 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
                 <div class="reference-menu-divider" />
                 <div v-if="moveTargetsLoading" class="reference-menu-state">{{ t('common.loading') }}</div>
                 <div v-else-if="moveTargetKbs.length === 0" class="reference-menu-state">{{ t('knowledgeBase.moveNoTargets') }}</div>
-                <button
-                  v-for="kb in moveTargetKbs"
-                  v-else
-                  :key="kb.id"
-                  type="button"
-                  class="reference-menu-item"
-                  @click="emit('move-select-target', kb)"
-                >
-                  <ReferenceIcon name="folder" :size="14" class="reference-menu-icon" />
-                  <span class="reference-menu-ellipsis">{{ kb.name }}</span>
-                </button>
+                <template v-else>
+                  <button
+                    v-for="kb in moveTargetKbs"
+                    :key="kb.id"
+                    type="button"
+                    class="reference-menu-item"
+                    @click="emit('move-select-target', kb)"
+                  >
+                    <ReferenceIcon name="folder" :size="14" class="reference-menu-icon" />
+                    <span class="reference-menu-ellipsis">{{ kb.name }}</span>
+                  </button>
+                </template>
               </div>
 
               <div v-else-if="moveMenuMode === 'confirm'" class="reference-document-card__menu reference-move-confirm" @click.stop>
@@ -411,6 +497,53 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
       </label>
     </article>
   </div>
+
+  <Teleport to="body">
+    <aside
+      v-if="hoveredCardItem"
+      class="reference-card-hover-inspector"
+      :style="{ left: `${hoverPosition.left}px`, top: `${hoverPosition.top}px` }"
+      @mouseenter="() => { if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null } }"
+      @mouseleave="hideHoverInspector"
+    >
+      <header class="reference-card-hover__header">
+        <ReferenceIcon :name="fileIconName(hoveredCardItem)" :size="15" />
+        <strong :title="cardTitle(hoveredCardItem)">{{ cardTitle(hoveredCardItem) }}</strong>
+        <span>{{ cardTypeLabel(hoveredCardItem) }}</span>
+      </header>
+
+      <div v-if="isParseInFlight(hoveredCardItem.parse_status) || hoveredCardItem.parse_status === 'failed'" class="reference-card-hover__timeline">
+        <KnowledgeProcessingTimeline
+          :knowledge-id="hoveredCardItem.id"
+          :parse-status="hoveredCardItem.parse_status"
+          :auto-poll="false"
+          :compact="true"
+        />
+      </div>
+      <div v-else-if="hoveredCardItem.parse_status === 'draft'" class="reference-card-hover__draft">
+        {{ t('knowledgeBase.draft') }} · {{ t('knowledgeBase.draftTip') }}
+      </div>
+      <template v-else>
+        <p v-if="cardSummary(hoveredCardItem)" class="reference-card-hover__summary">{{ cardSummary(hoveredCardItem) }}</p>
+        <div v-if="hoveredCardItem.source" class="reference-card-hover__source" :title="hoveredCardItem.source">
+          <ReferenceIcon name="globe" :size="12" />
+          <span>{{ hoveredCardItem.source }}</span>
+        </div>
+      </template>
+
+      <div class="reference-card-hover__meta">
+        <span v-if="hoveredCardItem.created_at">{{ t('knowledgeBase.createdAt') }} {{ formatDocTime(hoveredCardItem.created_at) }}</span>
+        <span v-if="Number(hoveredCardItem.file_size || 0) > 0">{{ formatFileSize(Number(hoveredCardItem.file_size)) }}</span>
+        <span>{{ t('knowledgeBase.updatedAt') }} {{ formatDocTime(hoveredCardItem.updated_at) }}</span>
+        <span v-if="channelLabel(hoveredCardItem.channel)" class="reference-card-hover__channel">{{ channelLabel(hoveredCardItem.channel) }}</span>
+      </div>
+
+      <div v-if="hoveredCardItem.tags?.length" class="reference-card-hover__tags">
+        <span v-for="tag in hoveredCardItem.tags" :key="tag.id">{{ tag.name }}</span>
+      </div>
+      <div class="reference-card-hover__hint">{{ t('knowledgeBase.clickToViewFull') }}</div>
+    </aside>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -451,69 +584,15 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
   box-shadow: 0 0 0 2px rgb(17 24 39 / 0.10), 0 1px 2px rgb(0 0 0 / 0.05);
 }
 .reference-document-card__body { min-width: 0; }
-.reference-document-card__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-.reference-document-card__title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1;
-}
+.reference-document-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.reference-document-card__title-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
 .reference-document-card__file-icon { flex: 0 0 auto; color: #4b5563; }
-.reference-document-card__title-wrap h4 {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #030712;
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 700;
-}
+.reference-document-card__title-wrap h4 { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #030712; font-size: 12px; line-height: 16px; font-weight: 700; }
 .reference-document-card__menu-anchor { position: relative; flex: 0 0 auto; }
-.reference-document-card__more {
-  width: 22px;
-  height: 22px;
-  margin: -3px -4px 0 0;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #9ca3af;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
+.reference-document-card__more { width: 22px; height: 22px; margin: -3px -4px 0 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; display: grid; place-items: center; cursor: pointer; }
 .reference-document-card__more:hover { background: #f3f4f6; color: #374151; }
-.reference-document-card__summary {
-  display: -webkit-box;
-  margin: 8px 0 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  color: #6b7280;
-  font-size: 11px;
-  line-height: 17px;
-  font-weight: 400;
-}
-.reference-status-badge {
-  width: fit-content;
-  margin-top: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  line-height: 14px;
-  font-weight: 700;
-}
+.reference-document-card__summary { display: -webkit-box; margin: 8px 0 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; color: #6b7280; font-size: 11px; line-height: 17px; font-weight: 400; }
+.reference-status-badge { width: fit-content; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; line-height: 14px; font-weight: 700; }
 .reference-status-action { border: 0; cursor: pointer; text-align: left; font-family: inherit; }
 .reference-status-action:hover { filter: brightness(.96); }
 .reference-status-badge--working { color: #b45309; background: #fffbeb; border: 1px solid rgb(253 230 138 / 0.8); }
@@ -523,90 +602,18 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
 .reference-draft-tip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9ca3af; font-size: 10px; line-height: 14px; }
 .reference-spin { animation: reference-spin 1s linear infinite; }
 @keyframes reference-spin { to { transform: rotate(360deg); } }
-.reference-document-card__footer {
-  padding-top: 10px;
-  border-top: 1px solid #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: #9ca3af;
-  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  font-size: 10px;
-  line-height: 14px;
-}
-.reference-document-card__extension {
-  flex: 0 0 auto;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: #f3f4f6;
-  color: #4b5563;
-  font-size: 9px;
-  line-height: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-.reference-card-folder-path {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #9ca3af;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font: inherit;
-  cursor: pointer;
-}
+.reference-document-card__footer { padding-top: 10px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; font-size: 10px; line-height: 14px; }
+.reference-document-card__extension { flex: 0 0 auto; padding: 2px 8px; border-radius: 4px; background: #f3f4f6; color: #4b5563; font-size: 9px; line-height: 12px; font-weight: 700; text-transform: uppercase; }
+.reference-card-folder-path { min-width: 0; padding: 0; border: 0; background: transparent; color: #9ca3af; display: inline-flex; align-items: center; gap: 4px; font: inherit; cursor: pointer; }
 .reference-card-folder-path span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reference-card-checkbox {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  z-index: 5;
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  background: rgb(255 255 255 / 0.94);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
-}
+.reference-card-checkbox { position: absolute; left: 8px; top: 8px; z-index: 5; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; background: rgb(255 255 255 / 0.94); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
 .reference-card-checkbox input { width: 13px; height: 13px; margin: 0; accent-color: #111827; cursor: pointer; }
 .reference-document-card__backdrop { position: fixed; inset: 0; z-index: 20; }
-.reference-document-card__menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 30;
-  width: 144px;
-  padding: 4px 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10);
-  color: #374151;
-  text-align: left;
-}
+.reference-document-card__menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: 144px; padding: 4px 0; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10); color: #374151; text-align: left; }
 .reference-folder-picker,
 .reference-move-target-menu,
 .reference-move-confirm { width: 190px; max-height: 300px; overflow-y: auto; }
-.reference-menu-item {
-  width: 100%;
-  min-height: 28px;
-  padding: 6px 12px;
-  border: 0;
-  background: transparent;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 400;
-  text-align: left;
-  cursor: pointer;
-}
+.reference-menu-item { width: 100%; min-height: 28px; padding: 6px 12px; border: 0; background: transparent; color: #374151; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; cursor: pointer; }
 .reference-menu-item:hover { background: #f9fafb; }
 .reference-menu-icon { color: #6b7280; }
 .reference-menu-item--warning { color: #b45309; }
@@ -629,27 +636,28 @@ const pickFolder = (item: KnowledgeCard, path: string) => {
 .reference-move-cancel { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; }
 .reference-move-submit { border: 1px solid #111827; background: #111827; color: #fff; }
 .reference-move-submit:disabled { opacity: .55; cursor: default; }
-.reference-folder-card {
-  padding: 0;
-  overflow: hidden;
-  color: #111827;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  text-align: left;
-  cursor: pointer;
-}
+.reference-folder-card { padding: 0; overflow: hidden; color: #111827; display: flex; flex-direction: column; justify-content: space-between; text-align: left; cursor: pointer; }
 .reference-folder-card:hover { border-color: #9ca3af; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.06); }
 .reference-folder-card__top { padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; color: #2563eb; }
 .reference-folder-card__top span { color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
 .reference-folder-card__footer { padding: 10px 16px; border-top: 1px solid #f3f4f6; color: #9ca3af; font-size: 10px; line-height: 14px; }
-@media (max-width: 1279px) {
-  .reference-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 1023px) {
-  .reference-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 639px) {
-  .reference-card-grid { grid-template-columns: 1fr; }
-}
+
+.reference-card-hover-inspector { position: fixed; z-index: 2400; width: 344px; max-height: min(430px, calc(100vh - 20px)); overflow: auto; padding: 14px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 16px; background: rgb(255 255 255 / .98); color: #374151; box-shadow: 0 20px 25px -5px rgb(0 0 0 / .10), 0 8px 10px -6px rgb(0 0 0 / .10); font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
+.reference-card-hover__header { display: flex; align-items: center; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
+.reference-card-hover__header strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #111827; font-size: 12px; line-height: 16px; font-weight: 700; }
+.reference-card-hover__header > span { flex: 0 0 auto; padding: 2px 6px; border-radius: 5px; background: #f3f4f6; color: #6b7280; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 9px; font-weight: 700; }
+.reference-card-hover__timeline { margin-top: 10px; }
+.reference-card-hover__draft { margin-top: 10px; padding: 9px 10px; border-radius: 10px; background: #fffbeb; color: #b45309; font-size: 11px; line-height: 16px; }
+.reference-card-hover__summary { margin: 10px 0 0; color: #4b5563; font-size: 11px; line-height: 17px; white-space: pre-wrap; }
+.reference-card-hover__source { margin-top: 8px; display: flex; align-items: center; gap: 5px; min-width: 0; color: #6b7280; font-size: 10px; }
+.reference-card-hover__source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reference-card-hover__meta { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px 10px; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 9px; line-height: 14px; }
+.reference-card-hover__channel { color: #6b7280; }
+.reference-card-hover__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.reference-card-hover__tags span { padding: 2px 6px; border-radius: 5px; background: #f3f4f6; color: #4b5563; font-size: 9px; line-height: 13px; }
+.reference-card-hover__hint { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f3f4f6; color: #9ca3af; font-size: 9px; line-height: 13px; text-align: right; }
+
+@media (max-width: 1279px) { .reference-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1023px) { .reference-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 639px) { .reference-card-grid { grid-template-columns: 1fr; } .reference-card-hover-inspector { display: none; } }
 </style>
