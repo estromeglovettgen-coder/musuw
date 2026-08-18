@@ -31,7 +31,6 @@ const baseline = new Map([
   ['../views/chat/components/usermsg.vue', '6dd0f2e44e4fc382d6f40702aa4b5eebc2467fea'],
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
-  ['../views/knowledge/components/DocumentCardView.vue', '7fdddb98988e06b2cd6b99b7ab991574abc58964'],
   ['../views/knowledge/components/DocumentListView.vue', 'dc553565d2c1818878c3c34631dc4d33010f96c6'],
   ['../views/knowledge/components/KbFolderTree.vue', '7475054ca4afb6ebb133fb47c394e2f57c1d8aea'],
   ['../views/knowledge/components/KbUploadSourceDropdown.vue', 'e0e83fcb20897a205f9b6ee1f65b1ebe8ca1da68'],
@@ -74,5 +73,22 @@ test('new-chat view may replace markup and CSS but must preserve its business co
     'navigateToKnowledgeBaseList(kbId)',
   ]) {
     assert.ok(script.includes(contract), `new-chat business contract changed: ${contract}`)
+  }
+})
+
+test('document-card view may replace markup and CSS but must preserve its event contract', () => {
+  const source = read('../views/knowledge/components/DocumentCardView.vue')
+  const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1] || ''
+
+  for (const contract of [
+    "emit('open', item)",
+    "emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))",
+    "emit('menu-visible-change', visible, item)",
+    "emit('move-to-folder', item, path)",
+    "emit('action', action, item)",
+    "folderPickerItemId.value = item.id",
+    "props.traceAvailableById[item.id] === true",
+  ]) {
+    assert.ok(script.includes(contract), `document-card business contract changed: ${contract}`)
   }
 })
