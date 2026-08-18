@@ -12,6 +12,9 @@ import "@/assets/dropdown-menu.less";
 import "@/components/css/chat-hljs-dark.less";
 // Stable vendor primitives only. Application Views own their own geometry and presentation.
 import "@/assets/musuw-ui-primitives.css";
+// Final presentation-only convergence for native business surfaces that have no
+// direct reference component, plus exact reference Lucide glyph masks.
+import "@/assets/musuw-visual-contract-final.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
