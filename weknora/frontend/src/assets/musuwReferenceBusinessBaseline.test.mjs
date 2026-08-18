@@ -29,7 +29,6 @@ const baseline = new Map([
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
   ['../views/knowledge/components/DocumentListView.vue', 'dc553565d2c1818878c3c34631dc4d33010f96c6'],
-  ['../views/knowledge/components/DocumentActionMenu.vue', '0d85aa2ab1ce2b5f85412427e9ee16530b6dab71'],
   ['../views/knowledge/components/BatchTagDialog.test.ts', '2cecdf2012ef924bfabe6f7fdbf3a3ab55c7ef8d'],
   ['../views/knowledge/components/BatchTagDialog.vue', 'dde15cb2dd4c8019b2f5f7b03277039a4c5af0b0'],
   ['../views/knowledge/components/DocumentBatchBar.vue', 'de5e7b6ed2685b9754a4d7c1becbf574a27abdfe'],
@@ -120,6 +119,20 @@ test('document-card view may replace markup and CSS but must preserve its event 
     "emit('action', action, item)",
     "folderPickerItemId.value = item.id",
     "props.traceAvailableById[item.id] === true",
+  ])
+})
+
+test('document action menu may replace markup and CSS but must preserve every action emit', () => {
+  assertContracts('../views/knowledge/components/DocumentActionMenu.vue', 'document action menu', [
+    "(e: 'edit'): void",
+    "(e: 'view-trace'): void",
+    "(e: 'reparse'): void",
+    "(e: 'cancel-parse'): void",
+    "(e: 'move'): void",
+    "(e: 'move-folder'): void",
+    "(e: 'batch-manage'): void",
+    "(e: 'delete'): void",
+    "CANCELABLE_PARSE_STATUSES.has(String(props.item.parse_status ?? ''))",
   ])
 })
 
