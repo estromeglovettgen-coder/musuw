@@ -1,107 +1,93 @@
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.request import urlopen
 import re
 import subprocess
 
 ROOT = Path("weknora/frontend/src")
-UPSTREAM_SHA = "3d5d8bfcdfeeea266b292b71cea616847af28d0f"
+MAIN = "origin/main"
 
 
-def git_show(commit: str, path: str, target: Path) -> None:
-    target.write_text(subprocess.check_output(["git", "show", f"{commit}:{path}"], text=True))
+def git_text(ref: str, path: str) -> str:
+    return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
 
-# Restore the source-level visual implementations that existed before the
-# business-only rollback. These files already preserve their emits/contracts;
-# the parent KnowledgeBase is rebuilt below from the exact upstream script.
-git_show(
-    "f3fd6f2470f0c31d04a783dff5c112352cbc5c6e",
-    "weknora/frontend/src/views/knowledge/components/DocumentCardView.vue",
-    ROOT / "views/knowledge/components/DocumentCardView.vue",
-)
-git_show(
-    "811c927e1e0829fb0a87f8c55c93dd54bcac07b5",
-    "weknora/frontend/src/views/knowledge/components/DocumentListView.vue",
-    ROOT / "views/knowledge/components/DocumentListView.vue",
-)
-git_show(
-    "04ef5c2eb333b93ac745b76540b7af4a3321b16d",
-    "weknora/frontend/src/views/knowledge/components/DocumentActionMenu.vue",
-    ROOT / "views/knowledge/components/DocumentActionMenu.vue",
-)
-git_show(
-    "8a34824909daa1783fc989b27b1150d0bc56681a",
-    "weknora/frontend/src/views/knowledge/components/KbFolderTree.vue",
-    ROOT / "views/knowledge/components/KbFolderTree.vue",
-)
-git_show(
-    "f83f34e12f3a2ee7bc39f873f3a0dcc72672611e",
-    "weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue",
-    ROOT / "views/knowledge/components/KbUploadSourceDropdown.vue",
-)
-git_show(
-    "f1fd4afaeba6edf6ac6ab5f2dc4f94f7234b049b",
-    "weknora/frontend/src/views/knowledge/components/DocumentBatchBar.vue",
-    ROOT / "views/knowledge/components/DocumentBatchBar.vue",
-)
-git_show(
-    "51268abf3b9867aa4fb21c70a1cd4c359e2ff1d9",
-    "weknora/frontend/src/views/knowledge/components/TagEditDialog.vue",
-    ROOT / "views/knowledge/components/TagEditDialog.vue",
-)
-git_show(
-    "06701cc139a8f07fdcc20ab79e6f7150d41d61c1",
-    "weknora/frontend/src/components/KBSwitcherDropdown.vue",
-    ROOT / "components/KBSwitcherDropdown.vue",
-)
+def write_from_main(path: str) -> None:
+    (ROOT / path).write_text(git_text(MAIN, f"weknora/frontend/src/{path}"))
 
-kb_path = ROOT / "views/knowledge/KnowledgeBase.vue"
-upstream = urlopen(
-    f"https://raw.githubusercontent.com/Tencent/WeKnora/{UPSTREAM_SHA}/frontend/src/views/knowledge/KnowledgeBase.vue",
-    timeout=60,
-).read().decode("utf-8")
-script = upstream[: upstream.index("</script>") + len("</script>")]
 
-donor = subprocess.check_output(
-    [
-        "git",
-        "show",
-        "e21dfccea851d6eafb7d5892f5dc990f66b11f48:weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue",
-    ],
-    text=True,
-)
+# Child presentation components already underwent source-level reference replacement
+# on main. Bring those exact versions into this isolated audit branch.
+for rel in [
+    "components/ReferenceIcon.vue",
+    "views/knowledge/components/DocumentCardView.vue",
+    "views/knowledge/components/DocumentListView.vue",
+    "views/knowledge/components/DocumentActionMenu.vue",
+    "views/knowledge/components/KbFolderTree.vue",
+    "views/knowledge/components/KbUploadSourceDropdown.vue",
+    "views/knowledge/components/DocumentBatchBar.vue",
+    "views/knowledge/components/TagEditDialog.vue",
+    "views/knowledge/components/BatchTagDialog.vue",
+    "views/knowledge/components/KbTagManageDrawer.vue",
+    "components/KBSwitcherDropdown.vue",
+]:
+    write_from_main(rel)
+
+# BUSINESS AUTHORITY: the exact current main KnowledgeBase script. Never use an
+# upstream/staging script here; project-specific permissions, upload behavior,
+# pagination, polling, routing, marquee selection and settings logic must survive.
+current = git_text(MAIN, "weknora/frontend/src/views/knowledge/KnowledgeBase.vue")
+if "<template>" not in current:
+    raise RuntimeError("current KnowledgeBase template boundary missing")
+native_script = current[: current.index("<template>")]
+script = native_script
+
+# PRESENTATION AUTHORITY: the mechanically translated reference template/style.
+donor = git_text(MAIN, "weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue")
+if "<template>" not in donor:
+    raise RuntimeError("reference donor template boundary missing")
 presentation = donor[donor.index("<template>") :]
 
-# ReferenceIcon is only a presentation adapter.
-anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
-if anchor not in script:
-    raise RuntimeError("exact upstream KBSwitcher import anchor changed")
-script = script.replace(anchor, anchor + "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n", 1)
+# Only two script additions are permitted: the reference icon component and two
+# display counters populated by the API call that the native script already makes.
+icon_import = "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n"
+import_anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
+if icon_import not in script:
+    if import_anchor not in script:
+        raise RuntimeError("ReferenceIcon import anchor changed")
+    script = script.replace(import_anchor, import_anchor + icon_import, 1)
 
-# The visual authority shows Wiki/graph counts. They come from the existing
-# upstream wiki stats call, never mock data.
-counter_anchor = "const wikiIsIndexing = computed(() => wikiStatus.value.isActive || wikiStatus.value.pendingTasks > 0)\n"
-if counter_anchor not in script:
-    raise RuntimeError("exact upstream wiki status anchor changed")
-script = script.replace(counter_anchor, "const wikiCount = ref(0)\nconst graphCount = ref(0)\n" + counter_anchor, 1)
-data_anchor = "    const data = res?.data || res\n    if (!data) return\n"
-if data_anchor not in script:
-    raise RuntimeError("exact upstream wiki response anchor changed")
-script = script.replace(
-    data_anchor,
-    data_anchor
-    + "    wikiCount.value = Number(data.total_pages || 0)\n"
-    + "    graphCount.value = Number(data.total_links || 0)\n",
-    1,
-)
+count_state = "const wikiPageCount = ref(0);\nconst wikiLinkCount = ref(0);\n"
+wiki_state_anchor = "const wikiStatus = ref<{ pendingTasks: number; isActive: boolean; pendingIssues: number }>({\n"
+if count_state not in script:
+    if wiki_state_anchor not in script:
+        raise RuntimeError("wiki status anchor changed")
+    script = script.replace(wiki_state_anchor, count_state + wiki_state_anchor, 1)
+    response_anchor = "    const data = res?.data || res\n    if (!data) return\n"
+    if response_anchor not in script:
+        raise RuntimeError("wiki stats response anchor changed")
+    script = script.replace(
+        response_anchor,
+        response_anchor
+        + "    wikiPageCount.value = Number(data.total_pages || 0)\n"
+        + "    wikiLinkCount.value = Number(data.total_links || 0)\n",
+        1,
+    )
+    reset_anchor = "  wikiStatus.value = { pendingTasks: 0, isActive: false, pendingIssues: 0 }\n"
+    if reset_anchor in script:
+        script = script.replace(
+            reset_anchor,
+            reset_anchor + "  wikiPageCount.value = 0\n  wikiLinkCount.value = 0\n",
+            1,
+        )
 
-# Visual DOM -> exact upstream handler wiring.
+# Wire every reference control back to the current native handler.
 wiring = {
     '@select="handleKnowledgeDropdownSelect"': '@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
     '@open-source-doc="(id) => openKnowledgeItem({ id })"': '@open-source-doc="openSourceDoc"',
     '@status-change="refreshWikiStats"': '@status-change="onWikiStatusChange"',
+    '<span>Wiki ({{ wikiCount }})</span>': '<span>Wiki ({{ wikiPageCount }})</span>',
+    "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>": "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ wikiLinkCount }})</span>",
     '@files="uploadFiles"': '@files="handleUploadSourceFiles"',
     '@url="importUrl"': '@url="handleUploadSourceUrl"',
     '@manual="createManual"': '@manual="handleManualCreate"',
@@ -116,11 +102,12 @@ wiring = {
     '@tag-created="loadTags"': '@tag-created="() => loadTags(kbId, true)"',
     '@open-manage="tagManageDrawerVisible = true"': '@open-manage="openTagManageFromEditDialog"',
     '@changed="() => { loadTags(); loadKnowledgeFiles() }"': '@changed="onTagManageChanged"',
+    'font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;': 'font-family: var(--app-font-family);',
 }
 for before, after in wiring.items():
     presentation = presentation.replace(before, after)
 
-# The list component has its own upstream bridge.
+# The list view has a separate action adapter in the native controller.
 probe = '@probe-trace="probeTraceAvailable"'
 probe_index = presentation.find(probe)
 if probe_index >= 0:
@@ -132,48 +119,74 @@ if probe_index >= 0:
             + presentation[action_index + len('@action="handleCardAction"') :]
         )
 
-# Tag filtering must execute upstream state reset/pagination behavior.
+# Batch tag management uses the batch-specific native bridge.
+if "<BatchTagDialog" in presentation:
+    before, rest = presentation.split("<BatchTagDialog", 1)
+    rest = rest.replace(
+        '@open-manage="openTagManageFromEditDialog"',
+        '@open-manage="openTagManageFromBatchDialog"',
+        1,
+    )
+    presentation = before + "<BatchTagDialog" + rest
+
+# Native tag handler synchronizes UI store, pagination and network reload state.
 presentation = re.sub(
     r'@click="selectedTagIds\s*=\s*selectedTagIds\.includes\(tag\.id\)[\s\S]*?\[\.\.\.selectedTagIds,\s*tag\.id\]"',
     '@click="handleTagRowClick(tag.id)"',
     presentation,
 )
+
+# Keep native infinite-scroll + marquee selection on the new scroll host.
+scroll = '<div class="reference-doc-scroll">'
+if scroll not in presentation:
+    raise RuntimeError("reference document scroll host missing")
 presentation = presentation.replace(
-    ':class="{ active: selectedTagIds.includes(tag.id) }"',
-    ':class="{ active: isTagFilterActive(tag.id) }"',
+    scroll,
+    '''<div class="reference-doc-scroll" ref="knowledgeScroll" @scroll="handleScroll" @mousedown="onDocMarqueeMouseDown">
+          <div v-if="docMarqueeVisible" class="doc-marquee-box" :class="{ 'is-add': docMarqueeMode === 'add', 'is-subtract': docMarqueeMode === 'subtract' }" :style="docMarqueeBoxStyle" aria-hidden="true" />''',
+    1,
 )
 
-# Preserve summary-state synchronization from exact upstream DocContent wiring.
-if "syncDocumentSummaryState" not in presentation:
-    presentation = presentation.replace(
-        '@getDoc="getDoc"\n    />',
-        '@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />',
-        1,
-    )
-
-# Project business actions not shown in the visual mockup remain available, but
-# are rendered with the same minimal reference visual language.
-header_marker = "        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
-if header_marker in presentation and "reference-kb-extra-actions" not in presentation:
-    presentation = presentation.replace(
-        header_marker,
-        """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
-        <div class="reference-kb-extra-actions">
-          <KBInfoPopover v-if="kbInfo && !authStore.isLiteMode" :kb-info="kbInfo" :supported-file-types="[...supportedFileTypes]" />
-          <button v-if="canManage" type="button" class="reference-kb-extra-button" :title="$t('knowledgeBase.settings')" @click="handleOpenKBSettings"><ReferenceIcon name="settings" :size="14" /></button>
-        </div>
-        <button v-if="unsupportedFileTypes.length" type="button" class="reference-kb-warning" @click="goToParserSettings"><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map(t => '.' + t).join('、') }) }}</span><strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
+# Preserve project-only parser/storage warnings, visually subordinated to the reference header.
+header = "        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
+if header not in presentation:
+    raise RuntimeError("reference header insertion point missing")
+presentation = presentation.replace(
+    header,
+    """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
+        <button v-if="unsupportedFileTypes.length" type="button" class="reference-kb-warning" @click="goToParserSettings"><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map((type) => '.' + type).join('、') }) }}</span><strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
         <button v-if="missingStorageEngine" type="button" class="reference-kb-warning" @click="handleOpenKBSettings"><span>{{ $t('knowledgeBase.missingStorageEngine') }}</span><strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong></button>
       </div>""",
-        1,
-    )
+    1,
+)
 
-# Preserve the real settings editor modal.
+# Root empty state keeps the real production upload/drop component. Folder/filter
+# empty states retain the compact reference presentation.
+empty_old = """          <div v-else-if="!docListLoading" class="reference-empty-state">
+            <ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" />
+            <strong>暂无文档</strong>
+          </div>"""
+empty_new = """          <div v-else-if="!docListLoading" class="reference-empty-state">
+            <template v-if="selectedFolderPath || isFiltering"><ReferenceIcon name="file-text" :size="38" :stroke-width="1.5" /><strong>{{ isFiltering ? $t('knowledgeBase.folderTree.emptySearch') : $t('knowledgeBase.folderTree.emptyFolder') }}</strong></template>
+            <EmptyKnowledge v-else />
+          </div>"""
+if empty_old not in presentation:
+    raise RuntimeError("reference empty state changed")
+presentation = presentation.replace(empty_old, empty_new, 1)
+
+# Preserve document summary synchronization.
+presentation = presentation.replace(
+    '@getDoc="getDoc"\n    />',
+    '@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />',
+    1,
+)
+
+# Preserve native KB settings editor host; only the detail presentation changes.
 if "<KnowledgeBaseEditorModal" not in presentation:
-    root_close = "\n  </div>\n</template>"
+    root_close = "\n  </div>\n</template>\n\n<style scoped>"
     pos = presentation.rfind(root_close)
     if pos < 0:
-        raise RuntimeError("reference KnowledgeBase root close not found")
+        raise RuntimeError("reference root close missing")
     modal = """
     <KnowledgeBaseEditorModal
       :visible="uiStore.showKBEditorModal"
@@ -186,48 +199,21 @@ if "<KnowledgeBaseEditorModal" not in presentation:
 """
     presentation = presentation[:pos] + modal + presentation[pos:]
 
-# Extra real controls use reference primitives; no alternate UI system.
+# Minimal style for real project-only warnings + marquee; no alternate design system.
 css = """
-.reference-kb-header__copy{position:relative}.reference-kb-extra-actions{position:absolute;left:calc(100% + 10px);top:0;display:flex;align-items:center;gap:4px}.reference-kb-extra-button{width:28px;height:28px;padding:0;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#6b7280;display:grid;place-items:center;cursor:pointer}.reference-kb-extra-button:hover{background:#f3f4f6;color:#111827}.reference-kb-warning{max-width:760px;margin:4px 0 0;padding:0;border:0;background:transparent;color:#9ca3af;display:flex;align-items:center;gap:5px;font:inherit;font-size:10px;line-height:14px;text-align:left;cursor:pointer}.reference-kb-warning strong{color:#6b7280;font-weight:700;white-space:nowrap}
+.reference-kb-warning{max-width:760px;margin:4px 0 0;padding:0;border:0;background:transparent;color:#9ca3af;display:flex;align-items:center;gap:5px;font:inherit;font-size:10px;line-height:14px;text-align:left;cursor:pointer}.reference-kb-warning strong{color:#6b7280;font-weight:700;white-space:nowrap}.doc-marquee-box{position:absolute;z-index:30;pointer-events:none;border:1px solid rgb(17 24 39 / .45);background:rgb(17 24 39 / .06)}.doc-marquee-box.is-subtract{border-color:rgb(220 38 38 / .45);background:rgb(220 38 38 / .06)}
 """
 style_pos = presentation.rfind("</style>")
 if style_pos < 0:
     raise RuntimeError("reference style close missing")
 presentation = presentation[:style_pos] + css + presentation[style_pos:]
-kb_path.write_text(script + "\n\n" + presentation)
 
-# Restore upstream global upload-confirm host while keeping Musuw's auth shell.
-app_path = ROOT / "App.vue"
-app = app_path.read_text()
-manual_import = 'import ManualKnowledgeEditor from "@/components/manual-knowledge-editor.vue";\n'
-host_import = 'import UploadConfirmHost from "@/components/UploadConfirmHost.vue";\n'
-if host_import not in app:
-    if manual_import not in app:
-        raise RuntimeError("App upload host import anchor missing")
-    app = app.replace(manual_import, manual_import + host_import, 1)
-if "<UploadConfirmHost />" not in app:
-    app = app.replace("      <ManualKnowledgeEditor />", "      <ManualKnowledgeEditor />\n      <UploadConfirmHost />", 1)
-app_path.write_text(app)
+final = script + "\n\n" + presentation
+(ROOT / "views/knowledge/KnowledgeBase.vue").write_text(final)
 
-# Reuse the real file input for any reference empty-state upload CTA.
-upload_path = ROOT / "views/knowledge/components/KbUploadSourceDropdown.vue"
-upload = upload_path.read_text()
-if "const openFilePicker = () =>" not in upload:
-    upload = upload.replace(
-        "const openUrlDialog = () => {",
-        "const openFilePicker = () => fileInputRef.value?.click()\n\nconst openUrlDialog = () => {",
-        1,
-    )
-upload = upload.replace("defineExpose({ openUrlDialog })", "defineExpose({ openUrlDialog, openFilePicker })")
-upload_path.write_text(upload)
-
-# Hard assertions: visual source is active; staging business is not.
-final = kb_path.read_text()
+# Adversarial invariants: no old detail template, no staging controller, protected
+# graph/trace hosts remain unchanged components, and every native business bridge exists.
 required = [
-    "useUploadConfirmStore",
-    "openUploadConfirmDialog",
-    "handleUploadConfirmResult",
-    "process_config",
     "reference-kb-header",
     "reference-kb-tabs",
     "reference-doc-stage",
@@ -241,21 +227,42 @@ required = [
     "confirmBatchDelete",
     "confirmBatchReparse",
     "handleBatchTag",
+    "<WikiBrowser",
+    "<DocContent",
 ]
-missing = [token for token in required if token not in final]
+missing = [x for x in required if x not in final]
 if missing:
-    raise RuntimeError(f"missing contracts: {missing}")
-for forbidden in ["const uploadFiles = async", "const importUrl = async", "const createManual ="]:
+    raise RuntimeError(f"missing native/reference contracts: {missing}")
+for forbidden in [
+    'class="knowledge-layout"',
+    'class="document-header"',
+    'class="doc-filter-bar"',
+    "const uploadFiles = async",
+    "const importUrl = async",
+    "const createManual =",
+]:
     if forbidden in final:
-        raise RuntimeError(f"staging business controller is active: {forbidden}")
+        raise RuntimeError(f"legacy/staging controller survived: {forbidden}")
 
-for file_name, tokens in {
-    "views/knowledge/components/DocumentCardView.vue": ["ReferenceIcon", "reference-card-grid", "reference-document-card"],
+# Prove script parity: remove exactly the permitted visual additions and compare to
+# the exact current-main script byte-for-byte.
+normalized = script
+normalized = normalized.replace(icon_import, "", 1)
+normalized = normalized.replace(count_state, "", 1)
+normalized = normalized.replace("    wikiPageCount.value = Number(data.total_pages || 0)\n", "", 1)
+normalized = normalized.replace("    wikiLinkCount.value = Number(data.total_links || 0)\n", "", 1)
+normalized = normalized.replace("  wikiPageCount.value = 0\n", "", 1)
+normalized = normalized.replace("  wikiLinkCount.value = 0\n", "", 1)
+if normalized != native_script:
+    raise RuntimeError("native business script changed beyond permitted visual counters/import")
+
+for rel, tokens in {
+    "views/knowledge/components/DocumentCardView.vue": ["ReferenceIcon", "reference-document-card"],
     "views/knowledge/components/DocumentListView.vue": ["ReferenceIcon"],
     "views/knowledge/components/KbFolderTree.vue": ["ReferenceIcon"],
     "views/knowledge/components/KbUploadSourceDropdown.vue": ["ReferenceIcon"],
 }.items():
-    text = (ROOT / file_name).read_text()
+    text = (ROOT / rel).read_text()
     for token in tokens:
         if token not in text:
-            raise RuntimeError(f"{file_name} missing {token}")
+            raise RuntimeError(f"{rel} missing source-level reference token {token}")
