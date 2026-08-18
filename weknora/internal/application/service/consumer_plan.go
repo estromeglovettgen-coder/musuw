@@ -55,11 +55,9 @@ func (s *knowledgeService) checkCreateKnowledgeEntitlement(ctx context.Context, 
 			return apperrors.NewForbiddenError("Free plan supports ten documents per knowledge base; upgrade to add more")
 		}
 	}
-	used := types.EffectiveOpenRouterUsage(tenant, time.Now())
-	remaining := limits.MonthlyOpenRouterMicrousd - used
-	if types.EstimateParseMicrousd(fileBytes) > remaining {
-		return apperrors.NewTooManyRequestsError("OpenRouter monthly credit is insufficient to parse this document")
-	}
+	// OpenRouter's provider-managed monthly key limit is authoritative. A
+	// request-size cost guess here would be both stale and endpoint-dependent.
+	_ = fileBytes
 	return nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 type entitlementRepoStub struct {
 	tenant *types.Tenant
 	used   int64
+	key    *types.OpenRouterTenantKey
 }
 
 func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*types.Tenant, error) {
@@ -21,14 +23,56 @@ func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*ty
 	return &copy, nil
 }
 
+func (s *entitlementRepoStub) GetOpenRouterKey(context.Context, uint64) (*types.OpenRouterTenantKey, error) {
+	if s.key == nil {
+		return nil, nil
+	}
+	copy := *s.key
+	return &copy, nil
+}
+
+func (s *entitlementRepoStub) SetOpenRouterKeyIfAbsent(_ context.Context, key *types.OpenRouterTenantKey) (bool, error) {
+	if s.key != nil {
+		return false, nil
+	}
+	copy := *key
+	s.key = &copy
+	return true, nil
+}
+
 func (s *entitlementRepoStub) RecordOpenRouterCost(_ context.Context, _ uint64, _ time.Time, cost int64) (int64, error) {
 	s.used += cost
 	return s.used, nil
 }
 
-func (s *entitlementRepoStub) ApplyConsumerPlan(context.Context, uint64, types.ConsumerPlan, string, string, time.Time, string, string) (bool, error) {
+func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, _ string, _ time.Time, _, _ string) (bool, error) {
+	s.tenant.Plan = plan
+	if status == "" {
+		status = "active"
+	}
+	s.tenant.PlanStatus = status
 	return true, nil
 }
+
+type keyManagerStub struct {
+	created     *modelopenrouter.ManagedKey
+	info        *modelopenrouter.KeyInfo
+	createCalls int
+	updateLimit int64
+}
+
+func (s *keyManagerStub) CreateKey(context.Context, string, int64) (*modelopenrouter.ManagedKey, error) {
+	s.createCalls++
+	return s.created, nil
+}
+func (s *keyManagerStub) UpdateKeyLimit(_ context.Context, _ string, limit int64) error {
+	s.updateLimit = limit
+	return nil
+}
+func (s *keyManagerStub) GetKey(context.Context, string) (*modelopenrouter.KeyInfo, error) {
+	return s.info, nil
+}
+func (s *keyManagerStub) DeleteKey(context.Context, string) error { return nil }
 
 func entitlementContext(tenantID uint64, userID string) context.Context {
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, tenantID)
@@ -58,6 +102,52 @@ func TestEntitlementServiceCurrentAndPreflight(t *testing.T) {
 	var appErr *apperrors.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, apperrors.ErrTooManyRequests, appErr.Code)
+}
+
+func TestEntitlementServiceProvisionsEncryptedProviderLimitedKey(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
+	repo := &entitlementRepoStub{tenant: &types.Tenant{ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active"}}
+	manager := &keyManagerStub{created: &modelopenrouter.ManagedKey{Key: "sk-child", Hash: "hash-7"}}
+	svc := newEntitlementService(repo, manager)
+	ctx := entitlementContext(7, "user-123")
+
+	key, err := svc.OpenRouterAPIKey(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "sk-child", key)
+	require.NotNil(t, repo.key)
+	assert.Equal(t, "hash-7", repo.key.KeyHash)
+	assert.NotEqual(t, "sk-child", repo.key.KeyCiphertext)
+	assert.Contains(t, repo.key.KeyCiphertext, "enc:v1:")
+	assert.Equal(t, 1, manager.createCalls)
+
+	key, err = svc.OpenRouterAPIKey(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "sk-child", key)
+	assert.Equal(t, 1, manager.createCalls)
+}
+
+func TestEntitlementServiceUsesProviderUsageAndSynchronizesPlanLimit(t *testing.T) {
+	repo := &entitlementRepoStub{
+		tenant: &types.Tenant{ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active"},
+		key:    &types.OpenRouterTenantKey{TenantID: 7, KeyHash: "hash-7", KeyCiphertext: "legacy-plaintext-key"},
+	}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash:                   "hash-7",
+		LimitMicrousd:          1_250_000,
+		LimitRemainingMicrousd: 1_000_000,
+		UsageMonthlyMicrousd:   250_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+	ctx := entitlementContext(7, "user-123")
+
+	current, err := svc.Current(ctx, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, int64(250_000), current.OpenRouterUsedMicrousd)
+	assert.Equal(t, int64(1_000_000), current.OpenRouterRemainingMicrousd)
+
+	_, err = svc.ApplyConsumerPlan(ctx, 7, types.ConsumerPlanPro, "active", "evt-1", time.Now(), "customer", "sub")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2_500_000), manager.updateLimit)
 }
 
 func TestEntitlementServiceOpenRouterUserIDIsStableAndOpaque(t *testing.T) {
