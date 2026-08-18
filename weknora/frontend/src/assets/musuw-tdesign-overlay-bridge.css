@@ -1,0 +1,103 @@
+/*
+ * Teleported TDesign overlay bridge.
+ * Visual-only: dropdown/dialog/popconfirm widgets keep their native instances,
+ * events and model bindings. This closes brand-blue chrome that escapes scoped
+ * visual-* roots because TDesign teleports overlays to <body>.
+ */
+
+body .t-dialog {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%) !important;
+}
+body .t-dialog__header {
+  color: #111827 !important;
+  font-family: var(--app-font-family) !important;
+  font-weight: 700 !important;
+}
+body .t-dialog__body {
+  color: #4b5563 !important;
+  font-family: var(--app-font-family) !important;
+  font-size: 12px !important;
+  line-height: 1.625 !important;
+}
+body .t-dialog .t-button { border-radius: 10px !important; box-shadow: none !important; }
+body .t-dialog .t-button--theme-primary,
+body .t-dialog .t-button--variant-base.t-button--theme-primary {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+}
+body .t-dialog .t-button--theme-primary:hover { border-color: #000 !important; background: #000 !important; }
+
+body .t-select__dropdown,
+body .t-dropdown__menu {
+  padding: 6px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
+  font-family: var(--app-font-family) !important;
+}
+body .t-select-option,
+body .t-dropdown__item {
+  min-height: 30px !important;
+  border-radius: 8px !important;
+  color: #4b5563 !important;
+  font-size: 11px !important;
+}
+body .t-select-option:hover,
+body .t-select-option.t-is-selected,
+body .t-dropdown__item:hover,
+body .t-dropdown__item.t-is-active {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+}
+body .t-select-option.t-is-selected { font-weight: 600 !important; }
+
+body .t-popconfirm {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
+  font-family: var(--app-font-family) !important;
+}
+body .t-popconfirm .t-button { border-radius: 8px !important; font-size: 11px !important; }
+body .t-popconfirm .t-button--theme-primary {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+}
+
+/* Reference controls are neutral/black rather than brand-blue. These rules only
+ * change the painted checked state; v-model values and events stay untouched. */
+.settings-modal .t-radio-button.t-is-checked,
+:where([class^="visual-"], [class*=" visual-"]) .t-radio-button.t-is-checked {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+}
+.settings-modal .t-checkbox__input.t-is-checked,
+:where([class^="visual-"], [class*=" visual-"]) .t-checkbox__input.t-is-checked {
+  border-color: #111827 !important;
+  background: #111827 !important;
+}
+.settings-modal .t-radio__input.t-is-checked,
+:where([class^="visual-"], [class*=" visual-"]) .t-radio__input.t-is-checked {
+  border-color: #111827 !important;
+  color: #111827 !important;
+}
+
+/* Keep focus visible but neutral, matching the exported reference's gray focus
+ * language except for components that explicitly opt into the editor's blue. */
+body .t-select-input.t-is-focused,
+body .t-input.t-is-focused {
+  border-color: #d1d5db !important;
+  box-shadow: 0 0 0 2px rgb(17 24 39 / 6%) !important;
+}
+
+/* Do not style graph/trace renderer roots here. */
