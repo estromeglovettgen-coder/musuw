@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
@@ -26,6 +27,40 @@ func (r *entitlementRepository) GetTenantEntitlement(ctx context.Context, tenant
 	return &tenant, nil
 }
 
+// SetOpenRouterCredentialsIfAbsent installs the first provider-managed key for
+// a tenant without replacing any other provider credentials. The row lock makes
+// first-use provisioning safe when multiple requests or replicas race.
+func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Context, tenantID uint64, credentials *types.OpenRouterCredentials) (bool, error) {
+	if credentials == nil || credentials.APIKey == "" || credentials.KeyHash == "" {
+		return false, fmt.Errorf("OpenRouter tenant credentials are incomplete")
+	}
+	inserted := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant types.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+			return err
+		}
+		if tenant.Credentials != nil && tenant.Credentials.OpenRouter != nil {
+			return nil
+		}
+		merged := types.CredentialsConfig{}
+		if tenant.Credentials != nil {
+			merged = *tenant.Credentials
+		}
+		copy := *credentials
+		merged.OpenRouter = &copy
+		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Update("credentials", &merged).Error; err != nil {
+			return err
+		}
+		inserted = true
+		return nil
+	})
+	return inserted, err
+}
+
+// RecordOpenRouterCost is retained for one migration cycle so old rows and
+// rollback code can still be read. Provider-managed key limits are the spend
+// authority and the active OpenRouter transport no longer calls this method.
 func (r *entitlementRepository) RecordOpenRouterCost(ctx context.Context, tenantID uint64, at time.Time, costMicrousd int64) (int64, error) {
 	if costMicrousd <= 0 {
 		var tenant types.Tenant
