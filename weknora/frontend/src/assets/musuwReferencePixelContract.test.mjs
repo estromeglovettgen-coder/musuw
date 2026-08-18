@@ -32,6 +32,8 @@ const migratedViewFiles = [
   '../views/chat/components/docInfo.vue',
   '../views/chat/components/deepThink.vue',
   '../views/chat/components/RagPipelineProgress.vue',
+  '../views/knowledge/KnowledgeBase.vue',
+  '../views/knowledge/KnowledgeBaseList.vue',
   '../views/knowledge/components/DocumentCardView.vue',
   '../views/knowledge/components/DocumentListView.vue',
   '../views/knowledge/components/DocumentActionMenu.vue',
@@ -47,7 +49,7 @@ const migratedViewFiles = [
   '../views/settings/ModelSettings.vue',
 ]
 
-test('transitional mechanical layer remains last only while KnowledgeBase mother view is unmigrated', () => {
+test('transitional mechanical layer remains isolated while the remaining shard audit is in progress', () => {
   const reference = main.indexOf('import "@/assets/musuw-reference-mechanical.css"')
   assert.ok(reference > main.indexOf('import "@/assets/dropdown-menu.less"'))
   assert.ok(reference > main.indexOf('import "@/components/css/chat-hljs-dark.less"'))
@@ -67,10 +69,6 @@ test('migrated views own their own visual-prefixed geometry', () => {
 
 test('global mechanical CSS never targets rebuilt visual roots', () => {
   assert.doesNotMatch(withoutComments, /\.visual-[a-z0-9_-]+/i)
-})
-
-test('KnowledgeBase is the only remaining mechanical mother root', () => {
-  assert.ok(mechanical.includes('.knowledge-layout'))
 })
 
 test('mechanical layer never owns product logic or excluded graph and trace renderers', () => {
