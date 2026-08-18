@@ -4,15 +4,14 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const main = read('../main.ts')
-const manifest = read('./musuw-reference-mechanical.css')
-const importNames = [...manifest.matchAll(/@import\s+"\.\/(musuw-reference-[^"]+\.css)";/g)].map((match) => match[1])
-const mechanical = importNames.map((name) => read(`./${name}`)).join('\n')
-const withoutComments = mechanical.replace(/\/\*[\s\S]*?\*\//g, '')
+const primitives = read('./musuw-ui-primitives.css')
 
 const migratedViewFiles = [
   '../views/creatChat/creatChat.vue',
+  '../views/chat/index.vue',
   '../components/menu.vue',
   '../components/Input-field.vue',
+  '../components/manual-knowledge-editor.vue',
   '../components/UserMenu.vue',
   '../components/SessionSidebarRow.vue',
   '../components/SessionSourceFilter.vue',
@@ -49,14 +48,21 @@ const migratedViewFiles = [
   '../views/settings/ModelSettings.vue',
 ]
 
-test('transitional mechanical layer remains isolated while the remaining shard audit is in progress', () => {
-  const reference = main.indexOf('import "@/assets/musuw-reference-mechanical.css"')
-  assert.ok(reference > main.indexOf('import "@/assets/dropdown-menu.less"'))
-  assert.ok(reference > main.indexOf('import "@/components/css/chat-hljs-dark.less"'))
+test('global mechanical reference layers are no longer active', () => {
   for (const legacy of [
-    'musuw-visual.less','musuw-reference-core.less','musuw-reference-workbench.less','musuw-reference-header.less',
-    'musuw-reference-knowledge-v2.less','musuw-reference-knowledge-v3.less','musuw-reference-knowledge-v4.less','musuw-reference-dom-bridge.css',
-  ]) assert.equal(main.includes(legacy) || manifest.includes(legacy), false, `${legacy} must not be active`)
+    'musuw-reference-mechanical.css',
+    'musuw-reference-citation-sources.css',
+    'musuw-visual.less',
+    'musuw-reference-core.less',
+    'musuw-reference-workbench.less',
+    'musuw-reference-header.less',
+    'musuw-reference-knowledge-v2.less',
+    'musuw-reference-knowledge-v3.less',
+    'musuw-reference-knowledge-v4.less',
+    'musuw-reference-dom-bridge.css',
+  ]) assert.equal(main.includes(legacy), false, `${legacy} must not be imported by main.ts`)
+
+  assert.ok(main.includes('import "@/assets/musuw-ui-primitives.css"'))
 })
 
 test('migrated views own their own visual-prefixed geometry', () => {
@@ -67,15 +73,12 @@ test('migrated views own their own visual-prefixed geometry', () => {
   }
 })
 
-test('global mechanical CSS never targets rebuilt visual roots', () => {
-  assert.doesNotMatch(withoutComments, /\.visual-[a-z0-9_-]+/i)
-})
-
-test('mechanical layer never owns product logic or excluded graph and trace renderers', () => {
-  assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.agent-stream-display(?=[\s.{:#>+~]|$)/m)
-  assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.streaming-steps-container(?=[\s.{:#>+~]|$)/m)
-  assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.tree-container(?=[\s.{:#>+~]|$)/m)
-  assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.wiki-graph(?:-canvas|-legend|-search-container)?(?=[\s.{:#>+~]|$)/m)
-  assert.equal(mechanical.includes('showFolderTree'), false)
-  assert.equal(mechanical.includes('localStorage'), false)
+test('vendor primitive layer contains only typography scrollbar popup and dialog primitives', () => {
+  for (const token of ['--font-sans', '--font-mono', 'scrollbar-width', '.t-popup .t-popup__content', '.t-dialog']) {
+    assert.ok(primitives.includes(token), `primitive layer lost ${token}`)
+  }
+  for (const legacySelector of [
+    '.aside_box', '.answers-input', '.rich-input-container', '.chat_scroll_box', '.kb-list-container',
+    '.knowledge-layout', '.settings-overlay', '.manual-editor', '.bot_msg', '.refer', '.wiki-graph',
+  ]) assert.equal(primitives.includes(legacySelector), false, `primitive layer owns product DOM: ${legacySelector}`)
 })
