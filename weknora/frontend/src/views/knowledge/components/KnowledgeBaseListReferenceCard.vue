@@ -2,6 +2,8 @@
 import KbWikiBadge from './KbWikiBadge.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 
+type OriginVariant = 'mine' | 'tenant' | 'creator' | 'space' | 'shared'
+
 const props = withDefaults(defineProps<{
   kb: any
   shared?: boolean
@@ -10,7 +12,7 @@ const props = withDefaults(defineProps<{
   canDuplicate?: boolean
   canManage?: boolean
   showOriginBadge?: boolean
-  originVariant?: string
+  originVariant?: OriginVariant
   creatorName?: string
   orgName?: string
   highlighted?: boolean
@@ -22,7 +24,7 @@ const props = withDefaults(defineProps<{
   canDuplicate: false,
   canManage: false,
   showOriginBadge: false,
-  originVariant: '',
+  originVariant: 'mine',
   creatorName: '',
   orgName: '',
   highlighted: false,
@@ -85,7 +87,8 @@ const emit = defineEmits<{
     <footer class="visual-reference-kb-card__footer">
       <span class="visual-reference-kb-card__badge">
         <t-icon :name="kb.type === 'faq' ? 'chat-bubble-help' : 'file'" />
-        <span>{{ kb.type === 'faq' ? (kb.chunk_count ?? 0) : (kb.knowledge_count ?? 0) }} {{ kb.type === 'faq' ? 'Q&A' : $t('knowledgeBase.documentCount') }}</span>
+        <span v-if="kb.type === 'faq'">{{ kb.chunk_count ?? 0 }} Q&A</span>
+        <span v-else>{{ $t('knowledgeBase.folderTree.folderCardCount', { count: kb.knowledge_count ?? 0 }) }}</span>
         <span v-if="kb.isProcessing" class="visual-reference-kb-card__spinner" />
       </span>
       <span class="visual-reference-kb-card__spacer" />
