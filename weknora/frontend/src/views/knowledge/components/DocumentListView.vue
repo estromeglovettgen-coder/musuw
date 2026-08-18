@@ -252,139 +252,185 @@ const handleAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'mo
 </script>
 
 <template>
-  <div class="doc-list-view" :class="{ 'is-loading': loading }">
-    <div ref="stickySentinel" class="doc-list-sticky-sentinel" aria-hidden="true"></div>
-    <div class="doc-list-header" :class="{ 'is-stuck': headerStuck }" role="row">
-      <div class="cell cell-check" role="columnheader" @click.stop>
-        <t-checkbox class="doc-list-check" size="small" :checked="allSelected" :indeterminate="someSelected"
-          :disabled="!items.length" :title="t('knowledgeBase.selectAll')" @change="onHeaderCheckboxChange" />
+  <div class="visual-document-list" :class="{ 'is-loading': loading }">
+    <div ref="stickySentinel" class="visual-document-list__sentinel" aria-hidden="true" />
+
+    <div class="visual-document-list__header" :class="{ 'is-stuck': headerStuck }" role="row">
+      <div class="visual-document-list__cell is-check" role="columnheader" @click.stop>
+        <t-checkbox
+          class="visual-document-list__check"
+          size="small"
+          :checked="allSelected"
+          :indeterminate="someSelected"
+          :disabled="!items.length"
+          :title="t('knowledgeBase.selectAll')"
+          @change="onHeaderCheckboxChange"
+        />
       </div>
-      <div class="cell cell-name" role="columnheader">{{ t('knowledgeBase.columnName') }}</div>
-      <div class="cell cell-tag" role="columnheader">{{ t('knowledgeBase.columnTag') }}</div>
-      <div class="cell cell-source" role="columnheader">{{ t('knowledgeBase.columnSource') }}</div>
-      <div class="cell cell-size" role="columnheader">{{ t('knowledgeBase.columnSize') }}</div>
-      <div class="cell cell-status" role="columnheader">{{ t('knowledgeBase.columnStatus') }}</div>
-      <div class="cell cell-time" role="columnheader">{{ t('knowledgeBase.columnUpdatedAt') }}</div>
-      <div class="cell cell-actions" role="columnheader" v-if="canEdit"></div>
+      <div class="visual-document-list__cell is-name" role="columnheader">{{ t('knowledgeBase.columnName') }}</div>
+      <div class="visual-document-list__cell is-tag" role="columnheader">{{ t('knowledgeBase.columnTag') }}</div>
+      <div class="visual-document-list__cell is-source" role="columnheader">{{ t('knowledgeBase.columnSource') }}</div>
+      <div class="visual-document-list__cell is-size" role="columnheader">{{ t('knowledgeBase.columnSize') }}</div>
+      <div class="visual-document-list__cell is-status" role="columnheader">{{ t('knowledgeBase.columnStatus') }}</div>
+      <div class="visual-document-list__cell is-time" role="columnheader">{{ t('knowledgeBase.columnUpdatedAt') }}</div>
+      <div v-if="canEdit" class="visual-document-list__cell is-actions" role="columnheader" />
     </div>
 
-    <div class="doc-list-body">
-      <div
+    <div class="visual-document-list__body">
+      <button
         v-for="folder in folders"
         :key="'folder-' + folder.path"
-        class="doc-list-row doc-list-row--folder"
+        type="button"
+        class="visual-document-list__row is-folder"
         :title="folder.path"
         role="row"
         @click="emit('open-folder', folder.path)"
       >
-        <div class="cell cell-check" aria-hidden="true"></div>
-        <div class="cell cell-name">
-          <span class="row-file-icon-wrap">
-            <t-icon name="folder" class="row-folder-icon" />
+        <span class="visual-document-list__cell is-check" aria-hidden="true" />
+        <span class="visual-document-list__cell is-name">
+          <span class="visual-document-list__file-icon is-folder"><t-icon name="folder" /></span>
+          <span class="visual-document-list__file-copy">
+            <strong>{{ folder.name }}</strong>
           </span>
-          <div class="row-file-text">
-            <span class="row-file-name">{{ folder.name }}</span>
-          </div>
-        </div>
-        <div class="cell cell-tag"></div>
-        <div class="cell cell-source">
-          <span class="row-folder-meta">
+        </span>
+        <span class="visual-document-list__cell is-tag" />
+        <span class="visual-document-list__cell is-source">
+          <span class="visual-document-list__folder-count">
             {{ t('knowledgeBase.folderTree.folderCardCount', { count: folder.total_count }) }}
           </span>
-        </div>
-        <div class="cell cell-size"></div>
-        <div class="cell cell-status"></div>
-        <div class="cell cell-time"></div>
-        <div v-if="canEdit" class="cell cell-actions" aria-hidden="true"></div>
-      </div>
+        </span>
+        <span class="visual-document-list__cell is-size" />
+        <span class="visual-document-list__cell is-status" />
+        <span class="visual-document-list__cell is-time" />
+        <span v-if="canEdit" class="visual-document-list__cell is-actions" aria-hidden="true" />
+      </button>
 
-      <div v-for="item in items" :key="item.id" class="doc-list-row"
-        :class="{ selected: selectedIds.has(item.id), 'menu-open': moreOpen === item.id }" :data-select-id="item.id"
-        role="row" @click="emit('open', item)">
-        <div class="cell cell-check" @click.stop>
-          <t-checkbox class="doc-list-check" size="small" :checked="selectedIds.has(item.id)" :title="item.file_name"
-            @change="(c: boolean, ctx?: { e?: Event }) => onRowCheckboxChange(item, c, ctx)" />
+      <div
+        v-for="item in items"
+        :key="item.id"
+        class="visual-document-list__row"
+        :class="{ 'is-selected': selectedIds.has(item.id), 'is-menu-open': moreOpen === item.id }"
+        :data-select-id="item.id"
+        role="row"
+        tabindex="0"
+        @click="emit('open', item)"
+        @keydown.enter="emit('open', item)"
+      >
+        <div class="visual-document-list__cell is-check" @click.stop>
+          <t-checkbox
+            class="visual-document-list__check"
+            size="small"
+            :checked="selectedIds.has(item.id)"
+            :title="item.file_name"
+            @change="(c: boolean, ctx?: { e?: Event }) => onRowCheckboxChange(item, c, ctx)"
+          />
         </div>
 
-        <div class="cell cell-name">
-          <span class="row-file-icon-wrap">
+        <div class="visual-document-list__cell is-name">
+          <span class="visual-document-list__file-icon">
             <t-icon :name="getFileIcon(item)" />
           </span>
-          <div class="row-file-text">
-            <span class="row-file-name" :title="item.file_name">{{ item.file_name }}</span>
-            <button v-if="showFolderPath && item.folder_path" type="button" class="row-file-folder"
-              :title="item.folder_path" @click.stop="emit('open-folder', item.folder_path)">
+          <span class="visual-document-list__file-copy">
+            <strong :title="item.file_name">{{ item.file_name }}</strong>
+            <button
+              v-if="showFolderPath && item.folder_path"
+              type="button"
+              class="visual-document-list__folder-path"
+              :title="item.folder_path"
+              @click.stop="emit('open-folder', item.folder_path)"
+            >
               <t-icon name="folder" />
               <span>{{ item.folder_path }}</span>
             </button>
-            <span v-if="item.description" class="row-file-desc" :title="item.description">{{ item.description }}</span>
-          </div>
-        </div>
-
-
-        <div class="cell cell-tag">
-          <template v-if="item.tags && item.tags.length > 0">
-            <t-tooltip v-if="hasTagOverflow(item.id, (item.tags || []).length)"
-              :content="(item.tags || []).map((t: any) => t.name).join(', ')" placement="top">
-              <div class="row-tag-chips" :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
-                :class="{ 'is-clickable': canEdit }" @click.stop="canEdit && emit('tag-edit', item)">
-                <t-tag v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" size="small"
-                  variant="light-outline" class="row-tag">
-                  {{ tag.name }}
-                </t-tag>
-                <span class="row-tag-overflow">+{{ getOverflowCount(item.id, (item.tags || []).length) }}</span>
-              </div>
-            </t-tooltip>
-            <div v-else class="row-tag-chips" :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
-              :class="{ 'is-clickable': canEdit }" @click.stop="canEdit && emit('tag-edit', item)">
-              <t-tag v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" size="small"
-                variant="light-outline" class="row-tag">
-                {{ tag.name }}
-              </t-tag>
-            </div>
-          </template>
-          <span v-else class="row-tag-chips is-clickable" @click.stop="canEdit && emit('tag-edit', item)">
-            <span class="row-tag-add">+ {{ t('knowledgeBase.tagLabel') }}</span>
+            <small v-if="item.description" :title="item.description">{{ item.description }}</small>
           </span>
         </div>
 
-        <div class="cell cell-source">
-          <t-icon class="row-source-icon" :name="getSourceInfo(item).icon" />
-          <span class="row-source-label">{{ getSourceInfo(item).label }}</span>
+        <div class="visual-document-list__cell is-tag" @click.stop>
+          <template v-if="item.tags && item.tags.length > 0">
+            <t-tooltip
+              v-if="hasTagOverflow(item.id, (item.tags || []).length)"
+              :content="(item.tags || []).map((tag: any) => tag.name).join(', ')"
+              placement="top"
+            >
+              <div
+                class="visual-document-list__tags"
+                :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
+                :class="{ 'is-clickable': canEdit }"
+                @click="canEdit && emit('tag-edit', item)"
+              >
+                <span v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" class="visual-document-list__tag">
+                  {{ tag.name }}
+                </span>
+                <span class="visual-document-list__tag-overflow">+{{ getOverflowCount(item.id, (item.tags || []).length) }}</span>
+              </div>
+            </t-tooltip>
+            <div
+              v-else
+              class="visual-document-list__tags"
+              :ref="(el: any) => setupTagChipsObserver(el, item.id, (item.tags || []).length)"
+              :class="{ 'is-clickable': canEdit }"
+              @click="canEdit && emit('tag-edit', item)"
+            >
+              <span v-for="tag in (item.tags || []).slice(0, getTagLimit(item.id))" :key="tag.id" class="visual-document-list__tag">
+                {{ tag.name }}
+              </span>
+            </div>
+          </template>
+          <button v-else-if="canEdit" type="button" class="visual-document-list__add-tag" @click="emit('tag-edit', item)">
+            + {{ t('knowledgeBase.tagLabel') }}
+          </button>
         </div>
 
-        <div class="cell cell-size">
-          <span class="row-mono">{{ formatFileSize(item.file_size) || '--' }}</span>
+        <div class="visual-document-list__cell is-source">
+          <t-icon class="visual-document-list__source-icon" :name="getSourceInfo(item).icon" />
+          <span class="visual-document-list__source-label">{{ getSourceInfo(item).label }}</span>
         </div>
 
-        <div class="cell cell-status">
+        <div class="visual-document-list__cell is-size">
+          <span class="visual-document-list__mono">{{ formatFileSize(item.file_size) || '--' }}</span>
+        </div>
+
+        <div class="visual-document-list__cell is-status">
           <template v-if="statusByRow.get(item.id) as StatusInfo | undefined">
-            <t-tag v-if="statusByRow.get(item.id)!.label !== '--'" size="small" :theme="statusByRow.get(item.id)!.theme"
-              variant="light-outline" class="row-status-tag">
-              <template v-if="statusByRow.get(item.id)!.icon" #icon>
-                <t-icon :name="statusByRow.get(item.id)!.icon!"
-                  :class="{ 'icon-spin': statusByRow.get(item.id)!.spin }" />
-              </template>
+            <span
+              v-if="statusByRow.get(item.id)!.label !== '--'"
+              class="visual-document-list__status"
+              :class="`is-${statusByRow.get(item.id)!.theme}`"
+            >
+              <t-icon
+                v-if="statusByRow.get(item.id)!.icon"
+                :name="statusByRow.get(item.id)!.icon!"
+                :class="{ 'is-spinning': statusByRow.get(item.id)!.spin }"
+              />
               {{ statusByRow.get(item.id)!.label }}
-            </t-tag>
-            <span v-else class="row-muted">--</span>
+            </span>
+            <span v-else class="visual-document-list__muted">--</span>
           </template>
         </div>
 
-        <div class="cell cell-time">
-          <span class="row-mono">{{ formatTime(item.updated_at) }}</span>
+        <div class="visual-document-list__cell is-time">
+          <span class="visual-document-list__mono">{{ formatTime(item.updated_at) }}</span>
         </div>
 
-        <div class="cell cell-actions" v-if="canEdit" @click.stop>
-          <t-popup placement="bottom-right" trigger="click" destroy-on-close overlay-class-name="card-more"
-            :on-visible-change="(v: boolean) => onMoreVisible(item.id, v)">
-            <button class="row-more-btn" :class="{ active: moreOpen === item.id }" type="button"
-              :aria-label="t('knowledgeBase.columnActions')">
+        <div v-if="canEdit" class="visual-document-list__cell is-actions" @click.stop>
+          <t-popup
+            placement="bottom-right"
+            trigger="click"
+            destroy-on-close
+            overlay-class-name="card-more"
+            :on-visible-change="(v: boolean) => onMoreVisible(item.id, v)"
+          >
+            <button
+              class="visual-document-list__more"
+              :class="{ 'is-active': moreOpen === item.id }"
+              type="button"
+              :aria-label="t('knowledgeBase.columnActions')"
+            >
               <t-icon name="more" size="16px" />
             </button>
             <template #content>
-              <!-- Move: folder picker (must win over the normal menu while open) -->
-              <div v-if="folderPickerItemId === item.id" class="card-menu move-menu">
+              <div v-if="folderPickerItemId === item.id" class="visual-list-menu visual-list-menu--move">
                 <FolderPickerMenu
                   :options="folderOptions || []"
                   :current-path="item.folder_path || ''"
@@ -394,8 +440,7 @@ const handleAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'mo
                 />
               </div>
 
-              <!-- Normal menu -->
-              <div v-else-if="moveMenuMode === 'normal'" class="card-menu">
+              <div v-else-if="moveMenuMode === 'normal'" class="visual-list-menu">
                 <DocumentActionMenu
                   :item="item"
                   :can-mutate-knowledge="canMutateKnowledge"
@@ -411,61 +456,69 @@ const handleAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'mo
                 />
               </div>
 
-              <!-- Move: target KB list -->
-              <div v-else-if="moveMenuMode === 'targets'" class="card-menu move-menu">
-                <div class="move-menu-header" @click.stop="emit('move-back')">
+              <div v-else-if="moveMenuMode === 'targets'" class="visual-list-menu visual-list-menu--move">
+                <button type="button" class="visual-list-menu__back" @click.stop="emit('move-back')">
                   <t-icon name="chevron-left" size="16px" />
                   <span>{{ $t('knowledgeBase.moveToKnowledgeBase') }}</span>
-                </div>
-                <div v-if="moveTargetsLoading" class="move-menu-loading">
-                  <t-loading size="small" />
-                </div>
-                <div v-else-if="moveTargetKbs.length === 0" class="move-menu-empty">
+                </button>
+                <div v-if="moveTargetsLoading" class="visual-list-menu__state"><t-loading size="small" /></div>
+                <div v-else-if="moveTargetKbs.length === 0" class="visual-list-menu__state">
                   {{ $t('knowledgeBase.moveNoTargets') }}
                 </div>
                 <template v-else>
-                  <div v-for="kb in moveTargetKbs" :key="kb.id" class="card-menu-item"
-                    @click.stop="emit('move-select-target', kb)">
-                    <t-icon class="icon" name="root-list" />
-                    <span class="move-target-name">{{ kb.name }}</span>
-                    <span v-if="kb.knowledge_count !== undefined" class="move-target-count">{{ kb.knowledge_count }}</span>
-                  </div>
+                  <button
+                    v-for="kb in moveTargetKbs"
+                    :key="kb.id"
+                    type="button"
+                    class="visual-list-menu__target"
+                    @click.stop="emit('move-select-target', kb)"
+                  >
+                    <t-icon name="root-list" />
+                    <span>{{ kb.name }}</span>
+                    <small v-if="kb.knowledge_count !== undefined">{{ kb.knowledge_count }}</small>
+                  </button>
                 </template>
               </div>
 
-              <!-- Move: confirm with mode selection -->
-              <div v-else-if="moveMenuMode === 'confirm'" class="card-menu move-menu">
-                <div class="move-menu-header" @click.stop="emit('move-back')">
+              <div v-else-if="moveMenuMode === 'confirm'" class="visual-list-menu visual-list-menu--move">
+                <button type="button" class="visual-list-menu__back" @click.stop="emit('move-back')">
                   <t-icon name="chevron-left" size="16px" />
                   <span>{{ $t('knowledgeBase.moveConfirmTitle') }}</span>
-                </div>
-                <div class="move-confirm-body">
-                  <div class="move-target-info">
+                </button>
+                <div class="visual-list-menu__confirm">
+                  <div class="visual-list-menu__destination">
                     <t-icon name="arrow-right" size="14px" />
                     <span>{{ moveSelectedTargetName }}</span>
                   </div>
-                  <div class="move-mode-item" :class="{ active: moveMode === 'reuse_vectors' }"
-                    @click.stop="emit('update:moveMode', 'reuse_vectors')">
+                  <button
+                    type="button"
+                    class="visual-list-menu__mode"
+                    :class="{ 'is-active': moveMode === 'reuse_vectors' }"
+                    @click.stop="emit('update:moveMode', 'reuse_vectors')"
+                  >
                     <t-radio :checked="moveMode === 'reuse_vectors'" />
-                    <div class="move-mode-text">
-                      <span class="move-mode-label">{{ $t('knowledgeBase.moveModeReuseVectors') }}</span>
-                      <span class="move-mode-desc">{{ $t('knowledgeBase.moveModeReuseVectorsDesc') }}</span>
-                    </div>
-                  </div>
-                  <div class="move-mode-item" :class="{ active: moveMode === 'reparse' }"
-                    @click.stop="emit('update:moveMode', 'reparse')">
+                    <span>
+                      <strong>{{ $t('knowledgeBase.moveModeReuseVectors') }}</strong>
+                      <small>{{ $t('knowledgeBase.moveModeReuseVectorsDesc') }}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="visual-list-menu__mode"
+                    :class="{ 'is-active': moveMode === 'reparse' }"
+                    @click.stop="emit('update:moveMode', 'reparse')"
+                  >
                     <t-radio :checked="moveMode === 'reparse'" />
-                    <div class="move-mode-text">
-                      <span class="move-mode-label">{{ $t('knowledgeBase.moveModeReparse') }}</span>
-                      <span class="move-mode-desc">{{ $t('knowledgeBase.moveModeReparseDesc') }}</span>
-                    </div>
-                  </div>
-                  <div class="move-confirm-actions">
-                    <t-button size="small" variant="outline" @click.stop="emit('move-back')">{{
-                      $t('common.cancel') }}</t-button>
-                    <t-button size="small" theme="primary" :loading="moveSubmitting"
-                      @click.stop="emit('move-confirm')">{{
-                        $t('knowledgeBase.moveConfirm') }}</t-button>
+                    <span>
+                      <strong>{{ $t('knowledgeBase.moveModeReparse') }}</strong>
+                      <small>{{ $t('knowledgeBase.moveModeReparseDesc') }}</small>
+                    </span>
+                  </button>
+                  <div class="visual-list-menu__actions">
+                    <t-button size="small" variant="outline" @click.stop="emit('move-back')">{{ $t('common.cancel') }}</t-button>
+                    <t-button size="small" theme="primary" :loading="moveSubmitting" @click.stop="emit('move-confirm')">
+                      {{ $t('knowledgeBase.moveConfirm') }}
+                    </t-button>
                   </div>
                 </div>
               </div>
@@ -478,392 +531,364 @@ const handleAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'mo
 </template>
 
 <style scoped lang="less">
-@keyframes doc-list-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.doc-list-view {
+.visual-document-list {
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 9px;
-  /* 不能用 overflow:hidden，否则表头 position:sticky 相对外层滚动区失效 */
   overflow: visible;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  animation: doc-list-fade-in 0.32s ease-out;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #374151;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
 }
 
-.doc-list-header,
-.doc-list-row {
-  display: grid;
-  grid-template-columns:
-    44px // checkbox
-    minmax(260px, 2.6fr) // name
-    minmax(100px, 0.9fr) // tag
-    minmax(96px, 0.8fr) // source
-    96px // size
-    minmax(96px, 0.7fr) // status
-    140px // updated_at
-    48px; // actions
-  align-items: center;
-  column-gap: 0;
-  padding: 0 16px;
-}
-
-.doc-list-sticky-sentinel {
+.visual-document-list__sentinel {
   height: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
   pointer-events: none;
 }
 
-.doc-list-header {
+.visual-document-list__header,
+.visual-document-list__row {
+  display: grid;
+  grid-template-columns:
+    40px
+    minmax(220px, 2.5fr)
+    minmax(96px, .9fr)
+    minmax(92px, .8fr)
+    84px
+    minmax(96px, .8fr)
+    126px
+    42px;
+  align-items: center;
+  min-width: 960px;
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+
+.visual-document-list__header {
   position: sticky;
   top: 0;
   z-index: 3;
-  height: 40px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--app-font-family);
-  color: var(--td-text-color-secondary);
-  background: var(--td-bg-color-secondarycontainer);
-  border-bottom: 1px solid var(--td-component-stroke);
-  border-radius: 8px 8px 0 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: border-radius 0.15s ease, box-shadow 0.2s ease;
-
-  &.is-stuck {
-    border-radius: 0;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-  }
+  min-height: 38px;
+  border-bottom: 1px solid #f3f4f6;
+  border-radius: 11px 11px 0 0;
+  background: #f9fafb;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 600;
+  transition: border-radius 150ms ease, box-shadow 150ms ease;
 }
 
-.doc-list-body {
+.visual-document-list__header.is-stuck {
+  border-radius: 0;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 7%);
+}
+
+.visual-document-list__body {
+  overflow: hidden;
+  border-radius: 0 0 11px 11px;
+}
+
+.visual-document-list__row {
+  min-height: 58px;
+  border: 0;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fff;
+  color: #374151;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.visual-document-list__row:last-child { border-bottom: 0; }
+
+.visual-document-list__row:hover,
+.visual-document-list__row.is-menu-open {
+  background: #f9fafb;
+}
+
+.visual-document-list__row.is-selected {
+  background: #f3f4f6;
+}
+
+.visual-document-list__row.is-folder {
+  width: 100%;
+}
+
+.visual-document-list__cell {
+  min-width: 0;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+}
+
+.visual-document-list__cell:first-child { padding-left: 0; }
+.visual-document-list__cell:last-child { padding-right: 0; }
+.visual-document-list__cell.is-check { justify-content: center; padding-inline: 0; }
+.visual-document-list__cell.is-name { gap: 9px; }
+.visual-document-list__cell.is-size,
+.visual-document-list__cell.is-time,
+.visual-document-list__cell.is-actions { justify-content: flex-end; }
+.visual-document-list__cell.is-source { gap: 5px; }
+
+.visual-document-list__check {
+  margin: 0;
+}
+
+.visual-document-list__check :deep(.t-checkbox__label) {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.visual-document-list__file-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.visual-document-list__file-icon.is-folder {
+  color: #2563eb;
+}
+
+.visual-document-list__file-icon :deep(.t-icon) { font-size: 15px; }
+
+.visual-document-list__file-copy {
+  min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  border-radius: 0 0 8px 8px;
+  gap: 1px;
+}
+
+.visual-document-list__file-copy strong,
+.visual-document-list__file-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-document-list__file-copy strong {
+  color: #111827;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.visual-document-list__file-copy small {
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.visual-document-list__folder-path {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 10px;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.visual-document-list__folder-path:hover { color: #4b5563; }
+.visual-document-list__folder-path span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-document-list__folder-path :deep(.t-icon) { flex: 0 0 auto; font-size: 11px; }
+
+.visual-document-list__tags {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   overflow: hidden;
 }
 
-.doc-list-row {
-  position: relative;
-  min-height: 60px;
-  font-size: 13px;
-  color: var(--td-text-color-primary);
-  border-bottom: 1px solid var(--td-component-stroke);
+.visual-document-list__tags.is-clickable { cursor: pointer; }
+
+.visual-document-list__tag,
+.visual-document-list__tag-overflow {
+  flex: 0 0 auto;
+  max-width: 96px;
+  padding: 1px 5px;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 9px;
+  line-height: 14px;
+  font-weight: 600;
+}
+
+.visual-document-list__tag-overflow {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.visual-document-list__add-tag {
+  padding: 1px 5px;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 9px;
+  line-height: 14px;
   cursor: pointer;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-
-  &:last-child {
-    border-bottom: 0;
-  }
-
-  &:hover:not(.selected),
-  &.menu-open:not(.selected) {
-    background: var(--td-bg-color-secondarycontainer);
-  }
-
-  &:hover .row-more-btn,
-  &.menu-open .row-more-btn,
-  &.selected .row-more-btn {
-    opacity: 1;
-  }
 }
 
-.cell {
-  display: flex;
-  align-items: center;
+.visual-document-list__source-icon {
+  flex: 0 0 13px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.visual-document-list__source-label,
+.visual-document-list__folder-count,
+.visual-document-list__mono,
+.visual-document-list__muted {
   min-width: 0;
-  padding: 0 8px;
-
-  &:first-child {
-    padding-left: 0;
-  }
-
-  &:last-child {
-    padding-right: 0;
-  }
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 15px;
 }
 
-.cell-check {
-  justify-content: center;
-  padding: 0;
+.visual-document-list__mono {
+  font-family: var(--app-font-family-mono);
+  font-variant-numeric: tabular-nums;
 }
 
-.cell-name {
-  gap: 10px;
-  font-family: var(--app-font-family);
+.visual-document-list__status {
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 9px;
+  line-height: 14px;
+  font-weight: 600;
 }
 
-.cell-size,
-.cell-time {
-  justify-content: flex-end;
-}
+.visual-document-list__status.is-success { background: #ecfdf5; color: #047857; }
+.visual-document-list__status.is-warning { background: #fffbeb; color: #b45309; }
+.visual-document-list__status.is-danger { background: #fef2f2; color: #b91c1c; }
+.visual-document-list__status.is-primary { background: #eff6ff; color: #2563eb; }
+.visual-document-list__status :deep(.t-icon) { flex: 0 0 auto; font-size: 10px; }
 
-.cell-actions {
-  justify-content: flex-end;
-}
+.is-spinning { animation: visual-list-spin 900ms linear infinite; }
 
-/* TDesign 勾选框：去掉空白 label、与表格行对齐 */
-.doc-list-check {
-  margin: 0;
-
-  :deep(.t-checkbox) {
-    align-items: center;
-  }
-
-  :deep(.t-checkbox__label) {
-    display: none !important;
-    width: 0 !important;
-    min-width: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  :deep(.t-checkbox__input) {
-    margin: 0;
-  }
-
-  :deep(.t-checkbox__input-wrapper) {
-    margin: 0;
-  }
-}
-
-.row-file-icon-wrap {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+.visual-document-list__more {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border: 0;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-secondary);
-}
-
-.row-file-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.row-file-name {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--td-text-color-primary);
-}
-
-.row-file-desc {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-}
-
-.doc-list-row--folder {
-  cursor: pointer;
-
-  .row-file-name {
-    font-weight: 500;
-  }
-}
-
-.row-folder-icon {
-  color: var(--td-brand-color);
-}
-
-.row-folder-meta,
-.row-folder-chevron {
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  transition: color 0.15s ease;
-}
-
-.row-file-folder {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 4px;
-  max-width: 100%;
-  padding: 0;
-  border: 0;
   background: transparent;
-  color: var(--td-text-color-placeholder);
-  font-family: var(--app-font-family);
-  font-size: 12px;
-  cursor: pointer;
-  transition: color 0.15s ease;
-
-  &:hover {
-    color: var(--td-brand-color);
-  }
-
-  span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .t-icon {
-    flex: 0 0 auto;
-    font-size: 13px;
-  }
-}
-
-.cell-source {
-  gap: 6px;
-  min-width: 0;
-}
-
-.row-source-icon {
-  flex-shrink: 0;
-  font-size: 14px;
-  color: var(--td-text-color-secondary);
-}
-
-.row-source-label {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-}
-
-.row-tag {
-  max-width: 100%;
-
-  :deep(.t-tag__text) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 120px;
-    display: inline-block;
-  }
-}
-
-.row-tag-chips {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: nowrap;
-
-  &.is-clickable {
-    cursor: pointer;
-  }
-}
-
-.row-tag-overflow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 20px;
-  min-width: 20px;
-  padding: 0 4px;
-  border-radius: 999px;
-  border: 1px solid var(--td-component-stroke);
-  color: var(--td-text-color-placeholder);
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: var(--td-brand-color);
-    color: var(--td-brand-color);
-    background: var(--td-bg-color-secondarycontainer);
-  }
-}
-
-.row-tag-add {
-  font-size: 11px;
-  color: var(--td-text-color-placeholder);
-  border: 1px dashed var(--td-component-stroke);
-  border-radius: 999px;
-  padding: 0 6px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-
-  &:hover {
-    border-color: var(--td-brand-color);
-    color: var(--td-brand-color);
-    background: var(--td-bg-color-secondarycontainer);
-    border-style: solid;
-  }
-}
-
-.row-muted {
-  color: var(--td-text-color-disabled, #bbb);
-}
-
-.row-mono {
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  font-family: var(--app-font-family);
-  color: var(--td-text-color-secondary);
-}
-
-.row-status-tag :deep(.t-icon) {
-  margin-right: 2px;
-}
-
-.icon-spin {
-  animation: doc-list-spin 0.9s linear infinite;
-}
-
-@keyframes doc-list-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.row-more-btn {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  border-radius: 5px;
-  color: var(--td-text-color-secondary);
-  cursor: pointer;
+  color: #9ca3af;
   opacity: 0;
-  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
-
-  &:hover {
-    background: var(--td-component-stroke);
-    color: var(--td-text-color-primary);
-  }
-
-  &.active {
-    opacity: 1;
-    background: var(--td-component-stroke);
-    color: var(--td-text-color-primary);
-  }
+  cursor: pointer;
 }
 
+.visual-document-list__row:hover .visual-document-list__more,
+.visual-document-list__row.is-menu-open .visual-document-list__more,
+.visual-document-list__row.is-selected .visual-document-list__more,
+.visual-document-list__more.is-active {
+  opacity: 1;
+}
+
+.visual-document-list__more:hover,
+.visual-document-list__more.is-active {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-list-menu {
+  min-width: 180px;
+}
+
+.visual-list-menu--move {
+  width: 300px;
+  padding: 6px;
+}
+
+.visual-list-menu__back,
+.visual-list-menu__target {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.visual-list-menu__back:hover,
+.visual-list-menu__target:hover { background: #f3f4f6; }
+.visual-list-menu__target span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-list-menu__target small { color: #9ca3af; }
+.visual-list-menu__state { padding: 16px 8px; text-align: center; color: #9ca3af; font-size: 12px; }
+.visual-list-menu__confirm { display: flex; flex-direction: column; gap: 8px; padding: 6px 2px 2px; }
+.visual-list-menu__destination { padding: 8px; border-radius: 8px; display: flex; gap: 7px; background: #f9fafb; color: #374151; font-size: 12px; }
+.visual-list-menu__mode { width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: flex-start; gap: 8px; background: #fff; text-align: left; cursor: pointer; }
+.visual-list-menu__mode.is-active { border-color: #9ca3af; background: #f9fafb; }
+.visual-list-menu__mode > span { display: flex; flex-direction: column; gap: 2px; }
+.visual-list-menu__mode strong { color: #1f2937; font-size: 12px; }
+.visual-list-menu__mode small { color: #9ca3af; font-size: 10px; line-height: 1.45; }
+.visual-list-menu__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+
+@keyframes visual-list-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1100px) {
+  .visual-document-list { overflow-x: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-document-list__row,
+  .is-spinning {
+    transition: none !important;
+    animation: none !important;
+  }
+}
 </style>
