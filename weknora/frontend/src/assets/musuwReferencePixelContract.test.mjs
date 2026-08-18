@@ -58,10 +58,11 @@ test("loads every mechanically compiled visual-reference shard and no legacy DOM
     "musuw-reference-mechanical-12.css",
     "musuw-reference-mechanical-13.css",
     "musuw-reference-mechanical-13b.css",
+    "musuw-reference-mechanical-14.css",
   ]) {
     assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
   }
-  assert.equal(importNames.length, 21);
+  assert.equal(importNames.length, 22);
 });
 
 test("matches copied reference shell, conversation, knowledge and settings geometry", () => {
@@ -81,6 +82,7 @@ test("matches copied reference shell, conversation, knowledge and settings geome
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h2\{[\s\S]*?font-size:var\(--text-base\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h3\{[\s\S]*?font-size:var\(--text-sm\) !important/);
   assert.match(mechanical, /\.bot_msg:hover > div > \.answer-toolbar\{opacity:100% !important/);
+  assert.match(mechanical, /--font-sans:var\(--app-font-family/);
 });
 
 test("preserves product conditional rendering and task-excluded renderers", () => {
