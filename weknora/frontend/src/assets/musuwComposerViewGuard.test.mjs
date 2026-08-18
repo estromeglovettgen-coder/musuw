@@ -57,14 +57,14 @@ test('composer presents every native resource and generation control in the new 
   ]) assert.ok(source.includes(token), `Input-field lost control surface: ${token}`)
 })
 
-test('agent-disabled mention control preserves native remediation without becoming unhoverable', () => {
+test('agent-disabled mention control preserves native remediation and native warning behavior without becoming unhoverable', () => {
   const source = read('../components/Input-field.vue')
   for (const token of [
     'isMentionDisabled && isKnowledgeBaseDisabledByAgent',
     "handleGoToAgentSettings('knowledge')",
     "input.goToAgentSettings",
     ':aria-disabled="isMentionDisabled"',
-    '@mousedown.prevent="!isMentionDisabled && triggerMention()"',
+    '@mousedown.prevent="triggerMention"',
   ]) assert.ok(source.includes(token), `Input-field lost disabled mention remediation: ${token}`)
   assert.equal(source.includes(':disabled="isMentionDisabled"'), false, 'disabled mention trigger must remain hoverable for remediation tooltip')
 })
