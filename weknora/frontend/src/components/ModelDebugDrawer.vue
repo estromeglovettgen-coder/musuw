@@ -1,8 +1,26 @@
 <template>
   <Teleport to="body">
     <Transition name="visual-model-debug">
-      <div v-if="drawerVisible" class="visual-model-debug__overlay" @click.self="drawerVisible = false">
-        <aside class="visual-model-debug" role="dialog" aria-modal="true" :aria-label="$t('modelSettings.debug.title')">
+      <div v-if="drawerVisible" class="visual-model-debug__overlay" @click.self="closeDrawer">
+        <div
+          class="visual-model-debug__resize-handle"
+          :class="{ 'is-active': drawerResizing }"
+          :style="{ right: `${drawerWidthPx}px` }"
+          role="separator"
+          aria-orientation="vertical"
+          @mousedown.prevent="onResizeStart"
+        >
+          <span />
+        </div>
+
+        <aside
+          class="visual-model-debug"
+          :class="{ 'is-resizing': drawerResizing }"
+          :style="{ width: `${drawerWidthPx}px` }"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="$t('modelSettings.debug.title')"
+        >
           <header class="visual-model-debug__header">
             <div class="visual-model-debug__heading">
               <span class="visual-model-debug__heading-icon"><t-icon name="play-circle-stroke" /></span>
@@ -11,7 +29,7 @@
                 <p>{{ $t('modelSettings.debug.description') }}</p>
               </div>
             </div>
-            <button type="button" class="visual-model-debug__close" :aria-label="$t('common.close')" @click="drawerVisible = false">
+            <button type="button" class="visual-model-debug__close" :aria-label="$t('common.close')" @click="closeDrawer">
               <t-icon name="close" />
             </button>
           </header>
@@ -151,7 +169,7 @@
               <span>{{ $t('modelSettings.debug.copyResult') }}</span>
             </button>
             <div class="visual-model-debug__footer-actions">
-              <button type="button" class="visual-model-debug__button" @click="drawerVisible = false">{{ $t('common.close') }}</button>
+              <button type="button" class="visual-model-debug__button" @click="closeDrawer">{{ $t('common.close') }}</button>
               <button type="button" class="visual-model-debug__button is-primary" :disabled="!canRun || running" @click="runDebug">
                 <t-loading v-if="running" size="small" />
                 <t-icon v-else name="play-circle-stroke" />
@@ -160,13 +178,15 @@
             </div>
           </footer>
         </aside>
+
+        <div v-if="drawerResizing" class="visual-model-debug__resize-shield" aria-hidden="true" />
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { debugModel, type ModelConfig, type ModelDebugResult } from '@/api/model'
@@ -187,6 +207,68 @@ const drawerVisible = computed({
   get: () => props.visible,
   set: value => emit('update:visible', value),
 })
+
+const MODEL_DEBUG_WIDTH_KEY = 'setting-drawer:width:model-debug'
+const MODEL_DEBUG_DEFAULT_WIDTH = 560
+const MODEL_DEBUG_MIN_WIDTH = 480
+const MODEL_DEBUG_MAX_WIDTH = 900
+const clampDrawerWidth = (value: number) => Math.max(MODEL_DEBUG_MIN_WIDTH, Math.min(MODEL_DEBUG_MAX_WIDTH, Math.round(value)))
+const loadStoredDrawerWidth = () => {
+  if (typeof window === 'undefined') return MODEL_DEBUG_DEFAULT_WIDTH
+  try {
+    const raw = window.localStorage.getItem(MODEL_DEBUG_WIDTH_KEY)
+    const parsed = raw ? Number(raw) : NaN
+    return Number.isFinite(parsed) ? clampDrawerWidth(parsed) : MODEL_DEBUG_DEFAULT_WIDTH
+  } catch {
+    return MODEL_DEBUG_DEFAULT_WIDTH
+  }
+}
+const drawerWidthPx = ref(loadStoredDrawerWidth())
+const drawerResizing = ref(false)
+let resizeStartX = 0
+let resizeStartWidth = MODEL_DEBUG_DEFAULT_WIDTH
+
+const persistDrawerWidth = () => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(MODEL_DEBUG_WIDTH_KEY, String(clampDrawerWidth(drawerWidthPx.value)))
+  } catch {
+    // Preserve the live width when storage is unavailable.
+  }
+}
+const onResizeMove = (event: MouseEvent) => {
+  drawerWidthPx.value = clampDrawerWidth(resizeStartWidth + resizeStartX - event.clientX)
+}
+const cleanupResize = () => {
+  document.removeEventListener('mousemove', onResizeMove)
+  document.removeEventListener('mouseup', onResizeEnd)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  drawerResizing.value = false
+}
+function onResizeEnd() {
+  cleanupResize()
+  persistDrawerWidth()
+}
+const onResizeStart = (event: MouseEvent) => {
+  drawerResizing.value = true
+  resizeStartX = event.clientX
+  resizeStartWidth = drawerWidthPx.value
+  document.addEventListener('mousemove', onResizeMove)
+  document.addEventListener('mouseup', onResizeEnd)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+const onWindowResize = () => {
+  drawerWidthPx.value = clampDrawerWidth(drawerWidthPx.value)
+}
+const blurActiveElementBeforeClose = () => {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+}
+const closeDrawer = () => {
+  blurActiveElementBeforeClose()
+  drawerVisible.value = false
+}
 
 type DebugModelType = ModelConfig['type']
 
@@ -381,14 +463,20 @@ const copyResult = async () => {
   }
 }
 
+onMounted(() => {
+  window.addEventListener('resize', onWindowResize, { passive: true })
+})
+
 onBeforeUnmount(() => {
-  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  window.removeEventListener('resize', onWindowResize)
+  cleanupResize()
+  blurActiveElementBeforeClose()
 })
 </script>
 
 <style scoped lang="less">
 .visual-model-debug__overlay { position: fixed; inset: 0; z-index: 3200; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 18%); backdrop-filter: blur(2px); }
-.visual-model-debug { width: min(560px, 100vw); height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
+.visual-model-debug { width: 560px; max-width: 100vw; height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
 .visual-model-debug__header { flex: 0 0 auto; padding: 18px 20px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .visual-model-debug__heading { min-width: 0; display: flex; gap: 10px; }
 .visual-model-debug__heading-icon { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #6b7280; }
@@ -438,8 +526,13 @@ onBeforeUnmount(() => {
 .visual-model-debug__button { min-height: 32px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
 .visual-model-debug__button.is-primary { border-color: #111827; background: #111827; color: #fff; }
 .visual-model-debug__button:disabled { cursor: default; opacity: .5; }
+.visual-model-debug__resize-handle { position: fixed; top: 0; bottom: 0; z-index: 3202; width: 12px; margin-right: -6px; display: flex; align-items: center; justify-content: center; cursor: col-resize; }
+.visual-model-debug__resize-handle > span { width: 2px; height: 48px; border-radius: 1px; background: #d1d5db; opacity: .55; transition: opacity 150ms ease, background-color 150ms ease; }
+.visual-model-debug__resize-handle:hover > span,.visual-model-debug__resize-handle.is-active > span { background: #6b7280; opacity: 1; }
+.visual-model-debug__resize-shield { position: fixed; inset: 0; z-index: 3201; cursor: col-resize; }
+.visual-model-debug.is-resizing .visual-model-debug__content { pointer-events: none; user-select: none; }
 .visual-model-debug-enter-active,.visual-model-debug-leave-active { transition: opacity 160ms ease; }
 .visual-model-debug-enter-from,.visual-model-debug-leave-to { opacity: 0; }
-@media (max-width: 640px) { .visual-model-debug { width: 100%; } .visual-model-debug__parameter-grid { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .visual-model-debug-enter-active,.visual-model-debug-leave-active { transition: none !important; } }
+@media (max-width: 640px) { .visual-model-debug { width: 100% !important; min-width: 0; } .visual-model-debug__resize-handle { display: none; } .visual-model-debug__parameter-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .visual-model-debug-enter-active,.visual-model-debug-leave-active,.visual-model-debug__resize-handle > span { transition: none !important; } }
 </style>
