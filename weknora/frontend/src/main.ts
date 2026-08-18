@@ -18,9 +18,11 @@ import "@/assets/musuw-visual-contract-final.css";
 // Reference-source precision fixes load after the broad convergence layer so
 // explicit TSX geometry wins over vendor defaults without owning behavior.
 import "@/assets/musuw-reference-precision-fixes.css";
-// Exact Lucide 0.546.0 glyph geometry is the final paint layer for controls
-// that have an explicit counterpart in the Google AI Studio source.
+// Exact Lucide 0.546.0 glyph geometry for controls that have explicit reference counterparts.
 import "@/assets/musuw-reference-lucide-precision.css";
+// Production-reachable native surfaces without direct reference counterparts
+// reuse the same geometry/chrome while retaining their original behavior.
+import "@/assets/musuw-reachable-surface-final.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
