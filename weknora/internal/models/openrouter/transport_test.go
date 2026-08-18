@@ -77,3 +77,31 @@ func TestTransportUsesTenantKeyWithoutBufferingMultipartBody(t *testing.T) {
 	require.NoError(t, resp.Body.Close())
 	assert.Equal(t, 1, meter.keyCalls)
 }
+
+func TestTransportClassifiesHTTP402AsCreditExhausted(t *testing.T) {
+	meter := &meterStub{key: "tenant-child-key", user: "musuw_opaque"}
+	base := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusPaymentRequired,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"error":{"code":402,"message":"payment_required"}}`)),
+			Request:    req,
+		}, nil
+	})}
+	client := WrapHTTPClient(base, meter)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://openrouter.ai/api/v1/chat/completions", bytes.NewBufferString(`{"model":"test"}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	assert.Nil(t, resp)
+	require.Error(t, err)
+	assert.True(t, IsCreditExhausted(err))
+	assert.Contains(t, err.Error(), "monthly AI credits")
+}
+
+func TestCreditExhaustedPayloadClassification(t *testing.T) {
+	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":402,"message":"payment_required"}}`)))
+	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"message":"spending limit reached"}}`)))
+	assert.False(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":429,"message":"rate limited"}}`)))
+}
