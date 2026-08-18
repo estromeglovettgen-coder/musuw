@@ -11,10 +11,11 @@ test('frozen KnowledgeBase business controller remains the original implementati
   assert.equal(blobSha(controller), 'c6c7c53a9f1eda91b645733256eb04221bf816da')
 })
 
-test('rebuilt KnowledgeBase reuses frozen component options and keeps Graph host binding intact', () => {
+test('rebuilt KnowledgeBase reuses normalized frozen setup and keeps Graph host binding intact', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   assert.match(source, /import LegacyKnowledgeBaseBusiness from .*KnowledgeBase\.pre-view\.vue/)
-  assert.match(source, /\.\.\.legacy,/)
+  assert.match(source, /const legacySetup = legacy\.setup/)
+  assert.match(source, /return \{ \.\.\.state \}/)
   assert.match(source, /class="visual-knowledge-page"/)
   assert.ok(source.includes(`:view="activeKbTab === 'graph' ? 'graph' : 'browser'"`))
   assert.ok(source.includes('@open-source-doc="openSourceDoc"'))
@@ -25,21 +26,16 @@ test('rebuilt KnowledgeBase reuses frozen component options and keeps Graph host
 test('rebuilt documents View retains every native filtering and document-operation surface', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   for (const token of [
-    'docSearchKeyword',
-    'tagFilterPanelVisible',
-    'selectedFileType',
-    'selectedParseStatus',
-    'selectedSource',
-    'updatedTimeRange',
-    "viewMode === 'grid'",
-    "viewMode === 'list'",
-    'KbUploadSourceDropdown',
-    'DocumentCardView',
-    'DocumentListView',
-    'DocumentBatchBar',
-    'TagEditDialog',
-    'BatchTagDialog',
-    'KbTagManageDrawer',
-    'DocContent',
+    'docSearchKeyword', 'tagFilterPanelVisible', 'selectedFileType', 'selectedParseStatus', 'selectedSource',
+    'updatedTimeRange', "viewMode === 'grid'", "viewMode === 'list'", 'KbUploadSourceDropdown',
+    'DocumentCardView', 'DocumentListView', 'DocumentBatchBar', 'TagEditDialog', 'BatchTagDialog',
+    'KbTagManageDrawer', 'DocContent',
   ]) assert.ok(source.includes(token), `KnowledgeBase active View lost ${token}`)
+})
+
+test('rebuilt active KnowledgeBase does not expose the legacy documents shell', () => {
+  const source = read('../views/knowledge/KnowledgeBase.vue')
+  for (const token of ['class="knowledge-layout"', 'class="document-header"', 'class="doc-filter-bar"', 'class="doc-card-list"']) {
+    assert.equal(source.includes(token), false, `KnowledgeBase still contains active legacy shell ${token}`)
+  }
 })
