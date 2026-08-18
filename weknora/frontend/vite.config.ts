@@ -34,39 +34,48 @@ const FRONTEND_COMMIT = resolveFrontendCommit()
 /**
  * Compile frozen pre-rebuild SFCs as headless controller modules.
  *
- * Files under src/assets/business-baselines are source snapshots used only to
- * preserve the original `<script setup>` behavior. This pre-plugin intercepts
- * their normal `.vue` imports before @vitejs/plugin-vue, compiles the script
- * with `inlineTemplate: false`, and therefore never loads their legacy template
- * or styles into the runtime bundle.
+ * The source import remains a normal `*.pre-view.vue`, so vue-tsc can use the
+ * standard Vue module declaration. During Vite resolution this pre-plugin maps
+ * that file to a same-directory virtual `.ts` id. Keeping the same directory is
+ * important because relative imports inside the original `<script setup>` must
+ * resolve exactly as before. The virtual `.ts` suffix also guarantees that
+ * @vitejs/plugin-vue never tries to parse the compiled controller as an SFC.
  */
 function businessControllerPlugin(): Plugin {
   const baselineMarker = '/src/assets/business-baselines/'
+  const virtualSuffix = '.business-controller.ts'
 
   return {
     name: 'musuw-business-controller',
     enforce: 'pre',
-    async load(id) {
-      const normalizedId = id.replaceAll('\\', '/')
-      if (!normalizedId.includes(baselineMarker) || !normalizedId.endsWith('.pre-view.vue')) {
+    async resolveId(source, importer) {
+      const normalizedSource = source.replaceAll('\\', '/')
+      if (!normalizedSource.includes('/business-baselines/') || !normalizedSource.endsWith('.pre-view.vue')) {
         return null
       }
+      const resolved = await this.resolve(source, importer, { skipSelf: true })
+      return resolved ? `${resolved.id}${virtualSuffix}` : null
+    },
+    async load(id) {
+      const normalizedId = id.replaceAll('\\', '/')
+      if (!normalizedId.includes(baselineMarker) || !id.endsWith(virtualSuffix)) return null
 
-      const source = readFileSync(id, 'utf8')
-      const { descriptor, errors } = parse(source, { filename: id })
+      const filename = id.slice(0, -virtualSuffix.length)
+      const source = readFileSync(filename, 'utf8')
+      const { descriptor, errors } = parse(source, { filename })
       if (errors.length) {
-        throw new Error(`Failed to parse business controller ${id}: ${errors.join('\n')}`)
+        throw new Error(`Failed to parse business controller ${filename}: ${errors.join('\n')}`)
       }
       if (!descriptor.scriptSetup) {
-        throw new Error(`Business controller ${id} must contain <script setup>.`)
+        throw new Error(`Business controller ${filename} must contain <script setup>.`)
       }
 
-      const scopeId = createHash('sha256').update(id).digest('hex').slice(0, 8)
+      const scopeId = createHash('sha256').update(filename).digest('hex').slice(0, 8)
       const compiled = compileScript(descriptor, {
         id: scopeId,
         inlineTemplate: false,
       })
-      const transformed = await transformWithEsbuild(compiled.content, id, {
+      const transformed = await transformWithEsbuild(compiled.content, filename, {
         loader: descriptor.scriptSetup.lang === 'ts' ? 'ts' : 'js',
         target: 'esnext',
         sourcemap: false,
