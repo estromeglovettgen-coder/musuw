@@ -23,6 +23,7 @@ import "@/assets/musuw-reference-authority.css";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import i18n from "./i18n";
 import { initTheme } from "@/composables/useTheme";
+import { initFont } from "@/composables/useFont";
 import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
 import { installAutofillGuard } from "@/utils/disable-autofill";
 
@@ -30,6 +31,7 @@ import { installAutofillGuard } from "@/utils/disable-autofill";
 installTDesignIconOfflineGuard();
 
 initTheme();
+initFont();
 
 const app = createApp(App);
 
