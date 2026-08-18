@@ -3,7 +3,6 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
 import TDesign from "tdesign-vue-next";
-// 引入组件库的少量全局样式变量
 import "tdesign-vue-next/dist/tdesign.css";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
@@ -11,11 +10,8 @@ import "@fontsource-variable/noto-sans-sc";
 import "@/assets/theme/theme.css";
 import "@/assets/dropdown-menu.less";
 import "@/components/css/chat-hljs-dark.less";
-// Task 1 visual authority: mechanically compiled from the reference TSX/Tailwind utilities.
-// This is presentation-only; Vue data/handlers/permissions/conditional rendering remain authoritative.
-import "@/assets/musuw-reference-mechanical.css";
-// SourcesPanel-derived palette for the unchanged WeKnora docInfo source/index widget.
-import "@/assets/musuw-reference-citation-sources.css";
+// Stable vendor primitives only. Application Views own their own geometry and presentation.
+import "@/assets/musuw-ui-primitives.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
