@@ -1,37 +1,54 @@
 <template>
-  <div class="session-source-filter" :class="{
-    'session-source-filter--inline': inline,
-    'session-source-filter--emphasized': emphasized,
-  }">
-    <button ref="triggerRef" type="button" class="session-source-filter__trigger" :aria-expanded="open"
-      aria-haspopup="listbox" @click.stop="toggleOpen">
-      <span class="session-source-filter__leading">
-        <img v-if="currentOption?.logo" :src="currentOption.logo" :alt="currentOption.label"
-          class="session-source-filter__logo" />
-        <t-icon v-else :name="iconFor(currentOption)" class="session-source-filter__icon" size="14px" />
-        <span class="session-source-filter__label" :title="currentOption?.label">{{ currentOption?.label }}</span>
+  <div class="visual-session-filter" :class="{ 'is-inline': inline, 'is-emphasized': emphasized }">
+    <button
+      ref="triggerRef"
+      type="button"
+      class="visual-session-filter__trigger"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
+      @click.stop="toggleOpen"
+    >
+      <span class="visual-session-filter__leading">
+        <img
+          v-if="currentOption?.logo"
+          :src="currentOption.logo"
+          :alt="currentOption.label"
+          class="visual-session-filter__logo"
+        />
+        <t-icon v-else :name="iconFor(currentOption)" class="visual-session-filter__icon" />
+        <span class="visual-session-filter__label" :title="currentOption?.label">{{ currentOption?.label }}</span>
       </span>
-      <t-icon v-if="inline" name="chevron-down" class="session-source-filter__chevron"
-        :class="{ 'session-source-filter__chevron--open': open }" size="10px" />
-      <t-icon v-else name="chevron-down" class="session-source-filter__chevron"
-        :class="{ 'session-source-filter__chevron--open': open }" size="12px" />
+      <t-icon
+        name="chevron-down"
+        class="visual-session-filter__chevron"
+        :class="{ 'is-open': open }"
+      />
     </button>
+
     <Teleport to="body">
-      <div v-if="open" class="session-source-filter__panel" role="listbox" :style="panelStyle" @click.stop>
-        <button v-for="item in sources" :key="item.value" type="button" class="session-source-filter__option"
-          :class="{ 'session-source-filter__option--active': item.value === current }" role="option"
-          :aria-selected="item.value === current" @click="handleSelect(item.value)">
-          <span class="session-source-filter__option-leading">
-            <img v-if="item.logo" :src="item.logo" :alt="item.label" class="session-source-filter__logo" />
-            <t-icon v-else :name="iconFor(item)" class="session-source-filter__icon" size="14px" />
-            <span class="session-source-filter__option-label" :title="item.label">{{ item.label }}</span>
+      <div
+        v-if="open"
+        class="visual-session-filter__panel"
+        role="listbox"
+        :style="panelStyle"
+        @click.stop
+      >
+        <button
+          v-for="item in sources"
+          :key="item.value"
+          type="button"
+          class="visual-session-filter__option"
+          :class="{ 'is-active': item.value === current }"
+          role="option"
+          :aria-selected="item.value === current"
+          @click="handleSelect(item.value)"
+        >
+          <span class="visual-session-filter__option-leading">
+            <img v-if="item.logo" :src="item.logo" :alt="item.label" class="visual-session-filter__logo" />
+            <t-icon v-else :name="iconFor(item)" class="visual-session-filter__icon" />
+            <span class="visual-session-filter__option-label" :title="item.label">{{ item.label }}</span>
           </span>
-          <t-icon
-            name="check"
-            class="session-source-filter__check"
-            :class="{ 'session-source-filter__check--visible': item.value === current }"
-            size="13px"
-          />
+          <t-icon name="check" class="visual-session-filter__check" :class="{ 'is-visible': item.value === current }" />
         </button>
       </div>
     </Teleport>
@@ -145,196 +162,193 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="less">
-.session-source-filter {
-  padding: 2px 0 6px;
-
-  &--inline {
-    padding: 0;
-    min-width: 0;
-    max-width: 100%;
-
-    .session-source-filter__leading {
-      gap: 4px;
-      flex: 0 1 auto;
-    }
-  }
-}
-
-.session-source-filter__trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 28px;
-  padding: 4px 10px 4px 14px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--td-text-color-secondary);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  font-family: var(--app-font-family);
-  text-align: left;
-
-  &:hover,
-  &[aria-expanded='true'] {
-    background: var(--td-bg-color-container-hover);
-    color: var(--td-text-color-primary);
-  }
-
-  .session-source-filter--inline & {
-    width: auto;
-    max-width: 100%;
-    min-height: 0;
-    gap: 2px;
-    padding: 0;
-    border-radius: 0;
-    color: var(--td-text-color-disabled);
-    justify-content: flex-end;
-
-    &:hover,
-    &[aria-expanded='true'] {
-      background: transparent;
-      color: var(--td-text-color-placeholder);
-    }
-  }
-}
-
-.session-source-filter__leading,
-.session-source-filter__option-leading {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.visual-session-filter {
   min-width: 0;
-  flex: 1 1 auto;
+  max-width: 100%;
 }
 
-.session-source-filter__label,
-.session-source-filter__option-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  letter-spacing: 0.01em;
-
-  .session-source-filter--inline .session-source-filter__trigger & {
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 16px;
-    color: inherit;
-  }
-}
-
-.session-source-filter__logo {
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-  opacity: 0.82;
-
-  .session-source-filter--inline & {
-    width: 12px;
-    height: 12px;
-    opacity: 0.7;
-  }
-}
-
-.session-source-filter__icon {
-  flex: 0 0 auto;
-  color: var(--td-text-color-placeholder);
-
-  .session-source-filter--inline & {
-    font-size: 12px !important;
-    color: var(--td-text-color-disabled);
-  }
-}
-
-.session-source-filter__chevron {
-  flex: 0 0 auto;
-  color: var(--td-text-color-placeholder);
-  transition: transform 0.18s ease, color 0.15s ease;
-
-  &--open {
-    transform: rotate(180deg);
-    color: var(--td-text-color-secondary);
-  }
-
-  .session-source-filter--inline & {
-    color: var(--td-text-color-disabled);
-    opacity: 0.85;
-    font-size: 10px !important;
-  }
-}
-
-.session-source-filter__panel {
-  position: fixed;
-  z-index: 3000;
-  width: max-content;
-  min-width: 108px;
-  max-width: min(200px, calc(100vw - 16px));
-  padding: 3px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 7px;
-  background: var(--td-bg-color-sidebar, var(--td-bg-color-container));
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.04);
-}
-
-.session-source-filter__option {
+.visual-session-filter__trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  width: 100%;
-  min-height: 28px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 5px;
   background: transparent;
-  color: var(--td-text-color-primary);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  font-family: var(--app-font-family);
-  text-align: left;
-  white-space: nowrap;
-
-  &:hover {
-    background: var(--td-bg-color-container-hover);
-  }
-
-  &--active {
-    background: var(--td-bg-color-secondarycontainer);
-    color: var(--td-text-color-primary);
-
-    .session-source-filter__icon {
-      color: var(--td-text-color-secondary);
-    }
-
-    .session-source-filter__logo {
-      opacity: 0.92;
-      filter: none;
-    }
-  }
-}
-
-.session-source-filter__option-label {
-  font-size: 12px;
-  font-weight: 500;
+  color: #6b7280;
+  font: inherit;
+  font-size: 11px;
   line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
-.session-source-filter__check {
+.visual-session-filter__trigger:hover,
+.visual-session-filter__trigger[aria-expanded='true'] {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.visual-session-filter.is-emphasized .visual-session-filter__trigger {
+  color: #374151;
+}
+
+.visual-session-filter.is-inline .visual-session-filter__trigger {
+  width: auto;
+  max-width: 100%;
+  min-height: 24px;
+  margin-left: auto;
+  padding: 3px 6px;
+  border-radius: 7px;
+  justify-content: flex-end;
+  color: #9ca3af;
+}
+
+.visual-session-filter.is-inline .visual-session-filter__trigger:hover,
+.visual-session-filter.is-inline .visual-session-filter__trigger[aria-expanded='true'] {
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.visual-session-filter__leading,
+.visual-session-filter__option-leading {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.visual-session-filter.is-inline .visual-session-filter__leading {
+  flex: 0 1 auto;
+  gap: 4px;
+}
+
+.visual-session-filter__label,
+.visual-session-filter__option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.visual-session-filter__logo {
   flex: 0 0 13px;
   width: 13px;
-  margin-left: 2px;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px !important;
-  visibility: hidden;
+  height: 13px;
+  object-fit: contain;
+  opacity: .8;
+}
 
-  &--visible {
-    visibility: visible;
-  }
+.visual-session-filter.is-inline .visual-session-filter__logo {
+  flex-basis: 12px;
+  width: 12px;
+  height: 12px;
+}
+
+.visual-session-filter__icon {
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.visual-session-filter__chevron {
+  flex: 0 0 11px;
+  width: 11px;
+  height: 11px;
+  font-size: 11px;
+  color: #9ca3af;
+  transition: transform 150ms ease;
+}
+
+.visual-session-filter__chevron.is-open {
+  transform: rotate(180deg);
+}
+</style>
+
+<style lang="less">
+.visual-session-filter__panel {
+  position: fixed;
+  z-index: 3000;
+  width: max-content;
+  min-width: 132px;
+  max-width: min(220px, calc(100vw - 16px));
+  padding: 5px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 12%);
+}
+
+.visual-session-filter__option {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 6px 7px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  background: transparent;
+  color: #4b5563;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.visual-session-filter__option:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.visual-session-filter__option.is-active {
+  background: #f9fafb;
+  color: #111827;
+  font-weight: 600;
+}
+
+.visual-session-filter__option-leading {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.visual-session-filter__option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.visual-session-filter__check {
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+  color: #6b7280;
+  visibility: hidden;
+}
+
+.visual-session-filter__check.is-visible {
+  visibility: visible;
 }
 </style>
