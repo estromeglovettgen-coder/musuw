@@ -1,288 +1,160 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import ReferenceIcon from '@/components/ReferenceIcon.vue'
-import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue'
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue';
 
-const props = defineProps<{
-  count: number
-  deleteLoading?: boolean
-  reparseLoading?: boolean
-  tagLoading?: boolean
-  // Keep the original visibility contract: batch mode may be open with 0 selected rows.
-  visible?: boolean
-  showMoveToFolder?: boolean
-  folderOptions?: FolderOption[]
-}>()
+defineProps<{
+  count: number;
+  deleteLoading?: boolean;
+  reparseLoading?: boolean;
+  tagLoading?: boolean;
+  // When true the bar stays visible even with 0 selections, so users can exit
+  // batch mode from here without selecting anything first.
+  visible?: boolean;
+  /** Hidden when the knowledge base has no folder structure to file into. */
+  showMoveToFolder?: boolean;
+  folderOptions?: FolderOption[];
+}>();
 
 const emit = defineEmits<{
-  (e: 'cancel'): void
-  (e: 'delete'): void
-  (e: 'reparse'): void
-  (e: 'batchTag'): void
-  (e: 'moveToFolder', folderPath: string): void
-}>()
+  (e: 'cancel'): void;
+  (e: 'delete'): void;
+  (e: 'reparse'): void;
+  (e: 'batchTag'): void;
+  (e: 'moveToFolder', folderPath: string): void;
+}>();
 
-const { t } = useI18n()
-const folderPickerVisible = ref(false)
-const confirmAction = ref<'reparse' | 'delete' | null>(null)
+const { t } = useI18n();
 
-const busy = computed(() => Boolean(props.deleteLoading || props.reparseLoading || props.tagLoading))
-const disabled = computed(() => props.count === 0 || busy.value)
-
-const closeTransientUi = () => {
-  folderPickerVisible.value = false
-  confirmAction.value = null
-}
-
-const requestConfirm = (action: 'reparse' | 'delete') => {
-  if (disabled.value) return
-  folderPickerVisible.value = false
-  confirmAction.value = action
-}
-
-const confirm = () => {
-  const action = confirmAction.value
-  confirmAction.value = null
-  if (action === 'reparse') emit('reparse')
-  if (action === 'delete') emit('delete')
-}
-
-const confirmTitle = computed(() =>
-  confirmAction.value === 'delete'
-    ? t('knowledgeBase.confirmBatchDeleteDocument', { count: props.count })
-    : t('knowledgeBase.confirmBatchReparseDocument', { count: props.count }),
-)
+const folderPickerVisible = ref(false);
 </script>
 
 <template>
-  <transition name="reference-batch-bar">
-    <div
-      v-if="visible || count > 0"
-      class="reference-batch-bar"
-      role="region"
-      :aria-label="t('knowledgeBase.selectedCount', { count })"
-    >
-      <div class="reference-batch-bar__inner">
-        <div class="reference-batch-bar__selection">
-          <span>{{ t('knowledgeBase.selectedCount', { count }) }}</span>
-          <button type="button" class="reference-batch-bar__clear" @click="emit('cancel')">
+  <transition name="batch-bar-fade">
+    <div v-if="visible || count > 0" class="doc-batch-bar" role="region"
+      :aria-label="t('knowledgeBase.selectedCount', { count })">
+      <div class="batch-bar-inner">
+        <div class="batch-bar-left">
+          <span class="batch-bar-count">{{ t('knowledgeBase.selectedCount', { count }) }}</span>
+          <t-button variant="text" theme="default" size="small" class="batch-bar-clear" @click="emit('cancel')">
             {{ t('knowledgeBase.clearSelection') }}
-          </button>
+          </t-button>
         </div>
+        <div class="batch-bar-actions">
+          <t-popconfirm theme="warning" :content="t('knowledgeBase.confirmBatchReparseDocument', { count })"
+            :confirm-btn="{ content: t('knowledgeBase.confirmBatchReparse'), theme: 'warning' }"
+            :cancel-btn="{ content: t('common.cancel') }" placement="top" @confirm="emit('reparse')">
+            <t-button theme="default" variant="outline" size="small"
+              :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading" :loading="reparseLoading" @click.stop>
+              <template #icon><t-icon name="refresh" size="14px" /></template>
+              {{ t('knowledgeBase.rebuildDocument') }}
+            </t-button>
+          </t-popconfirm>
 
-        <div class="reference-batch-bar__actions">
-          <button
-            type="button"
-            class="reference-batch-action"
-            :disabled="disabled"
-            @click="requestConfirm('reparse')"
-          >
-            <ReferenceIcon name="rotate-cw" :size="14" :class="{ 'is-spinning': reparseLoading }" />
-            <span>{{ t('knowledgeBase.rebuildDocument') }}</span>
-          </button>
+          <t-button theme="default" variant="outline" size="small"
+            :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading" :loading="tagLoading"
+            @click="emit('batchTag')">
+            <template #icon><t-icon name="discount" size="14px" /></template>
+            {{ t('knowledgeBase.batchTag') }}
+          </t-button>
 
-          <button
-            type="button"
-            class="reference-batch-action"
-            :disabled="disabled"
-            @click="emit('batchTag')"
-          >
-            <ReferenceIcon name="tag" :size="14" />
-            <span>{{ t('knowledgeBase.batchTag') }}</span>
-          </button>
-
-          <div v-if="showMoveToFolder" class="reference-batch-folder">
-            <button
-              type="button"
-              class="reference-batch-action"
-              :class="{ active: folderPickerVisible }"
-              :disabled="disabled"
-              @click="folderPickerVisible = !folderPickerVisible; confirmAction = null"
-            >
-              <ReferenceIcon name="folder" :size="14" />
-              <span>{{ t('knowledgeBase.moveToFolder.action') }}</span>
-            </button>
-            <template v-if="folderPickerVisible">
-              <div class="reference-batch-backdrop" @click="closeTransientUi" />
-              <div class="reference-batch-folder__menu" @click.stop>
-                <FolderPickerMenu
-                  :options="folderOptions || []"
-                  @confirm="(path: string) => { folderPickerVisible = false; emit('moveToFolder', path) }"
-                />
+          <t-popup v-if="showMoveToFolder" v-model:visible="folderPickerVisible" trigger="click"
+            placement="top" overlay-class-name="card-more" destroy-on-close>
+            <t-button theme="default" variant="outline" size="small"
+              :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading">
+              <template #icon><t-icon name="folder" size="14px" /></template>
+              {{ t('knowledgeBase.moveToFolder.action') }}
+            </t-button>
+            <template #content>
+              <div class="card-menu">
+                <FolderPickerMenu :options="folderOptions || []"
+                  @confirm="(path: string) => { folderPickerVisible = false; emit('moveToFolder', path) }" />
               </div>
             </template>
-          </div>
+          </t-popup>
 
-          <button
-            type="button"
-            class="reference-batch-action reference-batch-action--danger"
-            :disabled="disabled"
-            @click="requestConfirm('delete')"
-          >
-            <ReferenceIcon name="trash-2" :size="14" />
-            <span>{{ t('knowledgeBase.batchDelete') }}</span>
-          </button>
+          <t-popconfirm theme="warning" :content="t('knowledgeBase.confirmBatchDeleteDocument', { count })"
+            :confirm-btn="{ content: t('knowledgeBase.confirmDelete'), theme: 'danger' }"
+            :cancel-btn="{ content: t('common.cancel') }" placement="top" @confirm="emit('delete')">
+            <t-button theme="danger" variant="outline" size="small"
+              :disabled="count === 0 || deleteLoading || reparseLoading || tagLoading" :loading="deleteLoading" @click.stop>
+              <template #icon><t-icon name="delete" size="14px" /></template>
+              {{ t('knowledgeBase.batchDelete') }}
+            </t-button>
+          </t-popconfirm>
         </div>
-
-        <template v-if="confirmAction">
-          <div class="reference-batch-backdrop" @click="confirmAction = null" />
-          <div class="reference-batch-confirm" role="dialog" aria-modal="true">
-            <p>{{ confirmTitle }}</p>
-            <div class="reference-batch-confirm__actions">
-              <button type="button" @click="confirmAction = null">{{ t('common.cancel') }}</button>
-              <button
-                type="button"
-                class="reference-batch-confirm__primary"
-                :class="{ danger: confirmAction === 'delete' }"
-                @click="confirm"
-              >
-                {{ confirmAction === 'delete' ? t('knowledgeBase.confirmDelete') : t('knowledgeBase.confirmBatchReparse') }}
-              </button>
-            </div>
-          </div>
-        </template>
       </div>
     </div>
   </transition>
 </template>
 
-<style scoped>
-.reference-batch-bar {
+<style scoped lang="less">
+.doc-batch-bar {
   position: relative;
-  z-index: 20;
-  width: max-content;
-  max-width: min(760px, calc(100vw - 40px));
+  z-index: 5;
+  width: 100%;
+  max-width: 560px;
   margin: 0 auto;
-  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  padding: 0 4px;
+  box-sizing: border-box;
 }
-.reference-batch-bar__inner {
-  position: relative;
+
+.batch-bar-inner {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 46px;
-  padding: 6px 8px 6px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgb(0 0 0 / 0.10);
-  color: #374151;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
-.reference-batch-bar__selection {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-right: 12px;
-  border-right: 1px solid #e5e7eb;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
-}
-.reference-batch-bar__clear {
-  border: 0;
-  background: transparent;
-  padding: 2px 0;
-  color: #9ca3af;
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.reference-batch-bar__clear:hover { color: #111827; }
-.reference-batch-bar__actions {
+
+.batch-bar-left {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
-.reference-batch-action {
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: #4b5563;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-family: inherit;
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
-}
-.reference-batch-action:hover:not(:disabled),
-.reference-batch-action.active { background: #f3f4f6; color: #111827; }
-.reference-batch-action--danger { color: #dc2626; }
-.reference-batch-action--danger:hover:not(:disabled) { background: #fef2f2; color: #b91c1c; }
-.reference-batch-action:disabled { opacity: .4; cursor: default; }
-.reference-batch-folder { position: relative; }
-.reference-batch-backdrop { position: fixed; inset: 0; z-index: 40; }
-.reference-batch-folder__menu {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  z-index: 50;
-  min-width: 240px;
-  transform: translateX(-50%);
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / .10), 0 8px 10px -6px rgb(0 0 0 / .10);
-  overflow: hidden;
-}
-.reference-batch-confirm {
-  position: absolute;
-  right: 8px;
-  bottom: calc(100% + 8px);
-  z-index: 50;
-  width: 280px;
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / .10), 0 8px 10px -6px rgb(0 0 0 / .10);
-}
-.reference-batch-confirm p {
-  margin: 0;
-  color: #374151;
-  font-size: 12px;
-  line-height: 18px;
+
+.batch-bar-count {
+  font-size: 13px;
   font-weight: 500;
+  color: var(--td-text-color-secondary);
+  white-space: nowrap;
 }
-.reference-batch-confirm__actions {
+
+.batch-bar-clear {
+  flex-shrink: 0;
+  padding: 0 6px !important;
+  height: 28px !important;
+  font-size: 12px;
+  color: var(--td-text-color-secondary) !important;
+
+  &:hover {
+    color: var(--td-brand-color) !important;
+  }
+}
+
+.batch-bar-actions {
+  flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 8px;
 }
-.reference-batch-confirm__actions button {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #4b5563;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
+
+.batch-bar-fade-enter-active,
+.batch-bar-fade-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
-.reference-batch-confirm__actions .reference-batch-confirm__primary {
-  border-color: #111827;
-  background: #111827;
-  color: #fff;
+
+.batch-bar-fade-enter-from,
+.batch-bar-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
-.reference-batch-confirm__actions .reference-batch-confirm__primary.danger {
-  border-color: #dc2626;
-  background: #dc2626;
-}
-.is-spinning { animation: reference-spin 900ms linear infinite; }
-.reference-batch-bar-enter-active,
-.reference-batch-bar-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
-.reference-batch-bar-enter-from,
-.reference-batch-bar-leave-to { opacity: 0; transform: translateY(6px); }
-@keyframes reference-spin { to { transform: rotate(360deg); } }
 </style>
