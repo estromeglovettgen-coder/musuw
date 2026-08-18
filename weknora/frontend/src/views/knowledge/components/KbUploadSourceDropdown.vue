@@ -26,7 +26,7 @@
     >
       <button
         type="button"
-        :class="['visual-upload-source__trigger', triggerClass]"
+        class="visual-upload-source__trigger"
         :data-guide="dataGuide || undefined"
         :aria-label="tooltipText"
         :title="tooltipText"
