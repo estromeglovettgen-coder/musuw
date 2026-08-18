@@ -1,0 +1,38 @@
+name: Mechanical UI Frontend Verify
+
+on:
+  push:
+    branches:
+      - ci/mechanical-ui-frontend-verify
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend tests, types, i18n and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: weknora/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix weknora/frontend --ignore-scripts
+      - name: Run frontend tests
+        run: npm --prefix weknora/frontend test
+      - name: Run frontend type-check
+        run: npm --prefix weknora/frontend run type-check
+      - name: Audit locale keys
+        run: npm --prefix weknora/frontend run check-i18n
+      - name: Build frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm --prefix weknora/frontend run build
