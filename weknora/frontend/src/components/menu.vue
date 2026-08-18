@@ -3,6 +3,7 @@ import { defineComponent } from 'vue'
 import LegacySidebarBusiness from '@/assets/business-baselines/menu.pre-view.vue'
 import SessionSidebarRow from './SessionSidebarRow.vue'
 import SessionSourceFilter from './SessionSourceFilter.vue'
+import SessionBatchManageModal from './SessionBatchManageModal.vue'
 import UserMenu from './UserMenu.vue'
 
 const legacy = LegacySidebarBusiness as any
@@ -15,6 +16,7 @@ export default defineComponent({
     ...(legacy.components || {}),
     SessionSidebarRow,
     SessionSourceFilter,
+    SessionBatchManageModal,
     UserMenu,
   },
   setup(props, context) {
@@ -29,272 +31,84 @@ export default defineComponent({
   <aside class="visual-sidebar" :class="{ 'is-collapsed': uiStore.sidebarCollapsed }">
     <template v-if="uiStore.sidebarCollapsed">
       <div class="visual-sidebar__collapsed-main">
-        <button type="button" class="visual-sidebar__collapsed-logo" :title="'Musuw 穆苏瓦'" @click="toggleSidebar">
-          <span class="visual-sidebar__bolt" aria-hidden="true">↯</span>
-        </button>
-
-        <button type="button" class="visual-sidebar__collapsed-control" :title="t('menu.expandSidebar')" @click="toggleSidebar">
-          <t-icon name="chevron-right" />
-        </button>
-
+        <button type="button" class="visual-sidebar__collapsed-logo" :title="'Musuw 穆苏瓦'" @click="toggleSidebar"><span class="visual-sidebar__bolt" aria-hidden="true">↯</span></button>
+        <button type="button" class="visual-sidebar__collapsed-control" :title="t('menu.expandSidebar')" @click="toggleSidebar"><t-icon name="chevron-right" /></button>
         <div class="visual-sidebar__collapsed-divider" />
-
-        <button type="button" class="visual-sidebar__collapsed-nav is-new" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')">
-          <t-icon name="chat-add" />
-        </button>
-
-        <button
-          type="button"
-          class="visual-sidebar__collapsed-nav"
-          :class="{ 'is-active': isMenuItemActive('knowledge-bases') }"
-          :title="t('menu.knowledgeBase')"
-          @click="handleMenuClick('knowledge-bases')"
-        >
-          <t-icon name="folder" />
-        </button>
+        <button type="button" class="visual-sidebar__collapsed-nav is-new" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /></button>
+        <button type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': isMenuItemActive('knowledge-bases') }" :title="t('menu.knowledgeBase')" @click="handleMenuClick('knowledge-bases')"><t-icon name="folder" /></button>
       </div>
-
       <div class="visual-sidebar__drag-handle" @mousedown="onDragHandleMouseDown" />
       <div class="visual-sidebar__collapsed-user"><UserMenu /></div>
     </template>
 
     <template v-else>
       <header class="visual-sidebar__header">
-        <button type="button" class="visual-sidebar__brand" aria-label="Musuw 穆苏瓦" @click="handleMenuClick('creatChat')">
-          <span class="visual-sidebar__mark" aria-hidden="true">↯</span>
-          <strong>Musuw 穆苏瓦</strong>
-        </button>
-
+        <button type="button" class="visual-sidebar__brand" aria-label="Musuw 穆苏瓦" @click="handleMenuClick('creatChat')"><span class="visual-sidebar__mark" aria-hidden="true">↯</span><strong>Musuw 穆苏瓦</strong></button>
         <div class="visual-sidebar__header-actions">
-          <button
-            type="button"
-            class="visual-sidebar__header-icon"
-            :title="t('menu.search')"
-            :aria-label="t('menu.search')"
-            @click="commandPaletteStore.openPalette('')"
-          >
-            <t-icon name="search" />
-          </button>
-          <button
-            type="button"
-            class="visual-sidebar__header-icon"
-            :title="t('menu.collapseSidebar')"
-            :aria-label="t('menu.collapseSidebar')"
-            @click="toggleSidebar"
-          >
-            <t-icon name="chevron-left" />
-          </button>
+          <button type="button" class="visual-sidebar__header-icon" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')"><t-icon name="search" /></button>
+          <button type="button" class="visual-sidebar__header-icon" :title="t('menu.collapseSidebar')" :aria-label="t('menu.collapseSidebar')" @click="toggleSidebar"><t-icon name="chevron-left" /></button>
         </div>
       </header>
 
       <div class="visual-sidebar__primary-actions">
-        <button type="button" class="visual-sidebar__primary is-new" data-guide="nav-creatChat" @click="handleMenuClick('creatChat')">
-          <t-icon name="chat-add" />
-          <span>{{ t('menu.newChat') }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="visual-sidebar__primary is-kb"
-          :class="{ 'is-active': isMenuItemActive('knowledge-bases') }"
-          data-guide="nav-knowledge-bases"
-          @click="handleMenuClick('knowledge-bases')"
-        >
-          <span class="visual-sidebar__primary-copy">
-            <t-icon name="folder" />
-            <span>{{ t('menu.knowledgeBase') }}</span>
-          </span>
+        <button type="button" class="visual-sidebar__primary is-new" data-guide="nav-creatChat" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /><span>{{ t('menu.newChat') }}</span></button>
+        <button type="button" class="visual-sidebar__primary is-kb" :class="{ 'is-active': isMenuItemActive('knowledge-bases') }" data-guide="nav-knowledge-bases" @click="handleMenuClick('knowledge-bases')">
+          <span class="visual-sidebar__primary-copy"><t-icon name="folder" /><span>{{ t('menu.knowledgeBase') }}</span></span>
           <span v-if="chatResources.rawKnowledgeBases?.length" class="visual-sidebar__kb-count">{{ chatResources.rawKnowledgeBases.length }}</span>
         </button>
       </div>
 
       <section class="visual-sidebar__history" aria-label="Sessions">
-        <div v-if="showSessionSourceFilter && !batchMode" class="visual-sidebar__session-scope">
-          <SessionSourceFilter
-            inline
-            :emphasized="sessionScopeFilterPinned"
-            :sources="sessionSourceOptions"
-            :current="activeSessionBucketKey"
-            @select="switchSessionBucket"
-          />
-        </div>
-
+        <div v-if="showSessionSourceFilter && !batchMode" class="visual-sidebar__session-scope"><SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" /></div>
         <div ref="scrollContainer" class="visual-sidebar__history-scroll" @scroll="handleScroll">
-          <div v-if="sessionListBooting && !hasAnySession" class="visual-sidebar__session-skeletons" aria-hidden="true">
-            <div v-for="n in 4" :key="n" class="visual-sidebar__session-skeleton">
-              <t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" />
-            </div>
-          </div>
-
-          <div v-else-if="activeBucket?.loading && !activeBucket.loaded && filteredGroupedSessions.length === 0" class="visual-sidebar__session-skeletons" aria-hidden="true">
-            <div v-for="n in 4" :key="`bucket-${n}`" class="visual-sidebar__session-skeleton">
-              <t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" />
-            </div>
-          </div>
-
-          <div v-else-if="activeBucket?.loaded && filteredGroupedSessions.length === 0" class="visual-sidebar__empty">
-            <t-icon name="chat" />
-            <span>{{ t('menu.noSessions') }}</span>
-          </div>
-
+          <div v-if="sessionListBooting && !hasAnySession" class="visual-sidebar__session-skeletons" aria-hidden="true"><div v-for="n in 4" :key="n" class="visual-sidebar__session-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" /></div></div>
+          <div v-else-if="activeBucket?.loading && !activeBucket.loaded && filteredGroupedSessions.length === 0" class="visual-sidebar__session-skeletons" aria-hidden="true"><div v-for="n in 4" :key="`bucket-${n}`" class="visual-sidebar__session-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" /></div></div>
+          <div v-else-if="activeBucket?.loaded && filteredGroupedSessions.length === 0" class="visual-sidebar__empty"><t-icon name="chat" /><span>{{ t('menu.noSessions') }}</span></div>
           <template v-else>
             <section v-for="group in filteredGroupedSessions" :key="group.key" class="visual-sidebar__session-group">
               <h4 v-if="group.label">{{ group.label }}</h4>
-              <SessionSidebarRow
-                v-for="subitem in group.items"
-                :key="subitem.id"
-                :item="subitem"
-                :batch-mode="batchMode"
-                :active-path="currentSecondpath"
-                :selected-ids="batchSelectedIds"
-                :menu-options="buildSessionMenuOptions(subitem)"
-                @navigate="gotopage(subitem.path)"
-                @toggle-select="toggleBatchSelect(subitem.id)"
-                @menu-click="handleSessionMenuClick($event, subitem)"
-                @rename-submit="renameSessionTitle(subitem, $event.title)"
-                @hover-in="mouseenteBotDownr(subitem.id)"
-                @hover-out="mouseleaveBotDown"
-              />
+              <SessionSidebarRow v-for="subitem in group.items" :key="subitem.id" :item="subitem" :batch-mode="batchMode" :active-path="currentSecondpath" :selected-ids="batchSelectedIds" :menu-options="buildSessionMenuOptions(subitem)" @navigate="gotopage(subitem.path)" @toggle-select="toggleBatchSelect(subitem.id)" @menu-click="handleSessionMenuClick($event, subitem)" @rename-submit="renameSessionTitle(subitem, $event.title)" @hover-in="mouseenteBotDownr(subitem.id)" @hover-out="mouseleaveBotDown" />
             </section>
-
-            <div v-if="activeBucket?.loading && filteredGroupedSessions.length > 0" class="visual-sidebar__loading-more">
-              <t-loading size="small" />
-            </div>
+            <div v-if="activeBucket?.loading && filteredGroupedSessions.length > 0" class="visual-sidebar__loading-more"><t-loading size="small" /></div>
           </template>
-        </div>
-      </section>
-
-      <section v-if="batchMode" class="visual-sidebar__batch-footer">
-        <t-checkbox :checked="isAllBatchSelected" :indeterminate="isBatchIndeterminate" @change="toggleBatchSelectAll">
-          {{ t('batchManage.selectAll') }}
-        </t-checkbox>
-        <div>
-          <button type="button" class="visual-sidebar__batch-button" @click="exitBatchMode">{{ t('batchManage.cancel') }}</button>
-          <button
-            type="button"
-            class="visual-sidebar__batch-button is-danger"
-            :disabled="batchSelectedIds.length === 0 || batchDeleting"
-            @click="handleInlineBatchDelete"
-          >
-            <t-loading v-if="batchDeleting" size="small" />
-            <span>{{ t('batchManage.delete') }}{{ batchSelectedIds.length > 0 ? `(${batchDisplayCount})` : '' }}</span>
-          </button>
         </div>
       </section>
 
       <footer class="visual-sidebar__footer"><UserMenu /></footer>
     </template>
+
+    <SessionBatchManageModal
+      :visible="batchMode"
+      :items="filteredGroupedSessions.flatMap(group => group.items)"
+      :selected-ids="batchSelectedIds"
+      :all-selected="isAllBatchSelected"
+      :indeterminate="isBatchIndeterminate"
+      :deleting="batchDeleting"
+      @close="exitBatchMode"
+      @toggle="toggleBatchSelect"
+      @toggle-all="toggleBatchSelectAll"
+      @delete="handleInlineBatchDelete"
+    />
   </aside>
 </template>
 
 <style scoped lang="less">
-.visual-sidebar {
-  width: 256px;
-  min-width: 256px;
-  height: 100%;
-  min-height: 0;
-  padding: 12px;
-  box-sizing: border-box;
-  border-right: 1px solid rgb(229 231 235 / 80%);
-  background: #fbfbfb;
-  color: #374151;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  user-select: none;
-  transition: width 200ms ease, min-width 200ms ease;
-}
-.visual-sidebar.is-collapsed {
-  width: 56px;
-  min-width: 56px;
-  padding: 14px 8px;
-  align-items: center;
-  justify-content: space-between;
-  overflow: visible;
-}
-:global(html.wails-desktop) .visual-sidebar:not(.is-collapsed) { padding-top: 30px; }
-:global(html.wails-desktop) .visual-sidebar.is-collapsed { padding-top: 30px; }
-
-.visual-sidebar__header {
-  flex: 0 0 auto;
-  margin-bottom: 10px;
-  padding: 6px 4px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.visual-sidebar__brand {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: transparent;
-  color: #111827;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-.visual-sidebar__mark,
-.visual-sidebar__collapsed-logo {
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-  color: #fff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
-}
+.visual-sidebar { width: 256px; min-width: 256px; height: 100%; min-height: 0; padding: 12px; box-sizing: border-box; border-right: 1px solid rgb(229 231 235 / 80%); background: #fbfbfb; color: #374151; display: flex; flex-direction: column; position: relative; overflow: hidden; user-select: none; transition: width 200ms ease,min-width 200ms ease; }
+.visual-sidebar.is-collapsed { width: 56px; min-width: 56px; padding: 14px 8px; align-items: center; justify-content: space-between; overflow: visible; }
+:global(html.wails-desktop) .visual-sidebar:not(.is-collapsed),:global(html.wails-desktop) .visual-sidebar.is-collapsed { padding-top: 30px; }
+.visual-sidebar__header { flex: 0 0 auto; margin-bottom: 10px; padding: 6px 4px; display: flex; align-items: center; justify-content: space-between; }
+.visual-sidebar__brand { min-width: 0; padding: 0; border: 0; display: flex; align-items: center; gap: 10px; background: transparent; color: #111827; font: inherit; cursor: pointer; text-align: left; }
+.visual-sidebar__mark,.visual-sidebar__collapsed-logo { flex: 0 0 26px; width: 26px; height: 26px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #000; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-sidebar__mark { transition: transform 150ms ease; }
 .visual-sidebar__brand:hover .visual-sidebar__mark { transform: scale(1.05); }
 .visual-sidebar__bolt { font-size: 15px; line-height: 1; font-weight: 800; transform: translateY(-.5px); }
 .visual-sidebar__brand strong { min-width: 0; overflow: hidden; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
 .visual-sidebar__header-actions { display: flex; align-items: center; gap: 2px; color: #9ca3af; }
-.visual-sidebar__header-icon,
-.visual-sidebar__collapsed-control {
-  width: 28px;
-  height: 28px;
-  padding: 6px;
-  border: 0;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-  transition: color 150ms ease, background-color 150ms ease;
-}
+.visual-sidebar__header-icon,.visual-sidebar__collapsed-control { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; transition: color 150ms ease,background-color 150ms ease; }
 .visual-sidebar__header-icon:hover { color: #1f2937; background: rgb(229 231 235 / 60%); }
 .visual-sidebar__header-icon :deep(.t-icon) { font-size: 16px; }
-
 .visual-sidebar__primary-actions { flex: 0 0 auto; margin-bottom: 8px; padding: 0 2px; display: flex; flex-direction: column; gap: 4px; }
-.visual-sidebar__primary {
-  width: 100%;
-  min-height: 36px;
-  padding: 8px 12px;
-  box-sizing: border-box;
-  border: 0;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: #374151;
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 400;
-  text-align: left;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
+.visual-sidebar__primary { width: 100%; min-height: 36px; padding: 8px 12px; box-sizing: border-box; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; text-align: left; cursor: pointer; transition: all 150ms ease; }
 .visual-sidebar__primary.is-new { border: 1px solid rgb(229 231 235 / 80%); background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); font-weight: 500; }
 .visual-sidebar__primary.is-new:hover { background: #f9fafb; }
 .visual-sidebar__primary.is-new > span { font-size: 13px; font-weight: 600; }
@@ -305,7 +119,6 @@ export default defineComponent({
 .visual-sidebar__primary :deep(.t-icon) { flex: 0 0 16px; width: 16px; height: 16px; font-size: 16px; }
 .visual-sidebar__primary-copy > span:last-child { font-size: 13px; }
 .visual-sidebar__kb-count { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: rgb(229 231 235 / 80%); color: #4b5563; font-family: var(--app-font-family-mono); font-size: 10px; line-height: 16px; }
-
 .visual-sidebar__history { min-height: 0; flex: 1 1 auto; margin-top: 4px; display: flex; flex-direction: column; overflow: hidden; }
 .visual-sidebar__session-scope { flex: 0 0 auto; margin-bottom: 4px; padding: 0 2px; }
 .visual-sidebar__history-scroll { min-height: 0; flex: 1 1 auto; padding: 4px 4px 4px 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; }
@@ -316,30 +129,20 @@ export default defineComponent({
 .visual-sidebar__empty { padding: 32px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; color: #9ca3af; font-size: 12px; text-align: center; }
 .visual-sidebar__empty :deep(.t-icon) { font-size: 24px; color: #d1d5db; }
 .visual-sidebar__loading-more { min-height: 30px; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
-
-.visual-sidebar__batch-footer { flex: 0 0 auto; margin-top: 6px; padding: 8px; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; }
-.visual-sidebar__batch-footer > div { display: flex; gap: 6px; }
-.visual-sidebar__batch-button { min-height: 30px; padding: 6px 10px; border: 0; border-radius: 10px; background: #f9fafb; color: #374151; font: inherit; font-size: 11px; cursor: pointer; }
-.visual-sidebar__batch-button.is-danger { color: #dc2626; background: #fef2f2; }
-.visual-sidebar__batch-button:disabled { opacity: .45; cursor: default; }
 .visual-sidebar__footer { flex: 0 0 auto; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgb(229 231 235 / 70%); position: relative; }
-
 .visual-sidebar__collapsed-main { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .visual-sidebar__collapsed-logo { width: 32px; height: 32px; flex-basis: 32px; cursor: pointer; transition: transform 150ms ease; }
 .visual-sidebar__collapsed-logo:hover { transform: scale(1.05); }
 .visual-sidebar__collapsed-control { color: #9ca3af; }
 .visual-sidebar__collapsed-control:hover { color: #111827; background: #f3f4f6; }
 .visual-sidebar__collapsed-divider { width: 32px; height: 1px; margin: 4px 0; background: rgb(229 231 235 / 80%); }
-.visual-sidebar__collapsed-nav { width: 36px; height: 36px; padding: 9px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #4b5563; cursor: pointer; transition: color 150ms ease, background-color 150ms ease; }
+.visual-sidebar__collapsed-nav { width: 36px; height: 36px; padding: 9px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #4b5563; cursor: pointer; transition: color 150ms ease,background-color 150ms ease; }
 .visual-sidebar__collapsed-nav.is-new { background: #f3f4f6; color: #111827; }
 .visual-sidebar__collapsed-nav:hover { background: #e5e7eb; color: #111827; }
 .visual-sidebar__collapsed-nav.is-active { background: #111827; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-sidebar__collapsed-nav :deep(.t-icon) { font-size: 16px; }
 .visual-sidebar__collapsed-user { width: 100%; display: flex; justify-content: center; }
 .visual-sidebar__drag-handle { position: absolute; top: 0; right: -3px; z-index: 20; width: 6px; height: 100%; cursor: ew-resize; }
-
-@media (max-width: 760px) {
-  .visual-sidebar:not(.is-collapsed) { position: absolute; inset: 0 auto 0 0; z-index: 1000; box-shadow: 12px 0 36px rgb(15 23 42 / 14%); }
-}
+@media (max-width: 760px) { .visual-sidebar:not(.is-collapsed) { position: absolute; inset: 0 auto 0 0; z-index: 1000; box-shadow: 12px 0 36px rgb(15 23 42 / 14%); } }
 @media (prefers-reduced-motion: reduce) { .visual-sidebar,.visual-sidebar * { transition: none !important; } }
 </style>
