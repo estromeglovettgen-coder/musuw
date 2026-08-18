@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
@@ -24,6 +25,26 @@ func (r *entitlementRepository) GetTenantEntitlement(ctx context.Context, tenant
 		return nil, err
 	}
 	return &tenant, nil
+}
+
+func (r *entitlementRepository) GetOpenRouterKey(ctx context.Context, tenantID uint64) (*types.OpenRouterTenantKey, error) {
+	var key types.OpenRouterTenantKey
+	err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).First(&key).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &key, nil
+}
+
+func (r *entitlementRepository) SetOpenRouterKeyIfAbsent(ctx context.Context, key *types.OpenRouterTenantKey) (bool, error) {
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(key)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
 }
 
 func (r *entitlementRepository) RecordOpenRouterCost(ctx context.Context, tenantID uint64, at time.Time, costMicrousd int64) (int64, error) {

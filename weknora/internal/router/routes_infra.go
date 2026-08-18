@@ -8,35 +8,34 @@ import (
 	"github.com/Tencent/WeKnora/internal/handler"
 )
 
-// Models are tenant-wide infrastructure (LLM credentials, embeddings,
-// rerankers); Viewer+ for reads, Admin+ for any mutation. Credential
-// subresource writes are also Admin+ since secrets are tenant-scoped.
+// Models are platform-managed infrastructure in Musuw's C-end product.
+// Tenant users may read the catalog subject to consumer-plan filtering, but
+// model creation, mutation, credentials and real upstream debugging are
+// system-administrator operations. Tenant API keys keep read access only;
+// model writes are deliberately left undeclared so the API-key gate defaults
+// them to deny.
 func RegisterModelRoutes(
 	r *gin.RouterGroup,
 	handler *handler.ModelHandler,
 	credHandler *handler.ModelCredentialsHandler,
 	g *rbacGuards,
 ) {
-	// 模型路由组。空间级基础设施：仅完全访问（Owner）API key 可访问。
-	models := g.apiKeyGroup(r.Group("/models"), apiKeyManageModels(apiKeyFullAccess()))
+	modelRoutes := r.Group("/models")
+	models := g.apiKeyGroup(modelRoutes, apiKeyManageModels(apiKeyFullAccess()))
 	{
-		// 获取模型厂商列表 — Viewer+
+		// Catalog reads remain available to tenant users/API keys.
 		models.GET("/providers", g.Viewer(), handler.ListModelProviders)
-		// 创建模型 — Admin+
-		models.POST("", g.Admin(), handler.CreateModel)
-		// 获取模型列表 — Viewer+
 		models.GET("", g.Viewer(), handler.ListModels)
-		// 调试已保存模型会发起真实上游调用并产生费用 — Admin+
-		models.POST("/:id/debug", g.Admin(), handler.DebugModel)
-		// 获取单个模型 — Viewer+
 		models.GET("/:id", g.Viewer(), handler.GetModel)
-		// 更新模型 — Admin+；内置模型仍由服务层额外限定为 SystemAdmin。
-		models.PUT("/:id", g.AdminOrSystemAdmin(), handler.UpdateModel)
-		// 删除模型 — Admin+
-		models.DELETE("/:id", g.Admin(), handler.DeleteModel)
-		// Per-field credential subresource (see internal/handler/model_credentials.go) — Admin+
-		models.PUT("/:id/credentials", g.AdminOrSystemAdmin(), credHandler.Put)
-		models.DELETE("/:id/credentials/:field", g.AdminOrSystemAdmin(), credHandler.DeleteField)
+
+		// Musuw C-end does not expose custom-model/BYOK mutation. The platform
+		// administrator owns the shared catalog and its credentials.
+		modelRoutes.POST("", g.SystemAdmin(), handler.CreateModel)
+		modelRoutes.POST("/:id/debug", g.SystemAdmin(), handler.DebugModel)
+		modelRoutes.PUT("/:id", g.SystemAdmin(), handler.UpdateModel)
+		modelRoutes.DELETE("/:id", g.SystemAdmin(), handler.DeleteModel)
+		modelRoutes.PUT("/:id/credentials", g.SystemAdmin(), credHandler.Put)
+		modelRoutes.DELETE("/:id/credentials/:field", g.SystemAdmin(), credHandler.DeleteField)
 	}
 }
 
@@ -65,23 +64,25 @@ func RegisterInitializationRoutes(r *gin.RouterGroup, handler *handler.Initializ
 	g.apiKeyRoute(r, http.MethodPut, "/initialization/config/:kbId",
 		apiKeyManageKnowledgeBases(apiKeyFullAccess()), g.OwnedKBOrAdminFromKbIDParam(), g.KBAccessWrite("kbId"), handler.UpdateKBConfig)
 
-	// Ollama / 远程 API / 抽取等系统级检测/下载操作。这些不绑某个 KB，
-	// 会改空间级模型配置或拉远端模型；JWT 侧只读探测 Viewer+、变更 Admin+。
-	// 对 API key 均为空间级：full-access key 可用，scoped key 需要 manage_models。
-	g.apiKeyRoute(r, http.MethodGet, "/initialization/ollama/status", apiKeyManageModels(apiKeyFullAccess()), g.Viewer(), handler.CheckOllamaStatus)
-	g.apiKeyRoute(r, http.MethodGet, "/initialization/ollama/models", apiKeyManageModels(apiKeyFullAccess()), g.Viewer(), handler.ListOllamaModels)
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/ollama/models/check", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.CheckOllamaModels)
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/ollama/models/download", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.DownloadOllamaModel)
-	g.apiKeyRoute(r, http.MethodGet, "/initialization/ollama/download/progress/:taskId", apiKeyManageModels(apiKeyFullAccess()), g.Viewer(), handler.GetDownloadProgress)
-	g.apiKeyRoute(r, http.MethodGet, "/initialization/ollama/download/tasks", apiKeyManageModels(apiKeyFullAccess()), g.Viewer(), handler.ListDownloadTasks)
+	// Provider/catalog probing and downloads are platform administration in
+	// Musuw C-end. Keep them out of tenant API-key policies and require a real
+	// system administrator. This prevents the personal-tenant Owner from
+	// turning the restored native settings surface into BYOK/custom routing.
+	modelAdmin := r.Group("/initialization")
+	modelAdmin.GET("/ollama/status", g.SystemAdmin(), handler.CheckOllamaStatus)
+	modelAdmin.GET("/ollama/models", g.SystemAdmin(), handler.ListOllamaModels)
+	modelAdmin.POST("/ollama/models/check", g.SystemAdmin(), handler.CheckOllamaModels)
+	modelAdmin.POST("/ollama/models/download", g.SystemAdmin(), handler.DownloadOllamaModel)
+	modelAdmin.GET("/ollama/download/progress/:taskId", g.SystemAdmin(), handler.GetDownloadProgress)
+	modelAdmin.GET("/ollama/download/tasks", g.SystemAdmin(), handler.ListDownloadTasks)
+	modelAdmin.POST("/remote/check", g.SystemAdmin(), handler.CheckRemoteModel)
+	modelAdmin.POST("/embedding/test", g.SystemAdmin(), handler.TestEmbeddingModel)
+	modelAdmin.POST("/rerank/check", g.SystemAdmin(), handler.CheckRerankModel)
+	modelAdmin.POST("/asr/check", g.SystemAdmin(), handler.CheckASRModel)
+	modelAdmin.POST("/multimodal/test", g.SystemAdmin(), handler.TestMultimodalFunction)
 
-	// 远程API相关接口
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/remote/check", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.CheckRemoteModel)
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/embedding/test", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.TestEmbeddingModel)
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/rerank/check", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.CheckRerankModel)
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/asr/check", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.CheckASRModel)
-	g.apiKeyRoute(r, http.MethodPost, "/initialization/multimodal/test", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.TestMultimodalFunction)
-
+	// Extraction endpoints operate on product content rather than model
+	// administration and retain their existing tenant Admin contract.
 	g.apiKeyRoute(r, http.MethodPost, "/initialization/extract/text-relation", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.ExtractTextRelations)
 	g.apiKeyRoute(r, http.MethodPost, "/initialization/extract/fabri-tag", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.FabriTag)
 	g.apiKeyRoute(r, http.MethodPost, "/initialization/extract/fabri-text", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.FabriText)
@@ -290,10 +291,9 @@ func RegisterDataSourceRoutes(
 }
 
 // RegisterWeKnoraCloudRoutes 注册 WeKnoraCloud 初始化路由
-// RegisterWeKnoraCloudRoutes registers the WeKnoraCloud credential
-// management endpoints. SaveCredentials persists external SaaS keys
-// for the tenant (Admin+), Status is a low-risk readiness probe (Viewer+).
+// In Musuw C-end, saving provider credentials is platform administration;
+// tenant users may only read readiness/status.
 func RegisterWeKnoraCloudRoutes(r *gin.RouterGroup, handler *handler.WeKnoraCloudHandler, g *rbacGuards) {
-	g.apiKeyRoute(r, http.MethodPost, "/weknoracloud/credentials", apiKeyManageModels(apiKeyFullAccess()), g.Admin(), handler.SaveCredentials)
+	r.POST("/weknoracloud/credentials", g.SystemAdmin(), handler.SaveCredentials)
 	g.apiKeyRoute(r, http.MethodGet, "/models/weknoracloud/status", apiKeyManageModels(apiKeyFullAccess()), g.Viewer(), handler.Status)
 }

@@ -55,15 +55,20 @@ func (s *knowledgeService) checkCreateKnowledgeEntitlement(ctx context.Context, 
 			return apperrors.NewForbiddenError("Free plan supports ten documents per knowledge base; upgrade to add more")
 		}
 	}
-	used := types.EffectiveOpenRouterUsage(tenant, time.Now())
-	remaining := limits.MonthlyOpenRouterMicrousd - used
-	if types.EstimateParseMicrousd(fileBytes) > remaining {
-		return apperrors.NewTooManyRequestsError("OpenRouter monthly credit is insufficient to parse this document")
-	}
+	// OpenRouter's provider-managed monthly key limit is authoritative. A
+	// request-size cost guess here would be both stale and endpoint-dependent.
+	_ = fileBytes
 	return nil
 }
 
 func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types.Model) (bool, error) {
+	// Platform administrators manage the shared builtin catalog. Consumer-plan
+	// filtering is a C-end entitlement boundary and must not hide paid models
+	// from the only role allowed to maintain that catalog.
+	if types.IsSystemAdminFromContext(ctx) {
+		return true, nil
+	}
+
 	plan, ok := effectivePlanFromContext(ctx)
 	if ok {
 		return types.ConsumerPlanAllowsModel(plan, model), nil
