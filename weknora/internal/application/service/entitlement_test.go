@@ -103,6 +103,7 @@ func TestEntitlementServiceDoesNotUseLegacyUsageWhenProviderKeyIsAbsent(t *testi
 }
 
 func TestEntitlementServiceProvisionsProviderLimitedTenantKey(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 	repo := &entitlementRepoStub{tenant: &types.Tenant{ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active"}}
 	manager := &keyManagerStub{created: &modelopenrouter.ManagedKey{Key: "sk-child", Hash: "hash-7"}}
 	svc := newEntitlementService(repo, manager)
