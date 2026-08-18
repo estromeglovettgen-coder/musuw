@@ -35,11 +35,11 @@
     </form>
 
     <div v-else class="visual-session-row__title" :title="item.title">
-      <t-icon v-if="item.is_pinned" name="pin" class="visual-session-row__pin" />
       <span>{{ item.title }}</span>
     </div>
 
-    <div v-if="!batchMode" class="visual-session-row__menu" @click.stop>
+    <div v-if="!batchMode" class="visual-session-row__actions" @click.stop>
+      <t-icon v-if="item.is_pinned" name="pin-filled" class="visual-session-row__pin" />
       <t-popup
         v-model:visible="menuOpen"
         :overlay-class-name="menuOverlayClass"
@@ -227,92 +227,60 @@ const confirmDangerAction = (): void => {
   position: relative;
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: 29px;
   padding: 6px 10px;
   box-sizing: border-box;
   border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: space-between;
+  gap: 8px;
   background: transparent;
-  color: #4b5563;
-  font-size: 12px;
-  line-height: 18px;
+  color: #374151;
+  font-size: 12.5px;
+  line-height: 1.375;
   font-weight: 400;
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: all 150ms ease;
 }
 
 .visual-session-row:hover {
-  background: rgb(243 244 246 / 80%);
-  color: #111827;
+  background: rgb(229 231 235 / 50%);
+  color: #030712;
 }
 
 .visual-session-row.is-active,
 .visual-session-row.is-selected {
-  background: rgb(229 231 235 / 80%);
-  color: #111827;
-  font-weight: 500;
+  background: rgb(229 231 235 / 90%);
+  color: #030712;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
 }
 
-.visual-session-row__checkbox {
-  flex: 0 0 auto;
-}
-
-.visual-session-row__title {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.visual-session-row__title > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visual-session-row__pin {
-  flex: 0 0 12px;
-  width: 12px;
-  height: 12px;
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.visual-session-row__edit {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
+.visual-session-row__checkbox { flex: 0 0 auto; }
+.visual-session-row__title { min-width: 0; flex: 1 1 auto; }
+.visual-session-row__title > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.visual-session-row__actions { flex: 0 0 auto; margin-left: 6px; display: inline-flex; align-items: center; gap: 4px; }
+.visual-session-row__pin { flex: 0 0 12px; width: 12px; height: 12px; font-size: 12px; color: #f59e0b; }
+.visual-session-row__edit { min-width: 0; flex: 1 1 auto; }
 .visual-session-row__edit-input {
   width: 100%;
-  height: 26px;
-  padding: 0 7px;
+  height: 24px;
+  padding: 2px 6px;
   box-sizing: border-box;
-  border: 1px solid #9ca3af;
-  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   outline: 0;
   background: #fff;
   color: #111827;
   font: inherit;
   font-size: 12px;
-  line-height: 24px;
-  box-shadow: 0 0 0 2px rgb(156 163 175 / 12%);
 }
-
-.visual-session-row__menu {
-  flex: 0 0 auto;
-  position: relative;
-}
-
+.visual-session-row__edit-input:focus { border-color: #6366f1; }
 .visual-session-row__more {
-  width: 24px;
-  height: 24px;
-  margin: -2px -4px -2px 0;
-  padding: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 2px;
   border: 0;
   border-radius: 6px;
   display: inline-flex;
@@ -322,62 +290,37 @@ const confirmDangerAction = (): void => {
   color: #9ca3af;
   opacity: 0;
   cursor: pointer;
-  transition: opacity 120ms ease, background-color 150ms ease, color 150ms ease;
+  transition: all 150ms ease;
 }
-
 .visual-session-row:hover .visual-session-row__more,
-.visual-session-row__more[aria-expanded='true'] {
-  opacity: 1;
-}
-
-.visual-session-row__more:hover {
-  background: #fff;
-  color: #374151;
-}
-
-.visual-session-row__more :deep(.t-icon) {
-  font-size: 14px;
-}
+.visual-session-row__more[aria-expanded='true'],
+.visual-session-row.is-active .visual-session-row__more { opacity: 1; }
+.visual-session-row__more:hover { background: rgb(229 231 235 / 80%); color: #111827; }
+.visual-session-row__more :deep(.t-icon) { font-size: 14px; }
 </style>
 
 <style lang="less">
-.visual-session-menu-popup {
-  z-index: 3000 !important;
-}
-
+.visual-session-menu-popup { z-index: 3000 !important; }
 .visual-session-menu-popup .t-popup__content {
-  min-width: 160px !important;
-  width: max-content !important;
-  margin-top: 2px !important;
+  min-width: 128px !important;
+  width: 128px !important;
+  margin-top: 4px !important;
   padding: 0 !important;
   overflow: hidden;
   border: 1px solid #e5e7eb !important;
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   background: #fff !important;
   box-shadow: 0 12px 30px rgb(0 0 0 / 12%) !important;
 }
-
-.visual-session-menu-popup.is-confirm .t-popup__content {
-  width: 260px !important;
-  min-width: 260px !important;
-}
-
-.visual-session-menu {
-  min-width: 158px;
-  padding: 5px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
+.visual-session-menu-popup.is-confirm .t-popup__content { width: 260px !important; min-width: 260px !important; }
+.visual-session-menu { width: 128px; padding: 4px 0; box-sizing: border-box; display: flex; flex-direction: column; }
 .visual-session-menu__item {
   width: 100%;
-  min-height: 32px;
-  padding: 6px 9px;
+  min-height: 30px;
+  padding: 6px 12px;
   box-sizing: border-box;
   border: 0;
-  border-radius: 7px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -389,89 +332,16 @@ const confirmDangerAction = (): void => {
   white-space: nowrap;
   cursor: pointer;
 }
-
-.visual-session-menu__item:hover {
-  background: #f3f4f6;
-  color: #111827;
-}
-
-.visual-session-menu__item.is-danger {
-  color: #b91c1c;
-}
-
-.visual-session-menu__item.is-danger:hover {
-  background: #fef2f2;
-}
-
-.visual-session-menu__icon {
-  flex: 0 0 14px;
-  width: 14px;
-  height: 14px;
-  color: #6b7280;
-}
-
-.visual-session-menu__item.is-danger .visual-session-menu__icon {
-  color: #b91c1c;
-}
-
-.visual-session-menu__divider {
-  height: 1px;
-  margin: 3px 6px;
-  background: #f3f4f6;
-}
-
-.visual-session-confirm {
-  width: 258px;
-  padding: 14px;
-  box-sizing: border-box;
-}
-
-.visual-session-confirm h4 {
-  margin: 0 0 5px;
-  color: #111827;
-  font-size: 13px;
-  line-height: 19px;
-  font-weight: 700;
-}
-
-.visual-session-confirm p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.visual-session-confirm__actions {
-  margin-top: 14px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 7px;
-}
-
-.visual-session-confirm__button {
-  min-height: 30px;
-  padding: 5px 11px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #374151;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.visual-session-confirm__button:hover {
-  background: #f9fafb;
-}
-
-.visual-session-confirm__button.is-danger {
-  border-color: #b91c1c;
-  background: #b91c1c;
-  color: #fff;
-}
-
-.visual-session-confirm__button.is-danger:hover {
-  background: #991b1b;
-}
+.visual-session-menu__item:hover { background: #f9fafb; }
+.visual-session-menu__item.is-danger { color: #dc2626; }
+.visual-session-menu__item.is-danger:hover { background: #fef2f2; }
+.visual-session-menu__icon { flex: 0 0 12px; width: 12px; height: 12px; color: #6b7280; }
+.visual-session-menu__item.is-danger .visual-session-menu__icon { color: #ef4444; }
+.visual-session-menu__divider { height: 1px; margin: 4px 0; background: #f3f4f6; }
+.visual-session-confirm { width: 258px; padding: 14px; box-sizing: border-box; }
+.visual-session-confirm h4 { margin: 0 0 5px; color: #111827; font-size: 13px; line-height: 19px; font-weight: 700; }
+.visual-session-confirm p { margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5; }
+.visual-session-confirm__actions { margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px; }
+.visual-session-confirm__button { min-height: 30px; padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; color: #374151; font-size: 12px; font-weight: 500; cursor: pointer; }
+.visual-session-confirm__button.is-danger { border-color: #dc2626; background: #dc2626; color: #fff; font-weight: 600; }
 </style>
