@@ -40,7 +40,6 @@ const baseline = new Map([
   ['../views/knowledge/components/TagEditDialog.vue', '9127b181a073395a3b2de2e3b527594ba0a7ec86'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],
-  ['../views/settings/ModelSettings.vue', '6c6cd4255277e24d754b0017eac708148d92e935'],
   ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
 ])
 
@@ -169,5 +168,19 @@ test('general settings may replace markup and CSS but must preserve preference/e
     'locale.value = persisted',
     'if (!setTheme(value))',
     'MessagePlugin.success',
+  ])
+})
+
+test('model settings may replace markup and CSS but must preserve model lifecycle and permissions', () => {
+  assertContracts('../views/settings/ModelSettings.vue', 'model settings', [
+    'const models = await listModels()',
+    'model.isBuiltin ? authStore.isSystemAdmin : authStore.hasRole(\'admin\')',
+    'authStore.hasRole(\'admin\') && !model.isBuiltin',
+    'await updateModelAPI(editingModel.value.id, apiModelData)',
+    'await createModel(apiModelData)',
+    'await deleteModelAPI(modelId)',
+    'await createModel(newModel)',
+    'new URL(modelData.baseUrl.trim())',
+    'showDebugDrawer.value = true',
   ])
 })
