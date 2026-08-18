@@ -563,9 +563,9 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
 .visual-document-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   grid-auto-rows: max-content;
-  gap: 16px;
+  gap: 12px;
   align-content: start;
   padding: 0 0 16px;
   box-sizing: border-box;
@@ -877,15 +877,6 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
 
 @keyframes visual-document-spin { to { transform: rotate(360deg); } }
 
-@media (min-width: 860px) {
-  .visual-document-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 1180px) {
-  .visual-document-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 1540px) {
-  .visual-document-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 @media (prefers-reduced-motion: reduce) {
   .visual-folder-card,
   .visual-document-card,
