@@ -48,6 +48,7 @@ test("loads every mechanically compiled visual-reference shard and no handwritte
     "musuw-reference-mechanical-09a.css",
     "musuw-reference-mechanical-09b.css",
     "musuw-reference-mechanical-09c.css",
+    "musuw-reference-mechanical-09d.css",
     "musuw-reference-mechanical-10a.css",
     "musuw-reference-mechanical-10b.css",
     "musuw-reference-mechanical-10c.css",
@@ -58,7 +59,7 @@ test("loads every mechanically compiled visual-reference shard and no handwritte
   ]) {
     assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
   }
-  assert.equal(importNames.length, 18);
+  assert.equal(importNames.length, 19);
 });
 
 test("matches copied reference shell, conversation, knowledge and settings geometry", () => {
@@ -72,6 +73,7 @@ test("matches copied reference shell, conversation, knowledge and settings geome
   assert.match(mechanical, /\.knowledge-card\{[\s\S]*?height:calc\(var\(--spacing\) \* 48\) !important/);
   assert.match(mechanical, /body \.settings-overlay \.settings-modal\{[\s\S]*?height:520px !important[\s\S]*?max-width:var\(--container-4xl\) !important/);
   assert.match(mechanical, /body \.settings-overlay \.settings-sidebar\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/);
+  assert.match(mechanical, /body \.settings-overlay \.model-settings \.model-card\{[\s\S]*?border:1px solid var\(--color-gray-200\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h1\{[\s\S]*?font-size:var\(--text-lg\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h2\{[\s\S]*?font-size:var\(--text-base\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h3\{[\s\S]*?font-size:var\(--text-sm\) !important/);
@@ -86,7 +88,7 @@ test("preserves product conditional rendering and task-excluded renderers", () =
   assert.equal(mechanical.includes("localStorage"), false);
 });
 
-test("Task 1 presentation work cannot replace business Vue implementations", () => {
+test("Task 1 presentation work cannot replace business implementations", () => {
   const expected = new Map([
     ["../components/menu.vue", "c3914d4d4824890307790d2b8d6dcccfa35e91bf"],
     ["../components/Input-field.vue", "a34d09f5f9dbe44d4b3835213fdab662c4b7446a"],
@@ -94,6 +96,7 @@ test("Task 1 presentation work cannot replace business Vue implementations", () 
     ["../components/ChatHeader.vue", "79aec898f1e90c21a9f63fa77bce0dca509750c4"],
     ["../components/ChatReferencesDrawer.vue", "9001acea76aae131cc7420f3e1ffd275b58fce52"],
     ["../components/ChatCitationFloat.vue", "b2a42b84fc7a76ecbe8fb5f1c8079dddf6ef555b"],
+    ["../composables/useChatCitationPopover.ts", "b1142ec34ee9dec81600e6f3bda0c418cd478967"],
     ["../components/KnowledgeBaseSelector.vue", "98fc31d76351af5988a3b2445daa147048bab6fd"],
     ["../components/MentionSelector.vue", "d165e6e1d27be75acafc62298946fde2235c7167"],
     ["../components/ModelSelector.vue", "402713d0904156e32aba974b144b3e745511e344"],
