@@ -32,43 +32,41 @@ function resolveFrontendCommit(): string {
 const FRONTEND_COMMIT = resolveFrontendCommit()
 
 /**
- * Compile a frozen pre-rebuild SFC as a headless controller module.
+ * Compile frozen pre-rebuild SFCs as headless controller modules.
  *
- * The active View imports `*.vue?business-controller`, which keeps the original
- * `<script setup>` behavior but deliberately omits the original template and
- * styles. `inlineTemplate: false` is required so production builds return the
- * setup bindings instead of an inlined legacy render function.
+ * Files under src/assets/business-baselines are source snapshots used only to
+ * preserve the original `<script setup>` behavior. This pre-plugin intercepts
+ * their normal `.vue` imports before @vitejs/plugin-vue, compiles the script
+ * with `inlineTemplate: false`, and therefore never loads their legacy template
+ * or styles into the runtime bundle.
  */
 function businessControllerPlugin(): Plugin {
-  const query = '?business-controller'
+  const baselineMarker = '/src/assets/business-baselines/'
 
   return {
     name: 'musuw-business-controller',
     enforce: 'pre',
-    async resolveId(source, importer) {
-      if (!source.endsWith(query)) return null
-      const cleanSource = source.slice(0, -query.length)
-      const resolved = await this.resolve(cleanSource, importer, { skipSelf: true })
-      return resolved ? `${resolved.id}${query}` : null
-    },
     async load(id) {
-      if (!id.endsWith(query)) return null
-      const filename = id.slice(0, -query.length)
-      const source = readFileSync(filename, 'utf8')
-      const { descriptor, errors } = parse(source, { filename })
-      if (errors.length) {
-        throw new Error(`Failed to parse business controller ${filename}: ${errors.join('\n')}`)
-      }
-      if (!descriptor.scriptSetup) {
-        throw new Error(`Business controller ${filename} must contain <script setup>.`)
+      const normalizedId = id.replaceAll('\\', '/')
+      if (!normalizedId.includes(baselineMarker) || !normalizedId.endsWith('.pre-view.vue')) {
+        return null
       }
 
-      const scopeId = createHash('sha256').update(filename).digest('hex').slice(0, 8)
+      const source = readFileSync(id, 'utf8')
+      const { descriptor, errors } = parse(source, { filename: id })
+      if (errors.length) {
+        throw new Error(`Failed to parse business controller ${id}: ${errors.join('\n')}`)
+      }
+      if (!descriptor.scriptSetup) {
+        throw new Error(`Business controller ${id} must contain <script setup>.`)
+      }
+
+      const scopeId = createHash('sha256').update(id).digest('hex').slice(0, 8)
       const compiled = compileScript(descriptor, {
         id: scopeId,
         inlineTemplate: false,
       })
-      const transformed = await transformWithEsbuild(compiled.content, filename, {
+      const transformed = await transformWithEsbuild(compiled.content, id, {
         loader: descriptor.scriptSetup.lang === 'ts' ? 'ts' : 'js',
         target: 'esnext',
         sourcemap: false,
