@@ -117,6 +117,9 @@ services:
       - source: openrouter_api_key
         target: openrouter_api_key
         mode: 0400
+      - source: openrouter_management_api_key
+        target: openrouter_management_api_key
+        mode: 0400
       - source: r2_access_key_id
         target: r2_access_key_id
         mode: 0400
@@ -308,6 +311,8 @@ secrets:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/deepseek_api_key
   openrouter_api_key:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/openrouter_api_key
+  openrouter_management_api_key:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/openrouter_management_api_key
   r2_access_key_id:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/r2_access_key_id
   r2_secret_access_key:
