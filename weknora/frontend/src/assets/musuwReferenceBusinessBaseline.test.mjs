@@ -20,7 +20,6 @@ const frozen = new Map([
   ['../components/MentionSelector.vue', 'd165e6e1d27be75acafc62298946fde2235c7167'],
   ['../components/ModelDebugDrawer.vue', '9a4e8055dd52f862edc19f4e703cf4e068852dc5'],
   ['../components/manual-knowledge-editor.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
-  ['../components/AttachmentUpload.vue', '088d5164a770d213e2175a9ca27afb339aeff4e4'],
   ['../components/ChatAttachmentPreviewDrawer.vue', '5eb43fdb5487589133fd867c0e75081270bc86aa'],
   ['../composables/useChatCitationPopover.ts', 'b1142ec34ee9dec81600e6f3bda0c418cd478967'],
   ['../views/chat/components/botmsg.vue', 'f696550fc980c2a648ce19a631729950fe3b0e6b'],
@@ -63,6 +62,14 @@ const contracts = new Map([
     'newModels.filter(m => m.type === props.modelType)', 'const result = await listModels()',
     "models.value = result.filter(m => m.type === props.modelType)", "emit('add-model')",
     "emit('update:selectedModelId', value)", 'defineExpose({ refresh: loadModels })',
+  ]],
+  ['../components/AttachmentUpload.vue', [
+    'const response = await getParserEngines()', 'if (attachments.value.length >= maxFiles.value)',
+    'if (file.size > maxSize.value)', 'if (!supportedTypes.value.includes(ext))',
+    'await uploadTemporaryAttachment(', 'attachment.progress = progress', 'scheduleStatusPoll(attachment)',
+    'const response = await getTemporaryAttachment(props.sessionId, attachment.documentId)',
+    "attachment.status = 'failed'", "emit('update:files', [...attachments.value])", "emit('remove', id)",
+    'void deleteTemporaryAttachment(props.sessionId, attachment.documentId)', 'defineExpose({',
   ]],
   ['../views/knowledge/components/DocumentCardView.vue', [
     "emit('open', item)", "emit('toggle-checkbox', item.id, !props.selectedIds.has(item.id))",
