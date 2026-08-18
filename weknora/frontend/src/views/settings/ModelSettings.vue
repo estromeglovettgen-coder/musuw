@@ -1,145 +1,152 @@
 <template>
-  <div class="reference-model-settings">
-    <div class="reference-model-toolbar">
-      <div class="reference-model-note" role="note">
-        <div class="reference-model-note__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg>
+  <div class="model-settings">
+    <div class="section-header">
+      <div class="section-header__top">
+        <div>
+          <h2>{{ $t('modelSettings.title') }}</h2>
+          <p class="section-description">{{ $t('modelSettings.description') }}</p>
         </div>
-        <div class="reference-model-note__copy">
-          <strong>{{ $t('modelSettings.builtinModels.title') }}</strong>
-          <p>{{ $t(authStore.isSystemAdmin ? 'modelSettings.builtinModels.descriptionAdmin' : 'modelSettings.builtinModels.description') }}</p>
-          <a href="https://github.com/Tencent/WeKnora/blob/main/docs/BUILTIN_MODELS.md" target="_blank" rel="noopener noreferrer">
-            <span>{{ $t('modelSettings.builtinModels.viewGuide') }}</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-          </a>
-        </div>
+        <t-button
+          v-if="authStore.hasRole('admin')"
+          type="button"
+          theme="primary"
+          variant="text"
+          size="medium"
+          class="model-test-trigger"
+          @click="showDebugDrawer = true"
+        >
+          <template #icon><play-circle-icon /></template>
+          {{ $t('modelSettings.actions.debugModel') }}
+        </t-button>
       </div>
 
-      <button
-        v-if="authStore.hasRole('admin')"
-        id="btn-debug-model"
-        type="button"
-        class="reference-model-debug"
-        @click="showDebugDrawer = true"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-        <span>{{ $t('modelSettings.actions.debugModel') }}</span>
-      </button>
-    </div>
-
-    <div class="reference-model-tabs" data-guide="settings-models" role="tablist">
-      <button type="button" role="tab" :aria-selected="activeTypeFilter === 'all'" :class="{ active: activeTypeFilter === 'all' }" @click="activeTypeFilter = 'all'">
-        {{ $t('common.all') }} <span>{{ allLegacyModels.length }}</span>
-      </button>
-      <button type="button" role="tab" :aria-selected="activeTypeFilter === 'chat'" :class="{ active: activeTypeFilter === 'chat' }" @click="activeTypeFilter = 'chat'">
-        {{ $t('modelSettings.typeShort.chat') }} <span>{{ countByType('chat') }}</span>
-      </button>
-      <button type="button" role="tab" :aria-selected="activeTypeFilter === 'embedding'" :class="{ active: activeTypeFilter === 'embedding' }" @click="activeTypeFilter = 'embedding'">
-        {{ $t('modelSettings.typeShort.embedding') }} <span>{{ countByType('embedding') }}</span>
-      </button>
-      <button type="button" role="tab" :aria-selected="activeTypeFilter === 'rerank'" :class="{ active: activeTypeFilter === 'rerank' }" @click="activeTypeFilter = 'rerank'">
-        {{ $t('modelSettings.typeShort.rerank') }} <span>{{ countByType('rerank') }}</span>
-      </button>
-      <button type="button" role="tab" :aria-selected="activeTypeFilter === 'vllm'" :class="{ active: activeTypeFilter === 'vllm' }" @click="activeTypeFilter = 'vllm'">
-        {{ $t('modelSettings.typeShort.vllm') }} <span>{{ countByType('vllm') }}</span>
-      </button>
-      <button type="button" role="tab" :aria-selected="activeTypeFilter === 'asr'" :class="{ active: activeTypeFilter === 'asr' }" @click="activeTypeFilter = 'asr'">
-        {{ $t('modelSettings.typeShort.asr') }} <span>{{ countByType('asr') }}</span>
-      </button>
-    </div>
-
-    <div v-if="loading" class="reference-model-grid" aria-busy="true">
-      <div v-for="n in 4" :key="n" class="reference-model-skeleton"><span/><span/><span/></div>
-    </div>
-
-    <div v-else-if="filteredModels.length === 0 && !authStore.hasRole('admin')" class="reference-model-empty">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="16" x="4" y="4" rx="2"/><path d="M9 9h6v6H9z"/></svg>
-      <strong>{{ emptyHint }}</strong>
-    </div>
-
-    <div v-else class="reference-model-grid">
-      <article
-        v-for="model in filteredModels"
-        :key="`${model._modelType}-${model.id}`"
-        class="reference-model-card"
-        :class="{ builtin: model.isBuiltin, clickable: isModelCardClickable(model) }"
-        :role="isModelCardClickable(model) ? 'button' : undefined"
-        :tabindex="isModelCardClickable(model) ? 0 : undefined"
-        @click="onModelCardClick($event, model._modelType, model)"
-        @keydown.enter="onModelCardClick($event, model._modelType, model)"
-      >
-        <div class="reference-model-card__icon" :class="`type-${model._modelType}`" :aria-label="typeLabel(model._modelType)">
-          <svg v-if="model._modelType === 'chat'" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
-          <svg v-else-if="model._modelType === 'embedding'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="m7.7 7 3.2 8"/><path d="m16.3 7-3.2 8"/><path d="M8 6h8"/></svg>
-          <svg v-else-if="model._modelType === 'rerank'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M10 18h4"/></svg>
-          <svg v-else-if="model._modelType === 'vllm'" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3-3a2 2 0 0 0-3 0l-6 6"/></svg>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
-        </div>
-
-        <div class="reference-model-card__body">
-          <div class="reference-model-card__title-row">
-            <h4 :title="modelDisplayName(model)">{{ modelDisplayName(model) }}</h4>
-            <span v-if="model.isDefault" class="reference-model-default">{{ $t('model.defaultTag') }}</span>
-            <span v-if="model.isBuiltin" class="reference-model-builtin" :title="$t('modelSettings.builtinTag')">
-              <svg v-if="authStore.isSystemAdmin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2 2 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-              <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            </span>
-          </div>
-          <p>
-            <span>{{ vendorLabel(model) }}</span>
-            <template v-if="model._modelType === 'embedding' && model.dimension"><span>·</span><span>{{ $t('model.editor.dimensionLabel') }} {{ model.dimension }}</span></template>
-            <template v-if="model._modelType === 'chat' && model.supportsVision"><span>·</span><span>{{ $t('model.editor.supportsVisionLabel') }}</span></template>
-          </p>
-          <span class="reference-model-type-label">{{ typeLabel(model._modelType) }}</span>
-        </div>
-
-        <div v-if="canManageModel(model)" class="model-card__actions reference-model-actions" @click.stop>
-          <button type="button" :title="$t('common.edit')" @click="editModel(model._modelType, model)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2 2 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-          </button>
-          <button v-if="!model.isBuiltin" type="button" :title="$t('common.copy')" @click="copyModel(model._modelType, model.id)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-          </button>
-          <button v-if="canDeleteModel(model)" type="button" class="danger" :title="$t('common.delete')" @click="deleteConfirmModel = model">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
-          </button>
-        </div>
-      </article>
-
-      <button
-        v-if="authStore.hasRole('admin')"
-        type="button"
-        class="reference-model-card reference-model-add"
-        data-guide="settings-add-model"
-        @click="openAddDialog"
-      >
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
-        <strong>{{ $t('modelSettings.actions.addModel') }}</strong>
-      </button>
-    </div>
-
-    <Teleport to="body">
-      <div v-if="deleteConfirmModel" class="reference-model-confirm-backdrop" @mousedown.self="deleteConfirmModel = null">
-        <div class="reference-model-confirm">
-          <div class="reference-model-confirm__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0z"/></svg></div>
-          <h4>{{ $t('common.delete') }}</h4>
-          <p>{{ $t('modelSettings.confirmDelete', { name: modelDisplayName(deleteConfirmModel) }) }}</p>
-          <div class="reference-model-confirm__actions">
-            <button type="button" @click="deleteConfirmModel = null">{{ $t('common.cancel') }}</button>
-            <button type="button" class="danger" @click="confirmDeleteModel">{{ $t('common.delete') }}</button>
-          </div>
-        </div>
+      <div class="builtin-models-hint" role="note">
+        <p class="builtin-hint-label">{{ $t('modelSettings.builtinModels.title') }}</p>
+        <p class="builtin-hint-text">
+          {{ $t(authStore.isSystemAdmin
+            ? 'modelSettings.builtinModels.descriptionAdmin'
+            : 'modelSettings.builtinModels.description') }}
+        </p>
+        <a class="doc-link" href="https://github.com/Tencent/WeKnora/blob/main/docs/BUILTIN_MODELS.md" target="_blank"
+          rel="noopener noreferrer">
+          {{ $t('modelSettings.builtinModels.viewGuide') }}
+          <t-icon name="link" class="link-icon" />
+        </a>
       </div>
-    </Teleport>
+    </div>
 
-    <ModelEditorDialog v-model:visible="showDialog" :model-type="currentModelType" :model-data="editingModel" @confirm="handleModelSave" />
+    <t-tabs v-model="activeTypeFilter" class="model-type-tabs" data-guide="settings-models">
+      <t-tab-panel value="all" :label="`${$t('common.all')}(${allLegacyModels.length})`" />
+      <t-tab-panel value="chat" :label="`${$t('modelSettings.typeShort.chat')}(${countByType('chat')})`" />
+      <t-tab-panel value="embedding"
+        :label="`${$t('modelSettings.typeShort.embedding')}(${countByType('embedding')})`" />
+      <t-tab-panel value="rerank" :label="`${$t('modelSettings.typeShort.rerank')}(${countByType('rerank')})`" />
+      <t-tab-panel value="vllm" :label="`${$t('modelSettings.typeShort.vllm')}(${countByType('vllm')})`" />
+      <t-tab-panel value="asr" :label="`${$t('modelSettings.typeShort.asr')}(${countByType('asr')})`" />
+    </t-tabs>
+
+    <t-loading :loading="loading" size="small" class="model-list-loading">
+      <div v-if="!loading && filteredModels.length === 0 && !authStore.hasRole('admin')" class="empty-state">
+        <t-empty :description="emptyHint" />
+      </div>
+      <div v-else-if="!loading" class="model-grid">
+        <div v-for="model in filteredModels" :key="`${model._modelType}-${model.id}`" class="model-card" :class="[
+          `model-card--${model._modelType}`,
+          {
+            'model-card--builtin': model.isBuiltin,
+            'model-card--clickable': isModelCardClickable(model),
+          },
+        ]" :role="isModelCardClickable(model) ? 'button' : undefined"
+          :tabindex="isModelCardClickable(model) ? 0 : undefined"
+          @click="onModelCardClick($event, model._modelType, model)"
+          @keydown.enter="onModelCardClick($event, model._modelType, model)">
+          <div class="model-card__badge" :aria-label="typeLabel(model._modelType)">
+            <t-icon :name="typeIcon(model._modelType)" size="18px" />
+          </div>
+          <div class="model-card__body">
+            <div class="model-card__header">
+              <h3 class="model-card__title">{{ modelDisplayName(model) }}</h3>
+              <t-tag v-if="model.isDefault" size="small" theme="success" variant="light">
+                {{ $t('model.defaultTag') }}
+              </t-tag>
+              <span v-if="model.isBuiltin" class="model-card__lock" :title="$t('modelSettings.builtinTag')"
+                :aria-label="$t('modelSettings.builtinTag')">
+                <t-icon :name="authStore.isSystemAdmin ? 'edit-1' : 'lock-on'" />
+              </span>
+              <div v-if="canManageModel(model)" class="model-card__actions" @click.stop>
+                <t-dropdown :options="getModelOptions(model._modelType, model)" placement="bottom-right" attach="body"
+                  trigger="click"
+                  @click="(data: any) => handleMenuAction({ value: data.value }, model._modelType, model)">
+                  <t-button variant="text" shape="square" size="small" class="model-card__action-btn model-card__more">
+                    <t-icon name="ellipsis" />
+                  </t-button>
+                </t-dropdown>
+                <t-popconfirm
+                  v-if="canDeleteModel(model)"
+                  :content="$t('modelSettings.confirmDelete', { name: modelDisplayName(model) })"
+                  :confirm-btn="{ content: $t('common.delete'), theme: 'danger' }"
+                  :cancel-btn="{ content: $t('common.cancel') }"
+                  placement="bottom-right"
+                  @confirm="deleteModel(model._modelType, model.id)"
+                >
+                  <t-tooltip :content="$t('common.delete')" placement="top">
+                    <t-button
+                      theme="danger"
+                      shape="square"
+                      variant="text"
+                      size="small"
+                      class="model-card__action-btn model-card__delete"
+                      @click.stop
+                    >
+                      <template #icon><t-icon name="delete" /></template>
+                    </t-button>
+                  </t-tooltip>
+                </t-popconfirm>
+              </div>
+            </div>
+            <p class="model-card__subtitle">
+              <span>{{ vendorLabel(model) }}</span>
+              <template v-if="model._modelType === 'embedding' && model.dimension">
+                <span class="model-card__sep">·</span>
+                <span>{{ $t('model.editor.dimensionLabel') }} {{ model.dimension }}</span>
+              </template>
+              <template v-if="model._modelType === 'chat' && model.supportsVision">
+                <span class="model-card__sep">·</span>
+                <span class="model-card__vision" :title="$t('model.editor.supportsVisionLabel')"
+                  :aria-label="$t('model.editor.supportsVisionLabel')">
+                  <t-icon name="image" size="12px" />
+                </span>
+              </template>
+            </p>
+          </div>
+        </div>
+        <button
+          v-if="authStore.hasRole('admin')"
+          type="button"
+          class="model-card model-card--add"
+          data-guide="settings-add-model"
+          @click="openAddDialog"
+        >
+          <span class="model-card--add__icon" aria-hidden="true">
+            <add-icon />
+          </span>
+          <span class="model-card--add__label">{{ $t('modelSettings.actions.addModel') }}</span>
+        </button>
+      </div>
+    </t-loading>
+
+    <!-- 模型编辑器抽屉 -->
+    <ModelEditorDialog v-model:visible="showDialog" :model-type="currentModelType" :model-data="editingModel"
+      @confirm="handleModelSave" />
     <ModelDebugDrawer v-model:visible="showDebugDrawer" :models="allModels" />
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
+import { AddIcon, PlayCircleIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
 import ModelEditorDialog from '@/components/ModelEditorDialog.vue'
 import ModelDebugDrawer from '@/components/ModelDebugDrawer.vue'
@@ -158,7 +165,6 @@ const currentModelType = ref<ModelType>('chat')
 const editingModel = ref<any>(null)
 const loading = ref(true)
 const activeTypeFilter = ref<FilterType>('all')
-const deleteConfirmModel = ref<any>(null)
 
 const normalizeInitialType = (value?: string | null): FilterType => {
   const key = (value || '').toLowerCase()
@@ -171,8 +177,10 @@ watch(() => props.initialType, value => {
   activeTypeFilter.value = normalizeInitialType(value)
 }, { immediate: true })
 
+// 模型列表数据
 const allModels = ref<ModelConfig[]>([])
 
+// 后端 type → 前端分组 type 的映射
 const backendTypeToModelType: Record<string, ModelType> = {
   KnowledgeQA: 'chat',
   Embedding: 'embedding',
@@ -181,6 +189,11 @@ const backendTypeToModelType: Record<string, ModelType> = {
   ASR: 'asr'
 }
 
+// 将后端模型格式转换为旧的前端格式（附带 _modelType 便于渲染）
+// apiKey is always blank here: the server's main GET response does not
+// include it (see internal/handler/dto/model.go — ModelParametersDTO omits
+// secret fields). Credential read/write happens inside the editor dialog
+// via the dedicated /credentials subresource.
 function convertToLegacyFormat(model: ModelConfig) {
   return {
     id: model.id!,
@@ -201,12 +214,16 @@ function convertToLegacyFormat(model: ModelConfig) {
       ? Object.entries(model.parameters.custom_headers).map(([key, value]) => ({ key, value: String(value) }))
       : [],
     lkeapRegion: model.parameters.extra_config?.region || 'ap-guangzhou',
+    // 原始存库值，编辑弹窗内再 resolve（避免打开时被推断值覆盖）
     thinkingControl: model.parameters.extra_config?.thinking_control,
     _modelType: backendTypeToModelType[model.type] || 'chat' as ModelType,
+    // Preserve the credential metadata map so the editor dialog can render
+    // the "Configured" state without an extra round-trip.
     credentials: model.credentials,
   }
 }
 
+// 平铺 + 过滤
 const allLegacyModels = computed(() => allModels.value.map(convertToLegacyFormat))
 const filteredModels = computed(() => {
   if (activeTypeFilter.value === 'all') return allLegacyModels.value
@@ -214,6 +231,18 @@ const filteredModels = computed(() => {
 })
 
 const countByType = (type: ModelType) => allLegacyModels.value.filter(m => m._modelType === type).length
+
+// 类型徽章图标。沿用 TDesign 自带 icon name，避免再引第三方图标包。
+const typeIcon = (type: ModelType): string => {
+  const map: Record<ModelType, string> = {
+    chat: 'chat',
+    embedding: 'chart-bubble',
+    rerank: 'filter-sort',
+    vllm: 'image',
+    asr: 'sound',
+  }
+  return map[type]
+}
 
 const typeLabel = (type: ModelType) => {
   const map: Record<ModelType, string> = {
@@ -227,10 +256,18 @@ const typeLabel = (type: ModelType) => {
 }
 
 const sourceLabel = (type: ModelType) => {
-  if (type === 'vllm' || type === 'asr') return t('modelSettings.source.openaiCompatible')
+  // vllm / asr 的 remote 文案特殊，其余走通用 remote 文案
+  if (type === 'vllm' || type === 'asr') {
+    return t('modelSettings.source.openaiCompatible')
+  }
   return t('modelSettings.source.remote')
 }
 
+// Maps a backend `provider` id (e.g. "openai", "aliyun", "weknoracloud")
+// to its localized short label. Reuses the same i18n keys the editor's
+// provider dropdown uses, so the model card and the editor stay in sync
+// when a provider is renamed. Falls back to '' when the backend didn't
+// store a provider — caller falls back to sourceLabel().
 const providerLabel = (model: any): string => {
   const id = model.provider
   if (!id) return ''
@@ -238,9 +275,21 @@ const providerLabel = (model: any): string => {
   return te(key) ? t(key) : id
 }
 
+// What the vendor chip on a card shows. Keeps the chip text uniformly
+// short so cards line up:
+//   local  → "Ollama"
+//   remote → provider's localized short name (e.g. "腾讯云 LKEAP",
+//            "阿里云 DashScope"). For the catch-all "generic" provider
+//            we render a single short word ("自定义" / "Custom") — the
+//            editor dropdown's longer "自定义 (OpenAI兼容接口)" label
+//            blows out the card chip row, and the "OpenAI 兼容" framing
+//            isn't meaningful to most end users (they didn't pick "I
+//            want OpenAI compatibility", they just pasted a base URL).
 const vendorLabel = (model: any): string => {
   if (model.source === 'local') return 'Ollama'
-  if (model.provider === 'generic') return t('modelSettings.source.custom')
+  if (model.provider === 'generic') {
+    return t('modelSettings.source.custom')
+  }
   return providerLabel(model) || sourceLabel(model._modelType)
 }
 
@@ -261,6 +310,7 @@ const emptyHint = computed(() => {
   return map[activeTypeFilter.value as ModelType]
 })
 
+// 加载模型列表
 const loadModels = async () => {
   loading.value = true
   try {
@@ -274,18 +324,26 @@ const loadModels = async () => {
   }
 }
 
+// 打开添加对话框；类型在抽屉内选择，此处仅按当前 Tab 预填默认值
 const openAddDialog = () => {
   currentModelType.value = activeTypeFilter.value === 'all' ? 'chat' : activeTypeFilter.value
   editingModel.value = null
   showDialog.value = true
 }
 
+// Tenant Admin+ manages tenant models; only SystemAdmin manages shared
+// built-in models. The backend repeats this distinction authoritatively.
 const canEditModel = (model: any) =>
   model.isBuiltin ? authStore.isSystemAdmin : authStore.hasRole('admin')
 
 const isModelCardClickable = (model: any) => canEditModel(model)
+
 const canManageModel = (model: any) => canEditModel(model)
-const canDeleteModel = (model: any) => authStore.hasRole('admin') && !model.isBuiltin
+
+// Built-in lifecycle remains deployment-managed (YAML / SQL). The UI only
+// exposes configuration and credential editing to SystemAdmin.
+const canDeleteModel = (model: any) =>
+  authStore.hasRole('admin') && !model.isBuiltin
 
 const onModelCardClick = (event: Event, type: ModelType, model: any) => {
   if (!isModelCardClickable(model)) return
@@ -299,17 +357,21 @@ const onModelCardClick = (event: Event, type: ModelType, model: any) => {
   editModel(type, model)
 }
 
+// 编辑模型
 const editModel = (type: ModelType, model: any) => {
   if (model.isBuiltin && !authStore.isSystemAdmin) {
     MessagePlugin.warning(t('modelSettings.toasts.builtinCannotEdit'))
     return
   }
-  if (!model.isBuiltin && !authStore.hasRole('admin')) return
+  if (!model.isBuiltin && !authStore.hasRole('admin')) {
+    return
+  }
   currentModelType.value = type
   editingModel.value = { ...model }
   showDialog.value = true
 }
 
+// 保存模型
 const handleModelSave = async (modelData: any) => {
   const saveType: ModelType = modelData.modelType ?? currentModelType.value
   currentModelType.value = saveType
@@ -319,25 +381,31 @@ const handleModelSave = async (modelData: any) => {
       MessagePlugin.warning(t('modelSettings.toasts.nameRequired'))
       return
     }
+
     if (modelData.modelName.trim().length > 100) {
       MessagePlugin.warning(t('modelSettings.toasts.nameTooLong'))
       return
     }
+
     if (modelData.displayName && modelData.displayName.trim().length > 100) {
       MessagePlugin.warning(t('modelSettings.toasts.displayNameTooLong'))
       return
     }
+
     if (modelData.source === 'remote') {
       if (!modelData.baseUrl || !modelData.baseUrl.trim()) {
         MessagePlugin.warning(t('modelSettings.toasts.baseUrlRequired'))
         return
       }
-      try { new URL(modelData.baseUrl.trim()) }
-      catch {
+
+      try {
+        new URL(modelData.baseUrl.trim())
+      } catch {
         MessagePlugin.warning(t('modelSettings.toasts.baseUrlInvalid'))
         return
       }
     }
+
     if (saveType === 'embedding') {
       if (!modelData.dimension || modelData.dimension < 128 || modelData.dimension > 4096) {
         MessagePlugin.warning(t('modelSettings.toasts.dimensionInvalid'))
@@ -350,18 +418,35 @@ const handleModelSave = async (modelData: any) => {
       for (const item of modelData.customHeaders) {
         const key = (item?.key ?? '').trim()
         const value = (item?.value ?? '').trim()
-        if (key && value) customHeadersMap[key] = value
+        if (key && value) {
+          customHeadersMap[key] = value
+        }
       }
     }
 
+    // api_key flows in only on initial create (modelData.apiKey is wiped on
+    // every edit-mode open). Edits to existing models commit credentials via
+    // the /credentials subresource (handled inside ModelEditorDialog).
     const trimmedApiKey = (modelData.apiKey ?? '').trim()
-    const apiKeyFields: { api_key?: string } = !editingModel.value && trimmedApiKey ? { api_key: trimmedApiKey } : {}
+    const apiKeyFields: { api_key?: string } =
+      !editingModel.value && trimmedApiKey ? { api_key: trimmedApiKey } : {}
     const trimmedAppSecret = (modelData.appSecret ?? '').trim()
-    const appSecretFields: { app_secret?: string } = !editingModel.value && trimmedAppSecret ? { app_secret: trimmedAppSecret } : {}
+    const appSecretFields: { app_secret?: string } =
+      !editingModel.value && trimmedAppSecret ? { app_secret: trimmedAppSecret } : {}
     const extraConfig: Record<string, string> = {}
-    if (modelData.provider === 'lkeap' && saveType === 'rerank') extraConfig.region = (modelData.lkeapRegion || 'ap-guangzhou').trim()
-    if (saveType === 'chat' && modelData.source === 'remote' && modelData.thinkingControl) extraConfig.thinking_control = modelData.thinkingControl
-    const extraConfigFields = Object.keys(extraConfig).length > 0 ? { extra_config: extraConfig } : {}
+    if (modelData.provider === 'lkeap' && saveType === 'rerank') {
+      extraConfig.region = (modelData.lkeapRegion || 'ap-guangzhou').trim()
+    }
+    if (
+      saveType === 'chat'
+      && modelData.source === 'remote'
+      && modelData.thinkingControl
+    ) {
+      extraConfig.thinking_control = modelData.thinkingControl
+    }
+    const extraConfigFields = Object.keys(extraConfig).length > 0
+      ? { extra_config: extraConfig }
+      : {}
 
     const apiModelData: ModelConfig = {
       name: modelData.modelName.trim(),
@@ -384,8 +469,14 @@ const handleModelSave = async (modelData: any) => {
             supports_dimension_override: modelData.supportsDimensionOverride ?? false
           }
         } : {}),
-        ...(saveType === 'vllm' ? { supports_vision: true } : saveType === 'chat' ? { supports_vision: modelData.supportsVision ?? false } : {}),
-        ...(['chat', 'embedding', 'vllm'].includes(saveType) && Number(modelData.maxConcurrency) > 0
+        ...(saveType === 'vllm' ? {
+          supports_vision: true
+        } : saveType === 'chat' ? {
+          supports_vision: modelData.supportsVision ?? false
+        } : {}),
+        // 后台并发上限：仅 chat/embedding/vllm 受治理，>0 才写入（0/空沿用全局默认）。
+        ...(['chat', 'embedding', 'vllm'].includes(saveType)
+          && Number(modelData.maxConcurrency) > 0
           ? { max_concurrency: Number(modelData.maxConcurrency) }
           : {})
       }
@@ -398,6 +489,7 @@ const handleModelSave = async (modelData: any) => {
       await createModel(apiModelData)
       MessagePlugin.success(t('modelSettings.toasts.added'))
     }
+
     showDialog.value = false
     await loadModels()
   } catch (error: any) {
@@ -406,12 +498,14 @@ const handleModelSave = async (modelData: any) => {
   }
 }
 
+// 删除模型
 const deleteModel = async (_type: ModelType, modelId: string) => {
   const model = allModels.value.find(m => m.id === modelId)
   if (model?.is_builtin) {
     MessagePlugin.warning(t('modelSettings.toasts.builtinCannotDelete'))
     return
   }
+
   try {
     await deleteModelAPI(modelId)
     MessagePlugin.success(t('modelSettings.toasts.deleted'))
@@ -422,6 +516,53 @@ const deleteModel = async (_type: ModelType, modelId: string) => {
   }
 }
 
+// 获取模型操作菜单选项
+const getModelOptions = (type: ModelType, model: any) => {
+  const options: any[] = []
+
+  if (model.isBuiltin) {
+    if (authStore.isSystemAdmin) {
+      options.push({
+        content: t('common.edit'),
+        value: `edit-${type}-${model.id}`
+      })
+    }
+    return options
+  }
+
+  // Models are tenant-wide infrastructure (LLM credentials); the
+  // backend gates every mutation behind Admin+ (see RegisterModelRoutes).
+  // Non-Admins get an empty action menu — viewing is fine, but editing,
+  // copying (also goes through createModel), and deleting are not.
+  if (!authStore.hasRole('admin')) {
+    return options
+  }
+
+  options.push({
+    content: t('common.edit'),
+    value: `edit-${type}-${model.id}`
+  })
+
+  options.push({
+    content: t('common.copy'),
+    value: `copy-${type}-${model.id}`
+  })
+
+  return options
+}
+
+// 处理菜单操作
+const handleMenuAction = (data: { value: string }, type: ModelType, model: any) => {
+  const value = data.value
+
+  if (value.indexOf('edit-') === 0) {
+    editModel(type, model)
+  } else if (value.indexOf('copy-') === 0) {
+    copyModel(type, model.id)
+  }
+}
+
+// 生成不重复的复制名称
 const generateCopyName = (originalName: string): string => {
   const suffix = t('modelSettings.copySuffix')
   const existingNames = new Set(allModels.value.map(m => m.name))
@@ -434,13 +575,17 @@ const generateCopyName = (originalName: string): string => {
   return candidate
 }
 
+// 复制模型
 const copyModel = async (_type: ModelType, modelId: string) => {
   const source = allModels.value.find(m => m.id === modelId)
-  if (!source) return
+  if (!source) {
+    return
+  }
   if (source.is_builtin) {
     MessagePlugin.warning(t('modelSettings.toasts.builtinCannotCopy'))
     return
   }
+
   try {
     const newModel: ModelConfig = {
       name: generateCopyName(source.name),
@@ -451,6 +596,7 @@ const copyModel = async (_type: ModelType, modelId: string) => {
       is_default: false,
       parameters: JSON.parse(JSON.stringify(source.parameters || {}))
     }
+
     await createModel(newModel)
     MessagePlugin.success(t('modelSettings.toasts.copied'))
     await loadModels()
@@ -460,6 +606,7 @@ const copyModel = async (_type: ModelType, modelId: string) => {
   }
 }
 
+// 获取后端模型类型
 function getModelType(type: ModelType): 'KnowledgeQA' | 'Embedding' | 'Rerank' | 'VLLM' | 'ASR' {
   const typeMap = {
     chat: 'KnowledgeQA' as const,
@@ -471,82 +618,377 @@ function getModelType(type: ModelType): 'KnowledgeQA' | 'Embedding' | 'Rerank' |
   return typeMap[type]
 }
 
-const confirmDeleteModel = async () => {
-  const model = deleteConfirmModel.value
-  if (!model) return
-  deleteConfirmModel.value = null
-  await deleteModel(model._modelType, model.id)
-}
-
 onMounted(() => {
   loadModels()
 })
 </script>
 
-<style scoped>
-.reference-model-settings { width: 100%; color: #111827; font-family: "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif; }
-.reference-model-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
-.reference-model-note { min-width: 0; flex: 1; display: flex; gap: 10px; padding: 12px; border: 1px solid #f3f4f6; border-radius: 16px; background: rgb(249 250 251 / 65%); }
-.reference-model-note__icon { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 9px; background: #fff; color: #4b5563; border: 1px solid #e5e7eb; }
-.reference-model-note svg,.reference-model-debug svg,.reference-model-card svg,.reference-model-confirm svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.reference-model-note__icon svg { width: 15px; height: 15px; }
-.reference-model-note__copy { min-width: 0; }
-.reference-model-note__copy strong { display: block; color: #374151; font-size: 11px; line-height: 16px; font-weight: 700; }
-.reference-model-note__copy p { margin: 2px 0 5px; color: #9ca3af; font-size: 10px; line-height: 15px; }
-.reference-model-note__copy a { display: inline-flex; align-items: center; gap: 4px; color: #6b7280; font-size: 10px; line-height: 14px; font-weight: 600; text-decoration: none; }
-.reference-model-note__copy a:hover { color: #111827; }
-.reference-model-note__copy a svg { width: 11px; height: 11px; }
-.reference-model-debug { height: 32px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; color: #4b5563; font-size: 11px; font-weight: 700; cursor: pointer; }
-.reference-model-debug:hover { border-color: #d1d5db; color: #111827; background: #f9fafb; }
-.reference-model-debug svg { width: 14px; height: 14px; }
-.reference-model-tabs { display: flex; align-items: center; gap: 2px; max-width: 100%; margin-bottom: 16px; padding: 3px; overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 12px; background: #f3f4f6; scrollbar-width: none; }
-.reference-model-tabs::-webkit-scrollbar { display: none; }
-.reference-model-tabs button { height: 28px; flex: 0 0 auto; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: #6b7280; font-size: 10px; line-height: 14px; font-weight: 600; cursor: pointer; }
-.reference-model-tabs button span { margin-left: 3px; color: #9ca3af; font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace; font-size: 9px; }
-.reference-model-tabs button.active { background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
-.reference-model-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
-.reference-model-card { position: relative; min-width: 0; min-height: 82px; display: flex; align-items: flex-start; gap: 11px; padding: 13px 14px; box-sizing: border-box; border: 1px solid rgb(229 231 235 / 80%); border-radius: 16px; background: #fff; color: #111827; text-align: left; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
-.reference-model-card.clickable { cursor: pointer; }
-.reference-model-card.clickable:hover { border-color: #d1d5db; box-shadow: 0 4px 10px rgb(0 0 0 / 6%); transform: translateY(-1px); }
-.reference-model-card.builtin { background: rgb(249 250 251 / 55%); }
-.reference-model-card__icon { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; margin-top: 1px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f9fafb; color: #4b5563; }
-.reference-model-card__icon svg { width: 16px; height: 16px; }
-.reference-model-card__body { min-width: 0; flex: 1; }
-.reference-model-card__title-row { display: flex; align-items: center; gap: 5px; min-width: 0; padding-right: 2px; }
-.reference-model-card__title-row h4 { min-width: 0; flex: 1; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #111827; font-size: 11px; line-height: 16px; font-weight: 700; }
-.reference-model-card__body p { display: flex; align-items: center; gap: 4px; min-width: 0; margin: 2px 0 4px; overflow: hidden; color: #9ca3af; font-size: 9px; line-height: 13px; white-space: nowrap; text-overflow: ellipsis; }
-.reference-model-type-label { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 5px; background: #f3f4f6; color: #6b7280; font-size: 8px; line-height: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .025em; }
-.reference-model-default { flex: 0 0 auto; padding: 1px 5px; border-radius: 5px; background: #dcfce7; color: #15803d; font-size: 8px; line-height: 13px; font-weight: 800; }
-.reference-model-builtin { width: 16px; height: 16px; flex: 0 0 16px; display: grid; place-items: center; color: #9ca3af; }
-.reference-model-builtin svg { width: 12px; height: 12px; }
-.reference-model-actions { position: absolute; top: 9px; right: 9px; display: flex; align-items: center; gap: 1px; padding: 2px; border: 1px solid #f3f4f6; border-radius: 9px; background: rgb(255 255 255 / 95%); opacity: 0; transform: translateY(-2px); transition: opacity 120ms ease, transform 120ms ease; }
-.reference-model-card:hover .reference-model-actions,.reference-model-card:focus-within .reference-model-actions { opacity: 1; transform: none; }
-.reference-model-actions button { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #9ca3af; cursor: pointer; }
-.reference-model-actions button:hover { background: #f3f4f6; color: #374151; }
-.reference-model-actions button.danger:hover { background: #fef2f2; color: #dc2626; }
-.reference-model-actions svg { width: 13px; height: 13px; }
-.reference-model-add { width: 100%; align-items: center; justify-content: center; flex-direction: column; gap: 5px; border-style: dashed; background: rgb(249 250 251 / 30%); color: #9ca3af; cursor: pointer; }
-.reference-model-add:hover { border-color: #9ca3af; background: #f9fafb; color: #4b5563; }
-.reference-model-add > span { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 8px; background: #f3f4f6; }
-.reference-model-add svg { width: 14px; height: 14px; }
-.reference-model-add strong { font-size: 10px; font-weight: 700; }
-.reference-model-skeleton { height: 82px; padding: 13px; box-sizing: border-box; border: 1px solid #f3f4f6; border-radius: 16px; background: #fff; }
-.reference-model-skeleton span { display: block; height: 8px; margin-bottom: 8px; border-radius: 999px; background: linear-gradient(90deg,#f3f4f6,#e5e7eb,#f3f4f6); background-size: 200% 100%; animation: reference-model-pulse 1.3s linear infinite; }
-.reference-model-skeleton span:nth-child(1){width:45%}.reference-model-skeleton span:nth-child(2){width:70%}.reference-model-skeleton span:nth-child(3){width:30%}
-@keyframes reference-model-pulse { to { background-position: -200% 0; } }
-.reference-model-empty { min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #e5e7eb; border-radius: 16px; color: #9ca3af; }
-.reference-model-empty svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.reference-model-empty strong { max-width: 360px; color: #6b7280; font-size: 10px; line-height: 15px; font-weight: 600; text-align: center; }
-.reference-model-confirm-backdrop { position: fixed; inset: 0; z-index: 1600; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(0 0 0 / 40%); backdrop-filter: blur(3px); }
-.reference-model-confirm { width: 100%; max-width: 360px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 20px; background: #fff; box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%); }
-.reference-model-confirm__icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: #fef2f2; color: #dc2626; }
-.reference-model-confirm__icon svg { width: 17px; height: 17px; }
-.reference-model-confirm h4 { margin: 12px 0 4px; color: #111827; font-size: 13px; line-height: 18px; font-weight: 700; }
-.reference-model-confirm p { margin: 0; color: #6b7280; font-size: 11px; line-height: 17px; }
-.reference-model-confirm__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-.reference-model-confirm__actions button { height: 30px; padding: 0 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; color: #4b5563; font-size: 10px; font-weight: 700; cursor: pointer; }
-.reference-model-confirm__actions button:hover { background: #f9fafb; }
-.reference-model-confirm__actions button.danger { border-color: #dc2626; background: #dc2626; color: #fff; }
-.reference-model-confirm__actions button.danger:hover { background: #b91c1c; }
-@media (max-width: 760px) { .reference-model-grid { grid-template-columns: 1fr; } .reference-model-toolbar { flex-direction: column; } .reference-model-debug { align-self: flex-end; } }
+<style lang="less" scoped>
+.model-settings {
+  width: 100%;
+}
+
+.section-header {
+  margin-bottom: 28px;
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .section-description {
+    font-size: 14px;
+    color: var(--td-text-color-secondary);
+    margin: 0;
+    line-height: 1.6;
+  }
+}
+
+.section-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.model-test-trigger {
+  --td-bg-color-container-hover: transparent;
+  flex-shrink: 0;
+  padding-left: 0;
+  padding-right: 0;
+  font-weight: 600;
+
+  &:hover,
+  &:focus,
+  &.t-is-active,
+  &:active {
+    background-color: transparent !important;
+    color: var(--td-brand-color-hover);
+  }
+
+  &:active {
+    color: var(--td-brand-color-active);
+  }
+}
+
+.builtin-models-hint {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+}
+
+.builtin-hint-label {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--td-text-color-placeholder);
+  letter-spacing: 0.02em;
+}
+
+.builtin-hint-text {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--td-text-color-secondary);
+}
+
+.builtin-models-hint .doc-link {
+  font-size: 13px;
+}
+
+.model-list-loading {
+  min-height: 120px;
+}
+
+.model-type-tabs {
+  margin-bottom: 16px;
+
+  :deep(.t-tabs__nav-item) {
+    font-size: 13px;
+  }
+
+  :deep(.t-tabs__nav-item-wrapper) {
+    padding: 0 12px;
+    margin: 0;
+  }
+
+  :deep(.t-tabs__operations) {
+    display: none;
+  }
+
+  :deep(.t-tabs__nav-scroll) {
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  :deep(.t-tabs__content) {
+    display: none;
+  }
+}
+
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+
+  .model-card--add {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// 模型卡片 —— 可选类型徽章（仅「全部」Tab）+ 标题 + 一行副标题
+.model-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 10px;
+  background: var(--td-bg-color-container);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  min-width: 0;
+
+  &:hover {
+    border-color: var(--td-brand-color-3, var(--td-brand-color));
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  }
+
+  &--add {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 68px;
+    border-style: dashed;
+    background: transparent;
+    color: var(--td-text-color-placeholder);
+    cursor: pointer;
+    font: inherit;
+    text-align: center;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--td-brand-color);
+      border-color: var(--td-brand-color);
+      background: color-mix(in srgb, var(--td-brand-color) 6%, transparent);
+      box-shadow: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--td-brand-color);
+      outline-offset: 2px;
+    }
+
+    &__icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+      color: var(--td-brand-color);
+      font-size: 18px;
+    }
+
+    &__label {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+  }
+
+  &--builtin {
+    background: var(--td-bg-color-secondarycontainer);
+
+    &:hover {
+      box-shadow: none;
+      border-color: var(--td-component-stroke);
+    }
+  }
+
+  &--clickable {
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--td-brand-color-3, var(--td-brand-color));
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--td-brand-color);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.model-card__badge {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  // 默认底色，被 type 修饰覆盖
+  background: rgba(0, 82, 217, 0.1);
+  color: #0052D9;
+}
+
+// 5 种类型的徽章配色 —— 比原 tag 配色饱和度低一档，避免炫光
+.model-card--chat .model-card__badge {
+  background: rgba(0, 82, 217, 0.1);
+  color: #0052D9;
+}
+
+.model-card--embedding .model-card__badge {
+  background: rgba(98, 53, 187, 0.1);
+  color: #6235BB;
+}
+
+.model-card--rerank .model-card__badge {
+  background: rgba(184, 92, 0, 0.1);
+  color: #B85C00;
+}
+
+.model-card--vllm .model-card__badge {
+  background: rgba(201, 62, 62, 0.1);
+  color: #C93E3E;
+}
+
+.model-card--asr .model-card__badge {
+  background: rgba(17, 128, 83, 0.1);
+  color: #118053;
+}
+
+.model-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.model-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.model-card__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--td-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+  Built-in lock indicator. Most cards in a typical install ARE built-in,
+  so loud styling everywhere becomes noise — instead the lock is muted
+  and small by default, and lights up on hover. The signal that matters
+  to users is "which models did I add" → user-added cards stand out by
+  the absence of the lock.
+*/
+.model-card__lock {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--td-text-color-placeholder);
+  opacity: 0.6;
+  transition: color 0.15s ease, opacity 0.15s ease;
+
+  .t-icon {
+    font-size: 13px;
+  }
+}
+
+.model-card:hover .model-card__lock {
+  opacity: 1;
+  color: var(--td-text-color-secondary);
+}
+
+.model-card__subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-card__sep {
+  margin: 0 4px;
+  color: var(--td-text-color-placeholder);
+}
+
+.model-card__vision {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.model-card__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.model-card__action-btn {
+  flex-shrink: 0;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.model-card__more {
+  color: var(--td-text-color-placeholder);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--td-bg-color-secondarycontainer);
+    color: var(--td-text-color-primary);
+  }
+}
+
+// Hover / 键盘焦点 时显示操作按钮，避免静态卡片上有"杂物"。
+.model-card:hover .model-card__action-btn,
+.model-card:focus-within .model-card__action-btn,
+.model-card__actions:focus-within .model-card__action-btn {
+  opacity: 1;
+}
+
+.empty-state {
+  padding: 64px 0;
+  text-align: center;
+
+  :deep(.t-empty__description) {
+    font-size: 14px;
+    color: var(--td-text-color-placeholder);
+    margin-bottom: 16px;
+  }
+}
 </style>
