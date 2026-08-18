@@ -49,6 +49,7 @@ test("loads every mechanically compiled visual-reference shard and no legacy DOM
     "musuw-reference-mechanical-09b.css",
     "musuw-reference-mechanical-09c.css",
     "musuw-reference-mechanical-09d.css",
+    "musuw-reference-mechanical-09e.css",
     "musuw-reference-mechanical-10a.css",
     "musuw-reference-mechanical-10b.css",
     "musuw-reference-mechanical-10c.css",
@@ -60,7 +61,7 @@ test("loads every mechanically compiled visual-reference shard and no legacy DOM
   ]) {
     assert.ok(importNames.includes(shard), `${shard} must stay in the mechanical manifest`);
   }
-  assert.equal(importNames.length, 20);
+  assert.equal(importNames.length, 21);
 });
 
 test("matches copied reference shell, conversation, knowledge and settings geometry", () => {
@@ -74,6 +75,7 @@ test("matches copied reference shell, conversation, knowledge and settings geome
   assert.match(mechanical, /\.knowledge-card\{[\s\S]*?height:calc\(var\(--spacing\) \* 48\) !important/);
   assert.match(mechanical, /body \.settings-overlay \.settings-modal\{[\s\S]*?height:520px !important[\s\S]*?max-width:var\(--container-4xl\) !important/);
   assert.match(mechanical, /body \.settings-overlay \.settings-sidebar\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/);
+  assert.match(mechanical, /body \.settings-overlay \.settings-sidebar \.nav-item:nth-child\(2\)::before/);
   assert.match(mechanical, /body \.settings-overlay \.model-settings \.model-card\{[\s\S]*?border:1px solid var\(--color-gray-200\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h1\{[\s\S]*?font-size:var\(--text-lg\) !important/);
   assert.match(mechanical, /\.ai-markdown-template\.markdown-content h2\{[\s\S]*?font-size:var\(--text-base\) !important/);
