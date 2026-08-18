@@ -42,6 +42,18 @@ test('composer presents every native resource and generation control in the new 
   ]) assert.ok(source.includes(token), `Input-field lost control surface: ${token}`)
 })
 
+test('agent-disabled mention control preserves native remediation without becoming unhoverable', () => {
+  const source = read('../components/Input-field.vue')
+  for (const token of [
+    'isMentionDisabled && isKnowledgeBaseDisabledByAgent',
+    "handleGoToAgentSettings('knowledge')",
+    "input.goToAgentSettings",
+    ':aria-disabled="isMentionDisabled"',
+    '@mousedown.prevent="!isMentionDisabled && triggerMention()"',
+  ]) assert.ok(source.includes(token), `Input-field lost disabled mention remediation: ${token}`)
+  assert.equal(source.includes(':disabled="isMentionDisabled"'), false, 'disabled mention trigger must remain hoverable for remediation tooltip')
+})
+
 test('attachment visual layer exposes every native upload/parse terminal state', () => {
   const source = read('../components/AttachmentUpload.vue')
   for (const token of ["attachment.status === 'uploading'","attachment.status === 'uploaded'","attachment.status === 'processing'","attachment.status === 'ready'","attachment.status === 'failed'",'attachment.progress','visual-attachment-card__progress']) {
