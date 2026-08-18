@@ -1,55 +1,59 @@
 <template>
-  <div class="general-settings">
-    <div class="section-header">
+  <section class="visual-general-settings">
+    <header class="visual-general-settings__header">
       <h2>{{ $t('general.title') }}</h2>
-      <p class="section-description">{{ $t('general.description') }}</p>
-    </div>
+      <p>{{ $t('general.description') }}</p>
+    </header>
 
-    <div v-if="entitlement" class="plan-card">
-      <div class="plan-card__header">
-        <div>
-          <span class="plan-card__eyebrow">{{ $t('entitlement.currentPlan') }}</span>
-          <h3>{{ planName }}</h3>
+    <div v-if="entitlement" class="visual-plan-card">
+      <div class="visual-plan-card__top">
+        <div class="visual-plan-card__identity">
+          <span>{{ $t('entitlement.currentPlan') }}</span>
+          <strong>{{ planName }}</strong>
         </div>
-        <span class="plan-card__status">{{ entitlement.plan_status || $t('entitlement.active') }}</span>
+        <span class="visual-plan-card__status">{{ entitlement.plan_status || $t('entitlement.active') }}</span>
       </div>
-      <div class="plan-metrics">
-        <div class="plan-metric">
+
+      <div class="visual-plan-card__metrics">
+        <div class="visual-plan-metric">
           <span>{{ $t('entitlement.storage') }}</span>
           <strong>{{ formatBytes(entitlement.storage_used) }} / {{ formatBytes(entitlement.storage_bytes) }}</strong>
         </div>
-        <div class="plan-metric">
+        <div class="visual-plan-metric">
           <span>{{ $t('entitlement.monthlyCredits') }}</span>
           <strong>{{ formatCredits(entitlement.openrouter_used_microusd) }} / {{ formatCredits(entitlement.monthly_openrouter_microusd) }}</strong>
         </div>
-        <div class="plan-metric">
+        <div class="visual-plan-metric">
           <span>{{ $t('entitlement.knowledgeBases') }}</span>
           <strong>{{ formatLimit(entitlement.max_knowledge_bases) }}</strong>
         </div>
-        <div class="plan-metric">
+        <div class="visual-plan-metric">
           <span>{{ $t('entitlement.documentsPerKb') }}</span>
           <strong>{{ formatLimit(entitlement.max_documents_per_kb) }}</strong>
         </div>
       </div>
-      <p class="plan-note">
+
+      <p class="visual-plan-card__note">
         {{ entitlement.video_upload ? $t('entitlement.videoPlanAllowed') : $t('entitlement.videoFreeBlocked') }}
         · {{ $t('entitlement.renewsMonthly', { month: entitlement.openrouter_usage_month }) }}
       </p>
-      <p v-if="!billingConfigured" class="billing-note">{{ $t('entitlement.billingUnavailable') }}</p>
+      <p v-if="!billingConfigured" class="visual-plan-card__warning">{{ $t('entitlement.billingUnavailable') }}</p>
     </div>
-    <div v-else-if="entitlementLoading" class="plan-card plan-card--loading">{{ $t('common.loading') }}</div>
+    <div v-else-if="entitlementLoading" class="visual-plan-card visual-plan-card--loading">
+      {{ $t('common.loading') }}
+    </div>
 
-    <div class="settings-group">
-      <div class="setting-row">
-        <div class="setting-info">
-          <label>{{ $t('language.language') }}</label>
-          <p class="desc">{{ $t('language.languageDescription') }}</p>
+    <div class="visual-setting-list">
+      <div class="visual-setting-row">
+        <div class="visual-setting-row__copy">
+          <label for="visual-language-select">{{ $t('language.language') }}</label>
+          <p>{{ $t('language.languageDescription') }}</p>
         </div>
-        <div class="setting-control">
+        <div class="visual-setting-row__control">
           <t-select
+            id="visual-language-select"
             v-model="localLanguage"
             :placeholder="$t('language.selectLanguage')"
-            style="width: 280px"
             @change="handleLanguageChange"
           >
             <t-option value="zh-CN" :label="$t('language.zhCN')">{{ $t('language.zhCN') }}</t-option>
@@ -60,15 +64,15 @@
         </div>
       </div>
 
-      <div class="setting-row">
-        <div class="setting-info">
-          <label>{{ $t('theme.theme') }}</label>
-          <p class="desc">{{ $t('theme.themeDescription') }}</p>
+      <div class="visual-setting-row">
+        <div class="visual-setting-row__copy">
+          <label for="visual-theme-select">{{ $t('theme.theme') }}</label>
+          <p>{{ $t('theme.themeDescription') }}</p>
         </div>
-        <div class="setting-control">
+        <div class="visual-setting-row__control">
           <t-select
+            id="visual-theme-select"
             v-model="localTheme"
-            style="width: 280px"
             :placeholder="$t('theme.selectTheme')"
             @change="handleThemeChange"
           >
@@ -79,7 +83,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -154,151 +158,209 @@ const handleThemeChange = (value: ThemeMode) => {
 }
 </script>
 
-<style lang="less" scoped>
-.general-settings {
+<style scoped lang="less">
+.visual-general-settings {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: #1f2937;
 }
 
-.section-header {
-  margin-bottom: 32px;
-
-  h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0 0 8px;
-  }
-
-  .section-description {
-    font-size: 14px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
-  }
+.visual-general-settings__header {
+  margin: 0 0 24px;
+  padding-right: 40px;
 }
 
-.settings-group {
-  display: flex;
-  flex-direction: column;
+.visual-general-settings__header h2 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
 }
 
-.plan-card {
-  margin-bottom: 24px;
-  padding: 20px;
-  border: 1px solid var(--td-component-stroke);
+.visual-general-settings__header p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.visual-plan-card {
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 24px;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
-  background: var(--td-bg-color-container);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
 }
 
-.plan-card--loading {
-  color: var(--td-text-color-secondary);
+.visual-plan-card--loading {
+  color: #9ca3af;
+  font-size: 12px;
 }
 
-.plan-card__header {
+.visual-plan-card__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 18px;
-
-  h3 {
-    margin: 3px 0 0;
-    font-size: 24px;
-    color: var(--td-text-color-primary);
-  }
+  gap: 16px;
+  margin-bottom: 14px;
 }
 
-.plan-card__eyebrow,
-.plan-metric span {
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
+.visual-plan-card__identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.plan-card__status {
-  padding: 5px 10px;
+.visual-plan-card__identity span,
+.visual-plan-metric span {
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.visual-plan-card__identity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #111827;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+}
+
+.visual-plan-card__status {
+  flex: 0 0 auto;
+  padding: 3px 8px;
   border-radius: 999px;
-  color: #176b4d;
-  background: #e8f7f0;
-  font-size: 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
   text-transform: capitalize;
 }
 
-.plan-metrics {
+.visual-plan-card__metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
-.plan-metric {
+.visual-plan-metric {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--td-bg-color-secondarycontainer);
-
-  strong {
-    color: var(--td-text-color-primary);
-    font-size: 14px;
-  }
+  gap: 3px;
+  background: #f9fafb;
 }
 
-.plan-note,
-.billing-note {
-  margin: 14px 0 0;
-  color: var(--td-text-color-secondary);
+.visual-plan-metric strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #374151;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 18px;
+  font-weight: 600;
 }
 
-.billing-note {
-  color: var(--td-warning-color);
+.visual-plan-card__note,
+.visual-plan-card__warning {
+  margin: 12px 0 0;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 16px;
 }
 
-@media (max-width: 640px) {
-  .plan-metrics {
-    grid-template-columns: 1fr;
-  }
-}
+.visual-plan-card__warning { color: #b45309; }
 
-.setting-row {
+.visual-setting-list {
+  width: 100%;
+  min-width: 0;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--td-component-stroke);
-
-  &:last-child {
-    border-bottom: none;
-  }
+  flex-direction: column;
 }
 
-.setting-info {
-  flex: 1;
-  max-width: 65%;
-  padding-right: 24px;
-
-  label {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--td-text-color-primary);
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  .desc {
-    font-size: 13px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
-  }
-}
-
-.setting-control {
-  flex-shrink: 0;
-  min-width: 280px;
-  display: flex;
-  justify-content: flex-end;
+.visual-setting-row {
+  width: 100%;
+  min-width: 0;
+  padding: 0 0 24px;
+  margin: 0 0 24px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #f3f4f6;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
   align-items: center;
+  gap: 24px;
+}
+
+.visual-setting-row:last-child {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.visual-setting-row__copy {
+  min-width: 0;
+}
+
+.visual-setting-row__copy label {
+  display: block;
+  margin: 0 0 2px;
+  color: #111827;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.visual-setting-row__copy p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.visual-setting-row__control {
+  width: 220px;
+  min-width: 0;
+  justify-self: end;
+}
+
+.visual-setting-row__control :deep(.t-select) {
+  width: 100%;
+}
+
+.visual-setting-row__control :deep(.t-input) {
+  min-height: 34px;
+  border-color: #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .visual-setting-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .visual-setting-row__control {
+    width: min(280px, 100%);
+    justify-self: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .visual-plan-card__metrics { grid-template-columns: 1fr; }
+  .visual-general-settings__header { padding-right: 28px; }
 }
 </style>
