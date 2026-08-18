@@ -9,52 +9,67 @@ const importNames = [...manifest.matchAll(/@import\s+"\.\/(musuw-reference-[^"]+
 const mechanical = importNames.map((name) => read(`./${name}`)).join('\n')
 const withoutComments = mechanical.replace(/\/\*[\s\S]*?\*\//g, '')
 
-const requiredShards = [
-  'musuw-reference-mechanical-01.css','musuw-reference-mechanical-01b.css',
-  'musuw-reference-mechanical-02.css','musuw-reference-mechanical-03.css','musuw-reference-mechanical-04.css',
-  'musuw-reference-mechanical-05.css','musuw-reference-mechanical-06.css','musuw-reference-mechanical-06b.css',
-  'musuw-reference-mechanical-07.css','musuw-reference-mechanical-07b.css','musuw-reference-mechanical-08.css',
-  'musuw-reference-mechanical-09a.css','musuw-reference-mechanical-09b.css','musuw-reference-mechanical-09c.css',
-  'musuw-reference-mechanical-09d.css','musuw-reference-mechanical-09e.css',
-  'musuw-reference-mechanical-10a.css','musuw-reference-mechanical-10b.css','musuw-reference-mechanical-10c.css',
-  'musuw-reference-mechanical-11a.css','musuw-reference-mechanical-11b.css','musuw-reference-mechanical-12.css',
-  'musuw-reference-mechanical-13.css','musuw-reference-mechanical-13b.css','musuw-reference-mechanical-14.css',
+const migratedViewFiles = [
+  '../views/creatChat/creatChat.vue',
+  '../components/UserMenu.vue',
+  '../components/SessionSidebarRow.vue',
+  '../components/SessionSourceFilter.vue',
+  '../components/ModelSelector.vue',
+  '../components/AttachmentUpload.vue',
+  '../components/KnowledgeBaseSelector.vue',
+  '../components/KBSwitcherDropdown.vue',
+  '../components/MentionSelector.vue',
+  '../components/ChatAttachmentPreviewDrawer.vue',
+  '../components/ChatHeader.vue',
+  '../components/ChatRequestInfoButton.vue',
+  '../components/ChatCitationFloat.vue',
+  '../components/ChatReferencesDrawer.vue',
+  '../views/chat/components/usermsg.vue',
+  '../views/chat/components/botmsg.vue',
+  '../views/chat/components/docInfo.vue',
+  '../views/knowledge/components/DocumentCardView.vue',
+  '../views/knowledge/components/DocumentListView.vue',
+  '../views/knowledge/components/DocumentActionMenu.vue',
+  '../views/knowledge/components/DocumentBatchBar.vue',
+  '../views/knowledge/components/KbFolderTree.vue',
+  '../views/knowledge/components/FolderPickerMenu.vue',
+  '../views/knowledge/components/KbUploadSourceDropdown.vue',
+  '../views/knowledge/components/TagEditDialog.vue',
+  '../views/knowledge/components/BatchTagDialog.vue',
+  '../views/knowledge/components/KbTagManageDrawer.vue',
+  '../views/settings/Settings.vue',
+  '../views/settings/GeneralSettings.vue',
+  '../views/settings/ModelSettings.vue',
 ]
 
-test('uses only the active mechanical reference UI layer', () => {
+test('transitional mechanical layer remains last only while mother views are still unmigrated', () => {
   const reference = main.indexOf('import "@/assets/musuw-reference-mechanical.css"')
   assert.ok(reference > main.indexOf('import "@/assets/dropdown-menu.less"'))
   assert.ok(reference > main.indexOf('import "@/components/css/chat-hljs-dark.less"'))
-  for (const legacy of [
-    'musuw-visual.less','musuw-reference-core.less','musuw-reference-workbench.less','musuw-reference-header.less',
-    'musuw-reference-knowledge-v2.less','musuw-reference-knowledge-v3.less','musuw-reference-knowledge-v4.less',
-    'musuw-reference-dom-bridge.css',
-  ]) assert.equal(main.includes(legacy) || manifest.includes(legacy), false, `${legacy} must not be active`)
+  for (const legacy of ['musuw-visual.less','musuw-reference-core.less','musuw-reference-workbench.less','musuw-reference-header.less','musuw-reference-knowledge-v2.less','musuw-reference-knowledge-v3.less','musuw-reference-knowledge-v4.less','musuw-reference-dom-bridge.css']) {
+    assert.equal(main.includes(legacy) || manifest.includes(legacy), false, `${legacy} must not be active`)
+  }
 })
 
-test('loads every current reference shard', () => {
-  assert.deepEqual(importNames, requiredShards)
+test('migrated views own their own visual-prefixed geometry', () => {
+  for (const path of migratedViewFiles) {
+    const source = read(path)
+    assert.match(source, /class="(?:[^"\n]*\s)?visual-[^"\n]+"/, `${path} has no direct visual root`)
+    assert.match(source, /<style/, `${path} has no direct view stylesheet`)
+  }
 })
 
-test('keeps the reference geometry and glyph family on high-visibility surfaces', () => {
-  assert.match(mechanical, /\.aside_box\{[\s\S]*?width:calc\(var\(--spacing\) \* 64\) !important/)
-  assert.match(mechanical, /\[data-guide="nav-creatChat"\] \.menu_icon::before/)
-  assert.match(mechanical, /\.dialogue-answers\{[\s\S]*?max-width:var\(--container-3xl\) !important/)
-  assert.match(mechanical, /\.rich-input-container \.t-textarea__inner[\s\S]*?min-height:44px !important/)
-  assert.match(mechanical, /\.kb-folder-tree:not\(\.is-collapsed\)\{[\s\S]*?width:calc\(var\(--spacing\) \* 56\) !important/)
-  assert.match(mechanical, /\.doc-card-list\{[\s\S]*?grid-template-columns:repeat\(4,minmax\(0,1fr\)\) !important/)
-  assert.match(mechanical, /\.knowledge-card\{[\s\S]*?height:calc\(var\(--spacing\) \* 48\) !important/)
-  assert.match(mechanical, /\.content-bar-icon-btn::after\{content:"添加文档"/)
-  assert.match(mechanical, /\.knowledge-card \.more-wrap::before/)
-  assert.match(mechanical, /body \.settings-overlay \.settings-modal\{[\s\S]*?height:520px !important/)
-  assert.match(mechanical, /body \.settings-overlay \.settings-sidebar \.nav-item:nth-child\(2\)::before/)
-  assert.match(mechanical, /body \.settings-overlay \.model-settings \.model-card\{[\s\S]*?border:1px solid var\(--color-gray-200\) !important/)
-  assert.match(mechanical, /\.ai-markdown-template\.markdown-content h1\{[\s\S]*?font-size:var\(--text-lg\) !important/)
-  assert.match(mechanical, /\.bot_msg:hover > div > \.answer-toolbar\{opacity:100% !important/)
-  assert.match(mechanical, /--font-sans:var\(--app-font-family/)
+test('global mechanical CSS never targets rebuilt visual roots', () => {
+  assert.doesNotMatch(withoutComments, /\.visual-[a-z0-9_-]+/i)
 })
 
-test('never takes ownership of product logic or excluded graph/trace renderers', () => {
+test('remaining mechanical ownership is limited to legacy mother-root vocabulary', () => {
+  for (const token of ['.aside_box', '.rich-input-container', '.knowledge-layout']) {
+    assert.ok(mechanical.includes(token), `remaining mother root lost transitional styling: ${token}`)
+  }
+})
+
+test('mechanical layer never owns product logic or excluded graph and trace renderers', () => {
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.agent-stream-display(?=[\s.{:#>+~]|$)/m)
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.streaming-steps-container(?=[\s.{:#>+~]|$)/m)
   assert.doesNotMatch(withoutComments, /(^|[,\s>+~])\.tree-container(?=[\s.{:#>+~]|$)/m)
