@@ -6,8 +6,8 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('unmigrated inline citation parsing logic stays byte-for-byte frozen', () => {
-  assert.equal(blobSha(read('../composables/useChatCitationPopover.ts')), 'b1142ec34ee9dec81600e6f3bda0c418cd478967')
+test('audited inline citation controller stays byte-for-byte frozen after the visual selector bridge', () => {
+  assert.equal(blobSha(read('../composables/useChatCitationPopover.ts')), '948dad67061997eafc97664fabdf2d1307b203c4')
 })
 
 test('rebuilt answer reference summary preserves grouping, drawer handoff and KB navigation', () => {
@@ -22,7 +22,7 @@ test('rebuilt answer reference summary preserves grouping, drawer handoff and KB
 
 test('rebuilt citation hover and drawer retain citation states and navigation', () => {
   const float = read('../components/ChatCitationFloat.vue')
-  for (const token of ["float.type === 'web'", ':href="float.url"', 'float.loading', 'float.error', 'float.content', 'class="visual-citation-float"']) {
+  for (const token of ["float.type === 'web'", ':href="float.url"', 'float.loading', 'float.error', 'float.content', 'class="visual-citation-float"', 'position: absolute']) {
     assert.ok(float.includes(token), `ChatCitationFloat lost ${token}`)
   }
   const drawer = read('../components/ChatReferencesDrawer.vue')
