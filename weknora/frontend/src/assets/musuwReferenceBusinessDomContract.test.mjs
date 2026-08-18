@@ -26,7 +26,7 @@ test('mechanical CSS selectors still map to the native WeKnora DOM', () => {
   const settings = read('../views/settings/Settings.vue')
 
   for (const token of ['aside_box', 'menu_item', 'menu_top', 'menu_bottom']) assert.ok(menu.includes(token))
-  for (const token of ['rich-input-container', 't-textarea', 'model-select-btn']) assert.ok(input.includes(token))
+  for (const token of ['rich-input-container', '<t-textarea', 'model-selector-trigger', 'control-right']) assert.ok(input.includes(token))
   for (const token of ['bot_msg', 'content-wrapper', 'ai-markdown-template markdown-content', 'answer-toolbar']) assert.ok(bot.includes(token))
   for (const token of ['knowledge-layout', 'document-header', 'document-breadcrumb', 'knowledge-main', 'doc-filter-bar', 'doc-card-list']) assert.ok(knowledge.includes(token))
   for (const token of ['settings-overlay', 'settings-modal', 'settings-sidebar', 'settings-content', 'content-wrapper']) assert.ok(settings.includes(token))
