@@ -10,6 +10,7 @@ test('migrated composer subviews use visual roots and no legacy presentation she
     ['../components/AttachmentUpload.vue', 'class="visual-attachment-upload"', ['class="attachment-upload"', 'class="attachment-preview-bar"', 'class="attachment-preview-item"']],
     ['../components/KnowledgeBaseSelector.vue', 'class="visual-kb-selector"', ['class="kb-overlay"', 'class="kb-dropdown"', 'class="kb-item"', 'class="kb-actions"']],
     ['../components/ChatAttachmentPreviewDrawer.vue', 'class="visual-attachment-preview"', ['<t-drawer', 'class="chat-attachment-drawer-header"', 'class="chat-attachment-drawer-body"', 'chat-attachment-preview-drawer']],
+    ['../components/MentionSelector.vue', 'class="visual-mention-menu"', ['class="mention-menu"', 'class="mention-list"', 'class="mention-item"', 'class="mention-group-entry"', 'mention-detail-popup-wrap']],
   ]
   for (const [path, root, legacy] of cases) {
     const source = read(path)
@@ -20,28 +21,21 @@ test('migrated composer subviews use visual roots and no legacy presentation she
 
 test('attachment visual layer exposes every native upload/parse terminal state', () => {
   const source = read('../components/AttachmentUpload.vue')
-  for (const token of [
-    "attachment.status === 'uploading'",
-    "attachment.status === 'uploaded'",
-    "attachment.status === 'processing'",
-    "attachment.status === 'ready'",
-    "attachment.status === 'failed'",
-    'attachment.progress',
-    'visual-attachment-card__progress',
-  ]) assert.ok(source.includes(token), `AttachmentUpload lost state presentation: ${token}`)
+  for (const token of ["attachment.status === 'uploading'","attachment.status === 'uploaded'","attachment.status === 'processing'","attachment.status === 'ready'","attachment.status === 'failed'",'attachment.progress','visual-attachment-card__progress']) {
+    assert.ok(source.includes(token), `AttachmentUpload lost state presentation: ${token}`)
+  }
 })
 
 test('attachment preview keeps persistent resizable drawer semantics in the new shell', () => {
   const source = read('../components/ChatAttachmentPreviewDrawer.vue')
-  for (const token of [
-    'weknora-chat-attachment-drawer-width',
-    'clampMainDrawerWidth',
-    'onMainDrawerResizeStart',
-    'onMainDrawerResizeMove',
-    'onMainDrawerResizeEnd',
-    ':session-id="target.sessionId"',
-    ':attachment-id="target.attachmentId"',
-    ':file-type="target.fileType"',
-    ':file-name="target.fileName"',
-  ]) assert.ok(source.includes(token), `ChatAttachmentPreviewDrawer lost ${token}`)
+  for (const token of ['weknora-chat-attachment-drawer-width','clampMainDrawerWidth','onMainDrawerResizeStart','onMainDrawerResizeMove','onMainDrawerResizeEnd',':session-id="target.sessionId"',':attachment-id="target.attachmentId"',':file-type="target.fileType"',':file-name="target.fileName"']) {
+    assert.ok(source.includes(token), `ChatAttachmentPreviewDrawer lost ${token}`)
+  }
+})
+
+test('mention visual layer still renders every native business group and shared-agent detail state', () => {
+  const source = read('../components/MentionSelector.vue')
+  for (const token of ['type: "kb"','type: "tag"','type: "mcp"','type: "skill"','type: "file"','agentIdForDetail','agentSourceTenantIdForDetail','visual-mention-detail__error','visual-mention-loading','readOnlyFromAgent']) {
+    assert.ok(source.includes(token), `MentionSelector lost ${token}`)
+  }
 })
