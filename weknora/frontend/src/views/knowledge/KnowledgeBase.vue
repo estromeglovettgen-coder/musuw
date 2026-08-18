@@ -167,11 +167,12 @@ export default defineComponent({
 
       <section v-if="activeKbTab === 'documents' || !isWiki" class="visual-knowledge-documents">
         <KbFolderTree
-          v-if="showFolderTree && !folderTreeCollapsed"
+          v-if="showFolderTree"
           class="visual-knowledge-documents__tree"
           :tree="folderTree"
           :selected-path="selectedFolderPath"
           :loading="folderTreeLoading"
+          :collapsed="folderTreeCollapsed"
           :can-edit="canEdit"
           @select="handleFolderSelect"
           @update:collapsed="handleFolderTreeCollapsedChange"
@@ -184,16 +185,6 @@ export default defineComponent({
             class="visual-knowledge-folder-path"
             :aria-label="$t('knowledgeBase.folderTree.title')"
           >
-            <t-tooltip v-if="folderTreeCollapsed" :content="$t('knowledgeBase.folderTree.expand')" placement="top">
-              <button
-                type="button"
-                class="visual-knowledge-folder-path__tree-toggle"
-                :aria-label="$t('knowledgeBase.folderTree.expand')"
-                @click="handleFolderTreeCollapsedChange(false)"
-              >
-                <t-icon name="folder" />
-              </button>
-            </t-tooltip>
             <span v-if="!folderBreadcrumbs.length" class="visual-knowledge-folder-path__crumb is-current">
               {{ $t('knowledgeBase.folderTree.rootRow') }}
             </span>
