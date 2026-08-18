@@ -6,8 +6,8 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-// Task 1 is presentation-only. These are the exact Git blobs from the
-// pre-UI business baseline 367a0c76e48fcf8a3762c33b672cfa2e16b679f4.
+// Business implementation baseline from 367a0c76e48fcf8a3762c33b672cfa2e16b679f4.
+// Files that have not entered the view-rebuild track remain byte-for-byte frozen.
 const baseline = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
   ['../components/UserMenu.vue', 'f5c813ced2e0e7b98af86e814aa7b4f788661752'],
@@ -30,7 +30,6 @@ const baseline = new Map([
   ['../views/chat/components/botmsg.vue', 'f696550fc980c2a648ce19a631729950fe3b0e6b'],
   ['../views/chat/components/usermsg.vue', '6dd0f2e44e4fc382d6f40702aa4b5eebc2467fea'],
   ['../views/chat/components/docInfo.vue', '927afa7a36e30a65fe4695e1e40aaa3664b4dbfe'],
-  ['../views/creatChat/creatChat.vue', '3e2d251be91bdae1edca1fbf8b814c5293d1c769'],
   ['../views/knowledge/KnowledgeBase.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
   ['../views/knowledge/components/DocumentCardView.vue', '7fdddb98988e06b2cd6b99b7ab991574abc58964'],
   ['../views/knowledge/components/DocumentListView.vue', 'dc553565d2c1818878c3c34631dc4d33010f96c6'],
@@ -54,8 +53,26 @@ const baseline = new Map([
   ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
 ])
 
-test('Task 1 cannot change business Vue/TS implementations', () => {
+test('unmigrated business implementations stay on the pre-view-rebuild baseline', () => {
   for (const [path, sha] of baseline) {
-    assert.equal(blobSha(read(path)), sha, `${path} changed outside the presentation-only Task 1 contract`)
+    assert.equal(blobSha(read(path)), sha, `${path} changed before its view was explicitly migrated`)
+  }
+})
+
+test('new-chat view may replace markup and CSS but must preserve its business contract', () => {
+  const source = read('../views/creatChat/creatChat.vue')
+  const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1] || ''
+
+  for (const contract of [
+    'getSuggestedQuestions(agentId, settingsStore.getSuggestedQuestionsParams())',
+    'inputFieldRef.value?.triggerSend(question)',
+    'const selectedKbs = settingsStore.settings.selectedKnowledgeBases || []',
+    'const selectedFiles = settingsStore.settings.selectedFiles || []',
+    'const res = await createSessions(sessionData)',
+    'usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking)',
+    'router.push(`/platform/chat/${sessionId}`)',
+    'navigateToKnowledgeBaseList(kbId)',
+  ]) {
+    assert.ok(script.includes(contract), `new-chat business contract changed: ${contract}`)
   }
 })
