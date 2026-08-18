@@ -16,10 +16,10 @@ test('the rename sentinel cannot collide with the root folder path', () => {
   assert.match(tree, /row\.kind === 'folder' && renamingPath\.value === row\.path/)
 })
 
-test('only real folders expose a rename affordance', () => {
+test('only real folders expose the rename behavior', () => {
   assert.match(tree, /v-if="canEdit && row\.kind === 'folder'"/)
-  assert.match(tree, /popup-menu-item/)
   assert.match(tree, /onFolderMenuRename/)
+  assert.match(tree, /emit\('rename', \{ from: row\.path, to: joinFolderPath\(parent, name\) \}\)/)
 })
 
 // Picking a folder is a small, reversible action, so it stays a popup: in the row
