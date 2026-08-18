@@ -3,51 +3,42 @@
     <Transition name="modal">
       <div v-if="visible" class="settings-overlay">
         <div class="settings-modal">
-          <button class="close-btn" type="button" @click="handleClose" :aria-label="$t('general.close')">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <button class="close-btn" @click="handleClose" :aria-label="$t('general.close')">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
           </button>
 
           <div class="settings-container">
-            <aside class="settings-sidebar">
+            <div class="settings-sidebar">
               <div class="sidebar-header">
                 <h2 class="sidebar-title">{{ $t('general.settings') }}</h2>
               </div>
-              <nav class="settings-nav">
+              <div class="settings-nav">
                 <button
-                  id="tab-btn-general"
                   type="button"
                   class="nav-item"
                   :class="{ active: currentSection === 'general' }"
                   :aria-current="currentSection === 'general' ? 'page' : undefined"
                   @click="selectSection('general')"
                 >
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
-                  </svg>
+                  <t-icon name="setting" class="nav-icon" />
                   <span class="nav-label">{{ $t('general.title') }}</span>
                 </button>
                 <button
-                  id="tab-btn-models"
                   type="button"
                   class="nav-item"
                   :class="{ active: currentSection === 'models' }"
                   :aria-current="currentSection === 'models' ? 'page' : undefined"
                   @click="selectSection('models')"
                 >
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect width="16" height="16" x="4" y="4" rx="2" stroke="currentColor" stroke-width="2" />
-                    <rect width="6" height="6" x="9" y="9" rx="1" stroke="currentColor" stroke-width="2" />
-                    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  </svg>
+                  <t-icon name="chat" class="nav-icon" />
                   <span class="nav-label">{{ $t('settings.modelManagement') }}</span>
                 </button>
-              </nav>
-            </aside>
+              </div>
+            </div>
 
-            <section class="settings-content">
+            <div class="settings-content">
               <div class="content-wrapper">
                 <div v-if="currentSection === 'general'" class="section">
                   <GeneralSettings />
@@ -56,7 +47,7 @@
                   <ModelSettings :initial-type="currentModelType" />
                 </div>
               </div>
-            </section>
+            </div>
           </div>
         </div>
       </div>
@@ -168,21 +159,249 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style lang="less" scoped>
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(23, 23, 23, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+
+.settings-modal {
+  position: relative;
+  width: 100%;
+  max-width: 896px;
+  height: 520px;
+  max-height: calc(100dvh - 48px);
+  background: var(--td-bg-color-container);
+  border-radius: 12px;
+  border: 1px solid var(--td-component-stroke);
+  box-shadow: var(--musuw-shadow-raised, 0 12px 32px rgba(38, 38, 38, 0.06));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
+
+.close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--td-text-color-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+
+  &:hover {
+    background: var(--td-bg-color-container-hover);
+    color: var(--td-text-color-primary);
+  }
+
+  &:focus-visible {
+    border-color: var(--td-brand-color);
+    outline: 2px solid var(--td-brand-color);
+    outline-offset: 2px;
+  }
+}
+
 .settings-container {
   display: flex;
-  width: 100%;
   height: 100%;
+  width: 100%;
   overflow: hidden;
 }
-.nav-icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+
+.settings-sidebar {
+  width: 224px;
+  background-color: var(--td-bg-color-settings-modal);
+  border-right: 1px solid var(--td-component-stroke);
+  flex-shrink: 0;
 }
-.nav-label { min-width: 0; }
+
+.sidebar-header {
+  padding: 28px 24px 16px;
+  border-bottom: 0;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  margin: 0;
+}
+
+.settings-nav {
+  padding: 8px 24px 16px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--td-text-color-secondary);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--td-bg-color-container-hover);
+    color: var(--td-text-color-primary);
+  }
+
+  &.active {
+    color: var(--td-brand-color);
+    background-color: var(--td-brand-color-light);
+  }
+
+  & + & {
+    margin-top: 4px;
+  }
+}
+
+.nav-icon {
+  margin-right: 9px;
+  font-size: 16px;
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+  background-color: var(--td-bg-color-container);
+}
+
+.content-wrapper {
+  width: 100%;
+  max-width: 760px;
+  padding: 40px 48px 48px;
+}
+
 .modal-enter-active,
-.modal-leave-active { transition: opacity 150ms ease; }
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
 .modal-enter-from,
-.modal-leave-to { opacity: 0; }
+.modal-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 720px) {
+  .settings-overlay {
+    padding: 12px;
+  }
+
+  .settings-modal {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .settings-sidebar {
+    width: 184px;
+  }
+
+  .sidebar-header {
+    padding: 16px 12px 12px;
+  }
+
+  .settings-nav {
+    padding: 12px 8px;
+  }
+
+  .content-wrapper {
+    padding: 32px 24px 40px;
+  }
+
+  /* Keep the shared shell usable on tablets without rewriting each settings
+     provider's row markup. */
+  .settings-content :deep(.setting-row) {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .settings-content :deep(.setting-info) {
+    max-width: none;
+    padding-right: 0;
+  }
+
+  .settings-content :deep(.setting-control) {
+    min-width: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-content :deep(.setting-control .t-select) {
+    width: 100% !important;
+    max-width: 280px;
+  }
+}
+
+@media (max-width: 560px) {
+  .settings-overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .settings-modal {
+    border-radius: 0;
+    border-width: 0;
+    height: 100%;
+    max-height: none;
+  }
+
+  .settings-container {
+    flex-direction: column;
+  }
+
+  .settings-sidebar {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--td-component-stroke);
+  }
+
+  .sidebar-header {
+    padding-bottom: 8px;
+    border-bottom: 0;
+  }
+
+  .settings-nav {
+    padding: 0 16px 12px;
+  }
+
+  .sidebar-title {
+    font-size: 15px;
+  }
+
+  .content-wrapper {
+    padding: 32px 16px 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-overlay,
+  .settings-modal,
+  .modal-enter-active,
+  .modal-leave-active,
+  .close-btn {
+    transition: none;
+  }
+}
 </style>

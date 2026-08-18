@@ -42,14 +42,14 @@
     <div class="settings-group">
       <div class="setting-row">
         <div class="setting-info">
-          <label class="setting-label">{{ $t('language.language') }}</label>
-          <p class="setting-description">{{ $t('language.languageDescription') }}</p>
+          <label>{{ $t('language.language') }}</label>
+          <p class="desc">{{ $t('language.languageDescription') }}</p>
         </div>
         <div class="setting-control">
           <t-select
             v-model="localLanguage"
             :placeholder="$t('language.selectLanguage')"
-            style="width: 192px"
+            style="width: 280px"
             @change="handleLanguageChange"
           >
             <t-option value="zh-CN" :label="$t('language.zhCN')">{{ $t('language.zhCN') }}</t-option>
@@ -62,13 +62,13 @@
 
       <div class="setting-row">
         <div class="setting-info">
-          <label class="setting-label">{{ $t('theme.theme') }}</label>
-          <p class="setting-description">{{ $t('theme.themeDescription') }}</p>
+          <label>{{ $t('theme.theme') }}</label>
+          <p class="desc">{{ $t('theme.themeDescription') }}</p>
         </div>
         <div class="setting-control">
           <t-select
             v-model="localTheme"
-            style="width: 192px"
+            style="width: 280px"
             :placeholder="$t('theme.selectTheme')"
             @change="handleThemeChange"
           >
@@ -154,38 +154,151 @@ const handleThemeChange = (value: ThemeMode) => {
 }
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .general-settings {
   width: 100%;
-  font-family: var(--app-font-family, "Inter Variable", Inter, "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif);
 }
-.section-header { margin-bottom: 24px; }
-.section-header h2 { margin: 0; color: #111827; font-size: 16px; line-height: 24px; font-weight: 700; }
-.section-description { margin: 3px 0 0; color: #9ca3af; font-size: 12px; line-height: 16px; }
-.settings-group { display: flex; flex-direction: column; }
-.setting-info { min-width: 0; flex: 1; }
-.setting-control { flex: 0 0 auto; display: flex; align-items: center; }
+
+.section-header {
+  margin-bottom: 32px;
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    margin: 0 0 8px;
+  }
+
+  .section-description {
+    font-size: 14px;
+    color: var(--td-text-color-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+}
+
 .plan-card {
   margin-bottom: 24px;
-  padding: 18px;
-  border: 1px solid rgb(229 231 235 / 70%);
+  padding: 20px;
+  border: 1px solid var(--td-component-stroke);
   border-radius: 16px;
-  background: #fff;
+  background: var(--td-bg-color-container);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
-.plan-card--loading { color: #9ca3af; font-size: 12px; }
-.plan-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-.plan-card__eyebrow { color: #9ca3af; font-size: 10px; line-height: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.plan-card__header h3 { margin: 3px 0 0; color: #111827; font-size: 16px; line-height: 22px; font-weight: 700; }
-.plan-card__status { padding: 2px 7px; border-radius: 6px; background: #111827; color: #fff; font-size: 9px; line-height: 14px; font-weight: 800; text-transform: uppercase; }
-.plan-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-.plan-metric { display: flex; flex-direction: column; gap: 4px; padding: 10px 11px; border: 1px solid #f3f4f6; border-radius: 12px; background: rgb(249 250 251 / 70%); }
-.plan-metric span { color: #9ca3af; font-size: 10px; line-height: 14px; }
-.plan-metric strong { color: #374151; font-size: 11px; line-height: 16px; font-weight: 700; }
-.plan-note,.billing-note { margin: 10px 0 0; color: #9ca3af; font-size: 10px; line-height: 15px; }
-.billing-note { color: #b45309; }
+
+.plan-card--loading {
+  color: var(--td-text-color-secondary);
+}
+
+.plan-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18px;
+
+  h3 {
+    margin: 3px 0 0;
+    font-size: 24px;
+    color: var(--td-text-color-primary);
+  }
+}
+
+.plan-card__eyebrow,
+.plan-metric span {
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+}
+
+.plan-card__status {
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #176b4d;
+  background: #e8f7f0;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.plan-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--td-bg-color-secondarycontainer);
+
+  strong {
+    color: var(--td-text-color-primary);
+    font-size: 14px;
+  }
+}
+
+.plan-note,
+.billing-note {
+  margin: 14px 0 0;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.billing-note {
+  color: var(--td-warning-color);
+}
+
 @media (max-width: 640px) {
-  .plan-metrics { grid-template-columns: 1fr; }
-  .setting-row { align-items: flex-start !important; flex-direction: column; }
-  .setting-control,.setting-control :deep(.t-select) { width: 100% !important; }
+  .plan-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--td-component-stroke);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.setting-info {
+  flex: 1;
+  max-width: 65%;
+  padding-right: 24px;
+
+  label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--td-text-color-primary);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .desc {
+    font-size: 13px;
+    color: var(--td-text-color-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.setting-control {
+  flex-shrink: 0;
+  min-width: 280px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 </style>
