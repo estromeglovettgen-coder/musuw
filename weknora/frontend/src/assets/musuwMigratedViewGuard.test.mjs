@@ -13,6 +13,8 @@ const migratedKnowledgeViews = [
   ['../views/knowledge/components/FolderPickerMenu.vue', 'class="visual-folder-picker"', ['class="folder-picker"', 'class="folder-picker__item"', 'class="folder-picker__list"']],
   ['../views/knowledge/components/KbUploadSourceDropdown.vue', 'class="visual-upload-source"', ['class="kb-upload-source-dropdown"', 'class="kb-upload-source-trigger"', 'class="url-import-form"']],
   ['../views/knowledge/components/TagEditDialog.vue', 'class="visual-tag-edit"', ['dialog-class-name="tag-edit-dialog"', 'class="tag-edit-body"', 'class="tag-edit-chip"', 'class="setting-drawer__section"']],
+  ['../views/knowledge/components/BatchTagDialog.vue', 'class="visual-batch-tag"', ['dialog-class-name="batch-tag-dialog"', 'class="batch-tag-body"', 'class="batch-tag-chip"', 'class="setting-drawer__section"']],
+  ['../views/knowledge/components/KbTagManageDrawer.vue', 'class="visual-tag-manage"', ['<SettingDrawer', 'class="tag-manage-toolbar"', 'class="tag-tile"', 'class="setting-drawer__section"']],
 ]
 
 test('migrated knowledge document views expose only their new visual roots', () => {
