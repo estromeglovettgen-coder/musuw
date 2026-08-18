@@ -14,8 +14,6 @@ import "@/components/css/chat-hljs-dark.less";
 // Task 1 visual authority: mechanically compiled from the reference TSX/Tailwind utilities.
 // This is presentation-only; Vue data/handlers/permissions/conditional rendering remain authoritative.
 import "@/assets/musuw-reference-mechanical.css";
-// Final authority pass: exact reference font stack and Lucide icon family.
-import "@/assets/musuw-reference-authority.css";
 // SourcesPanel-derived palette for the unchanged WeKnora docInfo source/index widget.
 import "@/assets/musuw-reference-citation-sources.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
