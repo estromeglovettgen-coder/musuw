@@ -1,201 +1,174 @@
 <template>
-  <SettingDrawer
-    v-model:visible="drawerVisible"
-    :title="$t('modelSettings.debug.title')"
-    :description="$t('modelSettings.debug.description')"
-    icon="play-circle-stroke"
-    width="560px"
-    :min-width="480"
-    :max-width="900"
-    storage-key="setting-drawer:width:model-debug"
-    :confirm-text="$t('modelSettings.debug.run')"
-    :confirm-loading="running"
-    :confirm-disabled="!canRun"
-    :cancel-text="$t('common.close')"
-    @confirm="runDebug"
-  >
-    <template v-if="result" #footer-left>
-      <t-button variant="outline" @click="copyResult">
-        <template #icon><t-icon name="file-copy" /></template>
-        {{ $t('modelSettings.debug.copyResult') }}
-      </t-button>
-    </template>
-
-    <div class="model-debug">
-      <section class="setting-drawer__section">
-        <h4 class="setting-drawer__section-title">{{ $t('modelSettings.debug.groupModel') }}</h4>
-        <div v-if="availableModelTypes.length > 1" class="form-item">
-          <div class="model-type-options" role="radiogroup" :aria-label="$t('modelSettings.debug.modelType')">
-            <button
-              v-for="option in availableModelTypes"
-              :key="option.value"
-              type="button"
-              class="model-type-option"
-              :class="{ 'is-active': selectedModelType === option.value }"
-              role="radio"
-              :aria-checked="selectedModelType === option.value"
-              @click="selectModelType(option.value)"
-            >
-              <t-icon :name="option.icon" class="model-type-option__icon" />
-              <span class="model-type-option__label">{{ option.label }}</span>
-            </button>
-          </div>
-        </div>
-        <div class="form-item">
-          <label class="form-label">{{ $t('modelSettings.debug.model') }}</label>
-          <t-select
-            v-model="selectedModelId"
-            filterable
-            :placeholder="$t('modelSettings.debug.modelPlaceholder')"
-            :disabled="filteredModels.length === 0"
-            @change="resetResult"
-          >
-            <t-option
-              v-for="model in filteredModels"
-              :key="model.id"
-              :value="model.id!"
-              :label="modelLabel(model)"
-            >
-              <div class="model-option">
-                <span class="model-option__name">{{ modelLabel(model) }}</span>
-                <span class="model-option__meta">{{ vendorLabel(model) }}</span>
+  <Teleport to="body">
+    <Transition name="visual-model-debug">
+      <div v-if="drawerVisible" class="visual-model-debug__overlay" @click.self="drawerVisible = false">
+        <aside class="visual-model-debug" role="dialog" aria-modal="true" :aria-label="$t('modelSettings.debug.title')">
+          <header class="visual-model-debug__header">
+            <div class="visual-model-debug__heading">
+              <span class="visual-model-debug__heading-icon"><t-icon name="play-circle-stroke" /></span>
+              <div>
+                <h3>{{ $t('modelSettings.debug.title') }}</h3>
+                <p>{{ $t('modelSettings.debug.description') }}</p>
               </div>
-            </t-option>
-          </t-select>
-          <p v-if="filteredModels.length === 0" class="form-desc">
-            {{ $t('modelSettings.debug.noModelsForType') }}
-          </p>
-        </div>
-      </section>
-
-      <template v-if="selectedModel">
-        <section class="setting-drawer__section">
-          <h4 class="setting-drawer__section-title">{{ $t('modelSettings.debug.groupInput') }}</h4>
-          <div v-if="selectedModel.type !== 'ASR'" class="form-item">
-            <label class="form-label">{{ inputLabel }}</label>
-            <t-textarea
-              v-model="input"
-              :placeholder="inputPlaceholder"
-              :autosize="{ minRows: 4, maxRows: 8 }"
-            />
-          </div>
-
-          <div v-if="selectedModel.type === 'Rerank'" class="form-item">
-            <label class="form-label">{{ $t('modelSettings.debug.documents') }}</label>
-            <t-textarea
-              v-model="documentsText"
-              :placeholder="$t('modelSettings.debug.documentsPlaceholder')"
-              :autosize="{ minRows: 4, maxRows: 8 }"
-            />
-            <p class="form-desc">{{ $t('modelSettings.debug.documentsHint') }}</p>
-          </div>
-
-          <div v-if="needsFile" class="form-item">
-            <label class="form-label">{{ fileLabel }}</label>
-            <div class="file-picker">
-              <input
-                ref="fileInputRef"
-                class="file-picker__input"
-                type="file"
-                :accept="selectedModel.type === 'VLLM' ? 'image/*' : 'audio/*'"
-                @change="onNativeFileChange"
-              >
-              <t-button variant="outline" size="small" @click="fileInputRef?.click()">
-                <template #icon><t-icon name="upload" /></template>
-                {{ $t('modelSettings.debug.chooseFile') }}
-              </t-button>
             </div>
-            <p v-if="file" class="form-desc">{{ file.name }} · {{ formatBytes(file.size) }}</p>
-          </div>
-        </section>
+            <button type="button" class="visual-model-debug__close" :aria-label="$t('common.close')" @click="drawerVisible = false">
+              <t-icon name="close" />
+            </button>
+          </header>
 
-        <section v-if="isChat" class="setting-drawer__section">
-          <h4 class="setting-drawer__section-title">{{ $t('modelSettings.debug.parameters') }}</h4>
-          <div class="parameter-grid">
-            <div class="form-item">
-              <label class="form-label">Temperature</label>
-              <t-input-number v-model="temperature" :min="0" :max="2" :step="0.1" theme="column" />
-            </div>
-            <div class="form-item">
-              <label class="form-label">Top P</label>
-              <t-input-number v-model="topP" :min="0.01" :max="1" :step="0.1" theme="column" />
-            </div>
-            <div class="form-item">
-              <label class="form-label">Max Tokens</label>
-              <t-input-number v-model="maxTokens" :min="1" :max="8192" :step="128" theme="column" />
-            </div>
-          </div>
-          <div class="form-item">
-            <label class="form-label">{{ $t('modelSettings.debug.systemPrompt') }}</label>
-            <t-textarea
-              v-model="systemPrompt"
-              :placeholder="$t('modelSettings.debug.systemPromptPlaceholder')"
-              :autosize="{ minRows: 2, maxRows: 4 }"
-            />
-          </div>
-          <div v-if="supportsThinking" class="form-item">
-            <label class="form-label">{{ $t('modelSettings.debug.thinking') }}</label>
-            <div class="switch-field">
-              <t-switch v-model="thinking" />
-              <span class="form-desc form-desc--inline">{{ $t('modelSettings.debug.thinkingDesc') }}</span>
-            </div>
-          </div>
-        </section>
+          <div class="visual-model-debug__content">
+            <section class="visual-model-debug__section">
+              <h4>{{ $t('modelSettings.debug.groupModel') }}</h4>
+              <div v-if="availableModelTypes.length > 1" class="visual-model-debug__types" role="radiogroup" :aria-label="$t('modelSettings.debug.modelType')">
+                <button
+                  v-for="option in availableModelTypes"
+                  :key="option.value"
+                  type="button"
+                  :class="{ 'is-active': selectedModelType === option.value }"
+                  role="radio"
+                  :aria-checked="selectedModelType === option.value"
+                  @click="selectModelType(option.value)"
+                >
+                  <t-icon :name="option.icon" />
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+              <div class="visual-model-debug__field">
+                <label>{{ $t('modelSettings.debug.model') }}</label>
+                <t-select
+                  v-model="selectedModelId"
+                  filterable
+                  :placeholder="$t('modelSettings.debug.modelPlaceholder')"
+                  :disabled="filteredModels.length === 0"
+                  @change="resetResult"
+                >
+                  <t-option v-for="model in filteredModels" :key="model.id" :value="model.id!" :label="modelLabel(model)">
+                    <div class="visual-model-debug__model-option">
+                      <span>{{ modelLabel(model) }}</span>
+                      <small>{{ vendorLabel(model) }}</small>
+                    </div>
+                  </t-option>
+                </t-select>
+                <p v-if="filteredModels.length === 0">{{ $t('modelSettings.debug.noModelsForType') }}</p>
+              </div>
+            </section>
 
-        <section v-if="result || history.length > 0" class="setting-drawer__section">
-          <h4 class="setting-drawer__section-title">{{ $t('modelSettings.debug.groupResult') }}</h4>
+            <template v-if="selectedModel">
+              <section class="visual-model-debug__section">
+                <h4>{{ $t('modelSettings.debug.groupInput') }}</h4>
+                <div v-if="selectedModel.type !== 'ASR'" class="visual-model-debug__field">
+                  <label>{{ inputLabel }}</label>
+                  <t-textarea v-model="input" :placeholder="inputPlaceholder" :autosize="{ minRows: 4, maxRows: 8 }" />
+                </div>
 
-          <div v-if="history.length > 1" class="form-item">
-            <label class="form-label">{{ $t('modelSettings.debug.history') }}</label>
-            <div class="history-list">
-              <button
-                v-for="run in history"
-                :key="run.id"
-                type="button"
-                class="history-item"
-                :class="{ 'history-item--active': result === run.result }"
-                @click="result = run.result"
-              >
-                <span class="history-item__label">{{ run.label }}</span>
-                <span class="history-item__meta">{{ run.result.elapsed_ms }} ms</span>
+                <div v-if="selectedModel.type === 'Rerank'" class="visual-model-debug__field">
+                  <label>{{ $t('modelSettings.debug.documents') }}</label>
+                  <t-textarea v-model="documentsText" :placeholder="$t('modelSettings.debug.documentsPlaceholder')" :autosize="{ minRows: 4, maxRows: 8 }" />
+                  <p>{{ $t('modelSettings.debug.documentsHint') }}</p>
+                </div>
+
+                <div v-if="needsFile" class="visual-model-debug__field">
+                  <label>{{ fileLabel }}</label>
+                  <input
+                    ref="fileInputRef"
+                    class="visual-model-debug__native-file"
+                    type="file"
+                    :accept="selectedModel.type === 'VLLM' ? 'image/*' : 'audio/*'"
+                    @change="onNativeFileChange"
+                  >
+                  <button type="button" class="visual-model-debug__file-button" @click="fileInputRef?.click()">
+                    <t-icon name="upload" />
+                    <span>{{ $t('modelSettings.debug.chooseFile') }}</span>
+                  </button>
+                  <p v-if="file">{{ file.name }} · {{ formatBytes(file.size) }}</p>
+                </div>
+              </section>
+
+              <section v-if="isChat" class="visual-model-debug__section">
+                <h4>{{ $t('modelSettings.debug.parameters') }}</h4>
+                <div class="visual-model-debug__parameter-grid">
+                  <div class="visual-model-debug__field">
+                    <label>Temperature</label>
+                    <t-input-number v-model="temperature" :min="0" :max="2" :step="0.1" theme="column" />
+                  </div>
+                  <div class="visual-model-debug__field">
+                    <label>Top P</label>
+                    <t-input-number v-model="topP" :min="0.01" :max="1" :step="0.1" theme="column" />
+                  </div>
+                  <div class="visual-model-debug__field">
+                    <label>Max Tokens</label>
+                    <t-input-number v-model="maxTokens" :min="1" :max="8192" :step="128" theme="column" />
+                  </div>
+                </div>
+                <div class="visual-model-debug__field">
+                  <label>{{ $t('modelSettings.debug.systemPrompt') }}</label>
+                  <t-textarea v-model="systemPrompt" :placeholder="$t('modelSettings.debug.systemPromptPlaceholder')" :autosize="{ minRows: 2, maxRows: 4 }" />
+                </div>
+                <div v-if="supportsThinking" class="visual-model-debug__switch-field">
+                  <t-switch v-model="thinking" />
+                  <span>{{ $t('modelSettings.debug.thinkingDesc') }}</span>
+                </div>
+              </section>
+
+              <section v-if="result || history.length > 0" class="visual-model-debug__section">
+                <h4>{{ $t('modelSettings.debug.groupResult') }}</h4>
+                <div v-if="history.length > 1" class="visual-model-debug__history">
+                  <button
+                    v-for="run in history"
+                    :key="run.id"
+                    type="button"
+                    :class="{ 'is-active': result === run.result }"
+                    @click="result = run.result"
+                  >
+                    <strong>{{ run.label }}</strong>
+                    <span>{{ run.result.elapsed_ms }} ms</span>
+                  </button>
+                </div>
+
+                <div v-if="result" class="visual-model-debug__result">
+                  <div class="visual-model-debug__banner" :class="result.ok ? 'is-ok' : 'is-error'">
+                    <t-icon :name="result.ok ? 'check-circle-filled' : 'close-circle-filled'" />
+                    <strong>{{ result.ok ? $t('modelSettings.debug.success') : $t('modelSettings.debug.failed') }}</strong>
+                    <span>{{ result.elapsed_ms }} ms</span>
+                  </div>
+                  <div v-if="resultMetrics.length > 0" class="visual-model-debug__metrics">
+                    <span v-for="metric in resultMetrics" :key="metric.key">{{ metric.label }}: {{ metric.value }}</span>
+                  </div>
+                  <p v-if="result.error" class="visual-model-debug__error">{{ result.error }}</p>
+                  <div class="visual-model-debug__result-tabs" role="tablist">
+                    <button type="button" :class="{ 'is-active': resultTab === 'response' }" @click="resultTab = 'response'">{{ $t('modelSettings.debug.rawResponse') }}</button>
+                    <button type="button" :class="{ 'is-active': resultTab === 'request' }" @click="resultTab = 'request'">{{ $t('modelSettings.debug.requestPreview') }}</button>
+                  </div>
+                  <pre>{{ formattedResult }}</pre>
+                </div>
+              </section>
+            </template>
+          </div>
+
+          <footer class="visual-model-debug__footer">
+            <button v-if="result" type="button" class="visual-model-debug__button" @click="copyResult">
+              <t-icon name="file-copy" />
+              <span>{{ $t('modelSettings.debug.copyResult') }}</span>
+            </button>
+            <div class="visual-model-debug__footer-actions">
+              <button type="button" class="visual-model-debug__button" @click="drawerVisible = false">{{ $t('common.close') }}</button>
+              <button type="button" class="visual-model-debug__button is-primary" :disabled="!canRun || running" @click="runDebug">
+                <t-loading v-if="running" size="small" />
+                <t-icon v-else name="play-circle-stroke" />
+                <span>{{ $t('modelSettings.debug.run') }}</span>
               </button>
             </div>
-          </div>
-
-          <div v-if="result" class="debug-result">
-            <div class="result-banner" :class="result.ok ? 'result-banner--ok' : 'result-banner--error'">
-              <t-icon :name="result.ok ? 'check-circle-filled' : 'close-circle-filled'" />
-              <div class="result-banner__text">
-                <strong>{{ result.ok ? $t('modelSettings.debug.success') : $t('modelSettings.debug.failed') }}</strong>
-                <span>{{ result.elapsed_ms }} ms</span>
-              </div>
-            </div>
-
-            <div v-if="resultMetrics.length > 0" class="metric-list">
-              <span v-for="metric in resultMetrics" :key="metric.key" class="metric-chip">
-                {{ metric.label }}: {{ metric.value }}
-              </span>
-            </div>
-
-            <p v-if="result.error" class="result-error">{{ result.error }}</p>
-
-            <t-tabs v-model="resultTab" class="result-tabs">
-              <t-tab-panel value="response" :label="$t('modelSettings.debug.rawResponse')" />
-              <t-tab-panel value="request" :label="$t('modelSettings.debug.requestPreview')" />
-            </t-tabs>
-            <pre class="json-output">{{ formattedResult }}</pre>
-          </div>
-        </section>
-      </template>
-    </div>
-  </SettingDrawer>
+          </footer>
+        </aside>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
-import SettingDrawer from '@/components/settings/SettingDrawer.vue'
 import { debugModel, type ModelConfig, type ModelDebugResult } from '@/api/model'
 import { fileSizeVerification } from '@/utils'
 import { modelSupportsThinking } from '@/utils/thinkingControl'
@@ -268,13 +241,8 @@ const allModelTypeOptions = computed(() => {
 })
 
 const modelCount = (type: DebugModelType) => props.models.filter(model => model.type === type).length
-
-const availableModelTypes = computed(() =>
-  allModelTypeOptions.value.filter(option => modelCount(option.value) > 0),
-)
-
+const availableModelTypes = computed(() => allModelTypeOptions.value.filter(option => modelCount(option.value) > 0))
 const modelLabel = (model: ModelConfig) => model.display_name?.trim() || model.name
-
 const vendorLabel = (model: ModelConfig) => {
   const provider = model.parameters.provider || ''
   if (model.source === 'local') return 'Ollama'
@@ -289,24 +257,16 @@ const inputLabel = computed(() => {
   if (selectedModel.value?.type === 'Rerank') return t('modelSettings.debug.query')
   return t('modelSettings.debug.query')
 })
-
 const inputPlaceholder = computed(() => {
   if (selectedModel.value?.type === 'Embedding') return t('modelSettings.debug.embeddingPlaceholder')
   if (selectedModel.value?.type === 'VLLM') return t('modelSettings.debug.vlmPromptPlaceholder')
   return t('modelSettings.debug.queryPlaceholder')
 })
-
-const fileLabel = computed(() =>
-  selectedModel.value?.type === 'VLLM'
-    ? t('modelSettings.debug.imageFile')
-    : t('modelSettings.debug.audioFile'),
-)
+const fileLabel = computed(() => selectedModel.value?.type === 'VLLM' ? t('modelSettings.debug.imageFile') : t('modelSettings.debug.audioFile'))
 
 const formattedResult = computed(() => {
   if (!result.value) return ''
-  const value = resultTab.value === 'response'
-    ? result.value.raw_response
-    : result.value.request
+  const value = resultTab.value === 'response' ? result.value.raw_response : result.value.request
   return JSON.stringify(value, null, 2)
 })
 
@@ -319,24 +279,13 @@ const OBSERVATION_LABELS: Record<string, string> = {
   text_characters: 'modelSettings.debug.metrics.textChars',
   segment_count: 'modelSettings.debug.metrics.segmentCount',
 }
-
 const resultMetrics = computed(() => {
   if (!result.value?.observations) return []
   const obs = result.value.observations
   const keys = Object.keys(OBSERVATION_LABELS).filter(key => obs[key] !== undefined && obs[key] !== null)
-  return keys.map(key => ({
-    key,
-    label: t(OBSERVATION_LABELS[key]),
-    value: formatMetricValue(key, obs[key]),
-  }))
+  return keys.map(key => ({ key, label: t(OBSERVATION_LABELS[key]), value: formatMetricValue(key, obs[key]) }))
 })
-
-const formatMetricValue = (key: string, value: unknown) => {
-  if (typeof value === 'boolean') {
-    return value ? t('common.yes') : t('common.no')
-  }
-  return String(value)
-}
+const formatMetricValue = (_key: string, value: unknown) => typeof value === 'boolean' ? (value ? t('common.yes') : t('common.no')) : String(value)
 
 const ensureDefaultSelection = () => {
   const types = availableModelTypes.value
@@ -344,27 +293,13 @@ const ensureDefaultSelection = () => {
     selectedModelId.value = ''
     return
   }
-  if (!types.some(option => option.value === selectedModelType.value)) {
-    selectedModelType.value = types[0].value
-  }
+  if (!types.some(option => option.value === selectedModelType.value)) selectedModelType.value = types[0].value
   const models = filteredModels.value
-  if (!models.some(model => model.id === selectedModelId.value)) {
-    selectedModelId.value = models[0]?.id || ''
-  }
+  if (!models.some(model => model.id === selectedModelId.value)) selectedModelId.value = models[0]?.id || ''
 }
-
-watch(() => props.visible, visible => {
-  if (visible) ensureDefaultSelection()
-})
-
-watch(availableModelTypes, () => {
-  if (props.visible) ensureDefaultSelection()
-})
-
-watch(() => selectedModel.value?.id, () => {
-  if (!supportsThinking.value) thinking.value = false
-})
-
+watch(() => props.visible, visible => { if (visible) ensureDefaultSelection() })
+watch(availableModelTypes, () => { if (props.visible) ensureDefaultSelection() })
+watch(() => selectedModel.value?.id, () => { if (!supportsThinking.value) thinking.value = false })
 watch(() => selectedModel.value?.type, () => {
   file.value = null
   result.value = null
@@ -377,7 +312,6 @@ const resetResult = () => {
   history.value = []
   resultTab.value = 'response'
 }
-
 const selectModelType = (type: DebugModelType) => {
   if (selectedModelType.value === type) return
   selectedModelType.value = type
@@ -387,7 +321,6 @@ const selectModelType = (type: DebugModelType) => {
   file.value = null
   resetResult()
 }
-
 const onNativeFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   const selectedFile = target.files?.[0] || null
@@ -400,17 +333,13 @@ const onNativeFileChange = (event: Event) => {
   file.value = selectedFile
   resetResult()
 }
-
 const formatBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
-
 const historyLabel = (thinkingValue: boolean) => {
-  if (supportsThinking.value) {
-    return thinkingValue ? t('modelSettings.debug.thinkOn') : t('modelSettings.debug.thinkOff')
-  }
+  if (supportsThinking.value) return thinkingValue ? t('modelSettings.debug.thinkOn') : t('modelSettings.debug.thinkOff')
   return t('modelSettings.debug.runLabel', { n: runSequence })
 }
 
@@ -432,11 +361,7 @@ const runDebug = async () => {
       } : {},
     })
     result.value = nextResult
-    history.value.unshift({
-      id: ++runSequence,
-      label: historyLabel(thinkingValue),
-      result: nextResult,
-    })
+    history.value.unshift({ id: ++runSequence, label: historyLabel(thinkingValue), result: nextResult })
     history.value = history.value.slice(0, 6)
     resultTab.value = 'response'
   } catch (error: any) {
@@ -457,255 +382,64 @@ const copyResult = async () => {
 }
 
 onBeforeUnmount(() => {
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur()
-  }
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
 })
 </script>
 
 <style scoped lang="less">
-.form-item {
-  margin-bottom: 0;
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--td-text-color-primary);
-  line-height: 1.4;
-}
-
-.form-desc {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--td-text-color-placeholder);
-
-  &--inline {
-    margin: 0;
-  }
-}
-
-.model-type-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.model-type-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  min-height: 32px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  line-height: 1.4;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-
-  &__icon {
-    font-size: 15px;
-    flex-shrink: 0;
-  }
-
-  &__label {
-    white-space: nowrap;
-  }
-
-  &:hover:not(.is-active) {
-    border-color: var(--td-brand-color-3, var(--td-brand-color));
-    color: var(--td-text-color-primary);
-  }
-
-  &.is-active {
-    border-color: var(--td-brand-color);
-    background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
-    color: var(--td-brand-color);
-    font-weight: 500;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--td-brand-color);
-    outline-offset: 2px;
-  }
-}
-
-.model-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-
-  &__name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__meta {
-    flex-shrink: 0;
-    color: var(--td-text-color-placeholder);
-    font-size: 12px;
-  }
-}
-
-.parameter-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-
-  :deep(.t-input-number) {
-    width: 100%;
-  }
-}
-
-.switch-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-}
-
-.file-picker {
-  position: relative;
-
-  &__input {
-    position: absolute;
-    width: 0;
-    height: 0;
-    opacity: 0;
-    pointer-events: none;
-  }
-}
-
-.history-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.history-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-secondary);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-
-  &__label {
-    color: var(--td-text-color-primary);
-    font-weight: 500;
-  }
-
-  &__meta {
-    color: var(--td-text-color-placeholder);
-  }
-
-  &:hover,
-  &--active {
-    border-color: var(--td-brand-color);
-    background: color-mix(in srgb, var(--td-brand-color) 6%, var(--td-bg-color-container));
-  }
-}
-
-.result-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-
-  &--ok {
-    background: var(--td-success-color-light);
-    color: var(--td-success-color);
-
-    .result-banner__text strong {
-      color: var(--td-text-color-primary);
-    }
-  }
-
-  &--error {
-    background: var(--td-error-color-light);
-    color: var(--td-error-color);
-
-    .result-banner__text strong {
-      color: var(--td-text-color-primary);
-    }
-  }
-
-  &__text {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-
-    span {
-      color: var(--td-text-color-placeholder);
-      font-size: 12px;
-    }
-  }
-}
-
-.metric-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.metric-chip {
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-}
-
-.result-error {
-  margin: 10px 0 0;
-  color: var(--td-error-color);
-  font-size: 13px;
-  white-space: pre-wrap;
-}
-
-.result-tabs {
-  margin-top: 12px;
-
-  :deep(.t-tabs__content) {
-    display: none;
-  }
-}
-
-.json-output {
-  overflow: auto;
-  max-height: 420px;
-  min-height: 140px;
-  margin: 8px 0 0;
-  padding: 12px 14px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-primary);
-  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-@media (max-width: 640px) {
-  .parameter-grid {
-    grid-template-columns: 1fr;
-  }
-}
+.visual-model-debug__overlay { position: fixed; inset: 0; z-index: 3200; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 18%); backdrop-filter: blur(2px); }
+.visual-model-debug { width: min(560px, 100vw); height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
+.visual-model-debug__header { flex: 0 0 auto; padding: 18px 20px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.visual-model-debug__heading { min-width: 0; display: flex; gap: 10px; }
+.visual-model-debug__heading-icon { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #6b7280; }
+.visual-model-debug__heading h3 { margin: 0; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; }
+.visual-model-debug__heading p { margin: 3px 0 0; color: #9ca3af; font-size: 11px; line-height: 16px; }
+.visual-model-debug__close { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; }
+.visual-model-debug__close:hover { background: #f3f4f6; color: #374151; }
+.visual-model-debug__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 0 20px; }
+.visual-model-debug__section { padding: 16px 0; border-bottom: 1px solid #f3f4f6; display: flex; flex-direction: column; gap: 12px; }
+.visual-model-debug__section:last-child { border-bottom: 0; }
+.visual-model-debug__section > h4 { margin: 0; color: #374151; font-size: 10px; line-height: 16px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.visual-model-debug__types { display: flex; flex-wrap: wrap; gap: 6px; }
+.visual-model-debug__types button { min-height: 30px; padding: 5px 9px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #6b7280; font: inherit; font-size: 10px; cursor: pointer; }
+.visual-model-debug__types button:hover,.visual-model-debug__types button.is-active { background: #f3f4f6; color: #111827; border-color: #d1d5db; }
+.visual-model-debug__types :deep(.t-icon) { font-size: 12px; }
+.visual-model-debug__field { display: flex; flex-direction: column; gap: 6px; }
+.visual-model-debug__field > label { color: #4b5563; font-size: 10px; line-height: 15px; font-weight: 600; }
+.visual-model-debug__field > p { margin: 0; color: #9ca3af; font-size: 9px; line-height: 14px; }
+.visual-model-debug__field :deep(.t-input),.visual-model-debug__field :deep(.t-textarea__inner),.visual-model-debug__field :deep(.t-input-number) { border-color: #e5e7eb; border-radius: 8px; box-shadow: none !important; font-size: 11px; }
+.visual-model-debug__model-option { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.visual-model-debug__model-option span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-model-debug__model-option small { flex: 0 0 auto; color: #9ca3af; font-size: 9px; }
+.visual-model-debug__native-file { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+.visual-model-debug__file-button { align-self: flex-start; min-height: 30px; padding: 5px 9px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #6b7280; font: inherit; font-size: 10px; cursor: pointer; }
+.visual-model-debug__file-button:hover { background: #f9fafb; color: #374151; }
+.visual-model-debug__parameter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.visual-model-debug__switch-field { min-height: 30px; display: flex; align-items: center; gap: 8px; color: #9ca3af; font-size: 9px; }
+.visual-model-debug__history { display: flex; flex-wrap: wrap; gap: 5px; }
+.visual-model-debug__history button { min-height: 28px; padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #9ca3af; font: inherit; font-size: 9px; cursor: pointer; }
+.visual-model-debug__history button strong { color: #4b5563; font-weight: 600; }
+.visual-model-debug__history button.is-active,.visual-model-debug__history button:hover { background: #f3f4f6; border-color: #d1d5db; }
+.visual-model-debug__result { display: flex; flex-direction: column; gap: 9px; }
+.visual-model-debug__banner { min-height: 34px; padding: 7px 9px; border-radius: 8px; display: flex; align-items: center; gap: 7px; background: #f9fafb; color: #6b7280; font-size: 10px; }
+.visual-model-debug__banner.is-ok { background: #f0fdf4; color: #047857; }
+.visual-model-debug__banner.is-error { background: #fef2f2; color: #dc2626; }
+.visual-model-debug__banner strong { color: #374151; }
+.visual-model-debug__banner span { margin-left: auto; color: #9ca3af; }
+.visual-model-debug__metrics { display: flex; flex-wrap: wrap; gap: 5px; }
+.visual-model-debug__metrics span { padding: 2px 6px; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 9px; line-height: 14px; }
+.visual-model-debug__error { margin: 0; color: #dc2626; font-size: 10px; line-height: 16px; white-space: pre-wrap; }
+.visual-model-debug__result-tabs { display: flex; gap: 4px; }
+.visual-model-debug__result-tabs button { min-height: 28px; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; color: #9ca3af; font: inherit; font-size: 9px; cursor: pointer; }
+.visual-model-debug__result-tabs button.is-active { background: #f3f4f6; color: #374151; }
+.visual-model-debug__result pre { max-height: 420px; min-height: 140px; margin: 0; overflow: auto; padding: 10px 11px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; color: #374151; font: 10px/1.6 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; white-space: pre-wrap; word-break: break-word; }
+.visual-model-debug__footer { flex: 0 0 auto; min-height: 58px; padding: 11px 20px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f9fafb; }
+.visual-model-debug__footer-actions { margin-left: auto; display: flex; gap: 7px; }
+.visual-model-debug__button { min-height: 32px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.visual-model-debug__button.is-primary { border-color: #111827; background: #111827; color: #fff; }
+.visual-model-debug__button:disabled { cursor: default; opacity: .5; }
+.visual-model-debug-enter-active,.visual-model-debug-leave-active { transition: opacity 160ms ease; }
+.visual-model-debug-enter-from,.visual-model-debug-leave-to { opacity: 0; }
+@media (max-width: 640px) { .visual-model-debug { width: 100%; } .visual-model-debug__parameter-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .visual-model-debug-enter-active,.visual-model-debug-leave-active { transition: none !important; } }
 </style>
