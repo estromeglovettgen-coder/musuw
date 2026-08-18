@@ -41,6 +41,7 @@ test('migrated views do not retain the legacy view shells they replaced', () => 
     ['../views/knowledge/components/KbUploadSourceDropdown.vue', ['class="kb-upload-source-dropdown"', 'class="kb-upload-source-trigger"', 'class="url-import-form"']],
     ['../views/settings/Settings.vue', ['class="settings-overlay"', 'class="settings-modal"', 'class="settings-sidebar"', 'class="settings-content"']],
     ['../views/settings/GeneralSettings.vue', ['class="general-settings"', 'class="settings-group"', 'class="setting-row"']],
+    ['../views/settings/ModelSettings.vue', ['class="model-settings"', 'class="section-header"', 'class="model-type-tabs"', 'class="model-grid"', 'class="model-card"']],
   ])
 
   for (const [path, legacyTokens] of migrated) {
