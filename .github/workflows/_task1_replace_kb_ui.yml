@@ -1,4 +1,4 @@
-# second push intentionally triggers this one-shot workflow after registration
+# checkout main so the one-shot UI transplant cannot overwrite newer business fixes
 name: Task1 one-shot knowledge UI transplant
 
 on:
@@ -16,6 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - name: Replace legacy KnowledgeBase template/style with reference DOM
         shell: bash
@@ -29,7 +30,6 @@ jobs:
           target = target_path.read_text()
           donor = donor_path.read_text()
 
-          # Preserve the production business script exactly; only add the visual-authority icon adapter import.
           prefix = target[:target.index('<template>')]
           if "@/components/ReferenceIcon.vue" not in prefix:
               anchor = "import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue';\n"
@@ -38,7 +38,6 @@ jobs:
               prefix = prefix.replace(anchor, anchor + "import ReferenceIcon from '@/components/ReferenceIcon.vue';\n", 1)
 
           tail = donor[donor.index('<template>'):]
-
           replacements = {
               '@select="handleKnowledgeDropdownSelect"': '@select="(id) => handleKnowledgeDropdownSelect({ value: id })"',
               '@status-change="refreshWikiStats"': '@status-change="onWikiStatusChange"',
@@ -66,27 +65,16 @@ jobs:
               tail,
               flags=re.S,
           )
-
           tail = tail.replace("<span>Wiki ({{ wikiCount }})</span>", "<span>Wiki</span>")
           tail = tail.replace("<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }} ({{ graphCount }})</span>", "<span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span>")
 
           header_needle = "        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>\n      </div>"
           header_insert = """        <p>{{ $t('knowledgeEditor.document.subtitle') }}</p>
-        <button
-          v-if="unsupportedFileTypes.length"
-          type="button"
-          class="reference-inline-warning"
-          @click="goToParserSettings"
-        >
+        <button v-if="unsupportedFileTypes.length" type="button" class="reference-inline-warning" @click="goToParserSettings">
           <span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map((type) => '.' + type).join('、') }) }}</span>
           <strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong>
         </button>
-        <button
-          v-if="missingStorageEngine"
-          type="button"
-          class="reference-inline-warning"
-          @click="handleOpenKBSettings"
-        >
+        <button v-if="missingStorageEngine" type="button" class="reference-inline-warning" @click="handleOpenKBSettings">
           <span>{{ $t('knowledgeBase.missingStorageEngine') }}</span>
           <strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong>
         </button>
@@ -109,7 +97,6 @@ jobs:
           if empty_old not in tail:
               raise SystemExit('reference empty state insertion point not found')
           tail = tail.replace(empty_old, empty_new, 1)
-
           tail = tail.replace('@getDoc="getDoc"\n    />', '@getDoc="getDoc"\n      @summaryStateChange="syncDocumentSummaryState"\n    />', 1)
 
           editor = """
@@ -128,27 +115,10 @@ jobs:
           tail = tail.replace(closing, editor + closing, 1)
 
           warning_css = """
-.reference-inline-warning {
-  width: fit-content;
-  max-width: 760px;
-  margin: 4px 0 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #92400e;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font: inherit;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: left;
-  cursor: pointer;
-}
+.reference-inline-warning { width: fit-content; max-width: 760px; margin: 4px 0 0; padding: 0; border: 0; background: transparent; color: #92400e; display: flex; align-items: center; gap: 6px; font: inherit; font-size: 10px; line-height: 15px; text-align: left; cursor: pointer; }
 .reference-inline-warning strong { color: #4b5563; font-weight: 700; white-space: nowrap; }
 """
           tail = tail.replace('\n.reference-kb-tabs {', warning_css + '\n.reference-kb-tabs {', 1)
-
           target_path.write_text(prefix + tail)
           donor_path.unlink()
           PY
@@ -157,4 +127,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add weknora/frontend/src/views/knowledge/KnowledgeBase.vue weknora/frontend/src/views/knowledge/KnowledgeBaseMechanical.vue
           git commit -m "fix(ui): transplant reference knowledge DOM onto native logic"
+          git pull --rebase origin main
           git push origin HEAD:main
