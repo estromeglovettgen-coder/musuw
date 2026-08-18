@@ -1,3 +1,4 @@
+# checkout latest main; this is a one-shot visual-only transplant
 name: Task1 one-shot sidebar UI transplant
 
 on:
@@ -15,6 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - name: Replace legacy sidebar template/style with visual authority
         shell: bash
@@ -36,44 +38,20 @@ jobs:
               script = script.replace(anchor, anchor + 'import ReferenceIcon from "@/components/ReferenceIcon.vue";\n', 1)
 
           template = r'''<template>
-  <aside
-    class="reference-sidebar"
-    :class="{ 'reference-sidebar--collapsed': uiStore.sidebarCollapsed }"
-  >
+  <aside class="reference-sidebar" :class="{ 'reference-sidebar--collapsed': uiStore.sidebarCollapsed }">
     <template v-if="uiStore.sidebarCollapsed">
       <div class="reference-sidebar-collapsed-top">
-        <button
-          type="button"
-          class="reference-sidebar-collapsed-logo"
-          :title="'Musuw 穆苏瓦'"
-          @click="toggleSidebar"
-        >
+        <button type="button" class="reference-sidebar-collapsed-logo" title="Musuw 穆苏瓦" @click="toggleSidebar">
           <ReferenceIcon name="zap" :size="16" :filled="true" />
         </button>
-        <button
-          type="button"
-          class="reference-sidebar-icon-button"
-          :title="t('menu.expandSidebar')"
-          @click="toggleSidebar"
-        >
+        <button type="button" class="reference-sidebar-icon-button" :title="t('menu.expandSidebar')" @click="toggleSidebar">
           <ReferenceIcon name="chevron-right" :size="16" :stroke-width="1.8" />
         </button>
         <div class="reference-sidebar-collapsed-rule" />
-        <button
-          type="button"
-          class="reference-sidebar-collapsed-primary"
-          :title="t('menu.newChat')"
-          @click="handleMenuClick('creatChat')"
-        >
+        <button type="button" class="reference-sidebar-collapsed-primary" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')">
           <ReferenceIcon name="message-square-plus" :size="16" :stroke-width="1.9" />
         </button>
-        <button
-          type="button"
-          class="reference-sidebar-collapsed-nav"
-          :class="{ active: isMenuItemActive('knowledge-bases') }"
-          :title="t('menu.knowledgeBase')"
-          @click="handleMenuClick('knowledge-bases')"
-        >
+        <button type="button" class="reference-sidebar-collapsed-nav" :class="{ active: isMenuItemActive('knowledge-bases') }" :title="t('menu.knowledgeBase')" @click="handleMenuClick('knowledge-bases')">
           <ReferenceIcon name="folder" :size="16" :stroke-width="1.8" />
         </button>
       </div>
@@ -83,27 +61,14 @@ jobs:
     <template v-else>
       <header class="reference-sidebar-header">
         <button type="button" class="reference-sidebar-brand" @click="handleMenuClick('creatChat')">
-          <span class="reference-sidebar-brand-mark">
-            <ReferenceIcon name="zap" :size="14" :filled="true" />
-          </span>
+          <span class="reference-sidebar-brand-mark"><ReferenceIcon name="zap" :size="14" :filled="true" /></span>
           <span class="reference-sidebar-brand-name">Musuw 穆苏瓦</span>
         </button>
         <div class="reference-sidebar-header-actions">
-          <button
-            type="button"
-            class="reference-sidebar-icon-button"
-            :title="t('menu.search')"
-            :aria-label="t('menu.search')"
-            @click="commandPaletteStore.openPalette('')"
-          >
+          <button type="button" class="reference-sidebar-icon-button" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')">
             <ReferenceIcon name="search" :size="14" />
           </button>
-          <button
-            type="button"
-            class="reference-sidebar-icon-button"
-            :title="t('menu.collapseSidebar')"
-            @click="toggleSidebar"
-          >
+          <button type="button" class="reference-sidebar-icon-button" :title="t('menu.collapseSidebar')" @click="toggleSidebar">
             <ReferenceIcon name="chevron-left" :size="16" :stroke-width="1.8" />
           </button>
         </div>
@@ -111,47 +76,24 @@ jobs:
 
       <nav class="reference-sidebar-primary-nav">
         <template v-for="item in topMenuItems" :key="item.path">
-          <button
-            v-if="item.path === 'creatChat'"
-            type="button"
-            class="reference-sidebar-new-chat"
-            @click="handleMenuClick(item.path)"
-          >
+          <button v-if="item.path === 'creatChat'" type="button" class="reference-sidebar-new-chat" @click="handleMenuClick(item.path)">
             <ReferenceIcon name="message-square-plus" :size="16" :stroke-width="1.9" />
             <span>{{ item.title }}</span>
           </button>
-          <button
-            v-else
-            type="button"
-            class="reference-sidebar-kb"
-            :class="{ active: isMenuItemActive(item.path) }"
-            @click="handleMenuClick(item.path)"
-          >
-            <span class="reference-sidebar-kb-label">
-              <ReferenceIcon name="folder" :size="16" :stroke-width="1.8" />
-              <span>{{ item.title }}</span>
-            </span>
+          <button v-else type="button" class="reference-sidebar-kb" :class="{ active: isMenuItemActive(item.path) }" @click="handleMenuClick(item.path)">
+            <span class="reference-sidebar-kb-label"><ReferenceIcon name="folder" :size="16" :stroke-width="1.8" /><span>{{ item.title }}</span></span>
           </button>
         </template>
       </nav>
 
       <section class="reference-sidebar-history" ref="scrollContainer" @scroll="handleScroll">
         <div v-if="showSessionSourceFilter && !batchMode" class="reference-sidebar-source-filter">
-          <SessionSourceFilter
-            inline
-            :emphasized="sessionScopeFilterPinned"
-            :sources="sessionSourceOptions"
-            :current="activeSessionBucketKey"
-            @select="switchSessionBucket"
-          />
+          <SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" />
         </div>
-
         <template v-if="sessionListBooting && !hasAnySession">
           <div v-for="n in 5" :key="'sidebar-skeleton-' + n" class="reference-sidebar-skeleton" />
         </template>
-        <div v-else-if="activeBucket?.loaded && filteredGroupedSessions.length === 0" class="reference-sidebar-empty">
-          {{ t('menu.noSessions') }}
-        </div>
+        <div v-else-if="activeBucket?.loaded && filteredGroupedSessions.length === 0" class="reference-sidebar-empty">{{ t('menu.noSessions') }}</div>
         <template v-else>
           <section v-for="group in filteredGroupedSessions" :key="group.key" class="reference-sidebar-thread-group">
             <div v-if="group.label" class="reference-sidebar-thread-label">{{ group.label }}</div>
@@ -171,30 +113,18 @@ jobs:
               @hover-out="mouseleaveBotDown"
             />
           </section>
-          <div v-if="activeBucket?.loading && filteredGroupedSessions.length > 0" class="reference-sidebar-loading">
-            <ReferenceIcon name="loader-circle" :size="14" />
-          </div>
+          <div v-if="activeBucket?.loading && filteredGroupedSessions.length > 0" class="reference-sidebar-loading"><ReferenceIcon name="loader-circle" :size="14" /></div>
         </template>
       </section>
 
       <div v-if="batchMode" class="reference-sidebar-batch-footer">
         <label class="reference-sidebar-batch-select">
-          <input
-            type="checkbox"
-            :checked="isAllBatchSelected"
-            :indeterminate.prop="isBatchIndeterminate"
-            @change="toggleBatchSelectAll"
-          />
+          <input type="checkbox" :checked="isAllBatchSelected" :indeterminate.prop="isBatchIndeterminate" @change="toggleBatchSelectAll" />
           <span>{{ t('batchManage.selectAll') }}</span>
         </label>
         <div class="reference-sidebar-batch-actions">
           <button type="button" @click="exitBatchMode">{{ t('batchManage.cancel') }}</button>
-          <button
-            type="button"
-            class="danger"
-            :disabled="batchSelectedIds.length === 0 || batchDeleting"
-            @click="handleInlineBatchDelete"
-          >
+          <button type="button" class="danger" :disabled="batchSelectedIds.length === 0 || batchDeleting" @click="handleInlineBatchDelete">
             {{ t('batchManage.delete') }}{{ batchSelectedIds.length > 0 ? `(${batchDisplayCount})` : '' }}
           </button>
         </div>
@@ -206,79 +136,35 @@ jobs:
 </template>'''
 
           style = r'''<style scoped>
-.reference-sidebar {
-  width: 256px;
-  height: 100%;
-  flex: 0 0 256px;
-  min-height: 0;
-  box-sizing: border-box;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  border-right: 1px solid rgb(229 231 235 / .8);
-  background: #fbfbfb;
-  color: #374151;
-  font-family: var(--app-font-family);
-  user-select: none;
-  transition: width 200ms ease, flex-basis 200ms ease, padding 200ms ease;
-}
-.reference-sidebar--collapsed {
-  width: 56px;
-  flex-basis: 56px;
-  padding: 14px 8px;
-  align-items: center;
-  justify-content: space-between;
-}
-.reference-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px; margin-bottom: 10px; }
-.reference-sidebar-brand { min-width: 0; padding: 0; border: 0; background: transparent; display: flex; align-items: center; gap: 10px; color: #111827; cursor: pointer; }
-.reference-sidebar-brand-mark { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 8px; background: #000; color: #fff; display: grid; place-items: center; box-shadow: 0 1px 2px rgb(0 0 0 / .05); transition: transform 150ms ease; }
-.reference-sidebar-brand:hover .reference-sidebar-brand-mark { transform: scale(1.05); }
-.reference-sidebar-brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; }
-.reference-sidebar-header-actions { display: flex; align-items: center; gap: 2px; color: #9ca3af; }
-.reference-sidebar-icon-button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; display: grid; place-items: center; cursor: pointer; transition: color 150ms ease, background-color 150ms ease; }
-.reference-sidebar-icon-button:hover { color: #1f2937; background: rgb(229 231 235 / .6); }
-.reference-sidebar-primary-nav { display: flex; flex-direction: column; gap: 4px; padding: 0 2px; margin-bottom: 8px; }
-.reference-sidebar-new-chat,
-.reference-sidebar-kb { width: 100%; height: 34px; padding: 0 12px; border-radius: 12px; font-family: inherit; cursor: pointer; transition: all 150ms ease; }
-.reference-sidebar-new-chat { border: 1px solid rgb(229 231 235 / .8); background: #fff; color: #111827; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgb(0 0 0 / .04); font-size: 13px; font-weight: 600; }
-.reference-sidebar-new-chat:hover { background: #f3f4f6; }
-.reference-sidebar-kb { border: 0; background: transparent; color: #374151; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
-.reference-sidebar-kb:hover { color: #030712; background: rgb(229 231 235 / .5); }
-.reference-sidebar-kb.active { color: #030712; background: rgb(229 231 235 / .9); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
-.reference-sidebar-kb-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.reference-sidebar-history { flex: 1; min-height: 0; margin-top: 4px; padding: 4px 4px 4px 2px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
-.reference-sidebar-history::-webkit-scrollbar { width: 4px; }
-.reference-sidebar-history::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
-.reference-sidebar-source-filter { margin: 0 4px 8px; }
-.reference-sidebar-thread-group { margin-bottom: 12px; }
-.reference-sidebar-thread-label { padding: 4px 10px; color: #9ca3af; font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: .025em; }
-.reference-sidebar-skeleton { height: 28px; margin: 3px 6px; border-radius: 8px; background: linear-gradient(90deg,#f3f4f6,#fafafa,#f3f4f6); background-size: 200% 100%; animation: sidebar-shimmer 1.2s linear infinite; }
-.reference-sidebar-empty { padding: 28px 12px; color: #9ca3af; font-size: 12px; text-align: center; }
-.reference-sidebar-loading { height: 28px; display: grid; place-items: center; color: #9ca3af; }
-.reference-sidebar-loading :deep(.reference-icon) { animation: sidebar-spin .9s linear infinite; }
-.reference-sidebar-user { flex: 0 0 auto; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgb(229 231 235 / .7); }
-.reference-sidebar-batch-footer { flex: 0 0 auto; margin: 6px 2px 0; padding: 8px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 16px rgb(0 0 0 / .05); }
-.reference-sidebar-batch-select { display: flex; align-items: center; gap: 7px; color: #4b5563; font-size: 11px; font-weight: 600; }
-.reference-sidebar-batch-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
-.reference-sidebar-batch-actions button { height: 28px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; color: #4b5563; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
-.reference-sidebar-batch-actions button.danger { border-color: #dc2626; background: #dc2626; color: #fff; }
-.reference-sidebar-batch-actions button:disabled { opacity: .4; cursor: not-allowed; }
-.reference-sidebar-collapsed-top { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.reference-sidebar-collapsed-logo { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: #000; color: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / .05); transition: transform 150ms ease; }
-.reference-sidebar-collapsed-logo:hover { transform: scale(1.05); }
-.reference-sidebar-collapsed-rule { width: 32px; height: 1px; margin: 4px 0; background: rgb(229 231 235 / .8); }
-.reference-sidebar-collapsed-primary,
-.reference-sidebar-collapsed-nav { width: 36px; height: 36px; padding: 0; border: 0; border-radius: 12px; display: grid; place-items: center; cursor: pointer; transition: all 150ms ease; }
-.reference-sidebar-collapsed-primary { background: #f3f4f6; color: #111827; }
-.reference-sidebar-collapsed-primary:hover { background: #e5e7eb; }
-.reference-sidebar-collapsed-nav { background: transparent; color: #4b5563; }
-.reference-sidebar-collapsed-nav:hover { color: #111827; background: #f3f4f6; }
-.reference-sidebar-collapsed-nav.active { background: #111827; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .05); }
-.reference-sidebar-collapsed-user { width: 32px; height: 32px; overflow: hidden; border-radius: 999px; }
-@keyframes sidebar-shimmer { to { background-position: -200% 0; } }
-@keyframes sidebar-spin { to { transform: rotate(360deg); } }
+.reference-sidebar { width:256px;height:100%;flex:0 0 256px;min-height:0;box-sizing:border-box;padding:12px;display:flex;flex-direction:column;position:relative;overflow:hidden;border-right:1px solid rgb(229 231 235 / .8);background:#fbfbfb;color:#374151;font-family:var(--app-font-family);user-select:none;transition:width 200ms ease,flex-basis 200ms ease,padding 200ms ease; }
+.reference-sidebar--collapsed { width:56px;flex-basis:56px;padding:14px 8px;align-items:center;justify-content:space-between; }
+.reference-sidebar-header { display:flex;align-items:center;justify-content:space-between;padding:6px 4px;margin-bottom:10px; }
+.reference-sidebar-brand { min-width:0;padding:0;border:0;background:transparent;display:flex;align-items:center;gap:10px;color:#111827;cursor:pointer; }
+.reference-sidebar-brand-mark { width:26px;height:26px;flex:0 0 26px;border-radius:8px;background:#000;color:#fff;display:grid;place-items:center;box-shadow:0 1px 2px rgb(0 0 0 / .05);transition:transform 150ms ease; }
+.reference-sidebar-brand:hover .reference-sidebar-brand-mark { transform:scale(1.05); }
+.reference-sidebar-brand-name { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;font-weight:700;letter-spacing:-.025em; }
+.reference-sidebar-header-actions { display:flex;align-items:center;gap:2px;color:#9ca3af; }
+.reference-sidebar-icon-button { width:28px;height:28px;padding:0;border:0;border-radius:8px;background:transparent;color:#9ca3af;display:grid;place-items:center;cursor:pointer;transition:color 150ms ease,background-color 150ms ease; }
+.reference-sidebar-icon-button:hover { color:#1f2937;background:rgb(229 231 235 / .6); }
+.reference-sidebar-primary-nav { display:flex;flex-direction:column;gap:4px;padding:0 2px;margin-bottom:8px; }
+.reference-sidebar-new-chat,.reference-sidebar-kb { width:100%;height:34px;padding:0 12px;border-radius:12px;font-family:inherit;cursor:pointer;transition:all 150ms ease; }
+.reference-sidebar-new-chat { border:1px solid rgb(229 231 235 / .8);background:#fff;color:#111827;display:flex;align-items:center;gap:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);font-size:13px;font-weight:600; }
+.reference-sidebar-new-chat:hover { background:#f3f4f6; }
+.reference-sidebar-kb { border:0;background:transparent;color:#374151;display:flex;align-items:center;justify-content:space-between;font-size:13px; }
+.reference-sidebar-kb:hover { color:#030712;background:rgb(229 231 235 / .5); }
+.reference-sidebar-kb.active { color:#030712;background:rgb(229 231 235 / .9);font-weight:700;box-shadow:0 1px 2px rgb(0 0 0 / .04); }
+.reference-sidebar-kb-label { display:flex;align-items:center;gap:8px;min-width:0; }
+.reference-sidebar-history { flex:1;min-height:0;margin-top:4px;padding:4px 4px 4px 2px;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin; }
+.reference-sidebar-history::-webkit-scrollbar { width:4px; }.reference-sidebar-history::-webkit-scrollbar-thumb { background:#d1d5db;border-radius:999px; }
+.reference-sidebar-source-filter { margin:0 4px 8px; }.reference-sidebar-thread-group { margin-bottom:12px; }.reference-sidebar-thread-label { padding:4px 10px;color:#9ca3af;font-size:11px;line-height:16px;font-weight:500;letter-spacing:.025em; }
+.reference-sidebar-skeleton { height:28px;margin:3px 6px;border-radius:8px;background:linear-gradient(90deg,#f3f4f6,#fafafa,#f3f4f6);background-size:200% 100%;animation:sidebar-shimmer 1.2s linear infinite; }
+.reference-sidebar-empty { padding:28px 12px;color:#9ca3af;font-size:12px;text-align:center; }.reference-sidebar-loading { height:28px;display:grid;place-items:center;color:#9ca3af; }.reference-sidebar-loading :deep(.reference-icon){animation:sidebar-spin .9s linear infinite;}
+.reference-sidebar-user { flex:0 0 auto;margin-top:4px;padding-top:8px;border-top:1px solid rgb(229 231 235 / .7); }
+.reference-sidebar-batch-footer { flex:0 0 auto;margin:6px 2px 0;padding:8px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 16px rgb(0 0 0 / .05); }
+.reference-sidebar-batch-select { display:flex;align-items:center;gap:7px;color:#4b5563;font-size:11px;font-weight:600; }.reference-sidebar-batch-actions { display:flex;align-items:center;justify-content:flex-end;gap:6px; }.reference-sidebar-batch-actions button { height:28px;padding:0 10px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#4b5563;font:inherit;font-size:11px;font-weight:600;cursor:pointer; }.reference-sidebar-batch-actions button.danger { border-color:#dc2626;background:#dc2626;color:#fff; }.reference-sidebar-batch-actions button:disabled { opacity:.4;cursor:not-allowed; }
+.reference-sidebar-collapsed-top { width:100%;display:flex;flex-direction:column;align-items:center;gap:16px; }.reference-sidebar-collapsed-logo { width:32px;height:32px;padding:0;border:0;border-radius:8px;background:#000;color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 1px 2px rgb(0 0 0 / .05);transition:transform 150ms ease; }.reference-sidebar-collapsed-logo:hover { transform:scale(1.05); }.reference-sidebar-collapsed-rule { width:32px;height:1px;margin:4px 0;background:rgb(229 231 235 / .8); }
+.reference-sidebar-collapsed-primary,.reference-sidebar-collapsed-nav { width:36px;height:36px;padding:0;border:0;border-radius:12px;display:grid;place-items:center;cursor:pointer;transition:all 150ms ease; }.reference-sidebar-collapsed-primary { background:#f3f4f6;color:#111827; }.reference-sidebar-collapsed-primary:hover { background:#e5e7eb; }.reference-sidebar-collapsed-nav { background:transparent;color:#4b5563; }.reference-sidebar-collapsed-nav:hover { color:#111827;background:#f3f4f6; }.reference-sidebar-collapsed-nav.active { background:#111827;color:#fff;box-shadow:0 1px 2px rgb(0 0 0 / .05); }.reference-sidebar-collapsed-user { width:32px;height:32px;overflow:visible;border-radius:999px; }
+@keyframes sidebar-shimmer { to { background-position:-200% 0; } } @keyframes sidebar-spin { to { transform:rotate(360deg); } }
 </style>'''
 
           path.write_text(template + '\n\n' + script + '\n\n' + style + '\n')
@@ -288,4 +174,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add weknora/frontend/src/components/menu.vue
           git commit -m "fix(ui): transplant Sidebar.tsx structure onto native menu logic"
+          git pull --rebase origin main
           git push origin HEAD:main
