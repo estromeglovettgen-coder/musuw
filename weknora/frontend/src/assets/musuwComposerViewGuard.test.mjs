@@ -11,6 +11,7 @@ test('migrated composer subviews use visual roots and no legacy presentation she
     ['../components/KnowledgeBaseSelector.vue', 'class="visual-kb-selector"', ['class="kb-overlay"', 'class="kb-dropdown"', 'class="kb-item"', 'class="kb-actions"']],
     ['../components/ChatAttachmentPreviewDrawer.vue', 'class="visual-attachment-preview"', ['<t-drawer', 'class="chat-attachment-drawer-header"', 'class="chat-attachment-drawer-body"', 'chat-attachment-preview-drawer']],
     ['../components/MentionSelector.vue', 'class="visual-mention-menu"', ['class="mention-menu"', 'class="mention-list"', 'class="mention-item"', 'class="mention-group-entry"', 'mention-detail-popup-wrap']],
+    ['../components/ModelDebugDrawer.vue', 'class="visual-model-debug"', ['<SettingDrawer', 'class="model-debug"', 'class="setting-drawer__section"', 'class="history-item"', 'class="debug-result"']],
   ]
   for (const [path, root, legacy] of cases) {
     const source = read(path)
@@ -37,5 +38,12 @@ test('mention visual layer still renders every native business group and shared-
   const source = read('../components/MentionSelector.vue')
   for (const token of ['type: "kb"','type: "tag"','type: "mcp"','type: "skill"','type: "file"','agentIdForDetail','agentSourceTenantIdForDetail','visual-mention-detail__error','visual-mention-loading','readOnlyFromAgent']) {
     assert.ok(source.includes(token), `MentionSelector lost ${token}`)
+  }
+})
+
+test('model debug visual layer keeps every native model-type and result state', () => {
+  const source = read('../components/ModelDebugDrawer.vue')
+  for (const token of ["KnowledgeQA: { short: 'chat'", "Embedding: { short: 'embedding'", "Rerank: { short: 'rerank'", "VLLM: { short: 'vllm'", "ASR: { short: 'asr'", 'needsFile', 'supportsThinking', 'history.length > 1', 'resultMetrics.length > 0', "resultTab === 'response'", 'running', 'canRun']) {
+    assert.ok(source.includes(token), `ModelDebugDrawer lost ${token}`)
   }
 })
