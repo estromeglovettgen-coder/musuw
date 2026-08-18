@@ -50,6 +50,7 @@ function businessControllerPlugin(): Plugin {
     ['KnowledgeBaseList.pre-view.vue', resolve(__dirname, 'src/views/knowledge/KnowledgeBaseList.vue')],
     ['ChatIndex.pre-view.vue', resolve(__dirname, 'src/views/chat/index.vue')],
     ['manual-knowledge-editor.pre-view.vue', resolve(__dirname, 'src/components/manual-knowledge-editor.vue')],
+    ['menu.pre-view.vue', resolve(__dirname, 'src/components/menu.vue')],
   ])
 
   return {
