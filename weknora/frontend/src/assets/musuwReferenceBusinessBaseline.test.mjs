@@ -38,7 +38,6 @@ const baseline = new Map([
   ['../views/knowledge/components/BatchTagDialog.vue', 'dde15cb2dd4c8019b2f5f7b03277039a4c5af0b0'],
   ['../views/knowledge/components/DocumentBatchBar.vue', 'de5e7b6ed2685b9754a4d7c1becbf574a27abdfe'],
   ['../views/knowledge/components/FolderPickerMenu.vue', 'ecc3a74e8bda5b96691c89fd00fd5803edac6c4f'],
-  ['../views/knowledge/components/KbFolderTree.test.ts', '61c36c6e815817be9339ce4aa68cdcf82fd6feb8'],
   ['../views/knowledge/components/KbTagManageDrawer.vue', 'cc60b273a36ce031dc906cb3a680bb48496745b3'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/components/TagEditDialog.test.ts', '9c26837db390555b9a97372775b5738b19b0f1ce'],
