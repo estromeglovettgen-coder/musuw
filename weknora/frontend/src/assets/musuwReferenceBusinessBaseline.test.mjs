@@ -10,7 +10,6 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 // Files that have not entered the view-rebuild track remain byte-for-byte frozen.
 const baseline = new Map([
   ['../components/menu.vue', 'c3914d4d4824890307790d2b8d6dcccfa35e91bf'],
-  ['../components/UserMenu.vue', 'f5c813ced2e0e7b98af86e814aa7b4f788661752'],
   ['../components/SessionSourceFilter.vue', '4f307ffe65e4fc433dace9b69d32cda1cf94d2eb'],
   ['../components/ChatHeader.vue', '79aec898f1e90c21a9f63fa77bce0dca509750c4'],
   ['../components/ChatCitationFloat.vue', 'b2a42b84fc7a76ecbe8fb5f1c8079dddf6ef555b'],
@@ -74,6 +73,18 @@ test('new-chat view may replace markup and CSS but must preserve its business co
     'usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking)',
     'router.push(`/platform/chat/${sessionId}`)',
     'navigateToKnowledgeBaseList(kbId)',
+  ])
+})
+
+test('user menu may replace markup and CSS but must preserve settings/logout behavior', () => {
+  assertContracts('../components/UserMenu.vue', 'user menu', [
+    'menuVisible.value = !menuVisible.value',
+    'uiStore.openSettings("general")',
+    'void router.push({ path: "/platform/settings", query: { section: "general" } })',
+    'await logoutApi()',
+    'authStore.logout()',
+    'handoffToExternalAuth("logout")',
+    'document.addEventListener("click", handleClickOutside)',
   ])
 })
 
