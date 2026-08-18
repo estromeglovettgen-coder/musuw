@@ -10,18 +10,19 @@
     @mouseleave="emit('hover-out')"
     @click="batchMode ? emit('toggle-select') : emit('navigate')"
   >
-    <label v-if="batchMode" class="reference-session-checkbox" @click.stop>
-      <input
-        type="checkbox"
-        :checked="selectedIds.includes(item.id)"
-        @change="emit('toggle-select')"
-      />
-      <span aria-hidden="true">
-        <ReferenceIcon v-if="selectedIds.includes(item.id)" name="check-square" :size="13" />
-      </span>
-    </label>
-
-    <form v-if="titleEditing" class="session-title-edit" @submit.prevent="submitTitleEdit" @click.stop>
+    <t-checkbox
+      v-if="batchMode"
+      class="batch-checkbox"
+      :checked="selectedIds.includes(item.id)"
+      @click.stop
+      @change="emit('toggle-select')"
+    />
+    <form
+      v-if="titleEditing"
+      class="session-title-edit"
+      @submit.prevent="submitTitleEdit"
+      @click.stop
+    >
       <input
         ref="titleInputRef"
         v-model="titleDraft"
@@ -31,69 +32,82 @@
         @blur="submitTitleEdit"
       />
     </form>
-
     <span v-else class="submenu_title" :class="batchMode ? 'submenu_title--batch' : ''" :title="item.title">
-      <ReferenceIcon v-if="item.is_pinned" name="pin" :size="11" class="submenu_pin_icon reference-session-pin" />
+      <t-icon v-if="item.is_pinned" name="pin" class="submenu_pin_icon" />
       <span class="submenu_title-text">{{ item.title }}</span>
     </span>
-
     <div v-if="!batchMode" class="session-row-menu-wrap" @click.stop>
-      <button
-        ref="menuButtonRef"
-        type="button"
-        class="reference-session-more"
-        aria-haspopup="menu"
-        :aria-expanded="menuOpen"
-        @click.stop="toggleMenu"
+      <t-popup
+        v-model:visible="menuOpen"
+        :overlay-class-name="menuOverlayClass"
+        trigger="click"
+        destroy-on-close
+        placement="bottom-right"
+        @visible-change="onMenuVisibleChange"
       >
-        <ReferenceIcon name="more-horizontal" :size="14" />
-      </button>
-
-      <Teleport to="body">
-        <template v-if="menuOpen">
-          <div class="reference-session-backdrop" @click="closeMenu" />
-          <div
-            class="reference-session-menu"
-            :class="{ confirm: menuMode !== 'menu' }"
-            :style="{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }"
-            @click.stop
-          >
+        <button
+          type="button"
+          class="menu-more-wrap"
+          aria-haspopup="menu"
+          :aria-expanded="menuOpen"
+          @click.stop
+        >
+          <t-icon name="ellipsis" class="menu-more" />
+        </button>
+        <template #content>
+          <div class="session-action-menu" @click.stop>
             <template v-if="menuMode === 'menu'">
               <template v-for="(option, index) in menuOptions" :key="option.value">
-                <div v-if="shouldShowDividerBefore(option.value, index)" class="reference-session-menu__divider" />
+                <div
+                  v-if="shouldShowDividerBefore(option.value, index)"
+                  class="session-action-menu__divider"
+                />
                 <button
                   type="button"
-                  class="reference-session-menu__item"
-                  :class="{ danger: option.theme === 'error' }"
+                  class="session-action-menu__item"
+                  :class="{ 'is-danger': option.theme === 'error' }"
                   @click="handleMenuClick(option)"
                 >
-                  <ReferenceIcon :name="optionIcon(option.value)" :size="14" class="reference-session-menu__icon" />
+                  <component
+                    :is="option.prefixIcon"
+                    v-if="option.prefixIcon"
+                    class="session-action-menu__icon"
+                  />
                   <span>{{ option.content }}</span>
                 </button>
               </template>
             </template>
 
-            <div v-else class="reference-session-confirm">
-              <strong>{{ menuMode === 'clear' ? t('chatHeader.clearConfirmTitle') : t('chatHeader.deleteConfirmTitle') }}</strong>
-              <p>{{ menuMode === 'clear' ? t('chatHeader.clearConfirmBody') : t('chatHeader.deleteConfirmBody') }}</p>
-              <div>
-                <button type="button" @click="backToMenu">{{ t('common.cancel') }}</button>
-                <button type="button" class="danger" @click="confirmDangerAction">
+            <div v-else class="session-action-confirm">
+              <div class="session-action-confirm__title">
+                {{ menuMode === 'clear' ? t('chatHeader.clearConfirmTitle') : t('chatHeader.deleteConfirmTitle') }}
+              </div>
+              <div class="session-action-confirm__body">
+                {{ menuMode === 'clear' ? t('chatHeader.clearConfirmBody') : t('chatHeader.deleteConfirmBody') }}
+              </div>
+              <div class="session-action-confirm__footer">
+                <button type="button" class="session-action-confirm__btn" @click="backToMenu">
+                  {{ t('common.cancel') }}
+                </button>
+                <button
+                  type="button"
+                  class="session-action-confirm__btn is-danger"
+                  @click="confirmDangerAction"
+                >
                   {{ menuMode === 'clear' ? t('common.clear') : t('common.delete') }}
                 </button>
               </div>
             </div>
           </div>
         </template>
-      </Teleport>
+      </t-popup>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ReferenceIcon from '@/components/ReferenceIcon.vue'
 import { normalizeSessionTitleDraft, SESSION_TITLE_MAX_LENGTH } from './sessionTitleEdit'
 
 interface SessionMenuOption {
@@ -104,7 +118,6 @@ interface SessionMenuOption {
 }
 
 type MenuMode = 'menu' | 'clear' | 'delete'
-type SessionIconName = 'pin' | 'pin-off' | 'edit-3' | 'eraser' | 'check-square' | 'trash-2' | 'more-horizontal'
 
 const props = defineProps<{
   item: { id: string; path: string; title: string; is_pinned?: boolean }
@@ -112,6 +125,7 @@ const props = defineProps<{
   activePath: string
   selectedIds: string[]
   menuOptions: SessionMenuOption[]
+  /** 渠道文件夹下的会话（样式与聊天区会话共用文案列对齐） */
   nested?: boolean
 }>()
 
@@ -125,57 +139,35 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
 const menuOpen = ref(false)
 const menuMode = ref<MenuMode>('menu')
 const titleEditing = ref(false)
 const titleDraft = ref('')
 const titleInputRef = ref<HTMLInputElement | null>(null)
-const menuButtonRef = ref<HTMLButtonElement | null>(null)
-const menuPosition = ref({ x: 0, y: 0 })
 
-const optionIcon = (value: string): SessionIconName => {
-  if (value === 'pin') return 'pin'
-  if (value === 'unpin') return 'pin-off'
-  if (value === 'rename') return 'edit-3'
-  if (value === 'clearMessages') return 'eraser'
-  if (value === 'batchManage') return 'check-square'
-  if (value === 'delete') return 'trash-2'
-  return 'more-horizontal'
+const menuOverlayClass = computed(() => (
+  menuMode.value === 'menu'
+    ? 'session-action-menu-popup'
+    : 'session-action-menu-popup is-confirm'
+))
+
+const onMenuVisibleChange = (visible: boolean): void => {
+  if (!visible) menuMode.value = 'menu'
 }
 
-const positionMenu = async () => {
-  await nextTick()
-  const trigger = menuButtonRef.value
-  if (!trigger) return
-  const rect = trigger.getBoundingClientRect()
-  const panelWidth = menuMode.value === 'menu' ? 176 : 260
-  const estimatedHeight = menuMode.value === 'menu' ? Math.max(44, props.menuOptions.length * 34 + 12) : 142
-  let x = rect.right - panelWidth
-  let y = rect.bottom + 4
-  if (x < 8) x = 8
-  if (x + panelWidth > window.innerWidth - 8) x = window.innerWidth - panelWidth - 8
-  if (y + estimatedHeight > window.innerHeight - 8) y = Math.max(8, rect.top - estimatedHeight - 4)
-  menuPosition.value = { x, y }
-}
-
-const toggleMenu = () => {
-  menuOpen.value = !menuOpen.value
+const backToMenu = (): void => {
   menuMode.value = 'menu'
-  if (menuOpen.value) void positionMenu()
 }
-const closeMenu = () => {
+
+const shouldShowDividerBefore = (value: string, index: number): boolean => {
+  if (index === 0) return false
+  return value === 'clearMessages' || value === 'delete'
+}
+
+const startTitleEdit = (): void => {
   menuOpen.value = false
   menuMode.value = 'menu'
-}
-const backToMenu = () => {
-  menuMode.value = 'menu'
-  void positionMenu()
-}
-const shouldShowDividerBefore = (value: string, index: number): boolean =>
-  index > 0 && (value === 'clearMessages' || value === 'delete')
-
-const startTitleEdit = () => {
-  closeMenu()
   titleDraft.value = props.item.title || ''
   titleEditing.value = true
   nextTick(() => {
@@ -183,11 +175,14 @@ const startTitleEdit = () => {
     titleInputRef.value?.select()
   })
 }
-const cancelTitleEdit = () => {
+
+const cancelTitleEdit = (): void => {
   titleEditing.value = false
   titleDraft.value = ''
 }
-const submitTitleEdit = () => {
+
+const submitTitleEdit = (): void => {
+  // Enter 会先触发 form submit，随后 input blur 再进一次；必须同步退出编辑态防重入。
   if (!titleEditing.value) return
   const nextTitle = normalizeSessionTitleDraft(titleDraft.value)
   const currentTitle = normalizeSessionTitleDraft(props.item.title || '')
@@ -196,84 +191,227 @@ const submitTitleEdit = () => {
   if (!nextTitle || nextTitle === currentTitle) return
   emit('rename-submit', { title: nextTitle })
 }
-const handleMenuClick = (option: SessionMenuOption) => {
-  if (option.value === 'rename') return startTitleEdit()
+
+const handleMenuClick = (option: SessionMenuOption): void => {
+  if (option.value === 'rename') {
+    startTitleEdit()
+    return
+  }
   if (option.value === 'clearMessages') {
     menuMode.value = 'clear'
-    void positionMenu()
     return
   }
   if (option.value === 'delete') {
     menuMode.value = 'delete'
-    void positionMenu()
     return
   }
-  closeMenu()
+  menuOpen.value = false
+  menuMode.value = 'menu'
   emit('menu-click', { value: option.value })
 }
-const confirmDangerAction = () => {
+
+const confirmDangerAction = (): void => {
   const value = menuMode.value === 'clear' ? 'clearMessages' : 'delete'
-  closeMenu()
+  menuOpen.value = false
+  menuMode.value = 'menu'
   emit('menu-click', { value })
 }
 </script>
 
-<style scoped>
+<style scoped lang="less">
 .submenu_item {
   position: relative;
-  width: 100%;
-  min-height: 28px;
-  box-sizing: border-box;
-  padding: 6px 10px;
-  border-radius: 8px;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-family: var(--app-font-family);
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 400;
-  cursor: pointer;
-  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
-.submenu_item:hover { color: #030712; background: rgb(229 231 235 / .5); }
-.submenu_item_active { color: #030712; background: rgb(229 231 235 / .9); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
-.submenu_item_selected { background: #f3f4f6; color: #111827; }
-.submenu_item_batch { gap: 8px; }
-.submenu_title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
-.submenu_title-text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 12.5px; line-height: 17px; }
-.submenu_title--batch { font-size: 12px; }
-.reference-session-checkbox { position: relative; width: 16px; height: 16px; flex: 0 0 16px; display: grid; place-items: center; cursor: pointer; }
-.reference-session-checkbox input { position: absolute; inset: 0; width: 16px; height: 16px; margin: 0; opacity: 0; cursor: pointer; }
-.reference-session-checkbox > span { width: 14px; height: 14px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #111827; display: grid; place-items: center; }
-.reference-session-checkbox input:checked + span { border-color: #111827; }
-.session-title-edit { flex: 1 1 auto; min-width: 0; }
-.session-title-edit__input { width: 100%; height: 26px; padding: 0 7px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; font-family: var(--app-font-family); font-size: 11px; outline: none; box-shadow: 0 0 0 2px rgb(17 24 39 / .04); }
-.reference-session-pin { flex: 0 0 auto; color: #f59e0b; }
-.session-row-menu-wrap { position: relative; flex: 0 0 auto; }
-.reference-session-more { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #9ca3af; display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease; }
-.submenu_item:hover .reference-session-more,
-.reference-session-more[aria-expanded='true'] { opacity: 1; }
-.reference-session-more:hover { background: #e5e7eb; color: #374151; }
+
+.session-row-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.session-title-edit {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-title-edit__input {
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--td-brand-color);
+  border-radius: 5px;
+  color: var(--td-text-color-primary);
+  background: var(--td-bg-color-container);
+  font-size: 14px;
+  line-height: 24px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--td-brand-color-light);
+}
+
+.menu-more-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: var(--td-bg-color-container-hover);
+  }
+}
 </style>
 
-<style>
-.reference-session-backdrop { position: fixed; inset: 0; z-index: 4890; }
-.reference-session-menu { position: fixed; z-index: 4900; width: 176px; padding: 5px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 16px 30px rgb(0 0 0 / .12); font-family: var(--app-font-family); }
-.reference-session-menu.confirm { width: 260px; padding: 12px; }
-.reference-session-menu__item { width: 100%; min-height: 31px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: #374151; display: flex; align-items: center; gap: 8px; text-align: left; font-family: inherit; font-size: 11px; line-height: 16px; font-weight: 500; cursor: pointer; }
-.reference-session-menu__item:hover { background: #f3f4f6; color: #111827; }
-.reference-session-menu__item.danger { color: #dc2626; }
-.reference-session-menu__item.danger:hover { background: #fef2f2; color: #b91c1c; }
-.reference-session-menu__icon { flex: 0 0 auto; color: #6b7280; }
-.reference-session-menu__item.danger .reference-session-menu__icon { color: currentColor; }
-.reference-session-menu__divider { height: 1px; margin: 4px 6px; background: #f3f4f6; }
-.reference-session-confirm strong { display: block; margin: 0; color: #111827; font-size: 12px; line-height: 17px; font-weight: 700; }
-.reference-session-confirm p { margin: 5px 0 0; color: #6b7280; font-size: 11px; line-height: 17px; }
-.reference-session-confirm > div { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
-.reference-session-confirm button { height: 28px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 7px; background: #fff; color: #4b5563; font-family: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
-.reference-session-confirm button:hover { background: #f3f4f6; }
-.reference-session-confirm button.danger { border-color: #dc2626; background: #dc2626; color: #fff; }
+<style lang="less">
+.session-action-menu-popup {
+  z-index: 3000 !important;
+
+  .t-popup__content {
+    padding: 4px !important;
+    margin-top: 2px !important;
+    min-width: 160px !important;
+    width: max-content !important;
+    border-radius: 8px !important;
+    background: var(--td-bg-color-container) !important;
+    border: 0.5px solid var(--td-component-stroke) !important;
+    box-shadow:
+      0 0 0 0.5px rgba(0, 0, 0, 0.03),
+      0 2px 6px rgba(0, 0, 0, 0.08) !important;
+    overflow: hidden;
+  }
+
+  &.is-confirm .t-popup__content {
+    padding: 12px !important;
+    width: 260px !important;
+    min-width: 260px !important;
+  }
+}
+
+.session-action-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 152px;
+}
+
+.session-action-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--td-text-color-primary);
+  background: transparent;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+  box-sizing: border-box;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--td-bg-color-container-hover);
+  }
+
+  &.is-danger {
+    color: var(--td-error-color-6);
+
+    .session-action-menu__icon {
+      color: var(--td-error-color-6);
+    }
+
+    &:hover {
+      background: var(--td-error-color-1);
+    }
+  }
+}
+
+.session-action-menu__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--td-text-color-secondary);
+
+  .t-icon {
+    font-size: 16px;
+  }
+}
+
+.session-action-menu__divider {
+  height: 1px;
+  margin: 2px 6px;
+  background: var(--td-component-stroke);
+}
+
+.session-action-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 236px;
+}
+
+.session-action-confirm__title {
+  margin: 0;
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.session-action-confirm__body {
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.session-action-confirm__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.session-action-confirm__btn {
+  min-width: 60px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0.5px solid var(--td-component-stroke);
+  border-radius: 6px;
+  color: var(--td-text-color-primary);
+  background: var(--td-bg-color-container);
+  font-size: 14px;
+  line-height: 28px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--td-bg-color-container-hover);
+  }
+
+  &.is-danger {
+    border-color: transparent;
+    color: #fff;
+    background: var(--td-error-color-6);
+
+    &:hover:not(:disabled) {
+      background: var(--td-error-color-5);
+    }
+  }
+}
+
+:root[theme-mode='dark'] .session-action-menu-popup .t-popup__content {
+  background: rgba(36, 36, 36, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
 </style>

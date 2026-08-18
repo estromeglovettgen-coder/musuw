@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
-import ReferenceIcon from '@/components/ReferenceIcon.vue';
 import { MAX_FILE_SIZE_MB } from '@/utils';
 import { getParserEngines } from '@/api/system';
 import {
@@ -29,7 +28,7 @@ export interface AttachmentFile {
 
 const props = defineProps<{
   maxFiles?: number;
-  maxSize?: number;
+  maxSize?: number; // in MB
   disabled?: boolean;
   sessionId?: string;
   agentId?: string;
@@ -46,11 +45,17 @@ const fileInputRef = ref<HTMLInputElement>();
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let disposed = false;
 
+// Supported file types (matching backend)
 const supportedTypes = ref([
+  // Documents
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.epub', '.mhtml',
+  // Text
   '.txt', '.md', '.csv', '.json', '.xml', '.html',
-  '.markdown', '.yaml', '.yml', '.log',
-  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp',
+	'.markdown', '.yaml', '.yml', '.log',
+	// Images are parsed as documents here; the dedicated image button remains
+	// available for direct multimodal chat.
+	'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp',
+  // Audio
   '.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac',
 ]);
 
@@ -70,7 +75,7 @@ onMounted(async () => {
 
 const maxFiles = computed(() => props.maxFiles || 5);
 const maxSizeMB = computed(() => props.maxSize || MAX_FILE_SIZE_MB);
-const maxSize = computed(() => maxSizeMB.value * 1024 * 1024);
+const maxSize = computed(() => maxSizeMB.value * 1024 * 1024); // Convert MB to bytes
 
 const triggerFileSelect = () => {
   if (props.disabled) return;
@@ -80,30 +85,34 @@ const triggerFileSelect = () => {
 const handleFileSelect = async (event: Event) => {
   const input = event.target as HTMLInputElement;
   if (!input.files) return;
+  
   await addFiles(Array.from(input.files));
-  input.value = '';
+  input.value = ''; // Reset input
 };
 
 const addFiles = async (files: File[]) => {
   if (props.disabled) return;
-
+  
   for (const file of files) {
+    // Check max files limit
     if (attachments.value.length >= maxFiles.value) {
       MessagePlugin.warning(t('chat.attachmentTooMany', { max: maxFiles.value }));
       break;
     }
-
+    
+    // Check file size
     if (file.size > maxSize.value) {
       MessagePlugin.warning(t('chat.attachmentTooLarge', { name: file.name, max: maxSizeMB.value }));
       continue;
     }
-
+    
+    // Check file type
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!supportedTypes.value.includes(ext)) {
       MessagePlugin.warning(t('chat.attachmentTypeNotSupported', { name: file.name }));
       continue;
     }
-
+    
     const attachment: AttachmentFile = {
       file,
       id: `${Date.now()}-${Math.random()}`,
@@ -115,9 +124,14 @@ const addFiles = async (files: File[]) => {
     };
 
     attachments.value.push(attachment);
+    // Vue wraps objects inserted into a ref-backed array with a reactive proxy.
+    // Keep using that proxy in async upload/poll callbacks; mutating the raw
+    // object above does not trigger the attachment status UI to re-render.
     const reactiveAttachment = attachments.value[attachments.value.length - 1];
     emit('update:files', [...attachments.value]);
-    if (props.sessionId) void uploadAttachment(reactiveAttachment);
+    if (props.sessionId) {
+      void uploadAttachment(reactiveAttachment);
+    }
   }
 };
 
@@ -145,7 +159,9 @@ const uploadAttachment = async (attachment: AttachmentFile) => {
     attachment.status = response.data.status;
     attachment.progress = 100;
     emitFiles();
-    if (attachment.status !== 'ready' && attachment.status !== 'failed') scheduleStatusPoll(attachment);
+    if (attachment.status !== 'ready' && attachment.status !== 'failed') {
+      scheduleStatusPoll(attachment);
+    }
   } catch (error: any) {
     attachment.status = 'failed';
     attachment.error = error?.message || t('chat.attachmentUploadFailed');
@@ -199,8 +215,21 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
 
-const getFileExt = (fileName: string): string =>
-  fileName.split('.').pop()?.toUpperCase() || 'FILE';
+const getFileExt = (fileName: string): string => {
+  return fileName.split('.').pop()?.toUpperCase() || 'FILE';
+};
+
+const getFileIcon = (fileName: string): string => {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (['pdf'].includes(ext || '')) return 'file-pdf';
+  if (['doc', 'docx'].includes(ext || '')) return 'file-word';
+  if (['xls', 'xlsx'].includes(ext || '')) return 'file-excel';
+  if (['ppt', 'pptx'].includes(ext || '')) return 'file-powerpoint';
+  if (['epub', 'mhtml'].includes(ext || '')) return 'file';
+  if (['txt', 'md'].includes(ext || '')) return 'file';
+  if (['mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac'].includes(ext || '')) return 'sound';
+  return 'file';
+};
 
 const statusLabel = (attachment: AttachmentFile): string => {
   if (attachment.status === 'uploading') return t('chat.attachmentUploading', { progress: attachment.progress || 0 });
@@ -225,173 +254,158 @@ defineExpose({
     pollTimers.clear();
     attachments.value = [];
     emit('update:files', []);
-  },
+  }
 });
 </script>
 
 <template>
   <div class="attachment-upload">
+    <!-- Hidden file input -->
     <input
       ref="fileInputRef"
       type="file"
       :accept="supportedTypes.join(',')"
       multiple
-      hidden
+      style="display: none"
       @change="handleFileSelect"
     />
-
+    
+    <!-- Attachment list -->
     <div v-if="attachments.length > 0" class="attachment-preview-bar">
-      <article
+      <div
         v-for="attachment in attachments"
         :key="attachment.id"
         class="attachment-preview-item"
       >
-        <div class="attachment-preview-icon" aria-hidden="true">
-          <ReferenceIcon name="file-text" :size="16" />
+        <div class="attachment-preview-icon">
+          <svg viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="38">
+            <rect width="40" height="48" rx="4" fill="#4A90D9"/>
+            <path d="M8 6h16l8 8v28a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2z" fill="#5BA3E8"/>
+            <path d="M24 6l8 8h-6a2 2 0 01-2-2V6z" fill="#3A7BC8"/>
+            <rect x="10" y="20" width="20" height="2" rx="1" fill="white" fill-opacity="0.9"/>
+            <rect x="10" y="26" width="20" height="2" rx="1" fill="white" fill-opacity="0.9"/>
+            <rect x="10" y="32" width="14" height="2" rx="1" fill="white" fill-opacity="0.9"/>
+          </svg>
         </div>
         <div class="attachment-preview-info">
-          <div class="attachment-preview-name" :title="attachment.name">{{ attachment.name }}</div>
-          <div class="attachment-preview-meta">
-            <span>{{ getFileExt(attachment.name) }}</span>
-            <span aria-hidden="true">·</span>
-            <span>{{ formatFileSize(attachment.size) }}</span>
-          </div>
-          <div
-            v-if="attachment.status !== 'local'"
-            class="attachment-preview-status"
-            :class="`is-${attachment.status}`"
-          >
-            <ReferenceIcon
-              v-if="attachment.status === 'uploading' || attachment.status === 'uploaded' || attachment.status === 'processing'"
-              name="loader-circle"
-              :size="11"
-              class="attachment-status-spinner"
-            />
-            <span>{{ statusLabel(attachment) }}</span>
+          <div class="attachment-preview-name">{{ attachment.name }}</div>
+          <div class="attachment-preview-meta">{{ getFileExt(attachment.name) }}&nbsp;·&nbsp;{{ formatFileSize(attachment.size) }}</div>
+          <div v-if="attachment.status !== 'local'" class="attachment-preview-status" :class="`is-${attachment.status}`">
+            <span v-if="attachment.status === 'uploading' || attachment.status === 'uploaded' || attachment.status === 'processing'" class="attachment-status-spinner" />
+            {{ statusLabel(attachment) }}
           </div>
         </div>
-        <button
-          type="button"
-          class="attachment-preview-remove"
-          :aria-label="$t('common.remove')"
-          @click="removeAttachment(attachment.id)"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-        </button>
-      </article>
+        <span class="attachment-preview-remove" @click="removeAttachment(attachment.id)" :aria-label="$t('common.remove')">×</span>
+      </div>
     </div>
-
+    
+    <!-- Upload button (shown in control bar) -->
     <slot name="trigger" :trigger="triggerFileSelect" :count="attachments.length" />
   </div>
 </template>
 
-<style scoped>
-.attachment-upload { width: 100%; }
+<style scoped lang="less">
+.attachment-upload {
+  width: 100%;
+}
 
 .attachment-preview-bar {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 12px 4px;
-  font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  flex-wrap: wrap;
 }
 
 .attachment-preview-item {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  width: min(224px, 100%);
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 9px 30px 9px 10px;
-  border: 1px solid rgb(229 231 235 / .9);
-  border-radius: 12px;
-  background: #fff;
-  color: #1f2937;
-  box-shadow: 0 1px 2px rgb(0 0 0 / .03);
-}
-
-.attachment-preview-icon {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  display: grid;
-  place-items: center;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 32px 8px 10px;
   border-radius: 8px;
-  background: #f3f4f6;
-  color: #6b7280;
+  border: 1px solid var(--td-border-level-1-color, #e7e7e7);
+  background: var(--td-bg-color-container, #fff);
+  max-width: 240px;
+  min-width: 140px;
+  cursor: default;
+
+  .attachment-preview-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .attachment-preview-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .attachment-preview-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--td-text-color-primary, #333);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .attachment-preview-meta {
+    font-size: 11px;
+    color: var(--td-text-color-secondary, #999);
+    white-space: nowrap;
+  }
+
+  .attachment-preview-status {
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--td-text-color-secondary, #999);
+
+    &.is-ready { color: var(--td-success-color, #2ba471); }
+    &.is-failed { color: var(--td-error-color, #d54941); }
+  }
+
+  .attachment-status-spinner {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 3px;
+    border: 1px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: attachment-spin .8s linear infinite;
+  }
+
+  .attachment-preview-remove {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    width: 18px;
+    height: 18px;
+    background: rgba(0, 0, 0, 0.18);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.4);
+    }
+  }
 }
 
-.attachment-preview-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 1px;
+@keyframes attachment-spin {
+  to { transform: rotate(360deg); }
 }
-
-.attachment-preview-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #111827;
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 600;
-}
-
-.attachment-preview-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #9ca3af;
-  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  font-size: 9px;
-  line-height: 14px;
-}
-
-.attachment-preview-status {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  overflow: hidden;
-  color: #9ca3af;
-  font-size: 10px;
-  line-height: 14px;
-}
-.attachment-preview-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attachment-preview-status.is-ready { color: #059669; }
-.attachment-preview-status.is-failed { color: #dc2626; }
-.attachment-status-spinner { flex: 0 0 auto; animation: attachment-spin .8s linear infinite; }
-
-.attachment-preview-remove {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 18px;
-  height: 18px;
-  padding: 3px;
-  border: 0;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-  transition: color 150ms ease, background-color 150ms ease;
-}
-.attachment-preview-remove:hover { background: #f3f4f6; color: #374151; }
-.attachment-preview-remove svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-@keyframes attachment-spin { to { transform: rotate(360deg); } }
 </style>
