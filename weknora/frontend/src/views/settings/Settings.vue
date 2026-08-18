@@ -55,13 +55,6 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             </button>
 
-            <div class="settings-reference-heading">
-              <h3>
-                {{ currentSection === 'general' ? $t('general.title') : $t('settings.modelManagement') }}
-              </h3>
-              <p>{{ currentSection === 'general' ? $t('general.description') : $t('modelSettings.description') }}</p>
-            </div>
-
             <div class="settings-reference-body">
               <GeneralSettings v-if="currentSection === 'general'" />
               <ModelSettings v-else :initial-type="currentModelType" />
@@ -222,12 +215,13 @@ onUnmounted(() => {
 }
 .settings-reference-nav nav { display: flex; flex-direction: column; gap: 4px; }
 .settings-reference-nav button {
+  box-sizing: border-box;
   width: 100%;
   min-height: 36px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 10px 14px;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -268,7 +262,8 @@ onUnmounted(() => {
   height: 28px;
   display: grid;
   place-items: center;
-  padding: 0;
+  padding: 6px;
+  box-sizing: border-box;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -284,10 +279,7 @@ onUnmounted(() => {
   stroke-width: 2;
   stroke-linecap: round;
 }
-.settings-reference-heading { margin-bottom: 32px; padding-right: 40px; }
-.settings-reference-heading h3 { margin: 0; color: #111827; font-size: 16px; line-height: 24px; font-weight: 700; }
-.settings-reference-heading p { margin: 4px 0 0; color: #9ca3af; font-size: 12px; line-height: 16px; }
-.settings-reference-body { min-width: 0; flex: 1; }
+.settings-reference-body { min-width: 0; flex: 1; padding-top: 0; }
 .settings-reference-body :deep(.section-title),
 .settings-reference-body :deep(.settings-title),
 .settings-reference-body :deep(h1:first-child),
