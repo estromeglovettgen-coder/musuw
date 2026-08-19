@@ -36,12 +36,12 @@
       </div>
 
       <template v-else>
-        <div v-if="!authStore.canCreateTenant" class="invite-only-notice">
+        <div v-if="!authStore.isLiteMode && !authStore.canCreateTenant" class="invite-only-notice">
           <t-icon name="lock-on" size="20px" aria-hidden="true" />
           <span>{{ $t('auth.workspaceOnboarding.inviteOnlyNotice') }}</span>
         </div>
 
-        <div class="workspace-actions" :class="{ 'workspace-actions--single': !authStore.canCreateTenant }">
+        <div v-if="!authStore.isLiteMode" class="workspace-actions" :class="{ 'workspace-actions--single': !authStore.canCreateTenant }">
           <t-button v-if="authStore.canCreateTenant" theme="primary" size="large" @click="createVisible = true">
             <template #icon><t-icon name="add" /></template>
             {{ $t('auth.workspaceOnboarding.create') }}
@@ -61,7 +61,7 @@
         </div>
       </template>
 
-      <p v-if="!policyLoading && !policyLoadFailed" class="workspace-help">
+      <p v-if="!authStore.isLiteMode && !policyLoading && !policyLoadFailed" class="workspace-help">
         {{
           $t(
             authStore.canCreateTenant
@@ -75,8 +75,8 @@
       </button>
     </section>
 
-    <CreateTenantDialog v-model:visible="createVisible" @created="onTenantCreated" />
-    <MyInvitationsDialog v-model:visible="invitationsVisible" />
+    <CreateTenantDialog v-if="!authStore.isLiteMode" v-model:visible="createVisible" @created="onTenantCreated" />
+    <MyInvitationsDialog v-if="!authStore.isLiteMode" v-model:visible="invitationsVisible" />
   </main>
 </template>
 
@@ -106,7 +106,9 @@ async function loadPolicy() {
       policyLoadFailed.value = true
       return
     }
-    await authStore.fetchPendingInvitationCount()
+    if (!authStore.isLiteMode) {
+      await authStore.fetchPendingInvitationCount()
+    }
   } finally {
     policyLoading.value = false
   }
