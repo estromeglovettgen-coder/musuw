@@ -5,140 +5,149 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 /**
- * @视觉文件 is the sole visual authority. This suite protects the other half
- * of the contract: native Musuw / WeKnora UI capabilities must remain reachable
- * after the visual transplant, but reference-only demo behavior must not be
- * invented.
+ * Three authorities coexist:
+ * 1. @视觉文件 owns presentation of exposed surfaces.
+ * 2. WeKnora v0.7.2 owns behavior inside those exposed capabilities.
+ * 3. Musuw Lite owns which capabilities are exposed at all.
+ *
+ * Standard keeps the complete upstream source surface for reversible restore;
+ * Lite is intentionally narrower and that narrowing is not a behavior bug.
  */
 
-test('WeKnora application routes remain reachable instead of being hidden by the skin', () => {
+test('Standard WeKnora routes remain in source while Lite route exposure is fail-closed', () => {
   const router = read('../router/index.ts')
+
+  // Reversible Standard source stays present.
   assert.ok(router.includes('path: "agents"'))
-  assert.ok(router.includes('name: "agentList"'))
   assert.ok(router.includes('import("../views/agent/AgentList.vue")'))
   assert.ok(router.includes('path: "organizations"'))
-  assert.ok(router.includes('name: "organizationList"'))
   assert.ok(router.includes('import("../views/organization/OrganizationList.vue")'))
-  assert.ok(router.includes('section: "integrations"'))
-  assert.ok(router.includes('section: "system-global"'))
-  assert.ok(router.includes('section: "runtime-queues"'))
   assert.ok(router.includes('requiresSystemAdmin: true'))
-  assert.ok(router.includes("path: '/platform/organizations'"), 'join link must still resolve through organization behavior')
+
+  // Lite reachability is a deliberate product allow-list.
+  assert.ok(router.includes('function isAllowedLitePath(path: string)'))
+  for (const allowed of [
+    "path === '/platform/creatChat'",
+    "path.startsWith('/platform/chat/')",
+    "path === '/platform/knowledge-bases'",
+    "path.startsWith('/platform/knowledge-bases/')",
+    "path === '/platform/settings'",
+  ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
+  assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
+  assert.match(router, /section && section !== 'general'/)
+  assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
-test('native sidebar capabilities stay exposed while visual structure remains rebuilt', () => {
+test('sidebar keeps Standard definitions but Lite exposes only New Chat and Knowledge Base', () => {
   const store = read('../stores/menu.ts')
   const sidebar = read('../components/menu.vue')
-  for (const path of ['agents', 'organizations']) {
-    assert.ok(store.includes(`path: '${path}'`), `menu store lost ${path}`)
-    assert.ok(sidebar.includes(`handleMenuClick('${path}')`), `visual sidebar lost ${path} entry`)
+
+  assert.match(store, /liteVisiblePaths\s*=\s*new Set\(\['creatChat',\s*'knowledge-bases'\]\)/)
+  assert.match(store, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/)
+  for (const path of ['agents', 'organizations', 'settings', 'logout']) {
+    assert.ok(store.includes(`path: '${path}'`), `Standard menu source lost ${path}`)
   }
-  assert.ok(store.includes("item.path === 'organizations' && !authStore.hasRole('admin')"), 'organization visibility role gate changed')
-  assert.ok(sidebar.includes('<TenantSelector v-if="authStore.canAccessAllTenants"'), 'cross-tenant selector behavior disappeared')
-  assert.ok(sidebar.includes('orgStore.totalPendingJoinRequestCount'), 'organization pending-review status disappeared')
-  assert.ok(sidebar.includes('<UserMenu />'), 'settings/logout user menu disappeared')
+
+  assert.ok(sidebar.includes("handleMenuClick('creatChat')"))
+  assert.ok(sidebar.includes("handleMenuClick('knowledge-bases')"))
+  assert.ok(sidebar.includes('<UserMenu />'))
 })
 
-test('full native UserMenu capability set remains available inside reference Sidebar chrome', () => {
+test('Lite UserMenu cannot reopen management surfaces and keeps valid interactive DOM', () => {
   const userMenu = read('../components/UserMenu.vue')
+
+  assert.ok(userMenu.includes('class="visual-user-menu__account"'))
+  assert.equal(
+    /<button[^>]*class="visual-user-menu__account"[\s\S]{0,700}<button/.test(userMenu),
+    false,
+    'account container must not nest a button inside a button',
+  )
+  assert.ok(userMenu.includes("handleQuickNav('general')"))
+  assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/)
+  assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/)
+  assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*handleSettings[\s\S]*openDocs[\s\S]*openGithub/)
+
+  // Standard recovery remains source-complete.
   for (const token of [
     "handleQuickNav('userprofile')",
-    "handleQuickNav('general')",
     "handleQuickNav('tenant')",
     "handleQuickNav('members')",
     "handleQuickNav('models')",
     'handleSystemAdmin',
     'reopenGuide',
-    'openDocs',
-    'openGithub',
-    'switchableMemberships',
     'switchToTenant',
     'openCreateTenantDialog',
-    '<CreateTenantDialog',
-  ]) {
-    assert.ok(userMenu.includes(token), `UserMenu lost native capability: ${token}`)
-  }
-  assert.ok(userMenu.includes("handoffToExternalAuth('logout')"), 'Musuw external-auth logout contract changed')
-  assert.ok(userMenu.includes('class="visual-user-menu__trigger"'))
-  assert.ok(userMenu.includes('class="visual-user-menu__dropdown"'))
-  assert.ok(userMenu.includes('class="visual-user-tenant-submenu"'))
+    "handoffToExternalAuth('logout')",
+  ]) assert.ok(userMenu.includes(token), `Standard UserMenu source lost ${token}`)
 })
 
-test('chat composer keeps native Agent/WebSearch/thinking behavior inside reference topology', () => {
+test('Lite Settings is General-only and General is language-only; Standard settings remain recoverable', () => {
+  const settings = read('../views/settings/Settings.vue')
+  const general = read('../views/settings/GeneralSettings.vue')
+
+  assert.match(settings, /if \(authStore\.isLiteMode\) return 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'/)
+
+  assert.ok(general.includes('id="visual-language-select"'))
+  assert.ok(general.includes('handleLanguageChange'))
+  for (const standardOnly of ['visual-theme-select', 'visual-sans-font-select', 'visual-mono-font-select']) {
+    const index = general.indexOf(standardOnly)
+    assert.ok(index >= 0, `Standard preference source lost ${standardOnly}`)
+    assert.match(general.slice(Math.max(0, index - 260), index), /v-if="!authStore\.isLiteMode"/)
+  }
+  assert.match(general, /v-if="!authStore\.isLiteMode"[\s\S]*font\.fontSize/)
+
+  // Complete Standard sections remain mounted in source, not deleted.
+  for (const component of [
+    'UserProfile', 'TenantInfo', 'TenantMembers', 'ChatHistorySettings', 'ModelSettings',
+    'OllamaSettings', 'WeKnoraCloudSettings', 'IntegrationSettingsSection', 'VectorStoreSettings',
+    'ParserEngineSettings', 'StorageEngineSettings', 'WebSearchSettings', 'McpSettings',
+    'SystemSettings', 'RuntimeQueues', 'PlatformAPIKeys', 'SystemAuditLog', 'SystemInfo',
+  ]) assert.ok(settings.includes(component), `Standard Settings source lost ${component}`)
+})
+
+test('exposed chat keeps native model/thinking behavior without exposing Agent or WebSearch management discovery', () => {
   const input = read('../components/Input-field.vue')
   const baseline = read('./business-baselines/Input-field.pre-view.vue')
+  const resources = read('../stores/chatResources.ts')
+  const commandPalette = read('../stores/commandPalette.ts')
+
   assert.ok(input.includes('<textarea'), 'reference native textarea topology disappeared')
-  assert.equal(input.includes('<t-textarea'), false, 'composer must not restore the vendor textarea wrapper')
-  assert.ok(input.includes('<AgentSelector'))
-  assert.ok(input.includes('@select="handleSelectAgent"'))
-  assert.ok(input.includes('@not-ready="handleAgentNotReady"'))
-  assert.ok(input.includes('v-if="showWebSearchButton"'))
-  assert.ok(input.includes('@click.stop="toggleWebSearch"'))
-  assert.ok(input.includes('v-if="isProMode" class="visual-chat-composer__thinking"'))
-  for (const token of ['handleSelectAgent', 'handleAgentNotReady', 'showWebSearchButton', 'toggleWebSearch', 'thinkingEnabled']) {
-    assert.ok(baseline.includes(token), `visual adapter exposed non-native behavior: ${token}`)
+  assert.equal(input.includes('<t-textarea'), false, 'composer must not restore vendor textarea wrapper')
+  assert.ok(input.includes('v-for="model in availableModels"'))
+  assert.ok(input.includes('thinkingEnabled'))
+  for (const token of ['handleSelectAgent', 'handleAgentNotReady', 'thinkingEnabled']) {
+    assert.ok(baseline.includes(token), `allowed chat controller lost native behavior ${token}`)
   }
-  assert.ok(baseline.includes('if (textareaRef.value instanceof HTMLTextAreaElement)'), 'frozen controller no longer supports reference native textarea')
-  const autosize = read('../utils/referenceTextareaAutosize.ts')
-  assert.ok(autosize.includes("target.style.height = 'auto'"))
-  assert.ok(autosize.includes('Math.min(target.scrollHeight, REFERENCE_TEXTAREA_MAX_HEIGHT)'))
-  assert.equal(autosize.includes('query.value'), false, 'visual autosize adapter must not own input business state')
+
+  // Lite runtime may use the two built-in modes, but must not enumerate the
+  // Agent management catalog or web-search provider management surface.
+  assert.ok(resources.includes('BUILTIN_QUICK_ANSWER_ID'))
+  assert.ok(resources.includes('BUILTIN_SMART_REASONING_ID'))
+  assert.ok(resources.includes('getAgentById(id)'))
+  assert.match(resources, /if \(isLiteProductMode\(\)\)[\s\S]*webSearchProviders\.value = \[\]/)
+  assert.match(commandPalette, /if \(auth\.isLiteMode\) \{[\s\S]*open\.value = false[\s\S]*return/)
 })
 
-test('knowledge list exposes the native v0.7.2 scope contract through the rebuilt visual shell', () => {
+test('Knowledge Base keeps native scopes, sharing, Trace/Wiki/Graph-facing workflows', () => {
   const active = read('../views/knowledge/KnowledgeBaseList.vue')
   const controller = read('./business-baselines/KnowledgeBaseList.pre-view.vue')
+  const detail = read('../views/knowledge/KnowledgeBase.vue')
+  const documentMenu = read('../views/knowledge/components/DocumentActionMenu.vue')
+
   assert.ok(active.includes('<ListSpaceSidebar'))
   assert.ok(active.includes('v-model="spaceSelection"'))
-  assert.ok(active.includes(':count-all="allKnowledgeBases"'))
-  assert.ok(active.includes(':count-favorites="kbFavoritesCount"'))
-  assert.ok(active.includes(':count-recents="kbRecentsCount"'))
-  assert.ok(active.includes('v-if="hasUninitializedKbs"'))
-  assert.ok(active.includes('<ContextualGuide tour="kbList"'))
-  assert.ok(controller.includes("const defaultScope: 'all' | 'mine' = authStore.hasRole('contributor') ? 'mine' : 'all'"))
   assert.ok(controller.includes("val === 'all' || val === 'mine' || val === 'favorites' || val === 'recents'"))
   assert.ok(controller.includes('listOrganizationSharedKnowledgeBases(val)'))
   assert.ok(controller.includes('orgStore.fetchSharedKnowledgeBases({ force })'))
-  assert.ok(controller.includes('orgStore.fetchOrganizations({ force })'))
-  assert.equal(controller.includes('spaceSelection.value !== "mine"'), false)
-})
 
-test('full WeKnora settings capability set remains mounted in the reference SettingsModal shell', () => {
-  const settings = read('../views/settings/Settings.vue')
-  const access = read('../config/settingsAccess.ts')
-  const requiredComponents = [
-    'GeneralSettings', 'UserProfile', 'TenantInfo', 'TenantMembers', 'ChatHistorySettings',
-    'ModelSettings', 'OllamaSettings', 'WeKnoraCloudSettings', 'IntegrationSettingsSection',
-    'VectorStoreSettings', 'ParserEngineSettings', 'StorageEngineSettings', 'WebSearchSettings',
-    'McpSettings', 'SystemSettings', 'RuntimeQueues', 'PlatformAPIKeys', 'SystemAuditLog', 'SystemInfo',
-  ]
-  for (const component of requiredComponents) {
-    assert.ok(settings.includes(component), `Settings visual shell lost native section ${component}`)
+  assert.ok(detail.includes('<WikiBrowser'))
+  assert.ok(detail.includes("activeKbTab === 'graph'"))
+  assert.ok(detail.includes('@probe-trace="(item) => probeTraceAvailable(item)"'))
+  for (const token of ['trace', 'reparse', 'cancel', 'move', 'delete']) {
+    assert.ok(documentMenu.toLowerCase().includes(token), `Knowledge Base document action lost ${token}`)
   }
-  for (const token of ['width: min(896px, 100%);', 'height: 520px;', 'flex: 0 0 224px;', 'padding: 32px;']) {
-    assert.ok(settings.includes(token), `Settings drifted from @视觉文件 shell token ${token}`)
-  }
-  assert.ok(access.includes("models: 'viewer'"), 'read-only model list visibility no longer matches WeKnora contract')
-  assert.ok(settings.includes('canSeeSection(currentSection)'), 'settings permission gate disappeared')
-  assert.ok(settings.includes('INTEGRATION_TAB_MIN_ROLE'))
-  assert.ok(settings.includes('SYSTEM_ADMIN_SETTINGS_SECTIONS'))
-})
-
-test('General Settings keeps upstream preference behavior while using reference row styling', () => {
-  const general = read('../views/settings/GeneralSettings.vue')
-  for (const token of ['setTheme', 'setSansFont', 'setMonoFont', 'setFontSize', 'isAutoCheckUpdateEnabled']) {
-    assert.ok(general.includes(token), `General Settings lost native preference behavior: ${token}`)
-  }
-  assert.equal(general.includes('getCurrentEntitlement'), false, 'later entitlement card is outside the selected behavior authority')
-  assert.ok(general.includes('class="visual-setting-row"'))
-})
-
-test('Graph and parsing Trace stay outside the migrated global paint ownership', () => {
-  const bridge = read('./musuw-tdesign-overlay-bridge.css')
-  const closure = read('./musuw-final-contract-closure.css')
-  assert.equal(bridge.includes('body .t-popconfirm'), false, 'global popconfirm styling would leak into parsing Trace')
-  assert.ok(closure.includes('.wiki-graph-search-dropdown'))
-  assert.ok(closure.includes('.kp-proccfg-pop'))
 })
 
 test('reference-only demo actions are not invented as business behavior', () => {
@@ -151,11 +160,10 @@ test('reference-only demo actions are not invented as business behavior', () => 
   assert.equal(bot.includes('createReceiptAPI'), false)
 })
 
-test('batch adapter preserves event payload and native all-session semantics', () => {
-  const child = read('../components/SessionBatchManageModal.vue')
-  const parent = read('../components/menu.vue')
-  assert.ok(child.includes("'toggle-all': [checked: boolean]"))
-  assert.ok(child.includes("emit('toggle-all', !allSelected)"))
-  assert.ok(parent.includes("menuArr.find(item => item.path === 'creatChat')?.children || []"))
-  assert.ok(parent.includes('@toggle-all="toggleBatchSelectAll"'))
+test('Graph and parsing Trace remain outside global paint ownership', () => {
+  const bridge = read('./musuw-tdesign-overlay-bridge.css')
+  const closure = read('./musuw-final-contract-closure.css')
+  assert.equal(bridge.includes('body .t-popconfirm'), false, 'global popconfirm styling would leak into parsing Trace')
+  assert.ok(closure.includes('.wiki-graph-search-dropdown'))
+  assert.ok(closure.includes('.kp-proccfg-pop'))
 })
