@@ -26,7 +26,7 @@
         </div>
       </div>
 
-      <div class="visual-setting-row">
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
         <div class="visual-setting-row__copy">
           <label for="visual-theme-select">{{ $t('theme.theme') }}</label>
           <p>{{ $t('theme.themeDescription') }}</p>
@@ -45,7 +45,7 @@
         </div>
       </div>
 
-      <div class="visual-setting-row">
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
         <div class="visual-setting-row__copy">
           <label for="visual-sans-font-select">{{ $t('font.uiFont') }}</label>
           <p>{{ $t('font.uiFontDescription') }}</p>
@@ -70,7 +70,7 @@
         </div>
       </div>
 
-      <div class="visual-setting-row">
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
         <div class="visual-setting-row__copy">
           <label for="visual-mono-font-select">{{ $t('font.monoFont') }}</label>
           <p>{{ $t('font.monoFontDescription') }}</p>
@@ -95,7 +95,7 @@
         </div>
       </div>
 
-      <div class="visual-setting-row">
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
         <div class="visual-setting-row__copy">
           <label>{{ $t('font.fontSize') }}</label>
           <p>{{ $t('font.fontSizeDescription') }}</p>
@@ -108,16 +108,6 @@
           </t-radio-group>
         </div>
       </div>
-
-      <div v-if="authStore.isLiteMode" class="visual-setting-row">
-        <div class="visual-setting-row__copy">
-          <label>{{ $t('settings.autoCheckUpdate') }}</label>
-          <p>{{ $t('settings.autoCheckUpdateDesc') }}</p>
-        </div>
-        <div class="visual-setting-row__control is-switch">
-          <t-switch v-model="isAutoCheckUpdateEnabled" size="small" />
-        </div>
-      </div>
     </div>
   </section>
 </template>
@@ -128,7 +118,6 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { normalizeLocale, persistLocalePreference } from '@/i18n/locale'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
-import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
 import {
   useFont,
@@ -142,7 +131,6 @@ import {
 } from '@/composables/useFont'
 
 const { t, locale } = useI18n()
-const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
 const { currentTheme, setTheme } = useTheme()
 const {
@@ -183,18 +171,6 @@ const monoFontOptions = computed<{ value: MonoFontKey; label: string; preview: s
 
 const currentSansStack = computed(() => SANS_STACKS[localSansFont.value] ?? SANS_STACKS.system)
 const currentMonoStack = computed(() => MONO_STACKS[localMonoFont.value] ?? MONO_STACKS.system)
-
-const isAutoCheckUpdateEnabled = computed({
-  get: () => settingsStore.isAutoCheckUpdateEnabled,
-  set: (value: boolean) => {
-    settingsStore.toggleAutoCheckUpdate(value)
-    if (!value) return
-    const desktopApp = (window as Window & {
-      go?: { main?: { App?: { AutoCheckForUpdates?: () => void } } }
-    }).go?.main?.App
-    desktopApp?.AutoCheckForUpdates?.()
-  },
-})
 
 onMounted(() => {
   let savedLocale: string | null = null
