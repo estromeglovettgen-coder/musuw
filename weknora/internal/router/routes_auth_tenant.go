@@ -60,14 +60,11 @@ func RegisterTenantRoutes(
 	// 空间路由组
 	tenantRoutes := r.Group("/tenants")
 	{
-		// 创建空间对所有已登录用户开放：用户可以为自己再开一个工作区，
-		// handler 内部会调 EnsureOwner 把调用者写成新空间的 Owner。
-		// 跨空间超管走同一个端点，但能携带 storage_quota / status 等
-		// 全字段（见 handler.CreateTenant 内部分支）。
-		// 安全说明：这里不挂 g.CrossTenant()，因为 self-service 创建
-		// 不需要跨空间特权；handler 也不读写 X-Tenant-ID 指向的现有
-		// 空间，所以越过 PathTenantMatch 守卫不会扩大攻击面。
-		// 创建空间不对 API key 开放（注册在原始 group，默认拒绝）。
+		// Musuw ordinary-user self-service creation is policy-gated in the
+		// handler and defaults OFF; public registration creates the single
+		// Personal Tenant internally. Cross-tenant/SystemAdmin tooling and
+		// platform keys with system_tenants_manage retain the catalog create
+		// path. Workspace API keys remain default-denied here.
 		g.apiKeyRoute(tenantRoutes, http.MethodPost, "",
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage), handler.CreateTenant)
 		g.apiKeyRoute(tenantRoutes, http.MethodGet, "", apiKeyManageTenantSettings(apiKeyFullAccess()), handler.ListTenants)
@@ -190,7 +187,9 @@ func RegisterAuthRoutes(r *gin.RouterGroup, handler *handler.AuthHandler, g *rba
 	r.POST("/auth/switch-tenant", handler.SwitchTenant)
 	r.GET("/auth/oidc/config", handler.GetOIDCConfig)
 	r.GET("/auth/oidc/url", handler.GetOIDCAuthorizationURL)
-	r.GET("/auth/oidc/callback", handler.OIDCRedirectCallback)
+	// First-time OIDC identities must obey the same registration_mode policy as
+	// password registration; existing local OIDC users still log in normally.
+	r.GET("/auth/oidc/callback", handler.OIDCRedirectCallbackWithRegistrationPolicy)
 	r.POST("/auth/refresh", handler.RefreshToken)
 	r.GET("/auth/validate", handler.ValidateToken)
 	r.POST("/auth/logout", handler.Logout)
