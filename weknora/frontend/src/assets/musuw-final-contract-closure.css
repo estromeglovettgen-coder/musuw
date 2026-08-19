@@ -36,6 +36,17 @@
 .visual-chat-composer__select { order: 40; }
 .visual-chat-composer__tool:has(svg) { order: 50; }
 
+/* SettingsModal.tsx uses a single clean nav stack. The restored WeKnora
+ * capability set is internally ordered in groups for maintainability, but
+ * invented group headings are not part of @视觉文件 and must not paint. */
+.visual-settings-nav__group > h3 { display: none !important; }
+.visual-settings-nav__group { gap: 3px !important; }
+.visual-settings-nav__group + .visual-settings-nav__group {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid #f3f4f6 !important;
+}
+
 /* The visual export is neutral; native organization/agent brand artwork is
  * informational rather than semantic status, so reduce saturation without
  * hiding the underlying behavior or source identity. */
@@ -120,6 +131,10 @@
   color: var(--td-text-color-primary) !important;
   box-shadow: var(--td-shadow-2) !important;
   font-family: var(--td-font-family) !important;
+}
+
+:root[theme-mode="dark"] .visual-settings-nav__group + .visual-settings-nav__group {
+  border-top-color: var(--mvc-line, #31343a) !important;
 }
 
 /* Native semantic status colors are deliberately not neutralized here. */
