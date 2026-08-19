@@ -13,25 +13,23 @@ const (
 )
 
 // resolveTenantSelfServiceCreationEnabled is the shared policy resolver used
-// both by POST /tenants enforcement and /auth/me capability projection. Keeping
-// both on one function prevents the UI from advertising a capability that the
-// backend would reject.
+// both by POST /tenants enforcement and /auth/me capability projection. Musuw
+// defaults this capability to disabled for ordinary C-end users so hiding the
+// workspace-create UI is backed by an authoritative server-side deny. A
+// SystemAdmin/runtime setting or environment override can explicitly opt back
+// in; platform catalog managers are handled separately by CreateTenant.
 func resolveTenantSelfServiceCreationEnabled(
 	ctx context.Context,
-	cfg *config.Config,
+	_ *config.Config,
 	settings interfaces.SystemSettingService,
 ) bool {
-	enabled := true
-	if cfg != nil && cfg.Tenant != nil {
-		enabled = cfg.Tenant.IsSelfServiceCreationEnabled()
-	}
 	if settings == nil {
-		return enabled
+		return false
 	}
 	return settings.GetBool(
 		ctx,
 		tenantSelfServiceCreationSettingKey,
 		tenantSelfServiceCreationEnvName,
-		enabled,
+		false,
 	)
 }
