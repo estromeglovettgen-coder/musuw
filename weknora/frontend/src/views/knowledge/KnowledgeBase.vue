@@ -93,10 +93,22 @@ export default defineComponent({
         <div class="visual-knowledge-content">
           <div class="visual-knowledge-toolbar">
             <div class="visual-knowledge-toolbar__left">
-              <button type="button" class="visual-knowledge-path-pill" @click="handleFolderSelect('')">
-                <t-icon name="folder" /><strong>{{ $t('knowledgeBase.folderTree.rootRow') }}</strong>
-                <template v-for="crumb in folderBreadcrumbs" :key="crumb.path"><t-icon name="chevron-right" /><span>{{ crumb.name }}</span></template>
-              </button>
+              <div class="visual-knowledge-path-pill" :aria-label="$t('knowledgeBase.folderTree.rootRow')">
+                <t-icon name="folder" />
+                <button type="button" class="visual-knowledge-path-pill__segment is-root" @click="handleFolderSelect('')">{{ $t('knowledgeBase.folderTree.rootRow') }}</button>
+                <template v-for="(crumb, index) in folderBreadcrumbs" :key="crumb.path">
+                  <t-icon name="chevron-right" />
+                  <button
+                    v-if="index < folderBreadcrumbs.length - 1"
+                    type="button"
+                    class="visual-knowledge-path-pill__segment"
+                    @click="handleFolderSelect(crumb.path)"
+                  >
+                    {{ crumb.name }}
+                  </button>
+                  <span v-else class="visual-knowledge-path-pill__segment is-current">{{ crumb.name }}</span>
+                </template>
+              </div>
 
               <t-input v-model.trim="docSearchKeyword" :placeholder="$t('knowledgeBase.docSearchPlaceholder')" clearable class="visual-knowledge-search" @clear="loadKnowledgeFiles(kbId)" @enter="loadKnowledgeFiles(kbId)">
                 <template #prefix-icon><t-icon name="search" /></template>
@@ -201,9 +213,13 @@ export default defineComponent({
 .visual-knowledge-toolbar { flex: 0 0 auto; padding: 10px; border: 1px solid rgb(229 231 235 / 90%); border-radius: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-knowledge-toolbar__left { min-width: 280px; flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .visual-knowledge-toolbar__right { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
-.visual-knowledge-path-pill { min-height: 28px; padding: 4px 10px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; background: rgb(243 244 246 / 90%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 600; cursor: pointer; }
-.visual-knowledge-path-pill strong { color: #111827; font-weight: 700; }
-.visual-knowledge-path-pill :deep(.t-icon) { font-size: 14px; color: #6b7280; }
+.visual-knowledge-path-pill { min-height: 28px; padding: 4px 10px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; background: rgb(243 244 246 / 90%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 600; }
+.visual-knowledge-path-pill > :deep(.t-icon) { flex: 0 0 auto; font-size: 14px; color: #6b7280; }
+.visual-knowledge-path-pill__segment { max-width: 160px; padding: 0; border: 0; border-radius: 5px; overflow: hidden; background: transparent; color: #4b5563; font: inherit; font-size: inherit; line-height: inherit; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+button.visual-knowledge-path-pill__segment { cursor: pointer; }
+button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decoration: underline; text-underline-offset: 2px; }
+.visual-knowledge-path-pill__segment.is-root { color: #111827; font-weight: 700; }
+.visual-knowledge-path-pill__segment.is-current { color: #6b7280; cursor: default; }
 .visual-knowledge-search { min-width: 160px; max-width: 220px; flex: 1 1 160px; }
 .visual-knowledge-filters { min-width: 0; display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .visual-knowledge-filters::-webkit-scrollbar { display: none; }
