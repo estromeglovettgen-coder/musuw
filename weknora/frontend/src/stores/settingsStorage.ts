@@ -1,5 +1,4 @@
 import { safeRemoveItem, safeSetItem } from "@/composables/preferenceStorage";
-import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 import { reconcileBuiltinAgentMode } from "@/utils/agent-mode";
 
 export const SETTINGS_STORAGE_KEY = "WeKnora_settings";
@@ -34,6 +33,10 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
   loaded.selectedMCPServices ||= [];
   loaded.selectedSkills ||= (loaded.selectedTools as string[] | undefined) || [];
   loaded.selectedFileKbMap ||= {};
+
+  // First-Musuw added a persisted thinking preference. Keep that non-conflicting
+  // extension, but do not reintroduce its old managed-experience Agent/WebSearch
+  // narrowing: WeKnora v0.7.2 is authoritative for those behaviors.
   let reconciledThinking = false;
   if (!isStoredSettingsRecord(loaded.conversationModels)) {
     loaded.conversationModels = { thinkingEnabled: true };
@@ -42,32 +45,13 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
     loaded.conversationModels.thinkingEnabled = true;
     reconciledThinking = true;
   }
-  let reconciledManagedExperience = false;
-  if (
-    loaded.selectedAgentSourceTenantId != null ||
-    (loaded.selectedAgentId !== BUILTIN_QUICK_ANSWER_ID &&
-      loaded.selectedAgentId !== BUILTIN_SMART_REASONING_ID)
-  ) {
-    loaded.selectedAgentId = BUILTIN_QUICK_ANSWER_ID;
-    loaded.isAgentEnabled = false;
-    loaded.selectedAgentSourceTenantId = null;
-    reconciledManagedExperience = true;
-  }
-  if (loaded.webSearchEnabled !== true) {
-    loaded.webSearchEnabled = true;
-    reconciledManagedExperience = true;
-  }
+
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) {
     delete loaded.enableMemory;
   }
   const reconciledAgentMode = reconcileBuiltinAgentMode(loaded);
-  if (
-    removedLegacyMemorySetting ||
-    reconciledAgentMode ||
-    reconciledThinking ||
-    reconciledManagedExperience
-  ) {
+  if (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking) {
     safeSetItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
   }
   return loaded;
