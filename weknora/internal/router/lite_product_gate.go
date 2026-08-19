@@ -54,6 +54,10 @@ func liteProductRouteBlocked(method, path string) bool {
 	for _, prefix := range []string{
 		"/api/v1/evaluation",
 		"/api/v1/mcp-services",
+		"/api/v1/mcp-oauth",
+		"/api/v1/agent/tool-approvals",
+		"/api/v1/agent/mcp-oauth-resolutions",
+		"/api/v1/web-search",
 		"/api/v1/web-search-providers",
 		"/api/v1/vector-stores",
 		"/api/v1/storage-backends",
