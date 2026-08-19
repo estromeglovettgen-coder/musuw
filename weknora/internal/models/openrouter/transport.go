@@ -24,19 +24,23 @@ func (e *CreditExhaustedError) Error() string {
 	return "OpenRouter monthly AI credits are exhausted"
 }
 
+// IsCreditExhausted is intentionally type-only. Generic business/task layers
+// must not infer provider identity from arbitrary error text such as "credit
+// limit" and accidentally suppress retries for another upstream. Text parsing
+// is kept in PayloadIndicatesCreditExhausted, whose caller already knows the
+// payload came from an OpenRouter SSE stream.
 func IsCreditExhausted(err error) bool {
 	if err == nil {
 		return false
 	}
 	var target *CreditExhaustedError
-	if errors.As(err, &target) {
-		return true
-	}
-	return textIndicatesCreditExhausted(err.Error())
+	return errors.As(err, &target)
 }
 
-// PayloadIndicatesCreditExhausted handles providers that start a successful SSE
-// response and later emit an error object when the key budget is reached.
+// PayloadIndicatesCreditExhausted handles OpenRouter responses that start a
+// successful SSE stream and later emit an error object when the key budget is
+// reached. Provider-specific text fallback is safe here because the caller has
+// already established the payload source as OpenRouter.
 func PayloadIndicatesCreditExhausted(payload []byte) bool {
 	return textIndicatesCreditExhausted(string(payload))
 }
