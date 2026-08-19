@@ -38,6 +38,10 @@ import "@/assets/musuw-kb-editor-inner-final.css";
 // ModelEditorDialog keeps its native SettingDrawer/API/validation behavior; this
 // last inner bridge removes the remaining non-semantic brand-blue controls.
 import "@/assets/musuw-model-editor-inner-final.css";
+// User font/font-size/theme preferences are behavior contracts. Load the
+// compatibility layer last so the reference default stays exact while persisted
+// native preferences continue to have a visible effect on rebuilt surfaces.
+import "@/assets/musuw-visual-preference-compat.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
