@@ -11,7 +11,7 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
   general: 'viewer',
   ollama: 'admin',
   weknoracloud: 'admin',
-  models: 'admin',
+  models: 'viewer',
   websearch: 'admin',
   chathistory: 'admin',
   vectorstore: 'admin',
@@ -33,7 +33,9 @@ export const SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE = {
   models: 'admin',
 } as const satisfies Record<string, SettingsRoleKey>
 
-/** Platform-managed runtime details stay out of the end-user settings surface. */
+/** Platform-managed runtime details stay out of dedicated top-level pages; when
+ * exposed through Settings they remain permission-gated by the native section
+ * policy above. */
 export const MANAGED_RUNTIME_SETTINGS_SECTIONS = new Set([
   'ollama',
   'weknoracloud',
