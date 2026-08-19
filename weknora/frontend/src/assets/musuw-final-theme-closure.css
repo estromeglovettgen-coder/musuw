@@ -1,0 +1,227 @@
+/*
+ * Final native-theme closure.
+ *
+ * @视觉文件 is the light/default visual authority. Dark theme is a WeKnora
+ * behavior contract, so reference-translated/native-only surfaces added after
+ * musuw-visual-preference-compat.css must still react to theme-mode="dark".
+ * Geometry is intentionally unchanged here.
+ */
+
+:root[theme-mode="dark"] {
+  /* QAPanel late-loaded mention popup. */
+  .visual-mention-menu,
+  .visual-mention-detail-popup .t-popup__content,
+  .visual-mention-detail {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-text) !important;
+    box-shadow: var(--mvc-shadow) !important;
+  }
+  .visual-mention-group-entry,
+  .visual-mention-back,
+  .visual-mention-item,
+  .visual-mention-detail__meta button { color: var(--mvc-muted-strong) !important; }
+  .visual-mention-group-entry:hover,
+  .visual-mention-group-entry.is-active,
+  .visual-mention-back:hover,
+  .visual-mention-item:hover,
+  .visual-mention-item.is-active,
+  .visual-mention-group-entry__icon,
+  .visual-mention-item__icon,
+  .visual-mention-group-entry__count,
+  .visual-mention-detail__header span {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-hover) !important;
+    color: var(--mvc-text-strong) !important;
+  }
+  .visual-mention-item__copy strong,
+  .visual-mention-detail__header strong { color: var(--mvc-text-strong) !important; }
+  .visual-mention-item__copy small,
+  .visual-mention-section-label,
+  .visual-mention-detail p,
+  .visual-mention-detail__meta { color: var(--mvc-muted) !important; }
+
+  /* DocumentListView late-loaded exact geometry layer. */
+  .visual-document-list,
+  .visual-document-list__body,
+  .visual-document-list__row,
+  .visual-document-card,
+  .visual-knowledge-skeleton-card {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-text) !important;
+  }
+  .visual-document-list__header {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface-raised) !important;
+    color: var(--mvc-muted) !important;
+  }
+  .visual-document-list__row:hover,
+  .visual-document-list__row.is-menu-open,
+  .visual-document-list__row.is-selected,
+  .visual-document-list__file-icon,
+  .visual-document-list__tag,
+  .visual-document-list__tag-overflow,
+  .visual-document-list__add-tag {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-hover) !important;
+    color: var(--mvc-muted-strong) !important;
+  }
+  .visual-document-list__file-copy strong { color: var(--mvc-text-strong) !important; }
+  .visual-document-list__file-copy small,
+  .visual-document-list__source-label,
+  .visual-document-list__mono { color: var(--mvc-muted) !important; }
+
+  /* Knowledge-list native scope/status additions. */
+  .visual-kb-workspace,
+  .visual-kb-warning,
+  .visual-kb-upload-status article,
+  .visual-kb-list__create-card,
+  .visual-shared-detail,
+  .visual-shared-detail dl > div {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-text) !important;
+  }
+  .visual-kb-upload-status__icon,
+  .visual-kb-list__create-card > span,
+  .visual-kb-section small { background: var(--mvc-hover) !important; color: var(--mvc-muted) !important; }
+  .visual-kb-upload-status__copy strong,
+  .visual-shared-detail > header h3,
+  .visual-shared-detail dd { color: var(--mvc-text-strong) !important; }
+  .visual-kb-warning,
+  .visual-kb-upload-status__copy,
+  .visual-kb-section,
+  .visual-shared-detail dt { color: var(--mvc-muted) !important; }
+
+  /* Restored native Agent / Organization directory surfaces. */
+  .agent-list-container,
+  .org-list-container,
+  .agent-list-content,
+  .org-list-content,
+  .agent-list-main,
+  .org-list-main {
+    background: var(--mvc-page) !important;
+    color: var(--mvc-text) !important;
+  }
+  .agent-list-content > .header,
+  .org-list-content > .header,
+  .agent-card,
+  .org-card,
+  .agent-card-skeleton,
+  .org-card-skeleton,
+  .agent-list-content .header-action-btn,
+  .org-list-content .header-action-btn,
+  .org-list-content .org-join-btn {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-muted-strong) !important;
+  }
+  .agent-list-content .title-row h2,
+  .org-list-content .title-row h2,
+  .agent-card .card-title,
+  .org-card .card-title,
+  .agent-list-main .empty-txt,
+  .org-list-main .empty-txt { color: var(--mvc-text-strong) !important; }
+  .agent-list-content .header-subtitle,
+  .org-list-content .header-subtitle,
+  .agent-card .card-description,
+  .org-card .card-description,
+  .agent-section-header,
+  .org-section-header,
+  .agent-list-main .empty-desc,
+  .org-list-main .empty-desc { color: var(--mvc-muted) !important; }
+  .agent-card .builtin-avatar,
+  .org-card .org-avatar,
+  .agent-card .agent-avatar-small,
+  .agent-card .feature-badge,
+  .org-card .feature-badge,
+  .agent-card .builtin-badge,
+  .org-card .relation-role-tag,
+  .org-card .pending-requests-badge,
+  .agent-section-count,
+  .org-section-count,
+  .agent-card .agent-favorite-star:hover,
+  .agent-card .more-wrap:hover,
+  .org-card .more-wrap:hover {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-hover) !important;
+    color: var(--mvc-muted-strong) !important;
+  }
+  .agent-card:hover,
+  .org-card:hover { border-color: var(--mvc-line-strong) !important; box-shadow: var(--mvc-shadow) !important; }
+
+  /* Native list-space and cross-tenant switcher chrome. */
+  .list-space-sidebar,
+  .tenant-dropdown,
+  .visual-user-tenant-submenu {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-sidebar) !important;
+    color: var(--mvc-muted-strong) !important;
+    box-shadow: var(--mvc-shadow) !important;
+  }
+  .list-space-sidebar .icon-item-labeled,
+  .list-space-sidebar .sidebar-item,
+  .tenant-item,
+  .visual-user-tenant-submenu__item { color: var(--mvc-muted-strong) !important; }
+  .list-space-sidebar .icon-item-labeled:hover,
+  .list-space-sidebar .sidebar-item:hover,
+  .list-space-sidebar .icon-item-labeled.active,
+  .list-space-sidebar .sidebar-item.active,
+  .tenant-item:hover,
+  .tenant-item.selected,
+  .visual-user-tenant-submenu__item:hover,
+  .visual-user-tenant-submenu__item.is-current,
+  .visual-user-tenant-submenu__create:hover {
+    background: var(--mvc-hover) !important;
+    color: var(--mvc-text-strong) !important;
+  }
+
+  /* Reference-style UserMenu surfaces added after the earlier preference file. */
+  .visual-user-menu__dropdown,
+  .visual-user-menu__account,
+  .visual-user-menu__tenant,
+  .visual-user-menu__item {
+    border-color: var(--mvc-line) !important;
+    background-color: var(--mvc-surface) !important;
+    color: var(--mvc-muted-strong) !important;
+  }
+  .visual-user-menu__account:hover,
+  .visual-user-menu__tenant.is-open,
+  .visual-user-menu__tenant.is-clickable:hover,
+  .visual-user-menu__item:hover { background: var(--mvc-hover) !important; color: var(--mvc-text-strong) !important; }
+  .visual-user-menu__account-copy strong,
+  .visual-user-menu__tenant-copy strong,
+  .visual-user-tenant-submenu__copy strong { color: var(--mvc-text-strong) !important; }
+  .visual-user-menu__account-copy small,
+  .visual-user-menu__tenant-copy small,
+  .visual-user-tenant-submenu__copy small { color: var(--mvc-muted) !important; }
+
+  /* Invitation bell + inbox. */
+  .global-invitation-bell__btn,
+  .t-dialog:has(.invitation-list),
+  .t-dialog:has(.invitation-list) .invitation-card {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-muted-strong) !important;
+    box-shadow: var(--mvc-shadow) !important;
+  }
+  .t-dialog:has(.invitation-list) .tenant-name,
+  .t-dialog:has(.invitation-list) .t-dialog__header { color: var(--mvc-text-strong) !important; }
+  .t-dialog:has(.invitation-list) .my-invitations-desc,
+  .t-dialog:has(.invitation-list) .invitation-card-meta { color: var(--mvc-muted) !important; }
+
+  /* Popconfirm is used inside the parsing Trace and has no safe per-overlay
+     marker. Give every popconfirm back to native TDesign theme instead of
+     letting the earlier global visual bridge own it. */
+  body .t-popconfirm {
+    border-color: var(--td-component-stroke) !important;
+    background: var(--td-bg-color-container) !important;
+    color: var(--td-text-color-primary) !important;
+    box-shadow: var(--td-shadow-2) !important;
+    font-family: var(--td-font-family) !important;
+  }
+  body .t-popconfirm .t-button {
+    color: var(--td-text-color-primary) !important;
+  }
+}
