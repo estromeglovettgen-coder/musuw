@@ -125,8 +125,14 @@ func (s *tenantService) provisionOpenRouterTenantKey(ctx context.Context, tenant
 	if tenant == nil || tenant.ID == 0 || strings.TrimSpace(tenant.Status) != "active" {
 		return nil
 	}
-	if tenant.Credentials != nil && tenant.Credentials.GetOpenRouter() != nil {
-		return nil
+	if tenant.Credentials != nil && tenant.Credentials.OpenRouter != nil {
+		if tenant.Credentials.GetOpenRouter() != nil {
+			return nil
+		}
+		// A raw credential record exists but cannot be used (for example after
+		// an AES-key mismatch). Never create another provider key in this state:
+		// doing so would leave two spend boundaries for one tenant.
+		return fmt.Errorf("existing OpenRouter credentials are incomplete; refusing duplicate provider key")
 	}
 	// Local/test deployments may intentionally omit the Management API. The
 	// production contract requires the secret before rollout, while lazy
@@ -157,15 +163,20 @@ func (s *tenantService) provisionOpenRouterTenantKey(ctx context.Context, tenant
 
 // deleteOpenRouterTenantKey removes the provider key and then clears only the
 // OpenRouter member of Tenant.credentials, preserving unrelated credentials.
+// Provider deletion needs only the Management API hash, not the decrypted
+// inference API key, so cleanup remains possible after an AES-key mismatch.
 func (s *tenantService) deleteOpenRouterTenantKey(ctx context.Context, tenant *types.Tenant) error {
-	if tenant == nil || tenant.Credentials == nil || tenant.Credentials.GetOpenRouter() == nil {
+	if tenant == nil || tenant.Credentials == nil || tenant.Credentials.OpenRouter == nil {
 		return nil
 	}
-	credentials := tenant.Credentials.GetOpenRouter()
-	if s.keys == nil {
-		return fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured; refusing to orphan tenant key %s", credentials.KeyHash)
+	hash := strings.TrimSpace(tenant.Credentials.OpenRouter.KeyHash)
+	if hash == "" {
+		return fmt.Errorf("OpenRouter tenant credentials have no key hash; refusing lifecycle operation that could orphan a provider key")
 	}
-	if err := s.keys.DeleteKey(ctx, credentials.KeyHash); err != nil {
+	if s.keys == nil {
+		return fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured; refusing to orphan tenant key %s", hash)
+	}
+	if err := s.keys.DeleteKey(ctx, hash); err != nil {
 		return fmt.Errorf("delete OpenRouter tenant key: %w", err)
 	}
 	tenant.Credentials.OpenRouter = nil
@@ -465,7 +476,6 @@ func (s *tenantService) validateStorageBucketUniqueness(ctx context.Context, ten
 				return werrors.NewBadRequestError("存储桶名称「" + b + "」已被其他空间使用，为保证数据隔离，请使用其他名称")
 			}
 		}
-	}
 
 	return nil
 }
