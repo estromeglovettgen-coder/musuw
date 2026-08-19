@@ -25,8 +25,26 @@ function isLiteSpaDefaultEntry(to: RouteLocationNormalized) {
   )
 }
 
+/**
+ * Musuw Lite only exposes chat, knowledge-base workflows, and the language
+ * settings shell. Keep this as an allow-list so new upstream routes fail
+ * closed until they are deliberately reviewed for the consumer product.
+ */
+function isAllowedLitePath(path: string) {
+  return (
+    path === '/knowledgeBase' ||
+    path === '/platform/creatChat' ||
+    path.startsWith('/platform/chat/') ||
+    path === '/platform/knowledge-bases' ||
+    path.startsWith('/platform/knowledge-bases/') ||
+    path === '/platform/settings' ||
+    path === '/onboarding/workspace'
+  )
+}
+
 function isSafeLiteRestoreTarget(path: string) {
-  return path.startsWith('/platform/') && !path.startsWith('/platform/organizations')
+  const pathname = path.split('?')[0]?.split('#')[0] || ''
+  return isAllowedLitePath(pathname)
 }
 
 const router = createRouter({
@@ -238,8 +256,8 @@ async function hydrateSessionFromToken(authStore: ReturnType<typeof useAuthStore
     // Refresh memberships on every page load — same reason as
     // App.vue's syncOIDCUserContext: without this the auth store
     // would only ever see the snapshot from the original /auth/login
-    // call, so role changes (and tenant-switch role lookups) would
-    // be silently stale until the user logged out and back in.
+    // call, so role changes (and tenant-switch role lookups) would be
+    // silently stale until the user logged out and back in.
     const memberships = response.data?.memberships
     if (Array.isArray(memberships)) {
       authStore.setMemberships(memberships)
@@ -262,7 +280,7 @@ let liteDeepLinkRestoreDone = false
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // A failed callback must leave before any route component can mount.  In
+  // A failed callback must leave before any route component can mount. In
   // particular, /login's ordinary signed-out guard would otherwise restart
   // /auth/start before App.vue consumes the error fragment.
   if (hasOIDCErrorCallback(window.location.hash || '')) {
@@ -278,7 +296,7 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // Musnow owns human sign-in.  Never mount WeKnora's password/OIDC form;
+  // Musnow owns human sign-in. Never mount WeKnora's password/OIDC form;
   // a browser navigation lets the same-origin auth shell establish the native
   // token exchange and then return here.
   if (to.path === '/login' || to.path === '/register') {
@@ -295,7 +313,7 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // Lite：硬刷新后若落在默认首页，恢复本次会话中最后访问的 /platform 子路径
+  // Lite：硬刷新后若落在默认首页，恢复本次会话中最后访问的允许页面。
   if (!liteDeepLinkRestoreDone) {
     liteDeepLinkRestoreDone = true
     if (isLiteEdition(authStore)) {
@@ -358,6 +376,23 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  // Product exposure gate for browser navigation. Client-side gating is only
+  // UX hardening; the server applies the authoritative Lite API gate.
+  if (isLiteEdition(authStore)) {
+    if (!isAllowedLitePath(to.path)) {
+      next(AUTHENTICATED_HOME_PATH)
+      return
+    }
+    if (to.path === '/platform/settings') {
+      const section = typeof to.query.section === 'string' ? to.query.section : ''
+      const tab = typeof to.query.tab === 'string' ? to.query.tab : ''
+      if ((section && section !== 'general') || tab) {
+        next({ path: '/platform/settings' })
+        return
+      }
+    }
+  }
+
   // SystemAdmin gate — checked AFTER auth so a non-admin who's logged
   // out gets redirected to /login first (consistent with how the rest
   // of the auth flow works), and only an authenticated non-admin sees
@@ -375,7 +410,8 @@ router.beforeEach(async (to, from, next) => {
 router.afterEach((to) => {
   if (!isLiteEdition(useAuthStore())) return
   if (to.path === '/login') return
-  if (!to.path.startsWith('/platform')) return
+  if (!isAllowedLitePath(to.path)) return
+  if (to.path === '/platform/settings' && (to.query.section || to.query.tab)) return
   sessionStorage.setItem(LITE_LAST_PATH_KEY, to.fullPath)
 })
 
