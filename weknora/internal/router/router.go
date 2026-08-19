@@ -98,7 +98,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 	// embed endpoints rate-limit per (channel, ClientIP), so a spoofed XFF would
 	// trivially bypass the limiter. Restrict to the fronting proxy network so
 	// only the real client IP (appended by nginx) is returned. Configurable via
-	// WEKNORA_TRUSTED_PROXIES (comma-separated CIDRs/IPs).
+	// WEKNORA_TRUSTED_PROXIES (comma-separated).
 	if err := r.SetTrustedProxies(trustedProxies()); err != nil {
 		logger.Errorf(context.Background(), "[Router] failed to set trusted proxies: %v", err)
 	}
@@ -292,7 +292,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 // trustedProxies returns the proxy CIDRs/IPs whose X-Forwarded-For headers
 // gin should trust when resolving the client IP. Defaults to loopback and
 // private ranges (covers the bundled nginx in a container network); override
-// with WEKNORA_TRUSTED_PROXIES (comma-separated CIDRs/IPs). An explicit empty value
+// with WEKNORA_TRUSTED_PROXIES (comma-separated). An explicit empty value
 // disables proxy trust entirely so ClientIP() returns the direct peer.
 func trustedProxies() []string {
 	raw, ok := os.LookupEnv("WEKNORA_TRUSTED_PROXIES")
