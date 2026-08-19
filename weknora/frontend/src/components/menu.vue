@@ -74,7 +74,7 @@ export default defineComponent({
       </div>
 
       <section class="visual-sidebar__history" aria-label="Sessions">
-        <div v-if="showSessionSourceFilter && !batchMode" class="visual-sidebar__session-scope"><SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" /></div>
+        <div v-if="!authStore.isLiteMode && showSessionSourceFilter && !batchMode" class="visual-sidebar__session-scope"><SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" /></div>
         <div ref="scrollContainer" class="visual-sidebar__history-scroll" @scroll="handleScroll">
           <div v-if="sessionListBooting && !hasAnySession" class="visual-sidebar__session-skeletons" aria-hidden="true"><div v-for="n in 4" :key="n" class="visual-sidebar__session-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" /></div></div>
           <div v-else-if="activeBucket?.loading && !activeBucket.loaded && filteredGroupedSessions.length === 0" class="visual-sidebar__session-skeletons" aria-hidden="true"><div v-for="n in 4" :key="`bucket-${n}`" class="visual-sidebar__session-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" /></div></div>
