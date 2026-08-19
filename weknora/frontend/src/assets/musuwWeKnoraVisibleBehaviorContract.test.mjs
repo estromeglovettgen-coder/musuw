@@ -54,6 +54,24 @@ test('chat composer keeps native Agent/WebSearch behavior inside reference topol
   assert.ok(baseline.includes('if (textareaRef.value instanceof HTMLTextAreaElement)'), 'frozen controller no longer supports reference native textarea')
 })
 
+test('knowledge list exposes the native v0.7.2 scope contract through the rebuilt visual shell', () => {
+  const active = read('../views/knowledge/KnowledgeBaseList.vue')
+  const controller = read('./business-baselines/KnowledgeBaseList.pre-view.vue')
+  assert.ok(active.includes('<ListSpaceSidebar'))
+  assert.ok(active.includes('v-model="spaceSelection"'))
+  assert.ok(active.includes(':count-all="allKnowledgeBases"'))
+  assert.ok(active.includes(':count-favorites="kbFavoritesCount"'))
+  assert.ok(active.includes(':count-recents="kbRecentsCount"'))
+  assert.ok(active.includes('v-if="hasUninitializedKbs"'))
+  assert.ok(active.includes('<ContextualGuide tour="kbList"'))
+  assert.ok(controller.includes("const defaultScope: 'all' | 'mine' = authStore.hasRole('contributor') ? 'mine' : 'all'"))
+  assert.ok(controller.includes("val === 'all' || val === 'mine' || val === 'favorites' || val === 'recents'"))
+  assert.ok(controller.includes('listOrganizationSharedKnowledgeBases(val)'))
+  assert.ok(controller.includes('orgStore.fetchSharedKnowledgeBases({ force })'))
+  assert.ok(controller.includes('orgStore.fetchOrganizations({ force })'))
+  assert.equal(controller.includes('spaceSelection.value !== "mine"'), false)
+})
+
 test('full WeKnora settings capability set remains mounted in the reference SettingsModal shell', () => {
   const settings = read('../views/settings/Settings.vue')
   const access = read('../config/settingsAccess.ts')
@@ -75,14 +93,21 @@ test('full WeKnora settings capability set remains mounted in the reference Sett
   assert.ok(settings.includes('SYSTEM_ADMIN_SETTINGS_SECTIONS'))
 })
 
+test('General Settings keeps upstream preference behavior while using reference row styling', () => {
+  const general = read('../views/settings/GeneralSettings.vue')
+  for (const token of ['setTheme', 'setSansFont', 'setMonoFont', 'setFontSize', 'isAutoCheckUpdateEnabled']) {
+    assert.ok(general.includes(token), `General Settings lost native preference behavior: ${token}`)
+  }
+  assert.equal(general.includes('getCurrentEntitlement'), false, 'later entitlement card is outside the selected behavior authority')
+  assert.ok(general.includes('class="visual-setting-row"'))
+})
+
 test('reference-only demo actions are not invented as business behavior', () => {
   const batch = read('../components/SessionBatchManageModal.vue')
   assert.equal(batch.includes("emit('pin')"), false)
   assert.equal(batch.includes("emit('unpin')"), false)
 
   const bot = read('../views/chat/components/botmsg.vue')
-  // Visual reference contains reaction/bookmark affordances. Their mere visual
-  // presence must never be used to synthesize a new API contract.
   assert.equal(bot.includes('createReactionAPI'), false)
   assert.equal(bot.includes('createReceiptAPI'), false)
 })
