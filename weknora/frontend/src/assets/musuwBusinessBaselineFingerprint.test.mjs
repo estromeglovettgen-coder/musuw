@@ -9,46 +9,46 @@ const gitBlobSha = (text) => {
   return createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex')
 }
 
-// Three authorities are deliberately recorded:
-// 1) Tencent/WeKnora v0.7.2 is the upstream behavior contract.
-// 2) 76bc44... is Musuw's first explicit repository source baseline.
-// 3) 367a0c... is the product's pre-UI business baseline used by the existing
-//    Task-1 guard before the visual transplant began.
+// Authority order:
+// 1) Tencent/WeKnora v0.7.2 is the behavior contract.
+// 2) 76bc44... records Musuw's first published source baseline and is useful
+//    evidence only where it does not narrow/remove upstream v0.7.2 behavior.
+// 3) 367a0c... is the pre-UI product snapshot used to detect accidental
+//    visual-session mutations, not permission to preserve later product
+//    simplifications that conflict with the upstream behavior contract.
 const EXPECTED_UPSTREAM_COMMIT = '3d5d8bfcdfeeea266b292b71cea616847af28d0f'
 const INITIAL_MUSUW_BASELINE_COMMIT = '76bc44e15433e598c2c131e6873754e5ec5f4f5e'
 const PRE_UI_BUSINESS_BASELINE_COMMIT = '367a0c76e48fcf8a3762c33b672cfa2e16b679f4'
 const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b909'
 
-// Exact presentation-pre-rebuild business-controller snapshots on
-// ui/rebuild-from-visual-contract. Visual work must never edit them in place.
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': 'f2f5ceb08d7e6f2ee36ea12f8a67eea15b9c9612',
   './business-baselines/Input-field.pre-view.vue': 'a34d09f5f9dbe44d4b3835213fdab662c4b7446a',
   './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
-  './business-baselines/KnowledgeBaseList.pre-view.vue': '4379ee2fa0a16a366801765bdaf9597aa93bb9bf',
+  './business-baselines/KnowledgeBaseList.pre-view.vue': 'ee73dc142f2ceb90eea994720601021d74ce1d92',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '99a2c17c59bbd5b436492bba60a206b87400b527',
 }
 
-// These four current controller snapshots are byte-identical to the files at
-// Musuw's first explicit source baseline (76bc44...). This protects the user's
-// strongest "compare against the very first GitHub version" requirement.
+// These controllers remain byte-identical to Musuw's first source baseline.
+// KnowledgeBaseList is deliberately absent: the first Musuw snapshot had
+// narrowed WeKnora's All/Favorites/Recents/Organization scopes to `mine`; the
+// current controller restores the upstream v0.7.2 behavior instead.
 const INITIAL_MUSUW_BYTE_IDENTICAL = {
   './business-baselines/ChatIndex.pre-view.vue': 'f2f5ceb08d7e6f2ee36ea12f8a67eea15b9c9612',
   './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
-  './business-baselines/KnowledgeBaseList.pre-view.vue': '4379ee2fa0a16a366801765bdaf9597aa93bb9bf',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
 }
 
-// Input-field intentionally differs from 76bc44... because the product later
-// restored WeKnora's native multi-model selector in 72d340... . That commit is
-// business evolution, not a visual-transplant exception; the resulting pre-UI
-// controller blob is therefore locked above and must not be reverted by UI work.
 const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   inputField: {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
     authority: 'WeKnora v0.7.2 native multi-model selection',
+  },
+  knowledgeBaseList: {
+    resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
+    authority: 'WeKnora v0.7.2 native knowledge scopes and shared-space list behavior',
   },
 }
 
@@ -67,7 +67,7 @@ test('visual rebuild cannot mutate the locked business-controller snapshots', ()
   }
 })
 
-test('first Musuw baseline byte-identical controllers remain byte-identical', () => {
+test('first Musuw byte-identical controllers remain byte-identical where upstream behavior was not narrowed', () => {
   for (const [path, expected] of Object.entries(INITIAL_MUSUW_BYTE_IDENTICAL)) {
     assert.equal(gitBlobSha(read(path)), expected, `${path} drifted from initial Musuw source baseline`)
   }
@@ -75,13 +75,28 @@ test('first Musuw baseline byte-identical controllers remain byte-identical', ()
   assert.match(PRE_UI_BUSINESS_BASELINE_COMMIT, /^[0-9a-f]{40}$/)
 })
 
-test('intentional post-initial business evolution is explicit and locked, never inferred from UI code', () => {
+test('upstream behavior restorations are explicit and locked, never inferred from visual code', () => {
   assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.commit, NATIVE_MULTI_MODEL_RESTORE_COMMIT)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.resultingBlob,
     gitBlobSha(read('./business-baselines/Input-field.pre-view.vue')),
   )
+  assert.equal(
+    INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.resultingBlob,
+    gitBlobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),
+  )
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.authority, /WeKnora v0\.7\.2/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.authority, /WeKnora v0\.7\.2/)
+})
+
+test('knowledge list controller retains upstream scope behavior rather than Musuw single-scope narrowing', () => {
+  const source = read('./business-baselines/KnowledgeBaseList.pre-view.vue')
+  assert.ok(source.includes("const defaultScope: 'all' | 'mine' = authStore.hasRole('contributor') ? 'mine' : 'all'"))
+  assert.ok(source.includes("val === 'all' || val === 'mine' || val === 'favorites' || val === 'recents'"))
+  assert.ok(source.includes('listOrganizationSharedKnowledgeBases(val)'))
+  assert.ok(source.includes('orgStore.fetchSharedKnowledgeBases({ force })'))
+  assert.ok(source.includes('orgStore.fetchOrganizations({ force })'))
+  assert.equal(source.includes('spaceSelection.value !== "mine"'), false)
 })
 
 test('repository still declares the audited WeKnora v0.7.2 upstream authority', () => {
