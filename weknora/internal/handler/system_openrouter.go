@@ -1,11 +1,17 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/gin-gonic/gin"
 )
+
+type openRouterTenantProvisioner interface {
+	ProvisionOpenRouterKeysForExistingTenants(context.Context) (*types.OpenRouterTenantProvisionSummary, error)
+}
 
 // ProvisionOpenRouterTenantKeys godoc
 // @Summary      Provision OpenRouter keys for existing tenants
@@ -21,7 +27,12 @@ func (h *SystemHandler) ProvisionOpenRouterTenantKeys(c *gin.Context) {
 		c.Error(apperrors.NewInternalServerError("Tenant service is unavailable"))
 		return
 	}
-	summary, err := h.tenantSvc.ProvisionOpenRouterKeysForExistingTenants(c.Request.Context())
+	provisioner, ok := h.tenantSvc.(openRouterTenantProvisioner)
+	if !ok {
+		c.Error(apperrors.NewInternalServerError("OpenRouter tenant provisioning is unavailable"))
+		return
+	}
+	summary, err := provisioner.ProvisionOpenRouterKeysForExistingTenants(c.Request.Context())
 	if err != nil {
 		c.Error(apperrors.NewInternalServerError("Failed to provision OpenRouter tenant keys").WithDetails(err.Error()))
 		return
