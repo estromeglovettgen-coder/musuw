@@ -28,6 +28,15 @@ type ReconcilableSettings = {
   conversationModels?: { thinkingEnabled?: unknown };
 };
 
+const withAuthorityDefaults = <T extends ReconcilableSettings>(defaults: T): T => {
+  const cloned = cloneSettings(defaults)
+  // WeKnora v0.7.2 defaults Web Search off. First-Musuw changed the store
+  // constant to true for its managed experience; keep the large store file
+  // untouched and restore the effective runtime default at the storage boundary.
+  cloned.webSearchEnabled = false
+  return cloned
+}
+
 function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
   loaded.selectedTags ||= [];
   loaded.selectedMCPServices ||= [];
@@ -66,7 +75,7 @@ function resetStoredSettings<T extends ReconcilableSettings>(
     reason,
   );
   safeRemoveItem(SETTINGS_STORAGE_KEY);
-  return reconcileLoadedSettings(cloneSettings(defaultSettings));
+  return reconcileLoadedSettings(withAuthorityDefaults(defaultSettings));
 }
 
 /** Load settings from localStorage, reconcile builtin agent mode, fall back on corruption. */
@@ -76,7 +85,7 @@ export function loadAndReconcileSettings<T extends ReconcilableSettings>(
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!raw) {
-      return reconcileLoadedSettings(cloneSettings(defaultSettings));
+      return reconcileLoadedSettings(withAuthorityDefaults(defaultSettings));
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isStoredSettingsRecord(parsed)) {
