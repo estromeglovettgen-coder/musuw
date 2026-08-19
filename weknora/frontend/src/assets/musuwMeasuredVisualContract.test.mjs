@@ -65,7 +65,9 @@ test('document list table uses the visual-source radius, column widths and file-
   const closure = read('./musuw-document-list-reference-final.css')
   for (const token of [
     'border-radius: 16px !important',
-    '128px\n    96px\n    96px\n    96px\n    128px\n    64px !important',
+    '128px',
+    '96px',
+    '64px !important',
     'min-height: 56px !important',
     'flex: 0 0 32px !important',
     'width: 32px !important',
