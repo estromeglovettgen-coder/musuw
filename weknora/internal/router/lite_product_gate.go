@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,9 +11,31 @@ import (
 )
 
 const (
-	liteQuickAnswerAgentID   = "builtin-quick-answer"
-	liteSmartReasoningAgentID = "builtin-smart-reasoning"
+	musuwProductEditionEnv      = "MUSUW_PRODUCT_EDITION"
+	liteQuickAnswerAgentID      = "builtin-quick-answer"
+	liteSmartReasoningAgentID   = "builtin-smart-reasoning"
 )
+
+// Apply the optional product exposure override before NewRouter is built.
+// The production container already loads production.env, so operators can
+// switch Lite <-> Standard by changing one value and restarting the app.
+// Invalid/empty values are ignored and the build-time Edition remains intact.
+func init() {
+	if edition, ok := normalizeMusuwProductEdition(os.Getenv(musuwProductEditionEnv)); ok {
+		handler.Edition = edition
+	}
+}
+
+func normalizeMusuwProductEdition(raw string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "lite":
+		return "lite", true
+	case "standard":
+		return "standard", true
+	default:
+		return "", false
+	}
+}
 
 // liteProductGate is the server-side product exposure boundary for Musuw Lite.
 //
