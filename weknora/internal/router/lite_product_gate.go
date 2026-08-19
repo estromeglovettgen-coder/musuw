@@ -1,6 +1,9 @@
 package router
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -55,6 +58,45 @@ func serveLiteSystemInfo(c *gin.Context) {
 	})
 }
 
+func liteFavoriteRequestBlocked(c *gin.Context) bool {
+	const base = "/api/v1/user/favorites"
+	path := strings.TrimSpace(c.Request.URL.Path)
+	method := strings.ToUpper(strings.TrimSpace(c.Request.Method))
+
+	if path == base {
+		switch method {
+		case http.MethodGet:
+			return !strings.EqualFold(strings.TrimSpace(c.Query("type")), "kb")
+		case http.MethodPost:
+			body, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				return true
+			}
+			c.Request.Body = io.NopCloser(bytes.NewReader(body))
+			var req struct {
+				Type string `json:"type"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil {
+				return true
+			}
+			return !strings.EqualFold(strings.TrimSpace(req.Type), "kb")
+		default:
+			return true
+		}
+	}
+
+	if strings.HasPrefix(path, base+"/") {
+		if method != http.MethodDelete {
+			return true
+		}
+		rest := strings.TrimPrefix(path, base+"/")
+		parts := strings.SplitN(rest, "/", 2)
+		return len(parts) != 2 || !strings.EqualFold(strings.TrimSpace(parts[0]), "kb") || strings.TrimSpace(parts[1]) == ""
+	}
+
+	return false
+}
+
 // liteProductGate is the server-side product exposure boundary for Musuw Lite.
 //
 // Frontend hiding is UX only. This middleware is authoritative for authenticated
@@ -90,6 +132,14 @@ func liteProductGate() gin.HandlerFunc {
 		// handler, which also exposes database/vector/graph/storage internals.
 		if c.Request.Method == http.MethodGet && c.Request.URL.Path == "/api/v1/system/info" {
 			serveLiteSystemInfo(c)
+			return
+		}
+
+		// Favorites are shared by Knowledge Base and Agent directories upstream.
+		// Lite exposes the KB directory only, so the shared API is narrowed to
+		// type=kb instead of becoming an Agent discovery/mutation backdoor.
+		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/user/favorites") && liteFavoriteRequestBlocked(c) {
+			abortLiteProductRoute(c)
 			return
 		}
 
