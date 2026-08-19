@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Tencent/WeKnora/internal/event"
+	"github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/google/uuid"
@@ -87,6 +88,9 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 			"chat_model": chatManage.ChatModelID,
 			"error":      err.Error(),
 		})
+		if openrouter.IsCreditExhausted(err) {
+			return ErrCreditsExhausted.WithError(err)
+		}
 		return ErrModelCall.WithError(err)
 	}
 	if responseChan == nil {
@@ -112,6 +116,7 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 		thinkingID := fmt.Sprintf("%s-thinking", uuid.New().String()[:8])
 		answerID := fmt.Sprintf("%s-answer", uuid.New().String()[:8])
 		thinkingOpen := false
+		answerStarted := false
 		answerCompleted := false
 
 		closeThinking := func() {
@@ -146,6 +151,7 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 			}
 			answerTail := answerDecoder.Flush()
 			if answerTail != "" {
+				answerStarted = true
 				_ = eventBus.Emit(ctx, types.Event{
 					ID:        answerID,
 					Type:      types.EventType(event.EventAgentFinalAnswer),
@@ -153,6 +159,31 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 					Data:      event.AgentFinalAnswerData{Content: answerTail},
 				})
 			}
+		}
+
+		finishCreditExhausted := func() {
+			flushDecoders()
+			closeThinking()
+			if answerStarted && !answerCompleted {
+				_ = eventBus.Emit(ctx, types.Event{
+					ID:        answerID,
+					Type:      types.EventType(event.EventAgentFinalAnswer),
+					SessionID: chatManage.SessionID,
+					Data:      event.AgentFinalAnswerData{Done: true},
+				})
+				answerCompleted = true
+			}
+			_ = eventBus.Emit(ctx, types.Event{
+				ID:        fmt.Sprintf("%s-error", uuid.New().String()[:8]),
+				Type:      types.EventType(event.EventError),
+				SessionID: chatManage.SessionID,
+				Data: event.ErrorData{
+					Error:     "Monthly AI Credits exhausted",
+					ErrorCode: openrouter.CreditExhaustedCode,
+					Stage:     "chat_completion_stream",
+					SessionID: chatManage.SessionID,
+				},
+			})
 		}
 
 		for {
@@ -176,6 +207,13 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 				}
 
 				if response.ResponseType == types.ResponseTypeError {
+					if openrouter.PayloadIndicatesCreditExhausted([]byte(response.Content)) {
+						pipelineError(ctx, "Stream", "credits_exhausted", map[string]interface{}{
+							"session_id": chatManage.SessionID,
+						})
+						finishCreditExhausted()
+						return
+					}
 					pipelineError(ctx, "Stream", "stream_error", map[string]interface{}{
 						"session_id": chatManage.SessionID,
 						"error":      response.Content,
@@ -225,8 +263,14 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 						continue
 					}
 					response.Content = answerDecoder.Feed(response.Content)
+					if response.Content != "" {
+						answerStarted = true
+					}
 					if response.Done {
 						response.Content += answerDecoder.Flush()
+						if response.Content != "" {
+							answerStarted = true
+						}
 						answerCompleted = true
 					}
 					closeThinking()
