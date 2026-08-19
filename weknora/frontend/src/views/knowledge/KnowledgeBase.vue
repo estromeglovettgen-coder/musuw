@@ -79,8 +79,8 @@ export default defineComponent({
       </header>
 
       <div v-if="unsupportedFileTypes.length || missingStorageEngine" class="visual-knowledge-alerts">
-        <button v-if="unsupportedFileTypes.length" type="button" @click="goToParserSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map(t => '.' + t).join('、') }) }}</span><strong>{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
-        <button v-if="missingStorageEngine" type="button" @click="handleOpenKBSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.missingStorageEngine') }}</span><strong>{{ $t('knowledgeBase.goToStorageSettings') }} →</strong></button>
+        <button v-if="unsupportedFileTypes.length" type="button" :disabled="authStore.isLiteMode" @click="goToParserSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map(t => '.' + t).join('、') }) }}</span><strong v-if="!authStore.isLiteMode">{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
+        <button v-if="missingStorageEngine" type="button" :disabled="authStore.isLiteMode" @click="handleOpenKBSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.missingStorageEngine') }}</span><strong v-if="!authStore.isLiteMode">{{ $t('knowledgeBase.goToStorageSettings') }} →</strong></button>
       </div>
 
       <section v-if="isWiki && (activeKbTab === 'wiki' || activeKbTab === 'graph')" class="visual-knowledge-wiki-host">
@@ -204,6 +204,7 @@ export default defineComponent({
 .visual-knowledge-header__plain-tab { color: #374151; font-size: 12px; font-weight: 700; }
 .visual-knowledge-alerts { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 8px; }
 .visual-knowledge-alerts button { min-height: 30px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #6b7280; font: inherit; font-size: 11px; cursor: pointer; }
+.visual-knowledge-alerts button:disabled { cursor: default; }
 .visual-knowledge-alerts strong { color: #374151; }
 .visual-knowledge-wiki-host { min-height: 0; flex: 1 1 auto; overflow: hidden; }
 .visual-knowledge-documents { min-height: 0; flex: 1 1 auto; display: flex; gap: 12px; }
