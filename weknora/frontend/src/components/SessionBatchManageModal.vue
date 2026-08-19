@@ -10,7 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   toggle: [id: string]
-  'toggle-all': []
+  'toggle-all': [checked: boolean]
   delete: []
 }>()
 </script>
@@ -26,8 +26,8 @@ const emit = defineEmits<{
           </header>
 
           <div class="visual-batch-modal__body">
-            <button type="button" class="visual-batch-modal__select-all" @click="emit('toggle-all')">
-              <span class="visual-batch-modal__check"><t-icon :name="allSelected ? 'check-rectangle-filled' : 'rectangle'" /></span>
+            <button type="button" class="visual-batch-modal__select-all" @click="emit('toggle-all', !allSelected)">
+              <span class="visual-batch-modal__check"><t-icon :name="allSelected ? 'check-rectangle-filled' : indeterminate ? 'minus-rectangle-filled' : 'rectangle'" /></span>
               <strong>{{ $t('batchManage.selectAll') }}</strong>
               <small>{{ items.length }}</small>
             </button>
