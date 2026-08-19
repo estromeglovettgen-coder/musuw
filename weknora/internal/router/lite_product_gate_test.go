@@ -12,7 +12,8 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		blocked bool
 	}{
 		// Exposed product workflows.
-		{name: "chat", method: "POST", path: "/api/v1/chat/knowledge-chat/abc", blocked: false},
+		{name: "knowledge chat", method: "POST", path: "/api/v1/knowledge-chat/abc", blocked: false},
+		{name: "agent chat", method: "POST", path: "/api/v1/agent-chat/abc", blocked: false},
 		{name: "sessions", method: "GET", path: "/api/v1/sessions", blocked: false},
 		{name: "knowledge base", method: "POST", path: "/api/v1/knowledge-bases", blocked: false},
 		{name: "knowledge", method: "PUT", path: "/api/v1/knowledge/abc", blocked: false},
@@ -35,6 +36,10 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "organization kb shares", method: "GET", path: "/api/v1/organizations/3/shares", blocked: false},
 
 		// Hidden auth/workspace surfaces.
+		{name: "native register", method: "POST", path: "/api/v1/auth/register", blocked: true},
+		{name: "native password login", method: "POST", path: "/api/v1/auth/login", blocked: true},
+		{name: "native change password", method: "POST", path: "/api/v1/auth/change-password", blocked: true},
+		{name: "native auth config", method: "GET", path: "/api/v1/auth/config", blocked: true},
 		{name: "native lite auto setup", method: "POST", path: "/api/v1/auth/auto-setup", blocked: true},
 		{name: "workspace switch", method: "POST", path: "/api/v1/auth/switch-tenant", blocked: true},
 		{name: "workspace preference mutation", method: "PUT", path: "/api/v1/auth/me/preferences", blocked: true},
