@@ -63,7 +63,13 @@ const router = createRouter({
     {
       path: "/join",
       name: "joinOrganization",
-      redirect: "/platform/knowledge-bases",
+      redirect: (to) => {
+        const code = to.query.code as string
+        return {
+          path: '/platform/organizations',
+          query: code ? { invite_code: code } : {},
+        }
+      },
       meta: { requiresInit: true, requiresAuth: true }
     },
     {
@@ -114,12 +120,16 @@ const router = createRouter({
         },
         {
           path: "agents",
-          redirect: "/platform/creatChat",
+          name: "agentList",
+          component: () => import("../views/agent/AgentList.vue"),
           meta: { requiresInit: true, requiresAuth: true }
         },
         {
           path: "integrations",
-          redirect: { path: "/platform/settings", query: { section: "general" } },
+          redirect: (to) => ({
+            path: "/platform/settings",
+            query: { ...to.query, section: "integrations" },
+          }),
           meta: { requiresInit: true, requiresAuth: true }
         },
         {
@@ -142,7 +152,8 @@ const router = createRouter({
         },
         {
           path: "organizations",
-          redirect: "/platform/knowledge-bases",
+          name: "organizationList",
+          component: () => import("../views/organization/OrganizationList.vue"),
           meta: { requiresInit: true, requiresAuth: true }
         },
         // Compatibility redirects for /platform/system/* URLs. System
@@ -151,26 +162,26 @@ const router = createRouter({
         // external links.
         {
           path: "system",
-          redirect: { path: "/platform/settings", query: { section: "general" } },
-          meta: { requiresInit: true, requiresAuth: true },
+          redirect: { path: "/platform/settings", query: { section: "system-global" } },
+          meta: { requiresInit: true, requiresAuth: true, requiresSystemAdmin: true },
         },
         {
           path: "system/settings",
           name: "systemSettings",
-          redirect: { path: "/platform/settings", query: { section: "general" } },
-          meta: { requiresInit: true, requiresAuth: true },
+          redirect: { path: "/platform/settings", query: { section: "system-global" } },
+          meta: { requiresInit: true, requiresAuth: true, requiresSystemAdmin: true },
         },
         {
           path: "system/admins",
           name: "systemAdmins",
-          redirect: { path: "/platform/settings", query: { section: "general" } },
-          meta: { requiresInit: true, requiresAuth: true },
+          redirect: { path: "/platform/settings", query: { section: "system-global" } },
+          meta: { requiresInit: true, requiresAuth: true, requiresSystemAdmin: true },
         },
         {
           path: "system/queues",
           name: "systemQueues",
-          redirect: { path: "/platform/settings", query: { section: "general" } },
-          meta: { requiresInit: true, requiresAuth: true },
+          redirect: { path: "/platform/settings", query: { section: "runtime-queues" } },
+          meta: { requiresInit: true, requiresAuth: true, requiresSystemAdmin: true },
         },
       ],
     },
