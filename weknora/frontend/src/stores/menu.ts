@@ -59,12 +59,15 @@ export const useMenuStore = defineStore('menuStore', () => {
     }
   )
 
-  const liteHiddenPaths = new Set(['logout', 'organizations'])
+  // Musuw Lite is deliberately fail-closed: only product-approved top-level
+  // entries are visible. A newly-added upstream menu item must be explicitly
+  // reviewed before it can appear in the consumer product.
+  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases'])
 
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()
     return menuArr.filter(item => {
-      if (authStore.isLiteMode && liteHiddenPaths.has(item.path)) {
+      if (authStore.isLiteMode && !liteVisiblePaths.has(item.path)) {
         return false
       }
       if (item.path === 'organizations' && !authStore.hasRole('admin')) {
@@ -116,8 +119,8 @@ export const useMenuStore = defineStore('menuStore', () => {
     isFirstSession.value = payload
   }
 
-  const changeFirstQuery = (payload: string, mentionedItems: any[] = [], modelId: string = '', imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) => {
-    firstQuery.value = payload
+  const changeFirstQuery = (payload: boolean | string, mentionedItems: any[] = [], modelId: string = '', imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) => {
+    firstQuery.value = String(payload)
     firstMentionedItems.value = mentionedItems
     firstModelId.value = modelId
     firstImageFiles.value = imageFiles
