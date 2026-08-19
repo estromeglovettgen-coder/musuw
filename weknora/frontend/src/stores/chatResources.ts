@@ -265,7 +265,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
         agentKbCache.set(cacheKey, { at: Date.now(), data: list })
         return list
       } finally {
-        agentKbInflight.delete(agentId)
+        agentKbInflight.delete(cacheKey)
       }
     })()
     agentKbInflight.set(cacheKey, p)
