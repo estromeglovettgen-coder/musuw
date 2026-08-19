@@ -56,3 +56,15 @@ func TestKeyManagerUsesOfficialMonthlyLimitEndpoints(t *testing.T) {
 	assert.Equal(t, int64(100_000), info.UsageMonthlyMicrousd)
 	require.NoError(t, manager.DeleteKey(context.Background(), key.Hash))
 }
+
+func TestDeleteKeyTreatsMissingManagedKeyAsAlreadyDeleted(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Equal(t, "/keys/already-gone", r.URL.Path)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	manager := newHTTPKeyManager("management-secret", server.URL, server.Client())
+	require.NoError(t, manager.DeleteKey(context.Background(), "already-gone"))
+}
