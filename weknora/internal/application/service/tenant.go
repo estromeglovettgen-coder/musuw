@@ -3,12 +3,16 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/WeKnora/internal/utils"
 )
 
 // ListTenantsParams defines parameters for listing tenants with filtering and pagination
@@ -23,11 +27,20 @@ type ListTenantsParams struct {
 type tenantService struct {
 	repo        interfaces.TenantRepository // Repository for tenant data operations
 	storageRepo interfaces.StorageBackendRepository
+	keys        modelopenrouter.KeyManager
 }
 
 // NewTenantService creates a new tenant service instance
 func NewTenantService(repo interfaces.TenantRepository, storageRepo interfaces.StorageBackendRepository) interfaces.TenantService {
-	return &tenantService{repo: repo, storageRepo: storageRepo}
+	return newTenantService(repo, storageRepo, modelopenrouter.NewKeyManagerFromEnv())
+}
+
+func newTenantService(
+	repo interfaces.TenantRepository,
+	storageRepo interfaces.StorageBackendRepository,
+	keys modelopenrouter.KeyManager,
+) *tenantService {
+	return &tenantService{repo: repo, storageRepo: storageRepo, keys: keys}
 }
 
 // CreateTenant creates a new tenant
@@ -41,8 +54,9 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 
 	logger.Infof(ctx, "Creating tenant, name: %s", tenant.Name)
 
-	// New tenants do not receive an API key by default. Integrations create
-	// keys explicitly through tenant_api_keys.
+	// New tenants do not receive an integration API key by default. OpenRouter
+	// inference credentials are different: when the Management API is configured
+	// the personal workspace receives its own provider-managed monthly key.
 	tenant.Status = "active"
 	tenant.CreatedAt = time.Now()
 	tenant.UpdatedAt = time.Now()
@@ -61,9 +75,17 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 		})
 		return nil, err
 	}
+
+	if err := s.provisionOpenRouterTenantKey(ctx, tenant); err != nil {
+		_ = s.repo.DeleteTenant(ctx, tenant.ID)
+		return nil, err
+	}
 	if err := s.createDefaultStorageBackend(ctx, tenant); err != nil {
-		// No related rows exist yet, so rolling the tenant back is safe and
-		// avoids leaving a workspace that cannot bind new knowledge bases.
+		// No user content exists yet, so roll back both external inference
+		// credentials and the workspace instead of leaving a half-created tenant.
+		if cleanupErr := s.deleteOpenRouterTenantKey(ctx, tenant); cleanupErr != nil {
+			logger.Warnf(ctx, "failed to clean OpenRouter key while rolling back tenant %d: %v", tenant.ID, cleanupErr)
+		}
 		_ = s.repo.DeleteTenant(ctx, tenant.ID)
 		return nil, err
 	}
@@ -95,6 +117,60 @@ func (s *tenantService) createDefaultStorageBackend(ctx context.Context, tenant 
 	if err := s.repo.UpdateTenant(ctx, tenant); err != nil {
 		_ = s.storageRepo.Delete(ctx, tenant.ID, backend.ID)
 		return err
+	}
+	return nil
+}
+
+func (s *tenantService) provisionOpenRouterTenantKey(ctx context.Context, tenant *types.Tenant) error {
+	if tenant == nil || tenant.ID == 0 || strings.TrimSpace(tenant.Status) != "active" {
+		return nil
+	}
+	if tenant.Credentials != nil && tenant.Credentials.GetOpenRouter() != nil {
+		return nil
+	}
+	// Local/test deployments may intentionally omit the Management API. The
+	// production contract requires the secret before rollout, while lazy
+	// entitlement provisioning remains a migration fallback for old tenants.
+	if s.keys == nil {
+		return nil
+	}
+	if utils.GetAESKey() == nil {
+		return fmt.Errorf("SYSTEM_AES_KEY must contain exactly 32 bytes before provisioning OpenRouter tenant keys")
+	}
+
+	limit := types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
+	created, err := s.keys.CreateKey(ctx, fmt.Sprintf("musuw-tenant-%d", tenant.ID), limit)
+	if err != nil {
+		return fmt.Errorf("create OpenRouter tenant key: %w", err)
+	}
+	if tenant.Credentials == nil {
+		tenant.Credentials = &types.CredentialsConfig{}
+	}
+	tenant.Credentials.OpenRouter = &types.OpenRouterCredentials{APIKey: created.Key, KeyHash: created.Hash}
+	if err := s.repo.UpdateTenant(ctx, tenant); err != nil {
+		_ = s.keys.DeleteKey(ctx, created.Hash)
+		tenant.Credentials.OpenRouter = nil
+		return fmt.Errorf("persist OpenRouter tenant credentials: %w", err)
+	}
+	return nil
+}
+
+// deleteOpenRouterTenantKey removes the provider key and then clears only the
+// OpenRouter member of Tenant.credentials, preserving unrelated credentials.
+func (s *tenantService) deleteOpenRouterTenantKey(ctx context.Context, tenant *types.Tenant) error {
+	if tenant == nil || tenant.Credentials == nil || tenant.Credentials.GetOpenRouter() == nil {
+		return nil
+	}
+	credentials := tenant.Credentials.GetOpenRouter()
+	if s.keys == nil {
+		return fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured; refusing to orphan tenant key %s", credentials.KeyHash)
+	}
+	if err := s.keys.DeleteKey(ctx, credentials.KeyHash); err != nil {
+		return fmt.Errorf("delete OpenRouter tenant key: %w", err)
+	}
+	tenant.Credentials.OpenRouter = nil
+	if err := s.repo.UpdateTenant(ctx, tenant); err != nil {
+		return fmt.Errorf("clear deleted OpenRouter tenant credentials: %w", err)
 	}
 	return nil
 }
@@ -143,6 +219,10 @@ func (s *tenantService) UpdateTenant(ctx context.Context, tenant *types.Tenant) 
 
 	logger.Infof(ctx, "Updating tenant, ID: %d, name: %s", tenant.ID, tenant.Name)
 
+	before, err := s.repo.GetTenantByID(ctx, tenant.ID)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateStorageBucketUniqueness(ctx, tenant); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"tenant_id": tenant.ID,
@@ -160,6 +240,27 @@ func (s *tenantService) UpdateTenant(ctx context.Context, tenant *types.Tenant) 
 		return nil, err
 	}
 
+	wasActive := strings.TrimSpace(before.Status) == "active"
+	isActive := strings.TrimSpace(tenant.Status) == "active"
+	if wasActive && !isActive {
+		// The provider has no separate disabled flag in the Management API
+		// surface used here, so suspension deletes the server-only inference key.
+		// Reactivation provisions a fresh monthly-limited key below.
+		if tenant.Credentials == nil {
+			tenant.Credentials = before.Credentials
+		}
+		if err := s.deleteOpenRouterTenantKey(ctx, tenant); err != nil {
+			return nil, err
+		}
+	} else if !wasActive && isActive {
+		if tenant.Credentials == nil {
+			tenant.Credentials = before.Credentials
+		}
+		if err := s.provisionOpenRouterTenantKey(ctx, tenant); err != nil {
+			return nil, err
+		}
+	}
+
 	logger.Infof(ctx, "Tenant updated successfully, ID: %d", tenant.ID)
 	return tenant, nil
 }
@@ -175,10 +276,10 @@ func (s *tenantService) DeleteTenant(ctx context.Context, id uint64) error {
 
 	logger.Infof(ctx, "Deleting tenant, ID: %d", id)
 
-	// Get tenant information for logging
+	// Get tenant information for logging and provider-key cleanup.
 	tenant, err := s.repo.GetTenantByID(ctx, id)
 	if err != nil {
-		if err.Error() == "record not found" {
+		if err.Error() == "record not found" || err.Error() == "tenant not found" {
 			logger.Warnf(ctx, "Tenant to be deleted does not exist, ID: %d", id)
 		} else {
 			logger.ErrorWithFields(ctx, err, map[string]interface{}{
@@ -188,6 +289,9 @@ func (s *tenantService) DeleteTenant(ctx context.Context, id uint64) error {
 		}
 	} else {
 		logger.Infof(ctx, "Deleting tenant, ID: %d, name: %s", id, tenant.Name)
+		if err := s.deleteOpenRouterTenantKey(ctx, tenant); err != nil {
+			return err
+		}
 	}
 
 	err = s.repo.DeleteTenant(ctx, id)
