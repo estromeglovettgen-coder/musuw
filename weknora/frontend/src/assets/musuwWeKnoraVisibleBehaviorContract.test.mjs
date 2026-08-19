@@ -12,7 +12,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
  */
 
 test('WeKnora application routes remain reachable instead of being hidden by the skin', () => {
-  const router = read('../../router/index.ts')
+  const router = read('../router/index.ts')
   assert.ok(router.includes('path: "agents"'))
   assert.ok(router.includes('name: "agentList"'))
   assert.ok(router.includes('import("../views/agent/AgentList.vue")'))
@@ -27,7 +27,7 @@ test('WeKnora application routes remain reachable instead of being hidden by the
 })
 
 test('native sidebar capabilities stay exposed while visual structure remains rebuilt', () => {
-  const store = read('../../stores/menu.ts')
+  const store = read('../stores/menu.ts')
   const sidebar = read('../components/menu.vue')
   for (const path of ['agents', 'organizations']) {
     assert.ok(store.includes(`path: '${path}'`), `menu store lost ${path}`)
@@ -56,7 +56,7 @@ test('chat composer keeps native Agent/WebSearch behavior inside reference topol
 
 test('full WeKnora settings capability set remains mounted in the reference SettingsModal shell', () => {
   const settings = read('../views/settings/Settings.vue')
-  const access = read('../../config/settingsAccess.ts')
+  const access = read('../config/settingsAccess.ts')
   const requiredComponents = [
     'GeneralSettings', 'UserProfile', 'TenantInfo', 'TenantMembers', 'ChatHistorySettings',
     'ModelSettings', 'OllamaSettings', 'WeKnoraCloudSettings', 'IntegrationSettingsSection',
