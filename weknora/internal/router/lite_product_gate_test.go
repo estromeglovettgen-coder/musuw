@@ -34,6 +34,13 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "organization read for kb sharing", method: "GET", path: "/api/v1/organizations/3", blocked: false},
 		{name: "organization kb shares", method: "GET", path: "/api/v1/organizations/3/shares", blocked: false},
 
+		// Hidden auth/workspace surfaces.
+		{name: "native lite auto setup", method: "POST", path: "/api/v1/auth/auto-setup", blocked: true},
+		{name: "workspace switch", method: "POST", path: "/api/v1/auth/switch-tenant", blocked: true},
+		{name: "workspace preference mutation", method: "PUT", path: "/api/v1/auth/me/preferences", blocked: true},
+		{name: "invite registration", method: "POST", path: "/api/v1/auth/register-by-invite", blocked: true},
+		{name: "invite lookup", method: "POST", path: "/api/v1/auth/invitations/lookup", blocked: true},
+
 		// Hidden management/discovery surfaces.
 		{name: "model providers", method: "GET", path: "/api/v1/models/providers", blocked: true},
 		{name: "model create", method: "POST", path: "/api/v1/models", blocked: true},
