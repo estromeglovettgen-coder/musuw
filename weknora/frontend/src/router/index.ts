@@ -28,7 +28,9 @@ async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) 
         const response = await getSystemInfo()
         const edition = String(response.data?.edition || '').trim().toLowerCase()
         if (edition === 'lite' || edition === 'standard') {
-          authStore.setLiteMode(edition === 'lite')
+          const isLite = edition === 'lite'
+          authStore.setLiteMode(isLite)
+          if (isLite) authStore.setSelectedTenant(null)
         }
       } catch {
         // Backend API authorization remains authoritative. A transient edition
@@ -364,6 +366,7 @@ router.beforeEach(async (to, from, next) => {
         return
       }
     }
+    await ensureProductEdition(authStore)
     if (authStore.hasValidTenant) {
       next('/platform/knowledge-bases')
     } else {
