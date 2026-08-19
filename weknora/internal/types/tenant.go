@@ -246,11 +246,11 @@ func (c *APIPrincipalConfig) Value() (driver.Value, error) {
 	}
 	cp := *c
 	if cp.HMACSecret != "" {
-		if key := utils.GetAESKey(); key != nil {
-			if encrypted, err := utils.EncryptAESGCM(cp.HMACSecret, key); err == nil {
-				cp.HMACSecret = encrypted
-			}
+		encrypted, err := encryptStoredSecretStrict("tenant.api_principal_config.hmac_secret", cp.HMACSecret)
+		if err != nil {
+			return nil, err
 		}
+		cp.HMACSecret = encrypted
 	}
 	return json.Marshal(&cp)
 }
@@ -305,18 +305,18 @@ func (c *CredentialsConfig) Value() (driver.Value, error) {
 	}
 	cp := *c
 	if cp.WeKnoraCloud != nil && cp.WeKnoraCloud.AppSecret != "" {
-		if key := utils.GetAESKey(); key != nil {
-			if encrypted, err := utils.EncryptAESGCM(cp.WeKnoraCloud.AppSecret, key); err == nil {
-				cp.WeKnoraCloud = &WeKnoraCloudCredentials{AppID: cp.WeKnoraCloud.AppID, AppSecret: encrypted}
-			}
+		encrypted, err := encryptStoredSecretStrict("tenant.credentials.weknoracloud.app_secret", cp.WeKnoraCloud.AppSecret)
+		if err != nil {
+			return nil, err
 		}
+		cp.WeKnoraCloud = &WeKnoraCloudCredentials{AppID: cp.WeKnoraCloud.AppID, AppSecret: encrypted}
 	}
 	if cp.OpenRouter != nil && cp.OpenRouter.APIKey != "" {
-		if key := utils.GetAESKey(); key != nil {
-			if encrypted, err := utils.EncryptAESGCM(cp.OpenRouter.APIKey, key); err == nil {
-				cp.OpenRouter = &OpenRouterCredentials{APIKey: encrypted, KeyHash: cp.OpenRouter.KeyHash}
-			}
+		encrypted, err := encryptStoredSecretStrict("tenant.credentials.openrouter.api_key", cp.OpenRouter.APIKey)
+		if err != nil {
+			return nil, err
 		}
+		cp.OpenRouter = &OpenRouterCredentials{APIKey: encrypted, KeyHash: cp.OpenRouter.KeyHash}
 	}
 	return json.Marshal(cp)
 }
