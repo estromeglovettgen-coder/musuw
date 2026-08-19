@@ -52,8 +52,11 @@ import "@/assets/musuw-native-directory-reference.css";
 // components but inherit the visual-file SettingsModal grammar.
 import "@/assets/musuw-settings-reference-inner.css";
 // Resolve final collisions between exact reference masks and native-only
-// controls; this must stay last among Musuw presentation layers.
+// controls.
 import "@/assets/musuw-final-contract-closure.css";
+// Direct QAPanel counterpart closure (AtSign, mention popup) loads last so exact
+// source geometry wins over generic native-extension styling.
+import "@/assets/musuw-qapanel-reference-final.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
