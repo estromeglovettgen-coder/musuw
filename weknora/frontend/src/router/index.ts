@@ -21,13 +21,14 @@ let editionProbeDone = false
 let editionProbePromise: Promise<void> | null = null
 
 async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) {
-  if (isLiteEdition(authStore) || editionProbeDone) return
+  if (editionProbeDone) return
   if (!editionProbePromise) {
     editionProbePromise = (async () => {
       try {
         const response = await getSystemInfo()
-        if (String(response.data?.edition || '').trim().toLowerCase() === 'lite') {
-          authStore.setLiteMode(true)
+        const edition = String(response.data?.edition || '').trim().toLowerCase()
+        if (edition === 'lite' || edition === 'standard') {
+          authStore.setLiteMode(edition === 'lite')
         }
       } catch {
         // Backend API authorization remains authoritative. A transient edition
@@ -397,7 +398,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Resolve the server-owned Edition before evaluating browser exposure. This
-  // closes the first-load window where localStorage has not yet been seeded.
+  // closes both first-load discovery and stale localStorage after a Lite ↔ Standard switch.
   await ensureProductEdition(authStore)
 
   if (to.meta.requiresTenant !== false && !authStore.hasValidTenant) {
