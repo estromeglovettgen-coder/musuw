@@ -13,6 +13,10 @@ const generalSettings = read("../views/settings/GeneralSettings.vue");
 const sidebar = read("../components/menu.vue");
 const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
 const knowledgeBaseListController = read("../assets/business-baselines/KnowledgeBaseList.pre-view.vue");
+const commandPalette = read("../components/GlobalCommandPalette.vue");
+const commands = read("../components/GlobalCommandPalette/commands.ts");
+const newUserGuide = read("../components/NewUserGuide.vue");
+const settingsStorage = read("../stores/settingsStorage.ts");
 
 /**
  * Historical note: this file used to enforce a Musuw-only "managed experience"
@@ -93,4 +97,33 @@ test("user dropdown keeps account/workspace/help/system actions instead of two-i
   ]) {
     assert.ok(userMenu.includes(token), `UserMenu narrowing regression: ${token}`);
   }
+});
+
+test("Command Palette keeps native Agent search, Organizations gating and product tour commands", () => {
+  for (const token of [
+    "isGroupVisible('agents')",
+    'agentMatches.length',
+    "return ['chunks', 'messages', 'kbs', 'agents', 'sessions', 'commands']",
+    'agents: agentMatches.value.length',
+    'openAgent(a.id)',
+    "path: '/platform/creatChat', query: { agent_id: agentId }",
+  ]) assert.ok(commandPalette.includes(token), `Command Palette narrowing regression: ${token}`);
+  for (const id of ['open-agents', 'open-organizations', 'open-product-tour']) {
+    assert.ok(commands.includes(`id: '${id}'`), `quick command disappeared: ${id}`);
+  }
+  assert.ok(commandPalette.includes("cmds.filter((c) => c.id !== 'open-organizations')"));
+});
+
+test("global invitation and onboarding surfaces stay mounted", () => {
+  assert.ok(newUserGuide.includes("key: 'agents'"));
+  assert.ok(newUserGuide.includes("key: 'models'"));
+  assert.ok(newUserGuide.includes('<GlobalInvitationBell />'));
+  assert.ok(newUserGuide.includes('<AgentListContextualGuideBridge />'));
+});
+
+test("settings storage no longer forces the managed Agent/WebSearch experience", () => {
+  assert.doesNotMatch(settingsStorage, /selectedAgentSourceTenantId\s*=\s*undefined/);
+  assert.doesNotMatch(settingsStorage, /webSearchEnabled\s*=\s*true/);
+  assert.match(settingsStorage, /cloned\.webSearchEnabled\s*=\s*false/);
+  assert.match(settingsStorage, /thinkingEnabled/);
 });
