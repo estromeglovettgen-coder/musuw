@@ -269,11 +269,19 @@ onUnmounted(() => {
 
     <Transition name="visual-user-menu-pop">
       <div v-if="menuVisible" class="visual-user-menu__dropdown" @click.stop>
-        <button type="button" class="visual-user-menu__account" @click="handleQuickNav('userprofile')">
+        <div
+          class="visual-user-menu__account"
+          :class="{ 'is-clickable': !authStore.isLiteMode }"
+          :role="!authStore.isLiteMode ? 'button' : undefined"
+          :tabindex="!authStore.isLiteMode ? 0 : undefined"
+          @click="!authStore.isLiteMode && handleQuickNav('userprofile')"
+          @keydown.enter.prevent="!authStore.isLiteMode && handleQuickNav('userprofile')"
+          @keydown.space.prevent="!authStore.isLiteMode && handleQuickNav('userprofile')"
+        >
           <span class="visual-user-menu__avatar is-small"><img v-if="userAvatar" :src="userAvatar" alt="" /><span v-else>{{ userInitial }}</span></span>
           <span class="visual-user-menu__account-copy"><strong>{{ userName }}</strong><small>{{ userEmail }}</small></span>
-          <button type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
-        </button>
+          <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
+        </div>
 
         <div
           v-if="!authStore.isLiteMode"
@@ -289,20 +297,20 @@ onUnmounted(() => {
         </div>
 
         <div class="visual-user-menu__divider" />
-        <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="user" /><span>{{ $t('general.personalSettings') }}</span></button>
+        <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__item" @click="handleQuickNav('tenant')"><t-icon name="user-circle" /><span>{{ $t('settings.workspaceSettings') }}</span></button>
-        <button v-if="canManageMembers" type="button" class="visual-user-menu__item" @click="handleQuickNav('members')"><t-icon name="usergroup" /><span>{{ $t('tenantMember.title') }}</span></button>
-        <button v-if="canManageModels" type="button" class="visual-user-menu__item" @click="handleQuickNav('models')"><t-icon name="control-platform" /><span>{{ $t('settings.modelManagement') }}</span></button>
-
-        <div class="visual-user-menu__divider" />
-        <button type="button" class="visual-user-menu__item" @click="handleSettings"><t-icon name="setting" /><span>{{ $t('general.allSettings') }}</span></button>
-        <button v-if="authStore.isSystemAdmin" type="button" class="visual-user-menu__item" @click="handleSystemAdmin"><t-icon name="server" /><span>{{ $t('settings.system') }}</span></button>
-
-        <div class="visual-user-menu__divider" />
-        <button type="button" class="visual-user-menu__item" @click="openDocs"><t-icon name="help-circle" /><span>{{ $t('general.helpAndDocs') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
-        <button type="button" class="visual-user-menu__item" @click="openGithub"><t-icon name="logo-github" /><span>{{ $t('common.github') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
+        <button v-if="!authStore.isLiteMode && canManageMembers" type="button" class="visual-user-menu__item" @click="handleQuickNav('members')"><t-icon name="usergroup" /><span>{{ $t('tenantMember.title') }}</span></button>
+        <button v-if="!authStore.isLiteMode && canManageModels" type="button" class="visual-user-menu__item" @click="handleQuickNav('models')"><t-icon name="control-platform" /><span>{{ $t('settings.modelManagement') }}</span></button>
 
         <template v-if="!authStore.isLiteMode">
+          <div class="visual-user-menu__divider" />
+          <button type="button" class="visual-user-menu__item" @click="handleSettings"><t-icon name="setting" /><span>{{ $t('general.allSettings') }}</span></button>
+          <button v-if="authStore.isSystemAdmin" type="button" class="visual-user-menu__item" @click="handleSystemAdmin"><t-icon name="server" /><span>{{ $t('settings.system') }}</span></button>
+
+          <div class="visual-user-menu__divider" />
+          <button type="button" class="visual-user-menu__item" @click="openDocs"><t-icon name="help-circle" /><span>{{ $t('general.helpAndDocs') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
+          <button type="button" class="visual-user-menu__item" @click="openGithub"><t-icon name="logo-github" /><span>{{ $t('common.github') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
+
           <div class="visual-user-menu__divider" />
           <button type="button" class="visual-user-menu__item is-danger" @click="handleLogout"><t-icon name="logout" /><span>{{ $t('auth.logout') }}</span></button>
         </template>
@@ -351,8 +359,9 @@ onUnmounted(() => {
 .visual-user-menu__caret.is-open { transform: rotate(180deg); color: #374151; }
 .visual-user-menu__dropdown { position: absolute; left: 0; right: 0; bottom: 56px; z-index: 3000; max-height: min(620px, calc(100vh - 88px)); overflow-y: auto; padding: 8px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 16px; background: #fff; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%),0 8px 10px -6px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 3px; text-align: left; }
 .visual-user-menu.is-collapsed .visual-user-menu__dropdown { left: calc(100% + 8px); right: auto; bottom: 0; width: 264px; }
-.visual-user-menu__account { width: 100%; padding: 8px; border: 0; border-radius: 12px; background: #f9fafb; display: flex; align-items: center; gap: 9px; color: #374151; font: inherit; text-align: left; cursor: pointer; }
-.visual-user-menu__account:hover { background: #f3f4f6; }
+.visual-user-menu__account { width: 100%; padding: 8px; border: 0; border-radius: 12px; background: #f9fafb; display: flex; align-items: center; gap: 9px; color: #374151; font: inherit; text-align: left; cursor: default; }
+.visual-user-menu__account.is-clickable { cursor: pointer; }
+.visual-user-menu__account.is-clickable:hover { background: #f3f4f6; }
 .visual-user-menu__account-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .visual-user-menu__account-copy strong,.visual-user-menu__account-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .visual-user-menu__account-copy strong { color: #111827; font-size: 12px; line-height: 16px; }
