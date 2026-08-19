@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,6 @@ import (
 
 type entitlementRepoStub struct {
 	tenant *types.Tenant
-	used   int64
 }
 
 func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*types.Tenant, error) {
@@ -40,11 +38,6 @@ func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context
 	copy := *credentials
 	s.tenant.Credentials.OpenRouter = &copy
 	return true, nil
-}
-
-func (s *entitlementRepoStub) RecordOpenRouterCost(_ context.Context, _ uint64, _ time.Time, cost int64) (int64, error) {
-	s.used += cost
-	return s.used, nil
 }
 
 func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, _ string, _ time.Time, _, _ string) (bool, error) {
@@ -148,14 +141,6 @@ func TestEntitlementServiceUsesProviderUsageAndSynchronizesPlanLimit(t *testing.
 	assert.Equal(t, int64(250_000), current.OpenRouterUsedMicrousd)
 	assert.Equal(t, int64(1_000_000), current.OpenRouterRemainingMicrousd)
 	assert.Equal(t, int64(1_250_000), current.MonthlyOpenRouterMicrousd)
-	// Local request-price estimates no longer gate an otherwise-positive official balance.
-	require.NoError(t, svc.PreflightOpenRouter(ctx, time.Now(), 99_000_000))
-
-	manager.info.LimitRemainingMicrousd = 0
-	err = svc.PreflightOpenRouter(ctx, time.Now(), 1)
-	var appErr *apperrors.AppError
-	require.ErrorAs(t, err, &appErr)
-	assert.Equal(t, apperrors.ErrTooManyRequests, appErr.Code)
 
 	_, err = svc.ApplyConsumerPlan(ctx, 7, types.ConsumerPlanPro, "active", "evt-1", time.Now(), "customer", "sub")
 	require.NoError(t, err)
