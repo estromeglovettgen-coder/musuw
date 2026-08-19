@@ -248,6 +248,10 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 	knowledgeFailer := newDeadLetterKnowledgeFailer(params.KnowledgeService, params.SpanTracker)
 	mux.Use(asynqdl.MiddlewareWithCallback(params.DeadLetterRepo, knowledgeFailer))
 
+	// Provider monthly-credit exhaustion is non-transient. Persist a retryable
+	// credit_exhausted Knowledge state and tell Asynq not to repeat the request.
+	mux.Use(openRouterCreditExhaustionMiddleware(params.KnowledgeService, params.SpanTracker))
+
 	// Mark every asynq worker execution as a background task so the chat
 	// concurrency governor throttles ingestion/enrichment LLM traffic while
 	// leaving user-facing interactive chat ungated. Installed early so all
@@ -322,7 +326,6 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 			if err := srv.Run(mux); err != nil {
 				log.Fatalf("could not run %s asynq server: %v", name, err)
 			}
-		}()
 	}
 	runPool("core-pool", params.CoreServer)
 	runPool("postprocess-pool", params.PostProcessServer)
