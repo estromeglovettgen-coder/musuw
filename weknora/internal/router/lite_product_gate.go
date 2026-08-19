@@ -44,6 +44,17 @@ func abortLiteProductRoute(c *gin.Context) {
 	})
 }
 
+func serveLiteSystemInfo(c *gin.Context) {
+	c.AbortWithStatusJSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "success",
+		"data": gin.H{
+			"version": handler.Version,
+			"edition": handler.Edition,
+		},
+	})
+}
+
 // liteProductGate is the server-side product exposure boundary for Musuw Lite.
 //
 // Frontend hiding is UX only. This middleware is authoritative for authenticated
@@ -71,6 +82,14 @@ func liteProductGate() gin.HandlerFunc {
 		// state can be cleared.
 		if strings.TrimSpace(c.GetHeader("X-Tenant-ID")) != "" && c.Request.URL.Path != "/api/v1/system/info" {
 			abortLiteProductRoute(c)
+			return
+		}
+
+		// The browser only needs Edition to activate/deactivate the Musuw product
+		// boundary. Do not pass Lite /system/info through to the full system
+		// handler, which also exposes database/vector/graph/storage internals.
+		if c.Request.Method == http.MethodGet && c.Request.URL.Path == "/api/v1/system/info" {
+			serveLiteSystemInfo(c)
 			return
 		}
 
