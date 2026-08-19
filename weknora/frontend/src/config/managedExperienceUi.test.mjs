@@ -35,6 +35,13 @@ test("Lite sidebar is fail-closed to New Chat and Knowledge Base", () => {
   }
 });
 
+test("server Edition owns Lite activation and can clear stale browser Lite state", () => {
+  assert.match(router, /await ensureProductEdition\(authStore\)/);
+  assert.match(router, /edition === 'lite' \|\| edition === 'standard'/);
+  assert.match(router, /authStore\.setLiteMode\(edition === 'lite'\)/);
+  assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
+});
+
 test("Lite route guard blocks hidden pages and normalizes Settings deep links", () => {
   for (const allowed of [
     "path === '/platform/creatChat'",
@@ -70,13 +77,15 @@ test("Lite Settings exposes General only and General exposes Language only", () 
   assert.doesNotMatch(generalSettings, /isAutoCheckUpdateEnabled|toggleAutoCheckUpdate/);
 });
 
-test("Lite UserMenu does not rediscover hidden management surfaces", () => {
+test("Lite UserMenu keeps account exit but does not rediscover management surfaces", () => {
   assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account"/);
   assert.match(userMenu, /<button v-if="!authStore\.isLiteMode" type="button" class="visual-user-menu__guide"/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/);
   assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*openDocs[\s\S]*openGithub/);
   assert.match(userMenu, /handleQuickNav\('general'\)/);
+  assert.match(userMenu, /class="visual-user-menu__item is-danger" @click="handleLogout"/);
+  assert.match(userMenu, /handoffToExternalAuth\('logout'\)/);
 });
 
 test("Lite disables Command Palette as an alternate discovery path", () => {
