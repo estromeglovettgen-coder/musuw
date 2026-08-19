@@ -91,6 +91,7 @@ type RouterParams struct {
 func NewRouter(params RouterParams) *gin.Engine {
 	r := gin.New()
 	r.ContextWithFallback = true
+	isLiteEdition := strings.EqualFold(strings.TrimSpace(handler.Edition), "lite")
 
 	// Trusted proxies: gin defaults to trusting ALL proxies, which makes
 	// c.ClientIP() honor a client-supplied X-Forwarded-For. Public, unauthed
@@ -140,39 +141,39 @@ func NewRouter(params RouterParams) *gin.Engine {
 		))
 	}
 
-	// Embed page framing policy: emit a per-channel `frame-ancestors` CSP so the
-	// embed SPA page (/embed/:channelId) can only be iframed by the channel's
-	// allowed origins. This is the page-level counterpart to the API Origin
-	// allowlist enforced in EmbedAuth. Registered before the static handler so
-	// it runs for the embed HTML response.
-	if params.EmbedChannelService != nil {
+	// Embed infrastructure is a Standard-only product surface. Lite does not
+	// register its public page/API entry points at all, so publish tokens cannot
+	// be used to bypass the consumer product boundary.
+	if !isLiteEdition && params.EmbedChannelService != nil {
 		r.Use(embedFrameAncestorsMiddleware(params.EmbedChannelService))
 	}
 
 	// 前端静态文件（仅 Lite 版本内嵌前端）
-	if handler.Edition == "lite" {
+	if isLiteEdition {
 		serveFrontendStatic(r)
 	}
 
-	// IM 回调路由（在认证中间件之前注册，使用各平台自身的签名验证）
-	RegisterIMRoutes(r, params.IMHandler)
+	// IM callbacks, public Embed routes and short-lived resource grants belong
+	// to hidden integration surfaces. Keep their source for Standard, but do not
+	// register them in Musuw Lite.
+	if !isLiteEdition {
+		RegisterIMRoutes(r, params.IMHandler)
+		RegisterEmbedPublicRoutes(
+			r,
+			params.EmbedChannelHandler,
+			params.EmbedChannelService,
+			params.TenantService,
+			params.RedisClient,
+			params.FileService,
+			params.StorageBackendResolver,
+			params.ResourceCatalog,
+		)
+		serveResourceGrants(r, params.ResourceCatalog, params.TenantService, params.FileService, params.StorageBackendResolver)
+	}
+
+	// Billing provider callbacks are infrastructure, not a user-facing product
+	// capability, and must remain reachable for subscription state updates.
 	r.POST("/api/v1/billing/paddle/webhook", params.EntitlementHandler.PaddleWebhook)
-
-	// Web embed 公开路由（使用 publish token 鉴权，不走全局 Auth）
-	RegisterEmbedPublicRoutes(
-		r,
-		params.EmbedChannelHandler,
-		params.EmbedChannelService,
-		params.TenantService,
-		params.RedisClient,
-		params.FileService,
-		params.StorageBackendResolver,
-		params.ResourceCatalog,
-	)
-
-	// Short-lived capability URLs for IM and other clients that cannot attach
-	// WeKnora authentication headers.
-	serveResourceGrants(r, params.ResourceCatalog, params.TenantService, params.FileService, params.StorageBackendResolver)
 
 	// 认证中间件
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.Config))
