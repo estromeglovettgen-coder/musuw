@@ -5,6 +5,15 @@ import { useOrganizationStore } from '@/stores/organization'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useMenuStore } from '@/stores/menu'
 
+function isLiteProductMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('weknora_lite_mode') === 'true'
+  } catch {
+    return false
+  }
+}
+
 export interface CmdkKb {
   id: string
   name: string
@@ -57,11 +66,7 @@ export interface CmdkMsgGroup {
  * useCmdkSearch — debounced, cancellable search that fans out to
  *   • /api/v1/knowledge-search (chunks / files)
  *   • /api/v1/messages/search  (chat history)
- * and produces three client-side groups: kbs / files / messages.
- *
- * Cancellation is implemented with a monotonically-increasing request id so
- * that stale responses are dropped (AbortController is not used to keep the
- * backend API untouched).
+ * and produces client-side groups for exposed resources.
  *
  * `lockedKbIds` is a getter returning the current scope. When it returns a
  * non-empty array, chunk search is limited to those KBs and message search
@@ -90,7 +95,8 @@ export function useCmdkSearch(options: {
   const totalChunks = ref(0)
   const totalMessages = ref(0)
 
-  // Agents the current user can access (own + builtin + shared via orgs).
+  // Agents are a Standard-edition search group. Musuw Lite intentionally does
+  // not expose Agent discovery even though chat may use two built-in modes.
   const agents = ref<CmdkAgent[]>([])
   const agentsLoaded = ref(false)
   let agentsLoadingPromise: Promise<void> | null = null
@@ -146,9 +152,13 @@ export function useCmdkSearch(options: {
       .slice(0, 4)
   })
 
-  // Agents (own + shared). Lazily loaded & cached; no backend search endpoint
-  // exists so we always filter client-side.
+  // Agents (own + shared) are loaded only in Standard mode.
   const ensureAgents = async (): Promise<void> => {
+    if (isLiteProductMode()) {
+      agents.value = []
+      agentsLoaded.value = true
+      return
+    }
     if (agentsLoaded.value) return
     if (agentsLoadingPromise) return agentsLoadingPromise
     agentsLoadingPromise = (async () => {
@@ -188,6 +198,7 @@ export function useCmdkSearch(options: {
   }
 
   const agentMatches = computed<CmdkAgent[]>(() => {
+    if (isLiteProductMode()) return []
     const q = query.value.trim().toLowerCase()
     if (!q) return []
     return agents.value
@@ -200,8 +211,7 @@ export function useCmdkSearch(options: {
   })
 
   // Sessions: no dedicated list API; we re-use whatever menuStore already has
-  // cached (the sidebar already paginates them). Good enough for "jump to a
-  // session I've seen recently" — not a substitute for message-content search.
+  // cached (the sidebar already paginates them).
   const sessionList = computed<CmdkSessionItem[]>(() => {
     const chatMenu = (menuStore.menuArr as any[]).find((m: any) => m.path === 'creatChat')
     const children = (chatMenu?.children as any[]) || []
@@ -214,10 +224,6 @@ export function useCmdkSearch(options: {
   const sessionMatches = computed<CmdkSessionItem[]>(() => {
     const q = query.value.trim().toLowerCase()
     if (!q) return []
-    // If a session already appears in the message-content group, suppress it
-    // here — showing the same session title twice (once with a message hit,
-    // once by title match) is noise. The message-group entry is strictly
-    // more informative (it shows which message matched), so it wins.
     const coveredBySession = new Set(messageGroups.value.map(g => g.sessionId))
     return sessionList.value
       .filter(s => s.title && s.title.toLowerCase().includes(q))
@@ -241,8 +247,6 @@ export function useCmdkSearch(options: {
     loading.value = true
     hasSearched.value = true
 
-    // Determine knowledge_base_ids for chunk search. A non-empty lockedKbIds
-    // narrows the scope and also disables message search (out of scope).
     const locked = options.lockedKbIds?.() || []
     const scoped = locked.length > 0
     let kbIds: string[]
@@ -325,8 +329,6 @@ export function useCmdkSearch(options: {
     loading.value = false
   }
 
-  // Watch query changes (debounced). lockedKbIds is tracked as a derived
-  // string so the search re-runs when the KB scope toggles.
   const lockedSignature = () =>
     (options.lockedKbIds?.() || []).slice().sort().join(',')
 
@@ -346,11 +348,9 @@ export function useCmdkSearch(options: {
   })
 
   onMounted(() => {
-    // Preload KB and agent lists so name matches show up instantly on first
-    // keystroke. Sessions come from the menuStore (already populated by the
-    // sidebar) so no extra fetch needed here.
+    // KB search stays available in Lite; Agent discovery is Standard-only.
     ensureKbs()
-    ensureAgents()
+    if (!isLiteProductMode()) ensureAgents()
   })
 
   return {
