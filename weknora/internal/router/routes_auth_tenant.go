@@ -292,6 +292,12 @@ func RegisterSystemAdminRoutes(
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
 			handler.ApplyDefaultStorageQuotaToAllTenants)
 
+		// Explicit OpenRouter migration. This never runs during startup and
+		// returns only counts/tenant IDs on failure — never inference keys.
+		g.apiKeyRoute(adminRoutes, http.MethodPost, "/openrouter/provision-tenants",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
+			handler.ProvisionOpenRouterTenantKeys)
+
 		// Platform-wide audit feed (tenant_id=0 rows). Covers
 		// system.setting_changed / system.admin_promoted /
 		// system.admin_revoked etc. — events written by the routes
