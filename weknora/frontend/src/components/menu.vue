@@ -79,7 +79,7 @@ export default defineComponent({
 
     <SessionBatchManageModal
       :visible="batchMode"
-      :items="filteredGroupedSessions.flatMap(group => group.items)"
+      :items="menuArr.find(item => item.path === 'creatChat')?.children || []"
       :selected-ids="batchSelectedIds"
       :all-selected="isAllBatchSelected"
       :indeterminate="isBatchIndeterminate"
