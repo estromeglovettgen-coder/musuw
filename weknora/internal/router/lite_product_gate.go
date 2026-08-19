@@ -9,6 +9,11 @@ import (
 	"github.com/Tencent/WeKnora/internal/handler"
 )
 
+const (
+	liteQuickAnswerAgentID   = "builtin-quick-answer"
+	liteSmartReasoningAgentID = "builtin-smart-reasoning"
+)
+
 // liteProductGate is the server-side product exposure boundary for Musuw Lite.
 //
 // Frontend hiding is UX only. This middleware is authoritative for authenticated
@@ -42,6 +47,16 @@ func liteProductGate() gin.HandlerFunc {
 	}
 }
 
+func liteRuntimeAgentPathAllowed(path string) bool {
+	for _, id := range []string{liteQuickAnswerAgentID, liteSmartReasoningAgentID} {
+		base := "/api/v1/agents/" + id
+		if path == base || path == base+"/suggested-questions" {
+			return true
+		}
+	}
+	return false
+}
+
 // liteProductRouteBlocked keeps shared runtime dependencies narrow rather than
 // blindly disabling every route family. Chat still needs read-only model/agent
 // metadata, while Knowledge Base keeps its own sharing, parsing, Trace, Wiki and
@@ -62,33 +77,49 @@ func liteProductRouteBlocked(method, path string) bool {
 		"/api/v1/vector-stores",
 		"/api/v1/storage-backends",
 		"/api/v1/datasource",
+		"/api/v1/data-sources",
 		"/api/v1/weknora-cloud",
 		"/api/v1/system/admin",
 		"/api/v1/skills",
 		"/api/v1/shared-agents",
+		"/api/v1/im-channels",
+		"/api/v1/embed-channels",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true
 		}
 	}
 
-	// Model catalog is a chat runtime dependency. Lite may read models, but it
-	// may not create/edit/delete/debug them or touch credentials.
-	if path == "/api/v1/models" || strings.HasPrefix(path, "/api/v1/models/") {
+	// Model catalog is a chat runtime dependency. Lite may read the runtime
+	// model list/detail, but provider metadata and every mutation/debug/
+	// credential surface remain hidden.
+	if path == "/api/v1/models" {
 		return method != http.MethodGet
 	}
-
-	// Agent definitions are still used by the chat runtime. Authoring, copying,
-	// sharing and channel/embed management stay unavailable in Lite.
-	if path == "/api/v1/agents" || strings.HasPrefix(path, "/api/v1/agents/") {
+	if strings.HasPrefix(path, "/api/v1/models/") {
 		if method != http.MethodGet {
 			return true
 		}
-		if strings.Contains(path, "/shares") ||
-			strings.Contains(path, "/im-channels") ||
-			strings.Contains(path, "/embed-channels") {
+		if path == "/api/v1/models/providers" || strings.Contains(path, "/credentials") || strings.HasSuffix(path, "/debug") {
 			return true
 		}
+		// A single model detail is the only nested read required by runtime UI.
+		rest := strings.TrimPrefix(path, "/api/v1/models/")
+		return rest == "" || strings.Contains(rest, "/")
+	}
+
+	// Agent management itself is not a Lite product surface. The browser only
+	// needs the two built-in runtime modes used by the conversation composer.
+	// Do not expose GET /agents because it would enumerate custom/internal
+	// agents even though their UI is hidden.
+	if path == "/api/v1/agents" {
+		return true
+	}
+	if strings.HasPrefix(path, "/api/v1/agents/") {
+		if method != http.MethodGet {
+			return true
+		}
+		return !liteRuntimeAgentPathAllowed(path)
 	}
 
 	// Standalone organization management is hidden, but KB sharing is an
