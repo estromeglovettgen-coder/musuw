@@ -13,7 +13,7 @@ import (
 // fails. Read-side scanners remain deliberately lenient so an operator can
 // still load and repair rows after a key rotation problem.
 func encryptStoredSecretStrict(field, value string) (string, error) {
-	if value == "" || value == RedactedSecretPlaceholder || strings.HasPrefix(value, utils.EncPrefix) {
+	if value == "" || strings.HasPrefix(value, utils.EncPrefix) {
 		return value, nil
 	}
 	key := utils.GetAESKey()
