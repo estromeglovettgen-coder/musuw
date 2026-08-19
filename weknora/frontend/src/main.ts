@@ -51,6 +51,9 @@ import "@/assets/musuw-native-directory-reference.css";
 // Full Settings + Agent/Organization editor inner forms keep native business
 // components but inherit the visual-file SettingsModal grammar.
 import "@/assets/musuw-settings-reference-inner.css";
+// Native SpotlightGuide/ContextualGuide behavior has no direct reference
+// component; borrow the reference modal/popover chrome without changing steps.
+import "@/assets/musuw-guide-reference.css";
 // Resolve final collisions between exact reference masks and native-only
 // controls.
 import "@/assets/musuw-final-contract-closure.css";
