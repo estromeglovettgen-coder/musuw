@@ -37,6 +37,13 @@ func normalizeMusuwProductEdition(raw string) (string, bool) {
 	}
 }
 
+func abortLiteProductRoute(c *gin.Context) {
+	c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+		"success": false,
+		"message": "not found",
+	})
+}
+
 // liteProductGate is the server-side product exposure boundary for Musuw Lite.
 //
 // Frontend hiding is UX only. This middleware is authoritative for authenticated
@@ -56,14 +63,19 @@ func liteProductGate() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+
+		// Workspace switching is not an exposed Lite capability. The SPA clears
+		// its old selected-tenant preference as soon as the server reports Lite;
+		// reject a manually crafted X-Tenant-ID as well. System info is the one
+		// exception because it is used to discover Edition before stale browser
+		// state can be cleared.
+		if strings.TrimSpace(c.GetHeader("X-Tenant-ID")) != "" && c.Request.URL.Path != "/api/v1/system/info" {
+			abortLiteProductRoute(c)
+			return
+		}
+
 		if liteProductRouteBlocked(c.Request.Method, c.Request.URL.Path) {
-			// Product-disabled capabilities deliberately look absent. This is not
-			// the security mechanism by itself; the request is actually aborted
-			// here before RBAC/handler execution.
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"message": "not found",
-			})
+			abortLiteProductRoute(c)
 			return
 		}
 		c.Next()
@@ -87,6 +99,22 @@ func liteRuntimeAgentPathAllowed(path string) bool {
 func liteProductRouteBlocked(method, path string) bool {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	path = strings.TrimSpace(path)
+
+	// Native Lite desktop auto-setup creates/signs in a local default admin and
+	// is never part of Musuw's external-auth product. Tenant switching,
+	// workspace preference mutation, and invite registration/lookup are also
+	// hidden workspace capabilities rather than chat/KB runtime dependencies.
+	for _, blockedAuthPath := range []string{
+		"/api/v1/auth/auto-setup",
+		"/api/v1/auth/switch-tenant",
+		"/api/v1/auth/me/preferences",
+		"/api/v1/auth/register-by-invite",
+		"/api/v1/auth/invitations/lookup",
+	} {
+		if path == blockedAuthPath {
+			return true
+		}
+	}
 
 	// Entire management-only route families.
 	for _, prefix := range []string{
