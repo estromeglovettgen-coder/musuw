@@ -4,6 +4,21 @@
  * behavior remains owned by the existing Vue components/controllers.
  */
 
+/* KnowledgeBase.tsx detail shell: p-5 on small screens, md:p-7 from 768px. */
+.visual-knowledge-page {
+  padding: 20px !important;
+}
+@media (min-width: 768px) {
+  .visual-knowledge-page { padding: 28px !important; }
+}
+
+/* DocumentListView.tsx view buttons: p-1.5 around a 14px glyph => 26px. */
+.visual-knowledge-view-toggle button {
+  width: 26px !important;
+  height: 26px !important;
+  padding: 6px !important;
+}
+
 /* Reference grid: grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4. */
 .visual-document-grid,
 .visual-knowledge-skeleton-grid {
