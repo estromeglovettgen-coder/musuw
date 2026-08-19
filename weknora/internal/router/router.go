@@ -219,11 +219,16 @@ func NewRouter(params RouterParams) *gin.Engine {
 			params.AgentShareService,
 		)
 
+		// Product exposure is authoritative before per-principal RBAC. Lite
+		// rejects hidden management capabilities even when the caller would
+		// otherwise be a tenant Owner or SystemAdmin. Standard is a no-op.
+		v1.Use(liteProductGate())
+
 		// API-key gate: single authority for X-API-Key principals. Runs
-		// first on every /api/v1 route (JWT sessions pass straight
-		// through) and denies any route not explicitly declared via the
-		// apiKeyGroup helpers. Must be attached BEFORE the Register* calls
-		// so that sub-groups inherit it.
+		// first on every /api/v1 route after the product exposure boundary
+		// (JWT sessions pass straight through) and denies any route not explicitly
+		// declared via the apiKeyGroup helpers. Must be attached BEFORE the
+		// Register* calls so that sub-groups inherit it.
 		v1.Use(rbacGuards.apiKeyAuthorizer.Middleware())
 
 		RegisterAuthRoutes(v1, params.AuthHandler, rbacGuards)
