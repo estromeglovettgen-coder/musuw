@@ -26,25 +26,99 @@
   color: currentColor !important;
 }
 
-/* QAPanel.tsx core rhythm: Model must remain immediately before Thinking.
- * Native Agent/WebSearch controls are retained ahead of that reference pair. */
+/* -------------------------------------------------------------------------- */
+/* QAPanel.tsx exact counterpart closure                                       */
+/* -------------------------------------------------------------------------- */
+/* Reference core order: Image → Attachment → @ → Model → Thinking → Send.
+ * Native Agent/WebSearch controls are retained ahead of the Model/Thinking pair
+ * because they are WeKnora behavior with no direct @视觉文件 counterpart. */
+.visual-chat-composer__select { order: 40; }
+.visual-chat-composer__tool:has(svg) { order: 50; }
 .visual-chat-composer__model { order: 80; }
 .visual-chat-composer__thinking { order: 90; }
 .visual-chat-composer__submit { order: 100; }
 
-/* Native extra controls inherit the same reference 18px icon / neutral language. */
-.visual-chat-composer__select { order: 40; }
-.visual-chat-composer__tool:has(svg) { order: 50; }
+/* Model Selector Pill: QAPanel.tsx lines 528–579. */
+.visual-chat-composer__model {
+  min-width: 0 !important;
+  max-width: 160px !important;
+  min-height: 26px !important;
+  padding: 4px 10px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgb(229 231 235 / 80%) !important;
+  color: #374151 !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+.visual-chat-composer__model:hover {
+  background: #dcdfe4 !important;
+  color: #374151 !important;
+}
+.visual-chat-composer__model > span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.visual-chat-composer__model .t-icon { color: #6b7280 !important; }
 
-/* SettingsModal.tsx uses a single clean nav stack. The restored WeKnora
- * capability set is internally ordered in groups for maintainability, but
- * invented group headings are not part of @视觉文件 and must not paint. */
-.visual-settings-nav__group > h3 { display: none !important; }
-.visual-settings-nav__group { gap: 3px !important; }
-.visual-settings-nav__group + .visual-settings-nav__group {
-  margin-top: 6px !important;
-  padding-top: 6px !important;
-  border-top: 1px solid #f3f4f6 !important;
+/* Reference model menu is w-40 (160px), bottom-up, 12px rounded, p-1.5. Native
+ * model count/add-model behavior remains; only its painted geometry contracts. */
+.visual-chat-composer__model-menu {
+  width: 160px !important;
+  max-width: min(160px, calc(100vw - 32px)) !important;
+  padding: 6px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%) !important;
+}
+.visual-chat-composer__model-menu > header {
+  min-height: 24px !important;
+  padding: 1px 2px 4px !important;
+  font-size: 9px !important;
+  line-height: 14px !important;
+}
+.visual-chat-composer__model-menu > header > span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.visual-chat-composer__model-menu > header button {
+  flex: 0 0 auto !important;
+  padding: 3px 4px !important;
+  font-size: 9px !important;
+}
+.visual-chat-composer__model-options > button {
+  min-height: 30px !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+}
+.visual-chat-composer__model-copy strong {
+  font-size: 12px !important;
+  line-height: 18px !important;
+  font-weight: 500 !important;
+}
+.visual-chat-composer__model-options > button.is-selected .visual-chat-composer__model-copy strong {
+  font-weight: 600 !important;
+}
+.visual-chat-composer__model-copy small {
+  max-width: 132px !important;
+  font-size: 9px !important;
+  line-height: 13px !important;
+}
+
+/* Keep exact QAPanel native textarea geometry even when browser field-sizing
+ * support chooses a smaller intrinsic box. */
+.visual-chat-composer__textarea {
+  min-height: 44px !important;
+  max-height: 180px !important;
+  overflow-y: auto !important;
 }
 
 /* The visual export is neutral; native organization/agent brand artwork is
@@ -55,14 +129,6 @@
 .settings-overlay > .settings-modal :is(.nav-icon-img,.org-icon) {
   filter: grayscale(1) contrast(.85) !important;
   opacity: .72 !important;
-}
-
-/* Keep exact QAPanel native textarea geometry even when browser field-sizing
- * support chooses a smaller intrinsic box. */
-.visual-chat-composer__textarea {
-  min-height: 44px !important;
-  max-height: 180px !important;
-  overflow-y: auto !important;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -133,8 +199,19 @@
   font-family: var(--td-font-family) !important;
 }
 
-:root[theme-mode="dark"] .visual-settings-nav__group + .visual-settings-nav__group {
-  border-top-color: var(--mvc-line, #31343a) !important;
+/* Dark mode is native behavior; keep the reference counterpart's geometry but
+ * paint the equivalent native dark surfaces. */
+:root[theme-mode="dark"] .visual-chat-composer__model {
+  background: var(--mvc-hover, #25272c) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+}
+:root[theme-mode="dark"] .visual-chat-composer__model:hover {
+  background: var(--mvc-active, #30333a) !important;
+}
+:root[theme-mode="dark"] .visual-chat-composer__model-menu {
+  border-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface, #1d1f23) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
 }
 
 /* Native semantic status colors are deliberately not neutralized here. */
