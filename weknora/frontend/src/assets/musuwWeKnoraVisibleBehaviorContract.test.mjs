@@ -35,10 +35,36 @@ test('native sidebar capabilities stay exposed while visual structure remains re
   }
   assert.ok(store.includes("item.path === 'organizations' && !authStore.hasRole('admin')"), 'organization visibility role gate changed')
   assert.ok(sidebar.includes('<TenantSelector v-if="authStore.canAccessAllTenants"'), 'cross-tenant selector behavior disappeared')
+  assert.ok(sidebar.includes('orgStore.totalPendingJoinRequestCount'), 'organization pending-review status disappeared')
   assert.ok(sidebar.includes('<UserMenu />'), 'settings/logout user menu disappeared')
 })
 
-test('chat composer keeps native Agent/WebSearch behavior inside reference topology', () => {
+test('full native UserMenu capability set remains available inside reference Sidebar chrome', () => {
+  const userMenu = read('../components/UserMenu.vue')
+  for (const token of [
+    "handleQuickNav('userprofile')",
+    "handleQuickNav('general')",
+    "handleQuickNav('tenant')",
+    "handleQuickNav('members')",
+    "handleQuickNav('models')",
+    'handleSystemAdmin',
+    'reopenGuide',
+    'openDocs',
+    'openGithub',
+    'switchableMemberships',
+    'switchToTenant',
+    'openCreateTenantDialog',
+    '<CreateTenantDialog',
+  ]) {
+    assert.ok(userMenu.includes(token), `UserMenu lost native capability: ${token}`)
+  }
+  assert.ok(userMenu.includes("handoffToExternalAuth('logout')"), 'Musuw external-auth logout contract changed')
+  assert.ok(userMenu.includes('class="visual-user-menu__trigger"'))
+  assert.ok(userMenu.includes('class="visual-user-menu__dropdown"'))
+  assert.ok(userMenu.includes('class="visual-user-tenant-submenu"'))
+})
+
+test('chat composer keeps native Agent/WebSearch/thinking behavior inside reference topology', () => {
   const input = read('../components/Input-field.vue')
   const baseline = read('./business-baselines/Input-field.pre-view.vue')
   assert.ok(input.includes('<textarea'), 'reference native textarea topology disappeared')
@@ -48,10 +74,15 @@ test('chat composer keeps native Agent/WebSearch behavior inside reference topol
   assert.ok(input.includes('@not-ready="handleAgentNotReady"'))
   assert.ok(input.includes('v-if="showWebSearchButton"'))
   assert.ok(input.includes('@click.stop="toggleWebSearch"'))
-  for (const token of ['handleSelectAgent', 'handleAgentNotReady', 'showWebSearchButton', 'toggleWebSearch']) {
+  assert.ok(input.includes('v-if="isProMode" class="visual-chat-composer__thinking"'))
+  for (const token of ['handleSelectAgent', 'handleAgentNotReady', 'showWebSearchButton', 'toggleWebSearch', 'thinkingEnabled']) {
     assert.ok(baseline.includes(token), `visual adapter exposed non-native behavior: ${token}`)
   }
   assert.ok(baseline.includes('if (textareaRef.value instanceof HTMLTextAreaElement)'), 'frozen controller no longer supports reference native textarea')
+  const autosize = read('../utils/referenceTextareaAutosize.ts')
+  assert.ok(autosize.includes("target.style.height = 'auto'"))
+  assert.ok(autosize.includes('Math.min(target.scrollHeight, REFERENCE_TEXTAREA_MAX_HEIGHT)'))
+  assert.equal(autosize.includes('query.value'), false, 'visual autosize adapter must not own input business state')
 })
 
 test('knowledge list exposes the native v0.7.2 scope contract through the rebuilt visual shell', () => {
@@ -100,6 +131,14 @@ test('General Settings keeps upstream preference behavior while using reference 
   }
   assert.equal(general.includes('getCurrentEntitlement'), false, 'later entitlement card is outside the selected behavior authority')
   assert.ok(general.includes('class="visual-setting-row"'))
+})
+
+test('Graph and parsing Trace stay outside the migrated global paint ownership', () => {
+  const bridge = read('./musuw-tdesign-overlay-bridge.css')
+  const closure = read('./musuw-final-contract-closure.css')
+  assert.equal(bridge.includes('body .t-popconfirm'), false, 'global popconfirm styling would leak into parsing Trace')
+  assert.ok(closure.includes('.wiki-graph-search-dropdown'))
+  assert.ok(closure.includes('.kp-proccfg-pop'))
 })
 
 test('reference-only demo actions are not invented as business behavior', () => {
