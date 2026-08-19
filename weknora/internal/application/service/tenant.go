@@ -17,79 +17,56 @@ import (
 
 // ListTenantsParams defines parameters for listing tenants with filtering and pagination
 type ListTenantsParams struct {
-	Page     int    // Page number for pagination
-	PageSize int    // Number of items per page
-	Status   string // Filter by tenant status
-	Name     string // Filter by tenant name
+	Page     int
+	PageSize int
+	Status   string
+	Name     string
 }
 
-// tenantService implements the TenantService interface
 type tenantService struct {
-	repo        interfaces.TenantRepository // Repository for tenant data operations
+	repo        interfaces.TenantRepository
 	storageRepo interfaces.StorageBackendRepository
 	keys        modelopenrouter.KeyManager
 }
 
-// NewTenantService creates a new tenant service instance
 func NewTenantService(repo interfaces.TenantRepository, storageRepo interfaces.StorageBackendRepository) interfaces.TenantService {
 	return newTenantService(repo, storageRepo, modelopenrouter.NewKeyManagerFromEnv())
 }
 
-func newTenantService(
-	repo interfaces.TenantRepository,
-	storageRepo interfaces.StorageBackendRepository,
-	keys modelopenrouter.KeyManager,
-) *tenantService {
+func newTenantService(repo interfaces.TenantRepository, storageRepo interfaces.StorageBackendRepository, keys modelopenrouter.KeyManager) *tenantService {
 	return &tenantService{repo: repo, storageRepo: storageRepo, keys: keys}
 }
 
-// CreateTenant creates a new tenant
 func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) (*types.Tenant, error) {
 	logger.Info(ctx, "Start creating tenant")
-
 	if tenant.Name == "" {
 		logger.Error(ctx, "Workspace name cannot be empty")
 		return nil, errors.New("workspace name cannot be empty")
 	}
-
 	logger.Infof(ctx, "Creating tenant, name: %s", tenant.Name)
-
-	// New tenants do not receive an integration API key by default. OpenRouter
-	// inference credentials are different: when the Management API is configured
-	// the personal workspace receives its own provider-managed monthly key.
 	tenant.Status = "active"
 	tenant.CreatedAt = time.Now()
 	tenant.UpdatedAt = time.Now()
-
 	if err := s.validateStorageBucketUniqueness(ctx, tenant); err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_name": tenant.Name,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_name": tenant.Name})
 		return nil, err
 	}
-
 	logger.Info(ctx, "Saving tenant information to database")
 	if err := s.repo.CreateTenant(ctx, tenant); err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_name": tenant.Name,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_name": tenant.Name})
 		return nil, err
 	}
-
 	if err := s.provisionOpenRouterTenantKey(ctx, tenant); err != nil {
 		_ = s.repo.DeleteTenant(ctx, tenant.ID)
 		return nil, err
 	}
 	if err := s.createDefaultStorageBackend(ctx, tenant); err != nil {
-		// No user content exists yet, so roll back both external inference
-		// credentials and the workspace instead of leaving a half-created tenant.
 		if cleanupErr := s.deleteOpenRouterTenantKey(ctx, tenant); cleanupErr != nil {
 			logger.Warnf(ctx, "failed to clean OpenRouter key while rolling back tenant %d: %v", tenant.ID, cleanupErr)
 		}
 		_ = s.repo.DeleteTenant(ctx, tenant.ID)
 		return nil, err
 	}
-
 	logger.Infof(ctx, "Tenant created successfully, ID: %d, name: %s", tenant.ID, tenant.Name)
 	return tenant, nil
 }
@@ -129,21 +106,14 @@ func (s *tenantService) provisionOpenRouterTenantKey(ctx context.Context, tenant
 		if tenant.Credentials.GetOpenRouter() != nil {
 			return nil
 		}
-		// A raw credential record exists but cannot be used (for example after
-		// an AES-key mismatch). Never create another provider key in this state:
-		// doing so would leave two spend boundaries for one tenant.
 		return fmt.Errorf("existing OpenRouter credentials are incomplete; refusing duplicate provider key")
 	}
-	// Local/test deployments may intentionally omit the Management API. The
-	// production contract requires the secret before rollout, while lazy
-	// entitlement provisioning remains a migration fallback for old tenants.
 	if s.keys == nil {
 		return nil
 	}
 	if utils.GetAESKey() == nil {
 		return fmt.Errorf("SYSTEM_AES_KEY must contain exactly 32 bytes before provisioning OpenRouter tenant keys")
 	}
-
 	limit := types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
 	created, err := s.keys.CreateKey(ctx, fmt.Sprintf("musuw-tenant-%d", tenant.ID), limit)
 	if err != nil {
@@ -161,10 +131,6 @@ func (s *tenantService) provisionOpenRouterTenantKey(ctx context.Context, tenant
 	return nil
 }
 
-// deleteOpenRouterTenantKey removes the provider key and then clears only the
-// OpenRouter member of Tenant.credentials, preserving unrelated credentials.
-// Provider deletion needs only the Management API hash, not the decrypted
-// inference API key, so cleanup remains possible after an AES-key mismatch.
 func (s *tenantService) deleteOpenRouterTenantKey(ctx context.Context, tenant *types.Tenant) error {
 	if tenant == nil || tenant.Credentials == nil || tenant.Credentials.OpenRouter == nil {
 		return nil
@@ -186,116 +152,98 @@ func (s *tenantService) deleteOpenRouterTenantKey(ctx context.Context, tenant *t
 	return nil
 }
 
-// GetTenantByID retrieves a tenant by their ID
 func (s *tenantService) GetTenantByID(ctx context.Context, id uint64) (*types.Tenant, error) {
 	if id == 0 {
 		logger.Error(ctx, "Workspace ID cannot be 0")
 		return nil, errors.New("tenant ID cannot be 0")
 	}
-
 	tenant, err := s.repo.GetTenantByID(ctx, id)
 	if err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_id": id,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_id": id})
 		return nil, err
 	}
-
 	return tenant, nil
 }
 
-// GetTenantsByIDs batches GetTenantByID; returns a map keyed by tenant ID.
 func (s *tenantService) GetTenantsByIDs(ctx context.Context, ids []uint64) (map[uint64]*types.Tenant, error) {
 	return s.repo.GetTenantsByIDs(ctx, ids)
 }
 
-// ListTenants retrieves a list of all tenants
 func (s *tenantService) ListTenants(ctx context.Context) ([]*types.Tenant, error) {
 	tenants, err := s.repo.ListTenants(ctx)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, nil)
 		return nil, err
 	}
-
 	logger.Infof(ctx, "Tenant list retrieved successfully, total: %d", len(tenants))
 	return tenants, nil
 }
 
-// UpdateTenant updates an existing tenant's information
 func (s *tenantService) UpdateTenant(ctx context.Context, tenant *types.Tenant) (*types.Tenant, error) {
 	if tenant.ID == 0 {
 		logger.Error(ctx, "Workspace ID cannot be 0")
 		return nil, errors.New("tenant ID cannot be 0")
 	}
-
 	logger.Infof(ctx, "Updating tenant, ID: %d, name: %s", tenant.ID, tenant.Name)
-
 	before, err := s.repo.GetTenantByID(ctx, tenant.ID)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.validateStorageBucketUniqueness(ctx, tenant); err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_id": tenant.ID,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_id": tenant.ID})
 		return nil, err
 	}
-
+	if tenant.Credentials == nil {
+		tenant.Credentials = before.Credentials
+	}
 	tenant.UpdatedAt = time.Now()
-	logger.Info(ctx, "Saving tenant information to database")
-
-	if err := s.repo.UpdateTenant(ctx, tenant); err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_id": tenant.ID,
-		})
-		return nil, err
-	}
 
 	wasActive := strings.TrimSpace(before.Status) == "active"
 	isActive := strings.TrimSpace(tenant.Status) == "active"
+	lifecyclePersisted := false
 	if wasActive && !isActive {
-		// The provider has no separate disabled flag in the Management API
-		// surface used here, so suspension deletes the server-only inference key.
-		// Reactivation provisions a fresh monthly-limited key below.
-		if tenant.Credentials == nil {
-			tenant.Credentials = before.Credentials
-		}
+		// Delete the provider key before committing the status transition. If the
+		// provider call or DB credential clear fails, the database still exposes
+		// the old transition on retry, so the operation converges instead of
+		// silently skipping lifecycle work.
 		if err := s.deleteOpenRouterTenantKey(ctx, tenant); err != nil {
 			return nil, err
 		}
+		lifecyclePersisted = true
 	} else if !wasActive && isActive {
-		if tenant.Credentials == nil {
-			tenant.Credentials = before.Credentials
-		}
+		// Provisioning persists the fresh encrypted credentials together with the
+		// requested active status. On DB failure the helper deletes the provider
+		// key, so a retry remains safe.
 		if err := s.provisionOpenRouterTenantKey(ctx, tenant); err != nil {
 			return nil, err
 		}
+		lifecyclePersisted = tenant.Credentials != nil && tenant.Credentials.OpenRouter != nil
 	}
 
+	if !lifecyclePersisted {
+		logger.Info(ctx, "Saving tenant information to database")
+		if err := s.repo.UpdateTenant(ctx, tenant); err != nil {
+			logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_id": tenant.ID})
+			return nil, err
+		}
+	}
 	logger.Infof(ctx, "Tenant updated successfully, ID: %d", tenant.ID)
 	return tenant, nil
 }
 
-// DeleteTenant removes a tenant by their ID
 func (s *tenantService) DeleteTenant(ctx context.Context, id uint64) error {
 	logger.Info(ctx, "Start deleting tenant")
-
 	if id == 0 {
 		logger.Error(ctx, "Workspace ID cannot be 0")
 		return errors.New("tenant ID cannot be 0")
 	}
-
 	logger.Infof(ctx, "Deleting tenant, ID: %d", id)
-
-	// Get tenant information for logging and provider-key cleanup.
 	tenant, err := s.repo.GetTenantByID(ctx, id)
 	if err != nil {
 		if err.Error() == "record not found" || err.Error() == "tenant not found" {
 			logger.Warnf(ctx, "Tenant to be deleted does not exist, ID: %d", id)
 		} else {
-			logger.ErrorWithFields(ctx, err, map[string]interface{}{
-				"tenant_id": id,
-			})
+			logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_id": id})
 			return err
 		}
 	} else {
@@ -304,36 +252,25 @@ func (s *tenantService) DeleteTenant(ctx context.Context, id uint64) error {
 			return err
 		}
 	}
-
 	err = s.repo.DeleteTenant(ctx, id)
 	if err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_id": id,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_id": id})
 		return err
 	}
-
 	logger.Infof(ctx, "Workspace deleted successfully, ID: %d", id)
 	return nil
 }
 
-// ListAllTenants lists all tenants (for users with cross-tenant access permission)
-// This method returns all tenants without filtering, intended for admin users
 func (s *tenantService) ListAllTenants(ctx context.Context) ([]*types.Tenant, error) {
 	tenants, err := s.repo.ListTenants(ctx)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, nil)
 		return nil, err
 	}
-
 	logger.Infof(ctx, "All tenants list retrieved successfully, total: %d", len(tenants))
 	return tenants, nil
 }
 
-// BulkSetStorageQuota delegates to the repository. Validation is
-// minimal — quotaBytes <= 0 is rejected because the storage-quota
-// enforcement in knowledge_create.go treats <=0 as "unlimited", which
-// is never what a SystemAdmin pressing "apply default" intends.
 func (s *tenantService) BulkSetStorageQuota(ctx context.Context, quotaBytes int64) (int64, error) {
 	if quotaBytes <= 0 {
 		return 0, errors.New("quota must be positive")
@@ -347,54 +284,35 @@ func (s *tenantService) BulkSetStorageQuota(ctx context.Context, quotaBytes int6
 	return affected, nil
 }
 
-// SearchTenants searches tenants with pagination and filters
 func (s *tenantService) SearchTenants(ctx context.Context, keyword string, tenantID uint64, page, pageSize int) ([]*types.Tenant, int64, error) {
 	tenants, total, err := s.repo.SearchTenants(ctx, keyword, tenantID, page, pageSize)
 	if err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"keyword":  keyword,
-			"tenantID": tenantID,
-			"page":     page,
-			"pageSize": pageSize,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"keyword": keyword, "tenantID": tenantID, "page": page, "pageSize": pageSize})
 		return nil, 0, err
 	}
-
-	logger.Infof(ctx, "Tenants search completed, keyword: %s, tenantID: %d, page: %d, pageSize: %d, total: %d, found: %d",
-		keyword, tenantID, page, pageSize, total, len(tenants))
+	logger.Infof(ctx, "Tenants search completed, keyword: %s, tenantID: %d, page: %d, pageSize: %d, total: %d, found: %d", keyword, tenantID, page, pageSize, total, len(tenants))
 	return tenants, total, nil
 }
 
-// GetTenantByIDForUser gets a tenant by ID with permission check
-// This method verifies that the user has permission to access the tenant
 func (s *tenantService) GetTenantByIDForUser(ctx context.Context, tenantID uint64, userID string) (*types.Tenant, error) {
 	tenant, err := s.repo.GetTenantByID(ctx, tenantID)
 	if err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"tenant_id": tenantID,
-			"user_id":   userID,
-		})
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"tenant_id": tenantID, "user_id": userID})
 		return nil, err
 	}
-
 	return tenant, nil
 }
 
 func (s *tenantService) GetWeKnoraCloudCredentials(ctx context.Context) *types.WeKnoraCloudCredentials {
-	// Try to get tenant info from context first (already loaded by middleware).
-	// CredentialsConfig.Scan handles decryption, so credentials are ready to use.
 	if tenant, ok := types.TenantInfoFromContext(ctx); ok {
 		if creds := tenant.Credentials.GetWeKnoraCloud(); creds != nil {
 			return creds
 		}
 	}
-
-	// Fallback: load tenant from repo by tenantID
 	tenantID, ok := types.TenantIDFromContext(ctx)
 	if !ok {
 		return nil
 	}
-
 	tenant, err := s.repo.GetTenantByID(ctx, tenantID)
 	if err != nil || tenant == nil {
 		return nil
@@ -406,8 +324,6 @@ func (s *tenantService) validateStorageBucketUniqueness(ctx context.Context, ten
 	if tenant.StorageEngineConfig == nil {
 		return nil
 	}
-
-	// Fetch existing tenant from DB to compare
 	var oldTenant *types.Tenant
 	if tenant.ID != 0 {
 		var err error
@@ -416,14 +332,10 @@ func (s *tenantService) validateStorageBucketUniqueness(ctx context.Context, ten
 			return err
 		}
 	}
-
-	// Fetch ALL tenants to check for collision.
 	allTenants, err := s.repo.ListTenants(ctx)
 	if err != nil {
 		return err
 	}
-
-	// Helper to get bucket names from a StorageEngineConfig
 	getBuckets := func(cfg *types.StorageEngineConfig) map[string]string {
 		if cfg == nil {
 			return nil
@@ -446,15 +358,12 @@ func (s *tenantService) validateStorageBucketUniqueness(ctx context.Context, ten
 		}
 		return res
 	}
-
 	var oldBuckets map[string]string
 	if oldTenant != nil {
 		oldBuckets = getBuckets(oldTenant.StorageEngineConfig)
 	}
 	newBuckets := getBuckets(tenant.StorageEngineConfig)
-
-	// Collect buckets used by other tenants
-	usedByOthers := make(map[string]map[string]bool) // provider -> set of bucket names
+	usedByOthers := make(map[string]map[string]bool)
 	for _, t := range allTenants {
 		if t.ID == tenant.ID {
 			continue
@@ -467,15 +376,11 @@ func (s *tenantService) validateStorageBucketUniqueness(ctx context.Context, ten
 			usedByOthers[p][b] = true
 		}
 	}
-
-	// Check if any NEW bucket is already used by someone else, AND it's different from the OLD bucket
 	for p, b := range newBuckets {
 		oldB := oldBuckets[p]
-		if b != oldB { // User is trying to change their bucket name or set a new one
-			if usedByOthers[p] != nil && usedByOthers[p][b] {
-				return werrors.NewBadRequestError("存储桶名称「" + b + "」已被其他空间使用，为保证数据隔离，请使用其他名称")
-			}
+		if b != oldB && usedByOthers[p] != nil && usedByOthers[p][b] {
+			return werrors.NewBadRequestError("存储桶名称「" + b + "」已被其他空间使用，为保证数据隔离，请使用其他名称")
 		}
-
+	}
 	return nil
 }
