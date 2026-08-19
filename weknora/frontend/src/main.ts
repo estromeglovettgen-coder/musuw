@@ -57,6 +57,9 @@ import "@/assets/musuw-final-contract-closure.css";
 // Direct QAPanel counterpart closure (AtSign, mention popup) loads last so exact
 // source geometry wins over generic native-extension styling.
 import "@/assets/musuw-qapanel-reference-final.css";
+// Direct DocumentListView.tsx counterpart geometry: fixed responsive grid and
+// exact table/list radii/column/icon metrics without owning document behavior.
+import "@/assets/musuw-document-list-reference-final.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
