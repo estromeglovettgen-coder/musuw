@@ -33,20 +33,7 @@ test('citation hover bridge follows the rebuilt float class without restoring le
   assert.equal(floatView.includes('class="chat-citation-float"'), false)
 })
 
-const contracts = new Map([
-  ['../components/menu.vue', [
-    'buildBucketDefinitions(',
-    'mergeBucketPage(',
-    'ensureBucketFillsViewport',
-    'await deleteAllSessions()',
-    'await batchDelSessions([...batchSelectedIds.value])',
-    'await renameSession(item.id, title, item.description || "")',
-    'setSessionPinned(item.id, pin)',
-    'clearSession(item.id)',
-    'removeSession(item.id)',
-    'window.addEventListener(SESSION_MUTATION_EVENT, handleSessionMutation)',
-    'handoffToExternalAuth("logout")',
-  ]],
+const directScriptContracts = new Map([
   ['../views/creatChat/creatChat.vue', [
     'getSuggestedQuestions(agentId, settingsStore.getSuggestedQuestionsParams())',
     'inputFieldRef.value?.triggerSend(question)',
@@ -77,6 +64,8 @@ const contracts = new Map([
     "route.path === '/platform/settings' || uiStore.showSettingsModal",
     'uiStore.closeSettings()',
     'router.back()',
+    'INTEGRATION_TAB_MIN_ROLE',
+    'SYSTEM_ADMIN_SETTINGS_SECTIONS',
   ]],
   ['../views/settings/GeneralSettings.vue', [
     "savedLocale = localStorage.getItem('locale')",
@@ -93,9 +82,38 @@ const contracts = new Map([
   ]],
 ])
 
-test('migrated View shells retain their load-bearing native business contracts', () => {
-  for (const [path, tokens] of contracts) {
+test('direct script-setup views retain their load-bearing native business contracts', () => {
+  for (const [path, tokens] of directScriptContracts) {
     const script = scriptOf(path)
+    assert.ok(script, `${path} expected a direct <script setup> business surface`)
     for (const token of tokens) assert.ok(script.includes(token), `${path} lost business contract: ${token}`)
+  }
+})
+
+test('sidebar adapter consumes the frozen business controller instead of duplicating or replacing it', () => {
+  const active = read('../components/menu.vue')
+  const business = scriptOf('./business-baselines/menu.pre-view.vue')
+  assert.ok(active.includes("LegacySidebarBusiness from '@/assets/business-baselines/menu.pre-view.vue'"))
+  assert.ok(active.includes('const state = legacySetup?.(props, context)'))
+  for (const token of [
+    'buildBucketDefinitions(',
+    'mergeBucketPage(',
+    'ensureBucketFillsViewport',
+    'await deleteAllSessions()',
+    'await batchDelSessions([...batchSelectedIds.value])',
+    'await renameSession(item.id, title, item.description || "")',
+    'setSessionPinned(item.id, pin)',
+    'clearSession(item.id)',
+    'removeSession(item.id)',
+    'window.addEventListener(SESSION_MUTATION_EVENT, handleSessionMutation)',
+    'handoffToExternalAuth("logout")',
+  ]) {
+    assert.ok(business.includes(token), `frozen sidebar controller lost business contract: ${token}`)
+  }
+  for (const binding of [
+    'handleMenuClick', 'commandPaletteStore.openPalette', 'toggleBatchSelect',
+    'handleSessionMenuClick', 'renameSessionTitle', 'toggleBatchSelectAll', 'handleInlineBatchDelete',
+  ]) {
+    assert.ok(active.includes(binding), `sidebar visual adapter lost business binding: ${binding}`)
   }
 })
