@@ -1,0 +1,132 @@
+/*
+ * Native WeKnora AgentSelector rendered in the visual-file language.
+ * Behavior remains entirely inside AgentSelector.vue / frozen Input-field controller.
+ * Geometry borrows from QAPanel.tsx mention/model popovers: white surface,
+ * gray-200 border, 12px radius, compact 10/12px typography and gray hover.
+ */
+
+.agent-selector-dropdown {
+  width: 256px !important;
+  padding: 8px !important;
+  overflow: hidden !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%) !important;
+}
+.agent-selector-header {
+  min-height: 30px !important;
+  padding: 2px 4px 6px !important;
+  border-bottom: 0 !important;
+  color: #9ca3af !important;
+  font-size: 10px !important;
+  line-height: 16px !important;
+  font-weight: 600 !important;
+}
+.agent-selector-add {
+  min-height: 24px !important;
+  padding: 4px 6px !important;
+  border-radius: 6px !important;
+  color: #6b7280 !important;
+  font-size: 10px !important;
+  line-height: 16px !important;
+  font-weight: 500 !important;
+}
+.agent-selector-add:hover { background: #f3f4f6 !important; color: #111827 !important; }
+.agent-selector-content {
+  padding: 0 !important;
+  scrollbar-width: thin;
+}
+.agent-group:not(:last-child) {
+  margin-bottom: 4px !important;
+  padding-bottom: 4px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+.agent-group-title {
+  padding: 6px 8px 4px !important;
+  color: #9ca3af !important;
+  font-size: 10px !important;
+  line-height: 15px !important;
+  font-weight: 600 !important;
+}
+.agent-option {
+  min-height: 34px !important;
+  margin: 0 !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+  gap: 8px !important;
+  color: #374151 !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+.agent-option:hover { background: #f9fafb !important; color: #111827 !important; }
+.agent-option.selected { background: #f3f4f6 !important; color: #111827 !important; font-weight: 600 !important; }
+.agent-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-option-actions { margin-left: auto !important; color: #9ca3af !important; }
+.shared-tag,
+.detail-current,
+.detail-tag {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  background: #f3f4f6 !important;
+  color: #6b7280 !important;
+  font-size: 9px !important;
+  line-height: 14px !important;
+}
+.builtin-icon,
+.builtin-avatar,
+.agent-option .agent-avatar-small {
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 7px !important;
+  background: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.agent-detail-panel {
+  width: 256px !important;
+  overflow: hidden !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
+}
+.agent-detail-panel-inner { padding: 12px !important; }
+.detail-header { gap: 8px !important; }
+.detail-name { color: #111827 !important; font-size: 12px !important; line-height: 18px !important; font-weight: 700 !important; }
+.detail-desc { margin: 8px 0 !important; color: #6b7280 !important; font-size: 10.5px !important; line-height: 16px !important; }
+.detail-tag-group-title { color: #9ca3af !important; font-size: 9px !important; line-height: 14px !important; font-weight: 600 !important; }
+.detail-meta { border-top-color: #f3f4f6 !important; color: #9ca3af !important; font-size: 10px !important; }
+.detail-header-action {
+  width: 24px !important;
+  height: 24px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #9ca3af !important;
+}
+.detail-header-action:hover { background: #f3f4f6 !important; color: #374151 !important; }
+
+:root[theme-mode="dark"] .agent-selector-dropdown,
+:root[theme-mode="dark"] .agent-detail-panel {
+  border-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface, #1d1f23) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+}
+:root[theme-mode="dark"] .agent-option:hover,
+:root[theme-mode="dark"] .agent-option.selected,
+:root[theme-mode="dark"] .agent-selector-add:hover,
+:root[theme-mode="dark"] .shared-tag,
+:root[theme-mode="dark"] .detail-current,
+:root[theme-mode="dark"] .detail-tag,
+:root[theme-mode="dark"] .builtin-icon,
+:root[theme-mode="dark"] .builtin-avatar {
+  background: var(--mvc-hover, #25272c) !important;
+  border-color: var(--mvc-line, #31343a) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+}
+:root[theme-mode="dark"] .detail-name,
+:root[theme-mode="dark"] .agent-option.selected { color: var(--mvc-text-strong, #fff) !important; }
