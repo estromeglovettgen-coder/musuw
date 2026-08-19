@@ -174,29 +174,11 @@ func liteProductRouteBlocked(method, path string) bool {
 	// KB share routes are intentionally NOT blocked: they are part of the
 	// exposed Knowledge Base UI. Shared-KB reads are allowed for the same reason.
 
-	// Workspace/member/invitation/API-key administration is not a Musuw Lite
-	// surface. Keep a narrow GET /tenants/:id escape hatch because existing KB
-	// code may read active workspace metadata; catalog and management endpoints
-	// remain inaccessible.
-	if path == "/api/v1/tenants" {
+	// Workspace lifecycle/settings/member/invitation/API-key administration is
+	// not a Musuw Lite surface. The current tenant identity already comes from
+	// /auth/me, so there is no need to expose even GET /tenants/:id.
+	if path == "/api/v1/tenants" || strings.HasPrefix(path, "/api/v1/tenants/") {
 		return true
-	}
-	if strings.HasPrefix(path, "/api/v1/tenants/") {
-		rest := strings.TrimPrefix(path, "/api/v1/tenants/")
-		if rest == "all" || rest == "search" || strings.HasPrefix(rest, "kv/") {
-			return true
-		}
-		if strings.Contains(rest, "/members") ||
-			strings.Contains(rest, "/invitations") ||
-			strings.Contains(rest, "/invite-links") ||
-			strings.Contains(rest, "/api-keys") ||
-			strings.Contains(rest, "/api-principal") ||
-			strings.Contains(rest, "/audit-log") ||
-			strings.HasSuffix(rest, "/leave") {
-			return true
-		}
-		// Only the read-only active-tenant metadata endpoint remains available.
-		return method != http.MethodGet || strings.Contains(rest, "/")
 	}
 	if path == "/api/v1/me/invitations" || strings.HasPrefix(path, "/api/v1/me/invitations/") {
 		return true
