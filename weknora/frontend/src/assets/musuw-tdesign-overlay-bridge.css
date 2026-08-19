@@ -1,8 +1,10 @@
 /*
  * Teleported TDesign overlay bridge.
- * Visual-only: dropdown/dialog/popconfirm widgets keep their native instances,
- * events and model bindings. This closes brand-blue chrome that escapes scoped
- * visual-* roots because TDesign teleports overlays to <body>.
+ *
+ * Visual-only. This layer intentionally does NOT globally skin t-popconfirm:
+ * parsing Trace owns a native t-popconfirm without a dedicated overlay class,
+ * and Trace/Graph are explicit migration exclusions. Known migrated surfaces
+ * style their own confirmations locally instead.
  */
 
 body .t-dialog {
@@ -58,21 +60,6 @@ body .t-dropdown__item.t-is-active {
 }
 body .t-select-option.t-is-selected { font-weight: 600 !important; }
 
-body .t-popconfirm {
-  border: 1px solid #e5e7eb !important;
-  border-radius: 12px !important;
-  background: #fff !important;
-  color: #374151 !important;
-  box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
-  font-family: var(--app-font-family) !important;
-}
-body .t-popconfirm .t-button { border-radius: 8px !important; font-size: 11px !important; }
-body .t-popconfirm .t-button--theme-primary {
-  border-color: #111827 !important;
-  background: #111827 !important;
-  color: #fff !important;
-}
-
 /* Reference controls are neutral/black rather than brand-blue. These rules only
  * change the painted checked state; v-model values and events stay untouched. */
 .settings-modal .t-radio-button.t-is-checked,
@@ -92,12 +79,10 @@ body .t-popconfirm .t-button--theme-primary {
   color: #111827 !important;
 }
 
-/* Keep focus visible but neutral, matching the exported reference's gray focus
- * language except for components that explicitly opt into the editor's blue. */
+/* Keep focus visible but neutral on migrated/native business forms. Explicit
+ * Graph exclusions are restored in musuw-final-contract-closure.css. */
 body .t-select-input.t-is-focused,
 body .t-input.t-is-focused {
   border-color: #d1d5db !important;
   box-shadow: 0 0 0 2px rgb(17 24 39 / 6%) !important;
 }
-
-/* Do not style graph/trace renderer roots here. */
