@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { listKnowledgeBases, getKnowledgeBaseById } from '@/api/knowledge-base'
-import { listAgents, type CustomAgent } from '@/api/agent'
+import {
+  listAgents,
+  getAgentById,
+  BUILTIN_QUICK_ANSWER_ID,
+  BUILTIN_SMART_REASONING_ID,
+  type CustomAgent,
+} from '@/api/agent'
 import { listModels, type ModelConfig } from '@/api/model'
 import { listWebSearchProviders, type WebSearchProviderEntity } from '@/api/web-search-provider'
 import { useOrganizationStore } from '@/stores/organization'
@@ -19,6 +25,33 @@ function isKbModelReady(kb: any): boolean {
   const needsEmbedding = !strategy || strategy.vector_enabled || strategy.keyword_enabled
   if (needsEmbedding && (!kb.embedding_model_id || kb.embedding_model_id === '')) return false
   return true
+}
+
+/**
+ * Frontend-only exposure hint. Security never depends on this value: the Lite
+ * server gate is authoritative. This prevents the browser from intentionally
+ * calling management endpoints that the server would reject anyway.
+ */
+function isLiteProductMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('weknora_lite_mode') === 'true'
+  } catch {
+    return false
+  }
+}
+
+async function loadLiteRuntimeAgents(): Promise<CustomAgent[]> {
+  const ids = [BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID]
+  const results = await Promise.all(ids.map(async (id) => {
+    try {
+      const response: any = await getAgentById(id)
+      return response?.data ?? null
+    } catch {
+      return null
+    }
+  }))
+  return results.filter((agent): agent is CustomAgent => !!agent)
 }
 
 export const useChatResourcesStore = defineStore('chatResources', () => {
@@ -105,12 +138,25 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
 
   /**
    * 智能体列表（支持 creator 筛选）。creator=all 时写入缓存。
+   * Lite 不枚举 Agent 管理面，只读取聊天真正需要的两个内置运行时 Agent。
    */
   async function fetchAgentsForList(
     params?: { creator?: ListCreatorFilter },
     force = false,
   ): Promise<{ data: CustomAgent[]; disabled_own_agent_ids: string[] }> {
     const creator = params?.creator ?? 'all'
+
+    if (isLiteProductMode()) {
+      if (!force && isFresh('agents')) {
+        return { data: agents.value, disabled_own_agent_ids: [] }
+      }
+      const data = await loadLiteRuntimeAgents()
+      agents.value = data
+      disabledOwnAgentIds.value = []
+      loadedAt.value.agents = Date.now()
+      return { data, disabled_own_agent_ids: [] }
+    }
+
     const orgStore = useOrganizationStore()
 
     // 带 creator 过滤的列表不进缓存，但仍需刷新共享智能体（与全量路径保持一致）。
@@ -166,6 +212,11 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
   }
 
   async function ensureWebSearchProviders(force = false): Promise<void> {
+    if (isLiteProductMode()) {
+      webSearchProviders.value = []
+      loadedAt.value.webSearchProviders = Date.now()
+      return
+    }
     return runOnce('webSearchProviders', force, async () => {
       const response = await listWebSearchProviders()
       const providers = (response as any)?.data
@@ -176,6 +227,15 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
 
   /** 并行预取对话输入栏及列表页常用的空间级资源 */
   async function prefetchChatInput(force = false): Promise<void> {
+    if (isLiteProductMode()) {
+      await Promise.all([
+        ensureKnowledgeBases(force),
+        ensureAgents(force),
+        ensureModels(force),
+      ])
+      return
+    }
+
     const orgStore = useOrganizationStore()
     await Promise.all([
       ensureKnowledgeBases(force),
@@ -205,7 +265,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
         agentKbCache.set(cacheKey, { at: Date.now(), data: list })
         return list
       } finally {
-        agentKbInflight.delete(cacheKey)
+        agentKbInflight.delete(agentId)
       }
     })()
     agentKbInflight.set(cacheKey, p)
