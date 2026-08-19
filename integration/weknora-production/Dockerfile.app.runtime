@@ -11,6 +11,7 @@ ARG VERSION_ARG=0.7.2
 ARG COMMIT_ID_ARG=local
 ARG BUILD_TIME_ARG=production-source-build
 ARG GO_VERSION_ARG=go1.26
+ARG PRODUCT_EDITION_ARG=lite
 
 RUN if [ -n "$APT_MIRROR_ARG" ]; then \
         sed -i "s@deb.debian.org@${APT_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
@@ -30,7 +31,8 @@ COPY . .
 ENV VERSION=${VERSION_ARG} \
     COMMIT_ID=${COMMIT_ID_ARG} \
     BUILD_TIME=${BUILD_TIME_ARG} \
-    GO_VERSION=${GO_VERSION_ARG}
+    GO_VERSION=${GO_VERSION_ARG} \
+    EDITION=${PRODUCT_EDITION_ARG}
 
 RUN --mount=type=cache,target=/go/pkg/mod make build-prod
 RUN --mount=type=cache,target=/go/pkg/mod \
