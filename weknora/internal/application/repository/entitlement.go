@@ -58,38 +58,6 @@ func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Con
 	return inserted, err
 }
 
-// RecordOpenRouterCost is retained for one migration cycle so old rows and
-// rollback code can still be read. Provider-managed key limits are the spend
-// authority and the active OpenRouter transport no longer calls this method.
-func (r *entitlementRepository) RecordOpenRouterCost(ctx context.Context, tenantID uint64, at time.Time, costMicrousd int64) (int64, error) {
-	if costMicrousd <= 0 {
-		var tenant types.Tenant
-		if err := r.db.WithContext(ctx).Select("open_router_usage_month", "open_router_used_microusd").First(&tenant, tenantID).Error; err != nil {
-			return 0, err
-		}
-		return types.EffectiveOpenRouterUsage(&tenant, at), nil
-	}
-	var used int64
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var tenant types.Tenant
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
-		}
-		month := types.OpenRouterUsageMonth(at)
-		if tenant.OpenRouterUsageMonth != month {
-			tenant.OpenRouterUsageMonth = month
-			tenant.OpenRouterUsedMicrousd = 0
-		}
-		tenant.OpenRouterUsedMicrousd += costMicrousd
-		used = tenant.OpenRouterUsedMicrousd
-		return tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(map[string]any{
-			"open_router_usage_month":   tenant.OpenRouterUsageMonth,
-			"open_router_used_microusd": tenant.OpenRouterUsedMicrousd,
-		}).Error
-	})
-	return used, err
-}
-
 func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, eventID string, occurredAt time.Time, customerID, subscriptionID string) (bool, error) {
 	applied := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
