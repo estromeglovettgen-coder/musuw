@@ -31,7 +31,6 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "parser catalog", method: "GET", path: "/api/v1/system/parser-engines", blocked: false},
 		{name: "storage status", method: "GET", path: "/api/v1/system/storage-engine-status", blocked: false},
 		{name: "system info", method: "GET", path: "/api/v1/system/info", blocked: false},
-		{name: "active tenant metadata", method: "GET", path: "/api/v1/tenants/7", blocked: false},
 		{name: "organization read for kb sharing", method: "GET", path: "/api/v1/organizations/3", blocked: false},
 		{name: "organization kb shares", method: "GET", path: "/api/v1/organizations/3/shares", blocked: false},
 
@@ -57,6 +56,7 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "organization search", method: "GET", path: "/api/v1/organizations/search", blocked: true},
 		{name: "tenant list", method: "GET", path: "/api/v1/tenants", blocked: true},
 		{name: "tenant create", method: "POST", path: "/api/v1/tenants", blocked: true},
+		{name: "tenant metadata read", method: "GET", path: "/api/v1/tenants/7", blocked: true},
 		{name: "tenant update", method: "PUT", path: "/api/v1/tenants/7", blocked: true},
 		{name: "tenant members", method: "GET", path: "/api/v1/tenants/7/members", blocked: true},
 		{name: "tenant api keys", method: "GET", path: "/api/v1/tenants/7/api-keys", blocked: true},
