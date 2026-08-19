@@ -62,7 +62,7 @@ const emit = defineEmits<{
       <div class="visual-reference-kb-card__title" :title="kb.name">
         <span v-if="kb.is_pinned" class="visual-reference-kb-card__pinned">
           <t-icon name="pin-filled" />
-          <span>{{ $t('knowledgeList.pin.pinned') }}</span>
+          <span>{{ $t('knowledgeList.pin.pin') }}</span>
         </span>
         <KbWikiBadge v-if="kb.indexing_strategy?.wiki_enabled" />
         <strong>{{ kb.name }}</strong>
