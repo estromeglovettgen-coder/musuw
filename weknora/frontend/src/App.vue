@@ -148,20 +148,18 @@ const handleGlobalOIDCCallback = async () => {
 
 let updateCheckTimer: ReturnType<typeof setInterval> | null = null;
 
-// Pending invitations poll: fires once on mount (logged-in case) and
-// then every 2 minutes. Light enough to keep the avatar-row badge
-// near-live without slamming the API, and avoids the cost of a
-// dedicated SSE/WebSocket connection. Stopped on logout via the
-// computed below.
+// Pending invitations are a Standard workspace-management surface. Lite does
+// not expose invitations, so it must neither show their badge nor poll the
+// backend route that the product gate intentionally denies.
 let invitationPollTimer: ReturnType<typeof setInterval> | null = null;
 const INVITATION_POLL_INTERVAL_MS = 2 * 60 * 1000;
 
 const startInvitationPolling = () => {
-  if (invitationPollTimer || !authStore.isLoggedIn) return;
+  if (invitationPollTimer || !authStore.isLoggedIn || authStore.isLiteMode) return;
   // Immediate fetch so the badge is correct before the first tick.
   authStore.fetchPendingInvitationCount();
   invitationPollTimer = setInterval(() => {
-    if (!authStore.isLoggedIn) return;
+    if (!authStore.isLoggedIn || authStore.isLiteMode) return;
     authStore.fetchPendingInvitationCount();
   }, INVITATION_POLL_INTERVAL_MS);
 };
@@ -173,13 +171,12 @@ const stopInvitationPolling = () => {
   }
 };
 
-// React to login/logout via the store's isLoggedIn computed. Watching
-// here (rather than only on first mount) handles the OIDC callback
-// flow where the user logs in well after App.vue has already mounted.
+// React to login/logout and product-edition changes. When the server reports
+// Lite, stop an existing Standard invitation poll immediately.
 watch(
-  () => authStore.isLoggedIn,
-  (logged) => {
-    if (logged) startInvitationPolling();
+  () => [authStore.isLoggedIn, authStore.isLiteMode] as const,
+  ([logged, lite]) => {
+    if (logged && !lite) startInvitationPolling();
     else stopInvitationPolling();
   },
   { immediate: true },
