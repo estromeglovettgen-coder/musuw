@@ -48,6 +48,9 @@ import "@/assets/musuw-agent-selector-reference.css";
 // Restored native WeKnora directory surfaces (agents, organizations, spaces)
 // borrow only the visual-file KnowledgeBase/Sidebar grammar.
 import "@/assets/musuw-native-directory-reference.css";
+// Full Settings + Agent/Organization editor inner forms keep native business
+// components but inherit the visual-file SettingsModal grammar.
+import "@/assets/musuw-settings-reference-inner.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
