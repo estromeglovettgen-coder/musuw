@@ -119,11 +119,15 @@ func liteProductRouteBlocked(method, path string) bool {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	path = strings.TrimSpace(path)
 
-	// Native Lite desktop auto-setup creates/signs in a local default admin and
-	// is never part of Musuw's external-auth product. Tenant switching,
-	// workspace preference mutation, and invite registration/lookup are also
-	// hidden workspace capabilities rather than chat/KB runtime dependencies.
+	// Musuw uses the external OIDC/Auth shell for human identity. Native
+	// password registration/login/change-password, desktop auto-setup, tenant
+	// switching/preferences, and invite registration are not consumer surfaces.
+	// OIDC config/url/callback, refresh, validate, logout and /auth/me remain.
 	for _, blockedAuthPath := range []string{
+		"/api/v1/auth/register",
+		"/api/v1/auth/login",
+		"/api/v1/auth/change-password",
+		"/api/v1/auth/config",
 		"/api/v1/auth/auto-setup",
 		"/api/v1/auth/switch-tenant",
 		"/api/v1/auth/me/preferences",
