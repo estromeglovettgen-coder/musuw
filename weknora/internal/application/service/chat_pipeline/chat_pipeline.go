@@ -118,6 +118,10 @@ var (
 		Description: "Failed to call model",
 		ErrorType:   "model_call_failed",
 	}
+	ErrCreditsExhausted = &PluginError{
+		Description: "Monthly AI Credits exhausted",
+		ErrorType:   "openrouter_credits_exhausted",
+	}
 	ErrGetHistory = &PluginError{
 		Description: "Failed to get conversation history",
 		ErrorType:   "get_history_failed",
