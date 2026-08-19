@@ -117,15 +117,15 @@ type Model struct {
 	ID string `yaml:"id"          json:"id"          gorm:"type:varchar(64);primaryKey"`
 	// Workspace ID
 	TenantID uint64 `yaml:"tenant_id"   json:"tenant_id"`
-	// Name of the model
+	// Name
 	Name string `yaml:"name"        json:"name"`
 	// Optional user-facing display name. Runtime calls still use Name.
 	DisplayName string `yaml:"display_name" json:"display_name" gorm:"type:varchar(255);default:''"`
-	// Type of the model
+	// Type
 	Type ModelType `yaml:"type"        json:"type"`
-	// Source of the model
+	// Source
 	Source ModelSource `yaml:"source"      json:"source"`
-	// Description of the model
+	// Description
 	Description string `yaml:"description" json:"description"`
 	// Model parameters in JSON format
 	Parameters ModelParameters `yaml:"parameters"  json:"parameters"  gorm:"type:json"`
@@ -143,28 +143,31 @@ type Model struct {
 	ManagedBy string `yaml:"managed_by"  json:"managed_by,omitempty"  gorm:"type:varchar(32);default:''"`
 	// Model status, default: active, possible: downloading, download_failed
 	Status ModelStatus `yaml:"status"      json:"status"`
-	// Creation time of the model
+	// Creation time
 	CreatedAt time.Time `yaml:"created_at"  json:"created_at"`
-	// Last updated time of the model
+	// Last updated time
 	UpdatedAt time.Time `yaml:"updated_at"  json:"updated_at"`
-	// Deletion time of the model
+	// Deletion time
 	DeletedAt gorm.DeletedAt `yaml:"deleted_at"  json:"deleted_at"  gorm:"index"`
 }
 
 // Value implements the driver.Valuer interface, used to convert ModelParameters to database value.
-// Encrypts APIKey and AppSecret before persisting to database (value receiver = no memory pollution).
+// Secret-bearing writes are fail-closed: plaintext is never persisted when
+// SYSTEM_AES_KEY is missing or encryption fails.
 func (c ModelParameters) Value() (driver.Value, error) {
-	if key := utils.GetAESKey(); key != nil {
-		if c.APIKey != "" {
-			if encrypted, err := utils.EncryptAESGCM(c.APIKey, key); err == nil {
-				c.APIKey = encrypted
-			}
+	if c.APIKey != "" {
+		encrypted, err := encryptStoredSecretStrict("model.parameters.api_key", c.APIKey)
+		if err != nil {
+			return nil, err
 		}
-		if c.AppSecret != "" {
-			if encrypted, err := utils.EncryptAESGCM(c.AppSecret, key); err == nil {
-				c.AppSecret = encrypted
-			}
+		c.APIKey = encrypted
+	}
+	if c.AppSecret != "" {
+		encrypted, err := encryptStoredSecretStrict("model.parameters.app_secret", c.AppSecret)
+		if err != nil {
+			return nil, err
 		}
+		c.AppSecret = encrypted
 	}
 	return json.Marshal(c)
 }
