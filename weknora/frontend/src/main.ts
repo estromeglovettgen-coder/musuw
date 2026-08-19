@@ -45,6 +45,9 @@ import "@/assets/musuw-visual-preference-compat.css";
 // AgentSelector is a native WeKnora behavior surface absent from the visual
 // export; skin its existing DOM from QAPanel's compact popover language.
 import "@/assets/musuw-agent-selector-reference.css";
+// Restored native WeKnora directory surfaces (agents, organizations, spaces)
+// borrow only the visual-file KnowledgeBase/Sidebar grammar.
+import "@/assets/musuw-native-directory-reference.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
