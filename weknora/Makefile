@@ -151,7 +151,7 @@ stop-all:
 
 # Stop Docker container (传统方式)
 docker-stop:
-	@docker-compose down
+	docker-compose down
 
 # 从源码构建镜像相关命令
 build-images:
@@ -169,7 +169,7 @@ build-images-frontend:
 clean-images:
 	./scripts/build_images.sh --clean
 
-# Restart Docker container
+# Restart Docker container (stop, start)
 docker-restart:
 	@[ -f .env ] || ([ -f .env.example ] && cp .env.example .env || touch .env)
 	docker-compose stop -t 60
