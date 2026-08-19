@@ -27,7 +27,7 @@ help:
 	@echo "镜像构建:"
 	@echo "  build-images      从源码构建所有镜像"
 	@echo "  build-images-app  从源码构建应用镜像"
-	@echo "  build-images-docreader 从源码构建所有镜像"
+	@echo "  build-images-docreader 从源码构建文档读取器镜像"
 	@echo "  build-images-frontend  从源码构建前端镜像"
 	@echo "  clean-images      清理本地镜像"
 	@echo ""
@@ -151,7 +151,7 @@ stop-all:
 
 # Stop Docker container (传统方式)
 docker-stop:
-	docker-compose down
+	@docker-compose down
 
 # 从源码构建镜像相关命令
 build-images:
@@ -169,7 +169,7 @@ build-images-frontend:
 clean-images:
 	./scripts/build_images.sh --clean
 
-# Restart Docker container (stop, start)
+# Restart Docker container
 docker-restart:
 	@[ -f .env ] || ([ -f .env.example ] && cp .env.example .env || touch .env)
 	docker-compose stop -t 60
@@ -195,7 +195,7 @@ migrate-create:
 
 migrate-force:
 	@if [ -z "$(version)" ]; then \
-		echo "Error: migration name is required"; \
+		echo "Error: version is required"; \
 		echo "Usage: make migrate-force version=4"; \
 		exit 1; \
 	fi
@@ -203,7 +203,7 @@ migrate-force:
 
 migrate-goto:
 	@if [ -z "$(version)" ]; then \
-		echo "Error: migration name is required"; \
+		echo "Error: version is required"; \
 		echo "Usage: make migrate-goto version=3"; \
 		exit 1; \
 	fi
@@ -232,8 +232,9 @@ lint:
 deps:
 	go mod download
 
-# Build for production. EDITION defaults to standard so upstream/normal builds
-# keep their existing behavior; Musuw production passes EDITION=lite.
+# Build for production
+# google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn for qdrant milvus proto conflict
+# EDITION defaults to standard; Musuw production can opt into the Lite product exposure boundary.
 build-prod:
 	VERSION=$$(git describe --tags --abbrev=0 2>/dev/null || echo "$${VERSION:-unknown}"); \
 	COMMIT_ID=$${COMMIT_ID:-unknown}; \
@@ -309,6 +310,7 @@ pull-images:
 # Show current platform
 show-platform:
 	@echo "当前系统架构: $(shell uname -m)"
+	@echo "Docker构建平台: $(PLATFORM)"
 
 # Development mode commands
 dev-start:
