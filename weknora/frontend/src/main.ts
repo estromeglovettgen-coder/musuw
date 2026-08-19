@@ -42,6 +42,9 @@ import "@/assets/musuw-model-editor-inner-final.css";
 // compatibility layer last so the reference default stays exact while persisted
 // native preferences continue to have a visible effect on rebuilt surfaces.
 import "@/assets/musuw-visual-preference-compat.css";
+// AgentSelector is a native WeKnora behavior surface absent from the visual
+// export; skin its existing DOM from QAPanel's compact popover language.
+import "@/assets/musuw-agent-selector-reference.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
