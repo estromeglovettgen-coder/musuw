@@ -60,6 +60,9 @@ import "@/assets/musuw-qapanel-reference-final.css";
 // Direct DocumentListView.tsx counterpart geometry: fixed responsive grid and
 // exact table/list radii/column/icon metrics without owning document behavior.
 import "@/assets/musuw-document-list-reference-final.css";
+// This must be the last Musuw presentation layer: it keeps the native dark-theme
+// behavior visible after all later hard-coded reference geometry/paint layers.
+import "@/assets/musuw-final-theme-closure.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
