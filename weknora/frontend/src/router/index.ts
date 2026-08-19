@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
+import { getSystemInfo } from '@/api/system'
 import {
   AUTHENTICATED_HOME_PATH,
   handoffToExternalAuth,
@@ -14,6 +15,30 @@ const LITE_LAST_PATH_KEY = 'weknora_lite_last_path'
 
 function isLiteEdition(authStore: ReturnType<typeof useAuthStore>) {
   return authStore.isLiteMode || localStorage.getItem('weknora_lite_mode') === 'true'
+}
+
+let editionProbeDone = false
+let editionProbePromise: Promise<void> | null = null
+
+async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) {
+  if (isLiteEdition(authStore) || editionProbeDone) return
+  if (!editionProbePromise) {
+    editionProbePromise = (async () => {
+      try {
+        const response = await getSystemInfo()
+        if (String(response.data?.edition || '').trim().toLowerCase() === 'lite') {
+          authStore.setLiteMode(true)
+        }
+      } catch {
+        // Backend API authorization remains authoritative. A transient edition
+        // probe failure must not sign the user out or break normal navigation.
+      } finally {
+        editionProbeDone = true
+        editionProbePromise = null
+      }
+    })()
+  }
+  await editionProbePromise
 }
 
 function isLiteSpaDefaultEntry(to: RouteLocationNormalized) {
@@ -370,6 +395,10 @@ router.beforeEach(async (to, from, next) => {
       return
     }
   }
+
+  // Resolve the server-owned Edition before evaluating browser exposure. This
+  // closes the first-load window where localStorage has not yet been seeded.
+  await ensureProductEdition(authStore)
 
   if (to.meta.requiresTenant !== false && !authStore.hasValidTenant) {
     next('/onboarding/workspace')
