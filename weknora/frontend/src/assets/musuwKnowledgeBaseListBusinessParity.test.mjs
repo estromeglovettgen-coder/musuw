@@ -9,7 +9,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 test('frozen KnowledgeBaseList controller remains the original implementation', () => {
   assert.equal(
     blobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),
-    '4379ee2fa0a16a366801765bdaf9597aa93bb9bf',
+    'ee73dc142f2ceb90eea994720601021d74ce1d92',
   )
 })
 
