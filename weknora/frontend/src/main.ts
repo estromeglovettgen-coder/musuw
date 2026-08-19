@@ -51,6 +51,9 @@ import "@/assets/musuw-native-directory-reference.css";
 // Full Settings + Agent/Organization editor inner forms keep native business
 // components but inherit the visual-file SettingsModal grammar.
 import "@/assets/musuw-settings-reference-inner.css";
+// Resolve final collisions between exact reference masks and native-only
+// controls; this must stay last among Musuw presentation layers.
+import "@/assets/musuw-final-contract-closure.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.
