@@ -162,6 +162,13 @@ func (m *httpKeyManager) doJSON(ctx context.Context, method, path string, input,
 		return fmt.Errorf("OpenRouter Management API request failed: %w", err)
 	}
 	defer resp.Body.Close()
+	// Deletion is an idempotent lifecycle operation. If a previous attempt
+	// removed the provider key but failed before clearing Tenant.credentials,
+	// retrying must be able to converge instead of getting stuck on 404.
+	if method == http.MethodDelete && strings.HasPrefix(path, "/keys/") && resp.StatusCode == http.StatusNotFound {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return nil
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 		return fmt.Errorf("OpenRouter Management API %s %s returned HTTP %d", method, path, resp.StatusCode)
