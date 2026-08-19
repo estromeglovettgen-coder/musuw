@@ -5,6 +5,7 @@ import AttachmentUpload from './AttachmentUpload.vue'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import MentionSelector from './MentionSelector.vue'
 import AgentSelector from './AgentSelector.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const legacy = LegacyInputFieldBusiness as any
 const legacySetup = legacy.setup
@@ -21,6 +22,7 @@ export default defineComponent({
   },
   setup(props, context) {
     const state = legacySetup?.(props, context)
+    const authStore = useAuthStore()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const handleNativeInput = (event: Event) => {
         const target = event.target as HTMLTextAreaElement | null
@@ -34,7 +36,7 @@ export default defineComponent({
         const value = queryRef && typeof queryRef === 'object' && 'value' in queryRef ? queryRef.value : ''
         ;(state as any).onKeydown?.(value, { e: event })
       }
-      return { ...state, handleNativeInput, handleNativeKeydown }
+      return { ...state, authStore, handleNativeInput, handleNativeKeydown }
     }
     return state
   },
@@ -112,7 +114,7 @@ export default defineComponent({
             <template #content>
               <span v-if="isMentionDisabled && isKnowledgeBaseDisabledByAgent" class="visual-chat-composer__disabled-hint">
                 <span>{{ $t('input.kbDisabledByAgent') }}</span>
-                <button type="button" @click.stop.prevent="handleGoToAgentSettings('knowledge')">{{ $t('input.goToAgentSettings') }}</button>
+                <button v-if="!authStore.isLiteMode" type="button" @click.stop.prevent="handleGoToAgentSettings('knowledge')">{{ $t('input.goToAgentSettings') }}</button>
               </span>
               <span v-else>{{ allSelectedItems.length > 0 ? $t('input.knowledgeBaseWithCount', { count: allSelectedItems.length }) : $t('input.knowledgeBase') }}</span>
             </template>
@@ -168,7 +170,7 @@ export default defineComponent({
     <Teleport to="body">
       <div v-if="showModelSelector" class="visual-chat-composer__overlay" @click="closeModelSelector">
         <div class="visual-chat-composer__model-menu" :style="modelDropdownStyle" @click.stop>
-          <header><span>{{ $t('conversationSettings.models.chatGroupLabel') }}</span><button type="button" @click="handleModelChange('__add_model__')"><t-icon name="add" /><span>{{ $t('input.addModel') }}</span></button></header>
+          <header><span>{{ $t('conversationSettings.models.chatGroupLabel') }}</span><button v-if="!authStore.isLiteMode" type="button" @click="handleModelChange('__add_model__')"><t-icon name="add" /><span>{{ $t('input.addModel') }}</span></button></header>
           <div class="visual-chat-composer__model-options">
             <button v-for="model in availableModels" :key="model.id" type="button" :class="{ 'is-selected': model.id === selectedModelId }" @click="handleModelChange(model.id || '')">
               <span class="visual-chat-composer__model-copy"><strong>{{ modelDisplayName(model) }}</strong><small v-if="model.display_name">{{ model.name }}</small></span><t-icon v-if="model.id === selectedModelId" name="check" />
