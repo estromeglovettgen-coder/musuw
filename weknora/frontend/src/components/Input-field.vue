@@ -4,6 +4,7 @@ import LegacyInputFieldBusiness from '@/assets/business-baselines/Input-field.pr
 import AttachmentUpload from './AttachmentUpload.vue'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import MentionSelector from './MentionSelector.vue'
+import AgentSelector from './AgentSelector.vue'
 
 const legacy = LegacyInputFieldBusiness as any
 const legacySetup = legacy.setup
@@ -16,10 +17,25 @@ export default defineComponent({
     AttachmentUpload,
     KnowledgeBaseSelector,
     MentionSelector,
+    AgentSelector,
   },
   setup(props, context) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const handleNativeInput = (event: Event) => {
+        const target = event.target as HTMLTextAreaElement | null
+        if (target && (state as any).query && typeof (state as any).query === 'object' && 'value' in (state as any).query) {
+          ;(state as any).query.value = target.value
+        }
+        ;(state as any).onInput?.(event)
+      }
+      const handleNativeKeydown = (event: KeyboardEvent) => {
+        const queryRef = (state as any).query
+        const value = queryRef && typeof queryRef === 'object' && 'value' in queryRef ? queryRef.value : ''
+        ;(state as any).onKeydown?.(value, { e: event })
+      }
+      return { ...state, handleNativeInput, handleNativeKeydown }
+    }
     return state
   },
 })
@@ -60,15 +76,15 @@ export default defineComponent({
         </span>
       </div>
 
-      <t-textarea
+      <textarea
         ref="textareaRef"
         v-model="query"
         class="visual-chat-composer__textarea"
         :placeholder="inputPlaceholder"
         name="description"
-        :autosize="true"
-        @keydown="onKeydown"
-        @input="onInput"
+        rows="1"
+        @keydown="handleNativeKeydown"
+        @input="handleNativeInput"
         @compositionstart="onCompositionStart"
         @compositionend="onCompositionEnd"
         @paste="onPaste"
@@ -106,16 +122,27 @@ export default defineComponent({
             </button>
           </t-tooltip>
 
+          <button ref="agentModeButtonRef" type="button" class="visual-chat-composer__select" :aria-expanded="showAgentModeSelector" @click.stop="toggleAgentModeSelector">
+            <span :title="selectedAgent?.name || ''">{{ selectedAgent?.name || (isProMode ? 'V4 Pro' : 'V4 Flash') }}</span><t-icon name="chevron-down" />
+          </button>
+
+          <AgentSelector
+            :visible="showAgentModeSelector"
+            :anchor-el="agentModeButtonRef"
+            :current-agent-id="selectedAgentId"
+            :agents="enabledAgents"
+            :all-models="allModels"
+            @close="closeAgentModeSelector"
+            @select="handleSelectAgent"
+            @not-ready="handleAgentNotReady"
+          />
+
           <t-tooltip v-if="showWebSearchButton" placement="top" theme="light">
             <template #content>{{ isWebSearchEnabled ? $t('input.messages.webSearchEnabled') : $t('input.messages.webSearchDisabled') }}</template>
             <button type="button" class="visual-chat-composer__tool" :class="{ 'is-active': isWebSearchEnabled }" @click.stop="toggleWebSearch">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 12h17M12 3c2.3 2.5 3.5 5.5 3.5 9S14.3 18.5 12 21M12 3C9.7 5.5 8.5 8.5 8.5 12s1.2 6.5 3.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </button>
           </t-tooltip>
-
-          <button ref="agentModeButtonRef" type="button" class="visual-chat-composer__select" :aria-expanded="showAgentModeSelector" @click.stop="toggleAgentModeSelector">
-            <span>{{ isProMode ? 'V4 Pro' : 'V4 Flash' }}</span><t-icon name="chevron-down" />
-          </button>
 
           <div v-if="isProMode" class="visual-chat-composer__thinking">
             <span>{{ $t('agent.editor.thinking') }}</span>
@@ -137,15 +164,6 @@ export default defineComponent({
         </div>
       </div>
     </div>
-
-    <Teleport to="body">
-      <div v-if="showAgentModeSelector" class="visual-chat-composer__overlay" @click="closeAgentModeSelector">
-        <div class="visual-chat-composer__mode-menu" :style="agentModeDropdownStyle" @click.stop>
-          <button type="button" :class="{ 'is-selected': !isProMode }" @click="selectAgentMode('quick-answer')"><span><strong>V4 Flash</strong><small>快速模式</small></span><t-icon v-if="!isProMode" name="check" /></button>
-          <button type="button" :class="{ 'is-selected': isProMode }" @click="selectAgentMode('smart-reasoning')"><span><strong>V4 Pro</strong><small>全功能模式</small></span><t-icon v-if="isProMode" name="check" /></button>
-        </div>
-      </div>
-    </Teleport>
 
     <Teleport to="body">
       <div v-if="showModelSelector" class="visual-chat-composer__overlay" @click="closeModelSelector">
@@ -203,9 +221,8 @@ export default defineComponent({
 .visual-chat-resource__remove { flex: 0 0 18px; width: 18px; height: 18px; padding: 2px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; }
 .visual-chat-resource__remove:hover { color: #374151; }
 
-.visual-chat-composer__textarea :deep(.t-textarea),.visual-chat-composer__textarea :deep(.t-textarea__inner) { border: 0 !important; background: transparent !important; box-shadow: none !important; }
-.visual-chat-composer__textarea :deep(.t-textarea__inner) { width: 100%; min-height: 44px !important; max-height: 180px !important; padding: 0 !important; box-sizing: border-box; resize: none; color: #1f2937; font-family: var(--app-font-family); font-size: 15px; line-height: 1.625; font-weight: 400; }
-.visual-chat-composer__textarea :deep(.t-textarea__inner::placeholder) { color: #9ca3af; }
+.visual-chat-composer__textarea { width: 100%; min-height: 44px !important; max-height: 180px !important; padding: 0 !important; box-sizing: border-box; overflow-y: auto; border: 0 !important; outline: 0; resize: none; field-sizing: content; background: transparent !important; color: #1f2937; font-family: var(--app-font-family); font-size: 15px; line-height: 1.625; font-weight: 400; }
+.visual-chat-composer__textarea::placeholder { color: #9ca3af; }
 
 .visual-chat-composer__toolbar { margin-top: 8px; padding-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 12px; user-select: none; }
 .visual-chat-composer__toolbar.is-embedded { justify-content: flex-end; }
@@ -218,9 +235,10 @@ export default defineComponent({
 .visual-chat-composer__count { position: absolute; top: -5px; right: -6px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #111827; color: #fff; font-size: 8px; line-height: 1; }
 .visual-chat-composer__disabled-hint { display: flex; align-items: center; gap: 6px; }
 .visual-chat-composer__disabled-hint button { padding: 0; border: 0; background: transparent; color: #2563eb; font: inherit; text-decoration: underline; cursor: pointer; }
-.visual-chat-composer__select { min-height: 26px; padding: 4px 10px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; background: rgb(229 231 235 / 80%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 500; cursor: pointer; transition: background-color 150ms ease; }
+.visual-chat-composer__select { min-width: 0; max-width: 176px; min-height: 26px; padding: 4px 10px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; background: rgb(229 231 235 / 80%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 500; cursor: pointer; transition: background-color 150ms ease; }
 .visual-chat-composer__select:hover { background: #dcdfe4; }
-.visual-chat-composer__select :deep(.t-icon) { font-size: 12px; color: #6b7280; }
+.visual-chat-composer__select > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-chat-composer__select :deep(.t-icon) { flex: 0 0 12px; font-size: 12px; color: #6b7280; }
 .visual-chat-composer__thinking { display: inline-flex; align-items: center; gap: 6px; color: #4b5563; font-size: 12px; line-height: 18px; font-weight: 500; }
 .visual-chat-composer__thinking-switch { width: 32px; height: 18px; padding: 2px; border: 0; border-radius: 999px; background: #d1d5db; cursor: pointer; transition: background-color 150ms ease; }
 .visual-chat-composer__thinking-switch > span { width: 14px; height: 14px; border-radius: 999px; display: block; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 10%); transition: transform 150ms ease; }
@@ -240,14 +258,7 @@ export default defineComponent({
 .visual-chat-composer__stop-square { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
 
 .visual-chat-composer__overlay { position: fixed; inset: 0; z-index: 9998; background: transparent; }
-.visual-chat-composer__mode-menu,.visual-chat-composer__model-menu { position: fixed; z-index: 9999; box-sizing: border-box; overflow: hidden; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%),0 4px 6px -4px rgb(0 0 0 / 10%); }
-.visual-chat-composer__mode-menu { width: 160px; padding: 6px !important; }
-.visual-chat-composer__mode-menu > button { width: 100%; min-height: 34px; padding: 6px 12px; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: transparent; color: #374151; font: inherit; text-align: left; cursor: pointer; }
-.visual-chat-composer__mode-menu > button:hover,.visual-chat-composer__mode-menu > button.is-selected { background: #f3f4f6; color: #111827; }
-.visual-chat-composer__mode-menu > button > span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.visual-chat-composer__mode-menu strong { font-size: 12px; line-height: 18px; font-weight: 600; }
-.visual-chat-composer__mode-menu small { color: #9ca3af; font-size: 10px; line-height: 14px; }
-.visual-chat-composer__model-menu { width: 260px; max-height: min(420px,60vh); padding: 8px !important; }
+.visual-chat-composer__model-menu { position: fixed; z-index: 9999; box-sizing: border-box; overflow: hidden; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%),0 4px 6px -4px rgb(0 0 0 / 10%); width: 260px; max-height: min(420px,60vh); padding: 8px !important; }
 .visual-chat-composer__model-menu > header { min-height: 28px; padding: 2px 4px 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9ca3af; font-size: 10px; font-weight: 600; }
 .visual-chat-composer__model-menu > header button { padding: 4px 6px; border: 0; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; background: transparent; color: #6b7280; font: inherit; font-size: 10px; cursor: pointer; }
 .visual-chat-composer__model-menu > header button:hover { background: #f3f4f6; color: #111827; }
@@ -261,7 +272,7 @@ export default defineComponent({
 
 @media (max-width: 768px) { .visual-chat-composer__surface { border-radius: 16px; } .visual-chat-composer__tools { gap: 12px; } }
 @media (min-width: 640px) { .visual-chat-composer__tools { gap: 16px; } }
-@media (max-width: 620px) { .visual-chat-composer__toolbar { align-items: flex-end; } .visual-chat-composer__model { max-width: 120px; } }
+@media (max-width: 620px) { .visual-chat-composer__toolbar { align-items: flex-end; } .visual-chat-composer__model { max-width: 120px; } .visual-chat-composer__select { max-width: 120px; } }
 @media (max-width: 430px) { .visual-chat-composer__toolbar { align-items: flex-start; flex-wrap: wrap; } .visual-chat-composer__tools { flex: 1 1 100%; } .visual-chat-composer__submit { margin-left: auto; } }
 @media (prefers-reduced-motion: reduce) { .visual-chat-composer__surface,.visual-chat-composer__send,.visual-chat-composer__thinking-switch,.visual-chat-composer__thinking-switch > span { transition: none !important; } }
 </style>
