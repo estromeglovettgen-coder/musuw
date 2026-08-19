@@ -181,11 +181,13 @@ func NewRouter(params RouterParams) *gin.Engine {
 	// 文件服务：统一代理本地/MinIO/COS/TOS存储后端（需要认证）
 	serveFilesWithResources(r, params.FileService, params.StorageBackendResolver, params.ResourceCatalog)
 
-	// Presigned file access: no auth required, signature-verified.
-	servePresignedFiles(r, params.TenantService, params.StorageBackendResolver)
-
-	// Diagnostic preview of presigned URLs (Admin only, behind auth middleware).
-	servePresignedPreview(r, params.Config, params.StorageBackendResolver)
+	// Presigned file access and its Admin diagnostic exist for IM integrations.
+	// Lite does not expose IM, so do not register either route there; Standard
+	// retains the original behavior unchanged.
+	if !isLiteEdition {
+		servePresignedFiles(r, params.TenantService, params.StorageBackendResolver)
+		servePresignedPreview(r, params.Config, params.StorageBackendResolver)
+	}
 
 	// Langfuse observability — only active when LANGFUSE_* env vars are set.
 	// The middleware is registered unconditionally; when disabled it's a no-op.
@@ -290,7 +292,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 // trustedProxies returns the proxy CIDRs/IPs whose X-Forwarded-For headers
 // gin should trust when resolving the client IP. Defaults to loopback and
 // private ranges (covers the bundled nginx in a container network); override
-// with WEKNORA_TRUSTED_PROXIES (comma-separated). An explicit empty value
+// with WEKNORA_TRUSTED_PROXIES (comma-separated CIDRs/IPs). An explicit empty value
 // disables proxy trust entirely so ClientIP() returns the direct peer.
 func trustedProxies() []string {
 	raw, ok := os.LookupEnv("WEKNORA_TRUSTED_PROXIES")
