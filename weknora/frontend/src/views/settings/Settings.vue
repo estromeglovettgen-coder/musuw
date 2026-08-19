@@ -138,6 +138,10 @@ const isIntegrationSection = (section: string) =>
   INTEGRATION_TABS.includes(integrationTabFromSection(section))
 
 const normalizeSettingsSection = (section: string) => {
+  // Consumer Lite deliberately exposes only General, whose own surface is
+  // reduced to the language selector. Internal events/deep-links cannot
+  // reopen hidden management sections.
+  if (authStore.isLiteMode) return 'general'
   if (section === 'api') return integrationSectionKey('api')
   if (section === 'integrations') {
     return integrationSectionKey(integrationTabFromSection((route.query.tab as string) || 'im'))
@@ -146,6 +150,7 @@ const normalizeSettingsSection = (section: string) => {
 }
 
 const canSeeSection = (key: string): boolean => {
+  if (authStore.isLiteMode) return key === 'general'
   if (isIntegrationSection(key)) {
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
     if (!min) return true
@@ -159,6 +164,10 @@ const canSeeSection = (key: string): boolean => {
 }
 
 const navItems = computed<NavItem[]>(() => {
+  if (authStore.isLiteMode) {
+    return [{ key: 'general', icon: 'setting', label: t('general.title') }]
+  }
+
   const integrationItems: NavItem[] = INTEGRATION_PREVIEW_ITEMS.map((item) => ({
     key: integrationSectionKey(item.key),
     icon: item.icon.type === 'icon' ? item.icon.name : 'integration',
@@ -237,7 +246,7 @@ const handleClose = () => {
 watch(() => uiStore.settingsInitialSection, (section) => {
   if (!section || !visible.value) return
   currentSection.value = normalizeSettingsSection(section)
-  currentSubSection.value = uiStore.settingsInitialSubSection || ''
+  currentSubSection.value = authStore.isLiteMode ? '' : (uiStore.settingsInitialSubSection || '')
 }, { immediate: true })
 
 watch(
@@ -245,7 +254,7 @@ watch(
   ([isVisible, section, tab]) => {
     if (!isVisible || typeof section !== 'string') return
     currentSection.value = normalizeSettingsSection(section)
-    currentSubSection.value = typeof tab === 'string' ? tab : ''
+    currentSubSection.value = authStore.isLiteMode ? '' : (typeof tab === 'string' ? tab : '')
   },
   { immediate: true },
 )
@@ -261,7 +270,7 @@ const handleSettingsNav = (event: Event) => {
   const detail = event instanceof CustomEvent ? event.detail : null
   if (!detail?.section) return
   currentSection.value = normalizeSettingsSection(String(detail.section))
-  currentSubSection.value = detail.subsection ? String(detail.subsection) : ''
+  currentSubSection.value = authStore.isLiteMode ? '' : (detail.subsection ? String(detail.subsection) : '')
 }
 
 const handleEscape = (event: KeyboardEvent) => {
