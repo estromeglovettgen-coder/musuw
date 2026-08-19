@@ -66,12 +66,14 @@ import { initTheme } from "@/composables/useTheme";
 import { initFont } from "@/composables/useFont";
 import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
 import { installAutofillGuard } from "@/utils/disable-autofill";
+import { installReferenceTextareaAutosize } from "@/utils/referenceTextareaAutosize";
 
 // 必须在 Vue 组件挂载之前执行，避免 tdesign-icons 运行时请求 tdesign.gtimg.com
 installTDesignIconOfflineGuard();
 
 initTheme();
 initFont();
+installReferenceTextareaAutosize();
 
 const app = createApp(App);
 
