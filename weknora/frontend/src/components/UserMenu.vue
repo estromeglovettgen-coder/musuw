@@ -310,10 +310,10 @@ onUnmounted(() => {
           <div class="visual-user-menu__divider" />
           <button type="button" class="visual-user-menu__item" @click="openDocs"><t-icon name="help-circle" /><span>{{ $t('general.helpAndDocs') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
           <button type="button" class="visual-user-menu__item" @click="openGithub"><t-icon name="logo-github" /><span>{{ $t('common.github') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
-
-          <div class="visual-user-menu__divider" />
-          <button type="button" class="visual-user-menu__item is-danger" @click="handleLogout"><t-icon name="logout" /><span>{{ $t('auth.logout') }}</span></button>
         </template>
+
+        <div class="visual-user-menu__divider" />
+        <button type="button" class="visual-user-menu__item is-danger" @click="handleLogout"><t-icon name="logout" /><span>{{ $t('auth.logout') }}</span></button>
       </div>
     </Transition>
 
