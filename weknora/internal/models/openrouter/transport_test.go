@@ -3,6 +3,7 @@ package openrouter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -100,7 +101,14 @@ func TestTransportClassifiesHTTP402AsCreditExhausted(t *testing.T) {
 	assert.Contains(t, err.Error(), "monthly AI credits")
 }
 
-func TestCreditExhaustedPayloadClassification(t *testing.T) {
+func TestCreditExhaustedClassificationStaysProviderScoped(t *testing.T) {
+	// Generic task/business errors are not assumed to be OpenRouter just because
+	// their text happens to mention a credit limit.
+	assert.False(t, IsCreditExhausted(errors.New("third-party credit limit exceeded")))
+	assert.True(t, IsCreditExhausted(&CreditExhaustedError{StatusCode: http.StatusPaymentRequired}))
+
+	// Text fallback remains available for a payload already known to come from
+	// the OpenRouter SSE stream.
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":402,"message":"payment_required"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"message":"spending limit reached"}}`)))
 	assert.False(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":429,"message":"rate limited"}}`)))
