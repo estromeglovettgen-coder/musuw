@@ -1,11 +1,15 @@
 <template>
   <SpotlightGuide v-model:active="active" :steps="steps" step-i18n-prefix="newUserGuide.steps"
     labels-prefix="newUserGuide" @finish="onFinish" @step-change="onStepChange" />
+  <GlobalInvitationBell />
+  <AgentListContextualGuideBridge />
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
+import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
+import AgentListContextualGuideBridge from '@/components/AgentListContextualGuideBridge.vue'
 import { GLOBAL_USER_GUIDE_KEY, OPEN_NEW_USER_GUIDE_EVENT } from '@/config/contextualGuides'
 import { useUIStore } from '@/stores/ui'
 import type { SpotlightGuideStep } from '@/types/spotlightGuide'
