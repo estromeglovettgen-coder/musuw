@@ -1,0 +1,57 @@
+/*
+ * Final cross-layer closure rules.
+ * Loaded after all visual translation layers to resolve collisions between
+ * exact @视觉文件 glyph mappings and native WeKnora-only controls.
+ */
+
+/* Native Sidebar extensions have no direct @视觉文件 glyph. Do not let the
+ * exact Folder mask intended for the reference KB button overwrite them. */
+.visual-sidebar__primary.is-native::before { display: none !important; }
+.visual-sidebar__primary.is-native .visual-sidebar__primary-copy > .t-icon {
+  display: inline-flex !important;
+  width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 16px !important;
+  font-size: 16px !important;
+  color: currentColor !important;
+}
+.visual-sidebar__collapsed-nav:has(.t-icon-usergroup)::before,
+.visual-sidebar__collapsed-nav:has(.t-icon-system-sum)::before { display: none !important; }
+.visual-sidebar__collapsed-nav:has(.t-icon-usergroup) > .t-icon,
+.visual-sidebar__collapsed-nav:has(.t-icon-system-sum) > .t-icon {
+  display: inline-flex !important;
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+  color: currentColor !important;
+}
+
+/* QAPanel.tsx core rhythm: Model must remain immediately before Thinking.
+ * Native Agent/WebSearch controls are retained ahead of that reference pair. */
+.visual-chat-composer__model { order: 80; }
+.visual-chat-composer__thinking { order: 90; }
+.visual-chat-composer__submit { order: 100; }
+
+/* Native extra controls inherit the same reference 18px icon / neutral language. */
+.visual-chat-composer__select { order: 40; }
+.visual-chat-composer__tool:has(svg) { order: 50; }
+
+/* The visual export is neutral; native organization/agent brand artwork is
+ * informational rather than semantic status, so reduce saturation without
+ * hiding the underlying behavior or source identity. */
+.agent-list-container :is(.org-icon,.card-bottom-source img),
+.org-list-container :is(.org-create-icon,.stat-agent-icon),
+.settings-overlay > .settings-modal :is(.nav-icon-img,.org-icon) {
+  filter: grayscale(1) contrast(.85) !important;
+  opacity: .72 !important;
+}
+
+/* Keep exact QAPanel native textarea geometry even when browser field-sizing
+ * support chooses a smaller intrinsic box. */
+.visual-chat-composer__textarea {
+  min-height: 44px !important;
+  max-height: 180px !important;
+  overflow-y: auto !important;
+}
+
+/* Native semantic status colors are deliberately not neutralized here. */
