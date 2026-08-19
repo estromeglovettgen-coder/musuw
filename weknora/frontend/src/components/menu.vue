@@ -51,12 +51,12 @@ export default defineComponent({
       <header class="visual-sidebar__header">
         <button type="button" class="visual-sidebar__brand" aria-label="Musuw 穆苏瓦" @click="handleMenuClick('creatChat')"><span class="visual-sidebar__mark" aria-hidden="true">↯</span><strong>Musuw 穆苏瓦</strong></button>
         <div class="visual-sidebar__header-actions">
-          <button type="button" class="visual-sidebar__header-icon" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')"><t-icon name="search" /></button>
+          <button v-if="!authStore.isLiteMode" type="button" class="visual-sidebar__header-icon" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')"><t-icon name="search" /></button>
           <button type="button" class="visual-sidebar__header-icon" :title="t('menu.collapseSidebar')" :aria-label="t('menu.collapseSidebar')" @click="toggleSidebar"><t-icon name="chevron-left" /></button>
         </div>
       </header>
 
-      <TenantSelector v-if="authStore.canAccessAllTenants" class="visual-sidebar__tenant-selector" />
+      <TenantSelector v-if="!authStore.isLiteMode && authStore.canAccessAllTenants" class="visual-sidebar__tenant-selector" />
 
       <div class="visual-sidebar__primary-actions">
         <button type="button" class="visual-sidebar__primary is-new" data-guide="nav-creatChat" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /><span>{{ t('menu.newChat') }}</span></button>
