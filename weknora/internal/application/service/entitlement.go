@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -64,27 +63,6 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 	current.OpenRouterRemainingMicrousd = info.LimitRemainingMicrousd
 	current.OpenRouterCreditsStatus = types.OpenRouterCreditsAvailable
 	return current, nil
-}
-
-// PreflightOpenRouter remains as a compatibility boundary for callers that have
-// not yet been removed. It intentionally ignores the local price estimate and
-// only rejects when the provider's official remaining balance is exhausted.
-func (s *entitlementService) PreflightOpenRouter(ctx context.Context, at time.Time, _ int64) error {
-	current, err := s.Current(ctx, at)
-	if err != nil {
-		return err
-	}
-	if current.OpenRouterCreditsStatus == types.OpenRouterCreditsAvailable && current.OpenRouterRemainingMicrousd <= 0 {
-		return apperrors.NewTooManyRequestsError("OpenRouter monthly credit is exhausted; upgrade your plan or wait for next month")
-	}
-	return nil
-}
-
-// RecordOpenRouterCost remains only for rollback compatibility. The active
-// OpenRouter transport never calls it; provider-managed key metadata is the
-// monthly spend authority.
-func (s *entitlementService) RecordOpenRouterCost(ctx context.Context, at time.Time, costMicrousd int64) (int64, error) {
-	return s.repo.RecordOpenRouterCost(ctx, types.MustTenantIDFromContext(ctx), at, costMicrousd)
 }
 
 func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, error) {
