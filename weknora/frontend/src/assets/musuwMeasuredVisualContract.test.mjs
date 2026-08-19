@@ -33,22 +33,42 @@ test('collapsed directory rail stays at the measured 48px reference width', () =
   assert.ok(parent.includes(':collapsed="folderTreeCollapsed"'))
 })
 
-test('document grid keeps measured reference card density', () => {
-  const source = read('../views/knowledge/components/DocumentCardView.vue')
+test('document grid uses the reference responsive 1/2/3/4-column contract', () => {
+  const card = read('../views/knowledge/components/DocumentCardView.vue')
+  const closure = read('./musuw-document-list-reference-final.css')
+  for (const token of ['height: 192px', 'border-radius: 16px']) {
+    assert.ok(card.includes(token), `DocumentCardView measured geometry drifted: ${token}`)
+  }
   for (const token of [
-    'grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))',
-    'gap: 16px',
-    'height: 192px',
-    'border-radius: 16px',
-  ]) assert.ok(source.includes(token), `DocumentCardView measured geometry drifted: ${token}`)
+    '.visual-document-grid,',
+    'grid-template-columns: minmax(0, 1fr) !important',
+    '@media (min-width: 640px)',
+    'repeat(2, minmax(0, 1fr)) !important',
+    '@media (min-width: 768px)',
+    'repeat(3, minmax(0, 1fr)) !important',
+    '@media (min-width: 1024px)',
+    'repeat(4, minmax(0, 1fr)) !important',
+  ]) assert.ok(closure.includes(token), `Document grid reference breakpoint drifted: ${token}`)
+  assert.equal(closure.includes('repeat(auto-fill'), false)
 })
 
-test('knowledge skeleton follows the same measured card geometry', () => {
+test('knowledge skeleton shares the exact document grid breakpoints', () => {
+  const closure = read('./musuw-document-list-reference-final.css')
+  assert.ok(closure.includes('.visual-knowledge-skeleton-grid'))
   const source = read('../views/knowledge/KnowledgeBase.vue')
+  for (const token of ['min-height: 192px', 'border-radius: 16px']) {
+    assert.ok(source.includes(token), `knowledge skeleton geometry drifted: ${token}`)
+  }
+})
+
+test('document list table uses the visual-source radius, column widths and file-icon size', () => {
+  const closure = read('./musuw-document-list-reference-final.css')
   for (const token of [
-    'grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))',
-    'gap: 16px',
-    'min-height: 192px',
-    'border-radius: 16px',
-  ]) assert.ok(source.includes(token), `knowledge skeleton geometry drifted: ${token}`)
+    'border-radius: 16px !important',
+    '128px\n    96px\n    96px\n    96px\n    128px\n    64px !important',
+    'min-height: 56px !important',
+    'flex: 0 0 32px !important',
+    'width: 32px !important',
+    'height: 32px !important',
+  ]) assert.ok(closure.includes(token), `Document list geometry drifted: ${token}`)
 })
