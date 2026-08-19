@@ -26,13 +26,24 @@ export interface CommandContext {
   close: () => void
 }
 
+const LITE_COMMAND_IDS = new Set(['new-chat', 'open-kb-list', 'open-settings'])
+
+function isLiteProductMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('weknora_lite_mode') === 'true'
+  } catch {
+    return false
+  }
+}
+
 /**
- * Build the flat command list. Commands are intentionally static — dynamic
- * entities (KBs / agents / sessions) live in their own result groups.
+ * Build the flat command list. Standard keeps the complete upstream command
+ * surface. Lite keeps only commands belonging to the Musuw exposure contract.
  */
 export function buildCommands(ctx: CommandContext): CmdkCommand[] {
   const { router, t, close } = ctx
-  return [
+  const commands: CmdkCommand[] = [
     {
       id: 'new-chat',
       label: t('commandPalette.quick.newChat'),
@@ -94,6 +105,9 @@ export function buildCommands(ctx: CommandContext): CmdkCommand[] {
       },
     },
   ]
+
+  if (!isLiteProductMode()) return commands
+  return commands.filter((command) => LITE_COMMAND_IDS.has(command.id))
 }
 
 /**
