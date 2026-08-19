@@ -54,4 +54,72 @@
   overflow-y: auto !important;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Explicit Graph / parsing-Trace exclusions                                  */
+/* -------------------------------------------------------------------------- */
+/* @视觉文件 does not own these renderers. They must keep the native WeKnora
+ * theme/component chrome even though generic TDesign overlays are styled for
+ * migrated application surfaces elsewhere. No Graph/Trace component code is
+ * touched; these selectors only undo our own global presentation bridges. */
+
+.wiki-graph .graph-search-select .t-select-input,
+.wiki-graph .graph-search-select .t-input,
+.wiki-graph .graph-search-select .t-select-input.t-is-focused,
+.wiki-graph .graph-search-select .t-input.t-is-focused {
+  border-color: var(--td-component-stroke) !important;
+  border-radius: var(--td-radius-default) !important;
+  background: var(--td-bg-color-container) !important;
+  color: var(--td-text-color-primary) !important;
+  box-shadow: none !important;
+}
+.wiki-graph .graph-search-select .t-select-input:hover,
+.wiki-graph .graph-search-select .t-input:hover {
+  border-color: var(--td-component-border) !important;
+}
+.wiki-graph-search-dropdown,
+.wiki-graph-search-dropdown.t-select__dropdown,
+.wiki-graph-search-dropdown .t-select__dropdown {
+  padding: var(--td-comp-paddingTB-s, 4px) !important;
+  border: 1px solid var(--td-component-stroke) !important;
+  border-radius: var(--td-radius-medium) !important;
+  background: var(--td-bg-color-container) !important;
+  color: var(--td-text-color-primary) !important;
+  box-shadow: var(--td-shadow-2) !important;
+  font-family: var(--td-font-family) !important;
+}
+.wiki-graph-search-dropdown .t-select-option,
+.wiki-graph-search-dropdown.t-select__dropdown .t-select-option {
+  min-height: initial !important;
+  border-radius: var(--td-radius-default) !important;
+  background: transparent !important;
+  color: var(--td-text-color-primary) !important;
+  font-size: var(--td-font-size-body-medium) !important;
+}
+.wiki-graph-search-dropdown .t-select-option:hover,
+.wiki-graph-search-dropdown .t-select-option.t-is-selected,
+.wiki-graph-search-dropdown.t-select__dropdown .t-select-option:hover,
+.wiki-graph-search-dropdown.t-select__dropdown .t-select-option.t-is-selected {
+  background: var(--td-bg-color-container-hover) !important;
+  color: var(--td-text-color-primary) !important;
+}
+.wiki-graph-help-popup .t-popup__content,
+.t-popup__content:has(.wiki-graph-help) {
+  border-color: var(--td-component-stroke) !important;
+  border-radius: var(--td-radius-medium) !important;
+  background: var(--td-bg-color-container) !important;
+  color: var(--td-text-color-primary) !important;
+  box-shadow: var(--td-shadow-2) !important;
+  font-family: var(--td-font-family) !important;
+}
+/* Trace process-config popup is teleported; :has() gives us a marker without
+ * adding a class/property to the excluded Trace component itself. */
+.t-popup__content:has(.kp-proccfg-pop) {
+  border-color: var(--td-component-stroke) !important;
+  border-radius: var(--td-radius-medium) !important;
+  background: var(--td-bg-color-container) !important;
+  color: var(--td-text-color-primary) !important;
+  box-shadow: var(--td-shadow-2) !important;
+  font-family: var(--td-font-family) !important;
+}
+
 /* Native semantic status colors are deliberately not neutralized here. */
