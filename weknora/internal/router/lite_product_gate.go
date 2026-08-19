@@ -58,6 +58,15 @@ func serveLiteSystemInfo(c *gin.Context) {
 	})
 }
 
+func readAndRestoreRequestBody(c *gin.Context) ([]byte, error) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return nil, err
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	return body, nil
+}
+
 func liteFavoriteRequestBlocked(c *gin.Context) bool {
 	const base = "/api/v1/user/favorites"
 	path := strings.TrimSpace(c.Request.URL.Path)
@@ -68,11 +77,10 @@ func liteFavoriteRequestBlocked(c *gin.Context) bool {
 		case http.MethodGet:
 			return !strings.EqualFold(strings.TrimSpace(c.Query("type")), "kb")
 		case http.MethodPost:
-			body, err := io.ReadAll(c.Request.Body)
+			body, err := readAndRestoreRequestBody(c)
 			if err != nil {
 				return true
 			}
-			c.Request.Body = io.NopCloser(bytes.NewReader(body))
 			var req struct {
 				Type string `json:"type"`
 			}
@@ -94,6 +102,64 @@ func liteFavoriteRequestBlocked(c *gin.Context) bool {
 		return len(parts) != 2 || !strings.EqualFold(strings.TrimSpace(parts[0]), "kb") || strings.TrimSpace(parts[1]) == ""
 	}
 
+	return false
+}
+
+func liteAgentScopedKnowledgeRequestBlocked(c *gin.Context) bool {
+	path := strings.TrimSpace(c.Request.URL.Path)
+	if !strings.HasPrefix(path, "/api/v1/knowledge-bases") &&
+		!strings.HasPrefix(path, "/api/v1/knowledge") {
+		return false
+	}
+	return strings.TrimSpace(c.Query("agent_id")) != "" ||
+		strings.TrimSpace(c.Query("agent_source_tenant_id")) != ""
+}
+
+func liteRuntimeAgentIDAllowed(agentID string) bool {
+	agentID = strings.TrimSpace(agentID)
+	return agentID == "" || agentID == liteQuickAnswerAgentID || agentID == liteSmartReasoningAgentID
+}
+
+func liteChatRequestBlocked(c *gin.Context) bool {
+	if c.Request.Method != http.MethodPost {
+		return false
+	}
+	path := strings.TrimSpace(c.Request.URL.Path)
+	if !strings.HasPrefix(path, "/api/v1/knowledge-chat/") &&
+		!strings.HasPrefix(path, "/api/v1/agent-chat/") {
+		return false
+	}
+
+	body, err := readAndRestoreRequestBody(c)
+	if err != nil {
+		return true
+	}
+	var req struct {
+		AgentID             string   `json:"agent_id"`
+		AgentSourceTenantID uint64   `json:"agent_source_tenant_id"`
+		MCPServiceIDs       []string `json:"mcp_service_ids"`
+		SkillNames          []string `json:"skill_names"`
+		MentionedItems      []struct {
+			Type string `json:"type"`
+		} `json:"mentioned_items"`
+	}
+	// Malformed JSON is not a product-policy decision. Restore the body and let
+	// the native handler preserve its existing 400 validation semantics.
+	if err := json.Unmarshal(body, &req); err != nil {
+		return false
+	}
+	if !liteRuntimeAgentIDAllowed(req.AgentID) || req.AgentSourceTenantID != 0 {
+		return true
+	}
+	if len(req.MCPServiceIDs) > 0 || len(req.SkillNames) > 0 {
+		return true
+	}
+	for _, item := range req.MentionedItems {
+		switch strings.ToLower(strings.TrimSpace(item.Type)) {
+		case "mcp", "skill":
+			return true
+		}
+	}
 	return false
 }
 
@@ -139,6 +205,22 @@ func liteProductGate() gin.HandlerFunc {
 		// Lite exposes the KB directory only, so the shared API is narrowed to
 		// type=kb instead of becoming an Agent discovery/mutation backdoor.
 		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/user/favorites") && liteFavoriteRequestBlocked(c) {
+			abortLiteProductRoute(c)
+			return
+		}
+
+		// Shared/custom Agent KB access is a hidden Agent capability. Local Lite
+		// built-ins use the ordinary KB paths, so agent-scoped KB query parameters
+		// are never required by the exposed Chat/KB UI.
+		if liteAgentScopedKnowledgeRequestBlocked(c) {
+			abortLiteProductRoute(c)
+			return
+		}
+
+		// Both native QA endpoints accept Agent/MCP/Skill overrides in their JSON
+		// request. Limit those fields here so knowing a hidden Agent/tool ID cannot
+		// turn the exposed chat box into a management-feature execution backdoor.
+		if liteChatRequestBlocked(c) {
 			abortLiteProductRoute(c)
 			return
 		}
