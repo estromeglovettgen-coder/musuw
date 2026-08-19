@@ -6,12 +6,16 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 const menuStore = read("../stores/menu.ts");
 const router = read("../router/index.ts");
+const sidebar = read("../components/menu.vue");
 const inputField = read("../components/Input-field.vue");
+const agentSelector = read("../components/AgentSelector.vue");
 const userMenu = read("../components/UserMenu.vue");
 const settingsView = read("../views/settings/Settings.vue");
 const generalSettings = read("../views/settings/GeneralSettings.vue");
+const knowledgeBase = read("../views/knowledge/KnowledgeBase.vue");
 const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
 const knowledgeBaseListController = read("../assets/business-baselines/KnowledgeBaseList.pre-view.vue");
+const workspaceOnboarding = read("../views/auth/WorkspaceOnboarding.vue");
 const commandPaletteStore = read("../stores/commandPalette.ts");
 
 /**
@@ -27,6 +31,7 @@ const commandPaletteStore = read("../stores/commandPalette.ts");
 test("Lite sidebar is fail-closed to New Chat and Knowledge Base", () => {
   assert.match(menuStore, /const liteVisiblePaths = new Set\(\['creatChat', 'knowledge-bases'\]\)/);
   assert.match(menuStore, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/);
+  assert.match(sidebar, /!authStore\.isLiteMode && showSessionSourceFilter && !batchMode/);
 
   // Standard restoration remains possible because upstream menu definitions
   // are retained rather than deleted from source.
@@ -35,10 +40,12 @@ test("Lite sidebar is fail-closed to New Chat and Knowledge Base", () => {
   }
 });
 
-test("server Edition owns Lite activation and can clear stale browser Lite state", () => {
+test("server Edition owns Lite activation and clears stale browser workspace state", () => {
   assert.match(router, /await ensureProductEdition\(authStore\)/);
   assert.match(router, /edition === 'lite' \|\| edition === 'standard'/);
-  assert.match(router, /authStore\.setLiteMode\(edition === 'lite'\)/);
+  assert.match(router, /const isLite = edition === 'lite'/);
+  assert.match(router, /authStore\.setLiteMode\(isLite\)/);
+  assert.match(router, /if \(isLite\) authStore\.setSelectedTenant\(null\)/);
   assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
 });
 
@@ -86,6 +93,32 @@ test("Lite UserMenu keeps account exit but does not rediscover management surfac
   assert.match(userMenu, /handleQuickNav\('general'\)/);
   assert.match(userMenu, /class="visual-user-menu__item is-danger" @click="handleLogout"/);
   assert.match(userMenu, /handoffToExternalAuth\('logout'\)/);
+});
+
+test("Lite chat surfaces retain runtime selection but hide Agent/model management shortcuts", () => {
+  assert.match(inputField, /v-if="!authStore\.isLiteMode" type="button" @click\.stop\.prevent="handleGoToAgentSettings\('knowledge'\)"/);
+  assert.match(inputField, /<header><span>[\s\S]*<button v-if="!authStore\.isLiteMode" type="button" @click="handleModelChange\('__add_model__'\)"/);
+  assert.match(agentSelector, /<router-link v-if="!authStore\.isLiteMode" to="\/platform\/agents"/);
+  assert.match(agentSelector, /v-if="!authStore\.isLiteMode && canShowDetailHeaderAction"/);
+  assert.match(agentSelector, /authStore\.isLiteMode \? \[\] : agentsList\.value\.filter\(a => !a\.is_builtin\)/);
+  assert.match(agentSelector, /if \(authStore\.isLiteMode\) return \[\]/);
+  assert.match(agentSelector, /if \(authStore\.isLiteMode\) return;/);
+  assert.match(agentSelector, /if \(!authStore\.isLiteMode\) chatResources\.ensureWebSearchProviders\(\)/);
+});
+
+test("Lite Knowledge Base keeps diagnostics visible without opening hidden admin settings", () => {
+  assert.match(knowledgeBase, /:disabled="authStore\.isLiteMode" @click="goToParserSettings"/);
+  assert.match(knowledgeBase, /<strong v-if="!authStore\.isLiteMode">\{\{ \$t\('knowledgeBase\.goToParserSettings'\) \}\}/);
+  assert.match(knowledgeBase, /:disabled="authStore\.isLiteMode" @click="handleOpenKBSettings"/);
+  assert.match(knowledgeBase, /<strong v-if="!authStore\.isLiteMode">\{\{ \$t\('knowledgeBase\.goToStorageSettings'\) \}\}/);
+});
+
+test("Lite tenantless fallback does not expose workspace create or invitation management", () => {
+  assert.match(workspaceOnboarding, /v-if="!authStore\.isLiteMode" class="workspace-actions"/);
+  assert.match(workspaceOnboarding, /<CreateTenantDialog v-if="!authStore\.isLiteMode"/);
+  assert.match(workspaceOnboarding, /<MyInvitationsDialog v-if="!authStore\.isLiteMode"/);
+  assert.match(workspaceOnboarding, /if \(!authStore\.isLiteMode\) \{[\s\S]*fetchPendingInvitationCount/);
+  assert.match(workspaceOnboarding, /handleLogout/);
 });
 
 test("Lite disables Command Palette as an alternate discovery path", () => {
