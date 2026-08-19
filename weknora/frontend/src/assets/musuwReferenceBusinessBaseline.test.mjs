@@ -69,9 +69,12 @@ const directScriptContracts = new Map([
   ]],
   ['../views/settings/GeneralSettings.vue', [
     "savedLocale = localStorage.getItem('locale')",
-    'getCurrentEntitlement()',
     'const persisted = persistLocalePreference(localLanguage.value)',
     'if (!setTheme(value))',
+    'if (!setSansFont(value))',
+    'if (!setMonoFont(value))',
+    'if (!setFontSize(value))',
+    'settingsStore.toggleAutoCheckUpdate(value)',
   ]],
   ['../views/settings/ModelSettings.vue', [
     'const models = await listModels()',
