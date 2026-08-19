@@ -29,6 +29,13 @@ test('QAPanel.tsx composer tokens remain mechanically translated', () => {
     'gap: 12px;', 'gap: 16px;', 'width: 18px;', 'height: 18px;',
     'width: 32px;', 'height: 32px;', 'border-radius: 8px;',
   ])
+  expectTokens('./musuw-final-contract-closure.css', [
+    'max-width: 160px !important;', 'border-radius: 999px !important;',
+    '.visual-chat-composer__model-menu', 'width: 160px !important;',
+  ])
+  expectTokens('./musuw-qapanel-reference-final.css', [
+    '--mvc-icon-at-sign', 'width: 256px !important;', 'border-radius: 12px !important;',
+  ])
 })
 
 test('QAPanel.tsx message stream tokens remain mechanically translated', () => {
@@ -63,9 +70,14 @@ test('KnowledgeBase.tsx and DocumentListView.tsx tokens remain mechanically tran
     'flex-basis: 48px;', 'width: 48px;', 'flex: 0 0 224px;', 'width: 224px;',
   ])
   expectTokens('../views/knowledge/components/DocumentCardView.vue', [
-    'grid-template-columns: repeat(auto-fill,minmax(240px,1fr));', 'gap: 16px;',
     'height: 192px;', 'padding: 16px;', 'border-radius: 16px;',
     'font-size: 12px;', 'font-size: 11px;', 'font-size: 10px;',
+  ])
+  expectTokens('./musuw-document-list-reference-final.css', [
+    '@media (min-width: 640px)', 'repeat(2, minmax(0, 1fr)) !important',
+    '@media (min-width: 768px)', 'repeat(3, minmax(0, 1fr)) !important',
+    '@media (min-width: 1024px)', 'repeat(4, minmax(0, 1fr)) !important',
+    'border-radius: 16px !important', 'flex: 0 0 32px !important',
   ])
 })
 
@@ -79,13 +91,17 @@ test('SourcesPanel.tsx tokens remain mechanically translated', () => {
 
 test('KnowledgeBase.tsx list tokens remain mechanically translated while native scopes stay wired', () => {
   expectTokens('../views/knowledge/KnowledgeBaseList.vue', [
-    'padding: 24px;', 'gap: 24px;', 'padding-bottom: 20px;', 'font-size: 20px;',
-    'grid-template-columns: repeat(2,minmax(0,1fr));', 'grid-template-columns: repeat(3,minmax(0,1fr));', 'gap: 18px;',
+    'padding: 24px;', 'gap: 18px;', 'padding-bottom: 20px;', 'font-size: 20px;',
+    'grid-template-columns: repeat(2,minmax(0,1fr));', 'grid-template-columns: repeat(3,minmax(0,1fr));',
+    '<ListSpaceSidebar', 'v-model="spaceSelection"',
   ])
   expectTokens('../views/knowledge/components/KnowledgeBaseListReferenceCard.vue', [
-    'min-height: 154px;', 'padding: 18px;', 'border-radius: 12px;',
+    'padding: 18px;', 'border-radius: 12px;',
     'font-size: 14px;', 'font-size: 12px;', 'font-size: 11px;',
+    'visual-reference-kb-card__pinned',
   ])
+  const card = read('../views/knowledge/components/KnowledgeBaseListReferenceCard.vue')
+  assert.equal(card.includes('min-height: 154px;'), false, 'reference KB cards have no fixed minimum height')
 })
 
 test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
