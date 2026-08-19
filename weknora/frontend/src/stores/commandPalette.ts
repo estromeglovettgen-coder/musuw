@@ -43,6 +43,15 @@ export const useCommandPaletteStore = defineStore('commandPalette', () => {
   }
 
   const openPalette = (query = '') => {
+    const auth = useAuthStore()
+    // Musuw Lite deliberately exposes only New Chat + Knowledge Base as
+    // top-level product surfaces. Command Palette can otherwise rediscover
+    // hidden Agent/Organization/admin routes via keyboard or programmatic open.
+    if (auth.isLiteMode) {
+      open.value = false
+      initialQuery.value = ''
+      return
+    }
     initialQuery.value = query
     open.value = true
   }

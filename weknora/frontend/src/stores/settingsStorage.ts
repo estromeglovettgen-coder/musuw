@@ -1,5 +1,4 @@
 import { safeRemoveItem, safeSetItem } from "@/composables/preferenceStorage";
-import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 import { reconcileBuiltinAgentMode } from "@/utils/agent-mode";
 
 export const SETTINGS_STORAGE_KEY = "WeKnora_settings";
@@ -29,11 +28,24 @@ type ReconcilableSettings = {
   conversationModels?: { thinkingEnabled?: unknown };
 };
 
+const withAuthorityDefaults = <T extends ReconcilableSettings>(defaults: T): T => {
+  const cloned = cloneSettings(defaults)
+  // WeKnora v0.7.2 defaults Web Search off. First-Musuw changed the store
+  // constant to true for its managed experience; keep the large store file
+  // untouched and restore the effective runtime default at the storage boundary.
+  cloned.webSearchEnabled = false
+  return cloned
+}
+
 function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
   loaded.selectedTags ||= [];
   loaded.selectedMCPServices ||= [];
   loaded.selectedSkills ||= (loaded.selectedTools as string[] | undefined) || [];
   loaded.selectedFileKbMap ||= {};
+
+  // First-Musuw added a persisted thinking preference. Keep that non-conflicting
+  // extension, but do not reintroduce its old managed-experience Agent/WebSearch
+  // narrowing: WeKnora v0.7.2 is authoritative for those behaviors.
   let reconciledThinking = false;
   if (!isStoredSettingsRecord(loaded.conversationModels)) {
     loaded.conversationModels = { thinkingEnabled: true };
@@ -42,32 +54,13 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
     loaded.conversationModels.thinkingEnabled = true;
     reconciledThinking = true;
   }
-  let reconciledManagedExperience = false;
-  if (
-    loaded.selectedAgentSourceTenantId != null ||
-    (loaded.selectedAgentId !== BUILTIN_QUICK_ANSWER_ID &&
-      loaded.selectedAgentId !== BUILTIN_SMART_REASONING_ID)
-  ) {
-    loaded.selectedAgentId = BUILTIN_QUICK_ANSWER_ID;
-    loaded.isAgentEnabled = false;
-    loaded.selectedAgentSourceTenantId = null;
-    reconciledManagedExperience = true;
-  }
-  if (loaded.webSearchEnabled !== true) {
-    loaded.webSearchEnabled = true;
-    reconciledManagedExperience = true;
-  }
+
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) {
     delete loaded.enableMemory;
   }
   const reconciledAgentMode = reconcileBuiltinAgentMode(loaded);
-  if (
-    removedLegacyMemorySetting ||
-    reconciledAgentMode ||
-    reconciledThinking ||
-    reconciledManagedExperience
-  ) {
+  if (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking) {
     safeSetItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
   }
   return loaded;
@@ -82,7 +75,7 @@ function resetStoredSettings<T extends ReconcilableSettings>(
     reason,
   );
   safeRemoveItem(SETTINGS_STORAGE_KEY);
-  return reconcileLoadedSettings(cloneSettings(defaultSettings));
+  return reconcileLoadedSettings(withAuthorityDefaults(defaultSettings));
 }
 
 /** Load settings from localStorage, reconcile builtin agent mode, fall back on corruption. */
@@ -92,7 +85,7 @@ export function loadAndReconcileSettings<T extends ReconcilableSettings>(
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!raw) {
-      return reconcileLoadedSettings(cloneSettings(defaultSettings));
+      return reconcileLoadedSettings(withAuthorityDefaults(defaultSettings));
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isStoredSettingsRecord(parsed)) {

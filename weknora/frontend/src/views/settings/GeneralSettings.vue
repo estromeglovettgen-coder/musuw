@@ -5,44 +5,6 @@
       <p>{{ $t('general.description') }}</p>
     </header>
 
-    <div v-if="entitlement" class="visual-plan-card">
-      <div class="visual-plan-card__top">
-        <div class="visual-plan-card__identity">
-          <span>{{ $t('entitlement.currentPlan') }}</span>
-          <strong>{{ planName }}</strong>
-        </div>
-        <span class="visual-plan-card__status">{{ entitlement.plan_status || $t('entitlement.active') }}</span>
-      </div>
-
-      <div class="visual-plan-card__metrics">
-        <div class="visual-plan-metric">
-          <span>{{ $t('entitlement.storage') }}</span>
-          <strong>{{ formatBytes(entitlement.storage_used) }} / {{ formatBytes(entitlement.storage_bytes) }}</strong>
-        </div>
-        <div class="visual-plan-metric">
-          <span>{{ $t('entitlement.monthlyCredits') }}</span>
-          <strong>{{ formatCredits(entitlement.openrouter_used_microusd) }} / {{ formatCredits(entitlement.monthly_openrouter_microusd) }}</strong>
-        </div>
-        <div class="visual-plan-metric">
-          <span>{{ $t('entitlement.knowledgeBases') }}</span>
-          <strong>{{ formatLimit(entitlement.max_knowledge_bases) }}</strong>
-        </div>
-        <div class="visual-plan-metric">
-          <span>{{ $t('entitlement.documentsPerKb') }}</span>
-          <strong>{{ formatLimit(entitlement.max_documents_per_kb) }}</strong>
-        </div>
-      </div>
-
-      <p class="visual-plan-card__note">
-        {{ entitlement.video_upload ? $t('entitlement.videoPlanAllowed') : $t('entitlement.videoFreeBlocked') }}
-        · {{ $t('entitlement.renewsMonthly', { month: entitlement.openrouter_usage_month }) }}
-      </p>
-      <p v-if="!billingConfigured" class="visual-plan-card__warning">{{ $t('entitlement.billingUnavailable') }}</p>
-    </div>
-    <div v-else-if="entitlementLoading" class="visual-plan-card visual-plan-card--loading">
-      {{ $t('common.loading') }}
-    </div>
-
     <div class="visual-setting-list">
       <div class="visual-setting-row">
         <div class="visual-setting-row__copy">
@@ -64,7 +26,7 @@
         </div>
       </div>
 
-      <div class="visual-setting-row">
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
         <div class="visual-setting-row__copy">
           <label for="visual-theme-select">{{ $t('theme.theme') }}</label>
           <p>{{ $t('theme.themeDescription') }}</p>
@@ -82,6 +44,70 @@
           </t-select>
         </div>
       </div>
+
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
+        <div class="visual-setting-row__copy">
+          <label for="visual-sans-font-select">{{ $t('font.uiFont') }}</label>
+          <p>{{ $t('font.uiFontDescription') }}</p>
+        </div>
+        <div class="visual-setting-row__control is-stacked">
+          <t-select
+            id="visual-sans-font-select"
+            v-model="localSansFont"
+            :placeholder="$t('font.selectFont')"
+            @change="handleSansFontChange"
+          >
+            <t-option
+              v-for="opt in sansFontOptions"
+              :key="opt.value"
+              :value="opt.value"
+              :label="opt.label"
+            >
+              <span :style="{ fontFamily: opt.preview }">{{ opt.label }}</span>
+            </t-option>
+          </t-select>
+          <span class="visual-font-preview" :style="{ fontFamily: currentSansStack }">{{ $t('font.sansPreview') }}</span>
+        </div>
+      </div>
+
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
+        <div class="visual-setting-row__copy">
+          <label for="visual-mono-font-select">{{ $t('font.monoFont') }}</label>
+          <p>{{ $t('font.monoFontDescription') }}</p>
+        </div>
+        <div class="visual-setting-row__control is-stacked">
+          <t-select
+            id="visual-mono-font-select"
+            v-model="localMonoFont"
+            :placeholder="$t('font.selectFont')"
+            @change="handleMonoFontChange"
+          >
+            <t-option
+              v-for="opt in monoFontOptions"
+              :key="opt.value"
+              :value="opt.value"
+              :label="opt.label"
+            >
+              <span :style="{ fontFamily: opt.preview }">{{ opt.label }}</span>
+            </t-option>
+          </t-select>
+          <span class="visual-font-preview" :style="{ fontFamily: currentMonoStack }">{{ $t('font.monoPreview') }}</span>
+        </div>
+      </div>
+
+      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
+        <div class="visual-setting-row__copy">
+          <label>{{ $t('font.fontSize') }}</label>
+          <p>{{ $t('font.fontSizeDescription') }}</p>
+        </div>
+        <div class="visual-setting-row__control">
+          <t-radio-group v-model="localFontSize" @change="handleFontSizeChange">
+            <t-radio-button value="small">{{ $t('font.size.small') }}</t-radio-button>
+            <t-radio-button value="normal">{{ $t('font.size.normal') }}</t-radio-button>
+            <t-radio-button value="large">{{ $t('font.size.large') }}</t-radio-button>
+          </t-radio-group>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -92,20 +118,59 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { normalizeLocale, persistLocalePreference } from '@/i18n/locale'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
-import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
+import { useAuthStore } from '@/stores/auth'
+import {
+  useFont,
+  SANS_STACKS,
+  MONO_STACKS,
+  visibleSansKeys,
+  visibleMonoKeys,
+  type FontKey,
+  type MonoFontKey,
+  type FontSizeKey,
+} from '@/composables/useFont'
 
 const { t, locale } = useI18n()
+const authStore = useAuthStore()
 const { currentTheme, setTheme } = useTheme()
+const {
+  currentSans,
+  currentMono,
+  currentSize,
+  setSansFont,
+  setMonoFont,
+  setFontSize,
+} = useFont()
+
 const localLanguage = ref(locale.value)
 const localTheme = ref<ThemeMode>(currentTheme.value)
-const entitlement = ref<ConsumerEntitlement | null>(null)
-const entitlementLoading = ref(true)
-const billingConfigured = ref(false)
-const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan || 'free'}`))
+const localSansFont = ref<FontKey>(currentSans.value)
+const localMonoFont = ref<MonoFontKey>(currentMono.value)
+const localFontSize = ref<FontSizeKey>(currentSize.value)
 
-watch(currentTheme, (value) => {
-  localTheme.value = value
-})
+watch(currentTheme, (value) => { localTheme.value = value })
+watch(currentSans, (value) => { localSansFont.value = value })
+watch(currentMono, (value) => { localMonoFont.value = value })
+watch(currentSize, (value) => { localFontSize.value = value })
+
+const sansFontOptions = computed<{ value: FontKey; label: string; preview: string }[]>(() =>
+  visibleSansKeys().map((key) => ({
+    value: key,
+    label: t(`font.sans.${key}`),
+    preview: SANS_STACKS[key],
+  })),
+)
+
+const monoFontOptions = computed<{ value: MonoFontKey; label: string; preview: string }[]>(() =>
+  visibleMonoKeys().map((key) => ({
+    value: key,
+    label: t(`font.mono.${key}`),
+    preview: MONO_STACKS[key],
+  })),
+)
+
+const currentSansStack = computed(() => SANS_STACKS[localSansFont.value] ?? SANS_STACKS.system)
+const currentMonoStack = computed(() => MONO_STACKS[localMonoFont.value] ?? MONO_STACKS.system)
 
 onMounted(() => {
   let savedLocale: string | null = null
@@ -117,27 +182,7 @@ onMounted(() => {
   const normalized = normalizeLocale(savedLocale)
   localLanguage.value = normalized || locale.value
   if (normalized) locale.value = normalized
-
-  getCurrentEntitlement()
-    .then((response) => {
-      entitlement.value = response.data
-      billingConfigured.value = response.billing.configured
-    })
-    .catch(() => {
-      entitlement.value = null
-    })
-    .finally(() => {
-      entitlementLoading.value = false
-    })
 })
-
-const formatBytes = (bytes: number) => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 GB'
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(bytes < 1024 ** 3 ? 2 : 1)} GB`
-}
-
-const formatCredits = (microusd: number) => `$${(Math.max(0, microusd) / 1_000_000).toFixed(2)}`
-const formatLimit = (limit: number) => limit > 0 ? String(limit) : t('entitlement.unlimited')
 
 const handleLanguageChange = () => {
   const persisted = persistLocalePreference(localLanguage.value)
@@ -156,6 +201,30 @@ const handleThemeChange = (value: ThemeMode) => {
   }
   MessagePlugin.success(t('common.success'))
 }
+
+const handleSansFontChange = (value: FontKey) => {
+  if (!setSansFont(value)) {
+    localSansFont.value = currentSans.value
+    return
+  }
+  MessagePlugin.success(t('common.success'))
+}
+
+const handleMonoFontChange = (value: MonoFontKey) => {
+  if (!setMonoFont(value)) {
+    localMonoFont.value = currentMono.value
+    return
+  }
+  MessagePlugin.success(t('common.success'))
+}
+
+const handleFontSizeChange = (value: FontSizeKey) => {
+  if (!setFontSize(value)) {
+    localFontSize.value = currentSize.value
+    return
+  }
+  MessagePlugin.success(t('common.success'))
+}
 </script>
 
 <style scoped lang="less">
@@ -167,121 +236,22 @@ const handleThemeChange = (value: ThemeMode) => {
 }
 
 .visual-general-settings__header {
-  margin: 0 0 24px;
+  margin: 0 0 32px;
   padding-right: 40px;
 }
-
 .visual-general-settings__header h2 {
-  margin: 0 0 4px;
+  margin: 0;
   color: #111827;
   font-size: 16px;
   line-height: 24px;
   font-weight: 700;
 }
-
 .visual-general-settings__header p {
-  margin: 0;
+  margin: 4px 0 0;
   color: #9ca3af;
   font-size: 12px;
   line-height: 18px;
 }
-
-.visual-plan-card {
-  width: 100%;
-  min-width: 0;
-  margin: 0 0 24px;
-  padding: 16px;
-  box-sizing: border-box;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
-}
-
-.visual-plan-card--loading {
-  color: #9ca3af;
-  font-size: 12px;
-}
-
-.visual-plan-card__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.visual-plan-card__identity {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.visual-plan-card__identity span,
-.visual-plan-metric span {
-  color: #9ca3af;
-  font-size: 10px;
-  line-height: 14px;
-}
-
-.visual-plan-card__identity strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #111827;
-  font-size: 16px;
-  line-height: 22px;
-  font-weight: 700;
-}
-
-.visual-plan-card__status {
-  flex: 0 0 auto;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #047857;
-  font-size: 10px;
-  line-height: 16px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.visual-plan-card__metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.visual-plan-metric {
-  min-width: 0;
-  padding: 10px;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  background: #f9fafb;
-}
-
-.visual-plan-metric strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #374151;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 600;
-}
-
-.visual-plan-card__note,
-.visual-plan-card__warning {
-  margin: 12px 0 0;
-  color: #9ca3af;
-  font-size: 10px;
-  line-height: 16px;
-}
-
-.visual-plan-card__warning { color: #b45309; }
 
 .visual-setting-list {
   width: 100%;
@@ -293,51 +263,41 @@ const handleThemeChange = (value: ThemeMode) => {
 .visual-setting-row {
   width: 100%;
   min-width: 0;
-  padding: 0 0 24px;
   margin: 0 0 24px;
+  padding: 0 0 24px;
   box-sizing: border-box;
   border-bottom: 1px solid #f3f4f6;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 192px;
   align-items: center;
   gap: 24px;
 }
+.visual-setting-row:last-child { margin-bottom: 0; border-bottom: 0; }
 
-.visual-setting-row:last-child {
-  margin-bottom: 0;
-  border-bottom: 0;
-}
-
-.visual-setting-row__copy {
-  min-width: 0;
-}
-
+.visual-setting-row__copy { min-width: 0; }
 .visual-setting-row__copy label {
   display: block;
-  margin: 0 0 2px;
+  margin: 0;
   color: #111827;
   font-size: 12px;
   line-height: 18px;
   font-weight: 700;
 }
-
 .visual-setting-row__copy p {
-  margin: 0;
+  margin: 2px 0 0;
   color: #9ca3af;
   font-size: 12px;
   line-height: 18px;
 }
 
 .visual-setting-row__control {
-  width: 220px;
+  width: 192px;
   min-width: 0;
   justify-self: end;
 }
-
-.visual-setting-row__control :deep(.t-select) {
-  width: 100%;
-}
-
+.visual-setting-row__control.is-stacked { display: flex; flex-direction: column; gap: 6px; }
+.visual-setting-row__control.is-switch { display: flex; justify-content: flex-end; }
+.visual-setting-row__control :deep(.t-select) { width: 100%; }
 .visual-setting-row__control :deep(.t-input) {
   min-height: 34px;
   border-color: #e5e7eb;
@@ -345,22 +305,43 @@ const handleThemeChange = (value: ThemeMode) => {
   background: #fff;
   color: #374151;
   font-size: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 2%);
+}
+.visual-setting-row__control :deep(.t-input:hover) { border-color: #d1d5db; }
+.visual-setting-row__control :deep(.t-radio-group) { width: 100%; display: flex; }
+.visual-setting-row__control :deep(.t-radio-button) {
+  min-width: 0;
+  flex: 1 1 0;
+  height: 32px;
+  padding: 0 8px;
+  border-color: #e5e7eb;
+  background: #fff;
+  color: #6b7280;
+  font-size: 10px;
+}
+.visual-setting-row__control :deep(.t-radio-button.t-is-checked) {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+.visual-setting-row__control :deep(.t-switch.t-is-checked) { background: #111827; }
+
+.visual-font-preview {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #9ca3af;
+  font-size: 9px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {
-  .visual-setting-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .visual-setting-row__control {
-    width: min(280px, 100%);
-    justify-self: start;
-  }
+  .visual-setting-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .visual-setting-row__control { width: min(280px, 100%); justify-self: start; }
 }
-
 @media (max-width: 520px) {
-  .visual-plan-card__metrics { grid-template-columns: 1fr; }
   .visual-general-settings__header { padding-right: 28px; }
 }
 </style>

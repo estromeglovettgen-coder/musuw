@@ -4,6 +4,8 @@ import LegacyKnowledgeBaseListBusiness from '@/assets/business-baselines/Knowled
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import KnowledgeBaseListReferenceCard from './components/KnowledgeBaseListReferenceCard.vue'
+import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
+import ContextualGuide from '@/components/ContextualGuide.vue'
 
 const legacy = LegacyKnowledgeBaseListBusiness as any
 const legacySetup = legacy.setup
@@ -16,6 +18,8 @@ export default defineComponent({
     KnowledgeBaseEditorModal,
     ShareKnowledgeBaseDialog,
     KnowledgeBaseListReferenceCard,
+    ListSpaceSidebar,
+    ContextualGuide,
   },
   setup(props, context) {
     const state = legacySetup?.(props, context)
@@ -26,159 +30,181 @@ export default defineComponent({
 </script>
 
 <template>
-  <main class="visual-kb-list">
-    <header class="visual-kb-list__header" style="--wails-draggable: drag">
-      <div class="visual-kb-list__heading">
-        <div class="visual-kb-list__title-row"><t-icon name="folder" /><h1>{{ $t('knowledgeBase.title') }}</h1></div>
-        <p>{{ $t('knowledgeList.subtitle') }}</p>
-      </div>
-      <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button>
-    </header>
+  <div class="visual-kb-workspace">
+    <ListSpaceSidebar
+      v-if="!authStore.isLiteMode"
+      v-model="spaceSelection"
+      :count-all="allKnowledgeBases"
+      :count-mine="kbs.length"
+      :count-by-org="effectiveSharedCountByOrg"
+      :count-favorites="kbFavoritesCount"
+      :count-recents="kbRecentsCount"
+      collapsed-key="visual-kb-list-scope"
+    />
 
-    <section v-if="uploadSummaries.length" class="visual-kb-upload-status" aria-live="polite">
-      <article v-for="summary in uploadSummaries" :key="summary.kbId">
-        <span class="visual-kb-upload-status__icon" :class="{ 'is-done': summary.completed === summary.total }"><t-icon :name="summary.completed === summary.total ? 'check-circle-filled' : 'upload'" /></span>
-        <div class="visual-kb-upload-status__copy">
-          <strong>{{ summary.completed === summary.total ? $t('knowledgeList.uploadProgress.completedTitle', { name: summary.kbName }) : $t('knowledgeList.uploadProgress.uploadingTitle', { name: summary.kbName }) }}</strong>
-          <span>{{ summary.completed === summary.total ? $t('knowledgeList.uploadProgress.completedDetail', { total: summary.total }) : $t('knowledgeList.uploadProgress.detail', { completed: summary.completed, total: summary.total }) }}</span>
-          <span class="is-muted">{{ summary.completed === summary.total ? $t('knowledgeList.uploadProgress.refreshing') : $t('knowledgeList.uploadProgress.keepPageOpen') }}</span>
-          <span v-if="summary.hasError" class="is-error">{{ $t('knowledgeList.uploadProgress.errorTip') }}</span>
-          <span class="visual-kb-upload-status__bar"><span :style="{ width: summary.progress + '%' }" /></span>
+    <main class="visual-kb-list">
+      <header class="visual-kb-list__header" style="--wails-draggable: drag">
+        <div class="visual-kb-list__heading">
+          <div class="visual-kb-list__title-row"><t-icon name="folder" /><h1>{{ $t('knowledgeBase.title') }}</h1></div>
+          <p>{{ $t('knowledgeList.subtitle') }}</p>
         </div>
-      </article>
-    </section>
+        <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button>
+      </header>
 
-    <section class="visual-kb-list__content">
-      <div v-if="loading && kbs.length === 0 && !spaceSelectionOrgId" class="visual-kb-grid" aria-hidden="true">
-        <article v-for="n in 6" :key="n" class="visual-kb-list__skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '62%', height: '16px' },{ width: '100%', height: '12px' },{ width: '76%', height: '12px' }]" /></article>
-      </div>
+      <section v-if="hasUninitializedKbs" class="visual-kb-warning" role="status">
+        <t-icon name="info-circle" />
+        <span>{{ $t('knowledgeList.uninitializedBanner') }}</span>
+      </section>
 
-      <div v-else-if="(spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredKnowledgeBases.length > 0" class="visual-kb-grid">
-        <button v-if="filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ filteredKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
-
-        <template v-for="(kb, index) in filteredKnowledgeBases" :key="`${kb.isMine ? 'mine' : 'shared'}-${kb.id}`">
-          <button v-if="showShareGroupHeaders && kb.isMine && !isMyKb(kb) && !kb.is_pinned && (index === 0 || !filteredKnowledgeBases[index - 1].isMine || isMyKb(filteredKnowledgeBases[index - 1]) || filteredKnowledgeBases[index - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ filteredKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
-          <button v-if="showShareGroupHeaders && !kb.isMine && isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[index - 1].isMine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="usergroup-add" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ filteredKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
-          <button v-if="showShareGroupHeaders && !kb.isMine && !isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[index - 1].isMine || isSharedKbEditable(filteredKnowledgeBases[index - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ filteredKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
-
-          <div v-if="kb.isMine" v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
-            <KnowledgeBaseListReferenceCard
-              :kb="kb"
-              :favorited="isKbFavorited(kb.id)"
-              :can-duplicate="canDuplicateKBCard(kb)"
-              :can-manage="canManageKBCard(kb)"
-              :show-origin-badge="!authStore.isLiteMode && showKbOriginBadge(kb)"
-              :origin-variant="kbOriginVariant(kb)"
-              :creator-name="kb.creator_name"
-              :highlighted="highlightedKbId !== null && highlightedKbId === kb.id"
-              @open="handleCardClick(kb)"
-              @favorite="toggleFavoriteKb(kb.id, $event)"
-              @pin="handleTogglePinById(kb.id)"
-              @duplicate="handleDuplicateById(kb.id)"
-              @delete="handleDeleteById(kb.id)"
-            />
+      <section v-if="uploadSummaries.length" class="visual-kb-upload-status" aria-live="polite">
+        <article v-for="summary in uploadSummaries" :key="summary.kbId">
+          <span class="visual-kb-upload-status__icon" :class="{ 'is-done': summary.completed === summary.total }"><t-icon :name="summary.completed === summary.total ? 'check-circle-filled' : 'upload'" /></span>
+          <div class="visual-kb-upload-status__copy">
+            <strong>{{ summary.completed === summary.total ? $t('knowledgeList.uploadProgress.completedTitle', { name: summary.kbName }) : $t('knowledgeList.uploadProgress.uploadingTitle', { name: summary.kbName }) }}</strong>
+            <span>{{ summary.completed === summary.total ? $t('knowledgeList.uploadProgress.completedDetail', { total: summary.total }) : $t('knowledgeList.uploadProgress.detail', { completed: summary.completed, total: summary.total }) }}</span>
+            <span class="is-muted">{{ summary.completed === summary.total ? $t('knowledgeList.uploadProgress.refreshing') : $t('knowledgeList.uploadProgress.keepPageOpen') }}</span>
+            <span v-if="summary.hasError" class="is-error">{{ $t('knowledgeList.uploadProgress.errorTip') }}</span>
+            <span class="visual-kb-upload-status__bar"><span :style="{ width: summary.progress + '%' }" /></span>
           </div>
+        </article>
+      </section>
 
-          <KnowledgeBaseListReferenceCard
-            v-else
-            v-show="!isKbSectionCollapsed(kbSectionOf(kb))"
-            :kb="kb"
-            shared
-            :favorited="isKbFavorited(kb.id)"
-            :org-name="kb.org_name"
-            show-details-only
-            @open="handleSharedKbClickFromAll(kb)"
-            @favorite="toggleFavoriteKb(kb.id, $event)"
-            @details="openSharedDetailFromAll(kb)"
-          />
-        </template>
-
-        <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
-      </div>
-
-      <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0" class="visual-kb-grid">
-        <button v-if="sortedMineKbs[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ mineKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
-        <template v-for="(kb, index) in sortedMineKbs" :key="kb.id">
-          <button v-if="showShareGroupHeaders && !isMyKb(kb) && !kb.is_pinned && (index === 0 || isMyKb(sortedMineKbs[index - 1]) || sortedMineKbs[index - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ mineKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
-          <div v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
-            <KnowledgeBaseListReferenceCard
-              :kb="kb"
-              :favorited="isKbFavorited(kb.id)"
-              :can-duplicate="canDuplicateKBCard(kb)"
-              :can-manage="canManageKBCard(kb)"
-              :show-origin-badge="!authStore.isLiteMode && showKbOriginBadge(kb)"
-              :origin-variant="kbOriginVariant(kb)"
-              :creator-name="kb.creator_name"
-              :highlighted="highlightedKbId !== null && highlightedKbId === kb.id"
-              @open="handleCardClick(kb)"
-              @favorite="toggleFavoriteKb(kb.id, $event)"
-              @pin="handleTogglePin(kb)"
-              @duplicate="handleDuplicate(kb)"
-              @delete="handleDelete(kb)"
-            />
-          </div>
-        </template>
-        <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
-      </div>
-
-      <div v-else-if="spaceSelectionOrgId && spaceKbsLoading" class="visual-kb-loading"><t-loading size="medium" /></div>
-
-      <div v-else-if="spaceSelectionOrgId && sortedSpaceKbsList.length > 0" class="visual-kb-grid">
-        <template v-for="(shared, index) in sortedSpaceKbsList" :key="'shared-' + (shared.share_id || `agent-${shared.knowledge_base?.id}-${shared.source_from_agent?.agent_id || ''}`)">
-          <button v-if="showShareGroupHeaders && shared.is_mine && index === 0" type="button" class="visual-kb-section" @click="toggleKbSection('sharedByMe')"><t-icon name="share" /><span>{{ $t('knowledgeList.sections.sharedByMe') }}</span><small>{{ spaceKbSectionCounts.sharedByMe }}</small><t-icon :name="isKbSectionCollapsed('sharedByMe') ? 'chevron-right' : 'chevron-down'" /></button>
-          <button v-if="showShareGroupHeaders && !shared.is_mine && isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[index - 1].is_mine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="edit-1" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ spaceKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
-          <button v-if="showShareGroupHeaders && !shared.is_mine && !isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[index - 1].is_mine || isSharedKbEditable(sortedSpaceKbsList[index - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ spaceKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
-          <KnowledgeBaseListReferenceCard
-            v-show="!isSpaceKbCollapsed(shared)"
-            :kb="shared.knowledge_base"
-            shared
-            :can-favorite="false"
-            :org-name="shared.org_name"
-            :show-details-only="!shared.is_mine"
-            @open="handleSharedKbClick(shared)"
-            @details="openSharedDetail(shared)"
-          />
-        </template>
-        <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
-      </div>
-
-      <section v-else-if="spaceSelection === 'all' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
-      <section v-else-if="spaceSelection === 'favorites' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="star" /><strong>{{ $t('knowledgeList.empty.favoritesTitle') }}</strong><p>{{ $t('knowledgeList.empty.favoritesDescription') }}</p></section>
-      <section v-else-if="spaceSelection === 'recents' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="history" /><strong>{{ $t('knowledgeList.empty.recentsTitle') }}</strong><p>{{ $t('knowledgeList.empty.recentsDescription') }}</p></section>
-      <section v-else-if="spaceSelection === 'mine' && kbs.length === 0 && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
-      <section v-else-if="spaceSelectionOrgId && !spaceKbsLoading && spaceKbsList.length === 0" class="visual-kb-empty"><t-icon name="usergroup" /><strong>{{ $t('knowledgeList.empty.sharedTitle') }}</strong><p>{{ $t('knowledgeList.empty.sharedDescription') }}</p></section>
-    </section>
-
-    <t-dialog v-model:visible="deleteVisible" :close-btn="false" :cancel-btn="null" :confirm-btn="null" dialog-class-name="visual-kb-delete-dialog">
-      <div class="visual-kb-delete"><t-icon name="error-circle" /><div><strong>{{ $t('knowledgeList.delete.confirmTitle') }}</strong><p>{{ $t('knowledgeList.delete.confirmMessage', { name: deletingKb?.name ?? '' }) }}</p></div><footer><button type="button" @click="deleteVisible = false">{{ $t('common.cancel') }}</button><button type="button" class="is-danger" @click="confirmDelete">{{ $t('knowledgeList.delete.confirmButton') }}</button></footer></div>
-    </t-dialog>
-
-    <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val) => (val ? null : uiStore.closeKBEditor())" @success="handleKBEditorSuccess" />
-    <ShareKnowledgeBaseDialog v-model:visible="shareDialogVisible" :knowledge-base-id="sharingKbId" :knowledge-base-name="sharingKbName" @shared="handleShareSuccess" />
-
-    <Teleport to="body">
-      <Transition name="visual-shared-detail">
-        <div v-if="sharedDetailPanelVisible && currentSharedKbForDetail" class="visual-shared-detail__overlay" @click.self="closeSharedDetailPanel">
-          <aside class="visual-shared-detail">
-            <header><h3>{{ $t('knowledgeList.detail.title') }}</h3><button type="button" :aria-label="$t('general.close')" @click="closeSharedDetailPanel"><t-icon name="close" /></button></header>
-            <div class="visual-shared-detail__body"><dl>
-              <div><dt>{{ $t('knowledgeBase.name') }}</dt><dd>{{ currentSharedKbForDetail.knowledge_base.name }}</dd></div>
-              <div><dt>{{ $t('knowledgeList.detail.sourceType') }}</dt><dd>{{ currentSharedKbForDetail.source_from_agent ? $t('knowledgeList.detail.sourceTypeAgent') : $t('knowledgeList.detail.sourceTypeKbShare') }}</dd></div>
-              <div><dt>{{ currentSharedKbForDetail.source_from_agent ? $t('knowledgeList.detail.sourceFromAgent') : $t('knowledgeList.detail.sourceOrg') }}</dt><dd>{{ currentSharedKbForDetail.source_from_agent ? currentSharedKbForDetail.source_from_agent.agent_name : currentSharedKbForDetail.org_name }}</dd></div>
-              <div v-if="currentSharedKbForDetail.source_from_agent"><dt>{{ $t('knowledgeList.detail.agentKbStrategy') }}</dt><dd>{{ agentKbStrategyText(currentSharedKbForDetail.source_from_agent?.kb_selection_mode ?? '') }}</dd></div>
-              <div><dt>{{ $t('knowledgeList.detail.sharedAt') }}</dt><dd>{{ formatStringDate(new Date(currentSharedKbForDetail.shared_at)) }}</dd></div>
-              <div><dt>{{ $t('knowledgeList.detail.myPermission') }}</dt><dd>{{ $t(`organization.role.${currentSharedKbForDetail.permission}`) }}</dd></div>
-            </dl></div>
-            <footer><button type="button" @click="closeSharedDetailPanel">{{ $t('common.close') }}</button><button type="button" class="is-primary" @click="goToSharedKbFromPanel">{{ $t('knowledgeList.detail.goToKb') }}</button></footer>
-          </aside>
+      <section class="visual-kb-list__content">
+        <div v-if="loading && kbs.length === 0 && !spaceSelectionOrgId" class="visual-kb-grid" aria-hidden="true">
+          <article v-for="n in 6" :key="n" class="visual-kb-list__skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '62%', height: '16px' },{ width: '100%', height: '12px' },{ width: '76%', height: '12px' }]" /></article>
         </div>
-      </Transition>
-    </Teleport>
-  </main>
+
+        <div v-else-if="(spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredKnowledgeBases.length > 0" class="visual-kb-grid">
+          <button v-if="filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ filteredKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
+
+          <template v-for="(kb, index) in filteredKnowledgeBases" :key="`${kb.isMine ? 'mine' : 'shared'}-${kb.id}`">
+            <button v-if="showShareGroupHeaders && kb.isMine && !isMyKb(kb) && !kb.is_pinned && (index === 0 || !filteredKnowledgeBases[index - 1].isMine || isMyKb(filteredKnowledgeBases[index - 1]) || filteredKnowledgeBases[index - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ filteredKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !kb.isMine && isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[index - 1].isMine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="usergroup-add" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ filteredKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !kb.isMine && !isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[index - 1].isMine || isSharedKbEditable(filteredKnowledgeBases[index - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ filteredKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
+
+            <div v-if="kb.isMine" v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
+              <KnowledgeBaseListReferenceCard
+                :kb="kb"
+                :favorited="isKbFavorited(kb.id)"
+                :can-duplicate="canDuplicateKBCard(kb)"
+                :can-manage="canManageKBCard(kb)"
+                :show-origin-badge="!authStore.isLiteMode && showKbOriginBadge(kb)"
+                :origin-variant="kbOriginVariant(kb)"
+                :creator-name="kb.creator_name"
+                :highlighted="highlightedKbId !== null && highlightedKbId === kb.id"
+                @open="handleCardClick(kb)"
+                @favorite="toggleFavoriteKb(kb.id, $event)"
+                @pin="handleTogglePinById(kb.id)"
+                @duplicate="handleDuplicateById(kb.id)"
+                @delete="handleDeleteById(kb.id)"
+              />
+            </div>
+
+            <KnowledgeBaseListReferenceCard
+              v-else
+              v-show="!isKbSectionCollapsed(kbSectionOf(kb))"
+              :kb="kb"
+              shared
+              :favorited="isKbFavorited(kb.id)"
+              :org-name="kb.org_name"
+              show-details-only
+              @open="handleSharedKbClickFromAll(kb)"
+              @favorite="toggleFavoriteKb(kb.id, $event)"
+              @details="openSharedDetailFromAll(kb)"
+            />
+          </template>
+
+          <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
+        </div>
+
+        <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0" class="visual-kb-grid">
+          <button v-if="sortedMineKbs[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ mineKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
+          <template v-for="(kb, index) in sortedMineKbs" :key="kb.id">
+            <button v-if="showShareGroupHeaders && !isMyKb(kb) && !kb.is_pinned && (index === 0 || isMyKb(sortedMineKbs[index - 1]) || sortedMineKbs[index - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ mineKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
+            <div v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
+              <KnowledgeBaseListReferenceCard
+                :kb="kb"
+                :favorited="isKbFavorited(kb.id)"
+                :can-duplicate="canDuplicateKBCard(kb)"
+                :can-manage="canManageKBCard(kb)"
+                :show-origin-badge="!authStore.isLiteMode && showKbOriginBadge(kb)"
+                :origin-variant="kbOriginVariant(kb)"
+                :creator-name="kb.creator_name"
+                :highlighted="highlightedKbId !== null && highlightedKbId === kb.id"
+                @open="handleCardClick(kb)"
+                @favorite="toggleFavoriteKb(kb.id, $event)"
+                @pin="handleTogglePin(kb)"
+                @duplicate="handleDuplicate(kb)"
+                @delete="handleDelete(kb)"
+              />
+            </div>
+          </template>
+          <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
+        </div>
+
+        <div v-else-if="spaceSelectionOrgId && spaceKbsLoading" class="visual-kb-loading"><t-loading size="medium" /></div>
+
+        <div v-else-if="spaceSelectionOrgId && sortedSpaceKbsList.length > 0" class="visual-kb-grid">
+          <template v-for="(shared, index) in sortedSpaceKbsList" :key="'shared-' + (shared.share_id || `agent-${shared.knowledge_base?.id}-${shared.source_from_agent?.agent_id || ''}`)">
+            <button v-if="showShareGroupHeaders && shared.is_mine && index === 0" type="button" class="visual-kb-section" @click="toggleKbSection('sharedByMe')"><t-icon name="share" /><span>{{ $t('knowledgeList.sections.sharedByMe') }}</span><small>{{ spaceKbSectionCounts.sharedByMe }}</small><t-icon :name="isKbSectionCollapsed('sharedByMe') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !shared.is_mine && isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[index - 1].is_mine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="edit-1" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ spaceKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !shared.is_mine && !isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[index - 1].is_mine || isSharedKbEditable(sortedSpaceKbsList[index - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ spaceKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
+            <KnowledgeBaseListReferenceCard
+              v-show="!isSpaceKbCollapsed(shared)"
+              :kb="shared.knowledge_base"
+              shared
+              :can-favorite="false"
+              :org-name="shared.org_name"
+              :show-details-only="!shared.is_mine"
+              @open="handleSharedKbClick(shared)"
+              @details="openSharedDetail(shared)"
+            />
+          </template>
+          <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
+        </div>
+
+        <section v-else-if="spaceSelection === 'all' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
+        <section v-else-if="spaceSelection === 'favorites' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="star" /><strong>{{ $t('knowledgeList.empty.favoritesTitle') }}</strong><p>{{ $t('knowledgeList.empty.favoritesDescription') }}</p></section>
+        <section v-else-if="spaceSelection === 'recents' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="history" /><strong>{{ $t('knowledgeList.empty.recentsTitle') }}</strong><p>{{ $t('knowledgeList.empty.recentsDescription') }}</p></section>
+        <section v-else-if="spaceSelection === 'mine' && kbs.length === 0 && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
+        <section v-else-if="spaceSelectionOrgId && !spaceKbsLoading && spaceKbsList.length === 0" class="visual-kb-empty"><t-icon name="usergroup" /><strong>{{ $t('knowledgeList.empty.sharedTitle') }}</strong><p>{{ $t('knowledgeList.empty.sharedDescription') }}</p></section>
+      </section>
+
+      <t-dialog v-model:visible="deleteVisible" :close-btn="false" :cancel-btn="null" :confirm-btn="null" dialog-class-name="visual-kb-delete-dialog">
+        <div class="visual-kb-delete"><t-icon name="error-circle" /><div><strong>{{ $t('knowledgeList.delete.confirmTitle') }}</strong><p>{{ $t('knowledgeList.delete.confirmMessage', { name: deletingKb?.name ?? '' }) }}</p></div><footer><button type="button" @click="deleteVisible = false">{{ $t('common.cancel') }}</button><button type="button" class="is-danger" @click="confirmDelete">{{ $t('knowledgeList.delete.confirmButton') }}</button></footer></div>
+      </t-dialog>
+
+      <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val) => (val ? null : uiStore.closeKBEditor())" @success="handleKBEditorSuccess" />
+      <ShareKnowledgeBaseDialog v-model:visible="shareDialogVisible" :knowledge-base-id="sharingKbId" :knowledge-base-name="sharingKbName" @shared="handleShareSuccess" />
+
+      <Teleport to="body">
+        <Transition name="visual-shared-detail">
+          <div v-if="sharedDetailPanelVisible && currentSharedKbForDetail" class="visual-shared-detail__overlay" @click.self="closeSharedDetailPanel">
+            <aside class="visual-shared-detail">
+              <header><h3>{{ $t('knowledgeList.detail.title') }}</h3><button type="button" :aria-label="$t('general.close')" @click="closeSharedDetailPanel"><t-icon name="close" /></button></header>
+              <div class="visual-shared-detail__body"><dl>
+                <div><dt>{{ $t('knowledgeBase.name') }}</dt><dd>{{ currentSharedKbForDetail.knowledge_base.name }}</dd></div>
+                <div><dt>{{ $t('knowledgeList.detail.sourceType') }}</dt><dd>{{ currentSharedKbForDetail.source_from_agent ? $t('knowledgeList.detail.sourceTypeAgent') : $t('knowledgeList.detail.sourceTypeKbShare') }}</dd></div>
+                <div><dt>{{ currentSharedKbForDetail.source_from_agent ? $t('knowledgeList.detail.sourceFromAgent') : $t('knowledgeList.detail.sourceOrg') }}</dt><dd>{{ currentSharedKbForDetail.source_from_agent ? currentSharedKbForDetail.source_from_agent.agent_name : currentSharedKbForDetail.org_name }}</dd></div>
+                <div v-if="currentSharedKbForDetail.source_from_agent"><dt>{{ $t('knowledgeList.detail.agentKbStrategy') }}</dt><dd>{{ agentKbStrategyText(currentSharedKbForDetail.source_from_agent?.kb_selection_mode ?? '') }}</dd></div>
+                <div><dt>{{ $t('knowledgeList.detail.sharedAt') }}</dt><dd>{{ formatStringDate(new Date(currentSharedKbForDetail.shared_at)) }}</dd></div>
+                <div><dt>{{ $t('knowledgeList.detail.myPermission') }}</dt><dd>{{ $t(`organization.role.${currentSharedKbForDetail.permission}`) }}</dd></div>
+              </dl></div>
+              <footer><button type="button" @click="closeSharedDetailPanel">{{ $t('common.close') }}</button><button type="button" class="is-primary" @click="goToSharedKbFromPanel">{{ $t('knowledgeList.detail.goToKb') }}</button></footer>
+            </aside>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <ContextualGuide tour="kbList" :when="showKbListContextualGuide" />
+    </main>
+  </div>
 </template>
 
 <style scoped lang="less">
-.visual-kb-list { width: 100%; height: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; overflow: hidden; background: rgb(249 250 251 / 30%); color: #374151; }
+.visual-kb-workspace { width: 100%; height: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; display: flex; overflow: hidden; background: rgb(249 250 251 / 30%); }
+.visual-kb-workspace > :deep(.list-space-sidebar) { flex: 0 0 auto; }
+.visual-kb-list { width: auto; height: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; overflow: hidden; background: rgb(249 250 251 / 30%); color: #374151; }
 .visual-kb-list__header { flex: 0 0 auto; padding-bottom: 20px; border-bottom: 1px solid rgb(229 231 235 / 80%); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .visual-kb-list__heading { min-width: 0; }
 .visual-kb-list__title-row { display: flex; align-items: center; gap: 8px; }
@@ -188,6 +214,8 @@ export default defineComponent({
 .visual-kb-list__create { min-height: 32px; padding: 8px 14px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; background: #111827; color: #fff; font: inherit; font-size: 12px; line-height: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); transition: background-color 150ms ease; }
 .visual-kb-list__create:hover { background: #000; }
 .visual-kb-list__create :deep(.t-icon) { font-size: 14px; }
+.visual-kb-warning { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: #fff; color: #6b7280; font-size: 11px; line-height: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
+.visual-kb-warning :deep(.t-icon) { flex: 0 0 16px; font-size: 16px; color: #9ca3af; }
 .visual-kb-upload-status { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .visual-kb-upload-status article { min-height: 56px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; gap: 10px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-kb-upload-status__icon { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #6b7280; }
@@ -243,6 +271,7 @@ export default defineComponent({
 .visual-shared-detail-enter-from .visual-shared-detail,.visual-shared-detail-leave-to .visual-shared-detail { transform: translateX(100%); }
 @media (min-width: 768px) { .visual-kb-list { padding: 32px; } .visual-kb-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (min-width: 1024px) { .visual-kb-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 760px) { .visual-kb-workspace > :deep(.list-space-sidebar) { display: none; } }
 @media (max-width: 600px) { .visual-kb-list__header { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .visual-kb-list__create,.visual-kb-upload-status__bar span,.visual-kb-list__create-card,.visual-shared-detail-enter-active,.visual-shared-detail-leave-active,.visual-shared-detail-enter-active .visual-shared-detail,.visual-shared-detail-leave-active .visual-shared-detail { transition: none !important; } }
 </style>

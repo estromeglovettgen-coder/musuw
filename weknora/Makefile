@@ -234,15 +234,17 @@ deps:
 
 # Build for production
 # google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn for qdrant milvus proto conflict
+# EDITION defaults to standard; Musuw production can opt into the Lite product exposure boundary.
 build-prod:
 	VERSION=$$(git describe --tags --abbrev=0 2>/dev/null || echo "$${VERSION:-unknown}"); \
 	COMMIT_ID=$${COMMIT_ID:-unknown}; \
+	EDITION=$${EDITION:-standard}; \
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="-Wno-deprecated-declarations" \
 	CGO_LDFLAGS="$$(if [ "$$(uname)" = 'Darwin' ]; then echo '-Wl,-no_warn_duplicate_libraries'; fi)" \
 	BUILD_TIME=$${BUILD_TIME:-unknown}; \
 	GO_VERSION=$${GO_VERSION:-unknown}; \
-	LDFLAGS="-X 'github.com/Tencent/WeKnora/internal/handler.Version=$$VERSION' -X 'github.com/Tencent/WeKnora/internal/handler.Edition=standard' -X 'github.com/Tencent/WeKnora/internal/handler.CommitID=$$COMMIT_ID' -X 'github.com/Tencent/WeKnora/internal/handler.BuildTime=$$BUILD_TIME' -X 'github.com/Tencent/WeKnora/internal/handler.GoVersion=$$GO_VERSION' -X 'google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn'"; \
+	LDFLAGS="-X 'github.com/Tencent/WeKnora/internal/handler.Version=$$VERSION' -X 'github.com/Tencent/WeKnora/internal/handler.Edition=$$EDITION' -X 'github.com/Tencent/WeKnora/internal/handler.CommitID=$$COMMIT_ID' -X 'github.com/Tencent/WeKnora/internal/handler.BuildTime=$$BUILD_TIME' -X 'github.com/Tencent/WeKnora/internal/handler.GoVersion=$$GO_VERSION' -X 'google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn'"; \
 	go build -ldflags="-w -s $$LDFLAGS" -o $(BINARY_NAME) $(MAIN_PATH)
 
 # Build Lite version (single binary, SQLite + in-memory queue)
@@ -331,5 +333,4 @@ dev-app:
 
 dev-frontend:
 	./scripts/dev.sh frontend
-
 

@@ -5,6 +5,8 @@ import SessionSidebarRow from './SessionSidebarRow.vue'
 import SessionSourceFilter from './SessionSourceFilter.vue'
 import SessionBatchManageModal from './SessionBatchManageModal.vue'
 import UserMenu from './UserMenu.vue'
+import TenantSelector from './TenantSelector.vue'
+import { useOrganizationStore } from '@/stores/organization'
 
 const legacy = LegacySidebarBusiness as any
 const legacySetup = legacy.setup
@@ -18,10 +20,12 @@ export default defineComponent({
     SessionSourceFilter,
     SessionBatchManageModal,
     UserMenu,
+    TenantSelector,
   },
   setup(props, context) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    const orgStore = useOrganizationStore()
+    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state, orgStore }
     return state
   },
 })
@@ -36,6 +40,8 @@ export default defineComponent({
         <div class="visual-sidebar__collapsed-divider" />
         <button type="button" class="visual-sidebar__collapsed-nav is-new" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /></button>
         <button type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': isMenuItemActive('knowledge-bases') }" :title="t('menu.knowledgeBase')" @click="handleMenuClick('knowledge-bases')"><t-icon name="folder" /></button>
+        <button v-if="visibleMenuArr.some(item => item.path === 'agents')" type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': currentpath === 'agentList' }" :title="t('menu.agents')" @click="handleMenuClick('agents')"><t-icon name="usergroup" /></button>
+        <button v-if="visibleMenuArr.some(item => item.path === 'organizations')" type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': currentpath === 'organizationList' }" :title="t('menu.organizations')" @click="handleMenuClick('organizations')"><t-icon name="system-sum" /></button>
       </div>
       <div class="visual-sidebar__drag-handle" @mousedown="onDragHandleMouseDown" />
       <div class="visual-sidebar__collapsed-user"><UserMenu /></div>
@@ -45,10 +51,12 @@ export default defineComponent({
       <header class="visual-sidebar__header">
         <button type="button" class="visual-sidebar__brand" aria-label="Musuw 穆苏瓦" @click="handleMenuClick('creatChat')"><span class="visual-sidebar__mark" aria-hidden="true">↯</span><strong>Musuw 穆苏瓦</strong></button>
         <div class="visual-sidebar__header-actions">
-          <button type="button" class="visual-sidebar__header-icon" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')"><t-icon name="search" /></button>
+          <button v-if="!authStore.isLiteMode" type="button" class="visual-sidebar__header-icon" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')"><t-icon name="search" /></button>
           <button type="button" class="visual-sidebar__header-icon" :title="t('menu.collapseSidebar')" :aria-label="t('menu.collapseSidebar')" @click="toggleSidebar"><t-icon name="chevron-left" /></button>
         </div>
       </header>
+
+      <TenantSelector v-if="!authStore.isLiteMode && authStore.canAccessAllTenants" class="visual-sidebar__tenant-selector" />
 
       <div class="visual-sidebar__primary-actions">
         <button type="button" class="visual-sidebar__primary is-new" data-guide="nav-creatChat" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /><span>{{ t('menu.newChat') }}</span></button>
@@ -56,10 +64,17 @@ export default defineComponent({
           <span class="visual-sidebar__primary-copy"><t-icon name="folder" /><span>{{ t('menu.knowledgeBase') }}</span></span>
           <span v-if="chatResources.rawKnowledgeBases?.length" class="visual-sidebar__kb-count">{{ chatResources.rawKnowledgeBases.length }}</span>
         </button>
+        <button v-if="visibleMenuArr.some(item => item.path === 'agents')" type="button" class="visual-sidebar__primary is-native" :class="{ 'is-active': currentpath === 'agentList' }" data-guide="nav-agents" @click="handleMenuClick('agents')">
+          <span class="visual-sidebar__primary-copy"><t-icon name="usergroup" /><span>{{ t('menu.agents') }}</span></span>
+        </button>
+        <button v-if="visibleMenuArr.some(item => item.path === 'organizations')" type="button" class="visual-sidebar__primary is-native" :class="{ 'is-active': currentpath === 'organizationList' }" data-guide="nav-organizations" @click="handleMenuClick('organizations')">
+          <span class="visual-sidebar__primary-copy"><t-icon name="system-sum" /><span>{{ t('menu.organizations') }}</span></span>
+          <span v-if="orgStore.totalPendingJoinRequestCount > 0" class="visual-sidebar__kb-count">{{ orgStore.totalPendingJoinRequestCount }}</span>
+        </button>
       </div>
 
       <section class="visual-sidebar__history" aria-label="Sessions">
-        <div v-if="showSessionSourceFilter && !batchMode" class="visual-sidebar__session-scope"><SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" /></div>
+        <div v-if="!authStore.isLiteMode && showSessionSourceFilter && !batchMode" class="visual-sidebar__session-scope"><SessionSourceFilter inline :emphasized="sessionScopeFilterPinned" :sources="sessionSourceOptions" :current="activeSessionBucketKey" @select="switchSessionBucket" /></div>
         <div ref="scrollContainer" class="visual-sidebar__history-scroll" @scroll="handleScroll">
           <div v-if="sessionListBooting && !hasAnySession" class="visual-sidebar__session-skeletons" aria-hidden="true"><div v-for="n in 4" :key="n" class="visual-sidebar__session-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" /></div></div>
           <div v-else-if="activeBucket?.loading && !activeBucket.loaded && filteredGroupedSessions.length === 0" class="visual-sidebar__session-skeletons" aria-hidden="true"><div v-for="n in 4" :key="`bucket-${n}`" class="visual-sidebar__session-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px' }]" /></div></div>
@@ -79,7 +94,7 @@ export default defineComponent({
 
     <SessionBatchManageModal
       :visible="batchMode"
-      :items="filteredGroupedSessions.flatMap(group => group.items)"
+      :items="menuArr.find(item => item.path === 'creatChat')?.children || []"
       :selected-ids="batchSelectedIds"
       :all-selected="isAllBatchSelected"
       :indeterminate="isBatchIndeterminate"
@@ -107,14 +122,15 @@ export default defineComponent({
 .visual-sidebar__header-icon,.visual-sidebar__collapsed-control { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; transition: color 150ms ease,background-color 150ms ease; }
 .visual-sidebar__header-icon:hover { color: #1f2937; background: rgb(229 231 235 / 60%); }
 .visual-sidebar__header-icon :deep(.t-icon) { font-size: 16px; }
+.visual-sidebar__tenant-selector { flex: 0 0 auto; margin: -2px 2px 8px; }
 .visual-sidebar__primary-actions { flex: 0 0 auto; margin-bottom: 8px; padding: 0 2px; display: flex; flex-direction: column; gap: 4px; }
 .visual-sidebar__primary { width: 100%; min-height: 36px; padding: 8px 12px; box-sizing: border-box; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; text-align: left; cursor: pointer; transition: all 150ms ease; }
 .visual-sidebar__primary.is-new { border: 1px solid rgb(229 231 235 / 80%); background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); font-weight: 500; }
 .visual-sidebar__primary.is-new:hover { background: #f9fafb; }
 .visual-sidebar__primary.is-new > span { font-size: 13px; font-weight: 600; }
-.visual-sidebar__primary.is-kb { justify-content: space-between; }
-.visual-sidebar__primary.is-kb:hover { color: #030712; background: rgb(229 231 235 / 50%); }
-.visual-sidebar__primary.is-kb.is-active { color: #030712; background: rgb(229 231 235 / 90%); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-sidebar__primary.is-kb,.visual-sidebar__primary.is-native { justify-content: space-between; }
+.visual-sidebar__primary.is-kb:hover,.visual-sidebar__primary.is-native:hover { color: #030712; background: rgb(229 231 235 / 50%); }
+.visual-sidebar__primary.is-kb.is-active,.visual-sidebar__primary.is-native.is-active { color: #030712; background: rgb(229 231 235 / 90%); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-sidebar__primary-copy { min-width: 0; display: inline-flex; align-items: center; gap: 8px; }
 .visual-sidebar__primary :deep(.t-icon) { flex: 0 0 16px; width: 16px; height: 16px; font-size: 16px; }
 .visual-sidebar__primary-copy > span:last-child { font-size: 13px; }

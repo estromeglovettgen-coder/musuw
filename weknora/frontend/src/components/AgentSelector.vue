@@ -4,7 +4,7 @@
       <div class="agent-selector-dropdown" :style="dropdownStyle" @click.stop>
         <div class="agent-selector-header">
           <span>{{ $t('agent.selectAgent') }}</span>
-          <router-link to="/platform/agents" class="agent-selector-add" @click="$emit('close')">
+          <router-link v-if="!authStore.isLiteMode" to="/platform/agents" class="agent-selector-add" @click="$emit('close')">
             <span class="add-icon">+</span>
             <span class="add-text">{{ $t('agent.manageAgents') }}</span>
           </router-link>
@@ -102,7 +102,7 @@
             <div class="detail-title-wrap">
               <div class="detail-title-row">
                 <span class="detail-name">{{ activeDetail.agent.name }}</span>
-                <button v-if="canShowDetailHeaderAction" type="button" class="detail-header-action"
+                <button v-if="!authStore.isLiteMode && canShowDetailHeaderAction" type="button" class="detail-header-action"
                   :class="{ 'detail-header-action--warn': activeDetailNotReadyLabels.length }" :title="activeDetailNotReadyLabels.length
                     ? $t('agent.selector.configureAction')
                     : $t('agent.selector.goToSettings')"
@@ -131,7 +131,7 @@
             </span>
             <span v-if="getKbCapability(activeDetail.agent)" class="detail-tag">{{ getKbCapability(activeDetail.agent)
               }}</span>
-            <span v-if="getMcpCapability(activeDetail.agent)" class="detail-tag">{{ getMcpCapability(activeDetail.agent)
+            <span v-if="!authStore.isLiteMode && getMcpCapability(activeDetail.agent)" class="detail-tag">{{ getMcpCapability(activeDetail.agent)
               }}</span>
             <span v-if="activeDetail.agent.config?.multi_turn_enabled" class="detail-tag">{{
               $t('agent.capabilities.multiTurn')
@@ -141,7 +141,7 @@
           <div class="detail-tag-group">
             <div class="detail-tag-group-title">{{ $t('agent.selector.capabilitiesSection') }}</div>
             <div class="detail-tags detail-tags--capabilities">
-              <span class="detail-tag detail-capability-tag"
+              <span v-if="!authStore.isLiteMode" class="detail-tag detail-capability-tag"
                 :class="getWebSearchCapabilityClass(activeDetail.agent)">
                 <span class="detail-capability-icon-wrap">
                   <TIcon :name="getWebSearchCapabilityIcon(activeDetail.agent)" size="10px"
@@ -188,6 +188,7 @@ import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID }
 import AgentAvatar from '@/components/AgentAvatar.vue';
 import { useOrganizationStore } from '@/stores/organization';
 import { useSettingsStore } from '@/stores/settings';
+import { useAuthStore } from '@/stores/auth';
 import type { SharedAgentInfo } from '@/api/organization';
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom';
 import { type ModelConfig } from '@/api/model';
@@ -209,6 +210,7 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const orgStore = useOrganizationStore();
 const settingsStore = useSettingsStore();
+const authStore = useAuthStore();
 const chatResources = useChatResourcesStore();
 
 const props = defineProps<{
@@ -250,7 +252,11 @@ const agentsList = computed(() => props.agents ?? []);
 const webSearchProviders = computed(() => chatResources.webSearchProviders);
 
 const builtinAgents = computed(() => {
-  const apiBuiltins = agentsList.value.filter(a => a.is_builtin);
+  const apiBuiltins = agentsList.value.filter(a => {
+    if (!a.is_builtin) return false;
+    if (!authStore.isLiteMode) return true;
+    return a.id === BUILTIN_QUICK_ANSWER_ID || a.id === BUILTIN_SMART_REASONING_ID;
+  });
   return apiBuiltins.map(agent => {
     if (agent.id === BUILTIN_QUICK_ANSWER_ID) {
       return { ...agent, name: t('input.normalMode'), description: t('input.normalModeDesc') };
@@ -262,7 +268,9 @@ const builtinAgents = computed(() => {
   });
 });
 
-const customAgents = computed(() => agentsList.value.filter(a => !a.is_builtin));
+const customAgents = computed(() =>
+  authStore.isLiteMode ? [] : agentsList.value.filter(a => !a.is_builtin),
+);
 
 const toCustomAgent = (agent: SharedAgentInfo['agent']): CustomAgent => ({
   is_builtin: false,
@@ -270,11 +278,12 @@ const toCustomAgent = (agent: SharedAgentInfo['agent']): CustomAgent => ({
   ...agent,
 });
 
-const sharedAgentsList = computed<SharedAgentSelection[]>(() =>
-  (orgStore.sharedAgents || [])
+const sharedAgentsList = computed<SharedAgentSelection[]>(() => {
+  if (authStore.isLiteMode) return [];
+  return (orgStore.sharedAgents || [])
     .filter(shared => !shared.disabled_by_me)
-    .map(shared => ({ ...shared, agent: toCustomAgent(shared.agent) })),
-);
+    .map(shared => ({ ...shared, agent: toCustomAgent(shared.agent) }));
+});
 
 const currentAgentSourceTenantId = computed(() => settingsStore.selectedAgentSourceTenantId ?? null);
 
@@ -522,6 +531,7 @@ const selectSharedAgent = (shared: SharedAgentSelection) => {
 };
 
 const goToSettings = (agent: CustomAgent, sourceTenantId?: string) => {
+  if (authStore.isLiteMode) return;
   if (!canLocallyConfigureAgent(sourceTenantId) && getAgentNotReadyLabels(agent, sourceTenantId).length > 0) {
     return;
   }
@@ -594,7 +604,7 @@ const updateDropdownPosition = () => {
 watch(() => props.visible, (newVal) => {
   if (newVal) {
     nextTick(() => updateDropdownPosition());
-    chatResources.ensureWebSearchProviders();
+    if (!authStore.isLiteMode) chatResources.ensureWebSearchProviders();
   } else {
     hideDetailPanel();
   }

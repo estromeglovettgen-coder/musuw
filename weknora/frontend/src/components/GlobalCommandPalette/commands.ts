@@ -1,5 +1,6 @@
 import type { Router } from 'vue-router'
 import type { Composer } from 'vue-i18n'
+import { openNewUserGuide } from '@/config/contextualGuides'
 
 /**
  * A single command that can be searched and invoked from the palette.
@@ -25,13 +26,24 @@ export interface CommandContext {
   close: () => void
 }
 
+const LITE_COMMAND_IDS = new Set(['new-chat', 'open-kb-list', 'open-settings'])
+
+function isLiteProductMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('weknora_lite_mode') === 'true'
+  } catch {
+    return false
+  }
+}
+
 /**
- * Build the flat command list. Commands are intentionally static — dynamic
- * entities (KBs / agents / sessions) live in their own result groups.
+ * Build the flat command list. Standard keeps the complete upstream command
+ * surface. Lite keeps only commands belonging to the Musuw exposure contract.
  */
 export function buildCommands(ctx: CommandContext): CmdkCommand[] {
   const { router, t, close } = ctx
-  return [
+  const commands: CmdkCommand[] = [
     {
       id: 'new-chat',
       label: t('commandPalette.quick.newChat'),
@@ -53,6 +65,26 @@ export function buildCommands(ctx: CommandContext): CmdkCommand[] {
       },
     },
     {
+      id: 'open-agents',
+      label: t('commandPalette.quick.agents'),
+      icon: 'user-circle',
+      keywords: ['agent', 'bot', '智能体', '助手'],
+      run: () => {
+        close()
+        router.push('/platform/agents')
+      },
+    },
+    {
+      id: 'open-organizations',
+      label: t('commandPalette.quick.organizations'),
+      icon: 'usergroup',
+      keywords: ['org', 'organization', 'team', 'space', '组织', '共享'],
+      run: () => {
+        close()
+        router.push('/platform/organizations')
+      },
+    },
+    {
       id: 'open-settings',
       label: t('commandPalette.quick.settings'),
       icon: 'setting',
@@ -62,7 +94,20 @@ export function buildCommands(ctx: CommandContext): CmdkCommand[] {
         router.push('/platform/settings')
       },
     },
+    {
+      id: 'open-product-tour',
+      label: t('commandPalette.quick.productTour'),
+      icon: 'help-circle',
+      keywords: ['guide', 'tour', 'onboarding', 'help', '引导', '新手', '教程'],
+      run: () => {
+        close()
+        openNewUserGuide()
+      },
+    },
   ]
+
+  if (!isLiteProductMode()) return commands
+  return commands.filter((command) => LITE_COMMAND_IDS.has(command.id))
 }
 
 /**

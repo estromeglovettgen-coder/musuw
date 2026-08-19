@@ -150,10 +150,10 @@ function installTenantWatcher(): void {
       loaded.agent = false
       favoritesByType.kb.value = []
       favoritesByType.agent.value = []
-      // Eagerly refetch both types so any already-mounted list view sees
-      // fresh data without a manual refresh.
+      // Lite exposes Knowledge Base only; do not refetch Agent favorites from
+      // the shared favorites API after tenant state changes.
       void fetchFavorites('kb')
-      void fetchFavorites('agent')
+      if (!authStore.isLiteMode) void fetchFavorites('agent')
       // Recents are keyed on the tenant id (see `recentsKey`); bump the
       // revision so any active computed re-reads against the new key.
       bumpRecents()
@@ -174,25 +174,27 @@ export interface UseResourcePinsResult {
 
 export function useResourcePins(): UseResourcePinsResult {
   installTenantWatcher()
+  const authStore = useAuthStore()
 
-  // Lazy first load. Calling the composable always kicks off (or reuses)
-  // the in-flight fetch for both types; the templates render with empty
-  // arrays until data lands, which is fine because the counts default to
-  // 0 and no view depends on a synchronous read.
+  // Lazy first load. Lite only hydrates the Knowledge Base resource type;
+  // Standard keeps the native combined KB + Agent behavior.
   if (!loaded.kb) void fetchFavorites('kb')
-  if (!loaded.agent) void fetchFavorites('agent')
+  if (!authStore.isLiteMode && !loaded.agent) void fetchFavorites('agent')
+  if (authStore.isLiteMode) favoritesByType.agent.value = []
 
   const favorites = computed<PinEntry[]>(() => {
-    // Merge both type lists and sort by ts desc.
-    return [...favoritesByType.kb.value, ...favoritesByType.agent.value].sort(
-      (a, b) => b.ts - a.ts
-    )
+    const entries = authStore.isLiteMode
+      ? [...favoritesByType.kb.value]
+      : [...favoritesByType.kb.value, ...favoritesByType.agent.value]
+    return entries.sort((a, b) => b.ts - a.ts)
   })
 
   const recents = computed<PinEntry[]>(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _ = recentsRevision.value
-    return readRecents().sort((a, b) => b.ts - a.ts)
+    const entries = readRecents()
+    return (authStore.isLiteMode ? entries.filter((entry) => entry.type === 'kb') : entries)
+      .sort((a, b) => b.ts - a.ts)
   })
 
   const isFavorite = (type: ResourceType, id: string): boolean => {
@@ -253,6 +255,11 @@ export function useResourcePins(): UseResourcePinsResult {
   const refresh = async (): Promise<void> => {
     loaded.kb = false
     loaded.agent = false
+    favoritesByType.agent.value = []
+    if (authStore.isLiteMode) {
+      await fetchFavorites('kb')
+      return
+    }
     await Promise.all([fetchFavorites('kb'), fetchFavorites('agent')])
   }
 

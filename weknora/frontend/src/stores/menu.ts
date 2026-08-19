@@ -27,6 +27,8 @@ export const useMenuStore = defineStore('menuStore', () => {
       children: createMenuChildren()
     },
     { title: '', titleKey: 'menu.knowledgeBase', icon: 'zhishiku', path: 'knowledge-bases' },
+    { title: '', titleKey: 'menu.agents', icon: 'agent', path: 'agents' },
+    { title: '', titleKey: 'menu.organizations', icon: 'organization', path: 'organizations' },
     { title: '', titleKey: 'menu.settings', icon: 'setting', path: 'settings' },
     { title: '', titleKey: 'menu.logout', icon: 'logout', path: 'logout' }
   ])
@@ -57,12 +59,18 @@ export const useMenuStore = defineStore('menuStore', () => {
     }
   )
 
-  const liteHiddenPaths = new Set(['logout'])
+  // Musuw Lite is deliberately fail-closed: only product-approved top-level
+  // entries are visible. A newly-added upstream menu item must be explicitly
+  // reviewed before it can appear in the consumer product.
+  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases'])
 
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()
     return menuArr.filter(item => {
-      if (authStore.isLiteMode && liteHiddenPaths.has(item.path)) {
+      if (authStore.isLiteMode && !liteVisiblePaths.has(item.path)) {
+        return false
+      }
+      if (item.path === 'organizations' && !authStore.hasRole('admin')) {
         return false
       }
       return true

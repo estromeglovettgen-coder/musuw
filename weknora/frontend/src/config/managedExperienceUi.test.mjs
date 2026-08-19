@@ -6,98 +6,134 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 const menuStore = read("../stores/menu.ts");
 const router = read("../router/index.ts");
+const sidebar = read("../components/menu.vue");
 const inputField = read("../components/Input-field.vue");
-const commandPalette = read("../components/GlobalCommandPalette.vue");
+const agentSelector = read("../components/AgentSelector.vue");
 const userMenu = read("../components/UserMenu.vue");
-const newUserGuide = read("../components/NewUserGuide.vue");
-const settingsStore = read("../stores/settings.ts");
-const settingsStorage = read("../stores/settingsStorage.ts");
 const settingsView = read("../views/settings/Settings.vue");
 const generalSettings = read("../views/settings/GeneralSettings.vue");
-const sidebar = read("../components/menu.vue");
-const commands = read("../components/GlobalCommandPalette/commands.ts");
+const knowledgeBase = read("../views/knowledge/KnowledgeBase.vue");
 const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
-const platformShell = read("../views/platform/index.vue");
+const knowledgeBaseListController = read("../assets/business-baselines/KnowledgeBaseList.pre-view.vue");
+const workspaceOnboarding = read("../views/auth/WorkspaceOnboarding.vue");
+const commandPaletteStore = read("../stores/commandPalette.ts");
 
-test("agent management and selection are absent from the managed user experience", () => {
-  assert.doesNotMatch(menuStore, /titleKey:\s*'menu\.agents'/);
-  assert.doesNotMatch(router, /import\("\.\.\/views\/agent\/AgentList\.vue"\)/);
-  assert.match(router, /path:\s*["']agents["'][\s\S]*redirect:\s*["']\/platform\/creatChat["']/);
-  assert.doesNotMatch(inputField, /<AgentSelector\b/);
-  assert.doesNotMatch(commandPalette, /<ResultGroup[^>]+agents/);
-  assert.doesNotMatch(newUserGuide, /key:\s*'agents'/);
+/**
+ * Musuw product exposure policy:
+ * - Lite is the consumer surface: New Chat + Knowledge Base are the only
+ *   top-level product entries; Settings exposes General/Language only.
+ * - Standard keeps the complete upstream WeKnora source surface so operators
+ *   can restore it by switching edition instead of reconstructing deleted code.
+ * - Security-sensitive enforcement is server-side; these tests lock the
+ *   frontend non-discoverability/deep-link contract only.
+ */
+
+test("Lite sidebar is fail-closed to New Chat and Knowledge Base", () => {
+  assert.match(menuStore, /const liteVisiblePaths = new Set\(\['creatChat', 'knowledge-bases'\]\)/);
+  assert.match(menuStore, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/);
+  assert.match(sidebar, /!authStore\.isLiteMode && showSessionSourceFilter && !batchMode/);
+
+  // Standard restoration remains possible because upstream menu definitions
+  // are retained rather than deleted from source.
+  for (const titleKey of ['menu.agents', 'menu.organizations', 'menu.settings', 'menu.logout']) {
+    assert.ok(menuStore.includes(`titleKey: '${titleKey}'`), `standard menu source lost ${titleKey}`);
+  }
 });
 
-test("chat keeps exactly two managed modes and exposes the configured model selector", () => {
-  assert.match(inputField, /V4 Flash/);
-  assert.match(inputField, /V4 Pro/);
-  assert.equal((inputField.match(/@click="selectAgentMode\('/g) || []).length, 2);
-  assert.match(inputField, /@click="selectAgentMode\('quick-answer'\)"/);
-  assert.match(inputField, /@click="selectAgentMode\('smart-reasoning'\)"/);
-  assert.match(inputField, /v-if="isProMode"[\s\S]*v-model="thinkingEnabled"/);
-  assert.match(inputField, /v-for="model in availableModels"/);
-  assert.match(inputField, /toggleModelSelector/);
-  assert.match(inputField, /class="control-btn image-upload-btn"/);
-  assert.match(inputField, /class="control-btn attachment-upload-btn"/);
-  assert.doesNotMatch(userMenu, /handleQuickNav\('models'\)/);
+test("server Edition owns Lite activation and clears stale browser workspace state", () => {
+  assert.match(router, /await ensureProductEdition\(authStore\)/);
+  assert.match(router, /edition === 'lite' \|\| edition === 'standard'/);
+  assert.match(router, /const isLite = edition === 'lite'/);
+  assert.match(router, /authStore\.setLiteMode\(isLite\)/);
+  assert.match(router, /if \(isLite\) authStore\.setSelectedTenant\(null\)/);
+  assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
 });
 
-test("managed chat keeps web search enabled without exposing a per-user switch", () => {
-  assert.match(settingsStore, /webSearchEnabled:\s*true/);
-  assert.match(settingsStorage, /loaded\.webSearchEnabled = true/);
-  assert.doesNotMatch(inputField, /class="control-btn websearch-btn"/);
+test("Lite route guard blocks hidden pages and normalizes Settings deep links", () => {
+  for (const allowed of [
+    "path === '/platform/creatChat'",
+    "path.startsWith('/platform/chat/')",
+    "path === '/platform/knowledge-bases'",
+    "path.startsWith('/platform/knowledge-bases/')",
+    "path === '/platform/settings'",
+  ]) {
+    assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
+  }
+  assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/);
+  assert.match(router, /\(section && section !== 'general'\) \|\| tab/);
+
+  // Standard routes remain in the bundle/source for quick restoration.
+  assert.match(router, /AgentList\.vue/);
+  assert.match(router, /OrganizationList\.vue/);
 });
 
-test("settings expose only general preferences and native model management", () => {
-  assert.match(
-    settingsView,
-    /section === ['"]models['"] \? ['"]models['"] : ['"]general['"]/,
-  );
-  assert.match(settingsView, /ref<SettingsSection>\(['"]general['"]\)/);
-  assert.match(settingsView, /<GeneralSettings\s*\/>/);
-  assert.match(settingsView, /<ModelSettings\b/);
-  assert.doesNotMatch(
-    settingsView,
-    /<TenantInfo\b|<UserProfile\b|<TenantMembers\b/,
-  );
-  assert.doesNotMatch(
-    settingsView,
-    /<SystemSettings\b|<IntegrationSettingsSection\b|<WebSearchSettings\b/,
-  );
+test("Lite Settings exposes General only and General exposes Language only", () => {
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) return 'general'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general'/);
+
   assert.match(generalSettings, /language\.language/);
-  assert.match(generalSettings, /theme\.theme/);
-  assert.doesNotMatch(
-    generalSettings,
-    /font\.|autoCheckUpdate|useFont|useSettingsStore|useAuthStore/,
+  assert.match(generalSettings, /handleLanguageChange/);
+  for (const standardOnlyControl of ['theme.theme', 'font.uiFont', 'font.monoFont', 'font.fontSize']) {
+    assert.ok(generalSettings.includes(standardOnlyControl), `standard preference source lost ${standardOnlyControl}`);
+  }
+  assert.ok(
+    (generalSettings.match(/v-if="!authStore\.isLiteMode"/g) || []).length >= 4,
+    'theme/font controls must remain Standard-only in General Settings',
   );
+  assert.doesNotMatch(generalSettings, /isAutoCheckUpdateEnabled|toggleAutoCheckUpdate/);
 });
 
-test("shared-space and knowledge-base filter navigation have no managed UI or deep link", () => {
-  assert.doesNotMatch(menuStore, /titleKey:\s*['"]menu\.organizations['"]/);
-  assert.doesNotMatch(sidebar, /<TenantSelector\b/);
-  assert.doesNotMatch(commands, /id:\s*['"]open-(?:agents|organizations)['"]/);
-  assert.match(
-    router,
-    /path:\s*['"]organizations['"][\s\S]*?redirect:\s*['"]\/platform\/knowledge-bases['"]/,
-  );
-  assert.doesNotMatch(router, /OrganizationList\.vue/);
-  assert.doesNotMatch(knowledgeBaseList, /<ListSpaceSidebar\b/);
-  assert.match(knowledgeBaseList, /const defaultScope:\s*['"]mine['"]/);
-  assert.match(knowledgeBaseList, /spaceSelection\.value\s*!==\s*['"]mine['"]/);
-  assert.match(knowledgeBaseList, /creatorFilter\.value\s*!==\s*['"]all['"]/);
+test("Lite UserMenu keeps account exit but does not rediscover management surfaces", () => {
+  assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account"/);
+  assert.match(userMenu, /<button v-if="!authStore\.isLiteMode" type="button" class="visual-user-menu__guide"/);
+  assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/);
+  assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/);
+  assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*openDocs[\s\S]*openGithub/);
+  assert.match(userMenu, /handleQuickNav\('general'\)/);
+  assert.match(userMenu, /class="visual-user-menu__item is-danger" @click="handleLogout"/);
+  assert.match(userMenu, /handoffToExternalAuth\('logout'\)/);
 });
 
-test("the user dropdown has exactly settings and logout for every role", () => {
-  assert.equal((userMenu.match(/class="menu-item/g) || []).length, 2);
-  assert.match(userMenu, /@click="handleSettings"/);
-  assert.match(userMenu, /@click="handleLogout"/);
-  assert.doesNotMatch(
-    userMenu,
-    /CreateTenantDialog|handleQuickNav|handleSystemAdmin|openDocs|openGithub/,
-  );
-  assert.doesNotMatch(userMenu, /isSystemAdmin|hasRole|canAccessAllTenants|tenantSubmenu/);
+test("Lite chat surfaces retain runtime selection but hide Agent/model management shortcuts", () => {
+  assert.match(inputField, /v-if="!authStore\.isLiteMode" type="button" @click\.stop\.prevent="handleGoToAgentSettings\('knowledge'\)"/);
+  assert.match(inputField, /<header><span>[\s\S]*<button v-if="!authStore\.isLiteMode" type="button" @click="handleModelChange\('__add_model__'\)"/);
+  assert.match(agentSelector, /<router-link v-if="!authStore\.isLiteMode" to="\/platform\/agents"/);
+  assert.match(agentSelector, /v-if="!authStore\.isLiteMode && canShowDetailHeaderAction"/);
+  assert.match(agentSelector, /authStore\.isLiteMode \? \[\] : agentsList\.value\.filter\(a => !a\.is_builtin\)/);
+  assert.match(agentSelector, /if \(authStore\.isLiteMode\) return \[\]/);
+  assert.match(agentSelector, /if \(authStore\.isLiteMode\) return;/);
+  assert.match(agentSelector, /if \(!authStore\.isLiteMode\) chatResources\.ensureWebSearchProviders\(\)/);
 });
 
-test("the consumer shell has no invitation or workspace-management surface", () => {
-  assert.doesNotMatch(platformShell, /GlobalInvitationBell/);
+test("Lite Knowledge Base keeps diagnostics visible without opening hidden admin settings", () => {
+  assert.match(knowledgeBase, /:disabled="authStore\.isLiteMode" @click="goToParserSettings"/);
+  assert.match(knowledgeBase, /<strong v-if="!authStore\.isLiteMode">\{\{ \$t\('knowledgeBase\.goToParserSettings'\) \}\}/);
+  assert.match(knowledgeBase, /:disabled="authStore\.isLiteMode" @click="handleOpenKBSettings"/);
+  assert.match(knowledgeBase, /<strong v-if="!authStore\.isLiteMode">\{\{ \$t\('knowledgeBase\.goToStorageSettings'\) \}\}/);
+});
+
+test("Lite tenantless fallback does not expose workspace create or invitation management", () => {
+  assert.match(workspaceOnboarding, /v-if="!authStore\.isLiteMode" class="workspace-actions"/);
+  assert.match(workspaceOnboarding, /<CreateTenantDialog v-if="!authStore\.isLiteMode"/);
+  assert.match(workspaceOnboarding, /<MyInvitationsDialog v-if="!authStore\.isLiteMode"/);
+  assert.match(workspaceOnboarding, /if \(!authStore\.isLiteMode\) \{[\s\S]*fetchPendingInvitationCount/);
+  assert.match(workspaceOnboarding, /handleLogout/);
+});
+
+test("Lite disables Command Palette as an alternate discovery path", () => {
+  assert.match(commandPaletteStore, /const auth = useAuthStore\(\)/);
+  assert.match(commandPaletteStore, /if \(auth\.isLiteMode\) \{[\s\S]*open\.value = false[\s\S]*return/);
+});
+
+test("chat and Knowledge Base business surfaces remain present inside the exposed product", () => {
+  // Lite narrows product entry points; it does not rewrite the allowed chat/KB
+  // controllers. Runtime Agent/model reads may still back chat internally.
+  assert.match(inputField, /v-for="model in availableModels"/);
+  assert.match(inputField, /thinkingEnabled/);
+  assert.match(knowledgeBaseList, /<ListSpaceSidebar\b/);
+  assert.match(knowledgeBaseList, /v-model="spaceSelection"/);
+  assert.match(knowledgeBaseListController, /'favorites'/);
+  assert.match(knowledgeBaseListController, /'recents'/);
+  assert.match(knowledgeBaseListController, /listOrganizationSharedKnowledgeBases\(val\)/);
 });
