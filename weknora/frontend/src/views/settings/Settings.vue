@@ -6,22 +6,19 @@
           <aside class="visual-settings-sidebar">
             <h2 class="visual-settings-title">{{ $t('general.settings') }}</h2>
             <nav class="visual-settings-nav" :aria-label="$t('general.settings')">
-              <section v-for="group in navGroups" :key="group.key" class="visual-settings-nav__group">
-                <h3>{{ group.label }}</h3>
-                <button
-                  v-for="item in group.items"
-                  :key="item.key"
-                  type="button"
-                  class="visual-settings-nav__item"
-                  :class="{ 'is-active': currentSection === item.key }"
-                  :aria-current="currentSection === item.key ? 'page' : undefined"
-                  @click="handleNavClick(item)"
-                >
-                  <span v-if="item.emoji" class="visual-settings-nav__emoji" aria-hidden="true">{{ item.emoji }}</span>
-                  <t-icon v-else :name="item.icon || 'setting'" />
-                  <span>{{ item.label }}</span>
-                </button>
-              </section>
+              <button
+                v-for="item in navItems"
+                :key="item.key"
+                type="button"
+                class="visual-settings-nav__item"
+                :class="{ 'is-active': currentSection === item.key }"
+                :aria-current="currentSection === item.key ? 'page' : undefined"
+                @click="handleNavClick(item)"
+              >
+                <span v-if="item.emoji" class="visual-settings-nav__emoji" aria-hidden="true">{{ item.emoji }}</span>
+                <t-icon v-else :name="item.icon || 'setting'" />
+                <span>{{ item.label }}</span>
+              </button>
             </nav>
           </aside>
 
@@ -33,10 +30,8 @@
                 'is-full': SYSTEM_ADMIN_SECTIONS.has(currentSection) || isIntegrationSection(currentSection),
               }"
             >
-              <section v-if="!canSeeSection(currentSection)" class="visual-settings-role-denied">
+              <section v-if="!canSeeSection(currentSection)" class="visual-settings-role-denied" aria-hidden="true">
                 <t-icon name="lock-on" />
-                <strong>{{ $t('settings.roleDenied.title') }}</strong>
-                <p>{{ $t('settings.roleDenied.desc') }}</p>
               </section>
 
               <template v-else>
@@ -127,12 +122,6 @@ type NavItem = {
   emoji?: string
 }
 
-type NavGroup = {
-  key: string
-  label: string
-  items: NavItem[]
-}
-
 const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS
 const INTEGRATION_SECTION_PREFIX = 'integration-'
 const integrationSectionKey = (tab: IntegrationTab) => `${INTEGRATION_SECTION_PREFIX}${tab}`
@@ -176,50 +165,34 @@ const navItems = computed<NavItem[]>(() => {
     emoji: item.icon.type === 'emoji' ? item.icon.value : undefined,
     label: t(`integrations.tabs.${item.key}`),
   }))
+
+  // Behavior authority: keep the complete WeKnora v0.7.2 settings capability
+  // set. Visual authority: render it as one clean SettingsModal.tsx nav stack,
+  // without inventing extra group headings that do not exist in @视觉文件.
   const all: NavItem[] = [
     { key: 'general', icon: 'setting', label: t('general.title') },
+    { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
+    { key: 'tenant', icon: 'user-circle', label: t('settings.tenantInfo') },
+    { key: 'members', icon: 'usergroup', label: t('tenantMember.title') },
+    { key: 'chathistory', icon: 'chat', label: t('chatHistorySettings.title') },
+    { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
     { key: 'ollama', icon: 'server', label: 'Ollama' },
     { key: 'weknoracloud', icon: 'cloud', label: 'WeKnora Cloud' },
-    { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
-    { key: 'websearch', icon: 'search', label: t('settings.webSearchConfig') },
-    { key: 'chathistory', icon: 'chat', label: t('chatHistorySettings.title') },
+    ...integrationItems,
     { key: 'vectorstore', icon: 'data-base', label: t('settings.vectorStoreEngine') },
     { key: 'parser', icon: 'file-search', label: t('settings.parserEngine') },
     { key: 'storage', icon: 'cloud', label: t('settings.storageEngine') },
+    { key: 'websearch', icon: 'search', label: t('settings.webSearchConfig') },
     { key: 'mcp', icon: 'tools', label: t('settings.mcpService') },
-    { key: 'system', icon: 'info-circle', label: t('settings.versionInfo') },
     { key: 'system-global', icon: 'server', label: t('settings.system') },
     { key: 'runtime-queues', icon: 'queue', label: t('settings.taskQueue') },
     { key: 'platform-api-keys', icon: 'secured', label: t('platformApiKeys.title') },
     { key: 'system-audit-log', icon: 'history', label: t('system.globalSettings.audit.tabLabel') },
-    { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
-    { key: 'tenant', icon: 'user-circle', label: t('settings.tenantInfo') },
-    { key: 'members', icon: 'usergroup', label: t('tenantMember.title') },
-    ...integrationItems,
+    { key: 'system', icon: 'info-circle', label: t('settings.versionInfo') },
   ]
+
   if (!authStore.currentTenantRole && !authStore.canAccessAllTenants) return []
   return all.filter((item) => canSeeSection(item.key))
-})
-
-const navGroups = computed<NavGroup[]>(() => {
-  const map = new Map(navItems.value.map((item) => [item.key, item]))
-  const pick = (keys: string[]) => keys.map((key) => map.get(key)).filter(Boolean) as NavItem[]
-  return [
-    { key: 'account', label: t('settings.navGroups.account'), items: pick(['general', 'userprofile']) },
-    { key: 'workspace', label: t('settings.navGroups.workspace'), items: pick(['tenant', 'members', 'chathistory']) },
-    { key: 'models_runtime', label: t('settings.navGroups.modelsRuntime'), items: pick(['models', 'ollama', 'weknoracloud']) },
-    {
-      key: 'integrations',
-      label: t('integrations.title'),
-      items: pick([
-        integrationSectionKey('im'), integrationSectionKey('embed'), integrationSectionKey('api'),
-        integrationSectionKey('chrome'), integrationSectionKey('claw'),
-      ]),
-    },
-    { key: 'data_extensions', label: t('settings.navGroups.dataExtensions'), items: pick(['vectorstore', 'parser', 'storage', 'websearch', 'mcp']) },
-    { key: 'system_administration', label: t('settings.navGroups.systemAdministration'), items: pick(['system-global', 'runtime-queues', 'platform-api-keys', 'system-audit-log']) },
-    { key: 'platform', label: t('settings.navGroups.platform'), items: pick(['system']) },
-  ].filter((group) => group.items.length > 0)
 })
 
 const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
@@ -233,6 +206,9 @@ const currentModelType = computed(() => {
 const handleNavClick = (item: NavItem) => {
   currentSection.value = item.key
   currentSubSection.value = ''
+
+  // Preserve WeKnora's route contract: only integration/system compatibility
+  // URLs own a stable query encoding. Ordinary Settings tabs remain internal.
   if (route.path === '/platform/settings' && isIntegrationSection(item.key)) {
     void router.replace({
       path: '/platform/settings',
@@ -367,19 +343,8 @@ onUnmounted(() => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 3px;
   scrollbar-width: thin;
-}
-
-.visual-settings-nav__group { display: flex; flex-direction: column; gap: 3px; }
-.visual-settings-nav__group > h3 {
-  margin: 0;
-  padding: 0 10px 3px;
-  color: #9ca3af;
-  font-size: 9px;
-  line-height: 14px;
-  font-weight: 700;
-  letter-spacing: .04em;
 }
 
 .visual-settings-nav__item {
@@ -453,16 +418,11 @@ onUnmounted(() => {
 .visual-settings-role-denied {
   min-height: 300px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  color: #9ca3af;
-  text-align: center;
+  color: #d1d5db;
 }
-.visual-settings-role-denied > :deep(.t-icon) { font-size: 32px; color: #d1d5db; }
-.visual-settings-role-denied strong { color: #374151; font-size: 13px; }
-.visual-settings-role-denied p { max-width: 360px; margin: 0; font-size: 11px; line-height: 17px; }
+.visual-settings-role-denied > :deep(.t-icon) { font-size: 32px; }
 
 .visual-settings-fade-enter-active,.visual-settings-fade-leave-active { transition: opacity 160ms ease; }
 .visual-settings-fade-enter-from,.visual-settings-fade-leave-to { opacity: 0; }
@@ -479,8 +439,8 @@ onUnmounted(() => {
   .visual-settings-modal { width: 100%; height: 100%; max-height: none; flex-direction: column; border: 0; border-radius: 0; }
   .visual-settings-sidebar { width: 100%; flex: 0 0 auto; max-height: 180px; padding: 14px 12px; border-right: 0; border-bottom: 1px solid #f3f4f6; }
   .visual-settings-title { margin-bottom: 8px; }
-  .visual-settings-nav { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 8px; padding-right: 36px; }
-  .visual-settings-nav__group { flex: 0 0 auto; min-width: 150px; }
+  .visual-settings-nav { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 4px; padding-right: 36px; }
+  .visual-settings-nav__item { flex: 0 0 auto; width: auto; }
   .visual-settings-content { padding: 24px 16px 32px; }
   .visual-settings-close { top: 12px; right: 12px; }
 }
