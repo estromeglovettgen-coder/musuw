@@ -6,42 +6,67 @@
           <aside class="visual-settings-sidebar">
             <h2 class="visual-settings-title">{{ $t('general.settings') }}</h2>
             <nav class="visual-settings-nav" :aria-label="$t('general.settings')">
-              <button
-                type="button"
-                class="visual-settings-nav__item"
-                :class="{ 'is-active': currentSection === 'general' }"
-                :aria-current="currentSection === 'general' ? 'page' : undefined"
-                @click="selectSection('general')"
-              >
-                <t-icon name="setting" />
-                <span>{{ $t('general.title') }}</span>
-              </button>
-              <button
-                type="button"
-                class="visual-settings-nav__item"
-                :class="{ 'is-active': currentSection === 'models' }"
-                :aria-current="currentSection === 'models' ? 'page' : undefined"
-                @click="selectSection('models')"
-              >
-                <t-icon name="cpu" />
-                <span>{{ $t('settings.modelManagement') }}</span>
-              </button>
+              <section v-for="group in navGroups" :key="group.key" class="visual-settings-nav__group">
+                <h3>{{ group.label }}</h3>
+                <button
+                  v-for="item in group.items"
+                  :key="item.key"
+                  type="button"
+                  class="visual-settings-nav__item"
+                  :class="{ 'is-active': currentSection === item.key }"
+                  :aria-current="currentSection === item.key ? 'page' : undefined"
+                  @click="handleNavClick(item)"
+                >
+                  <span v-if="item.emoji" class="visual-settings-nav__emoji" aria-hidden="true">{{ item.emoji }}</span>
+                  <t-icon v-else :name="item.icon || 'setting'" />
+                  <span>{{ item.label }}</span>
+                </button>
+              </section>
             </nav>
           </aside>
 
           <main class="visual-settings-content">
-            <div class="visual-settings-content__inner">
-              <GeneralSettings v-if="currentSection === 'general'" />
-              <ModelSettings v-else :initial-type="currentModelType" />
+            <div
+              class="visual-settings-content__inner"
+              :class="{
+                'is-wide': currentSection === 'members',
+                'is-full': SYSTEM_ADMIN_SECTIONS.has(currentSection) || isIntegrationSection(currentSection),
+              }"
+            >
+              <section v-if="!canSeeSection(currentSection)" class="visual-settings-role-denied">
+                <t-icon name="lock-on" />
+                <strong>{{ $t('settings.roleDenied.title') }}</strong>
+                <p>{{ $t('settings.roleDenied.desc') }}</p>
+              </section>
+
+              <template v-else>
+                <GeneralSettings v-if="currentSection === 'general'" />
+                <OllamaSettings v-else-if="currentSection === 'ollama'" />
+                <WeKnoraCloudSettings v-else-if="currentSection === 'weknoracloud'" />
+                <ModelSettings v-else-if="currentSection === 'models'" :initial-type="currentModelType" />
+                <WebSearchSettings v-else-if="currentSection === 'websearch'" />
+                <ChatHistorySettings v-else-if="currentSection === 'chathistory'" />
+                <VectorStoreSettings v-else-if="currentSection === 'vectorstore'" />
+                <ParserEngineSettings v-else-if="currentSection === 'parser'" />
+                <StorageEngineSettings v-else-if="currentSection === 'storage'" />
+                <SystemInfo v-else-if="currentSection === 'system'" />
+                <SystemSettings v-else-if="currentSection === 'system-global'" />
+                <RuntimeQueues v-else-if="currentSection === 'runtime-queues'" />
+                <PlatformAPIKeys v-else-if="currentSection === 'platform-api-keys'" />
+                <SystemAuditLog v-else-if="currentSection === 'system-audit-log'" />
+                <UserProfile v-else-if="currentSection === 'userprofile'" />
+                <TenantInfo v-else-if="currentSection === 'tenant'" />
+                <TenantMembers v-else-if="currentSection === 'members'" />
+                <IntegrationSettingsSection
+                  v-else-if="isIntegrationSection(currentSection)"
+                  :tab="integrationTabFromSection(currentSection)"
+                />
+                <McpSettings v-else-if="currentSection === 'mcp'" />
+              </template>
             </div>
           </main>
 
-          <button
-            type="button"
-            class="visual-settings-close"
-            :aria-label="$t('general.close')"
-            @click="handleClose"
-          >
+          <button type="button" class="visual-settings-close" :aria-label="$t('general.close')" @click="handleClose">
             <t-icon name="close" />
           </button>
         </section>
@@ -54,91 +79,215 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
+import { useI18n } from 'vue-i18n'
+import SystemInfo from './SystemInfo.vue'
+import TenantInfo from './TenantInfo.vue'
+import UserProfile from './UserProfile.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import ModelSettings from './ModelSettings.vue'
+import OllamaSettings from './OllamaSettings.vue'
+import McpSettings from './McpSettings.vue'
+import WebSearchSettings from './WebSearchSettings.vue'
+import ChatHistorySettings from './ChatHistorySettings.vue'
+import VectorStoreSettings from './VectorStoreSettings.vue'
+import ParserEngineSettings from './ParserEngineSettings.vue'
+import StorageEngineSettings from './StorageBackendSettings.vue'
+import WeKnoraCloudSettings from './WeKnoraCloudSettings.vue'
+import TenantMembers from './TenantMembers.vue'
+import SystemSettings from '@/views/system/SystemSettings.vue'
+import RuntimeQueues from '@/views/system/RuntimeQueues.vue'
+import PlatformAPIKeys from '@/views/system/PlatformAPIKeys.vue'
+import SystemAuditLog from '@/views/system/SystemAuditLog.vue'
+import IntegrationSettingsSection from '@/views/integrations/IntegrationSettingsSection.vue'
+import {
+  INTEGRATION_PREVIEW_ITEMS,
+  INTEGRATION_TAB_MIN_ROLE,
+  INTEGRATION_TABS,
+  type IntegrationTab,
+} from '@/config/integrations'
+import {
+  SETTINGS_SECTION_MIN_ROLE,
+  SYSTEM_ADMIN_SETTINGS_SECTIONS,
+} from '@/config/settingsAccess'
 
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUIStore()
+const authStore = useAuthStore()
+const { t } = useI18n()
 
-type SettingsSection = 'general' | 'models'
+const currentSection = ref<string>('general')
+const currentSubSection = ref<string>('')
 
-const normalizeSettingsSection = (section?: string | null): SettingsSection =>
-  section === 'models' ? 'models' : 'general'
-
-const modalSection = ref<SettingsSection>('general')
-const modalSubSection = ref<string | null>(null)
-
-const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
-const currentSection = computed<SettingsSection>(() =>
-  route.path === '/platform/settings'
-    ? normalizeSettingsSection(typeof route.query.section === 'string' ? route.query.section : null)
-    : modalSection.value,
-)
-const currentModelType = computed(() => {
-  if (route.path === '/platform/settings') {
-    return typeof route.query.tab === 'string' ? route.query.tab : null
-  }
-  return modalSubSection.value
-})
-
-const syncSettingsSection = (event?: Event) => {
-  const detail = event instanceof CustomEvent ? event.detail : null
-  const requestedSection = detail?.section
-    ?? (route.path === '/platform/settings' ? route.query.section : uiStore.settingsInitialSection)
-  const requestedSubSection = detail?.subsection
-    ?? (route.path === '/platform/settings' ? route.query.tab : uiStore.settingsInitialSubSection)
-  const section = normalizeSettingsSection(
-    typeof requestedSection === 'string' ? requestedSection : null,
-  )
-  modalSection.value = section
-  modalSubSection.value = typeof requestedSubSection === 'string' ? requestedSubSection : null
-
-  if (route.path === '/platform/settings') {
-    const nextQuery: Record<string, string> = { section }
-    if (section === 'models' && modalSubSection.value) {
-      nextQuery.tab = modalSubSection.value
-    }
-    if (route.query.section !== nextQuery.section || route.query.tab !== nextQuery.tab) {
-      void router.replace({ path: '/platform/settings', query: nextQuery })
-    }
-  }
+type NavItem = {
+  key: string
+  icon: string
+  label: string
+  emoji?: string
 }
 
-const selectSection = (section: SettingsSection) => {
-  modalSection.value = section
-  modalSubSection.value = null
-  if (route.path === '/platform/settings') {
-    void router.replace({ path: '/platform/settings', query: { section } })
+type NavGroup = {
+  key: string
+  label: string
+  items: NavItem[]
+}
+
+const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS
+const INTEGRATION_SECTION_PREFIX = 'integration-'
+const integrationSectionKey = (tab: IntegrationTab) => `${INTEGRATION_SECTION_PREFIX}${tab}`
+
+const integrationTabFromSection = (section: string): IntegrationTab => {
+  const raw = section.startsWith(INTEGRATION_SECTION_PREFIX)
+    ? section.slice(INTEGRATION_SECTION_PREFIX.length)
+    : section
+  return INTEGRATION_TABS.includes(raw as IntegrationTab) ? raw as IntegrationTab : 'im'
+}
+
+const isIntegrationSection = (section: string) =>
+  section.startsWith(INTEGRATION_SECTION_PREFIX) &&
+  INTEGRATION_TABS.includes(integrationTabFromSection(section))
+
+const normalizeSettingsSection = (section: string) => {
+  if (section === 'api') return integrationSectionKey('api')
+  if (section === 'integrations') {
+    return integrationSectionKey(integrationTabFromSection((route.query.tab as string) || 'im'))
+  }
+  return section
+}
+
+const canSeeSection = (key: string): boolean => {
+  if (isIntegrationSection(key)) {
+    const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
+    if (!min) return true
+    if (authStore.canAccessAllTenants) return true
+    return authStore.hasRole(min)
+  }
+  if (SYSTEM_ADMIN_SECTIONS.has(key)) return authStore.isSystemAdmin
+  const min = SETTINGS_SECTION_MIN_ROLE[key] ?? 'viewer'
+  if (authStore.canAccessAllTenants) return true
+  return authStore.hasRole(min)
+}
+
+const navItems = computed<NavItem[]>(() => {
+  const integrationItems: NavItem[] = INTEGRATION_PREVIEW_ITEMS.map((item) => ({
+    key: integrationSectionKey(item.key),
+    icon: item.icon.type === 'icon' ? item.icon.name : 'integration',
+    emoji: item.icon.type === 'emoji' ? item.icon.value : undefined,
+    label: t(`integrations.tabs.${item.key}`),
+  }))
+  const all: NavItem[] = [
+    { key: 'general', icon: 'setting', label: t('general.title') },
+    { key: 'ollama', icon: 'server', label: 'Ollama' },
+    { key: 'weknoracloud', icon: 'cloud', label: 'WeKnora Cloud' },
+    { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
+    { key: 'websearch', icon: 'search', label: t('settings.webSearchConfig') },
+    { key: 'chathistory', icon: 'chat', label: t('chatHistorySettings.title') },
+    { key: 'vectorstore', icon: 'data-base', label: t('settings.vectorStoreEngine') },
+    { key: 'parser', icon: 'file-search', label: t('settings.parserEngine') },
+    { key: 'storage', icon: 'cloud', label: t('settings.storageEngine') },
+    { key: 'mcp', icon: 'tools', label: t('settings.mcpService') },
+    { key: 'system', icon: 'info-circle', label: t('settings.versionInfo') },
+    { key: 'system-global', icon: 'server', label: t('settings.system') },
+    { key: 'runtime-queues', icon: 'queue', label: t('settings.taskQueue') },
+    { key: 'platform-api-keys', icon: 'secured', label: t('platformApiKeys.title') },
+    { key: 'system-audit-log', icon: 'history', label: t('system.globalSettings.audit.tabLabel') },
+    { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
+    { key: 'tenant', icon: 'user-circle', label: t('settings.tenantInfo') },
+    { key: 'members', icon: 'usergroup', label: t('tenantMember.title') },
+    ...integrationItems,
+  ]
+  if (!authStore.currentTenantRole && !authStore.canAccessAllTenants) return []
+  return all.filter((item) => canSeeSection(item.key))
+})
+
+const navGroups = computed<NavGroup[]>(() => {
+  const map = new Map(navItems.value.map((item) => [item.key, item]))
+  const pick = (keys: string[]) => keys.map((key) => map.get(key)).filter(Boolean) as NavItem[]
+  return [
+    { key: 'account', label: t('settings.navGroups.account'), items: pick(['general', 'userprofile']) },
+    { key: 'workspace', label: t('settings.navGroups.workspace'), items: pick(['tenant', 'members', 'chathistory']) },
+    { key: 'models_runtime', label: t('settings.navGroups.modelsRuntime'), items: pick(['models', 'ollama', 'weknoracloud']) },
+    {
+      key: 'integrations',
+      label: t('integrations.title'),
+      items: pick([
+        integrationSectionKey('im'), integrationSectionKey('embed'), integrationSectionKey('api'),
+        integrationSectionKey('chrome'), integrationSectionKey('claw'),
+      ]),
+    },
+    { key: 'data_extensions', label: t('settings.navGroups.dataExtensions'), items: pick(['vectorstore', 'parser', 'storage', 'websearch', 'mcp']) },
+    { key: 'system_administration', label: t('settings.navGroups.systemAdministration'), items: pick(['system-global', 'runtime-queues', 'platform-api-keys', 'system-audit-log']) },
+    { key: 'platform', label: t('settings.navGroups.platform'), items: pick(['system']) },
+  ].filter((group) => group.items.length > 0)
+})
+
+const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
+const currentModelType = computed(() => {
+  if (currentSection.value !== 'models') return null
+  if (currentSubSection.value) return currentSubSection.value
+  if (route.path === '/platform/settings' && typeof route.query.tab === 'string') return route.query.tab
+  return uiStore.settingsInitialSubSection || null
+})
+
+const handleNavClick = (item: NavItem) => {
+  currentSection.value = item.key
+  currentSubSection.value = ''
+  if (route.path === '/platform/settings' && isIntegrationSection(item.key)) {
+    void router.replace({
+      path: '/platform/settings',
+      query: { ...route.query, section: 'integrations', tab: integrationTabFromSection(item.key) },
+    })
+  } else if (route.path === '/platform/settings' && SYSTEM_ADMIN_SECTIONS.has(item.key)) {
+    const query = { ...route.query }
+    delete query.tab
+    void router.replace({ path: '/platform/settings', query: { ...query, section: item.key } })
   }
 }
 
 const handleClose = () => {
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur()
-  }
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   uiStore.closeSettings()
   if (route.path === '/platform/settings') {
-    router.back()
+    const section = route.query.section
+    if (section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
+      void router.push('/platform/knowledge-bases')
+    } else {
+      router.back()
+    }
   }
 }
 
+watch(() => uiStore.settingsInitialSection, (section) => {
+  if (!section || !visible.value) return
+  currentSection.value = normalizeSettingsSection(section)
+  currentSubSection.value = uiStore.settingsInitialSubSection || ''
+}, { immediate: true })
+
 watch(
   () => [visible.value, route.query.section, route.query.tab],
-  ([isVisible]) => {
-    if (isVisible) syncSettingsSection()
+  ([isVisible, section, tab]) => {
+    if (!isVisible || typeof section !== 'string') return
+    currentSection.value = normalizeSettingsSection(section)
+    currentSubSection.value = typeof tab === 'string' ? tab : ''
   },
   { immediate: true },
 )
 
-watch(
-  () => [uiStore.settingsInitialSection, uiStore.settingsInitialSubSection],
-  () => {
-    if (visible.value) syncSettingsSection()
-  },
-)
+watch(navItems, (items) => {
+  if (!items.some((item) => item.key === currentSection.value)) {
+    currentSection.value = items[0]?.key || 'general'
+    currentSubSection.value = ''
+  }
+})
 
-const handleSettingsNav = (event: Event) => syncSettingsSection(event)
+const handleSettingsNav = (event: Event) => {
+  const detail = event instanceof CustomEvent ? event.detail : null
+  if (!detail?.section) return
+  currentSection.value = normalizeSettingsSection(String(detail.section))
+  currentSubSection.value = detail.subsection ? String(detail.subsection) : ''
+}
+
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && visible.value) handleClose()
 }
@@ -146,6 +295,10 @@ const handleEscape = (event: KeyboardEvent) => {
 onMounted(() => {
   window.addEventListener('keydown', handleEscape)
   window.addEventListener('settings-nav', handleSettingsNav)
+})
+
+watch(currentSection, () => {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
 })
 
 onUnmounted(() => {
@@ -191,13 +344,16 @@ onUnmounted(() => {
   width: 224px;
   min-width: 0;
   box-sizing: border-box;
-  padding: 24px;
+  padding: 24px 12px 16px 24px;
   border-right: 1px solid #f3f4f6;
   background: #fff;
+  display: flex;
+  flex-direction: column;
 }
 
 .visual-settings-title {
-  margin: 0 0 24px;
+  flex: 0 0 auto;
+  margin: 0 12px 18px 0;
   color: #111827;
   font-size: 16px;
   line-height: 24px;
@@ -205,48 +361,58 @@ onUnmounted(() => {
 }
 
 .visual-settings-nav {
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 8px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
+  scrollbar-width: thin;
+}
+
+.visual-settings-nav__group { display: flex; flex-direction: column; gap: 3px; }
+.visual-settings-nav__group > h3 {
+  margin: 0;
+  padding: 0 10px 3px;
+  color: #9ca3af;
+  font-size: 9px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
 }
 
 .visual-settings-nav__item {
   width: 100%;
-  min-height: 40px;
-  padding: 10px 14px;
+  min-height: 34px;
+  padding: 8px 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   background: transparent;
   color: #4b5563;
   font: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease;
 }
-
-.visual-settings-nav__item :deep(.t-icon) {
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-  font-size: 16px;
+.visual-settings-nav__item :deep(.t-icon), .visual-settings-nav__emoji {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-
-.visual-settings-nav__item:hover {
-  background: #f9fafb;
-  color: #111827;
-}
-
-.visual-settings-nav__item.is-active {
-  background: #f3f4f6;
-  color: #111827;
-  font-weight: 700;
-}
+.visual-settings-nav__item > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-settings-nav__item:hover { background: #f9fafb; color: #111827; }
+.visual-settings-nav__item.is-active { background: #f3f4f6; color: #111827; font-weight: 700; }
 
 .visual-settings-content {
   min-width: 0;
@@ -259,13 +425,9 @@ onUnmounted(() => {
   background: #fff;
   user-select: text;
 }
-
-.visual-settings-content__inner {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
+.visual-settings-content__inner { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.visual-settings-content__inner.is-wide,
+.visual-settings-content__inner.is-full { width: 100%; max-width: none; }
 
 .visual-settings-close {
   position: absolute;
@@ -285,64 +447,44 @@ onUnmounted(() => {
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease;
 }
+.visual-settings-close:hover { background: #f3f4f6; color: #374151; }
+.visual-settings-close :deep(.t-icon) { font-size: 16px; }
 
-.visual-settings-close:hover {
-  background: #f3f4f6;
-  color: #374151;
+.visual-settings-role-denied {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #9ca3af;
+  text-align: center;
 }
+.visual-settings-role-denied > :deep(.t-icon) { font-size: 32px; color: #d1d5db; }
+.visual-settings-role-denied strong { color: #374151; font-size: 13px; }
+.visual-settings-role-denied p { max-width: 360px; margin: 0; font-size: 11px; line-height: 17px; }
 
-.visual-settings-close :deep(.t-icon) {
-  font-size: 16px;
-}
-
-.visual-settings-fade-enter-active,
-.visual-settings-fade-leave-active {
-  transition: opacity 160ms ease;
-}
-
-.visual-settings-fade-enter-from,
-.visual-settings-fade-leave-to {
-  opacity: 0;
-}
+.visual-settings-fade-enter-active,.visual-settings-fade-leave-active { transition: opacity 160ms ease; }
+.visual-settings-fade-enter-from,.visual-settings-fade-leave-to { opacity: 0; }
 
 @media (max-width: 720px) {
   .visual-settings-overlay { padding: 12px; }
   .visual-settings-modal { max-height: calc(100dvh - 24px); }
-  .visual-settings-sidebar { flex-basis: 184px; width: 184px; padding: 20px 12px; }
+  .visual-settings-sidebar { flex-basis: 184px; width: 184px; padding: 20px 8px 14px 12px; }
   .visual-settings-content { padding: 28px 24px; }
   .visual-settings-close { top: 18px; right: 18px; }
 }
-
 @media (max-width: 560px) {
   .visual-settings-overlay { align-items: stretch; padding: 0; }
-  .visual-settings-modal {
-    width: 100%;
-    height: 100%;
-    max-height: none;
-    flex-direction: column;
-    border: 0;
-    border-radius: 0;
-  }
-  .visual-settings-sidebar {
-    width: 100%;
-    flex: 0 0 auto;
-    padding: 16px;
-    border-right: 0;
-    border-bottom: 1px solid #f3f4f6;
-  }
-  .visual-settings-title { margin-bottom: 12px; }
-  .visual-settings-nav { flex-direction: row; padding-right: 36px; }
-  .visual-settings-nav__item { width: auto; flex: 1 1 0; }
+  .visual-settings-modal { width: 100%; height: 100%; max-height: none; flex-direction: column; border: 0; border-radius: 0; }
+  .visual-settings-sidebar { width: 100%; flex: 0 0 auto; max-height: 180px; padding: 14px 12px; border-right: 0; border-bottom: 1px solid #f3f4f6; }
+  .visual-settings-title { margin-bottom: 8px; }
+  .visual-settings-nav { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 8px; padding-right: 36px; }
+  .visual-settings-nav__group { flex: 0 0 auto; min-width: 150px; }
   .visual-settings-content { padding: 24px 16px 32px; }
-  .visual-settings-close { top: 14px; right: 14px; }
+  .visual-settings-close { top: 12px; right: 12px; }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .visual-settings-fade-enter-active,
-  .visual-settings-fade-leave-active,
-  .visual-settings-nav__item,
-  .visual-settings-close {
-    transition: none !important;
-  }
+  .visual-settings-fade-enter-active,.visual-settings-fade-leave-active,.visual-settings-nav__item,.visual-settings-close { transition: none !important; }
 }
 </style>
