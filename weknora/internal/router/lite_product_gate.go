@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	musuwProductEditionEnv      = "MUSUW_PRODUCT_EDITION"
-	liteQuickAnswerAgentID      = "builtin-quick-answer"
-	liteSmartReasoningAgentID   = "builtin-smart-reasoning"
+	musuwProductEditionEnv    = "MUSUW_PRODUCT_EDITION"
+	liteQuickAnswerAgentID    = "builtin-quick-answer"
+	liteSmartReasoningAgentID = "builtin-smart-reasoning"
 )
 
 // Apply the optional product exposure override before NewRouter is built.
