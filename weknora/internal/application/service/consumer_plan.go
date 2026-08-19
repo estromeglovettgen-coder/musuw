@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -63,11 +64,21 @@ func (s *knowledgeService) checkCreateKnowledgeEntitlement(ctx context.Context, 
 }
 
 func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types.Model) (bool, error) {
-	// Consumer-plan filtering applies to C-end callers, not the system
-	// administrator that maintains the shared platform model catalog.
+	// SystemAdmin maintains the shared platform model catalog and therefore
+	// bypasses consumer restrictions.
 	if types.IsSystemAdminFromContext(ctx) {
 		return true, nil
 	}
+
+	// Musuw consumers never own arbitrary model infrastructure. Regardless of
+	// paid plan, runtime inference must resolve to a platform builtin model that
+	// is routed through OpenRouter. This turns the hidden custom-model UI into a
+	// backend invariant: a manually inserted/custom remote/Ollama model cannot be
+	// used by a C-end tenant even if some mutation route is accidentally exposed.
+	if model == nil || !model.IsBuiltin || !strings.EqualFold(strings.TrimSpace(model.Parameters.Provider), "openrouter") {
+		return false, nil
+	}
+
 	plan, ok := effectivePlanFromContext(ctx)
 	if ok {
 		return types.ConsumerPlanAllowsModel(plan, model), nil
