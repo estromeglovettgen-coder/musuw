@@ -41,7 +41,7 @@ test('share, document detail, file drop and message surfaces no longer expose le
   for (const token of [
     '.upload-mask',
     'body .t-dialog:has(.share-form)',
-    'body .doc-main-drawer .t-drawer',
+    'body .doc-main-drawer.t-drawer > .t-drawer__content-wrapper',
     'body .t-message',
     '.org-select-dropdown-popup.t-select__dropdown',
   ]) assert.ok(css.includes(token), `reachable surface missing: ${token}`)

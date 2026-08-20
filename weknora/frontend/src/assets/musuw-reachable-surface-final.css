@@ -376,8 +376,7 @@ body .t-dialog:has(.share-list) .share-item:hover { background: #f9fafb !importa
 /* Document detail drawer. Trace's secondary drawer and timeline are excluded. */
 /* -------------------------------------------------------------------------- */
 
-body .doc-main-drawer .t-drawer,
-body .doc-main-drawer.t-drawer {
+body .doc-main-drawer.t-drawer > .t-drawer__content-wrapper {
   border-left: 1px solid #e5e7eb !important;
   background: #fff !important;
   color: #374151 !important;
