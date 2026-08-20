@@ -12,6 +12,7 @@ candidate_dir="$repo_root/integration/weknora-candidate"
 runtime_dir="$repo_root/.runtime/weknora"
 candidate_env="$runtime_dir/candidate.env"
 auth_public_env="$runtime_dir/auth-public.env"
+paddle_sandbox_env="$runtime_dir/paddle-sandbox.env"
 state_dir="$runtime_dir/host-dev"
 
 : "${MUSUW_DEV_FRONTEND_PORT:=4190}"
@@ -111,6 +112,12 @@ load_host_environment() {
   prepare_runtime
   load_env_file "$candidate_env"
   load_env_file "$auth_public_env"
+  if [ -r "$paddle_sandbox_env" ]; then
+    load_env_file "$paddle_sandbox_env"
+  fi
+  if ! grep -q '^LOG_FORMAT=' "$candidate_env"; then
+    unset LOG_FORMAT
+  fi
 
   export OIDC_AUTH_CLIENT_ID="$(read_secret "$runtime_dir/secrets/oidc_client_id")"
   export OIDC_AUTH_CLIENT_SECRET="$(read_secret "$runtime_dir/secrets/oidc_client_secret")"

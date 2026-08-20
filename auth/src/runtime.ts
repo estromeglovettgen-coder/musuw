@@ -154,6 +154,19 @@ const nativeRefreshTokenKey = "weknora_refresh_token";
 const maximumFlowAgeMs = 10 * 60 * 1_000;
 const defaultRequestTimeoutMs = 30_000;
 
+function localWorkspaceURL(path: string, origin: string): string {
+  const root = new URL("/", origin);
+  try {
+    const candidate = new URL(path, origin);
+    if (candidate.origin === root.origin && candidate.pathname === "/" && candidate.hash === "") {
+      return candidate.toString();
+    }
+  } catch {
+    // Fall back to the same-origin workspace root.
+  }
+  return root.toString();
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -563,12 +576,12 @@ export function createAuthRuntime(options: RuntimeOptions) {
   let startOperation: Promise<AuthStartView> | null = null;
 
   return Object.freeze({
-    resumeStart(): Promise<AuthStartView> {
+    resumeStart(workspacePath = "/"): Promise<AuthStartView> {
       if (startOperation !== null) return startOperation;
       startOperation = (async (): Promise<AuthStartView> => {
         const nativeSession = await nativeSessionState();
         if (nativeSession === "active") {
-          location.assign(new URL("/", location.origin).toString());
+          location.assign(localWorkspaceURL(workspacePath, location.origin));
           return { state: "start_complete" };
         }
         if (nativeSession === "unavailable") {

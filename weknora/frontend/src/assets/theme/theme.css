@@ -42,7 +42,9 @@
   --musuw-blue: var(--musuw-accent);
   --musuw-blue-soft: var(--musuw-accent-soft);
   --musuw-shadow: var(--musuw-shadow-raised);
+}
 
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) {
   --brand-main: var(--td-brand-color);
   --td-brand-color-1: #eef4ff;
   --td-brand-color-2: #dce8fb;
@@ -281,7 +283,9 @@
   --musuw-line-strong: #484c54;
   --musuw-shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.24);
   --musuw-shadow-raised: 0 14px 34px rgba(0, 0, 0, 0.24);
+}
 
+:root[theme-mode="dark"] .musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) {
   --td-brand-color-1: rgba(124, 169, 232, 0.14);
   --td-brand-color-2: #1f4478;
   --td-brand-color-3: #285a9d;
@@ -378,27 +382,31 @@
   --td-success-color-light: var(--td-success-color-1);
 }
 
-* {
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab))),
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab))) * {
   scrollbar-color: var(--musuw-line-strong) transparent;
 }
 
-*::-webkit-scrollbar {
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)))::-webkit-scrollbar,
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab))) *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-*::-webkit-scrollbar-thumb {
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)))::-webkit-scrollbar-thumb,
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab))) *::-webkit-scrollbar-thumb {
   background: var(--musuw-line-strong);
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
 }
 
-*::-webkit-scrollbar-thumb:hover {
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)))::-webkit-scrollbar-thumb:hover,
+:where(.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab))) *::-webkit-scrollbar-thumb:hover {
   background-color: var(--musuw-muted);
 }
 
-.t-radio-group .t-radio-button {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button {
   border-color: var(--td-component-stroke);
   transition:
     background-color 0.15s ease,
@@ -406,27 +414,27 @@
     color 0.15s ease;
 }
 
-.t-radio-group .t-radio-button:hover:not(.t-is-disabled) {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button:hover:not(.t-is-disabled) {
   border-color: var(--td-brand-color);
   color: var(--td-brand-color);
 }
 
-.t-radio-group .t-radio-button.t-is-checked,
-.t-radio-group .t-radio-button.t-is-checked .t-radio-button__label,
-.t-radio-group .t-radio-button.t-is-checked > span {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button.t-is-checked,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button.t-is-checked .t-radio-button__label,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button.t-is-checked > span {
   background: var(--td-brand-color);
   border-color: var(--td-brand-color);
   color: var(--td-text-color-anti);
 }
 
-.t-radio-group .t-radio-button.t-is-checked:hover:not(.t-is-disabled),
-.t-radio-group .t-radio-button.t-is-checked:hover:not(.t-is-disabled) .t-radio-button__label,
-.t-radio-group .t-radio-button.t-is-checked:hover:not(.t-is-disabled) > span {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button.t-is-checked:hover:not(.t-is-disabled),
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button.t-is-checked:hover:not(.t-is-disabled) .t-radio-button__label,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-radio-group .t-radio-button.t-is-checked:hover:not(.t-is-disabled) > span {
   background: var(--td-brand-color-hover);
   border-color: var(--td-brand-color-hover);
 }
 
-.doc-link {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .doc-link {
   align-items: center;
   color: var(--td-brand-color);
   display: inline-flex;
@@ -435,27 +443,27 @@
   text-decoration: none;
 }
 
-.doc-link:hover {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .doc-link:hover {
   color: var(--td-brand-color-hover);
   text-decoration: underline;
 }
 
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active,
-textarea:-webkit-autofill,
-select:-webkit-autofill {
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) input:-webkit-autofill,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) input:-webkit-autofill:hover,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) input:-webkit-autofill:focus,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) input:-webkit-autofill:active,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) textarea:-webkit-autofill,
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) select:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 1000px var(--td-bg-color-container) inset !important;
   -webkit-text-fill-color: var(--td-text-color-primary) !important;
   caret-color: var(--td-text-color-primary) !important;
   transition: background-color 5000s ease-in-out 0s;
 }
 
-.t-input:focus:not(.t-is-disabled):not(.t-is-error):not(.t-is-warning):not(.t-is-success),
-.t-input--focused:not(.t-is-error):not(.t-is-warning):not(.t-is-success),
-.t-textarea__inner:focus:not(.t-is-disabled):not(.t-is-error):not(.t-is-warning):not(.t-is-success),
-.t-textarea__inner.t-is-focused:not(.t-is-disabled):not(.t-is-error):not(.t-is-warning):not(
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-input:focus:not(.t-is-disabled):not(.t-is-error):not(.t-is-warning):not(.t-is-success),
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-input--focused:not(.t-is-error):not(.t-is-warning):not(.t-is-success),
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-textarea__inner:focus:not(.t-is-disabled):not(.t-is-error):not(.t-is-warning):not(.t-is-success),
+.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-textarea__inner.t-is-focused:not(.t-is-disabled):not(.t-is-error):not(.t-is-warning):not(
     .t-is-success
   ) {
   border-color: var(--td-brand-color);

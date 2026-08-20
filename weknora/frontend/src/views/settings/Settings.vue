@@ -205,6 +205,10 @@ const navItems = computed<NavItem[]>(() => {
 })
 
 const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
+const hasCheckoutIntent = computed(() =>
+  (route.query.plan === 'plus' || route.query.plan === 'pro' || route.query.plan === 'max') &&
+  (route.query.period === 'monthly' || route.query.period === 'yearly'),
+)
 const currentModelType = computed(() => {
   if (currentSection.value !== 'models') return null
   if (currentSubSection.value) return currentSubSection.value
@@ -235,7 +239,7 @@ const handleClose = () => {
   uiStore.closeSettings()
   if (route.path === '/platform/settings') {
     const section = route.query.section
-    if (section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
+    if (hasCheckoutIntent.value || section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
       void router.push('/platform/knowledge-bases')
     } else {
       router.back()

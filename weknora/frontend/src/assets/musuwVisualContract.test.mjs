@@ -9,7 +9,13 @@ const visual = read("./musuw-visual.less");
 const main = read("../main.ts");
 const useTheme = read("../composables/useTheme.ts");
 const sidebar = read("../components/menu.vue");
+const platform = read("../views/platform/index.vue");
+const knowledgeBase = read("../views/knowledge/KnowledgeBase.vue");
 const wikiBrowser = read("../views/knowledge/wiki/WikiBrowser.vue");
+const overlayBridge = read("./musuw-tdesign-overlay-bridge.css");
+const preferenceCompat = read("./musuw-visual-preference-compat.css");
+const finalClosure = read("./musuw-final-contract-closure.css");
+const finalTheme = read("./musuw-final-theme-closure.css");
 
 test("uses the reference Musuw typefaces and cool-neutral visual tokens", () => {
   assert.match(main, /@fontsource-variable\/inter/);
@@ -27,14 +33,36 @@ test("uses the reference Musuw typefaces and cool-neutral visual tokens", () => 
 });
 
 test("keeps the knowledge graph outside the Musuw presentation layer", () => {
-  assert.doesNotMatch(visual, /\.wiki-graph(?:[\s.{:#>+~]|$)/);
-  assert.doesNotMatch(visual, /\.chat\s+\.tree-container/);
-  assert.doesNotMatch(visual, /\.chat\s+\.streaming-steps-container/);
-  assert.match(visual, /\.t-drawer:not\(\.wiki-graph-drawer\)/);
-  assert.match(visual, /\.t-select__dropdown:not\(\.wiki-graph-search-dropdown\)/);
-  assert.doesNotMatch(visual, /\.t-drawer\s+\.t-/);
+  const bareRootBlocks = [
+    ...theme.matchAll(/(?:^|\n):root(?:,\s*:root\[theme-mode="light"\])?\s*\{([\s\S]*?)\}/g),
+    ...theme.matchAll(/(?:^|\n):root\[theme-mode="dark"\]\s*\{([\s\S]*?)\}/g),
+  ];
+  assert.ok(bareRootBlocks.length >= 2, "light and dark semantic roots must exist");
+  for (const block of bareRootBlocks) {
+    assert.doesNotMatch(block[1], /--td-/, "bare :root must not override TDesign tokens");
+  }
+  assert.match(platform, /class="main musuw-workspace-surface"/);
+  assert.match(theme, /\.musuw-workspace-surface:not\(:has\(\.visual-knowledge-page\.is-graph-tab\)\)/);
+  assert.match(knowledgeBase, /'is-graph-tab':\s*activeKbTab\s*===\s*'graph'/);
   assert.match(wikiBrowser, /overlayClassName:\s*'wiki-graph-search-dropdown'/);
   assert.match(wikiBrowser, /drawer-class-name="wiki-graph-drawer"/);
+  assert.match(overlayBridge, /\.t-select__dropdown:not\(\.wiki-graph-search-dropdown\)/);
+  assert.doesNotMatch(preferenceCompat, /body \.t-popconfirm/);
+  assert.doesNotMatch(finalTheme, /body \.t-popconfirm/);
+  assert.doesNotMatch(finalClosure, /(?:^|\n)\.wiki-graph/m);
+});
+
+test("uses one ordered presentation entry instead of direct patch-layer imports", () => {
+  assert.match(main, /import "@\/assets\/musuw-visual\.less"/);
+  for (const layer of [
+    "theme/theme.css",
+    "musuw-ui-primitives.css",
+    "musuw-visual-contract-final.css",
+    "musuw-final-theme-closure.css",
+  ]) {
+    assert.equal(main.includes(layer), false, `${layer} must not bypass the visual entry`);
+    assert.ok(visual.includes(`"./${layer}"`), `visual entry lost ${layer}`);
+  }
 });
 
 test("lets CSS own the web canvas instead of a theme startup inline style", () => {

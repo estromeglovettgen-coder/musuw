@@ -11,7 +11,7 @@
           <span>{{ $t('entitlement.currentPlan') }}</span>
           <h3>{{ planName }}</h3>
         </div>
-        <span class="visual-plan-card__status">{{ entitlement.plan_status || $t('entitlement.active') }}</span>
+        <span class="visual-plan-card__status">{{ planStatusLabel }}</span>
       </header>
       <div class="visual-plan-card__metrics">
         <div><span>{{ $t('entitlement.storage') }}</span><strong>{{ formatBytes(entitlement.storage_used) }} / {{ formatBytes(entitlement.storage_bytes) }}</strong></div>
@@ -24,6 +24,32 @@
         <template v-if="creditsAvailable"> · {{ $t('entitlement.renewsMonthly', { month: entitlement.openrouter_usage_month }) }}</template>
       </p>
       <p v-if="!billingConfigured" class="visual-plan-card__billing">{{ $t('entitlement.billingUnavailable') }}</p>
+      <template v-else>
+        <div v-if="checkoutAvailable" class="visual-plan-card__checkout">
+          <div class="visual-plan-card__checkout-controls">
+            <t-select v-model="checkoutPlan" :aria-label="$t('entitlement.choosePlan')">
+              <t-option value="plus" :label="$t('entitlement.plans.plus')" />
+              <t-option value="pro" :label="$t('entitlement.plans.pro')" />
+              <t-option value="max" :label="$t('entitlement.plans.max')" />
+            </t-select>
+            <t-radio-group v-model="checkoutPeriod">
+              <t-radio-button value="monthly">{{ $t('entitlement.monthly') }}</t-radio-button>
+              <t-radio-button value="yearly">{{ $t('entitlement.yearly') }}</t-radio-button>
+            </t-radio-group>
+            <t-button theme="primary" :loading="checkoutOpening" :disabled="!selectedCheckoutOption" @click="handleCheckout">
+              {{ $t('entitlement.continueToCheckout') }}
+            </t-button>
+          </div>
+          <p>{{ $t('entitlement.checkoutSecureNote') }}</p>
+        </div>
+        <div v-if="portalAvailable" class="visual-plan-card__portal">
+          <p class="visual-plan-card__managed">{{ $t('entitlement.billingManaged') }}</p>
+          <t-button variant="outline" :loading="portalOpening" @click="handlePortal">
+            {{ $t('entitlement.manageBilling') }}
+          </t-button>
+        </div>
+        <p v-else-if="!checkoutAvailable" class="visual-plan-card__managed">{{ $t('entitlement.billingManaged') }}</p>
+      </template>
     </section>
     <section v-else-if="entitlementLoading" class="plan-card visual-plan-card is-loading">{{ $t('common.loading') }}</section>
 
@@ -138,10 +164,19 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { normalizeLocale, persistLocalePreference } from '@/i18n/locale'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
-import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
+import {
+  createPaddlePortalSession,
+  getCurrentEntitlement,
+  type BillingPeriod,
+  type ConsumerEntitlement,
+  type PaddleBillingConfig,
+  type PaidConsumerPlan,
+} from '@/api/entitlement'
+import { openPaddleCheckout } from '@/utils/paddleCheckout'
 import {
   useFont,
   SANS_STACKS,
@@ -154,6 +189,7 @@ import {
 } from '@/composables/useFont'
 
 const { t, locale } = useI18n()
+const route = useRoute()
 const authStore = useAuthStore()
 const { currentTheme, setTheme } = useTheme()
 const {
@@ -172,9 +208,25 @@ const localMonoFont = ref<MonoFontKey>(currentMono.value)
 const localFontSize = ref<FontSizeKey>(currentSize.value)
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const entitlementLoading = ref(true)
-const billingConfigured = ref(false)
+const billing = ref<PaddleBillingConfig | null>(null)
+const checkoutPlan = ref<PaidConsumerPlan>('plus')
+const checkoutPeriod = ref<BillingPeriod>('monthly')
+const checkoutOpening = ref(false)
+const portalOpening = ref(false)
 const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan || 'free'}`))
+const planStatusLabel = computed(() => (
+  entitlement.value?.plan === 'free'
+    ? t('entitlement.active')
+    : entitlement.value?.plan_status || t('entitlement.active')
+))
 const creditsAvailable = computed(() => entitlement.value?.openrouter_credits_status === 'available')
+const billingConfigured = computed(() => billing.value?.configured === true)
+const portalAvailable = computed(() => billing.value?.portal_available === true)
+const checkoutAvailable = computed(() => (
+  entitlement.value?.plan === 'free' &&
+  Boolean(billing.value?.client_token && billing.value?.tenant_id && billing.value?.prices)
+))
+const selectedCheckoutOption = computed(() => billing.value?.prices?.[checkoutPlan.value]?.[checkoutPeriod.value])
 
 watch(currentTheme, (value) => { localTheme.value = value })
 watch(currentSans, (value) => { localSansFont.value = value })
@@ -200,6 +252,19 @@ const monoFontOptions = computed<{ value: MonoFontKey; label: string; preview: s
 const currentSansStack = computed(() => SANS_STACKS[localSansFont.value] ?? SANS_STACKS.system)
 const currentMonoStack = computed(() => MONO_STACKS[localMonoFont.value] ?? MONO_STACKS.system)
 
+const loadEntitlement = async () => {
+  try {
+    const response = await getCurrentEntitlement()
+    entitlement.value = response.data
+    billing.value = response.billing
+  } catch {
+    entitlement.value = null
+    billing.value = null
+  } finally {
+    entitlementLoading.value = false
+  }
+}
+
 onMounted(() => {
   let savedLocale: string | null = null
   try {
@@ -211,17 +276,11 @@ onMounted(() => {
   localLanguage.value = normalized || locale.value
   if (normalized) locale.value = normalized
 
-  getCurrentEntitlement()
-    .then((response) => {
-      entitlement.value = response.data
-      billingConfigured.value = response.billing.configured
-    })
-    .catch(() => {
-      entitlement.value = null
-    })
-    .finally(() => {
-      entitlementLoading.value = false
-    })
+  const requestedPlan = route.query.plan
+  const requestedPeriod = route.query.period
+  if (requestedPlan === 'plus' || requestedPlan === 'pro' || requestedPlan === 'max') checkoutPlan.value = requestedPlan
+  if (requestedPeriod === 'monthly' || requestedPeriod === 'yearly') checkoutPeriod.value = requestedPeriod
+  void loadEntitlement()
 })
 
 const formatBytes = (bytes: number) => {
@@ -236,6 +295,47 @@ const creditsDisplay = computed(() => {
   return `${formatCredits(entitlement.value.openrouter_used_microusd)} / ${formatCredits(entitlement.value.monthly_openrouter_microusd)}`
 })
 const formatLimit = (limit: number) => limit > 0 ? String(limit) : t('entitlement.unlimited')
+
+const handleCheckout = async () => {
+  const config = billing.value
+  const option = selectedCheckoutOption.value
+  if (!config?.environment || !config.client_token || !config.tenant_id || !option) {
+    MessagePlugin.error(t('entitlement.checkoutFailed'))
+    return
+  }
+  checkoutOpening.value = true
+  try {
+    await openPaddleCheckout({
+      environment: config.environment,
+      clientToken: config.client_token,
+      priceId: option.price_id,
+      tenantId: config.tenant_id,
+      checkoutBinding: option.checkout_binding,
+      email: authStore.user?.email,
+      onCompleted: () => {
+        MessagePlugin.success(t('entitlement.checkoutCompleted'))
+        window.setTimeout(() => { void loadEntitlement() }, 1200)
+        window.setTimeout(() => { void loadEntitlement() }, 3500)
+      },
+    })
+  } catch {
+    MessagePlugin.error(t('entitlement.checkoutFailed'))
+  } finally {
+    checkoutOpening.value = false
+  }
+}
+
+const handlePortal = async () => {
+  portalOpening.value = true
+  try {
+    const response = await createPaddlePortalSession()
+    window.location.assign(response.authorization_url)
+  } catch {
+    MessagePlugin.error(t('entitlement.portalFailed'))
+  } finally {
+    portalOpening.value = false
+  }
+}
 
 const handleLanguageChange = () => {
   const persisted = persistLocalePreference(localLanguage.value)
@@ -328,6 +428,13 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 .visual-plan-card__metrics .is-unavailable strong { color: #9ca3af; }
 .visual-plan-card > p { margin: 12px 0 0; line-height: 18px; }
 .visual-plan-card__billing { color: #b45309; }
+.visual-plan-card__managed { color: #047857; }
+.visual-plan-card__portal { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.visual-plan-card__portal p { margin: 0; }
+.visual-plan-card__checkout { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f3f4f6; }
+.visual-plan-card__checkout-controls { display: grid; grid-template-columns: minmax(110px, 1fr) auto auto; align-items: center; gap: 8px; }
+.visual-plan-card__checkout-controls :deep(.t-select) { width: 100%; }
+.visual-plan-card__checkout > p { margin: 8px 0 0; color: #9ca3af; font-size: 11px; line-height: 16px; }
 
 .visual-setting-list {
   width: 100%;
@@ -415,6 +522,7 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 
 @media (max-width: 720px) {
   .visual-plan-card__metrics { grid-template-columns: minmax(0, 1fr); }
+  .visual-plan-card__checkout-controls { grid-template-columns: minmax(0, 1fr); }
   .visual-setting-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .visual-setting-row__control { width: min(280px, 100%); justify-self: start; }
 }

@@ -1,7 +1,8 @@
 // src/utils/request.js
 import axios from "axios";
 import { generateRandomString, MAX_FILE_SIZE_MB } from "./index";
-import i18n from '@/i18n'
+import i18n from '../i18n'
+import { localizeConsumerPlanError } from './consumerPlanError'
 import { getApiBaseUrl } from './api-base';
 import {
   EXTERNAL_AUTH_START_PATH,
@@ -255,6 +256,7 @@ instance.interceptors.response.use(
     } else if (typeof data === 'string') {
       errorMessage = data;
     }
+    errorMessage = localizeConsumerPlanError(errorMessage);
     return Promise.reject({ 
       status, 
       message: errorMessage,

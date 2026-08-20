@@ -8,12 +8,17 @@
 - [x] 2.1 Add failing service tests and enforce Free knowledge-base, document, video, and model limits
 - [x] 2.2 Use the official OpenRouter SDK for monthly-limited child keys, inject tenant keys/user attribution across existing model clients, and make 402 terminal
 - [x] 2.3 Add the authenticated entitlement endpoint and optional signature-verified Paddle webhook
+- [x] 2.4 Use Paddle's official Go verifier, tenant-bound checkout data, server-owned price mappings, subscription-only state changes, and idempotent observable event handling
 
 ## 3. Consumer UI
 
 - [x] 3.1 Show plan/storage/credit state in General settings and align storefront's four plans with enforced limits
+- [x] 3.2 Preserve storefront plan intent through authentication and open the official Paddle.js overlay from General settings without a custom payment form
+- [x] 3.3 Add an authenticated, tenant-owned Paddle Customer Portal button using the official Go SDK and expose only a fresh one-time overview URL
 
 ## 4. Verification and release
 
 - [x] 4.1 Run focused and full backend/frontend/storefront checks plus strict OpenSpec validation
 - [x] 4.2 Verify Free and paid catalog/limits in the local browser and retain the earlier bounded production evidence; defer the combined release at the user's request because GitHub Actions minutes are exhausted
+- [x] 4.3 Verify the six-price Sandbox catalog, real Paddle-signed activation/cancellation/duplicate deliveries, database state, audit logs, and browser entitlement refresh through the local Cloudflare tunnel
+- [x] 4.4 Verify the authenticated Customer Portal, anonymous/no-customer rejection, token-redacted logs, and final local browser lifecycle regression

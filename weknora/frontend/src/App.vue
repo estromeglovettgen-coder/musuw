@@ -11,7 +11,7 @@ import { consumePendingTenantSwitchToast } from "@/utils/tenantSwitch";
 import { useRoleLabel } from "@/composables/useRoleLabel";
 import { notifyLoginSuccess } from "@/utils/loginNotify";
 import { renderWorkspaceNotifyContent } from "@/utils/workspaceNotifyContent";
-import { AUTHENTICATED_HOME_PATH, handoffToExternalAuth } from "@/utils/nativeAuthHandoff";
+import { handoffToExternalAuth } from "@/utils/nativeAuthHandoff";
 
 // TDesign locale configs
 import enUSConfig from "tdesign-vue-next/esm/locale/en_US";
@@ -106,7 +106,9 @@ const persistOIDCLoginResponse = async (response: any) => {
   await syncOIDCUserContext();
 
   await nextTick();
-  router.replace(authStore.hasValidTenant ? AUTHENTICATED_HOME_PATH : "/onboarding/workspace");
+  // Re-enter through `/` so a validated checkout intent captured by the auth
+  // shell is consumed only after the native session is durable.
+  router.replace(authStore.hasValidTenant ? "/" : "/onboarding/workspace");
 };
 
 const handleGlobalOIDCCallback = async () => {

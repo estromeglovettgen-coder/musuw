@@ -211,17 +211,4 @@
   .t-dialog:has(.invitation-list) .my-invitations-desc,
   .t-dialog:has(.invitation-list) .invitation-card-meta { color: var(--mvc-muted) !important; }
 
-  /* Popconfirm is used inside the parsing Trace and has no safe per-overlay
-     marker. Give every popconfirm back to native TDesign theme instead of
-     letting the earlier global visual bridge own it. */
-  body .t-popconfirm {
-    border-color: var(--td-component-stroke) !important;
-    background: var(--td-bg-color-container) !important;
-    color: var(--td-text-color-primary) !important;
-    box-shadow: var(--td-shadow-2) !important;
-    font-family: var(--td-font-family) !important;
-  }
-  body .t-popconfirm .t-button {
-    color: var(--td-text-color-primary) !important;
-  }
 }

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
-const main = read('../main.ts')
+const main = read('./musuw-visual.less')
 const css = read('./musuw-onboarding-native.css')
 
 test('onboarding/image-preview closure loads after teleported overlay bridge', () => {

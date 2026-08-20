@@ -21,6 +21,33 @@ type Screen =
   | "email_code"
   | "identity_pending";
 
+export const CHECKOUT_INTENT_STORAGE_KEY = "musuw.checkout.intent";
+
+export type CheckoutIntent = Readonly<{
+  period: "monthly" | "yearly";
+  plan: "plus" | "pro" | "max";
+}>;
+
+export function checkoutIntentFromSearch(search: string): CheckoutIntent | null {
+  const parameters = new URLSearchParams(search);
+  const plan = parameters.get("plan");
+  const period = parameters.get("period");
+  if (
+    (plan !== "plus" && plan !== "pro" && plan !== "max") ||
+    (period !== "monthly" && period !== "yearly")
+  ) {
+    return null;
+  }
+  return { period, plan };
+}
+
+export function checkoutWorkspacePathFromSearch(search: string): string {
+  const intent = checkoutIntentFromSearch(search);
+  if (intent === null) return "/";
+  const parameters = new URLSearchParams({ plan: intent.plan, period: intent.period });
+  return `/?${parameters.toString()}`;
+}
+
 export type AuthCopy = Readonly<{
   title: string;
   intro: string;
@@ -166,6 +193,20 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   }, [copy.title, locale]);
 
   useEffect(() => {
+    if (window.location.pathname !== "/auth/start") return;
+    const intent = checkoutIntentFromSearch(window.location.search);
+    try {
+      if (intent === null) {
+        window.sessionStorage.removeItem(CHECKOUT_INTENT_STORAGE_KEY);
+      } else {
+        window.sessionStorage.setItem(CHECKOUT_INTENT_STORAGE_KEY, JSON.stringify(intent));
+      }
+    } catch {
+      // Checkout remains available from General Settings when storage is blocked.
+    }
+  }, []);
+
+  useEffect(() => {
     const route = `${screen}:${window.location.pathname}:${window.location.search}`;
     const routeAction =
       screen === "callback_pending" ||
@@ -175,7 +216,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     if (routeAction && handledRoute.current === route) return;
     if (screen === "start_pending") {
       handledRoute.current = route;
-      void runtime.resumeStart().then(
+      void runtime.resumeStart(checkoutWorkspacePathFromSearch(window.location.search)).then(
         (result) => {
           if (result.state === "start_login_required") {
             setScreen("login");

@@ -2208,8 +2208,21 @@ export default {
     unlimited: '요금제 제한 없음',
     videoPlanAllowed: '제품에서 지원되면 비디오를 사용할 수 있습니다',
     videoFreeBlocked: 'Free에는 비디오 업로드가 포함되지 않습니다',
+    freeKnowledgeBaseLimit: 'Free 요금제에서는 지식 베이스를 1개만 사용할 수 있습니다. 더 만들려면 업그레이드하세요.',
+    freeDocumentLimit: 'Free 요금제에서는 지식 베이스당 문서를 10개까지 사용할 수 있습니다. 더 추가하려면 업그레이드하세요.',
+    freeVideoLimit: '비디오 업로드는 유료 요금제에서 사용할 수 있습니다.',
     renewsMonthly: '크레딧 기간 {month} (UTC)',
     billingUnavailable: 'Paddle 결제가 구성될 때까지 업그레이드할 수 없습니다.',
+    choosePlan: '요금제 선택',
+    monthly: '월간',
+    yearly: '연간',
+    continueToCheckout: '안전한 결제로 이동',
+    checkoutSecureNote: '결제는 Paddle에서 처리하며 최종 가격과 세금이 표시됩니다. 서명된 웹훅 이후에만 요금제가 변경됩니다.',
+    checkoutCompleted: '결제가 완료되었습니다. 요금제를 동기화하고 있습니다.',
+    checkoutFailed: 'Paddle 결제를 열 수 없습니다. 다시 시도해 주세요.',
+    billingManaged: '결제 및 구독은 Paddle에서 안전하게 관리됩니다.',
+    manageBilling: '결제 관리',
+    portalFailed: 'Paddle 결제 포털을 열 수 없습니다. 다시 시도해 주세요.',
     plans: { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' }
   },
   language: {
@@ -3273,6 +3286,7 @@ export default {
     wikiFieldAffectedPages: '영향을 받는 페이지',
     wikiAffectedCount: '{count}개 페이지의 링크가 업데이트되었습니다',
     processError: '처리 오류',
+    aiServiceUnavailable: 'AI 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
     sessionExcerpt: '대화 발췌',
     noAnswerContent: '(답변 내용 없음)',
     noMatchFound: '일치하는 내용을 찾을 수 없습니다',
@@ -4083,6 +4097,10 @@ export default {
   knowledgeList: {
     create: '지식베이스 생성',
     subtitle: '지식베이스를 관리하고 구성합니다. 문서형과 Q&A형 지식베이스를 지원합니다',
+    favorites: {
+      add: '즐겨찾기에 추가',
+      remove: '즐겨찾기에서 제거'
+    },
     sharedToOrgs: '{count} 스페이스에 공유됨',
     uninitializedBanner: '일부 지식베이스가 아직 초기화되지 않았습니다. 지식 문서를 추가하려면 먼저 설정에서 모델 정보를 구성해야 합니다',
     uploadProgress: {
@@ -4352,6 +4370,7 @@ export default {
     next: '다음',
     finish: '완료',
     all: '전체',
+    more: '더 보기',
     clear: '지우기',
     website: '공식 웹사이트',
     clawhubSkill: 'Claw Skill',

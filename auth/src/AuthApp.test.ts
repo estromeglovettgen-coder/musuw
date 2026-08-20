@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { getAuthCopy, initialAuthErrorForPathname, initialAuthScreenForPathname } from "./AuthApp";
+import {
+  checkoutIntentFromSearch,
+  checkoutWorkspacePathFromSearch,
+  getAuthCopy,
+  initialAuthErrorForPathname,
+  initialAuthScreenForPathname,
+} from "./AuthApp";
 
 describe("auth shell browser routes", () => {
   it("treats the public start route as a session-resume route, not a login form", () => {
@@ -21,6 +27,20 @@ describe("auth shell browser routes", () => {
 
   it("keeps Supabase's OAuth consent route outside the auth asset prefix", () => {
     expect(initialAuthScreenForPathname("/oauth/consent")).toBe("consent_pending");
+  });
+
+  it("preserves only a supported storefront checkout intent", () => {
+    expect(checkoutIntentFromSearch("?plan=pro&period=yearly")).toEqual({
+      period: "yearly",
+      plan: "pro",
+    });
+    expect(checkoutIntentFromSearch("?plan=free&period=monthly")).toBeNull();
+    expect(checkoutIntentFromSearch("?plan=admin&period=monthly")).toBeNull();
+    expect(checkoutIntentFromSearch("?plan=plus&period=weekly")).toBeNull();
+    expect(checkoutWorkspacePathFromSearch("?plan=max&period=yearly")).toBe(
+      "/?plan=max&period=yearly",
+    );
+    expect(checkoutWorkspacePathFromSearch("?plan=admin&period=monthly")).toBe("/");
   });
 });
 

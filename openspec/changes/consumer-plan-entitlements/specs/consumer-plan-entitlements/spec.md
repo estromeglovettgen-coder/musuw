@@ -78,16 +78,36 @@ The authenticated product SHALL show the current plan, storage used and limit, m
 - **WHEN** an authenticated user opens General settings
 - **THEN** the values displayed come from the server's effective tenant entitlement rather than browser state
 
-### Requirement: Optional Paddle events are fail-closed
-When Paddle environment values are configured, the system SHALL accept only webhook requests with a valid Paddle signature and a known server-side price mapping, SHALL apply subscription activation or cancellation idempotently, and SHALL derive the tenant from signed event custom data. When Paddle is not fully configured, checkout SHALL be displayed as unavailable and no client-supplied plan claim SHALL grant an entitlement.
+### Requirement: Optional Paddle checkout, self-service, and events are fail-closed
+When Paddle environment values are fully configured, an authenticated Free tenant SHALL be able to open Paddle's hosted checkout only for the six server-owned Plus, Pro, and Max monthly/yearly price mappings. The system SHALL bind each offered price to that tenant, accept only subscription lifecycle webhooks with a valid Paddle signature and matching binding, and apply activation or cancellation idempotently. An authenticated tenant with a verified Paddle customer identity SHALL be able to open Paddle's hosted customer portal using a fresh server-created session. A browser callback or transaction event SHALL NOT grant an entitlement. When Paddle is not fully configured, checkout SHALL be displayed as unavailable and no client-supplied plan claim SHALL grant an entitlement.
+
+#### Scenario: Free user starts hosted checkout
+- **WHEN** an authenticated Free user chooses an allowed plan and billing period
+- **THEN** the official Paddle.js overlay receives exactly one server-mapped price with quantity one and tenant-bound custom data
 
 #### Scenario: Valid activation event
-- **WHEN** a correctly signed Paddle event contains a known price and tenant identifier
+- **WHEN** a correctly signed Paddle subscription event contains a known price, tenant identifier, and matching checkout binding
 - **THEN** the mapped paid plan is applied once
 
 #### Scenario: Invalid or unknown event
-- **WHEN** the signature is invalid, the price is unknown, or the tenant identifier is absent
+- **WHEN** the signature or binding is invalid, the price is unknown, the tenant identifier is absent, or the event is not a subscription lifecycle event
 - **THEN** no entitlement changes
+
+#### Scenario: Duplicate delivery
+- **WHEN** Paddle repeats an already processed signed subscription event
+- **THEN** the endpoint acknowledges it without applying the plan a second time
+
+#### Scenario: Paid tenant opens General settings
+- **WHEN** a tenant already has a paid plan
+- **THEN** current entitlement is displayed but new checkout options are withheld to prevent a duplicate subscription
+
+#### Scenario: Customer manages billing
+- **WHEN** an authenticated tenant with a Paddle customer record clicks manage billing
+- **THEN** the server resolves the customer from that tenant, creates a fresh Paddle portal session through the official SDK, and returns only its HTTPS overview URL
+
+#### Scenario: Portal ownership cannot be proven
+- **WHEN** a request is anonymous or the authenticated tenant has no Paddle customer record
+- **THEN** no portal session is created and no Paddle customer or subscription identifier is exposed
 
 #### Scenario: Paddle is unconfigured
 - **WHEN** required Paddle environment values are absent

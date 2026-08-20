@@ -45,6 +45,8 @@ type ConsumerEntitlement struct {
 	OpenRouterRemainingMicrousd int64                   `json:"openrouter_remaining_microusd"`
 	OpenRouterUsageMonth        string                  `json:"openrouter_usage_month"`
 	OpenRouterCreditsStatus     OpenRouterCreditsStatus `json:"openrouter_credits_status"`
+	PaddleCustomerID            string                  `json:"-"`
+	PaddleSubscriptionID        string                  `json:"-"`
 }
 
 func NormalizeConsumerPlan(plan ConsumerPlan) ConsumerPlan {

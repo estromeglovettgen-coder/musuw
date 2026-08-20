@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
-const main = read('../main.ts')
+const main = read('./musuw-visual.less')
 const glyphs = read('./musuw-reference-lucide-precision.css')
 
 test('exact reference glyph layer is the final visual CSS import', () => {

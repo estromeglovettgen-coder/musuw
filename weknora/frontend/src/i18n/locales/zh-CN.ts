@@ -2208,8 +2208,21 @@ export default {
     unlimited: '方案不限制',
     videoPlanAllowed: '产品支持视频后，此方案可使用视频功能',
     videoFreeBlocked: '免费版不支持视频上传',
+    freeKnowledgeBaseLimit: '免费版仅支持 1 个知识库；升级后可继续创建。',
+    freeDocumentLimit: '免费版每个知识库最多支持 10 篇文档；升级后可继续添加。',
+    freeVideoLimit: '视频上传仅对付费方案开放。',
     renewsMonthly: '额度周期 {month}（UTC）',
     billingUnavailable: 'Paddle 计费尚未配置，暂时无法升级。',
+    choosePlan: '选择方案',
+    monthly: '月付',
+    yearly: '年付',
+    continueToCheckout: '前往安全结账',
+    checkoutSecureNote: '支付由 Paddle 托管，结账页会显示最终价格与税费。套餐仅在签名 webhook 到达后生效。',
+    checkoutCompleted: '支付已完成，正在同步套餐。',
+    checkoutFailed: '暂时无法打开 Paddle 结账，请重试。',
+    billingManaged: '账单与订阅由 Paddle 安全管理。',
+    manageBilling: '管理账单与订阅',
+    portalFailed: '暂时无法打开 Paddle 账单中心，请重试。',
     plans: { free: '免费版', plus: 'Plus', pro: 'Pro', max: 'Max' }
   },
   language: {
@@ -3273,6 +3286,7 @@ export default {
     wikiFieldAffectedPages: '受影响页面',
     wikiAffectedCount: '{count} 个页面的链接已更新',
     processError: '处理出错',
+    aiServiceUnavailable: 'AI 服务暂时不可用，请稍后重试。',
     sessionExcerpt: '会话摘录',
     noAnswerContent: '（无回答内容）',
     noMatchFound: '未找到匹配的内容',
@@ -4083,6 +4097,10 @@ export default {
   knowledgeList: {
     create: '新建知识库',
     subtitle: '管理和组织您的知识库，支持文档型和问答型知识库',
+    favorites: {
+      add: '添加到收藏',
+      remove: '取消收藏'
+    },
     sharedToOrgs: '已共享给 {count} 个空间',
     uninitializedBanner: '部分知识库尚未初始化，需要先在设置中配置模型信息才能添加知识文档',
     uploadProgress: {
@@ -4352,6 +4370,7 @@ export default {
     next: '下一步',
     finish: '完成',
     all: '全部',
+    more: '更多',
     clear: '清空',
     website: '官方网站',
     clawhubSkill: 'Claw Skill',

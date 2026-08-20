@@ -38,7 +38,7 @@ export default defineComponent({
 
 <template>
   <template v-if="!isFAQ">
-    <main class="visual-knowledge-page">
+    <main class="visual-knowledge-page" :class="{ 'is-graph-tab': activeKbTab === 'graph' }">
       <header class="visual-knowledge-header">
         <div class="visual-knowledge-header__copy">
           <nav class="visual-knowledge-breadcrumb" :aria-label="$t('menu.knowledgeBase')">

@@ -1,11 +1,11 @@
 ## 1. Visual contract and isolation
 
-- [ ] 1.1 Replace the previous global presentation-token contract with one
+- [x] 1.1 Replace the previous global presentation-token contract with one
   Codex-inspired system token layer that does not override TDesign tokens at
   `:root`.
-- [ ] 1.2 Add an explicit visual isolation state for the Wiki graph tab and a
+- [x] 1.2 Add an explicit visual isolation state for the Wiki graph tab and a
   graph-specific class for its teleported search popup.
-- [ ] 1.3 Update the visual contract test to reject global graph-affecting
+- [x] 1.3 Update the visual contract test to reject global graph-affecting
   selectors and verify the single token/import authority.
 
 ## 2. Workspace presentation
@@ -35,5 +35,6 @@
 - [x] 3.2 Run fixed-viewport visual verification for default light/dark
   workspace surfaces when browser automation is available, including a graph
   isolation check.
-- [ ] 3.3 Complete a bounded adversarial review of the final visual delta and
-  release the verified frontend-only update.
+- [x] 3.3 Complete a bounded adversarial review of the final visual delta and
+  verify the frontend-only release candidate locally. Remote CI/deployment is
+  deferred at the user's request while the GitHub Actions allowance is exhausted.

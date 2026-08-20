@@ -204,40 +204,44 @@
 /* TDesign widgets teleported to body must follow the selected native theme.
  * This intentionally comes after the light reference bridge. */
 :root[theme-mode="dark"] body .t-dialog,
-:root[theme-mode="dark"] body .t-select__dropdown,
+:root[theme-mode="dark"] body .t-select__dropdown:not(.wiki-graph-search-dropdown),
 :root[theme-mode="dark"] body .t-dropdown__menu,
-:root[theme-mode="dark"] body .t-popconfirm,
-:root[theme-mode="dark"] body .t-popup__content {
+:root[theme-mode="dark"] body .t-popup__content:not(.wiki-graph-help-popup):not(:has(.wiki-graph-help)):not(:has(.kp-proccfg-pop)) {
   border-color: var(--mvc-line) !important;
   background: var(--mvc-surface) !important;
   color: var(--mvc-text) !important;
   box-shadow: var(--mvc-shadow) !important;
 }
 :root[theme-mode="dark"] body .t-dialog__header,
-:root[theme-mode="dark"] body .t-select-option.t-is-selected,
+:root[theme-mode="dark"] body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option.t-is-selected,
 :root[theme-mode="dark"] body .t-dropdown__item.t-is-active {
   color: var(--mvc-text-strong) !important;
 }
 :root[theme-mode="dark"] body .t-dialog__body,
-:root[theme-mode="dark"] body .t-select-option,
+:root[theme-mode="dark"] body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option,
 :root[theme-mode="dark"] body .t-dropdown__item {
   color: var(--mvc-muted-strong) !important;
 }
-:root[theme-mode="dark"] body .t-select-option:hover,
-:root[theme-mode="dark"] body .t-select-option.t-is-selected,
+:root[theme-mode="dark"] body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option:hover,
+:root[theme-mode="dark"] body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option.t-is-selected,
 :root[theme-mode="dark"] body .t-dropdown__item:hover,
 :root[theme-mode="dark"] body .t-dropdown__item.t-is-active {
   background: var(--mvc-hover) !important;
 }
-:root[theme-mode="dark"] body .t-input,
-:root[theme-mode="dark"] body .t-select-input,
-:root[theme-mode="dark"] body .t-textarea__inner {
+:root[theme-mode="dark"] .musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-input,
+:root[theme-mode="dark"] .musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-select-input,
+:root[theme-mode="dark"] .musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-textarea__inner,
+:root[theme-mode="dark"] body .t-dialog .t-input,
+:root[theme-mode="dark"] body .t-dialog .t-select-input,
+:root[theme-mode="dark"] body .t-dialog .t-textarea__inner {
   border-color: var(--mvc-line) !important;
   background: var(--mvc-surface) !important;
   color: var(--mvc-text) !important;
 }
-:root[theme-mode="dark"] body .t-input.t-is-focused,
-:root[theme-mode="dark"] body .t-select-input.t-is-focused {
+:root[theme-mode="dark"] .musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-input.t-is-focused,
+:root[theme-mode="dark"] .musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-select-input.t-is-focused,
+:root[theme-mode="dark"] body .t-dialog .t-input.t-is-focused,
+:root[theme-mode="dark"] body .t-dialog .t-select-input.t-is-focused {
   border-color: var(--mvc-line-strong) !important;
   box-shadow: 0 0 0 2px rgb(255 255 255 / 5%) !important;
 }

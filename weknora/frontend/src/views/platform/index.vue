@@ -1,5 +1,5 @@
 <template>
-  <div class="main" ref="dropzone">
+  <div class="main musuw-workspace-surface" ref="dropzone">
     <Menu></Menu>
     <div v-if="isRouterAlive" class="platform-route-outlet">
       <RouterView />

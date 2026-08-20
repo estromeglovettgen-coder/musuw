@@ -59,7 +59,8 @@ test("Paddle availability and authoritative confirmation copy is present in both
     assert.ok(copy.meta.title);
     assert.ok(copy.meta.description);
     assert.ok(copy.pricing.checkout.action);
-    assert.match(copy.pricing.checkout.note, locale === "zh-CN" ? /暂不开放升级/ : /upgrades remain unavailable/i);
+    assert.match(copy.pricing.checkout.note, /Paddle/);
+    assert.match(copy.pricing.checkout.note, locale === "zh-CN" ? /当前可用.*结账/ : /available.*checkout/i);
     assert.match(copy.pricing.checkout.providerNote, /Paddle/);
     assert.match(
       copy.pricing.checkout.providerNote,

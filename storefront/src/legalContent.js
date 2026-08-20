@@ -58,7 +58,7 @@ const englishDocuments = {
         blocks: [
           p("musuw is a knowledge workspace that preserves source materials, uploads and parses common formats, organizes connected Wiki pages with a graph view inside Wiki, and provides AI-assisted dialogue with exact evidence links, export, and deletion controls."),
           p("Features may evolve. We may improve, replace, or discontinue a feature when reasonably necessary for security, legal compliance, reliability, or product development. If a material change significantly reduces a paid feature, we will provide reasonable notice and any remedy required by law."),
-          note("Paid upgrades are unavailable until Paddle is configured. A URL or checkout return is not proof of payment; musuw grants a paid plan only after verifying Paddle's signed server notification.")
+          note("Available paid upgrades use Paddle's secure checkout. A URL or checkout return is not proof of payment; musuw grants a paid plan only after verifying Paddle's signed server notification.")
         ]
       },
       {
@@ -680,7 +680,7 @@ const chineseDocuments = {
         blocks: [
           p("musuw 是知识工作空间，用于保留原始资料、上传并解析常见格式、组织相互连接的 Wiki 页面及其中的图谱视图，并通过精确证据链接、导出和删除控制提供 AI 辅助对话。"),
           p("功能会持续演进。为安全、合规、可靠性或产品发展之合理需要，我们可以改进、替换或停止某项功能。若重大变化显著减少已付费功能，我们将提供合理通知及法律要求的救济。"),
-          note("Paddle 配置完成前暂不开放付费升级。网址参数或结账返回不代表付款成功；仅在 musuw 服务器验证 Paddle 签名通知后，产品才授予付费方案。")
+          note("可用付费升级使用 Paddle 安全结账。网址参数或结账返回不代表付款成功；仅在 musuw 服务器验证 Paddle 签名通知后，产品才授予付费方案。")
         ]
       },
       {

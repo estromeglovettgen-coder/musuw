@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const main = read('../main.ts')
+const visual = read('./musuw-visual.less')
 const primitives = read('./musuw-ui-primitives.css')
 
 const migratedViewFiles = [
@@ -48,11 +49,11 @@ const migratedViewFiles = [
   '../views/settings/ModelSettings.vue',
 ]
 
-test('global mechanical reference layers are no longer active', () => {
+test('one presentation seam owns the active visual layer order', () => {
+  assert.ok(main.includes('import "@/assets/musuw-visual.less"'))
   for (const legacy of [
     'musuw-reference-mechanical.css',
     'musuw-reference-citation-sources.css',
-    'musuw-visual.less',
     'musuw-reference-core.less',
     'musuw-reference-workbench.less',
     'musuw-reference-header.less',
@@ -62,7 +63,8 @@ test('global mechanical reference layers are no longer active', () => {
     'musuw-reference-dom-bridge.css',
   ]) assert.equal(main.includes(legacy), false, `${legacy} must not be imported by main.ts`)
 
-  assert.ok(main.includes('import "@/assets/musuw-ui-primitives.css"'))
+  assert.equal(main.includes('musuw-ui-primitives.css'), false)
+  assert.ok(visual.includes('"./musuw-ui-primitives.css"'))
 })
 
 test('migrated views own their own visual-prefixed geometry', () => {

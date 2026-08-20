@@ -371,7 +371,7 @@ export const faqs = [
   {
     question: "How does paid access become active?",
     answer:
-      "Upgrades remain unavailable until Paddle is configured. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access."
+      "Available upgrades open a secure Paddle checkout. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access."
   }
 ];
 

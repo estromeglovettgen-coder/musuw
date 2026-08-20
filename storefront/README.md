@@ -9,9 +9,10 @@ actions append only a bounded `plan` and `period=monthly|yearly`. The
 storefront Worker serves and localizes static assets; it has no account,
 checkout, billing, or entitlement endpoint.
 
-Until Paddle is configured, the authenticated application reports upgrades as
-unavailable. A paid plan can be mirrored only from a signature-verified Paddle
-Webhook; URL parameters and checkout returns never grant entitlements.
+The authenticated application reports the Paddle checkout options currently
+available to the signed-in tenant. A paid plan can be mirrored only from a
+signature-verified Paddle Webhook; URL parameters and checkout returns never
+grant entitlements.
 
 ## Local verification
 

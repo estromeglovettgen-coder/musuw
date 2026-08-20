@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
-const main = read('../main.ts')
+const main = read('./musuw-visual.less')
 const precision = read('./musuw-reference-precision-fixes.css')
 
 test('reference precision sheet loads after the general visual convergence layer', () => {

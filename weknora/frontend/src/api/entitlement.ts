@@ -1,7 +1,23 @@
-import { get } from '@/utils/request'
+import { get, post } from '@/utils/request'
 
 export type ConsumerPlan = 'free' | 'plus' | 'pro' | 'max'
 export type OpenRouterCreditsStatus = 'available' | 'unavailable' | 'unprovisioned'
+export type PaidConsumerPlan = Exclude<ConsumerPlan, 'free'>
+export type BillingPeriod = 'monthly' | 'yearly'
+
+export interface PaddleCheckoutOption {
+  price_id: string
+  checkout_binding: string
+}
+
+export interface PaddleBillingConfig {
+  configured: boolean
+  portal_available: boolean
+  environment?: 'sandbox' | 'live'
+  client_token?: string
+  tenant_id?: string
+  prices?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCheckoutOption>>>>
+}
 
 export interface ConsumerEntitlement {
   plan: ConsumerPlan
@@ -20,12 +36,13 @@ export interface ConsumerEntitlement {
 
 export interface EntitlementResponse {
   data: ConsumerEntitlement
-  billing: {
-    configured: boolean
-    environment?: string
-  }
+  billing: PaddleBillingConfig
 }
 
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
   return get('/api/v1/entitlements/current') as unknown as Promise<EntitlementResponse>
+}
+
+export async function createPaddlePortalSession(): Promise<{ authorization_url: string }> {
+  return post('/api/v1/billing/paddle/portal-session') as Promise<{ authorization_url: string }>
 }

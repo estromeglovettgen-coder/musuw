@@ -217,7 +217,7 @@ const en = {
     ],
     checkout: {
       action: "View plan",
-      note: "Sign in to inspect your current plan and exact usage. Upgrades remain unavailable until Paddle is configured.",
+      note: "Sign in to inspect your current plan, exact usage, and available Paddle checkout options.",
       providerNote:
         "A paid plan is granted only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access.",
     },
@@ -391,7 +391,7 @@ const en = {
       {
         question: "How does paid access become active?",
         answer:
-          "Upgrades remain unavailable until Paddle is configured. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access.",
+          "Available upgrades open a secure Paddle checkout. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access.",
       },
     ],
   },
@@ -577,7 +577,7 @@ const zhCN = {
     ],
     checkout: {
       action: "查看方案",
-      note: "登录后查看当前方案与精确用量；Paddle 配置完成前暂不开放升级。",
+      note: "登录后查看当前方案、精确用量与当前可用的 Paddle 安全结账选项。",
       providerNote:
         "只有 musuw 验证 Paddle 的服务器签名事件后才会授予付费方案；网址参数或结账返回不会授予权限。",
     },
@@ -721,7 +721,7 @@ const zhCN = {
       {
         question: "付费状态如何生效？",
         answer:
-          "Paddle 配置完成前暂不开放升级。只有 musuw 验证 Paddle 的服务器签名事件后，付费方案才会生效；网址参数或结账返回不会授予权限。",
+          "可用升级会进入 Paddle 安全结账。只有 musuw 验证 Paddle 的服务器签名事件后，付费方案才会生效；网址参数或结账返回不会授予权限。",
       },
     ],
   },

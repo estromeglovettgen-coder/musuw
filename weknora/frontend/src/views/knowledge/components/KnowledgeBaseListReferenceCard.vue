@@ -75,7 +75,7 @@ const emit = defineEmits<{
       </t-tooltip>
 
       <t-popup v-else-if="canDuplicate || canManage || !shared" trigger="click" destroy-on-close placement="bottom-right">
-        <button type="button" class="visual-reference-kb-card__more" @click.stop><t-icon name="ellipsis" /></button>
+        <button type="button" class="visual-reference-kb-card__more" :aria-label="$t('common.more')" @click.stop><t-icon name="ellipsis" /></button>
         <template #content>
           <div class="visual-reference-kb-card-menu" @click.stop>
             <button v-if="!shared" type="button" @click="emit('pin')"><t-icon :name="kb.is_pinned ? 'pin-filled' : 'pin'" /><span>{{ kb.is_pinned ? $t('knowledgeList.pin.unpin') : $t('knowledgeList.pin.pin') }}</span></button>

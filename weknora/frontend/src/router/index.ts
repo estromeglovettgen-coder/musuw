@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteLocationNormalized } from 'vue-router'
+import type { RouteLocationGeneric, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
 import { getSystemInfo } from '@/api/system'
@@ -12,6 +12,29 @@ import {
 
 /** Lite /桌面 WebView 硬刷新时可能只打开 `/`，用 session 记住上次页面以便恢复 */
 const LITE_LAST_PATH_KEY = 'weknora_lite_last_path'
+const CHECKOUT_INTENT_STORAGE_KEY = 'musuw.checkout.intent'
+
+function authenticatedEntryPath(to: RouteLocationGeneric) {
+  // The global OIDC callback handler must finish persisting the native session
+  // before a stored checkout intent is consumed.
+  if (hasPendingOIDCCallback(window.location.hash || '')) return AUTHENTICATED_HOME_PATH
+  try {
+    const raw = sessionStorage.getItem(CHECKOUT_INTENT_STORAGE_KEY)
+    sessionStorage.removeItem(CHECKOUT_INTENT_STORAGE_KEY)
+    const saved = raw ? JSON.parse(raw) as { plan?: unknown; period?: unknown } : null
+    const plan = to.query.plan ?? saved?.plan
+    const period = to.query.period ?? saved?.period
+    if (
+      (plan === 'plus' || plan === 'pro' || plan === 'max') &&
+      (period === 'monthly' || period === 'yearly')
+    ) {
+      return { path: '/platform/settings', query: { section: 'general', plan, period } }
+    }
+  } catch {
+    // Fall through to the normal authenticated home when storage is unavailable.
+  }
+  return AUTHENTICATED_HOME_PATH
+}
 
 function isLiteEdition(authStore: ReturnType<typeof useAuthStore>) {
   return authStore.isLiteMode || localStorage.getItem('weknora_lite_mode') === 'true'
@@ -80,7 +103,7 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      redirect: "/platform/knowledge-bases",
+      redirect: authenticatedEntryPath,
     },
     {
       path: "/login",
@@ -338,6 +361,11 @@ router.beforeEach(async (to, from, next) => {
     }
 
     next(authStore.hasValidTenant ? AUTHENTICATED_HOME_PATH : '/onboarding/workspace')
+    return
+  }
+
+  if (to.path === '/') {
+    next(authenticatedEntryPath(to))
     return
   }
 

@@ -48,6 +48,9 @@
     if (!saved || saved.indexOf('/platform/') !== 0 || saved.indexOf('/platform/organizations') === 0) return;
     var path = window.location.pathname;
     if (path !== '/' && path !== '/platform' && path !== '/platform/knowledge-bases') return;
+    // Query parameters and OIDC fragments carry explicit entry intent. Never
+    // replace either with stale navigation history.
+    if (window.location.search || window.location.hash) return;
     var target = saved.indexOf('#') >= 0 ? saved.slice(0, saved.indexOf('#')) : saved;
     if (!target) return;
     var current = window.location.pathname + window.location.search;

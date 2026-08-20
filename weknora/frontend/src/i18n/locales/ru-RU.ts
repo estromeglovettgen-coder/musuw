@@ -2208,8 +2208,21 @@ export default {
     unlimited: 'Без ограничения плана',
     videoPlanAllowed: 'Видео будет доступно, когда продукт его поддержит',
     videoFreeBlocked: 'Загрузка видео не входит в Free',
+    freeKnowledgeBaseLimit: 'Тариф Free поддерживает одну базу знаний. Перейдите на платный тариф, чтобы создать ещё одну.',
+    freeDocumentLimit: 'Тариф Free поддерживает до 10 документов в каждой базе знаний. Перейдите на платный тариф, чтобы добавить больше.',
+    freeVideoLimit: 'Загрузка видео доступна на платных тарифах.',
     renewsMonthly: 'Период кредитов {month} (UTC)',
     billingUnavailable: 'Обновление недоступно, пока Paddle не настроен.',
+    choosePlan: 'Выберите план',
+    monthly: 'Ежемесячно',
+    yearly: 'Ежегодно',
+    continueToCheckout: 'Перейти к безопасной оплате',
+    checkoutSecureNote: 'Платёж обрабатывает Paddle и показывает итоговую цену и налог. План меняется только после подписанного webhook.',
+    checkoutCompleted: 'Оплата завершена. План синхронизируется.',
+    checkoutFailed: 'Не удалось открыть оплату Paddle. Повторите попытку.',
+    billingManaged: 'Платежи и подписки безопасно управляются через Paddle.',
+    manageBilling: 'Управлять платежами',
+    portalFailed: 'Не удалось открыть платежный портал Paddle. Повторите попытку.',
     plans: { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' }
   },
   language: {
@@ -3273,6 +3286,7 @@ export default {
     wikiFieldAffectedPages: 'Затронутые страницы',
     wikiAffectedCount: 'Ссылки на {count} страницах обновлены',
     processError: 'Ошибка обработки',
+    aiServiceUnavailable: 'Сервис AI временно недоступен. Повторите попытку позже.',
     sessionExcerpt: 'Выдержка из сессии',
     noAnswerContent: '(Нет содержимого ответа)',
     noMatchFound: 'Совпадений не найдено',
@@ -4083,6 +4097,10 @@ export default {
   knowledgeList: {
     create: 'Создать базу знаний',
     subtitle: 'Управляйте и организуйте свои базы знаний, поддерживаются документные и FAQ-базы знаний',
+    favorites: {
+      add: 'Добавить в избранное',
+      remove: 'Удалить из избранного'
+    },
     sharedToOrgs: 'Shared to {count} space(s)',
     uninitializedBanner: 'Некоторые базы знаний не инициализированы. Сначала настройте модели в разделе настроек, чтобы добавлять документы.',
     uploadProgress: {
@@ -4352,6 +4370,7 @@ export default {
     next: 'Далее',
     finish: 'Завершить',
     all: 'Все',
+    more: 'Ещё',
     clear: 'Очистить',
     website: 'Официальный сайт',
     clawhubSkill: 'Claw Skill',

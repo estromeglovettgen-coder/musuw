@@ -148,7 +148,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     });
     const { assigned, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
 
-    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_complete" });
+    await expect(runtime.resumeStart("/?plan=max&period=yearly")).resolves.toEqual({ state: "start_complete" });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://app.musuw.com/api/v1/auth/me",
@@ -161,7 +161,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       }),
     );
     expect(client.getSession).not.toHaveBeenCalled();
-    expect(assigned).toHaveBeenLastCalledWith("https://app.musuw.com/");
+    expect(assigned).toHaveBeenLastCalledWith("https://app.musuw.com/?plan=max&period=yearly");
   });
 
   it("clears a stale native session before it resumes a valid Supabase session", async () => {

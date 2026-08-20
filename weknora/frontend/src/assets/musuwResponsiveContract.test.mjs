@@ -4,32 +4,17 @@ import test from "node:test";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-const visual = read("./musuw-visual.less");
 const menu = read("../components/menu.vue");
 const menuBusiness = read("./business-baselines/menu.pre-view.vue");
 const input = read("../components/Input-field.vue");
+const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
 
-test("create knowledge-base action matches the compact dark reference control", () => {
-  assert.match(
-    visual,
-    /#app\s+\.kb-card\.kb-create-card\s*\{[^}]*position:\s*fixed[^}]*height:\s*40px[^}]*background:\s*var\(--musuw-ink-strong\)/i,
-    "desktop uses the native create action as the compact reference button",
-  );
-  assert.match(
-    visual,
-    /#app\s+\.kb-card\.kb-create-card:hover[^}]*background:\s*var\(--musuw-ink\)/i,
-    "create action retains a visible interactive state",
-  );
-  assert.match(
-    visual,
-    /@media\s*\(max-width:\s*760px\)[\s\S]*?#app\s+\.kb-card\.kb-create-card\s*\{[^}]*position:\s*static[^}]*width:\s*100%/i,
-    "narrow layouts keep the existing action reachable in document flow",
-  );
-  assert.doesNotMatch(
-    visual,
-    /#app\s+\.kb-card\.kb-create-card[^}]*!important/,
-    "the cascade fix must not rely on !important",
-  );
+test("create knowledge-base action remains a responsive final grid tile", () => {
+  assert.match(knowledgeBaseList, /class="visual-kb-list__create-card"[^>]*@click="handleCreateKnowledgeBase"/);
+  assert.match(knowledgeBaseList, /\.visual-kb-list__create-card\s*\{[^}]*min-height:\s*154px[^}]*border:\s*1px dashed #d1d5db/i);
+  assert.match(knowledgeBaseList, /\.visual-kb-list__create-card:hover\s*\{[^}]*background:\s*#fff/i);
+  assert.ok(knowledgeBaseList.includes('.visual-kb-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }'));
+  assert.ok(knowledgeBaseList.includes('.visual-kb-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }'));
 });
 
 test("sidebar enters narrow view collapsed without rewriting desktop preference", () => {

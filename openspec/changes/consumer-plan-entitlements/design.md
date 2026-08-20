@@ -9,14 +9,14 @@ Musuw already has tenant storage quotas, tenant-scoped repositories, native mode
 - Make Free, Plus, Pro, and Max limits authoritative on existing server paths.
 - Make OpenRouter's managed key limit and usage the spend authority per tenant and UTC month.
 - Keep consumer-facing state visible and testable with two accounts.
-- Add the smallest secure Paddle synchronization seam for later credential configuration.
+- Add the smallest secure Paddle-hosted checkout, self-service portal, and subscription synchronization seam for configured environments.
 
 **Non-Goals:**
 
 - A general billing, local usage ledger, invoicing, analytics, or per-provider metering platform.
 - User-supplied API keys, request-price estimates, distributed reservations, queues, or historical usage events.
 - Restoring the video feature skipped in Task 2.
-- Building admin subscription management or a custom checkout UI.
+- Building admin subscription management, a custom checkout UI, or custom invoice/payment-method/cancellation screens.
 
 ## Decisions
 
@@ -44,7 +44,9 @@ General settings queries the child key through the official SDK and displays Ope
 
 ### Make Paddle an optional signed adapter
 
-A public webhook verifies Paddle's documented HMAC signature and replay window against the raw body, maps only configured price IDs, and uses signed `custom_data.tenant_id`. It writes the same tenant plan fields and stores the last event ID for idempotency. Missing credentials disable billing configuration; request parameters, checkout returns, and unsigned bodies never grant a plan. The standard Paddle-hosted checkout remains the future client when credentials are supplied.
+A public webhook uses Paddle's official Go verifier against the raw body, maps only the six configured recurring price IDs, and accepts only subscription lifecycle events. The authenticated entitlement response gives a Free tenant Paddle's public client token plus one server-mapped price and a stateless HMAC binding for each plan/period choice. Paddle.js opens the official overlay and copies the tenant ID and binding into subscription `custom_data`; the webhook verifies both before writing the existing tenant plan fields. The last Paddle event ID/time provide idempotency and ordering. Missing or partial configuration disables checkout, paid tenants are not offered a second checkout, and request parameters, checkout completion callbacks, transaction events, unknown prices, tampered bindings, or unsigned bodies never grant a plan.
+
+The existing tenant row also keeps Paddle's customer and subscription IDs from verified webhooks. An authenticated, input-free endpoint resolves those hidden IDs from the current tenant and uses Paddle's official Go SDK plus a server-only key limited to `customer_portal_session.write` to mint a fresh hosted portal session. It returns only the HTTPS overview URL, never caches it, and never exposes Paddle IDs or the SDK response. This lets Paddle own invoices, payment methods, and cancellation UI without a Musuw billing subsystem; checkout stays unavailable until this self-service credential is configured.
 
 ## Risks / Trade-offs
 
@@ -60,7 +62,7 @@ A public webhook verifies Paddle's documented HMAC signature and replay window a
 1. Keep tenant entitlement columns with Free defaults in PostgreSQL and SQLite; update existing rows to Free/5 GiB without deleting data.
 2. Deploy backend enforcement, tenant child-key provisioning, and the read-only entitlement UI with Paddle disabled by default.
 3. Configure `OPENROUTER_MANAGEMENT_API_KEY` and the existing 32-byte `SYSTEM_AES_KEY`; child keys are created lazily, so there is no bulk migration or provider-side scan.
-4. Configure Paddle values later as one deployment unit, then register its webhook endpoint.
+4. Configure Paddle environment, server API key with only `customer_portal_session.write`, public client token, webhook secret, and all six recurring price IDs as one deployment unit, then register `/api/v1/billing/paddle/webhook` for subscription lifecycle events.
 5. Validate Free and paid behavior with separate tenants and one bounded OpenRouter request after the management key is available.
 
 Rollback is code rollback plus leaving additive columns in place; no user objects or usage records are deleted.

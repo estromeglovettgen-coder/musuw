@@ -1558,6 +1558,7 @@ export default {
     next: 'Next',
     finish: 'Finish',
     all: 'All',
+    more: 'More',
     clear: 'Clear',
     website: 'Official Website',
     clawhubSkill: 'Claw Skill',
@@ -1748,6 +1749,10 @@ export default {
   knowledgeList: {
     create: 'Create Knowledge Base',
     subtitle: 'Manage and organize your knowledge bases, supporting document-based and FAQ-based knowledge bases',
+    favorites: {
+      add: 'Add to favorites',
+      remove: 'Remove from favorites'
+    },
     sharedToOrgs: 'Shared to {count} space(s)',
     uninitializedBanner: 'Some knowledge bases are not initialized. Configure model information in settings before adding documents.',
     empty: {
@@ -2728,6 +2733,7 @@ export default {
     wikiFieldAffectedPages: 'Affected pages',
     wikiAffectedCount: '{count} page link(s) updated',
     processError: 'Processing error',
+    aiServiceUnavailable: 'AI service is temporarily unavailable. Please try again later.',
     sessionExcerpt: 'Session Excerpt',
     noAnswerContent: '(No answer content)',
     noMatchFound: 'No matching content found',
@@ -3710,8 +3716,21 @@ export default {
     unlimited: 'Unlimited by plan',
     videoPlanAllowed: 'Your plan permits video when the product supports it',
     videoFreeBlocked: 'Video upload is not included in Free',
+    freeKnowledgeBaseLimit: 'The Free plan supports one knowledge base. Upgrade to create another.',
+    freeDocumentLimit: 'The Free plan supports 10 documents per knowledge base. Upgrade to add more.',
+    freeVideoLimit: 'Video upload is available on paid plans.',
     renewsMonthly: 'Credit period {month} (UTC)',
     billingUnavailable: 'Upgrades are unavailable until Paddle billing is configured.',
+    choosePlan: 'Choose a plan',
+    monthly: 'Monthly',
+    yearly: 'Yearly',
+    continueToCheckout: 'Continue to secure checkout',
+    checkoutSecureNote: 'Paddle hosts payment and shows the final price and tax. Your plan changes only after a signed webhook arrives.',
+    checkoutCompleted: 'Payment completed. Your plan is syncing.',
+    checkoutFailed: 'Paddle checkout could not be opened. Please try again.',
+    billingManaged: 'Billing and subscriptions are securely managed by Paddle.',
+    manageBilling: 'Manage billing',
+    portalFailed: 'The Paddle billing portal could not be opened. Please try again.',
     plans: { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' }
   },
   theme: {

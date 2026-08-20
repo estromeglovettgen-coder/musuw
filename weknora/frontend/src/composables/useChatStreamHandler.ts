@@ -1,6 +1,7 @@
 import { markRaw, nextTick, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ensureRagPipelineHistoryStream } from '@/utils/rag-pipeline-history'
+import { userFacingAIError } from '@/utils/userFacingAIError'
 
 export type ChatMessage = Record<string, unknown>
 
@@ -743,7 +744,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             console.warn('[Tool Result] No pending tool call found for', toolCallId || toolName)
           }
           if (responseType === 'error' && !toolName) {
-            const errorMsg = String(data.content || t('chat.processError'))
+            const errorMsg = userFacingAIError(data.content, t('chat.aiServiceUnavailable'))
             message.content = errorMsg
             message.is_completed = true
             isReplying.value = false
@@ -754,7 +755,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             console.error('[Chat Error]', errorMsg)
           }
         } else if (responseType === 'error') {
-          const errorMsg = String(data.content || t('chat.processError'))
+          const errorMsg = userFacingAIError(data.content, t('chat.aiServiceUnavailable'))
           message.content = errorMsg
           message.is_completed = true
           isReplying.value = false

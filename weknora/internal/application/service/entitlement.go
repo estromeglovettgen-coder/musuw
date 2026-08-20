@@ -43,6 +43,8 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 		StorageUsed:             tenant.StorageUsed,
 		OpenRouterUsageMonth:    types.OpenRouterUsageMonth(at),
 		OpenRouterCreditsStatus: types.OpenRouterCreditsUnprovisioned,
+		PaddleCustomerID:        tenant.PaddleCustomerID,
+		PaddleSubscriptionID:    tenant.PaddleSubscriptionID,
 	}
 
 	credentials := openRouterCredentialsFromTenant(tenant)

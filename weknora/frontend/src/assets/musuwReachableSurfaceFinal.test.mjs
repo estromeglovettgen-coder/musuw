@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
-const main = read('../main.ts')
+const main = read('./musuw-visual.less')
 const css = read('./musuw-reachable-surface-final.css')
 
 test('reachable surface closure is active after reference-specific layers', () => {
