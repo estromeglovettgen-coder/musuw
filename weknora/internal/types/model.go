@@ -62,6 +62,15 @@ type EmbeddingParameters struct {
 	SupportsDimensionOverride bool `yaml:"supports_dimension_override" json:"supports_dimension_override"`
 }
 
+// ReasoningParameters mirrors the public capability metadata returned by
+// OpenRouter for the platform's pinned chat models.
+type ReasoningParameters struct {
+	Supported        bool     `yaml:"supported"         json:"supported"`
+	Mandatory        bool     `yaml:"mandatory"         json:"mandatory"`
+	SupportedEfforts []string `yaml:"supported_efforts" json:"supported_efforts"`
+	DefaultEffort    string   `yaml:"default_effort"    json:"default_effort"`
+}
+
 type ModelParameters struct {
 	BaseURL             string              `yaml:"base_url"             json:"base_url"`
 	APIKey              string              `yaml:"api_key"              json:"api_key"`
@@ -74,8 +83,9 @@ type ModelParameters struct {
 	// 用途类似 Python OpenAI SDK 的 extra_headers 参数，
 	// 常见场景包括透传企业网关鉴权信息、追踪 ID、路由标识等。
 	// 保留字段（Authorization、api-key、Content-Type、Accept 等）会在运行期被忽略以避免破坏签名/鉴权流程。
-	CustomHeaders  map[string]string `yaml:"custom_headers,omitempty" json:"custom_headers,omitempty"`
-	SupportsVision bool              `yaml:"supports_vision"      json:"supports_vision"` // Whether the model accepts image/multimodal input
+	CustomHeaders  map[string]string   `yaml:"custom_headers,omitempty" json:"custom_headers,omitempty"`
+	SupportsVision bool                `yaml:"supports_vision"      json:"supports_vision"` // Whether the model accepts image/multimodal input
+	Reasoning      ReasoningParameters `yaml:"reasoning,omitempty" json:"reasoning"`
 	// MaxConcurrency caps concurrent in-flight BACKGROUND (ingestion /
 	// enrichment) calls to THIS specific model, keyed by model ID and shared
 	// across all replicas. 0 (the default) means "fall back to the

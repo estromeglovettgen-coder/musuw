@@ -34,7 +34,7 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
     "path === '/platform/settings'",
   ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
-  assert.match(router, /section && section !== 'general'/)
+  assert.match(router, /section && section !== 'general' && section !== 'usage'/)
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
@@ -63,6 +63,7 @@ test('Lite UserMenu cannot reopen management surfaces and keeps valid interactiv
     'account container must not nest a button inside a button',
   )
   assert.ok(userMenu.includes("handleQuickNav('general')"))
+  assert.ok(userMenu.includes("handleQuickNav('usage')"))
   assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/)
   assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/)
   assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*handleSettings[\s\S]*openDocs[\s\S]*openGithub/)
@@ -81,13 +82,14 @@ test('Lite UserMenu cannot reopen management surfaces and keeps valid interactiv
   ]) assert.ok(userMenu.includes(token), `Standard UserMenu source lost ${token}`)
 })
 
-test('Lite Settings is General-only and General is language-only; Standard settings remain recoverable', () => {
+test('Lite Settings exposes General and Usage; Standard settings remain recoverable', () => {
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(authStore\.isLiteMode\) return 'general'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage'\) return 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'/)
+  assert.ok(settings.includes('UsageBillingSettings'))
 
   assert.ok(general.includes('id="visual-language-select"'))
   assert.ok(general.includes('handleLanguageChange'))
@@ -116,7 +118,7 @@ test('exposed chat keeps native model/thinking behavior without exposing Agent o
   assert.ok(input.includes('<textarea'), 'reference native textarea topology disappeared')
   assert.equal(input.includes('<t-textarea'), false, 'composer must not restore vendor textarea wrapper')
   assert.ok(input.includes('v-for="model in availableModels"'))
-  assert.ok(input.includes('thinkingEnabled'))
+  assert.ok(input.includes('reasoningOptions'))
   for (const token of ['handleSelectAgent', 'handleAgentNotReady', 'thinkingEnabled']) {
     assert.ok(baseline.includes(token), `allowed chat controller lost native behavior ${token}`)
   }

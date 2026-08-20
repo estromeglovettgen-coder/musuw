@@ -133,7 +133,7 @@
 
     <t-drawer v-model:visible="drawerVisible" :header="t('retrievalSettings.title')" size="420px" :footer="false"
       :close-on-overlay-click="true" class="cmdk-retrieval-drawer">
-      <RetrievalSettings />
+      <RetrievalSettings v-if="drawerVisible && !authStore.isLiteMode" />
     </t-drawer>
   </t-dialog>
 </template>

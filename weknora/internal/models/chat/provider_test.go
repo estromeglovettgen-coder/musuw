@@ -138,6 +138,42 @@ func TestBuildOutbound_Thinking(t *testing.T) {
 	})
 }
 
+func TestBuildOutbound_OpenRouterReasoningEffort(t *testing.T) {
+	c := newOutboundChat(t, string(provider.ProviderOpenRouter), "deepseek/deepseek-v4-flash-0731", nil)
+	msgs := []Message{{Role: "user", Content: "hi"}}
+
+	body, _, useRaw, err := c.buildOutbound(msgs, &ChatOptions{ReasoningEffort: "max"}, true)
+	require.NoError(t, err)
+	require.True(t, useRaw)
+	request := body.(map[string]any)
+	assert.Equal(t, map[string]any{"effort": "max"}, request["reasoning"])
+
+	_, _, _, err = c.buildOutbound(msgs, &ChatOptions{ReasoningEffort: "impossible"}, true)
+	require.ErrorContains(t, err, "invalid reasoning effort")
+}
+
+func TestBuildOutbound_OpenRouterReasoningDetailsRoundTrip(t *testing.T) {
+	c := newOutboundChat(t, string(provider.ProviderOpenRouter), "anthropic/claude-sonnet-5", nil)
+	messages := []Message{{
+		Role:             "assistant",
+		Content:          "",
+		ReasoningDetails: []json.RawMessage{json.RawMessage(`{"type":"reasoning.encrypted","data":"opaque"}`)},
+		ToolCalls: []ToolCall{{
+			ID:   "call_1",
+			Type: "function",
+			Function: FunctionCall{
+				Name:      "knowledge_search",
+				Arguments: `{"query":"x"}`,
+			},
+		}},
+	}}
+
+	body, _, useRaw, err := c.buildOutbound(messages, &ChatOptions{ReasoningEffort: "high"}, true)
+	require.NoError(t, err)
+	require.True(t, useRaw)
+	assert.Contains(t, mustJSON(t, body), `"reasoning_details":[{"type":"reasoning.encrypted","data":"opaque"}]`)
+}
+
 // TestBuildOutbound_ShapeRequest covers the param-shaping providers that used
 // to live inline in BuildChatCompletionRequest.
 func TestBuildOutbound_ShapeRequest(t *testing.T) {

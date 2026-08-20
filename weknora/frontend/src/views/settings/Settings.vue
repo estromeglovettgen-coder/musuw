@@ -36,6 +36,7 @@
 
               <template v-else>
                 <GeneralSettings v-if="currentSection === 'general'" />
+                <UsageBillingSettings v-else-if="currentSection === 'usage'" />
                 <OllamaSettings v-else-if="currentSection === 'ollama'" />
                 <WeKnoraCloudSettings v-else-if="currentSection === 'weknoracloud'" />
                 <ModelSettings v-else-if="currentSection === 'models'" :initial-type="currentModelType" />
@@ -80,6 +81,7 @@ import SystemInfo from './SystemInfo.vue'
 import TenantInfo from './TenantInfo.vue'
 import UserProfile from './UserProfile.vue'
 import GeneralSettings from './GeneralSettings.vue'
+import UsageBillingSettings from './UsageBillingSettings.vue'
 import ModelSettings from './ModelSettings.vue'
 import OllamaSettings from './OllamaSettings.vue'
 import McpSettings from './McpSettings.vue'
@@ -138,10 +140,9 @@ const isIntegrationSection = (section: string) =>
   INTEGRATION_TABS.includes(integrationTabFromSection(section))
 
 const normalizeSettingsSection = (section: string) => {
-  // Consumer Lite deliberately exposes only General, whose own surface is
-  // reduced to the language selector. Internal events/deep-links cannot
-  // reopen hidden management sections.
-  if (authStore.isLiteMode) return 'general'
+  // Consumer Lite exposes the personal settings and usage surfaces only.
+  // Internal events/deep-links cannot reopen hidden management sections.
+  if (authStore.isLiteMode && section !== 'usage') return 'general'
   if (section === 'api') return integrationSectionKey('api')
   if (section === 'integrations') {
     return integrationSectionKey(integrationTabFromSection((route.query.tab as string) || 'im'))
@@ -150,7 +151,7 @@ const normalizeSettingsSection = (section: string) => {
 }
 
 const canSeeSection = (key: string): boolean => {
-  if (authStore.isLiteMode) return key === 'general'
+  if (authStore.isLiteMode) return key === 'general' || key === 'usage'
   if (isIntegrationSection(key)) {
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
     if (!min) return true
@@ -165,7 +166,10 @@ const canSeeSection = (key: string): boolean => {
 
 const navItems = computed<NavItem[]>(() => {
   if (authStore.isLiteMode) {
-    return [{ key: 'general', icon: 'setting', label: t('general.title') }]
+    return [
+      { key: 'general', icon: 'setting', label: t('general.title') },
+      { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
+    ]
   }
 
   const integrationItems: NavItem[] = INTEGRATION_PREVIEW_ITEMS.map((item) => ({
@@ -180,6 +184,7 @@ const navItems = computed<NavItem[]>(() => {
   // without inventing extra group headings that do not exist in @视觉文件.
   const all: NavItem[] = [
     { key: 'general', icon: 'setting', label: t('general.title') },
+    { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
     { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
     { key: 'tenant', icon: 'user-circle', label: t('settings.tenantInfo') },
     { key: 'members', icon: 'usergroup', label: t('tenantMember.title') },

@@ -47,6 +47,7 @@ type ModelParametersDTO struct {
 	ExtraConfig         map[string]string         `json:"extra_config,omitempty"`
 	CustomHeaders       map[string]string         `json:"custom_headers,omitempty"`
 	SupportsVision      bool                      `json:"supports_vision"`
+	Reasoning           types.ReasoningParameters `json:"reasoning"`
 	MaxConcurrency      int                       `json:"max_concurrency,omitempty"`
 	AppID               string                    `json:"app_id,omitempty"`
 }
@@ -68,6 +69,7 @@ func NewModelResponse(ctx context.Context, m *types.Model) *ModelResponse {
 		ExtraConfig:         m.Parameters.ExtraConfig,
 		CustomHeaders:       m.Parameters.CustomHeaders,
 		SupportsVision:      m.Parameters.SupportsVision,
+		Reasoning:           m.Parameters.Reasoning,
 		MaxConcurrency:      m.Parameters.MaxConcurrency,
 		AppID:               m.Parameters.AppID,
 	}

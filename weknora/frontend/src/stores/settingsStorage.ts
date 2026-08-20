@@ -1,5 +1,5 @@
 import { safeRemoveItem, safeSetItem } from "@/composables/preferenceStorage";
-import { reconcileBuiltinAgentMode } from "@/utils/agent-mode";
+import { BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 
 export const SETTINGS_STORAGE_KEY = "WeKnora_settings";
 
@@ -25,7 +25,7 @@ type ReconcilableSettings = {
   selectedAgentId?: string;
   selectedAgentSourceTenantId?: unknown;
   webSearchEnabled?: unknown;
-  conversationModels?: { thinkingEnabled?: unknown };
+  conversationModels?: { thinkingEnabled?: unknown; reasoningEffort?: unknown };
 };
 
 const withAuthorityDefaults = <T extends ReconcilableSettings>(defaults: T): T => {
@@ -34,6 +34,9 @@ const withAuthorityDefaults = <T extends ReconcilableSettings>(defaults: T): T =
   // constant to true for its managed experience; keep the large store file
   // untouched and restore the effective runtime default at the storage boundary.
   cloned.webSearchEnabled = false
+  cloned.selectedAgentId = BUILTIN_SMART_REASONING_ID
+  cloned.selectedAgentSourceTenantId = null
+  cloned.isAgentEnabled = true
   return cloned
 }
 
@@ -43,9 +46,8 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
   loaded.selectedSkills ||= (loaded.selectedTools as string[] | undefined) || [];
   loaded.selectedFileKbMap ||= {};
 
-  // First-Musuw added a persisted thinking preference. Keep that non-conflicting
-  // extension, but do not reintroduce its old managed-experience Agent/WebSearch
-  // narrowing: WeKnora v0.7.2 is authoritative for those behaviors.
+  // The consumer UI has one full-capability Agent. Keep the old boolean and the
+  // new effort value consistent while migrating existing browser preferences.
   let reconciledThinking = false;
   if (!isStoredSettingsRecord(loaded.conversationModels)) {
     loaded.conversationModels = { thinkingEnabled: true };
@@ -54,12 +56,28 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
     loaded.conversationModels.thinkingEnabled = true;
     reconciledThinking = true;
   }
+  if (typeof loaded.conversationModels.reasoningEffort !== "string") {
+    loaded.conversationModels.reasoningEffort = loaded.conversationModels.thinkingEnabled === false ? "none" : "high";
+    reconciledThinking = true;
+  }
+  const thinkingEnabled = loaded.conversationModels.reasoningEffort !== "none";
+  if (loaded.conversationModels.thinkingEnabled !== thinkingEnabled) {
+    loaded.conversationModels.thinkingEnabled = thinkingEnabled;
+    reconciledThinking = true;
+  }
+
+  const reconciledAgentMode =
+    loaded.selectedAgentId !== BUILTIN_SMART_REASONING_ID ||
+    loaded.selectedAgentSourceTenantId !== null ||
+    loaded.isAgentEnabled !== true;
+  loaded.selectedAgentId = BUILTIN_SMART_REASONING_ID;
+  loaded.selectedAgentSourceTenantId = null;
+  loaded.isAgentEnabled = true;
 
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) {
     delete loaded.enableMemory;
   }
-  const reconciledAgentMode = reconcileBuiltinAgentMode(loaded);
   if (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking) {
     safeSetItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
   }

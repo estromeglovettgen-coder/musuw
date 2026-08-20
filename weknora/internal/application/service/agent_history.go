@@ -152,6 +152,7 @@ func buildAssistantHistoryMessages(m *types.Message) []chat.Message {
 			Role:             "assistant",
 			Content:          step.Thought,
 			ReasoningContent: step.ReasoningContent,
+			ReasoningDetails: step.ReasoningDetails,
 			ToolCalls:        make([]chat.ToolCall, 0, len(nonTerminalCalls)),
 		}
 		for _, tc := range nonTerminalCalls {

@@ -28,9 +28,10 @@ func (c *RemoteAPIChat) parseCompletionResponse(resp *openai.ChatCompletionRespo
 
 	usage := tokenUsageFromOpenAI(resp.Usage, c.provider)
 	response := &types.ChatResponse{
-		Content:      content,
-		FinishReason: string(choice.FinishReason),
-		Usage:        usage,
+		Content:          content,
+		ReasoningContent: choice.Message.ReasoningContent,
+		FinishReason:     string(choice.FinishReason),
+		Usage:            usage,
 	}
 
 	if len(choice.Message.ToolCalls) > 0 {
@@ -48,6 +49,23 @@ func (c *RemoteAPIChat) parseCompletionResponse(resp *openai.ChatCompletionRespo
 	}
 
 	return response, nil
+}
+
+func applyRawReasoningDetails(body []byte, result *types.ChatResponse) {
+	if result == nil {
+		return
+	}
+	var raw struct {
+		Choices []struct {
+			Message struct {
+				ReasoningDetails []json.RawMessage `json:"reasoning_details,omitempty"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil || len(raw.Choices) == 0 {
+		return
+	}
+	result.ReasoningDetails = raw.Choices[0].Message.ReasoningDetails
 }
 
 func (c *RemoteAPIChat) applyCompletionToolCallMetadata(body []byte, result *types.ChatResponse) {
@@ -122,12 +140,13 @@ func (c *RemoteAPIChat) processStream(
 				logUsage(ctx, c.modelName, state.usage)
 				toolCalls := state.buildOrderedToolCalls()
 				streamChan <- types.StreamResponse{
-					ResponseType: types.ResponseTypeAnswer,
-					Content:      "",
-					Done:         true,
-					ToolCalls:    toolCalls,
-					Usage:        state.usage,
-					FinishReason: state.lastFinishReason,
+					ResponseType:     types.ResponseTypeAnswer,
+					Content:          "",
+					Done:             true,
+					ToolCalls:        toolCalls,
+					Usage:            state.usage,
+					FinishReason:     state.lastFinishReason,
+					ReasoningDetails: state.reasoningDetails,
 				}
 			} else {
 				streamChan <- types.StreamResponse{
@@ -174,11 +193,12 @@ func (c *RemoteAPIChat) processRawHTTPStream(
 				logUsage(ctx, c.modelName, state.usage)
 				toolCalls := state.buildOrderedToolCalls()
 				streamChan <- types.StreamResponse{
-					ResponseType: types.ResponseTypeAnswer,
-					Content:      "",
-					Done:         true,
-					ToolCalls:    toolCalls,
-					Usage:        state.usage,
+					ResponseType:     types.ResponseTypeAnswer,
+					Content:          "",
+					Done:             true,
+					ToolCalls:        toolCalls,
+					Usage:            state.usage,
+					ReasoningDetails: state.reasoningDetails,
 				}
 			} else {
 				logger.Errorf(ctx, "Stream read error: %v", err)
@@ -199,11 +219,12 @@ func (c *RemoteAPIChat) processRawHTTPStream(
 			logUsage(ctx, c.modelName, state.usage)
 			toolCalls := state.buildOrderedToolCalls()
 			streamChan <- types.StreamResponse{
-				ResponseType: types.ResponseTypeAnswer,
-				Content:      "",
-				Done:         true,
-				ToolCalls:    toolCalls,
-				Usage:        state.usage,
+				ResponseType:     types.ResponseTypeAnswer,
+				Content:          "",
+				Done:             true,
+				ToolCalls:        toolCalls,
+				Usage:            state.usage,
+				ReasoningDetails: state.reasoningDetails,
 			}
 			return
 		}
@@ -226,7 +247,8 @@ func (c *RemoteAPIChat) processRawHTTPStream(
 				Index int `json:"index"`
 				Delta struct {
 					openai.ChatCompletionStreamChoiceDelta
-					Reasoning string `json:"reasoning,omitempty"`
+					Reasoning        string            `json:"reasoning,omitempty"`
+					ReasoningDetails []json.RawMessage `json:"reasoning_details,omitempty"`
 				} `json:"delta"`
 				FinishReason openai.FinishReason `json:"finish_reason"`
 			} `json:"choices"`
@@ -245,6 +267,7 @@ func (c *RemoteAPIChat) processRawHTTPStream(
 
 		if len(streamResp.Choices) > 0 {
 			choice := streamResp.Choices[0]
+			state.reasoningDetails = append(state.reasoningDetails, choice.Delta.ReasoningDetails...)
 			// 统一获取逻辑（支持标准和 vLLM 两种路径）
 			reasoning := choice.Delta.Reasoning
 			if reasoning == "" {
@@ -304,6 +327,7 @@ type streamState struct {
 	nameNotified     map[int]bool
 	fieldExtractors  map[int]*jsonFieldExtractor // per tool-call-index extractors for streaming field extraction
 	usage            *types.TokenUsage           // captured from the final stream chunk when include_usage is enabled
+	reasoningDetails []json.RawMessage           // opaque OpenRouter blocks, retained in stream order
 	lastFinishReason string                      // last observed finish_reason for EOF handler fallback
 
 	// Diagnostic flags (fire-once) used to log earliest signals of tool_call

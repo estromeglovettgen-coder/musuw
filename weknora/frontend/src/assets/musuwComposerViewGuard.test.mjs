@@ -44,10 +44,10 @@ test('composer presents every native resource and generation control in the new 
     'triggerMention',
     'showWebSearchButton',
     'toggleWebSearch',
-    "isProMode ? 'V4 Pro' : 'V4 Flash'",
-    'thinkingEnabled',
     'selectedModelDisplayName',
-    'toggleModelSelector',
+    'selectedReasoningLabel',
+    'reasoningOptions',
+    'openModelPicker',
     'isReplying',
     'handleStop',
     'createSession(query)',
@@ -55,6 +55,8 @@ test('composer presents every native resource and generation control in the new 
     'uploadedAttachments.length',
     'allSelectedItems.length',
   ]) assert.ok(source.includes(token), `Input-field lost control surface: ${token}`)
+  assert.equal(source.includes('__thinking-switch'), false)
+  assert.equal(source.includes('<AgentSelector'), false)
 })
 
 test('agent-disabled mention control preserves native remediation and native warning behavior without becoming unhoverable', () => {

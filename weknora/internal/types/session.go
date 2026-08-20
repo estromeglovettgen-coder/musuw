@@ -46,6 +46,8 @@ type SummaryConfig struct {
 	MaxCompletionTokens int `json:"max_completion_tokens"`
 	// Thinking - whether to enable thinking mode
 	Thinking *bool `json:"thinking"`
+	// Reasoning effort selected for this request.
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 }
 
 // ContextCompressionStrategy represents the strategy for context compression
@@ -246,6 +248,7 @@ type SessionLastRequestState struct {
 	AgentEnabled     bool           `json:"agent_enabled"`
 	ModelID          string         `json:"model_id,omitempty"`
 	Thinking         *bool          `json:"thinking,omitempty"`
+	ReasoningEffort  string         `json:"reasoning_effort,omitempty"`
 	KnowledgeBaseIDs []string       `json:"knowledge_base_ids,omitempty"`
 	KnowledgeIDs     []string       `json:"knowledge_ids,omitempty"`
 	TagIDs           []string       `json:"tag_ids,omitempty"`

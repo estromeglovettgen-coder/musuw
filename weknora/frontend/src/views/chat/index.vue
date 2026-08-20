@@ -68,7 +68,7 @@ export default defineComponent({
     <Transition name="visual-chat-scroll-button"><button v-show="userHasScrolledUp" type="button" class="visual-chat-scroll-bottom" :aria-label="t('chat.scrollToBottom')" @click="onClickScrollToBottom"><t-icon name="chevron-down" /></button></Transition>
 
     <div class="visual-chat-input" :class="{ 'is-embedded': embeddedMode }">
-      <InputField ref="inputFieldRef" :is-replying="isReplying" :session-id="session_id" :assistant-message-id="currentAssistantMessageId" :embedded-mode="embeddedMode" @send-msg="(query: any, modelId: any, mentionedItems: any, imageFiles: any, attachmentFiles: any, thinking: any) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking)" @stop-generation="handleStopGeneration" />
+      <InputField ref="inputFieldRef" :is-replying="isReplying" :session-id="session_id" :assistant-message-id="currentAssistantMessageId" :embedded-mode="embeddedMode" @send-msg="(query: any, modelId: any, mentionedItems: any, imageFiles: any, attachmentFiles: any, thinking: any, reasoningEffort: any) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort)" @stop-generation="handleStopGeneration" />
     </div>
 
     <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val: boolean) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />

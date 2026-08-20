@@ -33,6 +33,7 @@ type BuiltinModelEntry struct {
 	ID          string          `yaml:"id"`
 	TenantID    uint64          `yaml:"tenant_id"`
 	Name        string          `yaml:"name"`
+	DisplayName string          `yaml:"display_name"`
 	Type        ModelType       `yaml:"type"`
 	Source      ModelSource     `yaml:"source"`
 	Description string          `yaml:"description"`
@@ -177,7 +178,7 @@ func LoadBuiltinModelsConfig(ctx context.Context, db *gorm.DB, configDir string)
 		res := db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
-				"tenant_id", "name", "type", "source", "description",
+				"tenant_id", "name", "display_name", "type", "source", "description",
 				"parameters", "is_default", "status", "is_builtin",
 				"managed_by", "deleted_at", "updated_at",
 			}),
@@ -314,6 +315,7 @@ func (e *BuiltinModelEntry) toModel() Model {
 		ID:          e.ID,
 		TenantID:    tenantID,
 		Name:        e.Name,
+		DisplayName: e.DisplayName,
 		Type:        e.Type,
 		Source:      source,
 		Description: e.Description,

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 type streamLLMResult struct {
 	Content          string
 	ReasoningContent string // accumulated reasoning content, kept separate from answer
+	ReasoningDetails []json.RawMessage
 	ToolCalls        []types.LLMToolCall
 	Usage            *types.TokenUsage
 	FinishReason     string // actual finish_reason from LLM (captured from last stream chunk)
@@ -103,6 +105,9 @@ func (e *AgentEngine) streamLLMToEventBus(
 		if chunk.FinishReason != "" {
 			result.FinishReason = chunk.FinishReason
 		}
+		if len(chunk.ReasoningDetails) > 0 {
+			result.ReasoningDetails = chunk.ReasoningDetails
+		}
 
 		if emitFunc != nil {
 			emitFunc(&chunk, result.Content)
@@ -165,14 +170,15 @@ func (e *AgentEngine) streamThinkingToEventBus(
 	iteration int,
 	sessionID string,
 ) (*types.ChatResponse, error) {
-	logger.Debugf(ctx, "[Agent][Thinking] Iteration-%d: temp=%.2f, tools=%d, thinking=%v",
-		iteration+1, e.config.Temperature, len(tools), e.config.Thinking)
+	logger.Debugf(ctx, "[Agent][Thinking] Iteration-%d: temp=%.2f, tools=%d, thinking=%v, reasoning_effort=%s",
+		iteration+1, e.config.Temperature, len(tools), e.config.Thinking, e.config.ReasoningEffort)
 
 	parallelToolCalls := true
 	opts := &chat.ChatOptions{
 		Temperature:       e.config.Temperature,
 		Tools:             tools,
 		Thinking:          e.config.Thinking,
+		ReasoningEffort:   e.config.ReasoningEffort,
 		ParallelToolCalls: &parallelToolCalls,
 	}
 
@@ -358,6 +364,7 @@ func (e *AgentEngine) streamThinkingToEventBus(
 	resp := &types.ChatResponse{
 		Content:          fullContent,
 		ReasoningContent: llmResult.ReasoningContent,
+		ReasoningDetails: llmResult.ReasoningDetails,
 		ToolCalls:        llmResult.ToolCalls,
 		FinishReason:     finishReason,
 		AnswerStreamed:   answerStreamed,

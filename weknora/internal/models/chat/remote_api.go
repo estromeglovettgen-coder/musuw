@@ -146,6 +146,17 @@ func (c *RemoteAPIChat) shapedRequest(messages []Message, opts *ChatOptions, isS
 func (c *RemoteAPIChat) buildOutbound(
 	messages []Message, opts *ChatOptions, isStream bool,
 ) (body any, endpoint string, useRawHTTP bool, err error) {
+	if opts != nil {
+		normalizedEffort, normalizeErr := NormalizeReasoningEffort(opts.ReasoningEffort)
+		if normalizeErr != nil {
+			return nil, "", false, normalizeErr
+		}
+		if normalizedEffort != opts.ReasoningEffort {
+			copied := *opts
+			copied.ReasoningEffort = normalizedEffort
+			opts = &copied
+		}
+	}
 	req := c.shapedRequest(messages, opts, isStream)
 
 	thinking := c.thinkingOverride
@@ -267,6 +278,7 @@ func (c *RemoteAPIChat) chatWithRawHTTP(ctx context.Context, endpoint string, cu
 		return nil, err
 	}
 	c.applyCompletionToolCallMetadata(body, result)
+	applyRawReasoningDetails(body, result)
 	applyRawPromptCacheUsage(body, &result.Usage)
 	logUsage(ctx, c.modelName, &result.Usage)
 	return result, nil

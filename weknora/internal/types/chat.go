@@ -105,10 +105,11 @@ type ChatResponse struct {
 	Content string `json:"content"`
 	// ReasoningContent 是支持思考链的模型（DeepSeek thinking、小米 MiMo、vLLM reasoning 等）
 	// 在本轮输出的推理内容。需要在后续多轮请求中原样回传给那些严格校验的供应商。
-	ReasoningContent string        `json:"reasoning_content,omitempty"`
-	ToolCalls        []LLMToolCall `json:"tool_calls,omitempty"`
-	FinishReason     string        `json:"finish_reason,omitempty"`
-	Usage            TokenUsage    `json:"usage"`
+	ReasoningContent string            `json:"reasoning_content,omitempty"`
+	ReasoningDetails []json.RawMessage `json:"reasoning_details,omitempty"`
+	ToolCalls        []LLMToolCall     `json:"tool_calls,omitempty"`
+	FinishReason     string            `json:"finish_reason,omitempty"`
+	Usage            TokenUsage        `json:"usage"`
 
 	// AnswerStreamed reports whether the user-facing answer text was already
 	// streamed live to the final-answer UI area during this round (i.e. the
@@ -174,6 +175,7 @@ type StreamResponse struct {
 	Data                map[string]interface{} `json:"data,omitempty"`
 	Usage               *TokenUsage            `json:"usage,omitempty"`
 	FinishReason        string                 `json:"finish_reason,omitempty"`
+	ReasoningDetails    []json.RawMessage      `json:"reasoning_details,omitempty"`
 }
 
 // References references

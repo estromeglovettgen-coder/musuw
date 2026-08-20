@@ -112,7 +112,7 @@
         </transition>
         <div class="input-container" :class="{ 'is-embedded': embeddedMode }">
             <InputField ref="inputFieldRef"
-                @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking)"
+                @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort)"
                 @stop-generation="handleStopGeneration" :isReplying="isReplying" :sessionId="session_id"
                 :assistantMessageId="currentAssistantMessageId" :embeddedMode="embeddedMode"></InputField>
         </div>
@@ -131,7 +131,7 @@ import InputField from '../../components/Input-field.vue';
 import botmsg from './components/botmsg.vue';
 import usermsg from './components/usermsg.vue';
 import { getMessageList, getSession } from "@/api/chat/index";
-import { getSuggestedQuestions } from "@/api/agent/index";
+import { getSuggestedQuestions, BUILTIN_SMART_REASONING_ID } from "@/api/agent/index";
 import { deleteTemporaryAttachment, uploadTemporaryAttachment } from '@/api/chat/temporary-attachments';
 import { useStream } from '../../api/chat/streame'
 import { useMenuStore } from '@/stores/menu';
@@ -658,12 +658,12 @@ const handleStopGeneration = () => {
     // 保留 currentAssistantMessageId，Input-field 仍需用它调用 stop API
 };
 
-const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = [], attachmentFiles = [], thinkingEnabled = useSettingsStoreInstance.conversationModels.thinkingEnabled !== false) => {
+const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = [], attachmentFiles = [], thinkingEnabled = useSettingsStoreInstance.conversationModels.thinkingEnabled !== false, reasoningEffort = useSettingsStoreInstance.conversationModels.reasoningEffort || 'high') => {
     stopStream();
     prepareForNewOutgoingMessage();
     isReplying.value = true;
     loading.value = true;
-    const selectedAgentId = props.embeddedMode ? props.agentId : (useSettingsStoreInstance.selectedAgentId || '');
+    const selectedAgentId = props.embeddedMode ? props.agentId : BUILTIN_SMART_REASONING_ID;
     const selectedAgentSourceTenantId = props.embeddedMode
         ? undefined
         : (useSettingsStoreInstance.selectedAgentSourceTenantId || undefined);
@@ -781,7 +781,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
     // Get agent mode status from settings store (prefer selectedAgentId for builtins)
     const agentEnabled = props.embeddedMode
         ? (props.agentId && props.agentId !== 'builtin-quick-answer')
-        : useSettingsStoreInstance.isAgentStreamMode;
+        : true;
 
     // Get web search status from settings store
     const webSearchEnabled = props.embeddedMode ? false : useSettingsStoreInstance.isWebSearchEnabled;
@@ -827,6 +827,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
         web_search_enabled: webSearchEnabled,
         summary_model_id: modelId,
         thinking: thinkingEnabled,
+        reasoning_effort: reasoningEffort,
         mcp_service_ids: requestMcpServiceIds,
         skill_names: requestSkillNames,
         tag_ids: tagIds,

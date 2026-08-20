@@ -31,39 +31,29 @@ test("shared-agent web search button waits for source readiness metadata", () =>
   assert.match(showWebSearchButton, /selectedSharedAgent\.value\?\.web_search_ready/);
 });
 
-test("managed chat keeps V4 modes, model selection, and Pro-only thinking", () => {
+test("consumer chat locks the full-capability Agent and sends model-specific reasoning effort", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
   assert.match(settingsStore, /thinkingEnabled:\s*true/);
+  assert.match(settingsStore, /reasoningEffort:\s*"high"/);
+  assert.match(settingsStore, /selectedAgentId:\s*BUILTIN_SMART_REASONING_ID/);
   assert.match(inputBusiness, /const thinkingEnabled = computed/);
-  assert.match(inputBusiness, /const V4_FLASH_MODEL_ID = "builtin-deepseek-v4-flash"/);
-  assert.match(inputBusiness, /const V4_PRO_MODEL_ID = "builtin-deepseek-v4-pro"/);
-  assert.match(inputField, /selectedAgent\?\.name \|\| \(isProMode \? 'V4 Pro' : 'V4 Flash'\)/);
-  assert.match(inputField, /v-if="isProMode"[\s\S]*thinkingEnabled/);
+  assert.match(inputBusiness, /get: \(\) => BUILTIN_SMART_REASONING_ID/);
+  assert.match(inputBusiness, /const reasoningEffort = computed/);
+  assert.match(inputBusiness, /const reasoningOptions = computed/);
+  assert.match(inputBusiness, /reasoning\.supported_efforts/);
+  assert.match(inputBusiness, /default_effort/);
+  assert.match(inputBusiness, /model\.is_builtin === true/);
+  assert.match(inputBusiness, /provider\?\.trim\(\)\.toLowerCase\(\) === "openrouter"/);
   assert.match(inputField, /v-for="model in availableModels"/);
-  assert.match(inputField, /toggleModelSelector/);
-  assert.match(inputField, /v-if="authStore\.isSystemAdmin"[\s\S]*__add_model__/);
-
-  const modeSwitchStart = inputBusiness.indexOf('const selectAgentMode = async');
-  const modeSwitchEnd = inputBusiness.indexOf('// 选择智能体（新版）', modeSwitchStart);
-  const modeSwitch = inputBusiness.slice(modeSwitchStart, modeSwitchEnd);
-  assert.notEqual(modeSwitchStart, -1);
-  assert.notEqual(modeSwitchEnd, -1);
-  assert.match(modeSwitch, /settingsStore\.selectAgent\(builtinAgentId\)/);
-  assert.match(modeSwitch, /if \(mode === "quick-answer"\) \{\s*thinkingEnabled\.value = false;/);
-  assert.match(modeSwitch, /const preferredModelId =[\s\S]*V4_PRO_MODEL_ID : V4_FLASH_MODEL_ID/);
-  assert.match(modeSwitch, /resolveChatModelId\(preferredModelId, availableModels\.value\)/);
-  assert.match(modeSwitch, /selectedModelId\.value = allowedModelId/);
-
-  const modelSyncStart = inputBusiness.indexOf("const ensureModelSelection = () =>");
-  const modelSyncEnd = inputBusiness.indexOf("const handleModelChange", modelSyncStart);
-  const modelSync = inputBusiness.slice(modelSyncStart, modelSyncEnd);
-  assert.notEqual(modelSyncStart, -1);
-  assert.notEqual(modelSyncEnd, -1);
-  assert.match(modelSync, /if \(!isProMode\.value && thinkingEnabled\.value\) \{\s*thinkingEnabled\.value = false;/);
-
-  assert.match(inputBusiness, /emit\(["']send-msg["'],[\s\S]*thinkingEnabled\.value/);
-  assert.match(chatView, /thinking: any\) => sendMsg\(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking\)/);
+  assert.match(inputField, /modelPickerView = 'models'/);
+  assert.match(inputField, /modelPickerView = 'reasoning'/);
+  assert.doesNotMatch(inputField, /__add_model__|__thinking-switch|<AgentSelector/);
+  assert.match(inputBusiness, /emit\(["']send-msg["'],[\s\S]*reasoningEffort\.value/);
+  assert.match(chatView, /thinking: any, reasoningEffort: any\) => sendMsg\(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort\)/);
   assert.match(chatBusiness, /thinking:\s*thinkingEnabled/);
+  assert.match(chatBusiness, /reasoning_effort:\s*reasoningEffort/);
   assert.match(streamClient, /thinking\?:\s*boolean/);
   assert.match(streamClient, /postBody\.thinking = params\.thinking/);
+  assert.match(streamClient, /reasoning_effort\?:\s*string/);
+  assert.match(streamClient, /postBody\.reasoning_effort = params\.reasoning_effort/);
 });

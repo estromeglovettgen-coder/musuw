@@ -51,6 +51,6 @@ test("compact composer uses a non-overlapping wrapped toolbar", () => {
   );
   assert.match(
     input,
-    /@media\s*\(max-width:\s*430px\)[^\n]*?\.visual-chat-composer__submit[^\n]*?margin-left:\s*auto/,
+    /@media\s*\(max-width:\s*430px\)[^\n]*?\.visual-chat-composer__actions[^\n]*?margin-left:\s*auto/,
   );
 });

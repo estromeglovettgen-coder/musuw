@@ -227,6 +227,9 @@ func (c *RemoteAPIChat) buildProviderOpenAIRequest(
 			}
 			msgMap["tool_calls"] = toolCalls
 		}
+		if i < len(messages) && messages[i].Role == "assistant" && len(messages[i].ReasoningDetails) > 0 {
+			msgMap["reasoning_details"] = messages[i].ReasoningDetails
+		}
 
 		providerMessages = append(providerMessages, msgMap)
 	}

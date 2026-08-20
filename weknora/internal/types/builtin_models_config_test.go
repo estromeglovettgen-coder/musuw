@@ -387,7 +387,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	var models []Model
 	require.NoError(t, db.Order("id").Find(&models).Error)
-	require.Len(t, models, 10)
+	require.Len(t, models, 15)
 
 	byID := make(map[string]Model, len(models))
 	defaultByType := make(map[ModelType]int)
@@ -408,18 +408,20 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, 1, defaultByType[ModelTypeVLLM])
 	assert.Equal(t, 1, defaultByType[ModelTypeASR])
 
-	assert.False(t, byID["builtin-deepseek-v4-flash"].IsDefault)
-	assert.Equal(t, "deepseek/deepseek-v4-flash", byID["builtin-deepseek-v4-flash"].Name)
+	assert.True(t, byID["builtin-deepseek-v4-flash"].IsDefault)
+	assert.Equal(t, "deepseek/deepseek-v4-flash-0731", byID["builtin-deepseek-v4-flash"].Name)
+	assert.Equal(t, "DeepSeek V4 Flash", byID["builtin-deepseek-v4-flash"].DisplayName)
 	assert.Equal(t, "openrouter", byID["builtin-deepseek-v4-flash"].Parameters.Provider)
+	assert.Equal(t, []string{"max", "high", "low"}, byID["builtin-deepseek-v4-flash"].Parameters.Reasoning.SupportedEfforts)
 	pro := byID["builtin-deepseek-v4-pro"]
 	assert.False(t, pro.IsDefault)
-	assert.Equal(t, "deepseek/deepseek-v4-pro", pro.Name)
+	assert.Equal(t, "deepseek/deepseek-v4-pro-0813", pro.Name)
 	assert.Equal(t, "openrouter", pro.Parameters.Provider)
-	assert.True(t, byID["builtin-openrouter-qwen-flash"].IsDefault)
-	assert.Equal(t, "qwen/qwen3.7-flash", byID["builtin-openrouter-qwen-flash"].Name)
-	assert.Equal(t, "moonshotai/kimi-k2.6", byID["builtin-openrouter-kimi"].Name)
-	assert.Equal(t, "mistralai/mistral-small-2603", byID["builtin-openrouter-mistral"].Name)
-	assert.Equal(t, "z-ai/glm-5.1", byID["builtin-openrouter-glm"].Name)
+	assert.Equal(t, "qwen/qwen3.8-max", byID["builtin-openrouter-qwen-max"].Name)
+	assert.True(t, byID["builtin-openrouter-qwen-max"].Parameters.Reasoning.Mandatory)
+	assert.Equal(t, "openai/gpt-5.6-sol", byID["builtin-openrouter-gpt-sol"].Name)
+	assert.Equal(t, "google/gemini-3.7-flash", byID["builtin-openrouter-gemini-flash"].Name)
+	assert.Equal(t, "anthropic/claude-opus-5", byID["builtin-openrouter-claude-opus"].Name)
 
 	embedding := byID["builtin-openrouter-embedding"]
 	assert.Equal(t, "qwen/qwen3-embedding-8b", embedding.Name)

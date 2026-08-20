@@ -8,7 +8,6 @@ const menuStore = read("../stores/menu.ts");
 const router = read("../router/index.ts");
 const sidebar = read("../components/menu.vue");
 const inputField = read("../components/Input-field.vue");
-const agentSelector = read("../components/AgentSelector.vue");
 const userMenu = read("../components/UserMenu.vue");
 const settingsView = read("../views/settings/Settings.vue");
 const platformView = read("../views/platform/index.vue");
@@ -18,11 +17,13 @@ const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
 const knowledgeBaseListController = read("../assets/business-baselines/KnowledgeBaseList.pre-view.vue");
 const workspaceOnboarding = read("../views/auth/WorkspaceOnboarding.vue");
 const commandPaletteStore = read("../stores/commandPalette.ts");
+const commandPalette = read("../components/GlobalCommandPalette.vue");
+const inputBusiness = read("../assets/business-baselines/Input-field.pre-view.vue");
 
 /**
  * Musuw product exposure policy:
  * - Lite is the consumer surface: New Chat + Knowledge Base are the only
- *   top-level product entries; Settings exposes General/Language only.
+ *   top-level product entries; Settings exposes General and Usage only.
  * - Standard keeps the complete upstream WeKnora source surface so operators
  *   can restore it by switching edition instead of reconstructing deleted code.
  * - Security-sensitive enforcement is server-side; these tests lock the
@@ -50,7 +51,7 @@ test("server Edition owns Lite activation and clears stale browser workspace sta
   assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
 });
 
-test("Lite route guard blocks hidden pages and normalizes Settings deep links", () => {
+test("Lite route guard blocks hidden pages and allows only consumer Settings sections", () => {
   for (const allowed of [
     "path === '/platform/creatChat'",
     "path.startsWith('/platform/chat/')",
@@ -61,17 +62,18 @@ test("Lite route guard blocks hidden pages and normalizes Settings deep links", 
     assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
   }
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/);
-  assert.match(router, /\(section && section !== 'general'\) \|\| tab/);
+  assert.match(router, /\(section && section !== 'general' && section !== 'usage'\) \|\| tab/);
 
   // Standard routes remain in the bundle/source for quick restoration.
   assert.match(router, /AgentList\.vue/);
   assert.match(router, /OrganizationList\.vue/);
 });
 
-test("Lite Settings exposes General only and General exposes Language only", () => {
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) return 'general'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general'/);
+test("Lite Settings exposes General and Usage while General exposes Language only", () => {
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage'\) return 'general'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage'/);
+  assert.match(settingsView, /<UsageBillingSettings v-else-if="currentSection === 'usage'"/);
 
   assert.match(generalSettings, /language\.language/);
   assert.match(generalSettings, /handleLanguageChange/);
@@ -97,19 +99,20 @@ test("Lite UserMenu keeps account exit but does not rediscover management surfac
   assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/);
   assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*openDocs[\s\S]*openGithub/);
   assert.match(userMenu, /handleQuickNav\('general'\)/);
+  assert.match(userMenu, /handleQuickNav\('usage'\)/);
+  assert.match(userMenu, /openUsageUpgrade/);
+  assert.match(userMenu, /handlePortal/);
   assert.match(userMenu, /class="visual-user-menu__item is-danger" @click="handleLogout"/);
   assert.match(userMenu, /handoffToExternalAuth\('logout'\)/);
 });
 
-test("Lite chat surfaces retain runtime selection but hide Agent/model management shortcuts", () => {
+test("Lite chat exposes one Codex-style model/reasoning picker without Agent management", () => {
   assert.match(inputField, /v-if="!authStore\.isLiteMode" type="button" @click\.stop\.prevent="handleGoToAgentSettings\('knowledge'\)"/);
-  assert.match(inputField, /<header><span>[\s\S]*<button v-if="authStore\.isSystemAdmin" type="button" @click="handleModelChange\('__add_model__'\)"/);
-  assert.match(agentSelector, /<router-link v-if="!authStore\.isLiteMode" to="\/platform\/agents"/);
-  assert.match(agentSelector, /v-if="!authStore\.isLiteMode && canShowDetailHeaderAction"/);
-  assert.match(agentSelector, /authStore\.isLiteMode \? \[\] : agentsList\.value\.filter\(a => !a\.is_builtin\)/);
-  assert.match(agentSelector, /if \(authStore\.isLiteMode\) return \[\]/);
-  assert.match(agentSelector, /if \(authStore\.isLiteMode\) return;/);
-  assert.match(agentSelector, /if \(!authStore\.isLiteMode\) chatResources\.ensureWebSearchProviders\(\)/);
+  assert.match(inputField, /class="visual-chat-composer__model-picker"/);
+  assert.match(inputField, /modelPickerView === 'overview'/);
+  assert.match(inputField, /modelPickerView === 'models'/);
+  assert.match(inputField, /modelPickerView = 'reasoning'/);
+  assert.doesNotMatch(inputField, /<AgentSelector\b|__thinking-switch|__add_model__/);
 });
 
 test("Lite Knowledge Base keeps diagnostics visible without opening hidden admin settings", () => {
@@ -130,13 +133,15 @@ test("Lite tenantless fallback does not expose workspace create or invitation ma
 test("Lite disables Command Palette as an alternate discovery path", () => {
   assert.match(commandPaletteStore, /const auth = useAuthStore\(\)/);
   assert.match(commandPaletteStore, /if \(auth\.isLiteMode\) \{[\s\S]*open\.value = false[\s\S]*return/);
+  assert.match(commandPalette, /<RetrievalSettings v-if="drawerVisible && !authStore\.isLiteMode"/);
+  assert.match(inputBusiness, /if \(authStore\.isLiteMode\) \{[\s\S]*mcpServices\.value = \[\][\s\S]*return/);
 });
 
 test("chat and Knowledge Base business surfaces remain present inside the exposed product", () => {
   // Lite narrows product entry points; it does not rewrite the allowed chat/KB
   // controllers. Runtime Agent/model reads may still back chat internally.
   assert.match(inputField, /v-for="model in availableModels"/);
-  assert.match(inputField, /thinkingEnabled/);
+  assert.match(inputField, /reasoningEffort/);
   assert.match(knowledgeBaseList, /<ListSpaceSidebar\b/);
   assert.match(knowledgeBaseList, /v-model="spaceSelection"/);
   assert.match(knowledgeBaseListController, /'favorites'/);

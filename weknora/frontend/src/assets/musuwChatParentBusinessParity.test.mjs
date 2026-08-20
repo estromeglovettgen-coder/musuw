@@ -6,10 +6,10 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('frozen chat parent controller remains the original implementation', () => {
+test('audited chat parent controller remains locked after reasoning passthrough', () => {
   assert.equal(
     blobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
-    'f2f5ceb08d7e6f2ee36ea12f8a67eea15b9c9612',
+    '3e606571962c8d0b3838610b4cc7977ddbe3021e',
   )
 })
 

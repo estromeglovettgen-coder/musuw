@@ -7,19 +7,6 @@ const BUILTIN_QUICK_ANSWER_ID = "builtin-quick-answer";
 const BUILTIN_SMART_REASONING_ID = "builtin-smart-reasoning";
 const settingsStorageSource = readFileSync(new URL("./settingsStorage.ts", import.meta.url), "utf8");
 
-function reconcileBuiltinAgentMode(settings) {
-  const agentId = settings.selectedAgentId || BUILTIN_QUICK_ANSWER_ID;
-  if (agentId === BUILTIN_QUICK_ANSWER_ID && settings.isAgentEnabled) {
-    settings.isAgentEnabled = false;
-    return true;
-  }
-  if (agentId === BUILTIN_SMART_REASONING_ID && !settings.isAgentEnabled) {
-    settings.isAgentEnabled = true;
-    return true;
-  }
-  return false;
-}
-
 function cloneSettings(settings) {
   return JSON.parse(JSON.stringify(settings));
 }
@@ -31,6 +18,9 @@ function isStoredSettingsRecord(value) {
 function withAuthorityDefaults(defaults) {
   const cloned = cloneSettings(defaults);
   cloned.webSearchEnabled = false;
+  cloned.selectedAgentId = BUILTIN_SMART_REASONING_ID;
+  cloned.selectedAgentSourceTenantId = null;
+  cloned.isAgentEnabled = true;
   return cloned;
 }
 
@@ -48,10 +38,25 @@ function reconcileLoadedSettings(loaded) {
     loaded.conversationModels.thinkingEnabled = true;
     reconciledThinking = true;
   }
+  if (typeof loaded.conversationModels.reasoningEffort !== "string") {
+    loaded.conversationModels.reasoningEffort = loaded.conversationModels.thinkingEnabled === false ? "none" : "high";
+    reconciledThinking = true;
+  }
+  const thinkingEnabled = loaded.conversationModels.reasoningEffort !== "none";
+  if (loaded.conversationModels.thinkingEnabled !== thinkingEnabled) {
+    loaded.conversationModels.thinkingEnabled = thinkingEnabled;
+    reconciledThinking = true;
+  }
 
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) delete loaded.enableMemory;
-  const reconciledAgentMode = reconcileBuiltinAgentMode(loaded);
+  const reconciledAgentMode =
+    loaded.selectedAgentId !== BUILTIN_SMART_REASONING_ID ||
+    loaded.selectedAgentSourceTenantId !== null ||
+    loaded.isAgentEnabled !== true;
+  loaded.selectedAgentId = BUILTIN_SMART_REASONING_ID;
+  loaded.selectedAgentSourceTenantId = null;
+  loaded.isAgentEnabled = true;
   if (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking) {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
   }
@@ -127,7 +132,10 @@ test("fresh settings use WeKnora v0.7.2 WebSearch default while keeping Musuw th
   assert.deepEqual(defaults.selectedTags, []);
   assert.equal(loaded.webSearchEnabled, false);
   assert.equal(loaded.conversationModels.thinkingEnabled, true);
-  assert.equal(store[SETTINGS_STORAGE_KEY], undefined);
+  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.selectedAgentId, BUILTIN_SMART_REASONING_ID);
+  assert.equal(loaded.isAgentEnabled, true);
+  assert.equal(JSON.parse(store[SETTINGS_STORAGE_KEY]).selectedAgentId, BUILTIN_SMART_REASONING_ID);
 });
 
 test("corrupt/non-object storage resets to authority defaults", () => {
@@ -154,7 +162,7 @@ test("valid stored WebSearch preference is preserved in both directions", () => 
   }
 });
 
-test("custom and shared Agent selections are preserved instead of normalized away", () => {
+test("consumer settings normalize old Agent selections to the full-capability builtin", () => {
   const store = installMockLocalStorage();
   store[SETTINGS_STORAGE_KEY] = JSON.stringify({
     selectedAgentId: "custom-agent",
@@ -164,13 +172,13 @@ test("custom and shared Agent selections are preserved instead of normalized awa
     conversationModels: { thinkingEnabled: true },
   });
   const loaded = loadAndReconcileSettings(makeDefaults());
-  assert.equal(loaded.selectedAgentId, "custom-agent");
+  assert.equal(loaded.selectedAgentId, BUILTIN_SMART_REASONING_ID);
   assert.equal(loaded.isAgentEnabled, true);
-  assert.equal(loaded.selectedAgentSourceTenantId, "other-tenant");
+  assert.equal(loaded.selectedAgentSourceTenantId, null);
   assert.equal(loaded.webSearchEnabled, false);
 });
 
-test("builtin quick/pro mode consistency still reconciles without narrowing Agent choice", () => {
+test("both legacy builtin modes normalize to the full-capability builtin", () => {
   const store = installMockLocalStorage();
   store[SETTINGS_STORAGE_KEY] = JSON.stringify({
     selectedAgentId: BUILTIN_SMART_REASONING_ID,
@@ -189,8 +197,8 @@ test("builtin quick/pro mode consistency still reconciles without narrowing Agen
     conversationModels: { thinkingEnabled: true },
   });
   const quick = loadAndReconcileSettings(makeDefaults());
-  assert.equal(quick.selectedAgentId, BUILTIN_QUICK_ANSWER_ID);
-  assert.equal(quick.isAgentEnabled, false);
+  assert.equal(quick.selectedAgentId, BUILTIN_SMART_REASONING_ID);
+  assert.equal(quick.isAgentEnabled, true);
 });
 
 test("first-Musuw thinking preference is backfilled but existing value is preserved", () => {
@@ -211,10 +219,13 @@ test("first-Musuw thinking preference is backfilled but existing value is preser
   });
   const preserved = loadAndReconcileSettings(makeDefaults());
   assert.equal(preserved.conversationModels.thinkingEnabled, false);
+  assert.equal(preserved.conversationModels.reasoningEffort, "none");
 });
 
-test("source code contains no managed Agent/WebSearch forced-reset branch", () => {
-  assert.doesNotMatch(settingsStorageSource, /selectedAgentSourceTenantId\s*=\s*(?:null|undefined)/);
+test("source code locks the consumer Agent while preserving the WebSearch preference", () => {
+  assert.match(settingsStorageSource, /loaded\.selectedAgentId\s*=\s*BUILTIN_SMART_REASONING_ID/);
+  assert.match(settingsStorageSource, /loaded\.selectedAgentSourceTenantId\s*=\s*null/);
+  assert.match(settingsStorageSource, /loaded\.isAgentEnabled\s*=\s*true/);
   assert.doesNotMatch(settingsStorageSource, /webSearchEnabled\s*=\s*true/);
   assert.match(settingsStorageSource, /cloned\.webSearchEnabled\s*=\s*false/);
   assert.match(settingsStorageSource, /thinkingEnabled/);

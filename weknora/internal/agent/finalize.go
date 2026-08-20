@@ -100,7 +100,7 @@ Now generate the final answer:`, query, imageRequirement)
 	llmResult, err := e.streamLLMToEventBus(
 		ctx,
 		messages,
-		&chat.ChatOptions{Temperature: e.config.Temperature, Thinking: e.config.Thinking},
+		&chat.ChatOptions{Temperature: e.config.Temperature, Thinking: e.config.Thinking, ReasoningEffort: e.config.ReasoningEffort},
 		func(chunk *types.StreamResponse, fullContent string) {
 			// Defensive filter: only emit answer content, skip thinking chunks
 			if chunk.ResponseType == types.ResponseTypeThinking {

@@ -28,7 +28,7 @@ function authenticatedEntryPath(to: RouteLocationGeneric) {
       (plan === 'plus' || plan === 'pro' || plan === 'max') &&
       (period === 'monthly' || period === 'yearly')
     ) {
-      return { path: '/platform/settings', query: { section: 'general', plan, period } }
+      return { path: '/platform/settings', query: { section: 'usage', plan, period } }
     }
   } catch {
     // Fall through to the normal authenticated home when storage is unavailable.
@@ -77,7 +77,7 @@ function isLiteSpaDefaultEntry(to: RouteLocationNormalized) {
 }
 
 /**
- * Musuw Lite only exposes chat, knowledge-base workflows, and the language
+ * Musuw Lite only exposes chat, knowledge-base workflows, and the consumer
  * settings shell. Keep this as an allow-list so new upstream routes fail
  * closed until they are deliberately reviewed for the consumer product.
  */
@@ -447,7 +447,7 @@ router.beforeEach(async (to, from, next) => {
     if (to.path === '/platform/settings') {
       const section = typeof to.query.section === 'string' ? to.query.section : ''
       const tab = typeof to.query.tab === 'string' ? to.query.tab : ''
-      if ((section && section !== 'general') || tab) {
+      if ((section && section !== 'general' && section !== 'usage') || tab) {
         next({ path: '/platform/settings' })
         return
       }

@@ -1,8 +1,10 @@
 package chat
 
 import (
+	"fmt"
 	"strings"
 
+	openrouter "github.com/OpenRouterTeam/go-sdk/models/components"
 	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/sashabaranov/go-openai"
 )
@@ -37,6 +39,15 @@ type ThinkingChatCompletionRequest struct {
 	Thinking *ThinkingConfig `json:"thinking,omitempty"`
 }
 
+type openRouterReasoningConfig struct {
+	Effort openrouter.ReasoningEffort `json:"effort"`
+}
+
+type openRouterChatCompletionRequest struct {
+	openai.ChatCompletionRequest
+	Reasoning *openRouterReasoningConfig `json:"reasoning,omitempty"`
+}
+
 // ThinkingStrategy encodes how ChatOptions.Thinking is mapped onto a provider's
 // HTTP request. Apply returns (customBody, useRawHTTP):
 //   - (nil, false) means "send the standard OpenAI request unchanged" (the
@@ -56,6 +67,48 @@ type noThinking struct{}
 
 func (noThinking) Apply(*openai.ChatCompletionRequest, *ChatOptions, bool) (any, bool) {
 	return nil, false
+}
+
+// NormalizeReasoningEffort accepts exactly the effort enum published by the
+// official OpenRouter SDK. Empty means "use the model default".
+func NormalizeReasoningEffort(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "", nil
+	}
+	effort := openrouter.ReasoningEffort(value)
+	if !(&effort).IsExact() {
+		return "", fmt.Errorf("invalid reasoning effort %q", value)
+	}
+	return value, nil
+}
+
+// openRouterReasoning encodes the gateway's native reasoning.effort field.
+// Legacy boolean callers are retained as a narrow compatibility bridge:
+// enabled maps to high, disabled maps to none.
+type openRouterReasoning struct{}
+
+func (openRouterReasoning) Apply(req *openai.ChatCompletionRequest, opts *ChatOptions, _ bool) (any, bool) {
+	if opts == nil {
+		return nil, false
+	}
+	effort := opts.ReasoningEffort
+	if effort == "" && opts.Thinking != nil {
+		if *opts.Thinking {
+			effort = string(openrouter.ReasoningEffortHigh)
+		} else {
+			effort = string(openrouter.ReasoningEffortNone)
+		}
+	}
+	if effort == "" {
+		return nil, false
+	}
+	return openRouterChatCompletionRequest{
+		ChatCompletionRequest: *req,
+		Reasoning: &openRouterReasoningConfig{
+			Effort: openrouter.ReasoningEffort(effort),
+		},
+	}, true
 }
 
 // enableThinking encodes thinking via Qwen's `enable_thinking` boolean.
@@ -166,6 +219,8 @@ func thinkingStrategyName(strategy ThinkingStrategy) string {
 		return "thinking_type"
 	case chatTemplateKwargs:
 		return "chat_template_kwargs"
+	case openRouterReasoning:
+		return "reasoning_effort"
 	default:
 		return "none"
 	}

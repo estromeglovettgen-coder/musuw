@@ -153,6 +153,7 @@ func (s *sessionService) KnowledgeQA(
 	// rewrite, fallback, FAQ strategy, history turns)
 	s.applyAgentOverridesToChatManage(ctx, req.CustomAgent, chatManage)
 	chatManage.SummaryConfig.Thinking = resolveRequestThinking(req.Thinking, chatManage.SummaryConfig.Thinking)
+	chatManage.SummaryConfig.ReasoningEffort = req.ReasoningEffort
 
 	// Determine pipeline based on the effective knowledge retrieval scope and
 	// web search setting. Tag-only mentions leave the raw KB/knowledge ID slices
@@ -969,6 +970,7 @@ func (s *sessionService) handleModelFallback(ctx context.Context, chatManage *ty
 		Temperature:         chatManage.SummaryConfig.Temperature,
 		MaxCompletionTokens: chatManage.SummaryConfig.MaxCompletionTokens,
 		Thinking:            chatManage.SummaryConfig.Thinking,
+		ReasoningEffort:     chatManage.SummaryConfig.ReasoningEffort,
 	}
 
 	// Start streaming response

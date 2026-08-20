@@ -17,7 +17,7 @@ const (
 	OpenRouterCreditsUnavailable   OpenRouterCreditsStatus = "unavailable"
 	OpenRouterCreditsUnprovisioned OpenRouterCreditsStatus = "unprovisioned"
 
-	CheapestChatModelID            = "builtin-openrouter-qwen-flash"
+	CheapestChatModelID            = "builtin-deepseek-v4-flash"
 	CheapestEmbeddingModelID       = PlatformKnowledgeBaseEmbeddingModelID
 	CheapestRerankModelID          = "builtin-openrouter-rerank"
 	CheapestVisionModelID          = PlatformKnowledgeBaseVLMModelID

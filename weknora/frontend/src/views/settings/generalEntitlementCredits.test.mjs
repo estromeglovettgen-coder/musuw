@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-const generalSettings = await readFile(new URL('./GeneralSettings.vue', import.meta.url), 'utf8')
+const usageSettings = await readFile(new URL('./UsageBillingSettings.vue', import.meta.url), 'utf8')
 const settingsShell = await readFile(new URL('./Settings.vue', import.meta.url), 'utf8')
 const entitlementApi = await readFile(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
 
@@ -11,16 +11,16 @@ test('entitlement API types the official OpenRouter credit availability state', 
   assert.match(entitlementApi, /openrouter_credits_status:\s*OpenRouterCreditsStatus/)
 })
 
-test('general settings shows the plan limit without inventing unavailable provider usage', () => {
-  assert.match(generalSettings, /openrouter_credits_status\s*===\s*'available'/)
-  assert.match(generalSettings, /if \(!entitlement\.value\) return '—'/)
-  assert.match(generalSettings, /if \(!creditsAvailable\.value\) return formatCredits\(entitlement\.value\.monthly_openrouter_microusd\)/)
-  assert.match(generalSettings, /<strong>\{\{ creditsDisplay \}\}<\/strong>/)
-  assert.doesNotMatch(generalSettings, /<strong>\{\{ formatCredits\(entitlement\.openrouter_used_microusd\)/)
+test('usage settings shows remaining percentages without provider or dollar fields', () => {
+  assert.match(usageSettings, /openrouter_credits_status === 'available'/)
+  assert.match(usageSettings, /clampPercent\(\(remaining \/ total\) \* 100\)/)
+  assert.match(usageSettings, /creditsRemainingPercent \}\}%/)
+  assert.match(usageSettings, /storageRemainingPercent \}\}%/)
+  assert.doesNotMatch(usageSettings, /formatCredits|monthlyCredits|OpenRouter|\$\d/)
 })
 
 test('credit period copy is shown only when provider metadata is available', () => {
-  assert.match(generalSettings, /<template v-if="creditsAvailable">[\s\S]*entitlement\.renewsMonthly/)
+  assert.match(usageSettings, /creditsRemainingPercent !== null && entitlement\.openrouter_usage_month/)
 })
 
 test('closing a checkout-intent settings route returns to the product instead of reopening checkout', () => {
@@ -31,7 +31,7 @@ test('closing a checkout-intent settings route returns to the product instead of
 test('Paddle customer portal stays server-authenticated and redirects with a fresh session URL', () => {
   assert.match(entitlementApi, /portal_available:\s*boolean/)
   assert.match(entitlementApi, /post\('\/api\/v1\/billing\/paddle\/portal-session'\)/)
-  assert.match(generalSettings, /billing\.value\?\.portal_available\s*===\s*true/)
-  assert.match(generalSettings, /window\.location\.assign\(response\.authorization_url\)/)
+  assert.match(usageSettings, /billing\.value\?\.portal_available\s*===\s*true/)
+  assert.match(usageSettings, /window\.location\.assign\(response\.authorization_url\)/)
   assert.doesNotMatch(entitlementApi, /customer_id/)
 })

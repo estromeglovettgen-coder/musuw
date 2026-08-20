@@ -151,6 +151,14 @@ func (deepseekProvider) Name() provider.ProviderName { return provider.ProviderD
 // use the raw path so prompt_cache_hit_tokens/miss_tokens remain observable.
 func (deepseekProvider) ForceRawHTTP() bool { return true }
 
+// --- OpenRouter: native reasoning.effort + opaque OpenAI-compatible transport ---
+
+type openRouterProvider struct{ baseProvider }
+
+func (openRouterProvider) Name() provider.ProviderName { return provider.ProviderOpenRouter }
+func (openRouterProvider) Thinking() ThinkingStrategy  { return openRouterReasoning{} }
+func (openRouterProvider) ForceRawHTTP() bool          { return true }
+
 // --- Generic (vLLM) / NVIDIA: thinking via chat_template_kwargs ---
 
 type genericProvider struct{ baseProvider }
@@ -268,6 +276,7 @@ func shapeOpenAIReasoning(req *openai.ChatCompletionRequest) {
 // Matches predicate) must precede the generic catch-all for the same provider.
 var providerRegistry = []providerAdapter{
 	weKnoraCloudProvider{},
+	openRouterProvider{},
 	qwenThinkingProvider{},
 	lkeapProvider{},
 	deepseekProvider{},

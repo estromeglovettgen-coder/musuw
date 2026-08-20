@@ -9,6 +9,7 @@ type QARequest struct {
 	AssistantMessageID  string             // Pre-created assistant message ID
 	SummaryModelID      string             // Optional model override; empty = use agent/KB default
 	Thinking            *bool              // Optional request override; nil = use agent/default configuration
+	ReasoningEffort     string             // OpenRouter native reasoning effort
 	CustomAgent         *CustomAgent       // Optional custom agent for config override
 	SharedAgentReadOnly bool               // True only when access came from an agent share; source-workspace writes are forbidden
 	KnowledgeBaseIDs    []string           // Knowledge base IDs to search (from request + @mentions)

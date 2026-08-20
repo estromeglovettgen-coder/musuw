@@ -4,8 +4,8 @@
 builtin_models:
   - id: builtin-deepseek-v4-pro
     tenant_id: 10000
-    name: deepseek/deepseek-v4-pro
-    display_name: V4 Pro
+    name: deepseek/deepseek-v4-pro-0813
+    display_name: DeepSeek V4 Pro
     type: KnowledgeQA
     source: remote
     description: DeepSeek V4 Pro through OpenRouter · high-quality conversation model
@@ -15,76 +15,201 @@ builtin_models:
       base_url: https://openrouter.ai/api/v1
       provider: openrouter
       supports_vision: false
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, high, low]
+        default_effort: high
 
   - id: builtin-deepseek-v4-flash
     tenant_id: 10000
-    name: deepseek/deepseek-v4-flash
-    display_name: V4 Flash
+    name: deepseek/deepseek-v4-flash-0731
+    display_name: DeepSeek V4 Flash
     type: KnowledgeQA
     source: remote
     description: DeepSeek V4 Flash through OpenRouter · lower-cost conversation model
-    is_default: false
-    status: active
-    parameters:
-      base_url: https://openrouter.ai/api/v1
-      provider: openrouter
-      supports_vision: false
-
-  - id: builtin-openrouter-qwen-flash
-    tenant_id: 10000
-    name: qwen/qwen3.7-flash
-    display_name: Qwen 3.7 Flash
-    type: KnowledgeQA
-    source: remote
-    description: Qwen 3.7 Flash through OpenRouter · fast multimodal conversation
     is_default: true
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
       provider: openrouter
-      supports_vision: true
-
-  - id: builtin-openrouter-kimi
-    tenant_id: 10000
-    name: moonshotai/kimi-k2.6
-    display_name: Kimi K2.6
-    type: KnowledgeQA
-    source: remote
-    description: Kimi K2.6 through OpenRouter · multimodal long-context conversation
-    is_default: false
-    status: active
-    parameters:
-      base_url: https://openrouter.ai/api/v1
-      provider: openrouter
-      supports_vision: true
-
-  - id: builtin-openrouter-mistral
-    tenant_id: 10000
-    name: mistralai/mistral-small-2603
-    display_name: Mistral Small 2603
-    type: KnowledgeQA
-    source: remote
-    description: Mistral Small 2603 through OpenRouter · efficient multimodal conversation
-    is_default: false
-    status: active
-    parameters:
-      base_url: https://openrouter.ai/api/v1
-      provider: openrouter
-      supports_vision: true
-
-  - id: builtin-openrouter-glm
-    tenant_id: 10000
-    name: z-ai/glm-5.1
-    display_name: GLM 5.1
-    type: KnowledgeQA
-    source: remote
-    description: GLM 5.1 through OpenRouter · general conversation model
-    is_default: false
-    status: active
-    parameters:
-      base_url: https://openrouter.ai/api/v1
-      provider: openrouter
       supports_vision: false
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, high, low]
+        default_effort: high
+
+  - id: builtin-openrouter-qwen-max
+    tenant_id: 10000
+    name: qwen/qwen3.8-max
+    display_name: Qwen 3.8 Max
+    type: KnowledgeQA
+    source: remote
+    description: Qwen 3.8 Max through OpenRouter · flagship multimodal conversation
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: true
+        supported_efforts: [xhigh, high, medium, low, minimal]
+        default_effort: xhigh
+
+  - id: builtin-openrouter-gpt-luna
+    tenant_id: 10000
+    name: openai/gpt-5.6-luna
+    display_name: GPT-5.6 Luna
+    type: KnowledgeQA
+    source: remote
+    description: GPT-5.6 Luna through OpenRouter · efficient general reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, xhigh, high, medium, low, none]
+        default_effort: medium
+
+  - id: builtin-openrouter-gpt-terra
+    tenant_id: 10000
+    name: openai/gpt-5.6-terra
+    display_name: GPT-5.6 Terra
+    type: KnowledgeQA
+    source: remote
+    description: GPT-5.6 Terra through OpenRouter · balanced general reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, xhigh, high, medium, low, none]
+        default_effort: medium
+
+  - id: builtin-openrouter-gpt-sol
+    tenant_id: 10000
+    name: openai/gpt-5.6-sol
+    display_name: GPT-5.6 Sol
+    type: KnowledgeQA
+    source: remote
+    description: GPT-5.6 Sol through OpenRouter · highest-capability general reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, xhigh, high, medium, low, none]
+        default_effort: medium
+
+  - id: builtin-openrouter-gemini-flash
+    tenant_id: 10000
+    name: google/gemini-3.7-flash
+    display_name: Gemini 3.7 Flash
+    type: KnowledgeQA
+    source: remote
+    description: Gemini 3.7 Flash through OpenRouter · fast multimodal reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: true
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-gemini-pro
+    tenant_id: 10000
+    name: google/gemini-3.1-pro-preview
+    display_name: Gemini 3.1 Pro
+    type: KnowledgeQA
+    source: remote
+    description: Gemini 3.1 Pro through OpenRouter · high-quality multimodal reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: true
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-claude-haiku
+    tenant_id: 10000
+    name: anthropic/claude-haiku-4.5
+    display_name: Claude Haiku 4.5
+    type: KnowledgeQA
+    source: remote
+    description: Claude Haiku 4.5 through OpenRouter · fast multimodal reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high]
+        default_effort: high
+
+  - id: builtin-openrouter-claude-sonnet
+    tenant_id: 10000
+    name: anthropic/claude-sonnet-5
+    display_name: Claude Sonnet 5
+    type: KnowledgeQA
+    source: remote
+    description: Claude Sonnet 5 through OpenRouter · advanced multimodal reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, xhigh, high, medium, low]
+        default_effort: high
+
+  - id: builtin-openrouter-claude-opus
+    tenant_id: 10000
+    name: anthropic/claude-opus-5
+    display_name: Claude Opus 5
+    type: KnowledgeQA
+    source: remote
+    description: Claude Opus 5 through OpenRouter · highest-capability multimodal reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [max, xhigh, high, medium, low]
+        default_effort: high
 
   - id: builtin-openrouter-embedding
     tenant_id: 10000

@@ -51,6 +51,7 @@ type CreateKnowledgeQARequest struct {
 	WebSearchEnabled      bool                         `json:"web_search_enabled"`                    // Whether web search is enabled for this request
 	SummaryModelID        string                       `json:"summary_model_id"`                      // Optional summary model ID for this request (overrides session default)
 	Thinking              *bool                        `json:"thinking,omitempty"`                    // Optional per-request thinking override; nil uses the agent default
+	ReasoningEffort       string                       `json:"reasoning_effort,omitempty"`            // OpenRouter native effort level
 	MCPServiceIDs         []string                     `json:"mcp_service_ids"`                       // Per-request MCP services selected via @mention
 	SkillNames            []string                     `json:"skill_names"`                           // Per-request Skills selected via @mention
 	TagIDs                []string                     `json:"tag_ids"`                               // @mentioned tag IDs (display/debug; scoped via MentionedItems)

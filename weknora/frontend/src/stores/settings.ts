@@ -41,6 +41,7 @@ interface ConversationModels {
   rerankModelId: string;
   selectedChatModelId: string;  // 用户当前选择的对话模型ID
   thinkingEnabled: boolean;
+  reasoningEffort: string;
 }
 
 // 单个模型项接口
@@ -75,7 +76,7 @@ const defaultSettings: Settings = {
   endpoint: getApiBaseUrl(),
   apiKey: "",
   knowledgeBaseId: "",
-  isAgentEnabled: false,
+  isAgentEnabled: true,
   agentConfig: {
     maxIterations: 5,
     temperature: 0.7,
@@ -104,8 +105,9 @@ const defaultSettings: Settings = {
     rerankModelId: "",
     selectedChatModelId: "",  // 用户当前选择的对话模型ID
     thinkingEnabled: true,
+    reasoningEffort: "high",
   },
-  selectedAgentId: BUILTIN_QUICK_ANSWER_ID,  // 默认选中快速问答模式
+  selectedAgentId: BUILTIN_SMART_REASONING_ID,
   selectedAgentSourceTenantId: null as string | null,  // 共享智能体来源空间 ID
   autoCheckUpdate: true,
 };
@@ -173,7 +175,7 @@ export const useSettingsStore = defineStore("settings", {
     isAutoCheckUpdateEnabled: (state) => state.settings.autoCheckUpdate ?? true,
 
     // 当前选中的智能体ID
-    selectedAgentId: (state) => state.settings.selectedAgentId || BUILTIN_QUICK_ANSWER_ID,
+    selectedAgentId: (state) => state.settings.selectedAgentId || BUILTIN_SMART_REASONING_ID,
     // 共享智能体来源空间 ID（可选）
     selectedAgentSourceTenantId: (state) => state.settings.selectedAgentSourceTenantId ?? null,
   },
@@ -474,7 +476,7 @@ export const useSettingsStore = defineStore("settings", {
     
     // 获取选中的智能体ID
     getSelectedAgentId(): string {
-      return this.settings.selectedAgentId || BUILTIN_QUICK_ANSWER_ID;
+      return this.settings.selectedAgentId || BUILTIN_SMART_REASONING_ID;
     },
 
     // —— 会话级输入态恢复 —— //
@@ -509,22 +511,23 @@ export const useSettingsStore = defineStore("settings", {
       if (!state) return;
       this._isApplyingSessionState = true;
       try {
-        if (typeof state.agent_enabled === "boolean") {
-          this.settings.isAgentEnabled = state.agent_enabled;
-        }
-        if (typeof state.agent_id === "string" && state.agent_id) {
-          this.settings.selectedAgentId = state.agent_id;
-          // 上次记录是自有 agent 还是共享 agent，目前服务端不区分回传 sourceTenantId。
-          // 与 selectAgent() 不同，这里**不**重置 KB/文件选择 —— 因为我们紧接着
-          // 就要用 state 里的 KB/文件覆盖，不需要先清空再写。
-        }
+        this.settings.isAgentEnabled = true;
+        this.settings.selectedAgentId = BUILTIN_SMART_REASONING_ID;
+        this.settings.selectedAgentSourceTenantId = null;
         if (state.model_id !== undefined) {
           const current = this.settings.conversationModels || defaultSettings.conversationModels;
           this.settings.conversationModels = { ...current, selectedChatModelId: state.model_id || "" };
         }
-        if (typeof state.thinking === "boolean") {
+        if (typeof state.thinking === "boolean" || (typeof state.reasoning_effort === "string" && state.reasoning_effort)) {
           const current = this.settings.conversationModels || defaultSettings.conversationModels;
-          this.settings.conversationModels = { ...current, thinkingEnabled: state.thinking };
+          const effort = typeof state.reasoning_effort === "string" && state.reasoning_effort
+            ? state.reasoning_effort
+            : state.thinking === false ? "none" : current.reasoningEffort || "high";
+          this.settings.conversationModels = {
+            ...current,
+            reasoningEffort: effort,
+            thinkingEnabled: effort !== "none",
+          };
         }
         if (Array.isArray(state.knowledge_base_ids)) {
           this.settings.selectedKnowledgeBases = [...state.knowledge_base_ids];
@@ -591,6 +594,7 @@ export interface SessionLastRequestStatePayload {
   agent_enabled?: boolean;
   model_id?: string;
   thinking?: boolean;
+  reasoning_effort?: string;
   knowledge_base_ids?: string[];
   knowledge_ids?: string[];
   tag_ids?: string[];

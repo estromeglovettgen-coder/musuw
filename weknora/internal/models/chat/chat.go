@@ -35,6 +35,7 @@ type ChatOptions struct {
 	FrequencyPenalty    float64         `json:"frequency_penalty"`             // 频率惩罚
 	PresencePenalty     float64         `json:"presence_penalty"`              // 存在惩罚
 	Thinking            *bool           `json:"thinking"`                      // 是否启用思考
+	ReasoningEffort     string          `json:"reasoning_effort,omitempty"`    // OpenRouter 原生推理档位
 	Tools               []Tool          `json:"tools,omitempty"`               // 可用工具列表
 	ToolChoice          string          `json:"tool_choice,omitempty"`         // "auto", "required", "none", or specific tool
 	ParallelToolCalls   *bool           `json:"parallel_tool_calls,omitempty"` // 是否允许并行工具调用（默认 nil 表示由模型决定）
@@ -68,6 +69,9 @@ type Message struct {
 	// 把 assistant 的 reasoning_content 原样回传，否则会以 400 拒绝请求；其他不要求的供应商
 	// 会忽略未知字段，无副作用。
 	ReasoningContent string `json:"reasoning_content,omitempty"`
+	// ReasoningDetails is OpenRouter's opaque provider reasoning state. It must
+	// be replayed byte-for-byte with assistant tool calls.
+	ReasoningDetails []json.RawMessage `json:"reasoning_details,omitempty"`
 }
 
 // ToolCall represents a tool call in a message

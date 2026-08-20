@@ -18,6 +18,12 @@ import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom'
 import { openNewUserGuide } from '@/config/contextualGuides'
 import { SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE } from '@/config/settingsAccess'
 import { handoffToExternalAuth } from '@/utils/nativeAuthHandoff'
+import {
+  createPaddlePortalSession,
+  getCurrentEntitlement,
+  type ConsumerEntitlement,
+  type PaddleBillingConfig,
+} from '@/api/entitlement'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -54,12 +60,50 @@ const userName = computed(() => userInfo.value.username)
 const userEmail = computed(() => userInfo.value.email)
 const userAvatar = computed(() => userInfo.value.avatar)
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase())
+const entitlement = ref<ConsumerEntitlement | null>(null)
+const billing = ref<PaddleBillingConfig | null>(null)
+const portalOpening = ref(false)
+const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
+const usageRemainingPercent = computed<number | null>(() => {
+  const data = entitlement.value
+  if (!data || data.openrouter_credits_status !== 'available') return null
+  const total = Number(data.monthly_openrouter_microusd)
+  const remaining = Number(data.openrouter_remaining_microusd)
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining)) return null
+  return clampPercent((remaining / total) * 100)
+})
+const checkoutAvailable = computed(() => Boolean(
+  entitlement.value?.plan === 'free' &&
+  billing.value?.configured === true &&
+  billing.value.environment &&
+  billing.value.client_token &&
+  billing.value.tenant_id &&
+  Object.values(billing.value.prices ?? {}).some((periods) =>
+    Object.values(periods ?? {}).some((option) => Boolean(option?.price_id && option.checkout_binding)),
+  ),
+))
+const portalAvailable = computed(() => billing.value?.configured === true && billing.value?.portal_available === true)
 
 const toggleMenu = () => { menuVisible.value = !menuVisible.value }
-const handleQuickNav = (section: string) => {
+const handleQuickNav = (section: string, query: Record<string, string> = {}) => {
   menuVisible.value = false
   uiStore.openSettings()
-  router.push({ path: '/platform/settings', query: { section } })
+  router.push({ path: '/platform/settings', query: { section, ...query } })
+}
+const openUsageUpgrade = () => handleQuickNav('usage', { plan: 'plus', period: 'monthly' })
+const handlePortal = async () => {
+  if (!portalAvailable.value || portalOpening.value) return
+  portalOpening.value = true
+  try {
+    const response = await createPaddlePortalSession()
+    if (!response.authorization_url) throw new Error('Missing portal URL')
+    menuVisible.value = false
+    window.location.assign(response.authorization_url)
+  } catch {
+    MessagePlugin.error(t('entitlement.portalUnavailable'))
+  } finally {
+    portalOpening.value = false
+  }
 }
 const handleSettings = () => {
   menuVisible.value = false
@@ -226,6 +270,17 @@ const loadUserInfo = async () => {
   }
 }
 
+const loadEntitlement = async () => {
+  try {
+    const response = await getCurrentEntitlement()
+    entitlement.value = response.data
+    billing.value = response.billing
+  } catch {
+    entitlement.value = null
+    billing.value = null
+  }
+}
+
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as Node
   if (menuRef.value?.contains(target)) return
@@ -238,6 +293,7 @@ const handleClickOutside = (event: MouseEvent) => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   loadUserInfo()
+  void loadEntitlement()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
@@ -298,6 +354,17 @@ onUnmounted(() => {
 
         <div class="visual-user-menu__divider" />
         <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>
+        <button type="button" class="visual-user-menu__item visual-user-menu__usage-item" @click="handleQuickNav('usage')">
+          <t-icon name="chart-line" />
+          <span>{{ $t('entitlement.usageMenu') }}</span>
+          <small v-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
+        </button>
+        <button v-if="checkoutAvailable" type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openUsageUpgrade">
+          <t-icon name="arrow-up" /><span>{{ $t('entitlement.upgradePlan') }}</span>
+        </button>
+        <button v-else-if="portalAvailable" type="button" class="visual-user-menu__item visual-user-menu__billing-item" :disabled="portalOpening" @click="handlePortal">
+          <t-icon name="setting" /><span>{{ $t('entitlement.managePlan') }}</span>
+        </button>
         <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__item" @click="handleQuickNav('tenant')"><t-icon name="user-circle" /><span>{{ $t('settings.workspaceSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode && canManageMembers" type="button" class="visual-user-menu__item" @click="handleQuickNav('members')"><t-icon name="usergroup" /><span>{{ $t('tenantMember.title') }}</span></button>
         <button v-if="!authStore.isLiteMode && canManageModels" type="button" class="visual-user-menu__item" @click="handleQuickNav('models')"><t-icon name="control-platform" /><span>{{ $t('settings.modelManagement') }}</span></button>
@@ -379,6 +446,11 @@ onUnmounted(() => {
 .visual-user-menu__divider { height: 1px; margin: 4px 2px; background: #f3f4f6; }
 .visual-user-menu__item { width: 100%; min-height: 34px; padding: 7px 9px; border: 0; border-radius: 10px; display: flex; align-items: center; gap: 8px; background: transparent; color: #4b5563; font: inherit; font-size: 11px; line-height: 18px; font-weight: 500; text-align: left; cursor: pointer; }
 .visual-user-menu__item:hover { background: #f3f4f6; color: #111827; }
+.visual-user-menu__item.visual-user-menu__usage-item { gap: 8px; }
+.visual-user-menu__usage-item > small { flex: 0 0 auto; margin-left: auto; color: #8b919b; font-size: 10px; line-height: 14px; font-weight: 500; white-space: nowrap; }
+.visual-user-menu__billing-item { color: #1f2937; }
+.visual-user-menu__billing-item:hover { color: #111827; }
+.visual-user-menu__billing-item:disabled { opacity: .55; cursor: wait; }
 .visual-user-menu__item.is-danger { color: #dc2626; }
 .visual-user-menu__item.is-danger:hover { background: #fef2f2; }
 .visual-user-menu__item :deep(.t-icon) { flex: 0 0 16px; width: 16px; height: 16px; font-size: 16px; }

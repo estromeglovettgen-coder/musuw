@@ -576,6 +576,7 @@ func (e *AgentEngine) runReActIteration(
 		Iteration:        state.CurrentRound,
 		Thought:          response.Content,
 		ReasoningContent: response.ReasoningContent,
+		ReasoningDetails: response.ReasoningDetails,
 		ToolCalls:        make([]types.ToolCall, 0),
 		Timestamp:        time.Now(),
 	}

@@ -481,11 +481,12 @@ func (e *AgentEngine) appendToolResults(
 	}
 
 	// Add assistant message with tool calls (if any)
-	if step.Thought != "" || len(step.ToolCalls) > 0 || step.ReasoningContent != "" {
+	if step.Thought != "" || len(step.ToolCalls) > 0 || step.ReasoningContent != "" || len(step.ReasoningDetails) > 0 {
 		assistantMsg := chat.Message{
 			Role:             "assistant",
 			Content:          step.Thought,
 			ReasoningContent: step.ReasoningContent,
+			ReasoningDetails: step.ReasoningDetails,
 		}
 
 		// Add tool calls to assistant message (following OpenAI format)

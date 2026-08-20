@@ -25,7 +25,8 @@ test('new chat keeps greeting, starter cards, and composer on one reading column
 test('composer preserves every existing action surface', () => {
   for (const token of [
     'triggerImageUpload', 'attachmentUploadRef?.triggerFileSelect()', 'triggerMention',
-    'toggleWebSearch', 'thinkingEnabled', 'toggleModelSelector', 'handleStop', 'createSession(query)',
+    'toggleWebSearch', 'selectedReasoningLabel', 'reasoningOptions', 'openModelPicker',
+    'handleStop', 'createSession(query)',
   ]) assert.ok(input.includes(token), `composer lost ${token}`)
   assert.match(input, /v-for="model in availableModels"/)
   assert.match(input, /@mousedown\.prevent="triggerMention"/)

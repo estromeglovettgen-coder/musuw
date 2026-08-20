@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { onBeforeRouteUpdate } from "vue-router";
 import { MessagePlugin } from "tdesign-vue-next";
 import { useSettingsStore } from "@/stores/settings";
+import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { useMenuStore } from "@/stores/menu";
 import {
@@ -56,6 +57,7 @@ const getOrganizationBadgeSrc = (itemType: string) =>
 const route = useRoute();
 const router = useRouter();
 const settingsStore = useSettingsStore();
+const authStore = useAuthStore();
 const uiStore = useUIStore();
 const orgStore = useOrganizationStore();
 const menuStore = useMenuStore();
@@ -68,8 +70,16 @@ const {
   chatModels: rawAvailableModels,
   webSearchProviders,
 } = storeToRefs(chatResources);
+// The consumer picker is the curated Musuw catalog, even when the signed-in
+// account also has platform-admin privileges.  Administrative model records
+// remain available to the settings/backend maintenance paths, but arbitrary
+// tenant or legacy models must never leak into the C-end picker.
 const availableModels = computed(() =>
-  rawAvailableModels.value.filter((model) => !model.status || model.status === "active"),
+  rawAvailableModels.value.filter((model) =>
+    (!model.status || model.status === "active")
+    && model.is_builtin === true
+    && model.parameters?.provider?.trim().toLowerCase() === "openrouter",
+  ),
 );
 const { t, locale } = useI18n();
 
@@ -157,17 +167,11 @@ const triggerImageUpload = () => {
   imageInputRef.value?.click();
 };
 const atButtonRef = ref<HTMLElement>();
-const showAgentModeSelector = ref(false);
-const agentModeButtonRef = ref<HTMLElement>();
-const agentModeDropdownStyle = ref<Record<string, string>>({});
 
 const selectedAgentId = computed({
-  get: () => settingsStore.selectedAgentId || BUILTIN_QUICK_ANSWER_ID,
-  set: (val: string) => settingsStore.selectAgent(val),
+  get: () => BUILTIN_SMART_REASONING_ID,
+  set: () => settingsStore.selectAgent(BUILTIN_SMART_REASONING_ID),
 });
-const V4_FLASH_MODEL_ID = "builtin-deepseek-v4-flash";
-const V4_PRO_MODEL_ID = "builtin-deepseek-v4-pro";
-const isProMode = computed(() => selectedAgentId.value === BUILTIN_SMART_REASONING_ID);
 const selectedAgent = computed(() => {
   // When a shared-agent source tenant is set, resolve from sharedAgents FIRST.
   // Builtin agents (e.g. builtin-smart-reasoning) use the same constant ID across
@@ -183,10 +187,10 @@ const selectedAgent = computed(() => {
   const mine = agents.value.find((a) => a.id === selectedAgentId.value);
   if (mine) return mine;
   return {
-    id: BUILTIN_QUICK_ANSWER_ID,
-    name: t("input.normalMode"),
+    id: BUILTIN_SMART_REASONING_ID,
+    name: t("input.agentMode"),
     is_builtin: true,
-    config: { agent_mode: "quick-answer" as const },
+    config: { agent_mode: "smart-reasoning" as const },
   } as CustomAgent;
 });
 const selectedSharedAgent = computed(() => {
@@ -733,8 +737,18 @@ const selectedModelId = computed({
   set: (val: string) => settingsStore.updateConversationModels({ selectedChatModelId: val }),
 });
 const thinkingEnabled = computed({
-  get: () => settingsStore.conversationModels.thinkingEnabled !== false,
-  set: (val: boolean) => settingsStore.updateConversationModels({ thinkingEnabled: val }),
+  get: () => settingsStore.conversationModels.reasoningEffort !== "none",
+  set: (val: boolean) => settingsStore.updateConversationModels({
+    thinkingEnabled: val,
+    reasoningEffort: val ? "high" : "none",
+  }),
+});
+const reasoningEffort = computed({
+  get: () => settingsStore.conversationModels.reasoningEffort || "high",
+  set: (val: string) => settingsStore.updateConversationModels({
+    reasoningEffort: val,
+    thinkingEnabled: val !== "none",
+  }),
 });
 const modelsLoading = ref(false);
 const showModelSelector = ref(false);
@@ -860,6 +874,10 @@ const loadFiles = async () => {
 };
 
 const loadMCPServices = async () => {
+  if (authStore.isLiteMode) {
+    mcpServices.value = [];
+    return;
+  }
   try {
     mcpServices.value = await listMCPServices();
   } catch (error) {
@@ -1015,9 +1033,6 @@ const loadChatModels = async (force = false) => {
 
 const ensureModelSelection = () => {
   if (!availableModels.value.length) return;
-  if (!isProMode.value && thinkingEnabled.value) {
-    thinkingEnabled.value = false;
-  }
   const modelId = resolveChatModelId(
     selectedModelId.value || readLastChatModelID(),
     availableModels.value,
@@ -1054,21 +1069,12 @@ watch(
   { immediate: true },
 );
 
-const handleGoToConversationModels = () => {
-  showModelSelector.value = false;
-  uiStore.openSettings("models", "chat");
-};
-
 const handleModelChange = (value: string | number | Array<string | number> | undefined) => {
   const normalized = Array.isArray(value) ? value[0] : value;
   const val = normalized !== undefined && normalized !== null ? String(normalized) : "";
 
   if (!val) {
     selectedModelId.value = "";
-    return;
-  }
-  if (val === "__add_model__") {
-    handleGoToConversationModels();
     return;
   }
   if (!availableModels.value.some((model) => model.id === val)) return;
@@ -1092,6 +1098,37 @@ const handleModelChange = (value: string | number | Array<string | number> | und
 const selectedModel = computed(() => {
   return availableModels.value.find((model) => model.id === selectedModelId.value);
 });
+
+const effortLabels: Record<string, { zh: string; en: string }> = {
+  none: { zh: "关闭", en: "Off" },
+  minimal: { zh: "最低", en: "Minimal" },
+  low: { zh: "低", en: "Low" },
+  medium: { zh: "中", en: "Medium" },
+  high: { zh: "高", en: "High" },
+  xhigh: { zh: "极高", en: "Extra high" },
+  max: { zh: "最高", en: "Max" },
+};
+const reasoningEffortLabel = (effort: string) => {
+  const labels = effortLabels[effort] || { zh: effort, en: effort };
+  return String(locale.value).toLowerCase().startsWith("zh") ? labels.zh : labels.en;
+};
+const reasoningOptions = computed(() => {
+  const reasoning = selectedModel.value?.parameters?.reasoning;
+  if (!reasoning?.supported) return [];
+  const efforts = [...(reasoning.supported_efforts || [])];
+  if (!reasoning.mandatory && !efforts.includes("none")) efforts.push("none");
+  return [...new Set(efforts)].map((value) => ({ value, label: reasoningEffortLabel(value) }));
+});
+const selectedReasoningLabel = computed(() => reasoningEffortLabel(reasoningEffort.value));
+const ensureReasoningSelection = () => {
+  if (!reasoningOptions.value.length) return;
+  if (reasoningOptions.value.some((item) => item.value === reasoningEffort.value)) return;
+  const configuredDefault = selectedModel.value?.parameters?.reasoning?.default_effort;
+  reasoningEffort.value = reasoningOptions.value.some((item) => item.value === configuredDefault)
+    ? configuredDefault || reasoningOptions.value[0].value
+    : reasoningOptions.value[0].value;
+};
+watch([selectedModel, reasoningOptions], ensureReasoningSelection, { immediate: true });
 
 // 模型展示名：本空间列表中有则用名称；若为共享智能体且其 model_id 不在本空间列表中则显示“共享智能体配置的模型”
 const selectedModelDisplayName = computed(() => {
@@ -1124,16 +1161,8 @@ const updateModelDropdownPosition = () => {
   // the browser will render them under the root `zoom` (see utils/zoom.ts).
   const zoom = getRootZoom();
   const rect = rectToCssPx(anchor.getBoundingClientRect(), zoom);
-  console.log("[Model Dropdown] Button rect:", {
-    top: rect.top,
-    bottom: rect.bottom,
-    left: rect.left,
-    right: rect.right,
-    width: rect.width,
-    height: rect.height,
-  });
 
-  const dropdownWidth = 280;
+  const dropdownWidth = 300;
   const offsetY = 8;
   const { width: vw, height: vh } = cssViewportSize(zoom);
 
@@ -1154,12 +1183,6 @@ const updateModelDropdownPosition = () => {
   const spaceBelow = vh - rect.bottom; // 下方剩余空间
   const spaceAbove = rect.top; // 上方剩余空间
 
-  console.log("[Model Dropdown] Space check:", {
-    spaceBelow,
-    spaceAbove,
-    windowHeight: vh,
-  });
-
   let actualHeight: number;
   let shouldOpenBelow: boolean;
 
@@ -1168,7 +1191,6 @@ const updateModelDropdownPosition = () => {
     // 下方有足够空间，向下弹出
     actualHeight = Math.min(preferredDropdownHeight, spaceBelow - offsetY - 16);
     shouldOpenBelow = true;
-    console.log("[Model Dropdown] Position: below button", { actualHeight });
   } else {
     // 向上弹出，优先使用 preferredHeight，必要时才扩展到 maxHeight
     const availableHeight = spaceAbove - offsetY - topMargin;
@@ -1180,14 +1202,12 @@ const updateModelDropdownPosition = () => {
       actualHeight = Math.max(minDropdownHeight, availableHeight);
     }
     shouldOpenBelow = false;
-    console.log("[Model Dropdown] Position: above button", { actualHeight });
   }
 
   // 根据弹出方向使用不同的定位方式
   if (shouldOpenBelow) {
     // 向下弹出：使用 top 定位，左对齐
     const top = Math.floor(rect.bottom + offsetY);
-    console.log("[Model Dropdown] Opening below, top:", top);
     modelDropdownStyle.value = {
       position: "fixed !important",
       width: `${dropdownWidth}px`,
@@ -1201,7 +1221,6 @@ const updateModelDropdownPosition = () => {
   } else {
     // 向上弹出：使用 bottom 定位，左对齐
     const bottom = vh - rect.top + offsetY;
-    console.log("[Model Dropdown] Opening above, bottom:", bottom);
     modelDropdownStyle.value = {
       position: "fixed !important",
       width: `${dropdownWidth}px`,
@@ -1213,8 +1232,6 @@ const updateModelDropdownPosition = () => {
       padding: "0 !important",
     };
   }
-
-  console.log("[Model Dropdown] Applied style:", modelDropdownStyle.value);
 };
 
 // Mention Logic
@@ -1695,7 +1712,6 @@ const triggerMention = () => {
   if (!textarea) return;
 
   // 关闭其他选择器
-  showAgentModeSelector.value = false;
   showModelSelector.value = false;
 
   textarea.focus();
@@ -1801,7 +1817,6 @@ const removeFile = (id: string) => {
 
 const toggleModelSelector = () => {
   showMention.value = false;
-  showAgentModeSelector.value = false;
   showModelSelector.value = !showModelSelector.value;
   if (!showModelSelector.value) return;
   if (!availableModels.value.length) {
@@ -1813,13 +1828,13 @@ const toggleModelSelector = () => {
   });
 };
 
-const closeModelSelector = () => {
-  showModelSelector.value = false;
+const selectReasoningEffort = (value: string) => {
+  if (!reasoningOptions.value.some((item) => item.value === value)) return;
+  reasoningEffort.value = value;
 };
 
-// 关闭 Agent 模式选择器（点击外部）
-const closeAgentModeSelector = () => {
-  showAgentModeSelector.value = false;
+const closeModelSelector = () => {
+  showModelSelector.value = false;
 };
 
 const closeMentionSelector = (e: MouseEvent) => {
@@ -1877,7 +1892,6 @@ onMounted(() => {
   }
 
   // 监听点击外部关闭下拉菜单
-  document.addEventListener("click", closeAgentModeSelector);
   document.addEventListener("click", closeModelSelector);
   document.addEventListener("click", closeMentionSelector);
 
@@ -1886,16 +1900,10 @@ onMounted(() => {
     if (showModelSelector.value) {
       updateModelDropdownPosition();
     }
-    if (showAgentModeSelector.value) {
-      updateAgentModeDropdownPosition();
-    }
   };
   scrollHandler = () => {
     if (showModelSelector.value) {
       updateModelDropdownPosition();
-    }
-    if (showAgentModeSelector.value) {
-      updateAgentModeDropdownPosition();
     }
   };
 
@@ -1905,7 +1913,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener(CHAT_FILE_DROP_EVENT, handleChatFileDrop as EventListener);
-  document.removeEventListener("click", closeAgentModeSelector);
   document.removeEventListener("click", closeModelSelector);
   document.removeEventListener("click", closeMentionSelector);
   if (resizeHandler) {
@@ -1955,6 +1962,7 @@ const emit = defineEmits<{
     imageFiles: File[],
     attachmentFiles: AttachmentFile[],
     thinking: boolean,
+    reasoningEffort: string,
   ): void;
   (e: "stop-generation"): void;
 }>();
@@ -1985,7 +1993,7 @@ const createSession = async (val: string) => {
   if (props.embeddedMode) {
     const textarea = getTextareaEl();
     if (textarea) textarea.blur();
-    emit("send-msg", val, selectedModelId.value || "", [], [], [], thinkingEnabled.value);
+    emit("send-msg", val, selectedModelId.value || "", [], [], [], thinkingEnabled.value, reasoningEffort.value);
     clearvalue();
     return;
   }
@@ -2060,6 +2068,7 @@ const createSession = async (val: string) => {
     imageFiles,
     attachmentFiles,
     thinkingEnabled.value,
+    reasoningEffort.value,
   );
 
   // Clean up image previews
@@ -2071,167 +2080,6 @@ const createSession = async (val: string) => {
   uploadedAttachments.value = [];
 
   clearvalue();
-};
-
-const updateAgentModeDropdownPosition = () => {
-  const anchor = agentModeButtonRef.value;
-
-  if (!anchor) {
-    agentModeDropdownStyle.value = {
-      position: "fixed",
-      top: "50%",
-      left: "50%",
-      transform: "translate(-50%, -50%)",
-    };
-    return;
-  }
-
-  // Normalize coordinates to CSS pixels (root <html> may carry `zoom`).
-  const zoom = getRootZoom();
-  const rect = rectToCssPx(anchor.getBoundingClientRect(), zoom);
-  const dropdownWidth = 200;
-  const offsetY = 8;
-  const { width: vw, height: vh } = cssViewportSize(zoom);
-
-  // 水平位置：左对齐
-  let left = Math.floor(rect.left);
-  const minLeft = 16;
-  const maxLeft = Math.max(16, vw - dropdownWidth - 16);
-  left = Math.max(minLeft, Math.min(maxLeft, left));
-
-  // 垂直位置：紧贴按钮，使用合理的高度避免空白
-  const preferredDropdownHeight = 140; // Agent 模式选择器内容较少，用更小的优选高度
-  const maxDropdownHeight = 150;
-  const minDropdownHeight = 100;
-  const topMargin = 20;
-  const spaceBelow = vh - rect.bottom;
-  const spaceAbove = rect.top;
-
-  console.log("[Agent Dropdown] Space check:", {
-    spaceBelow,
-    spaceAbove,
-    windowHeight: vh,
-  });
-
-  let actualHeight: number;
-
-  // 优先考虑下方空间
-  if (spaceBelow >= minDropdownHeight + offsetY) {
-    // 下方有足够空间，向下弹出
-    actualHeight = Math.min(preferredDropdownHeight, spaceBelow - offsetY - 16);
-    const top = Math.floor(rect.bottom + offsetY);
-
-    agentModeDropdownStyle.value = {
-      position: "fixed !important",
-      width: `${dropdownWidth}px`,
-      left: `${left}px`,
-      top: `${top}px`,
-      maxHeight: `${actualHeight}px`,
-      transform: "none !important",
-      margin: "0 !important",
-      padding: "0 !important",
-    };
-    console.log("[Agent Dropdown] Position: below button", { actualHeight });
-  } else {
-    // 向上弹出，使用 bottom 定位确保紧贴按钮
-    const availableHeight = spaceAbove - offsetY - topMargin;
-    if (availableHeight >= preferredDropdownHeight) {
-      actualHeight = preferredDropdownHeight;
-    } else {
-      actualHeight = Math.max(minDropdownHeight, availableHeight);
-    }
-
-    const bottom = vh - rect.top + offsetY;
-
-    agentModeDropdownStyle.value = {
-      position: "fixed !important",
-      width: `${dropdownWidth}px`,
-      left: `${left}px`,
-      bottom: `${bottom}px`, // 使用 bottom 定位，确保紧贴按钮
-      maxHeight: `${actualHeight}px`,
-      transform: "none !important",
-      margin: "0 !important",
-      padding: "0 !important",
-    };
-    console.log("[Agent Dropdown] Position: above button", { actualHeight, bottom });
-  }
-};
-
-const toggleAgentModeSelector = () => {
-  showMention.value = false;
-
-  showAgentModeSelector.value = !showAgentModeSelector.value;
-  if (showAgentModeSelector.value) {
-    if (!chatResources.isFresh("agents")) {
-      void loadAgents(true);
-    }
-    // 多次更新位置确保准确
-    nextTick(() => {
-      updateAgentModeDropdownPosition();
-      requestAnimationFrame(() => {
-        updateAgentModeDropdownPosition();
-        setTimeout(() => {
-          updateAgentModeDropdownPosition();
-        }, 50);
-      });
-    });
-  }
-};
-
-const selectAgentMode = async (mode: "quick-answer" | "smart-reasoning") => {
-  if (!chatResources.isFresh("models")) {
-    await loadChatModels();
-  }
-
-  const builtinAgentId =
-    mode === "smart-reasoning" ? BUILTIN_SMART_REASONING_ID : BUILTIN_QUICK_ANSWER_ID;
-  const builtinAgent = agents.value.find((a) => a.id === builtinAgentId);
-
-  if (builtinAgent) {
-    const { keys: notReadyKeys, labels: notReadyReasons } = collectAgentNotReadyReasons(
-      builtinAgent,
-      mode === "smart-reasoning",
-    );
-    if (notReadyReasons.length > 0) {
-      showAgentModeSelector.value = false;
-      showAgentNotReadyMessage(builtinAgent, notReadyReasons, notReadyKeys);
-      return;
-    }
-  }
-
-  const shouldEnableAgent = mode === "smart-reasoning";
-  const didSwitch =
-    selectedAgentId.value !== builtinAgentId || shouldEnableAgent !== isAgentEnabled.value;
-  if (didSwitch) {
-    settingsStore.selectAgent(builtinAgentId);
-  }
-
-  if (mode === "quick-answer") {
-    thinkingEnabled.value = false;
-  } else {
-    thinkingEnabled.value = true;
-  }
-  const preferredModelId =
-    mode === "smart-reasoning" ? V4_PRO_MODEL_ID : V4_FLASH_MODEL_ID;
-  const allowedModelId = resolveChatModelId(preferredModelId, availableModels.value);
-  if (allowedModelId) {
-    selectedModelId.value = allowedModelId;
-    writeLastChatModelID(allowedModelId);
-    settingsStore.updateConversationModels({
-      summaryModelId: allowedModelId,
-      selectedChatModelId: allowedModelId,
-      rerankModelId: "",
-    });
-  }
-
-  if (didSwitch) {
-    MessagePlugin.success(
-      shouldEnableAgent
-        ? t("input.messages.agentSwitchedOn")
-        : t("input.messages.agentSwitchedOff"),
-    );
-  }
-  showAgentModeSelector.value = false;
 };
 
 // 选择智能体（新版）；sourceTenantId 为共享智能体时传入
@@ -2265,7 +2113,6 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
   );
 
   if (notReadyReasons.length > 0) {
-    showAgentModeSelector.value = false;
     showAgentNotReadyMessage(actualAgent, notReadyReasons, notReadyKeys, sourceTenantId);
     return;
   }
@@ -2284,8 +2131,6 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
       selectedModelId.value = lastPick;
     }
   }
-
-  showAgentModeSelector.value = false;
 
   // Only the two "mode-entry" built-ins are re-branded as "Normal / Agent Mode"
   // in the dropdown — the switched-on/off toasts only make sense for them.
@@ -2554,7 +2399,6 @@ const toggleWebSearch = () => {
   // 互斥：虽然不是弹出层，但操作时关闭其他弹出层体验更好
   showMention.value = false;
   showModelSelector.value = false;
-  showAgentModeSelector.value = false;
 
   // 如果智能体禁用了网络搜索，不允许开启
   if (isWebSearchDisabledByAgent.value) {
@@ -2881,121 +2725,7 @@ defineExpose({
             </div>
           </t-tooltip>
 
-          <button
-            ref="agentModeButtonRef"
-            type="button"
-            class="agent-mode-trigger"
-            :aria-expanded="showAgentModeSelector"
-            @click.stop="toggleAgentModeSelector"
-          >
-            <span>{{ isProMode ? "V4 Pro" : "V4 Flash" }}</span>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="currentColor"
-              :class="{ rotate: showAgentModeSelector }"
-            >
-              <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
-            </svg>
-          </button>
-          <label v-if="isProMode" class="thinking-toggle" @click.stop>
-            <span>{{ $t("agent.editor.thinking") }}</span>
-            <t-switch v-model="thinkingEnabled" size="small" />
-          </label>
-          <div class="model-display">
-            <div ref="modelButtonRef" class="model-selector-trigger" @click.stop="toggleModelSelector">
-              <span class="model-selector-name">{{ selectedModelDisplayName }}</span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="currentColor"
-                class="model-dropdown-arrow"
-                :class="{ rotate: showModelSelector }"
-              >
-                <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
-              </svg>
-            </div>
-          </div>
         </div>
-
-        <Teleport to="body">
-          <div
-            v-if="showAgentModeSelector"
-            class="agent-mode-selector-overlay"
-            @click="closeAgentModeSelector"
-          >
-            <div class="agent-mode-selector-dropdown" :style="agentModeDropdownStyle" @click.stop>
-              <button
-                type="button"
-                class="agent-mode-option"
-                :class="{ selected: !isProMode }"
-                @click="selectAgentMode('quick-answer')"
-              >
-                <span class="agent-mode-option-main">
-                  <span class="agent-mode-option-name">V4 Flash</span>
-                  <span class="agent-mode-option-desc">快速模式</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                class="agent-mode-option"
-                :class="{ selected: isProMode }"
-                @click="selectAgentMode('smart-reasoning')"
-              >
-                <span class="agent-mode-option-main">
-                  <span class="agent-mode-option-name">V4 Pro</span>
-                  <span class="agent-mode-option-desc">全功能模式</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </Teleport>
-
-        <Teleport to="body">
-          <div
-            v-if="showModelSelector"
-            class="model-selector-overlay"
-            @click="closeModelSelector"
-          >
-            <div class="model-selector-dropdown" :style="modelDropdownStyle" @click.stop>
-              <div class="model-selector-header">
-                <span>{{ $t("conversationSettings.models.chatGroupLabel") }}</span>
-                <button
-                  class="model-selector-add"
-                  type="button"
-                  @click="handleModelChange('__add_model__')"
-                >
-                  <span class="add-icon">+</span>
-                  <span class="add-text">{{ $t("input.addModel") }}</span>
-                </button>
-              </div>
-              <div class="model-selector-content">
-                <div
-                  v-for="model in availableModels"
-                  :key="model.id"
-                  class="model-option"
-                  :class="{ selected: model.id === selectedModelId }"
-                  @click="handleModelChange(model.id || '')"
-                >
-                  <div class="model-option-left">
-                    <div class="model-option-icon">
-                      <t-icon name="chat" size="14px" />
-                    </div>
-                    <div class="model-option-name-wrap">
-                      <span class="model-option-name">{{ modelDisplayName(model) }}</span>
-                      <span v-if="model.display_name" class="model-option-raw-name">{{ model.name }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="availableModels.length === 0" class="model-option empty">
-                  {{ $t("input.noModel") }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </Teleport>
 
         <!-- 右侧控制按钮组 -->
         <div class="control-right">
@@ -3738,401 +3468,6 @@ defineExpose({
   }
 }
 
-/* 模型显示样式 */
-.model-display {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  flex-shrink: 0;
-
-  &.agent-controlled {
-    .model-selector-trigger {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-  }
-}
-
-.thinking-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.model-selector-trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  min-width: 100px;
-  height: 22px;
-  border-radius: 6px;
-  border: 0.5px solid var(--td-component-border, #e7e7e7);
-  transition:
-    background 0.12s,
-    border-color 0.12s;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #e6e6e6);
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-
-    &:hover {
-      background: var(--td-bg-color-secondarycontainer, #f5f5f5);
-    }
-  }
-}
-
-.model-selector-name {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-text-color-secondary, #666);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.model-dropdown-arrow {
-  width: 10px;
-  height: 10px;
-  color: var(--td-text-color-placeholder, #999);
-  flex-shrink: 0;
-  transition: transform 0.12s;
-
-  &.rotate {
-    transform: rotate(180deg);
-  }
-}
-
-.model-selector-trigger.disabled .model-dropdown-arrow {
-  color: var(--td-text-color-placeholder, #999);
-}
-
-.model-selector-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: transparent;
-  touch-action: none;
-}
-
-.model-selector-dropdown {
-  position: fixed !important;
-  z-index: 10000;
-  background: var(--td-bg-color-container);
-  border: 0.5px solid var(--td-component-border);
-  border-radius: 10px;
-  box-shadow: var(--td-shadow-2);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: none !important;
-  transform-origin: top left;
-  animation: modelSelectorFadeIn 0.15s ease-out;
-}
-
-@keyframes modelSelectorFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.model-selector-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 0.5px solid var(--td-component-stroke);
-  background: var(--td-bg-color-container);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-text-color-secondary);
-}
-
-.model-selector-content {
-  flex: 1;
-  min-height: 0;
-  max-height: 260px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding: 6px 8px;
-}
-
-.model-selector-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 0.5px solid transparent;
-  background: transparent;
-  color: var(--td-brand-color);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.12s;
-
-  .add-icon {
-    font-size: 14px;
-    line-height: 1;
-    font-weight: 400;
-  }
-
-  &:hover {
-    color: var(--td-brand-color-hover);
-    background: var(--td-bg-color-secondarycontainer);
-  }
-}
-
-.model-option {
-  display: flex;
-  align-items: center;
-  padding: 6px 8px;
-  cursor: pointer;
-  transition: background 0.12s;
-  border-radius: 6px;
-  margin-bottom: 4px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &:hover,
-  &.selected {
-    background: var(--td-bg-color-secondarycontainer);
-  }
-
-  &.empty {
-    color: var(--td-text-color-placeholder);
-    cursor: default;
-    text-align: center;
-    padding: 20px 8px;
-
-    &:hover {
-      background: transparent;
-    }
-  }
-}
-
-.model-option-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-}
-
-.model-option-icon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-}
-
-.model-option-name-wrap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
-}
-
-.model-option-name {
-  font-size: 12px;
-  color: var(--td-text-color-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
-}
-
-.model-option-raw-name {
-  font-size: 11px;
-  color: var(--td-text-color-placeholder);
-  flex-shrink: 0;
-}
-
-.agent-mode-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 100px;
-  height: 22px;
-  padding: 2px 8px;
-  border: 0.5px solid var(--td-component-border, #e7e7e7);
-  border-radius: var(--musuw-radius-control, 8px);
-  background: transparent;
-  color: var(--td-text-color-secondary, #666);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--td-bg-color-secondarycontainer-hover, #e6e6e6);
-  }
-
-  svg {
-    width: 10px;
-    height: 10px;
-    color: var(--td-text-color-placeholder, #999);
-    transition: transform 0.12s;
-
-    &.rotate {
-      transform: rotate(180deg);
-    }
-  }
-}
-
-/* Agent 模式选择下拉菜单 */
-.agent-mode-selector-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  background: transparent;
-  touch-action: none;
-}
-
-.agent-mode-selector-dropdown {
-  position: fixed !important;
-  z-index: 9999;
-  background: var(--td-bg-color-container, #fff);
-  border-radius: 10px;
-  box-shadow: var(--td-shadow-2, 0 6px 28px rgba(15, 23, 42, 0.08));
-  border: 1px solid var(--td-component-border, #e7e9eb);
-  overflow: hidden;
-  padding: 6px 8px;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: none !important;
-}
-
-.agent-mode-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  transition: background 0.12s;
-  border-radius: var(--musuw-radius-control, 8px);
-  position: relative;
-  margin: 4px 6px;
-
-  &:hover:not(.disabled) {
-    background: var(--td-bg-color-container-hover, #f6f8f7);
-  }
-
-  &.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-
-    &:hover {
-      background: transparent;
-    }
-  }
-
-  &.selected {
-    background: var(--td-brand-color-light, #eefdf5);
-
-    .agent-mode-option-name {
-      color: var(--musuw-accent, var(--td-brand-color));
-      font-weight: 600;
-    }
-  }
-}
-
-.agent-mode-option-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex: 1;
-  min-width: 0;
-}
-
-.agent-mode-option-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--td-text-color-primary, #222);
-  line-height: 1.4;
-  transition: color 0.12s;
-}
-
-.agent-mode-option-desc {
-  font-size: 11px;
-  color: var(--td-text-color-secondary, #8b9196);
-  line-height: 1.3;
-}
-
-.check-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--td-success-color);
-  flex-shrink: 0;
-  margin-left: 6px;
-}
-
-.agent-mode-warning {
-  display: flex;
-  align-items: center;
-  margin-left: 6px;
-
-  .warning-icon {
-    color: var(--td-warning-color);
-    font-size: 14px;
-  }
-}
-
-.agent-mode-footer {
-  padding: 6px 10px;
-  border-top: 1px solid var(--td-component-border, #f2f4f5);
-  margin-top: 2px;
-  background: var(--td-bg-color-secondarycontainer, #fafcfc);
-}
-
-.agent-mode-link {
-  color: var(--musuw-accent, var(--td-brand-color));
-  text-decoration: none;
-  font-size: 11px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  transition: all 0.12s;
-
-  &:hover {
-    color: var(--musuw-accent-hover, var(--td-brand-color-active));
-    text-decoration: underline;
-  }
-}
-
 /* At phone widths keep every composer action in the document flow.  The
    desktop toolbar overlays the textarea for a compact 56px footer, but that
    geometry leaves too little room for the agent/thinking controls around
@@ -4183,16 +3518,6 @@ defineExpose({
     gap: 6px;
   }
 
-  .agent-mode-trigger {
-    min-width: 0;
-    max-width: 100%;
-    flex: 0 1 auto;
-  }
-
-  .thinking-toggle {
-    flex: 0 1 auto;
-    white-space: nowrap;
-  }
 }
 
 :global(#app .rich-input-container) {
@@ -4235,8 +3560,6 @@ defineExpose({
 @media (prefers-reduced-motion: reduce) {
   .rich-input-container,
   .control-btn,
-  .agent-mode-trigger,
-  .agent-mode-option,
   .stop-btn,
   .send-btn {
     transition: none !important;

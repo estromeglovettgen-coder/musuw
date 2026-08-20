@@ -156,8 +156,8 @@ func TestResolveChatModelIDUsesAllowedRuntimeModelForPlatformModes(t *testing.T)
 					ID:   types.PlatformKnowledgeBaseChatModelID,
 					Type: types.ModelTypeKnowledgeQA,
 				},
-				"builtin-deepseek-v4-flash": {
-					ID:   "builtin-deepseek-v4-flash",
+				"builtin-deepseek-v4-pro": {
+					ID:   "builtin-deepseek-v4-pro",
 					Type: types.ModelTypeKnowledgeQA,
 				},
 			},
@@ -182,8 +182,8 @@ func TestResolveChatModelIDUsesAllowedRuntimeModelForPlatformModes(t *testing.T)
 			name:          "pro accepts a policy-approved runtime selection",
 			agentID:       types.BuiltinSmartReasoningID,
 			configuredID:  types.PlatformKnowledgeBaseChatModelID,
-			requestModel:  "builtin-deepseek-v4-flash",
-			expectedModel: "builtin-deepseek-v4-flash",
+			requestModel:  "builtin-deepseek-v4-pro",
+			expectedModel: "builtin-deepseek-v4-pro",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

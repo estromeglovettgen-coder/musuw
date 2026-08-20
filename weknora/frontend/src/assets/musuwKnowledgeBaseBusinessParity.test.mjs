@@ -49,7 +49,6 @@ test('rebuilt documents View retains native filtering and document-operation sur
     'openTagManageDrawer',
     'selectedFileType',
     'selectedParseStatus',
-    'selectedSource',
     "viewMode === 'grid'",
     "viewMode === 'list'",
     'KbUploadSourceDropdown',
@@ -65,6 +64,7 @@ test('rebuilt documents View retains native filtering and document-operation sur
     'DocContent',
   ]) assert.ok(source.includes(token), `KnowledgeBase active View lost ${token}`)
   assert.equal(source.includes('updatedTimeRange'), false, 'date filter must stay hidden from the active consumer View')
+  assert.equal(source.includes('selectedSource'), false, 'source filter must stay hidden from the active consumer View')
 })
 
 test('rebuilt documents View retains folder, collapsed rail, marquee, loading, empty and batch state machine surfaces', () => {

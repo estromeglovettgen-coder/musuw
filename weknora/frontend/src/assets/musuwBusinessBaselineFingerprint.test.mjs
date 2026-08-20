@@ -22,8 +22,8 @@ const PRE_UI_BUSINESS_BASELINE_COMMIT = '367a0c76e48fcf8a3762c33b672cfa2e16b679f
 const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b909'
 
 const LOCKED_BUSINESS_BLOBS = {
-  './business-baselines/ChatIndex.pre-view.vue': 'f2f5ceb08d7e6f2ee36ea12f8a67eea15b9c9612',
-  './business-baselines/Input-field.pre-view.vue': 'b3894bf8991b1324c5e5e8398fbcd84cae59365c',
+  './business-baselines/ChatIndex.pre-view.vue': '3e606571962c8d0b3838610b4cc7977ddbe3021e',
+  './business-baselines/Input-field.pre-view.vue': 'a54b22494ebaecf39119dcb0717f5d3d0cb448ea',
   './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
@@ -35,7 +35,6 @@ const LOCKED_BUSINESS_BLOBS = {
 // narrowed WeKnora's All/Favorites/Recents/Organization scopes to `mine`; the
 // current controller restores the upstream v0.7.2 behavior instead.
 const INITIAL_MUSUW_BYTE_IDENTICAL = {
-  './business-baselines/ChatIndex.pre-view.vue': 'f2f5ceb08d7e6f2ee36ea12f8a67eea15b9c9612',
   './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
 }
@@ -44,7 +43,11 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   inputField: {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native multi-model selection constrained by the server-provided plan catalog',
+    authority: 'WeKnora v0.7.2 native multi-model request flow constrained by the server catalog, with one consumer Agent and model-specific reasoning effort',
+  },
+  chatParent: {
+    resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
+    authority: 'WeKnora v0.7.2 Agent chat flow forwarding the consumer-selected model and reasoning effort',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
@@ -82,10 +85,15 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     gitBlobSha(read('./business-baselines/Input-field.pre-view.vue')),
   )
   assert.equal(
+    INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.resultingBlob,
+    gitBlobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
+  )
+  assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),
   )
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.authority, /WeKnora v0\.7\.2/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.authority, /WeKnora v0\.7\.2/)
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.authority, /WeKnora v0\.7\.2/)
 })
 

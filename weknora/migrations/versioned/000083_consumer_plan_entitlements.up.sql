@@ -15,11 +15,11 @@ SET plan = 'free',
 WHERE deleted_at IS NULL;
 
 UPDATE knowledge_bases
-SET summary_model_id = 'builtin-openrouter-qwen-flash',
+SET summary_model_id = 'builtin-deepseek-v4-flash',
     wiki_config = jsonb_set(
         COALESCE(wiki_config, '{}'::jsonb),
         '{synthesis_model_id}',
-        '"builtin-openrouter-qwen-flash"'::jsonb,
+        '"builtin-deepseek-v4-flash"'::jsonb,
         true
     ),
     updated_at = CURRENT_TIMESTAMP
