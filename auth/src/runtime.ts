@@ -335,22 +335,21 @@ function isTrustedCallbackOrigin(callback: URL, publicOrigin: string): boolean {
       configured.protocol === "http:" &&
       (configured.hostname === "localhost" || configured.hostname === "127.0.0.1") &&
       configured.port === "4190";
-    if (configuredLocal) {
-      return (
-        callback.protocol === "http:" &&
-        (callback.hostname === "localhost" || callback.hostname === "127.0.0.1") &&
-        callback.port === "4190"
-      );
-    }
+    const callbackLocal =
+      callback.protocol === "http:" &&
+      (callback.hostname === "localhost" || callback.hostname === "127.0.0.1") &&
+      callback.port === "4190";
+    if (configuredLocal) return callbackLocal;
 
     return (
       configured.protocol === "https:" &&
       (configured.hostname === "app.musuw.com" ||
         configured.hostname === "staging-app.musuw.com") &&
       (configured.port === "" || configured.port === "443") &&
-      callback.protocol === "https:" &&
-      callback.hostname === configured.hostname &&
-      (callback.port === "" || callback.port === "443")
+      (callbackLocal ||
+        (callback.protocol === "https:" &&
+          callback.hostname === configured.hostname &&
+          (callback.port === "" || callback.port === "443")))
     );
   } catch {
     return false;
