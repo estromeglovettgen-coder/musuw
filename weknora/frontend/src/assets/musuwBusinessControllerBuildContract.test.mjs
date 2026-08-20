@@ -29,7 +29,7 @@ const controllers = [
       'onViewWikiInGraph', 'showFolderTree', 'folderTreeCollapsed', 'folderTree',
       'selectedFolderPath', 'handleFolderSelect', 'docSearchKeyword', 'loadKnowledgeFiles',
       'tagFilterPanelVisible', 'sidebarTags', 'fileTypeOptions', 'selectedParseStatus',
-      'selectedSource', 'updatedTimeRange', 'disableFutureDate', 'viewMode', 'acceptFileTypes',
+      'selectedSource', 'viewMode', 'acceptFileTypes',
       'supportedFileTypes', 'handleUploadSourceFiles', 'handleUploadSourceUrl', 'handleManualCreate',
     ],
   },

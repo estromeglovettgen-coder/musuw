@@ -39,7 +39,7 @@ test('rebuilt KnowledgeBase keeps every native top-level mode and remediation su
   ]) assert.ok(source.includes(token), `KnowledgeBase active View lost mode/remediation contract: ${token}`)
 })
 
-test('rebuilt documents View retains every native filtering and document-operation surface', () => {
+test('rebuilt documents View retains native filtering and document-operation surfaces except the user-hidden date UI', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   for (const token of [
     'docSearchKeyword',
@@ -50,7 +50,6 @@ test('rebuilt documents View retains every native filtering and document-operati
     'selectedFileType',
     'selectedParseStatus',
     'selectedSource',
-    'updatedTimeRange',
     "viewMode === 'grid'",
     "viewMode === 'list'",
     'KbUploadSourceDropdown',
@@ -65,6 +64,7 @@ test('rebuilt documents View retains every native filtering and document-operati
     'KbTagManageDrawer',
     'DocContent',
   ]) assert.ok(source.includes(token), `KnowledgeBase active View lost ${token}`)
+  assert.equal(source.includes('updatedTimeRange'), false, 'date filter must stay hidden from the active consumer View')
 })
 
 test('rebuilt documents View retains folder, collapsed rail, marquee, loading, empty and batch state machine surfaces', () => {

@@ -4,11 +4,12 @@ import test from "node:test";
 
 const source = readFileSync(new URL("./KnowledgeBase.vue", import.meta.url), "utf8");
 
-test("knowledge detail keeps every filter and action in the two-level toolbar", () => {
+test("knowledge detail keeps the compact reference toolbar without the user-hidden date filter", () => {
   assert.match(source, /class="visual-knowledge-toolbar"[\s\S]*?visual-knowledge-toolbar__left/);
   assert.match(source, /data-guide="kb-detail-add-doc"/);
   assert.match(source, /visual-knowledge-toolbar__left[\s\S]*?visual-knowledge-toolbar__right/);
-  assert.match(source, /class="visual-knowledge-date/);
+  assert.match(source, /overlayInnerStyle: \{ maxHeight: '256px' \}/);
+  assert.doesNotMatch(source, /visual-knowledge-date|<t-date-range-picker/);
 });
 
 test("knowledge detail uses the restrained document empty state component", () => {

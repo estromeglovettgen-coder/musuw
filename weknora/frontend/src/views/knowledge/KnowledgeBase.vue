@@ -135,10 +135,9 @@ export default defineComponent({
                   </button>
                 </t-popup>
 
-                <t-select v-model="selectedFileType" :options="fileTypeOptions" :placeholder="$t('knowledgeBase.fileTypeFilter')" class="visual-knowledge-select" clearable><template #prefixIcon><t-icon name="file" /></template></t-select>
+                <t-select v-model="selectedFileType" :options="fileTypeOptions" :placeholder="$t('knowledgeBase.fileTypeFilter')" :popup-props="{ overlayInnerStyle: { maxHeight: '256px' } }" class="visual-knowledge-select" clearable><template #prefixIcon><t-icon name="file" /></template></t-select>
                 <t-select v-model="selectedParseStatus" :options="parseStatusOptions" :placeholder="$t('knowledgeBase.parseStatusFilter')" class="visual-knowledge-select" clearable><template #prefixIcon><t-icon name="check-circle" /></template></t-select>
                 <t-select v-model="selectedSource" :options="sourceOptions" :placeholder="$t('knowledgeBase.sourceFilter')" class="visual-knowledge-select" clearable><template #prefixIcon><t-icon name="link" /></template></t-select>
-                <t-date-range-picker v-model="updatedTimeRange" :placeholder="[$t('knowledgeBase.updatedTimeFrom'), $t('knowledgeBase.updatedTimeTo')]" :disable-date="disableFutureDate" class="visual-knowledge-date" clearable allow-input><template #prefixIcon><t-icon name="calendar" /></template></t-date-range-picker>
               </div>
             </div>
 
@@ -227,7 +226,6 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
 .visual-knowledge-toolbar :deep(.t-input),.visual-knowledge-toolbar :deep(.t-select-input),.visual-knowledge-toolbar :deep(.t-date-range-picker) { min-height: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background: rgb(249 250 251 / 80%); box-shadow: none !important; color: #374151; font-size: 12px; }
 .visual-knowledge-toolbar :deep(.t-input:hover),.visual-knowledge-toolbar :deep(.t-select-input:hover),.visual-knowledge-toolbar :deep(.t-input.t-is-focused) { border-color: #9ca3af; background: #fff; }
 .visual-knowledge-select { flex: 0 0 126px; width: 126px; }
-.visual-knowledge-date { flex: 0 0 210px; width: 210px; }
 .visual-knowledge-filter-button { min-height: 30px; padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 600; cursor: pointer; }
 .visual-knowledge-filter-button:hover { background: #f9fafb; }
 .visual-knowledge-filter-button.is-active { border-color: #d1d5db; background: #f3f4f6; color: #111827; font-weight: 700; }
@@ -264,7 +262,7 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
 
 @media (min-width: 768px) { .visual-knowledge-header { flex-direction: row; align-items: center; justify-content: space-between; } .visual-knowledge-tabs { align-self: auto; } }
 @media (max-width: 900px) { .visual-knowledge-page { padding: 20px; } .visual-knowledge-toolbar__left { min-width: 0; } }
-@media (max-width: 760px) { .visual-knowledge-page { padding: 16px 12px; } .visual-knowledge-documents { gap: 8px; } .visual-knowledge-date { flex-basis: 190px; width: 190px; } }
+@media (max-width: 760px) { .visual-knowledge-page { padding: 16px 12px; } .visual-knowledge-documents { gap: 8px; } }
 </style>
 <style>
 .visual-tag-filter-popup .t-popup__content { padding: 0 !important; overflow: hidden; border: 1px solid #e5e7eb !important; border-radius: 12px !important; background: #fff !important; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%),0 4px 6px -4px rgb(0 0 0 / 10%) !important; }
