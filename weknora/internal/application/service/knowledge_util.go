@@ -33,6 +33,7 @@ var supportedImportFileExtensions = map[string]struct{}{
 	"png": {}, "jpg": {}, "jpeg": {}, "gif": {},
 	"csv": {}, "xlsx": {}, "xls": {}, "pptx": {}, "ppt": {}, "json": {},
 	"mp3": {}, "wav": {}, "m4a": {}, "flac": {}, "ogg": {},
+	"mp4": {}, "mpeg": {}, "mov": {}, "webm": {},
 }
 
 // dataTableFileExtensions are the spreadsheet formats that get an extra
@@ -74,9 +75,6 @@ func validateImportFileType(fileType string) error {
 	fileType = normalizeFileExtension(fileType)
 	if fileType == "" || fileType == unknownFileType {
 		return werrors.NewBadRequestError("无法确定文件类型")
-	}
-	if IsVideoType(fileType) {
-		return werrors.NewBadRequestError("暂不支持上传视频文件")
 	}
 	if !isSupportedImportExtension(fileType) {
 		return werrors.NewBadRequestError(fmt.Sprintf("不支持的文件类型: %s", fileType))
@@ -445,10 +443,25 @@ func IsAudioType(fileType string) bool {
 // IsVideoType checks if a file type is a video format
 func IsVideoType(fileType string) bool {
 	switch strings.ToLower(fileType) {
-	case "mp4", "mov", "avi", "mkv", "webm", "wmv", "flv":
+	case "mp4", "mpeg", "mov", "avi", "mkv", "webm", "wmv", "flv":
 		return true
 	default:
 		return false
+	}
+}
+
+func videoMIMEType(fileType string) string {
+	switch normalizeFileExtension(fileType) {
+	case "mp4":
+		return "video/mp4"
+	case "mpeg":
+		return "video/mpeg"
+	case "mov":
+		return "video/mov"
+	case "webm":
+		return "video/webm"
+	default:
+		return ""
 	}
 }
 

@@ -21,6 +21,10 @@ const DEFAULT_VALID_TYPES = new Set([
   "m4a",
   "flac",
   "ogg",
+  "mp4",
+  "mpeg",
+  "mov",
+  "webm",
 ]);
 
 export function shouldRejectKnowledgeFileType(

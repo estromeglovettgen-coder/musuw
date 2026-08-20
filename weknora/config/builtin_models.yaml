@@ -241,10 +241,10 @@ builtin_models:
 
   - id: builtin-openrouter-vlm
     tenant_id: 10000
-    name: qwen/qwen3-vl-8b-instruct
+    name: google/gemini-2.5-flash
     type: VLLM
     source: remote
-    description: Qwen3-VL 8B Instruct · document image understanding and OCR
+    description: Gemini 2.5 Flash · image OCR and native video understanding
     is_default: true
     status: active
     parameters:
