@@ -66,7 +66,8 @@ const portalOpening = ref(false)
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const usageRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
-  if (!data || data.openrouter_credits_status !== 'available') return null
+  if (!data || data.openrouter_credits_status === 'unavailable') return null
+  if (data.openrouter_credits_status === 'unprovisioned') return 100
   const total = Number(data.monthly_openrouter_microusd)
   const remaining = Number(data.openrouter_remaining_microusd)
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining)) return null
@@ -225,11 +226,11 @@ const reopenGuide = () => {
 }
 const openDocs = () => {
   menuVisible.value = false
-  window.open('https://github.com/Tencent/WeKnora/tree/main/docs', '_blank')
+  window.open('https://github.com/estromeglovettgen-coder/musuw/tree/main/weknora/docs', '_blank')
 }
 const openGithub = () => {
   menuVisible.value = false
-  window.open('https://github.com/Tencent/WeKnora', '_blank')
+  window.open('https://github.com/estromeglovettgen-coder/musuw', '_blank')
 }
 const handleLogout = async () => {
   menuVisible.value = false

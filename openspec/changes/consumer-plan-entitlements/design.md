@@ -46,7 +46,11 @@ General settings queries the child key through the official SDK and displays Ope
 
 A public webhook uses Paddle's official Go verifier against the raw body, maps only the six configured recurring price IDs, and accepts only subscription lifecycle events. The authenticated entitlement response gives a Free tenant Paddle's public client token plus one server-mapped price and a stateless HMAC binding for each plan/period choice. Paddle.js opens the official overlay and copies the tenant ID and binding into subscription `custom_data`; the webhook verifies both before writing the existing tenant plan fields. The last Paddle event ID/time provide idempotency and ordering. Missing or partial configuration disables checkout, paid tenants are not offered a second checkout, and request parameters, checkout completion callbacks, transaction events, unknown prices, tampered bindings, or unsigned bodies never grant a plan.
 
-The existing tenant row also keeps Paddle's customer and subscription IDs from verified webhooks. An authenticated, input-free endpoint resolves those hidden IDs from the current tenant and uses Paddle's official Go SDK plus a server-only key limited to `customer_portal_session.write` to mint a fresh hosted portal session. It returns only the HTTPS overview URL, never caches it, and never exposes Paddle IDs or the SDK response. This lets Paddle own invoices, payment methods, and cancellation UI without a Musuw billing subsystem; checkout stays unavailable until this self-service credential is configured.
+The overlay receives Musuw's current supported UI locale using Paddle's documented locale tags. Billing country, currency, tax, and eligible payment methods remain Paddle-owned and are never inferred from UI language; this preserves Paddle's native address and regional eligibility rules without adding a local geo/payment rules engine.
+
+The existing tenant row also keeps Paddle's customer and subscription IDs from verified webhooks. An authenticated, input-free endpoint resolves those hidden IDs from the current tenant and uses Paddle's official Go SDK plus a server-only key to mint a fresh hosted portal session. It returns only the HTTPS overview URL, never caches it, and never exposes Paddle IDs or the SDK response. This lets Paddle own invoices, payment methods, and cancellation UI without a Musuw billing subsystem; checkout stays unavailable until this self-service credential is configured.
+
+The same official SDK fills the one gap in Paddle's hosted portal: changing a paid tier. The client sends only a higher target plan. The server resolves the hidden customer and subscription from the authenticated tenant, fetches the live subscription to prove ownership and current server-owned price, preserves its monthly/yearly period, and replaces the single item with the mapped target price. Paddle previews and applies the change using `prorated_immediately` and `prevent_change`; the UI shows Paddle's localized minor-unit result before confirmation. The update also rotates the tenant/target-price HMAC in subscription custom data so the existing signed `subscription.updated` webhook remains the sole plan authority. No direct UI callback or update response grants Pro/Max, and no downgrade, term switch, second subscription, ledger, or reconciliation process is added.
 
 ## Risks / Trade-offs
 
@@ -55,6 +59,7 @@ The existing tenant row also keeps Paddle's customer and subscription IDs from v
 - [A plan update reaches OpenRouter but not the database] → Restore the provider limit from the durable database plan immediately; do not add a background reconciler for the current single-server product.
 - [OpenRouter returns HTTP 402 or a terminal SSE credit error] → Treat it as non-retryable, preserve any already-streamed answer, and leave uploaded source data available for WeKnora's existing reparse flow.
 - [Paddle delivery order varies] → Use event occurrence time and event ID so an older or duplicate event cannot overwrite newer state.
+- [A prorated upgrade payment fails or the live subscription no longer matches the tenant] → Use Paddle's `prevent_change`, fail closed, and leave both the durable plan and existing OpenRouter key limit unchanged.
 - [Existing tenants currently have larger storage quotas] → Migration assigns Free and 5 GiB unless an explicit paid plan is set; files are never deleted when usage exceeds the new quota, but new uploads remain blocked.
 
 ## Migration Plan
@@ -62,7 +67,7 @@ The existing tenant row also keeps Paddle's customer and subscription IDs from v
 1. Keep tenant entitlement columns with Free defaults in PostgreSQL and SQLite; update existing rows to Free/5 GiB without deleting data.
 2. Deploy backend enforcement, tenant child-key provisioning, and the read-only entitlement UI with Paddle disabled by default.
 3. Configure `OPENROUTER_MANAGEMENT_API_KEY` and the existing 32-byte `SYSTEM_AES_KEY`; child keys are created lazily, so there is no bulk migration or provider-side scan.
-4. Configure Paddle environment, server API key with only `customer_portal_session.write`, public client token, webhook secret, and all six recurring price IDs as one deployment unit, then register `/api/v1/billing/paddle/webhook` for subscription lifecycle events.
+4. Configure Paddle environment, a least-privilege server API key with customer-portal-session and subscription read/write permissions, public client token, webhook secret, and all six recurring price IDs as one deployment unit, then register `/api/v1/billing/paddle/webhook` for subscription lifecycle events.
 5. Validate Free and paid behavior with separate tenants and one bounded OpenRouter request after the management key is available.
 
 Rollback is code rollback plus leaving additive columns in place; no user objects or usage records are deleted.

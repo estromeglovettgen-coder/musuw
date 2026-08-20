@@ -39,10 +39,26 @@ export interface EntitlementResponse {
   billing: PaddleBillingConfig
 }
 
+export interface PaddleSubscriptionUpgradePreview {
+  plan: PaidConsumerPlan
+  period: BillingPeriod
+  action: 'charge' | 'credit'
+  amount: string
+  currency_code: string
+}
+
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
   return get('/api/v1/entitlements/current') as unknown as Promise<EntitlementResponse>
 }
 
 export async function createPaddlePortalSession(): Promise<{ authorization_url: string }> {
   return post('/api/v1/billing/paddle/portal-session') as Promise<{ authorization_url: string }>
+}
+
+export async function previewPaddleSubscriptionUpgrade(plan: PaidConsumerPlan): Promise<PaddleSubscriptionUpgradePreview> {
+  return post('/api/v1/billing/paddle/subscription-upgrade/preview', { plan }) as Promise<PaddleSubscriptionUpgradePreview>
+}
+
+export async function upgradePaddleSubscription(plan: PaidConsumerPlan): Promise<{ pending: true; plan: PaidConsumerPlan }> {
+  return post('/api/v1/billing/paddle/subscription-upgrade', { plan }) as Promise<{ pending: true; plan: PaidConsumerPlan }>
 }

@@ -34,6 +34,27 @@ type paddlePortalSessionCreatorStub struct {
 
 type emptyPaddlePortalSessionCreatorStub struct{}
 
+type paddleSubscriptionUpdaterStub struct {
+	subscription *paddle.Subscription
+	preview      *paddle.SubscriptionPreview
+	previewReq   *paddle.PreviewSubscriptionUpdateRequest
+	updateReq    *paddle.UpdateSubscriptionRequest
+}
+
+func (s *paddleSubscriptionUpdaterStub) GetSubscription(context.Context, *paddle.GetSubscriptionRequest) (*paddle.Subscription, error) {
+	return s.subscription, nil
+}
+
+func (s *paddleSubscriptionUpdaterStub) PreviewSubscriptionUpdate(_ context.Context, request *paddle.PreviewSubscriptionUpdateRequest) (*paddle.SubscriptionPreview, error) {
+	s.previewReq = request
+	return s.preview, nil
+}
+
+func (s *paddleSubscriptionUpdaterStub) UpdateSubscription(_ context.Context, request *paddle.UpdateSubscriptionRequest) (*paddle.Subscription, error) {
+	s.updateReq = request
+	return s.subscription, nil
+}
+
 func (emptyPaddlePortalSessionCreatorStub) CreateCustomerPortalSession(context.Context, *paddle.CreateCustomerPortalSessionRequest) (*paddle.CustomerPortalSession, error) {
 	return nil, nil
 }
@@ -146,6 +167,139 @@ func TestPaddlePortalSessionFailsClosedOnEmptyProviderResponse(t *testing.T) {
 
 	assert.NotPanics(t, func() { h.PaddlePortalSession(c) })
 	require.NotEmpty(t, c.Errors)
+}
+
+func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config := PaddleConfig{
+		Environment:   "sandbox",
+		APIKey:        "pdl_sdbx_apikey_test",
+		ClientToken:   "test_client_token",
+		WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	subscription := &paddle.Subscription{
+		ID:         "sub_owned_by_tenant",
+		CustomerID: "ctm_owned_by_tenant",
+		Status:     paddle.SubscriptionStatusActive,
+		Items: []paddle.SubscriptionItem{{
+			Quantity: 1,
+			Price:    paddle.Price{ID: "pri_plus_monthly"},
+		}},
+	}
+	provider := &paddleSubscriptionUpdaterStub{
+		subscription: subscription,
+		preview: &paddle.SubscriptionPreview{UpdateSummary: &paddle.SubscriptionPreviewUpdateSummary{
+			Result: paddle.UpdateSummaryResult{Action: paddle.UpdateSummaryResultActionCharge, Amount: "1234", CurrencyCode: paddle.CurrencyCodeCNY},
+		}},
+	}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
+			ConsumerPlanLimits:   types.LimitsForConsumerPlan(types.ConsumerPlanPlus),
+			PlanStatus:           "active",
+			PaddleCustomerID:     "ctm_owned_by_tenant",
+			PaddleSubscriptionID: "sub_owned_by_tenant",
+		}},
+		paddle:        config,
+		subscriptions: provider,
+	}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade/preview", strings.NewReader(`{"plan":"pro","subscription_id":"sub_attacker"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+
+	h.PaddleSubscriptionUpgradePreview(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.JSONEq(t, `{"plan":"pro","period":"monthly","action":"charge","amount":"1234","currency_code":"CNY"}`, recorder.Body.String())
+	require.NotNil(t, provider.previewReq)
+	assert.Equal(t, "sub_owned_by_tenant", provider.previewReq.SubscriptionID)
+	require.NotNil(t, provider.previewReq.Items)
+	previewItems := *provider.previewReq.Items.Value()
+	require.Len(t, previewItems, 1)
+	assert.Equal(t, "pri_pro_monthly", previewItems[0].SubscriptionUpdateItemFromCatalog.PriceID)
+	assert.Equal(t, 1, previewItems[0].SubscriptionUpdateItemFromCatalog.Quantity)
+	assert.Equal(t, paddle.ProrationBillingModeProratedImmediately, *provider.previewReq.ProrationBillingMode.Value())
+	assert.Equal(t, paddle.SubscriptionOnPaymentFailurePreventChange, *provider.previewReq.OnPaymentFailure.Value())
+
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade", strings.NewReader(`{"plan":"pro","customer_id":"ctm_attacker"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+
+	h.PaddleSubscriptionUpgrade(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	assert.JSONEq(t, `{"pending":true,"plan":"pro"}`, recorder.Body.String())
+	require.NotNil(t, provider.updateReq)
+	assert.Equal(t, "sub_owned_by_tenant", provider.updateReq.SubscriptionID)
+	updateItems := *provider.updateReq.Items.Value()
+	require.Len(t, updateItems, 1)
+	assert.Equal(t, "pri_pro_monthly", updateItems[0].SubscriptionUpdateItemFromCatalog.PriceID)
+	customData := *provider.updateReq.CustomData.Value()
+	assert.Equal(t, "42", customData["tenant_id"])
+	assert.Equal(t, config.checkoutBinding(42, "pri_pro_monthly"), customData["musuw_checkout_binding"])
+	assert.Equal(t, paddle.ProrationBillingModeProratedImmediately, *provider.updateReq.ProrationBillingMode.Value())
+	assert.Equal(t, paddle.SubscriptionOnPaymentFailurePreventChange, *provider.updateReq.OnPaymentFailure.Value())
+}
+
+func TestPaddleSubscriptionUpgradeRejectsDowngradeAndProviderOwnershipMismatch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config := PaddleConfig{
+		Environment:   "sandbox",
+		APIKey:        "pdl_sdbx_apikey_test",
+		ClientToken:   "test_client_token",
+		WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	provider := &paddleSubscriptionUpdaterStub{subscription: &paddle.Subscription{
+		ID:         "sub_owned_by_tenant",
+		CustomerID: "ctm_different_customer",
+		Status:     paddle.SubscriptionStatusActive,
+		Items:      []paddle.SubscriptionItem{{Quantity: 1, Price: paddle.Price{ID: "pri_pro_monthly"}}},
+	}}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
+			ConsumerPlanLimits:   types.LimitsForConsumerPlan(types.ConsumerPlanPro),
+			PlanStatus:           "active",
+			PaddleCustomerID:     "ctm_owned_by_tenant",
+			PaddleSubscriptionID: "sub_owned_by_tenant",
+		}},
+		paddle:        config,
+		subscriptions: provider,
+	}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade/preview", strings.NewReader(`{"plan":"plus"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+	h.PaddleSubscriptionUpgradePreview(c)
+	require.NotEmpty(t, c.Errors)
+	assert.Nil(t, provider.previewReq)
+
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade/preview", strings.NewReader(`{"plan":"max"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+	h.PaddleSubscriptionUpgradePreview(c)
+	require.NotEmpty(t, c.Errors)
+	assert.Nil(t, provider.previewReq)
+	assert.Nil(t, provider.updateReq)
 }
 
 func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {

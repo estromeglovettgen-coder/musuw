@@ -69,7 +69,19 @@
         <t-button v-else theme="primary" :loading="checkoutOpening" @click="handleCheckout">{{ $t('entitlement.continueToCheckout') }}</t-button>
       </section>
 
-      <section v-else class="visual-usage-settings__manage">
+      <section v-else-if="upgradePlans.length" class="visual-usage-settings__upgrade">
+        <div class="visual-usage-settings__section-heading">
+          <div><h3>{{ $t('entitlement.upgradePlan') }}</h3><p>{{ $t('entitlement.upgradePaidDescription') }}</p></div>
+        </div>
+        <div class="visual-usage-settings__upgrade-actions">
+          <t-button v-for="plan in upgradePlans" :key="plan" variant="outline" :disabled="!subscriptionUpgradeAvailable" :loading="upgradeOpening === plan" @click="handleSubscriptionUpgrade(plan)">
+            {{ $t('entitlement.upgradeTo', { plan: $t(`entitlement.plans.${plan}`) }) }}
+          </t-button>
+        </div>
+        <p v-if="!subscriptionUpgradeAvailable" class="visual-usage-settings__notice">{{ $t('entitlement.billingNotConfigured') }}</p>
+      </section>
+
+      <section v-if="entitlement.plan !== 'free'" class="visual-usage-settings__manage">
         <div><h3>{{ $t('entitlement.managePlan') }}</h3><p>{{ $t('entitlement.manageDescription') }}</p></div>
         <p v-if="!portalAvailable" class="visual-usage-settings__notice">{{ $t('entitlement.billingNotConfigured') }}</p>
         <t-button v-else variant="outline" :loading="portalOpening" @click="handlePortal">{{ $t('entitlement.manageBilling') }}</t-button>
@@ -83,12 +95,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import {
   createPaddlePortalSession,
   getCurrentEntitlement,
+  previewPaddleSubscriptionUpgrade,
+  upgradePaddleSubscription,
   type BillingPeriod,
   type ConsumerEntitlement,
   type PaddleBillingConfig,
@@ -96,7 +110,7 @@ import {
 } from '@/api/entitlement'
 import { openPaddleCheckout } from '@/utils/paddleCheckout'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const route = useRoute()
 const authStore = useAuthStore()
 const entitlement = ref<ConsumerEntitlement | null>(null)
@@ -106,16 +120,18 @@ const checkoutPlan = ref<PaidConsumerPlan>('plus')
 const checkoutPeriod = ref<BillingPeriod>('monthly')
 const checkoutOpening = ref(false)
 const portalOpening = ref(false)
+const upgradeOpening = ref<PaidConsumerPlan | null>(null)
 const paidPlans: PaidConsumerPlan[] = ['plus', 'pro', 'max']
+const planRank: Record<PaidConsumerPlan, number> = { plus: 1, pro: 2, max: 3 }
 
 const accountName = computed(() => authStore.user?.username || '')
 const accountEmail = computed(() => authStore.user?.email || '')
 const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan || 'free'}`))
-const creditsAvailable = computed(() => entitlement.value?.openrouter_credits_status === 'available')
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const creditsRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
-  if (!data || !creditsAvailable.value) return null
+  if (!data || data.openrouter_credits_status === 'unavailable') return null
+  if (data.openrouter_credits_status === 'unprovisioned') return 100
   const total = Number(data.monthly_openrouter_microusd)
   const remaining = Number(data.openrouter_remaining_microusd)
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining)) return null
@@ -131,6 +147,14 @@ const storageRemainingPercent = computed<number | null>(() => {
 })
 const billingConfigured = computed(() => billing.value?.configured === true)
 const portalAvailable = computed(() => billing.value?.configured === true && billing.value?.portal_available === true)
+const upgradePlans = computed(() => {
+  const current = entitlement.value?.plan
+  if (current !== 'plus' && current !== 'pro' && current !== 'max') return []
+  return paidPlans.filter((plan) => planRank[plan] > planRank[current])
+})
+const subscriptionUpgradeAvailable = computed(() =>
+  billingConfigured.value && portalAvailable.value && entitlement.value?.plan_status === 'active',
+)
 const checkoutAvailable = computed(() => {
   const config = billing.value
   const hasPriceOptions = Object.values(config?.prices ?? {}).some((periods) =>
@@ -171,6 +195,18 @@ onMounted(() => {
 
 const formatLimit = (limit: number) => limit > 0 ? String(limit) : t('entitlement.unlimited')
 
+const formatMinorCurrency = (amount: string, currencyCode: string) => {
+  try {
+    const formatter = new Intl.NumberFormat(locale.value, { style: 'currency', currency: currencyCode })
+    const minorAmount = Number(amount)
+    if (!Number.isSafeInteger(minorAmount)) return `${amount} ${currencyCode}`
+    const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2
+    return formatter.format(minorAmount / (10 ** fractionDigits))
+  } catch {
+    return `${amount} ${currencyCode}`
+  }
+}
+
 const handleCheckout = async () => {
   const config = billing.value
   const option = selectedCheckoutOption.value
@@ -187,6 +223,7 @@ const handleCheckout = async () => {
       tenantId: config.tenant_id,
       checkoutBinding: option.checkout_binding,
       email: authStore.user?.email,
+      locale: locale.value,
       onCompleted: () => {
         MessagePlugin.success(t('entitlement.checkoutCompleted'))
         window.setTimeout(() => { void loadEntitlement() }, 1200)
@@ -211,6 +248,45 @@ const handlePortal = async () => {
     MessagePlugin.error(t('entitlement.portalUnavailable'))
   } finally {
     portalOpening.value = false
+  }
+}
+
+const handleSubscriptionUpgrade = async (plan: PaidConsumerPlan) => {
+  if (!subscriptionUpgradeAvailable.value || upgradeOpening.value) return
+  upgradeOpening.value = plan
+  try {
+    const preview = await previewPaddleSubscriptionUpgrade(plan)
+    const amount = formatMinorCurrency(preview.amount, preview.currency_code)
+    const dialog = DialogPlugin.confirm({
+      header: t('entitlement.upgradeConfirmTitle', { plan: t(`entitlement.plans.${plan}`) }),
+      body: t('entitlement.upgradeConfirmBody', { plan: t(`entitlement.plans.${plan}`), amount }),
+      confirmBtn: t('entitlement.upgradeConfirm'),
+      cancelBtn: t('common.cancel'),
+      onConfirm: async () => {
+        try {
+          await upgradePaddleSubscription(plan)
+          MessagePlugin.success(t('entitlement.upgradePending'))
+          window.setTimeout(() => { void loadEntitlement() }, 1200)
+          window.setTimeout(() => { void loadEntitlement() }, 3500)
+        } catch {
+          MessagePlugin.error(t('entitlement.upgradeFailed'))
+        } finally {
+          upgradeOpening.value = null
+          dialog.destroy()
+        }
+      },
+      onCancel: () => {
+        upgradeOpening.value = null
+        dialog.destroy()
+      },
+      onClose: () => {
+        upgradeOpening.value = null
+        dialog.destroy()
+      },
+    })
+  } catch {
+    upgradeOpening.value = null
+    MessagePlugin.error(t('entitlement.upgradeFailed'))
   }
 }
 </script>
@@ -255,6 +331,8 @@ const handlePortal = async () => {
 .visual-usage-settings__period-options { margin: 10px 0 14px; display: inline-flex; gap: 4px; padding: 3px; border-radius: 10px; background: #f4f5f7; }
 .visual-usage-settings__period-options button { min-height: 28px; padding: 4px 10px; border-color: transparent; background: transparent; font-size: 11px; }
 .visual-usage-settings__upgrade > .visual-usage-settings__notice { margin: 0 0 12px; }
+.visual-usage-settings__upgrade-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.visual-usage-settings__upgrade-actions + .visual-usage-settings__notice { margin: 10px 0 0; }
 .visual-usage-settings__manage { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .visual-usage-settings__manage > div { min-width: 0; }
 .visual-usage-settings__manage > .visual-usage-settings__notice { margin: 0; }

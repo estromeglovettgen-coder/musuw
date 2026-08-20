@@ -79,11 +79,11 @@ The authenticated product SHALL show the current plan, storage used and limit, m
 - **THEN** the values displayed come from the server's effective tenant entitlement rather than browser state
 
 ### Requirement: Optional Paddle checkout, self-service, and events are fail-closed
-When Paddle environment values are fully configured, an authenticated Free tenant SHALL be able to open Paddle's hosted checkout only for the six server-owned Plus, Pro, and Max monthly/yearly price mappings. The system SHALL bind each offered price to that tenant, accept only subscription lifecycle webhooks with a valid Paddle signature and matching binding, and apply activation or cancellation idempotently. An authenticated tenant with a verified Paddle customer identity SHALL be able to open Paddle's hosted customer portal using a fresh server-created session. A browser callback or transaction event SHALL NOT grant an entitlement. When Paddle is not fully configured, checkout SHALL be displayed as unavailable and no client-supplied plan claim SHALL grant an entitlement.
+When Paddle environment values are fully configured, an authenticated Free tenant SHALL be able to open Paddle's hosted checkout only for the six server-owned Plus, Pro, and Max monthly/yearly price mappings. An active paid tenant SHALL be able to preview and apply only a strictly higher server-owned tier on its existing subscription; the server SHALL derive the hidden subscription/customer identity and existing billing period, use Paddle's official immediate-proration preview/update with payment failure preventing the change, and replace the single subscription item with the mapped target price. The system SHALL bind each offered or updated price to that tenant, accept only subscription lifecycle webhooks with a valid Paddle signature and matching binding, and apply activation or cancellation idempotently. An authenticated tenant with a verified Paddle customer identity SHALL be able to open Paddle's hosted customer portal using a fresh server-created session. A browser callback, subscription-update response, or transaction event SHALL NOT grant an entitlement. When Paddle is not fully configured, checkout and subscription changes SHALL be displayed as unavailable and no client-supplied plan claim SHALL grant an entitlement.
 
 #### Scenario: Free user starts hosted checkout
 - **WHEN** an authenticated Free user chooses an allowed plan and billing period
-- **THEN** the official Paddle.js overlay receives exactly one server-mapped price with quantity one and tenant-bound custom data
+- **THEN** the official Paddle.js overlay receives exactly one server-mapped price with quantity one, tenant-bound custom data, and Musuw's current supported UI locale while Paddle remains authoritative for country, currency, tax, and eligible payment methods
 
 #### Scenario: Valid activation event
 - **WHEN** a correctly signed Paddle subscription event contains a known price, tenant identifier, and matching checkout binding
@@ -100,6 +100,18 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 #### Scenario: Paid tenant opens General settings
 - **WHEN** a tenant already has a paid plan
 - **THEN** current entitlement is displayed but new checkout options are withheld to prevent a duplicate subscription
+
+#### Scenario: Paid tenant previews a higher tier
+- **WHEN** an authenticated active Plus tenant asks to preview Pro
+- **THEN** the server proves ownership of the hidden live subscription, preserves its current monthly or yearly period, and returns Paddle's immediate prorated amount for the server-mapped Pro price without changing the subscription
+
+#### Scenario: Paid tenant confirms a higher tier
+- **WHEN** that tenant confirms the previewed upgrade and Paddle accepts payment
+- **THEN** the existing subscription contains exactly the mapped target item and target binding, while the plan and existing OpenRouter child-key limit change only after the signed `subscription.updated` webhook is processed
+
+#### Scenario: Paid tenant submits an unsafe plan change
+- **WHEN** the target is equal, lower, unknown, the subscription/customer ownership differs, or the live subscription is not the one active server-owned item expected for the durable plan
+- **THEN** Paddle is not updated and the durable plan and OpenRouter child-key limit remain unchanged
 
 #### Scenario: Customer manages billing
 - **WHEN** an authenticated tenant with a Paddle customer record clicks manage billing

@@ -101,15 +101,21 @@ func (c PaddleConfig) Configured() bool {
 }
 
 func (c PaddleConfig) planForPrice(priceID string) (types.ConsumerPlan, bool) {
+	plan, _, ok := c.planAndPeriodForPrice(priceID)
+	return plan, ok
+}
+
+func (c PaddleConfig) planAndPeriodForPrice(priceID string) (types.ConsumerPlan, string, bool) {
 	priceID = strings.TrimSpace(priceID)
 	for _, plan := range []types.ConsumerPlan{types.ConsumerPlanPlus, types.ConsumerPlanPro, types.ConsumerPlanMax} {
-		for _, mapped := range c.Prices[plan] {
+		for _, period := range []string{"monthly", "yearly"} {
+			mapped := c.Prices[plan][period]
 			if mapped == priceID {
-				return plan, true
+				return plan, period, true
 			}
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 func (c PaddleConfig) checkoutBinding(tenantID uint64, priceID string) string {
@@ -158,10 +164,17 @@ type paddlePortalSessionCreator interface {
 	CreateCustomerPortalSession(context.Context, *paddle.CreateCustomerPortalSessionRequest) (*paddle.CustomerPortalSession, error)
 }
 
+type paddleSubscriptionUpdater interface {
+	GetSubscription(context.Context, *paddle.GetSubscriptionRequest) (*paddle.Subscription, error)
+	PreviewSubscriptionUpdate(context.Context, *paddle.PreviewSubscriptionUpdateRequest) (*paddle.SubscriptionPreview, error)
+	UpdateSubscription(context.Context, *paddle.UpdateSubscriptionRequest) (*paddle.Subscription, error)
+}
+
 type EntitlementHandler struct {
-	service interfaces.EntitlementService
-	paddle  PaddleConfig
-	portal  paddlePortalSessionCreator
+	service       interfaces.EntitlementService
+	paddle        PaddleConfig
+	portal        paddlePortalSessionCreator
+	subscriptions paddleSubscriptionUpdater
 }
 
 func NewEntitlementHandler(service interfaces.EntitlementService) *EntitlementHandler {
@@ -170,16 +183,21 @@ func NewEntitlementHandler(service interfaces.EntitlementService) *EntitlementHa
 	if !config.PortalConfigured() {
 		return handler
 	}
-	var err error
+	var (
+		sdk *paddle.SDK
+		err error
+	)
 	if strings.EqualFold(config.Environment, "sandbox") {
-		handler.portal, err = paddle.NewSandbox(config.APIKey)
+		sdk, err = paddle.NewSandbox(config.APIKey)
 	} else {
-		handler.portal, err = paddle.New(config.APIKey)
+		sdk, err = paddle.New(config.APIKey)
 	}
 	if err != nil {
-		logger.Errorf(context.Background(), "Paddle portal client initialization failed: %v", err)
-		handler.portal = nil
+		logger.Errorf(context.Background(), "Paddle client initialization failed: %v", err)
+		return handler
 	}
+	handler.portal = sdk
+	handler.subscriptions = sdk
 	return handler
 }
 
@@ -239,6 +257,175 @@ func (h *EntitlementHandler) PaddlePortalSession(c *gin.Context) {
 	// Reuse the HTTP logger's existing authorization_url redaction. This URL
 	// contains a temporary bearer token and must never appear in access logs.
 	c.JSON(http.StatusOK, gin.H{"authorization_url": overview})
+}
+
+type paddleSubscriptionUpgradeRequest struct {
+	Plan types.ConsumerPlan `json:"plan" binding:"required"`
+}
+
+type paddleSubscriptionUpgradeTarget struct {
+	plan           types.ConsumerPlan
+	period         string
+	priceID        string
+	subscriptionID string
+}
+
+func consumerPlanRank(plan types.ConsumerPlan) int {
+	switch plan {
+	case types.ConsumerPlanPlus:
+		return 1
+	case types.ConsumerPlanPro:
+		return 2
+	case types.ConsumerPlanMax:
+		return 3
+	default:
+		return 0
+	}
+}
+
+func (h *EntitlementHandler) paddleSubscriptionUpgradeTarget(ctx context.Context, tenantID uint64, targetPlan types.ConsumerPlan) (*paddleSubscriptionUpgradeTarget, error) {
+	if h.subscriptions == nil || !h.paddle.Configured() {
+		return nil, apperrors.NewServiceUnavailableError("Paddle subscription upgrades are not configured")
+	}
+	current, err := h.service.Current(ctx, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	currentPlan := current.Plan
+	if consumerPlanRank(currentPlan) == 0 || consumerPlanRank(targetPlan) <= consumerPlanRank(currentPlan) {
+		return nil, apperrors.NewBadRequestError("target plan must be higher than the current paid plan")
+	}
+	if !strings.EqualFold(strings.TrimSpace(current.PlanStatus), string(paddle.SubscriptionStatusActive)) {
+		return nil, apperrors.NewBadRequestError("only active subscriptions can be upgraded")
+	}
+	customerID := strings.TrimSpace(current.PaddleCustomerID)
+	subscriptionID := strings.TrimSpace(current.PaddleSubscriptionID)
+	if customerID == "" || subscriptionID == "" {
+		return nil, apperrors.NewBadRequestError("Paddle subscription is unavailable")
+	}
+	subscription, err := h.subscriptions.GetSubscription(ctx, &paddle.GetSubscriptionRequest{SubscriptionID: subscriptionID})
+	if err != nil {
+		logger.Errorf(ctx, "Paddle subscription lookup failed tenant_id=%d: %v", tenantID, err)
+		return nil, apperrors.NewServiceUnavailableError("Paddle subscription is temporarily unavailable")
+	}
+	if subscription == nil || strings.TrimSpace(subscription.ID) != subscriptionID || strings.TrimSpace(subscription.CustomerID) != customerID {
+		return nil, apperrors.NewConflictError("Paddle subscription ownership does not match the authenticated account")
+	}
+	if subscription.Status != paddle.SubscriptionStatusActive || len(subscription.Items) != 1 {
+		return nil, apperrors.NewBadRequestError("Paddle subscription cannot be upgraded automatically")
+	}
+	providerPlan, period, ok := h.paddle.planAndPeriodForPrice(subscription.Items[0].Price.ID)
+	if !ok || providerPlan != currentPlan {
+		return nil, apperrors.NewConflictError("Paddle subscription does not match the current plan")
+	}
+	priceID := strings.TrimSpace(h.paddle.Prices[targetPlan][period])
+	if priceID == "" {
+		return nil, apperrors.NewServiceUnavailableError("target Paddle price is not configured")
+	}
+	return &paddleSubscriptionUpgradeTarget{plan: targetPlan, period: period, priceID: priceID, subscriptionID: subscriptionID}, nil
+}
+
+func paddlePreviewUpgradeRequest(tenantID uint64, config PaddleConfig, target *paddleSubscriptionUpgradeTarget) *paddle.PreviewSubscriptionUpdateRequest {
+	items := []paddle.PreviewSubscriptionUpdateItems{*paddle.NewPreviewSubscriptionUpdateItemsSubscriptionUpdateItemFromCatalog(&paddle.SubscriptionUpdateItemFromCatalog{
+		PriceID:  target.priceID,
+		Quantity: 1,
+	})}
+	customData := paddle.CustomData{
+		"tenant_id":              strconv.FormatUint(tenantID, 10),
+		"musuw_checkout_binding": config.checkoutBinding(tenantID, target.priceID),
+	}
+	return &paddle.PreviewSubscriptionUpdateRequest{
+		SubscriptionID:       target.subscriptionID,
+		Items:                paddle.NewPatchField(items),
+		CustomData:           paddle.NewPatchField(customData),
+		ProrationBillingMode: paddle.NewPatchField(paddle.ProrationBillingModeProratedImmediately),
+		OnPaymentFailure:     paddle.NewPatchField(paddle.SubscriptionOnPaymentFailurePreventChange),
+	}
+}
+
+func paddleApplyUpgradeRequest(tenantID uint64, config PaddleConfig, target *paddleSubscriptionUpgradeTarget) *paddle.UpdateSubscriptionRequest {
+	items := []paddle.UpdateSubscriptionItems{*paddle.NewUpdateSubscriptionItemsSubscriptionUpdateItemFromCatalog(&paddle.SubscriptionUpdateItemFromCatalog{
+		PriceID:  target.priceID,
+		Quantity: 1,
+	})}
+	customData := paddle.CustomData{
+		"tenant_id":              strconv.FormatUint(tenantID, 10),
+		"musuw_checkout_binding": config.checkoutBinding(tenantID, target.priceID),
+	}
+	return &paddle.UpdateSubscriptionRequest{
+		SubscriptionID:       target.subscriptionID,
+		Items:                paddle.NewPatchField(items),
+		CustomData:           paddle.NewPatchField(customData),
+		ProrationBillingMode: paddle.NewPatchField(paddle.ProrationBillingModeProratedImmediately),
+		OnPaymentFailure:     paddle.NewPatchField(paddle.SubscriptionOnPaymentFailurePreventChange),
+	}
+}
+
+func (h *EntitlementHandler) PaddleSubscriptionUpgradePreview(c *gin.Context) {
+	tenantID, ok := types.TenantIDFromContext(c.Request.Context())
+	if !ok || tenantID == 0 {
+		_ = c.Error(apperrors.NewUnauthorizedError("authentication required"))
+		return
+	}
+	var request paddleSubscriptionUpgradeRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("target plan is required"))
+		return
+	}
+	target, err := h.paddleSubscriptionUpgradeTarget(c.Request.Context(), tenantID, request.Plan)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	preview, err := h.subscriptions.PreviewSubscriptionUpdate(c.Request.Context(), paddlePreviewUpgradeRequest(tenantID, h.paddle, target))
+	if err != nil {
+		logger.Errorf(c.Request.Context(), "Paddle subscription upgrade preview failed tenant_id=%d target_plan=%s: %v", tenantID, target.plan, err)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle upgrade preview is temporarily unavailable"))
+		return
+	}
+	if preview == nil || preview.UpdateSummary == nil || strings.TrimSpace(preview.UpdateSummary.Result.Amount) == "" || preview.UpdateSummary.Result.CurrencyCode == "" {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle returned an incomplete upgrade preview"))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"plan":          target.plan,
+		"period":        target.period,
+		"action":        preview.UpdateSummary.Result.Action,
+		"amount":        preview.UpdateSummary.Result.Amount,
+		"currency_code": preview.UpdateSummary.Result.CurrencyCode,
+	})
+}
+
+func (h *EntitlementHandler) PaddleSubscriptionUpgrade(c *gin.Context) {
+	tenantID, ok := types.TenantIDFromContext(c.Request.Context())
+	if !ok || tenantID == 0 {
+		_ = c.Error(apperrors.NewUnauthorizedError("authentication required"))
+		return
+	}
+	var request paddleSubscriptionUpgradeRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("target plan is required"))
+		return
+	}
+	target, err := h.paddleSubscriptionUpgradeTarget(c.Request.Context(), tenantID, request.Plan)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	updated, err := h.subscriptions.UpdateSubscription(c.Request.Context(), paddleApplyUpgradeRequest(tenantID, h.paddle, target))
+	if err != nil {
+		logger.Errorf(c.Request.Context(), "Paddle subscription upgrade failed tenant_id=%d target_plan=%s: %v", tenantID, target.plan, err)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription upgrade is temporarily unavailable"))
+		return
+	}
+	if updated == nil || strings.TrimSpace(updated.ID) != target.subscriptionID {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle returned an incomplete subscription update"))
+		return
+	}
+	logger.Infof(c.Request.Context(), "Paddle subscription upgrade accepted tenant_id=%d target_plan=%s", tenantID, target.plan)
+	// The signed subscription.updated webhook remains the only authority that
+	// updates the plan and the existing OpenRouter child-key spend limit.
+	c.JSON(http.StatusAccepted, gin.H{"pending": true, "plan": target.plan})
 }
 
 type paddleEvent struct {

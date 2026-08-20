@@ -15,6 +15,7 @@
 - [x] 3.1 Show plan/storage/credit state in General settings and align storefront's four plans with enforced limits
 - [x] 3.2 Preserve storefront plan intent through authentication and open the official Paddle.js overlay from General settings without a custom payment form
 - [x] 3.3 Add an authenticated, tenant-owned Paddle Customer Portal button using the official Go SDK and expose only a fresh one-time overview URL
+- [x] 3.4 Add official Paddle preview/update for paid upgrades while preserving the current term and keeping the signed webhook authoritative
 
 ## 4. Verification and release
 
@@ -22,3 +23,4 @@
 - [x] 4.2 Verify Free and paid catalog/limits in the local browser and retain the earlier bounded production evidence; defer the combined release at the user's request because GitHub Actions minutes are exhausted
 - [x] 4.3 Verify the six-price Sandbox catalog, real Paddle-signed activation/cancellation/duplicate deliveries, database state, audit logs, and browser entitlement refresh through the local Cloudflare tunnel
 - [x] 4.4 Verify the authenticated Customer Portal, anonymous/no-customer rejection, token-redacted logs, and final local browser lifecycle regression
+- [x] 4.5 Upgrade a real non-admin Sandbox subscription in Chrome and verify the signed event updates the existing OpenRouter child-key limit before the durable plan

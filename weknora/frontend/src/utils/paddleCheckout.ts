@@ -15,7 +15,17 @@ export interface OpenPaddleCheckoutInput {
   tenantId: string
   checkoutBinding: string
   email?: string
+  locale?: string
   onCompleted: () => void
+}
+
+function toPaddleLocale(value?: string): string | undefined {
+  const locale = value?.trim().toLowerCase()
+  if (!locale) return undefined
+  if (locale === 'zh' || locale.startsWith('zh-')) return 'zh-Hans'
+  if (locale === 'ko' || locale.startsWith('ko-')) return 'ko'
+  if (locale === 'ru' || locale.startsWith('ru-')) return 'ru'
+  return 'en'
 }
 
 function initialize(input: OpenPaddleCheckoutInput) {
@@ -52,6 +62,7 @@ export async function openPaddleCheckout(input: OpenPaddleCheckoutInput): Promis
       displayMode: 'overlay',
       theme: 'light',
       allowLogout: false,
+      locale: toPaddleLocale(input.locale),
     },
   })
 }

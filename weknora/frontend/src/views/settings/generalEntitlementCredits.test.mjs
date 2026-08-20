@@ -12,7 +12,8 @@ test('entitlement API types the official OpenRouter credit availability state', 
 })
 
 test('usage settings shows remaining percentages without provider or dollar fields', () => {
-  assert.match(usageSettings, /openrouter_credits_status === 'available'/)
+  assert.match(usageSettings, /openrouter_credits_status === 'unavailable'/)
+  assert.match(usageSettings, /openrouter_credits_status === 'unprovisioned'\) return 100/)
   assert.match(usageSettings, /clampPercent\(\(remaining \/ total\) \* 100\)/)
   assert.match(usageSettings, /creditsRemainingPercent \}\}%/)
   assert.match(usageSettings, /storageRemainingPercent \}\}%/)
