@@ -238,6 +238,7 @@ export default defineConfig({
             '/oauth': {
               target: AUTH_DEV_TARGET,
               changeOrigin: true,
+              rewrite: (path) => `/auth${path}`,
               secure: false,
               ws: true,
             },

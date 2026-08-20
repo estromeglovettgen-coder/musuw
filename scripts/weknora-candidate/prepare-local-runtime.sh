@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Derive the local candidate runtime only from this checkout's root-only
-# runtime files. It replaces the historical external .env dependency and does
-# not require a migration-rehearsal volume; Compose can create empty local
-# named volumes on a fresh machine.
+# runtime files. Local authentication remains independent from production;
+# the remaining deployment secrets are reused only for local dependency data.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -26,19 +25,18 @@ read_secret() {
     printf '%s' "$value"
 }
 
+install -d -m 700 "$local_runtime" "$local_secrets"
+
 for required in \
     "$production_runtime/production.public.env" \
-    "$production_runtime/auth-public.env"; do
-    [ -f "$required" ] && [ -r "$required" ] || die 'run the production runtime preparation once before local development'
+    "$local_runtime/auth-public.env" \
+    "$local_secrets/oidc_client_id" \
+    "$local_secrets/oidc_client_secret"; do
+    [ -f "$required" ] && [ -r "$required" ] || die 'local runtime authentication configuration is unavailable'
 done
-for secret_name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret; do
+for secret_name in db_password redis_password system_aes_key jwt_secret neo4j_auth searxng_secret; do
     read_secret "$production_secrets/$secret_name" >/dev/null
 done
-
-install -d -m 700 "$local_runtime" "$local_secrets"
-install -m 600 "$production_runtime/auth-public.env" "$local_runtime/auth-public.env"
-install -m 600 "$production_secrets/oidc_client_id" "$local_secrets/oidc_client_id"
-install -m 600 "$production_secrets/oidc_client_secret" "$local_secrets/oidc_client_secret"
 
 # Only deployment-independent public settings become the input to the existing
 # candidate preparer. Candidate identity, ports, URLs, OIDC and volume names
