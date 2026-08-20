@@ -1086,6 +1086,7 @@ const handleModelChange = (value: string | number | Array<string | number> | und
   // Contributor switching models from the chat input got a 403.
   writeLastChatModelID(val);
   selectedModelId.value = val;
+  ensureReasoningSelection();
   showModelSelector.value = false;
 
   settingsStore.updateConversationModels({
@@ -1121,7 +1122,10 @@ const reasoningOptions = computed(() => {
 });
 const selectedReasoningLabel = computed(() => reasoningEffortLabel(reasoningEffort.value));
 const ensureReasoningSelection = () => {
-  if (!reasoningOptions.value.length) return;
+  if (!reasoningOptions.value.length) {
+    if (reasoningEffort.value !== "none") reasoningEffort.value = "none";
+    return;
+  }
   if (reasoningOptions.value.some((item) => item.value === reasoningEffort.value)) return;
   const configuredDefault = selectedModel.value?.parameters?.reasoning?.default_effort;
   reasoningEffort.value = reasoningOptions.value.some((item) => item.value === configuredDefault)

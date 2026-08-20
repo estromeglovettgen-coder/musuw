@@ -168,10 +168,10 @@ builtin_models:
       provider: openrouter
       supports_vision: true
       reasoning:
-        supported: true
+        supported: false
         mandatory: false
-        supported_efforts: [high]
-        default_effort: high
+        supported_efforts: []
+        default_effort: none
 
   - id: builtin-openrouter-claude-sonnet
     tenant_id: 10000

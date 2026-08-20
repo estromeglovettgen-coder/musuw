@@ -8,8 +8,8 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 const scriptOf = (path) => read(path).match(/<script setup(?: lang="ts")?>([\s\S]*?)<\/script>/)?.[1] || ''
 
 const frozen = new Map([
-  ['./business-baselines/Input-field.pre-view.vue', 'a54b22494ebaecf39119dcb0717f5d3d0cb448ea'],
-  ['./business-baselines/KnowledgeBase.pre-view.vue', 'c6c7c53a9f1eda91b645733256eb04221bf816da'],
+  ['./business-baselines/Input-field.pre-view.vue', 'cd262083e0d7ccef1ef39e636f3d19320d1fb37a'],
+  ['./business-baselines/KnowledgeBase.pre-view.vue', 'b9e9d9b2d3f09ebaf02bbe543681fdc90ae357df'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
   ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],

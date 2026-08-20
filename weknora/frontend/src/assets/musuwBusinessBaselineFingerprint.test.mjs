@@ -20,11 +20,12 @@ const EXPECTED_UPSTREAM_COMMIT = '3d5d8bfcdfeeea266b292b71cea616847af28d0f'
 const INITIAL_MUSUW_BASELINE_COMMIT = '76bc44e15433e598c2c131e6873754e5ec5f4f5e'
 const PRE_UI_BUSINESS_BASELINE_COMMIT = '367a0c76e48fcf8a3762c33b672cfa2e16b679f4'
 const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b909'
+const OPENROUTER_VIDEO_INGESTION_COMMIT = '22052ccf08c5ab2e370d94ea2508359aa367d0fe'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': '3e606571962c8d0b3838610b4cc7977ddbe3021e',
-  './business-baselines/Input-field.pre-view.vue': 'a54b22494ebaecf39119dcb0717f5d3d0cb448ea',
-  './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
+  './business-baselines/Input-field.pre-view.vue': 'cd262083e0d7ccef1ef39e636f3d19320d1fb37a',
+  './business-baselines/KnowledgeBase.pre-view.vue': 'b9e9d9b2d3f09ebaf02bbe543681fdc90ae357df',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '99a2c17c59bbd5b436492bba60a206b87400b527',
@@ -35,7 +36,6 @@ const LOCKED_BUSINESS_BLOBS = {
 // narrowed WeKnora's All/Favorites/Recents/Organization scopes to `mine`; the
 // current controller restores the upstream v0.7.2 behavior instead.
 const INITIAL_MUSUW_BYTE_IDENTICAL = {
-  './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
 }
 
@@ -48,6 +48,11 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   chatParent: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
     authority: 'WeKnora v0.7.2 Agent chat flow forwarding the consumer-selected model and reasoning effort',
+  },
+  knowledgeBase: {
+    commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
+    resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
+    authority: 'WeKnora v0.7.2 native document import flow extended only with the managed video file types',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
@@ -87,6 +92,10 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.resultingBlob,
     gitBlobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
+  )
+  assert.equal(
+    INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.resultingBlob,
+    gitBlobSha(read('./business-baselines/KnowledgeBase.pre-view.vue')),
   )
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.resultingBlob,

@@ -6,9 +6,9 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('frozen KnowledgeBase business controller remains the original implementation', () => {
+test('audited KnowledgeBase controller remains locked after managed video support', () => {
   const controller = read('./business-baselines/KnowledgeBase.pre-view.vue')
-  assert.equal(blobSha(controller), 'c6c7c53a9f1eda91b645733256eb04221bf816da')
+  assert.equal(blobSha(controller), 'b9e9d9b2d3f09ebaf02bbe543681fdc90ae357df')
 })
 
 test('rebuilt KnowledgeBase reuses normalized frozen setup and keeps Graph host binding intact', () => {

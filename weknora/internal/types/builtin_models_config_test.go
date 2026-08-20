@@ -421,6 +421,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.True(t, byID["builtin-openrouter-qwen-max"].Parameters.Reasoning.Mandatory)
 	assert.Equal(t, "openai/gpt-5.6-sol", byID["builtin-openrouter-gpt-sol"].Name)
 	assert.Equal(t, "google/gemini-3.7-flash", byID["builtin-openrouter-gemini-flash"].Name)
+	assert.False(t, byID["builtin-openrouter-claude-haiku"].Parameters.Reasoning.Supported)
 	assert.Equal(t, "anthropic/claude-opus-5", byID["builtin-openrouter-claude-opus"].Name)
 
 	embedding := byID["builtin-openrouter-embedding"]

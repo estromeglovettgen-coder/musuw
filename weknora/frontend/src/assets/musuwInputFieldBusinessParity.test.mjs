@@ -8,7 +8,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 
 test('audited Input-field controller remains locked after consumer picker integration', () => {
   const controller = read('./business-baselines/Input-field.pre-view.vue')
-  assert.equal(blobSha(controller), 'a54b22494ebaecf39119dcb0717f5d3d0cb448ea')
+  assert.equal(blobSha(controller), 'cd262083e0d7ccef1ef39e636f3d19320d1fb37a')
 })
 
 test('rebuilt Input-field reuses the frozen component options and replaces only its active View', () => {
