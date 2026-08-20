@@ -433,7 +433,6 @@
 .visual-general-settings .t-input,
 .visual-model-settings .t-input,
 .visual-knowledge-page .t-input,
-.visual-knowledge-page .t-select-input,
 .visual-manual-editor .t-input,
 .visual-manual-editor .t-select-input,
 .visual-model-selector .t-input {
@@ -445,7 +444,6 @@
 .visual-general-settings .t-input:hover,
 .visual-model-settings .t-input:hover,
 .visual-knowledge-page .t-input:hover,
-.visual-knowledge-page .t-select-input:hover,
 .visual-manual-editor .t-input:hover,
 .visual-manual-editor .t-select-input:hover,
 .visual-model-selector .t-input:hover {
@@ -453,8 +451,6 @@
 }
 .visual-general-settings .t-input.t-is-focused,
 .visual-model-settings .t-input.t-is-focused,
-.visual-knowledge-page .t-input.t-is-focused,
-.visual-knowledge-page .t-select-input.t-is-focused,
 .visual-manual-editor .t-input.t-is-focused,
 .visual-manual-editor .t-select-input.t-is-focused,
 .visual-model-selector .t-input.t-is-focused {

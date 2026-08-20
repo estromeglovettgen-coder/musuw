@@ -8,7 +8,8 @@ test("knowledge detail keeps the compact reference toolbar without the user-hidd
   assert.match(source, /class="visual-knowledge-toolbar"[\s\S]*?visual-knowledge-toolbar__left/);
   assert.match(source, /data-guide="kb-detail-add-doc"/);
   assert.match(source, /visual-knowledge-toolbar__left[\s\S]*?visual-knowledge-toolbar__right/);
-  assert.match(source, /overlayInnerStyle: \{ maxHeight: '256px' \}/);
+  assert.match(source, /overlayClassName: 'visual-knowledge-select-popup visual-knowledge-select-popup--type'/);
+  assert.match(source, /\.visual-knowledge-select-popup\.t-select__dropdown[\s\S]*?max-height: 256px !important/);
   assert.doesNotMatch(source, /visual-knowledge-date|<t-date-range-picker/);
 });
 

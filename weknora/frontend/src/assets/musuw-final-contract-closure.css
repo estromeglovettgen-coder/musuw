@@ -189,17 +189,6 @@
   background: #000 !important;
 }
 
-/* Neutral focus grammar for migrated/reference-owned surfaces only. Do not use
- * a body-wide selector: Graph/Trace are explicit visual exclusions. */
-:where([class^="visual-"], [class*=" visual-"]) :is(button, a, input, textarea, select):focus-visible,
-.visual-settings-modal :is(button, a, input, textarea, select):focus-visible,
-.cmdk :is(button, a, input, textarea, select):focus-visible,
-.global-invitation-bell__btn:focus-visible {
-  outline: 2px solid #d1d5db !important;
-  outline-offset: 2px !important;
-  box-shadow: none !important;
-}
-
 /* The visual export is neutral; native organization/agent brand artwork is
  * informational rather than semantic status, so reduce saturation without
  * hiding the underlying behavior or source identity. */

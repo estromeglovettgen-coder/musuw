@@ -34,7 +34,7 @@ body .t-dialog .t-button--variant-base.t-button--theme-primary {
 }
 body .t-dialog .t-button--theme-primary:hover { border-color: #000 !important; background: #000 !important; }
 
-body .t-select__dropdown:not(.wiki-graph-search-dropdown),
+body .t-select__dropdown:not(.wiki-graph-search-dropdown):not(.visual-knowledge-select-popup),
 body .t-dropdown__menu {
   padding: 6px !important;
   border: 1px solid #e5e7eb !important;
@@ -44,21 +44,21 @@ body .t-dropdown__menu {
   box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
   font-family: var(--app-font-family) !important;
 }
-body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option,
+body .t-select__dropdown:not(.wiki-graph-search-dropdown):not(.visual-knowledge-select-popup) .t-select-option,
 body .t-dropdown__item {
   min-height: 30px !important;
   border-radius: 8px !important;
   color: #4b5563 !important;
   font-size: 11px !important;
 }
-body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option:hover,
-body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option.t-is-selected,
+body .t-select__dropdown:not(.wiki-graph-search-dropdown):not(.visual-knowledge-select-popup) .t-select-option:hover,
+body .t-select__dropdown:not(.wiki-graph-search-dropdown):not(.visual-knowledge-select-popup) .t-select-option.t-is-selected,
 body .t-dropdown__item:hover,
 body .t-dropdown__item.t-is-active {
   background: #f3f4f6 !important;
   color: #111827 !important;
 }
-body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option.t-is-selected { font-weight: 600 !important; }
+body .t-select__dropdown:not(.wiki-graph-search-dropdown):not(.visual-knowledge-select-popup) .t-select-option.t-is-selected { font-weight: 600 !important; }
 
 /* Reference controls are neutral/black rather than brand-blue. These rules only
  * change the painted checked state; v-model values and events stay untouched. */
@@ -77,11 +77,4 @@ body .t-select__dropdown:not(.wiki-graph-search-dropdown) .t-select-option.t-is-
 :where([class^="visual-"], [class*=" visual-"]) .t-radio__input.t-is-checked {
   border-color: #111827 !important;
   color: #111827 !important;
-}
-
-/* Keep focus visible but neutral only inside the regular workspace. */
-.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-select-input.t-is-focused,
-.musuw-workspace-surface:not(:has(.visual-knowledge-page.is-graph-tab)) .t-input.t-is-focused {
-  border-color: #d1d5db !important;
-  box-shadow: 0 0 0 2px rgb(17 24 39 / 6%) !important;
 }

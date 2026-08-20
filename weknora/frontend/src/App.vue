@@ -297,11 +297,6 @@ select {
   color: var(--musuw-ink-strong);
 }
 
-:focus-visible {
-  outline: 2px solid var(--td-brand-color);
-  outline-offset: 2px;
-}
-
 #app {
   /* 独立合成层，减轻 WebKit 全量重绘时整窗与内容的撕裂感（桌面 WebView 尤其明显） */
   isolation: isolate;
