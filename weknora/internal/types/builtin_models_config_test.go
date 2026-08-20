@@ -18,6 +18,7 @@ import (
 // migrations produce.
 func setupBuiltinModelsDB(t *testing.T) *gorm.DB {
 	t.Helper()
+	t.Setenv("SYSTEM_AES_KEY", testAESKey32)
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&Model{}))
@@ -380,8 +381,6 @@ func TestLoadBuiltinModelsConfig_PreservesEntryIDOverBeforeCreate(t *testing.T) 
 
 func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	db := setupBuiltinModelsDB(t)
-	t.Setenv("DEEPSEEK_API_KEY", "deepseek-test-key")
-	t.Setenv("OPENROUTER_API_KEY", "openrouter-test-key")
 
 	configDir := filepath.Clean(filepath.Join("..", "..", "config"))
 	require.NoError(t, LoadBuiltinModelsConfig(context.Background(), db, configDir))
@@ -397,6 +396,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 		assert.True(t, model.IsBuiltin)
 		assert.Equal(t, BuiltinModelManagedBy, model.ManagedBy)
 		assert.Equal(t, ModelSourceRemote, model.Source)
+		assert.Empty(t, model.Parameters.APIKey, "platform catalog must not persist a shared inference key")
 		if model.IsDefault {
 			defaultByType[model.Type]++
 		}
@@ -411,7 +411,6 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.False(t, byID["builtin-deepseek-v4-flash"].IsDefault)
 	assert.Equal(t, "deepseek/deepseek-v4-flash", byID["builtin-deepseek-v4-flash"].Name)
 	assert.Equal(t, "openrouter", byID["builtin-deepseek-v4-flash"].Parameters.Provider)
-	assert.Equal(t, "openrouter-test-key", byID["builtin-deepseek-v4-flash"].Parameters.APIKey)
 	pro := byID["builtin-deepseek-v4-pro"]
 	assert.False(t, pro.IsDefault)
 	assert.Equal(t, "deepseek/deepseek-v4-pro", pro.Name)
@@ -425,7 +424,6 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	embedding := byID["builtin-openrouter-embedding"]
 	assert.Equal(t, "qwen/qwen3-embedding-8b", embedding.Name)
 	assert.Equal(t, 4096, embedding.Parameters.EmbeddingParameters.Dimension)
-	assert.Equal(t, "openrouter-test-key", embedding.Parameters.APIKey)
 
 	assert.Equal(t, "cohere/rerank-4-fast", byID["builtin-openrouter-rerank"].Name)
 	assert.Equal(t, "qwen/qwen3-vl-8b-instruct", byID["builtin-openrouter-vlm"].Name)

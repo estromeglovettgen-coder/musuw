@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
@@ -28,7 +28,7 @@ export default defineComponent({
     DocumentListView, DocumentCardView, DocumentBatchBar, KbUploadSourceDropdown, KbFolderTree,
     TagEditDialog, BatchTagDialog, KbTagManageDrawer, WikiBrowser,
   },
-  setup(props, context) {
+  setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
     return state
@@ -46,7 +46,7 @@ export default defineComponent({
               <t-icon name="chevron-left" /><span>{{ $t('menu.knowledgeBase') }}</span>
             </button>
             <span class="visual-knowledge-breadcrumb__sep">/</span>
-            <KBSwitcherDropdown v-if="knowledgeList.length" :kb-list="knowledgeList" :current-kb-id="kbId" @select="(id) => handleKnowledgeDropdownSelect({ value: id })">
+            <KBSwitcherDropdown v-if="knowledgeList.length" :kb-list="knowledgeList" :current-kb-id="kbId" @select="(id: string) => handleKnowledgeDropdownSelect({ value: id })">
               <button type="button" class="visual-knowledge-breadcrumb__current" :disabled="!kbId">
                 <template v-if="!kbInfo"><t-skeleton animation="gradient" :row-col="[{ width: '112px', height: '16px' }]" /></template>
                 <template v-else><span>{{ kbInfo.name }}</span><t-icon name="chevron-down" /></template>
@@ -67,11 +67,11 @@ export default defineComponent({
             <t-icon name="file" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabDocuments') }}<template v-if="typeof total === 'number'"> ({{ total }})</template></span>
           </button>
           <button type="button" :class="{ 'is-active': activeKbTab === 'wiki' }" role="tab" :aria-selected="activeKbTab === 'wiki'" @click="activeKbTab = 'wiki'">
-            <t-icon name="book" /><span>Wiki</span><t-loading v-if="wikiIsIndexing" size="small" />
+            <t-icon name="book" /><span>Wiki</span><t-tooltip v-if="wikiIsIndexing" :content="wikiIndexingTip" placement="bottom"><t-loading size="small" /></t-tooltip>
           </button>
           <t-tooltip :content="$t('knowledgeEditor.wikiBrowser.tabGraphTip')" placement="bottom">
             <button type="button" :class="{ 'is-active': activeKbTab === 'graph' }" role="tab" :aria-selected="activeKbTab === 'graph'" @click="activeKbTab = 'graph'">
-              <t-icon name="chart-bubble" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span><t-loading v-if="wikiIsIndexing" size="small" />
+              <t-icon name="chart-bubble" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span><t-tooltip v-if="wikiIsIndexing" :content="wikiIndexingTip" placement="bottom"><t-loading size="small" /></t-tooltip>
             </button>
           </t-tooltip>
         </div>
@@ -79,7 +79,7 @@ export default defineComponent({
       </header>
 
       <div v-if="unsupportedFileTypes.length || missingStorageEngine" class="visual-knowledge-alerts">
-        <button v-if="unsupportedFileTypes.length" type="button" :disabled="authStore.isLiteMode" @click="goToParserSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map(t => '.' + t).join('、') }) }}</span><strong v-if="!authStore.isLiteMode">{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
+        <button v-if="unsupportedFileTypes.length" type="button" :disabled="authStore.isLiteMode" @click="goToParserSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.unsupportedTypesHint', { types: unsupportedFileTypes.map((t: string) => '.' + t).join('、') }) }}</span><strong v-if="!authStore.isLiteMode">{{ $t('knowledgeBase.goToParserSettings') }} →</strong></button>
         <button v-if="missingStorageEngine" type="button" :disabled="authStore.isLiteMode" @click="handleOpenKBSettings"><t-icon name="info-circle" /><span>{{ $t('knowledgeBase.missingStorageEngine') }}</span><strong v-if="!authStore.isLiteMode">{{ $t('knowledgeBase.goToStorageSettings') }} →</strong></button>
       </div>
 
@@ -99,7 +99,7 @@ export default defineComponent({
                 <template v-for="(crumb, index) in folderBreadcrumbs" :key="crumb.path">
                   <t-icon name="chevron-right" />
                   <button
-                    v-if="index < folderBreadcrumbs.length - 1"
+                    v-if="Number(index) < folderBreadcrumbs.length - 1"
                     type="button"
                     class="visual-knowledge-path-pill__segment"
                     @click="handleFolderSelect(crumb.path)"
@@ -157,14 +157,14 @@ export default defineComponent({
               <div v-for="n in 8" :key="n" class="visual-knowledge-skeleton-card"><t-skeleton animation="gradient" :row-col="[{ width: '68%', height: '15px' },{ width: '100%', height: '12px' },{ width: '52%', height: '12px' }]" /></div>
             </div>
 
-            <DocumentCardView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'grid'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions" :selected-ids="selectedIds" :batch-mode="batchMode" :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge" :trace-available-by-id="traceAvailableById" :tag-list="tagList" :move-menu-mode="moveMenuMode" :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode" :move-submitting="moveSubmitting" :show-folder-path="showDocumentFolderPath" @open="(item) => openKnowledgeItem(item)" @open-folder="handleFolderSelect" @move-to-folder="(item, path) => moveKnowledgeIntoFolder([item.id], path)" @toggle-checkbox="onCardGridCheckboxChange" @menu-visible-change="(visible, item) => onCardMoreVisibleChange(visible, item)" @action="(action, item) => handleCardAction(action, item)" @tag-edit="(item) => openTagEditDialog(item)" @move-select-target="(kb) => handleMoveSelectTarget(kb)" @move-back="handleMoveBack" @move-confirm="handleMoveConfirm" @update:move-mode="(mode) => moveMode = mode" />
+            <DocumentCardView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'grid'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions" :selected-ids="selectedIds" :batch-mode="batchMode" :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge" :trace-available-by-id="traceAvailableById" :tag-list="tagList" :move-menu-mode="moveMenuMode" :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode" :move-submitting="moveSubmitting" :show-folder-path="showDocumentFolderPath" @open="(item: any) => openKnowledgeItem(item)" @open-folder="handleFolderSelect" @move-to-folder="(item: any, path: string) => moveKnowledgeIntoFolder([item.id], path)" @toggle-checkbox="onCardGridCheckboxChange" @menu-visible-change="(visible: boolean, item: any) => onCardMoreVisibleChange(visible, item)" @action="(action: string, item: any) => handleCardAction(action, item)" @tag-edit="(item: any) => openTagEditDialog(item)" @move-select-target="(kb: any) => handleMoveSelectTarget(kb)" @move-back="handleMoveBack" @move-confirm="handleMoveConfirm" @update:move-mode="(mode: any) => moveMode = mode" />
 
-            <DocumentListView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'list'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions" :selected-ids="selectedIds" :tag-list="tagList" :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge" :trace-visible-ids="traceAvailableById" :move-menu-mode="moveMenuMode" :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode" :move-submitting="moveSubmitting" :show-folder-path="showDocumentFolderPath" @open-folder="handleFolderSelect" @move-to-folder="(item, path) => moveKnowledgeIntoFolder([item.id], path)" @open="(item) => openKnowledgeItem(item)" @toggle-row="toggleSelectRow" @toggle-all="toggleSelectAll" @action="(action, item) => handleListAction(action, item)" @probe-trace="(item) => probeTraceAvailable(item)" @tag-edit="(item) => openTagEditDialog(item)" @move-select-target="(kb) => handleMoveSelectTarget(kb)" @move-back="handleMoveBack" @move-confirm="handleMoveConfirm" @update:move-mode="(mode) => moveMode = mode" @reset-move-state="moveMenuMode = 'normal'" />
+            <DocumentListView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'list'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions" :selected-ids="selectedIds" :tag-list="tagList" :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge" :trace-visible-ids="traceAvailableById" :move-menu-mode="moveMenuMode" :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode" :move-submitting="moveSubmitting" :show-folder-path="showDocumentFolderPath" @open-folder="handleFolderSelect" @move-to-folder="(item: any, path: string) => moveKnowledgeIntoFolder([item.id], path)" @open="(item: any) => openKnowledgeItem(item)" @toggle-row="toggleSelectRow" @toggle-all="toggleSelectAll" @action="(action: string, item: any) => handleListAction(action, item)" @probe-trace="(item: any) => probeTraceAvailable(item)" @tag-edit="(item: any) => openTagEditDialog(item)" @move-select-target="(kb: any) => handleMoveSelectTarget(kb)" @move-back="handleMoveBack" @move-confirm="handleMoveConfirm" @update:move-mode="(mode: any) => moveMode = mode" @reset-move-state="moveMenuMode = 'normal'" />
 
             <div v-else-if="!docListLoading" class="visual-knowledge-empty"><p v-if="selectedFolderPath || isFiltering">{{ isFiltering ? $t('knowledgeBase.folderTree.emptySearch') : $t('knowledgeBase.folderTree.emptyFolder') }}</p><EmptyKnowledge v-else /></div>
           </div>
 
-          <div v-show="batchMode || selectedIds.size > 0" class="visual-knowledge-batch-anchor"><DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting" :reparse-loading="batchReparsing" :tag-loading="batchTagging" :visible="batchMode || selectedIds.size > 0" :show-move-to-folder="canEdit" :folder-options="folderOptions" @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse" @batch-tag="handleBatchTag" @move-to-folder="(path) => moveKnowledgeIntoFolder(Array.from(selectedIds), path)" /></div>
+          <div v-show="batchMode || selectedIds.size > 0" class="visual-knowledge-batch-anchor"><DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting" :reparse-loading="batchReparsing" :tag-loading="batchTagging" :visible="batchMode || selectedIds.size > 0" :show-move-to-folder="canEdit" :folder-options="folderOptions" @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse" @batch-tag="handleBatchTag" @move-to-folder="(path: string) => moveKnowledgeIntoFolder(Array.from(selectedIds), path)" /></div>
         </div>
       </section>
 
@@ -173,7 +173,7 @@ export default defineComponent({
   </template>
 
   <section v-else class="visual-faq-manager"><FAQEntryManager v-if="kbId" :kb-id="kbId" /></section>
-  <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
+  <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val: boolean) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
   <TagEditDialog :visible="tagEditDialogVisible" :knowledge-name="tagEditTarget?.display_name || tagEditTarget?.file_name || tagEditTarget?.title || ''" :kb-id="kbId" :tag-list="tagList" :selected-tags="tagEditTarget?.tags || []" :can-manage="canEdit" @update:visible="tagEditDialogVisible = $event" @confirm="onTagEditConfirm" @tag-created="loadTags(kbId, true)" @open-manage="openTagManageFromEditDialog" />
   <BatchTagDialog :visible="batchTagDialogVisible" :count="selectedIds.size" :kb-id="kbId" :tag-list="tagList" :pre-selected-tag-ids="batchTagPreSelectedIds" :can-manage="canEdit" :confirm-loading="batchTagging" @update:visible="batchTagDialogVisible = $event" @confirm="onBatchTagConfirm" @tag-created="loadTags(kbId, true)" @open-manage="openTagManageFromBatchDialog" />
   <KbTagManageDrawer v-if="!isFAQ" v-model:visible="tagManageDrawerVisible" :kb-id="kbId" :is-faq="isFAQ" @changed="onTagManageChanged" />

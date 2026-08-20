@@ -107,7 +107,7 @@ test('KnowledgeBase.tsx list tokens remain mechanically translated while native 
 test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
   expectTokens('../views/settings/Settings.vue', [
     'width: min(896px, 100%);', 'height: 520px;', 'border-radius: 24px;',
-    'flex: 0 0 224px;', 'padding: 24px;', 'padding: 32px;',
+    'flex: 0 0 224px;', 'padding: 24px 12px 16px 24px;', 'padding: 32px;',
   ])
 })
 

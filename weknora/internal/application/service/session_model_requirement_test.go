@@ -148,7 +148,7 @@ func TestResolveChatModelIDUsesValidSummaryModelOverride(t *testing.T) {
 	assert.Equal(t, "override-chat", modelID)
 }
 
-func TestResolveChatModelIDKeepsPlatformModeModelAuthoritative(t *testing.T) {
+func TestResolveChatModelIDUsesAllowedRuntimeModelForPlatformModes(t *testing.T) {
 	svc := &sessionService{
 		modelService: &stubModelService{
 			modelsByID: map[string]*types.Model{
@@ -172,18 +172,18 @@ func TestResolveChatModelIDKeepsPlatformModeModelAuthoritative(t *testing.T) {
 		expectedModel string
 	}{
 		{
-			name:          "flash ignores a forged Pro override",
+			name:          "flash accepts a policy-approved runtime selection",
 			agentID:       types.BuiltinQuickAnswerID,
 			configuredID:  "builtin-deepseek-v4-flash",
 			requestModel:  types.PlatformKnowledgeBaseChatModelID,
-			expectedModel: "builtin-deepseek-v4-flash",
+			expectedModel: types.PlatformKnowledgeBaseChatModelID,
 		},
 		{
-			name:          "pro ignores a forged Flash override",
+			name:          "pro accepts a policy-approved runtime selection",
 			agentID:       types.BuiltinSmartReasoningID,
 			configuredID:  types.PlatformKnowledgeBaseChatModelID,
 			requestModel:  "builtin-deepseek-v4-flash",
-			expectedModel: types.PlatformKnowledgeBaseChatModelID,
+			expectedModel: "builtin-deepseek-v4-flash",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -202,6 +202,37 @@ func TestResolveChatModelIDKeepsPlatformModeModelAuthoritative(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedModel, modelID)
+			assert.Equal(t, tc.expectedModel, req.CustomAgent.Config.ModelID)
+			assert.Equal(t, tc.expectedModel, req.CustomAgent.Config.QueryUnderstandModelID)
 		})
 	}
+}
+
+func TestResolveChatModelIDRejectsUnavailableRuntimeModelForPlatformMode(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				"builtin-deepseek-v4-flash": {
+					ID:   "builtin-deepseek-v4-flash",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session:        &types.Session{},
+		SummaryModelID: "not-in-the-platform-catalog",
+		CustomAgent: &types.CustomAgent{
+			ID: types.BuiltinQuickAnswerID,
+			Config: types.CustomAgentConfig{
+				ModelID: "builtin-deepseek-v4-flash",
+			},
+		},
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.Error(t, err)
+	assert.Empty(t, modelID)
+	assert.Contains(t, err.Error(), "unavailable")
 }

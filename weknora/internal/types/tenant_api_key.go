@@ -243,14 +243,11 @@ func NormalizeAPIKeyCapabilities(in StringArray) StringArray {
 }
 
 func (k *TenantAPIKey) BeforeSave(tx *gorm.DB) error {
-	if key := utils.GetAESKey(); key != nil && k.APIKey != "" {
-		encrypted, err := utils.EncryptAESGCM(k.APIKey, key)
-		if err != nil {
-			// Never fall through to storing the plaintext key: abort the
-			// write so the caller sees the failure instead of silently
-			// persisting an unencrypted secret.
-			return fmt.Errorf("encrypt tenant_api_keys.api_key (id=%d): %w", k.ID, err)
-		}
+	encrypted, err := encryptStoredSecretStrict(fmt.Sprintf("tenant_api_keys.api_key (id=%d)", k.ID), k.APIKey)
+	if err != nil {
+		return err
+	}
+	if encrypted != "" {
 		tx.Statement.SetColumn("api_key", encrypted)
 	}
 	return nil

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
 import LegacyInputFieldBusiness from '@/assets/business-baselines/Input-field.pre-view.vue'
 import AttachmentUpload from './AttachmentUpload.vue'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
@@ -20,7 +20,7 @@ export default defineComponent({
     MentionSelector,
     AgentSelector,
   },
-  setup(props, context) {
+  setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const authStore = useAuthStore()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
@@ -170,7 +170,7 @@ export default defineComponent({
     <Teleport to="body">
       <div v-if="showModelSelector" class="visual-chat-composer__overlay" @click="closeModelSelector">
         <div class="visual-chat-composer__model-menu" :style="modelDropdownStyle" @click.stop>
-          <header><span>{{ $t('conversationSettings.models.chatGroupLabel') }}</span><button v-if="!authStore.isLiteMode" type="button" @click="handleModelChange('__add_model__')"><t-icon name="add" /><span>{{ $t('input.addModel') }}</span></button></header>
+          <header><span>{{ $t('conversationSettings.models.chatGroupLabel') }}</span><button v-if="authStore.isSystemAdmin" type="button" @click="handleModelChange('__add_model__')"><t-icon name="add" /><span>{{ $t('input.addModel') }}</span></button></header>
           <div class="visual-chat-composer__model-options">
             <button v-for="model in availableModels" :key="model.id" type="button" :class="{ 'is-selected': model.id === selectedModelId }" @click="handleModelChange(model.id || '')">
               <span class="visual-chat-composer__model-copy"><strong>{{ modelDisplayName(model) }}</strong><small v-if="model.display_name">{{ model.name }}</small></span><t-icon v-if="model.id === selectedModelId" name="check" />

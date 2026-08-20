@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
 import LegacyChatBusiness from '@/assets/business-baselines/ChatIndex.pre-view.vue'
 import InputField from '../../components/Input-field.vue'
 import botmsg from './components/botmsg.vue'
@@ -20,7 +20,7 @@ export default defineComponent({
     ...(legacy.components || {}), InputField, botmsg, usermsg, KnowledgeBaseEditorModal,
     ChatReferencesDrawer, ChatAttachmentPreviewDrawer, FollowUpSuggestions, ChatHeader,
   },
-  setup(props, context) {
+  setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
     return state
@@ -56,8 +56,8 @@ export default defineComponent({
         <article v-for="(session, index) in messagesList" :key="session.id || `${session.role}-${session.created_at}-${index}`" class="visual-chat-message-row" :class="`is-${session.role}`">
           <usermsg v-if="session.role === 'user'" :content="session.content" :mentioned_items="session.mentioned_items" :images="session.images" :attachments="session.attachments" :embedded-mode="embeddedMode" :session-id="session_id" />
           <template v-if="session.role === 'assistant' && shouldRenderAssistantMessage(session)">
-            <botmsg :content="session.content" :session="session" :session-id="session_id" :user-query="getUserQuery(index)" :is-first-enter="isFirstEnter" :embedded-mode="embeddedMode" :follow-up-loading="Boolean(session.suggestionLoading && !session.suggestionSet?.questions?.length)" @scroll-bottom="scrollToBottom" @render-complete-change="(ready) => handleAnswerRenderComplete(session, ready)" />
-            <FollowUpSuggestions v-if="session.answerFullyRendered && !session.suggestionsDismissed" :suggestion-set="session.suggestionSet" :loading="session.suggestionLoading" :allow-regenerate="session.suggestionSet?.allow_regenerate" @select="(item) => handleFollowUpSelect(session, item)" @regenerate="loadFollowUpSuggestions(session, true, true)" @impression="(set) => recordSuggestionEvent(session, set, 'impression')" @dismiss="(set) => dismissSuggestions(session, set)" />
+            <botmsg :content="session.content" :session="session" :session-id="session_id" :user-query="getUserQuery(index)" :is-first-enter="isFirstEnter" :embedded-mode="embeddedMode" :follow-up-loading="Boolean(session.suggestionLoading && !session.suggestionSet?.questions?.length)" @scroll-bottom="scrollToBottom" @render-complete-change="(ready: boolean) => handleAnswerRenderComplete(session, ready)" />
+            <FollowUpSuggestions v-if="session.answerFullyRendered && !session.suggestionsDismissed" :suggestion-set="session.suggestionSet" :loading="session.suggestionLoading" :allow-regenerate="session.suggestionSet?.allow_regenerate" @select="(item: any) => handleFollowUpSelect(session, item)" @regenerate="loadFollowUpSuggestions(session, true, true)" @impression="(set: any) => recordSuggestionEvent(session, set, 'impression')" @dismiss="(set: any) => dismissSuggestions(session, set)" />
           </template>
         </article>
 
@@ -68,10 +68,10 @@ export default defineComponent({
     <Transition name="visual-chat-scroll-button"><button v-show="userHasScrolledUp" type="button" class="visual-chat-scroll-bottom" :aria-label="t('chat.scrollToBottom')" @click="onClickScrollToBottom"><t-icon name="chevron-down" /></button></Transition>
 
     <div class="visual-chat-input" :class="{ 'is-embedded': embeddedMode }">
-      <InputField ref="inputFieldRef" :is-replying="isReplying" :session-id="session_id" :assistant-message-id="currentAssistantMessageId" :embedded-mode="embeddedMode" @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking)" @stop-generation="handleStopGeneration" />
+      <InputField ref="inputFieldRef" :is-replying="isReplying" :session-id="session_id" :assistant-message-id="currentAssistantMessageId" :embedded-mode="embeddedMode" @send-msg="(query: any, modelId: any, mentionedItems: any, imageFiles: any, attachmentFiles: any, thinking: any) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking)" @stop-generation="handleStopGeneration" />
     </div>
 
-    <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
+    <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val: boolean) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
     <ChatReferencesDrawer />
     <ChatAttachmentPreviewDrawer />
   </main>

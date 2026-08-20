@@ -509,8 +509,9 @@ type DataSourceSyncPayload struct {
 // ToJSON converts a DataSourceConfig to the JSON blob stored in
 // DataSource.Config.
 //
-// When SYSTEM_AES_KEY is configured, every string value inside
-// Credentials is AES-256-GCM encrypted before serialization. Non-string
+// Every non-empty string value inside Credentials is AES-256-GCM encrypted
+// before serialization; persistence fails when SYSTEM_AES_KEY is unavailable.
+// Non-string
 // values (numbers, bools, nested objects) pass through untouched. This is
 // the only write path through which credentials reach the DB (the GORM
 // JSON type itself is a byte passthrough), so encrypting here is
@@ -524,14 +525,16 @@ func (d *DataSourceConfig) ToJSON() (JSON, error) {
 		return nil, nil
 	}
 	out := *d
-	if key := utils.GetAESKey(); key != nil && len(out.Credentials) > 0 {
+	if len(out.Credentials) > 0 {
 		encCreds := make(map[string]interface{}, len(out.Credentials))
 		for k, v := range out.Credentials {
 			if s, ok := v.(string); ok && s != "" {
-				if enc, err := utils.EncryptAESGCM(s, key); err == nil {
-					encCreds[k] = enc
-					continue
+				enc, err := encryptStoredSecretStrict("data_source.config.credentials."+k, s)
+				if err != nil {
+					return nil, err
 				}
+				encCreds[k] = enc
+				continue
 			}
 			encCreds[k] = v
 		}

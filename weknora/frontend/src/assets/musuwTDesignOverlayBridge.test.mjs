@@ -17,11 +17,11 @@ test('native teleported overlays use reference neutral chrome', () => {
     'body .t-dialog',
     'body .t-select__dropdown',
     'body .t-dropdown__menu',
-    'body .t-popconfirm',
     'border-radius: 16px !important',
     'background: #111827 !important',
     'background: #f3f4f6 !important',
   ]) assert.ok(css.includes(token), `teleported visual contract missing: ${token}`)
+  assert.equal(css.includes('body .t-popconfirm'), false, 'Trace popconfirm must remain outside the global visual bridge')
 })
 
 test('overlay bridge does not own application behavior or excluded renderers', () => {

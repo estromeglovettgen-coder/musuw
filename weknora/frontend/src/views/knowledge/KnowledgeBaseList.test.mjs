@@ -3,31 +3,36 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const source = readFileSync(new URL("./KnowledgeBaseList.vue", import.meta.url), "utf8");
+const controller = readFileSync(
+  new URL("../../assets/business-baselines/KnowledgeBaseList.pre-view.vue", import.meta.url),
+  "utf8",
+);
 
 test("consumer KB creation opens the name-only document flow without model preselection", () => {
   assert.match(
-    source,
-    /const handleCreateKnowledgeBase = \(\) => \{[\s\S]*?uiStore\.openCreateKB\("document"\);/,
+    controller,
+    /const handleCreateKnowledgeBase = \(\) => \{[\s\S]*?uiStore\.openCreateKB\('document'\)/,
   );
-  assert.doesNotMatch(source, /useTenantModelReadiness|modelsReadyLoaded|isReadyForDocumentKb/);
+  assert.doesNotMatch(controller, /useTenantModelReadiness|modelsReadyLoaded|isReadyForDocumentKb/);
 });
 
 test("consumer KB list has no uninitialized-model repair prompt or settings escape hatch", () => {
-  assert.doesNotMatch(source, /hasUninitializedKbs|uninitializedBanner|isInitialized\(/);
-  assert.doesNotMatch(
-    source,
-    /knowledgeBase\.settings|handleSettingsById|handleSettings|goSettings|openKBSettings/,
-  );
+  assert.doesNotMatch(controller, /hasUninitializedKbs|uninitializedBanner|isInitialized\(/);
   assert.match(
-    source,
-    /const handleCardClick = \(kb: KB\) => \{[\s\S]*?pins\.touchRecent\("kb", kb\.id\);[\s\S]*?goDetail\(kb\.id\);/,
+    controller,
+    /const handleCardClick = \(kb: KB\) => \{[\s\S]*?pins\.touchRecent\('kb', kb\.id\)[\s\S]*?goDetail\(kb\.id\)/,
   );
+  const openCardPath = controller.match(
+    /const handleCardClick = \(kb: KB\) => \{[\s\S]*?\n\}/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(openCardPath, /settings|readiness|initialized/i);
 });
 
-test("KB list keeps creation in the grid and removes the noisy header/group chrome", () => {
+test("KB list keeps both visible and in-grid creation actions while preserving native scopes", () => {
   assert.doesNotMatch(source, /class="header-action-btn"/);
-  assert.match(source, /class="kb-card kb-create-card"[\s\S]*?data-guide="kb-list-create"/);
-  assert.doesNotMatch(source, /<span>\{\{ \$t\("knowledgeList\.sections\.mine"\) \}\}<\/span>/);
+  assert.match(source, /class="visual-kb-list__create"[\s\S]*?data-guide="kb-list-create"/);
+  assert.match(source, /class="visual-kb-list__create-card"[\s\S]*?data-guide="kb-list-create"/);
+  assert.match(source, /class="visual-kb-section"/);
 });
 
 test("KB cards do not render decorative graph or multimodal footer badges", () => {

@@ -42,7 +42,7 @@ const controllers = [
       'sortedMineKbs', 'spaceSelection', 'spaceSelectionOrgId', 'sortedSpaceKbsList', 'spaceKbsLoading',
       'toggleKbSection', 'mineKbSectionCounts', 'filteredKbSectionCounts', 'spaceKbSectionCounts',
       'isKbSectionCollapsed', 'isMyKb', 'showShareGroupHeaders', 'kbSectionOf', 'highlightedKbId',
-      'highlightedCardRef', 'handleCardClick', 'isKbFavorited', 'toggleFavoriteKb', 'isWikiKb',
+      'highlightedCardRef', 'handleCardClick', 'isKbFavorited', 'toggleFavoriteKb',
       'handleTogglePin', 'handleTogglePinById', 'canDuplicateKBCard', 'handleDuplicate', 'handleDuplicateById',
       'canManageKBCard', 'handleDelete', 'handleDeleteById', 'handleSharedKbClickFromAll',
       'openSharedDetailFromAll', 'handleSharedKbClick', 'openSharedDetail', 'isSpaceKbCollapsed',

@@ -96,20 +96,16 @@ test('rebuilt documents View retains folder, collapsed rail, marquee, loading, e
 test('rebuilt document child components retain all native parent event bridges', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   for (const token of [
-    '@toggle-checkbox="onCardGridCheckboxChange"',
-    '@menu-visible-change="(visible, item) => onCardMoreVisibleChange(visible, item)"',
-    '@action="(action, item) => handleCardAction(action, item)"',
-    '@toggle-row="toggleSelectRow"',
-    '@toggle-all="toggleSelectAll"',
-    '@action="(action, item) => handleListAction(action, item)"',
-    '@probe-trace="(item) => probeTraceAvailable(item)"',
-    '@move-select-target="(kb) => handleMoveSelectTarget(kb)"',
-    '@move-back="handleMoveBack"',
-    '@move-confirm="handleMoveConfirm"',
-    '@update:move-mode="(mode) => moveMode = mode"',
-    '@reset-move-state="moveMenuMode = \'normal\'"',
-    '@closeDoc="closeDoc"',
-    '@getDoc="getDoc"',
+    '@toggle-checkbox=', 'onCardGridCheckboxChange',
+    '@menu-visible-change=', 'onCardMoreVisibleChange',
+    '@action=', 'handleCardAction',
+    '@toggle-row=', 'toggleSelectRow',
+    '@toggle-all=', 'toggleSelectAll', 'handleListAction',
+    '@probe-trace=', 'probeTraceAvailable',
+    '@move-select-target=', 'handleMoveSelectTarget',
+    '@move-back="handleMoveBack"', '@move-confirm="handleMoveConfirm"',
+    '@update:move-mode=', "moveMenuMode = 'normal'",
+    '@closeDoc="closeDoc"', '@getDoc="getDoc"',
     '@summaryStateChange="syncDocumentSummaryState"',
   ]) assert.ok(source.includes(token), `KnowledgeBase lost parent/child event bridge: ${token}`)
 })

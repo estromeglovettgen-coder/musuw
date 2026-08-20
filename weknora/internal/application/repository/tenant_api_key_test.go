@@ -13,6 +13,7 @@ import (
 
 func TestTenantAPIKeyRepositoryPersistsUTCExpiry(t *testing.T) {
 	t.Setenv("TZ", "Asia/Shanghai")
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)

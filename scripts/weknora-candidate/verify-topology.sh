@@ -8,7 +8,7 @@ secret_dir="$repo_root/.runtime/weknora/secrets"
 config_json="$(mktemp)"
 trap 'rm -f "$config_json"' EXIT
 
-for secret in "$secret_dir/oidc_client_id" "$secret_dir/oidc_client_secret" "$secret_dir/deepseek_api_key" "$secret_dir/openrouter_api_key"; do
+for secret in "$secret_dir/oidc_client_id" "$secret_dir/oidc_client_secret"; do
     if [ ! -O "$secret" ] || [ ! -r "$secret" ]; then
         printf '%s\n' 'candidate backend secret ownership or readability is unsafe' >&2
         exit 1

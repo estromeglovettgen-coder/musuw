@@ -7,22 +7,22 @@ Musuw already has tenant storage quotas, tenant-scoped repositories, native mode
 **Goals:**
 
 - Make Free, Plus, Pro, and Max limits authoritative on existing server paths.
-- Count OpenRouter's own reported cost per tenant and UTC month.
+- Make OpenRouter's managed key limit and usage the spend authority per tenant and UTC month.
 - Keep consumer-facing state visible and testable with two accounts.
 - Add the smallest secure Paddle synchronization seam for later credential configuration.
 
 **Non-Goals:**
 
-- A general billing, ledger, invoicing, analytics, or per-provider metering platform.
-- Per-user OpenRouter API keys, distributed reservations, queues, or historical usage events.
+- A general billing, local usage ledger, invoicing, analytics, or per-provider metering platform.
+- User-supplied API keys, request-price estimates, distributed reservations, queues, or historical usage events.
 - Restoring the video feature skipped in Task 2.
 - Building admin subscription management or a custom checkout UI.
 
 ## Decisions
 
-### Keep entitlement state on the existing tenant row
+### Keep durable product state on the existing tenant row
 
-Add only plan/status, current usage month/amount, and optional Paddle identifiers to `tenants`. Storage remains in the existing `storage_quota`/`storage_used` fields. This avoids a new aggregate, join, repository family, and cross-table transaction. A separate entitlement table was rejected because there is exactly one current entitlement per tenant and no current consumer for history.
+Keep plan/status and optional Paddle identifiers on `tenants`; storage remains in the existing `storage_quota`/`storage_used` fields. Store only the OpenRouter-managed child key and key hash in the existing tenant credentials JSONB, encrypted by the existing secret-value path. OpenRouter, not a Musuw usage table or counter, owns monthly spend state. This avoids a second ledger, aggregate, join, and reconciliation service.
 
 ### Put the complete plan matrix in one pure Go definition
 
@@ -32,13 +32,15 @@ One `PlanLimits` function owns plan names, storage, monthly credits, Free conten
 
 Knowledge-base creation, all upload entry points, model listing/resolution, and provider construction call a small entitlement service. UI filtering is only presentation. This reuses WeKnora's repository counts and storage pipeline and prevents direct API bypasses.
 
-### Use an OpenRouter-aware HTTP transport
+### Use OpenRouter's official managed-key boundary
 
-A small transport wrapper injects the documented stable `user` identifier into JSON requests, performs a conservative credit preflight, and reads `usage.cost` from normal JSON or the terminal streaming payload before recording it. Existing chat, embedding, rerank, vision, and speech clients receive this HTTP client; provider behavior and response parsing otherwise remain unchanged. Direct DeepSeek credentials are not used by built-in models.
+On first inference, the entitlement service uses OpenRouter's official Go SDK to create one child key named for the tenant with the plan's monthly-reset limit. The existing tenant-row transaction installs the first winner; a concurrent loser is deleted at OpenRouter. No shared inference key or BYOK fallback exists. The stored key is encrypted at rest and never serialized to consumers.
 
-### Keep accounting current-state only
+A small transport wrapper obtains that tenant key, replaces the outbound authorization header, and injects the documented stable `user` identifier into JSON requests. Existing chat, embedding, rerank, vision, and speech clients receive this HTTP client; provider behavior and response parsing otherwise remain unchanged. OpenRouter HTTP/SSE credit exhaustion is converted into one typed terminal error so chat closes cleanly and ingestion uses WeKnora's native failed/reparse lifecycle without futile retries.
 
-Usage is an integer number of micro-US dollars plus a `YYYY-MM` UTC key on the tenant. Repository updates perform the month rollover and increment atomically. The preflight estimate is an admission guard; OpenRouter's reported cost is authoritative. This intentionally does not create an event ledger.
+### Query usage and synchronize plan changes at the provider
+
+General settings queries the child key through the official SDK and displays OpenRouter's limit, monthly usage, and remaining value. Before a paid-plan change is committed, the same SDK updates the child's monthly limit; failure leaves the durable plan unchanged. If the database write loses to a newer event or fails, the service restores the provider limit from the durable tenant plan. Tenant deletion removes the provider key before deleting local state. These short fail-closed operations replace a local accounting/reconciliation subsystem.
 
 ### Make Paddle an optional signed adapter
 
@@ -46,18 +48,20 @@ A public webhook verifies Paddle's documented HMAC signature and replay window a
 
 ## Risks / Trade-offs
 
-- [OpenRouter pricing changes can make an estimate imperfect] → Use a conservative byte/token estimate and charge only authoritative `usage.cost`; expose remaining credit clearly.
-- [Concurrent calls can exceed a quota by a small in-flight amount] → Use atomic month rollover/increment and preflight every call; do not introduce distributed reservations for the current single-server consumer load.
-- [A provider response omits `usage.cost`] → Do not invent a charge; log the omission and keep the official response value as the only accounting source.
+- [The management key or required AES key is absent] → Do not provision or fall back to a shared key; expose the plan limit with provider usage marked unavailable/unprovisioned and log a reason code.
+- [Concurrent first requests create multiple child keys] → Persist one winner under the existing tenant row lock and delete each provider-side loser.
+- [A plan update reaches OpenRouter but not the database] → Restore the provider limit from the durable database plan immediately; do not add a background reconciler for the current single-server product.
+- [OpenRouter returns HTTP 402 or a terminal SSE credit error] → Treat it as non-retryable, preserve any already-streamed answer, and leave uploaded source data available for WeKnora's existing reparse flow.
 - [Paddle delivery order varies] → Use event occurrence time and event ID so an older or duplicate event cannot overwrite newer state.
 - [Existing tenants currently have larger storage quotas] → Migration assigns Free and 5 GiB unless an explicit paid plan is set; files are never deleted when usage exceeds the new quota, but new uploads remain blocked.
 
 ## Migration Plan
 
-1. Add tenant entitlement columns with Free defaults in PostgreSQL and SQLite; update existing rows to Free/5 GiB without deleting data.
-2. Deploy backend enforcement and the read-only entitlement UI with Paddle disabled by default.
-3. Configure Paddle values later as one deployment unit, then register its webhook endpoint.
-4. Validate Free and paid behavior with separate Google-owned tenants and minimal OpenRouter calls.
+1. Keep tenant entitlement columns with Free defaults in PostgreSQL and SQLite; update existing rows to Free/5 GiB without deleting data.
+2. Deploy backend enforcement, tenant child-key provisioning, and the read-only entitlement UI with Paddle disabled by default.
+3. Configure `OPENROUTER_MANAGEMENT_API_KEY` and the existing 32-byte `SYSTEM_AES_KEY`; child keys are created lazily, so there is no bulk migration or provider-side scan.
+4. Configure Paddle values later as one deployment unit, then register its webhook endpoint.
+5. Validate Free and paid behavior with separate tenants and one bounded OpenRouter request after the management key is available.
 
 Rollback is code rollback plus leaving additive columns in place; no user objects or usage records are deleted.
 

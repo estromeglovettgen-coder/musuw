@@ -572,6 +572,20 @@ type sseStreamContext struct {
 	assistantMessage *types.Message
 }
 
+func titleModelIDForRequest(reqCtx *qaRequestContext) string {
+	if reqCtx == nil {
+		return ""
+	}
+	if reqCtx.customAgent == nil {
+		return reqCtx.summaryModelID
+	}
+	if (reqCtx.customAgent.ID == types.BuiltinQuickAnswerID ||
+		reqCtx.customAgent.ID == types.BuiltinSmartReasoningID) && reqCtx.summaryModelID != "" {
+		return reqCtx.summaryModelID
+	}
+	return reqCtx.customAgent.Config.ModelID
+}
+
 // setupSSEStream sets up the SSE streaming context
 func (h *Handler) setupSSEStream(reqCtx *qaRequestContext, generateTitle bool) *sseStreamContext {
 	// Set SSE headers
@@ -620,11 +634,10 @@ func (h *Handler) setupSSEStream(reqCtx *qaRequestContext, generateTitle bool) *
 
 	// Generate title if needed
 	if generateTitle && reqCtx.session.Title == "" {
-		// Use the same model as the conversation for title generation
-		modelID := ""
-		if reqCtx.customAgent != nil && reqCtx.customAgent.Config.ModelID != "" {
-			modelID = reqCtx.customAgent.Config.ModelID
-		}
+		// Use the same policy-approved model as the conversation. Platform answer
+		// modes bind their model at request time; custom agents keep their own
+		// configured model.
+		modelID := titleModelIDForRequest(reqCtx)
 		logger.Infof(reqCtx.ctx, "Session has no title, starting async title generation, session ID: %s, model: %s", reqCtx.sessionID, modelID)
 		h.sessionService.GenerateTitleAsync(asyncCtx, reqCtx.session, reqCtx.query, modelID, eventBus)
 	}

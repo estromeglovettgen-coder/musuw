@@ -400,8 +400,11 @@ func (h *Handler) handleAgentEventsForSSE(
 					return
 				}
 
-				// Check for completion event
-				if evt.Type == "complete" {
+				// A terminal error is already a complete outcome. Leaving the SSE
+				// request open here strands the browser in a generating state even
+				// though the assistant message has been finalized in the database.
+				if evt.Type == types.ResponseTypeComplete ||
+					(evt.Type == types.ResponseTypeError && evt.Done) {
 					streamCompleted = true
 				}
 

@@ -1,6 +1,7 @@
 import { get } from '@/utils/request'
 
 export type ConsumerPlan = 'free' | 'plus' | 'pro' | 'max'
+export type OpenRouterCreditsStatus = 'available' | 'unavailable' | 'unprovisioned'
 
 export interface ConsumerEntitlement {
   plan: ConsumerPlan
@@ -11,6 +12,7 @@ export interface ConsumerEntitlement {
   openrouter_used_microusd: number
   openrouter_remaining_microusd: number
   openrouter_usage_month: string
+  openrouter_credits_status: OpenRouterCreditsStatus
   max_knowledge_bases: number
   max_documents_per_kb: number
   video_upload: boolean

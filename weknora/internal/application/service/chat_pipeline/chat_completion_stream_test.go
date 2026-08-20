@@ -2,12 +2,14 @@ package chatpipeline
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/models/chat"
+	"github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/require"
@@ -44,12 +46,43 @@ func (b *syncEventBus) finalAnswerContents() []string {
 	return out
 }
 
+func (b *syncEventBus) finalAnswerEvents() []event.AgentFinalAnswerData {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var out []event.AgentFinalAnswerData
+	for _, evt := range b.events {
+		if evt.Type != types.EventType(event.EventAgentFinalAnswer) {
+			continue
+		}
+		if data, ok := evt.Data.(event.AgentFinalAnswerData); ok {
+			out = append(out, data)
+		}
+	}
+	return out
+}
+
+func (b *syncEventBus) errorEvents() []event.ErrorData {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var out []event.ErrorData
+	for _, evt := range b.events {
+		if evt.Type != types.EventType(event.EventError) {
+			continue
+		}
+		if data, ok := evt.Data.(event.ErrorData); ok {
+			out = append(out, data)
+		}
+	}
+	return out
+}
+
 // openStreamChat returns a buffered channel preloaded with chunks and never
 // closes it, so the stream plugin blocks on the channel until ctx is cancelled
 // — deterministically exercising the ctx.Done() branch.
 type openStreamChat struct {
 	chunks      []types.StreamResponse
 	closeStream bool
+	streamErr   error
 }
 
 func (m *openStreamChat) Chat(context.Context, []chat.Message, *chat.ChatOptions) (*types.ChatResponse, error) {
@@ -59,6 +92,9 @@ func (m *openStreamChat) Chat(context.Context, []chat.Message, *chat.ChatOptions
 func (m *openStreamChat) ChatStream(
 	context.Context, []chat.Message, *chat.ChatOptions,
 ) (<-chan types.StreamResponse, error) {
+	if m.streamErr != nil {
+		return nil, m.streamErr
+	}
 	ch := make(chan types.StreamResponse, len(m.chunks))
 	for _, c := range m.chunks {
 		ch <- c
@@ -152,4 +188,54 @@ func TestStreamIgnoresDuplicateTerminalAnswer(t *testing.T) {
 		}
 	}
 	require.Equal(t, []event.AgentFinalAnswerData{{Content: "hello"}, {Done: true}}, answerEvents)
+}
+
+func TestStreamCreditExhaustionPreservesPartialAnswerAndTerminates(t *testing.T) {
+	bus := &syncEventBus{}
+	model := &openStreamChat{closeStream: true, chunks: []types.StreamResponse{
+		{ResponseType: types.ResponseTypeAnswer, Content: "partial answer"},
+		{ResponseType: types.ResponseTypeError, Content: `{"error":{"code":402,"message":"Insufficient credits"}}`},
+		{ResponseType: types.ResponseTypeAnswer, Content: " must not be emitted", Done: true},
+	}}
+
+	chatManage := &types.ChatManage{}
+	chatManage.SessionID = "sess-credit-exhausted"
+	chatManage.EventBus = bus
+	plugin := &PluginChatCompletionStream{modelService: &stubModelService{model: model}}
+	require.Nil(t, plugin.OnEvent(context.Background(), types.CHAT_COMPLETION_STREAM, chatManage, func() *PluginError { return nil }))
+
+	require.Eventually(t, func() bool { return len(bus.errorEvents()) == 1 }, 2*time.Second, 5*time.Millisecond)
+	answerEvents := bus.finalAnswerEvents()
+	require.NotEmpty(t, answerEvents)
+	var answer strings.Builder
+	doneCount := 0
+	for _, answerEvent := range answerEvents {
+		answer.WriteString(answerEvent.Content)
+		if answerEvent.Done {
+			doneCount++
+		}
+	}
+	require.Equal(t, "partial answer", answer.String())
+	require.Equal(t, 1, doneCount)
+	require.True(t, answerEvents[len(answerEvents)-1].Done)
+	require.Equal(t, []event.ErrorData{{
+		Error:     "Monthly AI Credits exhausted",
+		ErrorCode: openrouter.CreditExhaustedCode,
+		Stage:     "chat_completion_stream",
+		SessionID: "sess-credit-exhausted",
+	}}, bus.errorEvents())
+}
+
+func TestStreamInitialCreditExhaustionUsesDedicatedPipelineError(t *testing.T) {
+	bus := &syncEventBus{}
+	model := &openStreamChat{streamErr: &openrouter.CreditExhaustedError{StatusCode: 402}}
+	chatManage := &types.ChatManage{}
+	chatManage.SessionID = "sess-credit-exhausted-initial"
+	chatManage.EventBus = bus
+	plugin := &PluginChatCompletionStream{modelService: &stubModelService{model: model}}
+
+	err := plugin.OnEvent(context.Background(), types.CHAT_COMPLETION_STREAM, chatManage, func() *PluginError { return nil })
+	require.NotNil(t, err)
+	require.Equal(t, openrouter.CreditExhaustedCode, err.ErrorType)
+	require.True(t, openrouter.IsCreditExhausted(err.Err))
 }

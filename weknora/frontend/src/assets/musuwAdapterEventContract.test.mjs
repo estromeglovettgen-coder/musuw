@@ -13,7 +13,7 @@ test('session batch adapter preserves the native boolean select-all payload and 
   assert.ok(child.includes("emit('toggle-all', !allSelected)"), 'batch modal must emit the target checked state')
   assert.ok(parent.includes('@toggle-all="toggleBatchSelectAll"'), 'sidebar must keep the frozen business handler')
   assert.ok(baseline.includes('const toggleBatchSelectAll = (checked: boolean)'), 'frozen handler signature changed unexpectedly')
-  assert.ok(parent.includes("menuArr.find(item => item.path === 'creatChat')?.children || []"), 'batch modal must show the same all-session collection used by native allSelected/delete-all semantics')
+  assert.match(parent, /menuArr\.find\(\(item(?:: \{ path\?: string \})?\) => item\.path === 'creatChat'\)\?\.children \|\| \[\]/, 'batch modal must show the same all-session collection used by native allSelected/delete-all semantics')
 })
 
 test('adapter event wiring never substitutes reference-demo business actions', () => {

@@ -20,11 +20,11 @@ new provider abstraction.
   complete default or fails before persistence because a required built-in
   model is unavailable.
 - The standard chat surface exposes exactly the existing quick-answer and
-  smart-reasoning built-in agents, presented as V4 Flash and V4 Pro.
-- V4 Flash uses the existing quick-answer/RAG pipeline and Flash model.  V4
-  Pro uses the existing smart-reasoning pipeline, Pro model, existing
-  deep-thinking control, and every existing healthy tool permitted by the
-  normal tenant-scope checks.
+  smart-reasoning built-in agents as V4 Flash and V4 Pro, plus the independent
+  picker over the server-approved plan catalog.
+- V4 Flash uses the existing quick-answer/RAG pipeline. V4 Pro uses the
+  existing smart-reasoning pipeline and deep-thinking control. Both use the
+  request's already-authorized selected chat model.
 - Standard user navigation does not reveal model, parser, storage, graph, or
   other knowledge-base configuration screens.
 - This change is deployed as a complete app release with its builtin YAML,
@@ -62,20 +62,16 @@ mismatch, so it is rejected.
 
 ### Reuse the two existing built-in agents
 
-`builtin-quick-answer` and `builtin-smart-reasoning` already select the RAG
-and agent pipelines.  Their existing YAML is changed so Quick uses
-`builtin-deepseek-v4-flash` and is labeled V4 Flash; Pro uses
-`builtin-deepseek-v4-pro`, is labeled V4 Pro, and retains the existing
-deep-thinking override.  The existing ordered built-in-agent list is reduced
-to those two user-facing entries; other built-ins remain callable internally
-where WeKnora already uses them.
+`builtin-quick-answer` and `builtin-smart-reasoning` already select the RAG and
+agent pipelines. The user-facing list remains reduced to these two answer-mode
+entries; other built-ins remain internal where WeKnora already uses them.
 
-V4 Pro's YAML allowed-tool list is the existing product tool set.  Runtime
-capability and tenant-scope authorization stay authoritative, so unavailable
-tools are omitted/fail closed and no user receives another tenant's resource.
-The existing session resolver, not the browser's `summary_model_id`, is
-authoritative for these two platform-managed IDs; this prevents a direct
-request from mixing Flash/Pro model selection with the other agent's mode.
+The existing session resolver remains authoritative for the mode/pipeline. It
+validates the requested model against the server catalog, then applies that
+model to a request-scoped copy of either platform agent and to title
+generation. Persisted built-in agent configuration is not mutated, custom
+agents in Standard WeKnora keep their own model, and Lite cannot use hidden
+Agent/MCP/Skill/web-search overrides.
 
 Alternative considered: create two persistent custom agents per tenant.  That
 duplicates the built-in registry and creates lifecycle/migration work, so it
@@ -131,6 +127,4 @@ catalog.  It is a guardrail, not a new deployment system.
 
 ## Open Questions
 
-None.  "All functions" means every healthy, already-integrated WeKnora tool
-in the caller's own tenant; it does not grant cross-tenant access or disclose
-platform secrets.
+None.

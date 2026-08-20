@@ -115,6 +115,23 @@ test('getAgentNotReadyReasonKeys treats empty allowed_tools as ready via backend
   ), [])
 })
 
+test('platform answer mode readiness accepts the already policy-filtered runtime chat model', () => {
+  assert.deepEqual(getAgentNotReadyReasonKeys(
+    {
+      model_id: 'paid-platform-model',
+      rerank_model_id: 'rerank-1',
+      kb_selection_mode: 'all',
+      allowed_tools: ['knowledge_search'],
+    },
+    [{ id: 'free-platform-model', type: 'KnowledgeQA' }, { id: 'rerank-1', type: 'Rerank' }],
+    {
+      isAgentMode: true,
+      isSharedAgent: false,
+      runtimeChatModelID: 'free-platform-model',
+    },
+  ), [])
+})
+
 test('canLocallyConfigureAgent is false for shared agents', () => {
   assert.equal(canLocallyConfigureAgent('42'), false)
   assert.equal(canLocallyConfigureAgent(undefined), true)

@@ -31,7 +31,7 @@
       <div v-if="isImgLoading" class="visual-assistant-image-loading"><t-loading size="small" /><span>{{ $t('common.loading') }}</span></div>
     </section>
 
-    <picturePreview :reviewImg="reviewImg" :reviewUrl="reviewUrl" @closePreImg="closePreImg" />
+    <picturePreview v-if="reviewImg && reviewUrl" :reviewImg="reviewImg" :reviewUrl="reviewUrl" @closePreImg="closePreImg" />
     <ChatCitationFloat :float="citationFloat" :on-enter="cancelCitationClose" :on-leave="scheduleCitationClose" />
   </article>
 </template>

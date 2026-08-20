@@ -18,7 +18,6 @@ import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 import { shouldShowResourceOriginBadge } from '@/utils/card-list-badge'
 import ContextualGuide from '@/components/ContextualGuide.vue'
 import { isContextualGuideDone, markContextualGuideDone } from '@/config/contextualGuides'
-import { useTenantModelReadiness } from '@/composables/useTenantModelReadiness'
 import { useI18n } from 'vue-i18n'
 import { useListUrlState } from '@/composables/useListUrlState'
 import { useResourcePins } from '@/composables/useResourcePins'
@@ -27,7 +26,6 @@ const router = useRouter()
 const route = useRoute()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
-const { loaded: modelsReadyLoaded, isReadyForDocumentKb } = useTenantModelReadiness()
 const orgStore = useOrganizationStore()
 const chatResources = useChatResourcesStore()
 const { t } = useI18n()
@@ -523,16 +521,8 @@ const confirmDelete = () => {
   })
 }
 
-const isInitialized = (kb: KB) => {
-  if (!kb.summary_model_id || kb.summary_model_id === '') return false
-  const strategy = (kb as any).indexing_strategy
-  const needsEmbedding = !strategy || strategy.vector_enabled || strategy.keyword_enabled
-  if (needsEmbedding && (!kb.embedding_model_id || kb.embedding_model_id === '')) return false
-  return true
-}
 const isWikiKb = (kb: unknown) =>
   !!(kb as { indexing_strategy?: { wiki_enabled?: boolean } } | null | undefined)?.indexing_strategy?.wiki_enabled
-const hasUninitializedKbs = computed(() => kbs.value.some(kb => !isInitialized(kb)))
 
 const getKbDisplayName = (kbId: string) => {
   const target = kbs.value.find(kb => kb.id === kbId)
@@ -608,8 +598,7 @@ const ensureUploadTaskEntry = (detail?: UploadEventDetail) => {
 
 const handleCardClick = (kb: KB) => {
   pins.touchRecent('kb', kb.id)
-  if (isInitialized(kb)) goDetail(kb.id)
-  else goSettings(kb.id)
+  goDetail(kb.id)
 }
 const toggleFavoriteKb = (kbId: string, evt?: Event) => {
   evt?.stopPropagation()
@@ -617,11 +606,9 @@ const toggleFavoriteKb = (kbId: string, evt?: Event) => {
 }
 const isKbFavorited = (kbId: string) => pins.isFavorite('kb', kbId)
 const goDetail = (id: string) => { router.push(`/platform/knowledge-bases/${id}`) }
-const goSettings = (id: string) => { uiStore.openKBSettings(id) }
 const handleCreateKnowledgeBase = () => {
   markContextualGuideDone('kbList')
-  const initialSection = modelsReadyLoaded.value && !isReadyForDocumentKb.value ? 'models' : undefined
-  uiStore.openCreateKB('document', initialSection)
+  uiStore.openCreateKB('document')
 }
 const handleKBEditorSuccess = (kbId: string) => {
   console.log('[KnowledgeBaseList] knowledge operation success:', kbId)

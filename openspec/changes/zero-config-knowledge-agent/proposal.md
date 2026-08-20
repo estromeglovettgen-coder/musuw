@@ -18,10 +18,10 @@ operating WeKnora's model plumbing.
   the standard-user flow.  Standard users retain normal content operations:
   create, rename, upload, organize, query, and delete their own knowledge
   bases.
-- Replace the raw chat-model selector with exactly two platform-provided
-  entries: V4 Flash (fast) and V4 Pro (full capability).  V4 Pro exposes the
-  existing deep-thinking control and every healthy, already-integrated tool
-  within the caller's own tenant.
+- Expose exactly two platform-provided answer modes: V4 Flash (fast) and V4 Pro
+  (smart reasoning), alongside the separate plan-filtered picker for
+  platform-configured models. V4 Pro retains the existing deep-thinking
+  control; neither surface permits arbitrary model or agent configuration.
 - Keep provider keys, raw model IDs, cross-tenant resources, and platform
   administration outside the user-facing flow.  Make frontend/backend
   built-in-model compatibility a full-release requirement so these entries
@@ -33,8 +33,8 @@ operating WeKnora's model plumbing.
 
 - `zero-config-knowledge-base`: Standard knowledge bases are provisioned from
   existing platform defaults and are usable immediately or fail cleanly.
-- `default-chat-modes`: Standard chat offers the two fixed platform modes,
-  including the Pro deep-thinking and full-tool behavior.
+- `default-chat-modes`: Standard chat offers two fixed platform answer modes
+  over the currently selected, server-approved model.
 - `built-in-model-release-compatibility`: The standard UI and backend catalog
   publish compatible built-in model definitions together.
 

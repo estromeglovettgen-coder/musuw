@@ -365,7 +365,7 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 		code,
 		strings.TrimSpace(decodedState.RedirectURI),
 		decodedState.CodeVerifier,
-		h.resolveDefaultTenantMode(ctx),
+		h.resolveOIDCProvisioningMode(ctx),
 	)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to complete OIDC login via redirect callback: %v", err)

@@ -13,6 +13,7 @@ import (
 
 func newMCPOAuthTestRepo(t *testing.T) *mcpOAuthRepository {
 	t.Helper()
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)

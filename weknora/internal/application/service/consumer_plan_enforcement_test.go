@@ -63,8 +63,8 @@ func (r *planModelRepo) List(context.Context, uint64, types.ModelType, types.Mod
 }
 
 func TestFreePlanFiltersAndRejectsPaidModels(t *testing.T) {
-	cheap := &types.Model{ID: types.CheapestChatModelID, Type: types.ModelTypeKnowledgeQA, Status: types.ModelStatusActive}
-	paid := &types.Model{ID: "builtin-deepseek-v4-pro", Type: types.ModelTypeKnowledgeQA, Status: types.ModelStatusActive}
+	cheap := platformOpenRouterTestModel(types.CheapestChatModelID)
+	paid := platformOpenRouterTestModel("builtin-deepseek-v4-pro")
 	repo := &planModelRepo{models: []*types.Model{cheap, paid}}
 	repo.model = paid
 	svc := NewModelService(repo, nil, nil, nil, nil, nil)
@@ -82,8 +82,8 @@ func TestFreePlanFiltersAndRejectsPaidModels(t *testing.T) {
 }
 
 func TestFreePlanFiltersPaidModelsForBackgroundContext(t *testing.T) {
-	cheap := &types.Model{ID: types.CheapestChatModelID, Type: types.ModelTypeKnowledgeQA, Status: types.ModelStatusActive}
-	paid := &types.Model{ID: "builtin-deepseek-v4-pro", Type: types.ModelTypeKnowledgeQA, Status: types.ModelStatusActive}
+	cheap := platformOpenRouterTestModel(types.CheapestChatModelID)
+	paid := platformOpenRouterTestModel("builtin-deepseek-v4-pro")
 	repo := &planModelRepo{models: []*types.Model{cheap, paid}}
 	entitlements := NewEntitlementService(&entitlementRepoStub{tenant: &types.Tenant{
 		ID:         1,
@@ -96,4 +96,16 @@ func TestFreePlanFiltersPaidModelsForBackgroundContext(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, models, 1)
 	assert.Equal(t, types.CheapestChatModelID, models[0].ID)
+}
+
+func platformOpenRouterTestModel(id string) *types.Model {
+	return &types.Model{
+		ID:        id,
+		Type:      types.ModelTypeKnowledgeQA,
+		Status:    types.ModelStatusActive,
+		IsBuiltin: true,
+		Parameters: types.ModelParameters{
+			Provider: "openrouter",
+		},
+	}
 }

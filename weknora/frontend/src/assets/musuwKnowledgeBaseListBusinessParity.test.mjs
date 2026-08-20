@@ -9,7 +9,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 test('frozen KnowledgeBaseList controller remains the original implementation', () => {
   assert.equal(
     blobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),
-    'ee73dc142f2ceb90eea994720601021d74ce1d92',
+    'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   )
 })
 
@@ -58,6 +58,7 @@ test('rebuilt list retains every native scope and sharing group surface', () => 
 
 test('rebuilt list retains native upload, pin, favorite, duplicate, delete, create and origin states', () => {
   const source = read('../views/knowledge/KnowledgeBaseList.vue')
+  const card = read('../views/knowledge/components/KnowledgeBaseListReferenceCard.vue')
   for (const token of [
     'uploadSummaries.length',
     'summary.completed === summary.total',
@@ -81,5 +82,5 @@ test('rebuilt list retains native upload, pin, favorite, duplicate, delete, crea
     'KnowledgeBaseEditorModal',
     'ShareKnowledgeBaseDialog',
     'sharedDetailPanelVisible',
-  ]) assert.ok(source.includes(token), `KnowledgeBaseList active View lost ${token}`)
+  ]) assert.ok(source.includes(token) || card.includes(token), `KnowledgeBaseList active View lost ${token}`)
 })

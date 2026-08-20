@@ -144,7 +144,7 @@ test('Knowledge Base keeps native scopes, sharing, Trace/Wiki/Graph-facing workf
 
   assert.ok(detail.includes('<WikiBrowser'))
   assert.ok(detail.includes("activeKbTab === 'graph'"))
-  assert.ok(detail.includes('@probe-trace="(item) => probeTraceAvailable(item)"'))
+  assert.match(detail, /@probe-trace="\(item(?:: any)?\) => probeTraceAvailable\(item\)"/)
   for (const token of ['trace', 'reparse', 'cancel', 'move', 'delete']) {
     assert.ok(documentMenu.toLowerCase().includes(token), `Knowledge Base document action lost ${token}`)
   }

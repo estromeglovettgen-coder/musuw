@@ -122,13 +122,16 @@ func StorageEngineConfigForResponse(cfg *StorageEngineConfig, maskSecrets bool) 
 	return &out
 }
 
-// CredentialsConfigForResponse returns a copy with app_secret redacted when
-// maskSecrets is true.
+// CredentialsConfigForResponse returns a copy safe for HTTP responses.
+// OpenRouter inference credentials are server-only and are never serialized to
+// a browser, even for privileged settings views. Other provider credentials
+// retain the existing maskSecrets behavior.
 func CredentialsConfigForResponse(cfg *CredentialsConfig, maskSecrets bool) *CredentialsConfig {
 	if cfg == nil {
 		return nil
 	}
 	out := *cfg
+	out.OpenRouter = nil
 	if !maskSecrets {
 		return &out
 	}

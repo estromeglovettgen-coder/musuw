@@ -1,20 +1,20 @@
 ## Why
 
-WeKnora already contains model management and chat model selection, but Musuw currently hides those entry points and limits chat to two managed DeepSeek choices. Users need the native controls restored with a small catalog that is verified from the production region.
+WeKnora already contains model management and chat model selection, but Musuw needs a consumer-safe form of that behavior: the platform owns a small OpenRouter catalog while users select only the models their plan allows. Consumers must never configure providers, credentials, or arbitrary model IDs.
 
 ## What Changes
 
-- Expose the existing Models section beside General settings.
-- Restore the existing chat model dropdown while preserving the V4 Flash/Pro mode switch.
-- Let tenant administrators mark one model per type as the default.
-- Route the existing DeepSeek choices through OpenRouter and add a small set of region-tested chat models.
+- Restore the existing chat model dropdown while preserving the two platform answer modes.
+- Keep model/provider/debug/credential management out of the consumer UI and require SystemAdmin on the retained WeKnora APIs.
+- Return only server-owned built-in OpenRouter models and filter that catalog by the active consumer plan.
+- Route the existing DeepSeek choices through OpenRouter and retain a small verified platform catalog.
 - Retain the existing production-proven embedding, rerank, vision, and speech presets.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `native-multi-model-selection`: native model configuration, defaults, and conversation selection for Musuw.
+- `native-multi-model-selection`: native conversation selection over a platform-managed, plan-filtered model catalog.
 
 ### Modified Capabilities
 
@@ -22,4 +22,4 @@ None.
 
 ## Impact
 
-The existing WeKnora model API, settings views, conversation input, and built-in model YAML are affected. No new service, provider adapter, or model abstraction is introduced.
+The existing WeKnora model API, Lite exposure gate, conversation input, and built-in model YAML are affected. No new model service, provider adapter, or catalog abstraction is introduced.

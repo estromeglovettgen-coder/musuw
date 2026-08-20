@@ -6,6 +6,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 const visual = read("./musuw-visual.less");
 const menu = read("../components/menu.vue");
+const menuBusiness = read("./business-baselines/menu.pre-view.vue");
 const input = read("../components/Input-field.vue");
 
 test("create knowledge-base action matches the compact dark reference control", () => {
@@ -32,39 +33,39 @@ test("create knowledge-base action matches the compact dark reference control", 
 });
 
 test("sidebar enters narrow view collapsed without rewriting desktop preference", () => {
-  assert.match(menu, /const\s+SIDEBAR_NARROW_BREAKPOINT\s*=\s*760/);
-  assert.match(menu, /uiStore\.sidebarCollapsed\s*=\s*true/);
+  assert.match(menuBusiness, /const\s+SIDEBAR_NARROW_BREAKPOINT\s*=\s*760/);
+  assert.match(menuBusiness, /uiStore\.sidebarCollapsed\s*=\s*true/);
   assert.match(
-    menu,
+    menuBusiness,
     /const\s+toggleSidebar\s*=\s*\(\)\s*=>\s*\{[\s\S]*?sidebarWasNarrow[\s\S]*?uiStore\.sidebarCollapsed\s*=\s*!uiStore\.sidebarCollapsed/,
     "the existing toggle remains usable on narrow screens without persisting a temporary override",
   );
-  assert.match(menu, /window\.addEventListener\("resize"/);
-  assert.match(menu, /window\.removeEventListener\("resize"/);
+  assert.match(menuBusiness, /window\.addEventListener\("resize"/);
+  assert.match(menuBusiness, /window\.removeEventListener\("resize"/);
   assert.match(
-    menu,
+    menuBusiness,
     /let\s+storedPreference:\s*string\s*\|\s*null\s*=\s*null[\s\S]*?try\s*\{[\s\S]*?window\.localStorage\.getItem\("sidebar_collapsed"\)[\s\S]*?\}\s*catch\s*\{[\s\S]*?\}/,
     "blocked storage must fall back to the live sidebar state",
   );
   assert.doesNotMatch(
-    menu,
+    menuBusiness,
     /sidebarCollapsed\s*=\s*true[\s\S]{0,160}uiStore\.collapseSidebar\(\)/,
     "narrow-screen initialization should not persist over the desktop preference",
   );
 });
 
 test("compact composer uses a non-overlapping wrapped toolbar", () => {
-  assert.match(input, /@media\s*\(max-width:\s*420px\)/);
+  assert.match(input, /@media\s*\(max-width:\s*430px\)/);
   assert.match(
     input,
-    /@media\s*\(max-width:\s*420px\)[\s\S]*?\.control-bar[\s\S]*?position:\s*static/,
+    /@media\s*\(max-width:\s*430px\)[^\n]*?\.visual-chat-composer__toolbar[^\n]*?flex-wrap:\s*wrap/,
   );
   assert.match(
     input,
-    /@media\s*\(max-width:\s*420px\)[\s\S]*?\.control-left[\s\S]*?width:\s*100%/,
+    /@media\s*\(max-width:\s*430px\)[^\n]*?\.visual-chat-composer__tools[^\n]*?flex:\s*1 1 100%/,
   );
   assert.match(
     input,
-    /@media\s*\(max-width:\s*420px\)[\s\S]*?\.control-bar[\s\S]*?max-height:\s*none/,
+    /@media\s*\(max-width:\s*430px\)[^\n]*?\.visual-chat-composer__submit[^\n]*?margin-left:\s*auto/,
   );
 });

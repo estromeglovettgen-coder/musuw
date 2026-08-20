@@ -1,48 +1,25 @@
 # Verification Report: consumer-plan-entitlements
 
-Verified on 2026-08-16 (America/Phoenix) against revision `e372c02f6183b2977cbdb9ecc3dc0d2d86ac1b08`.
+Verified locally on 2026-08-19 (America/Phoenix) against the combined integration commit containing this report. CI, push, and deployment were intentionally deferred at the user's request because the GitHub Actions allowance is exhausted.
 
-## Summary
+## Result
 
-| Dimension | Status |
-|---|---|
-| Completeness | 8/8 tasks complete; 7/7 requirements implemented |
-| Correctness | 17/17 specified scenarios covered by code, automated checks, or bounded production acceptance |
-| Coherence | Follows the tenant-row, single plan-matrix, existing service-boundary, OpenRouter transport, and optional Paddle decisions |
+- The four-plan matrix remains one pure server definition: Free/Plus/Pro/Max provide 5/20/40/80 GiB and USD 1/1.25/2.50/5 monthly OpenRouter limits.
+- Free enforcement is server-side: one knowledge base, ten documents per knowledge base, no video, and one least-cost built-in OpenRouter model per required capability.
+- Paid consumers receive the larger platform catalog but cannot create, edit, test, credential, or invoke arbitrary models.
+- OpenRouter's official Go SDK owns child-key creation, monthly limit updates, usage lookup, and deletion. The inference transport installs the tenant key and stable non-PII `user`; there is no shared inference key, BYOK path, local spend ledger, or file-byte price estimate.
+- First-use persistence uses the existing tenant row lock and encrypted credentials JSONB. Provider-side race losers are deleted. Plan and tenant lifecycle operations fail closed rather than orphaning keys or diverging silently.
+- HTTP 402 and terminal OpenRouter SSE credit errors are non-retryable; ingestion reuses WeKnora's failed/reparse and trace-finalization paths.
 
-## Requirement mapping
+## Fresh evidence
 
-- Four plans and UTC-month rules: `weknora/internal/types/entitlement.go:43`, `weknora/internal/types/entitlement.go:52`, `weknora/internal/types/entitlement.go:76`, and additive PostgreSQL/SQLite migrations.
-- Free knowledge-base, document, video, parse-estimate, and model gates: `weknora/internal/application/service/consumer_plan.go:19` and `weknora/internal/types/entitlement.go:87`.
-- Atomic current-month accounting and idempotent plan application: `weknora/internal/application/repository/entitlement.go:29` and `weknora/internal/application/repository/entitlement.go:58`.
-- Stable OpenRouter user attribution, preflight, and JSON/SSE `usage.cost` recording: `weknora/internal/models/openrouter/transport.go:49`, `weknora/internal/models/openrouter/transport.go:108`, and `weknora/internal/models/openrouter/transport.go:180`.
-- Existing chat, embedding, rerank, vision, and speech constructors consume the same meter: `weknora/internal/application/service/model.go:479` through `weknora/internal/application/service/model.go:712`. Built-in DeepSeek models use OpenRouter in `weknora/config/builtin_models.yaml`.
-- Authenticated entitlement state and fail-closed Paddle adapter: `weknora/internal/router/router.go:253`, `weknora/internal/handler/entitlement.go:87`, `weknora/internal/handler/entitlement.go:122`, and `weknora/internal/handler/entitlement.go:220`.
-- Consumer UI and storefront use server-aligned values: `weknora/frontend/src/views/settings/GeneralSettings.vue:8` and `storefront/src/data/homeContent.js:157`.
+- Backend entitlement, session, OpenRouter, router, and type suites passed; all Go packages compiled with `go test ./... -run '^$'`.
+- Frontend passed 508/508 tests, Vue type-check, and production build.
+- Local authenticated API acceptance returned Free's 5 GiB/USD 1/1 KB/10 docs/no-video entitlement and exactly five built-in OpenRouter capability models. Paid-plan simulation returned the larger built-in catalog. Paid-model detail was denied to Free; model mutation/provider/debug/credential endpoints and both initialization write routes returned the Lite not-found boundary.
+- Local browser acceptance showed the correct Free and Plus plan cards, plan-specific chat choices, no model-configuration affordance, a server-rejected second Free knowledge base, and successful cleanup of the temporary knowledge base.
+- With the management key intentionally absent, a real chat request selected the approved Qwen model, attempted no shared-key fallback, logged `management_key_not_configured`, emitted a terminal error, and closed the stream cleanly.
+- Database inspection found every active knowledge base bound to stable built-in OpenRouter capability IDs, no consumer-visible credential rows, valid default storage backends, and no retained temporary knowledge base.
 
-## Automated verification
+## Deferred release boundary
 
-- Focused Go entitlement, repository, service, handler, and OpenRouter transport tests passed; native server build passed.
-- Frontend: 383/383 tests, 11/11 locale audits, type-check, and production build passed.
-- Storefront: 38/38 tests and production build passed.
-- GitHub [CI run 31990816896](https://github.com/estromeglovettgen-coder/musuw/actions/runs/31990816896) passed all seven jobs, including the full Go suite/native build, frontend, storefront, auth, DocReader, workflow, release, provenance, and secret checks.
-- Strict OpenSpec validation passed after this report and checklist were finalized.
-
-## Release and production acceptance
-
-- [Storefront deployment 31991036493](https://github.com/estromeglovettgen-coder/musuw/actions/runs/31991036493) and [application deployment 31991036451](https://github.com/estromeglovettgen-coder/musuw/actions/runs/31991036451) completed successfully for the exact revision.
-- Production migration is `83`, clean. App, frontend, and PostgreSQL containers are healthy and the app/frontend run by fixed GHCR digests.
-- `musuw.com`, `www.musuw.com`, and `app.musuw.com/health` returned HTTP 200.
-- Browser acceptance with a Plus Google tenant showed 20 GB, USD 1.25 monthly credit, unlimited plan knowledge/document limits, all configured models, and truthful Paddle-unavailable state. A bounded DeepSeek V4 Flash request returned `OK`; authoritative usage persisted as 11 micro-USD for `2026-08`.
-- Browser acceptance with a separate Free Google tenant showed 5 GB, USD 1 monthly credit, one knowledge base, ten documents per knowledge base, no video, and exactly five least-cost capability models. A third knowledge-base creation was rejected with the actionable Free-plan limit message. A bounded Qwen Flash request returned `OK`; authoritative usage persisted as 17 micro-USD for `2026-08`.
-- The production storefront showed Free/Plus/Pro/Max at USD 0/5/10/20 with 5/20/40/80 GB and USD 1/1.25/2.50/5 monthly OpenRouter credits.
-- Paddle credentials are intentionally absent in production, so the specified unconfigured path was accepted: checkout is unavailable and cannot grant a plan. Signature, known-price, replay/idempotency, and signed tenant mapping are covered by automated tests.
-- Task 2 video support remains skipped; this change only enforces Free's no-video entitlement and does not claim that paid video upload currently exists.
-
-## Issues
-
-- CRITICAL: none.
-- WARNING: none.
-- SUGGESTION: none.
-
-All checks passed. Ready for archive.
+The two plan-document keys remain intentionally unconfigured, so this pass does not claim a fresh paid OpenRouter call. Earlier production evidence remains historical only. The combined candidate is local by explicit instruction; no CI, GitHub push, or production deployment is claimed here.

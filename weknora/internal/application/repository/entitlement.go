@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
@@ -26,33 +27,35 @@ func (r *entitlementRepository) GetTenantEntitlement(ctx context.Context, tenant
 	return &tenant, nil
 }
 
-func (r *entitlementRepository) RecordOpenRouterCost(ctx context.Context, tenantID uint64, at time.Time, costMicrousd int64) (int64, error) {
-	if costMicrousd <= 0 {
-		var tenant types.Tenant
-		if err := r.db.WithContext(ctx).Select("open_router_usage_month", "open_router_used_microusd").First(&tenant, tenantID).Error; err != nil {
-			return 0, err
-		}
-		return types.EffectiveOpenRouterUsage(&tenant, at), nil
+// SetOpenRouterCredentialsIfAbsent installs the first provider-managed key for
+// a tenant without replacing any other provider credentials. The row lock makes
+// first-use provisioning safe when multiple requests or replicas race.
+func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Context, tenantID uint64, credentials *types.OpenRouterCredentials) (bool, error) {
+	if credentials == nil || credentials.APIKey == "" || credentials.KeyHash == "" {
+		return false, fmt.Errorf("OpenRouter tenant credentials are incomplete")
 	}
-	var used int64
+	inserted := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
 			return err
 		}
-		month := types.OpenRouterUsageMonth(at)
-		if tenant.OpenRouterUsageMonth != month {
-			tenant.OpenRouterUsageMonth = month
-			tenant.OpenRouterUsedMicrousd = 0
+		if tenant.Credentials != nil && tenant.Credentials.OpenRouter != nil {
+			return nil
 		}
-		tenant.OpenRouterUsedMicrousd += costMicrousd
-		used = tenant.OpenRouterUsedMicrousd
-		return tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(map[string]any{
-			"open_router_usage_month":   tenant.OpenRouterUsageMonth,
-			"open_router_used_microusd": tenant.OpenRouterUsedMicrousd,
-		}).Error
+		merged := types.CredentialsConfig{}
+		if tenant.Credentials != nil {
+			merged = *tenant.Credentials
+		}
+		copy := *credentials
+		merged.OpenRouter = &copy
+		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Update("credentials", &merged).Error; err != nil {
+			return err
+		}
+		inserted = true
+		return nil
 	})
-	return used, err
+	return inserted, err
 }
 
 func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, eventID string, occurredAt time.Time, customerID, subscriptionID string) (bool, error) {
@@ -71,7 +74,8 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 		if status == "" {
 			status = "active"
 		}
-		limits := types.LimitsForConsumerPlan(plan)
+		effectivePlan := types.EffectiveConsumerPlan(&types.Tenant{Plan: plan, PlanStatus: status})
+		limits := types.LimitsForConsumerPlan(effectivePlan)
 		updates := map[string]any{
 			"plan":                   plan,
 			"plan_status":            status,

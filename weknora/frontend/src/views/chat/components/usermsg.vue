@@ -20,7 +20,7 @@
     </div>
 
     <div class="visual-user-message__bubble">{{ content }}</div>
-    <picturePreview :reviewImg="reviewImg" :reviewUrl="reviewUrl" @closePreImg="closePreImg" />
+    <picturePreview v-if="reviewImg && reviewUrl" :reviewImg="reviewImg" :reviewUrl="reviewUrl" @closePreImg="closePreImg" />
   </article>
 </template>
 

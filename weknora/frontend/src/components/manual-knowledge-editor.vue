@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { defineComponent, onMounted, onUnmounted, ref, type SetupContext } from 'vue'
 import LegacyManualEditorBusiness from '@/assets/business-baselines/manual-knowledge-editor.pre-view.vue'
 
 const legacy = LegacyManualEditorBusiness as any
@@ -26,7 +26,7 @@ const loadStoredDrawerWidth = () => {
 export default defineComponent({
   ...legacy,
   name: 'ManualKnowledgeEditor',
-  setup(props, context) {
+  setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const drawerWidthPx = ref(loadStoredDrawerWidth())
     const drawerResizing = ref(false)
@@ -196,7 +196,7 @@ export default defineComponent({
                             </button>
                           </t-tooltip>
                         </div>
-                        <span v-if="groupIndex < toolbarGroups.length - 1" class="visual-manual-editor__divider" />
+                        <span v-if="Number(groupIndex) < toolbarGroups.length - 1" class="visual-manual-editor__divider" />
                       </template>
                     </div>
                     <button

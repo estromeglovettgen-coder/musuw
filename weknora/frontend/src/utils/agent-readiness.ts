@@ -48,11 +48,14 @@ export function getAgentNotReadyReasonKeys(
     'model_id' | 'rerank_model_id' | 'kb_selection_mode' | 'allowed_tools' | 'agent_mode'
   > | undefined,
   models: Pick<ModelConfig, 'id' | 'type'>[],
-  options: { isAgentMode: boolean; isSharedAgent: boolean },
+  options: { isAgentMode: boolean; isSharedAgent: boolean; runtimeChatModelID?: string },
 ): AgentNotReadyReasonKey[] {
   const reasons: AgentNotReadyReasonKey[] = []
+	const readinessConfig = options.runtimeChatModelID?.trim()
+		? { ...config, model_id: options.runtimeChatModelID.trim() }
+		: config
 
-  if (!agentHasConfiguredChatModel(config, models, options.isSharedAgent)) {
+  if (!agentHasConfiguredChatModel(readinessConfig, models, options.isSharedAgent)) {
     reasons.push('summary_model')
   }
 

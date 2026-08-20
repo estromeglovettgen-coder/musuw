@@ -2211,14 +2211,18 @@ const selectAgentMode = async (mode: "quick-answer" | "smart-reasoning") => {
   } else {
     thinkingEnabled.value = true;
   }
-  selectedModelId.value =
+  const preferredModelId =
     mode === "smart-reasoning" ? V4_PRO_MODEL_ID : V4_FLASH_MODEL_ID;
-  writeLastChatModelID(selectedModelId.value);
-  settingsStore.updateConversationModels({
-    summaryModelId: selectedModelId.value,
-    selectedChatModelId: selectedModelId.value,
-    rerankModelId: "",
-  });
+  const allowedModelId = resolveChatModelId(preferredModelId, availableModels.value);
+  if (allowedModelId) {
+    selectedModelId.value = allowedModelId;
+    writeLastChatModelID(allowedModelId);
+    settingsStore.updateConversationModels({
+      summaryModelId: allowedModelId,
+      selectedChatModelId: allowedModelId,
+      rerankModelId: "",
+    });
+  }
 
   if (didSwitch) {
     MessagePlugin.success(
@@ -2459,9 +2463,14 @@ const collectAgentNotReadyReasons = (
   sourceTenantId?: string,
 ): { keys: AgentNotReadyReasonKey[]; labels: string[] } => {
   const isSharedAgent = !!sourceTenantId;
+  const isPlatformAnswerMode =
+    !isSharedAgent &&
+    agent.is_builtin &&
+    (agent.id === BUILTIN_QUICK_ANSWER_ID || agent.id === BUILTIN_SMART_REASONING_ID);
   const keys = getAgentNotReadyReasonKeys(agent.config, allModels.value, {
     isAgentMode,
     isSharedAgent,
+    runtimeChatModelID: isPlatformAnswerMode ? selectedModelId.value : undefined,
   });
   return {
     keys,

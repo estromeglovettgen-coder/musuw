@@ -446,7 +446,7 @@
   <ChatCitationFloat :float="citationFloat" :on-enter="cancelCitationClose" :on-leave="scheduleCitationClose" />
 
   <!-- Image Preview -->
-  <picturePreview :reviewImg="imagePreviewVisible" :reviewUrl="imagePreviewUrl" @closePreImg="closeImagePreview" />
+  <picturePreview v-if="imagePreviewVisible && imagePreviewUrl" :reviewImg="imagePreviewVisible" :reviewUrl="imagePreviewUrl" @closePreImg="closeImagePreview" />
 
   <!-- Wiki Page Detail Drawer -->
   <t-drawer v-model:visible="wikiDrawerVisible" :header="wikiDrawerPage?.title || ''" size="480px" :footer="false"

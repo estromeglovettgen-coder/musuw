@@ -114,9 +114,6 @@ load_host_environment() {
 
   export OIDC_AUTH_CLIENT_ID="$(read_secret "$runtime_dir/secrets/oidc_client_id")"
   export OIDC_AUTH_CLIENT_SECRET="$(read_secret "$runtime_dir/secrets/oidc_client_secret")"
-  export DEEPSEEK_API_KEY="$(read_secret "$runtime_dir/secrets/deepseek_api_key")"
-  export OPENROUTER_API_KEY="$(read_secret "$runtime_dir/secrets/openrouter_api_key")"
-
   # These are host-only addresses. The candidate.env remains Docker-native and
   # can still be consumed unchanged by the preview/release compose interface.
   export DB_HOST=127.0.0.1
@@ -132,6 +129,11 @@ load_host_environment() {
   export LOCAL_STORAGE_BASE_DIR="$runtime_dir/host-files"
   export VITE_DEV_PROXY_TARGET="http://127.0.0.1:${MUSUW_DEV_BACKEND_PORT}"
   export VITE_AUTH_DEV_TARGET="http://127.0.0.1:${MUSUW_DEV_AUTH_PORT}"
+  # The container candidate pins openrouter.ai to a freshly resolved public IP.
+  # Host development cannot use Compose extra_hosts, so trust only that same
+  # fixed platform endpoint through WeKnora's native SSRF whitelist. This also
+  # avoids local proxy DNS fake-IP ranges without weakening other destinations.
+  export SSRF_WHITELIST_EXTRA="${SSRF_WHITELIST_EXTRA:+${SSRF_WHITELIST_EXTRA},}openrouter.ai"
   install -d -m 700 "$LOCAL_STORAGE_BASE_DIR" "$state_dir"
 }
 

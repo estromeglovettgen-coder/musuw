@@ -24,10 +24,10 @@ test('agent actions reuse the fully-rendered answer state', () => {
 
 test('follow-up loading is shown compactly inside both answer toolbars', () => {
   assert.match(chatView, /:follow-up-loading="Boolean\(session\.suggestionLoading/)
-  assert.match(botMessage, /class="answer-toolbar__follow-up-loading"/)
+  assert.match(botMessage, /class="visual-assistant-toolbar__loading"/)
   assert.match(agentStream, /class="answer-toolbar__follow-up-loading"/)
-  assert.match(botMessage, /class="answer-toolbar__follow-up-label"/)
-  assert.match(botMessage, /transition name="follow-up-toolbar-loading"/)
+  assert.match(botMessage, /Transition name="visual-follow-up-loading"/)
+  assert.match(botMessage, /font-size: 10px/)
   assert.match(agentStream, /transition name="follow-up-toolbar-loading"/)
   assert.match(sharedStyles, /border-left: 1px solid/)
   assert.match(sharedStyles, /font-size: 12px/)
@@ -39,7 +39,7 @@ test('follow-up loading is shown compactly inside both answer toolbars', () => {
 test('follow-up suggestions wait until the answer is fully rendered', () => {
   assert.match(
     chatView,
-    /@render-complete-change="\(ready\) => handleAnswerRenderComplete\(session, ready\)"/,
+    /@render-complete-change="\(ready: boolean\) => handleAnswerRenderComplete\(session, ready\)"/,
   )
   assert.match(
     chatView,

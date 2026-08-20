@@ -6,7 +6,7 @@ Musuw currently advertises four consumer plans but every signed-in tenant receiv
 
 - Add tenant-scoped Free, Plus, Pro, and Max entitlements with storage and monthly OpenRouter credit limits.
 - Enforce Free's one-knowledge-base, ten-documents-per-knowledge-base, no-video, and cheapest-chat-model limits in existing service paths.
-- Attribute OpenRouter calls to a stable non-PII user identifier, preflight parse cost, and record authoritative OpenRouter response cost against the current month.
+- Lazily provision one OpenRouter-managed child key per tenant with the plan's native monthly limit, attribute supported calls with a stable non-PII user identifier, and read usage from OpenRouter.
 - Expose current plan, storage, and credit usage in the existing General settings page.
 - Accept optional, signature-verified Paddle subscription events when Paddle is configured; remain explicitly disabled when credentials are absent.
 - Route every built-in DeepSeek model through the existing OpenRouter integration.
@@ -24,7 +24,7 @@ None.
 ## Impact
 
 - PostgreSQL and SQLite tenant schema and tenant repository.
-- Existing knowledge-base, knowledge-upload, model-construction, and OpenRouter request paths.
+- Existing knowledge-base, knowledge-upload, model-construction, OpenRouter request, tenant lifecycle, and encrypted tenant-credential paths.
 - Existing authenticated API/router and General settings UI.
 - Storefront plan naming/copy and deployment environment documentation.
 - Optional Paddle webhook endpoint and environment variables; no new service or queue.

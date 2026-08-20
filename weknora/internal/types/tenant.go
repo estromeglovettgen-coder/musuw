@@ -199,6 +199,7 @@ func (c *RetrieverEngines) Scan(value interface{}) error {
 // providers can be added without schema changes.
 type CredentialsConfig struct {
 	WeKnoraCloud *WeKnoraCloudCredentials `json:"weknoracloud,omitempty"`
+	OpenRouter   *OpenRouterCredentials   `json:"openrouter,omitempty"`
 }
 
 // WeKnoraCloudCredentials stores WeKnoraCloud AppID and AppSecret.
@@ -206,6 +207,15 @@ type CredentialsConfig struct {
 type WeKnoraCloudCredentials struct {
 	AppID     string `json:"app_id"`
 	AppSecret string `json:"app_secret"`
+}
+
+// OpenRouterCredentials stores the per-personal-tenant provider key reference.
+// APIKey is encrypted with SYSTEM_AES_KEY by CredentialsConfig.Value before the
+// JSONB document is persisted. KeyHash is the Management API identifier used to
+// read usage and update the provider-managed monthly spending limit.
+type OpenRouterCredentials struct {
+	APIKey  string `json:"api_key"`
+	KeyHash string `json:"key_hash"`
 }
 
 type APIPrincipalMode string
@@ -236,11 +246,11 @@ func (c *APIPrincipalConfig) Value() (driver.Value, error) {
 	}
 	cp := *c
 	if cp.HMACSecret != "" {
-		if key := utils.GetAESKey(); key != nil {
-			if encrypted, err := utils.EncryptAESGCM(cp.HMACSecret, key); err == nil {
-				cp.HMACSecret = encrypted
-			}
+		encrypted, err := encryptStoredSecretStrict("tenant.api_principal_config.hmac_secret", cp.HMACSecret)
+		if err != nil {
+			return nil, err
 		}
+		cp.HMACSecret = encrypted
 	}
 	return json.Marshal(&cp)
 }
@@ -276,6 +286,18 @@ func (c *CredentialsConfig) GetWeKnoraCloud() *WeKnoraCloudCredentials {
 	return c.WeKnoraCloud
 }
 
+// GetOpenRouter returns the per-tenant OpenRouter inference credentials, or nil
+// until the tenant has been provisioned through the Management API.
+func (c *CredentialsConfig) GetOpenRouter() *OpenRouterCredentials {
+	if c == nil || c.OpenRouter == nil {
+		return nil
+	}
+	if strings.TrimSpace(c.OpenRouter.APIKey) == "" || strings.TrimSpace(c.OpenRouter.KeyHash) == "" {
+		return nil
+	}
+	return c.OpenRouter
+}
+
 // Value implements the driver.Valuer interface for CredentialsConfig
 func (c *CredentialsConfig) Value() (driver.Value, error) {
 	if c == nil {
@@ -283,11 +305,18 @@ func (c *CredentialsConfig) Value() (driver.Value, error) {
 	}
 	cp := *c
 	if cp.WeKnoraCloud != nil && cp.WeKnoraCloud.AppSecret != "" {
-		if key := utils.GetAESKey(); key != nil {
-			if encrypted, err := utils.EncryptAESGCM(cp.WeKnoraCloud.AppSecret, key); err == nil {
-				cp.WeKnoraCloud = &WeKnoraCloudCredentials{AppID: cp.WeKnoraCloud.AppID, AppSecret: encrypted}
-			}
+		encrypted, err := encryptStoredSecretStrict("tenant.credentials.weknoracloud.app_secret", cp.WeKnoraCloud.AppSecret)
+		if err != nil {
+			return nil, err
 		}
+		cp.WeKnoraCloud = &WeKnoraCloudCredentials{AppID: cp.WeKnoraCloud.AppID, AppSecret: encrypted}
+	}
+	if cp.OpenRouter != nil && cp.OpenRouter.APIKey != "" {
+		encrypted, err := encryptStoredSecretStrict("tenant.credentials.openrouter.api_key", cp.OpenRouter.APIKey)
+		if err != nil {
+			return nil, err
+		}
+		cp.OpenRouter = &OpenRouterCredentials{APIKey: encrypted, KeyHash: cp.OpenRouter.KeyHash}
 	}
 	return json.Marshal(cp)
 }
@@ -310,6 +339,14 @@ func (c *CredentialsConfig) Scan(value interface{}) error {
 		} else {
 			log.Printf("[crypto] tenant credentials we_knora_cloud.app_secret: decrypt failed (SYSTEM_AES_KEY missing/rotated?), treating as unconfigured")
 			c.WeKnoraCloud.AppSecret = ""
+		}
+	}
+	if c.OpenRouter != nil {
+		if plain, ok := utils.DecryptStoredSecretLenient(c.OpenRouter.APIKey); ok {
+			c.OpenRouter.APIKey = plain
+		} else {
+			log.Printf("[crypto] tenant credentials openrouter.api_key: decrypt failed (SYSTEM_AES_KEY missing/rotated?), treating as unconfigured")
+			c.OpenRouter.APIKey = ""
 		}
 	}
 	return nil

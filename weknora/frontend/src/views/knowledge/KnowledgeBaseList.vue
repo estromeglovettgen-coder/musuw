@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
 import LegacyKnowledgeBaseListBusiness from '@/assets/business-baselines/KnowledgeBaseList.pre-view.vue'
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
@@ -21,7 +21,7 @@ export default defineComponent({
     ListSpaceSidebar,
     ContextualGuide,
   },
-  setup(props, context) {
+  setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
     return state
@@ -51,11 +51,6 @@ export default defineComponent({
         <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button>
       </header>
 
-      <section v-if="hasUninitializedKbs" class="visual-kb-warning" role="status">
-        <t-icon name="info-circle" />
-        <span>{{ $t('knowledgeList.uninitializedBanner') }}</span>
-      </section>
-
       <section v-if="uploadSummaries.length" class="visual-kb-upload-status" aria-live="polite">
         <article v-for="summary in uploadSummaries" :key="summary.kbId">
           <span class="visual-kb-upload-status__icon" :class="{ 'is-done': summary.completed === summary.total }"><t-icon :name="summary.completed === summary.total ? 'check-circle-filled' : 'upload'" /></span>
@@ -78,9 +73,9 @@ export default defineComponent({
           <button v-if="filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ filteredKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
 
           <template v-for="(kb, index) in filteredKnowledgeBases" :key="`${kb.isMine ? 'mine' : 'shared'}-${kb.id}`">
-            <button v-if="showShareGroupHeaders && kb.isMine && !isMyKb(kb) && !kb.is_pinned && (index === 0 || !filteredKnowledgeBases[index - 1].isMine || isMyKb(filteredKnowledgeBases[index - 1]) || filteredKnowledgeBases[index - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ filteredKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
-            <button v-if="showShareGroupHeaders && !kb.isMine && isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[index - 1].isMine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="usergroup-add" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ filteredKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
-            <button v-if="showShareGroupHeaders && !kb.isMine && !isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[index - 1].isMine || isSharedKbEditable(filteredKnowledgeBases[index - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ filteredKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && kb.isMine && !isMyKb(kb) && !kb.is_pinned && (index === 0 || !filteredKnowledgeBases[Number(index) - 1].isMine || isMyKb(filteredKnowledgeBases[Number(index) - 1]) || filteredKnowledgeBases[Number(index) - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ filteredKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !kb.isMine && isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[Number(index) - 1].isMine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="usergroup-add" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ filteredKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !kb.isMine && !isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[Number(index) - 1].isMine || isSharedKbEditable(filteredKnowledgeBases[Number(index) - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ filteredKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
 
             <div v-if="kb.isMine" v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
               <KnowledgeBaseListReferenceCard
@@ -120,7 +115,7 @@ export default defineComponent({
         <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0" class="visual-kb-grid">
           <button v-if="sortedMineKbs[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ mineKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
           <template v-for="(kb, index) in sortedMineKbs" :key="kb.id">
-            <button v-if="showShareGroupHeaders && !isMyKb(kb) && !kb.is_pinned && (index === 0 || isMyKb(sortedMineKbs[index - 1]) || sortedMineKbs[index - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ mineKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !isMyKb(kb) && !kb.is_pinned && (index === 0 || isMyKb(sortedMineKbs[Number(index) - 1]) || sortedMineKbs[Number(index) - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ mineKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
             <div v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
               <KnowledgeBaseListReferenceCard
                 :kb="kb"
@@ -147,8 +142,8 @@ export default defineComponent({
         <div v-else-if="spaceSelectionOrgId && sortedSpaceKbsList.length > 0" class="visual-kb-grid">
           <template v-for="(shared, index) in sortedSpaceKbsList" :key="'shared-' + (shared.share_id || `agent-${shared.knowledge_base?.id}-${shared.source_from_agent?.agent_id || ''}`)">
             <button v-if="showShareGroupHeaders && shared.is_mine && index === 0" type="button" class="visual-kb-section" @click="toggleKbSection('sharedByMe')"><t-icon name="share" /><span>{{ $t('knowledgeList.sections.sharedByMe') }}</span><small>{{ spaceKbSectionCounts.sharedByMe }}</small><t-icon :name="isKbSectionCollapsed('sharedByMe') ? 'chevron-right' : 'chevron-down'" /></button>
-            <button v-if="showShareGroupHeaders && !shared.is_mine && isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[index - 1].is_mine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="edit-1" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ spaceKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
-            <button v-if="showShareGroupHeaders && !shared.is_mine && !isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[index - 1].is_mine || isSharedKbEditable(sortedSpaceKbsList[index - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ spaceKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !shared.is_mine && isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[Number(index) - 1].is_mine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="edit-1" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ spaceKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
+            <button v-if="showShareGroupHeaders && !shared.is_mine && !isSharedKbEditable(shared.permission) && (index === 0 || sortedSpaceKbsList[Number(index) - 1].is_mine || isSharedKbEditable(sortedSpaceKbsList[Number(index) - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ spaceKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
             <KnowledgeBaseListReferenceCard
               v-show="!isSpaceKbCollapsed(shared)"
               :kb="shared.knowledge_base"
@@ -174,7 +169,7 @@ export default defineComponent({
         <div class="visual-kb-delete"><t-icon name="error-circle" /><div><strong>{{ $t('knowledgeList.delete.confirmTitle') }}</strong><p>{{ $t('knowledgeList.delete.confirmMessage', { name: deletingKb?.name ?? '' }) }}</p></div><footer><button type="button" @click="deleteVisible = false">{{ $t('common.cancel') }}</button><button type="button" class="is-danger" @click="confirmDelete">{{ $t('knowledgeList.delete.confirmButton') }}</button></footer></div>
       </t-dialog>
 
-      <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val) => (val ? null : uiStore.closeKBEditor())" @success="handleKBEditorSuccess" />
+      <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val: boolean) => (val ? null : uiStore.closeKBEditor())" @success="handleKBEditorSuccess" />
       <ShareKnowledgeBaseDialog v-model:visible="shareDialogVisible" :knowledge-base-id="sharingKbId" :knowledge-base-name="sharingKbName" @shared="handleShareSuccess" />
 
       <Teleport to="body">

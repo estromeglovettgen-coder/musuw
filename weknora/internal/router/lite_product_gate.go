@@ -137,6 +137,7 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 	var req struct {
 		AgentID             string   `json:"agent_id"`
 		AgentSourceTenantID uint64   `json:"agent_source_tenant_id"`
+		WebSearchEnabled    bool     `json:"web_search_enabled"`
 		MCPServiceIDs       []string `json:"mcp_service_ids"`
 		SkillNames          []string `json:"skill_names"`
 		MentionedItems      []struct {
@@ -149,6 +150,9 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 		return false
 	}
 	if !liteRuntimeAgentIDAllowed(req.AgentID) || req.AgentSourceTenantID != 0 {
+		return true
+	}
+	if req.WebSearchEnabled {
 		return true
 	}
 	if len(req.MCPServiceIDs) > 0 || len(req.SkillNames) > 0 {
@@ -290,6 +294,8 @@ func liteProductRouteBlocked(method, path string) bool {
 		"/api/v1/shared-agents",
 		"/api/v1/im-channels",
 		"/api/v1/embed-channels",
+		"/api/v1/wechat",
+		"/api/v1/chunker/preview",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true
@@ -384,15 +390,14 @@ func liteProductRouteBlocked(method, path string) bool {
 		}
 	}
 
-	// KB initialization/configuration remains available. Model downloading,
-	// connectivity testing and extraction-debug endpoints are management tools.
+	// The consumer workflow may read the resolved KB configuration, but every
+	// initialization write is a model-management surface. In particular,
+	// InitializeByKB can create/update raw provider models internally, bypassing
+	// the ordinary /models route guard, so Lite must fail it closed.
 	if path == "/api/v1/initialization" || strings.HasPrefix(path, "/api/v1/initialization/") {
 		rest := strings.TrimPrefix(path, "/api/v1/initialization/")
 		if strings.HasPrefix(rest, "config/") {
-			return method != http.MethodGet && method != http.MethodPut
-		}
-		if strings.HasPrefix(rest, "initialize/") {
-			return method != http.MethodPost
+			return method != http.MethodGet
 		}
 		return true
 	}

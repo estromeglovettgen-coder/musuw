@@ -46,6 +46,6 @@ test("lets CSS own the web canvas instead of a theme startup inline style", () =
 });
 
 test("keeps the compact Musuw wordmark in the native Vue sidebar", () => {
-  assert.match(sidebar, /class="musuw-wordmark"/);
+  assert.match(sidebar, /class="visual-sidebar__brand"/);
   assert.match(sidebar, />Musuw 穆苏瓦</);
 });

@@ -530,7 +530,7 @@ func TestConnectionConfig_ValueScan(t *testing.T) {
 		assert.False(t, hasAPIKey)
 	})
 
-	t.Run("skips encryption when AES key is not set", func(t *testing.T) {
+	t.Run("fails closed when AES key is not set", func(t *testing.T) {
 		t.Setenv("SYSTEM_AES_KEY", "")
 
 		original := ConnectionConfig{
@@ -538,12 +538,8 @@ func TestConnectionConfig_ValueScan(t *testing.T) {
 			APIKey:   "sk-api-key",
 		}
 		raw, err := original.Value()
-		require.NoError(t, err)
-
-		var intermediate map[string]interface{}
-		require.NoError(t, json.Unmarshal(raw.([]byte), &intermediate))
-		assert.Equal(t, "secret-pass", intermediate["password"])
-		assert.Equal(t, "sk-api-key", intermediate["api_key"])
+		require.Error(t, err)
+		assert.Nil(t, raw)
 	})
 
 	t.Run("does not double-encrypt already encrypted values", func(t *testing.T) {

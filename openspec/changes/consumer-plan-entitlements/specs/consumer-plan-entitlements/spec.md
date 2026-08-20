@@ -27,7 +27,7 @@ The system SHALL limit Free tenants to one knowledge base, ten documents in that
 - **THEN** the server rejects it before storage or parsing
 
 ### Requirement: Model access follows the active plan
-The system SHALL expose and accept only the least-cost configured model for each required capability to Free tenants and SHALL expose all active configured models to paid tenants. Server-side model resolution SHALL reject a disallowed model ID even when the caller bypasses the UI. Built-in DeepSeek chat models SHALL use OpenRouter rather than the DeepSeek direct API.
+The system SHALL expose and accept only platform-built-in OpenRouter models from the server-owned catalog. Free tenants SHALL receive only the least-cost configured model for each required capability; paid tenants SHALL receive the larger plan-approved platform catalog. Consumer tenants SHALL NOT create, edit, test, credential, or invoke arbitrary models, including BYOK and manually inserted models. Server-side model resolution SHALL reject a disallowed model ID even when the caller bypasses the UI. Built-in DeepSeek chat models SHALL use OpenRouter rather than the DeepSeek direct API.
 
 #### Scenario: Free tenant lists chat models
 - **WHEN** a Free tenant requests available chat models
@@ -38,34 +38,38 @@ The system SHALL expose and accept only the least-cost configured model for each
 - **THEN** the server rejects the request without calling the provider
 
 #### Scenario: Paid tenant selects a model
-- **WHEN** an active paid tenant selects any active configured model
+- **WHEN** an active paid tenant selects any model in its server-provided platform catalog
 - **THEN** the existing model path is used without a plan-model rejection
 
+#### Scenario: Consumer attempts custom model configuration
+- **WHEN** a consumer calls a model mutation, provider, debug, or credential endpoint or submits a non-platform model ID
+- **THEN** the endpoint is unavailable or the model is rejected without calling the provider
+
 ### Requirement: OpenRouter usage is attributed and capped
-Every OpenRouter JSON request SHALL include a stable, non-PII internal user identifier when the API supports it. Before provider work the system SHALL reject a tenant whose current-month remaining credit cannot cover the request estimate, and after a successful response it SHALL add OpenRouter's authoritative reported cost to that tenant's current UTC month usage.
+Each tenant SHALL use one OpenRouter-managed child key whose native monthly-reset limit equals the effective plan credit. The key SHALL be lazily created through OpenRouter's official SDK, encrypted in the existing tenant credential field, never returned to a consumer, and used for chat, embedding, rerank, vision, and speech calls. Every supported OpenRouter JSON request SHALL also include a stable, non-PII internal user identifier. Musuw SHALL NOT fall back to a shared inference key or a user-supplied key. OpenRouter's key state SHALL be the usage and enforcement authority.
 
-#### Scenario: Request has sufficient credit
-- **WHEN** the request estimate is within the tenant's remaining monthly credit
-- **THEN** the provider request proceeds and its reported cost is recorded against that tenant
+#### Scenario: First provider request
+- **WHEN** an eligible tenant without a child key starts its first OpenRouter-backed inference and management credentials are configured
+- **THEN** the server creates one monthly-limited key, persists the encrypted winner, deletes any raced loser, and performs inference with that tenant key
 
-#### Scenario: Request exceeds remaining credit
-- **WHEN** the request estimate is greater than the tenant's remaining monthly credit
-- **THEN** the server rejects the request before calling OpenRouter
+#### Scenario: Provisioning cannot be secured
+- **WHEN** the management key or valid encryption key is absent
+- **THEN** inference fails closed with an observable reason and no shared or plaintext key is used
 
-#### Scenario: Calendar month changes
-- **WHEN** the stored usage month differs from the current UTC month
-- **THEN** effective usage is reset to zero before the new request is evaluated
+#### Scenario: Monthly limit is exhausted
+- **WHEN** OpenRouter returns HTTP 402 or an equivalent terminal SSE credit error for the tenant key
+- **THEN** the request terminates without generic retries and exposes the product's monthly-credit error state
 
-### Requirement: File parsing is preflighted
-The system SHALL calculate a simple conservative OpenRouter credit estimate from each uploaded file's byte size and SHALL reject parsing before durable storage when the estimate exceeds the tenant's remaining monthly credit. Actual model calls SHALL remain the source of charged usage.
+#### Scenario: Plan changes for a provisioned tenant
+- **WHEN** a verified billing event changes the effective plan
+- **THEN** the provider key limit is synchronized before the durable plan is committed, and failure leaves or restores the previous durable limit
 
-#### Scenario: File estimate exceeds balance
-- **WHEN** an upload's parse estimate exceeds the tenant's remaining monthly credit
-- **THEN** the upload is rejected before its object is persisted or a parser is started
+### Requirement: Ingestion reuses the native failure and recovery lifecycle
+The system SHALL NOT estimate OpenRouter cost from file bytes. When a provider-managed limit is exhausted during ingestion, the current task SHALL stop without retry, the knowledge row SHALL use WeKnora's existing failed status and trace finalization, and the source object SHALL remain available for the existing reparse flow after credits are restored.
 
-#### Scenario: File estimate fits balance
-- **WHEN** an upload's parse estimate fits the remaining monthly credit and other limits pass
-- **THEN** the existing upload and parsing pipeline proceeds unchanged
+#### Scenario: Credits expire during parsing
+- **WHEN** an OpenRouter-backed ingestion stage receives a typed credit-exhaustion error
+- **THEN** the stage is marked failed once, is not automatically retried, and can be reparsed through WeKnora's existing workflow after upgrade or monthly reset
 
 ### Requirement: Users can inspect their effective entitlement
 The authenticated product SHALL show the current plan, storage used and limit, monthly OpenRouter credit used and limit, and the principal Free-only restrictions in General settings.

@@ -23,9 +23,9 @@ const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': 'f2f5ceb08d7e6f2ee36ea12f8a67eea15b9c9612',
-  './business-baselines/Input-field.pre-view.vue': 'a34d09f5f9dbe44d4b3835213fdab662c4b7446a',
+  './business-baselines/Input-field.pre-view.vue': 'b3894bf8991b1324c5e5e8398fbcd84cae59365c',
   './business-baselines/KnowledgeBase.pre-view.vue': 'c6c7c53a9f1eda91b645733256eb04221bf816da',
-  './business-baselines/KnowledgeBaseList.pre-view.vue': 'ee73dc142f2ceb90eea994720601021d74ce1d92',
+  './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '99a2c17c59bbd5b436492bba60a206b87400b527',
 }
@@ -44,11 +44,11 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   inputField: {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native multi-model selection',
+    authority: 'WeKnora v0.7.2 native multi-model selection constrained by the server-provided plan catalog',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native knowledge scopes and shared-space list behavior',
+    authority: 'WeKnora v0.7.2 native knowledge scopes with Musuw platform-default model provisioning',
   },
 }
 

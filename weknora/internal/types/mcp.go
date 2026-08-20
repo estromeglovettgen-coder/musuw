@@ -207,17 +207,12 @@ func (c *MCPAuthConfig) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	out := *c
-	if key := utils.GetAESKey(); key != nil {
-		if out.APIKey != "" {
-			if encrypted, err := utils.EncryptAESGCM(out.APIKey, key); err == nil {
-				out.APIKey = encrypted
-			}
-		}
-		if out.Token != "" {
-			if encrypted, err := utils.EncryptAESGCM(out.Token, key); err == nil {
-				out.Token = encrypted
-			}
-		}
+	var err error
+	if out.APIKey, err = encryptStoredSecretStrict("mcp_services.auth_config.api_key", out.APIKey); err != nil {
+		return nil, err
+	}
+	if out.Token, err = encryptStoredSecretStrict("mcp_services.auth_config.token", out.Token); err != nil {
+		return nil, err
 	}
 	return json.Marshal(&out)
 }

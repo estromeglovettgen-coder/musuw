@@ -11,6 +11,7 @@ const inputField = read("../components/Input-field.vue");
 const agentSelector = read("../components/AgentSelector.vue");
 const userMenu = read("../components/UserMenu.vue");
 const settingsView = read("../views/settings/Settings.vue");
+const platformView = read("../views/platform/index.vue");
 const generalSettings = read("../views/settings/GeneralSettings.vue");
 const knowledgeBase = read("../views/knowledge/KnowledgeBase.vue");
 const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
@@ -84,6 +85,11 @@ test("Lite Settings exposes General only and General exposes Language only", () 
   assert.doesNotMatch(generalSettings, /isAutoCheckUpdateEnabled|toggleAutoCheckUpdate/);
 });
 
+test("Settings has one active mount on the dedicated route", () => {
+  assert.match(platformView, /<Settings v-if="route\.path !== '\/platform\/settings'" \/>/);
+  assert.equal((router.match(/views\/settings\/Settings\.vue/g) || []).length, 1);
+});
+
 test("Lite UserMenu keeps account exit but does not rediscover management surfaces", () => {
   assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account"/);
   assert.match(userMenu, /<button v-if="!authStore\.isLiteMode" type="button" class="visual-user-menu__guide"/);
@@ -97,7 +103,7 @@ test("Lite UserMenu keeps account exit but does not rediscover management surfac
 
 test("Lite chat surfaces retain runtime selection but hide Agent/model management shortcuts", () => {
   assert.match(inputField, /v-if="!authStore\.isLiteMode" type="button" @click\.stop\.prevent="handleGoToAgentSettings\('knowledge'\)"/);
-  assert.match(inputField, /<header><span>[\s\S]*<button v-if="!authStore\.isLiteMode" type="button" @click="handleModelChange\('__add_model__'\)"/);
+  assert.match(inputField, /<header><span>[\s\S]*<button v-if="authStore\.isSystemAdmin" type="button" @click="handleModelChange\('__add_model__'\)"/);
   assert.match(agentSelector, /<router-link v-if="!authStore\.isLiteMode" to="\/platform\/agents"/);
   assert.match(agentSelector, /v-if="!authStore\.isLiteMode && canShowDetailHeaderAction"/);
   assert.match(agentSelector, /authStore\.isLiteMode \? \[\] : agentsList\.value\.filter\(a => !a\.is_builtin\)/);

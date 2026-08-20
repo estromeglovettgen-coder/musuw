@@ -1,6 +1,6 @@
-# Platform-managed models are visible to every existing and future workspace.
-# Credentials are expanded from backend-only environment variables at startup
-# and encrypted before the model rows are persisted.
+# Platform-managed models are visible according to the tenant's plan. Catalog
+# rows carry no inference credential; the OpenRouter transport supplies the
+# tenant's encrypted, provider-managed child key at request time.
 builtin_models:
   - id: builtin-deepseek-v4-pro
     tenant_id: 10000
@@ -13,7 +13,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       supports_vision: false
 
@@ -28,7 +27,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       supports_vision: false
 
@@ -43,7 +41,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       supports_vision: true
 
@@ -58,7 +55,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       supports_vision: true
 
@@ -73,7 +69,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       supports_vision: true
 
@@ -88,7 +83,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       supports_vision: false
 
@@ -102,7 +96,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       embedding_parameters:
         dimension: 4096
@@ -119,7 +112,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
 
   - id: builtin-openrouter-vlm
@@ -132,7 +124,6 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter
       interface_type: openai
       supports_vision: true
@@ -147,5 +138,4 @@ builtin_models:
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
-      api_key: ${OPENROUTER_API_KEY}
       provider: openrouter

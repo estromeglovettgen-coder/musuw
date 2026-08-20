@@ -56,7 +56,7 @@ raise SystemExit(1)
     printf '%s' "$resolved"
 }
 
-for required in "$legacy_env" "$secret_dir/oidc_client_id" "$secret_dir/oidc_client_secret" "$secret_dir/deepseek_api_key" "$secret_dir/openrouter_api_key" "$auth_public_env"; do
+for required in "$legacy_env" "$secret_dir/oidc_client_id" "$secret_dir/oidc_client_secret" "$auth_public_env"; do
     if [ ! -r "$required" ]; then
         printf '%s\n' "candidate runtime prerequisite is unavailable" >&2
         exit 1
@@ -75,7 +75,6 @@ trap 'rm -f "$candidate_tmp"' EXIT
 # DeepSeek chat and OpenRouter's rerank/embedding/VLM/ASR models. Keep the
 # list explicit and local-only instead of weakening SSRF or trusting arbitrary
 # model configuration.
-deepseek_public_ipv4="$(resolve_public_ipv4 api.deepseek.com)"
 openrouter_public_ipv4="$(resolve_public_ipv4 openrouter.ai)"
 
 awk '
@@ -144,7 +143,6 @@ printf '%s\n' \
     'WEKNORA_CANDIDATE_DOCREADER_TMP_VOLUME=weknora-v072-candidate-docreader-tmp' \
     'WEKNORA_CANDIDATE_NEO4J_VOLUME=weknora-v072-candidate-neo4j-data' \
     'WEKNORA_CANDIDATE_SEARXNG_CONFIG_VOLUME=weknora-v072-candidate-searxng-config' \
-    "WEKNORA_CANDIDATE_DEEPSEEK_IP=$deepseek_public_ipv4" \
     "WEKNORA_CANDIDATE_OPENROUTER_IP=$openrouter_public_ipv4" \
     'APK_MIRROR_ARG=mirrors.aliyun.com' \
     'APP_HOST=app' \

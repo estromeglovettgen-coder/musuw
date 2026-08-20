@@ -90,10 +90,9 @@ type WebSearchProviderParameters struct {
 // Value implements the driver.Valuer interface.
 // Encrypts APIKey before persisting to database.
 func (p WebSearchProviderParameters) Value() (driver.Value, error) {
-	if key := utils.GetAESKey(); key != nil && p.APIKey != "" {
-		if encrypted, err := utils.EncryptAESGCM(p.APIKey, key); err == nil {
-			p.APIKey = encrypted
-		}
+	var err error
+	if p.APIKey, err = encryptStoredSecretStrict("web_search_providers.parameters.api_key", p.APIKey); err != nil {
+		return nil, err
 	}
 	return json.Marshal(p)
 }

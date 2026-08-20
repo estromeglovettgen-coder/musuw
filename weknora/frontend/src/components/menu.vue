@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
 import LegacySidebarBusiness from '@/assets/business-baselines/menu.pre-view.vue'
 import SessionSidebarRow from './SessionSidebarRow.vue'
 import SessionSourceFilter from './SessionSourceFilter.vue'
@@ -22,7 +22,7 @@ export default defineComponent({
     UserMenu,
     TenantSelector,
   },
-  setup(props, context) {
+  setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const orgStore = useOrganizationStore()
     if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state, orgStore }
@@ -40,8 +40,8 @@ export default defineComponent({
         <div class="visual-sidebar__collapsed-divider" />
         <button type="button" class="visual-sidebar__collapsed-nav is-new" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /></button>
         <button type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': isMenuItemActive('knowledge-bases') }" :title="t('menu.knowledgeBase')" @click="handleMenuClick('knowledge-bases')"><t-icon name="folder" /></button>
-        <button v-if="visibleMenuArr.some(item => item.path === 'agents')" type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': currentpath === 'agentList' }" :title="t('menu.agents')" @click="handleMenuClick('agents')"><t-icon name="usergroup" /></button>
-        <button v-if="visibleMenuArr.some(item => item.path === 'organizations')" type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': currentpath === 'organizationList' }" :title="t('menu.organizations')" @click="handleMenuClick('organizations')"><t-icon name="system-sum" /></button>
+        <button v-if="visibleMenuArr.some((item: { path?: string }) => item.path === 'agents')" type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': currentpath === 'agentList' }" :title="t('menu.agents')" @click="handleMenuClick('agents')"><t-icon name="usergroup" /></button>
+        <button v-if="visibleMenuArr.some((item: { path?: string }) => item.path === 'organizations')" type="button" class="visual-sidebar__collapsed-nav" :class="{ 'is-active': currentpath === 'organizationList' }" :title="t('menu.organizations')" @click="handleMenuClick('organizations')"><t-icon name="system-sum" /></button>
       </div>
       <div class="visual-sidebar__drag-handle" @mousedown="onDragHandleMouseDown" />
       <div class="visual-sidebar__collapsed-user"><UserMenu /></div>
@@ -64,10 +64,10 @@ export default defineComponent({
           <span class="visual-sidebar__primary-copy"><t-icon name="folder" /><span>{{ t('menu.knowledgeBase') }}</span></span>
           <span v-if="chatResources.rawKnowledgeBases?.length" class="visual-sidebar__kb-count">{{ chatResources.rawKnowledgeBases.length }}</span>
         </button>
-        <button v-if="visibleMenuArr.some(item => item.path === 'agents')" type="button" class="visual-sidebar__primary is-native" :class="{ 'is-active': currentpath === 'agentList' }" data-guide="nav-agents" @click="handleMenuClick('agents')">
+        <button v-if="visibleMenuArr.some((item: { path?: string }) => item.path === 'agents')" type="button" class="visual-sidebar__primary is-native" :class="{ 'is-active': currentpath === 'agentList' }" data-guide="nav-agents" @click="handleMenuClick('agents')">
           <span class="visual-sidebar__primary-copy"><t-icon name="usergroup" /><span>{{ t('menu.agents') }}</span></span>
         </button>
-        <button v-if="visibleMenuArr.some(item => item.path === 'organizations')" type="button" class="visual-sidebar__primary is-native" :class="{ 'is-active': currentpath === 'organizationList' }" data-guide="nav-organizations" @click="handleMenuClick('organizations')">
+        <button v-if="visibleMenuArr.some((item: { path?: string }) => item.path === 'organizations')" type="button" class="visual-sidebar__primary is-native" :class="{ 'is-active': currentpath === 'organizationList' }" data-guide="nav-organizations" @click="handleMenuClick('organizations')">
           <span class="visual-sidebar__primary-copy"><t-icon name="system-sum" /><span>{{ t('menu.organizations') }}</span></span>
           <span v-if="orgStore.totalPendingJoinRequestCount > 0" class="visual-sidebar__kb-count">{{ orgStore.totalPendingJoinRequestCount }}</span>
         </button>
@@ -94,7 +94,7 @@ export default defineComponent({
 
     <SessionBatchManageModal
       :visible="batchMode"
-      :items="menuArr.find(item => item.path === 'creatChat')?.children || []"
+      :items="menuArr.find((item: { path?: string }) => item.path === 'creatChat')?.children || []"
       :selected-ids="batchSelectedIds"
       :all-selected="isAllBatchSelected"
       :indeterminate="isBatchIndeterminate"

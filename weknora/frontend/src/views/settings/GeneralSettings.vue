@@ -5,6 +5,28 @@
       <p>{{ $t('general.description') }}</p>
     </header>
 
+    <section v-if="entitlement" class="plan-card visual-plan-card">
+      <header class="visual-plan-card__header">
+        <div>
+          <span>{{ $t('entitlement.currentPlan') }}</span>
+          <h3>{{ planName }}</h3>
+        </div>
+        <span class="visual-plan-card__status">{{ entitlement.plan_status || $t('entitlement.active') }}</span>
+      </header>
+      <div class="visual-plan-card__metrics">
+        <div><span>{{ $t('entitlement.storage') }}</span><strong>{{ formatBytes(entitlement.storage_used) }} / {{ formatBytes(entitlement.storage_bytes) }}</strong></div>
+        <div :class="{ 'is-unavailable': !creditsAvailable }"><span>{{ $t('entitlement.monthlyCredits') }}</span><strong>{{ creditsDisplay }}</strong></div>
+        <div><span>{{ $t('entitlement.knowledgeBases') }}</span><strong>{{ formatLimit(entitlement.max_knowledge_bases) }}</strong></div>
+        <div><span>{{ $t('entitlement.documentsPerKb') }}</span><strong>{{ formatLimit(entitlement.max_documents_per_kb) }}</strong></div>
+      </div>
+      <p>
+        {{ entitlement.video_upload ? $t('entitlement.videoPlanAllowed') : $t('entitlement.videoFreeBlocked') }}
+        <template v-if="creditsAvailable"> · {{ $t('entitlement.renewsMonthly', { month: entitlement.openrouter_usage_month }) }}</template>
+      </p>
+      <p v-if="!billingConfigured" class="visual-plan-card__billing">{{ $t('entitlement.billingUnavailable') }}</p>
+    </section>
+    <section v-else-if="entitlementLoading" class="plan-card visual-plan-card is-loading">{{ $t('common.loading') }}</section>
+
     <div class="visual-setting-list">
       <div class="visual-setting-row">
         <div class="visual-setting-row__copy">
@@ -119,6 +141,7 @@ import { useI18n } from 'vue-i18n'
 import { normalizeLocale, persistLocalePreference } from '@/i18n/locale'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
+import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
 import {
   useFont,
   SANS_STACKS,
@@ -147,6 +170,11 @@ const localTheme = ref<ThemeMode>(currentTheme.value)
 const localSansFont = ref<FontKey>(currentSans.value)
 const localMonoFont = ref<MonoFontKey>(currentMono.value)
 const localFontSize = ref<FontSizeKey>(currentSize.value)
+const entitlement = ref<ConsumerEntitlement | null>(null)
+const entitlementLoading = ref(true)
+const billingConfigured = ref(false)
+const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan || 'free'}`))
+const creditsAvailable = computed(() => entitlement.value?.openrouter_credits_status === 'available')
 
 watch(currentTheme, (value) => { localTheme.value = value })
 watch(currentSans, (value) => { localSansFont.value = value })
@@ -182,7 +210,32 @@ onMounted(() => {
   const normalized = normalizeLocale(savedLocale)
   localLanguage.value = normalized || locale.value
   if (normalized) locale.value = normalized
+
+  getCurrentEntitlement()
+    .then((response) => {
+      entitlement.value = response.data
+      billingConfigured.value = response.billing.configured
+    })
+    .catch(() => {
+      entitlement.value = null
+    })
+    .finally(() => {
+      entitlementLoading.value = false
+    })
 })
+
+const formatBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 GB'
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(bytes < 1024 ** 3 ? 2 : 1)} GB`
+}
+
+const formatCredits = (microusd: number) => `$${(Math.max(0, microusd) / 1_000_000).toFixed(2)}`
+const creditsDisplay = computed(() => {
+  if (!entitlement.value) return '—'
+  if (!creditsAvailable.value) return formatCredits(entitlement.value.monthly_openrouter_microusd)
+  return `${formatCredits(entitlement.value.openrouter_used_microusd)} / ${formatCredits(entitlement.value.monthly_openrouter_microusd)}`
+})
+const formatLimit = (limit: number) => limit > 0 ? String(limit) : t('entitlement.unlimited')
 
 const handleLanguageChange = () => {
   const persisted = persistLocalePreference(localLanguage.value)
@@ -252,6 +305,29 @@ const handleFontSizeChange = (value: FontSizeKey) => {
   font-size: 12px;
   line-height: 18px;
 }
+
+.visual-plan-card {
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  color: #6b7280;
+  font-size: 12px;
+}
+.visual-plan-card.is-loading { min-height: 80px; display: flex; align-items: center; justify-content: center; }
+.visual-plan-card__header { margin-bottom: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.visual-plan-card__header span,
+.visual-plan-card__metrics span { color: #9ca3af; font-size: 11px; }
+.visual-plan-card__header h3 { margin: 2px 0 0; color: #111827; font-size: 22px; line-height: 28px; }
+.visual-plan-card__status { padding: 4px 9px; border-radius: 999px; background: #ecfdf5; color: #047857 !important; text-transform: capitalize; }
+.visual-plan-card__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.visual-plan-card__metrics > div { min-width: 0; padding: 11px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px; background: #f9fafb; }
+.visual-plan-card__metrics strong { overflow-wrap: anywhere; color: #374151; font-size: 13px; }
+.visual-plan-card__metrics .is-unavailable strong { color: #9ca3af; }
+.visual-plan-card > p { margin: 12px 0 0; line-height: 18px; }
+.visual-plan-card__billing { color: #b45309; }
 
 .visual-setting-list {
   width: 100%;
@@ -338,6 +414,7 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 }
 
 @media (max-width: 720px) {
+  .visual-plan-card__metrics { grid-template-columns: minmax(0, 1fr); }
   .visual-setting-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .visual-setting-row__control { width: min(280px, 100%); justify-self: start; }
 }

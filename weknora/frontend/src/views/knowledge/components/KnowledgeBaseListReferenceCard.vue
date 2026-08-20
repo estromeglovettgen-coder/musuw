@@ -95,6 +95,12 @@ const emit = defineEmits<{
         <span v-else>{{ $t('knowledgeBase.folderTree.folderCardCount', { count: kb.knowledge_count ?? 0 }) }}</span>
         <span v-if="kb.isProcessing" class="visual-reference-kb-card__spinner" />
       </span>
+      <t-tooltip v-if="kb.question_generation_config?.enabled" :content="$t('knowledgeList.features.questionGeneration')" placement="top">
+        <span class="visual-reference-kb-card__state"><t-icon name="help-circle" /></span>
+      </t-tooltip>
+      <t-tooltip v-if="(kb.share_count ?? 0) > 0" :content="$t('knowledgeList.sharedToOrgs', { count: kb.share_count ?? 0 })" placement="top">
+        <span class="visual-reference-kb-card__state"><t-icon name="share" /><small>{{ kb.share_count }}</small></span>
+      </t-tooltip>
       <span class="visual-reference-kb-card__spacer" />
       <ResourceOriginBadge v-if="showOriginBadge" :variant="originVariant" :creator-name="creatorName" />
       <span v-else-if="orgName" class="visual-reference-kb-card__origin" :title="orgName"><t-icon name="usergroup" /><span>{{ orgName }}</span></span>
@@ -133,6 +139,9 @@ const emit = defineEmits<{
 .visual-reference-kb-card__favorite :deep(.t-icon) { width: 14px; height: 14px; font-size: 14px; }
 .visual-reference-kb-card__more { flex: 0 0 24px; width: 24px; height: 24px; padding: 4px; border: 0; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; opacity: 0; cursor: pointer; transition: opacity 150ms ease,color 150ms ease,background-color 150ms ease; }
 .visual-reference-kb-card:hover .visual-reference-kb-card__more,.visual-reference-kb-card__more:focus-visible { opacity: 1; }
+.visual-reference-kb-card__state { min-width: 20px; height: 20px; padding: 2px 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; background: #f3f4f6; color: #6b7280; font-size: 11px; }
+.visual-reference-kb-card__state :deep(.t-icon) { font-size: 12px; }
+.visual-reference-kb-card__state small { font-size: 9px; line-height: 1; }
 .visual-reference-kb-card__more:hover { background: rgb(243 244 246 / 80%); color: #1f2937; }
 .visual-reference-kb-card__more :deep(.t-icon) { width: 16px; height: 16px; font-size: 16px; }
 .visual-reference-kb-card__description { margin: 6px 0 0; overflow: hidden; color: #6b7280; font-size: 12px; line-height: 1.625; letter-spacing: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

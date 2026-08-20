@@ -45,7 +45,6 @@ services:
     # records resolved by prepare-runtime.sh. Production compose has no such
     # override and therefore keeps its normal resolver path unchanged.
     extra_hosts:
-      - "api.deepseek.com:${WEKNORA_CANDIDATE_DEEPSEEK_IP:?run prepare-runtime.sh to resolve api.deepseek.com}"
       - "openrouter.ai:${WEKNORA_CANDIDATE_OPENROUTER_IP:?run prepare-runtime.sh to resolve openrouter.ai}"
     volumes:
       - ../integration/weknora-candidate/app-entrypoint.sh:/opt/weknora-candidate/app-entrypoint.sh:ro
@@ -55,12 +54,6 @@ services:
         mode: 0400
       - source: oidc_client_secret
         target: oidc_client_secret
-        mode: 0400
-      - source: deepseek_api_key
-        target: deepseek_api_key
-        mode: 0400
-      - source: openrouter_api_key
-        target: openrouter_api_key
         mode: 0400
 
   docreader:
@@ -103,7 +96,3 @@ secrets:
     file: ../.runtime/weknora/secrets/oidc_client_id
   oidc_client_secret:
     file: ../.runtime/weknora/secrets/oidc_client_secret
-  deepseek_api_key:
-    file: ../.runtime/weknora/secrets/deepseek_api_key
-  openrouter_api_key:
-    file: ../.runtime/weknora/secrets/openrouter_api_key

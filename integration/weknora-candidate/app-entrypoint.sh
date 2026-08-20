@@ -21,7 +21,4 @@ read_required_secret() {
 
 export OIDC_AUTH_CLIENT_ID="$(read_required_secret /run/secrets/oidc_client_id)"
 export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_secret)"
-export DEEPSEEK_API_KEY="$(read_required_secret /run/secrets/deepseek_api_key)"
-export OPENROUTER_API_KEY="$(read_required_secret /run/secrets/openrouter_api_key)"
-
 exec /app/scripts/docker-entrypoint.sh "$@"

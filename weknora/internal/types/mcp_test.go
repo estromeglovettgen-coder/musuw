@@ -46,17 +46,12 @@ func TestMCPAuthConfig_Value_EncryptsWhenKeySet(t *testing.T) {
 	assert.Equal(t, "bearer-real-secret", cfg.Token)
 }
 
-func TestMCPAuthConfig_Value_PassthroughWhenNoKey(t *testing.T) {
+func TestMCPAuthConfig_Value_FailsClosedWhenNoKey(t *testing.T) {
 	withAESKey(t, "")
 	cfg := &MCPAuthConfig{APIKey: "plain-key", Token: "plain-tok"}
 	v, err := cfg.Value()
-	assert.NoError(t, err)
-	raw := v.([]byte)
-	// Without SYSTEM_AES_KEY we fall back to plaintext storage (matches
-	// the existing Model/WebSearch convention so deployments without a
-	// key don't break).
-	assert.Contains(t, string(raw), "plain-key")
-	assert.Contains(t, string(raw), "plain-tok")
+	assert.Error(t, err)
+	assert.Nil(t, v)
 }
 
 func TestMCPAuthConfig_ScanRoundtrip(t *testing.T) {

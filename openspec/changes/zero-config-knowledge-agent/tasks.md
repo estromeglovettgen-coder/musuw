@@ -11,11 +11,11 @@
 
 - [x] 2.1 Update the existing built-in-agent YAML so Quick is V4 Flash and Pro
   is V4 Pro with the complete existing in-tenant tool set.
-- [x] 2.2 Make platform Quick/Pro model resolution authoritative on the server
-  and cover attempted client model overrides.
+- [x] 2.2 Keep platform Quick/Pro pipeline resolution authoritative, apply the
+  already-authorized selected model request-scoped, and reject disallowed overrides.
 - [x] 2.3 Reuse the existing input-mode selector to expose only V4 Flash and
-  V4 Pro, derive its model from the selected built-in agent, keep Pro thinking
-  available, and preserve the selected Pro mode across reload.
+  V4 Pro, keep the separate plan-catalog model picker, retain Pro thinking,
+  and preserve the selected mode/model across reload.
 
 ## 3. Remove configuration exposure and release mismatch
 

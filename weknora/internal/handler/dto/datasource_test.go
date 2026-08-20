@@ -9,6 +9,7 @@ import (
 )
 
 func TestDataSourceResponse_OmitsCredentials(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 	cfg := types.DataSourceConfig{
 		Type: "github",
 		Credentials: map[string]interface{}{
@@ -17,7 +18,8 @@ func TestDataSourceResponse_OmitsCredentials(t *testing.T) {
 		ResourceIDs: []string{"repo-1"},
 		Settings:    map[string]interface{}{"branch": "main"},
 	}
-	blob, _ := cfg.ToJSON()
+	blob, err := cfg.ToJSON()
+	assert.NoError(t, err)
 	ds := &types.DataSource{
 		ID:     "ds-1",
 		Name:   "github-prod",
@@ -54,6 +56,7 @@ func TestDataSourceResponse_NilSafe(t *testing.T) {
 }
 
 func TestDataSourceResponse_RSSFeedURLsFromCredentials(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 	cfg := types.DataSourceConfig{
 		Type: types.ConnectorTypeRSS,
 		Credentials: map[string]interface{}{
@@ -61,7 +64,8 @@ func TestDataSourceResponse_RSSFeedURLsFromCredentials(t *testing.T) {
 		},
 		ResourceIDs: []string{"https://example.com/a.xml"},
 	}
-	blob, _ := cfg.ToJSON()
+	blob, err := cfg.ToJSON()
+	assert.NoError(t, err)
 	ds := &types.DataSource{
 		ID:     "ds-rss",
 		Name:   "my-rss",
@@ -80,6 +84,7 @@ func TestDataSourceResponse_RSSFeedURLsFromCredentials(t *testing.T) {
 }
 
 func TestDataSourceResponse_RSSAuthHeadersConfigured(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 	cfg := types.DataSourceConfig{
 		Type: types.ConnectorTypeRSS,
 		Credentials: map[string]interface{}{
@@ -89,7 +94,8 @@ func TestDataSourceResponse_RSSAuthHeadersConfigured(t *testing.T) {
 			"feed_urls": "https://example.com/feed.xml",
 		},
 	}
-	blob, _ := cfg.ToJSON()
+	blob, err := cfg.ToJSON()
+	assert.NoError(t, err)
 	ds := &types.DataSource{
 		ID:     "ds-rss-auth",
 		Name:   "my-rss",

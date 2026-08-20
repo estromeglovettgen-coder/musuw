@@ -42,9 +42,9 @@ type TenantService interface {
 
 // TenantRepository defines the tenant repository interface
 type TenantRepository interface {
-	// CreateTenant creates a tenant
+	// CreateTenant creates tenant
 	CreateTenant(ctx context.Context, tenant *types.Tenant) error
-	// GetTenantByID gets a tenant by ID
+	// GetTenantByID gets tenant by ID
 	GetTenantByID(ctx context.Context, id uint64) (*types.Tenant, error)
 	// GetTenantsByIDs batches GetTenantByID; see TenantService.GetTenantsByIDs.
 	GetTenantsByIDs(ctx context.Context, ids []uint64) (map[uint64]*types.Tenant, error)
@@ -52,9 +52,9 @@ type TenantRepository interface {
 	ListTenants(ctx context.Context) ([]*types.Tenant, error)
 	// SearchTenants searches tenants with pagination and filters
 	SearchTenants(ctx context.Context, keyword string, tenantID uint64, page, pageSize int) ([]*types.Tenant, int64, error)
-	// UpdateTenant updates a tenant
+	// UpdateTenant updates tenant
 	UpdateTenant(ctx context.Context, tenant *types.Tenant) error
-	// DeleteTenant deletes a tenant
+	// DeleteTenant deletes tenant
 	DeleteTenant(ctx context.Context, id uint64) error
 	// AdjustStorageUsed adjusts the storage used for a tenant
 	AdjustStorageUsed(ctx context.Context, tenantID uint64, delta int64) error

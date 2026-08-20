@@ -59,6 +59,8 @@ func TestLiteChatRequestBlocked(t *testing.T) {
 		{name: "skill override", body: `{"query":"hello","agent_id":"builtin-smart-reasoning","skill_names":["skill-1"]}`, blocked: true},
 		{name: "mcp mention", body: `{"query":"hello","mentioned_items":[{"type":"mcp","id":"mcp-1"}]}`, blocked: true},
 		{name: "skill mention", body: `{"query":"hello","mentioned_items":[{"type":"skill","id":"skill-1"}]}`, blocked: true},
+		{name: "web search override", body: `{"query":"hello","web_search_enabled":true}`, blocked: true},
+		{name: "disabled web search", body: `{"query":"hello","web_search_enabled":false}`, blocked: false},
 		{name: "kb mention stays valid", body: `{"query":"hello","mentioned_items":[{"type":"kb","id":"kb-1"}]}`, blocked: false},
 		{name: "malformed json stays native validation", body: `{"query":`, blocked: false},
 	} {

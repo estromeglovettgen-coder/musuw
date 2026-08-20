@@ -87,8 +87,10 @@ func (s *sessionService) restrictTagScopesToAgentScope(
 // resolveChatModelID resolves the effective chat model ID for a QA request.
 //
 // When an agent is selected, its model configuration must be complete and
-// valid. Custom agents may accept a request-level override, but the two
-// platform-owned answer modes always use their reviewed YAML binding.
+// valid. The two platform-owned answer modes may use the request model because
+// ModelService has already reduced that ID to the caller's plan-approved,
+// platform-owned OpenRouter catalog. Their prompts/tools stay YAML-owned; only
+// the runtime model binding follows the user's allowed dropdown selection.
 //
 // Without an agent, the legacy KB / session / system fallback remains
 // available for non-agent callers.
@@ -103,6 +105,23 @@ func (s *sessionService) resolveChatModelID(
 	session := req.Session
 
 	if customAgent != nil {
+		if isPlatformManagedBuiltinAgentID(customAgent.ID) {
+			runtimeModelID := strings.TrimSpace(summaryModelID)
+			if runtimeModelID != "" {
+				model, err := s.modelService.GetModelByID(ctx, runtimeModelID)
+				if err != nil || model == nil || model.Type != types.ModelTypeKnowledgeQA {
+					return "", fmt.Errorf("selected chat model %s is unavailable for platform answer mode %s", runtimeModelID, customAgent.ID)
+				}
+				// This agent object is request-scoped. Keep downstream query
+				// understanding and AgentQA on the same policy-approved model so a
+				// Free request never falls back to the paid YAML default.
+				customAgent.Config.ModelID = runtimeModelID
+				customAgent.Config.QueryUnderstandModelID = runtimeModelID
+				logger.Infof(ctx, "Using selected platform catalog model_id %s for answer mode %s", runtimeModelID, customAgent.ID)
+				return runtimeModelID, nil
+			}
+		}
+
 		configuredModelID := strings.TrimSpace(customAgent.Config.ModelID)
 		if configuredModelID == "" {
 			return "", fmt.Errorf("chat model is not configured: please set model_id on agent %s", customAgent.ID)
@@ -112,9 +131,6 @@ func (s *sessionService) resolveChatModelID(
 			return "", fmt.Errorf("configured chat model %s is unavailable for agent %s", configuredModelID, customAgent.ID)
 		}
 		if isPlatformManagedBuiltinAgentID(customAgent.ID) {
-			if summaryModelID = strings.TrimSpace(summaryModelID); summaryModelID != "" && summaryModelID != configuredModelID {
-				logger.Warnf(ctx, "Ignoring request model override for platform answer mode %s", customAgent.ID)
-			}
 			logger.Infof(ctx, "Using platform answer mode model_id: %s", configuredModelID)
 			return configuredModelID, nil
 		}
