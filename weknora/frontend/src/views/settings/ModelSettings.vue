@@ -27,7 +27,7 @@
           </p>
         </div>
         <a
-          href="https://github.com/Tencent/WeKnora/blob/main/docs/BUILTIN_MODELS.md"
+          href="https://github.com/estromeglovettgen-coder/musuw/blob/main/weknora/docs/BUILTIN_MODELS.md"
           target="_blank"
           rel="noopener noreferrer"
         >

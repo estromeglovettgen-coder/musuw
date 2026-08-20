@@ -327,6 +327,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   return (
     <main className="auth-page">
       <section aria-labelledby="auth-title" className="auth-panel">
+        <img alt="Musuw" className="auth-logo" height="56" src="/musuw-logo.png" width="56" />
         <h1 id="auth-title">{copy.title}</h1>
         <p className="auth-intro">{copy.intro}</p>
 

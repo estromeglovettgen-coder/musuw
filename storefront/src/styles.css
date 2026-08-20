@@ -149,16 +149,12 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-self: start;
-  gap: 10px;
-  font-size: 18px;
-  font-weight: 720;
-  letter-spacing: -0.025em;
 }
 
 .brand-mark {
   display: grid;
   width: 48px;
-  height: 30px;
+  height: 48px;
   place-items: center;
   background: transparent;
 }
@@ -1794,16 +1790,12 @@ textarea {
   }
 
   .brand {
-    gap: 10px;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    display: inline-flex;
   }
 
   .brand-mark {
     width: 48px;
-    height: 30px;
-    overflow: hidden;
+    height: 48px;
     border-radius: 0;
     background: transparent;
   }
@@ -3216,13 +3208,9 @@ textarea {
     min-height: 66px;
   }
 
-  .brand {
-    font-size: 17px;
-  }
-
   .brand-mark {
     width: 44px;
-    height: 28px;
+    height: 44px;
   }
 
   .hero {

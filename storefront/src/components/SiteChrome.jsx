@@ -12,9 +12,8 @@ export function Brand({ copy = defaultCopy }) {
   return (
     <a className="brand" href="/" aria-label={copy.brand.homeLabel}>
       <span className="brand-mark" aria-hidden="true">
-        <img src="/images/musuw-logo.png" alt="" width="48" height="30" draggable={false} />
+        <img src="/images/musuw-logo.png" alt="" width="30" height="30" draggable={false} />
       </span>
-      <span>musuw</span>
     </a>
   );
 }

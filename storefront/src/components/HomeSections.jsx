@@ -201,7 +201,7 @@ export function WorkflowSection({ copy }) {
                   }}
                 >
                   <img
-                    src={index === 0 ? "/images/musnow-wiki-page.jpg" : "/images/musnow-wiki-graph.jpg"}
+                    src={index === 0 ? "/images/musuw-wiki-page.jpg" : "/images/musuw-wiki-graph.jpg"}
                     alt={copy.workflow.imageAlts[index]}
                     width="1024"
                     height={index === 0 ? "673" : "601"}
@@ -696,7 +696,7 @@ export function FinalCTA({ copy }) {
           <div className="final-cta-visual" aria-hidden="true">
             <div className="final-cta-dashboard-frame">
               <img
-                src="/images/musnow-query-citation.jpg"
+                src="/images/musuw-query-citation.jpg"
                 alt=""
                 width="1800"
                 height="1200"

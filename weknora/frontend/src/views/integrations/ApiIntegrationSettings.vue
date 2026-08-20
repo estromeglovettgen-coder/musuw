@@ -1282,7 +1282,7 @@ const saveDesktopPort = async () => {
 }
 
 function openApiDoc() {
-  window.open('https://github.com/Tencent/WeKnora/blob/main/docs/api/README.md', '_blank')
+  window.open('https://github.com/estromeglovettgen-coder/musuw/blob/main/weknora/docs/api/README.md', '_blank')
 }
 
 function openCreateAPIKeyDialog() {

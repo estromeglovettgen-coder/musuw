@@ -191,7 +191,7 @@ const navItems = computed<NavItem[]>(() => {
     { key: 'chathistory', icon: 'chat', label: t('chatHistorySettings.title') },
     { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
     { key: 'ollama', icon: 'server', label: 'Ollama' },
-    { key: 'weknoracloud', icon: 'cloud', label: 'WeKnora Cloud' },
+    { key: 'weknoracloud', icon: 'cloud', label: 'Musuw Cloud' },
     ...integrationItems,
     { key: 'vectorstore', icon: 'data-base', label: t('settings.vectorStoreEngine') },
     { key: 'parser', icon: 'file-search', label: t('settings.parserEngine') },

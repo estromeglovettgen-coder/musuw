@@ -144,10 +144,10 @@ test("existing homepage structure points only to real musuw product evidence", (
   }
 
   const expectedAssets = new Set([
-    "/images/musnow-query-citation.jpg",
-    "/images/musnow-knowledge-base.jpg",
-    "/images/musnow-wiki-page.jpg",
-    "/images/musnow-wiki-graph.jpg"
+    "/images/musuw-query-citation.jpg",
+    "/images/musuw-knowledge-base.jpg",
+    "/images/musuw-wiki-page.jpg",
+    "/images/musuw-wiki-graph.jpg"
   ]);
   const evidenceSources = [
     "index.html",
@@ -156,7 +156,7 @@ test("existing homepage structure points only to real musuw product evidence", (
     "src/components/HomeSections.jsx"
   ].map((path) => readFileSync(join(root, path), "utf8")).join("\n");
   const referencedAssets = new Set(
-    [...evidenceSources.matchAll(/\/images\/(musnow-[a-z-]+\.(?:jpg|png))/g)]
+    [...evidenceSources.matchAll(/\/images\/(musuw-[a-z-]+\.(?:jpg|png))/g)]
       .map((match) => `/images/${match[1]}`)
   );
   assert.deepEqual(

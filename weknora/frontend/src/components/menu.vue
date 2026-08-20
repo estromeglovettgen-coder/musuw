@@ -35,7 +35,7 @@ export default defineComponent({
   <aside class="visual-sidebar" :class="{ 'is-collapsed': uiStore.sidebarCollapsed }">
     <template v-if="uiStore.sidebarCollapsed">
       <div class="visual-sidebar__collapsed-main">
-        <button type="button" class="visual-sidebar__collapsed-logo" :title="'Musuw 穆苏瓦'" @click="toggleSidebar"><span class="visual-sidebar__bolt" aria-hidden="true">↯</span></button>
+        <button type="button" class="visual-sidebar__collapsed-logo" :title="'Musuw 穆苏瓦'" @click="toggleSidebar"><img src="/musuw-logo.png" alt="Musuw" /></button>
         <button type="button" class="visual-sidebar__collapsed-control" :title="t('menu.expandSidebar')" @click="toggleSidebar"><t-icon name="chevron-right" /></button>
         <div class="visual-sidebar__collapsed-divider" />
         <button type="button" class="visual-sidebar__collapsed-nav is-new" :title="t('menu.newChat')" @click="handleMenuClick('creatChat')"><t-icon name="chat-add" /></button>
@@ -49,7 +49,7 @@ export default defineComponent({
 
     <template v-else>
       <header class="visual-sidebar__header">
-        <button type="button" class="visual-sidebar__brand" aria-label="Musuw 穆苏瓦" @click="handleMenuClick('creatChat')"><span class="visual-sidebar__mark" aria-hidden="true">↯</span><strong>Musuw 穆苏瓦</strong></button>
+        <button type="button" class="visual-sidebar__brand" aria-label="Musuw 穆苏瓦" @click="handleMenuClick('creatChat')"><span class="visual-sidebar__mark" aria-hidden="true"><img src="/musuw-logo.png" alt="" /></span><strong>Musuw 穆苏瓦</strong></button>
         <div class="visual-sidebar__header-actions">
           <button v-if="!authStore.isLiteMode" type="button" class="visual-sidebar__header-icon" :title="t('menu.search')" :aria-label="t('menu.search')" @click="commandPaletteStore.openPalette('')"><t-icon name="search" /></button>
           <button type="button" class="visual-sidebar__header-icon" :title="t('menu.collapseSidebar')" :aria-label="t('menu.collapseSidebar')" @click="toggleSidebar"><t-icon name="chevron-left" /></button>
@@ -113,10 +113,10 @@ export default defineComponent({
 :global(html.wails-desktop) .visual-sidebar:not(.is-collapsed),:global(html.wails-desktop) .visual-sidebar.is-collapsed { padding-top: 30px; }
 .visual-sidebar__header { flex: 0 0 auto; margin-bottom: 10px; padding: 6px 4px; display: flex; align-items: center; justify-content: space-between; }
 .visual-sidebar__brand { min-width: 0; padding: 0; border: 0; display: flex; align-items: center; gap: 10px; background: transparent; color: #111827; font: inherit; cursor: pointer; text-align: left; }
-.visual-sidebar__mark,.visual-sidebar__collapsed-logo { flex: 0 0 26px; width: 26px; height: 26px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #000; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-sidebar__mark,.visual-sidebar__collapsed-logo { flex: 0 0 26px; width: 26px; height: 26px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); overflow: hidden; }
+.visual-sidebar__mark img,.visual-sidebar__collapsed-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .visual-sidebar__mark { transition: transform 150ms ease; }
 .visual-sidebar__brand:hover .visual-sidebar__mark { transform: scale(1.05); }
-.visual-sidebar__bolt { font-size: 15px; line-height: 1; font-weight: 800; transform: translateY(-.5px); }
 .visual-sidebar__brand strong { min-width: 0; overflow: hidden; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
 .visual-sidebar__header-actions { display: flex; align-items: center; gap: 2px; color: #9ca3af; }
 .visual-sidebar__header-icon,.visual-sidebar__collapsed-control { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; transition: color 150ms ease,background-color 150ms ease; }

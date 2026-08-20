@@ -168,7 +168,7 @@ export function HeroScene({ copy }) {
           >
             <div className="dashboard-frame">
               <img
-                src="/images/musnow-wiki-page.jpg"
+                src="/images/musuw-wiki-page.jpg"
                 width="1800"
                 height="1200"
                 draggable={false}
@@ -188,7 +188,7 @@ export function HeroScene({ copy }) {
               transition={springScaleTransition}
             >
               <img
-                src="/images/musnow-query-citation.jpg"
+                src="/images/musuw-query-citation.jpg"
                 width="930"
                 height="470"
                 draggable={false}
@@ -208,7 +208,7 @@ export function HeroScene({ copy }) {
               transition={springScaleTransition}
             >
               <img
-                src="/images/musnow-wiki-graph.jpg"
+                src="/images/musuw-wiki-graph.jpg"
                 width="930"
                 height="470"
                 draggable={false}

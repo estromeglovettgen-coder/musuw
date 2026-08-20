@@ -41,6 +41,14 @@ button {
   width: 100%;
 }
 
+.auth-logo {
+  display: block;
+  height: 56px;
+  margin: 0 0 20px;
+  object-fit: contain;
+  width: 56px;
+}
+
 .auth-panel h1 {
   font-size: 28px;
   font-weight: 650;

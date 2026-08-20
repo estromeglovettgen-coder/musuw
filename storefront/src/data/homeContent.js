@@ -41,7 +41,7 @@ export const features = [
     title: "Ask naturally. Check every important answer.",
     description:
       "musuw searches the knowledge you authorize, answers in context, and connects important claims to exact source evidence.",
-    image: "/images/musnow-query-citation.jpg",
+    image: "/images/musuw-query-citation.jpg",
     imageAlt: "musuw grounded answer with exact source citations",
     icon: Sparkle,
     bullets: ["Natural questions", "Bounded source scope", "Exact citations", "Honest uncertainty"]
@@ -51,7 +51,7 @@ export const features = [
     title: "Turn saved sources into useful memory.",
     description:
       "Bring in notes and documents, preserve the originals, and let musuw maintain connected Wiki pages without rewriting your raw sources.",
-    image: "/images/musnow-wiki-page.jpg",
+    image: "/images/musuw-wiki-page.jpg",
     imageAlt: "musuw living Wiki generated from preserved sources",
     icon: Stack,
     bullets: ["Source preservation", "Automatic Wiki", "Topic organization", "Version history"]
@@ -61,7 +61,7 @@ export const features = [
     title: "Explore connected knowledge in one place.",
     description:
       "musuw turns parsed sources into native Wiki pages and shows their relationships as a graph view inside Wiki, with paths back to exact evidence.",
-    image: "/images/musnow-wiki-graph.jpg",
+    image: "/images/musuw-wiki-graph.jpg",
     imageAlt: "musuw Wiki graph view with paths back to exact evidence",
     icon: CheckCircle,
     bullets: ["Native Wiki", "Graph inside Wiki", "Linked pages", "Evidence return"]
@@ -71,7 +71,7 @@ export const features = [
     title: "Keep your knowledge portable and under control.",
     description:
       "musuw keeps personal workspaces scoped, model credentials server-side, and data lifecycle actions visible from export through deletion.",
-    image: "/images/musnow-knowledge-base.jpg",
+    image: "/images/musuw-knowledge-base.jpg",
     imageAlt: "musuw knowledge base with server-confirmed document states",
     icon: ShieldCheck,
     bullets: ["Personal isolation", "Portable export", "Deletion workflow", "Server-side credentials"]
@@ -320,7 +320,7 @@ export const articles = [
     title: "Ask with exact evidence",
     author: "musuw product guide",
     date: "Grounded dialogue",
-    image: "/images/musnow-query-citation.jpg",
+    image: "/images/musuw-query-citation.jpg",
     alt: "musuw knowledge dialogue with active tools",
     href: "/#feature"
   },
@@ -328,7 +328,7 @@ export const articles = [
     title: "See how knowledge connects",
     author: "musuw product guide",
     date: "Knowledge graph",
-    image: "/images/musnow-wiki-graph.jpg",
+    image: "/images/musuw-wiki-graph.jpg",
     alt: "musuw evidence-backed knowledge graph",
     href: "/#use-cases"
   },
@@ -336,7 +336,7 @@ export const articles = [
     title: "Keep control of your sources",
     author: "musuw product guide",
     date: "Source library",
-    image: "/images/musnow-knowledge-base.jpg",
+    image: "/images/musuw-knowledge-base.jpg",
     alt: "musuw source library and upload workflow",
     href: "/#feature"
   }
