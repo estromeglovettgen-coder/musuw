@@ -23,8 +23,9 @@ import (
 )
 
 type entitlementHandlerServiceStub struct {
-	current    *types.ConsumerEntitlement
-	applyCalls *int
+	current      *types.ConsumerEntitlement
+	applyCalls   *int
+	refreshCalls *int
 }
 
 type paddlePortalSessionCreatorStub struct {
@@ -81,9 +82,16 @@ func (entitlementHandlerServiceStub) OpenRouterAPIKey(context.Context) (string, 
 
 func (entitlementHandlerServiceStub) OpenRouterUserID(context.Context) string { return "" }
 
-func (s entitlementHandlerServiceStub) ApplyConsumerPlan(context.Context, uint64, types.ConsumerPlan, string, string, time.Time, string, string) (bool, error) {
+func (s entitlementHandlerServiceStub) ApplyConsumerPlan(context.Context, uint64, types.ConsumerPlan, string, string, string, time.Time, string, string, *time.Time) (bool, error) {
 	if s.applyCalls != nil {
 		(*s.applyCalls)++
+	}
+	return true, nil
+}
+
+func (s entitlementHandlerServiceStub) RefreshPaidAllowance(context.Context, uint64, types.ConsumerPlan, string, time.Time, string, string, time.Time) (bool, error) {
+	if s.refreshCalls != nil {
+		(*s.refreshCalls)++
 	}
 	return true, nil
 }
@@ -444,6 +452,51 @@ func TestPaddleWebhookAppliesServerBoundSubscription(t *testing.T) {
 	assert.Equal(t, 1, calls)
 }
 
+func TestPaddleWebhookRoutesOnlyBoundRecurringCompletionToAllowanceRefresh(t *testing.T) {
+	applyCalls, refreshCalls := 0, 0
+	config := PaddleConfig{
+		Environment: "sandbox", ClientToken: "test_client_token", WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	binding := config.checkoutBinding(42, "pri_plus_monthly")
+	now := time.Now().UTC()
+	body := []byte(fmt.Sprintf(`{
+		"event_id":"evt_renewal",
+		"event_type":"transaction.completed",
+		"occurred_at":%q,
+		"data":{
+			"id":"txn_renewal",
+			"status":"completed",
+			"origin":"subscription_recurring",
+			"customer_id":"ctm_bound",
+			"subscription_id":"sub_bound",
+			"custom_data":{"tenant_id":"42","musuw_checkout_binding":%q},
+			"billing_period":{"starts_at":%q,"ends_at":%q},
+			"items":[{"price":{"id":"pri_plus_monthly"}}]
+		}
+	}`, now.Format(time.RFC3339Nano), binding, now.Add(-time.Minute).Format(time.RFC3339Nano), now.AddDate(0, 1, 0).Format(time.RFC3339Nano)))
+	ts := time.Now().Unix()
+	mac := hmac.New(sha256.New, []byte(config.WebhookSecret))
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d:%s", ts, body)))
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/webhook", bytes.NewReader(body))
+	req.Header.Set("Paddle-Signature", fmt.Sprintf("ts=%d;h1=%s", ts, hex.EncodeToString(mac.Sum(nil))))
+	c.Request = req
+
+	h := &EntitlementHandler{service: entitlementHandlerServiceStub{applyCalls: &applyCalls, refreshCalls: &refreshCalls}, paddle: config}
+	h.PaddleWebhook(c)
+	require.Empty(t, c.Errors)
+	assert.Equal(t, 0, applyCalls)
+	assert.Equal(t, 1, refreshCalls)
+	assert.JSONEq(t, `{"ok":true,"applied":true}`, recorder.Body.String())
+}
+
 func TestVerifyPaddleRequestPreservesTheSignedBody(t *testing.T) {
 	secret := "pdl_secret"
 	body := []byte(`{"event_id":"evt_1"}`)
@@ -499,13 +552,14 @@ func TestPaddleCancellationStillRequiresKnownServerPrice(t *testing.T) {
 		} `json:"price"`
 	}{})
 	event.Data.Items[0].Price.ID = "pri_attacker"
-	_, _, _, err := config.planForEvent(event)
+	_, _, _, _, err := config.planForEvent(event)
 	assert.Error(t, err)
 
 	event.Data.Items[0].Price.ID = "pri_plus"
-	plan, status, priceID, err := config.planForEvent(event)
+	plan, status, priceID, period, err := config.planForEvent(event)
 	assert.NoError(t, err)
 	assert.Equal(t, "free", string(plan))
 	assert.Equal(t, "canceled", status)
 	assert.Equal(t, "pri_plus", priceID)
+	assert.Equal(t, "monthly", period)
 }

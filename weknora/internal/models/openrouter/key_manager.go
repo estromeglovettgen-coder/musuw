@@ -22,8 +22,8 @@ const managementKeyFilePath = "/run/secrets/openrouter_management_api_key"
 // The implementation delegates OpenRouter protocol, response typing and
 // idempotent retries to OpenRouter's official Go SDK.
 type KeyManager interface {
-	CreateKey(ctx context.Context, name string, limitMicrousd int64) (*ManagedKey, error)
-	UpdateKeyLimit(ctx context.Context, hash string, limitMicrousd int64) error
+	CreateKey(ctx context.Context, name string, limitMicrousd int64, monthlyReset bool) (*ManagedKey, error)
+	UpdateKeyLimit(ctx context.Context, hash string, limitMicrousd int64, monthlyReset bool) error
 	GetKey(ctx context.Context, hash string) (*KeyInfo, error)
 	DeleteKey(ctx context.Context, hash string) error
 }
@@ -37,7 +37,9 @@ type KeyInfo struct {
 	Hash                   string
 	LimitMicrousd          int64
 	LimitRemainingMicrousd int64
+	UsageMicrousd          int64
 	UsageMonthlyMicrousd   int64
+	MonthlyReset           bool
 }
 
 type sdkKeyManager struct {
@@ -69,7 +71,7 @@ func newSDKKeyManager(managementKey, baseURL string, client openroutersdk.HTTPCl
 	)}
 }
 
-func (m *sdkKeyManager) CreateKey(ctx context.Context, name string, limitMicrousd int64) (*ManagedKey, error) {
+func (m *sdkKeyManager) CreateKey(ctx context.Context, name string, limitMicrousd int64, monthlyReset bool) (*ManagedKey, error) {
 	if m == nil || m.client == nil {
 		return nil, fmt.Errorf("OpenRouter Management API is not configured")
 	}
@@ -77,11 +79,15 @@ func (m *sdkKeyManager) CreateKey(ctx context.Context, name string, limitMicrous
 		return nil, fmt.Errorf("OpenRouter key limit must be positive")
 	}
 	limitUSD := microusdToUSD(limitMicrousd)
-	reset := operations.CreateKeysLimitResetMonthly
+	reset := optionalnullable.From[operations.CreateKeysLimitReset](nil)
+	if monthlyReset {
+		value := operations.CreateKeysLimitResetMonthly
+		reset = optionalnullable.From(&value)
+	}
 	response, err := m.client.APIKeys.Create(ctx, operations.CreateKeysRequest{
 		Name:       name,
 		Limit:      optionalnullable.From(&limitUSD),
-		LimitReset: optionalnullable.From(&reset),
+		LimitReset: reset,
 	}, operations.WithRetries(retry.Config{Strategy: "none"}))
 	if err != nil {
 		return nil, managementSDKError("create key", err)
@@ -92,7 +98,7 @@ func (m *sdkKeyManager) CreateKey(ctx context.Context, name string, limitMicrous
 	return &ManagedKey{Key: response.Key, Hash: response.Data.Hash}, nil
 }
 
-func (m *sdkKeyManager) UpdateKeyLimit(ctx context.Context, hash string, limitMicrousd int64) error {
+func (m *sdkKeyManager) UpdateKeyLimit(ctx context.Context, hash string, limitMicrousd int64, monthlyReset bool) error {
 	if m == nil || m.client == nil {
 		return fmt.Errorf("OpenRouter Management API is not configured")
 	}
@@ -103,10 +109,14 @@ func (m *sdkKeyManager) UpdateKeyLimit(ctx context.Context, hash string, limitMi
 		return fmt.Errorf("OpenRouter key limit must be positive")
 	}
 	limitUSD := microusdToUSD(limitMicrousd)
-	reset := operations.UpdateKeysLimitResetMonthly
+	reset := optionalnullable.From[operations.UpdateKeysLimitReset](nil)
+	if monthlyReset {
+		value := operations.UpdateKeysLimitResetMonthly
+		reset = optionalnullable.From(&value)
+	}
 	_, err := m.client.APIKeys.Update(ctx, hash, operations.UpdateKeysRequestBody{
 		Limit:      optionalnullable.From(&limitUSD),
-		LimitReset: optionalnullable.From(&reset),
+		LimitReset: reset,
 	})
 	if err != nil {
 		return managementSDKError("update key", err)
@@ -132,7 +142,9 @@ func (m *sdkKeyManager) GetKey(ctx context.Context, hash string) (*KeyInfo, erro
 		Hash:                   response.Data.Hash,
 		LimitMicrousd:          usdToMicrousd(*response.Data.Limit),
 		LimitRemainingMicrousd: usdToMicrousd(*response.Data.LimitRemaining),
+		UsageMicrousd:          usdToMicrousd(response.Data.Usage),
 		UsageMonthlyMicrousd:   usdToMicrousd(response.Data.UsageMonthly),
+		MonthlyReset:           response.Data.LimitReset != nil && *response.Data.LimitReset == "monthly",
 	}, nil
 }
 

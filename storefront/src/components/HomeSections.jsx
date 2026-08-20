@@ -1,18 +1,14 @@
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import {
-  Check,
-  CheckCircle,
-  ClipboardText,
-  Fire,
-  Minus,
-  Plus,
-  Question,
-  SealCheck,
-  SquaresFour,
-  Star,
-  Wallet
-} from "@phosphor-icons/react";
+import { Check } from "@phosphor-icons/react/Check";
+import { CheckCircle } from "@phosphor-icons/react/CheckCircle";
+import { ClipboardText } from "@phosphor-icons/react/ClipboardText";
+import { Minus } from "@phosphor-icons/react/Minus";
+import { Plus } from "@phosphor-icons/react/Plus";
+import { Question } from "@phosphor-icons/react/Question";
+import { SealCheck } from "@phosphor-icons/react/SealCheck";
+import { SquaresFour } from "@phosphor-icons/react/SquaresFour";
+import { Star } from "@phosphor-icons/react/Star";
 import {
   articles,
   benefits,
@@ -257,7 +253,6 @@ export function BenefitsSection({ copy }) {
 
 export function PricingSection({ copy }) {
   const [yearly, setYearly] = useState(false);
-  const reduceMotion = useReducedMotion();
   const priceBook = priceBooks[copy.pricing.currencyCode] ?? priceBooks.USD;
   const localizedPlans = plans.map((plan, index) => ({
     ...plan,
@@ -268,13 +263,9 @@ export function PricingSection({ copy }) {
   return (
     <section className="section pricing-section" id="pricing">
       <div className="container">
-        <Reveal>
-          <SectionIntro
-            label={copy.pricing.intro.label}
-            icon={Wallet}
-            title={copy.pricing.intro.title}
-            body={copy.pricing.intro.body}
-          />
+        <Reveal className="pricing-heading">
+          <h2>{copy.pricing.intro.title}</h2>
+          <p>{copy.pricing.intro.body}</p>
         </Reveal>
         <div className="pricing-controls">
           <div className="billing-toggle" role="group" aria-label={copy.pricing.billingAria}>
@@ -297,96 +288,30 @@ export function PricingSection({ copy }) {
             </button>
           </div>
         </div>
-        <p className="purchase-mode-note" id="purchase-mode-note" aria-live="polite">
-          <span>{copy.pricing.checkout.note}</span>
-          <small>{copy.pricing.checkout.providerNote}</small>
+        <p className="pricing-note" aria-live="polite">
+          {copy.pricing.checkout.note}
         </p>
-        <motion.div
-          className="pricing-grid"
-          initial={reduceMotion ? false : "hidden"}
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={{
-            hidden: {},
-            visible: {
-              transition: {
-                staggerChildren: reduceMotion ? 0 : 0.11
-              }
-            }
-          }}
-        >
+        <div className="pricing-grid">
           {localizedPlans.map((plan) => (
-            <motion.article
-              className={`pricing-card ${plan.featured ? "pricing-card-featured" : ""}`}
+            <article
+              className="pricing-card"
               data-plan={plan.key}
               key={plan.name}
-              layout={!reduceMotion}
-              variants={{
-                hidden: reduceMotion
-                  ? {}
-                  : {
-                      opacity: 0,
-                      y: 72,
-                      scale: 0.975
-                    },
-                visible: {
-                  opacity: 1,
-                  y: 0,
-                  scale: 1,
-                  transition: reduceMotion
-                    ? { duration: 0 }
-                    : {
-                        type: "spring",
-                        stiffness: 96,
-                        damping: 19,
-                        mass: 0.82
-                      }
-                }
-              }}
-              transition={{
-                layout: {
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 24
-                }
-              }}
             >
-              <p className="plan-label">
-                {plan.featured ? <Fire size={19} weight="regular" aria-hidden="true" /> : null}
-                {plan.label}
-              </p>
               <div className="pricing-card-content">
                 <div className="plan-summary">
                   <div className="plan-heading">
-                    <h3>{plan.name}</h3>
+                    <div className="plan-title-row">
+                      <h3>{plan.name}</h3>
+                      {plan.featured ? <span className="plan-recommended">{copy.pricing.recommended}</span> : null}
+                    </div>
                     <p className="plan-description">{plan.description}</p>
                   </div>
                   <div className="plan-price">
-                    <AnimatePresence mode="wait" initial={false}>
-                      <motion.strong
-                        key={yearly ? plan.yearlyTotal : plan.monthly}
-                        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
-                        transition={{ duration: reduceMotion ? 0 : 0.18 }}
-                      >
-                        {formatPlanAmount(
-                          copy.pricing.currencySymbol,
-                          yearly ? plan.yearlyTotal : plan.monthly
-                        )}
-                      </motion.strong>
-                    </AnimatePresence>
+                    <strong>{formatPlanAmount(copy.pricing.currencySymbol, yearly ? plan.yearlyTotal : plan.monthly)}</strong>
                     <span>{yearly ? copy.pricing.perYear : copy.pricing.perUserMonth}</span>
                   </div>
                 </div>
-                <ul>
-                  {plan.features.map((feature) => (
-                    <li key={feature}>
-                      <Check size={18} weight="bold" aria-hidden="true" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
                 {plan.key === "free" ? (
                   <ButtonLink
                     className="pricing-button"
@@ -399,7 +324,7 @@ export function PricingSection({ copy }) {
                   <ButtonLink
                     className="pricing-button"
                     href="/contact"
-                    variant={plan.featured ? "primary" : "secondary"}
+                    variant="secondary"
                   >
                     {copy.pricing.unavailableAction}
                   </ButtonLink>
@@ -410,15 +335,26 @@ export function PricingSection({ copy }) {
                       plan: plan.key,
                       billingPeriod: yearly ? "yearly" : "monthly"
                     })}
-                    variant={plan.featured ? "primary" : "secondary"}
+                    variant="primary"
                   >
                     {copy.pricing.checkout.action}
                   </ButtonLink>
                 )}
+                <div className="plan-includes">
+                  <strong>{copy.pricing.includes}</strong>
+                  <ul>
+                    {plan.features.map((feature) => (
+                      <li key={feature}>
+                        <Check size={18} weight="bold" aria-hidden="true" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </motion.article>
+            </article>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

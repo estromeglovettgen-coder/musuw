@@ -6,8 +6,8 @@ Musuw currently advertises four consumer plans but every signed-in tenant receiv
 
 - Add tenant-scoped Free, Plus, Pro, and Max entitlements with storage and monthly OpenRouter credit limits.
 - Enforce Free's one-knowledge-base, ten-documents-per-knowledge-base, no-video, and cheapest-chat-model limits in existing service paths.
-- Lazily provision one OpenRouter-managed child key per tenant with the plan's native monthly limit, attribute supported calls with a stable non-PII user identifier, and read usage from OpenRouter.
-- Expose current plan, storage, and credit usage in the existing General settings page.
+- Lazily provision one OpenRouter-managed child key per tenant with no provider calendar reset, refresh Free on its registration anniversary and paid plans on their subscription cycle, and never stack inactive periods or add a Musuw usage ledger.
+- Expose current plan, storage, credit usage, exact personal-cycle boundary, and a GPT-style plan comparison in Usage & billing settings.
 - Open Paddle's hosted checkout from General settings, let an authenticated paid tenant preview and apply a higher server-owned tier through Paddle's official subscription API, accept signature-verified subscription events, and link authenticated customers to Paddle's hosted self-service portal when the complete server-owned catalog and credentials are configured; remain explicitly disabled when any required value is absent.
 - Route every built-in DeepSeek model through the existing OpenRouter integration.
 
@@ -27,4 +27,4 @@ None.
 - Existing knowledge-base, knowledge-upload, model-construction, OpenRouter request, tenant lifecycle, and encrypted tenant-credential paths.
 - Existing authenticated API/router and General settings UI.
 - Storefront plan naming/copy and deployment environment documentation.
-- Optional Paddle.js checkout, official Go webhook verifier, subscription updater and customer-portal client, endpoints, and environment variables; no new service, billing ledger, custom billing screen, or queue.
+- Optional Paddle.js checkout and price preview, official Go webhook verifier, subscription updater and customer-portal client, endpoints, and environment variables; no new service, usage ledger, custom payment form, scheduler, or queue.

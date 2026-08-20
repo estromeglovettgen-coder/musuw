@@ -21,6 +21,8 @@ type entitlementService struct {
 	keys modelopenrouter.KeyManager
 }
 
+var errAllowanceRenewalPending = errors.New("monthly allowance renewal is awaiting payment confirmation")
+
 func NewEntitlementService(repo interfaces.EntitlementRepository) interfaces.EntitlementService {
 	return newEntitlementService(repo, modelopenrouter.NewKeyManagerFromEnv())
 }
@@ -41,11 +43,11 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 		ConsumerPlanLimits:      limits,
 		PlanStatus:              tenant.PlanStatus,
 		StorageUsed:             tenant.StorageUsed,
-		OpenRouterUsageMonth:    types.OpenRouterUsageMonth(at),
 		OpenRouterCreditsStatus: types.OpenRouterCreditsUnprovisioned,
 		PaddleCustomerID:        tenant.PaddleCustomerID,
 		PaddleSubscriptionID:    tenant.PaddleSubscriptionID,
 	}
+	current.OpenRouterResetsAt = entitlementResetAt(tenant, plan, at)
 
 	credentials := openRouterCredentialsFromTenant(tenant)
 	if credentials == nil {
@@ -55,18 +57,27 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 		current.OpenRouterCreditsStatus = types.OpenRouterCreditsUnavailable
 		return current, nil
 	}
-	info, err := s.keys.GetKey(ctx, credentials.KeyHash)
+	info, err := s.ensureAllowanceCurrent(ctx, tenant, at)
 	if err != nil {
+		if errors.Is(err, errAllowanceRenewalPending) {
+			current.OpenRouterUsedMicrousd = limits.MonthlyOpenRouterMicrousd
+			current.OpenRouterRemainingMicrousd = 0
+			current.OpenRouterCreditsStatus = types.OpenRouterCreditsAvailable
+			return current, nil
+		}
 		logger.Warnf(ctx, "OpenRouter managed-key usage lookup failed for tenant %d: %v", tenantID, err)
 		current.OpenRouterCreditsStatus = types.OpenRouterCreditsUnavailable
 		return current, nil
 	}
-	current.MonthlyOpenRouterMicrousd = info.LimitMicrousd
-	current.OpenRouterUsedMicrousd = info.UsageMonthlyMicrousd
-	current.OpenRouterRemainingMicrousd = info.LimitRemainingMicrousd
+	// ensureAllowanceCurrent may advance a free/yearly tenant to its next
+	// personal period. Return that new boundary in the same response.
+	current.OpenRouterResetsAt = entitlementResetAt(tenant, plan, at)
+	remaining := clampMicrousd(info.LimitRemainingMicrousd, 0, limits.MonthlyOpenRouterMicrousd)
+	current.OpenRouterUsedMicrousd = limits.MonthlyOpenRouterMicrousd - remaining
+	current.OpenRouterRemainingMicrousd = remaining
 	current.OpenRouterCreditsStatus = types.OpenRouterCreditsAvailable
-	logger.Infof(ctx, "OpenRouter managed-key usage resolved tenant_id=%d limit_microusd=%d used_microusd=%d remaining_microusd=%d",
-		tenantID, info.LimitMicrousd, info.UsageMonthlyMicrousd, info.LimitRemainingMicrousd)
+	logger.Infof(ctx, "OpenRouter managed-key usage resolved tenant_id=%d allowance_microusd=%d used_microusd=%d remaining_microusd=%d monthly_reset=%t",
+		tenantID, limits.MonthlyOpenRouterMicrousd, current.OpenRouterUsedMicrousd, remaining, info.MonthlyReset)
 	return current, nil
 }
 
@@ -81,6 +92,15 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 			logger.Warnf(ctx, "OpenRouter tenant credentials are incomplete tenant_id=%d", tenantID)
 			return "", fmt.Errorf("OpenRouter tenant credentials are incomplete")
 		}
+		if s.keys == nil {
+			return "", fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured; cannot enforce the tenant spend limit")
+		}
+		now := time.Now().UTC()
+		if tenant.OpenRouterCreditPeriodEnd == nil || !tenant.OpenRouterCreditPeriodEnd.After(now) {
+			if _, err := s.ensureAllowanceCurrent(ctx, tenant, now); err != nil {
+				return "", err
+			}
+		}
 		return stored.APIKey, nil
 	}
 	if s.keys == nil {
@@ -92,15 +112,17 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 		return "", fmt.Errorf("SYSTEM_AES_KEY must contain exactly 32 bytes before provisioning OpenRouter tenant keys")
 	}
 
-	limit := types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
+	plan := types.EffectiveConsumerPlan(tenant)
+	limit := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
+	creditPeriodEnd := initialCreditPeriodEnd(tenant, plan, tenant.PaddleBillingPeriod, time.Now().UTC(), nil)
 	logger.Infof(ctx, "OpenRouter tenant key provisioning started tenant_id=%d monthly_limit_microusd=%d", tenantID, limit)
-	created, err := s.keys.CreateKey(ctx, fmt.Sprintf("musuw-tenant-%d", tenantID), limit)
+	created, err := s.keys.CreateKey(ctx, fmt.Sprintf("musuw-tenant-%d", tenantID), limit, false)
 	if err != nil {
 		logger.Warnf(ctx, "OpenRouter tenant key provisioning failed tenant_id=%d: %v", tenantID, err)
 		return "", err
 	}
 	candidate := &types.OpenRouterCredentials{APIKey: created.Key, KeyHash: created.Hash}
-	inserted, err := s.repo.SetOpenRouterCredentialsIfAbsent(ctx, tenantID, candidate)
+	inserted, err := s.repo.SetOpenRouterCredentialsIfAbsent(ctx, tenantID, candidate, creditPeriodEnd)
 	if err != nil {
 		if deleteErr := s.keys.DeleteKey(ctx, created.Hash); deleteErr != nil {
 			logger.Errorf(ctx, "OpenRouter orphaned tenant key cleanup failed tenant_id=%d: %v", tenantID, deleteErr)
@@ -135,6 +157,84 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 	return stored.APIKey, nil
 }
 
+// ensureAllowanceCurrent keeps one provider-managed key on the tenant's own
+// monthly cycle. Free and yearly plans refresh lazily on the first read/use
+// after their boundary. Monthly subscriptions wait for Paddle's paid recurring
+// transaction webhook, so unused credit cannot leak into an unpaid period.
+func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant *types.Tenant, at time.Time) (*modelopenrouter.KeyInfo, error) {
+	stored := openRouterCredentialsFromTenant(tenant)
+	if stored == nil || strings.TrimSpace(stored.KeyHash) == "" || s.keys == nil {
+		return nil, fmt.Errorf("OpenRouter tenant credentials are unavailable")
+	}
+	info, err := s.keys.GetKey(ctx, stored.KeyHash)
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, fmt.Errorf("OpenRouter tenant key lookup returned no state")
+	}
+
+	at = at.UTC()
+	plan := types.EffectiveConsumerPlan(tenant)
+	allowance := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
+	periodEnd := tenant.OpenRouterCreditPeriodEnd
+	if periodEnd != nil && !periodEnd.After(at) && plan != types.ConsumerPlanFree && tenant.PaddleBillingPeriod == "monthly" {
+		return info, errAllowanceRenewalPending
+	}
+
+	targetPeriodEnd := periodEnd
+	targetLimit := info.LimitMicrousd
+	if periodEnd == nil {
+		value := initialCreditPeriodEnd(tenant, plan, tenant.PaddleBillingPeriod, at, nil)
+		targetPeriodEnd = &value
+		// Existing keys may still use OpenRouter's UTC-calendar reset. Preserve
+		// their current remaining credit while moving them to the personal cycle.
+		remaining := clampMicrousd(info.LimitRemainingMicrousd, 0, allowance)
+		targetLimit = info.UsageMicrousd + remaining
+	} else if !periodEnd.After(at) {
+		value := nextPersonalCreditPeriodEnd(*periodEnd, at)
+		if plan == types.ConsumerPlanFree && !tenant.CreatedAt.IsZero() {
+			value = monthlyBoundaryAfter(tenant.CreatedAt, at)
+		}
+		targetPeriodEnd = &value
+		// Skipped inactive periods never stack. The current period starts with
+		// exactly one plan allowance above lifetime provider usage.
+		targetLimit = info.UsageMicrousd + allowance
+	} else if info.MonthlyReset {
+		remaining := clampMicrousd(info.LimitRemainingMicrousd, 0, allowance)
+		targetLimit = info.UsageMicrousd + remaining
+	}
+
+	providerChanged := info.LimitMicrousd != targetLimit || info.MonthlyReset
+	prior := *info
+	if providerChanged {
+		if err := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, targetLimit, false); err != nil {
+			return nil, fmt.Errorf("synchronize OpenRouter personal credit period: %w", err)
+		}
+		info.LimitMicrousd = targetLimit
+		info.LimitRemainingMicrousd = clampMicrousd(targetLimit-info.UsageMicrousd, 0, allowance)
+		info.MonthlyReset = false
+	}
+
+	if targetPeriodEnd != nil && (periodEnd == nil || targetPeriodEnd.After(periodEnd.UTC())) {
+		applied, persistErr := s.repo.AdvanceOpenRouterCreditPeriod(ctx, tenant.ID, targetPeriodEnd.UTC())
+		if persistErr != nil {
+			if providerChanged {
+				if restoreErr := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, prior.LimitMicrousd, prior.MonthlyReset); restoreErr != nil {
+					return nil, errors.Join(persistErr, fmt.Errorf("restore OpenRouter key after credit-period persistence failure: %w", restoreErr))
+				}
+			}
+			return nil, persistErr
+		}
+		if applied {
+			value := targetPeriodEnd.UTC()
+			tenant.OpenRouterCreditPeriodEnd = &value
+		}
+		logger.Infof(ctx, "OpenRouter personal credit period advanced tenant_id=%d period_end=%s applied=%t", tenant.ID, targetPeriodEnd.UTC().Format(time.RFC3339), applied)
+	}
+	return info, nil
+}
+
 func openRouterCredentialsFromTenant(tenant *types.Tenant) *types.OpenRouterCredentials {
 	if tenant == nil || tenant.Credentials == nil {
 		return nil
@@ -153,7 +253,7 @@ func (s *entitlementService) OpenRouterUserID(ctx context.Context) string {
 	return "musuw_" + hex.EncodeToString(sum[:12])
 }
 
-func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, eventID string, occurredAt time.Time, customerID, subscriptionID string) (bool, error) {
+func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, eventPeriodEnd *time.Time) (bool, error) {
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
 	if err != nil {
 		return false, err
@@ -167,34 +267,54 @@ func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uin
 	if strings.TrimSpace(status) == "" {
 		status = "active"
 	}
+	target := &types.Tenant{Plan: plan, PlanStatus: status}
+	targetPlan := types.EffectiveConsumerPlan(target)
+	if targetPlan == types.ConsumerPlanFree {
+		billingPeriod = ""
+	} else if billingPeriod != "monthly" && billingPeriod != "yearly" {
+		return false, fmt.Errorf("Paddle billing period is invalid")
+	}
+	creditPeriodEnd := nextCreditPeriodEnd(tenant, targetPlan, billingPeriod, occurredAt, eventPeriodEnd)
 
 	stored := openRouterCredentialsFromTenant(tenant)
+	var priorInfo *modelopenrouter.KeyInfo
+	providerChanged := false
 	if stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
 		if s.keys == nil {
 			return false, fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured; cannot synchronize the tenant spend limit")
 		}
-		target := &types.Tenant{Plan: plan, PlanStatus: status}
-		limit := types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(target)).MonthlyOpenRouterMicrousd
-		if err := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, limit); err != nil {
-			logger.Warnf(ctx, "OpenRouter tenant spend limit synchronization failed tenant_id=%d target_microusd=%d: %v", tenantID, limit, err)
-			return false, fmt.Errorf("synchronize OpenRouter tenant key limit: %w", err)
+		priorInfo, err = s.keys.GetKey(ctx, stored.KeyHash)
+		if err != nil {
+			return false, fmt.Errorf("read OpenRouter tenant key before plan change: %w", err)
 		}
-		logger.Infof(ctx, "OpenRouter tenant spend limit synchronized tenant_id=%d target_microusd=%d", tenantID, limit)
+		if priorInfo == nil {
+			return false, fmt.Errorf("OpenRouter tenant key lookup returned no state")
+		}
+		limit, monthlyReset := keyLimitForPlanChange(tenant, targetPlan, billingPeriod, priorInfo)
+		if priorInfo.LimitMicrousd != limit || priorInfo.MonthlyReset != monthlyReset {
+			if err := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, limit, monthlyReset); err != nil {
+				logger.Warnf(ctx, "OpenRouter tenant spend limit synchronization failed tenant_id=%d target_microusd=%d: %v", tenantID, limit, err)
+				return false, fmt.Errorf("synchronize OpenRouter tenant key limit: %w", err)
+			}
+			providerChanged = true
+		}
+		logger.Infof(ctx, "OpenRouter tenant spend limit synchronized tenant_id=%d target_microusd=%d monthly_reset=%t", tenantID, limit, monthlyReset)
 	}
 
-	applied, err := s.repo.ApplyConsumerPlan(ctx, tenantID, plan, status, eventID, occurredAt, customerID, subscriptionID)
+	applied, err := s.repo.ApplyConsumerPlan(ctx, tenantID, plan, status, billingPeriod, eventID, occurredAt, customerID, subscriptionID, creditPeriodEnd)
 	if err == nil && applied {
-		logger.Infof(ctx, "Consumer plan applied tenant_id=%d plan=%s status=%s", tenantID, plan, status)
+		logger.Infof(ctx, "Consumer plan applied tenant_id=%d plan=%s status=%s billing_period=%s", tenantID, plan, status, billingPeriod)
 		return true, nil
 	}
-	// A concurrent newer webhook may have won the DB lock, or the DB write may
-	// have failed after the provider update. Re-apply the durable DB plan to the
-	// provider so there is no second ledger or reconciliation subsystem.
-	if stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
+	if err != nil && providerChanged && priorInfo != nil {
+		if restoreErr := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, priorInfo.LimitMicrousd, priorInfo.MonthlyReset); restoreErr != nil {
+			return false, errors.Join(err, fmt.Errorf("restore OpenRouter tenant key after plan persistence failure: %w", restoreErr))
+		}
+	}
+	// A concurrent newer webhook may have won the DB lock. Re-apply the durable
+	// plan shape without introducing a reconciler or a second usage ledger.
+	if err == nil && !applied && providerChanged && stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
 		if syncErr := s.syncOpenRouterLimitFromTenant(ctx, tenantID, stored.KeyHash); syncErr != nil {
-			if err != nil {
-				return false, errors.Join(err, syncErr)
-			}
 			return false, syncErr
 		}
 	}
@@ -206,9 +326,165 @@ func (s *entitlementService) syncOpenRouterLimitFromTenant(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("reload durable consumer plan: %w", err)
 	}
-	limit := types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
-	if err := s.keys.UpdateKeyLimit(ctx, keyHash, limit); err != nil {
+	info, err := s.keys.GetKey(ctx, keyHash)
+	if err != nil {
+		return fmt.Errorf("read OpenRouter tenant key for durable restore: %w", err)
+	}
+	plan := types.EffectiveConsumerPlan(tenant)
+	limit, monthlyReset := keyLimitForPlanChange(tenant, plan, tenant.PaddleBillingPeriod, info)
+	if err := s.keys.UpdateKeyLimit(ctx, keyHash, limit, monthlyReset); err != nil {
 		return fmt.Errorf("restore OpenRouter tenant key limit from durable plan: %w", err)
 	}
 	return nil
+}
+
+func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
+	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
+	if err != nil {
+		return false, err
+	}
+	plan = types.NormalizeConsumerPlan(plan)
+	if eventID == "" || periodEnd.IsZero() || !periodEnd.After(occurredAt) {
+		return false, fmt.Errorf("Paddle recurring transaction has an invalid billing period")
+	}
+	if types.EffectiveConsumerPlan(tenant) != plan || plan == types.ConsumerPlanFree || tenant.PaddleBillingPeriod != "monthly" ||
+		strings.TrimSpace(tenant.PaddleCustomerID) != strings.TrimSpace(customerID) ||
+		strings.TrimSpace(tenant.PaddleSubscriptionID) != strings.TrimSpace(subscriptionID) {
+		return false, fmt.Errorf("Paddle recurring transaction does not match the active tenant subscription")
+	}
+	periodEnd = periodEnd.UTC()
+	if tenant.OpenRouterCreditPeriodEnd != nil && !periodEnd.After(tenant.OpenRouterCreditPeriodEnd.UTC()) {
+		logger.Infof(ctx, "Paid allowance event ignored for existing billing period tenant_id=%d event_id=%s", tenantID, eventID)
+		return false, nil
+	}
+
+	stored := openRouterCredentialsFromTenant(tenant)
+	var priorInfo *modelopenrouter.KeyInfo
+	providerChanged := false
+	if stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
+		if s.keys == nil {
+			return false, fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured; cannot refresh the tenant spend limit")
+		}
+		priorInfo, err = s.keys.GetKey(ctx, stored.KeyHash)
+		if err != nil {
+			return false, fmt.Errorf("read OpenRouter tenant key before allowance refresh: %w", err)
+		}
+		if priorInfo == nil {
+			return false, fmt.Errorf("OpenRouter tenant key lookup returned no state")
+		}
+		allowance := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
+		targetLimit := priorInfo.UsageMicrousd + allowance
+		if priorInfo.LimitMicrousd != targetLimit || priorInfo.MonthlyReset {
+			if err := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, targetLimit, false); err != nil {
+				return false, fmt.Errorf("refresh OpenRouter tenant allowance: %w", err)
+			}
+			providerChanged = true
+		}
+	}
+
+	applied, err := s.repo.AdvanceOpenRouterCreditPeriod(ctx, tenantID, periodEnd)
+	if err != nil && providerChanged && priorInfo != nil {
+		if restoreErr := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, priorInfo.LimitMicrousd, priorInfo.MonthlyReset); restoreErr != nil {
+			return false, errors.Join(err, fmt.Errorf("restore OpenRouter tenant key after allowance persistence failure: %w", restoreErr))
+		}
+	}
+	if err != nil {
+		return false, err
+	}
+	logger.Infof(ctx, "Paid allowance event processed tenant_id=%d event_id=%s period_end=%s applied=%t", tenantID, eventID, periodEnd.Format(time.RFC3339), applied)
+	return applied, nil
+}
+
+func entitlementResetAt(tenant *types.Tenant, plan types.ConsumerPlan, at time.Time) *time.Time {
+	if tenant != nil && tenant.OpenRouterCreditPeriodEnd != nil {
+		value := tenant.OpenRouterCreditPeriodEnd.UTC()
+		return &value
+	}
+	value := initialCreditPeriodEnd(tenant, plan, "", at, nil)
+	return &value
+}
+
+func nextCreditPeriodEnd(tenant *types.Tenant, targetPlan types.ConsumerPlan, billingPeriod string, at time.Time, eventPeriodEnd *time.Time) *time.Time {
+	if tenant != nil && types.EffectiveConsumerPlan(tenant) != types.ConsumerPlanFree && targetPlan != types.ConsumerPlanFree && tenant.OpenRouterCreditPeriodEnd != nil {
+		value := tenant.OpenRouterCreditPeriodEnd.UTC()
+		return &value
+	}
+	value := initialCreditPeriodEnd(tenant, targetPlan, billingPeriod, at, eventPeriodEnd)
+	return &value
+}
+
+func initialCreditPeriodEnd(tenant *types.Tenant, plan types.ConsumerPlan, billingPeriod string, at time.Time, eventPeriodEnd *time.Time) time.Time {
+	at = at.UTC()
+	if plan != types.ConsumerPlanFree && billingPeriod == "monthly" && eventPeriodEnd != nil && !eventPeriodEnd.IsZero() {
+		return eventPeriodEnd.UTC()
+	}
+	anchor := at
+	if plan == types.ConsumerPlanFree && tenant != nil && !tenant.CreatedAt.IsZero() {
+		anchor = tenant.CreatedAt.UTC()
+	}
+	return monthlyBoundaryAfter(anchor, at)
+}
+
+func nextPersonalCreditPeriodEnd(currentEnd, at time.Time) time.Time {
+	return monthlyBoundaryAfter(currentEnd.UTC(), at.UTC())
+}
+
+// monthlyBoundaryAfter returns the first registration/activation anniversary
+// strictly after at. Free plans always use the tenant creation timestamp as the
+// original anchor, avoiding January/February drift without a scheduler.
+func monthlyBoundaryAfter(anchor, at time.Time) time.Time {
+	anchor = anchor.UTC()
+	at = at.UTC()
+	months := (at.Year()-anchor.Year())*12 + int(at.Month()-anchor.Month())
+	if months < 1 {
+		months = 1
+	}
+	candidate := addMonthsClamped(anchor, months)
+	if !candidate.After(at) {
+		candidate = addMonthsClamped(anchor, months+1)
+	}
+	return candidate
+}
+
+func addMonthsClamped(anchor time.Time, months int) time.Time {
+	first := time.Date(anchor.Year(), anchor.Month()+time.Month(months), 1, anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), time.UTC)
+	lastDay := time.Date(first.Year(), first.Month()+1, 0, anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), time.UTC).Day()
+	day := anchor.Day()
+	if day > lastDay {
+		day = lastDay
+	}
+	return time.Date(first.Year(), first.Month(), day, anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), time.UTC)
+}
+
+func keyLimitForPlanChange(tenant *types.Tenant, targetPlan types.ConsumerPlan, billingPeriod string, info *modelopenrouter.KeyInfo) (int64, bool) {
+	targetAllowance := types.LimitsForConsumerPlan(targetPlan).MonthlyOpenRouterMicrousd
+	if info == nil {
+		return targetAllowance, false
+	}
+	oldPlan := types.EffectiveConsumerPlan(tenant)
+	oldAllowance := types.LimitsForConsumerPlan(oldPlan).MonthlyOpenRouterMicrousd
+	// Starting a paid plan or moving to a lower tier starts one clean target
+	// allowance. Only a same-cycle paid upgrade preserves what was already used.
+	if oldPlan != targetPlan && (oldPlan == types.ConsumerPlanFree || targetAllowance <= oldAllowance) {
+		return info.UsageMicrousd + targetAllowance, false
+	}
+	used := oldAllowance - clampMicrousd(info.LimitRemainingMicrousd, 0, oldAllowance)
+	if info.MonthlyReset {
+		used = clampMicrousd(info.UsageMonthlyMicrousd, 0, oldAllowance)
+	}
+	remaining := targetAllowance - used
+	if remaining < 0 {
+		remaining = 0
+	}
+	return info.UsageMicrousd + remaining, false
+}
+
+func clampMicrousd(value, minimum, maximum int64) int64 {
+	if value < minimum {
+		return minimum
+	}
+	if value > maximum {
+		return maximum
+	}
+	return value
 }

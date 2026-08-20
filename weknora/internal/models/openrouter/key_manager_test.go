@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestKeyManagerUsesOfficialMonthlyLimitEndpoints(t *testing.T) {
+func TestKeyManagerUsesOfficialLimitResetModes(t *testing.T) {
 	var created bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "Bearer management-secret", r.Header.Get("Authorization"))
@@ -31,10 +31,11 @@ func TestKeyManagerUsesOfficialMonthlyLimitEndpoints(t *testing.T) {
 			var body map[string]any
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			assert.Equal(t, 2.5, body["limit"])
-			assert.Equal(t, "monthly", body["limit_reset"])
-			_, _ = w.Write([]byte(`{"data":{"hash":"hash-7","limit":2.5,"limit_remaining":2.4,"usage_monthly":0.1}}`))
+			assert.Contains(t, body, "limit_reset")
+			assert.Nil(t, body["limit_reset"])
+			_, _ = w.Write([]byte(`{"data":{"hash":"hash-7","limit":2.5,"limit_remaining":2.4,"limit_reset":null,"usage":0.6,"usage_monthly":0.1}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/keys/hash-7":
-			_, _ = w.Write([]byte(`{"data":{"hash":"hash-7","limit":2.5,"limit_remaining":2.4,"usage_monthly":0.1}}`))
+			_, _ = w.Write([]byte(`{"data":{"hash":"hash-7","limit":2.5,"limit_remaining":2.4,"limit_reset":null,"usage":0.6,"usage_monthly":0.1}}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/keys/hash-7":
 			_, _ = w.Write([]byte(`{"deleted":true}`))
 		default:
@@ -44,18 +45,20 @@ func TestKeyManagerUsesOfficialMonthlyLimitEndpoints(t *testing.T) {
 	defer server.Close()
 
 	manager := newSDKKeyManager("management-secret", server.URL, server.Client())
-	key, err := manager.CreateKey(context.Background(), "musuw-tenant-7", 1_250_000)
+	key, err := manager.CreateKey(context.Background(), "musuw-tenant-7", 1_250_000, true)
 	require.NoError(t, err)
 	require.True(t, created)
 	assert.Equal(t, "sk-child", key.Key)
 	assert.Equal(t, "hash-7", key.Hash)
 
-	require.NoError(t, manager.UpdateKeyLimit(context.Background(), key.Hash, 2_500_000))
+	require.NoError(t, manager.UpdateKeyLimit(context.Background(), key.Hash, 2_500_000, false))
 	info, err := manager.GetKey(context.Background(), key.Hash)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2_500_000), info.LimitMicrousd)
 	assert.Equal(t, int64(2_400_000), info.LimitRemainingMicrousd)
+	assert.Equal(t, int64(600_000), info.UsageMicrousd)
 	assert.Equal(t, int64(100_000), info.UsageMonthlyMicrousd)
+	assert.False(t, info.MonthlyReset)
 	require.NoError(t, manager.DeleteKey(context.Background(), key.Hash))
 }
 

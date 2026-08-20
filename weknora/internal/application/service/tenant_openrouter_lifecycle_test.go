@@ -76,13 +76,15 @@ type tenantLifecycleKeyManager struct {
 	deletes []string
 }
 
-func (m *tenantLifecycleKeyManager) CreateKey(_ context.Context, name string, limitMicrousd int64) (*modelopenrouter.ManagedKey, error) {
+func (m *tenantLifecycleKeyManager) CreateKey(_ context.Context, name string, limitMicrousd int64, _ bool) (*modelopenrouter.ManagedKey, error) {
 	m.creates = append(m.creates, tenantLifecycleCreateCall{name: name, limit: limitMicrousd})
 	n := len(m.creates)
 	return &modelopenrouter.ManagedKey{Key: fmt.Sprintf("sk-test-%d", n), Hash: fmt.Sprintf("hash-%d", n)}, nil
 }
 
-func (m *tenantLifecycleKeyManager) UpdateKeyLimit(context.Context, string, int64) error { return nil }
+func (m *tenantLifecycleKeyManager) UpdateKeyLimit(context.Context, string, int64, bool) error {
+	return nil
+}
 func (m *tenantLifecycleKeyManager) GetKey(context.Context, string) (*modelopenrouter.KeyInfo, error) {
 	return nil, nil
 }

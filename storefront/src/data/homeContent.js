@@ -1,20 +1,18 @@
-import {
-  ArrowsClockwise,
-  CheckCircle,
-  Clock,
-  FileText,
-  FolderOpen,
-  Lightning,
-  LockKey,
-  PaperPlaneTilt,
-  Path,
-  PresentationChart,
-  ShareNetwork,
-  ShieldCheck,
-  Sparkle,
-  Stack,
-  UsersThree
-} from "@phosphor-icons/react";
+import { ArrowsClockwise } from "@phosphor-icons/react/ArrowsClockwise";
+import { CheckCircle } from "@phosphor-icons/react/CheckCircle";
+import { Clock } from "@phosphor-icons/react/Clock";
+import { FileText } from "@phosphor-icons/react/FileText";
+import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
+import { Lightning } from "@phosphor-icons/react/Lightning";
+import { LockKey } from "@phosphor-icons/react/LockKey";
+import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
+import { Path } from "@phosphor-icons/react/Path";
+import { PresentationChart } from "@phosphor-icons/react/PresentationChart";
+import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
+import { ShieldCheck } from "@phosphor-icons/react/ShieldCheck";
+import { Sparkle } from "@phosphor-icons/react/Sparkle";
+import { Stack } from "@phosphor-icons/react/Stack";
+import { UsersThree } from "@phosphor-icons/react/UsersThree";
 
 export const navItems = [
   { label: "Features", href: "/#feature" },
@@ -142,66 +140,62 @@ export const benefits = [
 export const priceBooks = Object.freeze({
   USD: Object.freeze([
     Object.freeze({ monthly: 0, yearlyTotal: 0 }),
-    Object.freeze({ monthly: 5, yearlyTotal: 49 }),
-    Object.freeze({ monthly: 10, yearlyTotal: 99 }),
-    Object.freeze({ monthly: 20, yearlyTotal: 199 })
+    Object.freeze({ monthly: 5, yearlyTotal: 39 }),
+    Object.freeze({ monthly: 10, yearlyTotal: 79 }),
+    Object.freeze({ monthly: 20, yearlyTotal: 179 })
   ]),
   CNY: Object.freeze([
     Object.freeze({ monthly: 0, yearlyTotal: 0 }),
-    Object.freeze({ monthly: 29, yearlyTotal: 289 }),
-    Object.freeze({ monthly: 59, yearlyTotal: 589 }),
-    Object.freeze({ monthly: 129, yearlyTotal: 1289 })
+    Object.freeze({ monthly: 29, yearlyTotal: 239 }),
+    Object.freeze({ monthly: 59, yearlyTotal: 499 }),
+    Object.freeze({ monthly: 129, yearlyTotal: 1199 })
   ])
 });
 
 export const plans = [
   {
     key: "free",
-    label: "Free",
     name: "Free",
     description: "A bounded plan for a personal knowledge base",
     features: [
       "5 GB storage",
-      "$1 monthly OpenRouter credit",
-      "1 knowledge base · 10 documents",
-      "Lowest-cost model set"
+      "Basic monthly AI allowance",
+      "1 knowledge base, 10 documents",
+      "Entry model set, no video upload"
     ]
   },
   {
     key: "plus",
-    label: "Plus",
     name: "Plus",
     description: "More room and every configured model",
     features: [
       "20 GB storage",
-      "$1.25 monthly OpenRouter credit",
+      "1.25x Free monthly AI allowance",
       "No plan cap on knowledge bases or documents",
-      "All configured models"
+      "All configured models and video upload"
     ]
   },
   {
     key: "pro",
-    label: "Pro",
     name: "Pro",
     description: "Higher storage and model allowance",
     featured: true,
     features: [
       "40 GB storage",
-      "$2.50 monthly OpenRouter credit",
+      "2.5x Free monthly AI allowance",
       "No plan cap on knowledge bases or documents",
-      "All configured models"
+      "All configured models and video upload"
     ]
   },
   {
     key: "max",
-    label: "Max",
     name: "Max",
     description: "The largest current personal allowance",
     features: [
       "80 GB storage",
-      "$5 monthly OpenRouter credit",
+      "5x Free monthly AI allowance",
       "No plan cap on knowledge bases or documents",
-      "All configured models"
+      "All configured models and video upload"
     ]
   }
 ];
@@ -371,7 +365,7 @@ export const faqs = [
   {
     question: "How does paid access become active?",
     answer:
-      "Available upgrades open a secure Paddle checkout. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access."
+      "Available upgrades use secure hosted checkout. A paid plan becomes active only after verified payment confirmation; a URL or checkout return never grants access."
   }
 ];
 

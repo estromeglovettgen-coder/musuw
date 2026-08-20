@@ -10,12 +10,17 @@ export interface PaddleCheckoutOption {
   checkout_binding: string
 }
 
+export interface PaddleCatalogOption {
+  price_id: string
+}
+
 export interface PaddleBillingConfig {
   configured: boolean
   portal_available: boolean
   environment?: 'sandbox' | 'live'
   client_token?: string
   tenant_id?: string
+  catalog?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCatalogOption>>>>
   prices?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCheckoutOption>>>>
 }
 
@@ -27,7 +32,7 @@ export interface ConsumerEntitlement {
   monthly_openrouter_microusd: number
   openrouter_used_microusd: number
   openrouter_remaining_microusd: number
-  openrouter_usage_month: string
+  openrouter_resets_at?: string
   openrouter_credits_status: OpenRouterCreditsStatus
   max_knowledge_bases: number
   max_documents_per_kb: number

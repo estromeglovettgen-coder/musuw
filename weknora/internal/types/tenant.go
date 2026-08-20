@@ -103,14 +103,14 @@ type Tenant struct {
 	// Consumer entitlement. Billing identifiers and provider spend are never
 	// serialized through the generic tenant API; the dedicated entitlement DTO
 	// exposes only effective limits and aggregate usage.
-	Plan                   ConsumerPlan `yaml:"plan" json:"-" gorm:"type:varchar(16);default:'free'"`
-	PlanStatus             string       `yaml:"plan_status" json:"-" gorm:"type:varchar(16);default:'active'"`
-	OpenRouterUsageMonth   string       `yaml:"openrouter_usage_month" json:"-" gorm:"type:varchar(7);default:''"`
-	OpenRouterUsedMicrousd int64        `yaml:"openrouter_used_microusd" json:"-" gorm:"default:0"`
-	PaddleCustomerID       string       `yaml:"paddle_customer_id" json:"-" gorm:"type:varchar(64);default:''"`
-	PaddleSubscriptionID   string       `yaml:"paddle_subscription_id" json:"-" gorm:"type:varchar(64);default:''"`
-	PaddleLastEventID      string       `yaml:"paddle_last_event_id" json:"-" gorm:"type:varchar(64);default:''"`
-	PaddleLastEventAt      *time.Time   `yaml:"paddle_last_event_at" json:"-"`
+	Plan                      ConsumerPlan `yaml:"plan" json:"-" gorm:"type:varchar(16);default:'free'"`
+	PlanStatus                string       `yaml:"plan_status" json:"-" gorm:"type:varchar(16);default:'active'"`
+	PaddleCustomerID          string       `yaml:"paddle_customer_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleSubscriptionID      string       `yaml:"paddle_subscription_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleBillingPeriod       string       `yaml:"paddle_billing_period" json:"-" gorm:"type:varchar(16);default:''"`
+	OpenRouterCreditPeriodEnd *time.Time   `yaml:"open_router_credit_period_end" json:"-"`
+	PaddleLastEventID         string       `yaml:"paddle_last_event_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleLastEventAt         *time.Time   `yaml:"paddle_last_event_at" json:"-"`
 	// Global Context configuration for this workspace (default for all sessions)
 	ContextConfig *ContextConfig `yaml:"context_config"      json:"context_config"      gorm:"type:jsonb"`
 	// Global WebSearch configuration for this workspace

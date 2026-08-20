@@ -86,35 +86,35 @@ test("public capability copy matches the simplified Query, Knowledge Base, and W
   assert.match(chinese, /精确(?:证据)?引用/);
 });
 
-test("consumer pricing matches the enforced storage and OpenRouter allowances", () => {
+test("consumer pricing matches the enforced storage and relative AI allowances", () => {
   for (const locale of ["en", "zh-CN"]) {
     const pricing = getStorefrontCopy(locale).pricing;
     assert.match(
       pricing.intro.body,
-      locale === "zh-CN" ? /四种方案.*存储空间.*OpenRouter 额度/ : /four enforced plans.*storage.*OpenRouter allowance/i,
+      locale === "zh-CN" ? /存储空间.*模型权限.*每月 AI 额度/ : /storage.*model access.*monthly AI allowance/i,
     );
     assert.equal(pricing.plans.length, 4);
     const freeFeatures = pricing.plans[0].features.join(" ");
-    assert.match(freeFeatures, locale === "zh-CN" ? /5 GB.*\$1.*1 个知识库.*10 篇文档/ : /5 GB.*\$1.*1 knowledge base.*10 documents/i);
+    assert.match(freeFeatures, locale === "zh-CN" ? /5 GB.*基础.*1 个知识库.*10 篇文档/ : /5 GB.*basic.*1 knowledge base.*10 documents/i);
   }
 
-  assert.match(plans[1].features.join(" "), /20 GB.*\$1\.25.*All configured models/i);
-  assert.match(plans[2].features.join(" "), /40 GB.*\$2\.50.*All configured models/i);
-  assert.match(plans[3].features.join(" "), /80 GB.*\$5.*All configured models/i);
+  assert.match(plans[1].features.join(" "), /20 GB.*1\.25x.*All configured models/i);
+  assert.match(plans[2].features.join(" "), /40 GB.*2\.5x.*All configured models/i);
+  assert.match(plans[3].features.join(" "), /80 GB.*5x.*All configured models/i);
 });
 
 test("regional price books expose exact monthly and annual totals for all four plans", () => {
   assert.deepEqual(priceBooks.USD, [
     { monthly: 0, yearlyTotal: 0 },
-    { monthly: 5, yearlyTotal: 49 },
-    { monthly: 10, yearlyTotal: 99 },
-    { monthly: 20, yearlyTotal: 199 },
+    { monthly: 5, yearlyTotal: 39 },
+    { monthly: 10, yearlyTotal: 79 },
+    { monthly: 20, yearlyTotal: 179 },
   ]);
   assert.deepEqual(priceBooks.CNY, [
     { monthly: 0, yearlyTotal: 0 },
-    { monthly: 29, yearlyTotal: 289 },
-    { monthly: 59, yearlyTotal: 589 },
-    { monthly: 129, yearlyTotal: 1289 },
+    { monthly: 29, yearlyTotal: 239 },
+    { monthly: 59, yearlyTotal: 499 },
+    { monthly: 129, yearlyTotal: 1199 },
   ]);
   assert.equal(plans[0].key, "free");
   assert.equal(plans[3].key, "max");
@@ -156,7 +156,7 @@ test("existing homepage structure points only to real musuw product evidence", (
     "src/components/HomeSections.jsx"
   ].map((path) => readFileSync(join(root, path), "utf8")).join("\n");
   const referencedAssets = new Set(
-    [...evidenceSources.matchAll(/\/images\/(musuw-[a-z-]+\.(?:jpg|png))/g)]
+    [...evidenceSources.matchAll(/\/images\/(musuw-[a-z-]+\.jpg)/g)]
       .map((match) => `/images/${match[1]}`)
   );
   assert.deepEqual(

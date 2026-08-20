@@ -1,6 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUpRight, EnvelopeSimple, List, X, XLogo } from "@phosphor-icons/react";
+import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
+import { EnvelopeSimple } from "@phosphor-icons/react/EnvelopeSimple";
+import { List } from "@phosphor-icons/react/List";
+import { X } from "@phosphor-icons/react/X";
+import { XLogo } from "@phosphor-icons/react/XLogo";
 import { footerGroups, navItems } from "../data/homeContent";
 import { getStorefrontCopy } from "../i18n";
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";

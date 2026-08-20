@@ -7,7 +7,7 @@ import {
   useTransform
 } from "motion/react";
 import { useRef } from "react";
-import { Sparkle } from "@phosphor-icons/react";
+import { Sparkle } from "@phosphor-icons/react/Sparkle";
 import { ButtonLink } from "./SiteChrome";
 import { APP_LOGIN_URL } from "../productHandoff";
 import {

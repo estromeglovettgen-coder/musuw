@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const paddleSignatureTolerance = 5 * time.Minute
+const paddleSignatureTolerance = 5 * time.Second
 
 type PaddleConfig struct {
 	Environment   string
@@ -140,7 +140,19 @@ func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, 
 		"environment":      strings.ToLower(strings.TrimSpace(c.Environment)),
 		"portal_available": portalAvailable,
 	}
-	if !configured || plan != types.ConsumerPlanFree || tenantID == 0 {
+	if !configured || tenantID == 0 {
+		return response
+	}
+	catalog := map[string]map[string]gin.H{}
+	for _, paidPlan := range []types.ConsumerPlan{types.ConsumerPlanPlus, types.ConsumerPlanPro, types.ConsumerPlanMax} {
+		catalog[string(paidPlan)] = map[string]gin.H{}
+		for _, period := range []string{"monthly", "yearly"} {
+			catalog[string(paidPlan)][period] = gin.H{"price_id": c.Prices[paidPlan][period]}
+		}
+	}
+	response["client_token"] = c.ClientToken
+	response["catalog"] = catalog
+	if plan != types.ConsumerPlanFree {
 		return response
 	}
 	prices := map[string]map[string]gin.H{}
@@ -154,7 +166,6 @@ func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, 
 			}
 		}
 	}
-	response["client_token"] = c.ClientToken
 	response["tenant_id"] = strconv.FormatUint(tenantID, 10)
 	response["prices"] = prices
 	return response
@@ -436,16 +447,24 @@ type paddleEvent struct {
 }
 
 type paddleEventData struct {
-	ID             string          `json:"id"`
-	Status         string          `json:"status"`
-	CustomerID     string          `json:"customer_id"`
-	SubscriptionID string          `json:"subscription_id"`
-	CustomData     json.RawMessage `json:"custom_data"`
-	Items          []struct {
+	ID                   string               `json:"id"`
+	Status               string               `json:"status"`
+	Origin               string               `json:"origin"`
+	CustomerID           string               `json:"customer_id"`
+	SubscriptionID       string               `json:"subscription_id"`
+	CustomData           json.RawMessage      `json:"custom_data"`
+	BillingPeriod        *paddleBillingPeriod `json:"billing_period"`
+	CurrentBillingPeriod *paddleBillingPeriod `json:"current_billing_period"`
+	Items                []struct {
 		Price struct {
 			ID string `json:"id"`
 		} `json:"price"`
 	} `json:"items"`
+}
+
+type paddleBillingPeriod struct {
+	StartsAt time.Time `json:"starts_at"`
+	EndsAt   time.Time `json:"ends_at"`
 }
 
 func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
@@ -468,7 +487,9 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 		return
 	}
 
-	if !isEntitlementPaddleEvent(event.EventType) {
+	isSubscriptionEvent := isEntitlementPaddleEvent(event.EventType)
+	isRecurringCompletion := event.EventType == "transaction.completed" && event.Data.Status == "completed" && event.Data.Origin == "subscription_recurring"
+	if !isSubscriptionEvent && !isRecurringCompletion {
 		c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
 		return
 	}
@@ -477,7 +498,7 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 		_ = c.Error(apperrors.NewBadRequestError("Paddle event has no valid tenant_id"))
 		return
 	}
-	plan, status, priceID, err := h.paddle.planForEvent(event)
+	plan, status, priceID, billingPeriod, err := h.paddle.planForEvent(event)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -490,13 +511,34 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 	if subscriptionID == "" && strings.HasPrefix(event.EventType, "subscription.") {
 		subscriptionID = event.Data.ID
 	}
-	applied, err := h.service.ApplyConsumerPlan(c.Request.Context(), tenantID, plan, status, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID)
+	var applied bool
+	if isRecurringCompletion {
+		// A yearly term is already paid and its monthly allowance advances lazily
+		// through the normal entitlement/model path. Only a monthly renewal needs
+		// this paid-transaction refresh.
+		if billingPeriod != "monthly" {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+			return
+		}
+		if event.Data.BillingPeriod == nil || event.Data.BillingPeriod.EndsAt.IsZero() {
+			_ = c.Error(apperrors.NewBadRequestError("Paddle recurring transaction has no billing period"))
+			return
+		}
+		applied, err = h.service.RefreshPaidAllowance(c.Request.Context(), tenantID, plan, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID, event.Data.BillingPeriod.EndsAt)
+	} else {
+		var periodEnd *time.Time
+		if event.Data.CurrentBillingPeriod != nil && !event.Data.CurrentBillingPeriod.EndsAt.IsZero() {
+			value := event.Data.CurrentBillingPeriod.EndsAt.UTC()
+			periodEnd = &value
+		}
+		applied, err = h.service.ApplyConsumerPlan(c.Request.Context(), tenantID, plan, status, billingPeriod, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID, periodEnd)
+	}
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	logger.Infof(c.Request.Context(), "Paddle subscription event processed event_id=%s event_type=%s tenant_id=%d plan=%s status=%s applied=%t",
-		event.EventID, event.EventType, tenantID, plan, status, applied)
+	logger.Infof(c.Request.Context(), "Paddle billing event processed event_id=%s event_type=%s tenant_id=%d plan=%s status=%s billing_period=%s applied=%t",
+		event.EventID, event.EventType, tenantID, plan, status, billingPeriod, applied)
 	c.JSON(http.StatusOK, gin.H{"ok": true, "applied": applied})
 }
 
@@ -509,30 +551,32 @@ func isEntitlementPaddleEvent(eventType string) bool {
 	}
 }
 
-func (c PaddleConfig) planForEvent(event paddleEvent) (types.ConsumerPlan, string, string, error) {
+func (c PaddleConfig) planForEvent(event paddleEvent) (types.ConsumerPlan, string, string, string, error) {
 	var matchedPlan types.ConsumerPlan
 	var matchedPrice string
+	var matchedPeriod string
 	for _, item := range event.Data.Items {
-		if plan, ok := c.planForPrice(item.Price.ID); ok {
+		if plan, period, ok := c.planAndPeriodForPrice(item.Price.ID); ok {
 			matchedPlan = plan
 			matchedPrice = item.Price.ID
+			matchedPeriod = period
 			break
 		}
 	}
 	if matchedPlan == "" {
-		return "", "", "", apperrors.NewBadRequestError("Paddle event contains no known price")
+		return "", "", "", "", apperrors.NewBadRequestError("Paddle event contains no known price")
 	}
 	status := event.Data.Status
 	if event.EventType == "subscription.canceled" || event.EventType == "subscription.paused" {
 		if status == "" {
 			status = strings.TrimPrefix(event.EventType, "subscription.")
 		}
-		return types.ConsumerPlanFree, status, matchedPrice, nil
+		return types.ConsumerPlanFree, status, matchedPrice, matchedPeriod, nil
 	}
 	if status == "" {
 		status = "active"
 	}
-	return matchedPlan, status, matchedPrice, nil
+	return matchedPlan, status, matchedPrice, matchedPeriod, nil
 }
 
 func paddleCheckoutBinding(raw json.RawMessage) string {

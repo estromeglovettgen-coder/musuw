@@ -23,7 +23,6 @@ const (
 	CheapestVisionModelID          = PlatformKnowledgeBaseVLMModelID
 	CheapestSpeechModelID          = PlatformKnowledgeBaseASRModelID
 	consumerGiB              int64 = 1024 * 1024 * 1024
-	parseEstimateMiB         int64 = 1024 * 1024
 )
 
 // ConsumerPlanLimits is deliberately current-state only. Zero content limits
@@ -43,7 +42,7 @@ type ConsumerEntitlement struct {
 	StorageUsed                 int64                   `json:"storage_used"`
 	OpenRouterUsedMicrousd      int64                   `json:"openrouter_used_microusd"`
 	OpenRouterRemainingMicrousd int64                   `json:"openrouter_remaining_microusd"`
-	OpenRouterUsageMonth        string                  `json:"openrouter_usage_month"`
+	OpenRouterResetsAt          *time.Time              `json:"openrouter_resets_at,omitempty"`
 	OpenRouterCreditsStatus     OpenRouterCreditsStatus `json:"openrouter_credits_status"`
 	PaddleCustomerID            string                  `json:"-"`
 	PaddleSubscriptionID        string                  `json:"-"`
@@ -76,32 +75,10 @@ func EffectiveConsumerPlan(tenant *Tenant) ConsumerPlan {
 		return ConsumerPlanFree
 	}
 	plan := NormalizeConsumerPlan(tenant.Plan)
-	if plan == ConsumerPlanFree || tenant.PlanStatus == "" || tenant.PlanStatus == "active" || tenant.PlanStatus == "trialing" {
+	if plan == ConsumerPlanFree || tenant.PlanStatus == "" || tenant.PlanStatus == "active" || tenant.PlanStatus == "trialing" || tenant.PlanStatus == "past_due" {
 		return plan
 	}
 	return ConsumerPlanFree
-}
-
-func OpenRouterUsageMonth(at time.Time) string {
-	return at.UTC().Format("2006-01")
-}
-
-func EffectiveOpenRouterUsage(tenant *Tenant, at time.Time) int64 {
-	if tenant == nil || tenant.OpenRouterUsageMonth != OpenRouterUsageMonth(at) || tenant.OpenRouterUsedMicrousd < 0 {
-		return 0
-	}
-	return tenant.OpenRouterUsedMicrousd
-}
-
-// EstimateParseMicrousd is retained only for compatibility with older tests and
-// rollback code. Active ingestion no longer uses request/file price estimates as
-// an admission or billing authority.
-func EstimateParseMicrousd(fileBytes int64) int64 {
-	if fileBytes <= 0 {
-		return 10_000
-	}
-	blocks := (fileBytes + parseEstimateMiB - 1) / parseEstimateMiB
-	return blocks * 10_000
 }
 
 func ConsumerPlanAllowsModel(plan ConsumerPlan, model *Model) bool {

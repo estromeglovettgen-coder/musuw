@@ -20,8 +20,10 @@ test('usage settings shows remaining percentages without provider or dollar fiel
   assert.doesNotMatch(usageSettings, /formatCredits|monthlyCredits|OpenRouter|\$\d/)
 })
 
-test('credit period copy is shown only when provider metadata is available', () => {
-  assert.match(usageSettings, /creditsRemainingPercent !== null && entitlement\.openrouter_usage_month/)
+test('credit period copy uses the tenant personal-cycle boundary', () => {
+  assert.match(entitlementApi, /openrouter_resets_at\?:\s*string/)
+  assert.match(usageSettings, /const raw = entitlement\.value\?\.openrouter_resets_at/)
+  assert.match(usageSettings, /v-if="formattedResetAt"/)
 })
 
 test('closing a checkout-intent settings route returns to the product instead of reopening checkout', () => {

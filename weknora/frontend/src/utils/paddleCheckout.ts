@@ -19,6 +19,18 @@ export interface OpenPaddleCheckoutInput {
   onCompleted: () => void
 }
 
+export interface PreviewPaddlePricesInput {
+  environment: 'sandbox' | 'live'
+  clientToken: string
+  priceIds: string[]
+}
+
+export interface PaddleLocalizedPrice {
+  priceId: string
+  formattedUnitTotal: string
+  currencyCode: string
+}
+
 function toPaddleLocale(value?: string): string | undefined {
   const locale = value?.trim().toLowerCase()
   if (!locale) return undefined
@@ -28,7 +40,7 @@ function toPaddleLocale(value?: string): string | undefined {
   return 'en'
 }
 
-function initialize(input: OpenPaddleCheckoutInput) {
+function initialize(input: Pick<OpenPaddleCheckoutInput, 'environment' | 'clientToken'>) {
   if (paddlePromise) return paddlePromise
   const eventCallback = (event: PaddleEventData) => {
     if (event.name !== CheckoutEventNames.CHECKOUT_COMPLETED) return
@@ -45,6 +57,21 @@ function initialize(input: OpenPaddleCheckoutInput) {
     throw error
   })
   return paddlePromise
+}
+
+export async function previewPaddlePrices(input: PreviewPaddlePricesInput): Promise<PaddleLocalizedPrice[]> {
+  const priceIds = [...new Set(input.priceIds.map((value) => value.trim()).filter(Boolean))]
+  if (!priceIds.length) return []
+  const paddle = await initialize(input)
+  if (!paddle) throw new Error('Paddle.js failed to initialize')
+  const preview = await paddle.PricePreview({
+    items: priceIds.map((priceId) => ({ priceId, quantity: 1 })),
+  })
+  return preview.data.details.lineItems.map((item) => ({
+    priceId: item.price.id,
+    formattedUnitTotal: item.formattedUnitTotals.total,
+    currencyCode: preview.data.currencyCode,
+  }))
 }
 
 export async function openPaddleCheckout(input: OpenPaddleCheckoutInput): Promise<void> {

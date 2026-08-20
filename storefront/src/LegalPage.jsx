@@ -1,4 +1,7 @@
-import { ArrowLeft, ArrowUpRight, CalendarBlank, EnvelopeSimple } from "@phosphor-icons/react";
+import { ArrowLeft } from "@phosphor-icons/react/ArrowLeft";
+import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
+import { CalendarBlank } from "@phosphor-icons/react/CalendarBlank";
+import { EnvelopeSimple } from "@phosphor-icons/react/EnvelopeSimple";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
 
 const navigation = {

@@ -2,7 +2,6 @@ package types
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -34,23 +33,9 @@ func TestPlanLimits(t *testing.T) {
 	}
 }
 
-func TestEffectiveOpenRouterUsageResetsOnUTCMonth(t *testing.T) {
-	tenant := &Tenant{OpenRouterUsageMonth: "2026-07", OpenRouterUsedMicrousd: 900_000}
-	assert.Equal(t, int64(0), EffectiveOpenRouterUsage(tenant, time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)))
-
-	tenant.OpenRouterUsageMonth = "2026-08"
-	assert.Equal(t, int64(900_000), EffectiveOpenRouterUsage(tenant, time.Date(2026, 8, 31, 23, 59, 0, 0, time.UTC)))
-}
-
 func TestFreeModelAllowlist(t *testing.T) {
 	assert.True(t, ConsumerPlanAllowsModel(ConsumerPlanFree, &Model{ID: CheapestChatModelID, Type: ModelTypeKnowledgeQA}))
 	assert.True(t, ConsumerPlanAllowsModel(ConsumerPlanFree, &Model{ID: PlatformKnowledgeBaseEmbeddingModelID, Type: ModelTypeEmbedding}))
 	assert.False(t, ConsumerPlanAllowsModel(ConsumerPlanFree, &Model{ID: "builtin-deepseek-v4-pro", Type: ModelTypeKnowledgeQA}))
 	assert.True(t, ConsumerPlanAllowsModel(ConsumerPlanPlus, &Model{ID: "builtin-deepseek-v4-pro", Type: ModelTypeKnowledgeQA}))
-}
-
-func TestEstimateParseMicrousd(t *testing.T) {
-	assert.Equal(t, int64(10_000), EstimateParseMicrousd(1))
-	assert.Equal(t, int64(10_000), EstimateParseMicrousd(1024*1024))
-	assert.Equal(t, int64(20_000), EstimateParseMicrousd(1024*1024+1))
 }

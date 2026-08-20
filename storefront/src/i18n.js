@@ -155,9 +155,8 @@ const en = {
   },
   pricing: {
     intro: {
-      label: "Transparent pricing",
       title: "Plans for personal knowledge work",
-      body: "Four enforced plans combine storage with a monthly OpenRouter allowance. Sign in to see your server-verified plan and usage.",
+      body: "Choose the storage, model access, and monthly AI allowance that fit your personal knowledge work.",
     },
     currencyCode: "USD",
     currencySymbol: "$",
@@ -165,61 +164,57 @@ const en = {
     monthly: "Monthly",
     yearly: "Yearly",
     save: "Yearly savings",
+    recommended: "Recommended",
+    includes: "Includes",
     perUserMonth: "/user/month",
     perYear: "/year",
     freeAction: "Start free",
     unavailableAction: "Planned",
     plans: [
       {
-        label: "Free",
         name: "Free",
         description: "A bounded plan for a personal knowledge base",
         features: [
           "5 GB storage",
-          "$1 monthly OpenRouter credit",
-          "1 knowledge base · 10 documents",
-          "Lowest-cost model set",
+          "Basic monthly AI allowance",
+          "1 knowledge base, 10 documents",
+          "Entry model set, no video upload",
         ],
       },
       {
-        label: "Plus",
         name: "Plus",
         description: "More room and every configured model",
         features: [
           "20 GB storage",
-          "$1.25 monthly OpenRouter credit",
+          "1.25x Free monthly AI allowance",
           "No plan cap on knowledge bases or documents",
-          "All configured models",
+          "All configured models and video upload",
         ],
       },
       {
-        label: "Pro",
         name: "Pro",
         description: "Higher storage and model allowance",
         features: [
           "40 GB storage",
-          "$2.50 monthly OpenRouter credit",
+          "2.5x Free monthly AI allowance",
           "No plan cap on knowledge bases or documents",
-          "All configured models",
+          "All configured models and video upload",
         ],
       },
       {
-        label: "Max",
         name: "Max",
         description: "The largest current personal allowance",
         features: [
           "80 GB storage",
-          "$5 monthly OpenRouter credit",
+          "5x Free monthly AI allowance",
           "No plan cap on knowledge bases or documents",
-          "All configured models",
+          "All configured models and video upload",
         ],
       },
     ],
     checkout: {
       action: "View plan",
-      note: "Sign in to inspect your current plan, exact usage, and available Paddle checkout options.",
-      providerNote:
-        "A paid plan is granted only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access.",
+      note: "Sign in to see your current plan and confirm localized pricing before secure checkout.",
     },
   },
   comparison: {
@@ -391,7 +386,7 @@ const en = {
       {
         question: "How does paid access become active?",
         answer:
-          "Available upgrades open a secure Paddle checkout. A paid plan becomes active only after musuw verifies Paddle's signed server event; a URL or checkout return never grants access.",
+          "Available upgrades use secure hosted checkout. A paid plan becomes active only after verified payment confirmation; a URL or checkout return never grants access.",
       },
     ],
   },
@@ -520,9 +515,8 @@ const zhCN = {
   },
   pricing: {
     intro: {
-      label: "透明价格",
       title: "为个人知识工作准备的套餐",
-      body: "四种方案分别执行存储空间与每月 OpenRouter 额度。登录后可查看服务器核验的方案和用量。",
+      body: "按你的个人知识工作需求，选择合适的存储空间、模型权限与每月 AI 额度。",
     },
     currencyCode: "CNY",
     currencySymbol: "¥",
@@ -530,56 +524,52 @@ const zhCN = {
     monthly: "月付",
     yearly: "年付",
     save: "年付优惠",
+    recommended: "推荐",
+    includes: "套餐包含",
     perUserMonth: "/用户/月",
     perYear: "/年",
     freeAction: "免费开始",
     unavailableAction: "规划中",
     plans: [
       {
-        label: "免费",
         name: "免费版",
         description: "适合个人知识库的有边界免费方案",
         features: [
           "5 GB 存储空间",
-          "每月 $1 OpenRouter 额度",
-          "1 个知识库 · 每库 10 篇文档",
-          "仅最低成本模型组合",
+          "基础每月 AI 额度",
+          "1 个知识库，每库 10 篇文档",
+          "入门模型组合，不支持视频上传",
         ],
       },
       {
-        label: "Plus",
         name: "Plus",
         description: "更多空间并解锁全部已配置模型",
         features: [
           "20 GB 存储空间",
-          "每月 $1.25 OpenRouter 额度",
+          "免费版 1.25 倍每月 AI 额度",
           "知识库和文档数不受方案限制",
-          "全部已配置模型",
+          "全部已配置模型与视频上传",
         ],
       },
       {
-        label: "Pro",
         name: "专业版 Pro",
         description: "更高的存储与模型额度",
         features: [
           "40 GB 存储空间",
-          "每月 $2.50 OpenRouter 额度",
+          "免费版 2.5 倍每月 AI 额度",
           "知识库和文档数不受方案限制",
-          "全部已配置模型",
+          "全部已配置模型与视频上传",
         ],
       },
       {
-        label: "Max",
         name: "Max",
         description: "当前个人方案的最高额度",
-        features: ["80 GB 存储空间", "每月 $5 OpenRouter 额度", "知识库和文档数不受方案限制", "全部已配置模型"],
+        features: ["80 GB 存储空间", "免费版 5 倍每月 AI 额度", "知识库和文档数不受方案限制", "全部已配置模型与视频上传"],
       },
     ],
     checkout: {
       action: "查看方案",
-      note: "登录后查看当前方案、精确用量与当前可用的 Paddle 安全结账选项。",
-      providerNote:
-        "只有 musuw 验证 Paddle 的服务器签名事件后才会授予付费方案；网址参数或结账返回不会授予权限。",
+      note: "登录后查看当前方案，并在安全结账前确认本地化价格。",
     },
   },
   comparison: {
@@ -721,7 +711,7 @@ const zhCN = {
       {
         question: "付费状态如何生效？",
         answer:
-          "可用升级会进入 Paddle 安全结账。只有 musuw 验证 Paddle 的服务器签名事件后，付费方案才会生效；网址参数或结账返回不会授予权限。",
+          "可用升级会进入安全托管结账。只有收到可信付款确认后，付费方案才会生效；网址参数或结账返回不会授予权限。",
       },
     ],
   },

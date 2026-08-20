@@ -53,18 +53,13 @@ test("the public header offers localized login and free-start actions", () => {
   assert.equal(getStorefrontCopy("zh-CN").nav.openApp, "打开 musuw");
 });
 
-test("Paddle availability and authoritative confirmation copy is present in both locales", () => {
+test("pricing keeps checkout provider-neutral in both locales", () => {
   for (const locale of ["en", "zh-CN"]) {
     const copy = getStorefrontCopy(locale);
     assert.ok(copy.meta.title);
     assert.ok(copy.meta.description);
     assert.ok(copy.pricing.checkout.action);
-    assert.match(copy.pricing.checkout.note, /Paddle/);
-    assert.match(copy.pricing.checkout.note, locale === "zh-CN" ? /当前可用.*结账/ : /available.*checkout/i);
-    assert.match(copy.pricing.checkout.providerNote, /Paddle/);
-    assert.match(
-      copy.pricing.checkout.providerNote,
-      locale === "zh-CN" ? /服务器签名事件|验证 Paddle/ : /signed server event|verifies Paddle/i,
-    );
+    assert.match(copy.pricing.checkout.note, locale === "zh-CN" ? /本地化价格/ : /localized pricing/i);
+    assert.doesNotMatch(JSON.stringify(copy.pricing), /Paddle|OpenRouter/i);
   }
 });

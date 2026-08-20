@@ -12,7 +12,7 @@ import (
 )
 
 func contextWithConsumerPlan(tenantID uint64, plan types.ConsumerPlan) context.Context {
-	tenant := &types.Tenant{ID: tenantID, Plan: plan, PlanStatus: "active", OpenRouterUsageMonth: "2026-08"}
+	tenant := &types.Tenant{ID: tenantID, Plan: plan, PlanStatus: "active"}
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, tenantID)
 	return context.WithValue(ctx, types.TenantInfoContextKey, tenant)
 }
