@@ -2,7 +2,13 @@
   <Teleport to="body">
     <Transition name="visual-settings-fade">
       <div v-if="visible" class="visual-settings-overlay">
-        <section class="visual-settings-modal" role="dialog" aria-modal="true" :aria-label="$t('general.settings')">
+        <section
+          class="visual-settings-modal"
+          :class="{ 'is-usage': currentSection === 'usage' }"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="$t('general.settings')"
+        >
           <aside class="visual-settings-sidebar">
             <h2 class="visual-settings-title">{{ $t('general.settings') }}</h2>
             <nav class="visual-settings-nav" :aria-label="$t('general.settings')">
@@ -333,6 +339,11 @@ onUnmounted(() => {
   text-align: left;
 }
 
+.visual-settings-modal.is-usage {
+  width: min(1280px, 100%);
+  height: min(760px, calc(100dvh - 32px));
+}
+
 .visual-settings-sidebar {
   flex: 0 0 224px;
   width: 224px;
@@ -455,6 +466,7 @@ onUnmounted(() => {
 @media (max-width: 560px) {
   .visual-settings-overlay { align-items: stretch; padding: 0; }
   .visual-settings-modal { width: 100%; height: 100%; max-height: none; flex-direction: column; border: 0; border-radius: 0; }
+  .visual-settings-modal.is-usage { width: 100%; height: 100%; max-height: none; }
   .visual-settings-sidebar { width: 100%; flex: 0 0 auto; max-height: 180px; padding: 14px 12px; border-right: 0; border-bottom: 1px solid #f3f4f6; }
   .visual-settings-title { margin-bottom: 8px; }
   .visual-settings-nav { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 4px; padding-right: 36px; }
