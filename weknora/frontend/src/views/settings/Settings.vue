@@ -4,7 +4,6 @@
       <div v-if="visible" class="visual-settings-overlay">
         <section
           class="visual-settings-modal"
-          :class="{ 'is-usage': currentSection === 'usage' }"
           role="dialog"
           aria-modal="true"
           :aria-label="$t('general.settings')"
@@ -216,10 +215,6 @@ const navItems = computed<NavItem[]>(() => {
 })
 
 const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
-const hasCheckoutIntent = computed(() =>
-  (route.query.plan === 'plus' || route.query.plan === 'pro' || route.query.plan === 'max') &&
-  (route.query.period === 'monthly' || route.query.period === 'yearly'),
-)
 const currentModelType = computed(() => {
   if (currentSection.value !== 'models') return null
   if (currentSubSection.value) return currentSubSection.value
@@ -250,7 +245,7 @@ const handleClose = () => {
   uiStore.closeSettings()
   if (route.path === '/platform/settings') {
     const section = route.query.section
-    if (hasCheckoutIntent.value || section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
+    if (section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
       void router.push('/platform/knowledge-bases')
     } else {
       router.back()
@@ -337,11 +332,6 @@ onUnmounted(() => {
   color: #1f2937;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%);
   text-align: left;
-}
-
-.visual-settings-modal.is-usage {
-  width: min(1280px, 100%);
-  height: min(760px, calc(100dvh - 32px));
 }
 
 .visual-settings-sidebar {
@@ -466,7 +456,6 @@ onUnmounted(() => {
 @media (max-width: 560px) {
   .visual-settings-overlay { align-items: stretch; padding: 0; }
   .visual-settings-modal { width: 100%; height: 100%; max-height: none; flex-direction: column; border: 0; border-radius: 0; }
-  .visual-settings-modal.is-usage { width: 100%; height: 100%; max-height: none; }
   .visual-settings-sidebar { width: 100%; flex: 0 0 auto; max-height: 180px; padding: 14px 12px; border-right: 0; border-bottom: 1px solid #f3f4f6; }
   .visual-settings-title { margin-bottom: 8px; }
   .visual-settings-nav { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 4px; padding-right: 36px; }

@@ -7,6 +7,7 @@ import {
 
 let paddlePromise: Promise<Paddle | undefined> | null = null
 let completed: (() => void) | undefined
+let activeEventCallback: ((event: PaddleEventData) => void) | undefined
 
 export interface OpenPaddleCheckoutInput {
   environment: 'sandbox' | 'live'
@@ -23,6 +24,11 @@ export interface PreviewPaddlePricesInput {
   environment: 'sandbox' | 'live'
   clientToken: string
   priceIds: string[]
+}
+
+export interface OpenPaddleInlineCheckoutInput extends OpenPaddleCheckoutInput {
+  frameTarget: string
+  onEvent?: (event: PaddleEventData) => void
 }
 
 export interface PaddleLocalizedPrice {
@@ -43,10 +49,12 @@ function toPaddleLocale(value?: string): string | undefined {
 function initialize(input: Pick<OpenPaddleCheckoutInput, 'environment' | 'clientToken'>) {
   if (paddlePromise) return paddlePromise
   const eventCallback = (event: PaddleEventData) => {
-    if (event.name !== CheckoutEventNames.CHECKOUT_COMPLETED) return
-    const callback = completed
-    completed = undefined
-    callback?.()
+    activeEventCallback?.(event)
+    if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
+      const callback = completed
+      completed = undefined
+      callback?.()
+    }
   }
   paddlePromise = initializePaddle({
     ...(input.environment === 'sandbox' ? { environment: 'sandbox' as const } : {}),
@@ -76,6 +84,7 @@ export async function previewPaddlePrices(input: PreviewPaddlePricesInput): Prom
 
 export async function openPaddleCheckout(input: OpenPaddleCheckoutInput): Promise<void> {
   completed = input.onCompleted
+  activeEventCallback = undefined
   const paddle = await initialize(input)
   if (!paddle) throw new Error('Paddle.js failed to initialize')
   paddle.Checkout.open({
@@ -92,4 +101,36 @@ export async function openPaddleCheckout(input: OpenPaddleCheckoutInput): Promis
       locale: toPaddleLocale(input.locale),
     },
   })
+}
+
+export async function openPaddleInlineCheckout(input: OpenPaddleInlineCheckoutInput): Promise<void> {
+  completed = input.onCompleted
+  activeEventCallback = input.onEvent
+  const paddle = await initialize(input)
+  if (!paddle) throw new Error('Paddle.js failed to initialize')
+  paddle.Checkout.open({
+    items: [{ priceId: input.priceId, quantity: 1 }],
+    customData: {
+      tenant_id: input.tenantId,
+      musuw_checkout_binding: input.checkoutBinding,
+    },
+    customer: input.email ? { email: input.email } : undefined,
+    settings: {
+      displayMode: 'inline',
+      variant: 'one-page',
+      theme: 'light',
+      allowLogout: false,
+      locale: toPaddleLocale(input.locale),
+      frameTarget: input.frameTarget,
+      frameInitialHeight: 640,
+      frameStyle: 'width:100%; min-width:312px; background-color:transparent; border:none;',
+    },
+  })
+}
+
+export async function closePaddleCheckout(): Promise<void> {
+  completed = undefined
+  activeEventCallback = undefined
+  const paddle = await paddlePromise
+  paddle?.Checkout.close()
 }

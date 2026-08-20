@@ -19,10 +19,8 @@ import { openNewUserGuide } from '@/config/contextualGuides'
 import { SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE } from '@/config/settingsAccess'
 import { handoffToExternalAuth } from '@/utils/nativeAuthHandoff'
 import {
-  createPaddlePortalSession,
   getCurrentEntitlement,
   type ConsumerEntitlement,
-  type PaddleBillingConfig,
 } from '@/api/entitlement'
 
 const { t } = useI18n()
@@ -61,8 +59,6 @@ const userEmail = computed(() => userInfo.value.email)
 const userAvatar = computed(() => userInfo.value.avatar)
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase())
 const entitlement = ref<ConsumerEntitlement | null>(null)
-const billing = ref<PaddleBillingConfig | null>(null)
-const portalOpening = ref(false)
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const usageRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
@@ -73,38 +69,15 @@ const usageRemainingPercent = computed<number | null>(() => {
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining)) return null
   return clampPercent((remaining / total) * 100)
 })
-const checkoutAvailable = computed(() => Boolean(
-  entitlement.value?.plan === 'free' &&
-  billing.value?.configured === true &&
-  billing.value.environment &&
-  billing.value.client_token &&
-  billing.value.tenant_id &&
-  Object.values(billing.value.prices ?? {}).some((periods) =>
-    Object.values(periods ?? {}).some((option) => Boolean(option?.price_id && option.checkout_binding)),
-  ),
-))
-const portalAvailable = computed(() => billing.value?.configured === true && billing.value?.portal_available === true)
-
 const toggleMenu = () => { menuVisible.value = !menuVisible.value }
 const handleQuickNav = (section: string, query: Record<string, string> = {}) => {
   menuVisible.value = false
   uiStore.openSettings()
   router.push({ path: '/platform/settings', query: { section, ...query } })
 }
-const openUsageUpgrade = () => handleQuickNav('usage', { plan: 'plus', period: 'monthly' })
-const handlePortal = async () => {
-  if (!portalAvailable.value || portalOpening.value) return
-  portalOpening.value = true
-  try {
-    const response = await createPaddlePortalSession()
-    if (!response.authorization_url) throw new Error('Missing portal URL')
-    menuVisible.value = false
-    window.location.assign(response.authorization_url)
-  } catch {
-    MessagePlugin.error(t('entitlement.portalUnavailable'))
-  } finally {
-    portalOpening.value = false
-  }
+const openPlans = () => {
+  menuVisible.value = false
+  void router.push('/plans')
 }
 const handleSettings = () => {
   menuVisible.value = false
@@ -275,10 +248,8 @@ const loadEntitlement = async () => {
   try {
     const response = await getCurrentEntitlement()
     entitlement.value = response.data
-    billing.value = response.billing
   } catch {
     entitlement.value = null
-    billing.value = null
   }
 }
 
@@ -360,11 +331,8 @@ onUnmounted(() => {
           <span>{{ $t('entitlement.usageMenu') }}</span>
           <small v-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
         </button>
-        <button v-if="checkoutAvailable" type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openUsageUpgrade">
-          <t-icon name="arrow-up" /><span>{{ $t('entitlement.upgradePlan') }}</span>
-        </button>
-        <button v-else-if="portalAvailable" type="button" class="visual-user-menu__item visual-user-menu__billing-item" :disabled="portalOpening" @click="handlePortal">
-          <t-icon name="setting" /><span>{{ $t('entitlement.managePlan') }}</span>
+        <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openPlans">
+          <t-icon name="arrow-up" /><span>{{ entitlement?.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
         </button>
         <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__item" @click="handleQuickNav('tenant')"><t-icon name="user-circle" /><span>{{ $t('settings.workspaceSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode && canManageMembers" type="button" class="visual-user-menu__item" @click="handleQuickNav('members')"><t-icon name="usergroup" /><span>{{ $t('tenantMember.title') }}</span></button>

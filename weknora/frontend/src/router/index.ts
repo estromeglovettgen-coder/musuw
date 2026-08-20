@@ -28,7 +28,7 @@ function authenticatedEntryPath(to: RouteLocationGeneric) {
       (plan === 'plus' || plan === 'pro' || plan === 'max') &&
       (period === 'monthly' || period === 'yearly')
     ) {
-      return { path: '/platform/settings', query: { section: 'usage', plan, period } }
+      return { path: '/plans', query: { plan, period } }
     }
   } catch {
     // Fall through to the normal authenticated home when storage is unavailable.
@@ -84,6 +84,8 @@ function isLiteSpaDefaultEntry(to: RouteLocationNormalized) {
 function isAllowedLitePath(path: string) {
   return (
     path === '/knowledgeBase' ||
+    path === '/plans' ||
+    path === '/checkout' ||
     path === '/platform/creatChat' ||
     path.startsWith('/platform/chat/') ||
     path === '/platform/knowledge-bases' ||
@@ -145,6 +147,18 @@ const router = createRouter({
       path: "/knowledgeBase",
       name: "home",
       component: () => import("../views/knowledge/KnowledgeBase.vue"),
+      meta: { requiresInit: true, requiresAuth: true }
+    },
+    {
+      path: "/plans",
+      name: "plans",
+      component: () => import("../views/billing/Plans.vue"),
+      meta: { requiresInit: true, requiresAuth: true }
+    },
+    {
+      path: "/checkout",
+      name: "checkout",
+      component: () => import("../views/billing/Checkout.vue"),
       meta: { requiresInit: true, requiresAuth: true }
     },
     {

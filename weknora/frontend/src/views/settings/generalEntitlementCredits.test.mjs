@@ -5,6 +5,8 @@ import test from 'node:test'
 const usageSettings = await readFile(new URL('./UsageBillingSettings.vue', import.meta.url), 'utf8')
 const settingsShell = await readFile(new URL('./Settings.vue', import.meta.url), 'utf8')
 const entitlementApi = await readFile(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
+const router = await readFile(new URL('../../router/index.ts', import.meta.url), 'utf8')
+const plansPage = await readFile(new URL('../billing/Plans.vue', import.meta.url), 'utf8')
 
 test('entitlement API types the official OpenRouter credit availability state', () => {
   assert.match(entitlementApi, /OpenRouterCreditsStatus\s*=\s*'available'\s*\|\s*'unavailable'\s*\|\s*'unprovisioned'/)
@@ -26,9 +28,13 @@ test('credit period copy uses the tenant personal-cycle boundary', () => {
   assert.match(usageSettings, /v-if="formattedResetAt"/)
 })
 
-test('closing a checkout-intent settings route returns to the product instead of reopening checkout', () => {
-  assert.match(settingsShell, /const hasCheckoutIntent = computed/)
-  assert.match(settingsShell, /hasCheckoutIntent\.value[\s\S]*router\.push\('\/platform\/knowledge-bases'\)/)
+test('plans live on a standalone authenticated route instead of inside Settings', () => {
+  assert.match(router, /path: "\/plans"[\s\S]*views\/billing\/Plans\.vue/)
+  assert.match(router, /return \{ path: '\/plans', query: \{ plan, period \} \}/)
+  assert.match(usageSettings, /router\.push\('\/plans'\)/)
+  assert.doesNotMatch(usageSettings, /usage-billing__pricing|openPaddleCheckout|previewPaddleSubscriptionUpgrade/)
+  assert.doesNotMatch(settingsShell, /is-usage|hasCheckoutIntent/)
+  assert.match(plansPage, /class="plans-page__grid"/)
 })
 
 test('Paddle customer portal stays server-authenticated and redirects with a fresh session URL', () => {

@@ -58,6 +58,8 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
     "path === '/platform/knowledge-bases'",
     "path.startsWith('/platform/knowledge-bases/')",
     "path === '/platform/settings'",
+    "path === '/plans'",
+    "path === '/checkout'",
   ]) {
     assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
   }
@@ -100,8 +102,8 @@ test("Lite UserMenu keeps account exit but does not rediscover management surfac
   assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*openDocs[\s\S]*openGithub/);
   assert.match(userMenu, /handleQuickNav\('general'\)/);
   assert.match(userMenu, /handleQuickNav\('usage'\)/);
-  assert.match(userMenu, /openUsageUpgrade/);
-  assert.match(userMenu, /handlePortal/);
+  assert.match(userMenu, /openPlans/);
+  assert.match(userMenu, /router\.push\('\/plans'\)/);
   assert.match(userMenu, /class="visual-user-menu__item is-danger" @click="handleLogout"/);
   assert.match(userMenu, /handoffToExternalAuth\('logout'\)/);
 });
