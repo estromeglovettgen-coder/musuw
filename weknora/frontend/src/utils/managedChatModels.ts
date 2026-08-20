@@ -6,6 +6,19 @@ type ChatModelLike = {
   is_builtin?: boolean
 }
 
+/**
+ * The backend is authoritative for ordinary consumers. System administrators
+ * intentionally receive the full maintenance catalog, so the Lite chat picker
+ * applies the same Free-plan boundary once more without hiding admin settings.
+ */
+export function filterChatModelsForPlan<T extends ChatModelLike>(
+  availableModels: readonly T[],
+  plan: 'free' | 'plus' | 'pro' | 'max',
+): T[] {
+  if (plan !== 'free') return [...availableModels]
+  return availableModels.filter((model) => model.id === DEFAULT_CHAT_MODEL_ID)
+}
+
 /** Keep a valid user choice, then prefer a tenant default over the shared platform fallback. */
 export function resolveChatModelId<T extends ChatModelLike>(
   candidateId: string | null | undefined,

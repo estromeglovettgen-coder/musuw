@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolveChatModelId } from './managedChatModels'
+import { filterChatModelsForPlan, resolveChatModelId } from './managedChatModels'
 
 const models = [
   { id: 'custom-chat-model', is_default: true, is_builtin: false },
@@ -20,4 +20,12 @@ test('falls back to a tenant default before the shared platform default', () => 
 test('falls back to Flash when no model is marked default', () => {
   const withoutDefault = models.map((model) => ({ ...model, is_default: false }))
   assert.equal(resolveChatModelId('', withoutDefault), 'builtin-deepseek-v4-flash')
+})
+
+test('keeps the admin maintenance catalog out of a Free Lite chat picker', () => {
+  assert.deepEqual(
+    filterChatModelsForPlan(models, 'free').map((model) => model.id),
+    ['builtin-deepseek-v4-flash'],
+  )
+  assert.equal(filterChatModelsForPlan(models, 'pro').length, models.length)
 })

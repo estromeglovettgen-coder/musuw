@@ -9,8 +9,10 @@ import {
   type CustomAgent,
 } from '@/api/agent'
 import { listModels, type ModelConfig } from '@/api/model'
+import { getCurrentEntitlement, type ConsumerPlan } from '@/api/entitlement'
 import { listWebSearchProviders, type WebSearchProviderEntity } from '@/api/web-search-provider'
 import { useOrganizationStore } from '@/stores/organization'
+import { filterChatModelsForPlan } from '@/utils/managedChatModels'
 
 /** 空间级资源缓存 TTL */
 const CACHE_TTL_MS = 60_000
@@ -59,6 +61,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
   const agents = ref<CustomAgent[]>([])
   const disabledOwnAgentIds = ref<string[]>([])
   const allModels = ref<ModelConfig[]>([])
+  const consumerPlan = ref<ConsumerPlan | null>(null)
   const webSearchProviders = ref<WebSearchProviderEntity[]>([])
 
   const loadedAt = ref<Partial<Record<ResourceKey, number>>>({})
@@ -78,7 +81,10 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
   const kbDetailInflight = new Map<string, Promise<any | null>>()
 
   const validKnowledgeBases = computed(() => rawKnowledgeBases.value.filter(isKbModelReady))
-  const chatModels = computed(() => allModels.value.filter((m) => m.type === 'KnowledgeQA'))
+  const chatModels = computed(() => {
+    const models = allModels.value.filter((m) => m.type === 'KnowledgeQA')
+    return consumerPlan.value ? filterChatModelsForPlan(models, consumerPlan.value) : models
+  })
 
   function isFresh(key: ResourceKey): boolean {
     const at = loadedAt.value[key]
@@ -200,8 +206,14 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
 
   async function ensureModels(force = false): Promise<void> {
     return runOnce('models', force, async () => {
-      const models = await listModels()
+      const liteMode = isLiteProductMode()
+      const [models, entitlement] = await Promise.all([
+        listModels(),
+        liteMode ? getCurrentEntitlement().catch(() => null) : Promise.resolve(null),
+      ])
       allModels.value = Array.isArray(models) ? models : []
+      // A missing entitlement response must not broaden a Lite chat catalog.
+      consumerPlan.value = liteMode ? (entitlement?.data?.plan ?? 'free') : null
       loadedAt.value.models = Date.now()
     })
   }
@@ -317,6 +329,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
       agents.value = []
       disabledOwnAgentIds.value = []
       allModels.value = []
+      consumerPlan.value = null
       webSearchProviders.value = []
       agentKbCache.clear()
       // 同时丢弃所有 inflight 句柄，否则失效后仍在飞行的请求会把旧数据写回缓存。
