@@ -11,11 +11,10 @@ import (
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
-// LLM 调用超时配置。仅作为"上层未设置 deadline 时"的兜底，避免 hung 请求
-// 永久阻塞 worker。如果上层 ctx 已经设置了 deadline（无论比默认更短还是更长），
-// 都会原样尊重，不再叠加默认超时。可通过环境变量覆盖：
-//   - WEKNORA_LLM_CHAT_TIMEOUT_SECONDS    非流式调用兜底超时（默认 600s）
-//   - WEKNORA_LLM_STREAM_TIMEOUT_SECONDS  流式调用兜底超时（默认 1800s）
+// LLM 调用超时配置。单次请求不能因上层批处理拥有更长 deadline 而永久阻塞；
+// 上层 deadline 更短时仍优先尊重上层。可通过环境变量覆盖：
+//   - WEKNORA_LLM_CHAT_TIMEOUT_SECONDS    非流式调用兜底超时（默认 300s）
+//   - WEKNORA_LLM_STREAM_TIMEOUT_SECONDS  流式调用兜底超时（默认 600s）
 var (
 	defaultChatTimeout   = envDurationSeconds("WEKNORA_LLM_CHAT_TIMEOUT_SECONDS", 300*time.Second)
 	defaultStreamTimeout = envDurationSeconds("WEKNORA_LLM_STREAM_TIMEOUT_SECONDS", 600*time.Second)
@@ -34,11 +33,9 @@ func envDurationSeconds(key string, fallback time.Duration) time.Duration {
 	return time.Duration(n) * time.Second
 }
 
-// withLLMTimeout 仅在上层 ctx 没有 deadline 时附加一个兜底超时；
-// 如果上层已显式设置 deadline（无论更短或更长），则原样返回，
-// 让调用方对自己的超时策略拥有最终决定权。
+// withLLMTimeout 使用调用方 deadline 与单次请求兜底中的较短值。
 func withLLMTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
-	if _, ok := ctx.Deadline(); ok {
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) <= d {
 		return ctx, func() {}
 	}
 	return context.WithTimeout(ctx, d)

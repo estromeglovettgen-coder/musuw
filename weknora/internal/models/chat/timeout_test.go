@@ -33,7 +33,7 @@ func TestWithLLMTimeout_ShorterParentDeadline_Respected(t *testing.T) {
 	}
 }
 
-func TestWithLLMTimeout_LongerParentDeadline_NotTruncated(t *testing.T) {
+func TestWithLLMTimeout_LongerParentDeadline_UsesRequestTimeout(t *testing.T) {
 	parent, parentCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer parentCancel()
 
@@ -44,8 +44,8 @@ func TestWithLLMTimeout_LongerParentDeadline_NotTruncated(t *testing.T) {
 	if !ok {
 		t.Fatalf("deadline must be set")
 	}
-	if remaining := time.Until(dl); remaining < 5*time.Second {
-		t.Fatalf("parent longer deadline should NOT be truncated by default, got remaining=%v", remaining)
+	if remaining := time.Until(dl); remaining <= 0 || remaining > 50*time.Millisecond {
+		t.Fatalf("single request timeout should cap a longer parent deadline, got remaining=%v", remaining)
 	}
 }
 
