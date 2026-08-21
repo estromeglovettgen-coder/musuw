@@ -272,7 +272,7 @@ start_background() {
   if [ -r "$file" ] && kill -0 "$(tr -d '[:space:]' < "$file")" 2>/dev/null; then
     die "host $name is already running; use scripts/musuw-dev down first"
   fi
-  "$@" >"$state_dir/$name.log" 2>&1 &
+  "$@" </dev/null >"$state_dir/$name.log" 2>&1 &
   printf '%s\n' "$!" > "$file"
 }
 
