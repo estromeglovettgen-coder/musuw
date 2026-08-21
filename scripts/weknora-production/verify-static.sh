@@ -124,7 +124,7 @@ printf '%s\n' \
         'MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID=pri_static_max_monthly' \
         'MUSUW_PADDLE_MAX_YEARLY_PRICE_ID=pri_static_max_yearly' \
         'AUTO_MIGRATE=true' \
-        'DISABLE_REGISTRATION=true' \
+        'DISABLE_REGISTRATION=false' \
         'GIN_MODE=release' \
         'TZ=Asia/Shanghai'
 } > "$runtime_dir/production.public.env"

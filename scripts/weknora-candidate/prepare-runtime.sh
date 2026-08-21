@@ -153,7 +153,7 @@ printf '%s\n' \
     'SEARXNG_BIND=127.0.0.1' \
     'WEKNORA_REDIS_NAMESPACE=weknora-v072-candidate' \
     'AUTO_MIGRATE=true' \
-    'DISABLE_REGISTRATION=true' \
+    'DISABLE_REGISTRATION=false' \
     'WEKNORA_AUTH_DEFAULT_TENANT_MODE=create_personal' \
     'NEO4J_ENABLE=true' \
     'NEO4J_URI=bolt://neo4j:7687' \
