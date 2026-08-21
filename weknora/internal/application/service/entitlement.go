@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -17,8 +18,9 @@ import (
 )
 
 type entitlementService struct {
-	repo interfaces.EntitlementRepository
-	keys modelopenrouter.KeyManager
+	repo           interfaces.EntitlementRepository
+	keys           modelopenrouter.KeyManager
+	allowanceLocks sync.Map
 }
 
 var errAllowanceRenewalPending = errors.New("monthly allowance renewal is awaiting payment confirmation")
@@ -31,8 +33,17 @@ func newEntitlementService(repo interfaces.EntitlementRepository, keys modelopen
 	return &entitlementService{repo: repo, keys: keys}
 }
 
+func (s *entitlementService) lockAllowance(tenantID uint64) func() {
+	value, _ := s.allowanceLocks.LoadOrStore(tenantID, &sync.Mutex{})
+	mu := value.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
 func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.ConsumerEntitlement, error) {
 	tenantID := types.MustTenantIDFromContext(ctx)
+	unlock := s.lockAllowance(tenantID)
+	defer unlock()
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -83,6 +94,8 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 
 func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, error) {
 	tenantID := types.MustTenantIDFromContext(ctx)
+	unlock := s.lockAllowance(tenantID)
+	defer unlock()
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
 	if err != nil {
 		return "", err
@@ -254,6 +267,8 @@ func (s *entitlementService) OpenRouterUserID(ctx context.Context) string {
 }
 
 func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, eventPeriodEnd *time.Time) (bool, error) {
+	unlock := s.lockAllowance(tenantID)
+	defer unlock()
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
 	if err != nil {
 		return false, err
@@ -339,6 +354,8 @@ func (s *entitlementService) syncOpenRouterLimitFromTenant(ctx context.Context, 
 }
 
 func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
+	unlock := s.lockAllowance(tenantID)
+	defer unlock()
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
 	if err != nil {
 		return false, err

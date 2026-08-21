@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,10 +18,13 @@ import (
 )
 
 type entitlementRepoStub struct {
+	mu     sync.Mutex
 	tenant *types.Tenant
 }
 
 func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*types.Tenant, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	copy := *s.tenant
 	if s.tenant.Credentials != nil {
 		credentials := *s.tenant.Credentials
@@ -33,6 +38,8 @@ func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*ty
 }
 
 func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context, _ uint64, credentials *types.OpenRouterCredentials, creditPeriodEnd time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.tenant.Credentials != nil && s.tenant.Credentials.OpenRouter != nil {
 		return false, nil
 	}
@@ -47,6 +54,8 @@ func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context
 }
 
 func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, billingPeriod, _ string, _ time.Time, customerID, subscriptionID string, creditPeriodEnd *time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.tenant.Plan = plan
 	if status == "" {
 		status = "active"
@@ -60,6 +69,8 @@ func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, pla
 }
 
 func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _ uint64, periodEnd time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.tenant.OpenRouterCreditPeriodEnd != nil && !periodEnd.After(*s.tenant.OpenRouterCreditPeriodEnd) {
 		return false, nil
 	}
@@ -69,8 +80,10 @@ func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _
 }
 
 type keyManagerStub struct {
+	mu           sync.Mutex
 	created      *modelopenrouter.ManagedKey
 	info         *modelopenrouter.KeyInfo
+	getDelay     time.Duration
 	createCalls  int
 	updateLimit  int64
 	updateCalls  int
@@ -81,6 +94,8 @@ type keyManagerStub struct {
 }
 
 func (s *keyManagerStub) CreateKey(_ context.Context, _ string, limit int64, monthlyReset bool) (*modelopenrouter.ManagedKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.createCalls++
 	s.createLimit = limit
 	s.createReset = monthlyReset
@@ -90,6 +105,8 @@ func (s *keyManagerStub) CreateKey(_ context.Context, _ string, limit int64, mon
 	return s.created, nil
 }
 func (s *keyManagerStub) UpdateKeyLimit(_ context.Context, _ string, limit int64, monthlyReset bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.updateCalls++
 	s.updateLimit = limit
 	s.monthlyReset = monthlyReset
@@ -188,8 +205,58 @@ func TestRecurringPaidAllowanceRefreshesOncePerPeriod(t *testing.T) {
 	assert.Equal(t, 1, manager.updateCalls)
 }
 
+func TestConcurrentRecurringDeliveriesMutateProviderOnlyOnce(t *testing.T) {
+	oldPeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	newPeriodEnd := time.Date(2026, 10, 28, 9, 30, 0, 0, time.UTC)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_1", OpenRouterCreditPeriodEnd: &oldPeriodEnd,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{
+		info: &modelopenrouter.KeyInfo{
+			LimitMicrousd: 2_500_000, LimitRemainingMicrousd: 100_000, UsageMicrousd: 900_000,
+		},
+		getDelay: 20 * time.Millisecond,
+	}
+	svc := newEntitlementService(repo, manager)
+
+	const deliveries = 12
+	var wg sync.WaitGroup
+	results := make(chan bool, deliveries)
+	errs := make(chan error, deliveries)
+	for i := 0; i < deliveries; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, fmt.Sprintf("evt-renew-%d", index), oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
+			results <- applied
+			errs <- err
+		}(i)
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	appliedCount := 0
+	for applied := range results {
+		if applied {
+			appliedCount++
+		}
+	}
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 1, appliedCount)
+	assert.Equal(t, 1, manager.updateCalls)
+}
+
 func (s *keyManagerStub) GetKey(context.Context, string) (*modelopenrouter.KeyInfo, error) {
-	return s.info, nil
+	time.Sleep(s.getDelay)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	copy := *s.info
+	return &copy, nil
 }
 func (s *keyManagerStub) DeleteKey(context.Context, string) error { return nil }
 
