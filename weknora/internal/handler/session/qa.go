@@ -146,11 +146,9 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		request.Images[i].Caption = ""
 	}
 
-	// Log request details
-	if requestJSON, err := json.Marshal(request); err == nil {
-		logger.Infof(ctx, "[%s] Request: session_id=%s, request=%s",
-			logPrefix, sessionID, secutils.SanitizeForLog(secutils.CompactImageDataURLForLog(string(requestJSON))))
-	}
+	logger.Infof(ctx, "[%s] Request accepted: session_id=%s, query_len=%d, images=%d, attachments=%d, agent=%t, web_search=%t",
+		logPrefix, sessionID, len(request.Query), len(request.Images), len(request.AttachmentUploads)+len(request.AttachmentIDs),
+		request.AgentEnabled, request.WebSearchEnabled)
 
 	// Get session. QA writes new messages into the session, so use the strict
 	// owner scope: a tenant admin may read an API-key session but must not be
