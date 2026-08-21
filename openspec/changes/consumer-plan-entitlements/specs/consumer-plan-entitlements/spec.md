@@ -152,3 +152,7 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 #### Scenario: Paddle is unconfigured
 - **WHEN** required Paddle environment values are absent
 - **THEN** the product reports billing as unavailable while all effective entitlement enforcement remains active
+
+#### Scenario: Fixed production runtime is only partially configured
+- **WHEN** the Musuw production overlay is missing a Paddle or OpenRouter server secret, lacks one of the six recurring price mappings, mixes Sandbox and Live prefixes, or attempts to place a server secret in the generated environment
+- **THEN** the production preflight rejects the release before Compose starts while generic deployments retain the optional unconfigured-billing behavior

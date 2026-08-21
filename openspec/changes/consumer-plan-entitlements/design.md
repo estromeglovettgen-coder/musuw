@@ -54,6 +54,8 @@ The existing tenant row also keeps Paddle's customer and subscription IDs from v
 
 The same official SDK fills the one gap in Paddle's hosted portal: changing a paid tier. The client sends only a higher target plan. The server resolves the hidden customer and subscription from the authenticated tenant, fetches the live subscription to prove ownership and current server-owned price, preserves its monthly/yearly period, and replaces the single item with the mapped target price. Paddle previews and applies the change using `prorated_immediately` and `prevent_change`; the UI shows Paddle's localized minor-unit result before confirmation. The update also rotates the tenant/target-price HMAC in subscription custom data so the existing signed `subscription.updated` webhook remains the sole plan authority. No direct UI callback or update response grants Pro/Max, and no downgrade, term switch, second subscription, ledger, or reconciliation process is added.
 
+Generic WeKnora deployments may leave Paddle unconfigured. Musuw's fixed production Compose overlay is stricter: it accepts only a complete Live client token and six-price catalog, mounts the Paddle API key and notification secret as protected files, and exports them inside the app container at startup. The same entrypoint exports the already-mounted OpenRouter management key. The preflight rejects missing, partial, Sandbox-prefixed, or environment-embedded production secrets; it never copies those values into the generated environment or browser bundle.
+
 ## Risks / Trade-offs
 
 - [The management key or required AES key is absent] → Do not provision or fall back to a shared key; expose the plan limit with provider usage marked unavailable/unprovisioned and log a reason code.

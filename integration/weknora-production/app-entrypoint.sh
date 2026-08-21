@@ -25,6 +25,9 @@ export SYSTEM_AES_KEY="$(read_required_secret /run/secrets/system_aes_key system
 export JWT_SECRET="$(read_required_secret /run/secrets/jwt_secret jwt-secret)"
 export OIDC_AUTH_CLIENT_ID="$(read_required_secret /run/secrets/oidc_client_id oidc-client-id)"
 export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_secret oidc-client-secret)"
+export OPENROUTER_MANAGEMENT_API_KEY="$(read_required_secret /run/secrets/openrouter_management_api_key openrouter-management-api-key)"
+export MUSUW_PADDLE_API_KEY="$(read_required_secret /run/secrets/paddle_api_key paddle-api-key)"
+export MUSUW_PADDLE_WEBHOOK_SECRET="$(read_required_secret /run/secrets/paddle_webhook_secret paddle-webhook-secret)"
 export S3_ACCESS_KEY="$(read_required_secret /run/secrets/r2_access_key_id r2-access-key-id)"
 export S3_SECRET_KEY="$(read_required_secret /run/secrets/r2_secret_access_key r2-secret-access-key)"
 

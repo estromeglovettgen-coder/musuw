@@ -128,5 +128,12 @@ The target-specific split is intentionally narrow:
 Private runtime credentials remain on the server; they are not copied into the
 repository, Cloudflare Worker, or browser bundles.
 
+The protected production secret directory must include the file-backed
+OpenRouter Management key plus Paddle's live API key and the secret for the
+exact production notification destination. The non-secret production public
+environment carries only Paddle's live client token and the six approved
+Plus/Pro/Max monthly/yearly price IDs. Sandbox and live values must never be
+mixed; the production preflight rejects sandbox prefixes and partial catalogs.
+
 The checked-in lockfiles are used by CI (`npm ci`). When a dependency changes,
 regenerate its lockfile in the same change.

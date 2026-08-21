@@ -114,6 +114,12 @@ services:
       - source: openrouter_management_api_key
         target: openrouter_management_api_key
         mode: 0400
+      - source: paddle_api_key
+        target: paddle_api_key
+        mode: 0400
+      - source: paddle_webhook_secret
+        target: paddle_webhook_secret
+        mode: 0400
       - source: r2_access_key_id
         target: r2_access_key_id
         mode: 0400
@@ -303,6 +309,10 @@ secrets:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/searxng_secret
   openrouter_management_api_key:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/openrouter_management_api_key
+  paddle_api_key:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/paddle_api_key
+  paddle_webhook_secret:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/paddle_webhook_secret
   r2_access_key_id:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/r2_access_key_id
   r2_secret_access_key:
