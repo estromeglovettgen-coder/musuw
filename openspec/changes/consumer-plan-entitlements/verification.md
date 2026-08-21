@@ -19,7 +19,7 @@ Verified locally through 2026-08-20 (America/Phoenix) against the combined local
 - Local browser acceptance showed the correct Free and Plus plan cards, plan-specific chat choices, no model-configuration affordance, a server-rejected second Free knowledge base, and successful cleanup of the temporary knowledge base.
 - With the management key intentionally absent, a real chat request selected the approved Qwen model, attempted no shared-key fallback, logged `management_key_not_configured`, emitted a terminal error, and closed the stream cleanly.
 - Database inspection found every active knowledge base bound to stable built-in OpenRouter capability IDs, no consumer-visible credential rows, valid default storage backends, and no retained temporary knowledge base.
-- Fresh Chrome acceptance showed the Free account's registration-anniversary reset date and remaining-credit percentage, the Codex-style profile/usage/settings split, the standalone four-card `/plans` page, and Paddle-localized monthly and yearly prices. The Lite route guard now preserves the user-profile deep link.
+- Fresh Chrome acceptance showed the Free account's registration-anniversary reset date and remaining-credit percentage, compact profile/usage settings without embedded plan cards, the standalone four-card `/plans` page, and Paddle-localized monthly and yearly prices. The Lite route guard preserves the user-profile deep link; the chat composer contains exactly the model and reasoning-effort rows, no agent selector, and the stored runtime normalizes to the full-capability built-in agent.
 
 ## Pending current-code evidence
 
