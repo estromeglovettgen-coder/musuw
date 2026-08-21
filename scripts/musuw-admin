@@ -1,0 +1,132 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+container_name=musuw-appsmith
+volume_name=musuw_appsmith_stacks
+listen_host=127.0.0.1
+listen_port=4186
+image_ref='appsmith/appsmith-ce:v2.2@sha256:dc17b968c88eebf42b85c2e22b97efb55f2339b2d685e48f804c5f87bdd9d4e5'
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/musuw-admin test|production|stop|status
+
+  test        Start the local TEST operations console.
+  production  Check the live-data lock; currently refuses until production is configured.
+  stop        Remove the local container; keep the Appsmith data volume.
+  status      Show the selected environment, health, and loopback URL.
+EOF
+}
+
+die() {
+  printf 'musuw-admin: %s\n' "$*" >&2
+  exit 1
+}
+
+require_docker() {
+  command -v docker >/dev/null 2>&1 || die 'Docker is required'
+  docker info >/dev/null 2>&1 || die 'Docker Desktop is not running'
+}
+
+container_exists() {
+  docker inspect "$container_name" >/dev/null 2>&1
+}
+
+selected_environment() {
+  if ! container_exists; then
+    printf '%s\n' stopped
+    return
+  fi
+  docker inspect "$container_name" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+    | sed -n 's/^MUSUW_ADMIN_TARGET=//p' \
+    | sed -n '1p'
+}
+
+wait_for_health() {
+  attempt=0
+  while [ "$attempt" -lt 60 ]; do
+    state=$(docker inspect "$container_name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)
+    case "$state" in
+      healthy|running) return 0 ;;
+      unhealthy|exited|dead) die "Appsmith failed to start ($state)" ;;
+    esac
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+  die 'Appsmith did not become healthy within 120 seconds'
+}
+
+start_console() {
+  target=$1
+  case "$target" in
+    test)
+      [ -r "$repo_root/.runtime/weknora/candidate.env" ] || die 'TEST runtime is missing .runtime/weknora/candidate.env'
+      [ -r "$repo_root/.runtime/weknora/paddle-sandbox.env" ] || die 'TEST Paddle runtime is missing .runtime/weknora/paddle-sandbox.env'
+      ;;
+    production)
+      [ "${MUSUW_ADMIN_PRODUCTION_UNLOCK:-}" = 'I_UNDERSTAND_THIS_IS_LIVE' ] || die 'production is locked; set MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE for this invocation'
+      die 'production is not configured on this machine; add an authorized production datasource before enabling it'
+      ;;
+    *) die "unknown environment: $target" ;;
+  esac
+
+  if container_exists; then
+    current=$(selected_environment)
+    if [ "$current" = "$target" ]; then
+      docker start "$container_name" >/dev/null 2>&1 || true
+      wait_for_health
+      printf 'Musuw admin (%s): http://%s:%s\n' "$target" "$listen_host" "$listen_port"
+      return
+    fi
+    docker rm -f "$container_name" >/dev/null
+  fi
+
+  docker volume create "$volume_name" >/dev/null
+  docker run -d \
+    --name "$container_name" \
+    --restart unless-stopped \
+    -p "$listen_host:$listen_port:80" \
+    -v "$volume_name:/appsmith-stacks" \
+    -e APPSMITH_DISABLE_TELEMETRY=true \
+    -e APPSMITH_SIGNUP_DISABLED=true \
+    -e "MUSUW_ADMIN_TARGET=$target" \
+    "$image_ref" >/dev/null
+
+  wait_for_health
+  printf 'Musuw admin (%s): http://%s:%s\n' "$target" "$listen_host" "$listen_port"
+}
+
+show_status() {
+  if ! container_exists; then
+    printf 'Musuw admin: stopped\n'
+    return
+  fi
+  target=$(selected_environment)
+  state=$(docker inspect "$container_name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}')
+  binding=$(docker inspect "$container_name" --format '{{(index (index .HostConfig.PortBindings "80/tcp") 0).HostIp}}:{{(index (index .HostConfig.PortBindings "80/tcp") 0).HostPort}}')
+  [ "$binding" = "$listen_host:$listen_port" ] || die "unsafe bind detected: $binding"
+  printf 'Musuw admin: target=%s state=%s url=http://%s\n' "$target" "$state" "$binding"
+}
+
+command=${1:-}
+case "$command" in
+  test|production)
+    require_docker
+    start_console "$command"
+    ;;
+  stop)
+    require_docker
+    if container_exists; then
+      docker rm -f "$container_name" >/dev/null
+    fi
+    printf 'Musuw admin: stopped (data volume preserved)\n'
+    ;;
+  status)
+    require_docker
+    show_status
+    ;;
+  -h|--help|help|'') usage ;;
+  *) usage >&2; exit 2 ;;
+esac
