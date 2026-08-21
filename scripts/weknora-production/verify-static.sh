@@ -33,10 +33,15 @@ done
 for model_id in \
     builtin-deepseek-v4-pro \
     builtin-deepseek-v4-flash \
-    builtin-openrouter-qwen-flash \
-    builtin-openrouter-kimi \
-    builtin-openrouter-mistral \
-    builtin-openrouter-glm \
+    builtin-openrouter-qwen-max \
+    builtin-openrouter-gpt-luna \
+    builtin-openrouter-gpt-terra \
+    builtin-openrouter-gpt-sol \
+    builtin-openrouter-gemini-flash \
+    builtin-openrouter-gemini-pro \
+    builtin-openrouter-claude-haiku \
+    builtin-openrouter-claude-sonnet \
+    builtin-openrouter-claude-opus \
     builtin-openrouter-embedding \
     builtin-openrouter-rerank \
     builtin-openrouter-vlm \
