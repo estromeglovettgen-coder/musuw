@@ -1,30 +1,27 @@
 <template>
   <div class="plans-page">
     <header class="plans-page__topbar">
-      <button type="button" class="plans-page__back" @click="leavePlans">
-        <t-icon name="chevron-left" />
-        <span>{{ $t('entitlement.backToProduct') }}</span>
+      <button type="button" class="plans-page__brand" :aria-label="$t('entitlement.backToProduct')" @click="leavePlans">
+        <img src="/musuw-logo.png" alt="" />
       </button>
     </header>
 
     <main class="plans-page__main">
       <section class="plans-page__intro">
-        <div class="plans-page__intro-row">
-          <h1>{{ $t('entitlement.pricingTitle') }}</h1>
-          <div class="plans-page__period" role="group" :aria-label="$t('entitlement.choosePeriod')">
-            <button type="button" :class="{ 'is-active': period === 'monthly' }" :aria-pressed="period === 'monthly'" @click="period = 'monthly'">{{ $t('entitlement.monthly') }}</button>
-            <button type="button" :class="{ 'is-active': period === 'yearly' }" :aria-pressed="period === 'yearly'" @click="period = 'yearly'">{{ $t('entitlement.yearly') }}</button>
-          </div>
-        </div>
+        <h1>{{ $t('entitlement.pricingTitle') }}</h1>
         <p>{{ $t('entitlement.pricingDescription') }}</p>
+        <div class="plans-page__period" role="group" :aria-label="$t('entitlement.choosePeriod')">
+          <button type="button" :class="{ 'is-active': period === 'monthly' }" :aria-pressed="period === 'monthly'" @click="period = 'monthly'">{{ $t('entitlement.monthly') }}</button>
+          <button type="button" :class="{ 'is-active': period === 'yearly' }" :aria-pressed="period === 'yearly'" @click="period = 'yearly'">{{ $t('entitlement.yearly') }}</button>
+        </div>
       </section>
 
       <div v-if="loading" class="plans-page__loading">{{ $t('common.loading') }}</div>
 
       <template v-else-if="entitlement">
-        <section class="plans-page__grid" :style="{ '--plan-columns': visiblePlanCards.length }" :aria-label="$t('entitlement.pricingTitle')">
+        <section class="plans-page__grid" :style="{ '--plan-columns': planCards.length }" :aria-label="$t('entitlement.pricingTitle')">
           <article
-            v-for="card in visiblePlanCards"
+            v-for="card in planCards"
             :key="card.plan"
             class="plan-card"
             :class="{
@@ -109,9 +106,6 @@ const planCards: Array<{ plan: ConsumerPlan; descriptionKey: string }> = [
   { plan: 'pro', descriptionKey: 'entitlement.planDescriptions.pro' },
   { plan: 'max', descriptionKey: 'entitlement.planDescriptions.max' },
 ]
-const visiblePlanCards = computed(() => entitlement.value?.plan === 'free'
-  ? planCards
-  : planCards.filter((card) => card.plan !== 'free'))
 const recommendedPlan = computed<ConsumerPlan | null>(() => {
   switch (entitlement.value?.plan) {
     case 'free': return 'plus'
@@ -239,41 +233,40 @@ const leavePlans = () => { void router.push('/platform/knowledge-bases') }
 
 <style scoped lang="less">
 .plans-page { min-height: 100dvh; background: #fff; color: #0d0d0d; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-.plans-page__topbar { height: 52px; padding: 0 16px; display: flex; align-items: center; border-bottom: 1px solid #ededed; }
-.plans-page__back { height: 36px; padding: 0 10px 0 7px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 9px; background: transparent; color: #5f6368; font: inherit; font-size: 13px; cursor: pointer; }
-.plans-page__back:hover { background: #f2f2f2; color: #111; }
-.plans-page__main { width: min(1420px,calc(100% - 48px)); margin: 0 auto; padding: 28px 0 44px; }
-.plans-page__intro { text-align: left; }
-.plans-page__intro-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.plans-page__intro h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -.025em; }
-.plans-page__intro p { max-width: 680px; margin: 7px 0 0; color: #747474; font-size: 13px; line-height: 20px; }
-.plans-page__period { flex: 0 0 auto; display: inline-flex; padding: 3px; border-radius: 999px; background: #f1f1f1; }
-.plans-page__period button { min-width: 88px; height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: #656565; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.plans-page__period button.is-active { background: #fff; color: #0d0d0d; box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+.plans-page__topbar { height: 82px; padding: 0 44px; display: flex; align-items: center; border-bottom: 1px solid #ededed; }
+.plans-page__brand { width: 50px; height: 50px; padding: 4px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.plans-page__brand:hover { background: #f2f2f2; }
+.plans-page__brand img { width: 100%; height: 100%; object-fit: contain; }
+.plans-page__main { width: min(1420px,calc(100% - 48px)); margin: 0 auto; padding: 84px 0 52px; }
+.plans-page__intro { max-width: 760px; margin: 0 auto; display: flex; align-items: center; flex-direction: column; text-align: center; }
+.plans-page__intro h1 { margin: 0; font-size: clamp(42px,5vw,64px); line-height: 1.05; font-weight: 500; letter-spacing: -.045em; }
+.plans-page__intro p { max-width: 680px; margin: 24px 0 0; color: #454545; font-size: 17px; line-height: 26px; }
+.plans-page__period { width: min(512px,100%); margin-top: 64px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); padding: 4px; border: 1px solid #dddddd; border-radius: 18px; background: #eeeeee; box-shadow: 0 1px 2px rgb(0 0 0 / 6%); }
+.plans-page__period button { min-width: 0; height: 48px; padding: 0 18px; border: 0; border-radius: 14px; background: transparent; color: #767676; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer; }
+.plans-page__period button.is-active { background: #fff; color: #0d0d0d; box-shadow: 0 1px 4px rgb(0 0 0 / 10%); }
 .plans-page__loading,.plans-page__error { margin-top: 48px; text-align: center; color: #6b6b6b; }
-.plans-page__grid { margin-top: 28px; display: grid; grid-template-columns: repeat(var(--plan-columns),minmax(0,1fr)); gap: 16px; }
-.plan-card { position: relative; min-width: 0; min-height: 500px; padding: 26px 24px 24px; display: flex; flex-direction: column; border: 1px solid #dedede; border-radius: 16px; background: #fff; }
-.plan-card.is-recommended { background: #f7f7f7; }
+.plans-page__grid { margin-top: 34px; display: grid; grid-template-columns: repeat(var(--plan-columns),minmax(0,1fr)); gap: 22px; }
+.plan-card { position: relative; min-width: 0; min-height: 540px; padding: 22px 18px 24px; display: flex; flex-direction: column; border: 1px solid #dedede; border-radius: 4px; background: #fff; }
 .plan-card.is-current,.plan-card.is-target { border-color: #0d0d0d; box-shadow: inset 0 0 0 1px #0d0d0d; }
 .plan-card__heading { min-height: 31px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.plan-card__heading h2 { margin: 0; font-size: 25px; line-height: 31px; font-weight: 650; letter-spacing: -.025em; }
+.plan-card__heading h2 { margin: 0; font-size: 27px; line-height: 34px; font-weight: 500; letter-spacing: -.035em; }
 .plan-card__heading span { padding: 4px 8px; border-radius: 999px; background: #dedede; font-size: 11px; font-weight: 650; }
-.plan-card__description { min-height: 48px; margin: 14px 0 0; color: #5f5f5f; font-size: 14px; line-height: 22px; }
-.plan-card__price { min-height: 50px; margin-top: 24px; display: flex; align-items: baseline; gap: 7px; }
-.plan-card__price strong { font-size: 30px; line-height: 38px; font-weight: 600; letter-spacing: -.035em; }
+.plan-card__description { min-height: 50px; margin: 8px 0 0; color: #333; font-size: 15px; line-height: 22px; }
+.plan-card__price { min-height: 58px; margin-top: 26px; display: flex; align-items: baseline; gap: 7px; }
+.plan-card__price strong { font-size: clamp(34px,3vw,46px); line-height: 52px; font-weight: 500; letter-spacing: -.045em; }
 .plan-card__price span { color: #6a6a6a; font-size: 13px; white-space: nowrap; }
-.plan-card__action { width: 100%; min-height: 44px; margin-top: 22px; padding: 0 16px; border: 1px solid #d0d0d0; border-radius: 999px; background: #fff; color: #0d0d0d; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+.plan-card__action { width: 100%; min-height: 38px; margin-top: 14px; padding: 0 16px; border: 1px solid #d0d0d0; border-radius: 999px; background: #fff; color: #0d0d0d; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .plan-card__action.is-primary { border-color: #0d0d0d; background: #0d0d0d; color: #fff; }
 .plan-card__action:disabled { color: #777; background: #f4f4f4; cursor: default; }
-.plan-card__divider { height: 1px; margin: 28px 0 22px; background: #dedede; }
+.plan-card__divider { height: 1px; margin: 24px 0 20px; background: #dedede; }
 .plan-card__includes { font-size: 13px; }
-.plan-card ul { margin: 16px 0 0; padding: 0; display: grid; gap: 13px; list-style: none; }
-.plan-card li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; color: #333; font-size: 13px; line-height: 19px; }
+.plan-card ul { margin: 16px 0 0; padding: 0; display: grid; gap: 15px; list-style: none; }
+.plan-card li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; color: #202020; font-size: 14px; line-height: 20px; }
 .plan-card li :deep(.t-icon) { margin-top: 2px; font-size: 15px; }
 .plans-page__footer { max-width: 720px; margin: 24px auto 0; display: grid; justify-items: center; gap: 10px; text-align: center; color: #6b6b6b; font-size: 12px; line-height: 18px; }
 .plans-page__footer p { margin: 0; }
 .plans-page__footer button { border: 0; background: transparent; color: #111; font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 @media (max-width: 1040px) { .plans-page__grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media (max-width: 640px) { .plans-page__main { width: min(100% - 28px,1420px); padding-top: 22px; } .plans-page__intro-row { align-items: flex-start; flex-direction: column; gap: 16px; } .plans-page__grid { grid-template-columns: 1fr; margin-top: 24px; } .plan-card { min-height: 0; } }
+@media (max-width: 640px) { .plans-page__topbar { height: 68px; padding: 0 16px; } .plans-page__main { width: min(100% - 28px,1420px); padding-top: 48px; } .plans-page__intro h1 { font-size: 42px; } .plans-page__intro p { margin-top: 18px; font-size: 15px; line-height: 23px; } .plans-page__period { margin-top: 38px; } .plans-page__grid { grid-template-columns: 1fr; margin-top: 24px; } .plan-card { min-height: 0; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>
