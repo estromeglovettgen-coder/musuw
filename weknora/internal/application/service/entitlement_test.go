@@ -131,6 +131,15 @@ func (s *keyManagerStub) UpdateKeyLimit(_ context.Context, _ string, limit int64
 	s.updateCalls++
 	s.updateLimit = limit
 	s.monthlyReset = monthlyReset
+	if s.info != nil {
+		s.info.LimitMicrousd = limit
+		remaining := limit - s.info.UsageMicrousd
+		if remaining < 0 {
+			remaining = 0
+		}
+		s.info.LimitRemainingMicrousd = remaining
+		s.info.MonthlyReset = monthlyReset
+	}
 	return s.updateErr
 }
 
@@ -493,6 +502,63 @@ func TestEntitlementServiceReportsUnprovisionedWhenProviderKeyIsAbsent(t *testin
 	assert.Equal(t, types.OpenRouterCreditsUnprovisioned, current.OpenRouterCreditsStatus)
 	assert.Zero(t, current.OpenRouterUsedMicrousd)
 	assert.Zero(t, current.OpenRouterRemainingMicrousd)
+}
+
+func TestEntitlementServiceReadsAnotherTenantThroughPlatformContext(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly", StorageUsed: 321,
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-7", LimitMicrousd: 1_250_000, LimitRemainingMicrousd: 900_000, UsageMicrousd: 350_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	current, err := svc.CurrentForTenant(context.Background(), 7, now)
+	require.NoError(t, err)
+	assert.Equal(t, int64(321), current.StorageUsed)
+	assert.Equal(t, int64(350_000), current.OpenRouterUsedMicrousd)
+	assert.Equal(t, int64(900_000), current.OpenRouterRemainingMicrousd)
+}
+
+func TestEntitlementServiceAdjustsProviderRemainingWithoutLocalLedger(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-7", LimitMicrousd: 1_250_000, LimitRemainingMicrousd: 900_000, UsageMicrousd: 350_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	current, err := svc.SetOpenRouterRemainingForTenant(context.Background(), 7, 700_000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1_050_000), manager.updateLimit)
+	assert.False(t, manager.monthlyReset)
+	assert.Equal(t, int64(700_000), current.OpenRouterRemainingMicrousd)
+	assert.Equal(t, int64(550_000), current.OpenRouterUsedMicrousd)
+}
+
+func TestEntitlementServiceRejectsRemainingAbovePlanAllowance(t *testing.T) {
+	periodEnd := time.Now().UTC().AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{Hash: "hash-7", LimitMicrousd: 1_250_000, LimitRemainingMicrousd: 1_250_000}}
+	svc := newEntitlementService(repo, manager)
+
+	_, err := svc.SetOpenRouterRemainingForTenant(context.Background(), 7, 1_250_001)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exceed current plan allowance")
+	assert.Zero(t, manager.updateCalls)
 }
 
 func TestEntitlementServiceProvisionsProviderLimitedTenantKey(t *testing.T) {

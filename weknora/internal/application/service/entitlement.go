@@ -95,6 +95,78 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 	return current, nil
 }
 
+// CurrentForTenant is the explicit-tenant form used by platform operations.
+// Reusing Current keeps the provider lookup, period refresh, clamping, and
+// fail-closed status in one implementation. The caller's identity remains in
+// ctx for audit/log attribution; only the target tenant context value changes.
+func (s *entitlementService) CurrentForTenant(ctx context.Context, tenantID uint64, at time.Time) (*types.ConsumerEntitlement, error) {
+	if tenantID == 0 {
+		return nil, fmt.Errorf("tenant ID must be positive")
+	}
+	return s.Current(context.WithValue(ctx, types.TenantIDContextKey, tenantID), at)
+}
+
+// SetOpenRouterRemainingForTenant adjusts the existing OpenRouter-managed
+// child key's remaining allowance without adding a local usage counter. The
+// absolute provider limit is lifetime usage plus the requested remainder,
+// exactly as the normal entitlement path does. Requests are bounded by the
+// effective plan allowance and cannot mutate Paddle or the persisted plan.
+func (s *entitlementService) SetOpenRouterRemainingForTenant(ctx context.Context, tenantID uint64, remainingMicrousd int64) (*types.ConsumerEntitlement, error) {
+	if tenantID == 0 {
+		return nil, fmt.Errorf("tenant ID must be positive")
+	}
+	if remainingMicrousd < 0 {
+		return nil, fmt.Errorf("remaining OpenRouter credits cannot be negative")
+	}
+
+	requestCtx := context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+	unlock := s.lockAllowance(tenantID)
+	tenant, err := s.repo.GetTenantEntitlement(requestCtx, tenantID)
+	if err != nil {
+		unlock()
+		return nil, err
+	}
+	plan := types.EffectiveConsumerPlan(tenant)
+	allowance := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
+	if remainingMicrousd > allowance {
+		unlock()
+		return nil, fmt.Errorf("remaining OpenRouter credits cannot exceed current plan allowance")
+	}
+	stored := openRouterCredentialsFromTenant(tenant)
+	if stored == nil || strings.TrimSpace(stored.KeyHash) == "" {
+		unlock()
+		return nil, fmt.Errorf("OpenRouter tenant credentials are unavailable")
+	}
+	if s.keys == nil {
+		unlock()
+		return nil, fmt.Errorf("OPENROUTER_MANAGEMENT_API_KEY is not configured")
+	}
+
+	// Normalize the provider state first. This preserves the existing paid-term
+	// and free-anniversary gates instead of letting an operator accidentally
+	// open an unpaid period by changing a stale key.
+	info, err := s.ensureAllowanceCurrent(requestCtx, tenant, time.Now().UTC())
+	if err != nil {
+		unlock()
+		return nil, err
+	}
+	targetLimit := info.UsageMicrousd + remainingMicrousd
+	// OpenRouter rejects a zero absolute limit. A zero remaining value is
+	// therefore exact only when lifetime usage is already positive; otherwise
+	// fail closed instead of silently granting one micro-dollar.
+	if targetLimit <= 0 {
+		unlock()
+		return nil, fmt.Errorf("remaining OpenRouter credits must be positive when provider usage is zero")
+	}
+	if err := s.keys.UpdateKeyLimit(requestCtx, stored.KeyHash, targetLimit, false); err != nil {
+		unlock()
+		return nil, fmt.Errorf("update OpenRouter tenant credit limit: %w", err)
+	}
+	unlock()
+
+	return s.CurrentForTenant(requestCtx, tenantID, time.Now().UTC())
+}
+
 func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, error) {
 	tenantID := types.MustTenantIDFromContext(ctx)
 	unlock := s.lockAllowance(tenantID)

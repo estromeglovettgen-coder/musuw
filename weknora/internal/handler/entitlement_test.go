@@ -77,11 +77,19 @@ func (s entitlementHandlerServiceStub) Current(context.Context, time.Time) (*typ
 	return s.current, nil
 }
 
+func (s entitlementHandlerServiceStub) CurrentForTenant(context.Context, uint64, time.Time) (*types.ConsumerEntitlement, error) {
+	return s.current, nil
+}
+
 func (entitlementHandlerServiceStub) OpenRouterAPIKey(context.Context) (string, error) {
 	return "", nil
 }
 
 func (entitlementHandlerServiceStub) OpenRouterUserID(context.Context) string { return "" }
+
+func (s entitlementHandlerServiceStub) SetOpenRouterRemainingForTenant(context.Context, uint64, int64) (*types.ConsumerEntitlement, error) {
+	return s.current, nil
+}
 
 func (s entitlementHandlerServiceStub) ApplyConsumerPlan(_ context.Context, _ uint64, _ types.ConsumerPlan, _, _, _ string, _ time.Time, _, _ string, periodEnd *time.Time) (bool, error) {
 	if s.applyCalls != nil {

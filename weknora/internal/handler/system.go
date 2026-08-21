@@ -43,6 +43,7 @@ type SystemHandler struct {
 	neo4jDriver      neo4j.Driver
 	documentReader   interfaces.DocumentReader
 	tenantSvc        interfaces.TenantService
+	entitlementSvc   interfaces.EntitlementService
 	userSvc          interfaces.UserService
 	systemSettingSvc interfaces.SystemSettingService
 	apiKeySvc        interfaces.TenantAPIKeyService
@@ -71,6 +72,7 @@ func NewSystemHandler(cfg *config.Config,
 	neo4jDriver neo4j.Driver,
 	documentReader interfaces.DocumentReader,
 	tenantSvc interfaces.TenantService,
+	entitlementSvc interfaces.EntitlementService,
 	userSvc interfaces.UserService,
 	systemSettingSvc interfaces.SystemSettingService,
 	apiKeySvc interfaces.TenantAPIKeyService,
@@ -84,6 +86,7 @@ func NewSystemHandler(cfg *config.Config,
 		neo4jDriver:        neo4jDriver,
 		documentReader:     documentReader,
 		tenantSvc:          tenantSvc,
+		entitlementSvc:     entitlementSvc,
 		userSvc:            userSvc,
 		systemSettingSvc:   systemSettingSvc,
 		apiKeySvc:          apiKeySvc,
@@ -98,6 +101,80 @@ type platformAPIKeyCreateRequest struct {
 	Name         string   `json:"name"`
 	Capabilities []string `json:"capabilities"`
 	ExpiresAt    *int64   `json:"expires_at_unix"`
+}
+
+// systemTenantEntitlementResponse is the operator-facing projection of one
+// workspace. It deliberately contains no credentials or raw provider keys;
+// OpenRouter usage remains provider-backed through EntitlementService.
+type systemTenantEntitlementResponse struct {
+	TenantID                  uint64                        `json:"tenant_id"`
+	TenantName                string                        `json:"tenant_name"`
+	TenantStatus              string                        `json:"tenant_status"`
+	ConfiguredPlan            types.ConsumerPlan            `json:"configured_plan"`
+	Plan                      types.ConsumerPlan            `json:"plan"`
+	PlanStatus                string                        `json:"plan_status"`
+	StorageQuotaBytes         int64                         `json:"storage_quota_bytes"`
+	StorageUsedBytes          int64                         `json:"storage_used_bytes"`
+	StorageUsagePercent       float64                       `json:"storage_usage_percent"`
+	BillingPeriod             string                        `json:"billing_period,omitempty"`
+	PaddleCustomerID          string                        `json:"paddle_customer_id,omitempty"`
+	PaddleSubscriptionID      string                        `json:"paddle_subscription_id,omitempty"`
+	PaddleCurrentPeriodEnd    *time.Time                    `json:"paddle_current_period_end,omitempty"`
+	OpenRouterCreditPeriodEnd *time.Time                    `json:"openrouter_credit_period_end,omitempty"`
+	OpenRouterMonthlyLimit    int64                         `json:"openrouter_monthly_limit_microusd"`
+	OpenRouterUsed            int64                         `json:"openrouter_used_microusd"`
+	OpenRouterRemaining       int64                         `json:"openrouter_remaining_microusd"`
+	OpenRouterResetAt         *time.Time                    `json:"openrouter_resets_at,omitempty"`
+	OpenRouterCreditsStatus   types.OpenRouterCreditsStatus `json:"openrouter_credits_status"`
+}
+
+type systemTenantUpdateRequest struct {
+	Status            *string `json:"status"`
+	StorageQuotaBytes *int64  `json:"storage_quota_bytes"`
+}
+
+type systemTenantOpenRouterCreditsRequest struct {
+	RemainingMicrousd *int64 `json:"remaining_microusd"`
+	Reset             bool   `json:"reset"`
+}
+
+func systemTenantID(c *gin.Context) (uint64, error) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		return 0, fmt.Errorf("invalid tenant ID")
+	}
+	return id, nil
+}
+
+func newSystemTenantEntitlementResponse(tenant *types.Tenant, current *types.ConsumerEntitlement) *systemTenantEntitlementResponse {
+	if tenant == nil || current == nil {
+		return nil
+	}
+	usagePercent := float64(0)
+	if tenant.StorageQuota > 0 {
+		usagePercent = float64(tenant.StorageUsed) * 100 / float64(tenant.StorageQuota)
+	}
+	return &systemTenantEntitlementResponse{
+		TenantID:                  tenant.ID,
+		TenantName:                tenant.Name,
+		TenantStatus:              tenant.Status,
+		ConfiguredPlan:            types.NormalizeConsumerPlan(tenant.Plan),
+		Plan:                      current.Plan,
+		PlanStatus:                current.PlanStatus,
+		StorageQuotaBytes:         tenant.StorageQuota,
+		StorageUsedBytes:          tenant.StorageUsed,
+		StorageUsagePercent:       usagePercent,
+		BillingPeriod:             tenant.PaddleBillingPeriod,
+		PaddleCustomerID:          tenant.PaddleCustomerID,
+		PaddleSubscriptionID:      tenant.PaddleSubscriptionID,
+		PaddleCurrentPeriodEnd:    tenant.PaddleCurrentPeriodEnd,
+		OpenRouterCreditPeriodEnd: tenant.OpenRouterCreditPeriodEnd,
+		OpenRouterMonthlyLimit:    current.MonthlyOpenRouterMicrousd,
+		OpenRouterUsed:            current.OpenRouterUsedMicrousd,
+		OpenRouterRemaining:       current.OpenRouterRemainingMicrousd,
+		OpenRouterResetAt:         current.OpenRouterResetsAt,
+		OpenRouterCreditsStatus:   current.OpenRouterCreditsStatus,
+	}
 }
 
 // ListPlatformAPIKeys godoc
@@ -2317,6 +2394,169 @@ func (h *SystemHandler) ApplyDefaultStorageQuotaToAllTenants(c *gin.Context) {
 		"affected":    affected,
 		"quota_bytes": quotaBytes,
 		"quota_gb":    gb,
+	})
+}
+
+// GetManagedTenantEntitlement returns one cross-tenant, provider-backed
+// entitlement snapshot for the local operations console. Paddle plan changes
+// are intentionally not accepted here; the signed Paddle webhook remains the
+// sole entitlement writer.
+func (h *SystemHandler) GetManagedTenantEntitlement(c *gin.Context) {
+	ctx := logger.CloneContext(c.Request.Context())
+	id, err := systemTenantID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if h.tenantSvc == nil || h.entitlementSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement service unavailable"})
+		return
+	}
+	tenant, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		return
+	}
+	current, err := h.entitlementSvc.CurrentForTenant(ctx, id, time.Now().UTC())
+	if err != nil {
+		logger.Errorf(ctx, "managed tenant entitlement read failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": newSystemTenantEntitlementResponse(tenant, current)})
+}
+
+// UpdateManagedTenant changes only the explicitly whitelisted operator fields
+// that are not owned by Paddle: account status and storage quota. It never
+// accepts plan, billing IDs, credentials, or arbitrary tenant JSON.
+func (h *SystemHandler) UpdateManagedTenant(c *gin.Context) {
+	ctx := logger.CloneContext(c.Request.Context())
+	id, err := systemTenantID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var req systemTenantUpdateRequest
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+	if req.Status == nil && req.StorageQuotaBytes == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status or storage_quota_bytes is required"})
+		return
+	}
+	if req.Status != nil {
+		status := strings.ToLower(strings.TrimSpace(*req.Status))
+		if status != "active" && status != "inactive" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be active or inactive"})
+			return
+		}
+		*req.Status = status
+	}
+	if req.StorageQuotaBytes != nil && *req.StorageQuotaBytes <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "storage_quota_bytes must be positive"})
+		return
+	}
+	if h.tenantSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant service unavailable"})
+		return
+	}
+	tenant, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		return
+	}
+	oldStatus, oldQuota := tenant.Status, tenant.StorageQuota
+	if req.Status != nil {
+		tenant.Status = *req.Status
+	}
+	if req.StorageQuotaBytes != nil {
+		tenant.StorageQuota = *req.StorageQuotaBytes
+	}
+	updated, err := h.tenantSvc.UpdateTenant(ctx, tenant)
+	if err != nil {
+		logger.Errorf(ctx, "managed tenant update failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "tenant update failed"})
+		return
+	}
+	h.emitManagedTenantAudit(ctx, types.AuditActionSystemTenantUpdated, id, map[string]any{
+		"old_status": oldStatus, "new_status": updated.Status,
+		"old_storage_quota_bytes": oldQuota, "new_storage_quota_bytes": updated.StorageQuota,
+	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"tenant_id": updated.ID, "status": updated.Status, "storage_quota_bytes": updated.StorageQuota,
+	}})
+}
+
+// UpdateManagedTenantOpenRouterCredits changes the provider-backed remaining
+// allowance only. `reset:true` restores the current effective plan allowance;
+// otherwise remaining_microusd must be supplied. No Paddle plan or local
+// usage ledger is changed.
+func (h *SystemHandler) UpdateManagedTenantOpenRouterCredits(c *gin.Context) {
+	ctx := logger.CloneContext(c.Request.Context())
+	id, err := systemTenantID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var req systemTenantOpenRouterCreditsRequest
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+	if req.Reset && req.RemainingMicrousd != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reset and remaining_microusd cannot be combined"})
+		return
+	}
+	if !req.Reset && req.RemainingMicrousd == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "remaining_microusd or reset is required"})
+		return
+	}
+	if req.RemainingMicrousd != nil && *req.RemainingMicrousd < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "remaining_microusd cannot be negative"})
+		return
+	}
+	if h.tenantSvc == nil || h.entitlementSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement service unavailable"})
+		return
+	}
+	tenant, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		return
+	}
+	remaining := int64(0)
+	if req.Reset {
+		remaining = types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
+	} else {
+		remaining = *req.RemainingMicrousd
+	}
+	current, err := h.entitlementSvc.SetOpenRouterRemainingForTenant(ctx, id, remaining)
+	if err != nil {
+		logger.Errorf(ctx, "managed OpenRouter credit update failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.emitManagedTenantAudit(ctx, types.AuditActionSystemCreditsAdjusted, id, map[string]any{
+		"reset": req.Reset, "remaining_microusd": remaining,
+	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": newSystemTenantEntitlementResponse(tenant, current)})
+}
+
+func (h *SystemHandler) emitManagedTenantAudit(ctx context.Context, action types.AuditAction, tenantID uint64, details map[string]any) {
+	if h.auditSvc == nil {
+		return
+	}
+	actorID, _ := types.UserIDFromContext(ctx)
+	detailsJSON, _ := json.Marshal(details)
+	_ = h.auditSvc.Log(ctx, &types.AuditLog{
+		TenantID: 0, ActorUserID: actorID, ActorRole: systemAuditActorRole(ctx),
+		Action: action, TargetType: "tenant", TargetID: strconv.FormatUint(tenantID, 10),
+		Outcome: types.AuditOutcomeSuccess, Details: types.JSON(detailsJSON),
 	})
 }
 

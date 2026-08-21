@@ -123,6 +123,8 @@ const (
 	AuditActionSystemUserPasswordReset AuditAction = "system.user_password_reset"
 	AuditActionSystemAPIKeyCreated     AuditAction = "system.api_key_created"
 	AuditActionSystemAPIKeyRevoked     AuditAction = "system.api_key_revoked"
+	AuditActionSystemTenantUpdated     AuditAction = "system.tenant_updated"
+	AuditActionSystemCreditsAdjusted   AuditAction = "system.credits_adjusted"
 
 	// Runtime queue mutations are privileged SystemAdmin actions. Retrying an
 	// archived task can repeat its original side effects; deleting one removes

@@ -291,6 +291,20 @@ func RegisterSystemAdminRoutes(
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
 			handler.ApplyDefaultStorageQuotaToAllTenants)
 
+		// Cross-tenant operations console seam. Reads use the provider-backed
+		// entitlement service; mutations are limited to account status,
+		// storage quota, and an OpenRouter child-key remaining allowance.
+		// Paddle plan/billing state remains webhook/API owned.
+		g.apiKeyRoute(adminRoutes, http.MethodGet, "/tenants/:id/entitlement",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsRead, types.APIKeyCapabilitySystemTenantsManage),
+			handler.GetManagedTenantEntitlement)
+		g.apiKeyRoute(adminRoutes, http.MethodPatch, "/tenants/:id",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
+			handler.UpdateManagedTenant)
+		g.apiKeyRoute(adminRoutes, http.MethodPut, "/tenants/:id/openrouter-credits",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
+			handler.UpdateManagedTenantOpenRouterCredits)
+
 		// Platform-wide audit feed (tenant_id=0 rows). Covers
 		// system.setting_changed / system.admin_promoted /
 		// system.admin_revoked etc. — events written by the routes

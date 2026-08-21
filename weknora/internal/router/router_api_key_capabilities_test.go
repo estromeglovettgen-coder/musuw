@@ -63,6 +63,9 @@ func TestPlatformControlPlaneRoutesDeclarePlatformCapabilities(t *testing.T) {
 		{http.MethodGet, "/api/v1/system/admin/runtime/queues", types.APIKeyCapabilitySystemRuntimeRead},
 		{http.MethodPost, "/api/v1/system/admin/runtime/queues/:queue/tasks/:task_id/actions/:action", types.APIKeyCapabilitySystemRuntimeManage},
 		{http.MethodDelete, "/api/v1/system/admin/runtime/queues/:queue/archived", types.APIKeyCapabilitySystemRuntimeManage},
+		{http.MethodGet, "/api/v1/system/admin/tenants/:id/entitlement", types.APIKeyCapabilitySystemTenantsRead},
+		{http.MethodPatch, "/api/v1/system/admin/tenants/:id", types.APIKeyCapabilitySystemTenantsManage},
+		{http.MethodPut, "/api/v1/system/admin/tenants/:id/openrouter-credits", types.APIKeyCapabilitySystemTenantsManage},
 	}
 	for _, tc := range cases {
 		policy := mustLookupAPIKeyPolicy(t, g, tc.method, tc.path)
