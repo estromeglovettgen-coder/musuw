@@ -394,16 +394,29 @@ func (h *EntitlementHandler) PaddleSubscriptionUpgradePreview(c *gin.Context) {
 		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle upgrade preview is temporarily unavailable"))
 		return
 	}
-	if preview == nil || preview.UpdateSummary == nil || strings.TrimSpace(preview.UpdateSummary.Result.Amount) == "" || preview.UpdateSummary.Result.CurrencyCode == "" {
+	if preview == nil || preview.UpdateSummary == nil || preview.ImmediateTransaction == nil || preview.NextBilledAt == nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle returned an incomplete upgrade preview"))
+		return
+	}
+	immediate := preview.ImmediateTransaction.Details.Totals
+	recurring := preview.RecurringTransactionDetails.Totals
+	currency := recurring.CurrencyCode
+	if strings.TrimSpace(immediate.Subtotal) == "" || strings.TrimSpace(immediate.Tax) == "" || strings.TrimSpace(immediate.Balance) == "" ||
+		strings.TrimSpace(recurring.Total) == "" ||
+		currency == "" || immediate.CurrencyCode != currency || preview.UpdateSummary.Result.CurrencyCode != currency || strings.TrimSpace(*preview.NextBilledAt) == "" {
 		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle returned an incomplete upgrade preview"))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"plan":          target.plan,
-		"period":        target.period,
-		"action":        preview.UpdateSummary.Result.Action,
-		"amount":        preview.UpdateSummary.Result.Amount,
-		"currency_code": preview.UpdateSummary.Result.CurrencyCode,
+		"plan":              target.plan,
+		"period":            target.period,
+		"action":            preview.UpdateSummary.Result.Action,
+		"prorated_subtotal": immediate.Subtotal,
+		"prorated_tax":      immediate.Tax,
+		"due_today":         immediate.Balance,
+		"recurring_total":   recurring.Total,
+		"currency_code":     currency,
+		"next_billed_at":    *preview.NextBilledAt,
 	})
 }
 

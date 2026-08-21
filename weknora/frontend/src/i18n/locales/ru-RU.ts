@@ -2288,6 +2288,10 @@ export default {
     returnToProduct: 'Вернуться в Musuw',
     refundPolicy: 'Политика возврата',
     planSuffix: 'план',
+    nextMonthlyCharge: 'Следующий ежемесячный платёж',
+    nextYearlyCharge: 'Следующий ежегодный платёж',
+    nextChargeOn: 'Продление {date}',
+    proratedSubtotal: 'Доплата за текущий период',
     estimatedTax: 'Расчётный налог',
     totalToday: 'К оплате сегодня',
     calculatedAtCheckout: 'Рассчитывается при оплате'

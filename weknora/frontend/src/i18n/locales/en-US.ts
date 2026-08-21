@@ -3802,6 +3802,10 @@ export default {
     returnToProduct: 'Return to Musuw',
     refundPolicy: 'Refund policy',
     planSuffix: 'plan',
+    nextMonthlyCharge: 'Next monthly charge',
+    nextYearlyCharge: 'Next yearly charge',
+    nextChargeOn: 'Renews {date}',
+    proratedSubtotal: 'Prorated charge for this period',
     estimatedTax: 'Estimated tax',
     totalToday: 'Total due today',
     calculatedAtCheckout: 'Calculated at checkout'

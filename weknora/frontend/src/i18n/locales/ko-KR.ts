@@ -2288,6 +2288,10 @@ export default {
     returnToProduct: 'Musuw로 돌아가기',
     refundPolicy: '환불 정책',
     planSuffix: '요금제',
+    nextMonthlyCharge: '다음 월간 결제',
+    nextYearlyCharge: '다음 연간 결제',
+    nextChargeOn: '{date} 갱신',
+    proratedSubtotal: '이번 기간 일할 계산 금액',
     estimatedTax: '예상 세금',
     totalToday: '오늘 결제 금액',
     calculatedAtCheckout: '결제 시 계산'

@@ -2288,6 +2288,10 @@ export default {
     returnToProduct: '返回 Musuw',
     refundPolicy: '退款政策',
     planSuffix: '套餐',
+    nextMonthlyCharge: '下次月付',
+    nextYearlyCharge: '下次年付',
+    nextChargeOn: '{date} 续费',
+    proratedSubtotal: '本次按比例补差',
     estimatedTax: '预估税费',
     totalToday: '今日应付金额',
     calculatedAtCheckout: '结账时计算'

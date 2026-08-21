@@ -199,11 +199,21 @@ func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing
 			Price:    paddle.Price{ID: "pri_plus_monthly"},
 		}},
 	}
+	nextBilledAt := "2026-09-20T17:20:07.682697Z"
 	provider := &paddleSubscriptionUpdaterStub{
 		subscription: subscription,
-		preview: &paddle.SubscriptionPreview{UpdateSummary: &paddle.SubscriptionPreviewUpdateSummary{
-			Result: paddle.UpdateSummaryResult{Action: paddle.UpdateSummaryResultActionCharge, Amount: "1234", CurrencyCode: paddle.CurrencyCodeCNY},
-		}},
+		preview: &paddle.SubscriptionPreview{
+			NextBilledAt: &nextBilledAt,
+			UpdateSummary: &paddle.SubscriptionPreviewUpdateSummary{
+				Result: paddle.UpdateSummaryResult{Action: paddle.UpdateSummaryResultActionCharge, Amount: "900", CurrencyCode: paddle.CurrencyCodeCNY},
+			},
+			ImmediateTransaction: &paddle.NextTransaction{Details: paddle.TransactionDetailsPreview{Totals: paddle.TransactionTotals{
+				Subtotal: "820", Tax: "80", Total: "900", Balance: "900", CurrencyCode: paddle.CurrencyCodeCNY,
+			}}},
+			RecurringTransactionDetails: paddle.TransactionDetailsPreview{Totals: paddle.TransactionTotals{
+				Subtotal: "5900", Tax: "0", Total: "5900", Balance: "5900", CurrencyCode: paddle.CurrencyCodeCNY,
+			}},
+		},
 	}
 	h := &EntitlementHandler{
 		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
@@ -226,7 +236,17 @@ func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing
 
 	require.Empty(t, c.Errors)
 	require.Equal(t, http.StatusOK, recorder.Code)
-	assert.JSONEq(t, `{"plan":"pro","period":"monthly","action":"charge","amount":"1234","currency_code":"CNY"}`, recorder.Body.String())
+	assert.JSONEq(t, `{
+		"plan":"pro",
+		"period":"monthly",
+		"action":"charge",
+		"prorated_subtotal":"820",
+		"prorated_tax":"80",
+		"due_today":"900",
+		"recurring_total":"5900",
+		"currency_code":"CNY",
+		"next_billed_at":"2026-09-20T17:20:07.682697Z"
+	}`, recorder.Body.String())
 	require.NotNil(t, provider.previewReq)
 	assert.Equal(t, "sub_owned_by_tenant", provider.previewReq.SubscriptionID)
 	require.NotNil(t, provider.previewReq.Items)

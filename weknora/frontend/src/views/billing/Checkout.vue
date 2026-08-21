@@ -61,7 +61,17 @@
             </li>
           </ul>
           <div class="checkout-page__totals">
-            <div><span>{{ period === 'monthly' ? $t('entitlement.monthly') : $t('entitlement.yearly') }}</span><strong>{{ displaySubtotal }}</strong></div>
+            <div v-if="upgradePreview" class="is-recurring">
+              <span>
+                {{ period === 'monthly' ? $t('entitlement.nextMonthlyCharge') : $t('entitlement.nextYearlyCharge') }}
+                <small>{{ $t('entitlement.nextChargeOn', { date: nextBilledDate }) }}</small>
+              </span>
+              <strong>{{ displayRecurringTotal }}</strong>
+            </div>
+            <div>
+              <span>{{ upgradePreview ? $t('entitlement.proratedSubtotal') : (period === 'monthly' ? $t('entitlement.monthly') : $t('entitlement.yearly')) }}</span>
+              <strong>{{ displaySubtotal }}</strong>
+            </div>
             <div><span>{{ $t('entitlement.estimatedTax') }}</span><strong>{{ displayTax }}</strong></div>
             <div class="is-total"><span>{{ $t('entitlement.totalToday') }}</span><strong>{{ displayTotal }}</strong></div>
           </div>
@@ -146,14 +156,30 @@ const formatCheckoutCurrency = (amount: number, currencyCode: string) => {
 
 const displaySubtotal = computed(() => {
   if (totals.value) return formatCheckoutCurrency(totals.value.subtotal, totals.value.currency)
-  if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.amount, upgradePreview.value.currency_code)
+  if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.prorated_subtotal, upgradePreview.value.currency_code)
   return previewPrice.value || '…'
 })
-const displayTax = computed(() => totals.value ? formatCheckoutCurrency(totals.value.tax, totals.value.currency) : t('entitlement.calculatedAtCheckout'))
+const displayTax = computed(() => {
+  if (totals.value) return formatCheckoutCurrency(totals.value.tax, totals.value.currency)
+  if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.prorated_tax, upgradePreview.value.currency_code)
+  return t('entitlement.calculatedAtCheckout')
+})
 const displayTotal = computed(() => {
   if (totals.value) return formatCheckoutCurrency(totals.value.total, totals.value.currency)
-  if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.amount, upgradePreview.value.currency_code)
+  if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.due_today, upgradePreview.value.currency_code)
   return previewPrice.value || '…'
+})
+const displayRecurringTotal = computed(() => upgradePreview.value
+  ? formatMinorCurrency(upgradePreview.value.recurring_total, upgradePreview.value.currency_code)
+  : '')
+const nextBilledDate = computed(() => {
+  const value = upgradePreview.value?.next_billed_at
+  if (!value) return ''
+  try {
+    return new Intl.DateTimeFormat(locale.value, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value))
+  } catch {
+    return value
+  }
 })
 const planFeatures = computed(() => {
   const plan = targetPlan.value
@@ -315,6 +341,8 @@ onUnmounted(() => {
 .checkout-page__summary li :deep(.t-icon) { margin-top: 2px; color: #1668dc; font-size: 17px; }
 .checkout-page__totals { margin-top: 34px; padding-top: 22px; display: grid; gap: 13px; border-top: 1px solid #dedede; }
 .checkout-page__totals > div { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; color: #5f5f5f; font-size: 14px; }
+.checkout-page__totals .is-recurring > span { display: grid; gap: 3px; }
+.checkout-page__totals .is-recurring small { color: #8b8b8b; font-size: 11px; }
 .checkout-page__totals strong { color: #242424; font-weight: 500; }
 .checkout-page__totals .is-total { margin-top: 5px; color: #111; font-size: 17px; font-weight: 650; }
 .checkout-page__totals .is-total strong { font-size: 20px; font-weight: 650; }

@@ -48,8 +48,12 @@ export interface PaddleSubscriptionUpgradePreview {
   plan: PaidConsumerPlan
   period: BillingPeriod
   action: 'charge' | 'credit'
-  amount: string
+  prorated_subtotal: string
+  prorated_tax: string
+  due_today: string
+  recurring_total: string
   currency_code: string
+  next_billed_at: string
 }
 
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
