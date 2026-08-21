@@ -69,7 +69,7 @@ The same official SDK fills the one gap in Paddle's hosted portal: changing a pa
 1. Keep tenant entitlement columns with Free defaults in PostgreSQL and SQLite; update existing rows to Free/5 GiB without deleting data.
 2. Deploy backend enforcement, tenant child-key provisioning, and the read-only entitlement UI with Paddle disabled by default.
 3. Configure `OPENROUTER_MANAGEMENT_API_KEY` and the existing 32-byte `SYSTEM_AES_KEY`; child keys are created lazily, so there is no bulk migration or provider-side scan.
-4. Configure Paddle environment, a least-privilege server API key with customer-portal-session and subscription read/write permissions, public client token, webhook secret, and all six recurring price IDs as one deployment unit, then register `/api/v1/billing/paddle/webhook` for subscription lifecycle events.
+4. Configure Paddle environment, a least-privilege server API key with customer-portal-session and subscription read/write permissions, public client token, webhook secret, and all six recurring price IDs as one deployment unit, then register `/api/v1/billing/paddle/webhook` for the subscription lifecycle events and `transaction.completed`.
 5. Validate Free and paid behavior with separate tenants and one bounded OpenRouter request after the management key is available.
 
 Rollback is code rollback plus leaving additive columns in place; no user objects or usage records are deleted.

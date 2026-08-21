@@ -82,6 +82,9 @@ func TestShouldLogBodies(t *testing.T) {
 	if shouldLogBodies("/api/v1/auth/oidc/callback") {
 		t.Fatal("authentication request and response bodies must not be logged")
 	}
+	if shouldLogBodies("/api/v1/billing/paddle/webhook") {
+		t.Fatal("payment webhook request and response bodies must not be logged")
+	}
 	if !shouldLogBodies("/api/v1/knowledge-bases") {
 		t.Fatal("ordinary API bodies should remain observable")
 	}

@@ -80,11 +80,13 @@ func sanitizeQuery(raw string) string {
 	return values.Encode()
 }
 
-// Authentication responses can contain encoded login results that field-level
-// JSON redaction cannot safely inspect. Keep request metadata, but never persist
-// auth request or response bodies.
+// Authentication and payment webhook bodies can contain credentials or buyer
+// data that field-level JSON redaction cannot safely inspect. Keep request
+// metadata, but never persist those request or response bodies.
 func shouldLogBodies(path string) bool {
-	return path != "/api/v1/auth" && !strings.HasPrefix(path, "/api/v1/auth/")
+	return path != "/api/v1/auth" &&
+		!strings.HasPrefix(path, "/api/v1/auth/") &&
+		path != "/api/v1/billing/paddle/webhook"
 }
 
 // readRequestBody 读取请求体（限制大小用于日志，但完整读取用于重置）
