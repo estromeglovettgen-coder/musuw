@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/handler"
 )
 
@@ -27,6 +28,7 @@ func init() {
 	if edition, ok := normalizeMusuwProductEdition(os.Getenv(musuwProductEditionEnv)); ok {
 		handler.Edition = edition
 	}
+	service.SetProductEdition(handler.Edition)
 }
 
 func normalizeMusuwProductEdition(raw string) (string, bool) {

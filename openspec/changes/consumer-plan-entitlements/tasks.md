@@ -10,6 +10,8 @@
 - [x] 2.3 Add the authenticated entitlement endpoint and optional signature-verified Paddle webhook
 - [x] 2.4 Use Paddle's official Go verifier, tenant-bound checkout data, server-owned price mappings, subscription-only state changes, and idempotent observable event handling
 - [x] 2.5 Move all child keys off the UTC natural-month reset, refresh Free on its registration anniversary, and replenish monthly-paid plans exactly once from a verified successful Paddle recurring period
+- [x] 2.6 Persist Paddle's verified paid-term end and block annual allowance use or refresh beyond that term
+- [x] 2.7 Make paid-term advancement monotonic and subscription-bound under the existing row lock, fail closed for unknown paid cadence, and remove legacy inline VLM credentials from consumer processing
 
 ## 3. Consumer UI
 
@@ -28,3 +30,6 @@
 - [x] 4.5 Upgrade a real non-admin Sandbox subscription in Chrome and verify the signed event updates the existing OpenRouter child-key limit before the durable plan
 - [x] 4.6 Verify Free anniversary refresh without stacking, paid-cycle renewal idempotency, same-cycle upgrade preservation, localized plan prices, and the final local browser lifecycle
 - [x] 4.7 Wire the complete Live Paddle catalog and file-backed Paddle/OpenRouter secrets through the fixed production runtime, with a fail-closed static preflight
+- [x] 4.8 Verify annual payment-recovery grace stops at the paid-term boundary, including migration, repository, and service regression coverage
+- [x] 4.9 Verify reordered paid-period events cannot roll back or cross subscriptions and legacy VLM overrides never reach a provider
+- [x] 4.10 Verify annual pause/resume retains the paid term and remaining allowance without granting another period

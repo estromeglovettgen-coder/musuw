@@ -364,6 +364,40 @@ func TestValidateProcessOverrides_ImageWithEffectiveVLM(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateProcessOverridesRejectsLegacyInlineVLM(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+
+	kb := &types.KnowledgeBase{VLMConfig: types.VLMConfig{Enabled: true, ModelID: "builtin-openrouter-vlm"}}
+	overrides := &types.KnowledgeProcessOverrides{VLMConfig: &types.VLMConfig{
+		ModelName: "google/gemini-2.5-flash",
+		BaseURL:   "https://openrouter.ai/api/v1",
+		APIKey:    "user-supplied-key",
+	}}
+	err := ValidateProcessOverrides(context.Background(), kb, overrides, []string{"png"})
+	require.Error(t, err)
+}
+
+func TestValidateProcessOverridesPreservesStandardLegacyVLM(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
+
+	kb := &types.KnowledgeBase{VLMConfig: types.VLMConfig{Enabled: true, ModelID: "builtin-openrouter-vlm"}}
+	overrides := &types.KnowledgeProcessOverrides{VLMConfig: &types.VLMConfig{
+		ModelName: "llava",
+		BaseURL:   "http://localhost:11434/v1",
+		APIKey:    "local-model",
+	}}
+	err := ValidateProcessOverrides(context.Background(), kb, overrides, []string{"png"})
+	require.NoError(t, err)
+}
+
+func TestRequiresPlatformVLMUsesResolvedBuildEdition(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "invalid")
+	SetProductEdition("lite")
+	t.Cleanup(func() { SetProductEdition("standard") })
+
+	require.True(t, requiresPlatformVLM())
+}
+
 func TestValidateProcessOverrides_AudioRequiresASR(t *testing.T) {
 	t.Parallel()
 

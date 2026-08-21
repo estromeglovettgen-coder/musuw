@@ -108,6 +108,7 @@ type Tenant struct {
 	PaddleCustomerID          string       `yaml:"paddle_customer_id" json:"-" gorm:"type:varchar(64);default:''"`
 	PaddleSubscriptionID      string       `yaml:"paddle_subscription_id" json:"-" gorm:"type:varchar(64);default:''"`
 	PaddleBillingPeriod       string       `yaml:"paddle_billing_period" json:"-" gorm:"type:varchar(16);default:''"`
+	PaddleCurrentPeriodEnd    *time.Time   `yaml:"paddle_current_period_end" json:"-"`
 	OpenRouterCreditPeriodEnd *time.Time   `yaml:"open_router_credit_period_end" json:"-"`
 	PaddleLastEventID         string       `yaml:"paddle_last_event_id" json:"-" gorm:"type:varchar(64);default:''"`
 	PaddleLastEventAt         *time.Time   `yaml:"paddle_last_event_at" json:"-"`

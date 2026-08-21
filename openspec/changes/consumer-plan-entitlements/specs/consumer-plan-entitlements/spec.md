@@ -45,8 +45,12 @@ The system SHALL expose and accept only platform-built-in OpenRouter models from
 - **WHEN** a consumer calls a model mutation, provider, debug, or credential endpoint or submits a non-platform model ID
 - **THEN** the endpoint is unavailable or the model is rejected without calling the provider
 
+#### Scenario: Legacy inline VLM override
+- **WHEN** a consumer upload or stored process override contains an inline VLM base URL, model name, or API key instead of a platform model ID
+- **THEN** processing is rejected before any provider request and no user-supplied credential is used
+
 ### Requirement: OpenRouter usage is attributed and capped
-Each tenant SHALL use one OpenRouter-managed child key with no provider calendar reset. Free SHALL use a monthly period anchored to tenant registration. A monthly paid plan SHALL receive its next allowance only after a successfully paid Paddle recurring period. An annual paid plan SHALL receive one allowance per monthly subperiod of the already-paid annual term. The key SHALL be lazily created through OpenRouter's official SDK, encrypted in the existing tenant credential field, never returned to a consumer, and used for chat, embedding, rerank, vision, and speech calls. Every supported OpenRouter JSON request SHALL also include a stable, non-PII internal user identifier. Musuw SHALL NOT fall back to a shared inference key or a user-supplied key, SHALL NOT keep a second usage counter, and SHALL use OpenRouter's lifetime usage, absolute limit, and remaining value as the usage and enforcement authority.
+Each tenant SHALL use one OpenRouter-managed child key with no provider calendar reset. Free SHALL use a monthly period anchored to tenant registration. A monthly paid plan SHALL receive its next allowance only after a successfully paid Paddle recurring period. An annual paid plan SHALL receive one allowance per monthly subperiod of the already-paid annual term and SHALL NOT use or refresh allowance after Paddle's last confirmed entitled-period end until a successful recurring transaction advances it. Renewal-time `subscription.updated` and `past_due` lifecycle events SHALL NOT advance the paid-term boundary from their unpaid `current_billing_period`; initial subscription creation/activation MAY seed it. The key SHALL be lazily created through OpenRouter's official SDK, encrypted in the existing tenant credential field, never returned to a consumer, and used for chat, embedding, rerank, vision, and speech calls. Every supported OpenRouter JSON request SHALL also include a stable, non-PII internal user identifier. Musuw SHALL NOT fall back to a shared inference key or a user-supplied key, SHALL NOT keep a second usage counter, and SHALL use OpenRouter's lifetime usage, absolute limit, and remaining value as the usage and enforcement authority.
 
 #### Scenario: First provider request
 - **WHEN** an eligible tenant without a child key starts its first OpenRouter-backed inference and management credentials are configured
@@ -72,13 +76,29 @@ Each tenant SHALL use one OpenRouter-managed child key with no provider calendar
 - **WHEN** a Free or annual-paid tenant returns after more than one credit boundary
 - **THEN** only one current allowance is granted and the stored boundary advances to the next future boundary without stacking missed allowances
 
+#### Scenario: Annual paid term expires during payment recovery
+- **WHEN** an annual subscription is `past_due` or otherwise lacks a successful renewal and Paddle's verified current billing-period end has elapsed
+- **THEN** model access is blocked, no unused credit carries beyond the paid term, and no monthly allowance is added until a matching successful recurring transaction advances the paid-term end
+
+#### Scenario: Paused annual subscription resumes inside the paid term
+- **WHEN** Paddle pauses an annual subscription and later resumes its existing billing period
+- **THEN** access is disabled while paused, the verified paid-term and credit boundaries plus provider limit are retained, and resumed access restores only the prior remaining allowance until that unchanged boundary
+
+#### Scenario: Paid cadence is unknown
+- **WHEN** a paid tenant lacks a verified monthly or annual billing cadence
+- **THEN** model access fails closed even if an older credit boundary or child key is present
+
 #### Scenario: Monthly renewal is not yet confirmed
 - **WHEN** a monthly-paid credit boundary expires before a matching successful Paddle recurring transaction is verified
 - **THEN** model access is blocked and no old unused credit carries into the unpaid period
 
-#### Scenario: Paid subscription renews successfully
-- **WHEN** a signed Paddle `transaction.completed` has origin `subscription_recurring`, a newer billing period, and the same tenant-bound customer, subscription, and server-owned price
-- **THEN** the existing child key's no-reset absolute limit becomes its lifetime usage plus exactly one current-plan allowance and the period end is stored once
+#### Scenario: Monthly paid subscription renews successfully
+- **WHEN** a signed Paddle `transaction.completed` has origin `subscription_recurring`, a newer monthly billing period, and the same tenant-bound customer, subscription, and server-owned price
+- **THEN** the existing child key's no-reset absolute limit becomes its lifetime usage plus exactly one current-plan allowance and the credit-period end is stored once
+
+#### Scenario: Annual paid subscription renews successfully
+- **WHEN** the matching signed recurring completion carries a newer annual billing-period end
+- **THEN** the paid-term boundary advances once and the next model access lazily grants one allowance only when its personal monthly subperiod is due
 
 #### Scenario: Paid renewal is duplicated or unpaid
 - **WHEN** the same billing period is delivered again, or a transaction is non-recurring, incomplete, mismatched, or unsigned

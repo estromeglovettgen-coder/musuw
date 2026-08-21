@@ -526,24 +526,13 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 	}
 	var applied bool
 	if isRecurringCompletion {
-		// A yearly term is already paid and its monthly allowance advances lazily
-		// through the normal entitlement/model path. Only a monthly renewal needs
-		// this paid-transaction refresh.
-		if billingPeriod != "monthly" {
-			c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
-			return
-		}
 		if event.Data.BillingPeriod == nil || event.Data.BillingPeriod.EndsAt.IsZero() {
 			_ = c.Error(apperrors.NewBadRequestError("Paddle recurring transaction has no billing period"))
 			return
 		}
 		applied, err = h.service.RefreshPaidAllowance(c.Request.Context(), tenantID, plan, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID, event.Data.BillingPeriod.EndsAt)
 	} else {
-		var periodEnd *time.Time
-		if event.Data.CurrentBillingPeriod != nil && !event.Data.CurrentBillingPeriod.EndsAt.IsZero() {
-			value := event.Data.CurrentBillingPeriod.EndsAt.UTC()
-			periodEnd = &value
-		}
+		periodEnd := entitledPaddlePeriodEnd(event.EventType, status, event.Data.CurrentBillingPeriod)
 		applied, err = h.service.ApplyConsumerPlan(c.Request.Context(), tenantID, plan, status, billingPeriod, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID, periodEnd)
 	}
 	if err != nil {
@@ -553,6 +542,24 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 	logger.Infof(c.Request.Context(), "Paddle billing event processed event_id=%s event_type=%s tenant_id=%d plan=%s status=%s billing_period=%s applied=%t",
 		event.EventID, event.EventType, tenantID, plan, status, billingPeriod, applied)
 	c.JSON(http.StatusOK, gin.H{"ok": true, "applied": applied})
+}
+
+// Paddle sends subscription.updated at the start of renewal, before payment is
+// collected, and past_due already points at that unpaid period. Only initial
+// creation/activation (or an intentional trial) may seed the boundary here;
+// successful recurring transactions advance renewals separately above.
+func entitledPaddlePeriodEnd(eventType, status string, period *paddleBillingPeriod) *time.Time {
+	if period == nil || period.EndsAt.IsZero() {
+		return nil
+	}
+	if eventType != "subscription.created" && eventType != "subscription.activated" && eventType != "subscription.trialing" {
+		return nil
+	}
+	if status != "active" && status != "trialing" {
+		return nil
+	}
+	value := period.EndsAt.UTC()
+	return &value
 }
 
 func isEntitlementPaddleEvent(eventType string) bool {
@@ -580,14 +587,18 @@ func (c PaddleConfig) planForEvent(event paddleEvent) (types.ConsumerPlan, strin
 		return "", "", "", "", apperrors.NewBadRequestError("Paddle event contains no known price")
 	}
 	status := event.Data.Status
-	if event.EventType == "subscription.canceled" || event.EventType == "subscription.paused" {
+	if event.EventType == "subscription.canceled" {
 		if status == "" {
 			status = strings.TrimPrefix(event.EventType, "subscription.")
 		}
 		return types.ConsumerPlanFree, status, matchedPrice, matchedPeriod, nil
 	}
 	if status == "" {
-		status = "active"
+		if event.EventType == "subscription.paused" {
+			status = "paused"
+		} else {
+			status = "active"
+		}
 	}
 	return matchedPlan, status, matchedPrice, matchedPeriod, nil
 }

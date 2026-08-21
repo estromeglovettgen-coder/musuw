@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,14 @@ import (
 )
 
 const xlsxFirstRowAsHeaderOverride = "xlsx_first_row_as_header"
+
+var configuredProductEdition = "standard"
+
+// SetProductEdition shares the router's resolved build-time/runtime edition
+// with background processing services. It is called once during router init.
+func SetProductEdition(edition string) {
+	configuredProductEdition = strings.ToLower(strings.TrimSpace(edition))
+}
 
 func applyParserRuleOverrides(
 	overrides map[string]string,
@@ -103,11 +112,11 @@ func validateDefaultFileImportRequirements(
 	fileType string,
 ) error {
 	fileType = normalizeFileExtension(fileType)
-	if IsImageType(fileType) && !eff.VLMConfig.IsEnabled() {
+	if IsImageType(fileType) && !hasUsableVLM(eff.VLMConfig) {
 		logger.Error(ctx, "VLM model is not configured")
 		return werrors.NewBadRequestError("上传图片文件需要设置VLM模型")
 	}
-	if IsVideoType(fileType) && !eff.VLMConfig.IsEnabled() {
+	if IsVideoType(fileType) && !hasUsableVLM(eff.VLMConfig) {
 		logger.Error(ctx, "VLM model is not configured for video")
 		return werrors.NewBadRequestError("上传视频文件需要设置VLM模型")
 	}
@@ -179,11 +188,11 @@ func ValidateProcessOverrides(
 	eff := ResolveProcessConfig(kb, overrides)
 
 	if hasImage {
-		if !eff.VLMConfig.IsEnabled() {
+		if !hasUsableVLM(eff.VLMConfig) {
 			return werrors.NewBadRequestError("上传图片文件需要设置VLM模型")
 		}
 	}
-	if hasVideo && !eff.VLMConfig.IsEnabled() {
+	if hasVideo && !hasUsableVLM(eff.VLMConfig) {
 		return werrors.NewBadRequestError("上传视频文件需要设置VLM模型")
 	}
 
@@ -196,6 +205,27 @@ func ValidateProcessOverrides(
 	}
 
 	return nil
+}
+
+func hasPlatformVLM(config types.VLMConfig) bool {
+	return config.Enabled && strings.TrimSpace(config.ModelID) != ""
+}
+
+func requiresPlatformVLM() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MUSUW_PRODUCT_EDITION"))) {
+	case "lite":
+		return true
+	case "standard":
+		return false
+	}
+	return configuredProductEdition == "lite"
+}
+
+func hasUsableVLM(config types.VLMConfig) bool {
+	if requiresPlatformVLM() {
+		return hasPlatformVLM(config)
+	}
+	return config.IsEnabled()
 }
 
 // ApplyKnowledgeProcessOverrides validates optional overrides, persists them on the

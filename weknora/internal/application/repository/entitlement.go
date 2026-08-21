@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
@@ -61,7 +62,7 @@ func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Con
 	return inserted, err
 }
 
-func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd *time.Time) (bool, error) {
+func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time) (bool, error) {
 	applied := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
@@ -87,6 +88,13 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 			"paddle_subscription_id":        subscriptionID,
 			"paddle_billing_period":         billingPeriod,
 			"open_router_credit_period_end": creditPeriodEnd,
+		}
+		if effectivePlan == types.ConsumerPlanFree && status != "paused" {
+			updates["paddle_current_period_end"] = nil
+		} else if paddlePeriodEnd != nil && !paddlePeriodEnd.IsZero() &&
+			(tenant.PaddleCurrentPeriodEnd == nil || paddlePeriodEnd.After(tenant.PaddleCurrentPeriodEnd.UTC())) {
+			value := paddlePeriodEnd.UTC()
+			updates["paddle_current_period_end"] = &value
 		}
 		if eventID != "" {
 			updates["paddle_last_event_id"] = eventID
@@ -115,6 +123,36 @@ func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Contex
 			return nil
 		}
 		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Update("open_router_credit_period_end", periodEnd).Error; err != nil {
+			return err
+		}
+		applied = true
+		return nil
+	})
+	return applied, err
+}
+
+// AdvancePaddleCurrentPeriod records only a newer provider-confirmed service
+// period. The timestamp itself is the idempotency key; no local billing ledger
+// is needed.
+func (r *entitlementRepository) AdvancePaddleCurrentPeriod(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, customerID, subscriptionID, billingPeriod string, periodEnd time.Time) (bool, error) {
+	applied := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant types.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+			return err
+		}
+		plan = types.NormalizeConsumerPlan(plan)
+		if plan == types.ConsumerPlanFree || types.EffectiveConsumerPlan(&tenant) != plan ||
+			tenant.PaddleBillingPeriod != billingPeriod || billingPeriod != "yearly" ||
+			strings.TrimSpace(tenant.PaddleCustomerID) != strings.TrimSpace(customerID) ||
+			strings.TrimSpace(tenant.PaddleSubscriptionID) != strings.TrimSpace(subscriptionID) {
+			return nil
+		}
+		periodEnd = periodEnd.UTC()
+		if tenant.PaddleCurrentPeriodEnd != nil && !periodEnd.After(tenant.PaddleCurrentPeriodEnd.UTC()) {
+			return nil
+		}
+		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Update("paddle_current_period_end", periodEnd).Error; err != nil {
 			return err
 		}
 		applied = true

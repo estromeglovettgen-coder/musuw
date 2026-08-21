@@ -511,9 +511,9 @@ func (s *ImageMultimodalService) indexChunks(ctx context.Context, payload types.
 	logger.Infof(ctx, "[ImageMultimodal] Indexed %d multimodal chunks for image %s", len(chunks), payload.ImageURL)
 }
 
-// resolveVLM creates a vlm.VLM instance for the given knowledge base,
-// supporting both new-style (ModelID) and legacy (inline BaseURL) configs.
-// Per-upload process_overrides on the knowledge entry take precedence over KB defaults.
+// resolveVLM creates the configured VLM for the given knowledge base.
+// Musuw Lite requires a tenant-metered platform model; Standard preserves the
+// upstream legacy provider configuration contract.
 func (s *ImageMultimodalService) resolveVLM(ctx context.Context, kbID, knowledgeID string) (vlm.VLM, types.VLMConfig, error) {
 	kb, err := s.kbService.GetKnowledgeBaseByIDOnly(ctx, kbID)
 	if err != nil {
@@ -534,14 +534,14 @@ func (s *ImageMultimodalService) resolveVLM(ctx context.Context, kbID, knowledge
 		return nil, types.VLMConfig{}, fmt.Errorf("VLM is not enabled for knowledge base %s", kbID)
 	}
 
-	// New-style: resolve model through ModelService
-	if vlmCfg.ModelID != "" {
-		model, err := s.modelService.GetVLMModel(ctx, vlmCfg.ModelID)
-		return model, vlmCfg, err
+	if requiresPlatformVLM() && !hasPlatformVLM(vlmCfg) {
+		return nil, types.VLMConfig{}, fmt.Errorf("inline VLM provider configuration is not supported; select a platform model")
 	}
-
-	// Legacy: create VLM from inline config
-	model, err := vlm.NewVLMFromLegacyConfig(vlmCfg, s.ollamaService)
+	if strings.TrimSpace(vlmCfg.ModelID) == "" {
+		model, legacyErr := vlm.NewVLMFromLegacyConfig(vlmCfg, s.ollamaService)
+		return model, vlmCfg, legacyErr
+	}
+	model, err := s.modelService.GetVLMModel(ctx, vlmCfg.ModelID)
 	return model, vlmCfg, err
 }
 
