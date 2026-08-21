@@ -140,15 +140,15 @@ export const benefits = [
 export const priceBooks = Object.freeze({
   USD: Object.freeze([
     Object.freeze({ monthly: 0, yearlyTotal: 0 }),
-    Object.freeze({ monthly: 5, yearlyTotal: 39 }),
-    Object.freeze({ monthly: 10, yearlyTotal: 79 }),
-    Object.freeze({ monthly: 20, yearlyTotal: 179 })
+    Object.freeze({ monthly: 5, yearlyTotal: 49 }),
+    Object.freeze({ monthly: 10, yearlyTotal: 99 }),
+    Object.freeze({ monthly: 20, yearlyTotal: 199 })
   ]),
   CNY: Object.freeze([
     Object.freeze({ monthly: 0, yearlyTotal: 0 }),
-    Object.freeze({ monthly: 29, yearlyTotal: 239 }),
-    Object.freeze({ monthly: 59, yearlyTotal: 499 }),
-    Object.freeze({ monthly: 129, yearlyTotal: 1199 })
+    Object.freeze({ monthly: 29, yearlyTotal: 289 }),
+    Object.freeze({ monthly: 59, yearlyTotal: 589 }),
+    Object.freeze({ monthly: 129, yearlyTotal: 1289 })
   ])
 });
 

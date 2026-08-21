@@ -106,15 +106,15 @@ test("consumer pricing matches the enforced storage and relative AI allowances",
 test("regional price books expose exact monthly and annual totals for all four plans", () => {
   assert.deepEqual(priceBooks.USD, [
     { monthly: 0, yearlyTotal: 0 },
-    { monthly: 5, yearlyTotal: 39 },
-    { monthly: 10, yearlyTotal: 79 },
-    { monthly: 20, yearlyTotal: 179 },
+    { monthly: 5, yearlyTotal: 49 },
+    { monthly: 10, yearlyTotal: 99 },
+    { monthly: 20, yearlyTotal: 199 },
   ]);
   assert.deepEqual(priceBooks.CNY, [
     { monthly: 0, yearlyTotal: 0 },
-    { monthly: 29, yearlyTotal: 239 },
-    { monthly: 59, yearlyTotal: 499 },
-    { monthly: 129, yearlyTotal: 1199 },
+    { monthly: 29, yearlyTotal: 289 },
+    { monthly: 59, yearlyTotal: 589 },
+    { monthly: 129, yearlyTotal: 1289 },
   ]);
   assert.equal(plans[0].key, "free");
   assert.equal(plans[3].key, "max");
