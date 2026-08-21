@@ -136,14 +136,22 @@ const formatMinorCurrency = (amount: number | string, currencyCode: string) => {
   }
 }
 
+const formatCheckoutCurrency = (amount: number, currencyCode: string) => {
+  try {
+    return new Intl.NumberFormat(locale.value, { style: 'currency', currency: currencyCode }).format(amount)
+  } catch {
+    return `${amount} ${currencyCode}`
+  }
+}
+
 const displaySubtotal = computed(() => {
-  if (totals.value) return formatMinorCurrency(totals.value.subtotal, totals.value.currency)
+  if (totals.value) return formatCheckoutCurrency(totals.value.subtotal, totals.value.currency)
   if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.amount, upgradePreview.value.currency_code)
   return previewPrice.value || '…'
 })
-const displayTax = computed(() => totals.value ? formatMinorCurrency(totals.value.tax, totals.value.currency) : t('entitlement.calculatedAtCheckout'))
+const displayTax = computed(() => totals.value ? formatCheckoutCurrency(totals.value.tax, totals.value.currency) : t('entitlement.calculatedAtCheckout'))
 const displayTotal = computed(() => {
-  if (totals.value) return formatMinorCurrency(totals.value.total, totals.value.currency)
+  if (totals.value) return formatCheckoutCurrency(totals.value.total, totals.value.currency)
   if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.amount, upgradePreview.value.currency_code)
   return previewPrice.value || '…'
 })
@@ -213,7 +221,7 @@ const mountCheckout = async () => {
       clientToken: config.client_token,
       priceIds: [option.price_id],
     })
-    previewPrice.value = preview?.formattedUnitTotal || ''
+    previewPrice.value = preview?.formattedUnitSubtotal || ''
   } catch {
     // Paddle checkout itself remains authoritative and can still load.
   }

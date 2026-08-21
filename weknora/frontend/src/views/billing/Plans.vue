@@ -141,7 +141,7 @@ const loadPrices = async () => {
       priceIds: options.map((option) => option.price_id),
     })
     const next = { ...localizedPrices.value }
-    for (const preview of previews) next[preview.priceId] = preview.formattedUnitTotal
+    for (const preview of previews) next[preview.priceId] = preview.formattedUnitSubtotal
     localizedPrices.value = next
   } catch {
     // The server allow-list still controls checkout if a localized read fails.

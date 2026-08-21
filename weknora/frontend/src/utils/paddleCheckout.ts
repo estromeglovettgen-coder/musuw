@@ -33,7 +33,7 @@ export interface OpenPaddleInlineCheckoutInput extends OpenPaddleCheckoutInput {
 
 export interface PaddleLocalizedPrice {
   priceId: string
-  formattedUnitTotal: string
+  formattedUnitSubtotal: string
   currencyCode: string
 }
 
@@ -77,7 +77,7 @@ export async function previewPaddlePrices(input: PreviewPaddlePricesInput): Prom
   })
   return preview.data.details.lineItems.map((item) => ({
     priceId: item.price.id,
-    formattedUnitTotal: item.formattedUnitTotals.total,
+    formattedUnitSubtotal: item.formattedUnitTotals.subtotal,
     currencyCode: preview.data.currencyCode,
   }))
 }
