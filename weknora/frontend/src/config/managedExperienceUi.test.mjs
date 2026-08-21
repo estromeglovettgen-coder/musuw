@@ -64,17 +64,17 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
     assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
   }
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/);
-  assert.match(router, /\(section && section !== 'general' && section !== 'usage'\) \|\| tab/);
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'userprofile'/);
 
   // Standard routes remain in the bundle/source for quick restoration.
   assert.match(router, /AgentList\.vue/);
   assert.match(router, /OrganizationList\.vue/);
 });
 
-test("Lite Settings exposes General and Usage while General exposes Language only", () => {
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage'\) return 'general'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage'/);
+test("Lite Settings exposes General, Usage, and User Profile while General exposes Language only", () => {
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'userprofile'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile'\) return 'general'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile'/);
   assert.match(settingsView, /<UsageBillingSettings v-else-if="currentSection === 'usage'"/);
 
   assert.match(generalSettings, /language\.language/);
@@ -95,7 +95,7 @@ test("Settings has one active mount on the dedicated route", () => {
 });
 
 test("Lite UserMenu keeps account exit but does not rediscover management surfaces", () => {
-  assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account"/);
+  assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account(?: [^"]*)?"/);
   assert.match(userMenu, /<button v-if="!authStore\.isLiteMode" type="button" class="visual-user-menu__guide"/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/);

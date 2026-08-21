@@ -36,7 +36,7 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
     "path === '/checkout'",
   ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
-  assert.match(router, /section && section !== 'general' && section !== 'usage'/)
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'userprofile'/)
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
@@ -58,7 +58,7 @@ test('sidebar keeps Standard definitions but Lite exposes only New Chat and Know
 test('Lite UserMenu cannot reopen management surfaces and keeps valid interactive DOM', () => {
   const userMenu = read('../components/UserMenu.vue')
 
-  assert.ok(userMenu.includes('class="visual-user-menu__account"'))
+  assert.match(userMenu, /class="visual-user-menu__account(?: [^"]*)?"/)
   assert.equal(
     /<button[^>]*class="visual-user-menu__account"[\s\S]{0,700}<button/.test(userMenu),
     false,
@@ -88,9 +88,9 @@ test('Lite Settings exposes General and Usage; Standard settings remain recovera
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage'\) return 'general'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'/)
+  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile'\) return 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'userprofile'/)
   assert.ok(settings.includes('UsageBillingSettings'))
 
   assert.ok(general.includes('id="visual-language-select"'))
