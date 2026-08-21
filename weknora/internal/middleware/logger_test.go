@@ -77,3 +77,12 @@ func TestSanitizeQuery(t *testing.T) {
 		t.Fatalf("sanitizeQuery() = %q, want %q", got, want)
 	}
 }
+
+func TestShouldLogBodies(t *testing.T) {
+	if shouldLogBodies("/api/v1/auth/oidc/callback") {
+		t.Fatal("authentication request and response bodies must not be logged")
+	}
+	if !shouldLogBodies("/api/v1/knowledge-bases") {
+		t.Fatal("ordinary API bodies should remain observable")
+	}
+}

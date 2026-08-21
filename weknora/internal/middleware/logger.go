@@ -80,6 +80,13 @@ func sanitizeQuery(raw string) string {
 	return values.Encode()
 }
 
+// Authentication responses can contain encoded login results that field-level
+// JSON redaction cannot safely inspect. Keep request metadata, but never persist
+// auth request or response bodies.
+func shouldLogBodies(path string) bool {
+	return path != "/api/v1/auth" && !strings.HasPrefix(path, "/api/v1/auth/")
+}
+
 // readRequestBody 读取请求体（限制大小用于日志，但完整读取用于重置）
 func readRequestBody(c *gin.Context) string {
 	if c.Request.Body == nil {
@@ -166,7 +173,7 @@ func Logger() gin.HandlerFunc {
 
 		// 读取请求体（在Next之前读取，因为Next会消费body）
 		var requestBody string
-		if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH" {
+		if shouldLogBodies(path) && (c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH") {
 			requestBody = readRequestBody(c)
 		}
 
@@ -205,7 +212,7 @@ func Logger() gin.HandlerFunc {
 
 		// 读取响应体
 		responseBodyStr := ""
-		if responseBody.Len() > 0 {
+		if shouldLogBodies(path) && responseBody.Len() > 0 {
 			contentType := c.Writer.Header().Get("Content-Type")
 			if strings.Contains(contentType, "text/event-stream") {
 				responseBodyStr = "[SSE流式响应，已跳过]"
