@@ -2281,6 +2281,8 @@ export default {
     upgradePaymentMethod: '使用当前订阅的付款方式，由 Paddle 安全处理',
     checkoutSuccessTitle: '套餐正在生效',
     checkoutSuccessDescription: '付款已确认。套餐和额度会在服务端同步完成后自动更新。',
+    checkoutActivatedTitle: '套餐已生效',
+    checkoutActivatedDescription: '套餐、额度和可用模型已经更新。',
     returnToProduct: '返回 Musuw',
     refundPolicy: '退款政策',
     planSuffix: '套餐',

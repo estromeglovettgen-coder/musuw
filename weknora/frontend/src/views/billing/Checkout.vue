@@ -15,10 +15,10 @@
 
       <div v-if="loading" class="checkout-page__loading">{{ $t('common.loading') }}</div>
 
-      <section v-else-if="completed" class="checkout-page__success">
-        <span class="checkout-page__success-icon"><t-icon name="check" /></span>
-        <h2>{{ $t('entitlement.checkoutSuccessTitle') }}</h2>
-        <p>{{ $t('entitlement.checkoutSuccessDescription') }}</p>
+      <section v-else-if="completed || syncing" class="checkout-page__success">
+        <span class="checkout-page__success-icon"><t-icon :name="completed ? 'check' : 'time'" /></span>
+        <h2>{{ $t(completed ? 'entitlement.checkoutActivatedTitle' : 'entitlement.checkoutSuccessTitle') }}</h2>
+        <p>{{ $t(completed ? 'entitlement.checkoutActivatedDescription' : 'entitlement.checkoutSuccessDescription') }}</p>
         <button type="button" @click="leaveCheckout">{{ $t('entitlement.returnToProduct') }}</button>
       </section>
 
@@ -77,6 +77,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { CheckoutEventNames, type PaddleEventData } from '@paddle/paddle-js'
 import { useAuthStore } from '@/stores/auth'
+import { useChatResourcesStore } from '@/stores/chatResources'
 import {
   getCurrentEntitlement,
   previewPaddleSubscriptionUpgrade,
@@ -103,9 +104,11 @@ interface CheckoutTotals {
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const chatResources = useChatResourcesStore()
 const { locale, t } = useI18n()
 const loading = ref(true)
 const completed = ref(false)
+const syncing = ref(false)
 const errorMessage = ref('')
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
@@ -172,10 +175,28 @@ const handlePaddleEvent = (event: PaddleEventData) => {
   }
 }
 
-const refreshAfterPayment = () => {
-  completed.value = true
-  window.setTimeout(() => { void getCurrentEntitlement() }, 1200)
-  window.setTimeout(() => { void getCurrentEntitlement() }, 3500)
+let syncRun = 0
+const refreshAfterPayment = async () => {
+  if (syncing.value || completed.value) return
+  const run = ++syncRun
+  syncing.value = true
+  for (const delay of [700, 1200, 1800, 2500, 3500]) {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
+    if (run !== syncRun) return
+    try {
+      const response = await getCurrentEntitlement()
+      if (response.data.plan === targetPlan.value) {
+        entitlement.value = response.data
+        billing.value = response.billing
+        chatResources.invalidate('models')
+        syncing.value = false
+        completed.value = true
+        return
+      }
+    } catch {
+      // The signed Paddle webhook remains authoritative; retry briefly.
+    }
+  }
 }
 
 const mountCheckout = async () => {
@@ -242,7 +263,7 @@ const confirmUpgrade = async () => {
   upgradeSubmitting.value = true
   try {
     await upgradePaddleSubscription(plan)
-    refreshAfterPayment()
+    void refreshAfterPayment()
   } catch {
     errorMessage.value = t('entitlement.upgradeFailed')
   } finally {
@@ -251,10 +272,16 @@ const confirmUpgrade = async () => {
 }
 
 const backToPlans = () => { void router.push({ path: '/plans', query: { plan: targetPlan.value || undefined, period: period.value } }) }
-const leaveCheckout = () => { void router.push('/platform/knowledge-bases') }
+const leaveCheckout = () => {
+  chatResources.invalidate('models')
+  void router.push('/platform/knowledge-bases')
+}
 
 onMounted(() => { void initializeCheckout() })
-onUnmounted(() => { void closePaddleCheckout() })
+onUnmounted(() => {
+  syncRun++
+  void closePaddleCheckout()
+})
 </script>
 
 <style scoped lang="less">

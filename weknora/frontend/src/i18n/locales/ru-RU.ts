@@ -2281,6 +2281,8 @@ export default {
     upgradePaymentMethod: 'Использовать текущий способ оплаты подписки, безопасно обработанный Paddle',
     checkoutSuccessTitle: 'План активируется',
     checkoutSuccessDescription: 'Платёж подтверждён. План и лимит обновятся после синхронизации на сервере.',
+    checkoutActivatedTitle: 'План активирован',
+    checkoutActivatedDescription: 'План, лимит и доступные модели обновлены.',
     returnToProduct: 'Вернуться в Musuw',
     refundPolicy: 'Политика возврата',
     planSuffix: 'план',

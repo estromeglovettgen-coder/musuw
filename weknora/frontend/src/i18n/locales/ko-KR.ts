@@ -2281,6 +2281,8 @@ export default {
     upgradePaymentMethod: '현재 구독 결제 수단을 사용하며 Paddle이 안전하게 처리합니다',
     checkoutSuccessTitle: '요금제를 활성화하고 있습니다',
     checkoutSuccessDescription: '결제가 확인되었습니다. 서버 동기화 후 요금제와 한도가 업데이트됩니다.',
+    checkoutActivatedTitle: '요금제가 활성화되었습니다',
+    checkoutActivatedDescription: '요금제, 한도 및 사용 가능한 모델이 업데이트되었습니다.',
     returnToProduct: 'Musuw로 돌아가기',
     refundPolicy: '환불 정책',
     planSuffix: '요금제',

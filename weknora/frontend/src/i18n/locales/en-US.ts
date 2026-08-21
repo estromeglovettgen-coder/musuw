@@ -3793,6 +3793,8 @@ export default {
     upgradePaymentMethod: 'Use the current subscription payment method, securely handled by Paddle',
     checkoutSuccessTitle: 'Your plan is being activated',
     checkoutSuccessDescription: 'Payment is confirmed. Your plan and allowance update after server synchronization.',
+    checkoutActivatedTitle: 'Your plan is active',
+    checkoutActivatedDescription: 'Your plan, allowance, and available models are now updated.',
     returnToProduct: 'Return to Musuw',
     refundPolicy: 'Refund policy',
     planSuffix: 'plan',
