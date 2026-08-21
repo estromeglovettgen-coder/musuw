@@ -10,6 +10,7 @@ Verified locally through 2026-08-21 (America/Phoenix) against the combined local
 - OpenRouter's official Go SDK owns child-key creation, monthly limit updates, usage lookup, and deletion. The inference transport installs the tenant key and stable non-PII `user`; there is no shared inference key, BYOK path, local spend ledger, or file-byte price estimate.
 - First-use persistence uses the existing tenant row lock and encrypted credentials JSONB. Provider-side race losers are deleted. Plan and tenant lifecycle operations fail closed rather than orphaning keys or diverging silently.
 - HTTP 402 and terminal OpenRouter SSE credit errors are non-retryable; ingestion reuses WeKnora's failed/reparse and trace-finalization paths.
+- Paid credit boundaries fail closed when a legacy row has no recorded billing period; only an explicit yearly period may advance lazily, so missing migration data cannot grant an unpaid month.
 
 ## Fresh evidence
 
@@ -23,6 +24,8 @@ Verified locally through 2026-08-21 (America/Phoenix) against the combined local
 - After explicit action-time confirmation, Chrome opened the Plus monthly Paddle Sandbox checkout through the real `/plans` action. The `/checkout?plan=plus&period=monthly` page rendered one visible official Paddle inline frame, the Musuw Plus summary and five benefits, and an enabled subscription control without any outer or frame error; Musuw rendered no custom card input.
 - Paddle independently selected Chinese UI with US as the current buyer country and exposed card and PayPal, but not Alipay. This confirms that browser locale and billing country remain separate and that payment-method selection is Paddle-owned. No country, payment, or personal field was changed; no payment detail was entered or saved, and the subscription control was not clicked.
 - Leaving Checkout and returning to the real usage settings kept the account on Free, showed the upgrade action, granted no paid plan, and rendered no embedded plan cards.
+- After switching the test browser to a US IP, the standalone plan page reloaded Paddle's native localized preview as `$5.00`, `$10.00`, and `$20.00` monthly and `$49.00`, `$99.00`, and `$199.00` yearly. The plan comparison did not itemize tax; Paddle remained authoritative for final checkout tax and payment methods.
+- The post-migration regression suite reproduced and fixed the unknown-paid-period case: an expired paid allowance with no `paddle_billing_period` now returns the renewal-pending error and never updates the OpenRouter key limit. The focused test and the complete service/repository/handler suites passed after the fix.
 
 ## Deferred release boundary
 
