@@ -1,6 +1,6 @@
 # Verification Report: consumer-plan-entitlements
 
-Verified locally through 2026-08-20 (America/Phoenix) against the combined local integration branch. CI, push, and deployment were intentionally deferred at the user's request because the GitHub Actions allowance is exhausted.
+Verified locally through 2026-08-21 (America/Phoenix) against the combined local integration branch. CI, push, and deployment were intentionally deferred at the user's request because the GitHub Actions allowance is exhausted.
 
 ## Result
 
@@ -20,10 +20,9 @@ Verified locally through 2026-08-20 (America/Phoenix) against the combined local
 - With the management key intentionally absent, a real chat request selected the approved Qwen model, attempted no shared-key fallback, logged `management_key_not_configured`, emitted a terminal error, and closed the stream cleanly.
 - Database inspection found every active knowledge base bound to stable built-in OpenRouter capability IDs, no consumer-visible credential rows, valid default storage backends, and no retained temporary knowledge base.
 - Fresh Chrome acceptance showed the Free account's registration-anniversary reset date and remaining-credit percentage, compact profile/usage settings without embedded plan cards, the standalone four-card `/plans` page, and Paddle-localized monthly and yearly prices. The Lite route guard preserves the user-profile deep link; the chat composer contains exactly the model and reasoning-effort rows, no agent selector, and the stored runtime normalizes to the full-capability built-in agent.
-
-## Pending current-code evidence
-
-- Opening the current Paddle Sandbox inline checkout is intentionally pending action-time confirmation because it transmits the test account email and tenant checkout binding to Paddle and may create an unpaid draft. No payment details or transaction confirmation have been attempted. Task 4.6 remains open until that exact browser render is checked.
+- After explicit action-time confirmation, Chrome opened the Plus monthly Paddle Sandbox checkout through the real `/plans` action. The `/checkout?plan=plus&period=monthly` page rendered one visible official Paddle inline frame, the Musuw Plus summary and five benefits, and an enabled subscription control without any outer or frame error; Musuw rendered no custom card input.
+- Paddle independently selected Chinese UI with US as the current buyer country and exposed card and PayPal, but not Alipay. This confirms that browser locale and billing country remain separate and that payment-method selection is Paddle-owned. No country, payment, or personal field was changed; no payment detail was entered or saved, and the subscription control was not clicked.
+- Leaving Checkout and returning to the real usage settings kept the account on Free, showed the upgrade action, granted no paid plan, and rendered no embedded plan cards.
 
 ## Deferred release boundary
 
