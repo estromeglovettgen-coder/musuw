@@ -49,6 +49,7 @@ test("server Edition owns Lite activation and clears stale browser workspace sta
   assert.match(router, /const isLite = edition === 'lite'/);
   assert.match(router, /authStore\.setLiteMode\(isLite\)/);
   assert.match(router, /if \(isLite\) authStore\.setSelectedTenant\(null\)/);
+  assert.match(router, /if \(restored\) \{\s*await ensureProductEdition\(authStore\)/);
   assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
   assert.doesNotMatch(sidebarBusiness, /getSystemInfo/);
 });

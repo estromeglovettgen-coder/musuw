@@ -407,6 +407,7 @@ router.beforeEach(async (to, from, next) => {
     if (!authStore.isLoggedIn) {
       const restored = await hydrateSessionFromToken(authStore)
       if (restored) {
+        await ensureProductEdition(authStore)
         next(
           !authStore.hasValidTenant && to.meta.requiresTenant !== false
             ? '/onboarding/workspace'
