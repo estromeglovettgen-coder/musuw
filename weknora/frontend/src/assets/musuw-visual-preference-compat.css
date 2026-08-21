@@ -152,7 +152,6 @@
 
 /* Typography: preserve semantic status colors by targeting structural copy,
  * not generic descendants or .is-error/.is-danger/.is-published states. */
-:root[theme-mode="dark"] .visual-sidebar__brand strong,
 :root[theme-mode="dark"] .visual-user-menu__identity strong,
 :root[theme-mode="dark"] .visual-user-menu__account strong,
 :root[theme-mode="dark"] .visual-new-chat-title,
