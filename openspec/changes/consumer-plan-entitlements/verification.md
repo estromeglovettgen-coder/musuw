@@ -26,6 +26,7 @@ Verified locally through 2026-08-21 (America/Phoenix) against the combined local
 - Leaving Checkout and returning to the real usage settings kept the account on Free, showed the upgrade action, granted no paid plan, and rendered no embedded plan cards.
 - After switching the test browser to a US IP, the standalone plan page reloaded Paddle's native localized preview as `$5.00`, `$10.00`, and `$20.00` monthly and `$39.00`, `$79.00`, and `$179.00` yearly. The Sandbox annual prices and mainland-China CNY overrides were aligned through Paddle's official catalog API with the public product matrix. The plan comparison did not itemize tax; Paddle remained authoritative for final checkout tax and payment methods.
 - The post-migration regression suite reproduced and fixed the unknown-paid-period case: an expired paid allowance with no `paddle_billing_period` now returns the renewal-pending error and never updates the OpenRouter key limit. The focused test and the complete service/repository/handler suites passed after the fix.
+- A fresh in-app-browser upload exposed that host development had dropped Compose's default `RETRIEVE_DRIVER=postgres`. Restoring that same upstream default produced 2/4 persisted vectors and 24,865/75,582 counted bytes for two real documents; `tenants.storage_used` exactly matched the active-document sum. Rebuilding the original document passed the same assertion, and deleting both test documents returned the tenant, active-document sum, and test-vector count to zero.
 
 ## Deferred release boundary
 

@@ -125,6 +125,7 @@ load_host_environment() {
   # can still be consumed unchanged by the preview/release compose interface.
   export DB_HOST=127.0.0.1
   export DB_PORT="$MUSUW_DEV_DB_PORT"
+  export RETRIEVE_DRIVER="${RETRIEVE_DRIVER:-postgres}"
   export REDIS_ADDR="127.0.0.1:${MUSUW_DEV_REDIS_PORT}"
   export DOCREADER_ADDR="127.0.0.1:${MUSUW_DEV_DOCREADER_PORT}"
   export DOCREADER_TRANSPORT=grpc
