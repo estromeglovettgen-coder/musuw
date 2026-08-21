@@ -9,7 +9,7 @@ let paddlePromise: Promise<Paddle | undefined> | null = null
 let completed: (() => void) | undefined
 let activeEventCallback: ((event: PaddleEventData) => void) | undefined
 
-export interface OpenPaddleCheckoutInput {
+interface PaddleCheckoutInput {
   environment: 'sandbox' | 'live'
   clientToken: string
   priceId: string
@@ -26,7 +26,7 @@ export interface PreviewPaddlePricesInput {
   priceIds: string[]
 }
 
-export interface OpenPaddleInlineCheckoutInput extends OpenPaddleCheckoutInput {
+export interface OpenPaddleInlineCheckoutInput extends PaddleCheckoutInput {
   frameTarget: string
   onEvent?: (event: PaddleEventData) => void
 }
@@ -46,7 +46,7 @@ function toPaddleLocale(value?: string): string | undefined {
   return 'en'
 }
 
-function initialize(input: Pick<OpenPaddleCheckoutInput, 'environment' | 'clientToken'>) {
+function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken'>) {
   if (paddlePromise) return paddlePromise
   const eventCallback = (event: PaddleEventData) => {
     activeEventCallback?.(event)
@@ -80,27 +80,6 @@ export async function previewPaddlePrices(input: PreviewPaddlePricesInput): Prom
     formattedUnitSubtotal: item.formattedUnitTotals.subtotal,
     currencyCode: preview.data.currencyCode,
   }))
-}
-
-export async function openPaddleCheckout(input: OpenPaddleCheckoutInput): Promise<void> {
-  completed = input.onCompleted
-  activeEventCallback = undefined
-  const paddle = await initialize(input)
-  if (!paddle) throw new Error('Paddle.js failed to initialize')
-  paddle.Checkout.open({
-    items: [{ priceId: input.priceId, quantity: 1 }],
-    customData: {
-      tenant_id: input.tenantId,
-      musuw_checkout_binding: input.checkoutBinding,
-    },
-    customer: input.email ? { email: input.email } : undefined,
-    settings: {
-      displayMode: 'overlay',
-      theme: 'light',
-      allowLogout: false,
-      locale: toPaddleLocale(input.locale),
-    },
-  })
 }
 
 export async function openPaddleInlineCheckout(input: OpenPaddleInlineCheckoutInput): Promise<void> {

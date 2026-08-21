@@ -4,7 +4,6 @@ import { listKnowledgeBases, getKnowledgeBaseById } from '@/api/knowledge-base'
 import {
   listAgents,
   getAgentById,
-  BUILTIN_QUICK_ANSWER_ID,
   BUILTIN_SMART_REASONING_ID,
   type CustomAgent,
 } from '@/api/agent'
@@ -44,16 +43,12 @@ function isLiteProductMode(): boolean {
 }
 
 async function loadLiteRuntimeAgents(): Promise<CustomAgent[]> {
-  const ids = [BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID]
-  const results = await Promise.all(ids.map(async (id) => {
-    try {
-      const response: any = await getAgentById(id)
-      return response?.data ?? null
-    } catch {
-      return null
-    }
-  }))
-  return results.filter((agent): agent is CustomAgent => !!agent)
+  try {
+    const response: any = await getAgentById(BUILTIN_SMART_REASONING_ID)
+    return response?.data ? [response.data] : []
+  } catch {
+    return []
+  }
 }
 
 export const useChatResourcesStore = defineStore('chatResources', () => {
@@ -242,7 +237,6 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     if (isLiteProductMode()) {
       await Promise.all([
         ensureKnowledgeBases(force),
-        ensureAgents(force),
         ensureModels(force),
       ])
       return

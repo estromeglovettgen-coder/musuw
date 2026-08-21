@@ -99,7 +99,7 @@ const defaultSettings: Settings = {
     baseUrl: "http://localhost:11434",
     enabled: true
   },
-  webSearchEnabled: true,  // 托管体验默认启用平台网络搜索
+  webSearchEnabled: false,  // 遵循 WeKnora v0.7.2：由用户显式开启网络搜索
   conversationModels: {
     summaryModelId: "",
     rerankModelId: "",

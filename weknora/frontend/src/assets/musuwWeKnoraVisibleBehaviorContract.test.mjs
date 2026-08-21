@@ -125,11 +125,11 @@ test('exposed chat keeps native model/thinking behavior without exposing Agent o
     assert.ok(baseline.includes(token), `allowed chat controller lost native behavior ${token}`)
   }
 
-  // Lite runtime may use the two built-in modes, but must not enumerate the
-  // Agent management catalog or web-search provider management surface.
-  assert.ok(resources.includes('BUILTIN_QUICK_ANSWER_ID'))
+  // Lite runtime loads only the product's full-capability built-in Agent and
+  // never enumerates the Agent management or web-search provider surfaces.
+  assert.equal(resources.includes('BUILTIN_QUICK_ANSWER_ID'), false)
   assert.ok(resources.includes('BUILTIN_SMART_REASONING_ID'))
-  assert.ok(resources.includes('getAgentById(id)'))
+  assert.ok(resources.includes('getAgentById(BUILTIN_SMART_REASONING_ID)'))
   assert.match(resources, /if \(isLiteProductMode\(\)\)[\s\S]*webSearchProviders\.value = \[\]/)
   assert.match(commandPalette, /if \(auth\.isLiteMode\) \{[\s\S]*open\.value = false[\s\S]*return/)
 })

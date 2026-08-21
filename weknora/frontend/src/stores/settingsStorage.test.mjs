@@ -15,15 +15,6 @@ function isStoredSettingsRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function withAuthorityDefaults(defaults) {
-  const cloned = cloneSettings(defaults);
-  cloned.webSearchEnabled = false;
-  cloned.selectedAgentId = BUILTIN_SMART_REASONING_ID;
-  cloned.selectedAgentSourceTenantId = null;
-  cloned.isAgentEnabled = true;
-  return cloned;
-}
-
 function reconcileLoadedSettings(loaded) {
   loaded.selectedTags ||= [];
   loaded.selectedMCPServices ||= [];
@@ -65,13 +56,13 @@ function reconcileLoadedSettings(loaded) {
 
 function resetStoredSettings(defaultSettings) {
   localStorage.removeItem(SETTINGS_STORAGE_KEY);
-  return reconcileLoadedSettings(withAuthorityDefaults(defaultSettings));
+  return reconcileLoadedSettings(cloneSettings(defaultSettings));
 }
 
 function loadAndReconcileSettings(defaultSettings) {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return reconcileLoadedSettings(withAuthorityDefaults(defaultSettings));
+    if (!raw) return reconcileLoadedSettings(cloneSettings(defaultSettings));
     const parsed = JSON.parse(raw);
     if (!isStoredSettingsRecord(parsed)) return resetStoredSettings(defaultSettings);
     return reconcileLoadedSettings(parsed);
@@ -82,15 +73,15 @@ function loadAndReconcileSettings(defaultSettings) {
 
 function makeDefaults() {
   return {
-    isAgentEnabled: false,
-    selectedAgentId: BUILTIN_QUICK_ANSWER_ID,
-    selectedAgentSourceTenantId: undefined,
-    webSearchEnabled: true, // store constant may differ; storage authority overrides fresh defaults
+    isAgentEnabled: true,
+    selectedAgentId: BUILTIN_SMART_REASONING_ID,
+    selectedAgentSourceTenantId: null,
+    webSearchEnabled: false,
     selectedTags: [],
     selectedMCPServices: [],
     selectedSkills: [],
     selectedFileKbMap: {},
-    conversationModels: { thinkingEnabled: true },
+    conversationModels: { thinkingEnabled: true, reasoningEffort: "high" },
     nested: { items: ["a"] },
   };
 }
@@ -135,7 +126,7 @@ test("fresh settings use WeKnora v0.7.2 WebSearch default while keeping Musuw th
   assert.equal(loaded.conversationModels.reasoningEffort, "high");
   assert.equal(loaded.selectedAgentId, BUILTIN_SMART_REASONING_ID);
   assert.equal(loaded.isAgentEnabled, true);
-  assert.equal(JSON.parse(store[SETTINGS_STORAGE_KEY]).selectedAgentId, BUILTIN_SMART_REASONING_ID);
+  assert.equal(store[SETTINGS_STORAGE_KEY], undefined);
 });
 
 test("corrupt/non-object storage resets to authority defaults", () => {
@@ -226,7 +217,7 @@ test("source code locks the consumer Agent while preserving the WebSearch prefer
   assert.match(settingsStorageSource, /loaded\.selectedAgentId\s*=\s*BUILTIN_SMART_REASONING_ID/);
   assert.match(settingsStorageSource, /loaded\.selectedAgentSourceTenantId\s*=\s*null/);
   assert.match(settingsStorageSource, /loaded\.isAgentEnabled\s*=\s*true/);
-  assert.doesNotMatch(settingsStorageSource, /webSearchEnabled\s*=\s*true/);
-  assert.match(settingsStorageSource, /cloned\.webSearchEnabled\s*=\s*false/);
+  assert.doesNotMatch(settingsStorageSource, /webSearchEnabled\s*=/);
+  assert.doesNotMatch(settingsStorageSource, /withAuthorityDefaults/);
   assert.match(settingsStorageSource, /thinkingEnabled/);
 });
