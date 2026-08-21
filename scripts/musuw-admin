@@ -1,0 +1,336 @@
+#!/usr/bin/env bash
+# Local-only DbGate launcher for the Musuw test and production PostgreSQL databases.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+runtime_dir="$repo_root/.runtime/musuw-admin"
+candidate_env="$repo_root/.runtime/weknora/candidate.env"
+production_runtime="${WEKNORA_PRODUCTION_RUNTIME_DIR:-$repo_root/.runtime/weknora-production}"
+production_public_env="$production_runtime/production.public.env"
+production_db_password="$production_runtime/secrets/db_password"
+state_environment="$runtime_dir/environment"
+state_ssh_target="$runtime_dir/ssh-target"
+
+dbgate_image='dbgate/dbgate:7.2.5'
+container_name='musuw-local-admin'
+admin_port='4186'
+test_db_port='15432'
+production_tunnel_port='15433'
+production_container='weknora-v072-production-postgres'
+admin_uid="$(id -u)"
+ssh_control_socket="/tmp/musuw-admin-ssh-${admin_uid}.sock"
+
+# Reuse the repository's data-only env parser and protected secret reader.
+# shellcheck source=weknora-production/lib.sh
+. "$repo_root/scripts/weknora-production/lib.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: scripts/musuw-admin <command>
+
+Commands:
+  test        Open DbGate for the local test database
+  production  Open DbGate for production through the existing root SSH config
+  stop        Stop DbGate and any production SSH tunnel
+  status      Show the active environment and local URL
+
+DbGate is always available only at http://127.0.0.1:4186.
+Production startup only opens a tunnel and database UI; it does not modify data.
+EOF
+}
+
+die() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || die "required command is unavailable: $1"
+}
+
+read_env_value() {
+    local file="$1"
+    local key="$2"
+    local value
+    [ -r "$file" ] && [ ! -L "$file" ] || die 'required local runtime configuration is unavailable'
+    value="$(weknora_production_env_value "$file" "$key")"
+    [ -n "$value" ] || die "required local runtime setting is unavailable: $key"
+    printf '%s' "$value"
+}
+
+valid_port() {
+    [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+}
+
+port_is_busy() {
+    lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | grep -q .
+}
+
+wait_for_http() {
+    local deadline=$(( $(date +%s) + 60 ))
+    until curl -fsS --connect-timeout 2 --max-time 3 "http://127.0.0.1:${admin_port}/" >/dev/null 2>&1; do
+        [ "$(date +%s)" -lt "$deadline" ] || return 1
+        sleep 1
+    done
+}
+
+wait_for_port() {
+    local port="$1"
+    local deadline=$(( $(date +%s) + 15 ))
+    until nc -z 127.0.0.1 "$port" >/dev/null 2>&1; do
+        [ "$(date +%s)" -lt "$deadline" ] || return 1
+        sleep 1
+    done
+}
+
+safe_ssh_target() {
+    case "$1" in
+        ''|-*|*[!A-Za-z0-9._:@-]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+infer_production_ssh_target() {
+    local explicit_target="${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-}"
+    local ssh_config="${HOME:?}/.ssh/config"
+    local candidate resolved_user
+    local -a root_targets=()
+
+    if [ -n "$explicit_target" ]; then
+        safe_ssh_target "$explicit_target" || die 'MUSUW_ADMIN_PRODUCTION_SSH_TARGET is unsafe'
+        printf '%s' "$explicit_target"
+        return
+    fi
+
+    [ -r "$ssh_config" ] || die 'no readable SSH config; set MUSUW_ADMIN_PRODUCTION_SSH_TARGET'
+    while IFS= read -r candidate; do
+        safe_ssh_target "$candidate" || continue
+        resolved_user="$(ssh -G "$candidate" 2>/dev/null | awk '$1 == "user" { print $2; exit }')"
+        [ "$resolved_user" = 'root' ] && root_targets+=( "$candidate" )
+    done < <(awk '
+        tolower($1) == "host" {
+            for (i = 2; i <= NF; i++) {
+                if ($i !~ /[*?!]/) print $i
+            }
+        }
+    ' "$ssh_config")
+
+    [ "${#root_targets[@]}" -eq 1 ] || \
+        die 'cannot infer one production root SSH target; set MUSUW_ADMIN_PRODUCTION_SSH_TARGET'
+    printf '%s' "${root_targets[0]}"
+}
+
+require_root_ssh_target() {
+    local target="$1"
+    local resolved_user
+    resolved_user="$(ssh -G "$target" 2>/dev/null | awk '$1 == "user" { print $2; exit }')"
+    [ "$resolved_user" = 'root' ] || die 'production SSH target must resolve to user root'
+}
+
+discover_production_container_ip() {
+    local target="$1"
+    local container_ip
+    local -a octets
+    container_ip="$(ssh \
+        -o BatchMode=yes \
+        -o StrictHostKeyChecking=yes \
+        -o ConnectTimeout=10 \
+        "$target" \
+        "docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' $production_container" \
+        2>/dev/null | awk 'NF { print; exit }')" || \
+        die 'cannot inspect production PostgreSQL; verify the root SSH alias, IdentityFile and known_hosts entry'
+
+    [[ "$container_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
+        die 'production PostgreSQL container returned an invalid IPv4 address'
+    local octet
+    IFS=. read -r -a octets <<< "$container_ip"
+    for octet in "${octets[@]}"; do
+        [ "$octet" -le 255 ] || die 'production PostgreSQL container returned an invalid IPv4 address'
+    done
+    printf '%s' "$container_ip"
+}
+
+stop_tunnel() {
+    local target=''
+    if [ -r "$state_ssh_target" ]; then
+        target="$(tr -d '\r\n' < "$state_ssh_target")"
+    fi
+    if [ -S "$ssh_control_socket" ] && safe_ssh_target "$target" && command -v ssh >/dev/null 2>&1; then
+        ssh -S "$ssh_control_socket" -O exit "$target" >/dev/null 2>&1 || true
+    fi
+    rm -f -- "$ssh_control_socket" "$state_ssh_target"
+}
+
+stop_admin() {
+    if command -v docker >/dev/null 2>&1; then
+        docker rm -f "$container_name" >/dev/null 2>&1 || true
+    fi
+    stop_tunnel
+    rm -f -- "$state_environment"
+}
+
+start_production_tunnel() {
+    local target="$1"
+    local container_ip="$2"
+    local database_port="$3"
+
+    valid_port "$database_port" || die 'production database port is invalid'
+    port_is_busy "$production_tunnel_port" && \
+        die "production tunnel port ${production_tunnel_port} is already in use"
+    rm -f -- "$ssh_control_socket"
+    ssh \
+        -o BatchMode=yes \
+        -o StrictHostKeyChecking=yes \
+        -o ConnectTimeout=10 \
+        -o ServerAliveInterval=30 \
+        -o ServerAliveCountMax=3 \
+        -o ExitOnForwardFailure=yes \
+        -M -S "$ssh_control_socket" -f -N \
+        -L "127.0.0.1:${production_tunnel_port}:${container_ip}:${database_port}" \
+        "$target"
+    printf '%s\n' "$target" > "$state_ssh_target"
+    wait_for_port "$production_tunnel_port" || die 'production SSH tunnel did not become ready'
+}
+
+start_dbgate() {
+    local environment="$1"
+    local database_host="$2"
+    local database_port="$3"
+    local database_user="$4"
+    local database_password="$5"
+    local database_name="$6"
+    local label
+
+    case "$environment" in
+        test) label='Musuw Test' ;;
+        production) label='Musuw Production' ;;
+        *) die 'unsupported admin environment' ;;
+    esac
+    valid_port "$database_port" || die 'database port is invalid'
+    [ -n "$database_user" ] && [ -n "$database_password" ] && [ -n "$database_name" ] || \
+        die 'database connection settings are incomplete'
+
+    docker run -d --rm \
+        --name "$container_name" \
+        --pull missing \
+        --init \
+        --publish "127.0.0.1:${admin_port}:3000" \
+        --tmpfs '/root/.dbgate:rw,nosuid,nodev,size=64m' \
+        --security-opt no-new-privileges \
+        --env 'SKIP_ALL_AUTH=1' \
+        --env 'LANGUAGE=zh' \
+        --env 'CONNECTIONS=musuw' \
+        --env 'SINGLE_CONNECTION=musuw' \
+        --env "SINGLE_DATABASE=$database_name" \
+        --env "LABEL_musuw=$label" \
+        --env "SERVER_musuw=$database_host" \
+        --env "PORT_musuw=$database_port" \
+        --env 'ENGINE_musuw=postgres@dbgate-plugin-postgres' \
+        --env "USER_musuw=$database_user" \
+        --env "PASSWORD_musuw=$database_password" \
+        --env "DATABASE_musuw=$database_name" \
+        "$dbgate_image" >/dev/null
+    printf '%s\n' "$environment" > "$state_environment"
+    wait_for_http || die 'DbGate did not become ready'
+}
+
+start_environment() {
+    local environment="$1"
+    local database_host database_port database_user database_password database_name
+    local ssh_target container_ip
+    local cleanup_armed=true
+
+    require_command docker
+    require_command curl
+    require_command lsof
+    install -d -m 700 "$runtime_dir"
+    stop_admin
+    port_is_busy "$admin_port" && die "local admin port ${admin_port} is already in use"
+
+    cleanup_start_failure() {
+        local status=$?
+        trap - EXIT INT TERM
+        if [ "$cleanup_armed" = true ]; then
+            stop_admin >/dev/null 2>&1 || true
+        fi
+        exit "$status"
+    }
+    trap cleanup_start_failure EXIT INT TERM
+
+    case "$environment" in
+        test)
+            database_host='host.docker.internal'
+            database_port="$test_db_port"
+            weknora_production_require_secret_file "$candidate_env"
+            database_user="$(read_env_value "$candidate_env" DB_USER)"
+            database_password="$(read_env_value "$candidate_env" DB_PASSWORD)"
+            database_name="$(read_env_value "$candidate_env" DB_NAME)"
+            port_is_busy "$test_db_port" || \
+                die 'local test PostgreSQL is not running; start it with scripts/musuw-dev deps up'
+            ;;
+        production)
+            require_command ssh
+            require_command nc
+            weknora_production_require_secret_file "$production_db_password"
+            database_user="$(read_env_value "$production_public_env" DB_USER)"
+            database_password="$(weknora_production_read_secret "$production_db_password")"
+            database_name="$(read_env_value "$production_public_env" DB_NAME)"
+            database_port="$(read_env_value "$production_public_env" DB_PORT)"
+            ssh_target="$(infer_production_ssh_target)"
+            require_root_ssh_target "$ssh_target"
+            container_ip="$(discover_production_container_ip "$ssh_target")"
+            start_production_tunnel "$ssh_target" "$container_ip" "$database_port"
+            database_host='host.docker.internal'
+            database_port="$production_tunnel_port"
+            ;;
+        *) die 'expected test or production' ;;
+    esac
+
+    start_dbgate "$environment" "$database_host" "$database_port" \
+        "$database_user" "$database_password" "$database_name"
+    cleanup_armed=false
+    trap - EXIT INT TERM
+    printf 'Musuw %s admin is ready: http://127.0.0.1:%s\n' "$environment" "$admin_port"
+}
+
+status_admin() {
+    local environment='none'
+    local container_state='stopped'
+    local tunnel_state='not needed'
+    local target=''
+
+    if [ -r "$state_environment" ]; then
+        environment="$(tr -d '\r\n' < "$state_environment")"
+    fi
+    if command -v docker >/dev/null 2>&1 && \
+        [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null || true)" = true ]; then
+        container_state='running'
+    fi
+    if [ "$environment" = production ]; then
+        tunnel_state='stopped'
+        if [ -r "$state_ssh_target" ]; then
+            target="$(tr -d '\r\n' < "$state_ssh_target")"
+        fi
+        if [ -S "$ssh_control_socket" ] && safe_ssh_target "$target" && \
+            ssh -S "$ssh_control_socket" -O check "$target" >/dev/null 2>&1; then
+            tunnel_state='running'
+        fi
+    fi
+
+    printf 'Environment: %s\n' "$environment"
+    printf 'DbGate: %s\n' "$container_state"
+    printf 'SSH tunnel: %s\n' "$tunnel_state"
+    printf 'URL: http://127.0.0.1:%s\n' "$admin_port"
+}
+
+case "${1:-}" in
+    test) start_environment test ;;
+    production) start_environment production ;;
+    stop)
+        stop_admin
+        printf '%s\n' 'Musuw local admin stopped.'
+        ;;
+    status) status_admin ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+esac
