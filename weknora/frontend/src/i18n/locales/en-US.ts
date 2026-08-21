@@ -2627,6 +2627,7 @@ export default {
     refreshSuggestedQuestions: 'More',
     thinking: 'Thinking...',
     thinkingAlt: 'Thinking in progress',
+    scrollToBottom: 'Scroll to bottom',
     preparingAnswer: 'Preparing an answer…',
     connectingModelAndGeneratingAnswer: 'Connecting to the model and generating an answer…',
     modelStillResponding: 'The model is taking longer than usual, still waiting…',

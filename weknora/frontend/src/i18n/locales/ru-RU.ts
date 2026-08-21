@@ -3242,6 +3242,7 @@ export default {
     refreshSuggestedQuestions: 'Ещё',
     thinking: 'Думаю...',
     thinkingAlt: 'Обдумывание...',
+    scrollToBottom: 'Прокрутить вниз',
     preparingAnswer: 'Подготовка ответа…',
     connectingModelAndGeneratingAnswer: 'Подключение к модели и создание ответа…',
     modelStillResponding: 'Модель отвечает дольше обычного, продолжаем ждать…',
