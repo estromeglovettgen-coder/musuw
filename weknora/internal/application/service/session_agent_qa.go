@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -24,11 +23,6 @@ func (s *sessionService) AgentQA(
 	eventBus *event.EventBus,
 ) error {
 	sessionID := req.Session.ID
-	sessionJSON, err := json.Marshal(req.Session)
-	if err != nil {
-		logger.Errorf(ctx, "Failed to marshal session, session ID: %s, error: %v", sessionID, err)
-		return fmt.Errorf("failed to marshal session: %w", err)
-	}
 
 	// customAgent is required for AgentQA (handler has already done permission check for shared agent)
 	if req.CustomAgent == nil {
@@ -38,8 +32,8 @@ func (s *sessionService) AgentQA(
 
 	// Resolve retrieval tenant using shared helper
 	agentTenantID := s.resolveRetrievalTenantID(ctx, req)
-	logger.Infof(ctx, "Start agent-based question answering, session ID: %s, agent tenant ID: %d, query: %s, session: %s",
-		sessionID, agentTenantID, req.Query, string(sessionJSON))
+	logger.Infof(ctx, "Start agent-based question answering, session ID: %s, agent tenant ID: %d, query length: %d",
+		sessionID, agentTenantID, len(req.Query))
 
 	var tenantInfo *types.Tenant
 	if v := ctx.Value(types.TenantInfoContextKey); v != nil {

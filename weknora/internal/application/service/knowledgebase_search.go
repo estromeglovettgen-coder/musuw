@@ -9,7 +9,6 @@ import (
 	"github.com/Tencent/WeKnora/internal/models/embedding"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
 // GetQueryEmbedding computes the query embedding using the embedding model
@@ -94,11 +93,8 @@ func (s *knowledgeBaseService) HybridSearch(ctx context.Context,
 		searchKBIDs = []string{id}
 	}
 
-	// QueryText is user-controlled; sanitize before logging to prevent
-	// CR/LF/tab log injection. Matches the handler-layer sanitization at
-	// handler/knowledgebase.go.
-	logger.Infof(ctx, "Hybrid search parameters, knowledge base IDs: %v, query text: %s",
-		searchKBIDs, secutils.SanitizeForLog(params.QueryText))
+	logger.Infof(ctx, "Hybrid search parameters, knowledge bases: %d, query length: %d",
+		len(searchKBIDs), len(params.QueryText))
 
 	tenantInfo, _ := types.TenantInfoFromContext(ctx)
 	requestTenantID := types.MustTenantIDFromContext(ctx)
@@ -441,7 +437,7 @@ func (s *knowledgeBaseService) resolveQueryEmbedding(
 	logger.Info(ctx, "Starting to generate query embedding")
 	queryEmbedding, err := embeddingModel.Embed(ctx, params.QueryText)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to embed query text, query text: %s, error: %v", params.QueryText, err)
+		logger.Errorf(ctx, "Failed to embed query text, query length: %d, error: %v", len(params.QueryText), err)
 		return nil, err
 	}
 	logger.Infof(ctx, "Query embedding generated successfully, embedding vector length: %d", len(queryEmbedding))

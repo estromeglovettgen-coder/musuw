@@ -263,14 +263,14 @@ func (h *MessageHandler) SearchMessages(c *gin.Context) {
 	}
 
 	params := &types.MessageSearchParams{
-		Query:      secutils.SanitizeForLog(request.Query),
+		Query:      request.Query,
 		Mode:       types.MessageSearchMode(request.Mode),
 		Limit:      request.Limit,
 		SessionIDs: request.SessionIDs,
 	}
 
-	logger.Infof(ctx, "Searching messages with params: query=%s, mode=%s, limit=%d, session_ids=%v",
-		params.Query, params.Mode, params.Limit, params.SessionIDs)
+	logger.Infof(ctx, "Searching messages with params: query_length=%d, mode=%s, limit=%d, session_count=%d",
+		len(params.Query), params.Mode, params.Limit, len(params.SessionIDs))
 
 	result, err := h.MessageService.SearchMessages(ctx, params)
 	if err != nil {

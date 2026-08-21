@@ -486,7 +486,7 @@ func (s *messageService) GetChatHistoryKBStats(ctx context.Context) (*types.Chat
 // SearchMessages searches messages by keyword and/or vector similarity across all sessions of the current tenant.
 // Vector search is delegated to the chat history knowledge base's HybridSearch (configured via ChatHistoryConfig).
 func (s *messageService) SearchMessages(ctx context.Context, params *types.MessageSearchParams) (*types.MessageSearchResult, error) {
-	logger.Infof(ctx, "Start searching messages, query: %s, mode: %s", params.Query, params.Mode)
+	logger.Infof(ctx, "Start searching messages, query length: %d, mode: %s", len(params.Query), params.Mode)
 
 	tenantID := types.MustTenantIDFromContext(ctx)
 
