@@ -1,6 +1,6 @@
 # Verification Report: consumer-plan-entitlements
 
-Verified locally on 2026-08-19 (America/Phoenix) against the combined integration commit containing this report. CI, push, and deployment were intentionally deferred at the user's request because the GitHub Actions allowance is exhausted.
+Verified locally through 2026-08-20 (America/Phoenix) against the combined local integration branch. CI, push, and deployment were intentionally deferred at the user's request because the GitHub Actions allowance is exhausted.
 
 ## Result
 
@@ -14,11 +14,16 @@ Verified locally on 2026-08-19 (America/Phoenix) against the combined integratio
 ## Fresh evidence
 
 - Backend entitlement, session, OpenRouter, router, and type suites passed; all Go packages compiled with `go test ./... -run '^$'`.
-- Frontend passed 508/508 tests, Vue type-check, and production build.
+- Frontend passed 516/516 tests, Vue type-check, and production build. Auth passed 45/45 tests and type-check; storefront passed 38/38 tests and production build.
 - Local authenticated API acceptance returned Free's 5 GiB/USD 1/1 KB/10 docs/no-video entitlement and exactly five built-in OpenRouter capability models. Paid-plan simulation returned the larger built-in catalog. Paid-model detail was denied to Free; model mutation/provider/debug/credential endpoints and both initialization write routes returned the Lite not-found boundary.
 - Local browser acceptance showed the correct Free and Plus plan cards, plan-specific chat choices, no model-configuration affordance, a server-rejected second Free knowledge base, and successful cleanup of the temporary knowledge base.
 - With the management key intentionally absent, a real chat request selected the approved Qwen model, attempted no shared-key fallback, logged `management_key_not_configured`, emitted a terminal error, and closed the stream cleanly.
 - Database inspection found every active knowledge base bound to stable built-in OpenRouter capability IDs, no consumer-visible credential rows, valid default storage backends, and no retained temporary knowledge base.
+- Fresh Chrome acceptance showed the Free account's registration-anniversary reset date and remaining-credit percentage, the Codex-style profile/usage/settings split, the standalone four-card `/plans` page, and Paddle-localized monthly and yearly prices. The Lite route guard now preserves the user-profile deep link.
+
+## Pending current-code evidence
+
+- Opening the current Paddle Sandbox inline checkout is intentionally pending action-time confirmation because it transmits the test account email and tenant checkout binding to Paddle and may create an unpaid draft. No payment details or transaction confirmation have been attempted. Task 4.6 remains open until that exact browser render is checked.
 
 ## Deferred release boundary
 
