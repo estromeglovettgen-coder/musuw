@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteLocationGeneric, RouteLocationNormalized } from 'vue-router'
+import type { RouteLocationGeneric } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
 import { getSystemInfo } from '@/api/system'
@@ -33,6 +33,10 @@ function authenticatedEntryPath(to: RouteLocationGeneric) {
   } catch {
     // Fall through to the normal authenticated home when storage is unavailable.
   }
+  if (localStorage.getItem('weknora_lite_mode') === 'true') {
+    const saved = sessionStorage.getItem(LITE_LAST_PATH_KEY)
+    if (saved && isSafeLiteRestoreTarget(saved)) return saved
+  }
   return AUTHENTICATED_HOME_PATH
 }
 
@@ -65,15 +69,6 @@ async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) 
     })()
   }
   await editionProbePromise
-}
-
-function isLiteSpaDefaultEntry(to: RouteLocationNormalized) {
-  return (
-    to.path === '/' ||
-    to.path === '/platform' ||
-    to.path === '/platform/knowledge-bases' ||
-    to.name === 'knowledgeBaseList'
-  )
 }
 
 /**
@@ -164,7 +159,7 @@ const router = createRouter({
     {
       path: "/platform",
       name: "Platform",
-      redirect: "/platform/knowledge-bases",
+      redirect: authenticatedEntryPath,
       component: () => import("../views/platform/index.vue"),
       meta: { requiresInit: true, requiresAuth: true },
       children: [
@@ -339,8 +334,6 @@ async function hydrateSessionFromToken(authStore: ReturnType<typeof useAuthStore
   }
 }
 
-let liteDeepLinkRestoreDone = false
-
 // 路由守卫：检查认证状态和系统初始化状态
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
@@ -381,20 +374,6 @@ router.beforeEach(async (to, from, next) => {
   if (to.path === '/') {
     next(authenticatedEntryPath(to))
     return
-  }
-
-  // Lite：硬刷新后若落在默认首页，恢复本次会话中最后访问的允许页面。
-  if (!liteDeepLinkRestoreDone) {
-    liteDeepLinkRestoreDone = true
-    if (isLiteEdition(authStore)) {
-      const saved = sessionStorage.getItem(LITE_LAST_PATH_KEY)
-      if (saved && isSafeLiteRestoreTarget(saved) && isLiteSpaDefaultEntry(to)) {
-        if (saved !== to.fullPath) {
-          next(saved)
-          return
-        }
-      }
-    }
   }
 
   // Tenantless onboarding still requires a valid user token even though it

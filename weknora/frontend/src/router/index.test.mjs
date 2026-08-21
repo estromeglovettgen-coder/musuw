@@ -22,10 +22,10 @@ test('an OIDC error stops routing before a protected route can start auth again'
 
 function nativeAuthEntryGuard() {
   const start = routerSource.indexOf("if (to.path === '/login' || to.path === '/register')")
-  const end = routerSource.indexOf('// Lite：', start)
+  const end = routerSource.indexOf('// Tenantless onboarding', start)
 
   assert.notEqual(start, -1, 'native /login and /register guard must exist')
-  assert.notEqual(end, -1, 'native auth guard must remain bounded before Lite routing')
+  assert.notEqual(end, -1, 'native auth guard must remain bounded before tenant onboarding')
   return routerSource.slice(start, end)
 }
 
@@ -42,4 +42,13 @@ test('a cold authenticated /login load restores the native session before auth h
     guard,
     /next\(authStore\.hasValidTenant \? AUTHENTICATED_HOME_PATH : '\/onboarding\/workspace'\)/,
   )
+})
+
+test('only generic Lite entry routes restore the last page', () => {
+  assert.match(
+    routerSource,
+    /localStorage\.getItem\('weknora_lite_mode'\) === 'true'[\s\S]*sessionStorage\.getItem\(LITE_LAST_PATH_KEY\)/,
+  )
+  assert.match(routerSource, /path: "\/platform",[\s\S]*redirect: authenticatedEntryPath/)
+  assert.doesNotMatch(routerSource, /isLiteSpaDefaultEntry/)
 })
