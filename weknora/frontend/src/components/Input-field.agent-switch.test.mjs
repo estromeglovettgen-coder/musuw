@@ -57,3 +57,19 @@ test("consumer chat locks the full-capability Agent and sends model-specific rea
   assert.match(streamClient, /reasoning_effort\?:\s*string/);
   assert.match(streamClient, /postBody\.reasoning_effort = params\.reasoning_effort/);
 });
+
+test("model selector distinguishes the initial catalog load from missing configuration", () => {
+  const labelStart = inputBusiness.indexOf("const selectedModelDisplayName = computed");
+  const labelEnd = inputBusiness.indexOf("const modelDisplayName", labelStart);
+  const selectedModelLabel = inputBusiness.slice(labelStart, labelEnd);
+
+  assert.notEqual(labelStart, -1);
+  assert.notEqual(labelEnd, -1);
+  assert.match(inputBusiness, /const modelsLoadSettled = ref\(false\)/);
+  assert.match(inputBusiness, /modelsLoadSettled\.value = true/);
+  assert.match(selectedModelLabel, /if \(!modelsLoadSettled\.value\) return t\("common\.loading"\)/);
+  assert.ok(
+    selectedModelLabel.indexOf('t("common.loading")') <
+      selectedModelLabel.indexOf('t("input.notConfigured")'),
+  );
+});

@@ -751,6 +751,7 @@ const reasoningEffort = computed({
   }),
 });
 const modelsLoading = ref(false);
+const modelsLoadSettled = ref(false);
 const showModelSelector = ref(false);
 const modelButtonRef = ref<HTMLElement>();
 const modelDropdownStyle = ref<Record<string, string>>({});
@@ -1019,6 +1020,7 @@ const initChatModelSelection = () => {
 
 const loadChatModels = async (force = false) => {
   if (modelsLoading.value) return;
+  modelsLoadSettled.value = false;
   modelsLoading.value = true;
   try {
     await chatResources.ensureChatModels(force);
@@ -1028,6 +1030,7 @@ const loadChatModels = async (force = false) => {
     chatResources.invalidate("models");
   } finally {
     modelsLoading.value = false;
+    modelsLoadSettled.value = true;
   }
 };
 
@@ -1137,6 +1140,7 @@ watch([selectedModel, reasoningOptions], ensureReasoningSelection, { immediate: 
 // 模型展示名：本空间列表中有则用名称；若为共享智能体且其 model_id 不在本空间列表中则显示“共享智能体配置的模型”
 const selectedModelDisplayName = computed(() => {
   if (selectedModel.value) return modelDisplayName(selectedModel.value);
+  if (!modelsLoadSettled.value) return t("common.loading");
   if (!selectedModelId.value) return t("input.notConfigured");
   const isSharedAgent = !!settingsStore.selectedAgentSourceTenantId;
   const modelFromAgent = agentModelId.value && agentModelId.value === selectedModelId.value;
