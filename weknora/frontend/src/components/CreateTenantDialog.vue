@@ -2,7 +2,7 @@
   <!-- 自助创建新工作区弹窗。任意已登录用户均可调用 POST /api/v1/tenants
        （后端 router 已去掉 g.CrossTenant() 守卫），handler 会自动把当前
        用户 EnsureOwner 成新空间的 Owner。 -->
-  <t-dialog :visible="visible" width="480px" :on-confirm="handleSubmit" :on-close="handleClose"
+  <t-dialog :visible="visible" width="480px" lazy destroy-on-close :on-confirm="handleSubmit" :on-close="handleClose"
     :confirm-btn="{ content: $t('tenant.create.submit'), loading: submitting, theme: 'primary' }"
     :cancel-btn="{ content: $t('tenant.create.cancel') }" :close-on-overlay-click="!submitting"
     :close-on-esc-keydown="!submitting" @update:visible="onVisibleUpdate">
