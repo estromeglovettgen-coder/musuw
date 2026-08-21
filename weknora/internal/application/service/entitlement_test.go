@@ -180,6 +180,21 @@ func TestMonthlyPaidAllowanceWaitsForConfirmedRenewal(t *testing.T) {
 	assert.Zero(t, manager.updateCalls)
 }
 
+func TestPaidAllowanceWithUnknownBillingPeriodFailsClosed(t *testing.T) {
+	periodEnd := time.Now().UTC().Add(-time.Minute)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanMax, PlanStatus: "active",
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{LimitMicrousd: 5_000_000, LimitRemainingMicrousd: 500_000}}
+	svc := newEntitlementService(repo, manager)
+
+	_, err := svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
+	require.ErrorIs(t, err, errAllowanceRenewalPending)
+	assert.Zero(t, manager.updateCalls)
+}
+
 func TestRecurringPaidAllowanceRefreshesOncePerPeriod(t *testing.T) {
 	oldPeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
 	newPeriodEnd := time.Date(2026, 10, 28, 9, 30, 0, 0, time.UTC)

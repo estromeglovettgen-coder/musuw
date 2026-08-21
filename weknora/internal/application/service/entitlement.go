@@ -191,7 +191,10 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 	plan := types.EffectiveConsumerPlan(tenant)
 	allowance := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
 	periodEnd := tenant.OpenRouterCreditPeriodEnd
-	if periodEnd != nil && !periodEnd.After(at) && plan != types.ConsumerPlanFree && tenant.PaddleBillingPeriod == "monthly" {
+	// A paid tenant may predate the billing-period column. Treat an unknown
+	// period like monthly (webhook-gated), not yearly (self-refreshing), so a
+	// missing migration value can never grant an unpaid allowance.
+	if periodEnd != nil && !periodEnd.After(at) && plan != types.ConsumerPlanFree && tenant.PaddleBillingPeriod != "yearly" {
 		return info, errAllowanceRenewalPending
 	}
 
