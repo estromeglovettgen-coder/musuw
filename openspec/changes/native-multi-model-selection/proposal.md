@@ -4,7 +4,7 @@ WeKnora already contains model management and chat model selection, but Musuw ne
 
 ## What Changes
 
-- Restore the existing chat model dropdown while preserving the two platform answer modes.
+- Restore the existing chat model dropdown while keeping the consumer runtime on the single full-capability built-in agent.
 - Keep model/provider/debug/credential management out of the consumer UI and require SystemAdmin on the retained WeKnora APIs.
 - Return only server-owned built-in OpenRouter models and filter that catalog by the active consumer plan.
 - Route the existing DeepSeek choices through OpenRouter and retain a small verified platform catalog.

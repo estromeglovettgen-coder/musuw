@@ -9,7 +9,7 @@ WeKnora v0.7.2 already implements model CRUD for chat, embedding, rerank, vision
 - Restore the native conversation picker in the current Musuw visual shell.
 - Preserve the native model services for SystemAdmin operations without exposing configuration to consumers.
 - Ship only OpenRouter models proven callable from the production region.
-- Preserve existing V4 Flash/Pro behavior and knowledge-base bindings.
+- Preserve the full-capability built-in agent and knowledge-base bindings while exposing only model and reasoning-effort choices.
 
 **Non-Goals:**
 
@@ -24,7 +24,7 @@ WeKnora v0.7.2 already implements model CRUD for chat, embedding, rerank, vision
 - Keep WeKnora's existing create/update/default logic behind SystemAdmin for platform catalog maintenance. No new table, preference entity, or catalog service is needed.
 - Keep stable IDs for the two managed DeepSeek modes, but call their OpenRouter model slugs. Add only four other chat models that returned HTTP 200 from the production region; omit providers blocked there.
 - Keep the existing embedding, rerank, VLM, and ASR IDs and dimensions. The real upload pipeline already proved the embedding binding, so changing it would invalidate existing vectors for no product benefit.
-- For the two platform answer modes, apply the request's already-authorized selected chat model to the request-scoped built-in agent and title generator. Custom/Standard agents keep their own configured model. This preserves WeKnora's execution pipeline without allowing a hidden YAML default to bypass the plan catalog.
+- For the consumer full-capability agent, apply the request's already-authorized selected chat model to the request-scoped built-in agent and title generator. Custom/Standard agents keep their own configured model. This preserves WeKnora's execution pipeline without allowing a hidden YAML default to bypass the plan catalog.
 
 ## Risks / Trade-offs
 

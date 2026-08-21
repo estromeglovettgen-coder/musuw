@@ -7,15 +7,16 @@
   user navigation that treats incomplete legacy data as a reason to expose
   settings.
 
-## 2. Wire the two existing chat modes
+## 2. Fix the consumer to the full-capability agent
 
-- [x] 2.1 Update the existing built-in-agent YAML so Quick is V4 Flash and Pro
-  is V4 Pro with the complete existing in-tenant tool set.
-- [x] 2.2 Keep platform Quick/Pro pipeline resolution authoritative, apply the
-  already-authorized selected model request-scoped, and reject disallowed overrides.
-- [x] 2.3 Reuse the existing input-mode selector to expose only V4 Flash and
-  V4 Pro, keep the separate plan-catalog model picker, retain Pro thinking,
-  and preserve the selected mode/model across reload.
+- [x] 2.1 Keep `builtin-smart-reasoning` as the single full-capability consumer
+  agent while retaining upstream built-ins for Standard compatibility.
+- [x] 2.2 Keep the smart-reasoning pipeline authoritative, apply the
+  already-authorized selected model and reasoning effort request-scoped, and
+  reject disallowed overrides.
+- [x] 2.3 Remove the consumer agent-mode selector, keep only the separate
+  plan-catalog model and supported reasoning-effort picker, and preserve those
+  choices across reload.
 
 ## 3. Remove configuration exposure and release mismatch
 

@@ -92,11 +92,15 @@ The system SHALL NOT estimate OpenRouter cost from file bytes. When a provider-m
 - **THEN** the stage is marked failed once, is not automatically retried, and can be reparsed through WeKnora's existing workflow after upgrade or monthly reset
 
 ### Requirement: Users can inspect their effective entitlement
-The authenticated product SHALL show the current plan, storage used and limit, credit used and limit, the exact current allowance boundary when available, and the principal Free-only restrictions in Usage & billing settings. It SHALL also show the four plans as equal, concise comparison cards with actions determined by the durable current plan.
+The authenticated product SHALL show the current plan, storage used and limit, credit used and limit, the exact current allowance boundary when available, and the principal Free-only restrictions in Usage & billing settings. A separate `/plans` page SHALL show the four plans as equal, concise comparison cards with actions determined by the durable current plan; plan cards SHALL NOT be duplicated inside settings.
 
 #### Scenario: User opens Usage & billing settings
 - **WHEN** an authenticated user opens Usage & billing settings
 - **THEN** the values displayed come from the server's effective tenant entitlement rather than browser state
+
+#### Scenario: User opens the plan comparison
+- **WHEN** an authenticated user follows an upgrade or view-plans action from the account menu or Usage & billing settings
+- **THEN** the product opens the standalone `/plans` comparison rather than rendering plan cards inside settings
 
 #### Scenario: Localized plan prices are shown
 - **WHEN** Paddle is configured and a plan price is available
@@ -107,7 +111,7 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 
 #### Scenario: Free user starts hosted checkout
 - **WHEN** an authenticated Free user chooses an allowed plan and billing period
-- **THEN** the official Paddle.js overlay receives exactly one server-mapped price with quantity one, tenant-bound custom data, and Musuw's current supported UI locale while Paddle remains authoritative for country, currency, tax, and eligible payment methods
+- **THEN** the dedicated `/checkout` route mounts Paddle's official one-page inline Checkout with exactly one server-mapped price of quantity one, tenant-bound custom data, and Musuw's current supported UI locale while Paddle remains authoritative for country, currency, tax, and eligible payment methods
 
 #### Scenario: Valid activation event
 - **WHEN** a correctly signed Paddle subscription event contains a known price, tenant identifier, and matching checkout binding
@@ -121,9 +125,9 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **WHEN** Paddle repeats an already processed signed subscription event
 - **THEN** the endpoint acknowledges it without applying the plan a second time
 
-#### Scenario: Paid tenant opens General settings
+#### Scenario: Paid tenant opens Usage & billing settings
 - **WHEN** a tenant already has a paid plan
-- **THEN** current entitlement is displayed but new checkout options are withheld to prevent a duplicate subscription
+- **THEN** current entitlement and the hosted billing-management action are displayed without a second-subscription checkout
 
 #### Scenario: Paid tenant previews a higher tier
 - **WHEN** an authenticated active Plus tenant asks to preview Pro

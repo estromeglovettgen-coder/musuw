@@ -19,12 +19,11 @@ new provider abstraction.
 - A name-only document knowledge-base creation either persists the existing
   complete default or fails before persistence because a required built-in
   model is unavailable.
-- The standard chat surface exposes exactly the existing quick-answer and
-  smart-reasoning built-in agents as V4 Flash and V4 Pro, plus the independent
-  picker over the server-approved plan catalog.
-- V4 Flash uses the existing quick-answer/RAG pipeline. V4 Pro uses the
-  existing smart-reasoning pipeline and deep-thinking control. Both use the
-  request's already-authorized selected chat model.
+- The standard chat surface always uses the existing smart-reasoning built-in
+  agent with its complete in-tenant RAG, Wiki, graph, and document tool set.
+- The consumer chooses only a server-approved model and that model's supported
+  reasoning effort. The selected model is applied request-scoped to the fixed
+  full-capability agent and title generation.
 - Standard user navigation does not reveal model, parser, storage, graph, or
   other knowledge-base configuration screens.
 - This change is deployed as a complete app release with its builtin YAML,
@@ -60,20 +59,21 @@ Alternative considered: add a provisioning state table and asynchronous model
 health worker.  It adds a new state machine without fixing the catalog-release
 mismatch, so it is rejected.
 
-### Reuse the two existing built-in agents
+### Reuse the existing full-capability built-in agent
 
-`builtin-quick-answer` and `builtin-smart-reasoning` already select the RAG and
-agent pipelines. The user-facing list remains reduced to these two answer-mode
-entries; other built-ins remain internal where WeKnora already uses them.
+`builtin-smart-reasoning` already owns the complete consumer RAG and tool
+pipeline. Musuw Lite fixes every normal web conversation to that agent and
+removes the answer-mode selector; `builtin-quick-answer` remains an upstream
+compatibility asset but is not a consumer choice.
 
-The existing session resolver remains authoritative for the mode/pipeline. It
+The existing session resolver remains authoritative for the pipeline. It
 validates the requested model against the server catalog, then applies that
-model to a request-scoped copy of either platform agent and to title
-generation. Persisted built-in agent configuration is not mutated, custom
-agents in Standard WeKnora keep their own model, and Lite cannot use hidden
-Agent/MCP/Skill/web-search overrides.
+model and reasoning effort to a request-scoped copy of the full-capability
+agent and to title generation. Persisted built-in agent configuration is not
+mutated, custom agents in Standard WeKnora keep their own model, and Lite
+cannot use hidden Agent/MCP/Skill overrides.
 
-Alternative considered: create two persistent custom agents per tenant.  That
+Alternative considered: create a persistent custom agent per tenant.  That
 duplicates the built-in registry and creates lifecycle/migration work, so it
 is rejected.
 

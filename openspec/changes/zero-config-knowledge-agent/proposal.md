@@ -18,10 +18,10 @@ operating WeKnora's model plumbing.
   the standard-user flow.  Standard users retain normal content operations:
   create, rename, upload, organize, query, and delete their own knowledge
   bases.
-- Expose exactly two platform-provided answer modes: V4 Flash (fast) and V4 Pro
-  (smart reasoning), alongside the separate plan-filtered picker for
-  platform-configured models. V4 Pro retains the existing deep-thinking
-  control; neither surface permits arbitrary model or agent configuration.
+- Fix the consumer runtime to the existing full-capability smart-reasoning
+  built-in agent. The composer exposes only the separate plan-filtered model
+  picker and the reasoning-effort choices supported by that selected model;
+  consumers cannot select or configure agents.
 - Keep provider keys, raw model IDs, cross-tenant resources, and platform
   administration outside the user-facing flow.  Make frontend/backend
   built-in-model compatibility a full-release requirement so these entries
@@ -48,7 +48,7 @@ operating WeKnora's model plumbing.
   release path.
 - Existing knowledge-base create/default logic and its standard-user frontend
   views.
-- Existing chat model selection, session request handling, agent-tool
-  selection, and associated frontend presentation.
+- Existing chat model selection, session request handling, full-capability
+  agent resolution, and associated frontend presentation.
 - No new provider, agent framework, persistent capability profile, or custom
   permission subsystem is introduced.

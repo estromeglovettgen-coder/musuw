@@ -13,11 +13,11 @@
 
 ## 3. Consumer UI
 
-- [x] 3.1 Show plan/storage/credit state in General settings and align storefront's four plans with enforced limits
-- [x] 3.2 Preserve storefront plan intent through authentication and open the official Paddle.js overlay from General settings without a custom payment form
+- [x] 3.1 Show plan/storage/credit state in Usage & billing settings and align storefront's four plans with enforced limits
+- [x] 3.2 Preserve storefront plan intent through authentication, route settings/account upgrade actions through standalone `/plans`, and mount the official Paddle.js inline Checkout on `/checkout` without a custom payment form
 - [x] 3.3 Add an authenticated, tenant-owned Paddle Customer Portal button using the official Go SDK and expose only a fresh one-time overview URL
 - [x] 3.4 Add official Paddle preview/update for paid upgrades while preserving the current term and keeping the signed webhook authoritative
-- [x] 3.5 Replace the compact upgrade controls with a GPT-style four-plan comparison and Paddle.js localized `PricePreview()` values
+- [x] 3.5 Replace the compact upgrade controls with a standalone GPT-style four-plan comparison and Paddle.js localized `PricePreview()` values
 
 ## 4. Verification and release
 
