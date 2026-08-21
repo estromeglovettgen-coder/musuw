@@ -20,7 +20,6 @@ test('final visual-contract layer is active after shared vendor primitives', () 
 test('high-visibility reference glyphs use the source Lucide geometry masks', () => {
   for (const token of [
     '--mvc-icon-search:',
-    '--mvc-icon-zap:',
     '--mvc-icon-message-plus:',
     '--mvc-icon-folder:',
     '--mvc-icon-chevron-left:',

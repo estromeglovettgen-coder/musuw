@@ -73,7 +73,8 @@ test("lets CSS own the web canvas instead of a theme startup inline style", () =
   assert.match(useTheme, /WindowSetBackgroundColour\(21, 22, 25, 255\)/);
 });
 
-test("keeps the compact Musuw wordmark in the native Vue sidebar", () => {
+test("keeps the complete Musuw logo without a duplicate sidebar wordmark", () => {
   assert.match(sidebar, /class="visual-sidebar__brand"/);
-  assert.match(sidebar, />Musuw 穆苏瓦</);
+  assert.match(sidebar, /class="visual-sidebar__mark"[\s\S]*<img src="\/musuw-logo\.png"/);
+  assert.doesNotMatch(sidebar, />Musuw 穆苏瓦</);
 });
