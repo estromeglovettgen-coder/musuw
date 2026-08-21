@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { formatFileSize } from '@/utils/files';
+import { formatFileSize, getFileIcon } from '@/utils/files';
 import { useTagChipsOverflow } from '@/composables/useTagChipsOverflow';
 import DocumentActionMenu from './DocumentActionMenu.vue';
 import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue';
@@ -77,14 +77,6 @@ const getKnowledgeType = (item: KnowledgeCard) => {
   if (item.type === 'manual') return t('knowledgeBase.typeManual');
   if (item.file_type) return item.file_type.toUpperCase();
   return '--';
-};
-const getFileIcon = (fileName?: string): string => {
-  const ext = String(fileName || '').split('.').pop()?.toLowerCase() || '';
-  if (['png','jpg','jpeg','webp','svg','gif','bmp','tiff'].includes(ext)) return 'image';
-  if (['wav','mp3','ogg','m4a','flac','aac'].includes(ext)) return 'sound';
-  if (['csv','xls','xlsx'].includes(ext)) return 'file-excel';
-  if (['md','json','js','ts','py','xml','yaml','yml'].includes(ext)) return 'code';
-  return 'file';
 };
 const channelLabelMap: Record<string, string> = {
   web: 'knowledgeBase.channelWeb', api: 'knowledgeBase.channelApi', browser_extension: 'knowledgeBase.channelBrowserExtension',
@@ -166,7 +158,7 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
         <div class="visual-document-card__top">
           <div class="visual-document-card__header">
             <div v-if="canEdit && batchMode" class="visual-document-card__check" @click.stop><t-checkbox size="small" :checked="selectedIds.has(item.id)" :title="item.file_name" @change="(checked: boolean, ctx?: { e?: Event }) => emit('toggle-checkbox', item.id, checked, ctx)" /></div>
-            <t-icon :name="getFileIcon(item.file_name)" class="visual-document-card__file-icon" />
+            <t-icon :name="getFileIcon(item)" class="visual-document-card__file-icon" />
             <h3 class="visual-document-card__title" :title="item.file_name">{{ item.file_name }}</h3>
             <t-popup v-if="canEdit" v-model="item.isMore" overlayClassName="card-more" :on-visible-change="(v: boolean) => onMenuVisibleChange(v, item)" trigger="click" destroy-on-close placement="bottom-right">
               <button type="button" class="visual-document-card__more" :class="{ 'is-active': activeMenuIndex === index }" :aria-label="$t('common.more')" @click.stop="openMenu(index)"><t-icon name="ellipsis" /></button>
