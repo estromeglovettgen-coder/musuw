@@ -26,4 +26,4 @@
 - [x] 4.3 Verify the six-price Sandbox catalog, real Paddle-signed activation/cancellation/duplicate deliveries, database state, audit logs, and browser entitlement refresh through the local Cloudflare tunnel
 - [x] 4.4 Verify the authenticated Customer Portal, anonymous/no-customer rejection, token-redacted logs, and final local browser lifecycle regression
 - [x] 4.5 Upgrade a real non-admin Sandbox subscription in Chrome and verify the signed event updates the existing OpenRouter child-key limit before the durable plan
-- [ ] 4.6 Verify Free anniversary refresh without stacking, paid-cycle renewal idempotency, same-cycle upgrade preservation, localized plan prices, and the final local browser lifecycle
+- [x] 4.6 Verify Free anniversary refresh without stacking, paid-cycle renewal idempotency, same-cycle upgrade preservation, localized plan prices, and the final local browser lifecycle
