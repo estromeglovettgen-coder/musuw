@@ -304,6 +304,9 @@ func RegisterSystemAdminRoutes(
 		g.apiKeyRoute(adminRoutes, http.MethodPut, "/tenants/:id/openrouter-credits",
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
 			handler.UpdateManagedTenantOpenRouterCredits)
+		g.apiKeyRoute(adminRoutes, http.MethodGet, "/users/:user_id/investigation",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsRead, types.APIKeyCapabilitySystemTenantsManage),
+			handler.InvestigateManagedUser)
 
 		// Platform-wide audit feed (tenant_id=0 rows). Covers
 		// system.setting_changed / system.admin_promoted /

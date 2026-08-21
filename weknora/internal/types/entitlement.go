@@ -38,14 +38,22 @@ type ConsumerPlanLimits struct {
 
 type ConsumerEntitlement struct {
 	ConsumerPlanLimits
-	PlanStatus                  string                  `json:"plan_status"`
-	StorageUsed                 int64                   `json:"storage_used"`
-	OpenRouterUsedMicrousd      int64                   `json:"openrouter_used_microusd"`
-	OpenRouterRemainingMicrousd int64                   `json:"openrouter_remaining_microusd"`
-	OpenRouterResetsAt          *time.Time              `json:"openrouter_resets_at,omitempty"`
-	OpenRouterCreditsStatus     OpenRouterCreditsStatus `json:"openrouter_credits_status"`
-	PaddleCustomerID            string                  `json:"-"`
-	PaddleSubscriptionID        string                  `json:"-"`
+	PlanStatus                  string `json:"plan_status"`
+	StorageUsed                 int64  `json:"storage_used"`
+	OpenRouterUsedMicrousd      int64  `json:"openrouter_used_microusd"`
+	OpenRouterRemainingMicrousd int64  `json:"openrouter_remaining_microusd"`
+	// Provider-backed usage is kept separate from the consumer-facing
+	// allowance projection. OpenRouter reports lifetime key usage/remaining;
+	// the consumer fields above are the current plan period after our plan
+	// boundary is applied. These fields are intentionally not serialized by
+	// generic entitlement responses; operator projections may expose them
+	// under explicit provider_* names.
+	OpenRouterProviderUsedMicrousd      int64                   `json:"-"`
+	OpenRouterProviderRemainingMicrousd int64                   `json:"-"`
+	OpenRouterResetsAt                  *time.Time              `json:"openrouter_resets_at,omitempty"`
+	OpenRouterCreditsStatus             OpenRouterCreditsStatus `json:"openrouter_credits_status"`
+	PaddleCustomerID                    string                  `json:"-"`
+	PaddleSubscriptionID                string                  `json:"-"`
 }
 
 func NormalizeConsumerPlan(plan ConsumerPlan) ConsumerPlan {

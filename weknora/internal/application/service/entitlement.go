@@ -86,6 +86,11 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 	// ensureAllowanceCurrent may advance a free/yearly tenant to its next
 	// personal period. Return that new boundary in the same response.
 	current.OpenRouterResetsAt = entitlementResetAt(tenant, plan, at)
+	// Preserve the provider's raw key counters separately from the consumer
+	// period projection below. OpenRouter usage is provider/lifetime state;
+	// the consumer fields are plan-scoped and may be clamped.
+	current.OpenRouterProviderUsedMicrousd = nonNegativeMicrousd(info.UsageMicrousd)
+	current.OpenRouterProviderRemainingMicrousd = nonNegativeMicrousd(info.LimitRemainingMicrousd)
 	remaining := clampMicrousd(info.LimitRemainingMicrousd, 0, limits.MonthlyOpenRouterMicrousd)
 	current.OpenRouterUsedMicrousd = limits.MonthlyOpenRouterMicrousd - remaining
 	current.OpenRouterRemainingMicrousd = remaining
@@ -110,7 +115,7 @@ func (s *entitlementService) CurrentForTenant(ctx context.Context, tenantID uint
 // child key's remaining allowance without adding a local usage counter. The
 // absolute provider limit is lifetime usage plus the requested remainder,
 // exactly as the normal entitlement path does. Requests are bounded by the
-// effective plan allowance and cannot mutate Paddle or the persisted plan.
+// existing Max plan allowance and cannot mutate Paddle or the persisted plan.
 func (s *entitlementService) SetOpenRouterRemainingForTenant(ctx context.Context, tenantID uint64, remainingMicrousd int64) (*types.ConsumerEntitlement, error) {
 	if tenantID == 0 {
 		return nil, fmt.Errorf("tenant ID must be positive")
@@ -126,11 +131,14 @@ func (s *entitlementService) SetOpenRouterRemainingForTenant(ctx context.Context
 		unlock()
 		return nil, err
 	}
-	plan := types.EffectiveConsumerPlan(tenant)
-	allowance := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
+	// A SystemAdmin may grant a bounded one-cycle compensation amount even to
+	// a lower plan, but never beyond the existing Max product allowance. The
+	// next period refresh re-applies the tenant's effective plan through the
+	// normal entitlement path; no local usage ledger is introduced.
+	allowance := types.LimitsForConsumerPlan(types.ConsumerPlanMax).MonthlyOpenRouterMicrousd
 	if remainingMicrousd > allowance {
 		unlock()
-		return nil, fmt.Errorf("remaining OpenRouter credits cannot exceed current plan allowance")
+		return nil, fmt.Errorf("remaining OpenRouter credits cannot exceed the Max plan allowance")
 	}
 	stored := openRouterCredentialsFromTenant(tenant)
 	if stored == nil || strings.TrimSpace(stored.KeyHash) == "" {
@@ -638,6 +646,13 @@ func clampMicrousd(value, minimum, maximum int64) int64 {
 	}
 	if value > maximum {
 		return maximum
+	}
+	return value
+}
+
+func nonNegativeMicrousd(value int64) int64 {
+	if value < 0 {
+		return 0
 	}
 	return value
 }

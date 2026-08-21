@@ -11,9 +11,12 @@ OpenRouter billing rules.
   service and OpenRouter-managed child-key usage.
 - Add a whitelist-only tenant mutation for account status and storage quota.
 - Add a provider-backed OpenRouter remaining-credit adjustment/reset bounded by
-  the current plan allowance; Paddle plan and billing state remain webhook/API
-  owned.
+  the existing Max plan allowance; Paddle plan and billing state remain
+  webhook/API owned.
 - Record each successful operator mutation in the existing system audit log.
+- Add one bounded read-only user investigation projection for support
+  correlations, reusing existing repositories and explicitly redacting user
+  content, attachments, provider keys, and task/span payloads.
 
 ## Out of Scope
 

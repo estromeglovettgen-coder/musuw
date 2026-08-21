@@ -81,13 +81,15 @@ func TestGetManagedTenantEntitlementReturnsProviderStatusAndUsage(t *testing.T) 
 			PaddleBillingPeriod: "monthly", PaddleCurrentPeriodEnd: &periodEnd,
 		}},
 		entitlementSvc: &managedEntitlementServiceStub{current: &types.ConsumerEntitlement{
-			ConsumerPlanLimits:          types.LimitsForConsumerPlan(types.ConsumerPlanPro),
-			PlanStatus:                  "active",
-			StorageUsed:                 1024,
-			OpenRouterUsedMicrousd:      500_000,
-			OpenRouterRemainingMicrousd: 2_000_000,
-			OpenRouterResetsAt:          &periodEnd,
-			OpenRouterCreditsStatus:     types.OpenRouterCreditsUnavailable,
+			ConsumerPlanLimits:                  types.LimitsForConsumerPlan(types.ConsumerPlanPro),
+			PlanStatus:                          "active",
+			StorageUsed:                         1024,
+			OpenRouterUsedMicrousd:              500_000,
+			OpenRouterRemainingMicrousd:         2_000_000,
+			OpenRouterProviderUsedMicrousd:      750_000,
+			OpenRouterProviderRemainingMicrousd: 3_500_000,
+			OpenRouterResetsAt:                  &periodEnd,
+			OpenRouterCreditsStatus:             types.OpenRouterCreditsUnavailable,
 		}},
 	}
 	r := managedTenantOpsRouter(h)
@@ -101,6 +103,9 @@ func TestGetManagedTenantEntitlementReturnsProviderStatusAndUsage(t *testing.T) 
 	assert.Equal(t, "pro", data["plan"])
 	assert.Equal(t, "unavailable", data["openrouter_credits_status"])
 	assert.Equal(t, float64(1024), data["storage_used_bytes"])
+	assert.Equal(t, float64(2_500_000), data["openrouter_consumer_allowance_microusd"])
+	assert.Equal(t, float64(750_000), data["openrouter_provider_used_microusd"])
+	assert.Equal(t, float64(3_500_000), data["openrouter_provider_remaining_microusd"])
 	assert.NotContains(t, w.Body.String(), "api_key")
 }
 

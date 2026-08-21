@@ -25,7 +25,7 @@ type EntitlementService interface {
 	OpenRouterUserID(ctx context.Context) string
 	// SetOpenRouterRemainingForTenant changes only the existing provider-managed
 	// child key's remaining allowance. The provider lifetime usage remains the
-	// authority; callers cannot exceed the current plan allowance.
+	// authority; callers cannot exceed the fixed Max plan allowance.
 	SetOpenRouterRemainingForTenant(ctx context.Context, tenantID uint64, remainingMicrousd int64) (*types.ConsumerEntitlement, error)
 	ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd *time.Time) (bool, error)
 	RefreshPaidAllowance(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error)

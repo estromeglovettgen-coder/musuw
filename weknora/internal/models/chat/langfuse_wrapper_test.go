@@ -57,6 +57,13 @@ func TestBuildLangfuseMessagesReasoningContent(t *testing.T) {
 	}
 }
 
+func TestBuildLangfuseModelParamsIncludesReasoningEffort(t *testing.T) {
+	params := buildLangfuseModelParams(&ChatOptions{ReasoningEffort: "high"})
+	if params["reasoning_effort"] != "high" {
+		t.Fatalf("reasoning_effort = %v; want high", params["reasoning_effort"])
+	}
+}
+
 func TestConvertUsageIncludesPromptCacheCounters(t *testing.T) {
 	got := convertUsage(&types.TokenUsage{
 		PromptTokens: 1000, CompletionTokens: 50, TotalTokens: 1050,

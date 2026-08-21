@@ -65,6 +65,15 @@ type SystemHandler struct {
 	// singleton tenant.StorageEngineConfig. Optional — nil in partially-wired
 	// unit tests, in which case only the legacy config is consulted.
 	storageBackendRepo interfaces.StorageBackendRepository
+	// Investigation dependencies reuse existing read-only repositories. They
+	// are optional so Lite/partial wiring can report an explicit unavailable
+	// section rather than inventing data or failing the whole view.
+	sessionRepo       interfaces.SessionRepository
+	messageRepo       interfaces.MessageRepository
+	knowledgeBaseRepo interfaces.KnowledgeBaseRepository
+	knowledgeRepo     interfaces.KnowledgeRepository
+	knowledgeSpanRepo repository.KnowledgeSpanRepository
+	deadLetterRepo    interfaces.TaskDeadLetterRepository
 }
 
 // NewSystemHandler creates a new system handler
@@ -80,6 +89,12 @@ func NewSystemHandler(cfg *config.Config,
 	taskInspector interfaces.TaskInspector,
 	knowledgeSvc interfaces.KnowledgeService,
 	storageBackendRepo interfaces.StorageBackendRepository,
+	sessionRepo interfaces.SessionRepository,
+	messageRepo interfaces.MessageRepository,
+	knowledgeBaseRepo interfaces.KnowledgeBaseRepository,
+	knowledgeRepo interfaces.KnowledgeRepository,
+	knowledgeSpanRepo repository.KnowledgeSpanRepository,
+	deadLetterRepo interfaces.TaskDeadLetterRepository,
 ) *SystemHandler {
 	return &SystemHandler{
 		cfg:                cfg,
@@ -94,6 +109,12 @@ func NewSystemHandler(cfg *config.Config,
 		taskInspector:      taskInspector,
 		knowledgeSvc:       knowledgeSvc,
 		storageBackendRepo: storageBackendRepo,
+		sessionRepo:        sessionRepo,
+		messageRepo:        messageRepo,
+		knowledgeBaseRepo:  knowledgeBaseRepo,
+		knowledgeRepo:      knowledgeRepo,
+		knowledgeSpanRepo:  knowledgeSpanRepo,
+		deadLetterRepo:     deadLetterRepo,
 	}
 }
 
@@ -107,25 +128,33 @@ type platformAPIKeyCreateRequest struct {
 // workspace. It deliberately contains no credentials or raw provider keys;
 // OpenRouter usage remains provider-backed through EntitlementService.
 type systemTenantEntitlementResponse struct {
-	TenantID                  uint64                        `json:"tenant_id"`
-	TenantName                string                        `json:"tenant_name"`
-	TenantStatus              string                        `json:"tenant_status"`
-	ConfiguredPlan            types.ConsumerPlan            `json:"configured_plan"`
-	Plan                      types.ConsumerPlan            `json:"plan"`
-	PlanStatus                string                        `json:"plan_status"`
-	StorageQuotaBytes         int64                         `json:"storage_quota_bytes"`
-	StorageUsedBytes          int64                         `json:"storage_used_bytes"`
-	StorageUsagePercent       float64                       `json:"storage_usage_percent"`
-	BillingPeriod             string                        `json:"billing_period,omitempty"`
-	PaddleCustomerID          string                        `json:"paddle_customer_id,omitempty"`
-	PaddleSubscriptionID      string                        `json:"paddle_subscription_id,omitempty"`
-	PaddleCurrentPeriodEnd    *time.Time                    `json:"paddle_current_period_end,omitempty"`
-	OpenRouterCreditPeriodEnd *time.Time                    `json:"openrouter_credit_period_end,omitempty"`
-	OpenRouterMonthlyLimit    int64                         `json:"openrouter_monthly_limit_microusd"`
-	OpenRouterUsed            int64                         `json:"openrouter_used_microusd"`
-	OpenRouterRemaining       int64                         `json:"openrouter_remaining_microusd"`
-	OpenRouterResetAt         *time.Time                    `json:"openrouter_resets_at,omitempty"`
-	OpenRouterCreditsStatus   types.OpenRouterCreditsStatus `json:"openrouter_credits_status"`
+	TenantID                  uint64             `json:"tenant_id"`
+	TenantName                string             `json:"tenant_name"`
+	TenantStatus              string             `json:"tenant_status"`
+	ConfiguredPlan            types.ConsumerPlan `json:"configured_plan"`
+	Plan                      types.ConsumerPlan `json:"plan"`
+	PlanStatus                string             `json:"plan_status"`
+	StorageQuotaBytes         int64              `json:"storage_quota_bytes"`
+	StorageUsedBytes          int64              `json:"storage_used_bytes"`
+	StorageUsagePercent       float64            `json:"storage_usage_percent"`
+	BillingPeriod             string             `json:"billing_period,omitempty"`
+	PaddleCustomerID          string             `json:"paddle_customer_id,omitempty"`
+	PaddleSubscriptionID      string             `json:"paddle_subscription_id,omitempty"`
+	PaddleCurrentPeriodEnd    *time.Time         `json:"paddle_current_period_end,omitempty"`
+	OpenRouterCreditPeriodEnd *time.Time         `json:"openrouter_credit_period_end,omitempty"`
+	OpenRouterMonthlyLimit    int64              `json:"openrouter_monthly_limit_microusd"`
+	OpenRouterUsed            int64              `json:"openrouter_used_microusd"`
+	OpenRouterRemaining       int64              `json:"openrouter_remaining_microusd"`
+	// The legacy fields above remain the consumer-period projection consumed
+	// by the existing console. Explicitly named fields prevent operators from
+	// confusing that clamped allowance with OpenRouter's raw key counters.
+	OpenRouterConsumerAllowance int64                         `json:"openrouter_consumer_allowance_microusd"`
+	OpenRouterConsumerUsed      int64                         `json:"openrouter_consumer_used_microusd"`
+	OpenRouterConsumerRemaining int64                         `json:"openrouter_consumer_remaining_microusd"`
+	OpenRouterProviderUsed      int64                         `json:"openrouter_provider_used_microusd"`
+	OpenRouterProviderRemaining int64                         `json:"openrouter_provider_remaining_microusd"`
+	OpenRouterResetAt           *time.Time                    `json:"openrouter_resets_at,omitempty"`
+	OpenRouterCreditsStatus     types.OpenRouterCreditsStatus `json:"openrouter_credits_status"`
 }
 
 type systemTenantUpdateRequest struct {
@@ -155,25 +184,30 @@ func newSystemTenantEntitlementResponse(tenant *types.Tenant, current *types.Con
 		usagePercent = float64(tenant.StorageUsed) * 100 / float64(tenant.StorageQuota)
 	}
 	return &systemTenantEntitlementResponse{
-		TenantID:                  tenant.ID,
-		TenantName:                tenant.Name,
-		TenantStatus:              tenant.Status,
-		ConfiguredPlan:            types.NormalizeConsumerPlan(tenant.Plan),
-		Plan:                      current.Plan,
-		PlanStatus:                current.PlanStatus,
-		StorageQuotaBytes:         tenant.StorageQuota,
-		StorageUsedBytes:          tenant.StorageUsed,
-		StorageUsagePercent:       usagePercent,
-		BillingPeriod:             tenant.PaddleBillingPeriod,
-		PaddleCustomerID:          tenant.PaddleCustomerID,
-		PaddleSubscriptionID:      tenant.PaddleSubscriptionID,
-		PaddleCurrentPeriodEnd:    tenant.PaddleCurrentPeriodEnd,
-		OpenRouterCreditPeriodEnd: tenant.OpenRouterCreditPeriodEnd,
-		OpenRouterMonthlyLimit:    current.MonthlyOpenRouterMicrousd,
-		OpenRouterUsed:            current.OpenRouterUsedMicrousd,
-		OpenRouterRemaining:       current.OpenRouterRemainingMicrousd,
-		OpenRouterResetAt:         current.OpenRouterResetsAt,
-		OpenRouterCreditsStatus:   current.OpenRouterCreditsStatus,
+		TenantID:                    tenant.ID,
+		TenantName:                  tenant.Name,
+		TenantStatus:                tenant.Status,
+		ConfiguredPlan:              types.NormalizeConsumerPlan(tenant.Plan),
+		Plan:                        current.Plan,
+		PlanStatus:                  current.PlanStatus,
+		StorageQuotaBytes:           tenant.StorageQuota,
+		StorageUsedBytes:            tenant.StorageUsed,
+		StorageUsagePercent:         usagePercent,
+		BillingPeriod:               tenant.PaddleBillingPeriod,
+		PaddleCustomerID:            tenant.PaddleCustomerID,
+		PaddleSubscriptionID:        tenant.PaddleSubscriptionID,
+		PaddleCurrentPeriodEnd:      tenant.PaddleCurrentPeriodEnd,
+		OpenRouterCreditPeriodEnd:   tenant.OpenRouterCreditPeriodEnd,
+		OpenRouterMonthlyLimit:      current.MonthlyOpenRouterMicrousd,
+		OpenRouterUsed:              current.OpenRouterUsedMicrousd,
+		OpenRouterRemaining:         current.OpenRouterRemainingMicrousd,
+		OpenRouterConsumerAllowance: current.MonthlyOpenRouterMicrousd,
+		OpenRouterConsumerUsed:      current.OpenRouterUsedMicrousd,
+		OpenRouterConsumerRemaining: current.OpenRouterRemainingMicrousd,
+		OpenRouterProviderUsed:      current.OpenRouterProviderUsedMicrousd,
+		OpenRouterProviderRemaining: current.OpenRouterProviderRemainingMicrousd,
+		OpenRouterResetAt:           current.OpenRouterResetsAt,
+		OpenRouterCreditsStatus:     current.OpenRouterCreditsStatus,
 	}
 }
 

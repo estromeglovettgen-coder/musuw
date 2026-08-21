@@ -5,8 +5,9 @@
 The system SHALL expose a SystemAdmin/platform-key snapshot for an explicit
 tenant using the existing tenant and entitlement services. The response SHALL
 include storage quota/used bytes, configured and effective plan/status,
-verified billing period metadata, OpenRouter used/remaining/reset/status, and
-MUST NOT include provider credentials.
+verified billing period metadata, consumer-period OpenRouter
+allowance/used/remaining/reset/status, and explicit provider raw
+used/remaining counters. It MUST NOT include provider credentials.
 
 #### Scenario: Provider usage is available
 
@@ -35,9 +36,10 @@ plan, Paddle, credential, and arbitrary tenant fields and SHALL audit success.
 ### Requirement: OpenRouter support adjustment uses the provider authority
 
 The system SHALL adjust an existing tenant child key through the official
-OpenRouter KeyManager and SHALL bound remaining credits by the current plan's
-allowance. `reset:true` SHALL restore that allowance. It MUST NOT add a local
-usage ledger or mutate Paddle state and SHALL audit success.
+OpenRouter KeyManager and SHALL bound manually supplied remaining credits by
+the existing Max plan allowance (5,000,000 microusd). `reset:true` SHALL
+restore the tenant's current effective plan allowance. It MUST NOT add a
+local usage ledger or mutate Paddle state and SHALL audit success.
 
 #### Scenario: Operator resets remaining credits
 
@@ -47,6 +49,36 @@ usage ledger or mutate Paddle state and SHALL audit success.
 
 #### Scenario: Operator requests an out-of-range amount
 
-- **WHEN** `remaining_microusd` exceeds the current plan allowance or is
+- **WHEN** `remaining_microusd` exceeds the Max allowance or is
   negative
 - **THEN** the request is rejected without a provider update
+
+### Requirement: Operators can investigate one user without sensitive payloads
+
+The system SHALL expose a bounded read-only investigation projection for an
+explicit user and optional tenant. It SHALL reuse existing user/tenant,
+entitlement, session/message, audit, knowledge/document, processing-span,
+dead-letter, and runtime queue read paths. Session/message entries SHALL
+include only IDs, timestamps, request/model/agent/channel/reasoning metadata,
+and completion state. Knowledge failures SHALL include document status and
+bounded error summaries; processing spans SHALL include correlation IDs,
+status and bounded error summaries. The response MUST NOT include prompts,
+message content, attachments, span input/output/metadata, provider keys, or
+pending/dead-letter raw payloads. Langfuse/OpenRouter trace fields SHALL be
+returned when the existing provider-backed data is available; otherwise each
+source SHALL explicitly report `available=false` and a reason.
+
+#### Scenario: Support operator investigates a user
+
+- **WHEN** a permitted operator requests
+  `GET /api/v1/system/admin/users/:user_id/investigation`
+- **THEN** the response returns bounded user/tenant/session/knowledge/audit
+  correlations and safe runtime status, with model and reasoning-effort
+  metadata where persisted
+
+#### Scenario: Optional observability is not configured
+
+- **WHEN** Langfuse query access or a runtime backend is unavailable
+- **THEN** the investigation remains readable and the corresponding section
+  reports `available=false` rather than returning an empty success that looks
+  authoritative
