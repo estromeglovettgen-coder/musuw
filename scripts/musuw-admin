@@ -17,6 +17,7 @@ admin_port='4186'
 test_db_port='15432'
 production_tunnel_port='15433'
 production_container='weknora-v072-production-postgres'
+production_ssh_target='musuw-production'
 admin_uid="$(id -u)"
 ssh_control_socket="/tmp/musuw-admin-ssh-${admin_uid}.sock"
 
@@ -90,34 +91,10 @@ safe_ssh_target() {
     esac
 }
 
-infer_production_ssh_target() {
-    local explicit_target="${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-}"
-    local ssh_config="${HOME:?}/.ssh/config"
-    local candidate resolved_user
-    local -a root_targets=()
-
-    if [ -n "$explicit_target" ]; then
-        safe_ssh_target "$explicit_target" || die 'MUSUW_ADMIN_PRODUCTION_SSH_TARGET is unsafe'
-        printf '%s' "$explicit_target"
-        return
-    fi
-
-    [ -r "$ssh_config" ] || die 'no readable SSH config; set MUSUW_ADMIN_PRODUCTION_SSH_TARGET'
-    while IFS= read -r candidate; do
-        safe_ssh_target "$candidate" || continue
-        resolved_user="$(ssh -G "$candidate" 2>/dev/null | awk '$1 == "user" { print $2; exit }')"
-        [ "$resolved_user" = 'root' ] && root_targets+=( "$candidate" )
-    done < <(awk '
-        tolower($1) == "host" {
-            for (i = 2; i <= NF; i++) {
-                if ($i !~ /[*?!]/) print $i
-            }
-        }
-    ' "$ssh_config")
-
-    [ "${#root_targets[@]}" -eq 1 ] || \
-        die 'cannot infer one production root SSH target; set MUSUW_ADMIN_PRODUCTION_SSH_TARGET'
-    printf '%s' "${root_targets[0]}"
+resolve_production_ssh_target() {
+    local target="${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-$production_ssh_target}"
+    safe_ssh_target "$target" || die 'MUSUW_ADMIN_PRODUCTION_SSH_TARGET is unsafe'
+    printf '%s' "$target"
 }
 
 require_root_ssh_target() {
@@ -276,7 +253,7 @@ start_environment() {
             database_password="$(weknora_production_read_secret "$production_db_password")"
             database_name="$(read_env_value "$production_public_env" DB_NAME)"
             database_port="$(read_env_value "$production_public_env" DB_PORT)"
-            ssh_target="$(infer_production_ssh_target)"
+            ssh_target="$(resolve_production_ssh_target)"
             require_root_ssh_target "$ssh_target"
             container_ip="$(discover_production_container_ip "$ssh_target")"
             start_production_tunnel "$ssh_target" "$container_ip" "$database_port"
