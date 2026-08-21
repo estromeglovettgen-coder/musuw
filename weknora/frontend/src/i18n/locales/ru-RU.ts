@@ -5344,6 +5344,7 @@ export default {
   },
   knowledgeBase: {
     title: 'База знаний',
+    moreOptions: 'Дополнительные действия',
     fileContent: 'Содержимое файла',
     name: 'Название',
     description: 'Описание',

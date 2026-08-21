@@ -5344,6 +5344,7 @@ export default {
   },
   knowledgeBase: {
     title: '지식베이스',
+    moreOptions: '더 보기',
     fileContent: '파일 내용',
     name: '이름',
     description: '설명',

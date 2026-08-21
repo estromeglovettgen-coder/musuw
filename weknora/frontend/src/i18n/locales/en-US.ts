@@ -326,6 +326,7 @@ export default {
   },
   knowledgeBase: {
     title: 'Knowledge Base',
+    moreOptions: 'More options',
     fileContent: 'File Content',
     accessInfo: {
       myRole: 'My role',

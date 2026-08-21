@@ -5344,6 +5344,7 @@ export default {
   },
   knowledgeBase: {
     title: '知识库',
+    moreOptions: '更多操作',
     fileContent: '文件内容',
     name: '名称',
     description: '描述',
