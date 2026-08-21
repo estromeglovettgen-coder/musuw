@@ -28,7 +28,7 @@ const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/KnowledgeBase.pre-view.vue': 'b9e9d9b2d3f09ebaf02bbe543681fdc90ae357df',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
-  './business-baselines/menu.pre-view.vue': '99a2c17c59bbd5b436492bba60a206b87400b527',
+  './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',
 }
 
 // These controllers remain byte-identical to Musuw's first source baseline.
@@ -57,6 +57,10 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
     authority: 'WeKnora v0.7.2 native knowledge scopes with Musuw platform-default model provisioning',
+  },
+  sidebar: {
+    resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/menu.pre-view.vue'],
+    authority: 'WeKnora v0.7.2 session behavior without requests to product-hidden channel APIs in Musuw Lite',
   },
 }
 
@@ -101,9 +105,14 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),
   )
+  assert.equal(
+    INTENTIONAL_BEHAVIOR_EVOLUTION.sidebar.resultingBlob,
+    gitBlobSha(read('./business-baselines/menu.pre-view.vue')),
+  )
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.authority, /WeKnora v0\.7\.2/)
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.authority, /WeKnora v0\.7\.2/)
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.authority, /WeKnora v0\.7\.2/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.sidebar.authority, /WeKnora v0\.7\.2/)
 })
 
 test('knowledge list controller retains upstream scope behavior rather than Musuw single-scope narrowing', () => {

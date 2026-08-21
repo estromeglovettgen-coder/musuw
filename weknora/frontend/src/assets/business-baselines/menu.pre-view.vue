@@ -214,7 +214,6 @@ import { useCommandPaletteStore } from "@/stores/commandPalette";
 import { MessagePlugin, DialogPlugin, Icon as TIcon } from "tdesign-vue-next";
 import UserMenu from "@/components/UserMenu.vue";
 import { useI18n } from "vue-i18n";
-import { getSystemInfo } from "@/api/system";
 import wecomLogo from "@/assets/img/im/wecom.svg";
 import feishuLogo from "@/assets/img/im/feishu.svg";
 import larkLogo from "@/assets/img/im/lark.svg";
@@ -661,6 +660,11 @@ async function loadCurrentKbInfo(kbId: string) {
   } else currentKbInfo.value = null;
 }
 const loadSessionOriginMeta = async () => {
+  if (authStore.isLiteMode) {
+    imPlatforms.value = [];
+    embedChannelNames.value = {};
+    return;
+  }
   try {
     const res: any = await listAllIMChannels();
     imPlatforms.value = configuredPlatforms(res?.data || []);
@@ -690,7 +694,6 @@ onMounted(async () => {
   currentpath.value = routeName;
   if (route.params.chatid) currentSecondpath.value = `chat/${route.params.chatid}`;
   window.addEventListener(SESSION_MUTATION_EVENT, handleSessionMutation);
-  getSystemInfo().then((res) => { if (res.data?.edition === "lite") authStore.setLiteMode(true); }).catch(() => {});
   await loadCurrentKbInfo((route.params as any)?.kbId as string);
   await loadSessionOriginMeta();
   await getMessageList();

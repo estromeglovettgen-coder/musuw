@@ -19,6 +19,7 @@ const workspaceOnboarding = read("../views/auth/WorkspaceOnboarding.vue");
 const commandPaletteStore = read("../stores/commandPalette.ts");
 const commandPalette = read("../components/GlobalCommandPalette.vue");
 const inputBusiness = read("../assets/business-baselines/Input-field.pre-view.vue");
+const sidebarBusiness = read("../assets/business-baselines/menu.pre-view.vue");
 
 /**
  * Musuw product exposure policy:
@@ -49,6 +50,14 @@ test("server Edition owns Lite activation and clears stale browser workspace sta
   assert.match(router, /authStore\.setLiteMode\(isLite\)/);
   assert.match(router, /if \(isLite\) authStore\.setSelectedTenant\(null\)/);
   assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
+  assert.doesNotMatch(sidebarBusiness, /getSystemInfo/);
+});
+
+test("Lite sidebar does not request hidden IM or embed channel metadata", () => {
+  assert.match(
+    sidebarBusiness,
+    /if \(authStore\.isLiteMode\) \{[\s\S]*imPlatforms\.value = \[\];[\s\S]*embedChannelNames\.value = \{\};[\s\S]*return;/,
+  );
 });
 
 test("Lite route guard blocks hidden pages and allows only consumer Settings sections", () => {
