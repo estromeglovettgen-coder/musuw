@@ -8,7 +8,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 
 test('audited KnowledgeBase controller remains locked after managed video support', () => {
   const controller = read('./business-baselines/KnowledgeBase.pre-view.vue')
-  assert.equal(blobSha(controller), 'b9e9d9b2d3f09ebaf02bbe543681fdc90ae357df')
+  assert.equal(blobSha(controller), '75996e898b170fe61e0c32eac39ca71b79bee9a0')
 })
 
 test('rebuilt KnowledgeBase reuses normalized frozen setup and keeps Graph host binding intact', () => {

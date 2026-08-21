@@ -171,7 +171,9 @@ onMounted(() => { void loadEntitlement() })
 const planPrice = (plan: ConsumerPlan) => {
   if (plan === 'free') return t('entitlement.freePrice')
   const priceId = billing.value?.catalog?.[plan]?.[period.value]?.price_id
-  if (priceId && localizedPrices.value[priceId]) return localizedPrices.value[priceId]
+  if (priceId && localizedPrices.value[priceId]) {
+    return localizedPrices.value[priceId].replace(/[.,]00(?=[^\d]*$)/, '')
+  }
   return pricePreviewLoading.value ? '…' : t('entitlement.unavailable')
 }
 

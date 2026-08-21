@@ -314,10 +314,10 @@ const canDownloadKnowledge = computed(() => {
 });
 
 const knowledgeList = ref<Array<{ id: string; name: string; type?: string }>>([]);
-let { cardList, total, moreIndex, details, getKnowled, delKnowledge, openMore, onVisibleChange: _onVisibleChange, getCardDetails, getfDetails } = useKnowledgeBase(kbId.value)
+let { cardList, total, moreIndex, details, getKnowled, delKnowledge, openMore, onVisibleChange: setMoreVisibility, getCardDetails, getfDetails } = useKnowledgeBase(kbId.value)
 
 const onVisibleChange = (visible: boolean) => {
-  _onVisibleChange(visible);
+  setMoreVisibility(visible);
   if (!visible) {
     moveMenuMode.value = 'normal';
   }
@@ -547,6 +547,7 @@ const fileTypeOptions = computed(() => [
   { label: 'M4A', value: 'm4a' },
   { label: 'FLAC', value: 'flac' },
   { label: 'OGG', value: 'ogg' },
+  ...UPLOAD_VIDEO_EXTENSIONS.map(value => ({ label: value.toUpperCase(), value })),
 ]);
 const selectedParseStatus = ref('');
 const parseStatusOptions = computed(() => [

@@ -25,7 +25,7 @@ const OPENROUTER_VIDEO_INGESTION_COMMIT = '22052ccf08c5ab2e370d94ea2508359aa367d
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': '3e606571962c8d0b3838610b4cc7977ddbe3021e',
   './business-baselines/Input-field.pre-view.vue': '98ecf8a3e51398e9afa71459235ab76d6ff79e39',
-  './business-baselines/KnowledgeBase.pre-view.vue': 'b9e9d9b2d3f09ebaf02bbe543681fdc90ae357df',
+  './business-baselines/KnowledgeBase.pre-view.vue': '75996e898b170fe61e0c32eac39ca71b79bee9a0',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',

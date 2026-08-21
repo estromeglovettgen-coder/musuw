@@ -12,3 +12,4 @@
 
 - [x] 3.1 Confirm the real OpenRouter model accepts a bounded local video.
 - [x] 3.2 Run focused checks and a browser upload through the local stack.
+- [x] 3.3 Confirm the native upload and file-type filter both expose the same four managed video containers.
