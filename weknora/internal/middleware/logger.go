@@ -23,13 +23,14 @@ const (
 // loggerResponseBodyWriter 自定义ResponseWriter用于捕获响应内容（用于logger中间件）
 type loggerResponseBodyWriter struct {
 	gin.ResponseWriter
-	body *bytes.Buffer
+	body    *bytes.Buffer
+	capture bool
 }
 
 // Write 重写Write方法，同时写入buffer和原始writer
 // 限制buffer大小，避免SSE等流式响应导致内存无限增长
 func (r loggerResponseBodyWriter) Write(b []byte) (int, error) {
-	if r.body.Len() < maxBodySize {
+	if r.capture && r.ResponseWriter.Status() >= 400 && r.body.Len() < maxBodySize {
 		remaining := maxBodySize - r.body.Len()
 		if len(b) <= remaining {
 			r.body.Write(b)
@@ -87,6 +88,15 @@ func shouldLogBodies(path string) bool {
 	return path != "/api/v1/auth" &&
 		!strings.HasPrefix(path, "/api/v1/auth/") &&
 		path != "/api/v1/billing/paddle/webhook"
+}
+
+// Successful response payloads are normal application data, not access-log
+// diagnostics. Keeping them out of the generic logger avoids duplicating large
+// agent prompts, knowledge-base metadata, and user content on every page load.
+// Failed ordinary API calls retain a bounded payload for diagnosis; auth and
+// payment bodies remain excluded regardless of status.
+func shouldLogBodyPayload(path string, statusCode int) bool {
+	return statusCode >= 400 && shouldLogBodies(path)
 }
 
 // readRequestBody 读取请求体（限制大小用于日志，但完整读取用于重置）
@@ -164,8 +174,10 @@ func RequestID() gin.HandlerFunc {
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		path := c.Request.URL.Path
+		routePath := c.Request.URL.Path
+		path := routePath
 		raw := c.Request.URL.RawQuery
+		bodyLoggingAllowed := shouldLogBodies(routePath)
 
 		isWikiStats := strings.HasPrefix(path, "/api/v1/knowledgebase/") && strings.HasSuffix(path, "/wiki/stats")
 		if strings.HasPrefix(path, "/assets/") || isWikiStats {
@@ -175,7 +187,7 @@ func Logger() gin.HandlerFunc {
 
 		// 读取请求体（在Next之前读取，因为Next会消费body）
 		var requestBody string
-		if shouldLogBodies(path) && (c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH") {
+		if bodyLoggingAllowed && (c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH") {
 			requestBody = readRequestBody(c)
 		}
 
@@ -184,6 +196,7 @@ func Logger() gin.HandlerFunc {
 		responseWriter := &loggerResponseBodyWriter{
 			ResponseWriter: c.Writer,
 			body:           responseBody,
+			capture:        bodyLoggingAllowed,
 		}
 		c.Writer = responseWriter
 
@@ -214,7 +227,7 @@ func Logger() gin.HandlerFunc {
 
 		// 读取响应体
 		responseBodyStr := ""
-		if shouldLogBodies(path) && responseBody.Len() > 0 {
+		if shouldLogBodyPayload(routePath, statusCode) && responseBody.Len() > 0 {
 			contentType := c.Writer.Header().Get("Content-Type")
 			if strings.Contains(contentType, "text/event-stream") {
 				responseBodyStr = "[SSE流式响应，已跳过]"
@@ -245,7 +258,7 @@ func Logger() gin.HandlerFunc {
 		})
 
 		// 添加请求体（如果有）
-		if requestBody != "" {
+		if requestBody != "" && shouldLogBodyPayload(routePath, statusCode) {
 			logMsg = logMsg.WithField("request_body", secutils.SanitizeForLog(requestBody))
 		}
 

@@ -86,6 +86,21 @@ func TestShouldLogBodies(t *testing.T) {
 		t.Fatal("payment webhook request and response bodies must not be logged")
 	}
 	if !shouldLogBodies("/api/v1/knowledge-bases") {
-		t.Fatal("ordinary API bodies should remain observable")
+		t.Fatal("failed ordinary API bodies should remain observable")
+	}
+}
+
+func TestShouldLogBodyPayload(t *testing.T) {
+	if shouldLogBodyPayload("/api/v1/agents/builtin-smart-reasoning", 200) {
+		t.Fatal("successful response bodies must not be copied into access logs")
+	}
+	if !shouldLogBodyPayload("/api/v1/agents/builtin-smart-reasoning", 500) {
+		t.Fatal("failed ordinary API bodies should remain observable")
+	}
+	if shouldLogBodyPayload("/api/v1/auth/oidc/callback", 500) {
+		t.Fatal("authentication bodies must stay omitted even on failure")
+	}
+	if shouldLogBodyPayload("/api/v1/billing/paddle/webhook", 500) {
+		t.Fatal("payment webhook bodies must stay omitted even on failure")
 	}
 }
