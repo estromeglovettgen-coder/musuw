@@ -1,41 +1,41 @@
 <template>
   <div class="plans-page">
     <header class="plans-page__topbar">
-      <button type="button" class="plans-page__brand" :aria-label="$t('entitlement.backToProduct')" @click="leavePlans">
-        <img src="/musuw-logo.png" alt="" />
-      </button>
-      <button type="button" class="plans-page__close" :aria-label="$t('entitlement.backToProduct')" @click="leavePlans">
-        <t-icon name="close" />
+      <button type="button" class="plans-page__back" @click="leavePlans">
+        <t-icon name="chevron-left" />
+        <span>{{ $t('entitlement.backToProduct') }}</span>
       </button>
     </header>
 
     <main class="plans-page__main">
       <section class="plans-page__intro">
-        <h1>{{ $t('entitlement.pricingTitle') }}</h1>
-        <p>{{ $t('entitlement.pricingDescription') }}</p>
-        <div class="plans-page__period" role="group" :aria-label="$t('entitlement.choosePeriod')">
-          <button type="button" :class="{ 'is-active': period === 'monthly' }" :aria-pressed="period === 'monthly'" @click="period = 'monthly'">{{ $t('entitlement.monthly') }}</button>
-          <button type="button" :class="{ 'is-active': period === 'yearly' }" :aria-pressed="period === 'yearly'" @click="period = 'yearly'">{{ $t('entitlement.yearly') }}</button>
+        <div class="plans-page__intro-row">
+          <h1>{{ $t('entitlement.pricingTitle') }}</h1>
+          <div class="plans-page__period" role="group" :aria-label="$t('entitlement.choosePeriod')">
+            <button type="button" :class="{ 'is-active': period === 'monthly' }" :aria-pressed="period === 'monthly'" @click="period = 'monthly'">{{ $t('entitlement.monthly') }}</button>
+            <button type="button" :class="{ 'is-active': period === 'yearly' }" :aria-pressed="period === 'yearly'" @click="period = 'yearly'">{{ $t('entitlement.yearly') }}</button>
+          </div>
         </div>
+        <p>{{ $t('entitlement.pricingDescription') }}</p>
       </section>
 
       <div v-if="loading" class="plans-page__loading">{{ $t('common.loading') }}</div>
 
       <template v-else-if="entitlement">
-        <section class="plans-page__grid" :aria-label="$t('entitlement.pricingTitle')">
+        <section class="plans-page__grid" :style="{ '--plan-columns': visiblePlanCards.length }" :aria-label="$t('entitlement.pricingTitle')">
           <article
-            v-for="card in planCards"
+            v-for="card in visiblePlanCards"
             :key="card.plan"
             class="plan-card"
             :class="{
               'is-current': card.plan === entitlement.plan,
-              'is-recommended': card.plan === 'pro',
+              'is-recommended': card.plan === recommendedPlan,
               'is-target': card.plan === requestedPlan,
             }"
           >
             <div class="plan-card__heading">
               <h2>{{ $t(`entitlement.plans.${card.plan}`) }}</h2>
-              <span v-if="card.plan === 'pro'">{{ $t('entitlement.recommended') }}</span>
+              <span v-if="card.plan === recommendedPlan">{{ $t('entitlement.recommended') }}</span>
             </div>
             <p class="plan-card__description">{{ $t(card.descriptionKey) }}</p>
             <div class="plan-card__price">
@@ -109,6 +109,17 @@ const planCards: Array<{ plan: ConsumerPlan; descriptionKey: string }> = [
   { plan: 'pro', descriptionKey: 'entitlement.planDescriptions.pro' },
   { plan: 'max', descriptionKey: 'entitlement.planDescriptions.max' },
 ]
+const visiblePlanCards = computed(() => entitlement.value?.plan === 'free'
+  ? planCards
+  : planCards.filter((card) => card.plan !== 'free'))
+const recommendedPlan = computed<ConsumerPlan | null>(() => {
+  switch (entitlement.value?.plan) {
+    case 'free': return 'plus'
+    case 'plus': return 'pro'
+    case 'pro': return 'max'
+    default: return null
+  }
+})
 const initialPeriod = route.query.period === 'yearly' ? 'yearly' : 'monthly'
 const period = ref<BillingPeriod>(initialPeriod)
 const requestedPlan = computed<ConsumerPlan | null>(() => {
@@ -228,26 +239,22 @@ const leavePlans = () => { void router.push('/platform/knowledge-bases') }
 
 <style scoped lang="less">
 .plans-page { min-height: 100dvh; background: #fff; color: #0d0d0d; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-.plans-page__topbar { height: 68px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ededed; }
-.plans-page__brand,.plans-page__close { display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
-.plans-page__brand { width: 44px; height: 44px; padding: 3px; }
-.plans-page__brand img { width: 100%; height: 100%; object-fit: contain; }
-.plans-page__close { width: 40px; height: 40px; border-radius: 999px; font-size: 20px; }
-.plans-page__close:hover { background: #f2f2f2; }
-.plans-page__main { width: min(1360px,calc(100% - 64px)); margin: 0 auto; padding: 64px 0 44px; }
-.plans-page__intro { display: grid; justify-items: center; text-align: center; }
-.plans-page__intro h1 { margin: 0; font-size: clamp(36px,4vw,54px); line-height: 1.05; font-weight: 600; letter-spacing: -.045em; }
-.plans-page__intro p { max-width: 560px; margin: 16px 0 0; color: #5d5d5d; font-size: 16px; line-height: 25px; }
-.plans-page__period { margin-top: 28px; display: inline-flex; padding: 3px; border-radius: 999px; background: #f1f1f1; }
-.plans-page__period button { min-width: 96px; height: 38px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; color: #656565; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.plans-page__topbar { height: 52px; padding: 0 16px; display: flex; align-items: center; border-bottom: 1px solid #ededed; }
+.plans-page__back { height: 36px; padding: 0 10px 0 7px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 9px; background: transparent; color: #5f6368; font: inherit; font-size: 13px; cursor: pointer; }
+.plans-page__back:hover { background: #f2f2f2; color: #111; }
+.plans-page__main { width: min(1420px,calc(100% - 48px)); margin: 0 auto; padding: 28px 0 44px; }
+.plans-page__intro { text-align: left; }
+.plans-page__intro-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.plans-page__intro h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -.025em; }
+.plans-page__intro p { max-width: 680px; margin: 7px 0 0; color: #747474; font-size: 13px; line-height: 20px; }
+.plans-page__period { flex: 0 0 auto; display: inline-flex; padding: 3px; border-radius: 999px; background: #f1f1f1; }
+.plans-page__period button { min-width: 88px; height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: #656565; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .plans-page__period button.is-active { background: #fff; color: #0d0d0d; box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
-.plans-page__loading,.plans-page__error { margin-top: 64px; text-align: center; color: #6b6b6b; }
-.plans-page__grid { margin-top: 58px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid #dedede; border-radius: 22px; overflow: hidden; }
-.plan-card { position: relative; min-width: 0; min-height: 510px; padding: 30px 26px 28px; display: flex; flex-direction: column; border-right: 1px solid #dedede; background: #fff; }
-.plan-card:last-child { border-right: 0; }
+.plans-page__loading,.plans-page__error { margin-top: 48px; text-align: center; color: #6b6b6b; }
+.plans-page__grid { margin-top: 28px; display: grid; grid-template-columns: repeat(var(--plan-columns),minmax(0,1fr)); gap: 16px; }
+.plan-card { position: relative; min-width: 0; min-height: 500px; padding: 26px 24px 24px; display: flex; flex-direction: column; border: 1px solid #dedede; border-radius: 16px; background: #fff; }
 .plan-card.is-recommended { background: #f7f7f7; }
-.plan-card.is-current::before,.plan-card.is-target::before { content: ""; position: absolute; inset: 0; border: 2px solid #0d0d0d; pointer-events: none; }
-.plan-card.is-current::before { border-radius: 0; }
+.plan-card.is-current,.plan-card.is-target { border-color: #0d0d0d; box-shadow: inset 0 0 0 1px #0d0d0d; }
 .plan-card__heading { min-height: 31px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .plan-card__heading h2 { margin: 0; font-size: 25px; line-height: 31px; font-weight: 650; letter-spacing: -.025em; }
 .plan-card__heading span { padding: 4px 8px; border-radius: 999px; background: #dedede; font-size: 11px; font-weight: 650; }
@@ -266,7 +273,7 @@ const leavePlans = () => { void router.push('/platform/knowledge-bases') }
 .plans-page__footer { max-width: 720px; margin: 24px auto 0; display: grid; justify-items: center; gap: 10px; text-align: center; color: #6b6b6b; font-size: 12px; line-height: 18px; }
 .plans-page__footer p { margin: 0; }
 .plans-page__footer button { border: 0; background: transparent; color: #111; font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-@media (max-width: 1040px) { .plans-page__grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .plan-card:nth-child(2) { border-right: 0; } .plan-card:nth-child(-n+2) { border-bottom: 1px solid #dedede; } }
-@media (max-width: 640px) { .plans-page__topbar { padding: 0 16px; } .plans-page__main { width: min(100% - 28px,1360px); padding-top: 42px; } .plans-page__grid { grid-template-columns: 1fr; margin-top: 38px; } .plan-card,.plan-card:nth-child(2) { min-height: 0; border-right: 0; border-bottom: 1px solid #dedede; } .plan-card:last-child { border-bottom: 0; } }
+@media (max-width: 1040px) { .plans-page__grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 640px) { .plans-page__main { width: min(100% - 28px,1420px); padding-top: 22px; } .plans-page__intro-row { align-items: flex-start; flex-direction: column; gap: 16px; } .plans-page__grid { grid-template-columns: 1fr; margin-top: 24px; } .plan-card { min-height: 0; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>

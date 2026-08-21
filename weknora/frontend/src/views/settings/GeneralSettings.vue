@@ -254,36 +254,6 @@ const handleFontSizeChange = (value: FontSizeKey) => {
   line-height: 18px;
 }
 
-.visual-plan-card {
-  margin: 0 0 24px;
-  padding: 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-  color: #6b7280;
-  font-size: 12px;
-}
-.visual-plan-card.is-loading { min-height: 80px; display: flex; align-items: center; justify-content: center; }
-.visual-plan-card__header { margin-bottom: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.visual-plan-card__header span,
-.visual-plan-card__metrics span { color: #9ca3af; font-size: 11px; }
-.visual-plan-card__header h3 { margin: 2px 0 0; color: #111827; font-size: 22px; line-height: 28px; }
-.visual-plan-card__status { padding: 4px 9px; border-radius: 999px; background: #ecfdf5; color: #047857 !important; text-transform: capitalize; }
-.visual-plan-card__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.visual-plan-card__metrics > div { min-width: 0; padding: 11px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px; background: #f9fafb; }
-.visual-plan-card__metrics strong { overflow-wrap: anywhere; color: #374151; font-size: 13px; }
-.visual-plan-card__metrics .is-unavailable strong { color: #9ca3af; }
-.visual-plan-card > p { margin: 12px 0 0; line-height: 18px; }
-.visual-plan-card__billing { color: #b45309; }
-.visual-plan-card__managed { color: #047857; }
-.visual-plan-card__portal { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.visual-plan-card__portal p { margin: 0; }
-.visual-plan-card__checkout { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f3f4f6; }
-.visual-plan-card__checkout-controls { display: grid; grid-template-columns: minmax(110px, 1fr) auto auto; align-items: center; gap: 8px; }
-.visual-plan-card__checkout-controls :deep(.t-select) { width: 100%; }
-.visual-plan-card__checkout > p { margin: 8px 0 0; color: #9ca3af; font-size: 11px; line-height: 16px; }
-
 .visual-setting-list {
   width: 100%;
   min-width: 0;
@@ -369,8 +339,6 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 }
 
 @media (max-width: 720px) {
-  .visual-plan-card__metrics { grid-template-columns: minmax(0, 1fr); }
-  .visual-plan-card__checkout-controls { grid-template-columns: minmax(0, 1fr); }
   .visual-setting-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .visual-setting-row__control { width: min(280px, 100%); justify-self: start; }
 }

@@ -3736,7 +3736,7 @@ export default {
     manageBilling: 'Manage billing',
     portalFailed: 'The billing portal could not be opened. Please try again.',
     plans: { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' },
-    pricingTitle: 'Choose the plan that fits you',
+    pricingTitle: 'Upgrade your plan',
     pricingDescription: 'Start free and upgrade anytime. Prices and payment methods adapt to your region.',
     planDescriptions: { free: 'Explore the complete personal knowledge workflow.', plus: 'For ongoing personal research and answers.', pro: 'More allowance for frequent knowledge work.', max: 'Our highest current allowance for intensive use.' },
     allowanceLevels: { free: 'Basic', plus: 'Increased', pro: 'Advanced', max: 'Highest' },
@@ -3757,6 +3757,8 @@ export default {
     featureVideo: 'Video upload and understanding',
     usageTitle: 'Usage & billing',
     usageDescription: 'Review your plan, remaining allowance and account limits.',
+    usageLimits: 'Usage limits',
+    planLimits: 'Plan benefits',
     usageMenu: 'Usage',
     account: 'Account',
     monthlyAllowance: 'Monthly allowance',
@@ -5765,7 +5767,7 @@ export default {
   },
   userProfile: {
     title: 'User Profile',
-    description: 'View your account info (user ID, username, email, registration time).'
+    description: 'View your username, email, and registration time.'
   },
   tenantMember: {
     title: 'Members',

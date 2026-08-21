@@ -226,7 +226,7 @@ export default {
   },
   userProfile: {
     title: '사용자 정보',
-    description: '계정 기본 정보(사용자 ID, 사용자 이름, 이메일, 가입 시각)를 확인합니다.'
+    description: '사용자 이름, 이메일 및 가입 시각을 확인합니다.'
   },
   credential: {
     configured: '구성됨',
@@ -2224,7 +2224,7 @@ export default {
     manageBilling: '결제 관리',
     portalFailed: '결제 포털을 열 수 없습니다. 다시 시도해 주세요.',
     plans: { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' },
-    pricingTitle: '나에게 맞는 요금제 선택',
+    pricingTitle: '요금제 업그레이드',
     pricingDescription: '무료로 시작하고 언제든 업그레이드하세요. 가격과 결제 수단은 지역에 맞게 표시됩니다.',
     planDescriptions: { free: '개인 지식 워크플로 전체를 체험하세요.', plus: '지속적인 개인 리서치와 답변에 적합합니다.', pro: '빈번한 지식 작업을 위한 더 높은 한도입니다.', max: '집중 사용을 위한 현재 최고 한도입니다.' },
     allowanceLevels: { free: '기본', plus: '향상', pro: '고급', max: '최고' },
@@ -2245,6 +2245,8 @@ export default {
     featureVideo: '비디오 업로드 및 이해',
     usageTitle: '사용량 및 결제',
     usageDescription: '요금제, 남은 한도와 계정 제한을 확인하세요.',
+    usageLimits: '사용량 한도',
+    planLimits: '요금제 혜택',
     usageMenu: '사용량',
     account: '계정',
     monthlyAllowance: '월간 한도',

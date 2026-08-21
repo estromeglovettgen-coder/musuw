@@ -298,13 +298,12 @@ onUnmounted(() => {
     <Transition name="visual-user-menu-pop">
       <div v-if="menuVisible" class="visual-user-menu__dropdown" @click.stop>
         <div
-          class="visual-user-menu__account"
-          :class="{ 'is-clickable': !authStore.isLiteMode }"
-          :role="!authStore.isLiteMode ? 'button' : undefined"
-          :tabindex="!authStore.isLiteMode ? 0 : undefined"
-          @click="!authStore.isLiteMode && handleQuickNav('userprofile')"
-          @keydown.enter.prevent="!authStore.isLiteMode && handleQuickNav('userprofile')"
-          @keydown.space.prevent="!authStore.isLiteMode && handleQuickNav('userprofile')"
+          class="visual-user-menu__account is-clickable"
+          role="button"
+          tabindex="0"
+          @click="handleQuickNav('userprofile')"
+          @keydown.enter.prevent="handleQuickNav('userprofile')"
+          @keydown.space.prevent="handleQuickNav('userprofile')"
         >
           <span class="visual-user-menu__avatar is-small"><img v-if="userAvatar" :src="userAvatar" alt="" /><span v-else>{{ userInitial }}</span></span>
           <span class="visual-user-menu__account-copy"><strong>{{ userName }}</strong><small>{{ userEmail }}</small></span>

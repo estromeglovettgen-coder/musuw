@@ -22,17 +22,6 @@
 
     <!-- Content -->
     <div v-else class="settings-group">
-      <!-- 用户 ID -->
-      <div class="setting-row">
-        <div class="setting-info">
-          <label>{{ $t('tenant.api.userIdLabel') }}</label>
-          <p class="desc">{{ $t('tenant.api.userIdDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <span class="info-value">{{ userInfo?.id || '-' }}</span>
-        </div>
-      </div>
-
       <!-- 用户名 -->
       <div class="setting-row">
         <div class="setting-info">
@@ -120,23 +109,27 @@ onMounted(loadInfo)
 <style lang="less" scoped>
 .user-profile {
   width: 100%;
+  max-width: 640px;
+  color: #202123;
 }
 
 .section-header {
-  margin-bottom: 32px;
+  margin-bottom: 22px;
 
   h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0 0 8px 0;
+    margin: 0;
+    color: #202123;
+    font-size: 22px;
+    line-height: 30px;
+    font-weight: 650;
+    letter-spacing: -.02em;
   }
 
   .section-description {
-    font-size: 14px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
+    margin: 5px 0 0;
+    color: #6f737a;
+    font-size: 13px;
+    line-height: 20px;
   }
 }
 
@@ -155,17 +148,22 @@ onMounted(loadInfo)
 }
 
 .settings-group {
+  overflow: hidden;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 
 .setting-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--td-component-stroke);
+  min-height: 58px;
+  padding: 12px 16px;
+  gap: 22px;
+  border-bottom: 1px solid #f0f0f0;
 
   &:last-child {
     border-bottom: none;
@@ -173,38 +171,44 @@ onMounted(loadInfo)
 }
 
 .setting-info {
+  min-width: 0;
   flex: 1;
-  max-width: 65%;
-  padding-right: 24px;
 
   label {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--td-text-color-primary);
     display: block;
-    margin-bottom: 4px;
+    color: #202123;
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
   }
 
   .desc {
-    font-size: 13px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
+    margin: 2px 0 0;
+    color: #858a92;
+    font-size: 11px;
+    line-height: 16px;
   }
 }
 
 .setting-control {
   flex-shrink: 0;
-  min-width: 280px;
+  max-width: 52%;
   display: flex;
   justify-content: flex-end;
-  align-items: flex-start;
+  align-items: center;
 
   .info-value {
-    font-size: 14px;
-    color: var(--td-text-color-primary);
+    color: #555b64;
+    font-size: 12px;
+    line-height: 18px;
     text-align: right;
     word-break: break-word;
   }
+}
+
+@media (max-width: 640px) {
+  .setting-row { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .setting-control { max-width: 100%; justify-content: flex-start; }
+  .setting-control .info-value { text-align: left; }
 }
 </style>

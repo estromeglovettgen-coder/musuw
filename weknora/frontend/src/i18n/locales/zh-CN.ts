@@ -226,7 +226,7 @@ export default {
   },
   userProfile: {
     title: '用户信息',
-    description: '查看您的账户基础信息（用户 ID、用户名、邮箱、注册时间）'
+    description: '查看用户名、邮箱和注册时间。'
   },
   credential: {
     configured: '已配置',
@@ -2224,7 +2224,7 @@ export default {
     manageBilling: '管理账单与订阅',
     portalFailed: '暂时无法打开账单中心，请重试。',
     plans: { free: '免费版', plus: 'Plus', pro: 'Pro', max: 'Max' },
-    pricingTitle: '选择适合你的套餐',
+    pricingTitle: '升级你的套餐',
     pricingDescription: '从免费版开始，随时升级。价格和支付方式会按所在地区自动显示。',
     planDescriptions: { free: '体验完整的个人知识工作流。', plus: '适合持续整理和问答的个人用户。', pro: '更高额度，适合高频知识工作。', max: '为重度使用提供当前最高额度。' },
     allowanceLevels: { free: '基础', plus: '提升', pro: '高级', max: '最高' },
@@ -2245,6 +2245,8 @@ export default {
     featureVideo: '视频上传与理解',
     usageTitle: '使用情况与计费',
     usageDescription: '查看当前方案、剩余额度和账号限制。',
+    usageLimits: '用量限制',
+    planLimits: '套餐权益',
     usageMenu: '使用情况',
     account: '账号',
     monthlyAllowance: '当前额度',
