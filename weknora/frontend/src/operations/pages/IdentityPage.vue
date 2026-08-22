@@ -17,20 +17,39 @@
 
       <div class="ops-callout" :class="data.provider.available ? '' : 'is-warning'" style="margin-top:14px">
         <component :is="data.provider.available ? CheckCircleIcon : InfoCircleIcon" class="ops-callout__icon" />
-        <div><strong>Supabase Auth Admin {{ data.provider.available ? '已连接' : 'unavailable' }}</strong><span>{{ data.provider.available ? '数据可从官方 Admin API 读取。' : data.provider.reason }}</span></div>
+        <div><strong>Supabase Auth Admin {{ data.provider.available ? '已连接' : 'unavailable' }}</strong><span>{{ data.provider.available ? '当前环境已通过官方 Auth Admin API 读取真实身份数据。' : data.provider.reason }}</span></div>
       </div>
 
       <section class="ops-grid ops-grid--equal">
         <article v-for="project in data.provider.projects" :key="project.ref" class="ops-panel identity-project">
           <header class="ops-panel__header">
             <div class="ops-panel__title"><h2>{{ project.name }}</h2><p>Supabase 官方项目</p></div>
-            <t-tag :theme="project.environment === 'PRODUCTION' ? 'danger' : 'primary'" variant="light-outline">{{ project.environment }}</t-tag>
+            <div class="identity-project__tags"><t-tag :theme="project.environment === 'PRODUCTION' ? 'danger' : 'primary'" variant="light-outline">{{ project.environment }}</t-tag><t-tag :theme="project.available ? 'success' : (project.applicable === false ? 'default' : 'warning')" variant="light-outline">{{ project.available ? 'CONNECTED' : (project.applicable === false ? 'NOT SELECTED' : 'UNAVAILABLE') }}</t-tag></div>
           </header>
           <div class="ops-panel__body">
-            <dl class="ops-definition"><div><dt>Project ref</dt><dd class="ops-mono">{{ project.ref }}</dd></div><div><dt>Auth Admin</dt><dd>{{ data.provider.available ? 'available' : 'unavailable' }}</dd></div></dl>
+            <dl class="ops-definition">
+              <div><dt>Project ref</dt><dd class="ops-mono">{{ project.ref }}</dd></div><div><dt>Auth Admin</dt><dd>{{ project.available ? 'available' : (project.applicable === false ? 'not selected' : 'unavailable') }}</dd></div>
+              <div><dt>官方用户</dt><dd>{{ project.available ? project.total : '—' }}</dd></div><div><dt>邮箱已确认</dt><dd>{{ project.available ? confirmedCount(project) : '—' }}</dd></div>
+              <div class="wide"><dt>最近登录</dt><dd>{{ formatDate(latestSignIn(project)) }}</dd></div>
+            </dl>
+            <p v-if="!project.available" class="identity-project__reason">{{ project.reason }}</p>
             <a :href="projectUrl(project.ref)" target="_blank" rel="noopener noreferrer"><t-button block variant="outline">打开 Supabase Auth <LinkIcon /></t-button></a>
           </div>
         </article>
+      </section>
+
+      <section class="ops-panel" style="margin-top:14px">
+        <header class="ops-panel__header"><div class="ops-panel__title"><h2>当前环境官方身份</h2><p>来自 Supabase Auth Admin；不读取 user_metadata 或令牌</p></div><t-tag v-if="targetProject" :theme="targetProject.available ? 'success' : 'warning'" variant="light-outline">{{ targetProject?.environment }}</t-tag></header>
+        <div class="ops-panel__body ops-panel__body--flush">
+          <t-table v-if="targetProject?.users.length" row-key="id" :data="targetProject.users" :columns="officialColumns" hover>
+            <template #email="{ row }"><div class="ops-cell-primary"><strong>{{ row.email || '无邮箱' }}</strong><span class="ops-mono">{{ row.id }}</span></div></template>
+            <template #provider="{ row }"><span class="ops-status is-active">{{ row.provider || row.providers?.join(', ') || 'unknown' }}</span></template>
+            <template #confirmed="{ row }"><span class="ops-status" :class="row.email_confirmed_at ? 'is-active' : 'is-warning'">{{ row.email_confirmed_at ? '已确认' : '未确认' }}</span></template>
+            <template #last_sign_in="{ row }"><span class="ops-muted">{{ formatDate(row.last_sign_in_at) }}</span></template>
+            <template #created="{ row }"><span class="ops-muted">{{ formatDate(row.created_at) }}</span></template>
+          </t-table>
+          <div v-else class="ops-empty"><div><span class="ops-empty__icon"><UserSafetyIcon /></span><h3>{{ targetProject?.available ? 'Supabase 当前返回 0 位用户' : 'Supabase Auth Admin unavailable' }}</h3><p>{{ targetProject?.reason || '这是官方 API 的真实空状态。' }}</p></div></div>
+        </div>
       </section>
 
       <section class="ops-panel" style="margin-top:14px">
@@ -48,14 +67,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { CheckCircleIcon, ChevronRightIcon, InfoCircleIcon, LinkIcon, ServerIcon, UserAddIcon, UserCheckedIcon, UserSafetyIcon, UsergroupIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { formatDate } from '../format'
 import type { IdentityData, OperationsConfig } from '../types'
 
 const props = defineProps<{ config: OperationsConfig | null; refreshKey: number }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const data = ref<IdentityData | null>(null), loading = ref(false), error = ref('')
+type IdentityProject = IdentityData['provider']['projects'][number]
+const targetProject = computed(() => data.value?.provider.projects.find((project) => project.environment === props.config?.environment) || null)
+const officialColumns = [
+  { colKey: 'email', title: '邮箱 / 用户 ID', minWidth: 260 }, { colKey: 'provider', title: 'Provider', width: 120 },
+  { colKey: 'confirmed', title: '邮箱', width: 100 }, { colKey: 'last_sign_in', title: '最近登录', width: 170 }, { colKey: 'created', title: '创建时间', width: 170 },
+]
+function confirmedCount(project: IdentityProject) { return project.users.filter((user) => Boolean(user.email_confirmed_at)).length }
+function latestSignIn(project: IdentityProject) { return project.users.map((user) => user.last_sign_in_at || '').filter(Boolean).sort().at(-1) }
 function projectUrl(ref: string) { return `https://supabase.com/dashboard/project/${encodeURIComponent(ref)}/auth/users` }
 function goToUsers() { window.location.hash = '/users' }
 async function load() { loading.value = true; error.value = ''; emit('busy', true); try { data.value = await operationsApi.identity() } catch (e) { error.value = e instanceof Error ? e.message : '加载失败' } finally { loading.value = false; emit('busy', false) } }
@@ -64,6 +92,9 @@ onMounted(load); watch(() => props.refreshKey, load)
 
 <style scoped>
 .identity-project a { display: block; margin-top: 18px; text-decoration: none; }
+.identity-project__tags { display: flex; gap: 6px; }
+.identity-project__reason { margin: 10px 0 0; color: #9a5a12; font-size: 10px; line-height: 1.5; }
+.identity-project .ops-definition .wide { grid-column: 1 / -1; }
 .identity-boundaries { display: grid; grid-template-columns: minmax(0,1fr) 28px minmax(0,1fr); align-items: center; gap: 16px; }
 .identity-boundaries > div { display: flex; align-items: flex-start; gap: 13px; }
 .identity-boundaries__icon { width: 38px; height: 38px; display: grid; place-items: center; flex: none; border-radius: 9px; color: #4d64d9; background: #eef2ff; }

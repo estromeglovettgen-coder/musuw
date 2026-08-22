@@ -79,20 +79,48 @@ test('operator workflow uses real data and guarded actions', async ({ page }) =>
   await expect(page.getByText('服务端最小权限凭据读取，浏览器不接触密钥')).toBeVisible()
 
   await page.getByRole('button', { name: '身份', exact: true }).click()
-  await expect(page.getByText('Supabase Auth Admin unavailable')).toBeVisible()
+  const identityResponse = await page.request.get('/admin-api/identity')
+  expect(identityResponse.status()).toBe(200)
+  const identity = (await identityResponse.json()).data
+  await expect(page.getByText(identity.provider.available ? 'Supabase Auth Admin 已连接' : 'Supabase Auth Admin unavailable')).toBeVisible()
   await expect(page.getByText('achfnnicetupvtoqiwqd')).toBeVisible()
   await expect(page.getByText('phtveqtlswzokwsztsvu')).toBeVisible()
 
   await page.getByRole('button', { name: '存储', exact: true }).click()
   await expect(page.getByText(/\d+ 个对象引用/)).toBeVisible()
-  await expect(page.getByText('R2 operator unavailable')).toBeVisible()
-  await expect(page.getByText('Cloudflare R2 官方对象查询 unavailable')).toBeVisible()
+  const storageResponse = await page.request.get('/admin-api/storage?page=1&page_size=25')
+  expect(storageResponse.status()).toBe(200)
+  const storage = (await storageResponse.json()).data
+  if (storage.provider.available) {
+    await expect(page.getByText('R2 operator available')).toBeVisible()
+    await expect(page.getByText('Cloudflare R2 官方对象查询 已连接')).toBeVisible()
+    await expect(page.getByText('S3 API CONNECTED')).toBeVisible()
+  } else if (storage.provider.applicable === false) {
+    await expect(page.getByText('TEST 本地存储')).toBeVisible()
+    await expect(page.getByText('TEST 使用本地存储')).toBeVisible()
+  } else {
+    await expect(page.getByText('R2 operator unavailable')).toBeVisible()
+    await expect(page.getByText('Cloudflare R2 官方对象查询 unavailable')).toBeVisible()
+  }
   await expect(page.getByText('原文件 file_size', { exact: true })).toBeVisible()
   await expect(page.getByText('索引 storage_size', { exact: true })).toBeVisible()
   await expect(page.getByText('tenant.storage_used', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: '日志与追踪', exact: true }).click()
-  await expect(page.getByText('Langfuse unavailable')).toBeVisible()
+  const langfuseResponse = await page.request.get('/admin-api/langfuse')
+  expect(langfuseResponse.status()).toBe(200)
+  const langfuse = (await langfuseResponse.json()).data
+  await expect(page.getByText(`Langfuse ${langfuse.available ? 'available' : 'unavailable'}`)).toBeVisible()
+  await page.getByRole('button', { name: 'Langfuse 追踪', exact: true }).click()
+  if (langfuse.available) {
+    await expect(page.getByRole('heading', { name: 'Langfuse 官方 Observations' })).toBeVisible()
+    if (langfuse.observations.length) {
+      await expect.poll(async () => page.locator('.langfuse-host tbody tr').count()).toBeGreaterThan(0)
+    }
+  } else {
+    await expect(page.getByText('Langfuse unavailable')).toBeVisible()
+  }
+  await page.getByRole('button', { name: '运行队列', exact: true }).click()
   const autoRefresh = page.getByRole('switch', { name: '自动刷新（每 5 秒）' })
   await expect(autoRefresh).toHaveAttribute('aria-checked', 'true')
   await autoRefresh.press('Space')

@@ -30,6 +30,7 @@
     "build": "npm run app:build && npm run auth:build && npm run homepage:build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1116.0",
     "@zip.js/zip.js": "2.8.31",
     "ai": "7.0.22",
     "drizzle-orm": "0.45.2",

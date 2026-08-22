@@ -62,7 +62,7 @@ mkdir -m 700 "$secret_dir"
 
 # Deliberately synthetic values: this test proves file mounts and interpolation
 # only. It never reads an operator credential or prints a secret value.
-for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key; do
+for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     printf '%s\n' 'static-verification-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -70,6 +70,8 @@ printf '%s\n' '0123456789abcdef0123456789abcdef' > "$secret_dir/system_aes_key"
 printf '%s\n' 'neo4j/static-verification-password' > "$secret_dir/neo4j_auth"
 printf '%s\n' 'static-native-oidc-client' > "$secret_dir/oidc_client_id"
 printf '%s\n' 'pdl_live_apikey_static-verification' > "$secret_dir/paddle_api_key"
+printf '%s\n' 'pk-lf-static-verification' > "$secret_dir/langfuse_public_key"
+printf '%s\n' 'sk-lf-static-verification' > "$secret_dir/langfuse_secret_key"
 
 # Exercise prepare-runtime.sh using only synthetic, non-production values.
 auth_public_env="$runtime_dir/auth-public.env"
@@ -123,6 +125,10 @@ printf '%s\n' \
         'MUSUW_PADDLE_PRO_YEARLY_PRICE_ID=pri_static_pro_yearly' \
         'MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID=pri_static_max_monthly' \
         'MUSUW_PADDLE_MAX_YEARLY_PRICE_ID=pri_static_max_yearly' \
+        'LANGFUSE_ENABLED=true' \
+        'LANGFUSE_HOST=https://jp.cloud.langfuse.com' \
+        'LANGFUSE_RELEASE=musuw-production' \
+        'LANGFUSE_ENVIRONMENT=production' \
         'AUTO_MIGRATE=true' \
         'DISABLE_REGISTRATION=false' \
         'GIN_MODE=release' \
@@ -130,7 +136,7 @@ printf '%s\n' \
 } > "$runtime_dir/production.public.env"
 
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null
-if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET|OPENROUTER_MANAGEMENT_API_KEY|MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET)=' "$runtime_dir/production.env"; then
+if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET|OPENROUTER_MANAGEMENT_API_KEY|MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET|LANGFUSE_PUBLIC_KEY|LANGFUSE_SECRET_KEY)=' "$runtime_dir/production.env"; then
     printf '%s\n' 'production runtime env contains a credential value instead of only a file path' >&2
     exit 1
 fi
@@ -190,6 +196,10 @@ jq -e '
   (.services.app.environment.MUSUW_PADDLE_CLIENT_TOKEN == "live_static-client-token") and
   (.services.app.environment.MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID == "pri_static_plus_monthly") and
   (.services.app.environment.MUSUW_PADDLE_MAX_YEARLY_PRICE_ID == "pri_static_max_yearly") and
+  (.services.app.environment.LANGFUSE_ENABLED == "true") and
+  (.services.app.environment.LANGFUSE_HOST == "https://jp.cloud.langfuse.com") and
+  (.services.app.environment.LANGFUSE_RELEASE == "musuw-production") and
+  (.services.app.environment.LANGFUSE_ENVIRONMENT == "production") and
   (.services.app.environment.STORAGE_TYPE == "s3") and
   (.services.app.environment.S3_ENDPOINT == "https://c692db4757e1454b71880ec6c431db9c.r2.cloudflarestorage.com") and
   (.services.app.environment.S3_REGION == "auto") and
@@ -215,14 +225,14 @@ jq -e '
     exit 1
 }
 
-for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key; do
+for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     jq -e --arg secret "$secret" '.secrets[$secret].file | type == "string"' "$config_json" >/dev/null || {
         printf '%s\n' 'production Compose does not use a file-backed required secret' >&2
         exit 1
     }
 done
 
-for secret in openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key; do
+for secret in openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     jq -e --arg secret "$secret" \
         '[.services.app.secrets[]?.source] | index($secret) != null' "$config_json" >/dev/null || {
         printf '%s\n' 'production app does not mount a required platform model secret' >&2
@@ -230,7 +240,7 @@ for secret in openrouter_management_api_key paddle_api_key paddle_webhook_secret
     }
 done
 
-for export_name in OPENROUTER_MANAGEMENT_API_KEY MUSUW_PADDLE_API_KEY MUSUW_PADDLE_WEBHOOK_SECRET; do
+for export_name in OPENROUTER_MANAGEMENT_API_KEY MUSUW_PADDLE_API_KEY MUSUW_PADDLE_WEBHOOK_SECRET LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY; do
     grep -Fq "export ${export_name}=\"\$(read_required_secret" "$repo_root/integration/weknora-production/app-entrypoint.sh" || {
         printf '%s\n' 'production entrypoint does not export a required server-only platform secret' >&2
         exit 1

@@ -161,7 +161,7 @@ const providerMetadata = {
   paddle: { name: 'Paddle', icon: markRaw(MoneyIcon), urlKey: 'paddle' },
   supabase: { name: 'Supabase Auth', icon: markRaw(UserSafetyIcon), urlKey: 'supabase_staging' },
   r2: { name: 'Cloudflare R2', icon: markRaw(CloudIcon), urlKey: 'cloudflare_r2' },
-  langfuse: { name: 'Langfuse', icon: markRaw(LinkIcon), url: '' },
+  langfuse: { name: 'Langfuse', icon: markRaw(LinkIcon), urlKey: 'langfuse' },
 } as const
 
 const providers = computed(() => Object.entries(providerMetadata).map(([key, meta]) => {

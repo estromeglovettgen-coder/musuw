@@ -14,6 +14,11 @@ candidate_env="$runtime_dir/candidate.env"
 auth_public_env="$runtime_dir/auth-public.env"
 paddle_sandbox_env="$runtime_dir/paddle-sandbox.env"
 state_dir="$runtime_dir/host-dev"
+paddle_api_key_service=com.musuw.local-admin.paddle-api-key
+paddle_webhook_secret_service=com.musuw.local-admin.paddle-webhook-secret
+langfuse_public_key_service=com.musuw.local-admin.langfuse-public-key
+langfuse_secret_key_service=com.musuw.local-admin.langfuse-secret-key
+paddle_keychain_account=musuw-admin-test
 
 : "${MUSUW_DEV_FRONTEND_PORT:=4190}"
 : "${MUSUW_DEV_AUTH_PORT:=4191}"
@@ -94,12 +99,41 @@ load_env_file() {
   done < "$file"
 }
 
+load_paddle_public_env() {
+  local file="$1"
+  local line key value
+  [ -r "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in
+      ''|'#'*) continue ;;
+    esac
+    [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || die 'Paddle Sandbox runtime contains an invalid assignment'
+    key="${line%%=*}"
+    case "$key" in
+      MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET) continue ;;
+    esac
+    value="${line#*=}"
+    export "$key=$value"
+  done < "$file"
+}
+
 read_secret() {
   local path="$1"
   [ -r "$path" ] && [ ! -L "$path" ] || die 'required host-development secret is unavailable'
   local value
   value="$(tr -d '\r\n' < "$path")"
   [ -n "$value" ] || die 'required host-development secret is empty'
+  printf '%s' "$value"
+}
+
+read_keychain_secret() {
+  local service="$1"
+  local account="$2"
+  local value
+  command -v security >/dev/null 2>&1 || die 'macOS Keychain command is unavailable'
+  value="$(security find-generic-password -w -s "$service" -a "$account" 2>/dev/null || true)"
+  [ -n "$value" ] || die 'required host-development Keychain secret is unavailable'
   printf '%s' "$value"
 }
 
@@ -112,15 +146,21 @@ load_host_environment() {
   prepare_runtime
   load_env_file "$candidate_env"
   load_env_file "$auth_public_env"
-  if [ -r "$paddle_sandbox_env" ]; then
-    load_env_file "$paddle_sandbox_env"
-  fi
+  load_paddle_public_env "$paddle_sandbox_env"
   if ! grep -q '^LOG_FORMAT=' "$candidate_env"; then
     unset LOG_FORMAT
   fi
 
   export OIDC_AUTH_CLIENT_ID="$(read_secret "$runtime_dir/secrets/oidc_client_id")"
   export OIDC_AUTH_CLIENT_SECRET="$(read_secret "$runtime_dir/secrets/oidc_client_secret")"
+  export MUSUW_PADDLE_API_KEY="$(read_keychain_secret "$paddle_api_key_service" "$paddle_keychain_account")"
+  export MUSUW_PADDLE_WEBHOOK_SECRET="$(read_keychain_secret "$paddle_webhook_secret_service" "$paddle_keychain_account")"
+  export LANGFUSE_PUBLIC_KEY="$(read_keychain_secret "$langfuse_public_key_service" "$paddle_keychain_account")"
+  export LANGFUSE_SECRET_KEY="$(read_keychain_secret "$langfuse_secret_key_service" "$paddle_keychain_account")"
+  export LANGFUSE_ENABLED=true
+  export LANGFUSE_HOST=https://jp.cloud.langfuse.com
+  export LANGFUSE_RELEASE=musuw-test
+  export LANGFUSE_ENVIRONMENT=test
   # These are host-only addresses. The candidate.env remains Docker-native and
   # can still be consumed unchanged by the preview/release compose interface.
   export DB_HOST=127.0.0.1

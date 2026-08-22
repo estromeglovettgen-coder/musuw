@@ -67,12 +67,13 @@ local integration seams:
   statements solely for operational projections.
 - The capability-scoped platform key is read at process start from macOS
   Keychain and is used only for the exact WeKnora allowlist above.
-- Paddle subscription and transaction reads use Paddle's official API and
-  return a safe field projection. Supabase Auth, R2 operator inventory, and
-  Langfuse remain explicitly unavailable because their independent query
-  adapters and server-side credentials are not enabled; merely detecting a
-  credential never marks an unqueried provider as available, and database
-  mirrors are never presented as provider success.
+- Paddle subscriptions/transactions, selected-environment Supabase Auth,
+  production R2 inventory and Langfuse observations use their official APIs
+  and return safe field projections. Credentials come only from environment-
+  specific Keychain items. TEST truthfully marks R2 not applicable because its
+  product runtime uses local storage. A credential never marks a failed or
+  unqueried provider available, and database mirrors are never presented as
+  provider success.
 - Complex supplier operations link to the official Paddle, Supabase, and
   Cloudflare consoles instead of cloning those products in Musuw.
 

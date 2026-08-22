@@ -30,6 +30,8 @@ export MUSUW_PADDLE_API_KEY="$(read_required_secret /run/secrets/paddle_api_key 
 export MUSUW_PADDLE_WEBHOOK_SECRET="$(read_required_secret /run/secrets/paddle_webhook_secret paddle-webhook-secret)"
 export S3_ACCESS_KEY="$(read_required_secret /run/secrets/r2_access_key_id r2-access-key-id)"
 export S3_SECRET_KEY="$(read_required_secret /run/secrets/r2_secret_access_key r2-secret-access-key)"
+export LANGFUSE_PUBLIC_KEY="$(read_required_secret /run/secrets/langfuse_public_key langfuse-public-key)"
+export LANGFUSE_SECRET_KEY="$(read_required_secret /run/secrets/langfuse_secret_key langfuse-secret-key)"
 
 if [ "${#SYSTEM_AES_KEY}" -ne 32 ]; then
     printf '%s\n' 'required system-aes-key has an invalid length' >&2

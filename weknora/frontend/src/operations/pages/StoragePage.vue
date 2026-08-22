@@ -3,7 +3,7 @@
     <header class="ops-page-header">
       <div><h1>存储</h1><p>分别呈现原文件 file_size、索引 storage_size、tenant.storage_used、配额和物理对象引用，不再把小数值四舍五入成“0 存储”。</p></div>
       <div class="ops-page-actions">
-        <t-tag :theme="config?.providers.r2.available ? 'success' : 'warning'" variant="light-outline">R2 operator {{ config?.providers.r2.available ? 'available' : 'unavailable' }}</t-tag>
+        <t-tag :theme="config?.providers.r2.available ? 'success' : (config?.providers.r2.applicable === false ? 'default' : 'warning')" variant="light-outline">{{ config?.providers.r2.applicable === false ? 'TEST 本地存储' : `R2 operator ${config?.providers.r2.available ? 'available' : 'unavailable'}` }}</t-tag>
         <a :href="config?.links.cloudflare_r2" target="_blank" rel="noopener noreferrer"><t-button theme="primary">打开 Cloudflare R2 <LinkIcon /></t-button></a>
       </div>
     </header>
@@ -18,7 +18,26 @@
         <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">租户总配额</span><span class="ops-metric__icon"><CloudIcon /></span></div><div class="ops-metric__value">{{ formatBytes(data.usage.quota_bytes) }}</div><div class="ops-metric__hint">当前套餐配额合计</div></article>
       </section>
 
-      <div v-if="!config?.providers.r2.available" class="ops-callout is-warning" style="margin-top:14px"><InfoCircleIcon class="ops-callout__icon"/><div><strong>Cloudflare R2 官方对象查询 unavailable</strong><span>{{ config?.providers.r2.reason }}。下方数据是 Musuw 的存储绑定与对象引用，不会被包装成 R2 LIST/HEAD 成功。</span></div></div>
+      <div class="ops-callout" :class="data.provider.available || data.provider.applicable === false ? '' : 'is-warning'" style="margin-top:14px">
+        <component :is="data.provider.available ? CheckCircleIcon : InfoCircleIcon" class="ops-callout__icon" />
+        <div><strong>{{ data.provider.applicable === false ? 'TEST 使用本地存储' : `Cloudflare R2 官方对象查询 ${data.provider.available ? '已连接' : 'unavailable'}` }}</strong><span>{{ data.provider.available ? `已通过官方 S3 API 核对 ${data.provider.bucket}/${data.provider.prefix || ''}，浏览器不接触凭据。` : data.provider.applicable === false ? '当前 TEST 运行时不使用 Cloudflare R2，因此不要求也不伪造 R2 凭据或对象清单。' : `${data.provider.reason}。下方 Musuw 存储绑定不会被包装成 R2 LIST/HEAD 成功。` }}</span></div>
+      </div>
+
+      <section v-if="data.provider.available" class="ops-panel" style="margin-top:14px">
+        <header class="ops-panel__header"><div class="ops-panel__title"><h2>Cloudflare R2 官方清单</h2><p>{{ data.provider.bucket }} / {{ data.provider.prefix || '桶根目录' }} · 最多展示前 1,000 个对象</p></div><t-tag theme="success" variant="light-outline">S3 API CONNECTED</t-tag></header>
+        <div class="ops-panel__body">
+          <dl class="ops-definition r2-summary">
+            <div><dt>官方对象数</dt><dd>{{ data.provider.total }}</dd></div><div><dt>当前清单大小</dt><dd>{{ formatBytes(data.provider.total_bytes) }}</dd></div>
+            <div><dt>Bucket</dt><dd class="ops-mono">{{ data.provider.bucket }}</dd></div><div><dt>Prefix</dt><dd class="ops-mono">{{ data.provider.prefix || '—' }}</dd></div>
+          </dl>
+          <t-table v-if="data.provider.objects.length" class="r2-objects" row-key="key" :data="data.provider.objects" :columns="r2Columns" size="small" hover>
+            <template #key="{ row }"><span class="ops-mono r2-object-key" :title="row.key">{{ row.key }}</span></template>
+            <template #size="{ row }"><strong>{{ formatBytes(row.size) }}</strong></template>
+            <template #last_modified="{ row }"><span class="ops-muted">{{ formatDate(row.last_modified) }}</span></template>
+          </t-table>
+          <div v-else class="ops-empty"><div><span class="ops-empty__icon"><CloudIcon /></span><h3>R2 当前返回 0 个对象</h3><p>这是官方 LIST API 的真实空状态。</p></div></div>
+        </div>
+      </section>
 
       <section class="ops-panel" style="margin-top:14px">
         <header class="ops-panel__header"><div class="ops-panel__title"><h2>Musuw 存储后端</h2><p>配置字段和凭据不返回浏览器</p></div></header>
@@ -61,14 +80,14 @@
         <div><dt>tenant.storage_used</dt><dd>{{ formatBytes(selected.measured_used_bytes) }}</dd></div><div><dt>配额</dt><dd>{{ formatBytes(selected.quota_bytes) }}</dd></div>
         <div><dt>Provider</dt><dd>{{ selected.storage_provider || 'unavailable' }}</dd></div><div><dt>Backend</dt><dd class="ops-mono">{{ selected.storage_backend_id || 'unavailable' }}</dd></div>
         <div class="wide"><dt>物理对象引用</dt><dd class="ops-mono">{{ selected.object_reference || 'unavailable' }}</dd></div>
-      </dl></section><div class="ops-callout" :class="selected.storage_provider === 's3' ? '' : 'is-warning'"><InfoCircleIcon class="ops-callout__icon"/><div><strong>{{ selected.storage_provider === 's3' ? 'S3/R2 路径已绑定' : '当前记录不是 R2 后端' }}</strong><span>“对象引用存在”不等同于官方 R2 HEAD 成功；当前本机没有 R2 operator credential 时不会伪造对象存在性。</span></div></div></template>
+      </dl></section><div class="ops-callout" :class="selected.storage_provider === 's3' ? '' : 'is-warning'"><InfoCircleIcon class="ops-callout__icon"/><div><strong>{{ selected.storage_provider === 's3' ? 'S3/R2 路径已绑定' : '当前记录不是 R2 后端' }}</strong><span>对象引用和官方 R2 清单是独立证据；只有清单中的匹配对象才能证明当前凭据可见该物理对象。</span></div></div></template>
     </t-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { ChartBubbleIcon, CloudIcon, DataBaseIcon, FileIcon, FileSearchIcon, InfoCircleIcon, LinkIcon, SearchIcon, ServerIcon } from 'tdesign-icons-vue-next'
+import { ChartBubbleIcon, CheckCircleIcon, CloudIcon, DataBaseIcon, FileIcon, FileSearchIcon, InfoCircleIcon, LinkIcon, SearchIcon, ServerIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
 import { formatBytes, formatDate, statusTone } from '../format'
 import type { OperationsConfig, StorageData, StorageObjectRow } from '../types'
@@ -81,6 +100,11 @@ const columns = [
   { colKey: 'file', title: '文件', minWidth: 230 }, { colKey: 'workspace', title: '空间 / 知识库', minWidth: 190 },
   { colKey: 'source_size', title: '原文件', width: 100 }, { colKey: 'index_size', title: '索引计量', width: 100 }, { colKey: 'quota', title: '空间计量 / 配额', width: 140 },
   { colKey: 'provider', title: 'Provider', width: 110 }, { colKey: 'object', title: '物理对象引用', minWidth: 230 }, { colKey: 'updated', title: '更新时间', width: 160 },
+]
+const r2Columns = [
+  { colKey: 'key', title: '对象 Key', minWidth: 360 },
+  { colKey: 'size', title: '对象大小', width: 120 },
+  { colKey: 'last_modified', title: '最后修改', width: 180 },
 ]
 async function load() { loading.value = true; error.value = ''; emit('busy', true); try { data.value = await operationsApi.storage({ page: page.value, page_size: pageSize, q: search.value }) } catch (e) { error.value = e instanceof Error ? e.message : '加载失败' } finally { loading.value = false; emit('busy', false) } }
 function applySearch() { page.value = 1; load() }
@@ -99,5 +123,8 @@ onMounted(load); watch(() => props.refreshKey, load)
 .storage-backend__body strong { color: #344054; font-size: 12px; }.storage-backend__body span { margin-top: 3px; color: #596579; font-size: 10px; }.storage-backend__body code { margin-top: 5px; color: #596579; font-size: 9px; }
 .storage-backend__meta { display: grid; justify-items: end; gap: 8px; }.storage-backend__meta small { color: #596579; font-size: 9px; }
 .object-ref { display: block; max-width: 270px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r2-summary { margin-bottom: 14px; }
+.r2-objects { border-top: 1px solid #e4e8ee; }
+.r2-object-key { display: block; max-width: 620px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ops-definition .wide { grid-column: 1 / -1; }
 </style>

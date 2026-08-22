@@ -65,6 +65,10 @@ services:
       S3_PATH_PREFIX: weknora
       S3_USE_SSL: "true"
       S3_FORCE_PATH_STYLE: "true"
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-true}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://jp.cloud.langfuse.com}
+      LANGFUSE_RELEASE: ${LANGFUSE_RELEASE:-musuw-production}
+      LANGFUSE_ENVIRONMENT: ${LANGFUSE_ENVIRONMENT:-production}
       LOCAL_STORAGE_BASE_DIR: /data/files
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
       APP_EXTERNAL_URL: ${APP_EXTERNAL_URL:?set APP_EXTERNAL_URL in production.env}
@@ -125,6 +129,12 @@ services:
         mode: 0400
       - source: r2_secret_access_key
         target: r2_secret_access_key
+        mode: 0400
+      - source: langfuse_public_key
+        target: langfuse_public_key
+        mode: 0400
+      - source: langfuse_secret_key
+        target: langfuse_secret_key
         mode: 0400
     depends_on: !override
       redis:
@@ -317,3 +327,7 @@ secrets:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/r2_access_key_id
   r2_secret_access_key:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/r2_secret_access_key
+  langfuse_public_key:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/langfuse_public_key
+  langfuse_secret_key:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/langfuse_secret_key

@@ -23,7 +23,7 @@ install -d -m 700 "$runtime_dir"
 [ -d "$secret_dir" ] || weknora_production_die 'production secret directory is unavailable'
 [ "$(weknora_production_file_mode "$secret_dir")" = '700' ] || weknora_production_die 'production secret directory permissions are unsafe'
 
-for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key; do
+for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     weknora_production_require_secret_file "$secret_dir/$secret"
 done
 
@@ -44,6 +44,18 @@ case "$paddle_api_key" in
     *) weknora_production_die 'production Paddle API key must be a live key' ;;
 esac
 unset paddle_api_key
+
+langfuse_public_key="$(weknora_production_read_secret "$secret_dir/langfuse_public_key")"
+langfuse_secret_key="$(weknora_production_read_secret "$secret_dir/langfuse_secret_key")"
+case "$langfuse_public_key" in
+    pk-lf-*) ;;
+    *) weknora_production_die 'Langfuse public key has an invalid format' ;;
+esac
+case "$langfuse_secret_key" in
+    sk-lf-*) ;;
+    *) weknora_production_die 'Langfuse secret key has an invalid format' ;;
+esac
+unset langfuse_public_key langfuse_secret_key
 
 public_oidc_client_id="$(weknora_production_require_env_value "$auth_public_env" VITE_WEKNORA_OAUTH_CLIENT_ID)"
 auth_public_origin="$(weknora_production_require_env_value "$auth_public_env" VITE_AUTH_PUBLIC_ORIGIN)"
@@ -72,7 +84,7 @@ chmod 600 "$tmp_env"
 
 awk '
     BEGIN {
-        split("WEKNORA_PRODUCTION_RELEASE_ID WEKNORA_PRODUCTION_REVISION WEKNORA_PRODUCTION_APP_IMAGE WEKNORA_PRODUCTION_FRONTEND_IMAGE WEKNORA_PRODUCTION_FRONTEND_PORT WEKNORA_PRODUCTION_APP_PORT WEKNORA_PRODUCTION_POSTGRES_VOLUME WEKNORA_PRODUCTION_FILES_VOLUME WEKNORA_PRODUCTION_DOCREADER_TMP_VOLUME WEKNORA_PRODUCTION_REDIS_VOLUME WEKNORA_PRODUCTION_NEO4J_VOLUME WEKNORA_PRODUCTION_SEARXNG_CONFIG_VOLUME WEKNORA_PRODUCTION_SEARXNG_PORT DB_DRIVER DB_HOST DB_PORT DB_USER DB_NAME REDIS_ADDR STREAM_MANAGER_TYPE REDIS_DB REDIS_PREFIX WEKNORA_REDIS_NAMESPACE NEO4J_ENABLE NEO4J_URI NEO4J_USERNAME STORAGE_TYPE LOCAL_STORAGE_BASE_DIR MAX_FILE_SIZE_MB GIN_MODE LOG_LEVEL TZ AUTO_MIGRATE AUTO_RECOVER_DIRTY DISABLE_REGISTRATION WEKNORA_AUTH_DEFAULT_TENANT_MODE MUSUW_PRODUCT_EDITION APP_EXTERNAL_URL FRONTEND_BASE_URL OIDC_AUTH_ENABLE OIDC_AUTH_ISSUER_URL OIDC_AUTH_DISCOVERY_URL OIDC_AUTH_PROVIDER_DISPLAY_NAME OIDC_AUTH_SCOPES OIDC_USER_INFO_MAPPING_USER_NAME OIDC_USER_INFO_MAPPING_EMAIL MUSUW_PADDLE_ENVIRONMENT MUSUW_PADDLE_CLIENT_TOKEN MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID MUSUW_PADDLE_PRO_YEARLY_PRICE_ID MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID MUSUW_PADDLE_MAX_YEARLY_PRICE_ID DOCREADER_ADDR DOCREADER_TRANSPORT", keys, " ")
+        split("WEKNORA_PRODUCTION_RELEASE_ID WEKNORA_PRODUCTION_REVISION WEKNORA_PRODUCTION_APP_IMAGE WEKNORA_PRODUCTION_FRONTEND_IMAGE WEKNORA_PRODUCTION_FRONTEND_PORT WEKNORA_PRODUCTION_APP_PORT WEKNORA_PRODUCTION_POSTGRES_VOLUME WEKNORA_PRODUCTION_FILES_VOLUME WEKNORA_PRODUCTION_DOCREADER_TMP_VOLUME WEKNORA_PRODUCTION_REDIS_VOLUME WEKNORA_PRODUCTION_NEO4J_VOLUME WEKNORA_PRODUCTION_SEARXNG_CONFIG_VOLUME WEKNORA_PRODUCTION_SEARXNG_PORT DB_DRIVER DB_HOST DB_PORT DB_USER DB_NAME REDIS_ADDR STREAM_MANAGER_TYPE REDIS_DB REDIS_PREFIX WEKNORA_REDIS_NAMESPACE NEO4J_ENABLE NEO4J_URI NEO4J_USERNAME STORAGE_TYPE LOCAL_STORAGE_BASE_DIR MAX_FILE_SIZE_MB GIN_MODE LOG_LEVEL TZ AUTO_MIGRATE AUTO_RECOVER_DIRTY DISABLE_REGISTRATION WEKNORA_AUTH_DEFAULT_TENANT_MODE MUSUW_PRODUCT_EDITION APP_EXTERNAL_URL FRONTEND_BASE_URL OIDC_AUTH_ENABLE OIDC_AUTH_ISSUER_URL OIDC_AUTH_DISCOVERY_URL OIDC_AUTH_PROVIDER_DISPLAY_NAME OIDC_AUTH_SCOPES OIDC_USER_INFO_MAPPING_USER_NAME OIDC_USER_INFO_MAPPING_EMAIL MUSUW_PADDLE_ENVIRONMENT MUSUW_PADDLE_CLIENT_TOKEN MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID MUSUW_PADDLE_PRO_YEARLY_PRICE_ID MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID MUSUW_PADDLE_MAX_YEARLY_PRICE_ID LANGFUSE_ENABLED LANGFUSE_HOST LANGFUSE_RELEASE LANGFUSE_ENVIRONMENT DOCREADER_ADDR DOCREADER_TRANSPORT", keys, " ")
         for (i in keys) allowed[keys[i]] = 1
     }
     /^[[:space:]]*($|#)/ { next }
@@ -101,7 +113,8 @@ for key in \
     MUSUW_PADDLE_ENVIRONMENT MUSUW_PADDLE_CLIENT_TOKEN \
     MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID \
     MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID MUSUW_PADDLE_PRO_YEARLY_PRICE_ID \
-    MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID MUSUW_PADDLE_MAX_YEARLY_PRICE_ID; do
+    MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID MUSUW_PADDLE_MAX_YEARLY_PRICE_ID \
+    LANGFUSE_ENABLED LANGFUSE_HOST LANGFUSE_RELEASE LANGFUSE_ENVIRONMENT; do
     weknora_production_require_env_value "$tmp_env" "$key" >/dev/null
 done
 
@@ -153,6 +166,9 @@ case "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_CLIENT_TOKE
     live_*) ;;
     *) weknora_production_die 'production Paddle client token must be a live token' ;;
 esac
+[ "$(weknora_production_require_env_value "$tmp_env" LANGFUSE_ENABLED)" = 'true' ] || weknora_production_die 'production Langfuse tracing must remain enabled'
+[ "$(weknora_production_require_env_value "$tmp_env" LANGFUSE_HOST)" = 'https://jp.cloud.langfuse.com' ] || weknora_production_die 'production Langfuse host must remain the JP Cloud endpoint'
+[ "$(weknora_production_require_env_value "$tmp_env" LANGFUSE_ENVIRONMENT)" = 'production' ] || weknora_production_die 'production Langfuse environment must remain production'
 for key in \
     MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID \
     MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID MUSUW_PADDLE_PRO_YEARLY_PRICE_ID \

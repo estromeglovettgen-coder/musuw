@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import pg from 'pg'
 
 const { Pool } = pg
@@ -19,6 +20,14 @@ const PAGE_SIZE_MAX = 100
 const API_TIMEOUT_MS = 12_000
 const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000
 const PLATFORM_KEY_SERVICE = 'com.musuw.local-admin.platform-key'
+const PROVIDER_KEY_SERVICES = Object.freeze({
+  paddle: 'com.musuw.local-admin.paddle-api-key',
+  supabase: 'com.musuw.local-admin.supabase-secret-key',
+  r2AccessKeyID: 'com.musuw.local-admin.r2-access-key-id',
+  r2SecretAccessKey: 'com.musuw.local-admin.r2-secret-access-key',
+  langfusePublicKey: 'com.musuw.local-admin.langfuse-public-key',
+  langfuseSecretKey: 'com.musuw.local-admin.langfuse-secret-key',
+})
 const PUBLIC_BRAND_ASSETS = new Set(['/favicon.ico', '/musuw-logo.png'])
 const PUBLIC_ASSET_PREFIXES = ['/assets/', '/tdesign-icons/']
 
@@ -97,35 +106,50 @@ function loadRuntime(target) {
     if (!runtime.MUSUW_ADMIN_DATABASE_URL || !runtime.MUSUW_ADMIN_BACKEND_URL) {
       throw new Error('production requires .runtime/musuw-admin/production.env with MUSUW_ADMIN_DATABASE_URL and MUSUW_ADMIN_BACKEND_URL')
     }
+    const platformKeyAccount = runtime.MUSUW_ADMIN_PLATFORM_KEY_ACCOUNT || 'musuw-admin-production'
+    const providerKeyAccount = runtime.MUSUW_ADMIN_PROVIDER_KEY_ACCOUNT || platformKeyAccount
     return {
       target,
       label: 'PRODUCTION',
       database: { connectionString: runtime.MUSUW_ADMIN_DATABASE_URL, application_name: 'musuw-operations-production' },
       backendBaseUrl: runtime.MUSUW_ADMIN_BACKEND_URL.replace(/\/$/, ''),
-      platformKeyAccount: runtime.MUSUW_ADMIN_PLATFORM_KEY_ACCOUNT || 'musuw-admin-production',
+      platformKeyAccount,
       paddleEnvironment: 'live',
-      paddleApiKey: runtime.MUSUW_PADDLE_API_KEY || '',
+      paddleApiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
       paddleApiBase: 'https://api.paddle.com',
-      supabaseAdmin: unavailableProviderState(
-        Boolean(runtime.MUSUW_SUPABASE_SERVICE_ROLE_KEY),
-        'Auth Admin server credential is not configured',
-        'Supabase Auth Admin query adapter is not enabled; use the official console',
-      ),
-      r2Admin: unavailableProviderState(
-        Boolean(runtime.MUSUW_R2_ACCESS_KEY_ID && runtime.MUSUW_R2_SECRET_ACCESS_KEY),
-        'R2 operator credential is not configured on this Mac',
-        'R2 inventory adapter is not enabled; use the official Cloudflare console',
-      ),
-      langfuse: unavailableProviderState(
-        Boolean(runtime.LANGFUSE_PUBLIC_KEY && runtime.LANGFUSE_SECRET_KEY),
-        'Langfuse query credentials are not configured',
-        'Langfuse query adapter is not enabled for this console',
-      ),
+      supabaseAdmin: {
+        targetEnvironment: 'PRODUCTION',
+        projects: [
+          {
+            environment: 'TEST', name: 'Musuw Staging', ref: 'achfnnicetupvtoqiwqd',
+            url: 'https://achfnnicetupvtoqiwqd.supabase.co',
+            applicable: false,
+          },
+          {
+            environment: 'PRODUCTION', name: 'Musuw Production', ref: 'phtveqtlswzokwsztsvu',
+            url: 'https://phtveqtlswzokwsztsvu.supabase.co',
+            applicable: true,
+            apiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.supabase, providerKeyAccount),
+          },
+        ],
+      },
+      r2Admin: {
+        accountId: runtime.MUSUW_R2_ACCOUNT_ID || 'c692db4757e1454b71880ec6c431db9c',
+        bucket: runtime.MUSUW_R2_BUCKET || 'musuw-production',
+        prefix: runtime.MUSUW_R2_PREFIX || 'weknora/',
+        accessKeyId: readKeychainSecret(PROVIDER_KEY_SERVICES.r2AccessKeyID, providerKeyAccount),
+        secretAccessKey: readKeychainSecret(PROVIDER_KEY_SERVICES.r2SecretAccessKey, providerKeyAccount),
+      },
+      langfuse: {
+        host: (runtime.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
+        publicKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
+        secretKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
+      },
     }
   }
 
   const candidate = parseEnvFile(resolve(repoRoot, '.runtime/weknora/candidate.env'))
-  const paddle = parseEnvFile(resolve(repoRoot, '.runtime/weknora/paddle-sandbox.env'))
+  const providerKeyAccount = 'musuw-admin-test'
   return {
     target: 'test',
     label: 'TEST',
@@ -138,27 +162,56 @@ function loadRuntime(target) {
       application_name: 'musuw-operations-test',
     },
     backendBaseUrl: (process.env.MUSUW_ADMIN_TEST_BACKEND_URL || 'http://127.0.0.1:18090').replace(/\/$/, ''),
-    platformKeyAccount: 'musuw-admin-test',
+    platformKeyAccount: providerKeyAccount,
     paddleEnvironment: 'sandbox',
-    paddleApiKey: paddle.MUSUW_PADDLE_API_KEY || '',
+    paddleApiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
     paddleApiBase: 'https://sandbox-api.paddle.com',
-    supabaseAdmin: { available: false, reason: 'Auth Admin server credential is not configured' },
-    r2Admin: { available: false, reason: 'R2 operator credential is not configured on this Mac' },
-    langfuse: { available: false, reason: 'Langfuse query credentials are not configured' },
+    supabaseAdmin: {
+      targetEnvironment: 'TEST',
+      projects: [
+        {
+          environment: 'TEST', name: 'Musuw Staging', ref: 'achfnnicetupvtoqiwqd',
+          url: 'https://achfnnicetupvtoqiwqd.supabase.co',
+          applicable: true,
+          apiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.supabase, providerKeyAccount),
+        },
+        {
+          environment: 'PRODUCTION', name: 'Musuw Production', ref: 'phtveqtlswzokwsztsvu',
+          url: 'https://phtveqtlswzokwsztsvu.supabase.co',
+          applicable: false,
+        },
+      ],
+    },
+    r2Admin: {
+      accountId: process.env.MUSUW_R2_ACCOUNT_ID || 'c692db4757e1454b71880ec6c431db9c',
+      bucket: process.env.MUSUW_R2_TEST_BUCKET || candidate.S3_BUCKET_NAME || 'musuw-staging',
+      prefix: process.env.MUSUW_R2_PREFIX || 'weknora/',
+      accessKeyId: readKeychainSecret(PROVIDER_KEY_SERVICES.r2AccessKeyID, providerKeyAccount),
+      secretAccessKey: readKeychainSecret(PROVIDER_KEY_SERVICES.r2SecretAccessKey, providerKeyAccount),
+    },
+    langfuse: {
+      host: (process.env.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
+      publicKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
+      secretKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
+    },
   }
 }
 
-function readPlatformKey(account) {
+export function readKeychainSecret(service, account, executor = execFileSync) {
   try {
-    return execFileSync('/usr/bin/security', [
+    return executor('/usr/bin/security', [
       'find-generic-password',
       '-w',
-      '-s', PLATFORM_KEY_SERVICE,
+      '-s', service,
       '-a', account,
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   } catch {
     return ''
   }
+}
+
+function readPlatformKey(account) {
+  return readKeychainSecret(PLATFORM_KEY_SERVICE, account)
 }
 
 function parseCookies(header = '') {
@@ -285,6 +338,191 @@ async function fetchJSON(url, options = {}) {
     return { response, payload }
   } finally {
     clearTimeout(timer)
+  }
+}
+
+function projectSupabaseUser(user) {
+  return {
+    id: user?.id || '',
+    email: user?.email || '',
+    created_at: user?.created_at || null,
+    last_sign_in_at: user?.last_sign_in_at || null,
+    email_confirmed_at: user?.email_confirmed_at || null,
+    provider: user?.app_metadata?.provider || '',
+    providers: Array.isArray(user?.app_metadata?.providers) ? user.app_metadata.providers : [],
+  }
+}
+
+export async function readSupabaseAdminData({ targetEnvironment, projects, fetcher = fetchJSON }) {
+  const results = await Promise.all(projects.map(async (project) => {
+    const base = {
+      environment: project.environment,
+      name: project.name,
+      ref: project.ref,
+      applicable: project.applicable !== false,
+      available: false,
+      reason: '',
+      total: 0,
+      users: [],
+    }
+    if (project.applicable === false) {
+      return { ...base, reason: `${project.environment} is not queried by the ${targetEnvironment} process` }
+    }
+    if (!project.apiKey) {
+      return { ...base, reason: 'Auth Admin server credential is not configured in macOS Keychain' }
+    }
+    try {
+      const endpoint = new URL('/auth/v1/admin/users', project.url)
+      endpoint.searchParams.set('page', '1')
+      endpoint.searchParams.set('per_page', '100')
+      const result = await fetcher(endpoint, {
+        headers: {
+          Accept: 'application/json',
+          apikey: project.apiKey,
+          'User-Agent': 'MusuwOperations/1.0',
+        },
+      })
+      if (!result.response.ok) {
+        return { ...base, reason: `Supabase ${project.environment} Auth Admin returned HTTP ${result.response.status}` }
+      }
+      const users = Array.isArray(result.payload?.users)
+        ? result.payload.users.map(projectSupabaseUser)
+        : []
+      return { ...base, available: true, total: users.length, users }
+    } catch (error) {
+      return { ...base, reason: publicError(error) }
+    }
+  }))
+  const target = results.find((project) => project.environment === targetEnvironment)
+  return {
+    available: Boolean(target?.available),
+    reason: target?.available ? '' : (target?.reason || 'Target Supabase Auth project is unavailable'),
+    projects: results,
+  }
+}
+
+export async function readR2Inventory({ client, bucket, prefix = '', applicable = true }) {
+  if (!applicable) {
+    return {
+      available: false,
+      applicable: false,
+      reason: 'TEST uses local storage; Cloudflare R2 is not applicable in this environment',
+      bucket: '',
+      prefix: '',
+      total: 0,
+      total_bytes: 0,
+      objects: [],
+    }
+  }
+  if (!client || !bucket) {
+    return {
+      available: false,
+      applicable: true,
+      reason: 'R2 operator credential is not configured in macOS Keychain',
+      bucket: bucket || '',
+      prefix,
+      total: 0,
+      total_bytes: 0,
+      objects: [],
+    }
+  }
+  try {
+    const payload = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1000 }))
+    const objects = (payload.Contents || []).map((object) => ({
+      key: object.Key || '',
+      size: Number(object.Size || 0),
+      last_modified: object.LastModified instanceof Date ? object.LastModified.toISOString() : (object.LastModified || null),
+      etag: object.ETag || '',
+    }))
+    return {
+      available: true,
+      applicable: true,
+      reason: payload.IsTruncated ? 'R2 inventory is capped at the first 1000 objects' : '',
+      bucket,
+      prefix,
+      total: Number(payload.KeyCount ?? objects.length),
+      total_bytes: objects.reduce((sum, object) => sum + object.size, 0),
+      objects,
+    }
+  } catch (error) {
+    return {
+      available: false,
+      applicable: true,
+      reason: publicError(error),
+      bucket,
+      prefix,
+      total: 0,
+      total_bytes: 0,
+      objects: [],
+    }
+  }
+}
+
+function projectLangfuseObservation(observation) {
+  return {
+    id: observation?.id || '',
+    trace_id: observation?.traceId || '',
+    name: observation?.name || '',
+    type: observation?.type || '',
+    start_time: observation?.startTime || null,
+    end_time: observation?.endTime || null,
+    environment: observation?.environment || '',
+    level: observation?.level || '',
+    model: observation?.providedModelName || '',
+    total_usage: observation?.totalUsage ?? observation?.usageDetails?.total ?? null,
+    total_cost: observation?.totalCost ?? observation?.costDetails?.total ?? null,
+    latency: observation?.latency ?? null,
+    trace_name: observation?.traceName || '',
+    release: observation?.release || '',
+  }
+}
+
+export async function readLangfuseData({ host, publicKey, secretKey, fetcher = fetchJSON }) {
+  const unavailable = (reason) => ({ available: false, reason, observations: [], cursor: null })
+  if (!publicKey || !secretKey) return unavailable('Langfuse query credentials are not configured in macOS Keychain')
+  try {
+    const endpoint = new URL('/api/public/v2/observations', host)
+    endpoint.searchParams.set('fields', 'core,basic,time,model,usage,metrics,trace_context')
+    endpoint.searchParams.set('limit', '100')
+    endpoint.searchParams.set('fromStartTime', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    endpoint.searchParams.set('toStartTime', new Date().toISOString())
+    const result = await fetcher(endpoint, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Basic ${Buffer.from(`${publicKey}:${secretKey}`).toString('base64')}`,
+      },
+    })
+    if (!result.response.ok) return unavailable(`Langfuse observations API returned HTTP ${result.response.status}`)
+    return {
+      available: true,
+      reason: '',
+      observations: Array.isArray(result.payload?.data)
+        ? result.payload.data.map(projectLangfuseObservation)
+        : [],
+      cursor: result.payload?.meta?.cursor || null,
+    }
+  } catch (error) {
+    return unavailable(publicError(error))
+  }
+}
+
+function cachedOfficialRead(loader, ttlMs = 30_000) {
+  let value
+  let loadedAt = 0
+  let pending
+  return async () => {
+    if (value && Date.now() - loadedAt < ttlMs) return value
+    if (!pending) {
+      pending = Promise.resolve()
+        .then(loader)
+        .then((next) => {
+          value = next
+          loadedAt = Date.now()
+          return next
+        })
+        .finally(() => { pending = null })
+    }
+    return pending
   }
 }
 
@@ -637,6 +875,29 @@ async function start() {
   if (!existsSync(operationsHtml)) throw new Error(`operations build is missing: ${operationsHtml}`)
 
   const platformKey = readPlatformKey(runtime.platformKeyAccount)
+  const r2Client = runtime.r2Admin.accessKeyId && runtime.r2Admin.secretAccessKey
+    ? new S3Client({
+      region: 'auto',
+      endpoint: `https://${runtime.r2Admin.accountId}.r2.cloudflarestorage.com`,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: runtime.r2Admin.accessKeyId,
+        secretAccessKey: runtime.r2Admin.secretAccessKey,
+      },
+    })
+    : null
+  const supabaseAdminData = cachedOfficialRead(() => readSupabaseAdminData(runtime.supabaseAdmin))
+  const r2Inventory = cachedOfficialRead(() => readR2Inventory({
+    client: r2Client,
+    bucket: runtime.r2Admin.bucket,
+    prefix: runtime.r2Admin.prefix,
+    applicable: target === 'production',
+  }))
+  const langfuseData = cachedOfficialRead(() => readLangfuseData(runtime.langfuse))
+  const paddleOfficialData = cachedOfficialRead(() => readPaddleData({
+    apiKey: runtime.paddleApiKey,
+    apiBase: runtime.paddleApiBase,
+  }))
   const pool = new Pool({
     ...runtime.database,
     // Two durable connections keep the single-operator console responsive when
@@ -710,10 +971,7 @@ async function start() {
   }
 
   async function paddleData() {
-    return readPaddleData({
-      apiKey: runtime.paddleApiKey,
-      apiBase: runtime.paddleApiBase,
-    })
+    return paddleOfficialData()
   }
 
   const server = createServer(async (request, response) => {
@@ -736,16 +994,29 @@ async function start() {
         if (request.method !== 'GET') return writeJSON(response, 405, { error: 'method not allowed' })
         switch (url.pathname) {
           case '/admin-api/config':
+            {
+            const [paddle, supabase, r2, langfuse] = await Promise.all([
+              paddleOfficialData(), supabaseAdminData(), r2Inventory(), langfuseData(),
+            ])
             return writeJSON(response, 200, { data: {
               csrf_token: session.csrf,
               environment: runtime.label,
               target: runtime.target,
               providers: {
                 weknora: { available: Boolean(platformKey), authority: 'Musuw scoped management API' },
-                paddle: { available: Boolean(runtime.paddleApiKey), authority: `Paddle ${runtime.paddleEnvironment}` },
-                supabase: { ...runtime.supabaseAdmin, authority: 'Supabase Auth Admin' },
-                r2: { ...runtime.r2Admin, authority: 'Cloudflare R2 S3 API' },
-                langfuse: { ...runtime.langfuse, authority: 'Langfuse' },
+                paddle: {
+                  available: Boolean(paddle.subscriptions_available && paddle.transactions_available),
+                  reason: paddle.reason,
+                  authority: `Paddle ${runtime.paddleEnvironment}`,
+                },
+                supabase: { available: supabase.available, reason: supabase.reason, authority: 'Supabase Auth Admin' },
+                r2: {
+                  available: r2.available,
+                  applicable: r2.applicable,
+                  reason: r2.reason,
+                  authority: r2.applicable === false ? 'TEST local storage' : 'Cloudflare R2 S3 API',
+                },
+                langfuse: { available: langfuse.available, reason: langfuse.reason, authority: 'Langfuse' },
               },
               links: {
                 paddle: runtime.paddleEnvironment === 'sandbox' ? 'https://sandbox-vendors.paddle.com/' : 'https://vendors.paddle.com/',
@@ -754,8 +1025,10 @@ async function start() {
                 cloudflare_r2: 'https://dash.cloudflare.com/c692db4757e1454b71880ec6c431db9c/r2',
                 openrouter: 'https://openrouter.ai/settings/keys',
                 resend: 'https://resend.com/domains',
+                langfuse: runtime.langfuse.host,
               },
             } })
+            }
           case '/admin-api/overview':
             return writeJSON(response, 200, { data: await queries.overview() })
           case '/admin-api/users':
@@ -767,19 +1040,20 @@ async function start() {
             return writeJSON(response, 200, { data: { mirror, provider } })
           }
           case '/admin-api/identity':
+            {
+            const provider = await supabaseAdminData()
             return writeJSON(response, 200, { data: {
               account_summary: await queries.identity(),
-              provider: {
-                available: runtime.supabaseAdmin.available,
-                reason: `${runtime.supabaseAdmin.reason}; account data below is the Musuw mirror, not a fabricated Supabase response.`,
-                projects: [
-                  { environment: 'TEST', name: 'Musuw Staging', ref: 'achfnnicetupvtoqiwqd' },
-                  { environment: 'PRODUCTION', name: 'Musuw Production', ref: 'phtveqtlswzokwsztsvu' },
-                ],
-              },
+              provider,
             } })
+            }
           case '/admin-api/storage':
-            return writeJSON(response, 200, { data: await queries.storage(url) })
+            {
+            const [mirror, provider] = await Promise.all([queries.storage(url), r2Inventory()])
+            return writeJSON(response, 200, { data: { ...mirror, provider } })
+            }
+          case '/admin-api/langfuse':
+            return writeJSON(response, 200, { data: await langfuseData() })
           default:
             return writeJSON(response, 404, { error: 'not found' })
         }

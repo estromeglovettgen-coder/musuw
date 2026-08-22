@@ -4,6 +4,7 @@ import type {
   IdentityData,
   InvestigationData,
   KnowledgeBaseRow,
+  LangfuseData,
   OperationsConfig,
   OverviewData,
   PageResult,
@@ -62,6 +63,7 @@ export const operationsApi = {
   identity: () => request<IdentityData>('/admin-api/identity'),
   storage: (params: { page?: number; page_size?: number; q?: string }) =>
     request<StorageData>(`/admin-api/storage${queryString(params)}`),
+  langfuse: () => request<LangfuseData>('/admin-api/langfuse'),
   entitlement: (tenantId: number) =>
     request<TenantEntitlement>(`/api/v1/system/admin/tenants/${tenantId}/entitlement`),
   investigation: (userId: string) =>

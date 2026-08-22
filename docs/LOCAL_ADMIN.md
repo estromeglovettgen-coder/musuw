@@ -53,35 +53,41 @@ scripts/musuw-admin stop
 
 ## 当前能力状态
 
-- Musuw scoped management API：available。平台密钥只从 macOS Keychain
-  的 `com.musuw.local-admin.platform-key` / `musuw-admin-test` 项读取，
-  不进入环境文件、页面 JavaScript、日志或仓库。
-- Paddle：按进程目标使用 Sandbox 或 Live，只从 ignored runtime 读取最小
-  权限凭据，浏览器只接收经过字段白名单的订阅/交易投影。当前 PRODUCTION
-  订阅读取 available（官方 API 返回 0 条），交易读取因凭据缺少该权限而
-  明确显示 `HTTP 403` unavailable；Musuw webhook 镜像和订阅读取不受影响。
-- Supabase Auth Admin：unavailable，因为本机没有 Auth Admin 服务端凭据，且
-  当前运营服务没有启用官方查询适配器。
-  项目必须显示为 Musuw Staging `achfnnicetupvtoqiwqd` 与 Musuw Production
-  `phtveqtlswzokwsztsvu`，不能使用别的组织或伪造空用户列表。
-- Cloudflare R2 operator：unavailable，因为本机运营服务没有独立 R2
-  operator credential，也没有启用对象清单适配器。生产 `musuw-production` 桶已通过 Cloudflare 官方
-  Console 只读核对；中台不会把 Musuw 对象引用冒充成官方对象清单。
-- Langfuse query：unavailable，因为没有查询凭据，也没有启用查询适配器。
-  Musuw request ID、处理 span、运行队列和审计仍可使用。
+- Musuw scoped management API：TEST 与 PRODUCTION 均 available。平台密钥
+  只从 macOS Keychain 对应环境账号读取，不进入页面 JavaScript、日志或仓库。
+- Paddle：Sandbox 与 Live 的订阅、交易官方读取均返回 HTTP 200。浏览器只
+  接收字段白名单投影；套餐仍只由签名 webhook 更新，退款、支付和供应商级
+  配置继续交给 Paddle 官方后台。
+- Supabase Auth Admin：Musuw Staging `achfnnicetupvtoqiwqd` 与 Musuw
+  Production `phtveqtlswzokwsztsvu` 已分别在 TEST/PRODUCTION 进程通过官方
+  Admin API。单个进程只读取所选环境凭据；另一项目仅显示 ref 与未选择状态。
+  服务端不返回 `user_metadata`、令牌或密钥。
+- Cloudflare R2：PRODUCTION 通过官方 S3 API 读取 `musuw-production/weknora/`
+  清单；TEST 的产品运行时使用本地存储，所以明确显示“不适用”，不要求或
+  伪造一组 TEST R2 凭据。
+- Langfuse：TEST 与 PRODUCTION 均连接 JP Cloud 的 `Musuw` 项目。生产应用
+  已产生真实 trace；运营台只展示 observation ID、trace ID、类型、模型、
+  用量、环境、release 和时间，不返回 input、output、prompt、content 或附件。
+
+密钥位置、账号、远端文件、权限边界和安全的“只检查存在性”命令统一记录在
+[`docs/SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md)。该文档不含
+任何密钥值。
 
 ## 2026-08-22 真实浏览器验收
 
-- TEST 七页、搜索筛选、用户详情抽屉、危险动作确认、CSRF/404 边界和
-  WCAG A/AA 严重问题扫描通过。
-- PRODUCTION 七页均读取真实数据：用户、知识库/文档、Paddle 镜像与官方
-  查询、账号镜像、源文件/索引/配额口径、运行队列和系统审计均可用。
-- PRODUCTION Paddle Live 订阅 API 可查询，当前返回 0 条；交易 API 返回
-  `HTTP 403` 并只将交易能力标为 unavailable。正式 inline checkout 仍被
-  Paddle 商户 onboarding 阻断，不会伪装成可支付。
-- Supabase Auth Admin、Cloudflare R2 operator 和 Langfuse query 仍按上文
-  明确显示 unavailable；这不影响产品本身已经生效的 Supabase 登录和 R2
-  文件存储链路。
+- PRODUCTION 七页全部以真实数据渲染：9 位用户、9 个空间、7 个知识库、
+  20 份文档；Paddle Live、两个 Supabase 项目、R2 和 Langfuse 全部连接。
+  R2 官方清单返回 40 个对象、10,220,178 bytes。Paddle Live 当前真实返回
+  0 个订阅和 0 个交易，不把真实空页伪装成失败。
+- TEST 七页全部通过：7 位用户；Paddle Sandbox 返回 2 个订阅、27 个交易；
+  Supabase 与 Langfuse 可用；R2 以“TEST 本地存储”显示为不适用。
+- Chrome 实际打开用户完整详情、严格脱敏调查、文档详情和 `UPDATE:<tenant>`
+  二次确认表单。确认按钮在输入精确短语前禁用；验收没有提交生产业务写入。
+- 一次低成本 PRODUCTION 对话经过消费者、WeKnora、模型和 Langfuse，随后
+  运营台通过官方 API 读取到 5 条安全 observation 元数据，且页面搜索不到
+  原始 prompt。
+- Playwright 3/3 通过，覆盖真实运营流程、404/403/CSRF/脱敏边界和全部七页
+  WCAG A/AA serious/critical 扫描。浏览器与自动化均无控制台错误。
 
 ## TEST / PRODUCTION 切换
 
@@ -124,5 +130,5 @@ npm run admin:e2e
 ```
 
 浏览器验收覆盖七页导航、真实非空数据、搜索/筛选、详情抽屉、按能力拆分
-的 provider unavailable 状态、危险动作确认、CSRF、审计、404/403 边界、
-敏感字段脱敏，以及全部七页的 WCAG A/AA 严重问题扫描。
+的 provider available/unavailable/not-applicable 状态、危险动作确认、CSRF、
+审计、404/403 边界、敏感字段脱敏，以及全部七页的 WCAG A/AA 严重问题扫描。

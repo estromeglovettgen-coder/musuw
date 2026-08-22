@@ -2,6 +2,7 @@ export type EnvironmentName = 'TEST' | 'PRODUCTION'
 
 export interface ProviderState {
   available: boolean
+  applicable?: boolean
   authority: string
   reason?: string
 }
@@ -161,7 +162,24 @@ export interface IdentityData {
   provider: {
     available: boolean
     reason: string
-    projects: Array<{ environment: EnvironmentName; name: string; ref: string }>
+    projects: Array<{
+      environment: EnvironmentName
+      name: string
+      ref: string
+      applicable?: boolean
+      available: boolean
+      reason: string
+      total: number
+      users: Array<{
+        id: string
+        email: string
+        created_at?: string
+        last_sign_in_at?: string
+        email_confirmed_at?: string
+        provider?: string
+        providers?: string[]
+      }>
+    }>
   }
 }
 
@@ -189,6 +207,43 @@ export interface StorageData extends PageResult<StorageObjectRow> {
     knowledge_base_count: number
     created_at: string
     updated_at: string
+  }>
+  provider: {
+    available: boolean
+    applicable?: boolean
+    reason: string
+    bucket: string
+    prefix: string
+    total: number
+    total_bytes: number
+    objects: Array<{
+      key: string
+      size: number
+      last_modified?: string
+      etag?: string
+    }>
+  }
+}
+
+export interface LangfuseData {
+  available: boolean
+  reason: string
+  cursor?: string
+  observations: Array<{
+    id: string
+    trace_id: string
+    name: string
+    type: string
+    start_time?: string
+    end_time?: string
+    environment?: string
+    level?: string
+    model?: string
+    total_usage?: number
+    total_cost?: number
+    latency?: number
+    trace_name?: string
+    release?: string
   }>
 }
 
