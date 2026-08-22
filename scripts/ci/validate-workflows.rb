@@ -54,6 +54,7 @@ paths = EXPECTED.map { |name| File.join(WORKFLOW_DIR, name) }
 paths.each { |path| fail_contract "missing #{path}" unless File.file?(path) }
 
 documents = paths.to_h { |path| [File.basename(path), parse_yaml(path)] }
+expected_runner = "${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}"
 documents.each do |name, document|
   assert_hash(document, name)
   assert_trigger(document, name)
@@ -71,6 +72,11 @@ documents.each do |name, document|
   walk_uses(document).each do |reference|
     ref = reference.split("@", 2).last
     fail_contract "#{name} has an unpinned action #{reference}" unless ref.match?(%r{\Av\d+(?:\.\d+(?:\.\d+)?)?\z|\A[0-9a-f]{40}\z})
+  end
+  document.fetch("jobs").each do |job_name, job|
+    next unless job.is_a?(Hash)
+
+    fail_contract "#{name}.jobs.#{job_name} must retain the hosted-runner fallback" unless job["runs-on"] == expected_runner
   end
 end
 

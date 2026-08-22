@@ -54,7 +54,7 @@ concurrency:
 jobs:
   workflow-contract:
     name: Workflow contracts
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: Check out the exact revision
@@ -67,7 +67,7 @@ jobs:
   frontend:
     name: Frontend tests, types and build
     needs: workflow-contract
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - name: Check out the exact revision
@@ -96,7 +96,7 @@ jobs:
   auth:
     name: Auth shell tests, types and build
     needs: workflow-contract
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     env:
       # Public-only placeholders make the build contract executable without
@@ -128,7 +128,7 @@ jobs:
   storefront:
     name: Storefront tests and build
     needs: workflow-contract
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Check out the exact revision
@@ -152,7 +152,7 @@ jobs:
   go:
     name: Active WeKnora Go tests and build
     needs: workflow-contract
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
     defaults:
       run:
@@ -176,7 +176,7 @@ jobs:
   docreader:
     name: Active DocReader tests
     needs: workflow-contract
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - name: Check out the exact revision
@@ -200,7 +200,7 @@ jobs:
   repository-contracts:
     name: Release, provenance and secret contracts
     needs: workflow-contract
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Check out the exact revision

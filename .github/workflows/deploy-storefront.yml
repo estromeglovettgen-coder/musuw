@@ -42,7 +42,7 @@ jobs:
           github.event.workflow_run.repository.full_name == 'estromeglovettgen-coder/musuw'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     outputs:
       release_sha: ${{ steps.resolve.outputs.release_sha }}
@@ -135,7 +135,7 @@ jobs:
     name: Deploy storefront Worker
     needs: build
     environment: storefront-production
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Check out the exact revision

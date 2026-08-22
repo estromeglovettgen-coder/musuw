@@ -109,6 +109,12 @@ changes the Cloudflare Worker.
 
 ## Required repository settings
 
+Jobs use `MUSUW_ACTIONS_RUNNER` when that repository variable is non-empty and
+otherwise use GitHub's `ubuntu-latest` hosted pool. The override is only for a
+temporary, trusted Linux runner with Docker; remove the variable when that
+runner is retired so normal hosted routing resumes. Never expose a self-hosted
+release runner to untrusted pull-request code.
+
 Keep the following values in the target-specific GitHub Environments or on the
 server, never in the repository:
 
