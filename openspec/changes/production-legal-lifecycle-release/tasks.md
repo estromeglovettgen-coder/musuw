@@ -1,9 +1,9 @@
 ## 1. Legal and auth entry
 
-- [x] 1.1 Add failing auth and storefront contract tests for the unchecked
-  acknowledgement, canonical links, bilingual copy, and live-provider legal
+- [x] 1.1 Add failing auth and storefront contract tests for the adjacent
+  continuation notice, canonical links, bilingual copy, and live-provider legal
   disclosures.
-- [x] 1.2 Implement the accessible auth acknowledgement gate and mature login
+- [x] 1.2 Implement the accessible auth continuation notice and mature login
   presentation without changing Supabase or WeKnora auth behavior.
 - [x] 1.3 Reconcile the bilingual legal suite with evidence-backed production
   providers, rights paths, purchase behavior, and the current effective date.
@@ -11,7 +11,7 @@
 ## 2. Local verification
 
 - [x] 2.1 Run auth tests/types/build and storefront tests/build, including the
-  original unchecked/checked acceptance scenarios.
+  direct legal-link and no-checkbox continuation scenarios.
 - [x] 2.2 Run frontend, Go, release/source/secret contracts and strict OpenSpec
   validation for the complete current mainline.
 

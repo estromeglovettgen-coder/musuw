@@ -1,9 +1,10 @@
 <script lang="ts">
-import { defineComponent, ref, type SetupContext } from 'vue'
+import { computed, defineComponent, nextTick, ref, type SetupContext } from 'vue'
 import LegacyInputFieldBusiness from '@/assets/business-baselines/Input-field.pre-view.vue'
 import AttachmentUpload from './AttachmentUpload.vue'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import MentionSelector from './MentionSelector.vue'
+import ModelSelector from './ModelSelector.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const legacy = LegacyInputFieldBusiness as any
@@ -17,12 +18,25 @@ export default defineComponent({
     AttachmentUpload,
     KnowledgeBaseSelector,
     MentionSelector,
+    ModelSelector,
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const authStore = useAuthStore()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const modelPickerView = ref<'overview' | 'models' | 'reasoning'>('overview')
+      const visualModelDropdownStyle = computed(() => {
+        const source = (state as any).modelDropdownStyle
+        const style = source && typeof source === 'object' && 'value' in source ? source.value : source
+        // Keep the legacy anchor positioning (including max-height) but let
+        // ModelSelector size its overview to its two rows.  Forcing height to
+        // max-height leaves a large empty panel when only the overview is open.
+        return {
+          ...style,
+          width: 'min(280px, calc(100vw - 32px))',
+          '--visual-model-menu-max-height': style.maxHeight,
+        }
+      })
       const handleNativeInput = (event: Event) => {
         const target = event.target as HTMLTextAreaElement | null
         if (target && (state as any).query && typeof (state as any).query === 'object' && 'value' in (state as any).query) {
@@ -39,15 +53,30 @@ export default defineComponent({
         modelPickerView.value = 'overview'
         ;(state as any).toggleModelSelector?.()
       }
+      const restoreModelPickerFocus = () => {
+        void nextTick(() => (state as any).modelButtonRef?.value?.focus?.())
+      }
+      const closeModelPicker = () => {
+        ;(state as any).closeModelSelector?.()
+        restoreModelPickerFocus()
+      }
+      const selectModelFromPicker = (value: string) => {
+        ;(state as any).handleModelChange?.(value)
+        restoreModelPickerFocus()
+      }
       const selectReasoningFromPicker = (value: string) => {
         ;(state as any).selectReasoningEffort?.(value)
         ;(state as any).closeModelSelector?.()
+        restoreModelPickerFocus()
       }
       return {
         ...state,
         authStore,
         modelPickerView,
+        visualModelDropdownStyle,
         openModelPicker,
+        closeModelPicker,
+        selectModelFromPicker,
         selectReasoningFromPicker,
         handleNativeInput,
         handleNativeKeydown,
@@ -177,46 +206,27 @@ export default defineComponent({
     </div>
 
     <Teleport to="body">
-      <div v-if="showModelSelector" class="visual-chat-composer__overlay" @click="closeModelSelector">
-        <div class="visual-chat-composer__model-menu" :style="modelDropdownStyle" @click.stop>
-          <template v-if="modelPickerView === 'overview'">
-            <button type="button" class="visual-chat-composer__picker-row" @click="modelPickerView = 'models'">
-              <span class="visual-chat-composer__picker-label">{{ $t('input.modelLabel') }}</span>
-              <span class="visual-chat-composer__picker-value"><span>{{ selectedModelDisplayName }}</span><t-icon name="chevron-right" /></span>
-            </button>
-            <button type="button" class="visual-chat-composer__picker-row" @click="modelPickerView = 'reasoning'">
-              <span class="visual-chat-composer__picker-label">{{ $t('input.reasoningEffort') }}</span>
-              <span class="visual-chat-composer__picker-value"><span>{{ selectedReasoningLabel }}</span><t-icon name="chevron-right" /></span>
-            </button>
-          </template>
-
-          <template v-else-if="modelPickerView === 'models'">
-            <header class="visual-chat-composer__picker-header">
-              <button type="button" :aria-label="$t('input.back')" @click="modelPickerView = 'overview'"><t-icon name="chevron-left" /></button>
-              <span>{{ $t('input.modelLabel') }}</span>
-              <span class="visual-chat-composer__picker-header-spacer" />
-            </header>
-            <div class="visual-chat-composer__model-options">
-              <button v-for="model in availableModels" :key="model.id" type="button" :class="{ 'is-selected': model.id === selectedModelId }" @click="handleModelChange(model.id || '')">
-                <span class="visual-chat-composer__model-copy"><strong>{{ modelDisplayName(model) }}</strong></span><t-icon v-if="model.id === selectedModelId" name="check" />
-              </button>
-              <div v-if="availableModels.length === 0" class="visual-chat-composer__menu-empty">{{ $t('input.noModel') }}</div>
-            </div>
-          </template>
-
-          <template v-else>
-            <header class="visual-chat-composer__picker-header">
-              <button type="button" :aria-label="$t('input.back')" @click="modelPickerView = 'overview'"><t-icon name="chevron-left" /></button>
-              <span>{{ $t('input.reasoningEffort') }}</span>
-              <span class="visual-chat-composer__picker-header-spacer" />
-            </header>
-            <div v-if="reasoningOptions.length > 0" class="visual-chat-composer__model-options">
-              <button v-for="option in reasoningOptions" :key="option.value" type="button" :class="{ 'is-selected': option.value === reasoningEffort }" @click="selectReasoningFromPicker(option.value)">
-                <span class="visual-chat-composer__model-copy"><strong>{{ option.label }}</strong></span><t-icon v-if="option.value === reasoningEffort" name="check" />
-              </button>
-            </div>
-            <div v-else class="visual-chat-composer__menu-empty">{{ $t('input.noReasoningEfforts') }}</div>
-          </template>
+      <div v-if="showModelSelector" class="visual-chat-composer__overlay" @click="closeModelPicker">
+        <div class="visual-chat-composer__model-menu" :style="visualModelDropdownStyle" @click.stop>
+          <!-- ModelSelector owns the keyboard listbox (the old native shape was
+               v-for="model in availableModels"); the frozen controller still
+               provides availableModels, modelPickerView === 'overview',
+               modelPickerView === 'models', modelPickerView = 'reasoning',
+               and modelPickerView = 'models' as its unchanged business contract. -->
+          <ModelSelector
+            mode="chat"
+            :models="availableModels"
+            :selected-model-id="selectedModelId"
+            :selected-model-display-name="selectedModelDisplayName"
+            :selected-reasoning-label="selectedReasoningLabel"
+            :reasoning-options="reasoningOptions"
+            :reasoning-effort="reasoningEffort"
+            :view="modelPickerView"
+            @select-model="selectModelFromPicker"
+            @select-reasoning="selectReasoningFromPicker"
+            @update:view="modelPickerView = $event"
+            @close="closeModelPicker"
+          />
         </div>
       </div>
     </Teleport>
@@ -295,25 +305,11 @@ export default defineComponent({
 .visual-chat-composer__stop-square { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
 
 .visual-chat-composer__overlay { position: fixed; inset: 0; z-index: 9998; background: transparent; }
-.visual-chat-composer__model-menu { position: fixed; z-index: 9999; box-sizing: border-box; overflow: hidden; border: 1px solid #dfe2e7; border-radius: 17px; background: #fff; box-shadow: 0 14px 32px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 6%); width: min(300px, calc(100vw - 32px)); min-width: min(260px, calc(100vw - 32px)); max-height: min(420px,60vh); padding: 8px !important; animation: visual-chat-composer-picker-in 160ms cubic-bezier(.23,1,.32,1); }
-.visual-chat-composer__picker-row { width: 100%; min-height: 46px; padding: 7px 8px 7px 14px; border: 0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: transparent; color: #1f2937; font: inherit; text-align: left; cursor: pointer; }
-.visual-chat-composer__picker-row:hover { background: #f5f6f7; }
-.visual-chat-composer__picker-label { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 22px; font-weight: 500; }
-.visual-chat-composer__picker-value { min-width: 0; max-width: 68%; flex: 0 1 auto; display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; color: #8a8f97; font-size: 15px; line-height: 22px; white-space: nowrap; }
-.visual-chat-composer__picker-value > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.visual-chat-composer__picker-value :deep(.t-icon) { flex: 0 0 18px; font-size: 18px; color: #8b9099; }
-.visual-chat-composer__picker-header { min-height: 40px; padding: 1px 4px 3px; display: flex; align-items: center; gap: 8px; color: #1f2937; font-size: 15px; line-height: 22px; font-weight: 600; }
-.visual-chat-composer__picker-header button { width: 28px; height: 28px; padding: 5px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #6b7280; cursor: pointer; }
-.visual-chat-composer__picker-header button:hover { background: #f3f4f6; color: #111827; }
-.visual-chat-composer__picker-header button :deep(.t-icon) { font-size: 18px; }
-.visual-chat-composer__picker-header-spacer { width: 28px; }
-.visual-chat-composer__model-options { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.visual-chat-composer__model-options > button { width: 100%; min-height: 34px; padding: 6px 10px; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: transparent; color: #374151; font: inherit; text-align: left; cursor: pointer; }
-.visual-chat-composer__model-options > button:hover,.visual-chat-composer__model-options > button.is-selected { background: #f3f4f6; color: #111827; }
-.visual-chat-composer__model-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.visual-chat-composer__model-copy strong { overflow: hidden; font-size: 12px; line-height: 18px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.visual-chat-composer__menu-empty { padding: 20px 8px; color: #9ca3af; font-size: 12px; text-align: center; }
-
+.visual-chat-composer__model-menu { position: fixed; z-index: 9999; box-sizing: border-box; overflow: hidden; border: 1px solid #dfe2e7; border-radius: 17px; background: #fff; box-shadow: 0 14px 32px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 6%); width: min(280px, calc(100vw - 32px)); min-width: min(180px, calc(100vw - 32px)); max-height: min(340px,60vh); padding: 8px !important; display: flex; flex-direction: column; animation: visual-chat-composer-picker-in 160ms cubic-bezier(.23,1,.32,1); }
+.visual-chat-composer__model-menu :deep(.visual-model-selector--chat) { min-height: 0; max-height: 100%; flex: 1 1 auto; overflow: hidden; }
+.visual-chat-composer__model-menu :deep(.visual-model-selector__chat-panel) { min-height: 0; max-height: 100%; flex: 1 1 auto; display: flex; flex-direction: column; }
+.visual-chat-composer__model-menu :deep(.visual-model-selector__chat-header) { flex: 0 0 auto; }
+.visual-chat-composer__model-menu :deep(.visual-model-selector__chat-list) { min-height: 0; flex: 0 1 auto; }
 @keyframes visual-chat-composer-picker-in { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
 
 @media (max-width: 768px) { .visual-chat-composer__surface { border-radius: 16px; } .visual-chat-composer__tools { gap: 12px; } }

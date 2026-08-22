@@ -28,11 +28,22 @@ export const AUTH_LEGAL_LINKS = Object.freeze({
   terms: "https://musuw.com/terms",
 });
 
+const EMAIL_CODE_COOLDOWN_SECONDS = 60;
+
 export function authLegalHref(
   document: keyof typeof AUTH_LEGAL_LINKS,
   locale: AuthLocale,
 ): string {
   return `${AUTH_LEGAL_LINKS[document]}?lang=${locale === "zh-CN" ? "zh-CN" : "en"}`;
+}
+
+export function maskAuthEmail(value: string): string {
+  const separator = value.indexOf("@");
+  if (separator <= 0 || separator === value.length - 1) return "••••";
+  const local = value.slice(0, separator);
+  const domain = value.slice(separator + 1);
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${"•".repeat(Math.max(2, local.length - visible.length))}@${domain}`;
 }
 
 export type CheckoutIntent = Readonly<{
@@ -70,8 +81,11 @@ export type AuthCopy = Readonly<{
   emailPlaceholder: string;
   emailCodeSent: (email: string) => string;
   sendCode: string;
+  sendingCode: string;
   verifyCode: string;
   changeEmail: string;
+  resendCode: string;
+  resendIn: (seconds: number) => string;
   legal: Readonly<{
     acknowledgement: string;
     connector: string;
@@ -92,7 +106,7 @@ export type AuthCopy = Readonly<{
 
 const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
   "zh-CN": {
-    title: "登录以进入知识库",
+    title: "登录 Musuw",
     intro: "使用 Google 或邮箱验证码继续。",
     google: "使用 Google 登录",
     divider: "或",
@@ -101,10 +115,13 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     emailPlaceholder: "name@example.com",
     emailCodeSent: (email) => `已向 ${email} 发送六位验证码`,
     sendCode: "发送验证码",
+    sendingCode: "发送中…",
     verifyCode: "验证并继续",
     changeEmail: "更换邮箱",
+    resendCode: "重新发送验证码",
+    resendIn: (seconds) => `${seconds} 秒后可重新发送`,
     legal: {
-      acknowledgement: "我已阅读并同意",
+      acknowledgement: "继续即表示你同意",
       terms: "《服务条款》",
       connector: "，并确认已阅读",
       privacy: "《隐私政策》",
@@ -121,7 +138,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     },
   },
   "en-US": {
-    title: "Log in to access your knowledge base",
+    title: "Log in to Musuw",
     intro: "Continue with Google or an email code.",
     google: "Continue with Google",
     divider: "or",
@@ -130,10 +147,13 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     emailPlaceholder: "name@example.com",
     emailCodeSent: (email) => `We sent a six-digit code to ${email}`,
     sendCode: "Send code",
+    sendingCode: "Sending…",
     verifyCode: "Verify and continue",
     changeEmail: "Use a different email",
+    resendCode: "Resend code",
+    resendIn: (seconds) => `Resend in ${seconds}s`,
     legal: {
-      acknowledgement: "I agree to the",
+      acknowledgement: "By continuing, you agree to the",
       terms: "Terms of Service",
       connector: "and acknowledge the",
       privacy: "Privacy Policy",
@@ -206,7 +226,10 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     return initialAuthScreenForPathname(window.location.pathname);
   });
   const [email, setEmail] = useState("");
-  const [legalAcknowledged, setLegalAcknowledged] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [resendSeconds, setResendSeconds] = useState(0);
   const [error, setError] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return initialAuthErrorForPathname(window.location.pathname, locale);
@@ -225,6 +248,20 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     document.documentElement.lang = locale;
     document.title = copy.title;
   }, [copy.title, locale]);
+
+  useEffect(() => {
+    if (resendAvailableAt === null) return;
+
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1_000));
+      setResendSeconds(remaining);
+      if (remaining === 0) setResendAvailableAt(null);
+    };
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1_000);
+    return () => window.clearInterval(timer);
+  }, [resendAvailableAt]);
 
   useEffect(() => {
     if (window.location.pathname !== "/auth/start") return;
@@ -305,20 +342,22 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   }, [applyIdentityCompletion, copy, runtime, screen]);
 
   const startGoogle = useCallback(() => {
-    if (!legalAcknowledged) return;
+    if (screen !== "login" || isSubmitting) return;
     setError(null);
+    setIsSubmitting(true);
     setScreen("identity_pending");
     void runtime.startGoogle().catch(() => {
       setError(copy.errors.google);
       setScreen("login");
+      setIsSubmitting(false);
     });
-  }, [copy.errors.google, legalAcknowledged, runtime]);
+  }, [copy.errors.google, isSubmitting, runtime, screen]);
 
-  const requestEmailCode = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!legalAcknowledged) return;
-      setError(null);
+  const sendEmailCode = useCallback(async () => {
+    if (isSubmitting) return;
+    setError(null);
+    setIsSubmitting(true);
+    try {
       const result = await runtime.requestEmailOtp(email);
       const message = failureMessage(result, copy);
       if (message !== null) {
@@ -327,23 +366,55 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       }
       if (result.state === "email_otp_sent") {
         setEmail(result.email);
+        setVerificationCode("");
+        setResendAvailableAt(Date.now() + EMAIL_CODE_COOLDOWN_SECONDS * 1_000);
+        setResendSeconds(EMAIL_CODE_COOLDOWN_SECONDS);
         setScreen("email_code");
       }
+    } catch {
+      setError(copy.errors.emailSend);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [copy, email, isSubmitting, runtime]);
+
+  const requestEmailCode = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      await sendEmailCode();
     },
-    [copy, email, legalAcknowledged, runtime],
+    [sendEmailCode],
   );
+
+  const resendEmailCode = useCallback(() => {
+    if (resendSeconds > 0) return;
+    void sendEmailCode();
+  }, [resendSeconds, sendEmailCode]);
 
   const verifyEmailCode = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      const code = String(form.get("code") ?? "");
+      if (isSubmitting) return;
       setError(null);
       setScreen("identity_pending");
-      const result = await runtime.verifyEmailOtp(email, code);
-      applyIdentityCompletion(result);
+      setIsSubmitting(true);
+      try {
+        const result = await runtime.verifyEmailOtp(email, verificationCode);
+        const message = failureMessage(result, copy);
+        if (message !== null) {
+          setError(message);
+          setScreen("email_code");
+        } else {
+          applyIdentityCompletion(result);
+        }
+      } catch {
+        setError(copy.errors.incomplete);
+        setScreen("email_code");
+      } finally {
+        setIsSubmitting(false);
+      }
     },
-    [applyIdentityCompletion, email, runtime],
+    [applyIdentityCompletion, copy, email, isSubmitting, runtime, verificationCode],
   );
 
   if (
@@ -355,39 +426,26 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   ) {
     return (
       <main className="auth-page" aria-busy="true">
-        <p aria-live="polite" className="auth-status">{copy.status}</p>
+        <section aria-labelledby="auth-status-title" className="auth-card auth-card--status">
+          <img alt="Musuw" className="auth-logo" height="48" src="/musuw-logo.png" width="48" />
+          <p aria-live="polite" className="auth-status" id="auth-status-title">{copy.status}</p>
+        </section>
       </main>
     );
   }
 
   return (
     <main className="auth-page">
-      <section aria-labelledby="auth-title" className="auth-panel">
-        <img alt="Musuw" className="auth-logo" height="56" src="/musuw-logo.png" width="56" />
+      <section aria-labelledby="auth-title" className="auth-card" aria-busy={isSubmitting}>
+        <header className="auth-header">
+          <img alt="Musuw" className="auth-logo" height="48" src="/musuw-logo.png" width="48" />
+        </header>
         <h1 id="auth-title">{copy.title}</h1>
         <p className="auth-intro">{copy.intro}</p>
 
-        <label className="auth-consent">
-          <input
-            checked={legalAcknowledged}
-            onChange={(event) => setLegalAcknowledged(event.target.checked)}
-            type="checkbox"
-          />
-          <span>
-            {copy.legal.acknowledgement}{" "}
-            <a href={authLegalHref("terms", locale)} rel="noopener noreferrer" target="_blank">
-              {copy.legal.terms}
-            </a>{" "}
-            {copy.legal.connector}{" "}
-            <a href={authLegalHref("privacy", locale)} rel="noopener noreferrer" target="_blank">
-              {copy.legal.privacy}
-            </a>
-          </span>
-        </label>
-
         <button
           className="auth-google"
-          disabled={!legalAcknowledged}
+          disabled={screen !== "login" || isSubmitting}
           onClick={startGoogle}
           type="button"
         >
@@ -402,44 +460,99 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           <form
             className="auth-form"
             key="email-code"
+            noValidate
             onSubmit={(event) => void verifyEmailCode(event)}
           >
-            <label htmlFor="email-code">{copy.emailCodeSent(email)}</label>
+            <label htmlFor="email-code">{copy.emailCodeSent(maskAuthEmail(email))}</label>
             <input
+              aria-describedby={error === copy.errors.invalidCode ? "auth-error" : undefined}
+              aria-invalid={error === copy.errors.invalidCode}
               autoComplete="one-time-code"
+              autoFocus
               id="email-code"
+              onChange={(event) => {
+                setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                if (error !== null) setError(null);
+              }}
               inputMode="numeric"
               maxLength={6}
               name="code"
               pattern="[0-9]{6}"
               required
+              value={verificationCode}
             />
-            <button type="submit">{copy.verifyCode}</button>
-            <button className="auth-link" onClick={() => setScreen("login")} type="button">
-              {copy.changeEmail}
+            <button disabled={isSubmitting || verificationCode.length !== 6} type="submit">
+              {copy.verifyCode}
             </button>
+            <div className="auth-form-actions">
+              <button
+                className="auth-link auth-resend"
+                disabled={isSubmitting || resendSeconds > 0}
+                onClick={resendEmailCode}
+                type="button"
+              >
+                {isSubmitting
+                  ? copy.sendingCode
+                  : resendSeconds > 0
+                    ? copy.resendIn(resendSeconds)
+                    : copy.resendCode}
+              </button>
+              <button
+                className="auth-link"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setError(null);
+                  setVerificationCode("");
+                  setResendAvailableAt(null);
+                  setResendSeconds(0);
+                  setScreen("login");
+                }}
+                type="button"
+              >
+                {copy.changeEmail}
+              </button>
+            </div>
           </form>
         ) : (
           <form
             className="auth-form"
             key="email-address"
+            noValidate
             onSubmit={(event) => void requestEmailCode(event)}
           >
             <label htmlFor="email">{copy.email}</label>
             <input
+              aria-describedby={error === copy.errors.invalidEmail ? "auth-error" : undefined}
+              aria-invalid={error === copy.errors.invalidEmail}
               autoComplete="email"
               id="email"
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (error !== null) setError(null);
+              }}
               placeholder={copy.emailPlaceholder}
               required
               type="email"
               value={email}
             />
-            <button disabled={!legalAcknowledged} type="submit">{copy.sendCode}</button>
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? copy.sendingCode : copy.sendCode}
+            </button>
           </form>
         )}
 
-        {error !== null ? <p className="auth-error" role="alert">{error}</p> : null}
+        <p className="auth-legal-note">
+          {copy.legal.acknowledgement}{" "}
+          <a href={authLegalHref("terms", locale)} rel="noopener noreferrer" target="_blank">
+            {copy.legal.terms}
+          </a>{" "}
+          {copy.legal.connector}{" "}
+          <a href={authLegalHref("privacy", locale)} rel="noopener noreferrer" target="_blank">
+            {copy.legal.privacy}
+          </a>
+        </p>
+
+        {error !== null ? <p className="auth-error" id="auth-error" role="alert">{error}</p> : null}
       </section>
     </main>
   );

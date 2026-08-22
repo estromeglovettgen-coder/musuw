@@ -231,6 +231,7 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 <style scoped lang="less">
 .visual-general-settings {
   width: 100%;
+  max-width: 640px;
   min-width: 0;
   box-sizing: border-box;
   color: #1f2937;
@@ -257,38 +258,43 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 .visual-setting-list {
   width: 100%;
   min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
+  background: #fff;
 }
 
 .visual-setting-row {
   width: 100%;
   min-width: 0;
-  margin: 0 0 24px;
-  padding: 0 0 24px;
+  min-height: 64px;
+  margin: 0;
+  padding: 12px 16px;
   box-sizing: border-box;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f0f0f0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 192px;
   align-items: center;
-  gap: 24px;
+  gap: 22px;
 }
-.visual-setting-row:last-child { margin-bottom: 0; border-bottom: 0; }
+.visual-setting-row:last-child { border-bottom: 0; }
 
 .visual-setting-row__copy { min-width: 0; }
 .visual-setting-row__copy label {
   display: block;
   margin: 0;
   color: #111827;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 18px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .visual-setting-row__copy p {
   margin: 2px 0 0;
-  color: #9ca3af;
-  font-size: 12px;
-  line-height: 18px;
+  color: #858a92;
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .visual-setting-row__control {

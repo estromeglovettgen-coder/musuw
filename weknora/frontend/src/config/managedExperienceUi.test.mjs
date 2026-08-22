@@ -25,7 +25,7 @@ const sidebarBusiness = read("../assets/business-baselines/menu.pre-view.vue");
 /**
  * Musuw product exposure policy:
  * - Lite is the consumer surface: New Chat + Knowledge Base are the only
- *   top-level product entries; Settings exposes General and Usage only.
+ *   top-level product entries; Settings exposes General, Usage, and User Profile only.
  * - Standard keeps the complete upstream WeKnora source surface so operators
  *   can restore it by switching edition instead of reconstructing deleted code.
  * - Security-sensitive enforcement is server-side; these tests lock the

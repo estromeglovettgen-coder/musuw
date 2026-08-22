@@ -1,19 +1,19 @@
 ## ADDED Requirements
 
-### Requirement: Auth entry exposes affirmative legal acknowledgement
+### Requirement: Auth entry exposes an adjacent legal continuation notice
 The logged-out auth shell SHALL display direct links to the canonical public
-Terms of Service and Privacy Policy in the active locale. Google and email-code
-initiation MUST remain unavailable until a native, unchecked acknowledgement
-is selected, and the acknowledgement MUST distinguish agreement to the Terms
-from acknowledgement of the Privacy Policy.
+Terms of Service and Privacy Policy in the active locale. The notice MUST
+distinguish agreement to the Terms from acknowledgement of the Privacy Policy,
+and Google and email-code initiation MUST remain available without a separate
+checkbox prerequisite.
 
-#### Scenario: User has not acknowledged the documents
-- **WHEN** a logged-out user opens the sign-in form and has not selected the acknowledgement
-- **THEN** the Google and email-code initiation actions are disabled while both legal documents remain directly accessible
+#### Scenario: User opens the sign-in form
+- **WHEN** a logged-out user opens the sign-in form
+- **THEN** Google and email-code initiation are available and the adjacent continuation notice links directly to both legal documents
 
-#### Scenario: User acknowledges the documents
-- **WHEN** the user explicitly selects the acknowledgement
-- **THEN** the existing Google and email-code initiation actions become available without adding a new identity or consent service
+#### Scenario: User continues with an authentication method
+- **WHEN** the user activates Google or valid email-code continuation
+- **THEN** the existing authentication action starts without a checkbox gate and without adding a new identity or consent service
 
 #### Scenario: User is entering a received email code
 - **WHEN** an email code has already been requested

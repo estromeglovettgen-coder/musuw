@@ -2,11 +2,11 @@
 
 Musuw already has bilingual public Terms, Privacy, Refund, Subscription,
 Acceptable Use, Cookie, Security, and Contact pages on `musuw.com`. The auth
-shell on `app.musuw.com` does not link them and its Google/email actions can be
-started without an affirmative acknowledgement. The repository is also ahead
-of the last deployed `main`; GitHub Actions is the only permitted production
-code entry and independently delivers the Cloudflare storefront and the
-server application.
+shell on `app.musuw.com` needs to keep them visible at the authentication
+decision point without adding a checkbox that mature identity entry pages do
+not require. The repository is also ahead of the last deployed `main`; GitHub
+Actions is the only permitted production code entry and independently delivers
+the Cloudflare storefront and the server application.
 
 The legal text must describe actual behavior, not copy another company's
 contract. Current official requirements and mature SaaS documents are inputs
@@ -23,8 +23,9 @@ represented according to its bounded production role.
 
 - Make the canonical Terms and Privacy Policy visible before a logged-out user
   starts Google or email authentication.
-- Require a clear, unchecked acknowledgement that distinguishes agreement to
-  the Terms from acknowledgement of the Privacy Policy.
+- Present a clear continuation notice that distinguishes agreement to the
+  Terms from acknowledgement of the Privacy Policy without blocking either
+  authentication method behind a separate checkbox.
 - Keep bilingual legal disclosures aligned with actual collection, named live
   providers, cross-border processing, retention determination, rights,
   cancellation, refunds, and billing behavior.
@@ -45,18 +46,21 @@ represented according to its bounded production role.
 
 ## Decisions
 
-### Use one local acknowledgement gate in the existing auth shell
+### Use one adjacent continuation notice in the existing auth shell
 
-The login panel will render an unchecked native checkbox with direct Terms and
-Privacy links. Google and email-code initiation remain disabled until it is
-checked. Verification of an already-requested email code stays available so a
-refresh or callback cannot strand a user. This provides a visible affirmative
-action without inventing a consent service or changing Supabase/OIDC.
+The login panel renders a direct, locale-correct “by continuing” notice with
+Terms and Privacy links immediately below the Google and email-code actions.
+Both authentication methods remain directly usable, while the act of
+continuing carries the displayed legal meaning. Verification of an
+already-requested email code and recovery actions stay available so a refresh,
+provider error, or retry cannot strand a user. This follows mature identity
+entry layouts without inventing a consent service or changing Supabase/OIDC.
 
-A passive “by continuing” sentence was considered because it is common on
-large SaaS login pages. The explicit unchecked control better supports the
-clear affirmative-action and prominent-notice expectations relevant to this
-China-operated product, with little implementation cost.
+A mandatory unchecked control was implemented earlier in this change, but the
+final product decision removes that extra friction. The notice remains
+prominent and testable; if counsel later requires versioned affirmative
+records, that is a separate server-side consent capability rather than a
+presentation-only checkbox.
 
 ### Keep the public legal suite canonical and reconcile only evidence-backed gaps
 
@@ -92,9 +96,9 @@ not deleted or canceled.
 
 ## Risks / Trade-offs
 
-- [A checkbox is not a server-side consent ledger] → retain the click as a
-  clear user action but do not add a new identity database solely for this
-  release; formal counsel can require versioned consent records later.
+- [A continuation notice is not a server-side consent ledger] → keep the
+  wording and links clear, but do not add a new identity database solely for
+  this release; formal counsel can require versioned consent records later.
 - [A provider or product data flow changes] → keep the policy tied to named
   current roles and update the effective date whenever the live flow changes.
 - [CI or one delivery target fails] → do not call the release complete; repair
@@ -107,7 +111,7 @@ not deleted or canceled.
 
 ## Migration Plan
 
-1. Add contract tests, then implement the auth acknowledgement and any
+1. Add contract tests, then implement the auth continuation notice and any
    evidence-backed legal corrections.
 2. Run auth, storefront, frontend, Go, source-boundary, secret, release, and
    strict OpenSpec checks locally.

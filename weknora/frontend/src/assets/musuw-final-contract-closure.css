@@ -65,16 +65,17 @@
 }
 .visual-chat-composer__model .t-icon { color: #6b7280 !important; }
 
-/* Reference model menu is w-40 (160px), bottom-up, 12px rounded, p-1.5. Native
- * model count/add-model behavior remains; only its painted geometry contracts. */
+/* Match the installed Codex picker's compact 280px single-line menu while the
+ * frozen controller continues to own safe viewport positioning. */
 .visual-chat-composer__model-menu {
-  width: 160px !important;
-  max-width: min(160px, calc(100vw - 32px)) !important;
-  padding: 6px !important;
+  width: 280px !important;
+  min-width: min(180px, calc(100vw - 32px)) !important;
+  max-width: min(280px, calc(100vw - 32px)) !important;
+  padding: 8px !important;
   border: 1px solid #e5e7eb !important;
-  border-radius: 12px !important;
+  border-radius: 17px !important;
   background: #fff !important;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%) !important;
+  box-shadow: 0 14px 32px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 6%) !important;
 }
 .visual-chat-composer__model-menu > header {
   min-height: 24px !important;
@@ -207,6 +208,18 @@
 }
 :root[theme-mode="dark"] .visual-chat-composer__model:hover {
   background: var(--mvc-active, #30333a) !important;
+}
+:root[theme-mode="dark"] .visual-chat-composer__model-picker {
+  background: var(--mvc-hover, #25272c) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+}
+:root[theme-mode="dark"] .visual-chat-composer__model-picker:hover,
+:root[theme-mode="dark"] .visual-chat-composer__model-picker[aria-expanded="true"] {
+  background: var(--mvc-active, #30333a) !important;
+}
+:root[theme-mode="dark"] .visual-chat-composer__model-picker-effort,
+:root[theme-mode="dark"] .visual-chat-composer__model-picker .t-icon {
+  color: var(--mvc-muted, #a9adb5) !important;
 }
 :root[theme-mode="dark"] .visual-chat-composer__model-menu {
   border-color: var(--mvc-line, #31343a) !important;

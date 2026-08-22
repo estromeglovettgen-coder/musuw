@@ -15,7 +15,7 @@ const controllers = [
       'triggerImageUpload', 'triggerMention', 'showWebSearchButton', 'isWebSearchEnabled',
       'toggleWebSearch', 'reasoningEffort', 'selectedReasoningLabel', 'reasoningOptions',
       'selectedModelDisplayName', 'showModelSelector', 'availableModels', 'handleModelChange',
-      'closeModelSelector', 'modelDisplayName', 'createSession', 'handleStop',
+      'closeModelSelector', 'createSession', 'handleStop',
       'showMention', 'mentionStyle', 'mentionItems', 'showKbSelector',
     ],
   },

@@ -31,7 +31,8 @@ test('QAPanel.tsx composer tokens remain mechanically translated', () => {
   ])
   expectTokens('./musuw-final-contract-closure.css', [
     'max-width: 160px !important;', 'border-radius: 999px !important;',
-    '.visual-chat-composer__model-menu', 'width: 160px !important;',
+    '.visual-chat-composer__model-menu', 'width: 280px !important;',
+    'max-width: min(280px, calc(100vw - 32px)) !important;',
   ])
   expectTokens('./musuw-qapanel-reference-final.css', [
     '--mvc-icon-at-sign', 'width: 256px !important;', 'border-radius: 12px !important;',
@@ -106,8 +107,21 @@ test('KnowledgeBase.tsx list tokens remain mechanically translated while native 
 
 test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
   expectTokens('../views/settings/Settings.vue', [
-    'width: min(896px, 100%);', 'height: 520px;', 'border-radius: 24px;',
-    'flex: 0 0 224px;', 'padding: 24px 12px 16px 24px;', 'padding: 32px;',
+    'width: min(1240px, 100%);', 'height: min(780px, calc(100dvh - 48px));', 'border-radius: 18px;',
+    'flex: 0 0 280px;', 'padding: 26px 16px 18px;',
+    'filterSettingsNavigation(navItems.value, settingsSearchQuery.value)',
+  ])
+})
+
+test('Lite personal settings share the Codex-style grouped-row geometry', () => {
+  expectTokens('../views/settings/GeneralSettings.vue', [
+    'max-width: 640px;', 'border: 1px solid #e5e5e5;', 'border-radius: 14px;', 'min-height: 64px;',
+  ])
+  expectTokens('../views/settings/UsageBillingSettings.vue', [
+    'max-width: 640px;', 'usage-billing__group', 'border-radius: 14px;',
+  ])
+  expectTokens('../views/settings/UserProfile.vue', [
+    'max-width: 640px;', 'settings-group', 'border-radius: 14px;',
   ])
 })
 

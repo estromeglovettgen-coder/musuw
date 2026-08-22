@@ -8,9 +8,9 @@ delivery and a real browser lifecycle check.
 
 ## What Changes
 
-- Add an explicit, unchecked Terms and Privacy acknowledgement beside the
+- Add a conventional Terms and Privacy continuation notice directly below the
   Google and email sign-in actions, with direct links to the canonical public
-  documents in both supported auth locales.
+  documents in both supported auth locales and no separate checkbox gate.
 - Reconcile the existing legal suite with the actual production operators,
   providers, data flows, billing behavior, user-rights channels, and current
   official Google, Paddle, Chinese, EU, and California requirements. Do not
@@ -25,9 +25,9 @@ delivery and a real browser lifecycle check.
 
 ### New Capabilities
 
-- `public-legal-consent`: Public legal documents and an explicit auth-entry
-  acknowledgement accurately disclose the real service and remain directly
-  accessible before authentication.
+- `public-legal-consent`: Public legal documents and an adjacent auth-entry
+  continuation notice accurately disclose the real service and remain
+  directly accessible before authentication.
 - `production-lifecycle-acceptance`: One exact source revision is delivered
   through the existing production paths and verified through the real user
   lifecycle without destructive production billing activity.
