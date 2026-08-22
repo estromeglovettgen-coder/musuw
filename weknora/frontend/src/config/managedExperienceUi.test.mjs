@@ -54,6 +54,15 @@ test("server Edition owns Lite activation and clears stale browser workspace sta
   assert.doesNotMatch(sidebarBusiness, /getSystemInfo/);
 });
 
+test("cached Edition is reapplied after logout resets the auth store", () => {
+  assert.match(router, /let resolvedLiteMode: boolean \| null = null/);
+  assert.match(
+    router,
+    /if \(editionProbeDone\) \{\s*if \(resolvedLiteMode !== null\) authStore\.setLiteMode\(resolvedLiteMode\)\s*return\s*\}/,
+  );
+  assert.match(router, /resolvedLiteMode = isLite/);
+});
+
 test("Lite sidebar does not request hidden IM or embed channel metadata", () => {
   assert.match(
     sidebarBusiness,

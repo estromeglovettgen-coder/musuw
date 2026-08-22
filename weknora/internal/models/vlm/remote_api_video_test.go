@@ -51,6 +51,14 @@ func TestRemoteAPIVLMPredictVideoUsesOpenRouterVideoURL(t *testing.T) {
 	if requestBody["model"] != OpenRouterGeminiVideoModel {
 		t.Fatalf("model = %#v", requestBody["model"])
 	}
+	providerRouting := requestBody["provider"].(map[string]any)
+	if providerRouting["allow_fallbacks"] != true {
+		t.Fatalf("allow_fallbacks = %#v", providerRouting["allow_fallbacks"])
+	}
+	providerOnly := providerRouting["only"].([]any)
+	if len(providerOnly) != 1 || providerOnly[0] != "google-vertex" {
+		t.Fatalf("provider only = %#v", providerOnly)
+	}
 	messages := requestBody["messages"].([]any)
 	content := messages[0].(map[string]any)["content"].([]any)
 	videoPart := content[1].(map[string]any)

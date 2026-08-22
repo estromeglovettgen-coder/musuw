@@ -336,7 +336,11 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         </button>
 
         {screen === "email_code" ? (
-          <form className="auth-form" onSubmit={(event) => void verifyEmailCode(event)}>
+          <form
+            className="auth-form"
+            key="email-code"
+            onSubmit={(event) => void verifyEmailCode(event)}
+          >
             <label htmlFor="email-code">{copy.emailCodeSent(email)}</label>
             <input
               autoComplete="one-time-code"
@@ -353,7 +357,11 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             </button>
           </form>
         ) : (
-          <form className="auth-form" onSubmit={(event) => void requestEmailCode(event)}>
+          <form
+            className="auth-form"
+            key="email-address"
+            onSubmit={(event) => void requestEmailCode(event)}
+          >
             <label htmlFor="email">{copy.email}</label>
             <input
               autoComplete="email"

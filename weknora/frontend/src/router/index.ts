@@ -46,9 +46,13 @@ function isLiteEdition(authStore: ReturnType<typeof useAuthStore>) {
 
 let editionProbeDone = false
 let editionProbePromise: Promise<void> | null = null
+let resolvedLiteMode: boolean | null = null
 
 async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) {
-  if (editionProbeDone) return
+  if (editionProbeDone) {
+    if (resolvedLiteMode !== null) authStore.setLiteMode(resolvedLiteMode)
+    return
+  }
   if (!editionProbePromise) {
     editionProbePromise = (async () => {
       try {
@@ -56,6 +60,7 @@ async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) 
         const edition = String(response.data?.edition || '').trim().toLowerCase()
         if (edition === 'lite' || edition === 'standard') {
           const isLite = edition === 'lite'
+          resolvedLiteMode = isLite
           authStore.setLiteMode(isLite)
           if (isLite) authStore.setSelectedTenant(null)
         }

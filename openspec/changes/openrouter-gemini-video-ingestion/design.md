@@ -19,7 +19,10 @@ The active v0.7.2 fork rejects video. OpenRouter accepts private videos directly
 - Extend the existing remote VLM adapter with an optional video prediction contract; existing decorators forward it.
 - Send stored bytes as a base64 data URL to the existing `/chat/completions` endpoint.
 - Bypass DocReader only for video-to-Markdown conversion, then immediately rejoin the existing document pipeline.
-- Pin the built-in VLM to `google/gemini-2.5-flash` and let OpenRouter choose an available provider.
+- Pin the built-in VLM to `google/gemini-2.5-flash` and use OpenRouter's
+  official provider routing to select Google Vertex endpoints. Vertex accepts
+  base64 private videos; excluding Google AI Studio avoids its regional/direct
+  video limitations without adding a fallback model or a second media path.
 
 ## Risks / Trade-offs
 

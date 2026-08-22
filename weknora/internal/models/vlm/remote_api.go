@@ -204,6 +204,14 @@ func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mime
 	dataURI := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(videoBytes)
 	payload := map[string]any{
 		"model": v.modelName,
+		// Google AI Studio rejects direct private video payloads in some
+		// operator regions. OpenRouter documents base64 video support through
+		// Google Vertex, so keep the model pinned while routing across Vertex
+		// endpoints instead of introducing a second video implementation.
+		"provider": map[string]any{
+			"only":            []string{"google-vertex"},
+			"allow_fallbacks": true,
+		},
 		"messages": []map[string]any{{
 			"role": "user",
 			"content": []map[string]any{
