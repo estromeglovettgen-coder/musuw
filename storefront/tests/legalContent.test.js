@@ -29,7 +29,7 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(document.path, route);
       assert.ok(document.title.length >= 4);
       assert.ok(document.summary.length >= 30);
-      assert.match(document.updated, /^2026-08-01$/);
+      assert.equal(document.updated, "2026-08-21");
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
 
@@ -71,11 +71,41 @@ test("policies identify the operator, support channel, refund promise, and condi
       : [/collect/i, /purpose/i, /retain/i, /international/i, /rights/i, /delete/i]) {
       assert.match(privacy, concept);
     }
+    for (const provider of ["Supabase", "Google", "Cloudflare", "OpenRouter", "Paddle"]) {
+      assert.match(privacy, new RegExp(provider));
+    }
+    assert.doesNotMatch(privacy, /Langfuse/);
+
+    const security = flatten(locale, "/security");
+    assert.doesNotMatch(
+      security,
+      locale === "zh-CN" ? /准备上线|正准备提供/ : /prepared for launch|being prepared to provide/i
+    );
 
     const cookies = flatten(locale, "/cookies");
-    assert.match(cookies, /Cloudflare Web Analytics/);
-    assert.match(cookies, locale === "zh-CN" ? /不使用 Cookie|浏览器存储/ : /cookie-free|browser storage/i);
-    assert.match(cookies, locale === "zh-CN" ? /不.*跨.*追踪/ : /does not track.*across/i);
+    assert.match(cookies, /Cloudflare/);
+    assert.match(
+      cookies,
+      locale === "zh-CN" ? /不加载.*分析|未加载.*分析/ : /does not load.*analytics/i
+    );
+    assert.match(cookies, locale === "zh-CN" ? /浏览器存储/ : /browser storage/i);
+    assert.match(cookies, locale === "zh-CN" ? /不.*跨.*追踪/ : /does not.*use cross-site behavioral tracking/i);
+  }
+});
+
+test("privacy policy links to the named providers' own notices", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+  for (const locale of ["en", "zh-CN"]) {
+    const privacy = JSON.stringify(getPublicDocument(locale, "/privacy"));
+    for (const href of [
+      "https://supabase.com/privacy",
+      "https://policies.google.com/privacy",
+      "https://www.cloudflare.com/privacypolicy/",
+      "https://openrouter.ai/privacy",
+      "https://www.paddle.com/legal/privacy"
+    ]) {
+      assert.match(privacy, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
   }
 });
 
@@ -98,12 +128,12 @@ test("the application and footer expose direct document routes", async () => {
   }
 });
 
-test("account security guidance matches Google-only sign-in", async () => {
+test("account security guidance matches Google and email-code sign-in", async () => {
   const { getPublicDocument } = await import("../src/legalContent.js");
   const english = JSON.stringify(getPublicDocument("en", "/security"));
   const chinese = JSON.stringify(getPublicDocument("zh-CN", "/security"));
 
-  assert.match(english, /Google account.*multi-factor authentication/i);
-  assert.match(chinese, /Google 账户.*多因素认证/);
+  assert.match(english, /Google account.*email inbox.*multi-factor authentication/i);
+  assert.match(chinese, /Google 账户.*邮箱.*多因素认证/);
   assert.doesNotMatch(`${english}\n${chinese}`, /strong,? unique password|唯一强密码/i);
 });

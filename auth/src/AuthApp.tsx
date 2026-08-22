@@ -23,6 +23,18 @@ type Screen =
 
 export const CHECKOUT_INTENT_STORAGE_KEY = "musuw.checkout.intent";
 
+export const AUTH_LEGAL_LINKS = Object.freeze({
+  privacy: "https://musuw.com/privacy",
+  terms: "https://musuw.com/terms",
+});
+
+export function authLegalHref(
+  document: keyof typeof AUTH_LEGAL_LINKS,
+  locale: AuthLocale,
+): string {
+  return `${AUTH_LEGAL_LINKS[document]}?lang=${locale === "zh-CN" ? "zh-CN" : "en"}`;
+}
+
 export type CheckoutIntent = Readonly<{
   period: "monthly" | "yearly";
   plan: "plus" | "pro" | "max";
@@ -52,6 +64,7 @@ export type AuthCopy = Readonly<{
   title: string;
   intro: string;
   google: string;
+  divider: string;
   status: string;
   email: string;
   emailPlaceholder: string;
@@ -59,6 +72,12 @@ export type AuthCopy = Readonly<{
   sendCode: string;
   verifyCode: string;
   changeEmail: string;
+  legal: Readonly<{
+    acknowledgement: string;
+    connector: string;
+    privacy: string;
+    terms: string;
+  }>;
   errors: Readonly<{
     unavailable: string;
     oauthNotAllowed: string;
@@ -76,6 +95,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     title: "登录以进入知识库",
     intro: "使用 Google 或邮箱验证码继续。",
     google: "使用 Google 登录",
+    divider: "或",
     status: "正在继续登录…",
     email: "邮箱",
     emailPlaceholder: "name@example.com",
@@ -83,6 +103,12 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     sendCode: "发送验证码",
     verifyCode: "验证并继续",
     changeEmail: "更换邮箱",
+    legal: {
+      acknowledgement: "我已阅读并同意",
+      terms: "《服务条款》",
+      connector: "，并确认已阅读",
+      privacy: "《隐私政策》",
+    },
     errors: {
       unavailable: "登录暂不可用，请重试。",
       oauthNotAllowed: "此应用未获允许，无法继续授权。",
@@ -98,6 +124,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     title: "Log in to access your knowledge base",
     intro: "Continue with Google or an email code.",
     google: "Continue with Google",
+    divider: "or",
     status: "Continuing sign-in…",
     email: "Email",
     emailPlaceholder: "name@example.com",
@@ -105,6 +132,12 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     sendCode: "Send code",
     verifyCode: "Verify and continue",
     changeEmail: "Use a different email",
+    legal: {
+      acknowledgement: "I agree to the",
+      terms: "Terms of Service",
+      connector: "and acknowledge the",
+      privacy: "Privacy Policy",
+    },
     errors: {
       unavailable: "Sign-in is temporarily unavailable. Please try again.",
       oauthNotAllowed: "This app is not allowed to continue.",
@@ -173,6 +206,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     return initialAuthScreenForPathname(window.location.pathname);
   });
   const [email, setEmail] = useState("");
+  const [legalAcknowledged, setLegalAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return initialAuthErrorForPathname(window.location.pathname, locale);
@@ -271,17 +305,19 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   }, [applyIdentityCompletion, copy, runtime, screen]);
 
   const startGoogle = useCallback(() => {
+    if (!legalAcknowledged) return;
     setError(null);
     setScreen("identity_pending");
     void runtime.startGoogle().catch(() => {
       setError(copy.errors.google);
       setScreen("login");
     });
-  }, [copy.errors.google, runtime]);
+  }, [copy.errors.google, legalAcknowledged, runtime]);
 
   const requestEmailCode = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (!legalAcknowledged) return;
       setError(null);
       const result = await runtime.requestEmailOtp(email);
       const message = failureMessage(result, copy);
@@ -294,7 +330,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         setScreen("email_code");
       }
     },
-    [copy, email, runtime],
+    [copy, email, legalAcknowledged, runtime],
   );
 
   const verifyEmailCode = useCallback(
@@ -331,9 +367,36 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         <h1 id="auth-title">{copy.title}</h1>
         <p className="auth-intro">{copy.intro}</p>
 
-        <button className="auth-google" onClick={startGoogle} type="button">
+        <label className="auth-consent">
+          <input
+            checked={legalAcknowledged}
+            onChange={(event) => setLegalAcknowledged(event.target.checked)}
+            type="checkbox"
+          />
+          <span>
+            {copy.legal.acknowledgement}{" "}
+            <a href={authLegalHref("terms", locale)} rel="noopener noreferrer" target="_blank">
+              {copy.legal.terms}
+            </a>{" "}
+            {copy.legal.connector}{" "}
+            <a href={authLegalHref("privacy", locale)} rel="noopener noreferrer" target="_blank">
+              {copy.legal.privacy}
+            </a>
+          </span>
+        </label>
+
+        <button
+          className="auth-google"
+          disabled={!legalAcknowledged}
+          onClick={startGoogle}
+          type="button"
+        >
           {copy.google}
         </button>
+
+        <div className="auth-divider" role="separator">
+          <span>{copy.divider}</span>
+        </div>
 
         {screen === "email_code" ? (
           <form
@@ -372,7 +435,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
               type="email"
               value={email}
             />
-            <button type="submit">{copy.sendCode}</button>
+            <button disabled={!legalAcknowledged} type="submit">{copy.sendCode}</button>
           </form>
         )}
 

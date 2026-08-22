@@ -16,7 +16,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
   "/contact"
 ]);
 
-const updated = "2026-08-01";
+const updated = "2026-08-21";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -190,7 +190,7 @@ const englishDocuments = {
         blocks: [
           p("We collect data directly from you, automatically from your device when you use the service, from workspace administrators who invite you, from integrations you authorize, and from payment, fraud-prevention, support, or infrastructure providers involved in delivering the service."),
           p("Cloudflare may provide a country code for storefront language selection. We use that code to select Chinese for visitors in mainland China and English elsewhere; we do not use it to infer a precise location."),
-          p("The public storefront uses Cloudflare Web Analytics to collect aggregate page-performance and Core Web Vitals measurements. Cloudflare documents this real-user monitoring beacon as cookie-free: it does not use browser storage and does not track people across customer properties.")
+          p("Cloudflare processes request metadata at the public edge for delivery, TLS, abuse prevention, and country-level language selection. The current storefront does not load an analytics or advertising beacon.")
         ]
       },
       {
@@ -210,23 +210,31 @@ const englishDocuments = {
       {
         heading: "5. Knowledge content and AI processing",
         blocks: [
-          p("musuw processes the source scope and prompts you select to retrieve evidence and generate requested output. Depending on the feature and configuration, selected content may be sent to a model or infrastructure provider acting for us. We limit that processing to delivering, securing, and supporting the requested service."),
+          p("musuw processes the source scope and prompts you select to retrieve evidence and generate requested output. For a requested AI feature, the minimum relevant prompts, retrieved excerpts, images, audio, or video may be sent through OpenRouter to the model and inference provider identified by the selected model. Embedding and reranking send the text needed to index or rank your sources."),
+          p("OpenRouter states that it does not use API inputs or outputs for model training. A downstream model or inference provider may have different retention or training practices. The product identifies the selected model; review OpenRouter's current provider information before sending sensitive content and contact us if you need help identifying the route used for a request."),
           p("We do not sell private workspace content or use it for cross-context behavioral advertising. We do not make solely automated decisions about you that produce legal or similarly significant effects."),
           p("Avoid uploading unnecessary sensitive personal data. If you use musuw to process data about another person, you are responsible for having an appropriate legal basis, giving required notices, and respecting that person's rights.")
         ]
       },
       {
-        heading: "6. Sharing and processors",
+        heading: "6. Service providers and recipients",
         blocks: [
-          p("We disclose personal data only as reasonably needed to the categories below. These recipients receive only the data necessary for their role."),
+          p("We disclose personal data only as reasonably needed for the roles below. The current principal service providers and independent recipients are:"),
           list(
-            "Hosting, storage, content-delivery, security, logging, communications, and support providers.",
-            "AI model and retrieval infrastructure providers used for a feature you request.",
-            "Paddle, the authorized reseller and seller of record for paid musuw orders. Paddle processes transaction data under its own buyer and privacy terms where it acts as an independent controller.",
+            "Supabase, Inc. provides identity and one-time-code services and processes account email, profile claims, identity identifiers, and login/session data for that role.",
+            "Google LLC processes Google-account data when you choose Google sign-in. musuw requests only the openid, profile, and email scopes and receives the identifiers and profile fields that Google returns for them.",
+            "Cloudflare, Inc. provides DNS and edge delivery, transport security, abuse prevention, country-level language selection, and R2 object storage. It may process IP and request metadata, security signals, and uploaded source objects for those roles.",
+            "OpenRouter, Inc. routes prompts, relevant source excerpts, media, model requests, usage, and a scoped user-tracking identifier to the selected model and inference provider. The model catalog currently includes models developed by DeepSeek, Alibaba Cloud's Qwen, OpenAI, Google, Anthropic, and Cohere; routing providers and their practices can vary by model.",
+            "Paddle entities act as the authorized reseller and Merchant of Record for paid musuw orders and process buyer contact, transaction, tax-location, payment, receipt, fraud-prevention, subscription, cancellation, and refund data under Paddle's buyer and privacy terms.",
             "Professional advisers, auditors, regulators, courts, and authorities when legally required or reasonably necessary to protect rights and safety.",
             "A successor in a merger, financing, reorganization, or sale, subject to appropriate confidentiality and notice requirements."
           ),
-          p("We do not sell personal information for money. We do not share personal information for cross-context behavioral advertising.")
+          p("We do not sell personal information for money. We do not share personal information for cross-context behavioral advertising."),
+          link("Supabase Privacy Policy", "https://supabase.com/privacy"),
+          link("Google Privacy Policy", "https://policies.google.com/privacy"),
+          link("Cloudflare Privacy Policy", "https://www.cloudflare.com/privacypolicy/"),
+          link("OpenRouter Privacy Policy", "https://openrouter.ai/privacy"),
+          link("Paddle Privacy Notice", "https://www.paddle.com/legal/privacy")
         ]
       },
       {
@@ -249,7 +257,7 @@ const englishDocuments = {
         blocks: [
           p("Depending on where you live, you may have rights to be informed, access data, correct inaccurate data, delete data, restrict or object to processing, obtain portable data, withdraw consent, and appeal or complain to a data-protection authority."),
           p("Residents of California may also have rights to know, delete, correct, limit use of sensitive information where applicable, opt out of sale or sharing, and receive equal service. musuw does not sell or share personal information for cross-context behavioral advertising."),
-          p(`To exercise a right, email ${LEGAL_OPERATOR.supportEmail} from the account address or provide enough information for us to verify the request. We may request proportionate verification and may decline or limit a request only where law permits. Authorized agents must provide valid authority.`),
+          p(`To exercise a right, withdraw consent, or close your account, email ${LEGAL_OPERATOR.supportEmail} from the account address with “Privacy request” or “Account deletion” in the subject. You may delete individual documents and knowledge bases with the product controls. We may request proportionate verification and may decline or limit a request only where law permits. Authorized agents must provide valid authority.`),
           p("We will respond within the period required by applicable law. You may appeal a denied request by replying with “Privacy appeal” in the subject line. You may also complain to your local supervisory or consumer-protection authority.")
         ]
       },
@@ -257,14 +265,14 @@ const englishDocuments = {
         heading: "10. Security",
         blocks: [
           p("We use technical and organizational safeguards designed to protect personal data, including scoped access, server-side handling of service credentials, transport encryption, logging, exact evidence links, and data lifecycle controls where supported."),
-          p("No system is completely secure. Protect your Google account with multi-factor authentication and current recovery channels, protect your device, and report suspected unauthorized access promptly."),
+          p("No system is completely secure. Protect your Google account and email inbox with multi-factor authentication and current recovery channels, protect your device, and report suspected unauthorized access promptly."),
           link("Read our Security Overview", "/security")
         ]
       },
       {
         heading: "11. Cookies and similar technology",
         blocks: [
-          p("The current public storefront uses Cloudflare Web Analytics for aggregate page-performance and Core Web Vitals measurements. Cloudflare documents its beacon as cookie-free, without browser storage or tracking people across customer properties. We do not use advertising cookies or cross-site behavioral tracking. Essential browser storage may be used for service operation, preferences, security, or checkout return state. External checkout providers may use their own necessary technology under their notices."),
+          p("The current public storefront does not load analytics or advertising tracking. Cloudflare processes edge request and security metadata as described above. We do not use advertising cookies or cross-site behavioral tracking. Essential browser storage is used for language, authentication, security, and checkout-return state. External identity and checkout providers may use their own necessary technology under their notices."),
           link("Read the Cookie Notice", "/cookies")
         ]
       },
@@ -493,8 +501,8 @@ const englishDocuments = {
       {
         heading: "1. Current storefront practice",
         blocks: [
-          p("The current public musuw storefront uses Cloudflare Web Analytics for aggregate page-performance and Core Web Vitals measurements. Cloudflare documents this real-user monitoring beacon as cookie-free: it does not use browser storage and does not track people across customer properties."),
-          p("The storefront does not set advertising cookies or use cross-site behavioral tracking. It selects a display language from Cloudflare's country code for the request without storing precise location data."),
+          p("The current public musuw storefront does not load an analytics or advertising beacon. Cloudflare processes edge request and security metadata to deliver and protect the site, and supplies a country code used only for language selection."),
+          p("The storefront does not set advertising cookies or use cross-site behavioral tracking. It stores the selected language in the essential musuw_locale cookie for up to one year and does not store a precise location."),
           p("If we introduce analytics that uses non-essential browser storage or advertising technology, we will update this notice and request consent where required.")
         ]
       },
@@ -542,7 +550,7 @@ const englishDocuments = {
         heading: "1. Security approach",
         blocks: [
           p("We apply layered technical and organizational measures appropriate to the service and the sensitivity of knowledge content. Security is an ongoing risk-management process, not a guarantee that incidents can never occur."),
-          p("Production controls are reviewed as the hosted product is prepared for launch. This page describes current product design commitments and will be updated when production infrastructure and independent assurance are available.")
+          p("The hosted product is delivered over HTTPS through scoped edge and server boundaries, and application releases use immutable image revisions. This page describes current product controls; it does not claim an external certification or independent assurance that has not been completed.")
         ]
       },
       {
@@ -569,7 +577,7 @@ const englishDocuments = {
       {
         heading: "5. Data lifecycle",
         blocks: [
-          p("The product provides or is being prepared to provide export and deletion workflows with visible status. Legal retention, fraud-prevention, dispute records, security logs, and backup rotation may delay complete removal as described in the Privacy Policy."),
+          p("You can delete individual documents and knowledge bases through product controls. Where a data type has an export action, you can use it directly; for an account-wide copy or deletion request, contact support for verified coordination across identity, application, object-storage, and provider records. Legal retention, fraud-prevention, dispute records, security logs, and backup rotation may delay complete removal as described in the Privacy Policy."),
           link("Read the Privacy Policy", "/privacy")
         ]
       },
@@ -584,7 +592,7 @@ const englishDocuments = {
         heading: "7. Your responsibilities",
         blocks: [
           list(
-            "Protect your Google account with multi-factor authentication and keep its recovery channels current.",
+            "Protect your Google account and email inbox with multi-factor authentication and keep their recovery channels current.",
             "Keep devices, browsers, and integrations updated.",
             "Use the narrowest appropriate knowledge and integration scope.",
             "Review important output and evidence before relying on it.",
@@ -811,7 +819,7 @@ const chineseDocuments = {
         blocks: [
           p("信息可能直接来自您、您使用服务时的设备、邀请您的工作空间管理员、您授权的集成，以及参与交付服务的付款、反欺诈、支持或基础设施服务商。"),
           p("Cloudflare 可能向我们提供国家或地区代码，用于向中国大陆访问者显示中文、向其他访问者显示英文。我们不会借此推断精确位置。"),
-          p("公开官网使用 Cloudflare Web Analytics 收集汇总的页面性能和核心网页指标。Cloudflare 将该真实用户性能监测信标说明为不使用 Cookie：它不使用浏览器存储，也不跨不同客户的网站追踪个人。")
+          p("Cloudflare 在公开网站边缘处理请求元数据，用于内容交付、TLS、滥用防护和国家或地区层级的语言选择。当前官网不加载分析或广告信标。")
         ]
       },
       {
@@ -831,23 +839,31 @@ const chineseDocuments = {
       {
         heading: "5. 知识内容与 AI 处理",
         blocks: [
-          p("musuw 处理您选择的来源范围和提示词，以检索证据并生成请求的输出。根据功能和配置，所选内容可能发送给代表我们提供服务的模型或基础设施服务商，且仅限于交付、保护和支持请求的服务。"),
+          p("musuw 处理您选择的来源范围和提示词，以检索证据并生成请求的输出。为完成您主动请求的 AI 功能，必要范围内的提示词、检索片段、图片、音频或视频可能经 OpenRouter 发送给所选模型对应的模型方和推理服务商；向量化和重排会发送建立索引或排序来源所需的文本。"),
+          p("OpenRouter 声明其不使用 API 输入或输出训练模型，但下游模型方或推理服务商的保留和训练做法可能不同。产品会显示所选模型；提交敏感内容前请查看 OpenRouter 最新服务商信息，如需确认某次请求的处理路径可联系我们。"),
           p("我们不出售私人工作空间内容，也不将其用于跨场景行为广告。我们不会仅通过自动化方式对您作出具有法律或类似重大影响的决定。"),
           p("请避免上传不必要的敏感个人信息。若您使用 musuw 处理他人信息，您有责任具备适当处理依据、提供必要告知并尊重其权利。")
         ]
       },
       {
-        heading: "6. 共享、委托处理与接收方",
+        heading: "6. 服务商、委托处理与接收方清单",
         blocks: [
-          p("我们仅在合理必要范围内向以下类别接收方提供个人信息，并限制在其履行职责所需范围。"),
+          p("我们仅在履行以下职责所合理必要的范围提供个人信息。目前主要服务商和独立接收方如下："),
           list(
-            "托管、存储、内容分发、安全、日志、通信和客户支持服务商。",
-            "为您请求的功能提供服务的 AI 模型和检索基础设施服务商。",
-            "Paddle，即 musuw 付费订单的授权经销商和记录卖方；其作为独立处理者时，适用 Paddle 买家条款和隐私政策。",
+            "Supabase, Inc. 提供身份认证和一次性验证码服务，为此处理账户邮箱、资料声明、身份标识以及登录和会话数据。",
+            "您选择 Google 登录时，Google LLC 处理 Google 账户数据。musuw 仅请求 openid、profile 和 email 范围，并接收 Google 就这些范围返回的标识和资料字段。",
+            "Cloudflare, Inc. 提供 DNS 与边缘交付、传输安全、滥用防护、国家或地区层级语言选择和 R2 对象存储，为此可能处理 IP 与请求元数据、安全信号和上传的原始资料对象。",
+            "OpenRouter, Inc. 将提示词、相关来源片段、媒体、模型请求、用量和范围化用户追踪标识路由给所选模型方和推理服务商。当前模型目录包括 DeepSeek、阿里云 Qwen、OpenAI、Google、Anthropic 和 Cohere 开发的模型；具体推理路由及其做法可能因模型而异。",
+            "Paddle 相关实体作为 musuw 付费订单的授权经销商和商户记录方，依据其买家条款和隐私政策处理买家联系、交易、税务地区、付款、收据、反欺诈、订阅、取消和退款数据。",
             "在法律要求或为保护权利与安全所合理必要时的专业顾问、审计人员、监管机构、法院和主管机关。",
             "合并、融资、重组或出售中的继受方，但须采取适当保密和告知措施。"
           ),
-          p("我们不以金钱为对价出售个人信息，也不为跨场景行为广告共享个人信息。")
+          p("我们不以金钱为对价出售个人信息，也不为跨场景行为广告共享个人信息。"),
+          link("Supabase 隐私政策", "https://supabase.com/privacy"),
+          link("Google 隐私政策", "https://policies.google.com/privacy"),
+          link("Cloudflare 隐私政策", "https://www.cloudflare.com/privacypolicy/"),
+          link("OpenRouter 隐私政策", "https://openrouter.ai/privacy"),
+          link("Paddle 隐私声明", "https://www.paddle.com/legal/privacy")
         ]
       },
       {
@@ -870,7 +886,7 @@ const chineseDocuments = {
         blocks: [
           p("根据您所在地区，您可能享有知情、查阅、复制、更正、删除、限制或拒绝处理、获取可携带副本、撤回同意，以及申诉或向监管机构投诉等权利。"),
           p("加利福尼亚居民还可能享有知情、删除、更正、在适用时限制敏感信息使用、选择退出出售或共享，以及不受差别待遇的权利。musuw 不出售个人信息，也不为跨场景行为广告共享个人信息。"),
-          p(`请使用账户邮箱向 ${LEGAL_OPERATOR.supportEmail} 发送请求，或提供足以核验请求的信息。我们可能进行适度身份核验，仅在法律允许时拒绝或限制请求。授权代理人须提供有效授权。`),
+          p(`行使权利、撤回同意或注销账户时，请使用账户邮箱向 ${LEGAL_OPERATOR.supportEmail} 发送邮件，并以“Privacy request”或“Account deletion”为主题。您可通过产品控件删除单篇文档或知识库。我们可能进行适度身份核验，仅在法律允许时拒绝或限制请求。授权代理人须提供有效授权。`),
           p("我们将在适用法律规定期限内答复。若请求被拒绝，可回复邮件并以“隐私申诉”为主题提出申诉，也可向所在地个人信息保护、数据保护或消费者保护机构投诉。")
         ]
       },
@@ -878,14 +894,14 @@ const chineseDocuments = {
         heading: "10. 安全措施",
         blocks: [
           p("我们采取旨在保护个人信息的技术和组织措施，包括范围化访问、服务凭据服务器端处理、传输加密、日志、精确证据链接和在支持范围内的数据生命周期控制。"),
-          p("任何系统都无法保证绝对安全。请为 Google 账户启用多因素认证并维护有效的恢复渠道、保护设备，并及时报告疑似未授权访问。"),
+          p("任何系统都无法保证绝对安全。请为 Google 账户和邮箱启用多因素认证并维护有效的恢复渠道、保护设备，并及时报告疑似未授权访问。"),
           link("查看安全概览", "/security")
         ]
       },
       {
         heading: "11. Cookie 与类似技术",
         blocks: [
-          p("当前公开官网使用 Cloudflare Web Analytics 收集汇总的页面性能和核心网页指标。Cloudflare 将其信标说明为不使用 Cookie、不使用浏览器存储，也不跨不同客户的网站追踪个人。我们不使用广告 Cookie 或跨站行为追踪。为服务运行、偏好、安全或结账返回状态，可能使用必要的浏览器存储。外部结账服务商可依据其告知使用必要技术。"),
+          p("当前公开官网不加载分析或广告追踪。Cloudflare 按上文说明处理边缘请求和安全元数据。我们不使用广告 Cookie 或跨站行为追踪；仅为语言、身份认证、安全和结账返回状态使用必要浏览器存储。外部身份和结账服务商可依据其告知使用必要技术。"),
           link("查看 Cookie 说明", "/cookies")
         ]
       },
@@ -1106,8 +1122,8 @@ const chineseDocuments = {
       {
         heading: "1. 当前官网做法",
         blocks: [
-          p("当前 musuw 公开官网使用 Cloudflare Web Analytics 收集汇总的页面性能和核心网页指标。Cloudflare 将该真实用户性能监测信标说明为不使用 Cookie：它不使用浏览器存储，也不跨不同客户的网站追踪个人。"),
-          p("官网不设置广告 Cookie，也不进行跨站行为追踪；仅根据 Cloudflare 为本次请求提供的国家或地区代码选择显示语言，不存储精确位置。"),
+          p("当前 musuw 公开官网不加载分析或广告信标。Cloudflare 为交付和保护网站处理边缘请求与安全元数据，并提供仅用于语言选择的国家或地区代码。"),
+          p("官网不设置广告 Cookie，也不进行跨站行为追踪。所选语言存储在必要的 musuw_locale Cookie 中，最长保留一年；我们不存储精确位置。"),
           p("如未来引入使用非必要浏览器存储的分析工具或广告技术，我们会更新本说明，并在法律要求时先取得同意。")
         ]
       },
@@ -1150,7 +1166,7 @@ const chineseDocuments = {
         heading: "1. 安全方法",
         blocks: [
           p("我们根据服务和知识内容敏感程度采取分层技术和组织措施。安全是持续风险管理过程，不能保证事件永远不会发生。"),
-          p("在托管产品准备上线期间，我们会审查生产控制。本页面说明当前产品设计承诺，并将在生产基础设施和独立保证可用后更新。")
+          p("托管产品通过范围化的边缘和服务器边界以 HTTPS 提供，应用发布使用不可变镜像版本。本页面说明当前产品控制，不声称尚未完成的外部认证或独立保证。")
         ]
       },
       {
@@ -1177,7 +1193,7 @@ const chineseDocuments = {
       {
         heading: "5. 数据生命周期",
         blocks: [
-          p("产品提供或正准备提供具有可见状态的导出和删除流程。法定留存、反欺诈、争议记录、安全日志和备份轮换可能按隐私政策说明延迟彻底移除。"),
+          p("您可通过产品控件删除单篇文档和知识库；数据类型提供导出操作时可直接使用。账户级副本或删除请求请联系支持，由我们在核验后协调身份、应用、对象存储和服务商记录。法定留存、反欺诈、争议记录、安全日志和备份轮换可能按隐私政策说明延迟彻底移除。"),
           link("查看隐私政策", "/privacy")
         ]
       },
@@ -1192,7 +1208,7 @@ const chineseDocuments = {
         heading: "7. 您的责任",
         blocks: [
           list(
-            "为 Google 账户启用多因素认证，并维护有效的账户恢复渠道。",
+            "为 Google 账户和邮箱启用多因素认证，并维护有效的恢复渠道。",
             "及时更新设备、浏览器和集成。",
             "使用满足需要的最小知识和集成范围。",
             "依赖重要输出前审查内容和证据。",

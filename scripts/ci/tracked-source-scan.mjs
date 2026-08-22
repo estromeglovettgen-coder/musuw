@@ -137,14 +137,14 @@ const allowedBinaryExtensions = new Map([
 // Keeping the exception path-specific prevents a newly misnamed binary from
 // silently widening the release boundary.
 const approvedSignatureExceptions = new Map([
-  ["storefront/public/images/musnow-data-control.png", isJpeg],
-  ["storefront/public/images/musnow-dialogue.png", isJpeg],
-  ["storefront/public/images/musnow-grounded-answer.png", isJpeg],
-  ["storefront/public/images/musnow-hero.png", isJpeg],
-  ["storefront/public/images/musnow-knowledge-graph.png", isJpeg],
-  ["storefront/public/images/musnow-library.png", isJpeg],
-  ["storefront/public/images/musnow-living-wiki.png", isJpeg],
-  ["storefront/public/images/musnow-review-answer.png", isJpeg],
+  ["storefront/public/images/musuw-data-control.png", isJpeg],
+  ["storefront/public/images/musuw-dialogue.png", isJpeg],
+  ["storefront/public/images/musuw-grounded-answer.png", isJpeg],
+  ["storefront/public/images/musuw-hero.png", isJpeg],
+  ["storefront/public/images/musuw-knowledge-graph.png", isJpeg],
+  ["storefront/public/images/musuw-library.png", isJpeg],
+  ["storefront/public/images/musuw-living-wiki.png", isJpeg],
+  ["storefront/public/images/musuw-review-answer.png", isJpeg],
   ["weknora/docs/images/arc.png", isWebp],
   ["weknora/docs/images/rbac-member-management.png", isJpeg],
   ["weknora/docs/images/rbac-pending-invitation.png", isJpeg],

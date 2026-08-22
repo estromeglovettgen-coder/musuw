@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  AUTH_LEGAL_LINKS,
+  AuthApp,
+  authLegalHref,
   checkoutIntentFromSearch,
   checkoutWorkspacePathFromSearch,
   getAuthCopy,
   initialAuthErrorForPathname,
   initialAuthScreenForPathname,
 } from "./AuthApp";
+import type { AuthRuntime } from "./runtime";
 
 describe("auth shell browser routes", () => {
   it("treats the public start route as a session-resume route, not a login form", () => {
@@ -51,15 +57,42 @@ describe("auth shell localized copy", () => {
       expect(copy.title).not.toBe("");
       expect(copy.intro).not.toBe("");
       expect(copy.google).not.toBe("");
+      expect(copy.divider).not.toBe("");
       expect(copy.status).not.toBe("");
       expect(copy.email).not.toBe("");
       expect(copy.emailCodeSent("user@example.com")).toContain("user@example.com");
       expect(copy.sendCode).not.toBe("");
       expect(copy.verifyCode).not.toBe("");
       expect(copy.changeEmail).not.toBe("");
+      expect(copy.legal.acknowledgement).not.toBe("");
+      expect(copy.legal.terms).not.toBe("");
+      expect(copy.legal.privacy).not.toBe("");
       for (const message of Object.values(copy.errors)) expect(message).not.toBe("");
     }
     expect(getAuthCopy("en-US").title).toMatch(/knowledge base/i);
     expect(getAuthCopy("zh-CN").title).toContain("知识库");
+  });
+});
+
+describe("auth shell legal acknowledgement", () => {
+  it("keeps both authentication initiators disabled until an unchecked acknowledgement", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthApp, { runtime: {} as AuthRuntime }),
+    );
+
+    expect(html).toContain('type="checkbox"');
+    expect(html).not.toContain('checked=""');
+    expect(html).toContain(`href="${authLegalHref("terms", "en-US")}"`);
+    expect(html).toContain(`href="${authLegalHref("privacy", "en-US")}"`);
+    expect(html.match(/disabled=""/g)).toHaveLength(2);
+  });
+
+  it("uses the canonical public legal documents", () => {
+    expect(AUTH_LEGAL_LINKS).toEqual({
+      privacy: "https://musuw.com/privacy",
+      terms: "https://musuw.com/terms",
+    });
+    expect(authLegalHref("terms", "zh-CN")).toBe("https://musuw.com/terms?lang=zh-CN");
+    expect(authLegalHref("privacy", "en-US")).toBe("https://musuw.com/privacy?lang=en");
   });
 });

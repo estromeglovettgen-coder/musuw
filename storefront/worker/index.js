@@ -18,7 +18,11 @@ export async function handleRequest(request, env) {
   if (request.method === "GET" && contentType.toLowerCase().includes("text/html")) {
     return localizeDocumentResponse(
       assetResponse,
-      selectLocale(request.cf?.country),
+      selectLocale(
+        request.cf?.country,
+        request.headers.get("cookie") ?? "",
+        url.searchParams.get("lang") ?? "",
+      ),
       url.pathname,
       url.hostname,
     );

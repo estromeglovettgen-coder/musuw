@@ -1,3 +1,4 @@
+// Browser acceptance for the production-shaped local operations console.
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 

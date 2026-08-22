@@ -1,8 +1,28 @@
 import { getStorefrontCopy } from "../src/i18n.js";
 import { getPublicDocumentMeta } from "../src/legalContent.js";
 
-export function selectLocale(country) {
-  return country === "CN" ? "zh-CN" : "en";
+function supportedLocale(value) {
+  if (value === "zh-CN") return "zh-CN";
+  if (value === "en") return "en";
+  return null;
+}
+
+function savedLocale(cookieHeader) {
+  if (!cookieHeader) return null;
+  for (const entry of cookieHeader.split(";")) {
+    const separator = entry.indexOf("=");
+    if (separator < 0 || entry.slice(0, separator).trim() !== "musuw_locale") continue;
+    try {
+      return supportedLocale(decodeURIComponent(entry.slice(separator + 1).trim()));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function selectLocale(country, cookieHeader = "", requestedLocale = "") {
+  return supportedLocale(requestedLocale) ?? savedLocale(cookieHeader) ?? (country === "CN" ? "zh-CN" : "en");
 }
 
 function localeCookie(locale, hostname = "musuw.com") {

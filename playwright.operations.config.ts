@@ -6,7 +6,7 @@ export default defineConfig({
   outputDir: 'test-results/operations-console',
   reporter: [['list']],
   retries: 0,
-  testDir: 'tests/browser',
+  testDir: 'e2e',
   testMatch: 'operations-console.spec.ts',
   timeout: 60_000,
   use: {

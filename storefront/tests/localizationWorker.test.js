@@ -19,6 +19,14 @@ test("the Worker selects Chinese only for Cloudflare country CN", () => {
   assert.equal(selectLocale(undefined), "en");
 });
 
+test("an explicit legal-page locale and saved preference override country fallback", () => {
+  assert.equal(selectLocale("US", "", "zh-CN"), "zh-CN");
+  assert.equal(selectLocale("CN", "", "en"), "en");
+  assert.equal(selectLocale("US", "musuw_locale=zh-CN"), "zh-CN");
+  assert.equal(selectLocale("CN", "musuw_locale=en"), "en");
+  assert.equal(selectLocale("CN", "musuw_locale=invalid", "invalid"), "zh-CN");
+});
+
 test("localized HTML hands the country signal to the product subdomain", async () => {
   const source = new Response(
     '<html lang="en"><head></head><body></body></html>',
@@ -71,6 +79,12 @@ test("HTML is localized while hashed assets stay immutable", async () => {
     env,
   );
   assert.equal(documentResponse.headers.get("content-language"), "zh-CN");
+
+  const explicitLocaleResponse = await handleRequest(
+    requestWithCountry("https://musuw.com/privacy?lang=en", "CN"),
+    env,
+  );
+  assert.equal(explicitLocaleResponse.headers.get("content-language"), "en");
 
   const assetResponse = await handleRequest(
     requestWithCountry("https://musuw.com/assets/app-123.css", "CN"),
