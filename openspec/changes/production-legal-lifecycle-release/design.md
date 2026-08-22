@@ -11,10 +11,11 @@ server application.
 The legal text must describe actual behavior, not copy another company's
 contract. Current official requirements and mature SaaS documents are inputs
 for coverage and presentation only. Production uses Supabase for identity,
-optional Google sign-in, Cloudflare for the public edge and R2 storage,
-OpenRouter plus the model provider selected in-product for AI processing, and
-Paddle as Merchant of Record. Langfuse is not configured and must not be
-represented as an active recipient.
+Resend for authentication email, optional Google sign-in, Cloudflare for the
+public edge and R2 storage, OpenRouter plus the model provider selected
+in-product for AI processing, Langfuse Japan Cloud for production AI
+observability, and Paddle as Merchant of Record. Each active recipient must be
+represented according to its bounded production role.
 
 ## Goals / Non-Goals
 

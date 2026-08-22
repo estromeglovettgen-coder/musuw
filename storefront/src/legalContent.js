@@ -16,7 +16,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
   "/contact"
 ]);
 
-const updated = "2026-08-21";
+const updated = "2026-08-22";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -222,18 +222,23 @@ const englishDocuments = {
           p("We disclose personal data only as reasonably needed for the roles below. The current principal service providers and independent recipients are:"),
           list(
             "Supabase, Inc. provides identity and one-time-code services and processes account email, profile claims, identity identifiers, and login/session data for that role.",
+            "Resend, Inc. delivers transactional authentication email and processes the recipient address, authentication-message content and metadata, and delivery and security events for that role.",
             "Google LLC processes Google-account data when you choose Google sign-in. musuw requests only the openid, profile, and email scopes and receives the identifiers and profile fields that Google returns for them.",
             "Cloudflare, Inc. provides DNS and edge delivery, transport security, abuse prevention, country-level language selection, and R2 object storage. It may process IP and request metadata, security signals, and uploaded source objects for those roles.",
             "OpenRouter, Inc. routes prompts, relevant source excerpts, media, model requests, usage, and a scoped user-tracking identifier to the selected model and inference provider. The model catalog currently includes models developed by DeepSeek, Alibaba Cloud's Qwen, OpenAI, Google, Anthropic, and Cohere; routing providers and their practices can vary by model.",
+            "Langfuse GmbH provides production AI observability and debugging in its Japan Cloud region. Bounded traces may include prompts or queries, retrieved or source previews, model responses, model and tool identifiers, usage, latency, and error metadata needed to operate and troubleshoot requested AI features.",
             "Paddle entities act as the authorized reseller and Merchant of Record for paid musuw orders and process buyer contact, transaction, tax-location, payment, receipt, fraud-prevention, subscription, cancellation, and refund data under Paddle's buyer and privacy terms.",
             "Professional advisers, auditors, regulators, courts, and authorities when legally required or reasonably necessary to protect rights and safety.",
             "A successor in a merger, financing, reorganization, or sale, subject to appropriate confidentiality and notice requirements."
           ),
           p("We do not sell personal information for money. We do not share personal information for cross-context behavioral advertising."),
           link("Supabase Privacy Policy", "https://supabase.com/privacy"),
+          link("Resend Privacy Policy", "https://resend.com/legal/privacy-policy"),
           link("Google Privacy Policy", "https://policies.google.com/privacy"),
           link("Cloudflare Privacy Policy", "https://www.cloudflare.com/privacypolicy/"),
           link("OpenRouter Privacy Policy", "https://openrouter.ai/privacy"),
+          link("Langfuse Privacy Policy", "https://langfuse.com/privacy"),
+          link("Langfuse Data Regions", "https://langfuse.com/security/data-regions"),
           link("Paddle Privacy Notice", "https://www.paddle.com/legal/privacy")
         ]
       },
@@ -851,18 +856,23 @@ const chineseDocuments = {
           p("我们仅在履行以下职责所合理必要的范围提供个人信息。目前主要服务商和独立接收方如下："),
           list(
             "Supabase, Inc. 提供身份认证和一次性验证码服务，为此处理账户邮箱、资料声明、身份标识以及登录和会话数据。",
+            "Resend, Inc. 发送身份认证事务邮件，为此处理收件地址、认证邮件内容和元数据，以及投递与安全事件。",
             "您选择 Google 登录时，Google LLC 处理 Google 账户数据。musuw 仅请求 openid、profile 和 email 范围，并接收 Google 就这些范围返回的标识和资料字段。",
             "Cloudflare, Inc. 提供 DNS 与边缘交付、传输安全、滥用防护、国家或地区层级语言选择和 R2 对象存储，为此可能处理 IP 与请求元数据、安全信号和上传的原始资料对象。",
             "OpenRouter, Inc. 将提示词、相关来源片段、媒体、模型请求、用量和范围化用户追踪标识路由给所选模型方和推理服务商。当前模型目录包括 DeepSeek、阿里云 Qwen、OpenAI、Google、Anthropic 和 Cohere 开发的模型；具体推理路由及其做法可能因模型而异。",
+            "Langfuse GmbH 在其日本云区域提供生产 AI 可观测与故障排查。为运营和排查用户请求的 AI 功能，范围受限的追踪可能包含提示词或查询、检索或来源预览、模型回复、模型与工具标识、用量、延迟和错误元数据。",
             "Paddle 相关实体作为 musuw 付费订单的授权经销商和商户记录方，依据其买家条款和隐私政策处理买家联系、交易、税务地区、付款、收据、反欺诈、订阅、取消和退款数据。",
             "在法律要求或为保护权利与安全所合理必要时的专业顾问、审计人员、监管机构、法院和主管机关。",
             "合并、融资、重组或出售中的继受方，但须采取适当保密和告知措施。"
           ),
           p("我们不以金钱为对价出售个人信息，也不为跨场景行为广告共享个人信息。"),
           link("Supabase 隐私政策", "https://supabase.com/privacy"),
+          link("Resend 隐私政策", "https://resend.com/legal/privacy-policy"),
           link("Google 隐私政策", "https://policies.google.com/privacy"),
           link("Cloudflare 隐私政策", "https://www.cloudflare.com/privacypolicy/"),
           link("OpenRouter 隐私政策", "https://openrouter.ai/privacy"),
+          link("Langfuse 隐私政策", "https://langfuse.com/privacy"),
+          link("Langfuse 数据区域", "https://langfuse.com/security/data-regions"),
           link("Paddle 隐私声明", "https://www.paddle.com/legal/privacy")
         ]
       },

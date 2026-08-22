@@ -29,7 +29,7 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(document.path, route);
       assert.ok(document.title.length >= 4);
       assert.ok(document.summary.length >= 30);
-      assert.equal(document.updated, "2026-08-21");
+      assert.equal(document.updated, "2026-08-22");
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
 
@@ -71,10 +71,9 @@ test("policies identify the operator, support channel, refund promise, and condi
       : [/collect/i, /purpose/i, /retain/i, /international/i, /rights/i, /delete/i]) {
       assert.match(privacy, concept);
     }
-    for (const provider of ["Supabase", "Google", "Cloudflare", "OpenRouter", "Paddle"]) {
+    for (const provider of ["Supabase", "Resend", "Google", "Cloudflare", "OpenRouter", "Langfuse", "Paddle"]) {
       assert.match(privacy, new RegExp(provider));
     }
-    assert.doesNotMatch(privacy, /Langfuse/);
 
     const security = flatten(locale, "/security");
     assert.doesNotMatch(
@@ -99,9 +98,12 @@ test("privacy policy links to the named providers' own notices", async () => {
     const privacy = JSON.stringify(getPublicDocument(locale, "/privacy"));
     for (const href of [
       "https://supabase.com/privacy",
+      "https://resend.com/legal/privacy-policy",
       "https://policies.google.com/privacy",
       "https://www.cloudflare.com/privacypolicy/",
       "https://openrouter.ai/privacy",
+      "https://langfuse.com/privacy",
+      "https://langfuse.com/security/data-regions",
       "https://www.paddle.com/legal/privacy"
     ]) {
       assert.match(privacy, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
