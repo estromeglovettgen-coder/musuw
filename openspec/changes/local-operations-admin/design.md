@@ -50,3 +50,41 @@ control plane.
 
 Successful writes emit system-scope audit rows with old/new or requested
 values and never include credentials.
+
+## Local operations console
+
+The local UI is a second Vite HTML entry inside the existing WeKnora frontend
+and uses the already-installed Tencent TDesign Vue Next primitives. It is not
+another application framework: seven fixed operations pages compose the
+bounded queries and the existing `RuntimeQueues` and `SystemAuditLog`
+components. The retired Appsmith container is removed while its named volume
+and image are preserved only as temporary rollback evidence.
+
+A small loopback-only Node server serves the production build and owns the
+local integration seams:
+
+- PostgreSQL is opened with `default_transaction_read_only=on` and bounded
+  statements solely for operational projections.
+- The capability-scoped platform key is read at process start from macOS
+  Keychain and is used only for the exact WeKnora allowlist above.
+- Paddle subscription and transaction reads use Paddle's official API and
+  return a safe field projection. Supabase Auth, R2 operator inventory, and
+  Langfuse remain explicitly unavailable because their independent query
+  adapters and server-side credentials are not enabled; merely detecting a
+  credential never marks an unqueried provider as available, and database
+  mirrors are never presented as provider success.
+- Complex supplier operations link to the official Paddle, Supabase, and
+  Cloudflare consoles instead of cloning those products in Musuw.
+
+The browser cannot select an environment. `scripts/musuw-admin test` and
+`production` each create a separate process configuration; production also
+requires an explicit unlock phrase and ignored production runtime file.
+Missing config, a writable database, or a busy port fails closed.
+
+The first direct GET creates an in-memory 12-hour local session. Mutations
+require the SameSite session cookie, the exact loopback Origin, and a CSRF
+token synchronized into both the console fetch helper and the existing
+WeKnora Axios client. Host allowlisting, CSP, frame denial, no-store API
+responses, pagination caps, and upstream deadlines are enforced by the
+server. User changes require `UPDATE:<tenant_id>` and queue actions retain the
+native TDesign confirmation dialog.

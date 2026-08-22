@@ -178,6 +178,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         embed: resolve(__dirname, 'embed.html'),
+        operations: resolve(__dirname, 'operations.html'),
       },
       output: {
         manualChunks(id) {

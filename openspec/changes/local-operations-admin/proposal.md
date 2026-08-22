@@ -17,9 +17,14 @@ OpenRouter billing rules.
 - Add one bounded read-only user investigation projection for support
   correlations, reusing existing repositories and explicitly redacting user
   content, attachments, provider keys, and task/span payloads.
+- Replace the rejected Appsmith prototype with one source-controlled TDesign
+  Vue Next operations entry that reuses the scoped APIs, official provider
+  reads/consoles, and existing WeKnora queue/audit components.
 
 ## Out of Scope
 
 - A general SQL or arbitrary mutation endpoint.
 - Manual Paddle plan, invoice, refund, or subscription writes.
 - A Musuw usage ledger, OpenRouter HTTP client, or alternate provider adapter.
+- A second account system, generic low-code platform, supplier-console clone,
+  or browser-selectable production datasource.

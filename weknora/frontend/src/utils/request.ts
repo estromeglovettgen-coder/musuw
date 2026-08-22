@@ -73,6 +73,10 @@ instance.interceptors.request.use(
   }
 );
 
+export function setOperationsCsrfHeader(token: string) {
+  instance.defaults.headers.common['X-Musuw-CSRF'] = token;
+}
+
 // Token刷新标志，防止多个请求同时刷新token
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: Function; reject: Function }> = [];

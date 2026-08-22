@@ -15,6 +15,16 @@ The public homepage and authentication shell retain the notices distributed by
 their own dependency manifests. No historical runtime or prior-project source
 is part of the active Musuw product release.
 
+## Operations console UI
+
+- **Tencent TDesign Vue Next 1.19.2** and **TDesign Icons Vue Next 0.4.4** —
+  the local operations console uses the existing MIT-licensed TDesign
+  component and icon packages distributed in the WeKnora frontend dependency
+  manifest. See the official
+  [TDesign Vue Next](https://github.com/Tencent/tdesign-vue-next) and
+  [TDesign Icons](https://github.com/Tencent/tdesign-icons) repositories. The
+  corresponding license texts remain in each installed package.
+
 ## Bundled font and spreadsheet assets
 
 - **Switzer webfonts** — the storefront's `public/fonts/switzer-*.woff2` files

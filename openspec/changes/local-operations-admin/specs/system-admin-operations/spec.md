@@ -82,3 +82,39 @@ source SHALL explicitly report `available=false` and a reason.
 - **THEN** the investigation remains readable and the corresponding section
   reports `available=false` rather than returning an empty success that looks
   authoritative
+
+### Requirement: The local console composes existing authorities safely
+
+The system SHALL provide a loopback-only, source-controlled TDesign operations
+console with overview, users, knowledge/documents, billing, identity, storage,
+and logs/tracing pages. Operational database queries MUST be read-only. Every
+business mutation MUST use the capability-scoped WeKnora routes above, while
+provider data MUST come from an official provider API or report an explicit
+unavailable reason. The console MUST NOT expose provider or platform keys to
+browser code.
+
+#### Scenario: A provider credential is absent
+
+- **WHEN** Supabase Auth Admin, R2 operator, Langfuse query, Paddle, or WeKnora
+  server credentials are not configured for the selected environment
+- **THEN** the affected capability reports unavailable with a reason and no
+  database mirror or empty response is presented as provider success
+
+#### Scenario: An operator submits a mutation
+
+- **WHEN** an operator confirms a supported user or runtime action
+- **THEN** the request requires the local SameSite session, exact Origin, CSRF
+  token and action-specific confirmation before reaching the existing API
+
+### Requirement: TEST and PRODUCTION are process-level environments
+
+The system SHALL select TEST or PRODUCTION only when the local operations
+process starts. PRODUCTION MUST require an explicit unlock phrase, separate
+ignored runtime configuration, and a read-only database connection. The
+browser MUST NOT switch or mix environment credentials.
+
+#### Scenario: Production is not independently configured
+
+- **WHEN** an operator attempts to start PRODUCTION without the unlock phrase,
+  complete runtime file, or a read-only database
+- **THEN** startup fails closed before serving the console

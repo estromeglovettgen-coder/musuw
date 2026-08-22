@@ -15,5 +15,7 @@
 - [x] 2.1 Add focused service and handler behavior tests
 - [x] 2.2 Declare platform API-key capabilities and run affected Go tests
 - [x] 2.3 Add investigation redaction/correlation and Max-cap behavior tests
-- [ ] 2.4 Wire the local Appsmith console to the published routes and validate
-  destructive operations only with explicit operator confirmation
+- [x] 2.4 Wire the source-controlled TDesign console to real TEST data, the
+  published routes and official-provider states; validate TEST/PRODUCTION
+  isolation, explicit operator confirmation, security boundaries and real
+  browser workflows

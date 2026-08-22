@@ -2,20 +2,24 @@
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-container_name=musuw-appsmith
-volume_name=musuw_appsmith_stacks
+runtime_dir="$repo_root/.runtime/musuw-admin"
+pid_file="$runtime_dir/server.pid"
+target_file="$runtime_dir/target"
+log_file="$runtime_dir/server.log"
+server_script="$repo_root/scripts/musuw-admin-server.mjs"
 listen_host=127.0.0.1
 listen_port=4186
-image_ref='appsmith/appsmith-ce:v2.2@sha256:dc17b968c88eebf42b85c2e22b97efb55f2339b2d685e48f804c5f87bdd9d4e5'
+legacy_container=musuw-appsmith
 
 usage() {
   cat <<'EOF'
-Usage: scripts/musuw-admin test|production|stop|status
+Usage: scripts/musuw-admin test|production|stop|status|logs
 
-  test        Start the local TEST operations console.
-  production  Check the live-data lock; currently refuses until production is configured.
-  stop        Remove the local container; keep the Appsmith data volume.
-  status      Show the selected environment, health, and loopback URL.
+  test        Build and start the source-controlled TEST operations console.
+  production  Start against explicit production runtime config (locked).
+  stop        Stop the operations server. The retired Appsmith volume is preserved.
+  status      Show the selected environment, process state, and loopback URL.
+  logs        Show the last 100 server log lines.
 EOF
 }
 
@@ -24,41 +28,69 @@ die() {
   exit 1
 }
 
-require_docker() {
-  command -v docker >/dev/null 2>&1 || die 'Docker is required'
-  docker info >/dev/null 2>&1 || die 'Docker Desktop is not running'
+server_pid() {
+  [ -r "$pid_file" ] || return 1
+  pid=$(sed -n '1p' "$pid_file")
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  command_line=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  case "$command_line" in
+    *musuw-admin-server.mjs*) printf '%s\n' "$pid" ;;
+    *) return 1 ;;
+  esac
 }
 
-container_exists() {
-  docker inspect "$container_name" >/dev/null 2>&1
-}
-
-selected_environment() {
-  if ! container_exists; then
-    printf '%s\n' stopped
-    return
+stop_server() {
+  if pid=$(server_pid); then
+    kill "$pid" 2>/dev/null || true
+    attempt=0
+    while kill -0 "$pid" 2>/dev/null && [ "$attempt" -lt 40 ]; do
+      attempt=$((attempt + 1))
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
   fi
-  docker inspect "$container_name" \
-    --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-    | sed -n 's/^MUSUW_ADMIN_TARGET=//p' \
-    | sed -n '1p'
+  rm -f "$pid_file" "$target_file"
+}
+
+retire_appsmith() {
+  command -v docker >/dev/null 2>&1 || return 0
+  docker info >/dev/null 2>&1 || return 0
+  if docker inspect "$legacy_container" >/dev/null 2>&1; then
+    state=$(docker inspect "$legacy_container" --format '{{.State.Running}}' 2>/dev/null || true)
+    if [ "$state" = true ]; then
+      docker stop "$legacy_container" >/dev/null
+    fi
+    docker rm "$legacy_container" >/dev/null
+  fi
+}
+
+port_is_busy() {
+  command -v lsof >/dev/null 2>&1 || return 1
+  lsof -nP -iTCP:"$listen_port" -sTCP:LISTEN >/dev/null 2>&1
 }
 
 wait_for_health() {
   attempt=0
-  while [ "$attempt" -lt 60 ]; do
-    state=$(docker inspect "$container_name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)
-    case "$state" in
-      healthy|running) return 0 ;;
-      unhealthy|exited|dead) die "Appsmith failed to start ($state)" ;;
-    esac
+  while [ "$attempt" -lt 100 ]; do
+    if curl --fail --silent --max-time 1 "http://$listen_host:$listen_port/healthz" >/dev/null 2>&1; then
+      return 0
+    fi
+    if ! server_pid >/dev/null 2>&1; then
+      tail -n 20 "$log_file" >&2 2>/dev/null || true
+      die 'operations server exited before becoming healthy'
+    fi
     attempt=$((attempt + 1))
-    sleep 2
+    sleep 0.1
   done
-  die 'Appsmith did not become healthy within 120 seconds'
+  tail -n 20 "$log_file" >&2 2>/dev/null || true
+  die 'operations server did not become healthy within 10 seconds'
 }
 
-start_console() {
+validate_target() {
   target=$1
   case "$target" in
     test)
@@ -67,65 +99,57 @@ start_console() {
       ;;
     production)
       [ "${MUSUW_ADMIN_PRODUCTION_UNLOCK:-}" = 'I_UNDERSTAND_THIS_IS_LIVE' ] || die 'production is locked; set MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE for this invocation'
-      die 'production is not configured on this machine; add an authorized production datasource before enabling it'
+      [ -r "$runtime_dir/production.env" ] || die 'production is not configured; create .runtime/musuw-admin/production.env first'
       ;;
     *) die "unknown environment: $target" ;;
   esac
+}
 
-  if container_exists; then
-    current=$(selected_environment)
-    if [ "$current" = "$target" ]; then
-      docker start "$container_name" >/dev/null 2>&1 || true
-      wait_for_health
-      printf 'Musuw admin (%s): http://%s:%s\n' "$target" "$listen_host" "$listen_port"
-      return
-    fi
-    docker rm -f "$container_name" >/dev/null
-  fi
+start_console() {
+  target=$1
+  validate_target "$target"
+  command -v node >/dev/null 2>&1 || die 'Node.js is required'
+  command -v npm >/dev/null 2>&1 || die 'npm is required'
+  command -v curl >/dev/null 2>&1 || die 'curl is required'
 
-  docker volume create "$volume_name" >/dev/null
-  docker run -d \
-    --name "$container_name" \
-    --restart unless-stopped \
-    -p "$listen_host:$listen_port:80" \
-    -v "$volume_name:/appsmith-stacks" \
-    -e APPSMITH_DISABLE_TELEMETRY=true \
-    -e APPSMITH_SIGNUP_DISABLED=true \
-    -e "MUSUW_ADMIN_TARGET=$target" \
-    "$image_ref" >/dev/null
+  mkdir -p "$runtime_dir"
+  npm --prefix "$repo_root/weknora/frontend" run build-with-types
 
+  stop_server
+  retire_appsmith
+  port_is_busy && die "port $listen_port is already in use"
+
+  : > "$log_file"
+  MUSUW_ADMIN_PORT="$listen_port" nohup node "$server_script" "$target" >>"$log_file" 2>&1 &
+  pid=$!
+  printf '%s\n' "$pid" > "$pid_file"
+  printf '%s\n' "$target" > "$target_file"
   wait_for_health
-  printf 'Musuw admin (%s): http://%s:%s\n' "$target" "$listen_host" "$listen_port"
+  printf 'Musuw operations (%s): http://%s:%s\n' "$target" "$listen_host" "$listen_port"
 }
 
 show_status() {
-  if ! container_exists; then
-    printf 'Musuw admin: stopped\n'
+  if ! pid=$(server_pid); then
+    printf 'Musuw operations: stopped\n'
     return
   fi
-  target=$(selected_environment)
-  state=$(docker inspect "$container_name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}')
-  binding=$(docker inspect "$container_name" --format '{{(index (index .HostConfig.PortBindings "80/tcp") 0).HostIp}}:{{(index (index .HostConfig.PortBindings "80/tcp") 0).HostPort}}')
-  [ "$binding" = "$listen_host:$listen_port" ] || die "unsafe bind detected: $binding"
-  printf 'Musuw admin: target=%s state=%s url=http://%s\n' "$target" "$state" "$binding"
+  target=$(sed -n '1p' "$target_file" 2>/dev/null || printf 'unknown')
+  health=$(curl --silent --max-time 1 "http://$listen_host:$listen_port/healthz" 2>/dev/null || printf '{"status":"unreachable"}')
+  printf 'Musuw operations: target=%s pid=%s url=http://%s:%s health=%s\n' "$target" "$pid" "$listen_host" "$listen_port" "$health"
 }
 
 command=${1:-}
 case "$command" in
-  test|production)
-    require_docker
-    start_console "$command"
-    ;;
+  test|production) start_console "$command" ;;
   stop)
-    require_docker
-    if container_exists; then
-      docker rm -f "$container_name" >/dev/null
-    fi
-    printf 'Musuw admin: stopped (data volume preserved)\n'
+    mkdir -p "$runtime_dir"
+    stop_server
+    printf 'Musuw operations: stopped (retired Appsmith data volume preserved)\n'
     ;;
-  status)
-    require_docker
-    show_status
+  status) show_status ;;
+  logs)
+    [ -r "$log_file" ] || die 'no operations log exists'
+    tail -n 100 "$log_file"
     ;;
   -h|--help|help|'') usage ;;
   *) usage >&2; exit 2 ;;
