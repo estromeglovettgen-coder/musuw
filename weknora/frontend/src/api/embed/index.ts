@@ -613,7 +613,7 @@ export function buildWidgetSnippet(
   const base = safeBaseUrl(opts?.baseUrl)
   const position = opts?.position || 'bottom-right'
   const attrs = [
-    `src="${escapeHtmlAttr(`${base}/weknora-widget.js`)}"`,
+    `src="${escapeHtmlAttr(`${base}/musuw-widget.js`)}"`,
     `data-channel="${escapeHtmlAttr(channelId)}"`,
     `data-token="${escapeHtmlAttr(token)}"`,
     `data-position="${escapeHtmlAttr(position)}"`,
@@ -640,7 +640,7 @@ export function buildSecureWidgetSnippet(
   const position = opts?.position || 'bottom-right'
   const endpoint = opts?.tokenEndpoint || SECURE_TOKEN_ENDPOINT_PLACEHOLDER
   const attrs = [
-    `src="${escapeHtmlAttr(`${base}/weknora-widget.js`)}"`,
+    `src="${escapeHtmlAttr(`${base}/musuw-widget.js`)}"`,
     `data-channel="${escapeHtmlAttr(channelId)}"`,
     `data-token-endpoint="${escapeHtmlAttr(endpoint)}"`,
     `data-position="${escapeHtmlAttr(position)}"`,

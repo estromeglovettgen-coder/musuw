@@ -12,7 +12,7 @@
 
 - [x] 2.1 Run auth tests/types/build and storefront tests/build, including the
   original unchecked/checked acceptance scenarios.
-- [ ] 2.2 Run frontend, Go, release/source/secret contracts and strict OpenSpec
+- [x] 2.2 Run frontend, Go, release/source/secret contracts and strict OpenSpec
   validation for the complete current mainline.
 
 ## 3. Production delivery

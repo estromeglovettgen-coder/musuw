@@ -4134,7 +4134,7 @@ export default {
     webhookUrlPlaceholder: 'https://your-server.example.com/musuw/embed-events',
     webhookUrlDesc: 'Optional. Musuw POSTs message_sent / message_received events to this HTTPS endpoint.',
     webhookSecret: 'Webhook secret',
-    webhookSecretPlaceholder: 'HMAC-SHA256 secret (X-WeKnora-Signature header)',
+    webhookSecretPlaceholder: 'HMAC-SHA256 secret (X-Musuw-Signature header)',
     webhookSecretKeep: 'Leave blank to keep the saved secret',
     webhookSecretDesc: 'Optional. When set, request bodies are signed for verification on your server.',
     agentWebSearchDisabledHint: 'У этого агента не включён веб-поиск. Посетители не увидят кнопку веб-поиска, пока вы не включите его в настройках агента.',

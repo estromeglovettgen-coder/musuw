@@ -284,9 +284,9 @@ Wiki 模式允许 Agent 根据原始文档自动生成并维护一套结构化�
 
 0.6.2 新增迁移 `000059_embeddings_hnsw_1024`，为 **1024 维** embedding（如 bge-m3）在 PostgreSQL pgvector 上创建 HNSW 索引。服务启动会自动执行迁移；若你使用其他维度，该索引可能不适用，需按自身 embedding 维度另行调优。升级后首次大批量入库期间索引构建可能占用额外 I/O，属正常现象。
 
-## 21. 如何在网站嵌入 WeKnora 智能体（Embed Widget）？
+## 21. 如何在网站嵌入 Musuw 智能体（Embed Widget）？
 
-0.6.3 起支持**嵌入渠道**：在 **集成中心** 或 Agent 编辑器中创建 embed 渠道，绑定自定义 Agent，获取渠道 ID 与发布 Token（`em_…`），将 `weknora-widget.js` 嵌入外部网页即可提供访客问答。
+0.6.3 起支持**嵌入渠道**：在 **集成中心** 或 Agent 编辑器中创建 embed 渠道，绑定自定义 Agent，获取渠道 ID 与发布 Token（`em_…`），将 `musuw-widget.js` 嵌入外部网页即可提供访客问答。
 
 - **域名白名单**：必须在渠道配置中填写允许加载 Widget 的 Origin，否则 exchange 会返回 403。
 - **安全模式（推荐）**：生产环境不要把 `em_…` 写在页面 HTML 里；由业务后端提供 `token-endpoint`，用发布 Token 调 `POST /api/v1/embed/:id/exchange` 换取短时令牌 `ems_…`（约 30 分钟有效）。详见 [`docs/embed-secure-mode.md`](./embed-secure-mode.md) 与 [`docs/embed-subdomain.md`](./embed-subdomain.md)。

@@ -1,6 +1,6 @@
 # 网页嵌入（Embed Channel）
 
-想给自己的官网、帮助中心加一个「问文档」的客服挂件，用嵌入渠道：在 WeKnora 里建一个渠道并绑定 Agent，拿到一段 `<script>` 贴进网页，访客不需要 WeKnora 账号就能对话。
+想给自己的官网、帮助中心加一个「问文档」的客服挂件，用嵌入渠道：在 Musuw 里建一个渠道并绑定 Agent，拿到一段 `<script>` 贴进网页，访客不需要 Musuw 账号就能对话。
 
 配置路径：「设置 → 网页嵌入」新建渠道 → 绑定 Agent → 填允许嵌入的域名白名单 → 复制代码片段。上线前务必配好域名白名单和限流，否则任何人都能拿你的渠道地址消耗你的模型额度。
 
@@ -165,20 +165,20 @@ embed := r.Group("/api/v1/embed/:channel_id", middleware.EmbedAuth(embedService,
 
 安全与投递语义：
 
-- 配置了 `webhook_secret` 时附带签名头 `X-WeKnora-Signature: sha256=<hex(HMAC-SHA256(secret, raw_body))>`；
-- URL 必须 HTTPS，出站请求走 SSRF 安全客户端（每次重定向重新校验，最多 5 跳），超时 5 秒，User-Agent 为 `WeKnora-Embed-Webhook/1.0`；
+- 配置了 `webhook_secret` 时附带签名头 `X-Musuw-Signature: sha256=<hex(HMAC-SHA256(secret, raw_body))>`；
+- URL 必须 HTTPS，出站请求走 SSRF 安全客户端（每次重定向重新校验，最多 5 跳），超时 5 秒，User-Agent 为 `Musuw-Embed-Webhook/1.0`；
 - 异步 best-effort 投递，失败仅记录日志、**不重试**；
 - 前端也可通过 `POST /api/v1/embed/:channel_id/sessions/:session_id/events` 显式转发事件。
 
 ## 前端挂件接入
 
-挂件 SDK 是一个无依赖的 loader 脚本 `frontend/public/weknora-widget.js`（部署后从 WeKnora 服务根路径提供），负责渲染悬浮按钮 + iframe 面板，iframe 指向嵌入页 SPA `/embed/{channel_id}`（入口 `frontend/src/embed-main.ts`）。
+挂件 SDK 是一个无依赖的 loader 脚本 `frontend/public/musuw-widget.js`（部署后从 Musuw 服务根路径提供），负责渲染悬浮按钮 + iframe 面板，iframe 指向嵌入页 SPA `/embed/{channel_id}`（入口 `frontend/src/embed-main.ts`）。
 
 ### 方式一：静态 Token 模式（最简单，token 暴露在页面）
 
 ```html
 <script
-  src="https://your-weknora.example.com/weknora-widget.js"
+  src="https://your-musuw.example.com/musuw-widget.js"
   data-channel="你的渠道UUID"
   data-token="em_你的publish_token"
   data-position="bottom-right"
@@ -195,35 +195,35 @@ publish token 只保存在站长自己的后端，页面通过 `data-token-endpo
 
 ```html
 <script
-  src="https://your-weknora.example.com/weknora-widget.js"
+  src="https://your-musuw.example.com/musuw-widget.js"
   data-channel="你的渠道UUID"
-  data-token-endpoint="https://your-backend.example.com/weknora/embed-token"
+  data-token-endpoint="https://your-backend.example.com/musuw/embed-token"
   data-position="bottom-right"
 ></script>
 ```
 
-站长后端实现该 endpoint：服务端持有 `em_` token，调用 `POST /api/v1/embed/{channel_id}/exchange` 换取 `ems_` 短效 token 并返回 `{ "token": "ems_...", "expiresIn": 1800 }`。挂件会在约 80% TTL 时（不早于 30 秒）自动刷新 token（见 `weknora-widget.js` 中的 `scheduleRefresh`）。**publish token 永不到达浏览器。**
+站长后端实现该 endpoint：服务端持有 `em_` token，调用 `POST /api/v1/embed/{channel_id}/exchange` 换取 `ems_` 短效 token 并返回 `{ "token": "ems_...", "expiresIn": 1800 }`。挂件会在约 80% TTL 时（不早于 30 秒）自动刷新 token（见 `musuw-widget.js` 中的 `scheduleRefresh`）。**publish token 永不到达浏览器。**
 
 其余可选属性：`data-base-url`（默认从 script src 推导）、`data-width` / `data-height`（面板尺寸，默认 400×600）、`data-sandbox`（iframe sandbox 策略；跨域嵌入时自动加 `allow-scripts allow-forms allow-popups allow-modals allow-same-origin`）。
 
 ### 方式三：编程式 API
 
 ```html
-<script src="https://your-weknora.example.com/weknora-widget.js"></script>
+<script src="https://your-musuw.example.com/musuw-widget.js"></script>
 <script>
-  WeKnora.init({
+  Musuw.init({
     channel: '渠道UUID',
-    tokenEndpoint: 'https://your-backend.example.com/weknora/embed-token', // 或 token: 'em_...'
+    tokenEndpoint: 'https://your-backend.example.com/musuw/embed-token', // 或 token: 'em_...'
     position: 'bottom-right',
     primaryColor: '#07C05F',
     title: 'AI Assistant',
-    baseUrl: 'https://your-weknora.example.com',
+    baseUrl: 'https://your-musuw.example.com',
   });
-  WeKnora.setContext({ userId: 'u_123', page: location.pathname }); // 上下文随每次提问注入
-  WeKnora.setLocale('en-US');
-  WeKnora.openWithQuery('如何重置密码？');   // 打开面板并自动发送提问
-  WeKnora.on('ready', () => console.log('widget ready'));
-  // 其他：WeKnora.open() / close() / toggle() / destroy() / off(event, fn)
+  Musuw.setContext({ userId: 'u_123', page: location.pathname }); // 上下文随每次提问注入
+  Musuw.setLocale('en-US');
+  Musuw.openWithQuery('如何重置密码？');   // 打开面板并自动发送提问
+  Musuw.on('ready', () => console.log('widget ready'));
+  // 其他：Musuw.open() / close() / toggle() / destroy() / off(event, fn)
 </script>
 ```
 
@@ -232,7 +232,7 @@ publish token 只保存在站长自己的后端，页面通过 `data-token-endpo
 也可以不用 loader，直接内嵌 iframe（此时需要通过 URL/postMessage 提供 token，通常建议使用 loader）：
 
 ```html
-<iframe src="https://your-weknora.example.com/embed/渠道UUID"
+<iframe src="https://your-musuw.example.com/embed/渠道UUID"
         width="400" height="600" style="border:none"></iframe>
 ```
 
@@ -249,17 +249,17 @@ publish token 只保存在站长自己的后端，页面通过 `data-token-endpo
 sequenceDiagram
     autonumber
     participant Visitor as "访客浏览器"
-    participant Host as "宿主页面 (weknora-widget.js)"
+    participant Host as "宿主页面 (musuw-widget.js)"
     participant Backend as "站长后端 (安全模式可选)"
     participant Iframe as "嵌入页 SPA (/embed/:channel_id)"
-    participant API as "WeKnora API (/api/v1/embed/:channel_id)"
+    participant API as "Musuw API (/api/v1/embed/:channel_id)"
     participant Webhook as "站长 Webhook"
 
     Visitor->>Host: 加载页面, script 标签自动初始化
     Host->>Iframe: 创建 iframe (悬浮面板)
     Iframe-->>Host: postMessage "bootstrap_request"
     alt 安全模式 (data-token-endpoint)
-        Host->>Backend: GET /weknora/embed-token
+        Host->>Backend: GET /musuw/embed-token
         Backend->>API: POST /exchange (Authorization: Embed em_...)
         API-->>Backend: "{ session_token: ems_..., expires_in: 1800 }"
         Backend-->>Host: "{ token: ems_... }"
@@ -274,7 +274,7 @@ sequenceDiagram
     Note over Iframe: session id + sig 存入 localStorage
     Visitor->>Iframe: 输入问题
     Iframe->>API: POST /agent-chat/:session_id (X-Embed-Session: sig)
-    API-->>Webhook: 异步 POST message_sent (X-WeKnora-Signature)
+    API-->>Webhook: 异步 POST message_sent (X-Musuw-Signature)
     API-->>Iframe: SSE 流式回复
     API-->>Webhook: 异步 POST message_received
     Iframe-->>Host: postMessage "message_received"
@@ -301,6 +301,6 @@ sequenceDiagram
 | Webhook 分发 | `internal/application/service/embed_webhook.go` |
 | 鉴权中间件 | `internal/middleware/embed_auth.go` |
 | 路由注册 | `internal/router/router.go`（`RegisterEmbedPublicRoutes` / `RegisterEmbedChannelRoutes`） |
-| 挂件加载器（SDK） | `frontend/public/weknora-widget.js` |
+| 挂件加载器（SDK） | `frontend/public/musuw-widget.js` |
 | 嵌入页 SPA 入口 | `frontend/src/embed-main.ts`、`frontend/src/composables/useEmbedBridge.ts`、`useEmbedChatSession.ts` |
 | 数据库迁移 | `migrations/versioned/000060_embed_channels.up.sql` |

@@ -7,6 +7,7 @@ import test from 'node:test'
 import {
   clampPage,
   clampPageSize,
+  isPublicBrandAsset,
   isSafeOperationsPath,
   parseEnvFile,
   unavailableProviderState,
@@ -64,4 +65,11 @@ test('allowlist admits only scoped operations routes and methods', () => {
     ['PATCH', '/api/v1/system/admin/tenants/10005/../../settings'],
   ]
   for (const [method, path] of denied) assert.equal(isSafeOperationsPath(method, path), false, `${method} ${path}`)
+})
+
+test('only immutable Musuw brand assets are public before an operator session exists', () => {
+  assert.equal(isPublicBrandAsset('GET', '/musuw-logo.png'), true)
+  assert.equal(isPublicBrandAsset('HEAD', '/favicon.ico'), true)
+  assert.equal(isPublicBrandAsset('GET', '/assets/operations.js'), false)
+  assert.equal(isPublicBrandAsset('POST', '/musuw-logo.png'), false)
 })

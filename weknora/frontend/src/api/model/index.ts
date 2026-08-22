@@ -235,7 +235,7 @@ export function saveWeKnoraCloudCredentials(data: InitializeWeKnoraCloudRequest)
         }
       })
       .catch((error: any) => {
-        console.error('Failed to save WeKnoraCloud credentials:', error)
+        console.error('Failed to save Musuw Cloud credentials:', error)
         reject(error)
       })
   })

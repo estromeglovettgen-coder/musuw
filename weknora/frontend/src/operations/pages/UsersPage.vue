@@ -84,7 +84,7 @@
 
     <t-dialog v-model:visible="manageVisible" header="管理用户空间" width="580px" :confirm-btn="{ content: '确认执行', theme: 'danger', disabled: !canSubmitManage, loading: managing }" @confirm="submitManage">
       <div v-if="selected" class="manage-form">
-        <div class="ops-callout is-warning"><InfoCircleIcon class="ops-callout__icon"/><div><strong>所有写操作经过 WeKnora 管理 API</strong><span>不会直接修改数据库。套餐仍只由 Paddle 签名事件负责，当前表单不能改套餐。</span></div></div>
+        <div class="ops-callout is-warning"><InfoCircleIcon class="ops-callout__icon"/><div><strong>所有写操作经过 Musuw 管理 API</strong><span>不会直接修改数据库。套餐仍只由 Paddle 签名事件负责，当前表单不能改套餐。</span></div></div>
         <t-form label-align="top">
           <t-form-item label="空间状态"><t-radio-group v-model="manage.status"><t-radio value="active">启用</t-radio><t-radio value="inactive">停用</t-radio></t-radio-group></t-form-item>
           <t-form-item label="存储配额（GiB）"><t-input-number v-model="manage.quotaGiB" :min="1" :max="1024" theme="column" /></t-form-item>
@@ -155,7 +155,7 @@ async function submitManage() {
     await operationsApi.updateTenant(selected.value.tenant_id, { status: manage.status, storage_quota_bytes: Math.round(manage.quotaGiB * 1024 ** 3) })
     if (manage.creditMode === 'reset') entitlement.value = await operationsApi.updateCredits(selected.value.tenant_id, { reset: true })
     if (manage.creditMode === 'custom') entitlement.value = await operationsApi.updateCredits(selected.value.tenant_id, { remaining_microusd: Math.round(manage.creditUsd * 1_000_000) })
-    MessagePlugin.success('用户空间已通过 WeKnora 管理 API 更新')
+    MessagePlugin.success('用户空间已通过 Musuw 管理 API 更新')
     manageVisible.value = false; await load(); if (selected.value) await openUser(rows.value.find((row) => row.id === selected.value?.id) || selected.value)
   } catch (manageError) { MessagePlugin.error(manageError instanceof Error ? manageError.message : '更新失败') }
   finally { managing.value = false }

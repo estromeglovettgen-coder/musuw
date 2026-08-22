@@ -59,7 +59,7 @@
           <header class="ops-panel__header">
             <div class="ops-panel__title">
               <h2>最近更新的文档</h2>
-              <p>解析状态来自 WeKnora，不把 provider 错误伪装为空结果</p>
+              <p>解析状态来自 Musuw，不把 provider 错误伪装为空结果</p>
             </div>
             <t-button variant="text" size="small" @click="goTo('knowledge')">查看全部 <ChevronRightIcon /></t-button>
           </header>
@@ -128,7 +128,7 @@
                 <span class="ops-status" :class="`is-${statusTone(backend.status)}`">{{ backend.status }}</span>
               </div>
             </div>
-            <div v-else class="ops-callout is-warning"><InfoCircleIcon class="ops-callout__icon" /><div><strong>没有活动存储后端</strong><span>请在 WeKnora 运行时检查存储注册，而不是在页面里伪造 R2 状态。</span></div></div>
+            <div v-else class="ops-callout is-warning"><InfoCircleIcon class="ops-callout__icon" /><div><strong>没有活动存储后端</strong><span>请在 Musuw 运行时检查存储注册，而不是在页面里伪造 R2 状态。</span></div></div>
           </div>
         </article>
       </section>
@@ -157,7 +157,7 @@ const recentColumns = [
 ]
 
 const providerMetadata = {
-  weknora: { name: 'WeKnora', icon: markRaw(ServerIcon), url: '' },
+  weknora: { name: 'Musuw', icon: markRaw(ServerIcon), url: '' },
   paddle: { name: 'Paddle', icon: markRaw(MoneyIcon), urlKey: 'paddle' },
   supabase: { name: 'Supabase Auth', icon: markRaw(UserSafetyIcon), urlKey: 'supabase_staging' },
   r2: { name: 'Cloudflare R2', icon: markRaw(CloudIcon), urlKey: 'cloudflare_r2' },

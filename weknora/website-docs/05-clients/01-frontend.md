@@ -93,7 +93,7 @@ flowchart TB
 | `frontend/src/assets/theme/` | 主题 CSS 变量（light / dark） |
 | `frontend/src/wailsjs/` | Wails 桌面端自动生成绑定（勿手改） |
 | `frontend/src/directives/`、`frontend/src/types/`、`frontend/src/config/` | 自定义指令、类型定义、配置 |
-| `frontend/public/` | 静态资源：`weknora-widget.js`（第三方站点嵌入加载器）、`config.js`（运行时配置占位，容器启动时覆盖）、离线 TDesign 图标 |
+| `frontend/public/` | 静态资源：`musuw-widget.js`（第三方站点嵌入加载器）、`config.js`（运行时配置占位，容器启动时覆盖）、离线 TDesign 图标 |
 | `frontend/packages/` | 本地依赖 tarball（`xlsx-0.20.2.tgz`） |
 
 ## 页面路由清单
@@ -308,7 +308,7 @@ RAG 流水线的可视化进度（`views/chat/components/RagPipelineProgress.vue
 - **SPA fallback**：`/` 下 `try_files ... /index.html`，且 `index.html` 设置 `no-cache`（避免升级后用户拿到旧版本）；带 hash 的 `/assets/*` 设置一年 immutable 缓存；
 - **API 代理**：`/api/` 与 `/files` 反代到 `${APP_SCHEME}://${APP_HOST}:${APP_PORT}`，`/api/` 针对 SSE 关闭 `proxy_buffering` / 缓存 / 分块编码，读写超时放宽到 3600s，并配置 3 次 upstream 重试；
 - **资源短链 `/r/`**：`location ^~ /r/` 同样反代到后端。IM 渠道把 `resource://` 图片改写成 `<APP_EXTERNAL_URL>/r/<token>`，缺这段配置时请求会落进 SPA fallback，IM 侧图片显示为空白（详见 [IM 集成](../03-features/12-im-integration.md)）；
-- **嵌入页**：`/embed/*` fallback 到 `embed.html`（独立 location，不继承主站的 `X-Frame-Options: SAMEORIGIN`，因此可被第三方 iframe 加载）；`/weknora-widget.js` 是给第三方站点的静态加载器；文件头部另附可选的独立 embed 子域 server 块示例；
+- **嵌入页**：`/embed/*` fallback 到 `embed.html`（独立 location，不继承主站的 `X-Frame-Options: SAMEORIGIN`，因此可被第三方 iframe 加载）；`/musuw-widget.js` 是给第三方站点的静态加载器；文件头部另附可选的独立 embed 子域 server 块示例；
 - 启用 gzip（注释记录了实测收益：低带宽下首屏从 25s 降到 3-5s）及一组安全响应头（`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy` 等，在各 location 内重复声明以规避 nginx `add_header` 不继承的问题）。
 
 ## 桌面端（Wails）关联

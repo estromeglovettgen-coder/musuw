@@ -30,21 +30,21 @@ scripts/musuw-admin stop
 - **账单**：由 Paddle 签名事件形成的 Musuw 镜像，以及 Paddle 官方 API
   返回的 Sandbox/Live 订阅和交易。Paddle 不可用时明确显示 unavailable，
   不把它伪装成 0 条记录。
-- **身份**：WeKnora 账号镜像和正确的 Supabase 项目标识。只有服务端查询
+- **身份**：Musuw 账号镜像和正确的 Supabase 项目标识。只有服务端查询
   适配器实际调用 Supabase Admin API 成功后才宣称官方数据 available；仅检测
   到一个凭据不会冒充连接成功。
 - **存储**：分开显示 `file_size`、`storage_size`、
-  `tenant.storage_used`、套餐配额、WeKnora 后端和物理对象引用。
+  `tenant.storage_used`、套餐配额、Musuw 后端和物理对象引用。
   “数据库有引用”不会被描述成“R2 HEAD 已成功”。
-- **日志与追踪**：直接复用 WeKnora 的运行队列与系统审计组件。
+- **日志与追踪**：直接复用 Musuw 的运行队列与系统审计组件。
   Langfuse 查询未配置时显示 unavailable；不会绘制虚假空图表。
 
 数据权威保持单一：
 
 - PostgreSQL 连接强制 `default_transaction_read_only=on`，只负责运营查询。
-- 用户/空间状态、配额和 OpenRouter 额度写入仅调用 WeKnora
+- 用户/空间状态、配额和 OpenRouter 额度写入仅调用 Musuw
   capability-scoped 管理 API，继续经过服务端校验与系统审计。
-- 队列操作直接复用 WeKnora 原生运行队列 API 和确认框。
+- 队列操作直接复用 Musuw 原生运行队列 API 和确认框。
 - Paddle 订阅/交易来自官方 API；套餐状态仍只由签名 webhook 和现有
   billing 服务维护。
 - Supabase、Cloudflare R2 和 Paddle 的复杂高风险操作优先打开各自官方
@@ -52,7 +52,7 @@ scripts/musuw-admin stop
 
 ## 当前 TEST 能力状态
 
-- WeKnora scoped management API：available。平台密钥只从 macOS Keychain
+- Musuw scoped management API：available。平台密钥只从 macOS Keychain
   的 `com.musuw.local-admin.platform-key` / `musuw-admin-test` 项读取，
   不进入环境文件、页面 JavaScript、日志或仓库。
 - Paddle Sandbox：available。只从 ignored runtime 读取最小权限凭据，
@@ -63,9 +63,21 @@ scripts/musuw-admin stop
   `phtveqtlswzokwsztsvu`，不能使用别的组织或伪造空用户列表。
 - Cloudflare R2 operator：unavailable，因为本机运营服务没有独立 R2
   operator credential，也没有启用对象清单适配器。生产 `musuw-production` 桶已通过 Cloudflare 官方
-  Console 只读核对；中台不会把 WeKnora 对象引用冒充成官方对象清单。
+  Console 只读核对；中台不会把 Musuw 对象引用冒充成官方对象清单。
 - Langfuse query：unavailable，因为没有查询凭据，也没有启用查询适配器。
-  WeKnora request ID、处理 span、运行队列和审计仍可使用。
+  Musuw request ID、处理 span、运行队列和审计仍可使用。
+
+## 2026-08-22 真实浏览器验收
+
+- TEST 七页、搜索筛选、用户详情抽屉、危险动作确认、CSRF/404 边界和
+  WCAG A/AA 严重问题扫描通过。
+- PRODUCTION 七页均读取真实数据：用户、知识库/文档、Paddle 镜像与官方
+  查询、账号镜像、源文件/索引/配额口径、运行队列和系统审计均可用。
+- PRODUCTION Paddle Live API 可查询，当前官方订阅和交易均为 0；正式
+  inline checkout 仍被 Paddle 商户 onboarding 阻断，不会伪装成可支付。
+- Supabase Auth Admin、Cloudflare R2 operator 和 Langfuse query 仍按上文
+  明确显示 unavailable；这不影响产品本身已经生效的 Supabase 登录和 R2
+  文件存储链路。
 
 ## TEST / PRODUCTION 切换
 

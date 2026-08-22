@@ -4134,7 +4134,7 @@ export default {
     webhookUrlPlaceholder: 'https://your-server.example.com/musuw/embed-events',
     webhookUrlDesc: '可选。访客发消息与助手回复完成时，Musuw 会向该 HTTPS 地址 POST 事件（message_sent / message_received）。',
     webhookSecret: 'Webhook 签名密钥',
-    webhookSecretPlaceholder: '用于 HMAC-SHA256 签名（X-WeKnora-Signature）',
+    webhookSecretPlaceholder: '用于 HMAC-SHA256 签名（X-Musuw-Signature）',
     webhookSecretKeep: '留空表示不修改已保存的密钥',
     webhookSecretDesc: '可选。配置后请求体会带 sha256 签名头，便于你的服务端校验来源。',
     agentWebSearchDisabledHint: '当前智能体未启用联网搜索，访客端不会显示联网按钮。请先在智能体设置中开启联网搜索。',

@@ -77,7 +77,7 @@ function resetStoredSettings<T extends ReconcilableSettings>(
   reason: unknown,
 ): T {
   console.error(
-    "[settings] Failed to parse WeKnora_settings from localStorage, resetting to defaults:",
+    "[Musuw] Failed to parse stored settings, resetting to defaults:",
     reason,
   );
   safeRemoveItem(SETTINGS_STORAGE_KEY);

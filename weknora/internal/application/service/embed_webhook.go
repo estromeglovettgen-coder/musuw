@@ -91,11 +91,15 @@ func DispatchEmbedWebhook(ch *types.EmbedChannel, eventType, sessionID string, p
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "WeKnora-Embed-Webhook/1.0")
+		req.Header.Set("User-Agent", "Musuw-Embed-Webhook/1.0")
 		if secret != "" {
 			mac := hmac.New(sha256.New, []byte(secret))
 			_, _ = mac.Write(raw)
-			req.Header.Set("X-WeKnora-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
+			signature := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+			req.Header.Set("X-Musuw-Signature", signature)
+			// Existing receivers may still verify the pre-brand header. Sending
+			// the same signature under both names avoids breaking those consumers.
+			req.Header.Set("X-WeKnora-Signature", signature)
 		}
 		resp, err := newEmbedWebhookHTTPClient().Do(req)
 		if err != nil {

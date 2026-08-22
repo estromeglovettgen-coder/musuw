@@ -1,7 +1,7 @@
 <template>
   <div class="ops-page">
     <header class="ops-page-header">
-      <div><h1>知识库与文档</h1><p>查看所有空间的知识库、原始文件、解析状态和索引计量。这里只读展示，业务变更继续从用户产品或 WeKnora API 完成。</p></div>
+      <div><h1>知识库与文档</h1><p>查看所有空间的知识库、原始文件、解析状态和索引计量。这里只读展示，业务变更继续从用户产品或 Musuw API 完成。</p></div>
       <div class="ops-page-actions"><t-tag variant="light">{{ total }} {{ kind === 'documents' ? '份文档' : '个知识库' }}</t-tag></div>
     </header>
 

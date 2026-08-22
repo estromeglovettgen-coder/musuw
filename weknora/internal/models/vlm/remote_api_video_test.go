@@ -70,3 +70,37 @@ func TestRemoteAPIVLMPredictVideoUsesOpenRouterVideoURL(t *testing.T) {
 		t.Fatalf("video URL = %q", videoURL)
 	}
 }
+
+func TestRemoteAPIVLMPredictVideoRoutesQwenToAlibaba(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"# Video summary\nA native Qwen result."}}]}`))
+	}))
+	defer server.Close()
+
+	withVLMSSRFWhitelist(t, "127.0.0.1")
+	model, err := NewRemoteAPIVLM(&Config{
+		BaseURL:   server.URL + "/api/v1",
+		ModelName: OpenRouterQwenVideoModel,
+		APIKey:    "openrouter-test-key",
+		Provider:  "openrouter",
+	})
+	if err != nil {
+		t.Fatalf("NewRemoteAPIVLM: %v", err)
+	}
+
+	if _, err := model.PredictVideo(context.Background(), []byte("tiny-video"), "video/mp4", "Describe it"); err != nil {
+		t.Fatalf("PredictVideo: %v", err)
+	}
+	if requestBody["model"] != OpenRouterQwenVideoModel {
+		t.Fatalf("model = %#v", requestBody["model"])
+	}
+	providerOnly := requestBody["provider"].(map[string]any)["only"].([]any)
+	if len(providerOnly) != 1 || providerOnly[0] != "alibaba" {
+		t.Fatalf("provider only = %#v", providerOnly)
+	}
+}

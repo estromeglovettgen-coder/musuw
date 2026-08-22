@@ -32,7 +32,7 @@
             <span>平台密钥仅由本机服务读取</span>
           </div>
         </div>
-        <div class="ops-template-credit">TDesign Starter · Tencent</div>
+        <div class="ops-template-credit">Musuw · Operations</div>
       </div>
     </aside>
 

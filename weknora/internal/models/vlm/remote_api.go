@@ -28,9 +28,17 @@ const (
 	defaultTimeout = 180 * time.Second
 	defaultMaxToks = 5000
 	defaultTemp    = float32(0.1)
-	// OpenRouterGeminiVideoModel is the only model admitted by Musuw's video path.
+	// Keep video ingestion on exact OpenRouter models with provider endpoints
+	// that advertise native base64 video support. Qwen is the production
+	// default; Gemini remains admitted for the planned Japan-region recheck.
+	OpenRouterQwenVideoModel   = "qwen/qwen3.7-flash"
 	OpenRouterGeminiVideoModel = "google/gemini-2.5-flash"
 )
+
+var openRouterVideoProviders = map[string]string{
+	OpenRouterQwenVideoModel:   "alibaba",
+	OpenRouterGeminiVideoModel: "google-vertex",
+}
 
 // vlmHTTPTimeout returns the HTTP client timeout for VLM requests, read from
 // the VLM_HTTP_TIMEOUT_SECONDS env var when set (and positive), falling back to
@@ -183,14 +191,16 @@ func (v *RemoteAPIVLM) GetModelName() string { return v.modelName }
 func (v *RemoteAPIVLM) GetModelID() string   { return v.modelID }
 
 // PredictVideo sends a private video through OpenRouter's documented
-// video_url chat-completions contract. It is intentionally pinned to Gemini
-// 2.5 Flash so video ingestion cannot silently fall back to another model.
+// video_url chat-completions contract. Exact model-to-provider routing keeps
+// the native-video capability explicit and prevents an image-only endpoint
+// from being selected silently.
 func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mimeType, prompt string) (string, error) {
 	if v.provider != provider.ProviderOpenRouter {
 		return "", fmt.Errorf("video input requires OpenRouter")
 	}
-	if v.modelName != OpenRouterGeminiVideoModel {
-		return "", fmt.Errorf("video input requires model %s", OpenRouterGeminiVideoModel)
+	videoProvider, supported := openRouterVideoProviders[v.modelName]
+	if !supported {
+		return "", fmt.Errorf("video input requires an approved native-video model")
 	}
 	if len(videoBytes) == 0 {
 		return "", fmt.Errorf("video input is empty")
@@ -204,12 +214,10 @@ func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mime
 	dataURI := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(videoBytes)
 	payload := map[string]any{
 		"model": v.modelName,
-		// Google AI Studio rejects direct private video payloads in some
-		// operator regions. OpenRouter documents base64 video support through
-		// Google Vertex, so keep the model pinned while routing across Vertex
-		// endpoints instead of introducing a second video implementation.
+		// OpenRouter exposes a stable provider slug for each approved native
+		// video endpoint. Keep the transport and tenant metering unchanged.
 		"provider": map[string]any{
-			"only":            []string{"google-vertex"},
+			"only":            []string{videoProvider},
 			"allow_fallbacks": true,
 		},
 		"messages": []map[string]any{{

@@ -25,9 +25,14 @@ server {
         proxy_set_header X-Forwarded-Proto https;
     }
 
-    location = /weknora-widget.js {
+    location = /musuw-widget.js {
         root /usr/share/nginx/html;
         add_header Cache-Control "public, max-age=3600" always;
+    }
+
+    # Backward-compatible path for already-installed third-party snippets.
+    location = /weknora-widget.js {
+        return 308 /musuw-widget.js;
     }
 
     location = /embed.html {

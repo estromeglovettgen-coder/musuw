@@ -18,10 +18,10 @@
         <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">租户总配额</span><span class="ops-metric__icon"><CloudIcon /></span></div><div class="ops-metric__value">{{ formatBytes(data.usage.quota_bytes) }}</div><div class="ops-metric__hint">当前套餐配额合计</div></article>
       </section>
 
-      <div v-if="!config?.providers.r2.available" class="ops-callout is-warning" style="margin-top:14px"><InfoCircleIcon class="ops-callout__icon"/><div><strong>Cloudflare R2 官方对象查询 unavailable</strong><span>{{ config?.providers.r2.reason }}。下方数据是 WeKnora 的存储绑定与对象引用，不会被包装成 R2 LIST/HEAD 成功。</span></div></div>
+      <div v-if="!config?.providers.r2.available" class="ops-callout is-warning" style="margin-top:14px"><InfoCircleIcon class="ops-callout__icon"/><div><strong>Cloudflare R2 官方对象查询 unavailable</strong><span>{{ config?.providers.r2.reason }}。下方数据是 Musuw 的存储绑定与对象引用，不会被包装成 R2 LIST/HEAD 成功。</span></div></div>
 
       <section class="ops-panel" style="margin-top:14px">
-        <header class="ops-panel__header"><div class="ops-panel__title"><h2>WeKnora 存储后端</h2><p>配置字段和凭据不返回浏览器</p></div></header>
+        <header class="ops-panel__header"><div class="ops-panel__title"><h2>Musuw 存储后端</h2><p>配置字段和凭据不返回浏览器</p></div></header>
         <div class="ops-panel__body">
           <div v-if="data.backends.length" class="storage-backends">
             <div v-for="backend in data.backends" :key="backend.id" class="storage-backend">
@@ -30,7 +30,7 @@
               <div class="storage-backend__meta"><span class="ops-status" :class="`is-${statusTone(backend.status)}`">{{ backend.status }}</span><small>{{ backend.knowledge_base_count }} KB</small></div>
             </div>
           </div>
-          <div v-else class="ops-empty"><div><span class="ops-empty__icon"><ServerIcon /></span><h3>没有存储后端记录</h3><p>此状态不代表 R2 桶为空；它表示当前 WeKnora 环境没有注册活动后端。</p></div></div>
+          <div v-else class="ops-empty"><div><span class="ops-empty__icon"><ServerIcon /></span><h3>没有存储后端记录</h3><p>此状态不代表 R2 桶为空；它表示当前 Musuw 环境没有注册活动后端。</p></div></div>
         </div>
       </section>
 
@@ -49,7 +49,7 @@
           <template #object="{ row }"><span class="object-ref ops-mono" :title="row.object_reference">{{ row.object_reference || 'unavailable' }}</span></template>
           <template #updated="{ row }"><span class="ops-muted">{{ formatDate(row.updated_at) }}</span></template>
         </t-table>
-        <div v-else class="ops-empty"><div><span class="ops-empty__icon"><FileSearchIcon /></span><h3>没有匹配对象引用</h3><p>这是 WeKnora 当前记录的真实空状态。R2 官方对象清单只有在 operator credential 可用时才能另行核对。</p></div></div>
+        <div v-else class="ops-empty"><div><span class="ops-empty__icon"><FileSearchIcon /></span><h3>没有匹配对象引用</h3><p>这是 Musuw 当前记录的真实空状态。R2 官方对象清单只有在 operator credential 可用时才能另行核对。</p></div></div>
         <footer class="ops-table-footer"><span class="ops-table-footer__count">共 {{ data.total }} 条 · 第 {{ page }} 页</span><t-pagination v-model="page" :total="data.total" :page-size="pageSize" :show-page-size="false" size="small" @current-change="load" /></footer>
       </div>
     </template>

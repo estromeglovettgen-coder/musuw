@@ -69,7 +69,7 @@ func (s *knowledgeService) convertVideo(
 
 	markdown, err := vlm.PredictVideo(ctx, model, videoBytes, mimeType, buildVideoUnderstandingPrompt(ctx, eff.VLMConfig))
 	if err != nil {
-		logger.Errorf(ctx, "[Video] Gemini understanding failed for %s: %v", knowledge.ID, err)
+		logger.Errorf(ctx, "[Video] native understanding failed for %s: %v", knowledge.ID, err)
 		s.failStage(ctx, knowledge.ID, types.StageDocReader,
 			werrors.ErrCodeDocReaderParseFailed, "video understanding failed: "+err.Error(), err)
 		return s.failKnowledge(ctx, knowledge, isLastRetry, "video understanding failed: %v", err)

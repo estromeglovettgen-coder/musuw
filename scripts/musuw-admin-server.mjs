@@ -19,6 +19,7 @@ const PAGE_SIZE_MAX = 100
 const API_TIMEOUT_MS = 12_000
 const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000
 const PLATFORM_KEY_SERVICE = 'com.musuw.local-admin.platform-key'
+const PUBLIC_BRAND_ASSETS = new Set(['/favicon.ico', '/musuw-logo.png'])
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -82,6 +83,10 @@ export function isSafeOperationsPath(method, pathname) {
   if (method === 'POST' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/tasks\/[0-9a-z:_-]+\/actions\/(retry|run-now|run_now)$/.test(pathname)) return true
   if (method === 'DELETE' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/archived$/.test(pathname)) return true
   return false
+}
+
+export function isPublicBrandAsset(method, pathname) {
+  return ['GET', 'HEAD'].includes(method) && PUBLIC_BRAND_ASSETS.has(pathname)
 }
 
 function loadRuntime(target) {
@@ -577,9 +582,13 @@ async function start() {
   const platformKey = readPlatformKey(runtime.platformKeyAccount)
   const pool = new Pool({
     ...runtime.database,
-    max: 5,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
+    // Two durable connections keep the single-operator console responsive when
+    // a page needs a count and a row query over the higher-latency SSH tunnel,
+    // without creating the five simultaneous handshakes used by the default.
+    max: 2,
+    // Keep both tunnel-backed connections alive for the operator session.
+    idleTimeoutMillis: 0,
+    connectionTimeoutMillis: 60_000,
     options: '-c default_transaction_read_only=on -c statement_timeout=12000',
   })
   const readOnly = await pool.query('SHOW transaction_read_only')
@@ -617,7 +626,7 @@ async function start() {
   }
 
   async function proxyOperationsRequest(request, response, url, session) {
-    if (!platformKey) return writeJSON(response, 503, { error: 'WeKnora operations credential unavailable' })
+    if (!platformKey) return writeJSON(response, 503, { error: 'Musuw operations credential unavailable' })
     if (!isSafeOperationsPath(request.method, url.pathname)) {
       return writeJSON(response, 404, { error: 'operation is outside the console allowlist' })
     }
@@ -675,7 +684,9 @@ async function start() {
         return writeJSON(response, 200, { status: 'ok', environment: runtime.label })
       }
       const session = ensureSession(request, response, url.pathname)
-      if (!session) return writeJSON(response, 401, { error: 'open the console directly from this Mac to start an operator session' })
+      if (!session && !isPublicBrandAsset(request.method || 'GET', url.pathname)) {
+        return writeJSON(response, 401, { error: 'open the console directly from this Mac to start an operator session' })
+      }
 
       if (url.pathname.startsWith('/api/v1/system/')) {
         return await proxyOperationsRequest(request, response, url, session)
@@ -689,7 +700,7 @@ async function start() {
               environment: runtime.label,
               target: runtime.target,
               providers: {
-                weknora: { available: Boolean(platformKey), authority: 'WeKnora scoped management API' },
+                weknora: { available: Boolean(platformKey), authority: 'Musuw scoped management API' },
                 paddle: { available: Boolean(runtime.paddleApiKey), authority: `Paddle ${runtime.paddleEnvironment}` },
                 supabase: { ...runtime.supabaseAdmin, authority: 'Supabase Auth Admin' },
                 r2: { ...runtime.r2Admin, authority: 'Cloudflare R2 S3 API' },
@@ -719,7 +730,7 @@ async function start() {
               account_summary: await queries.identity(),
               provider: {
                 available: runtime.supabaseAdmin.available,
-                reason: `${runtime.supabaseAdmin.reason}; account data below is the WeKnora mirror, not a fabricated Supabase response.`,
+                reason: `${runtime.supabaseAdmin.reason}; account data below is the Musuw mirror, not a fabricated Supabase response.`,
                 projects: [
                   { environment: 'TEST', name: 'Musuw Staging', ref: 'achfnnicetupvtoqiwqd' },
                   { environment: 'PRODUCTION', name: 'Musuw Production', ref: 'phtveqtlswzokwsztsvu' },
@@ -767,7 +778,7 @@ async function start() {
     throw error
   })
   console.log(`Musuw operations console ${runtime.label} listening on http://${host}:${port}`)
-  console.log(`WeKnora management API: ${platformKey ? 'available' : 'unavailable'}`)
+  console.log(`Musuw management API: ${platformKey ? 'available' : 'unavailable'}`)
 
   const shutdown = async () => {
     server.close()
