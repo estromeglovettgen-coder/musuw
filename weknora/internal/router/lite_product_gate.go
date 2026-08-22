@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -249,6 +250,73 @@ func liteRuntimeAgentPathAllowed(path string) bool {
 	return false
 }
 
+// liteOperationsAdminRouteAllowed exposes only the narrow operations-console
+// seam in Lite. These routes remain behind the existing SystemAdmin guard and
+// capability-scoped platform API-key middleware; this function only prevents
+// the product-surface gate from turning an authorized request into a 404.
+// Platform key management, settings and every other upstream admin surface
+// remain hidden.
+func liteOperationsAdminRouteAllowed(method, path string) bool {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	path = strings.TrimSpace(path)
+
+	if method == http.MethodGet && path == "/api/v1/system/admin/audit-log" {
+		return true
+	}
+
+	const tenantPrefix = "/api/v1/system/admin/tenants/"
+	if strings.HasPrefix(path, tenantPrefix) {
+		parts := strings.Split(strings.TrimPrefix(path, tenantPrefix), "/")
+		if len(parts) == 0 {
+			return false
+		}
+		tenantID, err := strconv.ParseUint(parts[0], 10, 64)
+		if err != nil || tenantID == 0 {
+			return false
+		}
+		switch {
+		case method == http.MethodPatch && len(parts) == 1:
+			return true
+		case method == http.MethodGet && len(parts) == 2 && parts[1] == "entitlement":
+			return true
+		case method == http.MethodPut && len(parts) == 2 && parts[1] == "openrouter-credits":
+			return true
+		default:
+			return false
+		}
+	}
+
+	const userPrefix = "/api/v1/system/admin/users/"
+	if method == http.MethodGet && strings.HasPrefix(path, userPrefix) {
+		parts := strings.Split(strings.TrimPrefix(path, userPrefix), "/")
+		return len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "investigation"
+	}
+
+	const runtimeQueues = "/api/v1/system/admin/runtime/queues"
+	if path == runtimeQueues {
+		return method == http.MethodGet
+	}
+	if strings.HasPrefix(path, runtimeQueues+"/") {
+		parts := strings.Split(strings.TrimPrefix(path, runtimeQueues+"/"), "/")
+		if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" {
+			return false
+		}
+		switch {
+		case method == http.MethodGet && len(parts) == 2 && parts[1] == "tasks":
+			return true
+		case method == http.MethodDelete && len(parts) == 2 && parts[1] == "archived":
+			return true
+		case method == http.MethodPost && len(parts) == 5 && parts[1] == "tasks" &&
+			strings.TrimSpace(parts[2]) != "" && parts[3] == "actions" && strings.TrimSpace(parts[4]) != "":
+			return true
+		default:
+			return false
+		}
+	}
+
+	return false
+}
+
 // liteProductRouteBlocked keeps shared runtime dependencies narrow rather than
 // blindly disabling every route family. Chat still needs read-only model/agent
 // metadata, while Knowledge Base keeps its own sharing, parsing, Trace, Wiki and
@@ -275,6 +343,10 @@ func liteProductRouteBlocked(method, path string) bool {
 		if path == blockedAuthPath {
 			return true
 		}
+	}
+
+	if liteOperationsAdminRouteAllowed(method, path) {
+		return false
 	}
 
 	// Entire management-only route families.
