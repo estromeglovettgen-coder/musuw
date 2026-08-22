@@ -13,8 +13,15 @@ ARG BUILD_TIME_ARG=production-source-build
 ARG GO_VERSION_ARG=go1.26
 ARG PRODUCT_EDITION_ARG=lite
 
-RUN if [ -n "$APT_MIRROR_ARG" ]; then \
+RUN printf '%s\n' \
+        'Acquire::Retries "5";' \
+        'Acquire::http::Timeout "30";' \
+        'Acquire::https::Timeout "30";' \
+        > /etc/apt/apt.conf.d/80-musuw-network && \
+    if [ -n "$APT_MIRROR_ARG" ]; then \
         sed -i "s@deb.debian.org@${APT_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
+    else \
+        sed -i 's@http://deb.debian.org@https://deb.debian.org@g' /etc/apt/sources.list.d/debian.sources; \
     fi && \
     apt-get update && \
     apt-get install -y --no-install-recommends git build-essential libsqlite3-dev && \
@@ -47,11 +54,18 @@ ARG COMMIT_ID_ARG=local
 ARG APT_MIRROR_ARG
 
 RUN useradd -m -s /bin/bash appuser
-RUN apt-get update && \
+RUN printf '%s\n' \
+        'Acquire::Retries "5";' \
+        'Acquire::http::Timeout "30";' \
+        'Acquire::https::Timeout "30";' \
+        > /etc/apt/apt.conf.d/80-musuw-network && \
+    apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 RUN if [ -n "$APT_MIRROR_ARG" ]; then \
         sed -i "s@deb.debian.org@${APT_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
+    else \
+        sed -i 's@http://deb.debian.org@https://deb.debian.org@g' /etc/apt/sources.list.d/debian.sources; \
     fi && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
