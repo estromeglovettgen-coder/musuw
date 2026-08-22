@@ -15,7 +15,9 @@ fail() {
 
 manifest_path() {
     case "$1" in
-        weknora/*|auth/*|integration/weknora-production/*|scripts/weknora-production/*|deploy/production.public.env|deploy/auth-public.env) ;;
+        weknora/docker-compose.yml|weknora/config/config.yaml|weknora/docker/searxng/settings.yml|\
+        integration/weknora-production/*|scripts/weknora-production/*|\
+        deploy/production.public.env|deploy/auth-public.env) ;;
         *) fail 'source manifest contains a path outside the production allowlist' ;;
     esac
 }
@@ -112,8 +114,14 @@ generate_manifest() {
     : > "$manifest_file"
     chmod 600 "$manifest_file"
 
-    append_tracked_paths weknora "$path_list"
-    append_tracked_paths auth "$path_list"
+    # Application and browser code is already bound to the approved revision
+    # inside the two immutable GHCR images. The server release tree therefore
+    # carries only the Compose/runtime inputs that the native release helper
+    # reads. Keeping that boundary explicit avoids copying a second, unused
+    # copy of the full application over the restricted SSH seam.
+    append_tracked_paths weknora/docker-compose.yml "$path_list"
+    append_tracked_paths weknora/config/config.yaml "$path_list"
+    append_tracked_paths weknora/docker/searxng/settings.yml "$path_list"
     append_tracked_paths integration/weknora-production "$path_list"
     append_tracked_paths scripts/weknora-production "$path_list"
 

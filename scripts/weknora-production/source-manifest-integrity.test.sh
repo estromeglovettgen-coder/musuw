@@ -12,6 +12,8 @@ fixture="$tmp_dir/repo"
 runtime="$tmp_dir/runtime"
 output="$tmp_dir/manifest"
 mkdir -p \
+    "$fixture/weknora/config" \
+    "$fixture/weknora/docker/searxng" \
     "$fixture/weknora/frontend" \
     "$fixture/auth" \
     "$fixture/integration/weknora-production" \
@@ -20,6 +22,9 @@ mkdir -p \
 
 printf '%s\n' 'tracked source' > "$fixture/weknora/app.go"
 printf '%s\n' 'tracked auth' > "$fixture/auth/app.ts"
+printf '%s\n' 'services: {}' > "$fixture/weknora/docker-compose.yml"
+printf '%s\n' 'runtime config' > "$fixture/weknora/config/config.yaml"
+printf '%s\n' 'runtime search config' > "$fixture/weknora/docker/searxng/settings.yml"
 printf '%s\n' 'services: {}' > "$fixture/integration/weknora-production/compose.yaml"
 printf '%s\n' 'auth/*.dump' 'weknora/frontend/.env.local' > "$fixture/.gitignore"
 cp "$script_dir/lib.sh" "$fixture/scripts/weknora-production/lib.sh"
@@ -98,7 +103,13 @@ expect_reject 'source manifest accepted a 64-hex digest that the production runt
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
     "$fixture/scripts/weknora-production/source-manifest.sh" generate \
     "$fixture" "$runtime" fixture-release local update "$output" >/dev/null
-grep -Fq 'weknora/app.go' "$output/source-manifest.sha256"
+grep -Fq 'weknora/docker-compose.yml' "$output/source-manifest.sha256"
+grep -Fq 'weknora/config/config.yaml' "$output/source-manifest.sha256"
+grep -Fq 'weknora/docker/searxng/settings.yml' "$output/source-manifest.sha256"
+if grep -Eq 'weknora/app\.go|auth/app\.ts' "$output/source-manifest.sha256"; then
+    printf '%s\n' 'source manifest included application source that is already shipped in immutable images' >&2
+    exit 1
+fi
 if grep -Eq '(^|/)(dist|node_modules)/' "$output/source-manifest.sha256"; then
     printf '%s\n' 'source manifest included generated browser or dependency output' >&2
     exit 1
