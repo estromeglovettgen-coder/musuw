@@ -1,8 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteLocationGeneric } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
 import { getSystemInfo } from '@/api/system'
+import { reconcileLiteChatSettings } from '@/utils/liteChatSettings'
 import {
   AUTHENTICATED_HOME_PATH,
   handoffToExternalAuth,
@@ -48,9 +50,21 @@ let editionProbeDone = false
 let editionProbePromise: Promise<void> | null = null
 let resolvedLiteMode: boolean | null = null
 
+function applyResolvedProductEdition(
+  authStore: ReturnType<typeof useAuthStore>,
+  isLite: boolean,
+) {
+  authStore.setLiteMode(isLite)
+  if (!isLite) return
+
+  authStore.setSelectedTenant(null)
+  const settingsStore = useSettingsStore()
+  settingsStore.saveSettings(reconcileLiteChatSettings(settingsStore.getSettings()))
+}
+
 async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) {
   if (editionProbeDone) {
-    if (resolvedLiteMode !== null) authStore.setLiteMode(resolvedLiteMode)
+    if (resolvedLiteMode !== null) applyResolvedProductEdition(authStore, resolvedLiteMode)
     return
   }
   if (!editionProbePromise) {
@@ -61,8 +75,7 @@ async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) 
         if (edition === 'lite' || edition === 'standard') {
           const isLite = edition === 'lite'
           resolvedLiteMode = isLite
-          authStore.setLiteMode(isLite)
-          if (isLite) authStore.setSelectedTenant(null)
+          applyResolvedProductEdition(authStore, isLite)
         }
       } catch {
         // Backend API authorization remains authoritative. A transient edition

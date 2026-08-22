@@ -1,8 +1,8 @@
 # Verification Report: local-operations-admin
 
-Verified locally on 2026-08-21 (America/Phoenix). No remote CI, push,
-deployment, production write, payment, refund, account deletion, or R2 mutation
-was performed.
+Verified locally on 2026-08-22 (America/Phoenix). The loopback console was not
+published. Browser writes were cancelled or intercepted; no production data
+mutation, payment, refund, account deletion, or R2 mutation was performed.
 
 ## Result
 
@@ -28,11 +28,13 @@ was performed.
 ## Fresh automated evidence
 
 - `npm run admin:build` passed Vue type-check and production build.
-- `npm run admin:test` passed 4/4 server unit tests, including the invariant
-  that credential presence alone cannot mark an unimplemented official
-  provider query as available.
+- `npm run admin:test` passed 6/6 server unit tests, including the invariants
+  that credential presence alone cannot mark an unimplemented provider query
+  as available, shell assets can recover after a process restart without
+  opening APIs, and Paddle capabilities fail independently.
 - `npm run admin:e2e` passed 3/3 Playwright workflows: real data and guarded
-  actions, security/redaction boundaries, and WCAG A/AA serious/critical scan.
+  actions, security/redaction boundaries, and a WCAG A/AA serious/critical scan
+  of all seven pages.
 - The E2E workflow exercised all seven pages, a real user detail/investigation,
   the disabled confirmation state, CSRF-bearing `run_now`, runtime audit,
   Paddle official reads, and explicit Supabase/R2/Langfuse unavailable states.
@@ -41,11 +43,11 @@ was performed.
   `X-Frame-Options` was `DENY`.
 - Recursive investigation-response key inspection found none of `prompt`,
   `content`, `attachments`, `keys`, `payload`, `api_key`, or `secret`.
-- Consumer frontend tests passed 520/520, auth tests 45/45, storefront tests
-  38/38, and the combined frontend/auth/storefront production build passed.
+- Consumer frontend tests passed 526/526, auth tests 45/45, storefront tests
+  40/40, and the combined frontend/auth/storefront production build passed.
 - Focused affected Go service, handler, router, type, and VLM suites passed;
   `go test ./... -run '^$'` compiled every Go package.
-- OpenSpec strict validation passed all 10 changes.
+- OpenSpec strict validation passed all 11 changes.
 
 The optional complete upstream `go test ./...` run also proved all affected
 packages green, but the aggregate command remains non-green in untouched
@@ -62,8 +64,11 @@ tests and whole-repository compilation are the alternative evidence.
 - The completed `musuw-video-audit.mp4` document was visible with its real
   source/index measurements, proving the OpenRouter Gemini 2.5 Flash video
   result reached the existing indexing consumer.
-- Paddle official subscriptions/transactions rendered from Sandbox. Identity
-  showed the exact staging/production Supabase refs. Storage separated source
+- Paddle official subscriptions and transactions are reported independently.
+  In the current PRODUCTION credential, subscriptions returned a real empty
+  page while transactions returned HTTP 403; the page retained the subscription
+  result and marked only transactions unavailable. Identity showed the exact
+  staging/production Supabase refs. Storage separated source
   bytes, index bytes, `tenant.storage_used`, quota, backend, object reference,
   and the missing official R2-operator assertion.
 - A paid consumer session showed Max entitlement, included video capability,

@@ -11,11 +11,11 @@
       <section class="ops-metrics">
         <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">空间镜像</span><span class="ops-metric__icon"><LayersIcon /></span></div><div class="ops-metric__value">{{ data.mirror.length }}</div><div class="ops-metric__hint">所有套餐空间，含 Free</div></article>
         <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">付费订阅绑定</span><span class="ops-metric__icon"><MoneyIcon /></span></div><div class="ops-metric__value">{{ boundSubscriptions }}</div><div class="ops-metric__hint">有 Paddle subscription_id</div></article>
-        <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">Paddle 订阅</span><span class="ops-metric__icon"><WalletIcon /></span></div><div class="ops-metric__value">{{ data.provider.available ? data.provider.subscriptions.length : '—' }}</div><div class="ops-metric__hint">官方 API 当前页</div></article>
-        <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">Paddle 交易</span><span class="ops-metric__icon"><BillIcon /></span></div><div class="ops-metric__value">{{ data.provider.available ? data.provider.transactions.length : '—' }}</div><div class="ops-metric__hint">官方 API 当前页</div></article>
+        <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">Paddle 订阅</span><span class="ops-metric__icon"><WalletIcon /></span></div><div class="ops-metric__value">{{ data.provider.subscriptions_available ? data.provider.subscriptions.length : '—' }}</div><div class="ops-metric__hint">{{ data.provider.subscriptions_available ? '官方 API 当前页' : '官方读取权限不可用' }}</div></article>
+        <article class="ops-metric"><div class="ops-metric__top"><span class="ops-metric__label">Paddle 交易</span><span class="ops-metric__icon"><BillIcon /></span></div><div class="ops-metric__value">{{ data.provider.transactions_available ? data.provider.transactions.length : '—' }}</div><div class="ops-metric__hint">{{ data.provider.transactions_available ? '官方 API 当前页' : '官方读取权限不可用' }}</div></article>
       </section>
 
-      <div v-if="!data.provider.available" class="ops-callout is-warning" style="margin-top:14px"><InfoCircleIcon class="ops-callout__icon"/><div><strong>Paddle 官方 API 不可用</strong><span>{{ data.provider.reason }}。Musuw webhook 镜像仍单独显示，不能把不可用当作 0 条交易。</span></div></div>
+      <div v-if="!allProviderCapabilitiesAvailable" class="ops-callout is-warning" style="margin-top:14px"><InfoCircleIcon class="ops-callout__icon"/><div><strong>{{ data.provider.available ? 'Paddle 官方 API 权限有限' : 'Paddle 官方 API 不可用' }}</strong><span>{{ data.provider.reason }}。已获授权的能力继续展示真实数据；未授权能力不会被伪装成 0 条记录。</span></div></div>
 
       <section class="ops-panel" style="margin-top:14px">
         <header class="ops-panel__header"><div class="ops-panel__title"><h2>Musuw 订阅镜像</h2><p>只由 Paddle 签名事件更新；点击查看完整标识</p></div></header>
@@ -39,7 +39,7 @@
             <template #id="{ row }"><span class="ops-mono">{{ row.id }}</span></template><template #status="{ row }"><span class="ops-status" :class="`is-${statusTone(row.status)}`">{{ row.status }}</span></template>
             <template #customer="{ row }"><span class="ops-mono">{{ row.customer_id || '—' }}</span></template><template #created="{ row }"><span class="ops-muted">{{ formatDate(row.created_at) }}</span></template>
           </t-table>
-          <div v-else class="ops-empty"><div><span class="ops-empty__icon"><WalletIcon /></span><h3>{{ data.provider.available ? `没有${providerTab === 'subscriptions' ? '订阅' : '交易'}记录` : 'Paddle 官方 API unavailable' }}</h3><p>{{ data.provider.available ? '当前 Paddle 环境返回 0 条真实记录。' : data.provider.reason }}</p></div></div>
+          <div v-else class="ops-empty"><div><span class="ops-empty__icon"><WalletIcon /></span><h3>{{ activeProviderCapability.available ? `没有${providerTab === 'subscriptions' ? '订阅' : '交易'}记录` : `Paddle ${providerTab === 'subscriptions' ? '订阅' : '交易'} API unavailable` }}</h3><p>{{ activeProviderCapability.available ? '当前 Paddle 环境返回 0 条真实记录。' : activeProviderCapability.reason }}</p></div></div>
         </div>
       </section>
     </template>
@@ -61,6 +61,10 @@ const data = ref<BillingData | null>(null), loading = ref(false), error = ref(''
 const drawerVisible = ref(false), drawerData = ref<unknown>(null)
 const boundSubscriptions = computed(() => data.value?.mirror.filter((row) => row.paddle_subscription_id).length || 0)
 const providerRows = computed(() => data.value?.provider[providerTab.value] || [])
+const allProviderCapabilitiesAvailable = computed(() => Boolean(data.value?.provider.subscriptions_available && data.value?.provider.transactions_available))
+const activeProviderCapability = computed(() => providerTab.value === 'subscriptions'
+  ? { available: Boolean(data.value?.provider.subscriptions_available), reason: data.value?.provider.subscriptions_reason || '' }
+  : { available: Boolean(data.value?.provider.transactions_available), reason: data.value?.provider.transactions_reason || '' })
 const mirrorColumns = [
   { colKey: 'tenant', title: '空间', minWidth: 190 }, { colKey: 'plan', title: '套餐', width: 90 }, { colKey: 'status', title: '状态', width: 110 },
   { colKey: 'subscription', title: 'Subscription / Customer', minWidth: 220 }, { colKey: 'period', title: '账期 / 到期', width: 170 }, { colKey: 'event', title: '最后签名事件', minWidth: 190 },

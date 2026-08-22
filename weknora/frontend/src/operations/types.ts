@@ -141,7 +141,11 @@ export interface BillingData {
   provider: {
     available: boolean
     reason: string
+    subscriptions_available: boolean
+    subscriptions_reason: string
     subscriptions: Array<Record<string, unknown>>
+    transactions_available: boolean
+    transactions_reason: string
     transactions: Array<Record<string, unknown>>
   }
 }

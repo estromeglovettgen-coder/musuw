@@ -47,6 +47,11 @@ server {
         add_header Cache-Control "no-cache, must-revalidate" always;
     }
 
+    # The operations console is served only by the loopback admin gateway.
+    location = /operations.html {
+        return 404;
+    }
+
     location ^~ /assets/ {
         root /usr/share/nginx/html;
         add_header Cache-Control "public, max-age=31536000, immutable" always;

@@ -12,7 +12,12 @@
           <t-switch
             v-model="autoRefresh"
             size="small"
+            role="switch"
+            :aria-checked="autoRefresh"
             :aria-label="t('system.globalSettings.runtime.autoRefresh')"
+            tabindex="0"
+            @keydown.space.prevent="autoRefresh = !autoRefresh"
+            @keydown.enter.prevent="autoRefresh = !autoRefresh"
           />
         </label>
         <button

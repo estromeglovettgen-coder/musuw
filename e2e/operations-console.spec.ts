@@ -61,8 +61,20 @@ test('operator workflow uses real data and guarded actions', async ({ page }) =>
   await page.getByRole('button', { name: '账单', exact: true }).click()
   await expect(page.getByText('Paddle 订阅')).toBeVisible()
   await expect(page.getByText('Paddle 交易')).toBeVisible()
-  await expect(page.locator('.ops-metric').filter({ hasText: 'Paddle 订阅' }).locator('.ops-metric__value')).toHaveText(/^[1-9]\d*$/)
-  await expect(page.locator('.ops-metric').filter({ hasText: 'Paddle 交易' }).locator('.ops-metric__value')).toHaveText(/^[1-9]\d*$/)
+  const billingResponse = await page.request.get('/admin-api/billing')
+  expect(billingResponse.status()).toBe(200)
+  const billing = (await billingResponse.json()).data
+  await expect(page.locator('.ops-metric').filter({ hasText: 'Paddle 订阅' }).locator('.ops-metric__value'))
+    .toHaveText(billing.provider.subscriptions_available ? String(billing.provider.subscriptions.length) : '—')
+  await expect(page.locator('.ops-metric').filter({ hasText: 'Paddle 交易' }).locator('.ops-metric__value'))
+    .toHaveText(billing.provider.transactions_available ? String(billing.provider.transactions.length) : '—')
+  const paddleCallout = page.locator('.ops-callout').filter({ hasText: 'Paddle 官方 API' })
+  if (!billing.provider.subscriptions_available) {
+    await expect(paddleCallout).toContainText(billing.provider.subscriptions_reason)
+  }
+  if (!billing.provider.transactions_available) {
+    await expect(paddleCallout).toContainText(billing.provider.transactions_reason)
+  }
   await expect(page.getByText('Paddle 官方数据')).toBeVisible()
   await expect(page.getByText('服务端最小权限凭据读取，浏览器不接触密钥')).toBeVisible()
 
@@ -81,6 +93,12 @@ test('operator workflow uses real data and guarded actions', async ({ page }) =>
 
   await page.getByRole('button', { name: '日志与追踪', exact: true }).click()
   await expect(page.getByText('Langfuse unavailable')).toBeVisible()
+  const autoRefresh = page.getByRole('switch', { name: '自动刷新（每 5 秒）' })
+  await expect(autoRefresh).toHaveAttribute('aria-checked', 'true')
+  await autoRefresh.press('Space')
+  await expect(autoRefresh).toHaveAttribute('aria-checked', 'false')
+  await autoRefresh.press('Space')
+  await expect(autoRefresh).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByRole('status')).toContainText(/\d+ 个任务待处理/)
   await page.getByRole('button', { name: /查看.+中 \d+ 个最终失败任务/ }).first().click()
   await page.getByRole('button', { name: '立即执行', exact: true }).first().click()
@@ -106,6 +124,8 @@ test('security boundary and redaction remain enforced', async ({ page, request }
 
   const deniedSettings = await page.request.get('/api/v1/system/settings')
   expect(deniedSettings.status()).toBe(404)
+  const deniedSystemInfo = await page.request.get('/api/v1/system/info')
+  expect(deniedSystemInfo.status()).toBe(404)
   const deniedApiKeys = await page.request.get('/api/v1/system/admin/api-keys')
   expect(deniedApiKeys.status()).toBe(404)
   const deniedMutation = await page.request.patch('/api/v1/system/admin/tenants/10005', { data: {} })
@@ -123,10 +143,22 @@ test('security boundary and redaction remain enforced', async ({ page, request }
   }
 })
 
-test('overview has no serious accessibility violations', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: '概览', exact: true })).toBeVisible()
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
-  const blocking = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact || ''))
-  expect(blocking).toEqual([])
+test('all operations pages have no serious accessibility violations', async ({ page }) => {
+  const routes = [
+    ['overview', '概览'],
+    ['users', '用户'],
+    ['knowledge', '知识库与文档'],
+    ['billing', '账单'],
+    ['identity', '身份'],
+    ['storage', '存储'],
+    ['logs', '日志与追踪'],
+  ] as const
+
+  for (const [route, heading] of routes) {
+    await page.goto(`/#/${route}`)
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+    const blocking = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact || ''))
+    expect(blocking, `${heading} has blocking accessibility violations`).toEqual([])
+  }
 })

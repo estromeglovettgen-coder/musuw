@@ -3,6 +3,8 @@ import { nextTick } from "vue";
 import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 import { getApiBaseUrl } from "@/utils/api-base";
 import { isAgentStreamAgentId } from "@/utils/agent-mode";
+import { reconcileLiteChatSettings } from "@/utils/liteChatSettings";
+import { useAuthStore } from "@/stores/auth";
 import { loadAndReconcileSettings } from "@/stores/settingsStorage";
 
 // 定义设置接口
@@ -454,7 +456,7 @@ export const useSettingsStore = defineStore("settings", {
     selectAgent(agentId: string, sourceTenantId?: string | null) {
       this.settings.selectedAgentId = agentId;
       this.settings.selectedAgentSourceTenantId = (sourceTenantId != null && sourceTenantId !== "") ? sourceTenantId : null;
-      this.settings.webSearchEnabled = true;
+      this.settings.webSearchEnabled = !useAuthStore().isLiteMode;
       // 根据智能体类型自动切换 Agent 模式
       if (agentId === BUILTIN_QUICK_ANSWER_ID) {
         this.settings.isAgentEnabled = false;
@@ -570,6 +572,9 @@ export const useSettingsStore = defineStore("settings", {
         }
         if (typeof state.web_search_enabled === "boolean") {
           this.settings.webSearchEnabled = state.web_search_enabled;
+        }
+        if (useAuthStore().isLiteMode) {
+          this.settings = reconcileLiteChatSettings(this.settings);
         }
       } finally {
         // 复位必须延后到下一次 flush 之后：监听 selectedAgentId 的 watcher 默认

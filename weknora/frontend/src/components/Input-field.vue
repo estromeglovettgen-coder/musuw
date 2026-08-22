@@ -139,7 +139,7 @@ export default defineComponent({
             </button>
           </t-tooltip>
 
-          <t-tooltip v-if="showWebSearchButton" placement="top" theme="light">
+          <t-tooltip v-if="!authStore.isLiteMode && showWebSearchButton" placement="top" theme="light">
             <template #content>{{ isWebSearchEnabled ? $t('input.messages.webSearchEnabled') : $t('input.messages.webSearchDisabled') }}</template>
             <button type="button" class="visual-chat-composer__tool" :class="{ 'is-active': isWebSearchEnabled }" @click.stop="toggleWebSearch">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 12h17M12 3c2.3 2.5 3.5 5.5 3.5 9S14.3 18.5 12 21M12 3C9.7 5.5 8.5 8.5 8.5 12s1.2 6.5 3.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>

@@ -28,8 +28,9 @@ scripts/musuw-admin stop
 - **知识库与文档**：知识库、文档、解析状态、错误、原文件大小、索引
   计量、存储后端和物理引用。
 - **账单**：由 Paddle 签名事件形成的 Musuw 镜像，以及 Paddle 官方 API
-  返回的 Sandbox/Live 订阅和交易。Paddle 不可用时明确显示 unavailable，
-  不把它伪装成 0 条记录。
+  返回的 Sandbox/Live 订阅和交易。订阅与交易按能力独立读取；某一项缺少
+  权限时只把该项标为 unavailable，已授权数据继续展示，也不会把 403
+  伪装成 0 条记录或整页失败。
 - **身份**：Musuw 账号镜像和正确的 Supabase 项目标识。只有服务端查询
   适配器实际调用 Supabase Admin API 成功后才宣称官方数据 available；仅检测
   到一个凭据不会冒充连接成功。
@@ -50,13 +51,15 @@ scripts/musuw-admin stop
 - Supabase、Cloudflare R2 和 Paddle 的复杂高风险操作优先打开各自官方
   Console，不在 Musuw 里复制一套供应商控制台。
 
-## 当前 TEST 能力状态
+## 当前能力状态
 
 - Musuw scoped management API：available。平台密钥只从 macOS Keychain
   的 `com.musuw.local-admin.platform-key` / `musuw-admin-test` 项读取，
   不进入环境文件、页面 JavaScript、日志或仓库。
-- Paddle Sandbox：available。只从 ignored runtime 读取最小权限凭据，
-  浏览器只接收经过字段白名单的订阅/交易投影。
+- Paddle：按进程目标使用 Sandbox 或 Live，只从 ignored runtime 读取最小
+  权限凭据，浏览器只接收经过字段白名单的订阅/交易投影。当前 PRODUCTION
+  订阅读取 available（官方 API 返回 0 条），交易读取因凭据缺少该权限而
+  明确显示 `HTTP 403` unavailable；Musuw webhook 镜像和订阅读取不受影响。
 - Supabase Auth Admin：unavailable，因为本机没有 Auth Admin 服务端凭据，且
   当前运营服务没有启用官方查询适配器。
   项目必须显示为 Musuw Staging `achfnnicetupvtoqiwqd` 与 Musuw Production
@@ -73,8 +76,9 @@ scripts/musuw-admin stop
   WCAG A/AA 严重问题扫描通过。
 - PRODUCTION 七页均读取真实数据：用户、知识库/文档、Paddle 镜像与官方
   查询、账号镜像、源文件/索引/配额口径、运行队列和系统审计均可用。
-- PRODUCTION Paddle Live API 可查询，当前官方订阅和交易均为 0；正式
-  inline checkout 仍被 Paddle 商户 onboarding 阻断，不会伪装成可支付。
+- PRODUCTION Paddle Live 订阅 API 可查询，当前返回 0 条；交易 API 返回
+  `HTTP 403` 并只将交易能力标为 unavailable。正式 inline checkout 仍被
+  Paddle 商户 onboarding 阻断，不会伪装成可支付。
 - Supabase Auth Admin、Cloudflare R2 operator 和 Langfuse query 仍按上文
   明确显示 unavailable；这不影响产品本身已经生效的 Supabase 登录和 R2
   文件存储链路。
@@ -119,6 +123,6 @@ npm run admin:test
 npm run admin:e2e
 ```
 
-浏览器验收覆盖七页导航、真实非空数据、搜索/筛选、详情抽屉、明确的
-provider unavailable 状态、危险动作确认、CSRF、审计、404/403 边界、
-敏感字段脱敏和 WCAG A/AA 严重问题扫描。
+浏览器验收覆盖七页导航、真实非空数据、搜索/筛选、详情抽屉、按能力拆分
+的 provider unavailable 状态、危险动作确认、CSRF、审计、404/403 边界、
+敏感字段脱敏，以及全部七页的 WCAG A/AA 严重问题扫描。

@@ -5,6 +5,7 @@ import test from "node:test";
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 const menuStore = read("../stores/menu.ts");
+const settingsStore = read("../stores/settings.ts");
 const router = read("../router/index.ts");
 const sidebar = read("../components/menu.vue");
 const inputField = read("../components/Input-field.vue");
@@ -47,8 +48,11 @@ test("server Edition owns Lite activation and clears stale browser workspace sta
   assert.match(router, /await ensureProductEdition\(authStore\)/);
   assert.match(router, /edition === 'lite' \|\| edition === 'standard'/);
   assert.match(router, /const isLite = edition === 'lite'/);
+  assert.match(router, /applyResolvedProductEdition\(authStore, isLite\)/);
   assert.match(router, /authStore\.setLiteMode\(isLite\)/);
-  assert.match(router, /if \(isLite\) authStore\.setSelectedTenant\(null\)/);
+  assert.match(router, /if \(!isLite\) return/);
+  assert.match(router, /authStore\.setSelectedTenant\(null\)/);
+  assert.match(router, /reconcileLiteChatSettings\(settingsStore\.getSettings\(\)\)/);
   assert.match(router, /if \(restored\) \{\s*await ensureProductEdition\(authStore\)/);
   assert.doesNotMatch(router, /if \(isLiteEdition\(authStore\) \|\| editionProbeDone\) return/);
   assert.doesNotMatch(sidebarBusiness, /getSystemInfo/);
@@ -58,9 +62,24 @@ test("cached Edition is reapplied after logout resets the auth store", () => {
   assert.match(router, /let resolvedLiteMode: boolean \| null = null/);
   assert.match(
     router,
-    /if \(editionProbeDone\) \{\s*if \(resolvedLiteMode !== null\) authStore\.setLiteMode\(resolvedLiteMode\)\s*return\s*\}/,
+    /if \(editionProbeDone\) \{\s*if \(resolvedLiteMode !== null\) applyResolvedProductEdition\(authStore, resolvedLiteMode\)\s*return\s*\}/,
   );
   assert.match(router, /resolvedLiteMode = isLite/);
+});
+
+test("agent selection keeps web search disabled in Lite", () => {
+  assert.match(
+    settingsStore,
+    /selectAgent\([\s\S]{0,450}this\.settings\.webSearchEnabled = !useAuthStore\(\)\.isLiteMode;/,
+  );
+  assert.match(inputField, /v-if="!authStore\.isLiteMode && showWebSearchButton"/);
+});
+
+test("Lite conversation restore cannot re-enable hidden capabilities", () => {
+  assert.match(
+    settingsStore,
+    /applyLastRequestState\([\s\S]*?if \(useAuthStore\(\)\.isLiteMode\) \{[\s\S]*?reconcileLiteChatSettings/,
+  );
 });
 
 test("Lite sidebar does not request hidden IM or embed channel metadata", () => {

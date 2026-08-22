@@ -20,6 +20,7 @@ const API_TIMEOUT_MS = 12_000
 const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000
 const PLATFORM_KEY_SERVICE = 'com.musuw.local-admin.platform-key'
 const PUBLIC_BRAND_ASSETS = new Set(['/favicon.ico', '/musuw-logo.png'])
+const PUBLIC_ASSET_PREFIXES = ['/assets/', '/tdesign-icons/']
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -70,7 +71,6 @@ export function unavailableProviderState(configured, missingReason, adapterReaso
 
 export function isSafeOperationsPath(method, pathname) {
   const exactReads = new Set([
-    '/api/v1/system/info',
     '/api/v1/system/admin/runtime/queues',
     '/api/v1/system/admin/audit-log',
   ])
@@ -85,8 +85,9 @@ export function isSafeOperationsPath(method, pathname) {
   return false
 }
 
-export function isPublicBrandAsset(method, pathname) {
-  return ['GET', 'HEAD'].includes(method) && PUBLIC_BRAND_ASSETS.has(pathname)
+export function isPublicConsoleAsset(method, pathname) {
+  if (!['GET', 'HEAD'].includes(method)) return false
+  return PUBLIC_BRAND_ASSETS.has(pathname) || PUBLIC_ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
 function loadRuntime(target) {
@@ -284,6 +285,62 @@ async function fetchJSON(url, options = {}) {
     return { response, payload }
   } finally {
     clearTimeout(timer)
+  }
+}
+
+async function readPaddleResource(fetcher, url, key, label, headers) {
+  try {
+    const result = await fetcher(url, { headers })
+    if (!result.response.ok) {
+      return {
+        available: false,
+        reason: `Paddle ${label} API returned HTTP ${result.response.status}`,
+        rows: [],
+      }
+    }
+    return {
+      available: true,
+      reason: '',
+      rows: normalizeProviderItems(result.payload, key),
+    }
+  } catch (error) {
+    return { available: false, reason: publicError(error), rows: [] }
+  }
+}
+
+export async function readPaddleData({ apiKey, apiBase, fetcher = fetchJSON }) {
+  if (!apiKey) {
+    const reason = 'Paddle API credential is not configured'
+    return {
+      available: false,
+      reason,
+      subscriptions_available: false,
+      subscriptions_reason: reason,
+      subscriptions: [],
+      transactions_available: false,
+      transactions_reason: reason,
+      transactions: [],
+    }
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }
+  const [subscriptions, transactions] = await Promise.all([
+    readPaddleResource(fetcher, `${apiBase}/subscriptions?per_page=50`, 'subscriptions', 'subscriptions', headers),
+    readPaddleResource(fetcher, `${apiBase}/transactions?per_page=50`, 'transactions', 'transactions', headers),
+  ])
+  const failures = [subscriptions, transactions]
+    .filter((capability) => !capability.available)
+    .map((capability) => capability.reason)
+
+  return {
+    available: subscriptions.available || transactions.available,
+    reason: failures.join('; '),
+    subscriptions_available: subscriptions.available,
+    subscriptions_reason: subscriptions.reason,
+    subscriptions: subscriptions.rows,
+    transactions_available: transactions.available,
+    transactions_reason: transactions.reason,
+    transactions: transactions.rows,
   }
 }
 
@@ -653,26 +710,10 @@ async function start() {
   }
 
   async function paddleData() {
-    if (!runtime.paddleApiKey) return { available: false, reason: 'Paddle API credential is not configured', subscriptions: [], transactions: [] }
-    const headers = { Authorization: `Bearer ${runtime.paddleApiKey}`, Accept: 'application/json' }
-    try {
-      const [subscriptions, transactions] = await Promise.all([
-        fetchJSON(`${runtime.paddleApiBase}/subscriptions?per_page=50`, { headers }),
-        fetchJSON(`${runtime.paddleApiBase}/transactions?per_page=50`, { headers }),
-      ])
-      if (!subscriptions.response.ok || !transactions.response.ok) {
-        const status = !subscriptions.response.ok ? subscriptions.response.status : transactions.response.status
-        return { available: false, reason: `Paddle API returned HTTP ${status}`, subscriptions: [], transactions: [] }
-      }
-      return {
-        available: true,
-        reason: '',
-        subscriptions: normalizeProviderItems(subscriptions.payload, 'subscriptions'),
-        transactions: normalizeProviderItems(transactions.payload, 'transactions'),
-      }
-    } catch (error) {
-      return { available: false, reason: publicError(error), subscriptions: [], transactions: [] }
-    }
+    return readPaddleData({
+      apiKey: runtime.paddleApiKey,
+      apiBase: runtime.paddleApiBase,
+    })
   }
 
   const server = createServer(async (request, response) => {
@@ -684,7 +725,7 @@ async function start() {
         return writeJSON(response, 200, { status: 'ok', environment: runtime.label })
       }
       const session = ensureSession(request, response, url.pathname)
-      if (!session && !isPublicBrandAsset(request.method || 'GET', url.pathname)) {
+      if (!session && !isPublicConsoleAsset(request.method || 'GET', url.pathname)) {
         return writeJSON(response, 401, { error: 'open the console directly from this Mac to start an operator session' })
       }
 

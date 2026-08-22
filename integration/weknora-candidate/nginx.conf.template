@@ -75,6 +75,11 @@ server {
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 
+    # The operations console is served only by the loopback admin gateway.
+    location = /operations.html {
+        return 404;
+    }
+
     # 前端静态文件
     location / {
         root /usr/share/nginx/html;

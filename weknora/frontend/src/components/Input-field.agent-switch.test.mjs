@@ -9,15 +9,16 @@ const streamClient = readFileSync(new URL("../api/chat/streame.ts", import.meta.
 const chatView = readFileSync(new URL("../views/chat/index.vue", import.meta.url), "utf8");
 const chatBusiness = readFileSync(new URL("../assets/business-baselines/ChatIndex.pre-view.vue", import.meta.url), "utf8");
 
-test("managed chat keeps platform web search enabled", () => {
+test("managed chat keeps Standard web search while Lite stays fail-closed", () => {
   const selectAgentStart = settingsStore.indexOf("selectAgent(agentId: string");
   const getSelectedAgentStart = settingsStore.indexOf("getSelectedAgentId()", selectAgentStart);
   const selectAgentAction = settingsStore.slice(selectAgentStart, getSelectedAgentStart);
 
   assert.notEqual(selectAgentStart, -1);
   assert.notEqual(getSelectedAgentStart, -1);
-  assert.match(selectAgentAction, /this\.settings\.webSearchEnabled = true/);
+  assert.match(selectAgentAction, /this\.settings\.webSearchEnabled = !useAuthStore\(\)\.isLiteMode/);
   assert.doesNotMatch(inputField, /class="control-btn websearch-btn"/);
+  assert.match(inputField, /v-if="!authStore\.isLiteMode && showWebSearchButton"/);
 });
 
 test("shared-agent web search button waits for source readiness metadata", () => {

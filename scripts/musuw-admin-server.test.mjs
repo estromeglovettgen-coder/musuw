@@ -7,9 +7,10 @@ import test from 'node:test'
 import {
   clampPage,
   clampPageSize,
-  isPublicBrandAsset,
+  isPublicConsoleAsset,
   isSafeOperationsPath,
   parseEnvFile,
+  readPaddleData,
   unavailableProviderState,
 } from './musuw-admin-server.mjs'
 
@@ -44,7 +45,6 @@ test('an unimplemented official provider never becomes available from credential
 
 test('allowlist admits only scoped operations routes and methods', () => {
   const allowed = [
-    ['GET', '/api/v1/system/info'],
     ['GET', '/api/v1/system/admin/runtime/queues'],
     ['GET', '/api/v1/system/admin/runtime/queues/knowledge/tasks'],
     ['GET', '/api/v1/system/admin/tenants/10005/entitlement'],
@@ -57,6 +57,7 @@ test('allowlist admits only scoped operations routes and methods', () => {
   for (const [method, path] of allowed) assert.equal(isSafeOperationsPath(method, path), true, `${method} ${path}`)
 
   const denied = [
+    ['GET', '/api/v1/system/info'],
     ['GET', '/api/v1/system/settings'],
     ['GET', '/api/v1/system/admin/api-keys'],
     ['POST', '/api/v1/system/admin/tenants/10005'],
@@ -67,9 +68,40 @@ test('allowlist admits only scoped operations routes and methods', () => {
   for (const [method, path] of denied) assert.equal(isSafeOperationsPath(method, path), false, `${method} ${path}`)
 })
 
-test('only immutable Musuw brand assets are public before an operator session exists', () => {
-  assert.equal(isPublicBrandAsset('GET', '/musuw-logo.png'), true)
-  assert.equal(isPublicBrandAsset('HEAD', '/favicon.ico'), true)
-  assert.equal(isPublicBrandAsset('GET', '/assets/operations.js'), false)
-  assert.equal(isPublicBrandAsset('POST', '/musuw-logo.png'), false)
+test('console shell assets can bootstrap after a server restart while APIs stay session-bound', () => {
+  assert.equal(isPublicConsoleAsset('GET', '/musuw-logo.png'), true)
+  assert.equal(isPublicConsoleAsset('HEAD', '/favicon.ico'), true)
+  assert.equal(isPublicConsoleAsset('GET', '/assets/operations.js'), true)
+  assert.equal(isPublicConsoleAsset('GET', '/tdesign-icons/0.4.1/fonts/index.js'), true)
+  assert.equal(isPublicConsoleAsset('GET', '/admin-api/config'), false)
+  assert.equal(isPublicConsoleAsset('GET', '/api/v1/system/info'), false)
+  assert.equal(isPublicConsoleAsset('POST', '/assets/operations.js'), false)
+})
+
+test('Paddle reads keep each official capability honest when transaction scope is absent', async () => {
+  const fetcher = async (url) => {
+    if (String(url).includes('/subscriptions?')) {
+      return {
+        response: { ok: true, status: 200 },
+        payload: { data: [{ id: 'sub_1', status: 'active', customer_id: 'ctm_1' }] },
+      }
+    }
+    return {
+      response: { ok: false, status: 403 },
+      payload: { error: { code: 'forbidden', detail: 'not authorized to read transaction' } },
+    }
+  }
+
+  const result = await readPaddleData({
+    apiKey: 'configured-for-test',
+    apiBase: 'https://api.paddle.test',
+    fetcher,
+  })
+
+  assert.equal(result.available, true)
+  assert.equal(result.subscriptions_available, true)
+  assert.equal(result.subscriptions.length, 1)
+  assert.equal(result.transactions_available, false)
+  assert.deepEqual(result.transactions, [])
+  assert.match(result.transactions_reason, /HTTP 403/)
 })

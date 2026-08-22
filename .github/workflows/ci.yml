@@ -221,6 +221,8 @@ jobs:
         run: node scripts/ci/source-manifest.mjs
       - name: Scan checked-in source for credentials
         run: bash scripts/ci/secret-scan.sh
+      - name: Test local operations gateway contracts
+        run: node --test scripts/musuw-admin-server.test.mjs
       - name: Run release workflow simulation
         run: bash scripts/weknora-workflow-simulation.test.sh
       - name: Run production static and direct deployment contracts

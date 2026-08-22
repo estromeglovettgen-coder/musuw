@@ -46,6 +46,7 @@ test('public integration names use Musuw endpoints and headers', () => {
   for (const nginx of activeContracts.slice(1, 4)) {
     assert.match(nginx, /location = \/musuw-widget\.js/)
     assert.match(nginx, /location = \/weknora-widget\.js \{\s*return 308 \/musuw-widget\.js;/)
+    assert.match(nginx, /location = \/operations\.html \{\s*return 404;/)
   }
   assert.match(activeContracts[4], /X-Musuw-Signature/)
   assert.match(activeContracts[4], /X-WeKnora-Signature/)
