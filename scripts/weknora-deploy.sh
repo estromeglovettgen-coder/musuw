@@ -77,12 +77,20 @@ done
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runner_runtime" \
 WEKNORA_PRODUCTION_REVISION="$revision" \
     "$production_dir/verify-static.sh"
+ssh_control_dir="$(mktemp -d "$runner_runtime/ssh-control.XXXXXX")"
+chmod 700 "$ssh_control_dir"
+ssh_control_path="$ssh_control_dir/control"
 ssh_args=(
     -F /dev/null
     -o BatchMode=yes
     -o StrictHostKeyChecking=yes
     -o UserKnownHostsFile="$known_hosts_file"
     -o IdentitiesOnly=yes
+    -o ConnectTimeout=15
+    -o ConnectionAttempts=1
+    -o ControlMaster=auto
+    -o ControlPath="$ssh_control_path"
+    -o ControlPersist=180
     -o ServerAliveInterval=15
     -o ServerAliveCountMax=4
     -i "$ssh_key"
@@ -117,15 +125,34 @@ remote_gate() {
 manifest_dir=''
 deploy_tree_root=''
 deploy_tree=''
-cleanup_manifest() {
+cleanup_release_inputs() {
+    if [ -n "${ssh_control_path:-}" ]; then
+        ssh "${ssh_args[@]}" -O exit "$remote" >/dev/null 2>&1 || true
+    fi
     if [ -n "$manifest_dir" ] && [ -d "$manifest_dir" ]; then
         find "$manifest_dir" -depth -delete 2>/dev/null || true
     fi
     if [ -n "$deploy_tree_root" ] && [ -d "$deploy_tree_root" ]; then
         find "$deploy_tree_root" -depth -delete 2>/dev/null || true
     fi
+    if [ -n "${ssh_control_dir:-}" ] && [ -d "$ssh_control_dir" ]; then
+        find "$ssh_control_dir" -depth -delete 2>/dev/null || true
+    fi
 }
-trap cleanup_manifest EXIT
+trap cleanup_release_inputs EXIT
+
+remote_prepare_with_retry() {
+    local attempt
+    for attempt in 1 2 3; do
+        if remote_gate prepare; then
+            return 0
+        fi
+        if [ "$attempt" -lt 3 ]; then
+            sleep "$((attempt * 10))"
+        fi
+    done
+    die 'release preparation failed after three bounded SSH attempts'
+}
 
 manifest_dir="$(mktemp -d "$runner_runtime/source-manifest.XXXXXX")"
 chmod 700 "$manifest_dir"
@@ -138,7 +165,7 @@ source_bundle_sha256="$("$production_dir/source-manifest.sh" materialize \
 
 # Prepare creates/clears exactly this SHA's incoming source before rsync. It
 # rejects a release that is already current or has an active release helper.
-remote_gate prepare
+remote_prepare_with_retry
 
 common_rsync=( -a --partial --timeout=120 --no-owner --no-group -e "$ssh_transport" )
 rsync_with_retry() {
@@ -147,7 +174,9 @@ rsync_with_retry() {
         if rsync "$@"; then
             return 0
         fi
-        sleep "$attempt"
+        if [ "$attempt" -lt 3 ]; then
+            sleep "$((attempt * 5))"
+        fi
     done
     die 'release upload failed after three resumable attempts'
 }

@@ -79,6 +79,12 @@ grep -Fq -- '-o StrictHostKeyChecking=yes' "$deploy_script" || fail 'runner SSH 
 grep -Fq -- '-o UserKnownHostsFile=' "$deploy_script" || fail 'runner SSH does not use its known-hosts file'
 grep -Fq -- '-F /dev/null' "$deploy_script" || fail 'runner SSH does not bypass mutable user configuration'
 grep -Fq -- '-o IdentitiesOnly=yes' "$deploy_script" || fail 'runner SSH does not pin its identity'
+grep -Fq -- '-o ConnectTimeout=15' "$deploy_script" || fail 'runner SSH can hang indefinitely before the server banner'
+grep -Fq -- '-o ConnectionAttempts=1' "$deploy_script" || fail 'runner SSH retries outside the reviewed release backoff'
+grep -Fq -- '-o ControlMaster=auto' "$deploy_script" || fail 'runner does not reuse one authenticated SSH transport'
+grep -Fq -- '-o ControlPath=' "$deploy_script" || fail 'runner SSH control socket is not explicitly isolated'
+grep -Fq -- '-o ControlPersist=180' "$deploy_script" || fail 'runner SSH transport does not survive the prepare/upload handoff'
+grep -Fq 'remote_prepare_with_retry' "$deploy_script" || fail 'idempotent prepare does not retry bounded SSH admission failures'
 grep -Fq 'ls-files -z' "$source_manifest" || fail 'source manifest does not enumerate tracked files'
 
 printf '%s\n' 'deployment CI seam contract green'
