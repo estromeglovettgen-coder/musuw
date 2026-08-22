@@ -68,7 +68,6 @@ type systemInvestigationMessage struct {
 
 type systemInvestigationSession struct {
 	ID          string                           `json:"id"`
-	Title       string                           `json:"title,omitempty"`
 	TenantID    uint64                           `json:"tenant_id"`
 	UserID      string                           `json:"user_id,omitempty"`
 	CreatedAt   time.Time                        `json:"created_at"`
@@ -96,7 +95,6 @@ type systemInvestigationAudit struct {
 
 type systemInvestigationKnowledgeBase struct {
 	ID              string    `json:"id"`
-	Name            string    `json:"name"`
 	Type            string    `json:"type"`
 	IsTemporary     bool      `json:"is_temporary,omitempty"`
 	KnowledgeCount  int64     `json:"knowledge_count,omitempty"`
@@ -109,8 +107,6 @@ type systemInvestigationKnowledgeBase struct {
 type systemInvestigationFailedDocument struct {
 	ID              string     `json:"id"`
 	KnowledgeBaseID string     `json:"knowledge_base_id"`
-	Title           string     `json:"title,omitempty"`
-	FileName        string     `json:"file_name,omitempty"`
 	FileType        string     `json:"file_type,omitempty"`
 	ParseStatus     string     `json:"parse_status"`
 	SummaryStatus   string     `json:"summary_status,omitempty"`
@@ -240,8 +236,9 @@ func investigationMessageProjection(message *types.Message, state *systemInvesti
 
 // InvestigateManagedUser returns a bounded, read-only support projection of
 // one user. It intentionally composes existing repositories instead of
-// creating a second event/trace store. Prompts, attachments, provider keys,
-// span payloads and dead-letter payloads never enter this response.
+// creating a second event/trace store. Prompts, content-derived names and
+// titles, attachments, provider keys, span payloads and dead-letter payloads
+// never enter this response.
 func (h *SystemHandler) InvestigateManagedUser(c *gin.Context) {
 	ctx := logger.CloneContext(c.Request.Context())
 	userID := strings.TrimSpace(c.Param("user_id"))
@@ -336,7 +333,7 @@ func (h *SystemHandler) populateInvestigationSessions(ctx context.Context, resul
 			continue
 		}
 		item := systemInvestigationSession{
-			ID: session.ID, Title: session.Title, TenantID: session.TenantID, UserID: session.UserID,
+			ID: session.ID, TenantID: session.TenantID, UserID: session.UserID,
 			CreatedAt: session.CreatedAt, UpdatedAt: session.UpdatedAt, Messages: []systemInvestigationMessage{},
 		}
 		if state := session.LastRequestState; state != nil {
@@ -385,7 +382,7 @@ func (h *SystemHandler) populateInvestigationKnowledge(ctx context.Context, resu
 			break
 		}
 		result.Knowledge.KnowledgeBases = append(result.Knowledge.KnowledgeBases, systemInvestigationKnowledgeBase{
-			ID: kb.ID, Name: kb.Name, Type: kb.Type, IsTemporary: kb.IsTemporary,
+			ID: kb.ID, Type: kb.Type, IsTemporary: kb.IsTemporary,
 			KnowledgeCount: kb.KnowledgeCount, Processing: kb.IsProcessing, ProcessingCount: kb.ProcessingCount,
 			CreatedAt: kb.CreatedAt, UpdatedAt: kb.UpdatedAt,
 		})
@@ -401,7 +398,7 @@ func (h *SystemHandler) populateInvestigationKnowledge(ctx context.Context, resu
 				break
 			}
 			result.Knowledge.FailedDocuments = append(result.Knowledge.FailedDocuments, systemInvestigationFailedDocument{
-				ID: doc.ID, KnowledgeBaseID: doc.KnowledgeBaseID, Title: doc.Title, FileName: doc.FileName,
+				ID: doc.ID, KnowledgeBaseID: doc.KnowledgeBaseID,
 				FileType: doc.FileType, ParseStatus: doc.ParseStatus, SummaryStatus: doc.SummaryStatus,
 				ErrorMessage: truncateInvestigationError(doc.ErrorMessage), StorageSize: doc.StorageSize,
 				CreatedAt: doc.CreatedAt, UpdatedAt: doc.UpdatedAt, ProcessedAt: doc.ProcessedAt,

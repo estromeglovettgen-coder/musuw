@@ -157,6 +157,18 @@ func TestInvestigateManagedUserReturnsCorrelationsWithoutSensitivePayloads(t *te
 	var decoded map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
 	data := decoded["data"].(map[string]any)
+	sessions := data["sessions"].(map[string]any)["items"].([]any)
+	_, exposesContentDerivedTitle := sessions[0].(map[string]any)["title"]
+	assert.False(t, exposesContentDerivedTitle, "content-derived session titles must not enter the support projection")
+	knowledge := data["knowledge"].(map[string]any)
+	knowledgeBases := knowledge["knowledge_bases"].([]any)
+	_, exposesKnowledgeBaseName := knowledgeBases[0].(map[string]any)["name"]
+	assert.False(t, exposesKnowledgeBaseName, "content-derived knowledge-base names must not enter the support projection")
+	failedDocuments := knowledge["failed_documents"].([]any)
+	_, exposesDocumentTitle := failedDocuments[0].(map[string]any)["title"]
+	_, exposesFileName := failedDocuments[0].(map[string]any)["file_name"]
+	assert.False(t, exposesDocumentTitle, "content-derived document titles must not enter the support projection")
+	assert.False(t, exposesFileName, "uploaded filenames must not enter the support projection")
 	assert.Equal(t, true, data["observability"].(map[string]any)["openrouter"].(map[string]any)["available"])
 }
 
