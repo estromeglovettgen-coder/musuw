@@ -71,6 +71,15 @@ test -d "$incoming" || fail 'prepare did not create the exact incoming source'
 test "$(cat "$root_dir/var/lib/musuw-deploy/incoming/$release_id/.prepared")" = "$revision" || \
     fail 'prepare marker does not bind the requested SHA'
 
+# A retry prepares the same immutable SHA again. It must remove a partial
+# rsync receiver file so strict manifest verification never sees stale bytes.
+printf '%s\n' 'interrupted receiver bytes' > "$incoming/scripts/weknora-production/.source-manifest.sh.partial"
+MUSUW_DEPLOY_GATE_TEST_MODE=1 \
+MUSUW_DEPLOY_GATE_ROOT="$root_dir" \
+    "$root_gate" prepare "$revision" >/dev/null
+test ! -e "$incoming/scripts/weknora-production/.source-manifest.sh.partial" || \
+    fail 'repeated prepare did not clear the exact SHA partial upload'
+
 mkdir -p "$incoming/scripts/weknora-production" "$incoming/deploy"
 cat > "$incoming/scripts/weknora-production/source-manifest.sh" <<'EOF'
 #!/usr/bin/env bash

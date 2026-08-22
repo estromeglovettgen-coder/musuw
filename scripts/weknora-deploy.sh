@@ -122,12 +122,22 @@ remote_gate() {
     fi
 }
 
+reset_ssh_transport() {
+    # A failed rsync can leave both a stale multiplexed connection locally and
+    # a dot-prefixed receiver file in this SHA's remote spool. Retire the
+    # transport before prepare clears that isolated spool for a fresh attempt.
+    if [ -S "$ssh_control_path" ]; then
+        ssh "${ssh_args[@]}" -O exit "$remote" >/dev/null 2>&1 || true
+    fi
+    rm -f -- "$ssh_control_path"
+}
+
 manifest_dir=''
 deploy_tree_root=''
 deploy_tree=''
 cleanup_release_inputs() {
-    if [ -n "${ssh_control_path:-}" ]; then
-        ssh "${ssh_args[@]}" -O exit "$remote" >/dev/null 2>&1 || true
+    if [ -n "${ssh_control_path:-}" ] && [ -n "${remote:-}" ]; then
+        reset_ssh_transport
     fi
     if [ -n "$manifest_dir" ] && [ -d "$manifest_dir" ]; then
         find "$manifest_dir" -depth -delete 2>/dev/null || true
@@ -167,7 +177,7 @@ source_bundle_sha256="$("$production_dir/source-manifest.sh" materialize \
 # rejects a release that is already current or has an active release helper.
 remote_prepare_with_retry
 
-common_rsync=( -a --partial --timeout=120 --no-owner --no-group -e "$ssh_transport" )
+common_rsync=( -a --timeout=120 --no-owner --no-group -e "$ssh_transport" )
 rsync_with_retry() {
     local attempt
     for attempt in 1 2 3; do
@@ -175,10 +185,15 @@ rsync_with_retry() {
             return 0
         fi
         if [ "$attempt" -lt 3 ]; then
+            reset_ssh_transport
             sleep "$((attempt * 5))"
+            # prepare is idempotent and clears only this immutable SHA's
+            # incoming tree, including any receiver temp file left behind by
+            # the failed attempt. The current production release is untouched.
+            remote_prepare_with_retry
         fi
     done
-    die 'release upload failed after three resumable attempts'
+    die 'release upload failed after three clean attempts'
 }
 rsync_with_retry "${common_rsync[@]}" "$deploy_tree/" "$remote:$release_source/"
 

@@ -85,6 +85,9 @@ grep -Fq -- '-o ControlMaster=auto' "$deploy_script" || fail 'runner does not re
 grep -Fq -- '-o ControlPath=' "$deploy_script" || fail 'runner SSH control socket is not explicitly isolated'
 grep -Fq -- '-o ControlPersist=180' "$deploy_script" || fail 'runner SSH transport does not survive the prepare/upload handoff'
 grep -Fq 'remote_prepare_with_retry' "$deploy_script" || fail 'idempotent prepare does not retry bounded SSH admission failures'
+rsync_retry_body="$(sed -n '/^rsync_with_retry()/,/^}/p' "$deploy_script")"
+grep -Fq 'reset_ssh_transport' <<< "$rsync_retry_body" || fail 'failed uploads do not retire their SSH transport before retry'
+grep -Fq 'remote_prepare_with_retry' <<< "$rsync_retry_body" || fail 'failed uploads do not clear the exact SHA spool before retry'
 grep -Fq 'ls-files -z' "$source_manifest" || fail 'source manifest does not enumerate tracked files'
 
 printf '%s\n' 'deployment CI seam contract green'
