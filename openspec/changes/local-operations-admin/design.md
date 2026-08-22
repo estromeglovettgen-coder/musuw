@@ -40,5 +40,13 @@ handler seam. It does not create a second event bus, trace store, or usage
 ledger. Knowledge spans and dead letters are queried only by already-known
 knowledge-base/document scopes and are capped before serialization.
 
+Lite keeps its consumer product boundary authoritative on the server. The
+gate exact-matches only the operations routes above plus the existing
+capability-scoped runtime and audit reads/actions. Authentication,
+`SystemAdmin`, and platform-key capability checks still run normally. General
+system settings, platform-key management, and every other upstream admin route
+remain hidden, so changing the browser UI or guessing a URL cannot expose the
+control plane.
+
 Successful writes emit system-scope audit rows with old/new or requested
 values and never include credentials.

@@ -7,6 +7,8 @@
 - [x] 1.4 Add bounded single-user investigation projection with explicit
   unavailable states and payload redaction
 - [x] 1.5 Include existing ReasoningEffort in Langfuse model parameters
+- [x] 1.6 Exact-allowlist the operations seam through the Lite server gate
+  while retaining SystemAdmin and capability authorization
 
 ## 2. Verification
 
