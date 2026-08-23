@@ -95,3 +95,23 @@ the preceding release evidence above is complete and non-sensitive.
 
 Reviewer tasks 5.4 and 5.6 and video task 4.3 remain unchecked pending a
 successful approved provider route.
+
+## 2026-08-23 Contact layout revision
+
+- The live ClientHub reference was inspected at 3024x1898, 1291x782,
+  1080x900, 767x1000, and 430x932. The implementation retains the Musuw
+  header and uses the reference's centered max-width, two-column desktop
+  composition, double-layer form shell, visible field labels, and single-column
+  mobile breakpoint without copying reference branding or proprietary code.
+- The rendered English Contact page now exposes a Contact Us pill, a Musuw
+  product-specific headline, two grounded support reasons, and a keyboard-safe
+  First name / Last name / Email / Message form. The form performs native
+  required and email validation and opens an honest mail draft; it does not
+  claim that Musuw sent a message. Operator, support, billing, privacy,
+  security, and merchant-review details remain available in a lower-weight
+  legal strip below the hero.
+- No contact submission endpoint exists in the storefront contract, so no
+  endpoint, database, mail provider, dependency, or fabricated delivery state
+  was added. Real-render checks found no horizontal overflow, Chinese text, or
+  obsolete route-card composition at the required viewports. Storefront
+  `npm test` passed 52 tests and `npm run build` passed.
