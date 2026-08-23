@@ -27,6 +27,6 @@
 - [ ] 4.1 Verify public legal/auth behavior and complete sign-in, knowledge
   creation, upload/parse, retrieval/chat, plan/billing checkout handoff,
   logout, and re-login in Chrome without a new live charge.
-- [ ] 4.2 Delete disposable acceptance knowledge through the product UI/API,
+- [x] 4.2 Delete disposable acceptance knowledge through the product UI/API,
   record the deployed SHA and evidence, and close the prior release-only
   OpenSpec task.

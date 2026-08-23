@@ -367,6 +367,63 @@ describe("Supabase to WeKnora authorization continuation", () => {
     );
   });
 
+  it("verifies a six-digit signup code and resumes the existing identity handoff", async () => {
+    const client = identity();
+    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    store.setItem(
+      "musnow.auth.flow",
+      JSON.stringify({ createdAt: 1, id: "flow_1", kind: "signup" }),
+    );
+
+    const completed = await (
+      runtime as typeof runtime & {
+        verifySignupOtp(email: string, token: string): Promise<unknown>;
+      }
+    ).verifySignupOtp(" USER@example.com ", "123456");
+
+    expect(completed).toEqual({ state: "identity_complete" });
+    expect(client.verifyOtp).toHaveBeenCalledWith({
+      email: "user@example.com",
+      token: "123456",
+      type: "signup",
+    });
+    expect(store.getItem("musnow.auth.flow")).toBeNull();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/oidc/url?"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(assigned).toHaveBeenLastCalledWith(
+      "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
+    );
+  });
+
+  it("fails closed for malformed or provider-failed signup codes without leaking details", async () => {
+    const verifyOtp = vi.fn<IdentityClient["verifyOtp"]>(async () => ({
+      data: { session: null },
+      error: null,
+    }));
+    const client = identity({ verifyOtp });
+    const { runtime } = runtimeFor(client);
+    const verifySignupOtp = (runtime as typeof runtime & {
+      verifySignupOtp(email: string, token: string): Promise<unknown>;
+    }).verifySignupOtp;
+
+    await expect(verifySignupOtp("user@example.com", "12345")).resolves.toEqual({
+      code: "email_code_invalid",
+      state: "identity_error",
+    });
+    expect(verifyOtp).not.toHaveBeenCalled();
+
+    verifyOtp.mockResolvedValueOnce({
+      data: { session: null },
+      error: { code: "invalid_credentials" as const },
+    });
+    await expect(verifySignupOtp("user@example.com", "123456")).resolves.toEqual({
+      code: "email_code_invalid",
+      state: "identity_error",
+    });
+  });
+
   it("approves a local authorization from the production consent origin without local storage", async () => {
     const client = identity({
       oauth: {

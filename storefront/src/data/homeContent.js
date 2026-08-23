@@ -9,7 +9,6 @@ import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
 import { Path } from "@phosphor-icons/react/Path";
 import { PresentationChart } from "@phosphor-icons/react/PresentationChart";
 import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
-import { ShieldCheck } from "@phosphor-icons/react/ShieldCheck";
 import { Sparkle } from "@phosphor-icons/react/Sparkle";
 import { Stack } from "@phosphor-icons/react/Stack";
 import { UsersThree } from "@phosphor-icons/react/UsersThree";
@@ -65,14 +64,14 @@ export const features = [
     bullets: ["Native Wiki", "Graph inside Wiki", "Linked pages", "Evidence return"]
   },
   {
-    label: "Ownership and Control",
-    title: "Keep your knowledge portable and under control.",
+    label: "Source Library and Upload",
+    title: "Upload and parse sources without losing the original.",
     description:
-      "musuw keeps personal workspaces scoped, model credentials server-side, and data lifecycle actions visible from export through deletion.",
+      "Bring in notes and common documents, track processing states, and keep the source version available while connected knowledge grows.",
     image: "/images/musuw-knowledge-base.jpg",
-    imageAlt: "musuw knowledge base with server-confirmed document states",
-    icon: ShieldCheck,
-    bullets: ["Personal isolation", "Portable export", "Deletion workflow", "Server-side credentials"]
+    imageAlt: "musuw source library with upload and document processing states",
+    icon: FolderOpen,
+    bullets: ["Notes and documents", "Upload and parsing", "Source preservation", "Processing states"]
   }
 ];
 
@@ -158,21 +157,21 @@ export const plans = [
     name: "Free",
     description: "A bounded plan for a personal knowledge base",
     features: [
-      "5 GB storage",
-      "Basic monthly AI allowance",
+      "5 GiB storage",
+      "$1.00 monthly AI credit allowance",
       "1 knowledge base, 10 documents",
-      "Entry model set, no video upload"
+      "One least-cost model per capability, no video upload"
     ]
   },
   {
     key: "plus",
     name: "Plus",
-    description: "More room and every configured model",
+    description: "More room and an expanded platform-approved catalog",
     features: [
-      "20 GB storage",
-      "1.25x Free monthly AI allowance",
+      "20 GiB storage",
+      "$1.25 monthly AI credit allowance",
       "No plan cap on knowledge bases or documents",
-      "All configured models and video upload"
+      "Expanded platform-approved catalog and video upload"
     ]
   },
   {
@@ -181,10 +180,10 @@ export const plans = [
     description: "Higher storage and model allowance",
     featured: true,
     features: [
-      "40 GB storage",
-      "2.5x Free monthly AI allowance",
+      "40 GiB storage",
+      "$2.50 monthly AI credit allowance",
       "No plan cap on knowledge bases or documents",
-      "All configured models and video upload"
+      "Expanded platform-approved catalog and video upload"
     ]
   },
   {
@@ -192,44 +191,57 @@ export const plans = [
     name: "Max",
     description: "The largest current personal allowance",
     features: [
-      "80 GB storage",
-      "5x Free monthly AI allowance",
+      "80 GiB storage",
+      "$5.00 monthly AI credit allowance",
       "No plan cap on knowledge bases or documents",
-      "All configured models and video upload"
+      "Expanded platform-approved catalog and video upload"
     ]
   }
 ];
 
 export const comparisonGroups = [
   {
-    title: "Knowledge Foundation",
+    title: "Workspace limits",
     rows: [
-      ["Personal source library", true, true, true, true],
-      ["Topics and source history", true, true, true, true],
-      ["Shared workspace administration", false, false, false, false]
+      ["Storage", "5 GiB", "20 GiB", "40 GiB", "80 GiB"],
+      ["Knowledge bases", "1", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"],
+      ["Documents per knowledge base", "10", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]
     ]
   },
   {
-    title: "Grounded AI",
+    title: "Source ingestion",
     rows: [
-      ["Knowledge-scoped dialogue", true, true, true, true],
-      ["Exact evidence citations", true, true, true, true],
-      ["Advanced knowledge tools", true, true, true, true]
+      ["Document upload and parsing", true, true, true, true],
+      ["Video upload", false, true, true, true]
     ]
   },
   {
-    title: "Connected Knowledge",
+    title: "Model access",
     rows: [
-      ["Living Wiki", true, true, true, true],
+      ["Platform-approved model catalog", "One least-cost model per capability", "Expanded platform-approved catalog", "Expanded platform-approved catalog", "Expanded platform-approved catalog"]
+    ]
+  },
+  {
+    title: "AI allowance and grounded answers",
+    rows: [
+      ["Monthly AI credit allowance", "$1.00", "$1.25", "$2.50", "$5.00"],
+      ["Grounded dialogue", true, true, true, true],
+      ["Exact citations", true, true, true, true]
+    ]
+  },
+  {
+    title: "Connected knowledge",
+    rows: [
+      ["Wiki", true, true, true, true],
+      ["Source-version history", true, true, true, true],
       ["Knowledge graph", true, true, true, true],
-      ["Graph view inside Wiki", true, true, true, true]
     ]
   },
   {
-    title: "Ownership and Support",
+    title: "Account and data controls",
     rows: [
-      ["Portable export and deletion", true, true, true, true],
-      ["Priority support", false, false, true, true]
+      ["Portable export", true, true, true, true],
+      ["Deletion controls", true, true, true, true]
     ]
   }
 ];

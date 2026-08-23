@@ -169,8 +169,8 @@ export function HeroScene({ copy }) {
             <div className="dashboard-frame">
               <img
                 src="/images/musuw-wiki-page.jpg"
-                width="1800"
-                height="1200"
+                width="3024"
+                height="1898"
                 draggable={false}
                 alt={copy.hero.dashboardAlt}
               />
@@ -189,8 +189,8 @@ export function HeroScene({ copy }) {
             >
               <img
                 src="/images/musuw-query-citation.jpg"
-                width="930"
-                height="470"
+                width="3024"
+                height="1898"
                 draggable={false}
                 alt={copy.hero.activityAlt}
               />
@@ -209,8 +209,8 @@ export function HeroScene({ copy }) {
             >
               <img
                 src="/images/musuw-wiki-graph.jpg"
-                width="930"
-                height="470"
+                width="3024"
+                height="1898"
                 draggable={false}
                 alt={copy.hero.deliverableAlt}
               />

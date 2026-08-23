@@ -80,6 +80,8 @@ describe("auth shell localized copy", () => {
       expect(copy.sendCode).not.toBe("");
       expect(copy.sendingCode).not.toBe("");
       expect(copy.verifyCode).not.toBe("");
+      expect(copy.confirmEmail).not.toBe("");
+      expect(copy.confirmingEmail).not.toBe("");
       expect(copy.changeEmail).not.toBe("");
       expect(copy.resendCode).not.toBe("");
       expect(copy.resendIn(3)).toContain("3");
@@ -139,5 +141,18 @@ describe("auth shell password-field composition", () => {
       /\.auth-form button:not\(\.auth-link\)(?!:not\(\.auth-password-toggle\))/,
     );
     expect(css).toMatch(/\.auth-password-toggle\s*\{[\s\S]*position:\s*absolute;/);
+  });
+
+  it("renders signup confirmation as an accessible six-digit code form", () => {
+    const source = readFileSync(new URL("./AuthApp.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('key="registration-confirmation"');
+    expect(source).toContain("runtime.verifySignupOtp");
+    expect(source).toContain('autoComplete="one-time-code"');
+    expect(source).toContain('inputMode="numeric"');
+    expect(source).toContain('pattern="[0-9]{6}"');
+    expect(source).toContain("copy.confirmEmail");
+    expect(source).toContain("copy.confirmingEmail");
+    expect(source).toContain("isSubmitting || verificationCode.length !== 6");
   });
 });

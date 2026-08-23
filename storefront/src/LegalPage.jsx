@@ -62,7 +62,75 @@ function renderBlock(block, index) {
   return <p key={index}>{block.text}</p>;
 }
 
+function ContactPage({ document, copy, locale }) {
+  const labels = locale === "zh-CN"
+    ? {
+        back: "返回首页",
+        routeTitle: "选择联系路径",
+        operator: "运营主体",
+        categories: ["客户支持", "账单与退款", "隐私与安全", "支付审核"],
+        updated: "生效日期",
+      }
+    : {
+        back: "Back to home",
+        routeTitle: "Choose a contact route",
+        operator: "Operator",
+        categories: ["Support", "Billing and refunds", "Privacy and security", "Merchant review"],
+        updated: "Effective",
+      };
+  const operatorSection = document.sections[0];
+  const contactSections = document.sections.slice(1);
+
+  return (
+    <>
+      <SiteHeader copy={copy} />
+      <main className="contact-page">
+        <div className="container contact-layout">
+          <section className="contact-intro">
+            <a className="legal-back" href="/">
+              <ArrowLeft size={16} weight="bold" aria-hidden="true" />
+              {labels.back}
+            </a>
+            <span className="legal-eyebrow">{document.eyebrow}</span>
+            <h1>{document.title}</h1>
+            <p className="contact-summary">{document.summary}</p>
+            <div className="contact-operator">
+              <span className="contact-kicker">{labels.operator}</span>
+              <div className="contact-operator-copy">
+                {operatorSection?.blocks.map(renderBlock)}
+              </div>
+            </div>
+            <div className="legal-updated">
+              <CalendarBlank size={17} weight="bold" aria-hidden="true" />
+              <span>{labels.updated}: {document.updated}</span>
+            </div>
+          </section>
+
+          <section className="contact-cards" aria-labelledby="contact-routes-title">
+            <h2 id="contact-routes-title">{labels.routeTitle}</h2>
+            <div className="contact-card-grid">
+              {contactSections.map((section, index) => (
+                <article className="contact-card" key={section.heading}>
+                  <h3>{labels.categories[index] ?? section.heading}</h3>
+                  <div className="contact-card-copy">
+                    {section.blocks.map(renderBlock)}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      </main>
+      <SiteFooter copy={copy} />
+    </>
+  );
+}
+
 export function LegalPage({ document, copy, locale }) {
+  if (document.path === "/contact") {
+    return <ContactPage document={document} copy={copy} locale={locale} />;
+  }
+
   const labels = locale === "zh-CN"
     ? { back: "返回首页", updated: "生效日期", contents: "本页目录", policies: "公开文件" }
     : { back: "Back to home", updated: "Effective", contents: "On this page", policies: "Public documents" };

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAuthStorage, createSupabaseIdentityClient } from "./supabase";
-import { AUTH_FLOW_TTL_MS, type AuthConfig, type SessionStorageLike } from "./runtime";
+import {
+  AUTH_FLOW_TTL_MS,
+  type AuthConfig,
+  type IdentityClient,
+  type SessionStorageLike,
+} from "./runtime";
 
 const mocked = vi.hoisted(() => ({
   auth: {
@@ -9,6 +14,7 @@ const mocked = vi.hoisted(() => ({
     getSession: vi.fn(),
     signInWithPassword: vi.fn(),
     signUp: vi.fn(),
+    verifyOtp: vi.fn(),
     resetPasswordForEmail: vi.fn(),
     updateUser: vi.fn(),
   },
@@ -101,6 +107,38 @@ describe("Supabase identity adapter", () => {
     await expect(
       client.signInWithPassword({ email: "user@example.com", password: "secret-password" }),
     ).resolves.toEqual({ data: { session: null }, error: { code: "invalid_credentials" } });
+  });
+
+  it("verifies signup tokens through Supabase and keeps provider errors bounded", async () => {
+    mocked.auth.verifyOtp.mockResolvedValueOnce({
+      data: { session: { access_token: "access-token", refresh_token: "secret-refresh-token" } },
+      error: null,
+    });
+    const client = createSupabaseIdentityClient(config, storage());
+    const signupVerification = {
+      email: "user@example.com",
+      token: "123456",
+      type: "signup",
+    } satisfies Parameters<IdentityClient["verifyOtp"]>[0];
+
+    await expect(client.verifyOtp(signupVerification)).resolves.toEqual({
+      data: { session: { access_token: "access-token" } },
+      error: null,
+    });
+    expect(mocked.auth.verifyOtp).toHaveBeenCalledWith(signupVerification);
+
+    mocked.auth.verifyOtp.mockResolvedValueOnce({
+      data: { session: null },
+      error: {
+        code: "over_email_send_rate_limit",
+        message: "raw provider detail must never cross the auth boundary",
+        status: 429,
+      },
+    });
+    await expect(client.verifyOtp(signupVerification)).resolves.toEqual({
+      data: { session: null },
+      error: { code: "rate_limited" },
+    });
   });
 
   it("uses appendable SDK flow ids and passes a validated flow id to exchange", async () => {

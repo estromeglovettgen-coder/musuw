@@ -49,7 +49,7 @@ export function CustomerStrip({ copy }) {
   );
 }
 
-function FeatureStory({ feature, index, learnMore }) {
+function FeatureStory({ feature, index }) {
   const Icon = feature.icon;
   const reverse = index % 2 === 1;
   const reduceMotion = useReducedMotion();
@@ -65,9 +65,6 @@ function FeatureStory({ feature, index, learnMore }) {
         </p>
         <h3>{feature.title}</h3>
         <p>{feature.description}</p>
-        <ButtonLink href="/#pricing">
-          {learnMore}
-        </ButtonLink>
         <ul className="feature-bullets">
           {feature.bullets.map((bullet) => (
             <li key={bullet}>
@@ -112,9 +109,10 @@ function FeatureStory({ feature, index, learnMore }) {
 }
 
 export function FeaturesSection({ copy }) {
-  const localizedFeatures = features.map((feature, index) => ({
-    ...feature,
-    ...copy.features.items[index]
+  const visibleFeatureIndexes = [0, 3, 2];
+  const localizedFeatures = visibleFeatureIndexes.map((sourceIndex) => ({
+    ...features[sourceIndex],
+    ...copy.features.items[sourceIndex]
   }));
   return (
     <section className="section features-section" id="feature">
@@ -132,7 +130,6 @@ export function FeaturesSection({ copy }) {
             <FeatureStory
               feature={feature}
               index={index}
-              learnMore={copy.features.learnMore}
               key={feature.title}
             />
           ))}
@@ -199,8 +196,8 @@ export function WorkflowSection({ copy }) {
                   <img
                     src={index === 0 ? "/images/musuw-wiki-page.jpg" : "/images/musuw-wiki-graph.jpg"}
                     alt={copy.workflow.imageAlts[index]}
-                    width="1024"
-                    height={index === 0 ? "673" : "601"}
+                    width="3024"
+                    height="1898"
                     draggable={false}
                     loading="lazy"
                   />
@@ -381,12 +378,10 @@ function ComparisonTable({ copy }) {
         </div>
         {comparisonGroups.map((group, groupIndex) => (
           <div className="comparison-group" key={group.title}>
-            {groupIndex > 0 ? (
-              <div className="comparison-group-head" role="row">
-                <h4>{copy.comparison.groups[groupIndex].title}</h4>
-                {copy.comparison.plans.map((plan) => <span key={plan}>{plan}</span>)}
-              </div>
-            ) : null}
+            <div className="comparison-group-head" role="row">
+              <h4>{copy.comparison.groups[groupIndex].title}</h4>
+              {copy.comparison.plans.map((plan) => <span key={plan}>{plan}</span>)}
+            </div>
             {group.rows.map(([_name, ...availability], rowIndex) => {
               const name = copy.comparison.groups[groupIndex].rows[rowIndex];
               return (
@@ -394,7 +389,11 @@ function ComparisonTable({ copy }) {
                 <span role="cell">{name}</span>
                 {availability.map((enabled, index) => (
                   <span role="cell" key={`${name}-${index}`}>
-                    {enabled ? (
+                    {typeof enabled === "string" ? (
+                      <span className="comparison-value-text">
+                        {copy.comparison.valueLabels[enabled] ?? enabled}
+                      </span>
+                    ) : enabled ? (
                       <CheckCircle size={19} weight="fill" aria-label={copy.comparison.included} />
                     ) : (
                       <Minus size={17} aria-label={copy.comparison.notIncluded} />
@@ -538,8 +537,8 @@ export function BlogPreviewSection({ copy }) {
                   <img
                     src={article.image}
                     alt={article.alt}
-                    width="1024"
-                    height="823"
+                    width="3024"
+                    height="1898"
                     draggable={false}
                     loading="lazy"
                   />
@@ -634,8 +633,8 @@ export function FinalCTA({ copy }) {
               <img
                 src="/images/musuw-query-citation.jpg"
                 alt=""
-                width="1800"
-                height="1200"
+                width="3024"
+                height="1898"
                 draggable={false}
                 loading="lazy"
               />

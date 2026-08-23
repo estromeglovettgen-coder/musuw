@@ -116,14 +116,14 @@ test("the application and footer expose direct document routes", async () => {
   const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
   const chrome = await readFile(new URL("../src/data/homeContent.js", import.meta.url), "utf8");
   const siteChrome = await readFile(new URL("../src/components/SiteChrome.jsx", import.meta.url), "utf8");
+  const legalContent = await readFile(new URL("../src/legalContent.js", import.meta.url), "utf8");
   const i18n = await readFile(new URL("../src/i18n.js", import.meta.url), "utf8");
   const legacyCompanyToken = ["Didi", "ren"].join("");
   const legacyDomain = ["didi", "ren.com"].join("");
 
   assert.match(app, /getPublicDocument/);
   assert.match(app, /LegalPage/);
-  assert.match(siteChrome, /support@didren\.com/);
-  assert.match(i18n, /Hangzhou Didren Technology Co\., Ltd\./);
+  assert.match(legalContent, /support@didren\.com/);
   assert.doesNotMatch(`${siteChrome}\n${i18n}`, new RegExp(`${legacyCompanyToken}|${legacyDomain}`, "i"));
   for (const route of ["/terms", "/privacy", "/refund-policy", "/security", "/contact"]) {
     assert.match(chrome, new RegExp(route.replace("/", "\\/")));

@@ -120,6 +120,8 @@ export type AuthCopy = Readonly<{
   sendCode: string;
   sendingCode: string;
   verifyCode: string;
+  confirmEmail: string;
+  confirmingEmail: string;
   changeEmail: string;
   resendCode: string;
   resendIn: (seconds: number) => string;
@@ -176,7 +178,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     forgotPasswordIntro: "输入邮箱，我们会发送重置密码的链接。",
     sendResetLink: "发送重置链接",
     resetLinkSent: (email) => `如果 ${email} 已注册，你会收到重置密码的邮件。`,
-    registrationConfirmation: (email) => `请检查 ${email} 的收件箱，确认邮箱后即可登录。`,
+    registrationConfirmation: (email) => `请检查 ${email} 的收件箱，输入六位验证码或打开确认链接后即可登录。`,
     passwordRecoveryTitle: "设置新密码",
     passwordRecoveryIntro: "设置一个新的密码以完成恢复。",
     passwordUpdated: "密码已更新，请继续登录。",
@@ -190,6 +192,8 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     sendCode: "发送验证码",
     sendingCode: "发送中…",
     verifyCode: "验证并继续",
+    confirmEmail: "确认邮箱",
+    confirmingEmail: "确认中…",
     changeEmail: "更换邮箱",
     resendCode: "重新发送验证码",
     resendIn: (seconds) => `${seconds} 秒后可重新发送`,
@@ -244,7 +248,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     forgotPasswordIntro: "Enter your email and we’ll send a password reset link.",
     sendResetLink: "Send reset link",
     resetLinkSent: (email) => `If ${email} is registered, you’ll receive a password reset email.`,
-    registrationConfirmation: (email) => `Check ${email} for a confirmation link before signing in.`,
+    registrationConfirmation: (email) => `Check ${email} for a six-digit code or confirmation link before signing in.`,
     passwordRecoveryTitle: "Set a new password",
     passwordRecoveryIntro: "Choose a new password to finish recovering your account.",
     passwordUpdated: "Your password was updated. You can sign in now.",
@@ -258,6 +262,8 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     sendCode: "Send code",
     sendingCode: "Sending…",
     verifyCode: "Verify and continue",
+    confirmEmail: "Confirm email",
+    confirmingEmail: "Confirming…",
     changeEmail: "Use a different email",
     resendCode: "Resend code",
     resendIn: (seconds) => `Resend in ${seconds}s`,
@@ -612,6 +618,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         clearPasswordFields();
         if (result.state === "registration_confirmation") {
           setEmail(result.email);
+          setVerificationCode("");
           setScreen("registration_confirmation");
         } else {
           setScreen("identity_pending");
@@ -754,6 +761,32 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       } catch {
         setError(copy.errors.incomplete);
         setScreen("email_code");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [applyIdentityCompletion, copy, email, isSubmitting, runtime, verificationCode],
+  );
+
+  const verifySignupCode = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      setError(null);
+      setIsSubmitting(true);
+      setScreen("identity_pending");
+      try {
+        const result = await runtime.verifySignupOtp(email, verificationCode);
+        const message = failureMessage(result, copy);
+        if (message !== null) {
+          setError(message);
+          setScreen("registration_confirmation");
+        } else {
+          applyIdentityCompletion(result);
+        }
+      } catch {
+        setError(copy.errors.incomplete);
+        setScreen("registration_confirmation");
       } finally {
         setIsSubmitting(false);
       }
@@ -1098,10 +1131,40 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             </button>
           </form>
         ) : screen === "registration_confirmation" ? (
-          <div className="auth-message" role="status">
-            <p>{copy.registrationConfirmation(maskAuthEmail(email))}</p>
-            <button className="auth-link" onClick={showLogin} type="button">{copy.backToSignIn}</button>
-          </div>
+          <form
+            className="auth-form"
+            key="registration-confirmation"
+            noValidate
+            onSubmit={(event) => void verifySignupCode(event)}
+          >
+            <label htmlFor="registration-confirmation-code">
+              {copy.registrationConfirmation(maskAuthEmail(email))}
+            </label>
+            <input
+              aria-describedby={error !== null ? "auth-error" : undefined}
+              aria-invalid={error !== null}
+              autoComplete="one-time-code"
+              autoFocus
+              disabled={isSubmitting}
+              id="registration-confirmation-code"
+              inputMode="numeric"
+              maxLength={6}
+              name="confirmationCode"
+              onChange={(event) => {
+                setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                if (error !== null) setError(null);
+              }}
+              pattern="[0-9]{6}"
+              required
+              value={verificationCode}
+            />
+            <button disabled={isSubmitting || verificationCode.length !== 6} type="submit">
+              {isSubmitting ? copy.confirmingEmail : copy.confirmEmail}
+            </button>
+            <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
+              {copy.backToSignIn}
+            </button>
+          </form>
         ) : screen === "password_reset_requested" ? (
           <div className="auth-message" role="status">
             <p>{copy.resetLinkSent(maskAuthEmail(email))}</p>

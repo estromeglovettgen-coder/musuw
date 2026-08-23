@@ -99,7 +99,7 @@ export interface IdentityClient {
     data: { session: IdentitySession | null };
     error: IdentityError;
   }>;
-  verifyOtp(input: { email: string; token: string; type: "email" }): Promise<{
+  verifyOtp(input: { email: string; token: string; type: "email" | "signup" }): Promise<{
     data: { session: IdentitySession | null };
     error: IdentityError;
   }>;
@@ -1069,9 +1069,28 @@ export function createAuthRuntime(options: RuntimeOptions) {
         const result = await withinRequestDeadline(
           identity().verifyOtp({ email, token, type: "email" }),
         );
-        if (result.error !== null || result.data.session?.access_token.trim() === "") {
+        if (result.error !== null || !validSession(result.data.session)) {
           return { code: "email_code_invalid", state: "identity_error" };
         }
+        return resumeAfterIdentity();
+      } catch {
+        return { code: "identity_network_error", state: "identity_error" };
+      }
+    },
+
+    async verifySignupOtp(emailInput: string, token: string): Promise<IdentityCompletionView> {
+      const email = normalizeEmailAddress(emailInput);
+      if (email === null || !isEmailOtpCode(token)) {
+        return { code: "email_code_invalid", state: "identity_error" };
+      }
+      try {
+        const result = await withinRequestDeadline(
+          identity().verifyOtp({ email, token, type: "signup" }),
+        );
+        if (result.error !== null || !validSession(result.data.session)) {
+          return { code: "email_code_invalid", state: "identity_error" };
+        }
+        removeFlowFromAllStores();
         return resumeAfterIdentity();
       } catch {
         return { code: "identity_network_error", state: "identity_error" };
