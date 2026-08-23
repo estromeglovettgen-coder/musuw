@@ -400,4 +400,9 @@ if ! grep -Fq 'COPY --from=builder /app/WeKnora ./WeKnora' "$repo_root/integrati
     exit 1
 fi
 
+if ! grep -Fq 'go mod download || go mod download || go mod download' "$repo_root/integration/weknora-production/Dockerfile.app.runtime"; then
+    printf '%s\n' 'production app Dockerfile lacks bounded official Go module download retries' >&2
+    exit 1
+fi
+
 printf '%s\n' 'production static contract is green: amd64, staged loopback frontend, edge web alias, file secrets, native Nginx routes'

@@ -16,7 +16,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
   "/contact"
 ]);
 
-const updated = "2026-08-22";
+const updated = "2026-08-23";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -28,6 +28,11 @@ const contact = (label = LEGAL_OPERATOR.supportEmail) => ({
   address: LEGAL_OPERATOR.supportEmail
 });
 const link = (label, href) => ({ type: "link", label, href });
+const PADDLE_LINKS = Object.freeze({
+  buyerTerms: "https://www.paddle.com/legal/buyer-terms",
+  refundPolicy: "https://www.paddle.com/legal/refund-policy",
+  buyerSupport: "https://paddle.net/"
+});
 
 const englishDocuments = {
   "/terms": {
@@ -42,7 +47,7 @@ const englishDocuments = {
         heading: "1. Who operates musuw",
         blocks: [
           p(`${LEGAL_OPERATOR.productName} is provided by ${operator}, referred to as “we”, “us”, or the “Operator” in these terms.`),
-          p(`Questions about the service or these terms can be sent to ${LEGAL_OPERATOR.supportEmail}. We aim to respond to support requests within three business days.`),
+          p(`Questions about the service or these terms can be sent to ${LEGAL_OPERATOR.supportEmail}.`),
           contact()
         ]
       },
@@ -100,16 +105,20 @@ const englishDocuments = {
       {
         heading: "8. Seller and Merchant of Record",
         blocks: [
-          p("Paddle acts as the authorized reseller and seller of record for musuw paid orders and handles the payment, applicable transaction taxes, receipt, and order-related buyer support under Paddle's buyer terms."),
+          p("Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns."),
+          p("musuw provides product and technical support."),
+          link("Read Paddle Buyer Terms", PADDLE_LINKS.buyerTerms),
+          link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport),
           p("These provider terms apply to the purchase transaction. These musuw Terms govern your use of the product. If a mandatory consumer rule provides greater protection, that rule prevails.")
         ]
       },
       {
         heading: "9. Cancellation and refunds",
         blocks: [
-          p("You can cancel a recurring plan through the management link in your receipt, the applicable payment provider's customer portal, an in-product billing link when available, or by contacting us. Cancellation stops future renewals and normally takes effect at the end of the paid period."),
-          p("We offer the refund terms stated in the Refund Policy, including a 30-calendar-day request window for an initial paid order and the most recent renewal, subject to fraud and abuse safeguards and mandatory law."),
-          link("Read the Refund Policy", "/refund-policy")
+          p("You can cancel a recurring plan through the management link in your receipt, Paddle's buyer portal, an in-product billing link when available, or by contacting us. Paddle's confirmation controls the recorded cancellation time; cancellation stops future renewals and takes effect at the end of the current paid period unless mandatory law provides otherwise."),
+          p("musuw offers the 30-calendar-day money-back guarantee stated in our Refund Policy. Paddle's current Refund Policy and mandatory consumer rights also apply."),
+          link("Read Musuw Refund Policy", "/refund-policy"),
+          link("Read Paddle Refund Policy", PADDLE_LINKS.refundPolicy)
         ]
       },
       {
@@ -151,7 +160,7 @@ const englishDocuments = {
       {
         heading: "15. Changes and contact",
         blocks: [
-          p("We may update these terms to reflect product, legal, security, or operational changes. We will post the effective date and provide additional notice for material changes when required. Continued use after the effective date means the updated terms apply, except where affirmative consent is legally required."),
+          p("We may update these terms to reflect product, legal, security, or operational changes. We will post the effective date and provide additional notice for material changes when required. The version shown at checkout and in the receipt governs that purchase; later changes apply prospectively unless law requires otherwise."),
           contact()
         ]
       }
@@ -166,9 +175,9 @@ const englishDocuments = {
     updated,
     sections: [
       {
-        heading: "1. Controller and scope",
+        heading: "1. Operator and scope",
         blocks: [
-          p(`${operator} is the controller of personal data processed to operate musuw, except where another party is identified as an independent controller. This policy covers the public website, accounts, product features, support, and related communications.`),
+          p(`${operator} determines how personal data is used to operate musuw. A provider that independently determines its own processing may have a separate role and notice. This policy covers the public website, accounts, product features, support, and related communications.`),
           p(`Privacy questions and rights requests can be sent to ${LEGAL_OPERATOR.supportEmail}.`),
           contact()
         ]
@@ -301,7 +310,7 @@ const englishDocuments = {
     eyebrow: "Purchases",
     title: "Refund Policy",
     summary:
-      "musuw provides a clear 30-calendar-day refund request window for initial paid orders and the most recent subscription renewal, with mandatory consumer rights preserved.",
+      "musuw offers a 30-calendar-day money-back guarantee for initial paid orders and the most recent subscription renewal, while preserving Paddle and mandatory consumer rights.",
     updated,
     sections: [
       {
@@ -312,11 +321,12 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "2. Our 30-day promise",
+        heading: "2. Our 30-day money-back guarantee",
         blocks: [
           p("You may request a full refund within 30 calendar days after an initial paid order or within 30 calendar days after the most recent subscription renewal."),
-          p("The request window applies to monthly and annual renewals. A refund normally ends access associated with the refunded order. It does not automatically refund older billing periods outside the request window."),
-          p("We may decline a discretionary refund where there is credible evidence of fraud, refund abuse, duplicate recovery, or an active chargeback. This exception never limits mandatory consumer rights.")
+          p("This additional guarantee applies to monthly and annual renewals. A refund normally ends access associated with the refunded order and does not automatically refund older billing periods outside the request window."),
+          p("We may decline this additional guarantee where there is credible evidence of fraud, refund abuse, duplicate recovery, or an active chargeback. This exception never limits mandatory consumer rights or Paddle's current Refund Policy."),
+          link("Read Paddle Refund Policy", PADDLE_LINKS.refundPolicy)
         ]
       },
       {
@@ -327,28 +337,29 @@ const englishDocuments = {
             "Use the applicable payment provider's customer or transaction portal.",
             `Email ${LEGAL_OPERATOR.supportEmail} with the account email, transaction identifier, purchase date, and a short description of the request.`
           ),
-          p("We aim to acknowledge support requests within three business days. Do not send full card numbers, passwords, government identifiers, or other unnecessary sensitive information."),
+          p("Paddle and musuw use the receipt and transaction details to verify the request. Do not send full card numbers, passwords, government identifiers, or other unnecessary sensitive information."),
           contact()
         ]
       },
       {
         heading: "4. Who processes the refund",
         blocks: [
-          p("Paddle processes the refund to the original payment method where possible. Follow the Paddle receipt, Customer Portal, or buyer-support process."),
-          p("We will cooperate with the Merchant of Record and honor our published 30-day promise, but transaction verification, payment-network timing, currency conversion, and provider buyer terms may affect how the refund appears.")
+          p("Paddle processes eligible refunds to the original payment method where possible. Follow the Paddle receipt, Customer Portal, or buyer-support process."),
+          p("We will cooperate with Paddle, the Merchant of Record, to honor this 30-day guarantee. Transaction verification, payment-network timing, currency conversion, and provider buyer terms may affect how the refund appears."),
+          link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport)
         ]
       },
       {
         heading: "5. Timing and access",
         blocks: [
-          p("Approved refunds are submitted to the original payment method where possible, normally within 14 days after approval. Your bank or payment network may need additional time to display the credit."),
+          p("Paddle's current Refund Policy says an eligible refund is processed to the original payment method where possible within 14 days after approval. Your bank or payment network may need additional time to display the credit; the current Paddle policy controls."),
           p("When a full refund is issued, access to the refunded paid entitlement may end immediately. Before requesting deletion, export any material you are entitled to keep.")
         ]
       },
       {
         heading: "6. Defects, misdescription, and mandatory rights",
         blocks: [
-          p("If musuw is materially defective, not as described, or not supplied with legally required care, contact us even if 30 calendar days have passed. Remedies required by applicable law remain available."),
+          p("If musuw is materially defective, not as described, or not supplied with legally required care, contact us through the support channels above. Remedies required by applicable law remain available."),
           p("Nothing in this policy excludes or limits mandatory consumer rights, statutory withdrawal rights, or a payment provider's buyer protections. Where different terms apply, the highest non-waivable level of protection controls.")
         ]
       },
@@ -392,7 +403,8 @@ const englishDocuments = {
             "Use an in-product billing link when production account billing is available.",
             `Email ${LEGAL_OPERATOR.supportEmail} from your account email and include the transaction identifier.`
           ),
-          p("We aim to respond within three business days. To avoid the next charge, submit the cancellation before the renewal date and allow enough time for identity and transaction verification."),
+          p("Paddle's confirmation controls the recorded cancellation time. Cancellation stops future renewals and takes effect at the end of the current billing period, subject to mandatory law."),
+          link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport),
           contact()
         ]
       },
@@ -407,7 +419,7 @@ const englishDocuments = {
         heading: "5. Plan and price changes",
         blocks: [
           p("An upgrade may take effect immediately and may create a prorated charge or credit disclosed before confirmation. A downgrade normally takes effect at the next renewal unless stated otherwise."),
-          p("We will give at least 30 calendar days' notice before a material price increase for an existing subscription, unless a shorter period is required by tax or law. You may cancel before the new price takes effect.")
+          p("If the price changes, Paddle or musuw will notify you and obtain consent before charging the new price where required by law. You may cancel before the new price takes effect.")
         ]
       },
       {
@@ -634,7 +646,7 @@ const englishDocuments = {
       {
         heading: "Customer support",
         blocks: [
-          p(`Email ${LEGAL_OPERATOR.supportEmail}. We aim to acknowledge customer-support requests within three business days.`),
+          p(`Email ${LEGAL_OPERATOR.supportEmail}. Include the product, account, and transaction context needed to help; do not send passwords or full card numbers.`),
           contact("Email customer support")
         ]
       },
@@ -643,7 +655,8 @@ const englishDocuments = {
         blocks: [
           p("For the fastest transaction support, use the manage-order link in your Paddle receipt or Customer Portal. You can also email us with the account email and transaction identifier. Never send a full card number or password."),
           link("Refund Policy", "/refund-policy"),
-          link("Subscription and Cancellation Policy", "/subscription-policy")
+          link("Subscription and Cancellation Policy", "/subscription-policy"),
+          link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport)
         ]
       },
       {
@@ -677,7 +690,7 @@ const chineseDocuments = {
         heading: "1. 运营主体",
         blocks: [
           p(`musuw 由 ${operator} 提供，本条款中的“我们”“本公司”或“运营方”均指该公司。`),
-          p(`服务或条款问题可发送至 ${LEGAL_OPERATOR.supportEmail}。我们力争在 3 个工作日内回应支持请求。`),
+          p(`服务或条款问题可发送至 ${LEGAL_OPERATOR.supportEmail}。`),
           contact("联系支持")
         ]
       },
@@ -735,16 +748,20 @@ const chineseDocuments = {
       {
         heading: "8. 卖方与商户记录方",
         blocks: [
-          p("Paddle 是 musuw 付费订单的授权经销商和记录卖方，根据其买家条款处理付款、适用交易税、收据和订单相关买家支持。"),
+          p("订单流程由在线经销商 Paddle.com 处理。Paddle.com 是所有订单的商户记录方；Paddle 负责所有客户服务咨询并处理退货。"),
+          p("musuw 提供产品和技术支持。"),
+          link("查看 Paddle 买家条款", PADDLE_LINKS.buyerTerms),
+          link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport),
           p("付款服务商条款适用于购买交易，本 musuw 条款适用于产品使用。若强制性消费者规则提供更高保护，以该规则为准。")
         ]
       },
       {
         heading: "9. 取消与退款",
         blocks: [
-          p("您可通过收据中的管理链接、适用付款服务商的客户门户、可用时的产品内账单入口或联系我们取消循环订阅。取消会停止未来续费，通常在已付费周期结束时生效。"),
-          p("退款政策提供初次真实付款及最近一次续费后 30 个日历日的申请期限，同时适用反欺诈、反滥用措施和强制性法律。"),
-          link("查看退款政策", "/refund-policy")
+          p("您可通过收据中的管理链接、Paddle 买家门户、可用时的产品内账单入口或联系我们取消循环订阅。Paddle 的确认记录取消时间；取消会停止未来续费，并在当前已付费周期结束时生效，除非强制性法律另有规定。"),
+          p("musuw 提供本退款政策所述的 30 个日历日退款保证；同时适用 Paddle 当前退款政策及强制性消费者权利。"),
+          link("查看 musuw 退款政策", "/refund-policy"),
+          link("查看 Paddle 退款政策", PADDLE_LINKS.refundPolicy)
         ]
       },
       {
@@ -786,7 +803,7 @@ const chineseDocuments = {
       {
         heading: "15. 变更与联系",
         blocks: [
-          p("我们可因产品、法律、安全或运营变化更新本条款，并公布生效日期。重大变化将在法律要求时另行通知；法律要求主动同意的，继续使用不会替代该同意。"),
+          p("我们可因产品、法律、安全或运营变化更新本条款，并公布生效日期。重大变化将在法律要求时另行通知；结账页面和收据展示的版本适用于该笔购买，后续变更仅向未来生效，除非法律另有要求。"),
           contact("联系运营方")
         ]
       }
@@ -800,9 +817,9 @@ const chineseDocuments = {
     updated,
     sections: [
       {
-        heading: "1. 个人信息处理者与适用范围",
+        heading: "1. 运营主体与适用范围",
         blocks: [
-          p(`${operator} 是为运营 musuw 而处理个人信息的个人信息处理者，但明确由其他主体独立决定处理目的和方式的情形除外。本政策适用于公开网站、账户、产品功能、支持及相关沟通。`),
+          p(`${operator} 决定为运营 musuw 如何使用个人信息。若服务商独立决定其处理目的和方式，则适用其自身角色和隐私说明。本政策适用于公开网站、账户、产品功能、支持及相关沟通。`),
           p(`隐私问题和权利请求可发送至 ${LEGAL_OPERATOR.supportEmail}。`),
           contact("提交隐私请求")
         ]
@@ -934,7 +951,7 @@ const chineseDocuments = {
     path: "/refund-policy",
     eyebrow: "购买",
     title: "退款政策",
-    summary: "musuw 为初次真实付款和最近一次订阅续费提供 30 个日历日的退款申请期限，同时完整保留强制性消费者权利。",
+    summary: "musuw 为初次真实付款和最近一次订阅续费提供 30 个日历日退款保证，同时保留 Paddle 政策及强制性消费者权利。",
     updated,
     sections: [
       {
@@ -945,11 +962,12 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "2. 30 天退款承诺",
+        heading: "2. 我们的 30 天退款保证",
         blocks: [
           p("您可在初次真实付款后 30 个日历日内，或最近一次订阅续费后 30 个日历日内申请全额退款。"),
-          p("该申请期限适用于月度和年度续费。退款通常会终止该笔订单对应的付费访问权，不会自动退还申请期限以外更早的计费周期。"),
-          p("存在可信欺诈、退款滥用、重复追偿或进行中拒付时，我们可拒绝酌情退款，但该例外绝不限制强制性消费者权利。")
+          p("这项额外保证适用于月度和年度续费。退款通常会终止该笔订单对应的付费访问权，不会自动退还申请期限以外更早的计费周期。"),
+          p("存在可信欺诈、退款滥用、重复追偿或进行中拒付时，我们可拒绝这项额外保证；该例外绝不限制强制性消费者权利或 Paddle 当前退款政策。"),
+          link("查看 Paddle 退款政策", PADDLE_LINKS.refundPolicy)
         ]
       },
       {
@@ -960,28 +978,29 @@ const chineseDocuments = {
             "使用适用付款服务商的客户或交易门户。",
             `发送邮件至 ${LEGAL_OPERATOR.supportEmail}，提供账户邮箱、交易标识、购买日期和简短说明。`
           ),
-          p("我们力争在 3 个工作日内确认支持请求。请勿发送完整银行卡号、密码、政府证件号码或其他不必要的敏感信息。"),
+          p("Paddle 和 musuw 会使用收据及交易信息核验申请。请勿发送完整银行卡号、密码、政府证件号码或其他不必要的敏感信息。"),
           contact("申请退款")
         ]
       },
       {
         heading: "4. 谁处理退款",
         blocks: [
-          p("Paddle 会在可能时将退款退回原付款方式。请使用 Paddle 收据、客户门户或买家支持流程。"),
-          p("我们会与商户记录方配合并履行本政策的 30 天承诺，但交易核验、支付网络处理时间、汇率换算和服务商买家条款可能影响退款到账方式。")
+          p("Paddle 会在可能时将符合条件的退款退回原付款方式。请使用 Paddle 收据、客户门户或买家支持流程。"),
+          p("我们会与商户记录方 Paddle 配合履行这项 30 天保证。交易核验、支付网络处理时间、汇率换算和服务商买家条款可能影响退款到账方式。"),
+          link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport)
         ]
       },
       {
         heading: "5. 时间与访问权",
         blocks: [
-          p("退款获批后，会在可能时原路提交，通常在批准后 14 日内完成提交；银行或支付网络可能需要额外时间显示入账。"),
+          p("Paddle 当前退款政策说明，符合条件的退款会在可能时原路处理，并在批准后 14 日内处理；银行或支付网络可能需要额外时间显示入账，以当前 Paddle 政策为准。"),
           p("全额退款完成后，相应付费权益可能立即终止。申请删除前，请先导出您有权保留的材料。")
         ]
       },
       {
         heading: "6. 缺陷、描述不符与法定权利",
         blocks: [
-          p("若 musuw 存在重大缺陷、与描述不符或未以法律要求的合理注意提供，即使超过 30 个日历日也请联系我们。适用法律要求的救济仍然有效。"),
+          p("若 musuw 存在重大缺陷、与描述不符或未以法律要求的合理注意提供，请通过上述支持渠道联系我们。适用法律要求的救济仍然有效。"),
           p("本政策不排除或限制强制性消费者权利、法定撤回权或付款服务商提供的买家保护。不同规则并存时，以不可放弃的最高保护为准。")
         ]
       },
@@ -1024,7 +1043,8 @@ const chineseDocuments = {
             "生产账户账单功能可用时，使用产品内账单入口。",
             `使用账户邮箱联系 ${LEGAL_OPERATOR.supportEmail} 并提供交易标识。`
           ),
-          p("我们力争在 3 个工作日内回应。为避免下一次扣款，请在续费日前提交取消，并为身份和交易核验预留合理时间。"),
+          p("Paddle 的确认记录取消时间。取消会停止未来续费，并在当前计费周期结束时生效，受强制性法律约束。"),
+          link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport),
           contact("请求取消")
         ]
       },
@@ -1039,7 +1059,7 @@ const chineseDocuments = {
         heading: "5. 套餐和价格变更",
         blocks: [
           p("升级可能立即生效，并在确认前披露按比例计算的扣款或抵扣；降级通常在下次续费时生效，除非页面另有说明。"),
-          p("现有订阅发生重大涨价前，我们会至少提前 30 个日历日通知，税费或法律要求更短时间的除外。您可在新价格生效前取消。")
+          p("若价格发生变化，Paddle 或 musuw 会通知您，并在法律要求时先取得同意再按新价格扣款。您可在新价格生效前取消。")
         ]
       },
       {
@@ -1254,7 +1274,7 @@ const chineseDocuments = {
       {
         heading: "客户支持",
         blocks: [
-          p(`请发送邮件至 ${LEGAL_OPERATOR.supportEmail}。我们力争在 3 个工作日内确认客户支持请求。`),
+          p(`请发送邮件至 ${LEGAL_OPERATOR.supportEmail}，并提供必要的产品、账户和交易背景；请勿发送密码或完整银行卡号。`),
           contact("发送支持邮件")
         ]
       },
@@ -1263,7 +1283,8 @@ const chineseDocuments = {
         blocks: [
           p("为更快处理交易问题，请使用 Paddle 收据或客户门户中的订单管理链接，也可提供账户邮箱和交易标识联系我们。请勿发送完整银行卡号或密码。"),
           link("退款政策", "/refund-policy"),
-          link("订阅与取消政策", "/subscription-policy")
+          link("订阅与取消政策", "/subscription-policy"),
+          link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport)
         ]
       },
       {

@@ -67,9 +67,11 @@ presentation-only checkbox.
 `storefront/src/legalContent.js` remains the one bilingual source. The policy
 will name the live provider roles and link to their notices, state that the
 selected model/provider receives only content needed for a requested feature,
-and preserve the existing voluntary 30-day Musuw refund promise because
-Paddle's current policy expressly permits suppliers to grant additional
-rights. Unknown infrastructure identities, retention durations, or legal
+and preserve Musuw's voluntary 30-day money-back guarantee because Paddle's
+Seller Handbook recommends at least 30 days and Paddle's Refund Policy preserves
+additional supplier rights. Musuw will not publish an unverified support
+deadline or assert a legal role or provider guarantee it cannot substantiate.
+Unknown infrastructure identities, retention durations, or legal
 representations will not be invented.
 
 Replacing the suite with a generated template or copying OpenAI, Notion,

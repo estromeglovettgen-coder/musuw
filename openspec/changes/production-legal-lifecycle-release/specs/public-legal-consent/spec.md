@@ -33,4 +33,4 @@ rights with Musuw's voluntary terms.
 
 #### Scenario: Visitor reads purchase terms
 - **WHEN** a visitor opens the Terms, Refund, or Subscription document
-- **THEN** the page distinguishes Musuw product terms from Paddle's Merchant-of-Record terms, explains renewal and cancellation, and preserves both mandatory rights and any additional Musuw promise
+- **THEN** the page distinguishes Musuw product terms from Paddle's Merchant-of-Record terms, explains renewal and cancellation, links Paddle's current buyer/refund/support routes, preserves mandatory rights and Musuw's 30-day money-back guarantee, and does not invent a support deadline

@@ -34,3 +34,16 @@ supported TEST native-video route reached provider-classified HTTP 402 /
 `DOCREADER_PARSE_FAILED` without exhausted tenant allowance. No new service,
 provider credit, Live charge, fake event, or manual entitlement mutation was
 used.
+
+## 2026-08-23 policy hardening (local, pending release)
+
+- The bilingual legal source now identifies Paddle as Merchant of Record,
+  links Paddle Buyer Terms, Refund Policy, and buyer support, and describes
+  recurring billing and cancellation using the provider's current routes.
+- Musuw publishes a 30-day money-back guarantee aligned with Paddle's Seller
+  Handbook recommendation and Paddle's rule preserving additional supplier
+  rights, while avoiding an unverified support response deadline. The privacy
+  text avoids asserting an unsupported controller role.
+- Storefront build and all 53 storefront tests passed locally. This evidence
+  is not a production-deployment claim; the legal copy remains pending the
+  parent task's exact-SHA release and public smoke.

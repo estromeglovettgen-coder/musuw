@@ -29,7 +29,7 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(document.path, route);
       assert.ok(document.title.length >= 4);
       assert.ok(document.summary.length >= 30);
-      assert.equal(document.updated, "2026-08-22");
+      assert.equal(document.updated, "2026-08-23");
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
 
@@ -43,7 +43,7 @@ test("every merchant-review document is public and complete in English and Chine
   assert.equal(getPublicDocumentMeta("en", "/missing"), null);
 });
 
-test("policies identify the operator, support channel, refund promise, and conditional sellers", async () => {
+test("policies identify the operator, support channel, Paddle terms, and mandatory rights", async () => {
   const { getPublicDocument } = await import("../src/legalContent.js");
   const flatten = (locale, route) => JSON.stringify(getPublicDocument(locale, route));
 
@@ -52,9 +52,11 @@ test("policies identify the operator, support channel, refund promise, and condi
     assert.match(all, /Hangzhou Didren Technology Co\., Ltd\./);
     assert.match(all, /杭州地底人科技有限公司/);
     assert.match(all, /support@didren\.com/);
+    assert.doesNotMatch(all, locale === "zh-CN" ? /3\s*个工作日/ : /three business days/i);
 
     const refund = flatten(locale, "/refund-policy");
-    assert.match(refund, locale === "zh-CN" ? /30\s*个?日|30\s*天/ : /30 calendar days/i);
+    assert.match(refund, locale === "zh-CN" ? /30\s*个日历日|30\s*天/ : /30 calendar days/i);
+    assert.match(refund, locale === "zh-CN" ? /Paddle.*退款|退款.*Paddle/ : /Paddle.*Refund|Refund.*Paddle/i);
     assert.match(refund, locale === "zh-CN" ? /续费/ : /renewal/i);
     assert.match(refund, locale === "zh-CN" ? /强制性.*消费者|法定.*权利/ : /mandatory consumer rights/i);
 
@@ -64,6 +66,20 @@ test("policies identify the operator, support channel, refund promise, and condi
 
     const terms = flatten(locale, "/terms");
     assert.match(terms, /Paddle/);
+    assert.match(terms, /Merchant of Record|商户记录方/);
+    assert.match(
+      terms,
+      locale === "zh-CN"
+        ? /Paddle 负责所有客户服务咨询并处理退货/
+        : /Paddle provides all customer service inquiries and handles returns/,
+    );
+    for (const href of [
+      "https://www.paddle.com/legal/buyer-terms",
+      "https://www.paddle.com/legal/refund-policy",
+      "https://paddle.net/"
+    ]) {
+      assert.match(terms, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
 
     const privacy = flatten(locale, "/privacy");
     for (const concept of locale === "zh-CN"
