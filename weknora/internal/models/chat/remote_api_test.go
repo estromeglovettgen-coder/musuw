@@ -137,7 +137,7 @@ func TestBuildChatCompletionRequest_GPT5MaxCompletionTokens(t *testing.T) {
 		t.Helper()
 		c, err := NewRemoteAPIChat(&ChatConfig{
 			Source:    types.ModelSourceRemote,
-			BaseURL:   "https://example.openai.azure.com",
+			BaseURL:   "",
 			ModelName: modelName,
 			APIKey:    "test-key",
 			ModelID:   modelName,
