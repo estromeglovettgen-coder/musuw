@@ -24,6 +24,31 @@ Official evidence:
 
 Production paid-term and post-deploy evidence remains tracked by task 4.3.
 
+## 2026-08-23 final approved-route gate
+
+- Two bounded Qwen native-video smokes (the reviewer fixture and a 1.5-second
+  English MP4) reached the provider's HTTP 402 classification. The observed
+  wallet and tenant allowance were not exhausted; no credit purchase, retry
+  loop, alternate service, fake event, or manual entitlement mutation was
+  used.
+- Direct probes of the approved Gemini video routes returned HTTP 403 from
+  temporary provider-management credentials. This is not treated as
+  canonical consumer-path evidence.
+- The canonical TEST consumer path was then exercised once with a fresh
+  official OIDC session, a temporary English knowledge base, and the
+  per-upload `builtin-openrouter-gemini-flash` override. Upload returned HTTP
+  200, but polling reached `processing` and then the normalized
+  `provider_error` failure at about two minutes; no retrieval success is
+  claimed.
+- The documented Japan transport/SSH target was unavailable, so no DNS,
+  server, or new provider path was added. All temporary knowledge bases,
+  documents, and conversations from these checks were removed through the
+  authenticated product capability.
+
+Tasks 4.3, 5.4, and 5.6 remain unchecked until an approved route completes
+video parsing, indexing, retrieval, and evidence without changing the
+no-recharge/no-new-service boundary.
+
 ## 2026-08-23 TEST reviewer gate
 
 - A fresh English H.264/AAC MP4 was uploaded through the real TEST Max browser

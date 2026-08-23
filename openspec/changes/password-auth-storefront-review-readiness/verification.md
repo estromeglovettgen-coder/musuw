@@ -77,3 +77,21 @@ verification file.
 The next exact-SHA CI, Cloudflare storefront, immutable GHCR server release,
 and public revision/health checks are the gate for the evidence-sync commit;
 the preceding release evidence above is complete and non-sensitive.
+
+## Final video gate (2026-08-23)
+
+- Qwen original-fixture and tiny-video provider smokes both classified as HTTP
+  402 while the observed wallet and tenant allowance were non-exhausted.
+- Approved Gemini direct-route probes classified as HTTP 403 with temporary
+  provider-management credentials; this did not establish a canonical app
+  failure or success.
+- One canonical TEST Max upload using the supported per-upload
+  `builtin-openrouter-gemini-flash` override returned HTTP 200, then moved
+  from `processing` to normalized `provider_error` failure at roughly two
+  minutes. No video retrieval or citation success is claimed.
+- The documented Japan transport was unavailable. No recharge, new service,
+  DNS/server change, fake event, or manual entitlement mutation was used, and
+  all temporary video fixtures and conversations were cleaned up.
+
+Reviewer tasks 5.4 and 5.6 and video task 4.3 remain unchecked pending a
+successful approved provider route.
