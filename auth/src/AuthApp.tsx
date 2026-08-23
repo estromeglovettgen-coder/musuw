@@ -6,6 +6,7 @@ import {
   type AuthorizationContinuationView,
   type EmailOtpSendView,
   type IdentityCompletionView,
+  type PasswordResetRequestView,
 } from "./runtime";
 import { getInitialAuthLocale, type AuthLocale } from "./locale";
 
@@ -14,12 +15,19 @@ export type InitialAuthScreen =
   | "consent_pending"
   | "login"
   | "logout_pending"
+  | "recovery_pending"
   | "start_pending";
 
 type Screen =
   | InitialAuthScreen
+  | "email_entry"
   | "email_code"
-  | "identity_pending";
+  | "identity_pending"
+  | "password_recovery"
+  | "password_reset_request"
+  | "password_reset_requested"
+  | "register"
+  | "registration_confirmation";
 
 export const CHECKOUT_INTENT_STORAGE_KEY = "musuw.checkout.intent";
 
@@ -74,11 +82,40 @@ export function checkoutWorkspacePathFromSearch(search: string): string {
 export type AuthCopy = Readonly<{
   title: string;
   intro: string;
+  registerTitle: string;
+  registerIntro: string;
   google: string;
   divider: string;
   status: string;
   email: string;
   emailPlaceholder: string;
+  password: string;
+  passwordPlaceholder: string;
+  confirmPassword: string;
+  confirmPasswordPlaceholder: string;
+  signIn: string;
+  signingIn: string;
+  signInUnavailable: string;
+  createAccount: string;
+  creatingAccount: string;
+  signUpUnavailable: string;
+  updatePassword: string;
+  updatingPassword: string;
+  forgotPassword: string;
+  forgotPasswordTitle: string;
+  forgotPasswordIntro: string;
+  sendResetLink: string;
+  resetLinkSent: (email: string) => string;
+  registrationConfirmation: (email: string) => string;
+  passwordRecoveryTitle: string;
+  passwordRecoveryIntro: string;
+  passwordUpdated: string;
+  useEmailCode: string;
+  needAccount: string;
+  alreadyHaveAccount: string;
+  backToSignIn: string;
+  showPassword: string;
+  hidePassword: string;
   emailCodeSent: (email: string) => string;
   sendCode: string;
   sendingCode: string;
@@ -101,18 +138,54 @@ export type AuthCopy = Readonly<{
     invalidEmail: string;
     emailSend: string;
     google: string;
+    invalidCredentials: string;
+    emailNotConfirmed: string;
+    passwordWeak: string;
+    passwordMismatch: string;
+    passwordTooShort: string;
+    resetUnavailable: string;
+    rateLimited: string;
   }>;
 }>;
 
 const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
   "zh-CN": {
     title: "登录 Musuw",
-    intro: "使用 Google 或邮箱验证码继续。",
+    intro: "使用 Google、邮箱密码或验证码继续。",
+    registerTitle: "创建 Musuw 账号",
+    registerIntro: "使用邮箱和密码创建你的账号。",
     google: "使用 Google 登录",
     divider: "或",
     status: "正在继续登录…",
     email: "邮箱",
     emailPlaceholder: "name@example.com",
+    password: "密码",
+    passwordPlaceholder: "输入密码",
+    confirmPassword: "确认密码",
+    confirmPasswordPlaceholder: "再次输入密码",
+    signIn: "登录",
+    signingIn: "登录中…",
+    signInUnavailable: "登录暂不可用，请稍后重试。",
+    createAccount: "创建账号",
+    creatingAccount: "创建中…",
+    signUpUnavailable: "暂时无法创建账号，请稍后重试。",
+    updatePassword: "更新密码",
+    updatingPassword: "更新中…",
+    forgotPassword: "忘记密码？",
+    forgotPasswordTitle: "重置密码",
+    forgotPasswordIntro: "输入邮箱，我们会发送重置密码的链接。",
+    sendResetLink: "发送重置链接",
+    resetLinkSent: (email) => `如果 ${email} 已注册，你会收到重置密码的邮件。`,
+    registrationConfirmation: (email) => `请检查 ${email} 的收件箱，确认邮箱后即可登录。`,
+    passwordRecoveryTitle: "设置新密码",
+    passwordRecoveryIntro: "设置一个新的密码以完成恢复。",
+    passwordUpdated: "密码已更新，请继续登录。",
+    useEmailCode: "使用邮箱验证码",
+    needAccount: "还没有账号？",
+    alreadyHaveAccount: "已有账号？",
+    backToSignIn: "返回登录",
+    showPassword: "显示密码",
+    hidePassword: "隐藏密码",
     emailCodeSent: (email) => `已向 ${email} 发送六位验证码`,
     sendCode: "发送验证码",
     sendingCode: "发送中…",
@@ -135,16 +208,52 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
       invalidEmail: "请输入有效的邮箱地址。",
       emailSend: "暂时无法发送验证码，请稍后重试。",
       google: "暂时无法使用 Google 登录，请重试。",
+      invalidCredentials: "邮箱或密码不正确。",
+      emailNotConfirmed: "请先确认邮箱，再使用密码登录。",
+      passwordWeak: "这个密码不够安全，请换一个更强的密码。",
+      passwordMismatch: "两次输入的密码不一致。",
+      passwordTooShort: "密码至少需要 8 个字符。",
+      resetUnavailable: "暂时无法处理密码重置，请稍后重试。",
+      rateLimited: "请求过于频繁，请稍后再试。",
     },
   },
   "en-US": {
     title: "Log in to Musuw",
-    intro: "Continue with Google or an email code.",
+    intro: "Continue with Google, an email and password, or a code.",
+    registerTitle: "Create your Musuw account",
+    registerIntro: "Use your email and a password to get started.",
     google: "Continue with Google",
     divider: "or",
     status: "Continuing sign-in…",
     email: "Email",
     emailPlaceholder: "name@example.com",
+    password: "Password",
+    passwordPlaceholder: "Enter your password",
+    confirmPassword: "Confirm password",
+    confirmPasswordPlaceholder: "Enter your password again",
+    signIn: "Sign in",
+    signingIn: "Signing in…",
+    signInUnavailable: "Sign-in is temporarily unavailable. Please try again later.",
+    createAccount: "Create account",
+    creatingAccount: "Creating account…",
+    signUpUnavailable: "Account creation is temporarily unavailable. Please try again later.",
+    updatePassword: "Update password",
+    updatingPassword: "Updating password…",
+    forgotPassword: "Forgot password?",
+    forgotPasswordTitle: "Reset your password",
+    forgotPasswordIntro: "Enter your email and we’ll send a password reset link.",
+    sendResetLink: "Send reset link",
+    resetLinkSent: (email) => `If ${email} is registered, you’ll receive a password reset email.`,
+    registrationConfirmation: (email) => `Check ${email} for a confirmation link before signing in.`,
+    passwordRecoveryTitle: "Set a new password",
+    passwordRecoveryIntro: "Choose a new password to finish recovering your account.",
+    passwordUpdated: "Your password was updated. You can sign in now.",
+    useEmailCode: "Use an email code",
+    needAccount: "Need an account?",
+    alreadyHaveAccount: "Already have an account?",
+    backToSignIn: "Back to sign in",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     emailCodeSent: (email) => `We sent a six-digit code to ${email}`,
     sendCode: "Send code",
     sendingCode: "Sending…",
@@ -167,6 +276,13 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
       invalidEmail: "Enter a valid email address.",
       emailSend: "We couldn't send a code right now. Please try again later.",
       google: "Google sign-in is temporarily unavailable. Please try again.",
+      invalidCredentials: "Your email or password is incorrect.",
+      emailNotConfirmed: "Confirm your email before signing in with a password.",
+      passwordWeak: "That password is too weak. Choose a stronger one.",
+      passwordMismatch: "The passwords do not match.",
+      passwordTooShort: "Passwords must be at least 8 characters.",
+      resetUnavailable: "Password reset is temporarily unavailable. Please try again later.",
+      rateLimited: "Too many requests. Please try again later.",
     },
   },
 };
@@ -178,6 +294,7 @@ export function getAuthCopy(locale: AuthLocale): AuthCopy {
 export function initialAuthScreenForPathname(pathname: string): InitialAuthScreen {
   if (pathname === "/auth/start") return "start_pending";
   if (pathname === "/auth/callback") return "callback_pending";
+  if (pathname === "/auth/recovery") return "recovery_pending";
   if (pathname === "/oauth/consent") return "consent_pending";
   if (pathname === "/auth/logout") return "logout_pending";
   return "login";
@@ -197,22 +314,68 @@ function startFailureMessage(result: AuthStartView, copy: AuthCopy): string | nu
 function failureMessage(
   result: AuthorizationContinuationView | IdentityCompletionView | EmailOtpSendView,
   copy: AuthCopy,
+  context: "generic" | "signIn" | "signUp" | "reset" = "generic",
 ): string | null {
   if (result.state === "identity_complete" || result.state === "authorization_complete") return null;
-  if (result.state === "authorization_login_required" || result.state === "email_otp_sent") return null;
+  if (
+    result.state === "authorization_login_required" ||
+    result.state === "email_otp_sent" ||
+    result.state === "registration_confirmation" ||
+    result.state === "password_recovery_ready"
+  ) return null;
   if (result.state === "authorization_error") {
     return result.code === "oauth_client_not_allowed"
       ? copy.errors.oauthNotAllowed
       : copy.errors.authorization;
   }
   if (result.state === "identity_error") {
-    return result.code === "email_code_invalid"
-      ? copy.errors.invalidCode
-      : copy.errors.incomplete;
+    switch (result.code) {
+      case "email_code_invalid":
+        return copy.errors.invalidCode;
+      case "email_invalid":
+        return copy.errors.invalidEmail;
+      case "invalid_credentials":
+        return context === "reset" ? copy.errors.resetUnavailable : copy.errors.invalidCredentials;
+      case "email_not_confirmed":
+        // Supabase may evaluate confirmation status before password validity;
+        // keep this indistinguishable from a bad password at the UI boundary.
+        return context === "reset" ? copy.errors.resetUnavailable : copy.errors.invalidCredentials;
+      case "weak_password":
+        return copy.errors.passwordWeak;
+      case "password_mismatch":
+        return copy.errors.passwordMismatch;
+      case "password_too_short":
+        return copy.errors.passwordTooShort;
+      case "password_recovery_failed":
+        return copy.errors.resetUnavailable;
+      case "password_invalid":
+        return context === "reset" ? copy.errors.resetUnavailable : copy.errors.invalidCredentials;
+      case "rate_limited":
+        return copy.errors.rateLimited;
+      case "signup_unavailable":
+        return context === "signUp" ? copy.signUpUnavailable : copy.errors.unavailable;
+      case "unavailable":
+        return context === "signIn"
+          ? copy.signInUnavailable
+          : context === "signUp"
+            ? copy.signUpUnavailable
+            : context === "reset"
+              ? copy.errors.resetUnavailable
+              : copy.errors.unavailable;
+      default:
+        return copy.errors.incomplete;
+    }
   }
   return result.code === "email_invalid"
     ? copy.errors.invalidEmail
     : copy.errors.emailSend;
+}
+
+function passwordResetMessage(result: PasswordResetRequestView, copy: AuthCopy): string | null {
+  if (result.state === "password_reset_requested") return null;
+  if (result.code === "email_invalid") return copy.errors.invalidEmail;
+  if (result.code === "rate_limited") return copy.errors.rateLimited;
+  return copy.errors.resetUnavailable;
 }
 
 export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
@@ -226,6 +389,10 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     return initialAuthScreenForPathname(window.location.pathname);
   });
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
@@ -237,12 +404,51 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   const handledRoute = useRef<string | null>(null);
 
   const applyIdentityCompletion = useCallback((result: IdentityCompletionView) => {
+    if (result.state === "password_recovery_ready") {
+      window.history.replaceState({}, document.title, "/auth/recovery");
+      setError(null);
+      setPassword("");
+      setPasswordConfirmation("");
+      setShowPassword(false);
+      setShowPasswordConfirmation(false);
+      setScreen("password_recovery");
+      return;
+    }
     const message = failureMessage(result, copy);
     if (message !== null) {
       setError(message);
-      setScreen("login");
+      setScreen(
+        result.state === "identity_error" && result.code === "password_recovery_failed"
+          ? "password_reset_request"
+          : "login",
+      );
     }
   }, [copy]);
+
+  const clearPasswordFields = useCallback(() => {
+    setPassword("");
+    setPasswordConfirmation("");
+    setShowPassword(false);
+    setShowPasswordConfirmation(false);
+  }, []);
+
+  useEffect(() => () => clearPasswordFields(), [clearPasswordFields]);
+
+  const showLogin = useCallback(() => {
+    clearPasswordFields();
+    setVerificationCode("");
+    setResendAvailableAt(null);
+    setResendSeconds(0);
+    setError(null);
+    setScreen("login");
+  }, [clearPasswordFields]);
+
+  const showEmailEntry = useCallback(() => {
+    if (isSubmitting) return;
+    clearPasswordFields();
+    setError(null);
+    setScreen("email_entry");
+  }, [clearPasswordFields, isSubmitting]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -283,6 +489,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       screen === "callback_pending" ||
       screen === "consent_pending" ||
       screen === "logout_pending" ||
+      screen === "recovery_pending" ||
       screen === "start_pending";
     if (routeAction && handledRoute.current === route) return;
     if (screen === "start_pending") {
@@ -314,6 +521,14 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       });
       return;
     }
+    if (screen === "recovery_pending") {
+      handledRoute.current = route;
+      void runtime.resumePasswordRecovery().then(applyIdentityCompletion, () => {
+        setError(copy.errors.resetUnavailable);
+        setScreen("password_reset_request");
+      });
+      return;
+    }
     if (screen === "consent_pending") {
       handledRoute.current = route;
       void runtime.continueAuthorization(window.location.search).then(
@@ -342,7 +557,8 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   }, [applyIdentityCompletion, copy, runtime, screen]);
 
   const startGoogle = useCallback(() => {
-    if (screen !== "login" || isSubmitting) return;
+    if ((screen !== "login" && screen !== "register") || isSubmitting) return;
+    clearPasswordFields();
     setError(null);
     setIsSubmitting(true);
     setScreen("identity_pending");
@@ -351,7 +567,135 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       setScreen("login");
       setIsSubmitting(false);
     });
-  }, [copy.errors.google, isSubmitting, runtime, screen]);
+  }, [clearPasswordFields, copy.errors.google, isSubmitting, runtime, screen]);
+
+  const signInWithPassword = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      setError(null);
+      setIsSubmitting(true);
+      setScreen("identity_pending");
+      try {
+        const result = await runtime.signInWithPassword(email, password);
+        if (result.state === "identity_complete") {
+          setScreen("identity_pending");
+          return;
+        }
+        const message = failureMessage(result, copy, "signIn");
+        setError(message ?? copy.errors.incomplete);
+        setScreen("login");
+      } catch {
+        setError(copy.errors.invalidCredentials);
+        setScreen("login");
+      } finally {
+        setIsSubmitting(false);
+        clearPasswordFields();
+      }
+    },
+    [clearPasswordFields, copy, email, isSubmitting, password, runtime],
+  );
+
+  const signUpWithPassword = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      setError(null);
+      setIsSubmitting(true);
+      try {
+        const result = await runtime.signUpWithPassword(email, password, passwordConfirmation);
+        const message = failureMessage(result, copy, "signUp");
+        if (message !== null) {
+          setError(message);
+          return;
+        }
+        clearPasswordFields();
+        if (result.state === "registration_confirmation") {
+          setEmail(result.email);
+          setScreen("registration_confirmation");
+        } else {
+          setScreen("identity_pending");
+        }
+      } catch {
+        setError(copy.signUpUnavailable);
+      } finally {
+        setIsSubmitting(false);
+        clearPasswordFields();
+      }
+    },
+    [clearPasswordFields, copy, email, isSubmitting, password, passwordConfirmation, runtime],
+  );
+
+  const requestPasswordReset = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      setError(null);
+      setIsSubmitting(true);
+      try {
+        const result = await runtime.requestPasswordReset(email);
+        const message = passwordResetMessage(result, copy);
+        if (message !== null) {
+          setError(message);
+          return;
+        }
+        if (result.state === "password_reset_requested") {
+          setEmail(result.email);
+          setScreen("password_reset_requested");
+        }
+      } catch {
+        setError(copy.errors.resetUnavailable);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [copy, email, isSubmitting, runtime],
+  );
+
+  const updatePassword = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      setError(null);
+      setIsSubmitting(true);
+      try {
+        const result = await runtime.updatePassword(password, passwordConfirmation);
+        if (result.state === "identity_complete") {
+          setScreen("identity_pending");
+          return;
+        }
+        const message = failureMessage(result, copy, "reset");
+        setError(message ?? copy.errors.resetUnavailable);
+      } catch {
+        setError(copy.errors.resetUnavailable);
+      } finally {
+        setIsSubmitting(false);
+        clearPasswordFields();
+      }
+    },
+    [clearPasswordFields, copy, isSubmitting, password, passwordConfirmation, runtime],
+  );
+
+  const showRegister = useCallback(() => {
+    if (isSubmitting) return;
+    clearPasswordFields();
+    setError(null);
+    setScreen("register");
+  }, [clearPasswordFields, isSubmitting]);
+
+  const showPasswordReset = useCallback(() => {
+    if (isSubmitting) return;
+    clearPasswordFields();
+    setError(null);
+    setScreen("password_reset_request");
+  }, [clearPasswordFields, isSubmitting]);
+
+  const useEmailCode = useCallback(() => {
+    if (isSubmitting) return;
+    clearPasswordFields();
+    setError(null);
+    setScreen("email_entry");
+  }, [clearPasswordFields, isSubmitting]);
 
   const sendEmailCode = useCallback(async () => {
     if (isSubmitting) return;
@@ -422,6 +766,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     screen === "consent_pending" ||
     screen === "identity_pending" ||
     screen === "logout_pending" ||
+    screen === "recovery_pending" ||
     screen === "start_pending"
   ) {
     return (
@@ -434,27 +779,47 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     );
   }
 
+  const isPasswordMode = screen === "login" || screen === "register";
+  const passwordInputType = showPassword ? "text" : "password";
+  const confirmationInputType = showPasswordConfirmation ? "text" : "password";
+  const title = screen === "register" ? copy.registerTitle :
+    screen === "password_reset_request" || screen === "password_reset_requested"
+      ? copy.forgotPasswordTitle
+      : screen === "password_recovery"
+        ? copy.passwordRecoveryTitle
+        : copy.title;
+  const intro = screen === "register" ? copy.registerIntro :
+    screen === "password_reset_request"
+      ? copy.forgotPasswordIntro
+      : screen === "password_recovery"
+        ? copy.passwordRecoveryIntro
+        : null;
+
   return (
     <main className="auth-page">
       <section aria-labelledby="auth-title" className="auth-card" aria-busy={isSubmitting}>
         <header className="auth-header">
           <img alt="Musuw" className="auth-logo" height="48" src="/musuw-logo.png" width="48" />
         </header>
-        <h1 id="auth-title">{copy.title}</h1>
-        <p className="auth-intro">{copy.intro}</p>
+        <h1 id="auth-title">{title}</h1>
+        {intro !== null ? <p className="auth-intro">{intro}</p> : null}
 
-        <button
-          className="auth-google"
-          disabled={screen !== "login" || isSubmitting}
-          onClick={startGoogle}
-          type="button"
-        >
-          {copy.google}
-        </button>
+        {isPasswordMode ? (
+          <>
+            <button
+              className="auth-google"
+              disabled={isSubmitting}
+              onClick={startGoogle}
+              type="button"
+            >
+              {copy.google}
+            </button>
 
-        <div className="auth-divider" role="separator">
-          <span>{copy.divider}</span>
-        </div>
+            <div className="auth-divider" role="separator">
+              <span>{copy.divider}</span>
+            </div>
+          </>
+        ) : null}
 
         {screen === "email_code" ? (
           <form
@@ -497,35 +862,260 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
                     ? copy.resendIn(resendSeconds)
                     : copy.resendCode}
               </button>
-              <button
-                className="auth-link"
-                disabled={isSubmitting}
-                onClick={() => {
-                  setError(null);
-                  setVerificationCode("");
-                  setResendAvailableAt(null);
-                  setResendSeconds(0);
-                  setScreen("login");
-                }}
-                type="button"
-              >
+              <button className="auth-link" disabled={isSubmitting} onClick={showEmailEntry} type="button">
                 {copy.changeEmail}
               </button>
             </div>
           </form>
+        ) : screen === "login" ? (
+          <form className="auth-form" key="password-login" noValidate onSubmit={(event) => void signInWithPassword(event)}>
+            <label htmlFor="email">{copy.email}</label>
+            <input
+              aria-describedby={error === copy.errors.invalidEmail ? "auth-error" : undefined}
+              aria-invalid={error === copy.errors.invalidEmail}
+              autoComplete="username"
+              id="email"
+              name="email"
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (error !== null) setError(null);
+              }}
+              placeholder={copy.emailPlaceholder}
+              required
+              type="email"
+              value={email}
+            />
+            <label htmlFor="password">{copy.password}</label>
+            <div className="auth-password-field">
+              <input
+                aria-describedby={error !== null ? "auth-error" : undefined}
+                aria-invalid={error !== null}
+                autoComplete="current-password"
+                id="password"
+                name="password"
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (error !== null) setError(null);
+                }}
+                placeholder={copy.passwordPlaceholder}
+                required
+                type={passwordInputType}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+                className="auth-password-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                type="button"
+              >
+                {showPassword ? copy.hidePassword : copy.showPassword}
+              </button>
+            </div>
+            <button className="auth-link auth-forgot" disabled={isSubmitting} onClick={showPasswordReset} type="button">
+              {copy.forgotPassword}
+            </button>
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? copy.signingIn : copy.signIn}
+            </button>
+            <button className="auth-link" disabled={isSubmitting} onClick={useEmailCode} type="button">
+              {copy.useEmailCode}
+            </button>
+            <div className="auth-form-actions auth-mode-switch">
+              <span>{copy.needAccount}</span>
+              <button className="auth-link" disabled={isSubmitting} onClick={showRegister} type="button">
+                {copy.createAccount}
+              </button>
+            </div>
+          </form>
+        ) : screen === "register" ? (
+          <form className="auth-form" key="password-register" noValidate onSubmit={(event) => void signUpWithPassword(event)}>
+            <label htmlFor="email">{copy.email}</label>
+            <input
+              autoComplete="email"
+              id="email"
+              name="email"
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (error !== null) setError(null);
+              }}
+              placeholder={copy.emailPlaceholder}
+              required
+              type="email"
+              value={email}
+            />
+            <label htmlFor="password">{copy.password}</label>
+            <div className="auth-password-field">
+              <input
+                aria-describedby={
+                  error === copy.errors.passwordTooShort || error === copy.errors.passwordMismatch
+                    ? "auth-error"
+                    : undefined
+                }
+                aria-invalid={error === copy.errors.passwordTooShort || error === copy.errors.passwordMismatch}
+                autoComplete="new-password"
+                id="password"
+                name="password"
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (error !== null) setError(null);
+                }}
+                placeholder={copy.passwordPlaceholder}
+                required
+                type={passwordInputType}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+                className="auth-password-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                type="button"
+              >
+                {showPassword ? copy.hidePassword : copy.showPassword}
+              </button>
+            </div>
+            <label htmlFor="password-confirmation">{copy.confirmPassword}</label>
+            <div className="auth-password-field">
+              <input
+                aria-describedby={error === copy.errors.passwordMismatch ? "auth-error" : undefined}
+                aria-invalid={error === copy.errors.passwordMismatch}
+                autoComplete="new-password"
+                id="password-confirmation"
+                name="passwordConfirmation"
+                onChange={(event) => {
+                  setPasswordConfirmation(event.target.value);
+                  if (error !== null) setError(null);
+                }}
+                placeholder={copy.confirmPasswordPlaceholder}
+                required
+                type={confirmationInputType}
+                value={passwordConfirmation}
+              />
+              <button
+                aria-label={showPasswordConfirmation ? copy.hidePassword : copy.showPassword}
+                className="auth-password-toggle"
+                onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+                type="button"
+              >
+                {showPasswordConfirmation ? copy.hidePassword : copy.showPassword}
+              </button>
+            </div>
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? copy.creatingAccount : copy.createAccount}
+            </button>
+            <button className="auth-link" disabled={isSubmitting} onClick={useEmailCode} type="button">
+              {copy.useEmailCode}
+            </button>
+            <div className="auth-form-actions auth-mode-switch">
+              <span>{copy.alreadyHaveAccount}</span>
+              <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
+                {copy.backToSignIn}
+              </button>
+            </div>
+          </form>
+        ) : screen === "password_reset_request" ? (
+          <form className="auth-form" key="password-reset-request" noValidate onSubmit={(event) => void requestPasswordReset(event)}>
+            <label htmlFor="email">{copy.email}</label>
+            <input
+              autoComplete="email"
+              id="email"
+              name="email"
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (error !== null) setError(null);
+              }}
+              placeholder={copy.emailPlaceholder}
+              required
+              type="email"
+              value={email}
+            />
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? copy.sendingCode : copy.sendResetLink}
+            </button>
+            <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
+              {copy.backToSignIn}
+            </button>
+          </form>
+        ) : screen === "password_recovery" ? (
+          <form className="auth-form" key="password-recovery" noValidate onSubmit={(event) => void updatePassword(event)}>
+            <label htmlFor="password">{copy.password}</label>
+            <div className="auth-password-field">
+              <input
+                aria-describedby={
+                  error === copy.errors.passwordTooShort || error === copy.errors.passwordMismatch
+                    ? "auth-error"
+                    : undefined
+                }
+                aria-invalid={error === copy.errors.passwordTooShort || error === copy.errors.passwordMismatch}
+                autoComplete="new-password"
+                id="password"
+                name="password"
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (error !== null) setError(null);
+                }}
+                placeholder={copy.passwordPlaceholder}
+                required
+                type={passwordInputType}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+                className="auth-password-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                type="button"
+              >
+                {showPassword ? copy.hidePassword : copy.showPassword}
+              </button>
+            </div>
+            <label htmlFor="password-confirmation">{copy.confirmPassword}</label>
+            <div className="auth-password-field">
+              <input
+                aria-describedby={error === copy.errors.passwordMismatch ? "auth-error" : undefined}
+                aria-invalid={error === copy.errors.passwordMismatch}
+                autoComplete="new-password"
+                id="password-confirmation"
+                name="passwordConfirmation"
+                onChange={(event) => {
+                  setPasswordConfirmation(event.target.value);
+                  if (error !== null) setError(null);
+                }}
+                placeholder={copy.confirmPasswordPlaceholder}
+                required
+                type={confirmationInputType}
+                value={passwordConfirmation}
+              />
+              <button
+                aria-label={showPasswordConfirmation ? copy.hidePassword : copy.showPassword}
+                className="auth-password-toggle"
+                onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+                type="button"
+              >
+                {showPasswordConfirmation ? copy.hidePassword : copy.showPassword}
+              </button>
+            </div>
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? copy.updatingPassword : copy.updatePassword}
+            </button>
+          </form>
+        ) : screen === "registration_confirmation" ? (
+          <div className="auth-message" role="status">
+            <p>{copy.registrationConfirmation(maskAuthEmail(email))}</p>
+            <button className="auth-link" onClick={showLogin} type="button">{copy.backToSignIn}</button>
+          </div>
+        ) : screen === "password_reset_requested" ? (
+          <div className="auth-message" role="status">
+            <p>{copy.resetLinkSent(maskAuthEmail(email))}</p>
+            <button className="auth-link" onClick={showLogin} type="button">{copy.backToSignIn}</button>
+          </div>
         ) : (
-          <form
-            className="auth-form"
-            key="email-address"
-            noValidate
-            onSubmit={(event) => void requestEmailCode(event)}
-          >
+          <form className="auth-form" key="email-address" noValidate onSubmit={(event) => void requestEmailCode(event)}>
             <label htmlFor="email">{copy.email}</label>
             <input
               aria-describedby={error === copy.errors.invalidEmail ? "auth-error" : undefined}
               aria-invalid={error === copy.errors.invalidEmail}
               autoComplete="email"
               id="email"
+              name="email"
               onChange={(event) => {
                 setEmail(event.target.value);
                 if (error !== null) setError(null);
@@ -537,6 +1127,9 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             />
             <button disabled={isSubmitting} type="submit">
               {isSubmitting ? copy.sendingCode : copy.sendCode}
+            </button>
+            <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
+              {copy.backToSignIn}
             </button>
           </form>
         )}

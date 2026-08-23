@@ -10,7 +10,19 @@ export type SessionStorageLike = Readonly<{
   setItem(key: string, value: string): void;
 }>;
 
-type IdentityError = Readonly<{ message?: string }> | null;
+/** A short-lived browser continuation must never outlive the auth attempt. */
+export const AUTH_FLOW_TTL_MS = 10 * 60 * 1_000;
+
+export type IdentityErrorCode =
+  | "invalid_credentials"
+  | "email_not_confirmed"
+  | "weak_password"
+  | "signup_unavailable"
+  | "identity_exists"
+  | "rate_limited"
+  | "unavailable";
+
+export type IdentityError = Readonly<{ code: IdentityErrorCode }> | null;
 
 export type AuthorizationDetails = Readonly<{
   authorization_id: string;
@@ -29,7 +41,7 @@ type AuthorizationRedirect = Readonly<{ redirect_url: string }>;
 type IdentitySession = Readonly<{ access_token: string }>;
 
 export interface IdentityClient {
-  exchangeCodeForSession(code: string): Promise<{
+  exchangeCodeForSession(code: string, options?: { flowId?: string }): Promise<{
     data: { session: IdentitySession | null };
     error: IdentityError;
   }>;
@@ -54,11 +66,39 @@ export interface IdentityClient {
     };
     provider: "google";
   }): Promise<{ data: { url: string | null }; error: IdentityError }>;
+  signInWithPassword(input: {
+    email: string;
+    password: string;
+    options?: { captchaToken?: string };
+  }): Promise<{
+    data: { session: IdentitySession | null };
+    error: IdentityError;
+  }>;
+  signUp(input: {
+    email: string;
+    password: string;
+    options?: { captchaToken?: string; emailRedirectTo?: string };
+  }): Promise<{
+    data: { session: IdentitySession | null };
+    error: IdentityError;
+  }>;
   signInWithOtp(input: {
     email: string;
     options: { shouldCreateUser: true };
   }): Promise<{ error: IdentityError }>;
+  resetPasswordForEmail(
+    email: string,
+    options: { captchaToken?: string; redirectTo: string },
+  ): Promise<{ error: IdentityError }>;
   signOut(input: { scope: "local" }): Promise<{ error: IdentityError }>;
+  updateUser(input: {
+    current_password?: string;
+    nonce?: string;
+    password: string;
+  }): Promise<{
+    data: { session: IdentitySession | null };
+    error: IdentityError;
+  }>;
   verifyOtp(input: { email: string; token: string; type: "email" }): Promise<{
     data: { session: IdentitySession | null };
     error: IdentityError;
@@ -83,10 +123,13 @@ type RuntimeOptions = Readonly<{
   nextFlowId?: () => string;
   now?: () => number;
   requestTimeoutMs?: number;
+  sharedStorage?: SessionStorageLike;
   storage: SessionStorageLike;
 }>;
 
-type LoginFlow = Readonly<{ createdAt: number; id: string }>;
+type LoginFlowKind = "oauth" | "recovery" | "signup";
+
+type LoginFlow = Readonly<{ createdAt: number; id: string; kind: LoginFlowKind }>;
 
 type PendingAuthorization = Readonly<{ authorizationId: string; createdAt: number }>;
 
@@ -103,17 +146,36 @@ export type EmailOtpSendView =
       state: "email_otp_error";
     }>;
 
+export type IdentityCompletionErrorCode =
+  | "callback_expired_or_used"
+  | "callback_invalid"
+  | "email_invalid"
+  | "email_not_confirmed"
+  | "identity_exchange_failed"
+  | "identity_network_error"
+  | "invalid_credentials"
+  | "password_invalid"
+  | "password_mismatch"
+  | "password_too_short"
+  | "password_recovery_failed"
+  | "rate_limited"
+  | "signup_unavailable"
+  | "unavailable"
+  | "weak_password"
+  | "email_code_invalid"
+  | "native_oidc_unavailable";
+
 export type IdentityCompletionView =
   | Readonly<{ state: "identity_complete" }>
+  | Readonly<{ email: string; state: "registration_confirmation" }>
+  | Readonly<{ state: "password_recovery_ready" }>
+  | Readonly<{ code: IdentityCompletionErrorCode; state: "identity_error" }>;
+
+export type PasswordResetRequestView =
+  | Readonly<{ email: string; state: "password_reset_requested" }>
   | Readonly<{
-      code:
-        | "callback_expired_or_used"
-        | "callback_invalid"
-        | "identity_exchange_failed"
-        | "identity_network_error"
-        | "email_code_invalid"
-        | "native_oidc_unavailable";
-      state: "identity_error";
+      code: "email_invalid" | "rate_limited" | "unavailable";
+      state: "password_reset_error";
     }>;
 
 export type AuthorizationContinuationView =
@@ -146,12 +208,13 @@ const callbackPath = "/api/v1/auth/oidc/callback";
 const oidcURLPath = "/api/v1/auth/oidc/url";
 const nativeSessionPath = "/api/v1/auth/me";
 const flowKey = "musnow.auth.flow";
+const recoveryMarkerKey = "musnow.auth.password-recovery";
 const pendingAuthorizationKey = "musnow.auth.pending-authorization";
 const supabaseStorageKey = "musnow.supabase.pkce";
 const weknoraAuthorizationKey = "musnow.auth.weknora-oidc";
 const nativeTokenKey = "weknora_token";
 const nativeRefreshTokenKey = "weknora_refresh_token";
-const maximumFlowAgeMs = 10 * 60 * 1_000;
+const maximumFlowAgeMs = AUTH_FLOW_TTL_MS;
 const defaultRequestTimeoutMs = 30_000;
 
 function localWorkspaceURL(path: string, origin: string): string {
@@ -181,6 +244,12 @@ function opaqueIdentifier(value: unknown): string | null {
   return candidate !== null && /^[A-Za-z0-9._~-]+$/u.test(candidate) ? candidate : null;
 }
 
+/** Supabase's PKCE flow ids are 16 random bytes encoded as 32 hex digits. */
+function supabaseFlowIdentifier(value: unknown): string | null {
+  const candidate = exactString(value, 64);
+  return candidate !== null && /^[0-9a-f]{32}$/iu.test(candidate) ? candidate : null;
+}
+
 function jsonOf<T>(raw: string, parse: (value: unknown) => T | null): T | null {
   try {
     return parse(JSON.parse(raw) as unknown);
@@ -199,7 +268,14 @@ function parseLoginFlow(value: unknown, now: number): LoginFlow | null {
   if (!isObject(value)) return null;
   const id = opaqueIdentifier(value["id"]);
   const createdAt = validCreatedAt(value["createdAt"], now);
-  return id === null || createdAt === null ? null : { createdAt, id };
+  const rawKind = value["kind"];
+  const kind =
+    rawKind === undefined
+      ? "oauth"
+      : rawKind === "recovery" || rawKind === "signup" || rawKind === "oauth"
+        ? rawKind
+        : null;
+  return id === null || createdAt === null || kind === null ? null : { createdAt, id, kind };
 }
 
 function parsePendingAuthorization(value: unknown, now: number): PendingAuthorization | null {
@@ -425,6 +501,28 @@ export function createAuthRuntime(options: RuntimeOptions) {
     return client;
   };
 
+  const sharedStorage = options.sharedStorage ?? options.storage;
+
+  const flowStorage = (kind: LoginFlowKind): SessionStorageLike =>
+    kind === "signup" || kind === "recovery" ? sharedStorage : options.storage;
+
+  const removeFlowFromAllStores = (): void => {
+    options.storage.removeItem(flowKey);
+    if (sharedStorage !== options.storage) sharedStorage.removeItem(flowKey);
+  };
+
+  const parseStoredFlow = (raw: string, timestamp: number): LoginFlow | null => {
+    const parsed = jsonOf(raw, (value) => value);
+    if (isObject(parsed) && "expiresAt" in parsed && "flow" in parsed) {
+      const expiresAt = parsed["expiresAt"];
+      if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt) || expiresAt <= timestamp) {
+        return null;
+      }
+      return parseLoginFlow(parsed["flow"], timestamp);
+    }
+    return parseLoginFlow(parsed, timestamp);
+  };
+
   const currentIdentitySession = async (): Promise<IdentitySession | null> => {
     try {
       const current = await withinRequestDeadline(identity().getSession());
@@ -433,6 +531,24 @@ export function createAuthRuntime(options: RuntimeOptions) {
     } catch {
       return null;
     }
+  };
+
+  const clearRecoveryMarker = (): void => {
+    options.storage.removeItem(recoveryMarkerKey);
+  };
+
+  const recoveryMarkerIsReady = async (): Promise<boolean> => {
+    const raw = options.storage.getItem(recoveryMarkerKey);
+    if (raw === null) return false;
+    const marker = jsonOf(raw, (value) => {
+      if (!isObject(value)) return null;
+      return validCreatedAt(value["createdAt"], now()) === null ? null : value;
+    });
+    if (marker === null || await currentIdentitySession() === null) {
+      clearRecoveryMarker();
+      return false;
+    }
+    return true;
   };
 
   const withinRequestDeadline = <T>(request: Promise<T>): Promise<T> =>
@@ -454,12 +570,60 @@ export function createAuthRuntime(options: RuntimeOptions) {
     });
 
   const consumeFlow = (flowId: string): LoginFlow | null => {
-    const raw = options.storage.getItem(flowKey);
-    options.storage.removeItem(flowKey);
-    if (raw === null) return null;
-    const flow = jsonOf(raw, (value) => parseLoginFlow(value, now()));
-    return flow !== null && flow.id === flowId ? flow : null;
+    const timestamp = now();
+    let consumed: LoginFlow | null = null;
+    for (const store of sharedStorage === options.storage
+      ? [options.storage]
+      : [options.storage, sharedStorage]) {
+      const raw = store.getItem(flowKey);
+      if (raw === null) continue;
+      store.removeItem(flowKey);
+      const flow = parseStoredFlow(raw, timestamp);
+      if (consumed === null && flow !== null && flow.id === flowId) consumed = flow;
+    }
+    return consumed;
   };
+
+  const createFlow = (kind: LoginFlowKind): string | null => {
+    const flowId = options.nextFlowId?.() ?? crypto.randomUUID().replaceAll("-", "");
+    const normalizedFlowId = opaqueIdentifier(flowId);
+    if (normalizedFlowId === null) return null;
+    const flow = { createdAt: now(), id: normalizedFlowId, kind } satisfies LoginFlow;
+    const store = flowStorage(kind);
+    store.setItem(
+      flowKey,
+      store === options.storage
+        ? JSON.stringify(flow)
+        : JSON.stringify({ expiresAt: now() + AUTH_FLOW_TTL_MS, flow }),
+    );
+    return normalizedFlowId;
+  };
+
+  const identityErrorCode = (
+    error: IdentityError,
+    fallback: Extract<IdentityErrorCode, "signup_unavailable" | "unavailable"> = "unavailable",
+  ): IdentityCompletionErrorCode => {
+    if (error === null) return fallback;
+    if (
+      error.code === "invalid_credentials" ||
+      error.code === "email_not_confirmed" ||
+      error.code === "weak_password" ||
+      error.code === "rate_limited" ||
+      error.code === "signup_unavailable" ||
+      error.code === "unavailable"
+    ) {
+      return error.code;
+    }
+    return fallback;
+  };
+
+  const identityError = (code: IdentityCompletionErrorCode): IdentityCompletionView => ({
+    code,
+    state: "identity_error",
+  });
+
+  const validSession = (session: IdentitySession | null): boolean =>
+    typeof session?.access_token === "string" && session.access_token.trim() !== "";
 
   const pendingAuthorization = (): PendingAuthorization | null => {
     const raw = options.storage.getItem(pendingAuthorizationKey);
@@ -605,23 +769,63 @@ export function createAuthRuntime(options: RuntimeOptions) {
         const parameters = new URLSearchParams(search);
         const flowId = opaqueIdentifier(parameters.get("flow"));
         const code = exactString(parameters.get("code"), 2_048);
-        if (flowId === null || code === null || parameters.has("error")) {
+        if (flowId === null) {
           return { code: "callback_invalid", state: "identity_error" };
         }
-        if (consumeFlow(flowId) === null) {
+        const flow = consumeFlow(flowId);
+        if (flow === null) {
+          if (await recoveryMarkerIsReady()) return { state: "password_recovery_ready" };
           return { code: "callback_expired_or_used", state: "identity_error" };
         }
+        const rawSupabaseFlowId = parameters.get("sb_flow_id");
+        const supabaseFlowId =
+          rawSupabaseFlowId === null ? null : supabaseFlowIdentifier(rawSupabaseFlowId);
+        const callbackInvalid =
+          code === null || parameters.has("error") ||
+          (rawSupabaseFlowId !== null && supabaseFlowId === null);
+        if (callbackInvalid || code === null) {
+          clearRecoveryMarker();
+          return flow.kind === "recovery"
+            ? { code: "password_recovery_failed", state: "identity_error" }
+            : { code: "callback_invalid", state: "identity_error" };
+        }
+        if ((flow.kind === "signup" || flow.kind === "recovery") && supabaseFlowId === null) {
+          clearRecoveryMarker();
+          return flow.kind === "recovery"
+            ? { code: "password_recovery_failed", state: "identity_error" }
+            : { code: "callback_invalid", state: "identity_error" };
+        }
         try {
-          const result = await withinRequestDeadline(identity().exchangeCodeForSession(code));
-          if (result.error !== null || result.data.session?.access_token.trim() === "") {
-            return { code: "identity_exchange_failed", state: "identity_error" };
+          const result = await withinRequestDeadline(
+            supabaseFlowId === null
+              ? identity().exchangeCodeForSession(code)
+              : identity().exchangeCodeForSession(code, { flowId: supabaseFlowId }),
+          );
+          if (result.error !== null || !validSession(result.data.session)) {
+            clearRecoveryMarker();
+            return flow.kind === "recovery"
+              ? { code: "password_recovery_failed", state: "identity_error" }
+              : { code: "identity_exchange_failed", state: "identity_error" };
+          }
+          if (flow.kind === "recovery") {
+            options.storage.setItem(recoveryMarkerKey, JSON.stringify({ createdAt: now() }));
+            return { state: "password_recovery_ready" };
           }
           return resumeAfterIdentity();
         } catch {
-          return { code: "identity_network_error", state: "identity_error" };
+          clearRecoveryMarker();
+          return flow.kind === "recovery"
+            ? { code: "password_recovery_failed", state: "identity_error" }
+            : { code: "identity_network_error", state: "identity_error" };
         }
       })();
       return callbackOperation;
+    },
+
+    async resumePasswordRecovery(): Promise<IdentityCompletionView> {
+      return (await recoveryMarkerIsReady())
+        ? { state: "password_recovery_ready" }
+        : { code: "password_recovery_failed", state: "identity_error" };
     },
 
     continueAuthorization(search: string): Promise<AuthorizationContinuationView> {
@@ -706,6 +910,104 @@ export function createAuthRuntime(options: RuntimeOptions) {
       return authorizationOperation;
     },
 
+    async signInWithPassword(emailInput: string, password: string): Promise<IdentityCompletionView> {
+      const email = normalizeEmailAddress(emailInput);
+      if (email === null) return identityError("email_invalid");
+      if (password === "") return identityError("password_invalid");
+      try {
+        const result = await withinRequestDeadline(
+          identity().signInWithPassword({ email, password }),
+        );
+        if (result.error !== null) return identityError(identityErrorCode(result.error));
+        if (!validSession(result.data.session)) return identityError("unavailable");
+        return resumeAfterIdentity();
+      } catch {
+        return identityError("unavailable");
+      }
+    },
+
+    async signUpWithPassword(
+      emailInput: string,
+      password: string,
+      confirmation: string,
+    ): Promise<IdentityCompletionView> {
+      const email = normalizeEmailAddress(emailInput);
+      if (email === null) return identityError("email_invalid");
+      if (password.length < 8) return identityError("password_too_short");
+      if (password !== confirmation) return identityError("password_mismatch");
+
+      const flowId = createFlow("signup");
+      if (flowId === null) return identityError("unavailable");
+      const redirectTo = new URL("/auth/callback", location.origin).toString();
+      try {
+        const result = await withinRequestDeadline(
+          identity().signUp({
+            email,
+            password,
+            options: { emailRedirectTo: `${redirectTo}?flow=${encodeURIComponent(flowId)}` },
+          }),
+        );
+        if (result.error !== null) {
+          if (result.error.code === "identity_exists") {
+            return { email, state: "registration_confirmation" };
+          }
+          removeFlowFromAllStores();
+          return identityError(identityErrorCode(result.error, "signup_unavailable"));
+        }
+        if (!validSession(result.data.session)) {
+          return { email, state: "registration_confirmation" };
+        }
+        removeFlowFromAllStores();
+        return resumeAfterIdentity();
+      } catch {
+        removeFlowFromAllStores();
+        return identityError("unavailable");
+      }
+    },
+
+    async requestPasswordReset(input: string): Promise<PasswordResetRequestView> {
+      const email = normalizeEmailAddress(input);
+      if (email === null) return { code: "email_invalid", state: "password_reset_error" };
+
+      const flowId = createFlow("recovery");
+      if (flowId === null) return { code: "unavailable", state: "password_reset_error" };
+      const redirectTo = new URL("/auth/callback", location.origin).toString();
+      try {
+        const result = await withinRequestDeadline(
+          identity().resetPasswordForEmail(email, {
+            redirectTo: `${redirectTo}?flow=${encodeURIComponent(flowId)}`,
+          }),
+        );
+        if (result.error !== null) {
+          removeFlowFromAllStores();
+          return result.error.code === "rate_limited"
+            ? { code: "rate_limited", state: "password_reset_error" }
+            : result.error.code === "unavailable"
+              ? { code: "unavailable", state: "password_reset_error" }
+              : { email, state: "password_reset_requested" };
+        }
+        return { email, state: "password_reset_requested" };
+      } catch {
+        removeFlowFromAllStores();
+        return { code: "unavailable", state: "password_reset_error" };
+      }
+    },
+
+    async updatePassword(password: string, confirmation: string): Promise<IdentityCompletionView> {
+      if (password.length < 8) return identityError("password_too_short");
+      if (password !== confirmation) return identityError("password_mismatch");
+      try {
+        const result = await withinRequestDeadline(identity().updateUser({ password }));
+        if (result.error !== null) return identityError(identityErrorCode(result.error));
+        if (!validSession(result.data.session)) return identityError("unavailable");
+        removeFlowFromAllStores();
+        clearRecoveryMarker();
+        return resumeAfterIdentity();
+      } catch {
+        return identityError("unavailable");
+      }
+    },
+
     async requestEmailOtp(input: string): Promise<EmailOtpSendView> {
       const email = normalizeEmailAddress(input);
       if (email === null) return { code: "email_invalid", state: "email_otp_error" };
@@ -722,7 +1024,8 @@ export function createAuthRuntime(options: RuntimeOptions) {
     },
 
     async signOut(): Promise<void> {
-      options.storage.removeItem(flowKey);
+      removeFlowFromAllStores();
+      clearRecoveryMarker();
       clearContinuation();
       clearNativeSession();
       try {
@@ -735,13 +1038,8 @@ export function createAuthRuntime(options: RuntimeOptions) {
     },
 
     async startGoogle(): Promise<void> {
-      const flowId = options.nextFlowId?.() ?? crypto.randomUUID().replaceAll("-", "");
-      const normalizedFlowId = opaqueIdentifier(flowId);
+      const normalizedFlowId = createFlow("oauth");
       if (normalizedFlowId === null) throw new Error("Unable to start sign-in");
-      options.storage.setItem(
-        flowKey,
-        JSON.stringify({ createdAt: now(), id: normalizedFlowId } satisfies LoginFlow),
-      );
       try {
         const redirectTo = new URL("/auth/callback", location.origin).toString();
         const result = await withinRequestDeadline(
@@ -757,7 +1055,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
         if (result.error !== null || result.data.url === null) throw new Error("Sign-in unavailable");
         location.assign(result.data.url);
       } catch (error) {
-        options.storage.removeItem(flowKey);
+        removeFlowFromAllStores();
         throw error;
       }
     },

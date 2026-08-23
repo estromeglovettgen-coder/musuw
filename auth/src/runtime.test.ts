@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  AUTH_FLOW_TTL_MS,
   createAuthRuntime,
   type AuthorizationDetails,
   type IdentityClient,
@@ -69,8 +70,21 @@ function identity(
       data: { url: "https://identity.example/authorize" },
       error: null,
     })),
+    signInWithPassword: vi.fn(async () => ({
+      data: { session: { access_token: "supabase-access-token" } },
+      error: null,
+    })),
+    signUp: vi.fn(async () => ({
+      data: { session: null },
+      error: null,
+    })),
     signInWithOtp: vi.fn(async () => ({ error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     signOut: vi.fn(async () => ({ error: null })),
+    updateUser: vi.fn(async () => ({
+      data: { session: { access_token: "supabase-access-token" } },
+      error: null,
+    })),
     verifyOtp: vi.fn(async () => ({
       data: { session: { access_token: "supabase-access-token" } },
       error: null,
@@ -92,25 +106,28 @@ function runtimeFor(
   ),
   nativeStore = storage(),
   publicOrigin = "https://app.musuw.com",
+  sharedStore?: SessionStorageLike,
 ) {
+  const runtimeOptions = {
+    config: {
+      publicOrigin,
+      publishableKey: "sb_publishable_key",
+      supabaseUrl: "https://identity.example",
+      weknoraOAuthClientId: "weknora-client",
+    },
+    createIdentityClient: () => client,
+    fetch,
+    location: { assign: assigned, origin: "https://app.musuw.com" },
+    nativeStorage: nativeStore,
+    nextFlowId: () => "flow_1",
+    now: () => 1,
+    storage: store,
+    ...(sharedStore === undefined ? {} : { sharedStorage: sharedStore }),
+  };
   return {
     assigned,
     fetch,
-    runtime: createAuthRuntime({
-      config: {
-        publicOrigin,
-        publishableKey: "sb_publishable_key",
-        supabaseUrl: "https://identity.example",
-        weknoraOAuthClientId: "weknora-client",
-      },
-      createIdentityClient: () => client,
-      fetch,
-      location: { assign: assigned, origin: "https://app.musuw.com" },
-      nativeStorage: nativeStore,
-      nextFlowId: () => "flow_1",
-      now: () => 1,
-      storage: store,
-    }),
+    runtime: createAuthRuntime(runtimeOptions),
     nativeStore,
     store,
   };
@@ -673,5 +690,301 @@ describe("Supabase to WeKnora authorization continuation", () => {
 
     expect(client.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(store.values.size).toBe(0);
+  });
+});
+
+describe("password identity continuation", () => {
+  it("signs in with a normalized email and resumes the native OIDC handoff", async () => {
+    const client = identity() as IdentityClient & {
+      signInWithPassword: ReturnType<typeof vi.fn>;
+    };
+    client.signInWithPassword = vi.fn(async () => ({
+      data: { session: { access_token: "supabase-access-token" } },
+      error: null,
+    }));
+    const { assigned, fetch, runtime } = runtimeFor(client);
+
+    await expect(
+      (runtime as typeof runtime & {
+        signInWithPassword(email: string, password: string): Promise<unknown>;
+      }).signInWithPassword(" USER@example.com ", "correct horse battery staple"),
+    ).resolves.toEqual({ state: "identity_complete" });
+
+    expect(client.signInWithPassword).toHaveBeenCalledWith({
+      email: "user@example.com",
+      password: "correct horse battery staple",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/oidc/url?"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(assigned).toHaveBeenLastCalledWith(
+      "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
+    );
+  });
+
+  it("keeps signup confirmation in a bounded state when Supabase requires email confirmation", async () => {
+    const client = identity() as IdentityClient & {
+      signUp: ReturnType<typeof vi.fn>;
+    };
+    client.signUp = vi.fn(async () => ({
+      data: { session: null },
+      error: null,
+    }));
+    const { assigned, runtime, store } = runtimeFor(client);
+
+    const result = await (
+      runtime as typeof runtime & {
+        signUpWithPassword(
+          email: string,
+          password: string,
+          confirmation: string,
+        ): Promise<unknown>;
+      }
+    ).signUpWithPassword(" USER@example.com ", "correct horse battery staple", "correct horse battery staple");
+
+    expect(result).toEqual({ email: "user@example.com", state: "registration_confirmation" });
+    expect(client.signUp).toHaveBeenCalledWith({
+      email: "user@example.com",
+      password: "correct horse battery staple",
+      options: {
+        emailRedirectTo: "https://app.musuw.com/auth/callback?flow=flow_1",
+      },
+    });
+    expect(store.getItem("musnow.auth.flow")).toBe(
+      JSON.stringify({ createdAt: 1, id: "flow_1", kind: "signup" }),
+    );
+    expect(assigned).not.toHaveBeenCalled();
+  });
+
+  it("masks an existing-account signup result exactly like a new confirmation flow", async () => {
+    const client = identity({
+      signUp: vi.fn(async () => ({
+        data: { session: null },
+        error: { code: "identity_exists" as const },
+      })),
+    });
+    const { runtime, store } = runtimeFor(client);
+    await expect(
+      (runtime as typeof runtime & { signUpWithPassword(email: string, password: string, confirmation: string): Promise<unknown> })
+        .signUpWithPassword("existing@example.com", "correct horse battery staple", "correct horse battery staple"),
+    ).resolves.toEqual({ email: "existing@example.com", state: "registration_confirmation" });
+    expect(store.getItem("musnow.auth.flow")).toContain('"kind":"signup"');
+  });
+
+  it("resumes the native handoff after a confirmed signup callback", async () => {
+    const client = identity() as IdentityClient & {
+      signUp: ReturnType<typeof vi.fn>;
+    };
+    client.signUp = vi.fn(async () => ({
+      data: { session: null },
+      error: null,
+    }));
+    const { assigned, fetch, runtime } = runtimeFor(client);
+
+    await expect(
+      (runtime as typeof runtime & {
+        signUpWithPassword(
+          email: string,
+          password: string,
+          confirmation: string,
+        ): Promise<unknown>;
+      }).signUpWithPassword("user@example.com", "correct horse battery staple", "correct horse battery staple"),
+    ).resolves.toEqual({ email: "user@example.com", state: "registration_confirmation" });
+
+    await expect(runtime.completeCallback("?flow=flow_1&code=signup-code&sb_flow_id=0123456789abcdef0123456789abcdef")).resolves.toEqual({
+      state: "identity_complete",
+    });
+    expect(client.exchangeCodeForSession).toHaveBeenCalledWith("signup-code", {
+      flowId: "0123456789abcdef0123456789abcdef",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/oidc/url?"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(assigned).toHaveBeenLastCalledWith(
+      "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
+    );
+  });
+
+  it("uses a recovery flow once and exposes only the recovery-ready state", async () => {
+    const client = identity() as IdentityClient & {
+      resetPasswordForEmail: ReturnType<typeof vi.fn>;
+      updateUser: ReturnType<typeof vi.fn>;
+    };
+    client.resetPasswordForEmail = vi.fn(async () => ({ error: null }));
+    client.updateUser = vi.fn(async () => ({
+      data: { session: { access_token: "supabase-access-token" } },
+      error: null,
+    }));
+    const { assigned, fetch, runtime, store } = runtimeFor(client);
+
+    await expect(
+      (runtime as typeof runtime & {
+        requestPasswordReset(email: string): Promise<unknown>;
+      }).requestPasswordReset(" USER@example.com "),
+    ).resolves.toEqual({ email: "user@example.com", state: "password_reset_requested" });
+    expect(client.resetPasswordForEmail).toHaveBeenCalledWith("user@example.com", {
+      redirectTo: "https://app.musuw.com/auth/callback?flow=flow_1",
+    });
+    expect(store.getItem("musnow.auth.flow")).toBe(
+      JSON.stringify({ createdAt: 1, id: "flow_1", kind: "recovery" }),
+    );
+
+    await expect(
+      runtime.completeCallback("?code=recovery-code&flow=flow_1&sb_flow_id=0123456789abcdef0123456789abcdef"),
+    ).resolves.toEqual({ state: "password_recovery_ready" });
+    expect(client.exchangeCodeForSession).toHaveBeenCalledWith("recovery-code", {
+      flowId: "0123456789abcdef0123456789abcdef",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(assigned).not.toHaveBeenCalled();
+    expect(store.getItem("musnow.auth.flow")).toBeNull();
+
+    await expect(
+      (runtime as typeof runtime & {
+        updatePassword(password: string, confirmation: string): Promise<unknown>;
+      }).updatePassword("new correct horse battery staple", "new correct horse battery staple"),
+    ).resolves.toEqual({ state: "identity_complete" });
+    expect(client.updateUser).toHaveBeenCalledWith({ password: "new correct horse battery staple" });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/oidc/url?"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
+  it("exchanges signup and recovery callbacks from another tab through only the shared flow store", async () => {
+    const shared = storage();
+    const firstSession = storage();
+    const secondSession = storage();
+    const exchange = vi.fn(async (_code: string, options?: { flowId?: string }) => ({
+      data: { session: options?.flowId === "0123456789abcdef0123456789abcdef" ? { access_token: "token" } : null },
+      error: options?.flowId === "0123456789abcdef0123456789abcdef" ? null : { code: "unavailable" as const },
+    }));
+    const client = identity({ exchangeCodeForSession: exchange });
+    const first = runtimeFor(client, firstSession, vi.fn(), undefined, storage(), "https://app.musuw.com", shared);
+    await expect(
+      (first.runtime as typeof first.runtime & { signUpWithPassword(email: string, password: string, confirmation: string): Promise<unknown> })
+        .signUpWithPassword("new@example.com", "correct horse battery staple", "correct horse battery staple"),
+    ).resolves.toEqual({ email: "new@example.com", state: "registration_confirmation" });
+    expect(firstSession.getItem("musnow.auth.flow")).toBeNull();
+    expect(shared.getItem("musnow.auth.flow")).toContain('"kind":"signup"');
+
+    const second = runtimeFor(client, secondSession, vi.fn(), undefined, storage(), "https://app.musuw.com", shared);
+    await expect(
+      second.runtime.completeCallback("?flow=flow_1&code=signup-code&sb_flow_id=0123456789abcdef0123456789abcdef"),
+    ).resolves.toEqual({ state: "identity_complete" });
+    expect(exchange).toHaveBeenCalledWith("signup-code", { flowId: "0123456789abcdef0123456789abcdef" });
+    expect(shared.getItem("musnow.auth.flow")).toBeNull();
+
+    await expect(
+      (first.runtime as typeof first.runtime & { requestPasswordReset(email: string): Promise<unknown> })
+        .requestPasswordReset("new@example.com"),
+    ).resolves.toEqual({ email: "new@example.com", state: "password_reset_requested" });
+    const recoveryTab = runtimeFor(client, storage(), vi.fn(), undefined, storage(), "https://app.musuw.com", shared);
+    await expect(
+      recoveryTab.runtime.completeCallback("?flow=flow_1&code=recovery-code&sb_flow_id=0123456789abcdef0123456789abcdef"),
+    ).resolves.toEqual({ state: "password_recovery_ready" });
+    expect(exchange).toHaveBeenCalledWith("recovery-code", { flowId: "0123456789abcdef0123456789abcdef" });
+    expect(shared.getItem("musnow.auth.flow")).toBeNull();
+  });
+
+  it("fails closed for missing or wrong SDK flow ids and never borrows a verifier", async () => {
+    const exchange = vi.fn(async (_code: string, options?: { flowId?: string }) => ({
+      data: { session: null },
+      error: options?.flowId === "0123456789abcdef0123456789abcdef" ? null : { code: "unavailable" as const },
+    }));
+    const client = identity({ exchangeCodeForSession: exchange });
+    const missing = runtimeFor(client);
+    await (missing.runtime as typeof missing.runtime & { signUpWithPassword(email: string, password: string, confirmation: string): Promise<unknown> })
+      .signUpWithPassword("new@example.com", "correct horse battery staple", "correct horse battery staple");
+    await expect(missing.runtime.completeCallback("?flow=flow_1&code=signup-code")).resolves.toEqual({
+      code: "callback_invalid",
+      state: "identity_error",
+    });
+    expect(exchange).not.toHaveBeenCalled();
+
+    const wrong = runtimeFor(client);
+    await (wrong.runtime as typeof wrong.runtime & { signUpWithPassword(email: string, password: string, confirmation: string): Promise<unknown> })
+      .signUpWithPassword("new@example.com", "correct horse battery staple", "correct horse battery staple");
+    await expect(
+      wrong.runtime.completeCallback("?flow=flow_1&code=signup-code&sb_flow_id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+    ).resolves.toEqual({ code: "identity_exchange_failed", state: "identity_error" });
+    expect(exchange).toHaveBeenCalledWith("signup-code", { flowId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+  });
+
+  it("returns a bounded recovery retry state for an invalid or consumed recovery callback", async () => {
+    const client = identity();
+    const { runtime } = runtimeFor(client);
+    await (runtime as typeof runtime & { requestPasswordReset(email: string): Promise<unknown> })
+      .requestPasswordReset("user@example.com");
+    await expect(runtime.completeCallback("?flow=flow_1&error=access_denied")).resolves.toEqual({
+      code: "password_recovery_failed",
+      state: "identity_error",
+    });
+    const replay = runtimeFor(client);
+    await expect(replay.runtime.completeCallback("?flow=flow_1&code=used-code")).resolves.toEqual({
+      code: "callback_expired_or_used",
+      state: "identity_error",
+    });
+  });
+
+  it("uses a short-lived recovery marker after a callback refresh and rejects an expired marker", async () => {
+    const client = identity();
+    const session = storage();
+    const first = runtimeFor(client, session);
+    await (first.runtime as typeof first.runtime & { requestPasswordReset(email: string): Promise<unknown> })
+      .requestPasswordReset("user@example.com");
+    await expect(
+      first.runtime.completeCallback("?flow=flow_1&code=recovery-code&sb_flow_id=0123456789abcdef0123456789abcdef"),
+    ).resolves.toEqual({ state: "password_recovery_ready" });
+    expect(session.getItem("musnow.auth.password-recovery")).toContain('"createdAt":1');
+
+    const refreshed = runtimeFor(client, session);
+    await expect(refreshed.runtime.completeCallback("?flow=flow_1")).resolves.toEqual({
+      state: "password_recovery_ready",
+    });
+    session.setItem("musnow.auth.password-recovery", JSON.stringify({ createdAt: -AUTH_FLOW_TTL_MS }));
+    const expired = runtimeFor(client, session);
+    await expect(expired.runtime.completeCallback("?flow=flow_1")).resolves.toEqual({
+      code: "callback_expired_or_used",
+      state: "identity_error",
+    });
+  });
+
+  it("treats a legacy flow without kind as the existing OAuth flow", async () => {
+    const client = identity();
+    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    store.setItem("musnow.auth.flow", JSON.stringify({ createdAt: 1, id: "flow_1" }));
+
+    await expect(runtime.completeCallback("?code=legacy-code&flow=flow_1")).resolves.toEqual({
+      state: "identity_complete",
+    });
+    expect(client.exchangeCodeForSession).toHaveBeenCalledWith("legacy-code");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/oidc/url?"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(assigned).toHaveBeenLastCalledWith(
+      "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
+    );
+  });
+
+  it("rejects an unknown flow kind instead of treating it as an OAuth callback", async () => {
+    const client = identity();
+    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    store.setItem(
+      "musnow.auth.flow",
+      JSON.stringify({ createdAt: 1, id: "flow_1", kind: "unexpected" }),
+    );
+
+    await expect(runtime.completeCallback("?code=unexpected-code&flow=flow_1")).resolves.toEqual({
+      code: "callback_expired_or_used",
+      state: "identity_error",
+    });
+    expect(client.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(assigned).not.toHaveBeenCalled();
+    expect(store.getItem("musnow.auth.flow")).toBeNull();
   });
 });

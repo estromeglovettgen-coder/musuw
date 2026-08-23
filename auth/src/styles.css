@@ -91,7 +91,7 @@ button {
 }
 
 .auth-google,
-.auth-form button:not(.auth-link) {
+.auth-form button:not(.auth-link):not(.auth-password-toggle) {
   align-items: center;
   appearance: none;
   background: #202124;
@@ -111,19 +111,19 @@ button {
 }
 
 .auth-google:hover,
-.auth-form button:not(.auth-link):hover {
+.auth-form button:not(.auth-link):not(.auth-password-toggle):hover {
   background: #303134;
   border-color: #303134;
   box-shadow: 0 2px 6px rgba(32, 33, 36, 0.18);
 }
 
 .auth-google:active,
-.auth-form button:not(.auth-link):active {
+.auth-form button:not(.auth-link):not(.auth-password-toggle):active {
   transform: translateY(1px);
 }
 
 .auth-google:disabled,
-.auth-form button:not(.auth-link):disabled {
+.auth-form button:not(.auth-link):not(.auth-password-toggle):disabled {
   background: #f1f3f4;
   border-color: #dadce0;
   color: #9aa0a6;
@@ -194,6 +194,35 @@ button {
   outline: none;
 }
 
+.auth-password-field {
+  align-items: center;
+  display: flex;
+  position: relative;
+}
+
+.auth-password-field input {
+  padding-right: 92px;
+}
+
+.auth-password-toggle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #1967d2;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 8px;
+  position: absolute;
+  right: 5px;
+}
+
+.auth-password-toggle:hover {
+  background: rgba(26, 115, 232, 0.08);
+  color: #174ea6;
+}
+
 .auth-link {
   appearance: none;
   background: transparent;
@@ -225,6 +254,32 @@ button {
   gap: 2px 8px;
   justify-content: space-between;
   margin: -2px -8px 0;
+}
+
+.auth-mode-switch {
+  align-items: center;
+  color: #5f6368;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.auth-mode-switch .auth-link {
+  justify-self: auto;
+}
+
+.auth-forgot {
+  margin-top: -3px;
+}
+
+.auth-message {
+  color: #3c4043;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.auth-message p {
+  margin: 0 0 14px;
 }
 
 .auth-resend {
@@ -373,7 +428,7 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .auth-google,
-  .auth-form button:not(.auth-link),
+  .auth-form button:not(.auth-link):not(.auth-password-toggle),
   .auth-form input,
   .auth-link,
   .auth-legal-note a {

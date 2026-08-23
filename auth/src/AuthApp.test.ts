@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
@@ -22,6 +23,7 @@ describe("auth shell browser routes", () => {
 
   it("uses only the public auth paths for start, callback, and logout", () => {
     expect(initialAuthScreenForPathname("/auth/callback")).toBe("callback_pending");
+    expect(initialAuthScreenForPathname("/auth/recovery")).toBe("recovery_pending");
     expect(initialAuthScreenForPathname("/auth/logout")).toBe("logout_pending");
     expect(initialAuthScreenForPathname("/logout")).toBe("login");
   });
@@ -61,6 +63,19 @@ describe("auth shell localized copy", () => {
       expect(copy.divider).not.toBe("");
       expect(copy.status).not.toBe("");
       expect(copy.email).not.toBe("");
+      expect(copy.password).not.toBe("");
+      expect(copy.confirmPassword).not.toBe("");
+      expect(copy.signIn).not.toBe("");
+      expect(copy.signInUnavailable).not.toBe("");
+      expect(copy.createAccount).not.toBe("");
+      expect(copy.signUpUnavailable).not.toBe("");
+      expect(copy.updatePassword).not.toBe("");
+      expect(copy.updatingPassword).not.toBe("");
+      expect(copy.passwordRecoveryTitle).not.toBe("");
+      expect(copy.forgotPassword).not.toBe("");
+      expect(copy.useEmailCode).not.toBe("");
+      expect(copy.showPassword).not.toBe("");
+      expect(copy.hidePassword).not.toBe("");
       expect(copy.emailCodeSent("user@example.com")).toContain("user@example.com");
       expect(copy.sendCode).not.toBe("");
       expect(copy.sendingCode).not.toBe("");
@@ -90,6 +105,9 @@ describe("auth shell legal acknowledgement", () => {
     expect(html).toContain("auth-legal-note");
     expect(html).not.toMatch(/class="auth-google" disabled/);
     expect(html).not.toMatch(/<button disabled="" type="submit">Send code/);
+    expect(html).toContain('name="password"');
+    expect(html).toContain("Forgot password?");
+    expect(html).toContain("Create account");
   });
 
   it("uses the canonical public legal documents", () => {
@@ -107,5 +125,19 @@ describe("auth shell email privacy", () => {
     expect(maskAuthEmail("person@example.com")).toBe("pe••••@example.com");
     expect(maskAuthEmail("a@example.com")).toBe("a••@example.com");
     expect(maskAuthEmail("invalid")).toBe("••••");
+  });
+});
+
+describe("auth shell password-field composition", () => {
+  it("keeps the reveal control out of the full-width primary-button selector", () => {
+    const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+
+    expect(css).toContain(
+      ".auth-form button:not(.auth-link):not(.auth-password-toggle)",
+    );
+    expect(css).not.toMatch(
+      /\.auth-form button:not\(\.auth-link\)(?!:not\(\.auth-password-toggle\))/,
+    );
+    expect(css).toMatch(/\.auth-password-toggle\s*\{[\s\S]*position:\s*absolute;/);
   });
 });

@@ -20,8 +20,9 @@ try {
   const runtime = createAuthRuntime({
     config,
     createIdentityClient: (identityConfig) =>
-      createSupabaseIdentityClient(identityConfig, window.sessionStorage),
+      createSupabaseIdentityClient(identityConfig, window.sessionStorage, window.localStorage),
     nativeStorage: window.localStorage,
+    sharedStorage: window.localStorage,
     storage: window.sessionStorage,
   });
   content = <AuthApp runtime={runtime} />;
