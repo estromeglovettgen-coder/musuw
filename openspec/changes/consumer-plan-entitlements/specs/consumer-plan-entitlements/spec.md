@@ -137,8 +137,16 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **WHEN** a correctly signed active Paddle `subscription.created` or `subscription.activated` event contains a known price, tenant identifier, matching checkout binding, and confirmed current-period end
 - **THEN** the mapped paid plan is applied once
 
+#### Scenario: Current paid subscription owns lifecycle events
+- **WHEN** a tenant has a durable paid plan with an active or paused current subscription and a correctly signed lifecycle event names a different subscription
+- **THEN** the event does not change the tenant's plan, provider identity, cadence, paid term, or allowance
+
+#### Scenario: Free or canceled tenant replaces a stale subscription identifier
+- **WHEN** a tenant's durable plan is Free or its status is canceled, and a correctly signed active `subscription.created` or `subscription.activated` event for a different subscription contains a known paid price, matching checkout binding, and a confirmed period after the event time
+- **THEN** the new paid subscription replaces the stale identifier; other lifecycle events without a confirmed period do not replace it
+
 #### Scenario: Initial paid period is unconfirmed
-- **WHEN** a paid lifecycle event has no confirmed current-period end and the tenant has no prior confirmed paid credit period
+- **WHEN** a paid lifecycle event has no confirmed current-period end and the tenant has no prior confirmed paid credit period (a Free registration-anniversary boundary does not count)
 - **THEN** the event does not initialize or change the paid plan, provider identity, cadence, or allowance
 
 #### Scenario: Invalid or unknown event

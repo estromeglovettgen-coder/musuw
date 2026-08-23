@@ -388,6 +388,15 @@ func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uin
 	}
 	target := &types.Tenant{Plan: plan, PlanStatus: status}
 	targetPlan := types.EffectiveConsumerPlan(target)
+	currentSubscriptionID := strings.TrimSpace(tenant.PaddleSubscriptionID)
+	incomingSubscriptionID := strings.TrimSpace(subscriptionID)
+	newInitialPaidActivation := (types.NormalizeConsumerPlan(tenant.Plan) == types.ConsumerPlanFree || tenant.PlanStatus == "canceled") &&
+		targetPlan != types.ConsumerPlanFree && incomingSubscriptionID != "" &&
+		status == "active" && eventPeriodEnd != nil && !eventPeriodEnd.IsZero() && eventPeriodEnd.After(occurredAt)
+	if currentSubscriptionID != "" && incomingSubscriptionID != currentSubscriptionID && !newInitialPaidActivation {
+		logger.Infof(ctx, "Consumer plan event ignored for non-current subscription tenant_id=%d", tenantID)
+		return false, nil
+	}
 	pausingSamePlan := status == "paused" && plan != types.ConsumerPlanFree && types.NormalizeConsumerPlan(tenant.Plan) == plan
 	resumingSamePlan := tenant.PlanStatus == "paused" && targetPlan != types.ConsumerPlanFree && types.NormalizeConsumerPlan(tenant.Plan) == targetPlan
 	if targetPlan == types.ConsumerPlanFree && !pausingSamePlan {
@@ -395,8 +404,11 @@ func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uin
 	} else if billingPeriod != "monthly" && billingPeriod != "yearly" {
 		return false, fmt.Errorf("Paddle billing period is invalid")
 	}
-	if targetPlan != types.ConsumerPlanFree && tenant.OpenRouterCreditPeriodEnd == nil &&
-		(eventPeriodEnd == nil || eventPeriodEnd.IsZero()) {
+	previousPlan := types.EffectiveConsumerPlan(tenant)
+	requiresConfirmedPaidPeriod := targetPlan != types.ConsumerPlanFree && !resumingSamePlan &&
+		(previousPlan == types.ConsumerPlanFree || tenant.OpenRouterCreditPeriodEnd == nil)
+	if requiresConfirmedPaidPeriod &&
+		(eventPeriodEnd == nil || eventPeriodEnd.IsZero() || !eventPeriodEnd.After(occurredAt)) {
 		logger.Infof(ctx, "Consumer plan event ignored without a confirmed initial paid period tenant_id=%d", tenantID)
 		return false, nil
 	}

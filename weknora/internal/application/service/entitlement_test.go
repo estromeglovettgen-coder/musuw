@@ -354,6 +354,166 @@ func TestApplyConsumerPlanIgnoresInitialPaidStateWithoutConfirmedPeriod(t *testi
 	assert.Nil(t, repo.tenant.OpenRouterCreditPeriodEnd)
 }
 
+func TestApplyConsumerPlanDoesNotInitializePaidPlanFromFreeAnniversaryWithoutProviderPeriod(t *testing.T) {
+	now := time.Date(2026, 8, 28, 9, 30, 0, 0, time.UTC)
+	freePeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	for _, eventName := range []string{"subscription.updated", "subscription.resumed"} {
+		t.Run(eventName, func(t *testing.T) {
+			repo := &entitlementRepoStub{tenant: &types.Tenant{
+				ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", PaddleBillingPeriod: "",
+				PaddleCustomerID: "ctm_current", PaddleSubscriptionID: "sub_current",
+				OpenRouterCreditPeriodEnd: &freePeriodEnd,
+			}}
+			svc := newEntitlementService(repo, nil)
+
+			applied, err := svc.ApplyConsumerPlan(
+				context.Background(), 7, types.ConsumerPlanPlus, "active", "monthly",
+				"evt-"+eventName, now, "ctm_current", "sub_current", nil,
+			)
+			require.NoError(t, err)
+			assert.False(t, applied)
+			assert.Equal(t, types.ConsumerPlanFree, repo.tenant.Plan)
+			assert.Equal(t, "active", repo.tenant.PlanStatus)
+			assert.Equal(t, "sub_current", repo.tenant.PaddleSubscriptionID)
+			require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+			assert.Equal(t, freePeriodEnd, repo.tenant.OpenRouterCreditPeriodEnd.UTC())
+		})
+	}
+}
+
+func TestApplyConsumerPlanDoesNotResumeCanceledPaidPlanWithoutProviderPeriod(t *testing.T) {
+	now := time.Date(2026, 8, 28, 9, 30, 0, 0, time.UTC)
+	freePeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "canceled", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm_current", PaddleSubscriptionID: "sub_current",
+		OpenRouterCreditPeriodEnd: &freePeriodEnd,
+	}}
+	svc := newEntitlementService(repo, nil)
+
+	applied, err := svc.ApplyConsumerPlan(
+		context.Background(), 7, types.ConsumerPlanPro, "active", "monthly",
+		"evt-subscription-resumed", now, "ctm_current", "sub_current", nil,
+	)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan)
+	assert.Equal(t, "canceled", repo.tenant.PlanStatus)
+	assert.Equal(t, "sub_current", repo.tenant.PaddleSubscriptionID)
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, freePeriodEnd, repo.tenant.OpenRouterCreditPeriodEnd.UTC())
+}
+
+func TestApplyConsumerPlanIgnoresLifecycleEventFromNonCurrentSubscription(t *testing.T) {
+	now := time.Now().UTC()
+	creditPeriodEnd := now.AddDate(0, 1, 0)
+	paidPeriodEnd := now.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_current",
+		OpenRouterCreditPeriodEnd: &creditPeriodEnd, PaddleCurrentPeriodEnd: &paidPeriodEnd,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{
+			APIKey: "sk-child", KeyHash: "hash-7",
+		}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		UsageMicrousd: 100_000, LimitMicrousd: 2_500_000, LimitRemainingMicrousd: 2_400_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	applied, err := svc.ApplyConsumerPlan(
+		context.Background(), 7, types.ConsumerPlanFree, "canceled", "monthly",
+		"evt-old-canceled", now, "ctm_1", "sub_old", nil,
+	)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Zero(t, manager.updateCalls)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan)
+	assert.Equal(t, "active", repo.tenant.PlanStatus)
+	assert.Equal(t, "sub_current", repo.tenant.PaddleSubscriptionID)
+	assert.Equal(t, "monthly", repo.tenant.PaddleBillingPeriod)
+}
+
+func TestApplyConsumerPlanAllowsNewSubscriptionAfterFreeOrCanceledState(t *testing.T) {
+	now := time.Now().UTC()
+	periodEnd := now.AddDate(0, 1, 0)
+	for _, test := range []struct {
+		name      string
+		plan      types.ConsumerPlan
+		status    string
+		oldSubID  string
+		oldCustID string
+	}{
+		{name: "free", plan: types.ConsumerPlanFree, status: "active", oldSubID: "sub_old_free", oldCustID: "ctm_free"},
+		{name: "canceled", plan: types.ConsumerPlanPro, status: "canceled", oldSubID: "sub_old_canceled", oldCustID: "ctm_canceled"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &entitlementRepoStub{tenant: &types.Tenant{
+				ID: 7, Plan: test.plan, PlanStatus: test.status,
+				PaddleCustomerID: test.oldCustID, PaddleSubscriptionID: test.oldSubID,
+			}}
+			svc := newEntitlementService(repo, nil)
+
+			applied, err := svc.ApplyConsumerPlan(
+				context.Background(), 7, types.ConsumerPlanPlus, "active", "monthly",
+				"evt-new-activation", now, "ctm_new", "sub_new", &periodEnd,
+			)
+			require.NoError(t, err)
+			assert.True(t, applied)
+			assert.Equal(t, types.ConsumerPlanPlus, repo.tenant.Plan)
+			assert.Equal(t, "active", repo.tenant.PlanStatus)
+			assert.Equal(t, "ctm_new", repo.tenant.PaddleCustomerID)
+			assert.Equal(t, "sub_new", repo.tenant.PaddleSubscriptionID)
+			assert.Equal(t, "monthly", repo.tenant.PaddleBillingPeriod)
+			require.NotNil(t, repo.tenant.PaddleCurrentPeriodEnd)
+			assert.Equal(t, periodEnd, repo.tenant.PaddleCurrentPeriodEnd.UTC())
+		})
+	}
+}
+
+func TestApplyConsumerPlanRejectsNonInitialEventsFromFreeOrCanceledState(t *testing.T) {
+	now := time.Now().UTC()
+	for _, test := range []struct {
+		name            string
+		plan            types.ConsumerPlan
+		status          string
+		incomingPlan    types.ConsumerPlan
+		incomingStatus  string
+		billingPeriod   string
+		confirmedPeriod bool
+	}{
+		{name: "free_updated", plan: types.ConsumerPlanFree, status: "active", incomingPlan: types.ConsumerPlanPlus, incomingStatus: "active", billingPeriod: "monthly"},
+		{name: "canceled_resumed", plan: types.ConsumerPlanPro, status: "canceled", incomingPlan: types.ConsumerPlanPlus, incomingStatus: "active", billingPeriod: "monthly"},
+		{name: "canceled_past_due", plan: types.ConsumerPlanPro, status: "canceled", incomingPlan: types.ConsumerPlanPlus, incomingStatus: "past_due", billingPeriod: "monthly"},
+		{name: "paused_activation", plan: types.ConsumerPlanPro, status: "paused", incomingPlan: types.ConsumerPlanPlus, incomingStatus: "active", billingPeriod: "monthly", confirmedPeriod: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			creditPeriodEnd := now.AddDate(0, 1, 0)
+			var eventPeriodEnd *time.Time
+			if test.confirmedPeriod {
+				value := now.AddDate(0, 1, 0)
+				eventPeriodEnd = &value
+			}
+			repo := &entitlementRepoStub{tenant: &types.Tenant{
+				ID: 7, Plan: test.plan, PlanStatus: test.status,
+				PaddleCustomerID: "ctm_old", PaddleSubscriptionID: "sub_old",
+				OpenRouterCreditPeriodEnd: &creditPeriodEnd,
+			}}
+			svc := newEntitlementService(repo, nil)
+
+			applied, err := svc.ApplyConsumerPlan(
+				context.Background(), 7, test.incomingPlan, test.incomingStatus, test.billingPeriod,
+				"evt-non-initial", now, "ctm_new", "sub_new", eventPeriodEnd,
+			)
+			require.NoError(t, err)
+			assert.False(t, applied)
+			assert.Equal(t, test.plan, repo.tenant.Plan)
+			assert.Equal(t, test.status, repo.tenant.PlanStatus)
+			assert.Equal(t, "sub_old", repo.tenant.PaddleSubscriptionID)
+		})
+	}
+}
+
 func TestPausedAnnualResumePreservesAllowanceAndPaidTerm(t *testing.T) {
 	now := time.Now().UTC()
 	creditPeriodEnd := now.AddDate(0, 1, 0)
