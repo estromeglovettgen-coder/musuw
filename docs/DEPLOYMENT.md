@@ -21,6 +21,11 @@ The two delivery targets are deliberately small:
   streaming responses on the existing server path instead of adding a Worker
   proxy.
 
+The current production Lighthouse is the Tokyo host (`musuw-tokyo`). The
+Cloudflare tunnel has one active connector at a time; keep the former Hong
+Kong runtime intact as a stopped recovery copy and never run both connectors
+for the same production hostname during a cutover.
+
 ## Normal path
 
 1. Push a change to a branch and open a pull request. CI runs the required
@@ -92,6 +97,20 @@ sequence is GitHub build/push → upload/verify SHA and manifest → GHCR login 
 pull exact digests → `docker compose up -d --no-build --force-recreate app
 frontend` → health checks. Keep named volumes and server-owned runtime files
 in place; the server never builds images or prunes its build cache.
+
+On a fresh host, install the tunnel token with
+`scripts/weknora-production/install-tunnel-token.sh` (the token file is
+server-owned, not tracked). The installer rejects symlinks and requires the
+cloudflared runtime UID (65532) to own the file with mode `0600`; it reports
+only numeric ownership and mode. During a cutover, quiesce the current writers,
+seal and verify the data snapshot, stop the old connector, restore and
+health-check the target, and only then start the target connector. The current
+rollback posture is stop-and-retain-disk: stop Tokyo public traffic and keep
+the Hong Kong runtime, releases, volumes, and Tunnel inputs stopped for an
+operator-led recovery. After the migration observation window the Hong Kong
+guest was powered off only after a zero-public-service precheck; its disk and
+volumes remain retained. This migration does not promise a hot reverse-sync or
+safe traffic flip without a separately verified data restore.
 
 Useful checks after a release are:
 

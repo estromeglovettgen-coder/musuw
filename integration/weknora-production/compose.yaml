@@ -184,6 +184,12 @@ services:
         mode: 0400
     networks: !override
       WeKnora-network: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:?set DB_USER in production.env} -d ${DB_NAME:?set DB_NAME in production.env}"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     restart: unless-stopped
     stop_grace_period: 1m
 
