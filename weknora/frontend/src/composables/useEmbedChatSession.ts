@@ -135,7 +135,9 @@ export function useEmbedChatSession(options: {
     onReplyComplete: notifyEmbedReceived,
     onTurnComplete: options.onTurnComplete,
     onAfterMsgList: () => options.onMessagesLoaded?.(messagesList),
-    onError: embedToast,
+    // Embedded consumers get the honest localized text only; billing repair
+    // navigation belongs to the authenticated primary product shell.
+    onError: (message) => embedToast(message),
     isFirstEnter,
     scrollContainer,
   })

@@ -2,6 +2,7 @@ package chatpipeline
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -238,4 +239,38 @@ func TestStreamInitialCreditExhaustionUsesDedicatedPipelineError(t *testing.T) {
 	require.NotNil(t, err)
 	require.Equal(t, openrouter.CreditExhaustedCode, err.ErrorType)
 	require.True(t, openrouter.IsCreditExhausted(err.Err))
+}
+
+func TestStreamInitialAllowanceRenewalPendingUsesDedicatedPipelineError(t *testing.T) {
+	bus := &syncEventBus{}
+	model := &openStreamChat{streamErr: fmt.Errorf("chat transport: %w", openrouter.ErrAllowanceRenewalPending)}
+	chatManage := &types.ChatManage{}
+	chatManage.SessionID = "sess-renewal-pending-initial"
+	chatManage.EventBus = bus
+	plugin := &PluginChatCompletionStream{modelService: &stubModelService{model: model}}
+
+	err := plugin.OnEvent(context.Background(), types.CHAT_COMPLETION_STREAM, chatManage, func() *PluginError { return nil })
+	require.NotNil(t, err)
+	require.Equal(t, openrouter.AllowanceRenewalPendingCode, err.ErrorType)
+	require.True(t, openrouter.IsAllowanceRenewalPending(err.Err))
+}
+
+func TestStreamStructuredAllowanceRenewalPendingPreservesErrorCode(t *testing.T) {
+	bus := &syncEventBus{}
+	model := &openStreamChat{closeStream: true, chunks: []types.StreamResponse{
+		{ResponseType: types.ResponseTypeError, Content: "billing boundary", ErrorCode: openrouter.AllowanceRenewalPendingCode},
+	}}
+	chatManage := &types.ChatManage{}
+	chatManage.SessionID = "sess-renewal-pending-in-channel"
+	chatManage.EventBus = bus
+	plugin := &PluginChatCompletionStream{modelService: &stubModelService{model: model}}
+	require.Nil(t, plugin.OnEvent(context.Background(), types.CHAT_COMPLETION_STREAM, chatManage, func() *PluginError { return nil }))
+
+	require.Eventually(t, func() bool { return len(bus.errorEvents()) == 1 }, 2*time.Second, 5*time.Millisecond)
+	require.Equal(t, []event.ErrorData{{
+		Error:     "billing boundary",
+		ErrorCode: openrouter.AllowanceRenewalPendingCode,
+		Stage:     "chat_completion_stream",
+		SessionID: "sess-renewal-pending-in-channel",
+	}}, bus.errorEvents())
 }

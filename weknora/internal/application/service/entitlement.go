@@ -24,7 +24,9 @@ type entitlementService struct {
 }
 
 var (
-	errAllowanceRenewalPending = errors.New("allowance renewal is awaiting payment confirmation")
+	// Keep the package-local name for existing service tests/callers while the
+	// stable classification lives at the OpenRouter transport boundary.
+	errAllowanceRenewalPending = modelopenrouter.ErrAllowanceRenewalPending
 	errSubscriptionPaused      = errors.New("subscription is paused")
 )
 
@@ -54,12 +56,15 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 	plan := types.EffectiveConsumerPlan(tenant)
 	limits := types.LimitsForConsumerPlan(plan)
 	current := &types.ConsumerEntitlement{
-		ConsumerPlanLimits:      limits,
-		PlanStatus:              tenant.PlanStatus,
-		StorageUsed:             tenant.StorageUsed,
-		OpenRouterCreditsStatus: types.OpenRouterCreditsUnprovisioned,
-		PaddleCustomerID:        tenant.PaddleCustomerID,
-		PaddleSubscriptionID:    tenant.PaddleSubscriptionID,
+		ConsumerPlanLimits:        limits,
+		PlanStatus:                tenant.PlanStatus,
+		StorageUsed:               tenant.StorageUsed,
+		OpenRouterCreditsStatus:   types.OpenRouterCreditsUnprovisioned,
+		PaddleCustomerID:          tenant.PaddleCustomerID,
+		PaddleSubscriptionID:      tenant.PaddleSubscriptionID,
+		PaddleBillingPeriod:       tenant.PaddleBillingPeriod,
+		PaddleCurrentPeriodEnd:    tenant.PaddleCurrentPeriodEnd,
+		OpenRouterCreditPeriodEnd: tenant.OpenRouterCreditPeriodEnd,
 	}
 	current.OpenRouterResetsAt = entitlementResetAt(tenant, plan, at)
 
@@ -76,7 +81,7 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 		if errors.Is(err, errAllowanceRenewalPending) {
 			current.OpenRouterUsedMicrousd = limits.MonthlyOpenRouterMicrousd
 			current.OpenRouterRemainingMicrousd = 0
-			current.OpenRouterCreditsStatus = types.OpenRouterCreditsAvailable
+			current.OpenRouterCreditsStatus = types.OpenRouterCreditsPending
 			return current, nil
 		}
 		logger.Warnf(ctx, "OpenRouter managed-key usage lookup failed for tenant %d: %v", tenantID, err)

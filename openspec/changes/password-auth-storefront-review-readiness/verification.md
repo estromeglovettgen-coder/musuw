@@ -66,9 +66,11 @@
 
 The current TEST video fixture reached the terminal provider-classified HTTP
 402 / `DOCREADER_PARSE_FAILED` state even though the root wallet and tenant
-allowance were not exhausted. The supported Qwen fallback is configured and
-catalog-advertised for video, but no successful current video parse/retrieval
-is claimed. OpenRouter/Gemini task 4.3, reviewer fixture task 5.4, and
+allowance were not exhausted. That run exercised the historical Qwen fallback;
+no successful current video parse/retrieval is claimed. The Tokyo default VLM
+is now explicitly pinned to Gemini 2.5 Flash on the OpenRouter Google Vertex
+route, and the next no-override production smoke is the gate for claiming the
+video lifecycle. OpenRouter/Gemini task 4.3, reviewer fixture task 5.4, and
 paid-video task 5.6 remain unchecked until an approved provider route succeeds
 without adding services or purchasing credits. The zero-config consumer model,
 reasoning, and retrieval checks are complete and recorded in its dedicated
@@ -85,10 +87,13 @@ the preceding release evidence above is complete and non-sensitive.
 - Approved Gemini direct-route probes classified as HTTP 403 with temporary
   provider-management credentials; this did not establish a canonical app
   failure or success.
-- One canonical TEST Max upload using the supported per-upload
+- One canonical TEST Max upload using the then-supported per-upload
   `builtin-openrouter-gemini-flash` override returned HTTP 200, then moved
   from `processing` to normalized `provider_error` failure at roughly two
-  minutes. No video retrieval or citation success is claimed.
+  minutes. That catalog row was bound to Gemini 3.7 at the time, so the run is
+  not Gemini 2.5 evidence; no video retrieval or citation success is claimed.
+- The current default `builtin-openrouter-vlm` row is pinned to Gemini 2.5 Flash
+  for the Tokyo no-override path; a fresh production smoke is still pending.
 - The documented Japan transport was unavailable. No recharge, new service,
   DNS/server change, fake event, or manual entitlement mutation was used, and
   all temporary video fixtures and conversations were cleaned up.

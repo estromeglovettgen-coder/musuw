@@ -26,9 +26,9 @@
 
       <section v-else-if="entitlement && targetPlan" class="checkout-page__layout">
         <div class="checkout-page__payment">
-          <template v-if="entitlement.plan === 'free'">
-            <h2>{{ $t('entitlement.quickPayment') }}</h2>
-            <p>{{ $t('entitlement.secureCheckoutLoading') }}</p>
+          <template v-if="entitlement.plan === 'free' || recoveryCheckout">
+            <h2>{{ $t(recoveryCheckout ? 'entitlement.recoveryCheckoutTitle' : 'entitlement.quickPayment') }}</h2>
+            <p>{{ $t(recoveryCheckout ? 'entitlement.recoveryCheckoutDescription' : 'entitlement.secureCheckoutLoading') }}</p>
             <div class="paddle-inline-target" />
           </template>
 
@@ -122,6 +122,7 @@ const syncing = ref(false)
 const errorMessage = ref('')
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
+const recoveryCheckout = computed(() => billing.value?.recovery_checkout === true)
 const totals = ref<CheckoutTotals | null>(null)
 const previewPrice = ref('')
 const upgradePreview = ref<PaddleSubscriptionUpgradePreview | null>(null)
@@ -219,7 +220,7 @@ const refreshAfterPayment = async () => {
     if (run !== syncRun) return
     try {
       const response = await getCurrentEntitlement()
-      if (response.data.plan === targetPlan.value) {
+      if (response.data.plan === targetPlan.value && response.billing.recovery_checkout !== true) {
         entitlement.value = response.data
         billing.value = response.billing
         chatResources.invalidate('models')
@@ -277,12 +278,13 @@ const initializeCheckout = async () => {
     const response = await getCurrentEntitlement()
     entitlement.value = response.data
     billing.value = response.billing
-    if (planRank[plan] <= planRank[response.data.plan]) {
+    const recovering = response.billing.recovery_checkout === true
+    if (planRank[plan] < planRank[response.data.plan] || (planRank[plan] === planRank[response.data.plan] && !recovering)) {
       await router.replace('/plans')
       return
     }
     loading.value = false
-    if (response.data.plan === 'free') await mountCheckout()
+    if (response.data.plan === 'free' || recovering) await mountCheckout()
     else upgradePreview.value = await previewPaddleSubscriptionUpgrade(plan)
   } catch {
     errorMessage.value = t('entitlement.checkoutLoadFailed')

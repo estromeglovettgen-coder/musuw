@@ -241,10 +241,11 @@ builtin_models:
 
   - id: builtin-openrouter-vlm
     tenant_id: 10000
-    name: qwen/qwen3.7-flash
+    name: google/gemini-2.5-flash
     type: VLLM
     source: remote
-    description: Qwen 3.7 Flash · image OCR and native video understanding
+    display_name: Gemini 2.5 Flash
+    description: Gemini 2.5 Flash · image OCR and native video understanding
     is_default: true
     status: active
     parameters:

@@ -20,6 +20,14 @@ WeKnora v0.7.2 source in [`weknora/`](weknora/).
 - Prefer an existing WeKnora capability over a custom parallel implementation.
 - Keep model keys, Supabase secrets, and provider credentials on the server;
   never expose them to browser code or checked-in configuration.
+- Treat [`docs/external-credentials-registry.yaml`](docs/external-credentials-registry.yaml)
+  as the single metadata-only credential inventory and
+  [`docs/SECRETS_AND_INTEGRATIONS.md`](docs/SECRETS_AND_INTEGRATIONS.md) as the
+  operator playbook. Do not duplicate values in project docs or examples.
+- Paddle is Sandbox-only until a separately reviewed Live authorization change;
+  keep client token, six price IDs, API key, webhook secret, destination and
+  default plan link in one environment. A Live-shaped input is a mismatch, not
+  authorization.
 - Preserve upstream licensing and update the v0.7.2 provenance records when an
   application-source change needs a durable attribution record.
 - Do not revive historical runtime, protocol, or documentation trees without

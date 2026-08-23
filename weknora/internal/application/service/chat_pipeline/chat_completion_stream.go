@@ -91,6 +91,9 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 		if openrouter.IsCreditExhausted(err) {
 			return ErrCreditsExhausted.WithError(err)
 		}
+		if openrouter.IsAllowanceRenewalPending(err) {
+			return ErrAllowanceRenewalPending.WithError(err)
+		}
 		return ErrModelCall.WithError(err)
 	}
 	if responseChan == nil {
@@ -224,6 +227,7 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 						SessionID: chatManage.SessionID,
 						Data: event.ErrorData{
 							Error:     response.Content,
+							ErrorCode: response.ErrorCode,
 							Stage:     "chat_completion_stream",
 							SessionID: chatManage.SessionID,
 						},

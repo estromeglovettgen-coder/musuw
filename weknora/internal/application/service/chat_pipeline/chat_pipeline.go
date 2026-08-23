@@ -3,6 +3,7 @@ package chatpipeline
 import (
 	"context"
 
+	"github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
@@ -120,7 +121,11 @@ var (
 	}
 	ErrCreditsExhausted = &PluginError{
 		Description: "Monthly AI Credits exhausted",
-		ErrorType:   "openrouter_credits_exhausted",
+		ErrorType:   openrouter.CreditExhaustedCode,
+	}
+	ErrAllowanceRenewalPending = &PluginError{
+		Description: "Billing confirmation is pending",
+		ErrorType:   openrouter.AllowanceRenewalPendingCode,
 	}
 	ErrGetHistory = &PluginError{
 		Description: "Failed to get conversation history",

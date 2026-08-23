@@ -93,6 +93,7 @@ services:
       - docreader-tmp:/tmp/docreader:ro
       - ../weknora/config/config.yaml:/app/config/config.yaml:ro
       - ../integration/weknora-production/app-entrypoint.sh:/opt/weknora-production/app-entrypoint.sh:ro
+      - ../integration/weknora-production/paddle-runtime-contract.sh:/opt/weknora-production/paddle-runtime-contract.sh:ro
     secrets:
       - source: db_password
         target: db_password

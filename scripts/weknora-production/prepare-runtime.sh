@@ -8,6 +8,11 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$script_dir/lib.sh"
 
 runtime_dir="$(weknora_production_runtime_dir)"
+repo_root="$(weknora_production_repo_root)"
+paddle_runtime_contract="$repo_root/integration/weknora-production/paddle-runtime-contract.sh"
+weknora_production_require_file "$paddle_runtime_contract"
+# shellcheck source=../../integration/weknora-production/paddle-runtime-contract.sh
+. "$paddle_runtime_contract"
 public_env="${WEKNORA_PRODUCTION_PUBLIC_ENV:-$runtime_dir/production.public.env}"
 auth_public_env="${WEKNORA_PRODUCTION_AUTH_PUBLIC_ENV:-$runtime_dir/auth-public.env}"
 secret_dir="${WEKNORA_PRODUCTION_SECRET_DIR:-$runtime_dir/secrets}"
@@ -39,11 +44,7 @@ esac
 unset neo4j_auth
 
 paddle_api_key="$(weknora_production_read_secret "$secret_dir/paddle_api_key")"
-case "$paddle_api_key" in
-    pdl_live_apikey_*) ;;
-    *) weknora_production_die 'production Paddle API key must be a live key' ;;
-esac
-unset paddle_api_key
+paddle_webhook_secret="$(weknora_production_read_secret "$secret_dir/paddle_webhook_secret")"
 
 langfuse_public_key="$(weknora_production_read_secret "$secret_dir/langfuse_public_key")"
 langfuse_secret_key="$(weknora_production_read_secret "$secret_dir/langfuse_secret_key")"
@@ -161,24 +162,23 @@ unset file_revision selected_revision
 [ "$(weknora_production_require_env_value "$tmp_env" WEKNORA_REDIS_NAMESPACE)" = 'weknora-v072-production' ] || weknora_production_die 'production Redis namespace is not isolated'
 [ "$(weknora_production_require_env_value "$tmp_env" OIDC_AUTH_ISSUER_URL)" = "${supabase_url%/}/auth/v1" ] || weknora_production_die 'OIDC issuer must match the public Supabase URL'
 [ "$(weknora_production_require_env_value "$tmp_env" OIDC_AUTH_DISCOVERY_URL)" = "${supabase_url%/}/auth/v1/.well-known/openid-configuration" ] || weknora_production_die 'OIDC discovery must match the public Supabase URL'
-[ "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_ENVIRONMENT)" = 'live' ] || weknora_production_die 'production Paddle environment must remain live'
-case "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_CLIENT_TOKEN)" in
-    live_*) ;;
-    *) weknora_production_die 'production Paddle client token must be a live token' ;;
-esac
+paddle_environment="$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_ENVIRONMENT)"
+paddle_client_token="$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_CLIENT_TOKEN)"
+musuw_paddle_validate_production_launch \
+    "$paddle_environment" \
+    "$paddle_client_token" \
+    "$paddle_api_key" \
+    "$paddle_webhook_secret" \
+    "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID)" \
+    "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID)" \
+    "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID)" \
+    "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_PRO_YEARLY_PRICE_ID)" \
+    "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID)" \
+    "$(weknora_production_require_env_value "$tmp_env" MUSUW_PADDLE_MAX_YEARLY_PRICE_ID)"
+unset paddle_environment paddle_client_token paddle_api_key paddle_webhook_secret
 [ "$(weknora_production_require_env_value "$tmp_env" LANGFUSE_ENABLED)" = 'true' ] || weknora_production_die 'production Langfuse tracing must remain enabled'
 [ "$(weknora_production_require_env_value "$tmp_env" LANGFUSE_HOST)" = 'https://jp.cloud.langfuse.com' ] || weknora_production_die 'production Langfuse host must remain the JP Cloud endpoint'
 [ "$(weknora_production_require_env_value "$tmp_env" LANGFUSE_ENVIRONMENT)" = 'production' ] || weknora_production_die 'production Langfuse environment must remain production'
-for key in \
-    MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID \
-    MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID MUSUW_PADDLE_PRO_YEARLY_PRICE_ID \
-    MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID MUSUW_PADDLE_MAX_YEARLY_PRICE_ID; do
-    case "$(weknora_production_require_env_value "$tmp_env" "$key")" in
-        pri_*) ;;
-        *) weknora_production_die 'production Paddle price IDs must use Paddle price identifiers' ;;
-    esac
-done
-
 weknora_production_assert_exact_volume postgres-data "$(weknora_production_require_env_value "$tmp_env" WEKNORA_PRODUCTION_POSTGRES_VOLUME)"
 weknora_production_assert_exact_volume data-files "$(weknora_production_require_env_value "$tmp_env" WEKNORA_PRODUCTION_FILES_VOLUME)"
 weknora_production_assert_exact_volume docreader-tmp "$(weknora_production_require_env_value "$tmp_env" WEKNORA_PRODUCTION_DOCREADER_TMP_VOLUME)"

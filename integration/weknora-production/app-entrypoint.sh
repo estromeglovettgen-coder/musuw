@@ -4,6 +4,14 @@
 # execs the native WeKnora process.
 set -eu
 
+paddle_runtime_contract=/opt/weknora-production/paddle-runtime-contract.sh
+if [ ! -r "$paddle_runtime_contract" ]; then
+    printf '%s\n' 'required Paddle runtime contract is unavailable' >&2
+    exit 1
+fi
+# shellcheck source=paddle-runtime-contract.sh
+. /opt/weknora-production/paddle-runtime-contract.sh
+
 read_required_secret() {
     secret_path="$1"
     secret_name="$2"
@@ -28,6 +36,17 @@ export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_
 export OPENROUTER_MANAGEMENT_API_KEY="$(read_required_secret /run/secrets/openrouter_management_api_key openrouter-management-api-key)"
 export MUSUW_PADDLE_API_KEY="$(read_required_secret /run/secrets/paddle_api_key paddle-api-key)"
 export MUSUW_PADDLE_WEBHOOK_SECRET="$(read_required_secret /run/secrets/paddle_webhook_secret paddle-webhook-secret)"
+musuw_paddle_validate_production_launch \
+    "${MUSUW_PADDLE_ENVIRONMENT:-}" \
+    "${MUSUW_PADDLE_CLIENT_TOKEN:-}" \
+    "$MUSUW_PADDLE_API_KEY" \
+    "$MUSUW_PADDLE_WEBHOOK_SECRET" \
+    "${MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID:-}" \
+    "${MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID:-}" \
+    "${MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID:-}" \
+    "${MUSUW_PADDLE_PRO_YEARLY_PRICE_ID:-}" \
+    "${MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID:-}" \
+    "${MUSUW_PADDLE_MAX_YEARLY_PRICE_ID:-}"
 export S3_ACCESS_KEY="$(read_required_secret /run/secrets/r2_access_key_id r2-access-key-id)"
 export S3_SECRET_KEY="$(read_required_secret /run/secrets/r2_secret_access_key r2-secret-access-key)"
 export LANGFUSE_PUBLIC_KEY="$(read_required_secret /run/secrets/langfuse_public_key langfuse-public-key)"

@@ -17,3 +17,15 @@ test('keeps ordinary actionable errors', () => {
   assert.equal(userFacingAIError('Attachment is still processing', 'fallback'), 'Attachment is still processing')
   assert.equal(userFacingAIError('', 'fallback'), 'fallback')
 })
+
+test('prefers a stable billing code over provider error text', () => {
+  assert.equal(
+    userFacingAIError(
+      'LLM call failed: provider returned a payment error',
+      'AI service unavailable',
+      'billing_renewal_pending',
+      'Billing confirmation is pending or needs repair',
+    ),
+    'Billing confirmation is pending or needs repair',
+  )
+})

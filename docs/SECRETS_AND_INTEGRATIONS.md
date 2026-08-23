@@ -1,25 +1,45 @@
 # Musuw 密钥与官方集成清单
 
-最后核对：2026-08-22（America/Phoenix）。本文件只记录位置、账号、用途、
-状态和轮换边界，**绝不记录任何密钥值**。密钥值不得写入仓库、普通 shell
-环境文件、浏览器、截图、日志、工单或交接消息。
+最后核对：2026-08-23（America/Phoenix）。本文件只记录变量名、服务/账号标签、
+文件名、权限、消费者和健康证明，**绝不记录密钥值、邮件地址、完整主机/IP、
+hash 或供应商响应内容**。
 
-## 1. 本机 macOS Keychain
+完整的、可机器校验的去重注册表见
+[`docs/external-credentials-registry.yaml`](external-credentials-registry.yaml)。
+所有项目的密钥都只在这个注册表登记一次；其他仓库只保留指向当前权威来源的
+索引，不复制值。
 
-运营台只由服务端调用 `/usr/bin/security` 读取下列项。浏览器得到的始终是
-字段白名单投影。`present` 只表示该 service/account 项存在，不代表本文公开
-了它的值。
+## 1. 当前硬边界
 
-| Service | TEST 账号 | PRODUCTION 账号 | 当前状态与用途 |
+- 当前产品阶段只使用 **Paddle Sandbox**。Paddle Live 尚未申请、尚未授权，
+  不能因为本地存在一个 production Keychain 项或某个旧运行文件而视为可用。
+- Sandbox 的环境选择、client token、六个价格 ID、API key、webhook secret、
+  notification destination 和默认套餐链接必须属于同一个 Sandbox 账户。
+  Live 与 Sandbox 不可混用。
+- 生产公开环境中的 `MUSUW_PADDLE_ENVIRONMENT` 必须是 `sandbox`；
+  `scripts/ci/verify-external-credentials-registry.sh` 和生产静态校验会挡住
+  Live-shaped 的 client token/API key、缺失价格目录或混合环境。即使一整套
+  Live 前缀彼此匹配，固定生产 preflight 与 app entrypoint 也会拒绝；未来启用
+  Live 必须先获授权并经过代码审查，不能只改环境变量。
+- 浏览器只能接收 publishable/client/catalog 值；server secret、management/admin、
+  webhook signing、SSH/deploy 和 OAuth secret 只能从 Keychain、GitHub Environment
+  或服务器 `0600` 文件进入受控进程。
+
+## 2. 本机 macOS Keychain（只检查存在性）
+
+运营台通过 `/usr/bin/security` 读取下列项；浏览器得到的始终是字段白名单投影。
+`present` 只表示 service/account 项存在，不代表读出或授权了它的值。
+
+| Service | TEST 账号 | PRODUCTION 账号 | 边界与用途 |
 | --- | --- | --- | --- |
-| `com.musuw.local-admin.platform-key` | `musuw-admin-test` | `musuw-admin-production` | 两项 present；capability-scoped WeKnora 管理 API。只含 entitlement、状态/配额、OpenRouter 额度、用户调查、运行队列和审计；settings/API-key management 仍不放行。 |
-| `com.musuw.local-admin.paddle-api-key` | `musuw-admin-test` | `musuw-admin-production` | 两项 present；分别对应 Sandbox 与 Live。订阅和交易官方读取均已返回 HTTP 200。当前两把轮换后密钥的供应商到期日为 2026-11-20；旧的已暴露密钥已撤销。 |
-| `com.musuw.local-admin.paddle-webhook-secret` | `musuw-admin-test` | — | TEST present；用于本地签名 webhook。PRODUCTION 权威副本只在服务器保护文件中，本机运营台不需要该值。旧 Sandbox destination secret 已轮换。 |
-| `com.musuw.local-admin.supabase-secret-key` | `musuw-admin-test` | `musuw-admin-production` | 两项 present；使用 Supabase secret-key 类型，不使用 legacy `service_role` 文本值。Auth Admin 读取已分别验证。 |
-| `com.musuw.local-admin.r2-access-key-id` | — | `musuw-admin-production` | PRODUCTION present；TEST 故意 absent，因为 TEST 产品使用本地存储。 |
-| `com.musuw.local-admin.r2-secret-access-key` | — | `musuw-admin-production` | PRODUCTION present；与上一项组成 R2 S3 凭据，只供服务端使用。 |
-| `com.musuw.local-admin.langfuse-public-key` | `musuw-admin-test` | `musuw-admin-production` | 两项 present；当前同一个 `Musuw` 项目 key pair 以两个账号保存，运行时由 environment/release 隔离。 |
-| `com.musuw.local-admin.langfuse-secret-key` | `musuw-admin-test` | `musuw-admin-production` | 两项 present；JP Cloud 官方 API 查询与 trace 写入。 |
+| `com.musuw.local-admin.platform-key` | `musuw-admin-test` | `musuw-admin-production` | capability-scoped WeKnora 管理 API；不开放 settings/API-key management。 |
+| `com.musuw.local-admin.paddle-api-key` | `musuw-admin-test` present | `musuw-admin-production` present-but-unauthorized | TEST 只对应 Paddle Sandbox；PRODUCTION 项存在性不是 Live 授权，当前不得用于 Tokyo。 |
+| `com.musuw.local-admin.paddle-webhook-secret` | `musuw-admin-test` present | —（本机未登记） | TEST Sandbox notification destination；当前没有获授权的 Live destination。 |
+| `com.musuw.local-admin.supabase-secret-key` | `musuw-admin-test` | `musuw-admin-production` | Supabase secret-key 类型，只供 Auth Admin/运营台。 |
+| `com.musuw.local-admin.r2-access-key-id` | — | `musuw-admin-production` | R2 S3 访问标识；TEST 使用本地存储。 |
+| `com.musuw.local-admin.r2-secret-access-key` | — | `musuw-admin-production` | R2 S3 server secret；只供服务端。 |
+| `com.musuw.local-admin.langfuse-public-key` | `musuw-admin-test` | `musuw-admin-production` | Langfuse 项目 public key；按 environment 隔离。 |
+| `com.musuw.local-admin.langfuse-secret-key` | `musuw-admin-test` | `musuw-admin-production` | Langfuse 项目 secret key；只供服务端。 |
 
 安全地检查某一项是否存在（不要加 `-w`）：
 
@@ -29,80 +49,121 @@ security find-generic-password \
   -a musuw-admin-test >/dev/null
 ```
 
-退出码 `0` 表示存在。禁止使用会把值输出到终端的命令，也禁止在浏览器
-开发者工具、DOM snapshot 或截图中查看供应商 secret。
+退出码 `0` 仅表示存在。禁止使用会把值输出到终端的命令，也禁止在开发者工具、
+DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 
-## 2. 本机 ignored runtime
+## 3. 本机 ignored runtime
 
-这些路径受 `.gitignore` 保护且当前权限为 `0600`：
+这些路径受 `.gitignore` 保护；密钥文件当前约定为 `0600`，但文档仍只记录路径和
+用途，不记录内容：
 
 | 路径 | 内容边界 |
 | --- | --- |
-| `.runtime/musuw-admin/production.env` | PRODUCTION 运营进程的数据库/后端连接与非密钥定位信息；可能包含敏感连接串，只能由本机进程读取。供应商 API key 仍来自 Keychain。 |
-| `.runtime/weknora/candidate.env` | TEST WeKnora 与依赖服务的本机运行配置。 |
-| `.runtime/weknora/auth-public.env` | 可进入浏览器构建的 Supabase publishable/OIDC 公共值；仍不提交。 |
-| `.runtime/weknora/paddle-sandbox.env` | Paddle Sandbox client token、价格 ID 等公共运行配置；服务端 API key/webhook secret 会被启动脚本忽略并改从 Keychain 读取。 |
-| `.runtime/weknora/secrets/oidc_client_id` | TEST 原生 OIDC client ID，文件模式 `0600`。 |
-| `.runtime/weknora/secrets/oidc_client_secret` | TEST 原生 OIDC client secret，文件模式 `0600`。 |
+| `.runtime/musuw-admin/production.env` | 运营进程的连接与非密钥定位信息；供应商 secret 仍来自 Keychain。 |
+| `.runtime/weknora/candidate.env` | TEST WeKnora 与依赖服务运行配置；不得作为生产权威。 |
+| `.runtime/weknora/auth-public.env` | Supabase publishable/OIDC 公共值；不提交。 |
+| `.runtime/weknora/paddle-sandbox.env` | Paddle Sandbox environment、client token、六个价格 ID；API key/webhook secret 由 Keychain 注入。 |
+| `.runtime/weknora/secrets/*` | OIDC、数据库、Redis、AES、JWT 等服务运行 secret；仅本机受控进程读取。 |
 
-`candidate.env` 和生成源文件中的数据库、Redis、AES、JWT 等本地依赖凭据也
-是敏感运行状态；它们不是供应商控制台密钥，不得复制到文档或提交。
+旧的 `candidate`/迁移目录若出现 Live-shaped Paddle 公开值，只能归类为历史审计
+材料，不能覆盖 Sandbox 权威源。部署前必须重新生成公开环境并运行静态校验。
 
-## 3. PRODUCTION 服务器保护文件
+仓库顶层 `.env.example` 中的 `DEEPSEEK_*`、`MUSNOW_*` 和旧 Paddle fallback
+变量只是空模板/兼容名，不是当前生产 authority；任何仍引用它们的测试或旧快照
+都必须迁移到本注册表登记的 `MUSUW_*`/provider-specific source，不能在生产环境
+填值。
 
-服务器：SSH alias `musuw-production`，保护目录
-`/opt/weknora/runtime/secrets`。目录模式为 `0700`；以下文件全部 present，
-宿主机模式为 `0600`，进入容器时 Compose 以 `0400` 只读 secret 挂载：
+## 4. 生产服务器保护文件
 
-| 文件 | 用途 |
-| --- | --- |
-| `db_password` | PostgreSQL |
-| `redis_password` | Redis |
-| `system_aes_key` | WeKnora 敏感字段加密 |
-| `jwt_secret` | WeKnora 会话签名 |
-| `neo4j_auth` | Neo4j |
-| `oidc_client_id` / `oidc_client_secret` | Supabase OIDC |
-| `searxng_secret` | SearXNG |
-| `openrouter_management_api_key` | OpenRouter child-key 管理与官方额度权威 |
-| `paddle_api_key` / `paddle_webhook_secret` | Paddle Live 官方 API 与签名事件 |
-| `r2_access_key_id` / `r2_secret_access_key` | Cloudflare R2 S3 访问 |
-| `langfuse_public_key` / `langfuse_secret_key` | Langfuse trace 写入与官方查询 |
+服务器通过受限 SSH alias 访问；保护目录为 `/opt/weknora/runtime/secrets`，目录
+模式 `0700`，宿主机文件模式 `0600`，Compose 以只读 secret mount 进入容器。只
+记录文件名和消费者：
 
-`integration/weknora-production/app-entrypoint.sh` 只在容器启动时读取这些挂载，
-并把所需值导出到应用进程。`scripts/weknora-production/prepare-runtime.sh`
-会拒绝缺失、符号链接、错误权限和错误前缀，并且生成的 `production.env`
-明确不允许包含 server secret。
+| 文件 | 用途 | 当前边界 |
+| --- | --- | --- |
+| `db_password` / `redis_password` | PostgreSQL、Redis | 内部运行 secret。 |
+| `system_aes_key` / `jwt_secret` | 敏感字段加密、会话签名 | 内部运行 secret。 |
+| `neo4j_auth` / `searxng_secret` | Neo4j、SearXNG | 内部运行 secret。 |
+| `oidc_client_id` / `oidc_client_secret` | Supabase OIDC | server-only OAuth client。 |
+| `openrouter_management_api_key` | child-key provisioning、usage/limit 权威 | server-only management key。 |
+| `paddle_api_key` | Paddle 官方 API | **当前必须是 Sandbox API key**；Live 未授权。 |
+| `paddle_webhook_secret` | 签名 webhook | **当前必须对应 Sandbox notification destination**。 |
+| `r2_access_key_id` / `r2_secret_access_key` | Cloudflare R2 S3 存储 | server-only；不进浏览器/Worker。 |
+| `langfuse_public_key` / `langfuse_secret_key` | Langfuse trace 写入 | server-only；observability 投影排除内容。 |
+
+`integration/weknora-production/app-entrypoint.sh` 只在容器启动时读取这些挂载；
+`scripts/weknora-production/prepare-runtime.sh` 生成不含 server secret 值的
+`production.env`。任何生产公开 env 都必须从受控的 Sandbox public contract
+生成，不能手工把 candidate/Tokyo 文件复制过去。
 
 安全地只检查文件与权限：
 
 ```sh
-ssh musuw-production \
+ssh musuw-tokyo \
   'test -f /opt/weknora/runtime/secrets/paddle_api_key &&
    test "$(stat -c %a /opt/weknora/runtime/secrets/paddle_api_key)" = 600'
 ```
 
 不要运行 `cat`、`sed`、`xxd`、`base64`、`env` 或任何会显示内容的检查。
 
-## 4. 官方服务权威与已验证状态
+## 5. 提供商矩阵与真实消费者
 
-| 服务 | TEST | PRODUCTION | 单一权威与边界 |
+| 提供商/类别 | TEST/Sandbox | PROD/Live | 权威、消费者和健康证明 |
 | --- | --- | --- | --- |
-| WeKnora | available | available | capability-scoped 管理 API；业务 mutation 禁止裸 SQL。 |
-| Paddle | Sandbox：2 subscriptions / 27 transactions | Live：0 / 0，均 HTTP 200 | Paddle 订阅、交易、退款、支付方式和门户；Musuw 只保存签名 webhook 镜像。 |
-| Supabase Auth | Staging ref `achfnnicetupvtoqiwqd`，7 users | Production ref `phtveqtlswzokwsztsvu`，8 users | Supabase Auth Admin；不返回 metadata、session token 或 key。不得再使用 `fofa11111` 组织。 |
-| Cloudflare R2 | 不适用：本地存储 | `musuw-production/weknora/`，40 objects / 10,220,178 bytes | R2 官方 S3 API。原文件、索引计量、租户计量和物理对象是四个不同口径。 |
-| Langfuse | available | available，已读到 5 条真实生产 observations | JP Cloud `Musuw` 项目。运营投影排除 input/output/prompt/content/attachments。 |
-| OpenRouter | TEST 既有链路 | 服务器 `openrouter_management_api_key` present | 官方 child keys 与 usage/limit 是额度权威；Musuw 不维护第二套 usage ledger。 |
+| Paddle | Sandbox public client/catalog、server API key、webhook destination 可用 | Live 全部 `not-authorized`；不得部署 | Paddle 控制台是唯一权威；frontend Paddle.js、billing config/checkout、portal/upgrade API 和 webhook 路由必须使用同一 Sandbox；健康证明只保留状态/count/price metadata。 |
+| Supabase Auth | TEST public auth + Auth Admin | Production public auth + Auth Admin | Supabase dashboard/project 是权威；auth shell、OIDC discovery/callback、运营台 Auth Admin；不记录 session/token。 |
+| OpenRouter | 候选运行时只读 metadata | production management key + encrypted tenant child key | 官方 usage/limit 是额度权威；entrypoint、entitlement service 和 model transport；tenant key 不进浏览器。 |
+| Cloudflare Worker | 不适用 | GitHub `storefront-production` 只含 Worker-scoped account/token | GitHub Environment + Cloudflare dashboard；仅 Wrangler 部署，Worker 不拿 server/model/billing secret。 |
+| Cloudflare R2 | 本地存储，故意无 TEST key | production protected files | R2 S3 API；应用只返回对象/计量 metadata。 |
+| Langfuse | test Keychain pair | production protected pair | Langfuse 项目；trace health 只返回 count/status，排除 input/output/prompt/content/attachments。 |
+| GitHub/GHCR/SSH | CI ephemeral token | `server-production` restricted SSH + pinned known hosts；GHCR token 为 job-only | GitHub Environment 和 workflow 是权威；固定 release gate、exact digest pull、health check。 |
+| Tencent VectorDB / Alibaba Cloud | optional/independent inventory | Tokyo 当前无此 active consumer | 各自 provider dashboard；仅在明确启用的独立项目中使用，不能从示例变量推断已配置。 |
+| Google OAuth / SMTP | Supabase/OAuth 与邮件设置待按项目确认 | 当前 Musuw 没有 direct Google secret consumer；SMTP 由 Supabase Auth 配置边界管理 | Supabase/Google/provider dashboard；只验证 discovery、callback、OTP delivery，不记录 token 或邮件内容。 |
 
-浏览器公开值（Supabase publishable key、Paddle client token、price IDs、项目
-ref、R2 bucket 名称）不是 server secret，但也不得与 server secret 混淆或用来
-宣称 Admin 能力。任何“已连接”必须来自一次成功的官方 API 调用。
+Paddle 的 destination、domain 和默认链接含义也固定在中央注册表：Sandbox
+notification destination → app webhook；storefront plan CTA → app billing route。
+没有获授权的 Live destination/domain/default link，不得出现在部署输入或客服说明中。
 
-## 5. 轮换与交接规则
+## 6. 其他本地项目：只登记，不复制
 
-1. 在供应商后台创建替代凭据并先验证最小真实能力。
-2. 用 Keychain 或远端 `0600` 文件原子替换，不经过聊天、剪贴文档或普通 env。
-3. 重启对应服务，验证官方 API、真实消费者和错误态。
-4. 撤销旧凭据；记录“已撤销/到期日/能力”，仍不记录值。
-5. 若任何值曾出现在终端输出、DOM snapshot、截图、日志或 git diff，立即按
-   已泄露处理并轮换，不能只删除视觉证据。
+受控盘点覆盖 `Documents/Codex` 下 62 个 git 根目录。重复的 WeKnora/Musuw 快照
+只归并到当前 Musuw 权威；AiToEarn、Dify、Ditto、Khoj、Pascal、mus-system-health、
+marketingskills、openai-codex-fixed 等独立项目在注册表的 `repository_index`
+中按 provider/class/owner 去重列出。它们的 `.env.example`、CI、Compose 和源码
+消费者只作为索引证据，**不会把值或副本搬到 Musuw**。
+
+特别需要后续治理、但不属于 Musuw Tokyo 当前运行时的类别：
+
+- AiToEarn 的 OSS/SMS/实名、Tencent TMS、Qwen、Google OAuth、Twitter、WeChat；
+- Dify 的 DashScope、DeepSeek、Supabase Admin/Google OAuth；
+- Ditto 的 Resend、S3-compatible storage、CLI API key；
+- Khoj 的模型、搜索、Stripe、AWS、Twilio、Notion、邮件和 CI provider keys；
+- Pascal 与 mus-system-health 的 Supabase/Google integrations。
+
+独立项目应链接自己的 provider dashboard/secret store；不要把这些变量填入
+Musuw 的 production env。AiToEarn 发现有 tracked env 文件，需由其 owner 单独
+处理权限和轮换，不能在本仓库复制或“帮忙猜值”。
+
+## 7. 轮换、撤销、交接与验证
+
+1. 先在对应 provider 创建替代 credential，确认最小真实能力；Sandbox/Live
+   分开验证，Live 当前不执行。
+2. 只通过 Keychain、GitHub Environment 或远端 `0600` 文件原子替换，不经过聊天、
+   剪贴板、普通 env、日志或截图。
+3. 重启对应服务，验证真实消费者和错误态：Paddle checkout/portal/webhook、
+   Auth callback、model request、R2 metadata、Langfuse redacted trace 或 release
+   health。
+4. 撤销旧 credential；登记状态、能力、权限和验证时间，仍不登记值。
+5. 若值曾出现在终端输出、DOM snapshot、截图、日志或 git diff，立即按已泄露处理
+   并轮换，不能只删除视觉证据。
+
+本地校验入口：
+
+```sh
+bash scripts/ci/external-credentials-registry.test.sh
+bash scripts/ci/verify-external-credentials-registry.sh
+```
+
+这两个脚本只检查注册表元数据、Sandbox-only 生产边界、文档链接和禁止值模式；
+不会读取 Keychain secret、连接 provider、扫描 shell history/session 或解析 git
+objects/blobs。

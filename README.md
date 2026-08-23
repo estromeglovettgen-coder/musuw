@@ -6,6 +6,14 @@ Users enter through Musuw's Google or email-OTP sign-in, then use a single,
 preconfigured knowledge workspace. Model credentials and infrastructure remain
 server-side.
 
+Credential ownership is recorded once in the metadata-only
+[`docs/external-credentials-registry.yaml`](docs/external-credentials-registry.yaml);
+the operator-facing rules live in
+[`docs/SECRETS_AND_INTEGRATIONS.md`](docs/SECRETS_AND_INTEGRATIONS.md). The
+current billing launch stage is Paddle **Sandbox**. Paddle Live has not been
+authorized, so Live-shaped values are rejected and must not be copied into the
+Tokyo runtime.
+
 ## Active source
 
 | Path | Responsibility |

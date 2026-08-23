@@ -127,7 +127,7 @@ The authenticated product SHALL show the current plan, storage used and limit, c
 - **THEN** the client calls Paddle.js `PricePreview()` with the same server-mapped price ID used by checkout and renders Paddle's formatted unit subtotal without inferring country from UI language or itemizing estimated tax on the plan comparison
 
 ### Requirement: Optional Paddle checkout, self-service, and events are fail-closed
-When Paddle environment values are fully configured, an authenticated Free tenant SHALL be able to open Paddle's hosted checkout only for the six server-owned Plus, Pro, and Max monthly/yearly price mappings. An active paid tenant SHALL be able to preview and apply only a strictly higher server-owned tier on its existing subscription; the server SHALL derive the hidden subscription/customer identity and existing billing period, use Paddle's official immediate-proration preview/update with payment failure preventing the change, and replace the single subscription item with the mapped target price. The system SHALL bind each offered or updated price to that tenant, accept subscription lifecycle events for plan state and only successful recurring transaction events for allowance refresh, all with a valid Paddle signature and matching binding, and apply them idempotently. An authenticated tenant with a verified Paddle customer identity SHALL be able to open Paddle's hosted customer portal using a fresh server-created session. A browser callback, subscription-update response, or transaction event SHALL NOT grant a plan; only the verified active subscription can do so. When Paddle is not fully configured, checkout and subscription changes SHALL be displayed as unavailable and no client-supplied plan claim SHALL grant an entitlement.
+When Paddle environment values are fully configured, an authenticated Free tenant SHALL be able to open Paddle's hosted checkout only for the six server-owned Plus, Pro, and Max monthly/yearly price mappings. An active paid tenant whose existing provider identity resolves SHALL be able to preview and apply only a strictly higher server-owned tier on that subscription; the server SHALL derive the hidden subscription/customer identity and existing billing period, use Paddle's official immediate-proration preview/update with payment failure preventing the change, and replace the single subscription item with the mapped target price. The only hosted-checkout exception for an already-paid tenant SHALL be the provider-proven orphan recovery scenarios below. The system SHALL bind each offered or updated price to that tenant, accept subscription lifecycle events for plan state and only successful recurring transaction events for allowance refresh, all with a valid Paddle signature and matching binding, and apply them idempotently. An authenticated tenant with a verified Paddle customer identity SHALL be able to open Paddle's hosted customer portal using a fresh server-created session. A browser callback, subscription-update response, or transaction event SHALL NOT grant a plan; only the verified active subscription can do so. When Paddle is not fully configured, checkout and subscription changes SHALL be displayed as unavailable and no client-supplied plan claim SHALL grant an entitlement.
 
 #### Scenario: Free user starts hosted checkout
 - **WHEN** an authenticated Free user chooses an allowed plan and billing period
@@ -146,19 +146,19 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **THEN** the endpoint acknowledges it without applying the plan a second time
 
 #### Scenario: Paid tenant opens Usage & billing settings
-- **WHEN** a tenant already has a paid plan
+- **WHEN** a tenant already has a paid plan whose provider identity resolves or whose paid period is confirmed
 - **THEN** current entitlement and the hosted billing-management action are displayed without a second-subscription checkout
 
 #### Scenario: Paid tenant previews a higher tier
 - **WHEN** an authenticated active Plus tenant asks to preview Pro
-- **THEN** the server proves ownership of the hidden live subscription, preserves its current monthly or yearly period, and returns Paddle's immediate prorated amount for the server-mapped Pro price without changing the subscription
+- **THEN** the server proves ownership of the hidden current Paddle subscription, preserves its current monthly or yearly period, and returns Paddle's immediate prorated amount for the server-mapped Pro price without changing the subscription
 
 #### Scenario: Paid tenant confirms a higher tier
 - **WHEN** that tenant confirms the previewed upgrade and Paddle accepts payment
 - **THEN** the existing subscription contains exactly the mapped target item and target binding, while the plan and existing OpenRouter child-key limit change only after the signed `subscription.updated` webhook is processed
 
 #### Scenario: Paid tenant submits an unsafe plan change
-- **WHEN** the target is equal, lower, unknown, the subscription/customer ownership differs, or the live subscription is not the one active server-owned item expected for the durable plan
+- **WHEN** the target is equal, lower, unknown, the subscription/customer ownership differs, or the current Paddle subscription is not the one active server-owned item expected for the durable plan
 - **THEN** Paddle is not updated and the durable plan and OpenRouter child-key limit remain unchanged
 
 #### Scenario: Customer manages billing
@@ -174,5 +174,33 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **THEN** the product reports billing as unavailable while all effective entitlement enforcement remains active
 
 #### Scenario: Fixed production runtime is only partially configured
-- **WHEN** the Musuw production overlay is missing a Paddle or OpenRouter server secret, lacks one of the six recurring price mappings, mixes Sandbox and Live prefixes, or attempts to place a server secret in the generated environment
+- **WHEN** the Musuw production overlay is missing a Paddle or OpenRouter server secret, lacks one of six distinct recurring price mappings, pairs Sandbox with anything other than a `test_` client token and `pdl_sdbx_apikey_` API key, selects Live before authorization (even with internally matching Live prefixes), supplies an invalid destination-secret shape, or attempts to place a server secret in the generated environment
 - **THEN** the production preflight rejects the release before Compose starts while generic deployments retain the optional unconfigured-billing behavior
+
+#### Scenario: Selected Paddle environment is proven end to end
+- **WHEN** operators prepare to enable billing for the fixed production runtime
+- **THEN** all six recurring prices resolve through the selected Paddle environment and the exact notification destination delivers a correctly signed event before billing is declared operational; local prefix checks alone SHALL NOT claim that price IDs or a destination secret belong to that environment
+
+#### Scenario: Current launch stage remains Sandbox
+- **WHEN** Live has not yet been authorized
+- **THEN** the checked production example, preflight, and app entrypoint require the complete Sandbox unit; changing only one client token, API key, price, or destination secret or supplying a complete Live unit SHALL fail closed, and enabling Live SHALL require a reviewed code change
+
+#### Scenario: Persisted paid identity belongs to another Paddle environment
+- **WHEN** an authenticated active paid tenant has stored customer/subscription IDs but no cadence, paid-term end, or credit-period end, and the selected Sandbox SDK returns Paddle's typed `not_found` for that exact subscription
+- **THEN** portal and existing-subscription upgrade operations remain unavailable, while the entitlement response may expose tenant-bound hosted-checkout options for only the same or a higher server-owned plan and marks them explicitly as recovery; no database field changes from this read
+
+#### Scenario: Signed recovery lifecycle restores migration state
+- **WHEN** a recovery checkout produces a newer correctly signed active Sandbox subscription event with the application-issued tenant/price binding, a supported cadence, and confirmed current-period end
+- **THEN** only the normal webhook path replaces the stale provider identity and restores the initial plan, cadence, paid-period, and credit state idempotently without direct database changes; later allowance refreshes still require matching successful signed recurring transaction events
+
+#### Scenario: Orphan recovery cannot be proven
+- **WHEN** the provider request times out, returns 401, 403, 5xx, nil, an ownership/plan mismatch, or any result other than typed `not_found`, or the tenant already has a cadence or paid/credit period
+- **THEN** no recovery checkout is exposed, no preview, subscription mutation, or Portal-session mutation is sent for the unconfirmed identity, no database value is overridden, and model access remains fail-closed
+
+#### Scenario: Direct Portal request cannot bypass orphan recovery
+- **WHEN** an authenticated paid tenant with every period field absent calls the Portal endpoint directly and the selected environment returns typed `not_found`, times out, returns nil, or resolves a different subscription/customer
+- **THEN** the request fails before creating a customer Portal session; only a matching resolved subscription may use the normal Portal flow
+
+#### Scenario: Normal paid tenant never receives recovery checkout
+- **WHEN** the selected environment resolves the stored active subscription or the tenant's paid period is already confirmed
+- **THEN** the normal portal/higher-tier upgrade flow applies and neither the current plan nor any parallel second-subscription checkout is offered

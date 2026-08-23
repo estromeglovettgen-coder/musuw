@@ -164,9 +164,13 @@ const (
 
 // StreamResponse stream response
 type StreamResponse struct {
-	ID                  string                 `json:"id"`
-	ResponseType        ResponseType           `json:"response_type"`
-	Content             string                 `json:"content"`
+	ID           string       `json:"id"`
+	ResponseType ResponseType `json:"response_type"`
+	Content      string       `json:"content"`
+	// ErrorCode is populated only by an internal/model boundary that already
+	// classified the failure. Callers must not infer stable codes from
+	// provider-facing Content text.
+	ErrorCode           string                 `json:"error_code,omitempty"`
 	Done                bool                   `json:"done"`
 	KnowledgeReferences References             `json:"knowledge_references,omitempty"`
 	SessionID           string                 `json:"session_id,omitempty"`

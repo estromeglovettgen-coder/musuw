@@ -26,6 +26,11 @@ Cloudflare tunnel has one active connector at a time; keep the former Hong
 Kong runtime intact as a stopped recovery copy and never run both connectors
 for the same production hostname during a cutover.
 
+The single credential inventory is [`external-credentials-registry.yaml`](external-credentials-registry.yaml),
+with the operator playbook in [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md).
+The current launch boundary is Paddle Sandbox only: Live has not been applied
+for or authorized, so a Live-shaped runtime input is a configuration mismatch.
+
 ## Normal path
 
 1. Push a change to a branch and open a pull request. CI runs the required
@@ -154,11 +159,41 @@ Private runtime credentials remain on the server; they are not copied into the
 repository, Cloudflare Worker, or browser bundles.
 
 The protected production secret directory must include the file-backed
-OpenRouter Management key plus Paddle's live API key and the secret for the
-exact production notification destination. The non-secret production public
-environment carries only Paddle's live client token and the six approved
-Plus/Pro/Max monthly/yearly price IDs. Sandbox and live values must never be
-mixed; the production preflight rejects sandbox prefixes and partial catalogs.
+OpenRouter Management key plus the Sandbox Paddle API key and secret for the
+exact Sandbox notification destination. The non-secret production public
+environment carries only `sandbox`, its matching `test_` client token, and six
+approved Sandbox Plus/Pro/Max monthly/yearly price IDs. The preflight and app
+entrypoint both require `test_` with `pdl_sdbx_apikey_` and reject Live even
+when its prefixes are internally consistent. They also reject mixed pairs, an
+invalid destination-secret shape, missing or duplicate prices, and any server
+secret placed in the generated environment.
+
+The current checked launch stage is **Paddle Sandbox** because Live has not
+been authorized. Keep `production.env.example`, the protected API key, all six
+prices, and the exact notification destination on Sandbox as one unit. Price
+IDs and destination secrets do not encode their environment, so prefix checks
+are necessary but not sufficient: before enabling checkout, resolve all six
+recurring prices through the Sandbox Paddle API and accept one correctly
+signed event from that exact destination. Live cannot be enabled with an env
+edit. After authorization, a future cutover requires a reviewed code change
+that replaces the entire unit together; never rotate one field in isolation.
+
+Paid Paddle identities are environment-local. A provider-proven orphan is the
+one recovery exception: the tenant is active and paid, all cadence/paid/credit
+period fields are absent, and the selected Paddle SDK returns typed
+`not_found` for the exact stored subscription. Only then may the authenticated
+API return same-or-higher tenant-bound hosted-checkout options. Timeout,
+401/403, 5xx, nil or mismatched responses, and any confirmed period all fail
+closed. While an unconfirmed paid identity is orphaned or unverifiable, both
+the advertised Portal action and the direct Portal API fail before creating a
+provider session. Normal paid tenants never receive this checkout. The
+recovery read writes nothing. Only a newer correctly signed active `subscription.created`
+or `subscription.activated` event with the tenant binding and confirmed
+current period may replace the stale identity and restore the initial plan,
+cadence, period, and credit. Later allowance renewals still require correctly
+signed `transaction.completed` events with `subscription_recurring` origin.
+Browser callbacks never grant either state. Never bypass this with SQL or a
+hand-written entitlement.
 
 The checked-in lockfiles are used by CI (`npm ci`). When a dependency changes,
 regenerate its lockfile in the same change.

@@ -221,6 +221,8 @@ jobs:
         run: node scripts/ci/source-manifest.mjs
       - name: Scan checked-in source for credentials
         run: bash scripts/ci/secret-scan.sh
+      - name: Validate metadata-only external credential registry
+        run: bash scripts/ci/external-credentials-registry.test.sh
       - name: Test local operations gateway contracts
         run: node --test scripts/musuw-admin-server.test.mjs
       - name: Run release workflow simulation

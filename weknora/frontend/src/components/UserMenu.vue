@@ -62,7 +62,7 @@ const entitlement = ref<ConsumerEntitlement | null>(null)
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const usageRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
-  if (!data || data.openrouter_credits_status === 'unavailable') return null
+  if (!data || data.openrouter_credits_status === 'unavailable' || data.openrouter_credits_status === 'pending') return null
   if (data.openrouter_credits_status === 'unprovisioned') return 100
   const total = Number(data.monthly_openrouter_microusd)
   const remaining = Number(data.openrouter_remaining_microusd)
@@ -329,6 +329,7 @@ onUnmounted(() => {
           <t-icon name="chart-line" />
           <span>{{ $t('entitlement.usageMenu') }}</span>
           <small v-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
+          <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>
         <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openPlans">
           <t-icon name="arrow-up" /><span>{{ entitlement?.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>

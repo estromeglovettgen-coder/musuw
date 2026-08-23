@@ -269,6 +269,7 @@ export interface TenantEntitlement {
   openrouter_provider_error?: string
   openrouter_provider_limit_microusd?: number
   openrouter_provider_usage_microusd?: number
+  openrouter_credits_status?: 'available' | 'unavailable' | 'unprovisioned' | 'pending'
 }
 
 export interface InvestigationData {

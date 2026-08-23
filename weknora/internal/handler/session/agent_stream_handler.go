@@ -545,6 +545,9 @@ func (h *AgentStreamHandler) handleError(ctx context.Context, evt event.Event) e
 		"stage": data.Stage,
 		"error": data.Error,
 	}
+	if data.ErrorCode != "" {
+		metadata["error_code"] = data.ErrorCode
+	}
 
 	// Append error event to stream
 	if err := h.streamManager.AppendEvent(h.ctx, h.sessionID, h.assistantMessageID, interfaces.StreamEvent{

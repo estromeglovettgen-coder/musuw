@@ -29,8 +29,8 @@ const (
 	defaultMaxToks = 5000
 	defaultTemp    = float32(0.1)
 	// Keep video ingestion on exact OpenRouter models with provider endpoints
-	// that advertise native base64 video support. Qwen is the production
-	// default; Gemini remains admitted for the planned Japan-region recheck.
+	// that advertise native base64 video support. Tokyo's default VLM is Gemini;
+	// Qwen remains admitted for the historical regional fallback route.
 	OpenRouterQwenVideoModel   = "qwen/qwen3.7-flash"
 	OpenRouterGeminiVideoModel = "google/gemini-2.5-flash"
 )

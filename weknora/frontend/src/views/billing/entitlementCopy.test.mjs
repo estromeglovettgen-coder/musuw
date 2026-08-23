@@ -6,6 +6,7 @@ const en = readFileSync(new URL('../../i18n/locales/en-US.ts', import.meta.url),
 const zh = readFileSync(new URL('../../i18n/locales/zh-CN.ts', import.meta.url), 'utf8')
 const plans = readFileSync(new URL('./Plans.vue', import.meta.url), 'utf8')
 const checkout = readFileSync(new URL('./Checkout.vue', import.meta.url), 'utf8')
+const api = readFileSync(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
 
 test('consumer plan copy states the enforced storage, allowance, and model catalog contract', () => {
   assert.match(en, /allowanceLevels:\s*\{\s*free: '\$1\.00', plus: '\$1\.25', pro: '\$2\.50', max: '\$5\.00'\s*\}/)
@@ -29,4 +30,17 @@ test('plans and checkout keep the four enforced storage tiers and shared feature
   assert.match(checkout, /const storage = \{ plus: 20, pro: 40, max: 80 \}\[plan\]/)
   assert.match(checkout, /featureAllowance/)
   assert.match(checkout, /featureAllModels/)
+})
+
+test('provider-proven orphan recovery uses tenant-bound hosted checkout and honest copy', () => {
+  assert.match(api, /recovery_checkout:\s*boolean/)
+  assert.match(plans, /recovery_checkout/)
+  assert.match(plans, /hasCheckout\(plan as PaidConsumerPlan\)/)
+  assert.match(checkout, /recoveryCheckout/)
+  assert.match(checkout, /recovery_checkout/)
+  assert.match(checkout, /planRank\[plan\] === planRank\[response\.data\.plan\] && !recovering/)
+  assert.match(checkout, /response\.data\.plan === 'free' \|\| recovering\) await mountCheckout\(\)/)
+  assert.match(checkout, /response\.billing\.recovery_checkout !== true/)
+  assert.match(en, /recoveryCheckoutDescription:\s*'Your previous billing link could not be verified/)
+  assert.match(zh, /recoveryCheckoutDescription:\s*'无法验证此前的支付绑定/)
 })

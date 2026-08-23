@@ -17,6 +17,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/modelcontext"
 	"github.com/Tencent/WeKnora/internal/models/chat"
+	"github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -282,6 +283,7 @@ func (e *AgentEngine) Execute(
 			SessionID: sessionID,
 			Data: event.ErrorData{
 				Error:     err.Error(),
+				ErrorCode: openrouter.ErrorCode(err),
 				Stage:     "agent_execution",
 				SessionID: sessionID,
 			},

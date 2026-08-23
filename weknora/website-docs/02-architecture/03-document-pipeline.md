@@ -103,7 +103,10 @@ mp4 mpeg mov webm
 
 此前 URL 导入维护着一份更短的独立白名单，导致「直接上传 xlsx 可以、URL 导入 xlsx 被拒」这类不一致（#2447）；现在统一由 `isSupportedImportExtension()` / `validateImportFileType()` 判定。
 
-视频仅接收 OpenRouter 官方支持的上述四种容器，并在 VLM 配置可用时交给 Gemini 2.5 Flash 转为 Markdown 后继续原有入库链路。
+视频仅接收 OpenRouter 官方支持的上述四种容器，并在默认 VLM 配置
+`builtin-openrouter-vlm` 下交给 Gemini 2.5 Flash（Tokyo 使用
+OpenRouter `google-vertex` 路由）转为 Markdown 后继续原有入库链路；正常
+消费者上传不需要 per-upload 模型 override。
 
 表格类扩展名（`csv` / `xlsx` / `xls`，`dataTableFileExtensions`）在文档处理任务之后额外挂一个表摘要任务（`enqueueDataTableSummaryIfNeeded`）。
 

@@ -19,10 +19,10 @@ The active v0.7.2 fork rejects video. OpenRouter accepts private videos directly
 - Extend the existing remote VLM adapter with an optional video prediction contract; existing decorators forward it.
 - Send stored bytes as a base64 data URL to the existing `/chat/completions` endpoint.
 - Bypass DocReader only for video-to-Markdown conversion, then immediately rejoin the existing document pipeline.
-- Pin the built-in VLM to `qwen/qwen3.7-flash` and use OpenRouter's provider
-  routing to select its Alibaba endpoint. Keep `google/gemini-2.5-flash`
-  explicitly admitted for a later Japan-region recheck, but do not add a
-  second transport, credential, media path, or automatic cross-model retry.
+- Pin the default `builtin-openrouter-vlm` to `google/gemini-2.5-flash` and use
+  OpenRouter's `google-vertex` provider route on the Tokyo runtime. The earlier
+  Hong Kong Qwen fallback remains historical evidence only; do not add a second
+  transport, credential, media path, or automatic cross-model retry.
 
 ## Risks / Trade-offs
 

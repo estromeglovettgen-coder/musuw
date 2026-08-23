@@ -9,12 +9,13 @@ const router = await readFile(new URL('../../router/index.ts', import.meta.url),
 const plansPage = await readFile(new URL('../billing/Plans.vue', import.meta.url), 'utf8')
 
 test('entitlement API types the official OpenRouter credit availability state', () => {
-  assert.match(entitlementApi, /OpenRouterCreditsStatus\s*=\s*'available'\s*\|\s*'unavailable'\s*\|\s*'unprovisioned'/)
+  assert.match(entitlementApi, /OpenRouterCreditsStatus\s*=\s*'available'\s*\|\s*'unavailable'\s*\|\s*'unprovisioned'\s*\|\s*'pending'/)
   assert.match(entitlementApi, /openrouter_credits_status:\s*OpenRouterCreditsStatus/)
 })
 
 test('usage settings shows remaining percentages without provider or dollar fields', () => {
   assert.match(usageSettings, /openrouter_credits_status === 'unavailable'/)
+  assert.match(usageSettings, /openrouter_credits_status === 'pending'/)
   assert.match(usageSettings, /openrouter_credits_status === 'unprovisioned'\) return 100/)
   assert.match(usageSettings, /clampPercent\(\(remaining \/ total\) \* 100\)/)
   assert.match(usageSettings, /creditsRemainingPercent \}\}%/)

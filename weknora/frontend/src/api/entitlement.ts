@@ -1,7 +1,7 @@
 import { get, post } from '@/utils/request'
 
 export type ConsumerPlan = 'free' | 'plus' | 'pro' | 'max'
-export type OpenRouterCreditsStatus = 'available' | 'unavailable' | 'unprovisioned'
+export type OpenRouterCreditsStatus = 'available' | 'unavailable' | 'unprovisioned' | 'pending'
 export type PaidConsumerPlan = Exclude<ConsumerPlan, 'free'>
 export type BillingPeriod = 'monthly' | 'yearly'
 
@@ -17,6 +17,7 @@ export interface PaddleCatalogOption {
 export interface PaddleBillingConfig {
   configured: boolean
   portal_available: boolean
+  recovery_checkout: boolean
   environment?: 'sandbox' | 'live'
   client_token?: string
   tenant_id?: string

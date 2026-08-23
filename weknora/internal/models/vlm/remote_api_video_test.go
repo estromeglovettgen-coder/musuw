@@ -10,6 +10,9 @@ import (
 )
 
 func TestRemoteAPIVLMPredictVideoUsesOpenRouterVideoURL(t *testing.T) {
+	if OpenRouterGeminiVideoModel != "google/gemini-2.5-flash" {
+		t.Fatalf("Gemini video model = %q, want google/gemini-2.5-flash", OpenRouterGeminiVideoModel)
+	}
 	var requestPath string
 	var authorization string
 	var requestBody map[string]any

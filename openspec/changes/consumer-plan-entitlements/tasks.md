@@ -29,7 +29,9 @@
 - [x] 4.4 Verify the authenticated Customer Portal, anonymous/no-customer rejection, token-redacted logs, and final local browser lifecycle regression
 - [x] 4.5 Upgrade a real non-admin Sandbox subscription in Chrome and verify the signed event updates the existing OpenRouter child-key limit before the durable plan
 - [x] 4.6 Verify Free anniversary refresh without stacking, paid-cycle renewal idempotency, same-cycle upgrade preservation, localized plan prices, and the final local browser lifecycle
-- [x] 4.7 Wire the complete Live Paddle catalog and file-backed Paddle/OpenRouter secrets through the fixed production runtime, with a fail-closed static preflight
+- [x] 4.7 Wire the complete Sandbox Paddle catalog and file-backed Paddle/OpenRouter secrets through the fixed production runtime, with a fail-closed static preflight
 - [x] 4.8 Verify annual payment-recovery grace stops at the paid-term boundary, including migration, repository, and service regression coverage
 - [x] 4.9 Verify reordered paid-period events cannot roll back or cross subscriptions and legacy VLM overrides never reach a provider
 - [x] 4.10 Verify annual pause/resume retains the paid term and remaining allowance without granting another period
+- [x] 4.11 Replace the hard-coded Live preflight with a shared Sandbox/Live shape validator plus a fixed-production Sandbox-only wrapper; reject even a complete Live unit before authorization, as well as mixed credentials, invalid destination-secret shape, and incomplete or duplicate six-price catalogs at preflight and app startup
+- [x] 4.12 Add provider-proven orphan recovery checkout: only active paid tenants with every period field absent and a typed selected-environment Paddle `not_found` receive same-or-higher tenant-bound options; all other provider outcomes fail closed, normal paid tenants never receive a second checkout, a signed active subscription event with a confirmed current period is the only initial recovery authority, and signed recurring transaction completion remains the only later renewal authority

@@ -11,7 +11,17 @@ import (
 	"strings"
 )
 
-const CreditExhaustedCode = "openrouter_credits_exhausted"
+const (
+	CreditExhaustedCode         = "openrouter_credits_exhausted"
+	AllowanceRenewalPendingCode = "billing_renewal_pending"
+)
+
+// ErrAllowanceRenewalPending is returned before a provider request when a
+// paid entitlement has reached the end of its verified billing term but the
+// signed renewal event has not arrived yet. Keeping this sentinel at the
+// provider transport boundary lets every model path classify the same state
+// without inspecting provider error text.
+var ErrAllowanceRenewalPending = errors.New("allowance renewal is awaiting payment confirmation")
 
 // CreditExhaustedError is the provider-level hard monthly-spend boundary. It is
 // intentionally distinct from transient transport/provider failures so callers
@@ -35,6 +45,27 @@ func IsCreditExhausted(err error) bool {
 	}
 	var target *CreditExhaustedError
 	return errors.As(err, &target)
+}
+
+// IsAllowanceRenewalPending classifies the durable entitlement gate. It is
+// intentionally type/sentinel based; arbitrary provider or task error text
+// must never be promoted to a billing state.
+func IsAllowanceRenewalPending(err error) bool {
+	return err != nil && errors.Is(err, ErrAllowanceRenewalPending)
+}
+
+// ErrorCode returns the stable wire code for known OpenRouter boundary
+// failures. Unknown errors deliberately return an empty string so callers do
+// not infer a billing/provider state from human-readable text.
+func ErrorCode(err error) string {
+	switch {
+	case IsAllowanceRenewalPending(err):
+		return AllowanceRenewalPendingCode
+	case IsCreditExhausted(err):
+		return CreditExhaustedCode
+	default:
+		return ""
+	}
 }
 
 // PayloadIndicatesCreditExhausted handles OpenRouter responses that start a

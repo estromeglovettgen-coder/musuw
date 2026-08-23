@@ -1,6 +1,22 @@
 # Verification evidence
 
-## 2026-08-22 regional fallback
+## 2026-08-23 Tokyo default-route contract repair
+
+- The consumer video path resolves `types.PlatformKnowledgeBaseVLMModelID`
+  (`builtin-openrouter-vlm`) without a per-upload override. Its catalog contract
+  now pins the exact model `google/gemini-2.5-flash`, matching display and
+  description metadata, while the remote video transport pins its provider to
+  `google-vertex`.
+- The paid chat catalog row `builtin-openrouter-gemini-flash` intentionally
+  remains the separate Gemini 3.7 chat choice; it is not the default video
+  model and was not changed by this repair.
+- The focused catalog contract was red against the previous Qwen VLLM row and
+  green after the Gemini mapping was restored. Remote VLM video routing and
+  process-configuration tests also pass.
+- A real Tokyo production upload without an override is still required before
+  marking the regional video and reviewer lifecycle gates complete.
+
+## 2026-08-22 Hong Kong regional fallback (historical)
 
 - OpenRouter's live model catalog reports `qwen/qwen3.7-flash` with native
   `text`, `image`, and `video` input modalities.
@@ -38,8 +54,9 @@ Production paid-term and post-deploy evidence remains tracked by task 4.3.
   official OIDC session, a temporary English knowledge base, and the
   per-upload `builtin-openrouter-gemini-flash` override. Upload returned HTTP
   200, but polling reached `processing` and then the normalized
-  `provider_error` failure at about two minutes; no retrieval success is
-  claimed.
+  `provider_error` failure at about two minutes; at that release the override
+  row was incorrectly bound to Gemini 3.7, so this run is not evidence for
+  Gemini 2.5 and no retrieval success is claimed.
 - The documented Japan transport/SSH target was unavailable, so no DNS,
   server, or new provider path was added. All temporary knowledge bases,
   documents, and conversations from these checks were removed through the
@@ -59,9 +76,10 @@ no-recharge/no-new-service boundary.
   OpenRouter wallet and the tenant Max allowance were both available; no
   recharge, provider change, fake event, SQL edit, or repeated reparse was
   performed.
-- Qwen 3.7 Flash remains the configured OpenRouter/Alibaba fallback and its
-  catalog metadata advertises video input. The failure is therefore recorded
-  as an external provider/model gate, not as successful video ingestion.
+- At the time of this run Qwen 3.7 Flash was the configured OpenRouter/Alibaba
+  fallback and its catalog metadata advertised video input. The result is
+  historical external-provider evidence, not current Tokyo default-route
+  evidence.
 - The video item, TEST reviewer knowledge base, and temporary conversations
   were removed through the product capability after evidence capture. Task
   4.3 remains unchecked and the video portion of the reviewer lifecycle stays

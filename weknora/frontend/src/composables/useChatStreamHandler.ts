@@ -15,7 +15,7 @@ export interface UseChatStreamHandlerOptions {
   scrollToBottom: (force?: boolean) => void
   onReplyComplete?: (content: string) => void
   onTurnComplete?: (message: ChatMessage) => void
-  onError?: (message: string) => void
+  onError?: (message: string, details?: { code?: string }) => void
   /** Main chat: keep the last incomplete message reactive for continue-stream. */
   preserveIncompleteStreamReactive?: boolean
   isFirstEnter?: Ref<boolean>
@@ -465,9 +465,9 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     scrollToBottom()
   }
 
-  const reportError = (errorMsg: string) => {
+  const reportError = (errorMsg: string, errorCode?: string) => {
     if (onError) {
-      onError(errorMsg)
+      onError(errorMsg, errorCode ? { code: errorCode } : undefined)
     }
   }
 
@@ -700,6 +700,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       }
       case 'tool_result':
       case 'error': {
+        const errorCode = (dataPayload?.error_code ?? data.error_code) as string | undefined
         if (dataPayload) {
           const toolCallId = dataPayload.tool_call_id as string | undefined
           const toolName = dataPayload.tool_name as string | undefined
@@ -744,25 +745,35 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             console.warn('[Tool Result] No pending tool call found for', toolCallId || toolName)
           }
           if (responseType === 'error' && !toolName) {
-            const errorMsg = userFacingAIError(data.content, t('chat.aiServiceUnavailable'))
+            const errorMsg = userFacingAIError(
+              data.content,
+              t('chat.aiServiceUnavailable'),
+              errorCode,
+              t('chat.billingRenewalPending'),
+            )
             message.content = errorMsg
             message.is_completed = true
             isReplying.value = false
             loading.value = false
             fullContent.value = ''
             currentAssistantMessageId.value = ''
-            reportError(errorMsg)
+            reportError(errorMsg, errorCode)
             console.error('[Chat Error]', errorMsg)
           }
         } else if (responseType === 'error') {
-          const errorMsg = userFacingAIError(data.content, t('chat.aiServiceUnavailable'))
+          const errorMsg = userFacingAIError(
+            data.content,
+            t('chat.aiServiceUnavailable'),
+            errorCode,
+            t('chat.billingRenewalPending'),
+          )
           message.content = errorMsg
           message.is_completed = true
           isReplying.value = false
           loading.value = false
           fullContent.value = ''
           currentAssistantMessageId.value = ''
-          reportError(errorMsg)
+          reportError(errorMsg, errorCode)
           console.error('[Chat Error]', errorMsg)
         }
         break
@@ -944,6 +955,45 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         isReplying.value = false
         currentAssistantMessageId.value = ''
       }
+      return
+    }
+
+    // Normal chat errors do not use the agent event reducer. Classify the
+    // structured error code here before touching the assistant row; never
+    // infer billing state from provider-facing content text.
+    if (data.response_type === 'error') {
+      const existingMessage = findLastMessage((item) => {
+        if (item.request_id === data.id) return true
+        return item.id === data.id
+      })
+      const message = existingMessage || {
+        id: data.id,
+        request_id: data.id,
+        role: 'assistant',
+        content: '',
+        is_completed: false,
+      }
+      if (!existingMessage) {
+        messagesList.push(message)
+        onMessageCreated?.(message)
+      }
+      const dataPayload = data.data as ChatMessage | undefined
+      const errorCode = (dataPayload?.error_code ?? data.error_code) as string | undefined
+      const errorMsg = userFacingAIError(
+        data.content,
+        t('chat.aiServiceUnavailable'),
+        errorCode,
+        t('chat.billingRenewalPending'),
+      )
+      message.content = errorMsg
+      message.is_completed = true
+      isReplying.value = false
+      loading.value = false
+      fullContent.value = ''
+      currentAssistantMessageId.value = ''
+      onMessageUpdated?.(message, data)
+      reportError(errorMsg, errorCode)
+      console.error('[Chat Error]', errorMsg)
       return
     }
 

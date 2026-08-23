@@ -210,6 +210,25 @@ func TestMonthlyPaidAllowanceWaitsForConfirmedRenewal(t *testing.T) {
 	assert.Zero(t, manager.updateCalls)
 }
 
+func TestCurrentMarksAllowanceRenewalAsPending(t *testing.T) {
+	periodEnd := time.Now().UTC().Add(-time.Minute)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{LimitMicrousd: 2_500_000, LimitRemainingMicrousd: 500_000}}
+	svc := newEntitlementService(repo, manager)
+
+	current, err := svc.Current(entitlementContext(7, "user-123"), time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, current)
+	assert.Equal(t, types.OpenRouterCreditsPending, current.OpenRouterCreditsStatus)
+	assert.Zero(t, current.OpenRouterRemainingMicrousd)
+	assert.Equal(t, types.LimitsForConsumerPlan(types.ConsumerPlanPro).MonthlyOpenRouterMicrousd, current.OpenRouterUsedMicrousd)
+	assert.Zero(t, manager.updateCalls)
+}
+
 func TestAnnualPaidAllowanceStopsAtVerifiedPaidTermEnd(t *testing.T) {
 	now := time.Now().UTC()
 	creditPeriodEnd := now.Add(24 * time.Hour)

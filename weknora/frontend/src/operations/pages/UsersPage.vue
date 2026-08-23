@@ -62,6 +62,7 @@
             <div><dt>有效套餐</dt><dd>{{ entitlement?.plan?.toUpperCase() || selected.plan?.toUpperCase() || 'FREE' }}</dd></div><div><dt>套餐状态</dt><dd>{{ entitlement?.plan_status || selected.plan_status || '—' }}</dd></div>
             <div><dt>空间计量</dt><dd>{{ formatBytes(entitlement?.storage_used_bytes ?? selected.storage_used_bytes) }}</dd></div><div><dt>空间配额</dt><dd>{{ formatBytes(entitlement?.storage_quota_bytes ?? selected.storage_quota_bytes) }}</dd></div>
             <div><dt>OpenRouter 已用</dt><dd>{{ entitlement ? formatMicrousd(entitlement.openrouter_used_microusd) : 'unavailable' }}</dd></div><div><dt>OpenRouter 剩余</dt><dd>{{ entitlement ? formatMicrousd(entitlement.openrouter_remaining_microusd) : 'unavailable' }}</dd></div>
+            <div><dt>AI 额度状态</dt><dd>{{ entitlement?.openrouter_credits_status || '—' }}</dd></div>
             <div><dt>额度周期结束</dt><dd>{{ formatDate(entitlement?.openrouter_credit_period_end || selected.open_router_credit_period_end) }}</dd></div><div><dt>Paddle 周期结束</dt><dd>{{ formatDate(entitlement?.paddle_current_period_end || selected.paddle_current_period_end) }}</dd></div>
           </dl>
         </section>

@@ -12,7 +12,10 @@ Musuw SHALL accept MP4, MPEG, MOV, and WebM knowledge uploads and SHALL reject u
 - **THEN** the existing entitlement gate SHALL reject it before model inference
 
 ### Requirement: Native OpenRouter video understanding
-Musuw SHALL convert each supported video to Markdown using the built-in OpenRouter VLM. The production catalog SHALL use `qwen/qwen3.7-flash` routed to the Alibaba endpoint; `google/gemini-2.5-flash` MAY remain explicitly admitted for region-specific verification.
+Musuw SHALL convert each supported video to Markdown using the default
+`builtin-openrouter-vlm` catalog row bound to `google/gemini-2.5-flash` and
+routed to the OpenRouter `google-vertex` provider on the Tokyo runtime. A
+per-upload model override SHALL NOT be required for the normal consumer path.
 
 #### Scenario: Worker processes a private video
 - **WHEN** the document worker reads a supported stored video

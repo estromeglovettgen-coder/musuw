@@ -16,6 +16,7 @@ const (
 	OpenRouterCreditsAvailable     OpenRouterCreditsStatus = "available"
 	OpenRouterCreditsUnavailable   OpenRouterCreditsStatus = "unavailable"
 	OpenRouterCreditsUnprovisioned OpenRouterCreditsStatus = "unprovisioned"
+	OpenRouterCreditsPending       OpenRouterCreditsStatus = "pending"
 
 	CheapestChatModelID            = "builtin-deepseek-v4-flash"
 	CheapestEmbeddingModelID       = PlatformKnowledgeBaseEmbeddingModelID
@@ -54,6 +55,9 @@ type ConsumerEntitlement struct {
 	OpenRouterCreditsStatus             OpenRouterCreditsStatus `json:"openrouter_credits_status"`
 	PaddleCustomerID                    string                  `json:"-"`
 	PaddleSubscriptionID                string                  `json:"-"`
+	PaddleBillingPeriod                 string                  `json:"-"`
+	PaddleCurrentPeriodEnd              *time.Time              `json:"-"`
+	OpenRouterCreditPeriodEnd           *time.Time              `json:"-"`
 }
 
 func NormalizeConsumerPlan(plan ConsumerPlan) ConsumerPlan {

@@ -60,7 +60,9 @@
         </section>
 
         <footer class="plans-page__footer">
-          <p v-if="!billingConfigured">{{ $t('entitlement.billingNotConfigured') }}</p>
+          <p v-if="recoveryCheckout">{{ $t('entitlement.recoveryCheckoutNotice') }}</p>
+          <p v-else-if="billingPending">{{ $t('entitlement.billingRenewalPending') }}</p>
+          <p v-else-if="!billingConfigured">{{ $t('entitlement.billingNotConfigured') }}</p>
           <p v-else>{{ $t('entitlement.checkoutSecureNote') }}</p>
           <button v-if="entitlement.plan !== 'free' && portalAvailable" type="button" :disabled="portalOpening" @click="handlePortal">
             {{ $t('entitlement.manageBilling') }}
@@ -122,8 +124,10 @@ const requestedPlan = computed<ConsumerPlan | null>(() => {
 })
 const billingConfigured = computed(() => billing.value?.configured === true)
 const portalAvailable = computed(() => billing.value?.portal_available === true)
+const recoveryCheckout = computed(() => billing.value?.recovery_checkout === true)
+const billingPending = computed(() => entitlement.value?.openrouter_credits_status === 'pending')
 const subscriptionUpgradeAvailable = computed(() =>
-  billingConfigured.value && portalAvailable.value && entitlement.value?.plan_status === 'active',
+  billingConfigured.value && !recoveryCheckout.value && portalAvailable.value && entitlement.value?.plan_status === 'active',
 )
 
 const loadPrices = async () => {
@@ -195,8 +199,10 @@ const hasCheckout = (plan: PaidConsumerPlan) => {
 
 const planActionKind = (plan: ConsumerPlan): 'current' | 'included' | 'choose' | 'unavailable' => {
   const current = entitlement.value?.plan || 'free'
+  if (plan === 'free') return current === 'free' ? 'current' : 'included'
+  if (planRank[plan] < planRank[current]) return 'included'
+  if (recoveryCheckout.value) return hasCheckout(plan as PaidConsumerPlan) ? 'choose' : 'unavailable'
   if (plan === current) return 'current'
-  if (plan === 'free' || planRank[plan] < planRank[current]) return 'included'
   if (current === 'free') return hasCheckout(plan as PaidConsumerPlan) ? 'choose' : 'unavailable'
   return subscriptionUpgradeAvailable.value ? 'choose' : 'unavailable'
 }
@@ -205,6 +211,7 @@ const planActionLabel = (plan: ConsumerPlan) => {
   const kind = planActionKind(plan)
   if (kind === 'current') return t('entitlement.currentPlanAction')
   if (kind === 'included') return t('entitlement.includedInCurrent')
+  if (kind === 'choose' && recoveryCheckout.value) return t('entitlement.recoveryPlanAction', { plan: t(`entitlement.plans.${plan}`) })
   if (kind === 'choose') return entitlement.value?.plan === 'free'
     ? t('entitlement.choosePlanAction', { plan: t(`entitlement.plans.${plan}`) })
     : t('entitlement.upgradeTo', { plan: t(`entitlement.plans.${plan}`) })

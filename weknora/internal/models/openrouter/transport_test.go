@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -112,4 +113,14 @@ func TestCreditExhaustedClassificationStaysProviderScoped(t *testing.T) {
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":402,"message":"payment_required"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"message":"spending limit reached"}}`)))
 	assert.False(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":429,"message":"rate limited"}}`)))
+}
+
+func TestAllowanceRenewalPendingClassificationIsStableAndTextIndependent(t *testing.T) {
+	wrapped := fmt.Errorf("transport boundary: %w", ErrAllowanceRenewalPending)
+
+	assert.True(t, IsAllowanceRenewalPending(wrapped))
+	assert.Equal(t, AllowanceRenewalPendingCode, ErrorCode(wrapped))
+	assert.False(t, IsAllowanceRenewalPending(errors.New("allowance renewal is awaiting payment confirmation")))
+	assert.False(t, IsAllowanceRenewalPending(errors.New("provider says billing_renewal_pending")))
+	assert.Empty(t, ErrorCode(errors.New("third-party billing renewal pending")))
 }

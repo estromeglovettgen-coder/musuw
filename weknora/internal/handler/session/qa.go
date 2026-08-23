@@ -17,6 +17,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/chat"
+	"github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/storageurl"
 	"github.com/Tencent/WeKnora/internal/types"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
@@ -1015,6 +1016,7 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 					SessionID: sessionID,
 					Data: event.ErrorData{
 						Error:     serviceErr.Error(),
+						ErrorCode: openrouter.ErrorCode(serviceErr),
 						Stage:     stageName,
 						SessionID: sessionID,
 					},

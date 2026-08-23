@@ -17,9 +17,10 @@
 ## 4. Regional provider resilience
 
 - [x] 4.1 Keep the existing OpenRouter transport and tenant metering, switch the
-  built-in VLM to Qwen 3.7 Flash on Alibaba, and retain exact Gemini/Vertex
-  routing for the later Japan-region recheck.
-- [x] 4.2 Run focused unit/catalog checks and a real bounded Qwen video request.
+  default `builtin-openrouter-vlm` to Gemini 2.5 Flash on the Tokyo
+  `google-vertex` route, and do not add an automatic model fallback.
+- [ ] 4.2 Run focused unit/catalog checks and a real bounded Gemini 2.5 Flash
+  video request through the default VLM path.
 - [ ] 4.3 Deploy the complete catalog and browser-test paid video upload through
   ingestion, retrieval, and cleanup; if a valid paid production term is
   externally unavailable, record the production gate and complete the same

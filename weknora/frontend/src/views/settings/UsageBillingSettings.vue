@@ -30,6 +30,11 @@
         </div>
       </section>
 
+      <p v-if="entitlement.openrouter_credits_status === 'pending'" class="usage-billing__notice usage-billing__notice--action">
+        <span>{{ $t('entitlement.billingRenewalPending') }}</span>
+        <button type="button" class="usage-billing__secondary" @click="openPlans">{{ $t('entitlement.viewPlans') }}</button>
+      </p>
+
       <section class="usage-billing__group" :aria-label="$t('entitlement.usageLimits')">
         <h3>{{ $t('entitlement.usageLimits') }}</h3>
         <div class="usage-billing__row">
@@ -42,7 +47,7 @@
               <span :style="{ width: `${creditsRemainingPercent ?? 0}%` }" />
             </div>
             <strong v-if="creditsRemainingPercent !== null">{{ creditsRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
-            <strong v-else class="is-muted">{{ $t('entitlement.unavailable') }}</strong>
+            <strong v-else class="is-muted">{{ entitlement.openrouter_credits_status === 'pending' ? $t('entitlement.billingPendingShort') : $t('entitlement.unavailable') }}</strong>
           </div>
         </div>
 
@@ -95,7 +100,7 @@ const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan |
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const creditsRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
-  if (!data || data.openrouter_credits_status === 'unavailable') return null
+  if (!data || data.openrouter_credits_status === 'unavailable' || data.openrouter_credits_status === 'pending') return null
   if (data.openrouter_credits_status === 'unprovisioned') return 100
   const total = Number(data.monthly_openrouter_microusd)
   const remaining = Number(data.openrouter_remaining_microusd)
@@ -159,6 +164,7 @@ onMounted(() => { void loadEntitlement() })
 .usage-billing__header h2 { margin: 0; font-size: 22px; line-height: 30px; font-weight: 650; letter-spacing: -.02em; }
 .usage-billing__header p { margin: 5px 0 0; color: #6f737a; font-size: 13px; line-height: 20px; }
 .usage-billing__loading,.usage-billing__notice { color: #7a7f87; font-size: 12px; line-height: 18px; }
+.usage-billing__notice--action { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fafafa; }
 .usage-billing__group { margin-top: 18px; overflow: hidden; border: 1px solid #e5e5e5; border-radius: 14px; background: #fff; }
 .usage-billing__group h3 { margin: 0; padding: 13px 16px 11px; border-bottom: 1px solid #eeeeee; font-size: 12px; line-height: 18px; font-weight: 650; }
 .usage-billing__row { min-height: 58px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 22px; border-bottom: 1px solid #f0f0f0; }
