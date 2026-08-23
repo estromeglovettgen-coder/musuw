@@ -30,7 +30,37 @@
   VLM, and runtime packages passed; connector/model/security suites that resolve
   public domains failed because this runner maps them to the restricted
   `198.18.0.0/15` test range (plus a pre-existing Feishu summary-log assertion).
-  This environment gate is why lifecycle task 6.1 remains unchecked.
+  The authoritative exact-SHA CI run passed the complete configured matrix;
+  this local network gate is retained as a reproducibility note, not a release
+  failure.
+
+## 2026-08-23 consumer capability smoke
+
+- Using the canonical TEST reviewer native OIDC session and the real consumer
+  endpoints, Flash and Pro each returned a bounded non-empty English SSE
+  answer with HTTP 200 and a completed stream.
+- A high-reasoning request returned HTTP 200 with `thinking`, retrieval-tool,
+  answer, and completion events. A KB-scoped retrieval request returned three
+  evidence chunks and a non-empty answer through the supported consumer tool
+  path.
+- The temporary English knowledge base and all four smoke sessions were removed
+  through the product API after the checks. The reviewer account and active
+  Paddle Sandbox Max entitlement were retained.
+
+## Release and public smoke baseline
+
+- Exact source release SHA:
+  `42395dbf9df923bc75d841d694531102d7adc06c`.
+- Exact-SHA CI: `32625412806`; Cloudflare storefront: `32625936901`;
+  immutable-GHCR server: `32625936888`. Each workflow reached terminal
+  success, and the public `/health` revision matched the release.
+- Public English smoke returned 200 for the storefront root/contact and the
+  app auth/platform/plans entry routes. The four active product image URLs
+  returned 200 `image/jpeg` at 3024x1898 source scale; metadata probes found
+  OG, Twitter, icon, and manifest references with no Musnow text.
+- This evidence-sync revision is itself sent through the same release path
+  after commit; its exact SHA and workflow run IDs are recorded by the release
+  monitor rather than guessed in advance.
 
 ## Deferred gate
 
@@ -38,10 +68,12 @@ The current TEST video fixture reached the terminal provider-classified HTTP
 402 / `DOCREADER_PARSE_FAILED` state even though the root wallet and tenant
 allowance were not exhausted. The supported Qwen fallback is configured and
 catalog-advertised for video, but no successful current video parse/retrieval
-is claimed. OpenRouter/Gemini task 4.3, zero-config task 4.2, reviewer fixture
-task 5.4, and paid-video task 5.6 remain unchecked until an approved provider
-route succeeds without adding services or purchasing credits.
+is claimed. OpenRouter/Gemini task 4.3, reviewer fixture task 5.4, and
+paid-video task 5.6 remain unchecked until an approved provider route succeeds
+without adding services or purchasing credits. The zero-config consumer model,
+reasoning, and retrieval checks are complete and recorded in its dedicated
+verification file.
 
-Final exact-SHA CI, Cloudflare storefront, immutable GHCR server release, and
-public revision/health checks remain release-gate work and are not claimed by
-this local evidence.
+The next exact-SHA CI, Cloudflare storefront, immutable GHCR server release,
+and public revision/health checks are the gate for the evidence-sync commit;
+the preceding release evidence above is complete and non-sensitive.

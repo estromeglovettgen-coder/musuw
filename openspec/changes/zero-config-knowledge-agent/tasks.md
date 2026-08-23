@@ -29,7 +29,7 @@
 
 - [x] 4.1 Run focused Go and frontend tests, build checks, and strict OpenSpec
   validation.
-- [ ] 4.2 After production capacity is restored, run one full release and
+- [x] 4.2 After production capacity is restored, run one full release and
   browser-test create, upload, retrieval, Flash, Pro, deep thinking, and
   tool-capability flows; remove intentional preset test knowledge bases only
   as part of that acceptance run.

@@ -43,8 +43,8 @@
 
 ## 6. Consolidated verification and release
 
-- [ ] 6.1 Run storefront tests, auth tests, frontend tests, Go tests, DocReader tests, typechecks, lint where configured, production builds, static preflight, OpenSpec strict validation, and git diff checks.
-- [ ] 6.2 Run one consolidated adversarial review covering credential security, account enumeration, redirect/recovery abuse, plan truth, screenshot privacy, SEO assets, responsive layout, dark mode auth, accessibility, performance, and release rollback.
+- [x] 6.1 Run storefront tests, auth tests, frontend tests, Go tests, DocReader tests, typechecks, lint where configured, production builds, static preflight, OpenSpec strict validation, and git diff checks.
+- [x] 6.2 Run one consolidated adversarial review covering credential security, account enumeration, redirect/recovery abuse, plan truth, screenshot privacy, SEO assets, responsive layout, dark mode auth, accessibility, performance, and release rollback.
 - [x] 6.3 Record non-sensitive verification evidence in this change and reconcile any superseded lifecycle tasks in the previously active OpenSpec changes without claiming unavailable Production Max evidence.
-- [ ] 6.4 Commit and push main through the existing unique release path, then require terminal success for exact-SHA CI, Cloudflare storefront, immutable GHCR server release, manifests, public revision binding, and health.
-- [ ] 6.5 Re-run public English auth, storefront, metadata/logo, screenshot, legal, plans, reviewer login, and representative lifecycle smoke against the final deployed revision.
+- [x] 6.4 Commit and push main through the existing unique release path, then require terminal success for exact-SHA CI, Cloudflare storefront, immutable GHCR server release, manifests, public revision binding, and health.
+- [x] 6.5 Re-run public English auth, storefront, metadata/logo, screenshot, legal, plans, reviewer login, and representative lifecycle smoke against the final deployed revision.

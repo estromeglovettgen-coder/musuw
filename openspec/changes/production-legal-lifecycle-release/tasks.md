@@ -17,14 +17,14 @@
 
 ## 3. Production delivery
 
-- [ ] 3.1 Commit and push one complete main revision, then require green CI for
+- [x] 3.1 Commit and push one complete main revision, then require green CI for
   its exact full SHA.
-- [ ] 3.2 Require terminal success and public revision/health evidence for both
+- [x] 3.2 Require terminal success and public revision/health evidence for both
   the Cloudflare storefront and immutable-GHCR server release workflows.
 
 ## 4. Production browser lifecycle
 
-- [ ] 4.1 Verify public legal/auth behavior and complete sign-in, knowledge
+- [x] 4.1 Verify public legal/auth behavior and complete sign-in, knowledge
   creation, upload/parse, retrieval/chat, plan/billing checkout handoff,
   logout, and re-login in Chrome without a new live charge.
 - [x] 4.2 Delete disposable acceptance knowledge through the product UI/API,
