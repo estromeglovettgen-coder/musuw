@@ -3,12 +3,16 @@ export const LOCALE_COOKIE_NAME = "musuw_locale";
 
 export type AuthLocale = "zh-CN" | "en-US";
 
-type StorageLike = Readonly<{ getItem(key: string): string | null }>;
+type StorageLike = Readonly<{
+  getItem(key: string): string | null;
+  setItem?(key: string, value: string): void;
+}>;
 
 export type AuthLocaleResolutionInput = Readonly<{
   storage?: StorageLike | null;
   cookie?: string | null;
   languages?: readonly string[] | null;
+  search?: string | null;
 }>;
 
 function authLocale(value: unknown): AuthLocale | null {
@@ -41,8 +45,12 @@ function cookieValue(cookie: string | null | undefined): string | null {
 }
 
 function browserStorage(): StorageLike | null {
-  if (typeof localStorage === "undefined") return null;
-  return localStorage;
+  try {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage;
+  } catch {
+    return null;
+  }
 }
 
 function browserCookie(): string {
@@ -55,15 +63,37 @@ function browserLanguages(): readonly string[] {
   return languages.length > 0 ? languages : [navigator.language];
 }
 
-/** Existing preference > storefront country signal > browser > English. */
+function browserSearch(): string {
+  return typeof window === "undefined" ? "" : window.location.search;
+}
+
+function queryLocale(search: string | null | undefined): AuthLocale | null {
+  if (!search) return null;
+  try {
+    return authLocale(new URLSearchParams(search).get("lang"));
+  } catch {
+    return null;
+  }
+}
+
+/** Explicit reviewer link > existing preference > storefront signal > browser > English. */
 export function resolveInitialAuthLocale(
   input: AuthLocaleResolutionInput = {},
 ): AuthLocale {
+  const storage = input.storage === undefined ? browserStorage() : input.storage;
+  const explicit = queryLocale(input.search ?? browserSearch());
+  if (explicit !== null) {
+    try {
+      storage?.setItem?.(LOCALE_STORAGE_KEY, explicit);
+    } catch {
+      // The explicit locale still applies when storage is unavailable.
+    }
+    return explicit;
+  }
+
   let saved: string | null = null;
   try {
-    saved = input.storage === undefined
-      ? browserStorage()?.getItem(LOCALE_STORAGE_KEY) ?? null
-      : input.storage?.getItem(LOCALE_STORAGE_KEY) ?? null;
+    saved = storage?.getItem(LOCALE_STORAGE_KEY) ?? null;
   } catch {
     saved = null;
   }
