@@ -17,7 +17,6 @@ export interface PaddleCatalogOption {
 export interface PaddleBillingConfig {
   configured: boolean
   portal_available: boolean
-  recovery_checkout: boolean
   environment?: 'sandbox' | 'live'
   client_token?: string
   tenant_id?: string

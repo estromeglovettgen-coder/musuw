@@ -148,7 +148,17 @@ test('host development loads Paddle and Langfuse server secrets from Keychain in
   assert.match(source, /security find-generic-password/)
   assert.match(source, /musuw-admin-test/)
   assert.doesNotMatch(source, /load_env_file "\$paddle_sandbox_env"/)
-  assert.match(source, /export LANGFUSE_ENVIRONMENT=test/)
+	assert.match(source, /export LANGFUSE_ENVIRONMENT=test/)
+})
+
+test('production operations keeps Paddle on the authorized Sandbox unit', () => {
+  const source = readFileSync(new URL('./musuw-admin-server.mjs', import.meta.url), 'utf8')
+  const productionBranch = source.slice(source.indexOf("if (target === 'production')"), source.indexOf('const candidate ='))
+  assert.match(productionBranch, /paddleEnvironment:\s*'sandbox'/)
+  assert.match(productionBranch, /paddleApiBase:\s*'https:\/\/sandbox-api\.paddle\.com'/)
+  assert.match(productionBranch, /paddleApiKey:\s*readKeychainSecret\(PROVIDER_KEY_SERVICES\.paddle,\s*'musuw-admin-test'\)/)
+  assert.doesNotMatch(productionBranch, /paddleEnvironment:\s*'live'/)
+  assert.doesNotMatch(productionBranch, /https:\/\/api\.paddle\.com/)
 })
 
 test('Supabase Auth Admin reads only the selected process environment with the official apikey header', async () => {

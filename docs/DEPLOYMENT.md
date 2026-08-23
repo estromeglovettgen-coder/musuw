@@ -178,22 +178,15 @@ signed event from that exact destination. Live cannot be enabled with an env
 edit. After authorization, a future cutover requires a reviewed code change
 that replaces the entire unit together; never rotate one field in isolation.
 
-Paid Paddle identities are environment-local. A provider-proven orphan is the
-one recovery exception: the tenant is active and paid, all cadence/paid/credit
-period fields are absent, and the selected Paddle SDK returns typed
-`not_found` for the exact stored subscription. Only then may the authenticated
-API return same-or-higher tenant-bound hosted-checkout options. Timeout,
-401/403, 5xx, nil or mismatched responses, and any confirmed period all fail
-closed. While an unconfirmed paid identity is orphaned or unverifiable, both
-the advertised Portal action and the direct Portal API fail before creating a
-provider session. Normal paid tenants never receive this checkout. The
-recovery read writes nothing. Only a newer correctly signed active `subscription.created`
-or `subscription.activated` event with the tenant binding and confirmed
-current period may replace the stale identity and restore the initial plan,
-cadence, period, and credit. Later allowance renewals still require correctly
-signed `transaction.completed` events with `subscription_recurring` origin.
-Browser callbacks never grant either state. Never bypass this with SQL or a
-hand-written entitlement.
+Sandbox launch data is disposable and is not migrated across Paddle
+environments. Remove stale test accounts through the existing product account
+deletion lifecycle and validate a fresh checkout; do not add a parallel
+subscription-recovery path or repair billing state with SQL. Only a correctly
+signed active `subscription.created` or `subscription.activated` event with the
+tenant binding and a confirmed current period grants an initial paid period.
+Later allowance renewals still require a correctly signed
+`transaction.completed` event with `subscription_recurring` origin. Browser
+callbacks never grant either state.
 
 The checked-in lockfiles are used by CI (`npm ci`). When a dependency changes,
 regenerate its lockfile in the same change.

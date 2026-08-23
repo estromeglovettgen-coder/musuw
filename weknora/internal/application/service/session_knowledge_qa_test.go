@@ -8,6 +8,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/models/asr"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/models/embedding"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/rerank"
 	"github.com/Tencent/WeKnora/internal/models/vlm"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -17,6 +18,7 @@ import (
 
 type captureChatModel struct {
 	lastMessages []chat.Message
+	streamErr    error
 }
 
 func (m *captureChatModel) Chat(
@@ -33,6 +35,9 @@ func (m *captureChatModel) ChatStream(
 	_ *chat.ChatOptions,
 ) (<-chan types.StreamResponse, error) {
 	m.lastMessages = append([]chat.Message(nil), messages...)
+	if m.streamErr != nil {
+		return nil, m.streamErr
+	}
 
 	ch := make(chan types.StreamResponse, 1)
 	ch <- types.StreamResponse{
@@ -179,4 +184,30 @@ func TestHandleModelFallback_IncludesHistoryMessages(t *testing.T) {
 	assert.Equal(t, "WeKnora 是一个知识库问答系统。", chatModel.lastMessages[2].Content)
 	assert.Equal(t, "user", chatModel.lastMessages[3].Role)
 	assert.Contains(t, chatModel.lastMessages[3].Content, "现在还能继续讲吗？")
+}
+
+func TestHandleModelFallbackEmitsBillingRenewalPendingWithoutFixedAnswer(t *testing.T) {
+	chatModel := &captureChatModel{streamErr: modelopenrouter.ErrAllowanceRenewalPending}
+	svc := &sessionService{modelService: &stubModelService{chatModel: chatModel}}
+	bus := event.NewEventBus()
+	var errors []event.ErrorData
+	bus.On(event.EventError, func(_ context.Context, evt event.Event) error {
+		errors = append(errors, evt.Data.(event.ErrorData))
+		return nil
+	})
+	cm := &types.ChatManage{
+		PipelineRequest: types.PipelineRequest{
+			SessionID: "session-1", Query: "question", ChatModelID: "chat-model",
+			FallbackPrompt: "Answer: {{query}}", FallbackResponse: "fixed fallback",
+			SummaryConfig: types.SummaryConfig{},
+		},
+		PipelineContext: types.PipelineContext{EventBus: bus.AsEventBusInterface()},
+	}
+
+	svc.handleModelFallback(context.Background(), cm)
+
+	require.Len(t, errors, 1)
+	assert.Equal(t, modelopenrouter.AllowanceRenewalPendingCode, errors[0].ErrorCode)
+	assert.Equal(t, "model_fallback", errors[0].Stage)
+	assert.Nil(t, cm.ChatResponse)
 }

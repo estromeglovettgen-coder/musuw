@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	paddle "github.com/PaddleHQ/paddle-go-sdk/v5"
-	paddleerr "github.com/PaddleHQ/paddle-go-sdk/v5/pkg/paddleerr"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -40,18 +38,13 @@ type emptyPaddlePortalSessionCreatorStub struct{}
 
 type paddleSubscriptionUpdaterStub struct {
 	subscription *paddle.Subscription
-	getErr       error
-	getCtx       context.Context
-	getReq       *paddle.GetSubscriptionRequest
 	preview      *paddle.SubscriptionPreview
 	previewReq   *paddle.PreviewSubscriptionUpdateRequest
 	updateReq    *paddle.UpdateSubscriptionRequest
 }
 
-func (s *paddleSubscriptionUpdaterStub) GetSubscription(ctx context.Context, request *paddle.GetSubscriptionRequest) (*paddle.Subscription, error) {
-	s.getCtx = ctx
-	s.getReq = request
-	return s.subscription, s.getErr
+func (s *paddleSubscriptionUpdaterStub) GetSubscription(context.Context, *paddle.GetSubscriptionRequest) (*paddle.Subscription, error) {
+	return s.subscription, nil
 }
 
 func (s *paddleSubscriptionUpdaterStub) PreviewSubscriptionUpdate(_ context.Context, request *paddle.PreviewSubscriptionUpdateRequest) (*paddle.SubscriptionPreview, error) {
@@ -194,70 +187,6 @@ func TestPaddlePortalSessionFailsClosedOnEmptyProviderResponse(t *testing.T) {
 
 	assert.NotPanics(t, func() { h.PaddlePortalSession(c) })
 	require.NotEmpty(t, c.Errors)
-}
-
-func TestPaddlePortalSessionRejectsUnconfirmedPaidIdentityUnlessSubscriptionResolves(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	tests := []struct {
-		name         string
-		subscription *paddle.Subscription
-		providerErr  error
-	}{
-		{name: "provider proves orphan", providerErr: paddle.ErrNotFound},
-		{name: "provider times out", providerErr: context.DeadlineExceeded},
-		{name: "provider returns nil"},
-		{name: "provider identity mismatches", subscription: &paddle.Subscription{ID: "sub_other", CustomerID: "ctm_other"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			portal := &paddlePortalSessionCreatorStub{}
-			provider := &paddleSubscriptionUpdaterStub{subscription: tt.subscription, getErr: tt.providerErr}
-			h := &EntitlementHandler{
-				service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
-					ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-					PaddleCustomerID: "ctm_unconfirmed", PaddleSubscriptionID: "sub_unconfirmed",
-				}},
-				paddle: completeSandboxPaddleConfig(), portal: portal, subscriptions: provider,
-			}
-			recorder := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(recorder)
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/portal-session", nil)
-			c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
-
-			h.PaddlePortalSession(c)
-
-			require.NotEmpty(t, c.Errors)
-			assert.Empty(t, portal.customerID)
-			assert.Nil(t, provider.previewReq)
-			assert.Nil(t, provider.updateReq)
-		})
-	}
-}
-
-func TestPaddlePortalSessionAllowsUnconfirmedPaidIdentityOnlyAfterSubscriptionResolves(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	portal := &paddlePortalSessionCreatorStub{}
-	provider := &paddleSubscriptionUpdaterStub{subscription: &paddle.Subscription{
-		ID: "sub_unconfirmed", CustomerID: "ctm_unconfirmed", Status: paddle.SubscriptionStatusActive,
-	}}
-	h := &EntitlementHandler{
-		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
-			ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-			PaddleCustomerID: "ctm_unconfirmed", PaddleSubscriptionID: "sub_unconfirmed",
-		}},
-		paddle: completeSandboxPaddleConfig(), portal: portal, subscriptions: provider,
-	}
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/portal-session", nil)
-	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
-
-	h.PaddlePortalSession(c)
-
-	require.Empty(t, c.Errors)
-	assert.Equal(t, "ctm_unconfirmed", portal.customerID)
-	assert.Equal(t, []string{"sub_unconfirmed"}, portal.subscriptionIDs)
 }
 
 func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing.T) {
@@ -413,44 +342,6 @@ func TestPaddleSubscriptionUpgradeRejectsDowngradeAndProviderOwnershipMismatch(t
 	assert.Nil(t, provider.updateReq)
 }
 
-func TestPaddleSubscriptionUpgradeFailsClosedWhenStoredIdentityIsUnavailableInSelectedEnvironment(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	config := PaddleConfig{
-		Environment:   "sandbox",
-		APIKey:        "pdl_sdbx_apikey_test",
-		ClientToken:   "test_client_token",
-		WebhookSecret: "pdl_ntfset_secret",
-		Prices: map[types.ConsumerPlan]map[string]string{
-			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
-			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
-			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
-		},
-	}
-	provider := &paddleSubscriptionUpdaterStub{getErr: errors.New("subscription does not exist in selected environment")}
-	h := &EntitlementHandler{
-		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
-			ConsumerPlanLimits:   types.LimitsForConsumerPlan(types.ConsumerPlanPlus),
-			PlanStatus:           "active",
-			PaddleCustomerID:     "ctm_from_previous_environment",
-			PaddleSubscriptionID: "sub_from_previous_environment",
-		}},
-		paddle:        config,
-		subscriptions: provider,
-	}
-
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade/preview", strings.NewReader(`{"plan":"pro"}`))
-	req.Header.Set("Content-Type", "application/json")
-	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
-
-	h.PaddleSubscriptionUpgradePreview(c)
-
-	require.NotEmpty(t, c.Errors)
-	assert.Nil(t, provider.previewReq)
-	assert.Nil(t, provider.updateReq)
-}
-
 func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	portal := &paddlePortalSessionCreatorStub{}
@@ -506,230 +397,6 @@ func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 	assert.NotEmpty(t, option.Binding)
 	assert.True(t, h.paddle.validCheckoutBinding(42, option.PriceID, option.Binding))
 	assert.NotContains(t, recorder.Body.String(), "ctm_server_only")
-}
-
-func TestCurrentOffersProviderProvenOrphanRecoveryCheckoutForSameOrHigherPlan(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	provider := &paddleSubscriptionUpdaterStub{getErr: paddle.ErrNotFound}
-	h := &EntitlementHandler{
-		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
-			ConsumerPlanLimits:   types.LimitsForConsumerPlan(types.ConsumerPlanPlus),
-			PlanStatus:           "active",
-			PaddleCustomerID:     "ctm_orphaned",
-			PaddleSubscriptionID: "sub_orphaned",
-		}},
-		paddle: PaddleConfig{
-			Environment:   "sandbox",
-			APIKey:        "pdl_sdbx_apikey_test",
-			ClientToken:   "test_client_token",
-			WebhookSecret: "pdl_ntfset_secret",
-			Prices: map[types.ConsumerPlan]map[string]string{
-				types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
-				types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
-				types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
-			},
-		},
-		portal:        &paddlePortalSessionCreatorStub{},
-		subscriptions: provider,
-	}
-
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entitlements/current", nil)
-	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
-
-	h.Current(c)
-
-	require.Empty(t, c.Errors)
-	require.Equal(t, http.StatusOK, recorder.Code)
-	require.NotNil(t, provider.getReq)
-	assert.Equal(t, "sub_orphaned", provider.getReq.SubscriptionID)
-	require.NotNil(t, provider.getCtx)
-	deadline, hasDeadline := provider.getCtx.Deadline()
-	require.True(t, hasDeadline)
-	assert.WithinDuration(t, time.Now().UTC().Add(5*time.Second), deadline.UTC(), time.Second)
-	var response struct {
-		Billing struct {
-			Configured      bool   `json:"configured"`
-			PortalAvailable bool   `json:"portal_available"`
-			Recovery        bool   `json:"recovery_checkout"`
-			TenantID        string `json:"tenant_id"`
-			Prices          map[string]map[string]struct {
-				PriceID string `json:"price_id"`
-				Binding string `json:"checkout_binding"`
-			} `json:"prices"`
-		} `json:"billing"`
-	}
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	assert.True(t, response.Billing.Configured)
-	assert.True(t, response.Billing.Recovery)
-	assert.False(t, response.Billing.PortalAvailable)
-	assert.Equal(t, "42", response.Billing.TenantID)
-	assert.Nil(t, provider.previewReq)
-	assert.Nil(t, provider.updateReq)
-	assert.NotContains(t, recorder.Body.String(), "ctm_orphaned")
-	assert.NotContains(t, recorder.Body.String(), "sub_orphaned")
-	assert.NotContains(t, recorder.Body.String(), "paddle_billing_period")
-	assert.NotContains(t, recorder.Body.String(), "paddle_current_period_end")
-	assert.NotContains(t, recorder.Body.String(), "openrouter_credit_period_end")
-	assert.Empty(t, response.Billing.Prices["free"])
-	for _, plan := range []string{"plus", "pro", "max"} {
-		option := response.Billing.Prices[plan]["monthly"]
-		assert.NotEmpty(t, option.PriceID)
-		assert.NotEmpty(t, option.Binding)
-	}
-}
-
-func TestCurrentOrphanRecoveryFailsClosedWithoutExplicitProviderNotFound(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	future := time.Now().UTC().Add(time.Hour)
-	tests := []struct {
-		name         string
-		current      *types.ConsumerEntitlement
-		subscription *paddle.Subscription
-		providerErr  error
-		wantLookup   bool
-		wantPortal   bool
-	}{
-		{
-			name: "timeout",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			providerErr: context.DeadlineExceeded, wantLookup: true,
-		},
-		{
-			name: "unauthorized",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			providerErr: paddle.ErrAuthenticationMissing, wantLookup: true,
-		},
-		{
-			name: "forbidden",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			providerErr: &paddleerr.Error{Status: http.StatusForbidden, Type: paddleerr.ErrorTypeRequestError, Code: "forbidden"}, wantLookup: true,
-		},
-		{
-			name: "server error",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			providerErr: &paddleerr.Error{Status: http.StatusInternalServerError, Type: paddleerr.ErrorTypeRequestError, Code: "internal_server_error"}, wantLookup: true,
-		},
-		{
-			name: "nil response without not found",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			wantLookup: true,
-		},
-		{
-			name: "provider identity mismatch",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			subscription: &paddle.Subscription{ID: "sub_other", CustomerID: "ctm_other"}, wantLookup: true,
-		},
-		{
-			name: "normal paid subscription still exists",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			subscription: &paddle.Subscription{ID: "sub_stored", CustomerID: "ctm_stored", Status: paddle.SubscriptionStatusActive}, wantLookup: true,
-			wantPortal: true,
-		},
-		{
-			name: "billing cadence already confirmed",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored", PaddleBillingPeriod: "monthly"},
-			providerErr: paddle.ErrNotFound, wantPortal: true,
-		},
-		{
-			name: "paid term already confirmed",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored", PaddleCurrentPeriodEnd: &future},
-			providerErr: paddle.ErrNotFound, wantPortal: true,
-		},
-		{
-			name: "credit period already confirmed",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "active",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored", OpenRouterCreditPeriodEnd: &future},
-			providerErr: paddle.ErrNotFound, wantPortal: true,
-		},
-		{
-			name: "subscription is not active",
-			current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPlus), PlanStatus: "past_due",
-				PaddleCustomerID: "ctm_stored", PaddleSubscriptionID: "sub_stored"},
-			providerErr: paddle.ErrNotFound, wantPortal: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			provider := &paddleSubscriptionUpdaterStub{subscription: tt.subscription, getErr: tt.providerErr}
-			h := &EntitlementHandler{
-				service:       entitlementHandlerServiceStub{current: tt.current},
-				paddle:        completeSandboxPaddleConfig(),
-				portal:        &paddlePortalSessionCreatorStub{},
-				subscriptions: provider,
-			}
-			recorder := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(recorder)
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/entitlements/current", nil)
-			c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
-
-			h.Current(c)
-
-			require.Empty(t, c.Errors)
-			var response struct {
-				Billing struct {
-					Recovery        bool                           `json:"recovery_checkout"`
-					PortalAvailable bool                           `json:"portal_available"`
-					Prices          map[string]map[string]struct{} `json:"prices"`
-				} `json:"billing"`
-			}
-			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-			assert.False(t, response.Billing.Recovery)
-			assert.Equal(t, tt.wantPortal, response.Billing.PortalAvailable)
-			assert.Empty(t, response.Billing.Prices)
-			assert.Equal(t, tt.wantLookup, provider.getReq != nil)
-		})
-	}
-}
-
-func TestCurrentOrphanRecoveryDoesNotOfferDowngrade(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	provider := &paddleSubscriptionUpdaterStub{getErr: paddle.ErrNotFound}
-	h := &EntitlementHandler{
-		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
-			ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPro), PlanStatus: "active",
-			PaddleCustomerID: "ctm_orphaned", PaddleSubscriptionID: "sub_orphaned",
-		}},
-		paddle: completeSandboxPaddleConfig(), portal: &paddlePortalSessionCreatorStub{}, subscriptions: provider,
-	}
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entitlements/current", nil)
-	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
-
-	h.Current(c)
-
-	var response struct {
-		Billing struct {
-			Prices map[string]map[string]struct{} `json:"prices"`
-		} `json:"billing"`
-	}
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	assert.NotContains(t, response.Billing.Prices, "plus")
-	assert.Contains(t, response.Billing.Prices, "pro")
-	assert.Contains(t, response.Billing.Prices, "max")
-}
-
-func completeSandboxPaddleConfig() PaddleConfig {
-	return PaddleConfig{
-		Environment: "sandbox", APIKey: "pdl_sdbx_apikey_test", ClientToken: "test_client_token", WebhookSecret: "pdl_ntfset_secret",
-		Prices: map[types.ConsumerPlan]map[string]string{
-			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
-			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
-			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
-		},
-	}
 }
 
 func TestPaddleWebhookRejectsUnsignedCheckoutBinding(t *testing.T) {

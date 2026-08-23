@@ -395,6 +395,11 @@ func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uin
 	} else if billingPeriod != "monthly" && billingPeriod != "yearly" {
 		return false, fmt.Errorf("Paddle billing period is invalid")
 	}
+	if targetPlan != types.ConsumerPlanFree && tenant.OpenRouterCreditPeriodEnd == nil &&
+		(eventPeriodEnd == nil || eventPeriodEnd.IsZero()) {
+		logger.Infof(ctx, "Consumer plan event ignored without a confirmed initial paid period tenant_id=%d", tenantID)
+		return false, nil
+	}
 	creditPeriodEnd := nextCreditPeriodEnd(tenant, targetPlan, billingPeriod, occurredAt, eventPeriodEnd)
 	if (pausingSamePlan || resumingSamePlan) && tenant.OpenRouterCreditPeriodEnd != nil {
 		value := tenant.OpenRouterCreditPeriodEnd.UTC()

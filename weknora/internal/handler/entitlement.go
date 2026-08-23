@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -134,13 +133,12 @@ func (c PaddleConfig) validCheckoutBinding(tenantID uint64, priceID, binding str
 	return err == nil && hmac.Equal(want, got)
 }
 
-func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, portalAvailable, recoveryCheckout bool) gin.H {
+func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, portalAvailable bool) gin.H {
 	configured := c.Configured() && c.PortalConfigured()
 	response := gin.H{
-		"configured":        configured,
-		"environment":       strings.ToLower(strings.TrimSpace(c.Environment)),
-		"portal_available":  portalAvailable,
-		"recovery_checkout": recoveryCheckout,
+		"configured":       configured,
+		"environment":      strings.ToLower(strings.TrimSpace(c.Environment)),
+		"portal_available": portalAvailable,
 	}
 	if !configured || tenantID == 0 {
 		return response
@@ -154,14 +152,11 @@ func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, 
 	}
 	response["client_token"] = c.ClientToken
 	response["catalog"] = catalog
-	if plan != types.ConsumerPlanFree && !recoveryCheckout {
+	if plan != types.ConsumerPlanFree {
 		return response
 	}
 	prices := map[string]map[string]gin.H{}
 	for _, paidPlan := range []types.ConsumerPlan{types.ConsumerPlanPlus, types.ConsumerPlanPro, types.ConsumerPlanMax} {
-		if recoveryCheckout && consumerPlanRank(paidPlan) < consumerPlanRank(plan) {
-			continue
-		}
 		prices[string(paidPlan)] = map[string]gin.H{}
 		for _, period := range []string{"monthly", "yearly"} {
 			priceID := c.Prices[paidPlan][period]
@@ -192,17 +187,6 @@ type EntitlementHandler struct {
 	portal        paddlePortalSessionCreator
 	subscriptions paddleSubscriptionUpdater
 }
-
-const paddleRecoveryProofTimeout = 5 * time.Second
-
-type paddlePaidIdentityProof uint8
-
-const (
-	paddlePaidIdentityProofNotRequired paddlePaidIdentityProof = iota
-	paddlePaidIdentityProofResolved
-	paddlePaidIdentityProofOrphaned
-	paddlePaidIdentityProofUnavailable
-)
 
 func NewEntitlementHandler(service interfaces.EntitlementService) *EntitlementHandler {
 	config := loadPaddleConfig()
@@ -235,49 +219,8 @@ func (h *EntitlementHandler) Current(c *gin.Context) {
 		return
 	}
 	tenantID, _ := types.TenantIDFromContext(c.Request.Context())
-	identityProof := h.probeUnconfirmedPaidIdentity(c.Request.Context(), tenantID, current)
-	recoveryCheckout := identityProof == paddlePaidIdentityProofOrphaned
-	portalAvailable := h.portal != nil && strings.TrimSpace(current.PaddleCustomerID) != "" &&
-		identityProof != paddlePaidIdentityProofOrphaned && identityProof != paddlePaidIdentityProofUnavailable
-	c.JSON(http.StatusOK, gin.H{"data": current, "billing": h.paddle.billingResponse(tenantID, current.Plan, portalAvailable, recoveryCheckout)})
-}
-
-func requiresPaddlePaidIdentityProof(current *types.ConsumerEntitlement) bool {
-	return current != nil &&
-		types.NormalizeConsumerPlan(current.Plan) != types.ConsumerPlanFree &&
-		strings.EqualFold(strings.TrimSpace(current.PlanStatus), string(paddle.SubscriptionStatusActive)) &&
-		strings.TrimSpace(current.PaddleCustomerID) != "" && strings.TrimSpace(current.PaddleSubscriptionID) != "" &&
-		strings.TrimSpace(current.PaddleBillingPeriod) == "" && current.PaddleCurrentPeriodEnd == nil &&
-		current.OpenRouterCreditPeriodEnd == nil
-}
-
-func (h *EntitlementHandler) probeUnconfirmedPaidIdentity(ctx context.Context, tenantID uint64, current *types.ConsumerEntitlement) paddlePaidIdentityProof {
-	if !requiresPaddlePaidIdentityProof(current) {
-		return paddlePaidIdentityProofNotRequired
-	}
-	if tenantID == 0 || h.subscriptions == nil || !h.paddle.Configured() || !h.paddle.PortalConfigured() {
-		return paddlePaidIdentityProofUnavailable
-	}
-
-	proofCtx, cancel := context.WithTimeout(ctx, paddleRecoveryProofTimeout)
-	defer cancel()
-	subscription, err := h.subscriptions.GetSubscription(proofCtx, &paddle.GetSubscriptionRequest{
-		SubscriptionID: strings.TrimSpace(current.PaddleSubscriptionID),
-	})
-	if errors.Is(err, paddle.ErrNotFound) {
-		logger.Warnf(ctx, "Paddle paid subscription is orphaned in the selected environment tenant_id=%d", tenantID)
-		return paddlePaidIdentityProofOrphaned
-	}
-	if err != nil {
-		logger.Warnf(ctx, "Paddle paid subscription recovery proof unavailable tenant_id=%d", tenantID)
-		return paddlePaidIdentityProofUnavailable
-	}
-	if subscription == nil || strings.TrimSpace(subscription.ID) != strings.TrimSpace(current.PaddleSubscriptionID) ||
-		strings.TrimSpace(subscription.CustomerID) != strings.TrimSpace(current.PaddleCustomerID) {
-		logger.Warnf(ctx, "Paddle paid subscription recovery proof mismatched tenant_id=%d", tenantID)
-		return paddlePaidIdentityProofUnavailable
-	}
-	return paddlePaidIdentityProofResolved
+	portalAvailable := h.portal != nil && strings.TrimSpace(current.PaddleCustomerID) != ""
+	c.JSON(http.StatusOK, gin.H{"data": current, "billing": h.paddle.billingResponse(tenantID, current.Plan, portalAvailable)})
 }
 
 func (h *EntitlementHandler) PaddlePortalSession(c *gin.Context) {
@@ -293,11 +236,6 @@ func (h *EntitlementHandler) PaddlePortalSession(c *gin.Context) {
 	current, err := h.service.Current(c.Request.Context(), time.Now())
 	if err != nil {
 		_ = c.Error(err)
-		return
-	}
-	identityProof := h.probeUnconfirmedPaidIdentity(c.Request.Context(), tenantID, current)
-	if identityProof == paddlePaidIdentityProofOrphaned || identityProof == paddlePaidIdentityProofUnavailable {
-		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle customer portal is unavailable until billing identity is restored"))
 		return
 	}
 	customerID := strings.TrimSpace(current.PaddleCustomerID)

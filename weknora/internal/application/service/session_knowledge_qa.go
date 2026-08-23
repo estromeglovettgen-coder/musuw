@@ -13,6 +13,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/modelcontext"
 	"github.com/Tencent/WeKnora/internal/models/chat"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -977,6 +978,22 @@ func (s *sessionService) handleModelFallback(ctx context.Context, chatManage *ty
 	fallbackMessages, modelContext := prepareFallbackMessages(chatManage, promptContent)
 	responseChan, err := chatModel.ChatStream(ctx, fallbackMessages, opt)
 	if err != nil {
+		if modelopenrouter.IsAllowanceRenewalPending(err) {
+			if emitErr := chatManage.EventBus.Emit(ctx, types.Event{
+				ID:        generateEventID("error"),
+				Type:      types.EventType(event.EventError),
+				SessionID: chatManage.SessionID,
+				Data: event.ErrorData{
+					Error:     err.Error(),
+					ErrorCode: modelopenrouter.AllowanceRenewalPendingCode,
+					Stage:     "model_fallback",
+					SessionID: chatManage.SessionID,
+				},
+			}); emitErr != nil {
+				logger.Errorf(ctx, "Failed to emit billing renewal pending fallback error: %v", emitErr)
+			}
+			return
+		}
 		logger.Errorf(ctx, "Failed to start streaming fallback response: %v, falling back to fixed response", err)
 		s.handleFixedFallback(ctx, chatManage)
 		return

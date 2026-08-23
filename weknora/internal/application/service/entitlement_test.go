@@ -326,6 +326,34 @@ func TestApplyAnnualConsumerPlanPersistsVerifiedPaidTerm(t *testing.T) {
 	assert.Equal(t, time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC), repo.tenant.OpenRouterCreditPeriodEnd.UTC())
 }
 
+func TestApplyConsumerPlanIgnoresInitialPaidStateWithoutConfirmedPeriod(t *testing.T) {
+	now := time.Date(2026, 8, 28, 9, 30, 0, 0, time.UTC)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active",
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{
+			APIKey: "sk-child", KeyHash: "hash-7",
+		}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		UsageMicrousd: 600_000, LimitMicrousd: 1_000_000, LimitRemainingMicrousd: 400_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	applied, err := svc.ApplyConsumerPlan(
+		context.Background(), 7, types.ConsumerPlanPro, "active", "monthly",
+		"evt-unconfirmed", now, "ctm_new", "sub_new", nil,
+	)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Zero(t, manager.updateCalls)
+	assert.Equal(t, types.ConsumerPlanFree, repo.tenant.Plan)
+	assert.Empty(t, repo.tenant.PaddleCustomerID)
+	assert.Empty(t, repo.tenant.PaddleSubscriptionID)
+	assert.Empty(t, repo.tenant.PaddleBillingPeriod)
+	assert.Nil(t, repo.tenant.PaddleCurrentPeriodEnd)
+	assert.Nil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+}
+
 func TestPausedAnnualResumePreservesAllowanceAndPaidTerm(t *testing.T) {
 	now := time.Now().UTC()
 	creditPeriodEnd := now.AddDate(0, 1, 0)
