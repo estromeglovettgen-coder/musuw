@@ -3887,7 +3887,7 @@ export default {
       typeDescription: 'FAQ 类型适合结构化问答数据；文档型支持文件解析与分块；Wiki 类型由 LLM 自动构建互链知识页面。',
       nameLabel: '知识库名称',
       namePlaceholder: '请输入知识库名称',
-      descriptionLabel: '知识库描述',
+      descriptionLabel: '知识库描述（可选）',
       descriptionPlaceholder: '请输入知识库描述（可选）'
     },
     errors: {
@@ -4214,7 +4214,7 @@ export default {
     messages: {
       deleted: '已删除',
       deleteFailed: '删除失败',
-      duplicateSuccess: '知识库副本已创建（不包含知识内容）',
+      duplicateSuccess: '复制已开始，请稍后刷新列表查看',
       duplicateFailed: '创建知识库副本失败'
     },
     sections: {

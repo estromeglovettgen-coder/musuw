@@ -1809,7 +1809,7 @@ export default {
     messages: {
       deleted: 'Knowledge base deleted',
       deleteFailed: 'Failed to delete knowledge base',
-      duplicateSuccess: 'Knowledge base duplicate created (content not included)',
+      duplicateSuccess: 'Copy started. Refresh the list later to view it.',
       duplicateFailed: 'Failed to create knowledge base duplicate'
     },
     detail: {
@@ -2138,7 +2138,7 @@ export default {
       typeDescription: 'FAQ suits structured Q&A datasets; document type supports file parsing and chunking; Wiki type auto-builds interlinked knowledge pages via LLM.',
       nameLabel: 'Knowledge Base Name',
       namePlaceholder: 'Enter knowledge base name',
-      descriptionLabel: 'Knowledge Base Description',
+      descriptionLabel: 'Knowledge Base Description (optional)',
       descriptionPlaceholder: 'Enter knowledge base description (optional)'
     },
     wiki: {

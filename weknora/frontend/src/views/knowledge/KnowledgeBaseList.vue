@@ -109,7 +109,6 @@ export default defineComponent({
             />
           </template>
 
-          <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
         </div>
 
         <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0" class="visual-kb-grid">
@@ -134,7 +133,6 @@ export default defineComponent({
               />
             </div>
           </template>
-          <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
         </div>
 
         <div v-else-if="spaceSelectionOrgId && spaceKbsLoading" class="visual-kb-loading"><t-loading size="medium" /></div>
@@ -155,7 +153,6 @@ export default defineComponent({
               @details="openSharedDetail(shared)"
             />
           </template>
-          <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create-card" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><span><t-icon name="folder-add" /></span><strong>{{ $t('knowledgeList.create') }}</strong></button>
         </div>
 
         <section v-else-if="spaceSelection === 'all' && filteredKnowledgeBases.length === 0 && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
@@ -206,7 +203,7 @@ export default defineComponent({
 .visual-kb-list__title-row :deep(.t-icon) { width: 20px; height: 20px; font-size: 20px; color: #374151; }
 .visual-kb-list__header h1 { margin: 0; color: #111827; font-size: 20px; line-height: 28px; font-weight: 700; }
 .visual-kb-list__header p { margin: 4px 0 0; color: #6b7280; font-size: 12px; line-height: 18px; }
-.visual-kb-list__create { min-height: 32px; padding: 8px 14px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; background: #111827; color: #fff; font: inherit; font-size: 12px; line-height: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); transition: background-color 150ms ease; }
+.visual-kb-list__create { min-height: 32px; padding: 8px 14px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; background: #111827; color: #fff; font: inherit; font-size: 12px; line-height: 16px; font-weight: 700; white-space: nowrap; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); transition: background-color 150ms ease; }
 .visual-kb-list__create:hover { background: #000; }
 .visual-kb-list__create :deep(.t-icon) { font-size: 14px; }
 .visual-kb-warning { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: #fff; color: #6b7280; font-size: 11px; line-height: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
@@ -229,11 +226,6 @@ export default defineComponent({
 .visual-kb-section small { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #9ca3af; font-size: 9px; }
 .visual-kb-section :deep(.t-icon:last-child) { margin-left: 2px; }
 .visual-kb-list__skeleton { min-height: 154px; padding: 18px; border: 1px solid rgb(229 231 235 / 90%); border-radius: 12px; background: #fff; }
-.visual-kb-list__create-card { min-height: 154px; padding: 18px; border: 1px dashed #d1d5db; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgb(255 255 255 / 55%); color: #9ca3af; font: inherit; cursor: pointer; transition: border-color 150ms ease,background-color 150ms ease,color 150ms ease; }
-.visual-kb-list__create-card:hover { border-color: #9ca3af; background: #fff; color: #374151; }
-.visual-kb-list__create-card > span { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; }
-.visual-kb-list__create-card > span :deep(.t-icon) { font-size: 18px; }
-.visual-kb-list__create-card strong { font-size: 12px; font-weight: 700; }
 .visual-kb-loading { min-height: 220px; display: flex; align-items: center; justify-content: center; }
 .visual-kb-empty { min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #9ca3af; text-align: center; }
 .visual-kb-empty > :deep(.t-icon) { font-size: 30px; color: #d1d5db; }
@@ -268,7 +260,7 @@ export default defineComponent({
 @media (min-width: 1024px) { .visual-kb-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
 @media (max-width: 760px) { .visual-kb-workspace > :deep(.list-space-sidebar) { display: none; } }
 @media (max-width: 600px) { .visual-kb-list__header { align-items: flex-start; flex-direction: column; } }
-@media (prefers-reduced-motion: reduce) { .visual-kb-list__create,.visual-kb-upload-status__bar span,.visual-kb-list__create-card,.visual-shared-detail-enter-active,.visual-shared-detail-leave-active,.visual-shared-detail-enter-active .visual-shared-detail,.visual-shared-detail-leave-active .visual-shared-detail { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .visual-kb-list__create,.visual-kb-upload-status__bar span,.visual-shared-detail-enter-active,.visual-shared-detail-leave-active,.visual-shared-detail-enter-active .visual-shared-detail,.visual-shared-detail-leave-active .visual-shared-detail { transition: none !important; } }
 </style>
 
 <style>

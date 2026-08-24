@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, type SetupContext } from 'vue'
+import { computed, defineComponent, unref, type SetupContext } from 'vue'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
@@ -15,6 +15,7 @@ import TagEditDialog from './components/TagEditDialog.vue'
 import BatchTagDialog from './components/BatchTagDialog.vue'
 import KbTagManageDrawer from './components/KbTagManageDrawer.vue'
 import WikiBrowser from './wiki/WikiBrowser.vue'
+import { childFolders, ROOT_FOLDER_PATH } from './folderTree'
 
 const legacy = LegacyKnowledgeBaseBusiness as any
 const legacySetup = legacy.setup
@@ -30,7 +31,18 @@ export default defineComponent({
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      return {
+        ...state,
+        showFolderTree: computed(() => !Boolean(unref(state.isFAQ))),
+        currentChildFolders: computed(() => Boolean(unref(state.isFiltering))
+          ? []
+          : childFolders(
+            unref(state.folderTree) ?? null,
+            unref(state.selectedFolderPath) ?? ROOT_FOLDER_PATH,
+          )),
+      }
+    }
     return state
   },
 })
@@ -285,7 +297,7 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
 .visual-knowledge-skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap: 16px; }
 .visual-knowledge-skeleton-card { min-height: 192px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 16px; background: #fff; }
 .visual-knowledge-empty { min-height: 260px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 12px; text-align: center; }
-.visual-knowledge-batch-anchor { position: absolute; left: 50%; bottom: 12px; z-index: 100; transform: translateX(-50%); }
+.visual-knowledge-batch-anchor { position: absolute; left: 50%; bottom: 12px; z-index: 100; width: min(760px,calc(100% - 24px)); max-width: calc(100vw - 24px); box-sizing: border-box; transform: translateX(-50%); }
 .visual-faq-manager { width: 100%; height: 100%; min-height: 0; overflow: auto; background: #fff; }
 
 .visual-tag-filter { width: 280px; max-height: min(480px,70vh); padding: 8px; display: flex; flex-direction: column; gap: 8px; color: #374151; }

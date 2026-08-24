@@ -9,10 +9,10 @@ const menuBusiness = read("./business-baselines/menu.pre-view.vue");
 const input = read("../components/Input-field.vue");
 const knowledgeBaseList = read("../views/knowledge/KnowledgeBaseList.vue");
 
-test("create knowledge-base action remains a responsive final grid tile", () => {
-  assert.match(knowledgeBaseList, /class="visual-kb-list__create-card"[^>]*@click="handleCreateKnowledgeBase"/);
-  assert.match(knowledgeBaseList, /\.visual-kb-list__create-card\s*\{[^}]*min-height:\s*154px[^}]*border:\s*1px dashed #d1d5db/i);
-  assert.match(knowledgeBaseList, /\.visual-kb-list__create-card:hover\s*\{[^}]*background:\s*#fff/i);
+test("create knowledge-base action stays a single responsive header CTA", () => {
+  assert.match(knowledgeBaseList, /class="visual-kb-list__create"[^>]*@click="handleCreateKnowledgeBase"/);
+  assert.doesNotMatch(knowledgeBaseList, /visual-kb-list__create-card/);
+  assert.match(knowledgeBaseList, /\.visual-kb-list__create\s*\{[^}]*display:\s*inline-flex[^}]*white-space:\s*nowrap/i);
   assert.ok(knowledgeBaseList.includes('.visual-kb-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }'));
   assert.ok(knowledgeBaseList.includes('.visual-kb-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }'));
 });

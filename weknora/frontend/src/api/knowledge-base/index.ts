@@ -173,7 +173,7 @@ export function copyKnowledgeBase(data: { source_id: string; target_id?: string 
 }
 
 export function duplicateKnowledgeBase(id: string) {
-  return post(`/api/v1/knowledge-bases/${id}/duplicate`);
+  return copyKnowledgeBase({ source_id: id });
 }
 
 // 获取可移动目标知识库列表（同类型、同Embedding模型）

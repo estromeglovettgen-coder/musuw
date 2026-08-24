@@ -20,10 +20,9 @@
 }
 
 /* -------------------------------------------------------------------------- */
-/* KnowledgeBase.tsx create modal -> native zero-config create behavior.        */
-/* The reference has an extra description field; Musuw's server-owned create   */
-/* contract intentionally accepts only name, so no fake description behavior is */
-/* added. Everything that exists is laid out using the reference modal pixels. */
+/* KnowledgeBase create modal -> native zero-config create behavior.            */
+/* User-authored metadata stays compact while the server continues to own all   */
+/* model, storage and pipeline defaults.                                        */
 /* -------------------------------------------------------------------------- */
 
 .settings-overlay:has(.settings-modal--compact) {
@@ -47,8 +46,8 @@
 }
 .settings-modal--compact .zero-config-create { min-height: 0 !important; }
 .settings-modal--compact .zero-config-create__body {
-  gap: 16px !important;
-  padding: 24px 24px 16px !important;
+  gap: 14px !important;
+  padding: 22px 24px 14px !important;
 }
 .settings-modal--compact .sidebar-title {
   margin: 0 !important;
@@ -98,7 +97,7 @@
   box-shadow: none !important;
 }
 .settings-modal--compact .settings-footer {
-  margin: 0 24px 24px !important;
+  margin: 0 24px 20px !important;
   padding: 10px 0 0 !important;
   border-top: 1px solid #f3f4f6 !important;
   background: #fff !important;

@@ -1160,6 +1160,11 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 		return nil, nil, err
 	}
 	sourceKB.EnsureDefaults()
+	if dstKB == "" {
+		if err := s.checkCreateKnowledgeBaseEntitlement(ctx); err != nil {
+			return nil, nil, err
+		}
+	}
 	var targetKB *types.KnowledgeBase
 	if dstKB != "" {
 		// Load target KB with tenant scope so we only clone into the caller's tenant
@@ -1294,6 +1299,9 @@ func (s *knowledgeBaseService) DuplicateKnowledgeBase(
 		}
 	}
 
+	if err := s.checkCreateKnowledgeBaseEntitlement(ctx); err != nil {
+		return nil, err
+	}
 	if err := s.repo.CreateKnowledgeBase(ctx, targetKB); err != nil {
 		return nil, err
 	}

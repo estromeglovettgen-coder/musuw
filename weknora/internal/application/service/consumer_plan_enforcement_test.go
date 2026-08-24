@@ -29,6 +29,93 @@ func TestFreePlanRejectsSecondKnowledgeBase(t *testing.T) {
 	assert.Len(t, repo.rows, 1)
 }
 
+func TestFreePlanRejectsCopyThatWouldCreateSecondKnowledgeBase(t *testing.T) {
+	repo := newFakeKBRepo()
+	repo.rows["source"] = &types.KnowledgeBase{
+		ID:       "source",
+		Name:     "Source",
+		Type:     types.KnowledgeBaseTypeDocument,
+		TenantID: 1,
+	}
+	svc := &knowledgeBaseService{repo: repo}
+
+	_, _, err := svc.CopyKnowledgeBase(
+		contextWithConsumerPlan(1, types.ConsumerPlanFree),
+		"source",
+		"",
+	)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, apperrors.ErrForbidden, appErr.Code)
+	assert.Len(t, repo.rows, 1, "rejected copy must not create a target knowledge base")
+}
+
+func TestPaidPlanCopyStillUsesNativeCreateTargetPath(t *testing.T) {
+	repo := newFakeKBRepo()
+	repo.rows["source"] = &types.KnowledgeBase{
+		ID:       "source",
+		Name:     "Source",
+		Type:     types.KnowledgeBaseTypeDocument,
+		TenantID: 1,
+	}
+	svc := &knowledgeBaseService{repo: repo}
+
+	source, target, err := svc.CopyKnowledgeBase(
+		contextWithConsumerPlan(1, types.ConsumerPlanPlus),
+		"source",
+		"",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "source", source.ID)
+	require.NotNil(t, target)
+	assert.NotEqual(t, source.ID, target.ID)
+	assert.Len(t, repo.rows, 2)
+}
+
+func TestFreePlanRejectsSettingsOnlyDuplicateThatWouldCreateSecondKnowledgeBase(t *testing.T) {
+	repo := newFakeKBRepo()
+	repo.rows["source"] = &types.KnowledgeBase{
+		ID:       "source",
+		Name:     "Source",
+		Type:     types.KnowledgeBaseTypeDocument,
+		TenantID: 1,
+	}
+	svc := &knowledgeBaseService{repo: repo}
+
+	_, err := svc.DuplicateKnowledgeBase(
+		contextWithConsumerPlan(1, types.ConsumerPlanFree),
+		"source",
+	)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, apperrors.ErrForbidden, appErr.Code)
+	assert.Len(t, repo.rows, 1, "rejected duplicate must not create a target knowledge base")
+}
+
+func TestPaidPlanSettingsOnlyDuplicateKeepsLegacySemantics(t *testing.T) {
+	repo := newFakeKBRepo()
+	repo.rows["source"] = &types.KnowledgeBase{
+		ID:             "source",
+		Name:           "Source",
+		Description:    "settings survive",
+		Type:           types.KnowledgeBaseTypeDocument,
+		TenantID:       1,
+		KnowledgeCount: 7,
+	}
+	svc := &knowledgeBaseService{repo: repo}
+
+	target, err := svc.DuplicateKnowledgeBase(
+		contextWithConsumerPlan(1, types.ConsumerPlanPlus),
+		"source",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, target)
+	assert.NotEqual(t, "source", target.ID)
+	assert.Equal(t, "settings survive", target.Description)
+	assert.Zero(t, target.KnowledgeCount, "legacy endpoint must remain settings-only")
+	assert.Len(t, repo.rows, 2)
+}
+
 type planKnowledgeRepo struct {
 	interfaces.KnowledgeRepository
 	count int64

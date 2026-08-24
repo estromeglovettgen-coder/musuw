@@ -12,14 +12,17 @@ test('reachable surface closure is active after reference-specific layers', () =
   assert.ok(i > main.indexOf('musuw-reference-lucide-precision.css'))
 })
 
-test('KnowledgeBase.tsx create-modal geometry is applied to native zero-config create', () => {
+test('KnowledgeBase create modal is content-driven and reuses shared TDesign field styling', () => {
   for (const token of [
     '.settings-overlay:has(.settings-modal--compact)',
     'background: rgb(0 0 0 / 40%) !important',
     'width: min(448px, 100%) !important',
     'max-width: 448px !important',
+    'height: auto !important',
+    'min-height: 0 !important',
+    'max-height: calc(100dvh - 32px) !important',
     'border-radius: 16px !important',
-    'padding: 24px 24px 16px !important',
+    'padding: 22px 24px 14px !important',
     '--mvs-folder-plus:',
     'background: #111827 !important',
   ]) assert.ok(css.includes(token), `KB create reference token missing: ${token}`)

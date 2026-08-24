@@ -158,6 +158,9 @@ func (e *OpenAIEmbedder) doRequestWithRetry(ctx context.Context, jsonData []byte
 		if err == nil {
 			return resp, nil
 		}
+		if modelopenrouter.IsAllowanceRenewalPending(err) || modelopenrouter.IsCreditExhausted(err) {
+			return nil, err
+		}
 
 		logger.GetLogger(ctx).Errorf("OpenAIEmbedder request failed (attempt %d/%d): %v", i+1, e.maxRetries+1, err)
 	}

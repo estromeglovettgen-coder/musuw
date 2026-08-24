@@ -135,15 +135,21 @@ const handleFolderConfirm = (path: string) => {
 .visual-document-batch {
   position: relative;
   z-index: 5;
-  width: min(760px, 100%);
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   margin: 0 auto;
-  padding: 8px 10px;
+  padding: 6px 8px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   background: rgb(255 255 255 / 96%);
@@ -153,6 +159,7 @@ const handleFolderConfirm = (path: string) => {
 
 .visual-document-batch__summary {
   min-width: 0;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -167,7 +174,7 @@ const handleFolderConfirm = (path: string) => {
 }
 
 .visual-document-batch__clear {
-  padding: 4px 6px;
+  padding: 3px 5px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -175,6 +182,7 @@ const handleFolderConfirm = (path: string) => {
   font: inherit;
   font-size: 11px;
   line-height: 16px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -185,16 +193,17 @@ const handleFolderConfirm = (path: string) => {
 
 .visual-document-batch__actions {
   min-width: 0;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 5px;
+  flex-wrap: nowrap;
 }
 
 .visual-document-batch__button {
-  min-height: 32px;
-  padding: 6px 10px;
+  min-height: 30px;
+  padding: 5px 8px;
   border: 1px solid #e5e7eb;
   border-radius: 9px;
   display: inline-flex;
@@ -255,18 +264,6 @@ const handleFolderConfirm = (path: string) => {
 .visual-document-batch-leave-to {
   opacity: 0;
   transform: translateY(6px);
-}
-
-@media (max-width: 700px) {
-  .visual-document-batch {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .visual-document-batch__actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

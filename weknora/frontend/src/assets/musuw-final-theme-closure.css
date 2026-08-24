@@ -76,7 +76,6 @@
   .visual-kb-workspace,
   .visual-kb-warning,
   .visual-kb-upload-status article,
-  .visual-kb-list__create-card,
   .visual-shared-detail,
   .visual-shared-detail dl > div {
     border-color: var(--mvc-line) !important;
@@ -84,7 +83,6 @@
     color: var(--mvc-text) !important;
   }
   .visual-kb-upload-status__icon,
-  .visual-kb-list__create-card > span,
   .visual-kb-section small { background: var(--mvc-hover) !important; color: var(--mvc-muted) !important; }
   .visual-kb-upload-status__copy strong,
   .visual-shared-detail > header h3,

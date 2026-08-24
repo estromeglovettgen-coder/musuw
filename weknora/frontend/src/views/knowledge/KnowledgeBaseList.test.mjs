@@ -8,7 +8,7 @@ const controller = readFileSync(
   "utf8",
 );
 
-test("consumer KB creation opens the name-only document flow without model preselection", () => {
+test("consumer KB creation opens the zero-config document flow without model preselection", () => {
   assert.match(
     controller,
     /const handleCreateKnowledgeBase = \(\) => \{[\s\S]*?uiStore\.openCreateKB\('document'\)/,
@@ -28,10 +28,11 @@ test("consumer KB list has no uninitialized-model repair prompt or settings esca
   assert.doesNotMatch(openCardPath, /settings|readiness|initialized/i);
 });
 
-test("KB list keeps both visible and in-grid creation actions while preserving native scopes", () => {
+test("non-empty KB grids keep the single header creation action while preserving native scopes", () => {
   assert.doesNotMatch(source, /class="header-action-btn"/);
   assert.match(source, /class="visual-kb-list__create"[\s\S]*?data-guide="kb-list-create"/);
-  assert.match(source, /class="visual-kb-list__create-card"[\s\S]*?data-guide="kb-list-create"/);
+  assert.doesNotMatch(source, /visual-kb-list__create-card/);
+  assert.match(source, /class="visual-kb-empty"[\s\S]*?data-guide="kb-list-create"/);
   assert.match(source, /class="visual-kb-section"/);
 });
 

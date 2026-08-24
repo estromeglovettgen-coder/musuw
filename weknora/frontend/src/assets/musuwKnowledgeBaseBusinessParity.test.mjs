@@ -15,7 +15,7 @@ test('rebuilt KnowledgeBase reuses normalized frozen setup and keeps Graph host 
   const source = read('../views/knowledge/KnowledgeBase.vue')
   assert.match(source, /import LegacyKnowledgeBaseBusiness from .*KnowledgeBase\.pre-view\.vue/)
   assert.match(source, /const legacySetup = legacy\.setup/)
-  assert.match(source, /return \{ \.\.\.state \}/)
+  assert.match(source, /\.\.\.state,[\s\S]*?showFolderTree: computed[\s\S]*?currentChildFolders: computed/)
   assert.match(source, /class="visual-knowledge-page"/)
   assert.ok(source.includes(`:view="activeKbTab === 'graph' ? 'graph' : 'browser'"`))
   assert.ok(source.includes('@open-source-doc="openSourceDoc"'))

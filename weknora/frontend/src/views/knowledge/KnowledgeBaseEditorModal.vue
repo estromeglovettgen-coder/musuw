@@ -2,9 +2,14 @@
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="visible" class="settings-overlay" @click.self="handleClose">
-        <div :class="['settings-modal', { 'settings-modal--compact': editorMode === 'create' }]">
+        <div
+          :class="['settings-modal', { 'settings-modal--compact': editorMode === 'create' }]"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="editorMode === 'create' ? 'kb-create-title' : 'kb-edit-title'"
+        >
           <!-- 关闭按钮 -->
-          <button class="close-btn" @click="handleClose" :aria-label="$t('general.close')">
+          <button type="button" class="close-btn" @click="handleClose" :aria-label="$t('general.close')">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -12,16 +17,27 @@
 
           <div v-if="editorMode === 'create'" class="zero-config-create">
             <div class="zero-config-create__body">
-              <h2 class="sidebar-title">{{ $t('knowledgeEditor.titleCreate') }}</h2>
+              <h2 id="kb-create-title" class="sidebar-title">{{ $t('knowledgeEditor.titleCreate') }}</h2>
               <div class="form-item" data-guide="kb-create-name">
                 <label class="form-label required">{{ $t('knowledgeEditor.basic.nameLabel') }}</label>
                 <t-input
                   v-if="formData"
                   v-model="formData.name"
+                  name="name"
                   autofocus
                   :placeholder="$t('knowledgeEditor.basic.namePlaceholder')"
                   :maxlength="50"
                   @enter="handleSubmit"
+                />
+              </div>
+              <div class="form-item">
+                <label class="form-label">{{ $t('knowledgeEditor.basic.descriptionLabel') }}</label>
+                <t-textarea
+                  v-if="formData"
+                  v-model="formData.description"
+                  :placeholder="$t('knowledgeEditor.basic.descriptionPlaceholder')"
+                  :maxlength="200"
+                  :autosize="{ minRows: 2, maxRows: 4 }"
                 />
               </div>
             </div>
@@ -41,7 +57,7 @@
             <!-- 左侧导航 -->
             <div class="settings-sidebar">
               <div class="sidebar-header">
-                <h2 class="sidebar-title">{{ $t('knowledgeEditor.titleEdit') }}</h2>
+                <h2 id="kb-edit-title" class="sidebar-title">{{ $t('knowledgeEditor.titleEdit') }}</h2>
               </div>
               <div class="settings-nav" data-guide="kb-editor-sidebar">
                 <template v-for="group in navGroups" :key="group.key">
@@ -728,11 +744,12 @@ watch(
   }
 )
 
-// Creation is deliberately name-only. The server owns every model and
-// pipeline default, so the browser never selects or serializes one.
+// Creation only collects user-facing metadata. The server still owns every
+// model and pipeline default, so the browser never selects or serializes one.
 const initFormData = (type: 'document' | 'faq' = 'document') => ({
   type,
   name: '',
+  description: '',
 })
 
 // 加载所有模型
@@ -1055,7 +1072,7 @@ const validateForm = (): boolean => {
   }
 
   // Creation is server-owned zero configuration: the client only supplies
-  // the name and must not depend on model/settings endpoints being available.
+  // metadata and must not depend on model/settings endpoints being available.
   if (editorMode.value === 'create') return true
 
   // 验证索引策略 — 文档类型至少需要开启一种
@@ -1269,8 +1286,11 @@ const doSubmit = async () => {
   saving.value = true
   try {
     if (editorMode.value === 'create') {
-      // Creation is server-owned zero configuration: only send the name.
-      const result: any = await createKnowledgeBase({ name: formData.value.name.trim() })
+      // Creation is server-owned zero configuration; only metadata is sent.
+      const result: any = await createKnowledgeBase({
+        name: formData.value.name.trim(),
+        description: formData.value.description.trim(),
+      })
       if (!result.success || !result.data?.id) {
         throw new Error(result.message || t('knowledgeEditor.messages.createFailed'))
       }
@@ -1459,8 +1479,8 @@ watch(() => props.visible, async (newVal) => {
     resetState()
     
     if (props.mode === 'create') {
-      // Name-only create: all capabilities and model bindings are applied by
-      // CreateKnowledgeBase on the server.
+      // Metadata-only create: all capabilities and model bindings are applied
+      // by CreateKnowledgeBase on the server.
       currentSection.value = 'basic'
       formData.value = initFormData(props.initialType || 'document')
       hasFiles.value = false
@@ -1525,27 +1545,30 @@ watch(
 }
 
 .settings-modal--compact {
-  width: min(92vw, 520px);
+  width: min(448px, calc(100vw - 32px));
+  max-width: 448px;
   height: auto;
-  min-height: 240px;
+  min-height: 0;
+  max-height: calc(100dvh - 32px);
 }
 
 .zero-config-create {
   display: flex;
-  min-height: 240px;
-  flex: 1;
+  min-height: 0;
+  flex: 0 1 auto;
   flex-direction: column;
+  overflow-y: auto;
 
   &__body {
     display: flex;
-    flex: 1;
+    flex: 0 1 auto;
     flex-direction: column;
-    gap: 28px;
-    padding: 44px 40px 28px;
+    gap: 14px;
+    padding: 22px 24px 14px;
   }
 
   &__footer {
-    margin-top: auto;
+    margin-top: 0;
   }
 }
 

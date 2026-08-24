@@ -3,10 +3,86 @@ package embedding
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 )
+
+type openAIEmbeddingRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f openAIEmbeddingRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestOpenAIEmbedderDoesNotRetryTerminalOpenRouterErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "allowance renewal pending", err: modelopenrouter.ErrAllowanceRenewalPending},
+		{name: "credits exhausted", err: &modelopenrouter.CreditExhaustedError{StatusCode: http.StatusPaymentRequired}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			embedder := &OpenAIEmbedder{
+				apiKey:     "test-key",
+				baseURL:    "https://embedding.invalid/v1",
+				maxRetries: 1,
+				httpClient: &http.Client{Transport: openAIEmbeddingRoundTripFunc(func(*http.Request) (*http.Response, error) {
+					calls++
+					return nil, tt.err
+				})},
+			}
+
+			_, err := embedder.doRequestWithRetry(context.Background(), []byte(`{"input":["x"]}`))
+			if !errors.Is(err, tt.err) && modelopenrouter.ErrorCode(err) != modelopenrouter.ErrorCode(tt.err) {
+				t.Fatalf("doRequestWithRetry error = %v, want terminal error %v", err, tt.err)
+			}
+			if calls != 1 {
+				t.Fatalf("terminal error calls = %d, want 1", calls)
+			}
+		})
+	}
+}
+
+func TestOpenAIEmbedderStillRetriesTransientTransportErrors(t *testing.T) {
+	transientErr := errors.New("temporary transport failure")
+	calls := 0
+	embedder := &OpenAIEmbedder{
+		apiKey:     "test-key",
+		baseURL:    "https://embedding.invalid/v1",
+		maxRetries: 1,
+		httpClient: &http.Client{Transport: openAIEmbeddingRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			calls++
+			if calls == 1 {
+				return nil, transientErr
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+				Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+			}, nil
+		})},
+	}
+
+	resp, err := embedder.doRequestWithRetry(context.Background(), []byte(`{"input":["x"]}`))
+	if err != nil {
+		t.Fatalf("doRequestWithRetry returned transient error after recovery: %v", err)
+	}
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("doRequestWithRetry response = %#v, want HTTP 200", resp)
+	}
+	if calls != 2 {
+		t.Fatalf("transient error calls = %d, want 2", calls)
+	}
+}
 
 func TestOpenAIEmbedderBatchEmbedOmitsDimensionsByDefault(t *testing.T) {
 	requestBody := captureOpenAIEmbeddingRequest(t, "text-embedding-3-small", 256, false)

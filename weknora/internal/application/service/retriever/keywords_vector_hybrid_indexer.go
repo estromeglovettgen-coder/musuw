@@ -10,6 +10,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/embedding"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/utils"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -138,6 +139,9 @@ func batchEmbedWithBackoff(ctx context.Context, embedder embedding.Embedder, con
 		embeddings, err = embedder.BatchEmbedWithPool(ctx, embedder, contentList)
 		if err == nil {
 			return embeddings, nil
+		}
+		if modelopenrouter.IsAllowanceRenewalPending(err) || modelopenrouter.IsCreditExhausted(err) {
+			return embeddings, err
 		}
 		logger.Errorf(ctx, "BatchEmbedWithPool attempt %d/%d failed: %v", attempt+1, embedRetryAttempts, err)
 		if attempt+1 < embedRetryAttempts {

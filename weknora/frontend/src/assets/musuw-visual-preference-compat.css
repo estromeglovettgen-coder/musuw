@@ -138,8 +138,7 @@
 :root[theme-mode="dark"] .visual-plan-metric,
 :root[theme-mode="dark"] .visual-reference-item:hover,
 :root[theme-mode="dark"] .visual-manual-editor__toolbar,
-:root[theme-mode="dark"] .visual-manual-editor__tool:hover,
-:root[theme-mode="dark"] .visual-kb-list__create-card:hover {
+:root[theme-mode="dark"] .visual-manual-editor__tool:hover {
   background: var(--mvc-hover) !important;
   color: var(--mvc-text-strong) !important;
 }

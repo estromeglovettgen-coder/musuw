@@ -2,10 +2,13 @@ package retriever
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/models/embedding"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 )
@@ -36,6 +39,68 @@ func (e *capturingEmbedder) BatchEmbedWithPool(
 
 type saveOnlyRepository struct {
 	interfaces.RetrieveEngineRepository
+}
+
+type retryProbeEmbedder struct {
+	embedding.Embedder
+	calls      int
+	failures   int
+	err        error
+	embeddings [][]float32
+}
+
+func (e *retryProbeEmbedder) BatchEmbedWithPool(
+	context.Context,
+	embedding.Embedder,
+	[]string,
+) ([][]float32, error) {
+	e.calls++
+	if e.calls <= e.failures {
+		return nil, e.err
+	}
+	return e.embeddings, nil
+}
+
+func TestBatchEmbedWithBackoffDoesNotRetryTerminalOpenRouterErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "allowance renewal pending", err: modelopenrouter.ErrAllowanceRenewalPending},
+		{name: "credits exhausted", err: &modelopenrouter.CreditExhaustedError{StatusCode: http.StatusPaymentRequired}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			embedder := &retryProbeEmbedder{failures: embedRetryAttempts, err: tt.err}
+			_, err := batchEmbedWithBackoff(context.Background(), embedder, []string{"x"})
+			if modelopenrouter.ErrorCode(err) != modelopenrouter.ErrorCode(tt.err) {
+				t.Fatalf("batchEmbedWithBackoff error = %v, want terminal code %q", err, modelopenrouter.ErrorCode(tt.err))
+			}
+			if embedder.calls != 1 {
+				t.Fatalf("terminal error calls = %d, want 1", embedder.calls)
+			}
+		})
+	}
+}
+
+func TestBatchEmbedWithBackoffStillRetriesOrdinaryErrors(t *testing.T) {
+	embedder := &retryProbeEmbedder{
+		failures:   1,
+		err:        errors.New("billing_renewal_pending from unrelated provider text"),
+		embeddings: [][]float32{{1}},
+	}
+
+	embeddings, err := batchEmbedWithBackoff(context.Background(), embedder, []string{"x"})
+	if err != nil {
+		t.Fatalf("batchEmbedWithBackoff returned ordinary error after recovery: %v", err)
+	}
+	if len(embeddings) != 1 {
+		t.Fatalf("batchEmbedWithBackoff embeddings = %v, want one result", embeddings)
+	}
+	if embedder.calls != 2 {
+		t.Fatalf("ordinary error calls = %d, want 2", embedder.calls)
+	}
 }
 
 func (r *saveOnlyRepository) Save(ctx context.Context, indexInfo *types.IndexInfo, params map[string]any) error {

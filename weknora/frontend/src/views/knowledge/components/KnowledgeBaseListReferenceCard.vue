@@ -86,7 +86,7 @@ const emit = defineEmits<{
       </t-popup>
     </header>
 
-    <p class="visual-reference-kb-card__description">{{ kb.description || $t('knowledgeBase.noDescription') }}</p>
+    <p class="visual-reference-kb-card__description">{{ kb.description?.trim() || $t('knowledgeBase.noDescription') }}</p>
 
     <footer class="visual-reference-kb-card__footer">
       <span class="visual-reference-kb-card__badge">

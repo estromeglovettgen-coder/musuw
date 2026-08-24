@@ -27,3 +27,9 @@ test("graph view keeps the original layout chrome instead of inheriting document
     /v-if="activeKbTab === 'documents' \|\| !isWiki" class="visual-knowledge-documents"/,
   );
 });
+
+test("knowledge detail derives folder data independently from the collapsed sidebar layout", () => {
+  assert.match(source, /showFolderTree:\s*computed\(\(\) => !Boolean\(unref\(state\.isFAQ\)\)\)/);
+  assert.match(source, /currentChildFolders:\s*computed\([\s\S]*?childFolders\(/);
+  assert.doesNotMatch(source.slice(0, source.indexOf('<template>')), /folderTreeCollapsed/);
+});
