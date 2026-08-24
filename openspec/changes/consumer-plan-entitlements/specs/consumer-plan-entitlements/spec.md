@@ -105,11 +105,11 @@ Each tenant SHALL use one OpenRouter-managed child key with no provider calendar
 - **THEN** no additional allowance is granted
 
 ### Requirement: Ingestion reuses the native failure and recovery lifecycle
-The system SHALL NOT estimate OpenRouter cost from file bytes. When a provider-managed limit is exhausted during ingestion, the current task SHALL stop without retry, the knowledge row SHALL use WeKnora's existing failed status and trace finalization, and the source object SHALL remain available for the existing reparse flow after credits are restored.
+The system SHALL NOT estimate OpenRouter cost from file bytes. When a provider-managed limit is exhausted during ingestion, the current task SHALL stop without retry, the knowledge row SHALL use WeKnora's existing failed status and trace finalization, and the source object SHALL remain available for the existing reparse flow after credits are restored. Failure-state persistence SHALL retain the typed provider cause in the returned Go error chain so the worker classifies it without inspecting human-readable text.
 
 #### Scenario: Credits expire during parsing
 - **WHEN** an OpenRouter-backed ingestion stage receives a typed credit-exhaustion error
-- **THEN** the stage is marked failed once, is not automatically retried, and can be reparsed through WeKnora's existing workflow after upgrade or monthly reset
+- **THEN** the stage is marked failed once, the first worker delivery returns `SkipRetry`, no automatic provider retry occurs, and the item can be reparsed through WeKnora's existing workflow after upgrade or monthly reset
 
 ### Requirement: Users can inspect their effective entitlement
 The authenticated product SHALL show the current plan, storage used and limit, credit used and limit, the exact current allowance boundary when available, and the principal Free-only restrictions in Usage & billing settings. A separate `/plans` page SHALL show the four plans as equal, concise comparison cards with actions determined by the durable current plan; plan cards SHALL NOT be duplicated inside settings.

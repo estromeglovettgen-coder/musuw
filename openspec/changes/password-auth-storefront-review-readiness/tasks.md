@@ -21,7 +21,7 @@
 - [x] 3.3 Remove feature-level View Plans actions and replace oversized or empty product media frames with bounded responsive compositions that do not repeat the same layout family more than twice.
 - [x] 3.4 Rewrite English and Chinese storefront copy from current Musuw capabilities, remove template residue and unverified customer claims, and keep navigation, legal routes, and analytics-stable anchor IDs intact.
 - [x] 3.5 Rework Contact with Musuw content using the reference site's direct two-part layout pattern and no copied customer, brand, text, imagery, or proprietary code.
-- [x] 3.6 Set the visible copyright exactly to © 2026 Musuw. and verify social links are absent from all rendered footer variants.
+- [x] 3.6 Set the visible copyright exactly to `© 2026 musuw. All rights reserved.` and verify social links are absent from all rendered footer variants.
 - [x] 3.7 Replace comparison groups and rows with the enforced Free/Plus/Pro/Max storage, knowledge/document, video, model, AI allowance, connected-knowledge, export, and deletion facts while leaving the comparison UI system unchanged.
 
 ## 4. Brand metadata and English product media
@@ -36,15 +36,22 @@
 
 - [x] 5.1 Verify and apply the minimal Supabase TEST and Production password/confirmation/recovery redirect configuration without changing SMTP credentials or exposing settings values.
 - [x] 5.2 Provision one dedicated English reviewer identity in Production and TEST where required, store its generated password only in macOS Keychain, and document rotation without committing or printing the credential.
-- [x] 5.3 Activate TEST Max only through Paddle Sandbox or an already authorized correctly signed test event, then prove the server-reported Max entitlement without a Live charge, refund, fake webhook, raw SQL mutation, or browser override.
-- [ ] 5.4 Populate the reviewer workspace with English-only knowledge, source, conversation, and video fixtures that demonstrate real current behavior and contain no private or fictional customer data.
+- [x] 5.3 On the same freshly confirmed disposable Production password account,
+  prove initial Free, exactly one Paddle Sandbox Plus monthly checkout, and the
+  official same-subscription Pro update through signed deliveries without a
+  Live charge, refund, fake webhook, raw SQL mutation, or browser override.
+- [x] 5.4 Populate the reviewer workspace with English-only knowledge, source, conversation, and video fixtures that demonstrate real current behavior and contain no private or fictional customer data.
 - [x] 5.5 In real Chrome, verify Production password sign-in, logout, re-login, knowledge creation, upload/completed parsing, scoped retrieval, citations, available model/reasoning/tool flows, plans, Paddle checkout handoff, settings, and authorized cleanup.
-- [ ] 5.6 In the paid test environment, verify Max model access, supported video upload/parsing/indexing/retrieval, and relevant plan limits using the same English fixture contract.
+- [x] 5.6 In the active Paddle Sandbox paid reviewer environment, verify
+  server-authorized model access, supported video upload/parsing/indexing/
+  retrieval, and relevant plan limits using the same English fixture contract.
+  The current reviewer path is Production Sandbox Pro and uses the default
+  no-override video route.
 
 ## 6. Consolidated verification and release
 
 - [x] 6.1 Run storefront tests, auth tests, frontend tests, Go tests, DocReader tests, typechecks, lint where configured, production builds, static preflight, OpenSpec strict validation, and git diff checks.
 - [x] 6.2 Run one consolidated adversarial review covering credential security, account enumeration, redirect/recovery abuse, plan truth, screenshot privacy, SEO assets, responsive layout, dark mode auth, accessibility, performance, and release rollback.
-- [x] 6.3 Record non-sensitive verification evidence in this change and reconcile any superseded lifecycle tasks in the previously active OpenSpec changes without claiming unavailable Production Max evidence.
+- [x] 6.3 Record non-sensitive verification evidence in this change and reconcile any superseded lifecycle tasks in the previously active OpenSpec changes without claiming unavailable paid-video evidence.
 - [x] 6.4 Commit and push main through the existing unique release path, then require terminal success for exact-SHA CI, Cloudflare storefront, immutable GHCR server release, manifests, public revision binding, and health.
 - [x] 6.5 Re-run public English auth, storefront, metadata/logo, screenshot, legal, plans, reviewer login, and representative lifecycle smoke against the final deployed revision.

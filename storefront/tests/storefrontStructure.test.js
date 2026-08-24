@@ -58,7 +58,7 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
   assert.equal((home.match(/class="comparison-group-head"/g) ?? []).length, 6);
   assert.match(home, /Workspace limits/);
   assert.doesNotMatch(footer, /social-links|x\.com\/greeenyang|support@didren\.com/);
-  assert.match(footer, /© 2026 Musuw\./);
+  assert.match(footer, />© 2026 musuw\. All rights reserved\.<\/span>/);
   assert.match(contact, /contact-(?:page|layout|cards|card)/);
   assert.match(contact, /Support/);
   assert.match(contact, /Billing and refunds/);
@@ -68,7 +68,7 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
   assert.match(contactZh, /账单与退款/);
   assert.match(contactZh, /隐私与安全/);
   assert.match(contactZh, /支付审核/);
-  assert.match(contactZh, /© 2026 Musuw\./);
+  assert.match(contactZh, />© 2026 musuw\. All rights reserved\.<\/span>/);
 });
 
 test("hidden storefront sections and their source modules remain available for later reconsideration", () => {

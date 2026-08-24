@@ -1,5 +1,22 @@
 # Verification evidence
 
+## 2026-08-23 typed credit propagation repair
+
+- A deterministic red-first worker-boundary test used the real
+  `ProcessDocument` video path and existing OpenRouter credit middleware. The
+  typed credit error reached video failure persistence, then became a plain
+  formatted error; `errors.As` failed and the middleware could not return
+  `SkipRetry`.
+- Video failure wrapping now uses `%w`, while `failKnowledge` uses the same
+  formatted error for both its persisted message and returned cause. The test
+  is green for the typed cause and `errors.Is(asynq.SkipRetry)` and confirms the
+  existing failed row, credit message, OpenRouter root code, and
+  `DOCREADER_PARSE_FAILED` document-stage code remain stable.
+- Focused and complete router, OpenRouter transport, VLM native-video, and
+  complete application service tests pass locally without contacting
+  OpenRouter. The server build, strict validation of all configured OpenSpec
+  changes, and diff whitespace check also pass.
+
 ## 2026-08-23 Tokyo default-route contract repair
 
 - The consumer video path resolves `types.PlatformKnowledgeBaseVLMModelID`
@@ -13,10 +30,54 @@
 - The focused catalog contract was red against the previous Qwen VLLM row and
   green after the Gemini mapping was restored. Remote VLM video routing and
   process-configuration tests also pass.
-- A real Tokyo production upload without an override is still required before
-  marking the regional video and reviewer lifecycle gates complete.
+- At that contract snapshot, a real Tokyo production upload without an override
+  was still required before marking the regional video and reviewer lifecycle
+  gates complete; the current smoke is recorded below.
 
-## 2026-08-22 Hong Kong regional fallback (historical)
+## Historical 2026-08-23 initial Production no-override failure boundary
+
+- The active reviewer tenant was on the server-authorized Production Paddle
+  Sandbox Pro path. Paddle Live remained unauthorized and was not used.
+- One English fictional MP4 was uploaded once to the bound reviewer knowledge
+  base with no per-upload model override. The process-override relation was
+  empty, and the default `builtin-openrouter-vlm` resolved to
+  `google/gemini-2.5-flash` through the OpenRouter `google-vertex` route.
+- The document ended in `DOCREADER_PARSE_FAILED` with inner
+  `openrouter_credits_exhausted`. Four automatic worker attempts processed the
+  same upload. The parent balance was positive but below the provider's required
+  funding boundary, while the child limit and remaining allowance were positive
+  and within the configured plan; activity exposed no failure reason.
+- This was a provider-credit failure, not a successful video lifecycle. Tasks
+  4.2 and 4.3 were left unchecked at that boundary. The later recovery below
+  resolves the provider failure without replacing or uploading the source
+  again.
+
+## 2026-08-23 Production recovery through the default route
+
+- The OpenRouter parent account later satisfied the provider's required funding
+  boundary. The existing `aurora-observation-briefing.mp4` was not uploaded
+  again; the product's Retry parsing/Reparse action was invoked exactly once on
+  that same failed item, and its `process_overrides` relation remained empty.
+- The historical first processing lineage retained four root attempts. The
+  recovery created exactly one new root task, and the worker reported retry
+  count zero for that task.
+- The provider request used the deployed default `builtin-openrouter-vlm` →
+  `google/gemini-2.5-flash` mapping through OpenRouter's `google-vertex` route,
+  with no override. It returned HTTP 2xx and non-empty Markdown.
+- Final state was `parse=completed`, `summary=completed`, and `pending=0`.
+  DocReader, chunking, embedding, and post-processing were each `done`;
+  multimodal processing was `skipped` because this video conversion produced no
+  image subtask, which is the expected path. Chunks, the searchable index, and
+  the summary were all materialized.
+- In the knowledge-base-bound chat, the real fixture question returned `after
+  the second horizon scan`. Its citation control opened successfully and showed
+  the complete MP4 as the source.
+- Task 4.2 is complete because both its focused catalog checks and its real
+  bounded default-path Gemini request are now proven. Task 4.3 remains unchecked
+  because its exact wording also requires cleanup: the MP4 and its reviewer chat
+  are intentionally retained for Paddle review rather than deleted.
+
+## Historical 2026-08-22 Hong Kong regional fallback
 
 - OpenRouter's live model catalog reports `qwen/qwen3.7-flash` with native
   `text`, `image`, and `video` input modalities.
@@ -38,9 +99,10 @@ Official evidence:
 - <https://openrouter.ai/docs/guides/overview/multimodal/videos>
 - <https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-chat-completions>
 
-Production paid-term and post-deploy evidence remains tracked by task 4.3.
+At that historical point, Production paid-term and post-deploy evidence was
+still tracked by task 4.3.
 
-## 2026-08-23 final approved-route gate
+## Historical 2026-08-23 final approved-route gate
 
 - Two bounded Qwen native-video smokes (the reviewer fixture and a 1.5-second
   English MP4) reached the provider's HTTP 402 classification. The observed
@@ -62,11 +124,11 @@ Production paid-term and post-deploy evidence remains tracked by task 4.3.
   documents, and conversations from these checks were removed through the
   authenticated product capability.
 
-Tasks 4.3, 5.4, and 5.6 remain unchecked until an approved route completes
-video parsing, indexing, retrieval, and evidence without changing the
-no-recharge/no-new-service boundary.
+At this historical boundary, tasks 4.3, 5.4, and 5.6 were left unchecked. The
+current default-route recovery above supersedes the provider blocker without
+changing the no-new-service boundary.
 
-## 2026-08-23 TEST reviewer gate
+## Historical 2026-08-23 TEST reviewer gate
 
 - A fresh English H.264/AAC MP4 was uploaded through the real TEST Max browser
   flow. The document reached the terminal `DOCREADER_PARSE_FAILED` state after
@@ -81,6 +143,6 @@ no-recharge/no-new-service boundary.
   historical external-provider evidence, not current Tokyo default-route
   evidence.
 - The video item, TEST reviewer knowledge base, and temporary conversations
-  were removed through the product capability after evidence capture. Task
-  4.3 remains unchecked and the video portion of the reviewer lifecycle stays
-  an explicit residual risk until a supported provider route succeeds.
+  were removed through the product capability after evidence capture. This was
+  a historical residual risk; the later Production default-route recovery above
+  resolved the provider-path failure.

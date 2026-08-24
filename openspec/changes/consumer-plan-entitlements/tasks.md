@@ -12,6 +12,7 @@
 - [x] 2.5 Move all child keys off the UTC natural-month reset, refresh Free on its registration anniversary, and replenish monthly-paid plans exactly once from a verified successful Paddle recurring period
 - [x] 2.6 Persist Paddle's verified paid-term end and block annual allowance use or refresh beyond that term
 - [x] 2.7 Make paid-term advancement monotonic and subscription-bound under the existing row lock, fail closed for unknown paid cadence, and remove legacy inline VLM credentials from consumer processing
+- [x] 2.8 Preserve typed OpenRouter credit exhaustion through video-ingestion failure persistence so the existing worker middleware returns `SkipRetry` without changing the failed/reparse lifecycle
 
 ## 3. Consumer UI
 

@@ -64,7 +64,7 @@ and account/data controls, and SHALL omit unsupported team or support promises.
 ### Requirement: Contact and footer are concise
 Contact SHALL use a direct two-part composition with a short support statement,
 the real contact method, and relevant legal or response context. Footer social
-links SHALL be hidden. The visible copyright SHALL be exactly `© 2026 Musuw.`
+links SHALL be hidden. The visible copyright SHALL be exactly `© 2026 musuw. All rights reserved.`
 and the existing product, trust, and legal routes SHALL remain accessible.
 
 #### Scenario: Contact page opens
@@ -73,7 +73,7 @@ and the existing product, trust, and legal routes SHALL remain accessible.
 
 #### Scenario: Footer renders
 - **WHEN** any storefront page reaches its footer
-- **THEN** no social icon is visible and the copyright text is exactly `© 2026 Musuw.`
+- **THEN** no social icon is visible and the copyright text is exactly `© 2026 musuw. All rights reserved.`
 
 ### Requirement: Search and share surfaces use the canonical Musuw mark
 The storefront SHALL expose one approved Musuw mark through favicon sizes,

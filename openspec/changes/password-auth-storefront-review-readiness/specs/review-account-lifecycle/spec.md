@@ -17,8 +17,8 @@ text or an obsolete Musnow brand.
 ### Requirement: One reviewer credential proves routine access
 The reviewer SHALL be able to sign in to the deployed Production auth shell with
 email and password, enter the product, log out, and sign in again without mailbox
-access. The same credential identifier SHOULD be provisioned in TEST when that
-is needed for Sandbox Max evidence.
+access. The current paid reviewer path is the server-authorized Production
+Paddle Sandbox Pro entitlement; older TEST Max evidence is historical only.
 
 #### Scenario: Production first sign-in
 - **WHEN** the reviewer enters the valid password credentials on the deployed auth page
@@ -28,19 +28,19 @@ is needed for Sandbox Max evidence.
 - **WHEN** the reviewer logs out and submits the credentials again in a fresh auth state
 - **THEN** the same workspace and its authorized English fixture data are restored
 
-### Requirement: Max evidence avoids a new Live mutation
-Max-plan checkout and paid-feature evidence SHALL use Paddle Sandbox or an
-already authorized, correctly signed test-entitlement event. This work SHALL NOT
-create a new Live charge, refund, fabricated webhook, naked SQL plan mutation,
-or browser-local plan override.
+### Requirement: Paid evidence remains Sandbox-only
+Paid-plan checkout and feature evidence SHALL use Paddle Sandbox or an already
+authorized, correctly signed test-entitlement event. This work SHALL NOT create
+a new Live charge, refund, fabricated webhook, naked SQL plan mutation, or
+browser-local plan override. Paddle Live remains unauthorized.
 
-#### Scenario: Sandbox Max activates
-- **WHEN** a matching Sandbox checkout or signed event activates Max for the TEST reviewer identity
-- **THEN** the server's effective entitlement reports Max and the TEST product exposes the corresponding server-authorized model, video, storage, and allowance paths
+#### Scenario: Current Sandbox Pro reviewer path
+- **WHEN** the current reviewer tenant has the signed Sandbox checkout and official subscription update applied
+- **THEN** the server's effective entitlement reports active Pro and the Production product exposes only the corresponding server-authorized model, video, storage, and allowance paths
 
-#### Scenario: Production remains Free
-- **WHEN** no pre-existing verified Production Max entitlement is available without a new Live transaction
-- **THEN** Production remains truthfully Free while the evidence identifies TEST as the Max proof environment
+#### Scenario: Historical TEST evidence is not current Production proof
+- **WHEN** older TEST Max evidence is referenced
+- **THEN** it is labeled historical and cannot be used to imply a current Production plan or Paddle Live authorization
 
 ### Requirement: Reviewer lifecycle proves the represented product
 The reviewer lifecycle SHALL cover password authentication, knowledge-base
@@ -59,8 +59,8 @@ and disposable content cleanup.
 - **THEN** selections are made through the server-provided catalog and responses complete without bypassing plan enforcement
 
 #### Scenario: Video is exercised
-- **WHEN** the TEST reviewer has a verified paid entitlement and uploads the supported English video fixture
-- **THEN** video parsing, indexing, retrieval, and answer evidence complete through the configured production-equivalent OpenRouter fallback path
+- **WHEN** the current Production reviewer has a verified Paddle Sandbox Pro entitlement and uploads the supported English video fixture with no per-upload override
+- **THEN** video parsing, indexing, retrieval, and answer evidence complete through the configured default OpenRouter route
 
 #### Scenario: Paddle handoff is inspected
 - **WHEN** the reviewer selects an allowed plan and period

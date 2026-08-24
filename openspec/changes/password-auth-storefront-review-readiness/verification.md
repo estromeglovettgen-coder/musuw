@@ -1,6 +1,12 @@
 # Verification evidence
 
-## 2026-08-23 reviewer lifecycle
+## Historical 2026-08-23 reviewer lifecycle (TEST Max baseline)
+
+This block records the earlier TEST Max baseline. It is not the current
+Production reviewer entitlement; the active reviewer path is Production Paddle
+Sandbox Pro, and Paddle Live remains unauthorized. Its reviewer-account payment
+evidence is retained only as history and is superseded by the stronger
+same-account Free-to-Plus-to-Pro lifecycle below.
 
 - Fresh real Supabase recovery flows completed in both TEST and Production:
   reset email accepted, Gmail recovery message opened, official Supabase
@@ -49,38 +55,33 @@
 
 ## Release and public smoke baseline
 
-- Exact source release SHA:
-  `42395dbf9df923bc75d841d694531102d7adc06c`.
-- Exact-SHA CI: `32625412806`; Cloudflare storefront: `32625936901`;
-  immutable-GHCR server: `32625936888`. Each workflow reached terminal
-  success, and the public `/health` revision matched the release.
+- Exact-revision CI, Cloudflare storefront delivery, and immutable-GHCR server
+  delivery each reached terminal success, and the public `/health` revision
+  matched the release.
 - Public English smoke returned 200 for the storefront root/contact and the
   app auth/platform/plans entry routes. The four active product image URLs
   returned 200 `image/jpeg` at 3024x1898 source scale; metadata probes found
   OG, Twitter, icon, and manifest references with no Musnow text.
-- This evidence-sync revision is itself sent through the same release path
-  after commit; its exact SHA and workflow run IDs are recorded by the release
-  monitor rather than guessed in advance.
+- This documentation-only evidence sync is intentionally not committed or
+  pushed by this task, so it makes no new release claim.
 
-## Deferred gate
+## Historical deferred gate (before the current Production Sandbox Pro smoke)
 
-The current TEST video fixture reached the terminal provider-classified HTTP
+The earlier TEST video fixture reached the terminal provider-classified HTTP
 402 / `DOCREADER_PARSE_FAILED` state even though the root wallet and tenant
-allowance were not exhausted. That run exercised the historical Qwen fallback;
-no successful current video parse/retrieval is claimed. The Tokyo default VLM
-is now explicitly pinned to Gemini 2.5 Flash on the OpenRouter Google Vertex
-route, and the next no-override production smoke is the gate for claiming the
-video lifecycle. OpenRouter/Gemini task 4.3, reviewer fixture task 5.4, and
-paid-video task 5.6 remain unchecked until an approved provider route succeeds
-without adding services or purchasing credits. The zero-config consumer model,
-reasoning, and retrieval checks are complete and recorded in its dedicated
-verification file.
+allowance were not exhausted. That run exercised the historical Qwen fallback
+and did not prove current video parsing or retrieval. The Tokyo default VLM was
+then pinned to Gemini 2.5 Flash on the OpenRouter Google Vertex route. At this
+boundary the no-override Production smoke was still pending; the current
+recovery recorded below supersedes that provider blocker without adding a
+service. The zero-config consumer model, reasoning, and retrieval checks remain
+recorded in their dedicated verification file.
 
-The next exact-SHA CI, Cloudflare storefront, immutable GHCR server release,
-and public revision/health checks are the gate for the evidence-sync commit;
-the preceding release evidence above is complete and non-sensitive.
+That historical gate did not make a claim for a future evidence-sync release.
+This documentation-only sync remains uncommitted and undeployed as recorded
+above.
 
-## Final video gate (2026-08-23)
+## Historical final video gate (2026-08-23)
 
 - Qwen original-fixture and tiny-video provider smokes both classified as HTTP
   402 while the observed wallet and tenant allowance were non-exhausted.
@@ -92,14 +93,80 @@ the preceding release evidence above is complete and non-sensitive.
   from `processing` to normalized `provider_error` failure at roughly two
   minutes. That catalog row was bound to Gemini 3.7 at the time, so the run is
   not Gemini 2.5 evidence; no video retrieval or citation success is claimed.
-- The current default `builtin-openrouter-vlm` row is pinned to Gemini 2.5 Flash
-  for the Tokyo no-override path; a fresh production smoke is still pending.
+- The current default `builtin-openrouter-vlm` row was pinned to Gemini 2.5
+  Flash for the Tokyo no-override path; at this historical boundary a fresh
+  Production smoke was still pending.
 - The documented Japan transport was unavailable. No recharge, new service,
   DNS/server change, fake event, or manual entitlement mutation was used, and
   all temporary video fixtures and conversations were cleaned up.
 
-Reviewer tasks 5.4 and 5.6 and video task 4.3 remain unchecked pending a
-successful approved provider route.
+Reviewer tasks 5.4 and 5.6 and video task 4.3 were left unchecked at this
+historical boundary. The current recovery below supersedes its provider-route
+failure.
+
+## 2026-08-23 current Production same-account lifecycle and reviewer fixture
+
+- A fresh disposable Production password account was created through
+  `/auth/start` → `Create account`. The generic confirmation flow completed
+  once into the authenticated product shell; no identity or credential value is
+  recorded here.
+- The official `/auth/logout` route then cleared the session. Re-entering the
+  same password credentials in the deployed auth shell restored the
+  authenticated product shell. No email address, password, code, token, or user
+  identifier is recorded here.
+- The same account's authoritative entitlement initially reported Free. Exactly
+  one Paddle Sandbox Plus monthly standard checkout then completed. Its exact
+  signed initial delivery group—`subscription.created`,
+  `subscription.activated`, and the initial `transaction.completed`—each
+  reached delivered HTTP 2xx with `attempts=1`.
+- The same subscription's official Pro preview returned HTTP 200 and its apply
+  returned HTTP 202. The resulting signed `subscription.updated` and
+  `transaction.completed` deliveries each reached HTTP 2xx with `attempts=1`;
+  no browser response granted the plan.
+- The final authoritative entitlement reported Pro, active, and monthly, with
+  the required checkout/provider bindings and paid/credit periods present.
+  Gemini 3.7 and Claude Haiku 4.5 were each exercised once in their first
+  in-product UI proof; both completed with a non-empty answer, with neither an
+  error nor a pending state remaining. The server-authorized Pro limits exposed
+  the paid model and video paths. A following entitlement read reported
+  `credits_status=available` and usable credits.
+- This single confirmed account now supplies the stronger registration,
+  re-login, Free baseline, checkout, signed-update, entitlement, and first paid
+  model proof. Earlier reviewer-account payment evidence is historical only and
+  no longer supplies current acceptance.
+- In `Aurora Research Notes`, `aurora-observation-guide.md` and
+  `aurora-maintenance-window.md` were each uploaded once. Both reached summary,
+  chunk, and index completion. The bound chat prompt asking for the Northstar
+  calibration phrase returned `ORBITAL SAGE 4826`, and the citation opened
+  `aurora-observation-guide.md`.
+- The English fictional MP4 was uploaded once to the same knowledge base with
+  no per-upload model override. The process-override relation was empty, and
+  the deployed default `builtin-openrouter-vlm` resolved to
+  `google/gemini-2.5-flash` through OpenRouter's `google-vertex` route. Its
+  initial processing lineage ended in `DOCREADER_PARSE_FAILED` with inner
+  `openrouter_credits_exhausted` after four root attempts because the parent
+  account had not yet met the provider's funding boundary. The child limit and
+  remaining allowance were positive and within the configured plan.
+- After the parent account satisfied that boundary, the same
+  `aurora-observation-briefing.mp4` was not uploaded again. Retry
+  parsing/Reparse was invoked exactly once through the product, the
+  `process_overrides` relation remained empty, the recovery created exactly one
+  new root task, and its worker retry count was zero.
+- The no-override provider request returned HTTP 2xx and non-empty Markdown.
+  Final state was `parse=completed`, `summary=completed`, and `pending=0`.
+  DocReader, chunking, embedding, and post-processing were each `done`.
+  Multimodal processing was `skipped` because there was no image subtask, which
+  is expected for this video conversion. Chunks, the searchable index, and the
+  summary were materialized.
+- The bound Aurora question returned `after the second horizon scan`. Its
+  citation button opened successfully and exposed the complete MP4 as the
+  source.
+- Reviewer tasks 5.4 and 5.6 and OpenRouter video task 4.2 now satisfy their
+  exact wording. OpenRouter task 4.3 remains unchecked because its wording also
+  requires cleanup, while the two Markdown sources, MP4, and related bound chat
+  are intentionally retained as the ongoing Paddle reviewer fixture.
+- No new-subscription cancellation or account deletion is claimed. Consumer
+  task 4.13 therefore remains unchecked.
 
 ## 2026-08-23 Contact layout revision
 

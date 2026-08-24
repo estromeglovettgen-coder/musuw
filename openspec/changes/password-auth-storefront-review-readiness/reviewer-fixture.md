@@ -14,6 +14,7 @@ All visible reviewer-owned names use this fixed vocabulary:
 - Workspace: `Musuw Review Workspace`
 - Knowledge base: `Aurora Research Notes`
 - Source file: `aurora-observation-guide.md`
+- Supporting source: `aurora-maintenance-window.md`
 - Conversation: `Aurora evidence review`
 - Video source: `aurora-observation-briefing.mp4`
 
@@ -37,14 +38,18 @@ fixture instead of generic model knowledge.
 
 The video fixture presents the same English-only material in a short title and
 caption sequence. It is generated locally from the canonical text, contains no
-person, voice identity, customer mark, or private data, and is uploaded only to
-the paid TEST reviewer workspace. Its retrieval prompt is:
+person, voice identity, customer mark, or private data, and is uploaded once to
+the current Production reviewer workspace under its active Paddle Sandbox Pro
+entitlement. The normal path uses no per-upload model override. Its retrieval
+prompt is:
 
 > According to the video briefing, when should the Northstar calibration be
 > recorded?
 
 The expected answer is `after the second horizon scan` with evidence from the
-parsed video source.
+parsed video source. The existing upload later completed through the default
+route after exactly one product Retry parsing/Reparse action; the grounded
+answer and openable full-MP4 citation now provide observed acceptance evidence.
 
 ## Capture settings
 
@@ -74,7 +79,7 @@ parsed video source.
 | Model and reasoning | Production, new chat | Compact Codex-style model or reasoning list with a real allowed selection | No explanatory overflow or account footer |
 | Plans | Production, `/plans` | English Free/Plus/Pro/Max comparison with server-truthful limits | Stop before any checkout personal field |
 | Settings | Production, account settings | English General, Usage & billing, or Profile layout without email | Crop or mask identity values before capture |
-| Video evidence | TEST Max, reviewer knowledge base/conversation | Completed English video source and the expected grounded answer | No TEST credential or internal host detail |
+| Video evidence | Production Paddle Sandbox Pro, reviewer knowledge base/conversation | One no-override upload, completed default-route reparse, grounded answer, and openable full-MP4 citation | No credential, internal host detail, or provider response data |
 
 The storefront uses only the strongest representative product images needed by
 its final information architecture. The matrix is the capture inventory, not a
@@ -88,9 +93,15 @@ requirement to publish every image on the home page.
    and verify Wiki/graph behavior.
 4. Verify model/reasoning and supported tool flows, plans, Paddle handoff, and
    settings without completing a Live transaction.
-5. In TEST only, prove the signed Sandbox Max entitlement, then upload, parse,
-   retrieve from, and cite the English video fixture.
+5. On the current Production Paddle Sandbox Pro reviewer path, upload the
+   English video once with no model override. If the provider fails at its
+   funding boundary and that boundary is later resolved, use the product's
+   Retry parsing/Reparse action exactly once on the existing item; do not upload
+   another copy or change models or environments. Verify parsing, retrieval,
+   and the full-source citation through the approved default route.
 6. Capture the approved matrix after transient acceptance data is removed.
-7. Keep only the reviewer fixture intended for ongoing review. Delete one-off
-   duplicate uploads, temporary conversations, and disposable knowledge bases
-   through authorized product actions.
+7. Keep only the reviewer fixture intended for ongoing review. The two Markdown
+   sources, MP4, and related bound chat are intentionally retained for the
+   Paddle reviewer; delete one-off duplicate uploads, unrelated temporary
+   conversations, and disposable knowledge bases through authorized product
+   actions.

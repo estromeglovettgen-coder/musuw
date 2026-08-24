@@ -29,12 +29,13 @@ sections create avoidable friction for Paddle review and understate the product.
   groups and plan distinctions derived from server-enforced entitlements.
 - Rework Contact using the reference site's simple direct-contact composition,
   while retaining Musuw branding and truthful support channels.
-- Publish the footer copyright exactly as `© 2026 Musuw.` and repair favicon,
+- Publish the footer copyright exactly as `© 2026 musuw. All rights reserved.` and repair favicon,
   manifest, structured-data, Open Graph, and search-logo brand assets.
 - Replace obsolete or Chinese product captures with a complete English-only
   reviewer screenshot set generated from the dedicated account.
-- Validate Max behavior without creating a new Live charge or refund. Use
-  Paddle Sandbox or an existing verified signed-event/test-entitlement path.
+- Validate paid-plan behavior without creating a new Live charge or refund.
+  Use the active Paddle Sandbox Pro reviewer path or an existing verified
+  signed-event/test-entitlement path; Paddle Live remains unauthorized.
 
 ## Capabilities
 
@@ -46,7 +47,7 @@ sections create avoidable friction for Paddle review and understate the product.
   plan comparison, contact, English product media, concise footer, and correct
   searchable brand metadata.
 - `review-account-lifecycle`: A dedicated English reviewer account can exercise
-  the supported product lifecycle and Max-plan evidence without an unauthorized
+  the supported product lifecycle and paid-plan evidence without an unauthorized
   Live billing mutation.
 
 ### Modified Capabilities

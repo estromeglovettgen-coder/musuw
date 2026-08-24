@@ -72,7 +72,7 @@ func (s *knowledgeService) convertVideo(
 		logger.Errorf(ctx, "[Video] native understanding failed for %s: %v", knowledge.ID, err)
 		s.failStage(ctx, knowledge.ID, types.StageDocReader,
 			werrors.ErrCodeDocReaderParseFailed, "video understanding failed: "+err.Error(), err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "video understanding failed: %v", err)
+		return s.failKnowledge(ctx, knowledge, isLastRetry, "video understanding failed: %w", err)
 	}
 	markdown = strings.TrimSpace(markdown)
 	if markdown == "" {

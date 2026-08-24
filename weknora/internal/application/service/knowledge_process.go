@@ -3792,14 +3792,14 @@ func (s *knowledgeService) failKnowledge(
 	format string,
 	args ...interface{},
 ) (*types.ReadResult, error) {
-	errMsg := fmt.Sprintf(format, args...)
+	failureErr := fmt.Errorf(format, args...)
 	if isLastRetry {
 		knowledge.ParseStatus = "failed"
-		knowledge.ErrorMessage = errMsg
+		knowledge.ErrorMessage = failureErr.Error()
 		knowledge.UpdatedAt = time.Now()
 		s.repo.UpdateKnowledge(ctx, knowledge)
 	}
-	return nil, fmt.Errorf(format, args...)
+	return nil, failureErr
 }
 
 // enqueueImageMultimodalTasks enqueues asynq tasks for multimodal image processing.

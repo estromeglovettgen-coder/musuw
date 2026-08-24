@@ -19,9 +19,12 @@
 - [x] 4.1 Keep the existing OpenRouter transport and tenant metering, switch the
   default `builtin-openrouter-vlm` to Gemini 2.5 Flash on the Tokyo
   `google-vertex` route, and do not add an automatic model fallback.
-- [ ] 4.2 Run focused unit/catalog checks and a real bounded Gemini 2.5 Flash
+- [x] 4.2 Run focused unit/catalog checks and a real bounded Gemini 2.5 Flash
   video request through the default VLM path.
 - [ ] 4.3 Deploy the complete catalog and browser-test paid video upload through
   ingestion, retrieval, and cleanup; if a valid paid production term is
   externally unavailable, record the production gate and complete the same
   lifecycle against TEST without fabricating entitlement state.
+- [x] 4.4 Preserve typed OpenRouter credit exhaustion across video failure
+  persistence and prove red-to-green that the existing worker middleware emits
+  `SkipRetry` without changing the stable parse failure code.

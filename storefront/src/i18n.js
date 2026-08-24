@@ -422,7 +422,7 @@ const en = {
       { title: "Trust", links: ["FAQ", "Security", "Contact"] },
       { title: "Legal", links: ["Terms", "Privacy", "Refunds"] },
     ],
-    copyright: "© 2026 Musuw.",
+    copyright: "© 2026 musuw. All rights reserved.",
   },
 };
 
@@ -765,7 +765,7 @@ const zhCN = {
       { title: "信任", links: ["常见问题", "安全", "联系"] },
       { title: "法律", links: ["服务条款", "隐私政策", "退款政策"] },
     ],
-    copyright: "© 2026 Musuw.",
+    copyright: "© 2026 musuw. All rights reserved.",
   },
 };
 

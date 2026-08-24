@@ -30,10 +30,10 @@ must not receive a new Live charge or refund during this work.
   localized direct legal notice.
 - Produce a concise, truthful storefront for foreign review using only current
   capabilities and sharp English product captures.
-- Use one dedicated English reviewer identity across Production and TEST where
-  practical. Production proves the real login and Free/live-safe lifecycle;
-  TEST may hold the Max Sandbox entitlement needed for paid-path evidence and
-  screenshot generation.
+- Use one dedicated English reviewer identity on the deployed Production path.
+  Its current paid reviewer path is Paddle Sandbox Pro; any older TEST Max
+  evidence is historical only. Paddle Live remains unauthorized and is never
+  used for this change.
 - Retain the exact-SHA CI, Cloudflare, GHCR, and server release protocol.
 
 **Non-Goals:**
@@ -110,12 +110,12 @@ committed, printed, put in screenshots, or copied into browser-visible fixture
 content. The account's visible profile, workspace, knowledge bases, document
 titles, prompts, responses, and screenshot state will be English only.
 
-The same login identifier may be provisioned independently in Production and
-TEST. Production proves password login and the publicly deployed product. TEST
-uses Paddle Sandbox or an already verified signed test event to grant Max and
-prove paid model/video paths without a Live mutation. If a single Production
-Max entitlement cannot be obtained through an already-authorized verified
-event, the evidence will state this split rather than fabricate plan state.
+The current reviewer identity is exercised on the deployed Production path,
+whose active paid entitlement is Paddle Sandbox Pro after the official Sandbox
+checkout/update lifecycle. Older TEST Max evidence remains a historical record
+and is not substituted for the current path. All paid model/video checks use
+server-reported entitlement and the default no-override model route; Paddle
+Live remains forbidden without a separately reviewed authorization change.
 
 ### 5. Recompose the existing storefront instead of changing stacks
 
@@ -187,9 +187,10 @@ deployed metadata and Search Console request are the acceptance evidence.
 - [A reviewer account becomes a standing privileged credential] -> Use a unique
   generated password, English-only non-sensitive fixtures, least required plan,
   Keychain storage, documented rotation, and no admin or operations capability.
-- [TEST Max and Production Free appear inconsistent] -> Use the same visible
-  fixture design and record which environment proves each claim. Do not label a
-  Production account Max unless the verified production entitlement says Max.
+- [Historical TEST Max and current Production Sandbox Pro appear inconsistent]
+  -> Label the environment and plan from server truth. Treat the older TEST Max
+  run as historical, use the current Production Sandbox Pro path for reviewer
+  evidence, and never imply Paddle Live authorization.
 - [A reference-site copy creates legal or brand risk] -> Reuse only generic
   layout and interaction patterns; retain Musuw copy, components, icons, assets,
   accessibility, and legal identity.
@@ -211,8 +212,9 @@ deployed metadata and Search Console request are the acceptance evidence.
    metadata while preserving routes and legal pages.
 5. Provision the English reviewer identity in TEST and Production, store its
    password only in Keychain, and verify routine password sign-in.
-6. Use Sandbox or existing signed test evidence for TEST Max, populate English
-   fixtures, and capture the approved screenshot set.
+6. Use the active Production Paddle Sandbox Pro path, populate English fixtures,
+   and capture the approved screenshot set. Retain older TEST Max evidence only
+   as explicitly historical; do not create a Live transaction.
 7. Run unit, integration, type, build, static contract, accessibility,
    responsive, dark-mode-auth, Lighthouse, and real Chrome lifecycle checks.
 8. Commit and push one exact SHA through CI, Cloudflare storefront, and immutable
