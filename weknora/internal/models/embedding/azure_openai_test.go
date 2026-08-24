@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
 func TestAzureOpenAIEmbedderBatchEmbedSendsConfiguredDimensions(t *testing.T) {
-	t.Parallel()
+	withAzureOpenAISSRFWhitelist(t)
 
 	var requestBody map[string]any
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -65,7 +67,7 @@ func TestAzureOpenAIEmbedderBatchEmbedSendsConfiguredDimensions(t *testing.T) {
 }
 
 func TestAzureOpenAIEmbedderBatchEmbedOmitsDimensionsByDefault(t *testing.T) {
-	t.Parallel()
+	withAzureOpenAISSRFWhitelist(t)
 
 	var requestBody map[string]any
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -105,7 +107,7 @@ func TestAzureOpenAIEmbedderBatchEmbedOmitsDimensionsByDefault(t *testing.T) {
 }
 
 func TestAzureOpenAIEmbedderBatchEmbedSendsDimensionsWhenOverrideEnabledRegardlessOfAPIVersion(t *testing.T) {
-	t.Parallel()
+	withAzureOpenAISSRFWhitelist(t)
 
 	var requestBody map[string]any
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -150,6 +152,13 @@ func TestAzureOpenAIEmbedderBatchEmbedSendsDimensionsWhenOverrideEnabledRegardle
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func withAzureOpenAISSRFWhitelist(t *testing.T) {
+	t.Helper()
+	t.Setenv("SSRF_WHITELIST_EXTRA", "example-resource.openai.azure.com")
+	secutils.ResetSSRFWhitelistForTest()
+	t.Cleanup(secutils.ResetSSRFWhitelistForTest)
+}
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	return f(r)
