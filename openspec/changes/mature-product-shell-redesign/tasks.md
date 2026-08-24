@@ -16,4 +16,4 @@
 ## 4. Verification and Release
 
 - [x] 4.1 Run auth and Vue tests/builds, secret scan, strict OpenSpec validation, and one consolidated adversarial UI review across desktop and narrow viewports
-- [ ] 4.2 Release one exact final SHA through CI, Cloudflare and immutable GHCR, then complete real production Chrome acceptance alongside the required legal/auth/knowledge/chat/video/billing lifecycle
+- [x] 4.2 Release one exact final SHA through CI, Cloudflare and immutable GHCR, then complete real production Chrome acceptance alongside the required legal/auth/knowledge/chat/video/billing lifecycle

@@ -75,3 +75,17 @@ The two plan-document keys remain intentionally unconfigured in the local
 verification baseline, so the earlier statement that no fresh paid OpenRouter
 call or production deployment was claimed applies only to that baseline. The
 current production delivery and Sandbox billing evidence are recorded above.
+
+## 2026-08-23 current deployed entitlement release
+
+- The selected revision completed all seven CI jobs on the first run, followed
+  by terminal-success Cloudflare storefront and Tokyo production deliveries.
+  Public and loopback health, root, and auth probes returned HTTP 200.
+- Production preflight and runtime checks confirm one complete Paddle Sandbox
+  unit. Sensitive runtime files have the required restrictive permissions, and
+  the configured credential mounts are read-only; no Live unit is authorized.
+- The same-account Free-to-Plus-to-Pro checkout/update, paid model, and default
+  video reparse/citation evidence recorded above remains the current lifecycle
+  proof.
+- Task 4.13 remains unchecked: the fresh checkout and signed activation half is
+  proven, but the required stale-data and account/data-deletion half is not.

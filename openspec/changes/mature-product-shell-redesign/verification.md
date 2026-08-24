@@ -39,5 +39,31 @@
   internally rather than expanding the popup. The reasoning submenu used the
   same compact one-line/check contract.
 
-Production release and end-to-end lifecycle evidence remains tracked by task
-4.2.
+## 2026-08-23 current deployed final-release closure
+
+- Before this evidence-only sync, local `main` matched its canonical remote and
+  the worktree was clean. The selected revision completed all seven CI jobs on
+  the first run; Cloudflare storefront delivery and Tokyo production delivery
+  then each reached terminal success.
+- Tokyo's source pointer, source manifest, runtime and image labels, and
+  immutable image references all matched the selected revision. Required
+  containers and the Tunnel were healthy, and loopback plus public health,
+  root, and auth probes returned HTTP 200.
+- Both storefront domains returned HTTP 200. English and Chinese output rendered
+  the exact footer `© 2026 musuw. All rights reserved.`; all eight public legal
+  routes and the Merchant-of-Record, refund, cancellation, and buyer-support
+  links were present and reachable. One first probe of the primary domain was
+  transiently unsuccessful; its bounded retry returned HTTP 200 and every
+  subsequent grouped probe passed, so it is not a release blocker.
+- The already-recorded same-account Production lifecycle proves registration,
+  logout and password re-login, authoritative Free, one Paddle Sandbox Plus
+  checkout, the official same-subscription Pro update, paid model access,
+  knowledge parsing and cited retrieval, and one no-override video reparse
+  through indexing, retrieval, and an opened source citation. Paddle remains one
+  complete Sandbox unit; runtime sensitive-file permissions and read-only mounts
+  passed their release checks.
+
+Task 4.2 now satisfies its exact release and lifecycle wording. The retained
+reviewer fixtures, consumer account/data deletion, public support phone, and
+Alibaba control-plane receipt remain governed by their separate unchecked or
+open boundaries.

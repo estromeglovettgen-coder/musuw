@@ -86,3 +86,20 @@ OpenRouter and reviewer-readiness changes.
 - This correction is local and uncommitted. It does not claim a new CI run,
   push, deployment, Live Paddle authorization, payment-logic change, price
   change, or checkout change.
+
+## 2026-08-23 current deployed legal release
+
+- The preceding local-only boundary is retained as historical evidence. The
+  correction is now included in the selected revision: all seven CI jobs reached
+  terminal success on the first run, followed by terminal-success Cloudflare
+  storefront and Tokyo production deliveries.
+- Both storefront domains returned HTTP 200 in English and Chinese and rendered
+  the exact footer `© 2026 musuw. All rights reserved.` All eight public legal
+  routes returned HTTP 200, and the Merchant-of-Record, refund, cancellation,
+  and buyer-support links were present and reachable.
+- The primary domain had one transiently unsuccessful first probe. Its bounded
+  retry returned HTTP 200, and the complete follow-up probe group passed without
+  a blocker.
+- A verified public support phone is still not evidenced, so task 1.6 remains
+  unchecked. Paddle remains the complete Sandbox unit; no Live authorization or
+  billing-path change is claimed.

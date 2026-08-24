@@ -98,3 +98,19 @@ identifiers are stored here.
   synchronized system poweroff, and closed SSH port passed. No Alibaba
   control-plane credential was available, so this evidence does not claim an
   independently read cloud-console power-state receipt.
+
+## 2026-08-23 current deployed revision
+
+- The selected revision completed all seven CI jobs on the first run. Cloudflare
+  storefront and Tokyo production delivery each reached terminal success.
+- Tokyo's current source pointer, source manifest, application/frontend runtime
+  labels, image labels, and immutable image references all matched the selected
+  revision. Required containers and the Tunnel were healthy.
+- Loopback and public health, root, and auth probes returned HTTP 200. Both
+  storefront domains also returned HTTP 200; the one transient first primary-
+  domain probe recovered within its bounded retry, and the subsequent complete
+  probe group passed.
+- Runtime sensitive-file permissions and read-only credential mounts passed.
+  The complete Paddle unit remains Sandbox-only.
+- The Alibaba control-plane receipt remains open and is not claimed; the retained
+  guest-level shutdown evidence and stop-and-retain-disk boundary are unchanged.

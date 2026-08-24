@@ -146,3 +146,18 @@ changing the no-new-service boundary.
   were removed through the product capability after evidence capture. This was
   a historical residual risk; the later Production default-route recovery above
   resolved the provider-path failure.
+
+## 2026-08-23 current deployed typed-error evidence
+
+- The selected production revision completed all seven CI jobs on the first run,
+  then reached terminal success through Cloudflare storefront and Tokyo
+  production delivery.
+- The typed video failure contract is true at all three required boundaries:
+  source inspection finds the `%w` wrap, the focused behavior test preserves the
+  provider cause through failure persistence and reaches `SkipRetry`, and the
+  deployed application binary contains the corrected wrapping literal.
+- The earlier same-item, no-override Production reparse remains the real video
+  lifecycle evidence: parsing, indexing, retrieval, and the opened MP4 citation
+  completed through the deployed default route.
+- Task 4.3 remains unchecked because its exact wording also requires cleanup;
+  the reviewer Markdown sources, MP4, and bound chat are intentionally retained.
