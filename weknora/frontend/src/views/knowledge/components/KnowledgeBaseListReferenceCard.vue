@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import KbWikiBadge from './KbWikiBadge.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 
@@ -41,15 +40,13 @@ const emit = defineEmits<{
   details: []
 }>()
 
-const menuVisible = ref(false)
-
 const requestDuplicate = () => {
-  menuVisible.value = false
+  props.kb.showMore = false
   emit('duplicate')
 }
 
 const requestDelete = () => {
-  menuVisible.value = false
+  props.kb.showMore = false
   emit('delete')
 }
 </script>
@@ -87,7 +84,7 @@ const requestDelete = () => {
         </button>
       </t-tooltip>
 
-      <t-popup v-else-if="canDuplicate || canManage || !shared" v-model:visible="menuVisible" trigger="click" destroy-on-close placement="bottom-right">
+      <t-popup v-else-if="canDuplicate || canManage || !shared" v-model="kb.showMore" trigger="click" destroy-on-close placement="bottom-right">
         <button type="button" class="visual-reference-kb-card__more" :aria-label="$t('common.more')" @click.stop><t-icon name="ellipsis" /></button>
         <template #content>
           <div class="visual-reference-kb-card-menu" @click.stop>
