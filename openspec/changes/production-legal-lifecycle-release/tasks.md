@@ -18,6 +18,10 @@
 - [ ] 1.6 Publish a support phone only after the owner supplies and authorizes a
   verified real public business number. Do not invent a phone, address, or KYC
   identity; until then this remains an explicit Paddle review-risk gap.
+- [x] 1.7 Add the public Paddle default-payment-link landing page using only
+  fail-closed Paddle.js runtime config, make checkout-sync exhaustion
+  recoverable without client-side entitlement authority, and add the bounded
+  URL-import ownership/private-indexing disclosure in the product and AUP.
 
 ## 2. Local verification
 

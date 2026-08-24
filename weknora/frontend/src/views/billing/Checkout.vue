@@ -15,11 +15,14 @@
 
       <div v-if="loading" class="checkout-page__loading">{{ $t('common.loading') }}</div>
 
-      <section v-else-if="completed || syncing" class="checkout-page__success">
+      <section v-else-if="completed || syncing || syncDelayed" class="checkout-page__success">
         <span class="checkout-page__success-icon"><t-icon :name="completed ? 'check' : 'time'" /></span>
-        <h2>{{ $t(completed ? 'entitlement.checkoutActivatedTitle' : 'entitlement.checkoutSuccessTitle') }}</h2>
-        <p>{{ $t(completed ? 'entitlement.checkoutActivatedDescription' : 'entitlement.checkoutSuccessDescription') }}</p>
-        <button type="button" @click="leaveCheckout">{{ $t('entitlement.returnToProduct') }}</button>
+        <h2>{{ $t(completed ? 'entitlement.checkoutActivatedTitle' : (syncDelayed ? 'entitlement.checkoutSyncDelayedTitle' : 'entitlement.checkoutSuccessTitle')) }}</h2>
+        <p>{{ $t(completed ? 'entitlement.checkoutActivatedDescription' : (syncDelayed ? 'entitlement.checkoutSyncDelayedDescription' : 'entitlement.checkoutSuccessDescription')) }}</p>
+        <div class="checkout-page__success-actions">
+          <button type="button" @click="leaveCheckout">{{ $t('entitlement.returnToProduct') }}</button>
+          <button v-if="syncDelayed" type="button" class="is-secondary" @click="refreshAfterPayment">{{ $t('entitlement.refreshStatus') }}</button>
+        </div>
       </section>
 
       <p v-else-if="errorMessage" class="checkout-page__error">{{ errorMessage }}</p>
@@ -119,6 +122,7 @@ const { locale, t } = useI18n()
 const loading = ref(true)
 const completed = ref(false)
 const syncing = ref(false)
+const syncDelayed = ref(false)
 const errorMessage = ref('')
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
@@ -213,6 +217,7 @@ let syncRun = 0
 const refreshAfterPayment = async () => {
   if (syncing.value || completed.value) return
   const run = ++syncRun
+  syncDelayed.value = false
   syncing.value = true
   for (const delay of [700, 1200, 1800, 2500, 3500]) {
     await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
@@ -231,6 +236,9 @@ const refreshAfterPayment = async () => {
       // The signed Paddle webhook remains authoritative; retry briefly.
     }
   }
+  if (run !== syncRun) return
+  syncing.value = false
+  syncDelayed.value = true
 }
 
 const mountCheckout = async () => {
@@ -356,7 +364,9 @@ onUnmounted(() => {
 .checkout-page__success-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 999px; background: #111; color: #fff; font-size: 23px; }
 .checkout-page__success h2 { margin: 20px 0 0; font-size: 28px; }
 .checkout-page__success p { margin: 10px 0 0; color: #666; line-height: 24px; }
-.checkout-page__success button { min-height: 44px; margin-top: 26px; padding: 0 24px; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+.checkout-page__success-actions { margin-top: 26px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.checkout-page__success button { min-height: 44px; padding: 0 24px; border: 1px solid #111; border-radius: 999px; background: #111; color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+.checkout-page__success button.is-secondary { background: #fff; color: #111; }
 @media (max-width: 920px) { .checkout-page__layout { grid-template-columns: 1fr; gap: 34px; } .checkout-page__summary { order: -1; } }
 @media (max-width: 640px) { .checkout-page__topbar { height: 68px; padding: 0 16px; } .checkout-page__main { width: min(100% - 28px,1320px); padding-top: 30px; } .checkout-page__main > h1 { margin-bottom: 30px; } .checkout-page__summary { padding: 26px 22px; border-radius: 18px; } }
 </style>

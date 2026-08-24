@@ -174,6 +174,10 @@ func NewRouter(params RouterParams) *gin.Engine {
 	// Billing provider callbacks are infrastructure, not a user-facing product
 	// capability, and must remain reachable for subscription state updates.
 	r.POST("/api/v1/billing/paddle/webhook", params.EntitlementHandler.PaddleWebhook)
+	// Paddle default payment links land on a public page. Only the client-side
+	// token and its matching environment are exposed; all billing authority
+	// remains behind authentication or the signed webhook.
+	r.GET("/api/v1/billing/paddle/public-config", params.EntitlementHandler.PaddlePublicConfig)
 
 	// 认证中间件
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.Config))

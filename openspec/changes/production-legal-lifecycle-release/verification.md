@@ -103,3 +103,42 @@ OpenRouter and reviewer-readiness changes.
 - A verified public support phone is still not evidenced, so task 1.6 remains
   unchecked. Paddle remains the complete Sandbox unit; no Live authorization or
   billing-path change is claimed.
+
+## 2026-08-24 Paddle payment-link and URL-use correction (local)
+
+- Paddle's official default-payment-link, transaction-query, and Paddle.js
+  guidance were rechecked at
+  <https://developer.paddle.com/build/transactions/default-payment-link/>,
+  <https://developer.paddle.com/build/transactions/pass-transaction-checkout/>,
+  and <https://developer.paddle.com/paddle-js/about/include-paddlejs/>. The
+  public `/pay` page initializes the existing `@paddle/paddle-js` integration
+  and leaves `_ptxn` handling to Paddle.js; it does not parse the transaction
+  query or call `Checkout.open()`.
+- The exact anonymous GET returns only `configured`, normalized `environment`,
+  and `client_token`. It reuses the existing complete `Configured()` plus
+  `PortalConfigured()` checks, so a missing API key, webhook secret, or catalog
+  price fails closed before Paddle.js is initialized; API keys, webhook
+  secrets, price IDs, tenant IDs, and checkout bindings are never returned.
+- A fresh local Chrome profile with no Musuw token opened
+  `/pay?_ptxn=txn_local_contract_probe` against a fail-closed mock config and
+  rendered the payment-link error and home/support/legal exits without an auth
+  handoff. The automated route contract also proves the anonymous exit occurs
+  before session hydration and the generic authentication gate.
+- Exhausting the existing five signed-webhook entitlement polls now ends the
+  loading state and offers the existing safe-return path plus a status refresh.
+  The frontend never grants a plan; the signed webhook and current-entitlement
+  response remain authoritative.
+- URL import now carries the same short ownership/authorization,
+  private-indexing, and no-streaming-download/no-redistribution boundary in all
+  four application locales. Only the matching English and Chinese Acceptable
+  Use Policy section was supplemented; the rest of the legal suite was not
+  expanded.
+- Red-first contracts failed for the absent public config route/page, URL-use
+  disclosure, sync-timeout exit, and incomplete-server-config boundary, then
+  passed after the minimal implementation. Fresh verification passed the full
+  Vue test suite, type check, production build, all 53 storefront tests/build,
+  affected Go tests, Go vet and server build, the tracked secret scan, the
+  WeKnora v0.7.2 source-manifest check, and the production static contract.
+- Support phone task 1.6 remains open. This work is local and uncommitted; it
+  made no Paddle Dashboard/default-link change, Live authorization, payment,
+  refund, provider-state mutation, push, or deployment.

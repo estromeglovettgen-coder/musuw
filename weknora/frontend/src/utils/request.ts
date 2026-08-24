@@ -87,9 +87,11 @@ let failedQueue: Array<{ resolve: Function; reject: Function }> = [];
 // refresh-then-redirect-to-login flow (issue #1617). '/auth/register' already
 // covers '/auth/register-by-invite' via substring match.
 const PUBLIC_AUTH_PATHS = ['/auth/auto-setup', '/auth/login', '/auth/register', '/auth/oidc/', '/auth/invitations/lookup', '/api/v1/embed/'];
+const PADDLE_PUBLIC_CONFIG_PATH = '/api/v1/billing/paddle/public-config';
 
 function isPublicAuthRequest(url?: string): boolean {
   if (!url) return false;
+  if (url.split('?')[0] === PADDLE_PUBLIC_CONFIG_PATH) return true;
   return PUBLIC_AUTH_PATHS.some(p => url.includes(p));
 }
 

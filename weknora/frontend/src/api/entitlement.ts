@@ -24,6 +24,12 @@ export interface PaddleBillingConfig {
   prices?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCheckoutOption>>>>
 }
 
+export interface PaddlePublicConfig {
+  configured: boolean
+  environment?: 'sandbox' | 'live'
+  client_token?: string
+}
+
 export interface ConsumerEntitlement {
   plan: ConsumerPlan
   plan_status: string
@@ -58,6 +64,10 @@ export interface PaddleSubscriptionUpgradePreview {
 
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
   return get('/api/v1/entitlements/current') as unknown as Promise<EntitlementResponse>
+}
+
+export async function getPaddlePublicConfig(): Promise<PaddlePublicConfig> {
+  return get('/api/v1/billing/paddle/public-config') as unknown as Promise<PaddlePublicConfig>
 }
 
 export async function createPaddlePortalSession(): Promise<{ authorization_url: string }> {

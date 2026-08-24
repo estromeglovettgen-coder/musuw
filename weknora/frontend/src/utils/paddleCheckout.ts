@@ -67,6 +67,13 @@ function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clientToke
   return paddlePromise
 }
 
+export async function initializePaddlePaymentLink(
+  input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken'>,
+): Promise<void> {
+  const paddle = await initialize(input)
+  if (!paddle) throw new Error('Paddle.js failed to initialize')
+}
+
 export async function previewPaddlePrices(input: PreviewPaddlePricesInput): Promise<PaddleLocalizedPrice[]> {
   const priceIds = [...new Set(input.priceIds.map((value) => value.trim()).filter(Boolean))]
   if (!priceIds.length) return []

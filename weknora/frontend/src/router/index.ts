@@ -175,6 +175,12 @@ const router = createRouter({
       meta: { requiresInit: true, requiresAuth: true }
     },
     {
+      path: "/pay",
+      name: "paddlePaymentLink",
+      component: () => import("../views/billing/PaymentLink.vue"),
+      meta: { requiresInit: false, requiresAuth: false }
+    },
+    {
       path: "/platform",
       name: "Platform",
       redirect: authenticatedEntryPath,

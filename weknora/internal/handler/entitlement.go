@@ -223,6 +223,26 @@ func (h *EntitlementHandler) Current(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": current, "billing": h.paddle.billingResponse(tenantID, current.Plan, portalAvailable)})
 }
 
+// PaddlePublicConfig exposes only the client-side values required to
+// initialize Paddle.js on Paddle's public default-payment-link page.
+func (h *EntitlementHandler) PaddlePublicConfig(c *gin.Context) {
+	environment := strings.ToLower(strings.TrimSpace(h.paddle.Environment))
+	clientToken := strings.TrimSpace(h.paddle.ClientToken)
+	configured := h.paddle.Configured() && h.paddle.PortalConfigured() &&
+		((environment == "sandbox" && len(clientToken) > len("test_")) ||
+			(environment == "live" && len(clientToken) > len("live_")))
+	c.Header("Cache-Control", "no-store")
+	if !configured {
+		c.JSON(http.StatusOK, gin.H{"configured": false})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"configured":   true,
+		"environment":  environment,
+		"client_token": clientToken,
+	})
+}
+
 func (h *EntitlementHandler) PaddlePortalSession(c *gin.Context) {
 	tenantID, ok := types.TenantIDFromContext(c.Request.Context())
 	if !ok || tenantID == 0 {

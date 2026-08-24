@@ -94,6 +94,7 @@
                 autofocus
                 @enter="handleUrlDialogConfirm"
               />
+              <p class="visual-url-modal__notice">{{ t('knowledgeBase.urlUsageNotice') }}</p>
             </div>
 
             <footer class="visual-url-modal__footer">
@@ -458,6 +459,13 @@ defineExpose({ openUrlDialog })
   background: #fff;
   color: #1f2937;
   font-size: 12px;
+}
+
+.visual-url-modal__notice {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .visual-url-modal__footer {
