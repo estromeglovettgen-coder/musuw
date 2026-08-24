@@ -52,3 +52,32 @@ test('only generic Lite entry routes restore the last page', () => {
   assert.match(routerSource, /path: "\/platform",[\s\S]*redirect: authenticatedEntryPath/)
   assert.doesNotMatch(routerSource, /isLiteSpaDefaultEntry/)
 })
+
+test('generic product entry never restores a prior billing surface', () => {
+  const policyStart = routerSource.indexOf('function isSafeLiteRestoreTarget(path: string)')
+  const policyEnd = routerSource.indexOf('\n}\n', policyStart)
+
+  assert.notEqual(policyStart, -1, 'Lite restore policy must exist')
+  assert.notEqual(policyEnd, -1, 'Lite restore policy must have a bounded body')
+
+  const policy = routerSource.slice(policyStart, policyEnd + 2)
+  assert.match(
+    policy,
+    /return isAllowedLitePath\(pathname\) && pathname !== '\/plans' && pathname !== '\/checkout'/,
+  )
+})
+
+test('an explicit storefront checkout intent still wins before normal app entry', () => {
+  const entryStart = routerSource.indexOf('function authenticatedEntryPath(')
+  const entryEnd = routerSource.indexOf('\n}\n', entryStart)
+
+  assert.notEqual(entryStart, -1, 'authenticated entry policy must exist')
+  assert.notEqual(entryEnd, -1, 'authenticated entry policy must have a bounded body')
+
+  const entry = routerSource.slice(entryStart, entryEnd + 2)
+  const checkoutIntent = entry.indexOf("return { path: '/plans', query: { plan, period } }")
+  const normalRestore = entry.indexOf('sessionStorage.getItem(LITE_LAST_PATH_KEY)')
+  assert.notEqual(checkoutIntent, -1, 'supported checkout intent must enter plans')
+  assert.notEqual(normalRestore, -1, 'normal app entry must retain safe workspace restore')
+  assert.ok(checkoutIntent < normalRestore, 'checkout intent must be handled before normal restore')
+})

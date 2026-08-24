@@ -110,7 +110,7 @@ function isAllowedLitePath(path: string) {
 
 function isSafeLiteRestoreTarget(path: string) {
   const pathname = path.split('?')[0]?.split('#')[0] || ''
-  return isAllowedLitePath(pathname)
+  return isAllowedLitePath(pathname) && pathname !== '/plans' && pathname !== '/checkout'
 }
 
 const router = createRouter({
