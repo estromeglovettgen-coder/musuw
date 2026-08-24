@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import KbWikiBadge from './KbWikiBadge.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 
@@ -39,6 +40,18 @@ const emit = defineEmits<{
   delete: []
   details: []
 }>()
+
+const menuVisible = ref(false)
+
+const requestDuplicate = () => {
+  menuVisible.value = false
+  emit('duplicate')
+}
+
+const requestDelete = () => {
+  menuVisible.value = false
+  emit('delete')
+}
 </script>
 
 <template>
@@ -74,13 +87,13 @@ const emit = defineEmits<{
         </button>
       </t-tooltip>
 
-      <t-popup v-else-if="canDuplicate || canManage || !shared" trigger="click" destroy-on-close placement="bottom-right">
+      <t-popup v-else-if="canDuplicate || canManage || !shared" v-model:visible="menuVisible" trigger="click" destroy-on-close placement="bottom-right">
         <button type="button" class="visual-reference-kb-card__more" :aria-label="$t('common.more')" @click.stop><t-icon name="ellipsis" /></button>
         <template #content>
           <div class="visual-reference-kb-card-menu" @click.stop>
             <button v-if="!shared" type="button" @click="emit('pin')"><t-icon :name="kb.is_pinned ? 'pin-filled' : 'pin'" /><span>{{ kb.is_pinned ? $t('knowledgeList.pin.unpin') : $t('knowledgeList.pin.pin') }}</span></button>
-            <button v-if="canDuplicate" type="button" @click="emit('duplicate')"><t-icon name="file-copy" /><span>{{ $t('knowledgeList.menu.duplicate') }}</span></button>
-            <button v-if="canManage" type="button" class="is-danger" @click="emit('delete')"><t-icon name="delete" /><span>{{ $t('common.delete') }}</span></button>
+            <button v-if="canDuplicate" type="button" @click="requestDuplicate"><t-icon name="file-copy" /><span>{{ $t('knowledgeList.menu.duplicate') }}</span></button>
+            <button v-if="canManage" type="button" class="is-danger" @click="requestDelete"><t-icon name="delete" /><span>{{ $t('common.delete') }}</span></button>
           </div>
         </template>
       </t-popup>
