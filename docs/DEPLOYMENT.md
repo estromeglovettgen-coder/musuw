@@ -287,6 +287,11 @@ build-record artifact, while job logs, image digests, provenance, and the
 release manifest stay available. The app Dockerfile keeps stable apt/tool and runtime-package layers
 ahead of the release SHA. Public npm downloads use the self-hosted runner's
 ordinary persistent npm cache instead of uploading a duplicate Actions cache.
+Likewise, Go CI disables `setup-go`'s remote cache whenever
+`MUSUW_ACTIONS_RUNNER` selects the persistent self-hosted runner; its local Go
+module and compiler caches survive jobs without a gigabyte-scale restore/save
+post-step. The official Actions cache remains enabled only for the
+`ubuntu-latest` fallback, whose filesystem is disposable.
 
 Keep the following values in GitHub settings or on the server, never in checked-in
 files:

@@ -98,6 +98,11 @@ frontend_build = frontend_steps.find { |step| step.is_a?(Hash) && step["name"] =
 fail_contract "frontend build must pin NODE_OPTIONS to a 4096 MiB heap" unless frontend_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
 fail_contract "frontend tests must not inherit the build-only NODE_OPTIONS override" if ci.dig("jobs", "frontend", "env", "NODE_OPTIONS")
 
+go_steps = Array(ci.dig("jobs", "go", "steps"))
+setup_go = go_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-go@") }
+expected_go_cache_policy = "${{ vars.MUSUW_ACTIONS_RUNNER == '' }}"
+fail_contract "self-hosted Go CI must reuse its persistent local cache without restoring or uploading a duplicate Actions cache" unless setup_go&.dig("with", "cache") == expected_go_cache_policy && setup_go&.dig("with", "cache-dependency-path") == "weknora/go.sum"
+
 docreader_steps = Array(ci.dig("jobs", "docreader", "steps"))
 setup_python = docreader_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-python@") }
 fail_contract "DocReader setup-python must not request the unavailable pip cache" if setup_python&.dig("with", "cache") == "pip"

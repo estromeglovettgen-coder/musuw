@@ -166,7 +166,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: weknora/go.mod
-          cache: true
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' }}
           cache-dependency-path: weknora/go.sum
       - name: Run Go tests
         run: go test ./...
