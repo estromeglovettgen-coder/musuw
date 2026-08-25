@@ -171,9 +171,9 @@ const isIntegrationSection = (section: string) =>
   INTEGRATION_TABS.includes(integrationTabFromSection(section))
 
 const normalizeSettingsSection = (section: string) => {
-  // Consumer Lite exposes the personal settings and usage surfaces only.
+  // Consumer Lite exposes personal settings, usage, and consumer model choices only.
   // Internal events/deep-links cannot reopen hidden management sections.
-  if (authStore.isLiteMode && section !== 'usage' && section !== 'userprofile') return 'general'
+  if (authStore.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models') return 'general'
   if (section === 'api') return integrationSectionKey('api')
   if (section === 'integrations') {
     return integrationSectionKey(integrationTabFromSection((route.query.tab as string) || 'im'))
@@ -182,7 +182,7 @@ const normalizeSettingsSection = (section: string) => {
 }
 
 const canSeeSection = (key: string): boolean => {
-  if (authStore.isLiteMode) return key === 'general' || key === 'usage' || key === 'userprofile'
+  if (authStore.isLiteMode) return key === 'general' || key === 'usage' || key === 'userprofile' || key === 'models'
   if (isIntegrationSection(key)) {
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
     if (!min) return true
@@ -200,6 +200,7 @@ const navItems = computed<NavItem[]>(() => {
     return [
       { key: 'general', icon: 'setting', label: t('general.title') },
       { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
+      { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
       { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
     ]
   }

@@ -39,3 +39,10 @@ test('system administration settings stay explicitly system-admin-only', () => {
     ['system-global', 'runtime-queues', 'platform-api-keys', 'system-audit-log'],
   )
 })
+
+test('consumer model settings are viewer-visible but not a system-admin section', () => {
+  assert.equal(SETTINGS_SECTION_MIN_ROLE.models, 'viewer')
+  assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models, 'admin')
+  assert.equal(SYSTEM_ADMIN_SETTINGS_SECTIONS.has('models'), false)
+  assert.equal(SYSTEM_ADMIN_SETTINGS_SECTIONS.has('system-global'), true)
+})

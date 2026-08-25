@@ -25,7 +25,7 @@ const sidebarBusiness = read("../assets/business-baselines/menu.pre-view.vue");
 /**
  * Musuw product exposure policy:
  * - Lite is the consumer surface: New Chat + Knowledge Base are the only
- *   top-level product entries; Settings exposes General, Usage, and User Profile only.
+ *   top-level product entries; Settings exposes General, Usage, Models, and User Profile.
  * - Standard keeps the complete upstream WeKnora source surface so operators
  *   can restore it by switching edition instead of reconstructing deleted code.
  * - Security-sensitive enforcement is server-side; these tests lock the
@@ -109,10 +109,12 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
   assert.match(router, /OrganizationList\.vue/);
 });
 
-test("Lite Settings exposes General, Usage, and User Profile while General exposes Language only", () => {
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'userprofile'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile'\) return 'general'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile'/);
+test("Lite Settings exposes General, Usage, Models, and User Profile while General exposes Language only", () => {
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models'\) return 'general'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/);
+  assert.match(settingsView, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/);
+  assert.match(settingsView, /<ModelSettings v-else-if="currentSection === 'models'"/);
   assert.match(settingsView, /<UsageBillingSettings v-else-if="currentSection === 'usage'"/);
 
   assert.match(generalSettings, /language\.language/);

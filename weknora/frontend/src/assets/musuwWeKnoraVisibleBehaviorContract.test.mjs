@@ -84,13 +84,15 @@ test('Lite UserMenu cannot reopen management surfaces and keeps valid interactiv
   ]) assert.ok(userMenu.includes(token), `Standard UserMenu source lost ${token}`)
 })
 
-test('Lite Settings exposes General, Usage, and User Profile; Standard settings remain recoverable', () => {
+test('Lite Settings exposes General, Usage, Models, and User Profile; Standard settings remain recoverable', () => {
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile'\) return 'general'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'userprofile'/)
+  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models'\) return 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'/)
+  assert.match(settings, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
+  assert.ok(settings.includes('<ModelSettings v-else-if="currentSection === \'models\'"'))
   assert.ok(settings.includes('UsageBillingSettings'))
 
   assert.ok(general.includes('id="visual-language-select"'))
