@@ -40,15 +40,11 @@ jobs:
           github.event.workflow_run.repository.full_name == 'estromeglovettgen-coder/musuw'
         )
       )
-    runs-on: musuw-release
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       release_sha: ${{ steps.resolve.outputs.release_sha }}
       ci_workflow_run: ${{ steps.resolve.outputs.ci_workflow_run }}
-      source_artifact_id: ${{ steps.source_artifact.outputs.artifact-id }}
-      source_artifact_name: ${{ steps.source_bundle.outputs.artifact_name }}
-      source_artifact_digest: ${{ steps.source_artifact.outputs.artifact-digest }}
-      source_archive_digest: ${{ steps.source_bundle.outputs.archive_digest }}
     steps:
       - name: Check out the exact requested revision
         uses: actions/checkout@v4
@@ -114,133 +110,13 @@ jobs:
             printf 'release_sha=%s\n' "$actual"
             printf 'ci_workflow_run=%s\n' "$ci_workflow_run"
           } >> "$GITHUB_OUTPUT"
-      - name: Package the exact authorized source tree
-        id: source_bundle
-        env:
-          RELEASE_SHA: ${{ steps.resolve.outputs.release_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
-          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
-          test "$GITHUB_REPOSITORY" = estromeglovettgen-coder/musuw
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          for command_name in awk find git grep gzip mktemp shasum tar wc; do
-            command -v "$command_name" >/dev/null 2>&1
-          done
-          unset TAR_OPTIONS
-
-          bundle_dir=''
-          cleanup_failed_bundle() {
-            local status="$1"
-            if [ "$status" -ne 0 ] && [ -n "$bundle_dir" ]; then
-              case "$bundle_dir" in
-                "$RUNNER_TEMP"/musuw-source-bundle.*)
-                  if [ -d "$bundle_dir" ] && [ ! -L "$bundle_dir" ]; then
-                    find "$bundle_dir" -depth -delete 2>/dev/null || true
-                  fi
-                  ;;
-              esac
-            fi
-            exit "$status"
-          }
-          trap 'cleanup_failed_bundle "$?"' EXIT
-          bundle_dir="$(mktemp -d "$RUNNER_TEMP/musuw-source-bundle.XXXXXX")"
-          archive="$bundle_dir/musuw-source.tar.gz"
-          artifact_name="musuw-production-source-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE_SHA"
-          git archive --format=tar --prefix=musuw-source/ "$RELEASE_SHA" -- \
-            . \
-            ':(exclude)weknora/website-docs/**' \
-            ':(exclude)weknora/docs/images/**' | \
-            gzip -n > "$archive"
-          test -s "$archive"
-          archive_size="$(wc -c < "$archive" | awk '{print $1}')"
-          [[ "$archive_size" =~ ^[0-9]+$ ]]
-          test "$archive_size" -le 268435456
-
-          entries="$bundle_dir/tar-entries.txt"
-          entry_types="$bundle_dir/tar-types.txt"
-          tar -tzf "$archive" > "$entries"
-          awk '
-            BEGIN { count = 0 }
-            {
-              entry = $0
-              if (entry == "" || entry ~ /^\// || entry ~ /(^|\/)\.\.(\/|$)/ || entry !~ /^musuw-source\//) exit 1
-              count++
-            }
-            END { if (count == 0) exit 1 }
-          ' "$entries" || {
-            printf '%s\n' 'authorized source archive has an invalid tree' >&2
-            exit 1
-          }
-          tar -tvzf "$archive" > "$entry_types"
-          awk 'substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }' "$entry_types" || {
-            printf '%s\n' 'authorized source archive contains an unsupported member type' >&2
-            exit 1
-          }
-          for required_path in \
-            .nvmrc \
-            auth/package-lock.json \
-            weknora/frontend/package-lock.json \
-            weknora/docs/docs.go \
-            weknora/internal/assets/asr_test.wav \
-            weknora/frontend/packages/xlsx-0.20.2.tgz \
-            integration/weknora-production/Dockerfile.app.runtime \
-            integration/weknora-production/Dockerfile.frontend \
-            .github/buildkitd.production.toml \
-            scripts/weknora-production/build-static.sh \
-            scripts/weknora-production/lib.sh; do
-            grep -Fxq "musuw-source/$required_path" "$entries" || {
-              printf '%s\n' "authorized source archive is missing: $required_path" >&2
-              exit 1
-            }
-          done
-          test "$(git ls-tree "$RELEASE_SHA" scripts/weknora-production/build-static.sh | awk '{print $1}')" = 100755
-          archive_digest="$(shasum -a 256 "$archive" | awk '{print $1}')"
-          [[ "$archive_digest" =~ ^[0-9a-f]{64}$ ]]
-          for output_line in \
-            "bundle_dir=$bundle_dir" \
-            "archive_path=$archive" \
-            "archive_digest=$archive_digest" \
-            "artifact_name=$artifact_name"; do
-            printf '%s\n' "$output_line" >> "$GITHUB_OUTPUT" || {
-              printf '%s\n' 'authorized source bundle outputs could not be published' >&2
-              exit 1
-            }
-          done
-          trap - EXIT
-      - name: Upload the exact authorized source artifact
-        id: source_artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.source_bundle.outputs.artifact_name }}
-          path: ${{ steps.source_bundle.outputs.archive_path }}
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
-      - name: Remove the temporary authorized source bundle
-        if: always()
-        env:
-          BUNDLE_DIR: ${{ steps.source_bundle.outputs.bundle_dir }}
-        run: |
-          set -euo pipefail
-          if [ -n "${BUNDLE_DIR:-}" ]; then
-            case "$BUNDLE_DIR" in
-              "$RUNNER_TEMP"/musuw-source-bundle.*) ;;
-              *) printf '%s\n' 'source bundle cleanup escaped runner temp' >&2; exit 1 ;;
-            esac
-            test -d "$BUNDLE_DIR"
-            test ! -L "$BUNDLE_DIR"
-            find "$BUNDLE_DIR" -depth -delete
-          fi
   build:
     name: Build immutable production images on native AMD64
     needs: authorize
     permissions:
-      actions: read
       contents: read
       packages: write
-    runs-on: musuw-build-x64
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     outputs:
       app_digest: ${{ steps.images.outputs.app_digest }}
@@ -253,31 +129,6 @@ jobs:
           RUNNER_ARCH: ${{ runner.arch }}
         run: |
           set -euo pipefail
-          test -n "${RUNNER_WORKSPACE:-}"
-          test -n "${GITHUB_ENV:-}"
-          test -d "$RUNNER_WORKSPACE"
-          test ! -L "$RUNNER_WORKSPACE"
-          for command_name in grep install stat; do
-            command -v "$command_name" >/dev/null 2>&1
-          done
-          buildx_config="$RUNNER_WORKSPACE/.musuw-production-buildx-config"
-          case "$buildx_config" in
-            "$RUNNER_WORKSPACE"/.musuw-production-buildx-config) ;;
-            *) printf '%s\n' 'persistent Buildx configuration escaped runner workspace' >&2; exit 1 ;;
-          esac
-          if [ -e "$buildx_config" ] || [ -L "$buildx_config" ]; then
-            test -d "$buildx_config"
-            test ! -L "$buildx_config"
-            test -O "$buildx_config"
-          else
-            install -d -m 700 "$buildx_config"
-          fi
-          chmod 700 "$buildx_config"
-          test -O "$buildx_config"
-          test "$(stat -c '%a' "$buildx_config")" = 700
-          export BUILDX_CONFIG="$buildx_config"
-          printf 'BUILDX_CONFIG=%s\n' "$buildx_config" >> "$GITHUB_ENV"
-
           test "$RUNNER_ARCH" = X64
           test "$(uname -m)" = x86_64
           daemon_arch="$(docker info --format '{{.Architecture}}')"
@@ -285,360 +136,32 @@ jobs:
             x86_64|amd64) ;;
             *) printf '%s\n' "production Docker daemon is not native AMD64: $daemon_arch" >&2; exit 1 ;;
           esac
-          case "$(docker info --format '{{json .RegistryConfig.Mirrors}}')" in
-            *mirror.ccs.tencentyun.com*) ;;
-            *) printf '%s\n' 'production Docker daemon is missing the required regional Docker Hub mirror' >&2; exit 1 ;;
-          esac
           docker buildx version
           docker buildx create --help | grep -Fq -- '--buildkitd-config'
-          docker buildx rm --help | grep -Fq -- '--keep-state'
           docker buildx build --help | grep -Fq -- '--metadata-file'
           docker buildx build --help | grep -Fq -- '--attest'
           docker buildx imagetools inspect --help | grep -Fq -- '--format'
-      - name: Materialize the exact approved source archive
-        id: source
+      - name: Check out the exact authorized revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.authorize.outputs.release_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Assert the detached checkout matches the authorized SHA
         env:
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
-          SOURCE_ARTIFACT_ID: ${{ needs.authorize.outputs.source_artifact_id }}
-          SOURCE_ARTIFACT_NAME: ${{ needs.authorize.outputs.source_artifact_name }}
-          SOURCE_ARTIFACT_DIGEST: ${{ needs.authorize.outputs.source_artifact_digest }}
-          SOURCE_ARCHIVE_DIGEST: ${{ needs.authorize.outputs.source_archive_digest }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            printf '%s\n' 'approved source identity must be a lowercase full Git SHA' >&2
-            exit 1
-          }
-          test "$GITHUB_REPOSITORY" = estromeglovettgen-coder/musuw || {
-            printf '%s\n' 'source materialization is restricted to the canonical repository' >&2
-            exit 1
-          }
-          [[ "$SOURCE_ARTIFACT_ID" =~ ^[0-9]+$ ]]
-          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
-          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
-          expected_artifact_name="musuw-production-source-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE_SHA"
-          test "$SOURCE_ARTIFACT_NAME" = "$expected_artifact_name"
-          [[ "$SOURCE_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
-          [[ "$SOURCE_ARCHIVE_DIGEST" =~ ^[0-9a-f]{64}$ ]]
-          for command_name in awk cp curl find jq mktemp mv rm sha256sum stat tar unzip zipinfo; do
-            command -v "$command_name" >/dev/null 2>&1 || {
-              printf '%s\n' "required source materialization command is unavailable: $command_name" >&2
-              exit 1
-            }
-          done
-          unset TAR_OPTIONS
-
-          test ! -L "$GITHUB_WORKSPACE" || {
-            printf '%s\n' 'runner repository workspace must not be a symbolic link' >&2
-            exit 1
-          }
-          test -d "$GITHUB_WORKSPACE" && test -d "$RUNNER_WORKSPACE"
-          workspace="$(cd "$GITHUB_WORKSPACE" && pwd -P)"
-          runner_workspace="$(cd "$RUNNER_WORKSPACE" && pwd -P)"
-          expected_workspace="$runner_workspace/${GITHUB_REPOSITORY##*/}"
-          test "$workspace" = "$expected_workspace" || {
-            printf '%s\n' 'runner repository workspace does not match the exact expected path' >&2
-            exit 1
-          }
-          test "$workspace" != / && test "$workspace" != "$RUNNER_WORKSPACE"
-
-          artifact_metadata="$(mktemp "$RUNNER_TEMP/musuw-source-artifact-metadata.XXXXXX.json")"
-          artifact_zip="$(mktemp "$RUNNER_TEMP/musuw-source-artifact.XXXXXX.zip")"
-          headers="$(mktemp "$RUNNER_TEMP/musuw-source-artifact-headers.XXXXXX")"
-          zip_entries="$(mktemp "$RUNNER_TEMP/musuw-source-artifact-zip-entries.XXXXXX")"
-          archive="$(mktemp "$RUNNER_TEMP/musuw-source-archive.XXXXXX.tar.gz")"
-          entries="$(mktemp "$RUNNER_TEMP/musuw-source-archive-entries.XXXXXX")"
-          entry_types="$(mktemp "$RUNNER_TEMP/musuw-source-archive-types.XXXXXX")"
-          source_stage="$(mktemp -d "$RUNNER_TEMP/musuw-source-tree.XXXXXX")"
-          publish_stage="$(mktemp -d "$RUNNER_WORKSPACE/.musuw-source-publish.XXXXXX")"
-          previous_workspace=''
-          previous_workspace_owned=false
-          workspace_swapped=false
-          workspace_committed=false
-          cleanup_tree() {
-            local tree="$1"
-            if [ -n "$tree" ] && [ -d "$tree" ]; then
-              find "$tree" -depth -delete 2>/dev/null || true
-            fi
-          }
-          cleanup() {
-            rm -f -- "$artifact_metadata" "$artifact_zip" "$headers" "$zip_entries" \
-              "$archive" "$entries" "$entry_types" \
-              "${artifact_zip}.part.0" "${artifact_zip}.part.1" \
-              "${artifact_zip}.part.2" "${artifact_zip}.part.3" \
-              "${headers}.part.0" "${headers}.part.1" \
-              "${headers}.part.2" "${headers}.part.3"
-            cleanup_tree "$source_stage"
-            cleanup_tree "$publish_stage"
-            if [ "$workspace_committed" = true ]; then
-              cleanup_tree "$previous_workspace"
-            elif [ "$workspace_swapped" = true ]; then
-              cleanup_tree "$workspace"
-            fi
-            if [ "$workspace_committed" != true ] && [ "$previous_workspace_owned" = true ]; then
-              if [ ! -e "$workspace" ] && [ ! -L "$workspace" ] && \
-                mv "$previous_workspace" "$workspace" 2>/dev/null; then
-                previous_workspace=''
-                previous_workspace_owned=false
-              else
-                printf '%s\n' 'prior runner workspace was preserved for recovery after a failed source replacement' >&2
-              fi
-            fi
-          }
-          trap cleanup EXIT
-          cd "$RUNNER_TEMP"
-
-          metadata_status="$(curl -q --proto '=https' --fail --silent --show-error \
-            --connect-timeout 15 --max-time 30 \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            --write-out '%{http_code}' \
-            --output "$artifact_metadata" \
-            "https://api.github.com/repos/estromeglovettgen-coder/musuw/actions/artifacts/$SOURCE_ARTIFACT_ID")"
-          test "$metadata_status" = 200
-          test "$(jq -er '.id | tostring' "$artifact_metadata")" = "$SOURCE_ARTIFACT_ID"
-          test "$(jq -er '.name' "$artifact_metadata")" = "$SOURCE_ARTIFACT_NAME"
-          test "$(jq -er '.workflow_run.id | tostring' "$artifact_metadata")" = "$GITHUB_RUN_ID"
-          test "$(jq -er 'if .expired == false then "false" else error("artifact expired") end' "$artifact_metadata")" = false
-          metadata_size="$(jq -er '.size_in_bytes | select(type == "number" and floor == . and . > 0) | tostring' "$artifact_metadata")"
-          [[ "$metadata_size" =~ ^[0-9]+$ ]]
-          test "$metadata_size" -le 268435456
-          metadata_size_number=$((10#$metadata_size))
-          test "$metadata_size_number" -ge 4
-          segment_base=$((metadata_size_number / 4))
-          segment_remainder=$((metadata_size_number % 4))
-          test "$(jq -er '.digest' "$artifact_metadata")" = "sha256:$SOURCE_ARTIFACT_DIGEST"
-
-          # Artifact download locations expire quickly. Every bounded attempt
-          # obtains a fresh API redirect, validates the official blob host,
-          # then downloads without forwarding the GitHub API credential.
-          artifact_downloaded=false
-          for attempt in 1 2 3; do
-            : > "$headers"
-            if api_status="$(curl -q --proto '=https' --fail --silent --show-error \
-              --connect-timeout 15 --max-time 30 \
-              -H 'Accept: application/vnd.github+json' \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              --write-out '%{http_code}' \
-              --dump-header "$headers" --output /dev/null \
-              "https://api.github.com/repos/estromeglovettgen-coder/musuw/actions/artifacts/$SOURCE_ARTIFACT_ID/zip")" && \
-              [ "$api_status" = 302 ]; then
-              artifact_url="$(awk '
-                {
-                  line = $0
-                  if (tolower(line) ~ /^location:/) {
-                    sub(/^[^:]*:[[:space:]]*/, "", line)
-                    sub(/\r$/, "", line)
-                    value = line
-                  }
-                }
-                END { print value }
-              ' "$headers")"
-              case "$artifact_url" in
-                https://*/*) ;;
-                *) printf '%s\n' 'GitHub artifact API returned an invalid source location' >&2; exit 1 ;;
-              esac
-              artifact_authority="${artifact_url#https://}"
-              artifact_authority="${artifact_authority%%/*}"
-              case "$artifact_authority" in
-                *[@:]*) printf '%s\n' 'GitHub artifact location contains forbidden authority syntax' >&2; exit 1 ;;
-                ?*.blob.core.windows.net) ;;
-                *) printf '%s\n' 'GitHub artifact location is outside the official blob service' >&2; exit 1 ;;
-              esac
-
-              : > "$artifact_zip"
-              segment_pids=''
-              segment_start=0
-              for segment in 0 1 2 3; do
-                segment_length=$segment_base
-                if [ "$segment" -lt "$segment_remainder" ]; then
-                  segment_length=$((segment_length + 1))
-                fi
-                segment_end=$((segment_start + segment_length - 1))
-                segment_file="${artifact_zip}.part.${segment}"
-                segment_header="${headers}.part.${segment}"
-                range_start="$segment_start"
-                range_end="$segment_end"
-                (
-                  set -euo pipefail
-                  : > "$segment_file"
-                  : > "$segment_header"
-                  blob_status="$(curl -q --http1.1 --proto '=https' --fail --silent --show-error \
-                    --connect-timeout 15 --max-time 900 \
-                    --speed-limit 1024 --speed-time 120 \
-                    -H "Range: bytes=$range_start-$range_end" \
-                    --write-out '%{http_code}' \
-                    --dump-header "$segment_header" \
-                    --output "$segment_file" "$artifact_url")"
-                  test "$blob_status" = 206
-                  content_range="$(awk '
-                    {
-                      line = $0
-                      if (tolower(line) ~ /^content-range:/) {
-                        count++
-                        sub(/^[^:]*:[[:space:]]*/, "", line)
-                        sub(/\r$/, "", line)
-                        value = line
-                      }
-                    }
-                    END { if (count != 1) exit 1; print value }
-                  ' "$segment_header")"
-                  content_length="$(awk '
-                    {
-                      line = $0
-                      if (tolower(line) ~ /^content-length:/) {
-                        count++
-                        sub(/^[^:]*:[[:space:]]*/, "", line)
-                        sub(/\r$/, "", line)
-                        value = line
-                      }
-                    }
-                    END { if (count != 1) exit 1; print value }
-                  ' "$segment_header")"
-                  test "$content_range" = "bytes $range_start-$range_end/$metadata_size_number"
-                  test "$content_length" = "$segment_length"
-                  test "$(stat -c '%s' "$segment_file")" = "$segment_length"
-                ) &
-                segment_pids="$segment_pids $!"
-                segment_start=$((segment_end + 1))
-              done
-              test "$segment_start" = "$metadata_size_number"
-              segments_ok=true
-              for segment_pid in $segment_pids; do
-                if ! wait "$segment_pid"; then
-                  segments_ok=false
-                fi
-              done
-              if [ "$segments_ok" = true ]; then
-                cat \
-                  "${artifact_zip}.part.0" \
-                  "${artifact_zip}.part.1" \
-                  "${artifact_zip}.part.2" \
-                  "${artifact_zip}.part.3" > "$artifact_zip"
-                if [ "$(stat -c '%s' "$artifact_zip")" = "$metadata_size_number" ] && \
-                  [ "$(sha256sum "$artifact_zip" | awk '{print $1}')" = "$SOURCE_ARTIFACT_DIGEST" ]; then
-                  artifact_downloaded=true
-                fi
-              fi
-              rm -f -- \
-                "${artifact_zip}.part.0" "${artifact_zip}.part.1" \
-                "${artifact_zip}.part.2" "${artifact_zip}.part.3" \
-                "${headers}.part.0" "${headers}.part.1" \
-                "${headers}.part.2" "${headers}.part.3"
-              if [ "$artifact_downloaded" = true ]; then
-                break
-              fi
-              : > "$artifact_zip"
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              sleep "$((attempt * 2))"
-            fi
-          done
-          [ "$artifact_downloaded" = true ] || {
-            printf '%s\n' 'GitHub source artifact download failed after three bounded attempts' >&2
-            exit 1
-          }
-
-          zipinfo -1 "$artifact_zip" > "$zip_entries"
-          test "$(awk 'END { print NR }' "$zip_entries")" = 1
-          test "$(awk 'NR == 1 { print }' "$zip_entries")" = musuw-source.tar.gz
-          unzip -tqq "$artifact_zip"
-          unzip -p "$artifact_zip" musuw-source.tar.gz > "$archive"
-          test -s "$archive"
-          test "$(stat -c '%s' "$archive")" -le 268435456
-          test "$(sha256sum "$archive" | awk '{print $1}')" = "$SOURCE_ARCHIVE_DIGEST"
-          tar -tzf "$archive" > "$entries"
-          awk '
-            BEGIN { count = 0 }
-            {
-              entry = $0
-              if (entry == "" || entry ~ /^\// || entry ~ /(^|\/)\.\.(\/|$)/ || entry !~ /^musuw-source\//) exit 1
-              count++
-            }
-            END { if (count == 0) exit 1 }
-          ' "$entries" || {
-            printf '%s\n' 'GitHub source archive has an invalid top-level tree' >&2
-            exit 1
-          }
-          tar -tvzf "$archive" > "$entry_types"
-          awk 'substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }' "$entry_types" || {
-            printf '%s\n' 'GitHub source archive contains an unsupported member type' >&2
-            exit 1
-          }
-          tar -xzf "$archive" --no-same-owner --strip-components=1 -C "$source_stage"
-          test ! -e "$source_stage/.git"
-          test -z "$(find "$source_stage" -type l -print -quit)" || {
-            printf '%s\n' 'GitHub source archive contains an unsupported symbolic link' >&2
-            exit 1
-          }
-          for required_path in \
-            .nvmrc \
-            auth/package-lock.json \
-            weknora/frontend/package-lock.json \
-            weknora/docs/docs.go \
-            weknora/internal/assets/asr_test.wav \
-            weknora/frontend/packages/xlsx-0.20.2.tgz \
-            integration/weknora-production/Dockerfile.app.runtime \
-            integration/weknora-production/Dockerfile.frontend \
-            .github/buildkitd.production.toml \
-            scripts/weknora-production/build-static.sh \
-            scripts/weknora-production/lib.sh; do
-            test -f "$source_stage/$required_path" && test ! -L "$source_stage/$required_path" || {
-              printf '%s\n' "GitHub source archive is missing a required build input: $required_path" >&2
-              exit 1
-            }
-          done
-          test -x "$source_stage/scripts/weknora-production/build-static.sh" || {
-            printf '%s\n' 'GitHub source archive did not preserve executable release inputs' >&2
-            exit 1
-          }
-
-          cp -a "$source_stage/." "$publish_stage/"
-          previous_workspace="$RUNNER_WORKSPACE/.musuw-source-previous.$$"
-          test ! -e "$previous_workspace" && test ! -L "$previous_workspace"
-          if [ -e "$workspace" ]; then
-            mv "$workspace" "$previous_workspace"
-            previous_workspace_owned=true
-          fi
-          if ! mv "$publish_stage" "$workspace"; then
-            printf '%s\n' 'validated source could not replace the runner workspace' >&2
-            exit 1
-          fi
-          publish_stage=''
-          workspace_swapped=true
-          cd "$workspace"
-          test -f .nvmrc
-          test -f auth/package-lock.json
-          test -f weknora/frontend/package-lock.json
-          test -f integration/weknora-production/Dockerfile.app.runtime
-          test -f integration/weknora-production/Dockerfile.frontend
-          test -f .github/buildkitd.production.toml
-          test -x scripts/weknora-production/build-static.sh
-          workspace_committed=true
-          cleanup_tree "$previous_workspace"
-          previous_workspace=''
-          previous_workspace_owned=false
-          printf '%s\n' 'official exact-SHA source archive materialized'
-      - name: Select preinstalled Node for production browser build
-        id: node
-        run: |
-          set -euo pipefail
-          test -n "${RUNNER_TOOL_CACHE:-}"
-          test -n "${GITHUB_PATH:-}"
-          IFS= read -r node_version < .nvmrc
-          [[ "$node_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          printf '%s\n' "$node_version" | cmp -s - .nvmrc
-          node_bin="$RUNNER_TOOL_CACHE/node/$node_version/x64/bin"
-          test -x "$node_bin/node"
-          test -x "$node_bin/npm"
-          export PATH="$node_bin:$PATH"
-          test "$("$node_bin/node" --version)" = "v$node_version"
-          test "$("$node_bin/node" -p 'process.arch')" = x64
-          [[ "$("$node_bin/npm" --version)" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
-          printf '%s\n' "$node_bin" >> "$GITHUB_PATH"
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - name: Set up Node for production browser build
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            auth/package-lock.json
+            weknora/frontend/package-lock.json
       - name: Install auth shell dependencies for build-static
         run: npm ci --prefix auth --ignore-scripts
       - name: Set up temporary public build inputs
@@ -676,18 +199,13 @@ jobs:
           WEKNORA_PRODUCTION_RUNTIME_DIR="$RUNTIME_DIR" \
           WEKNORA_PRODUCTION_REVISION="$RELEASE_SHA" \
             bash scripts/weknora-production/build-static.sh
-      - name: Create persistent native AMD64 BuildKit builder
+      - name: Create job-scoped native AMD64 BuildKit builder
         id: buildx
         env:
-          BUILDER_NAME: musuw-production-native-amd64-v1
+          BUILDER_NAME: musuw-production-${{ github.run_id }}-${{ github.run_attempt }}
           DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
         run: |
           set -euo pipefail
-          test "$BUILDX_CONFIG" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config"
-          test -d "$BUILDX_CONFIG"
-          test ! -L "$BUILDX_CONFIG"
-          test -O "$BUILDX_CONFIG"
-          test "$(stat -c '%a' "$BUILDX_CONFIG")" = 700
           case "$DOCKER_CONFIG" in
             "$RUNNER_TEMP"/musuw-production-docker-config) ;;
             *) printf '%s\n' 'temporary Docker configuration escaped runner temp' >&2; exit 1 ;;
@@ -696,11 +214,7 @@ jobs:
             test -d "$DOCKER_CONFIG" && test ! -L "$DOCKER_CONFIG"
             find "$DOCKER_CONFIG" -depth -delete
           fi
-
           install -d -m 700 "$DOCKER_CONFIG"
-          if docker buildx inspect --builder "$BUILDER_NAME" >/dev/null 2>&1; then
-            docker buildx rm --force --keep-state "$BUILDER_NAME"
-          fi
           test -f .github/buildkitd.production.toml
           test ! -L .github/buildkitd.production.toml
           created_name="$(docker buildx create \
@@ -725,7 +239,7 @@ jobs:
       - name: Build, push, and validate immutable images
         id: images
         env:
-          BUILDER_NAME: musuw-production-native-amd64-v1
+          BUILDER_NAME: musuw-production-${{ github.run_id }}-${{ github.run_attempt }}
           DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
         run: |
@@ -737,12 +251,6 @@ jobs:
           [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
           test -d "$DOCKER_CONFIG"
           test ! -L "$DOCKER_CONFIG"
-          test "$BUILDX_CONFIG" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config"
-          test -d "$BUILDX_CONFIG"
-          test ! -L "$BUILDX_CONFIG"
-          test -O "$BUILDX_CONFIG"
-          test "$(stat -c '%a' "$BUILDX_CONFIG")" = 700
-
           app_repository=ghcr.io/estromeglovettgen-coder/musuw-app
           frontend_repository=ghcr.io/estromeglovettgen-coder/musuw-frontend
           app_tag="$app_repository:$RELEASE_SHA"
@@ -812,10 +320,9 @@ jobs:
             --tag "$app_tag" \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$RELEASE_SHA" \
-            --build-arg APT_MIRROR_ARG=mirrors.cloud.tencent.com \
             --build-arg VERSION_ARG=0.7.2 \
             --build-arg COMMIT_ID_ARG="$RELEASE_SHA" \
-            --build-arg BUILD_TIME_ARG=production-native-x64-runner \
+            --build-arg BUILD_TIME_ARG=production-github-hosted-amd64 \
             --build-arg GO_VERSION_ARG=go1.26 \
             --file ./integration/weknora-production/Dockerfile.app.runtime \
             ./weknora
@@ -845,33 +352,25 @@ jobs:
       - name: Remove temporary registry credentials and builder container
         if: always()
         env:
-          BUILDER_NAME: musuw-production-native-amd64-v1
+          BUILDER_NAME: musuw-production-${{ github.run_id }}-${{ github.run_attempt }}
           DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
         run: |
           set -uo pipefail
           cleanup_status=0
-          buildx_config_valid=false
-          if test "${BUILDX_CONFIG:-}" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config" && \
-              test -d "$BUILDX_CONFIG" && test ! -L "$BUILDX_CONFIG" && \
-              test -O "$BUILDX_CONFIG" && test "$(stat -c '%a' "$BUILDX_CONFIG")" = 700; then
-            buildx_config_valid=true
-          else
-            printf '%s\n' 'persistent Buildx configuration failed cleanup validation' >&2
-            cleanup_status=1
-          fi
           case "$DOCKER_CONFIG" in
             "$RUNNER_TEMP"/musuw-production-docker-config) ;;
             *) printf '%s\n' 'temporary Docker cleanup path escaped runner temp' >&2; exit 1 ;;
           esac
           if [ -d "$DOCKER_CONFIG" ] && [ ! -L "$DOCKER_CONFIG" ]; then
             docker logout ghcr.io >/dev/null 2>&1 || cleanup_status=1
-            if [ "$buildx_config_valid" = true ] && \
-                docker buildx inspect --builder "$BUILDER_NAME" >/dev/null 2>&1; then
-              docker buildx rm --force --keep-state "$BUILDER_NAME" || cleanup_status=1
-            fi
-            find "$DOCKER_CONFIG" -depth -delete || cleanup_status=1
           elif [ -e "$DOCKER_CONFIG" ] || [ -L "$DOCKER_CONFIG" ]; then
             rm -f -- "$DOCKER_CONFIG" || cleanup_status=1
+          fi
+          if docker buildx inspect --builder "$BUILDER_NAME" >/dev/null 2>&1; then
+            docker buildx rm --force "$BUILDER_NAME" || cleanup_status=1
+          fi
+          if [ -d "$DOCKER_CONFIG" ] && [ ! -L "$DOCKER_CONFIG" ]; then
+            find "$DOCKER_CONFIG" -depth -delete || cleanup_status=1
           fi
           exit "$cleanup_status"
       - name: Remove temporary public build inputs
