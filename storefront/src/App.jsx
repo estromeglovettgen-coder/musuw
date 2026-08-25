@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { HomePage } from "./HomePage";
+import { getHomeJourney } from "./data/homeJourney";
 import { getInitialLocale, getStorefrontCopy } from "./i18n";
 import { LegalPage, NotFoundPage } from "./LegalPage";
 import { getPublicDocument, getPublicDocumentMeta } from "./legalContent";
@@ -25,6 +26,7 @@ function setMeta(attribute, key, content) {
 export default function App() {
   const locale = useMemo(() => getInitialLocale(), []);
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
+  const homeJourney = useMemo(() => getHomeJourney(locale), [locale]);
   const pathname = useMemo(() => window.location.pathname, []);
   const publicDocument = useMemo(() => getPublicDocument(locale, pathname), [locale, pathname]);
   const isHome = pathname === "/";
@@ -32,7 +34,7 @@ export default function App() {
     const meta = publicDocument
       ? getPublicDocumentMeta(locale, pathname)
       : isHome
-        ? copy.meta
+        ? homeJourney.meta
         : {
             title: locale === "zh-CN" ? "页面未找到 | musuw" : "Page not found | musuw",
             description:
@@ -86,7 +88,7 @@ export default function App() {
       document.head.appendChild(structured);
     }
     structured.textContent = structuredDataText({ locale, pathname: normalizedPath });
-  }, [copy, isHome, locale, pathname, publicDocument]);
+  }, [homeJourney, isHome, locale, pathname, publicDocument]);
 
   useEffect(() => {
     const targetId = decodeURIComponent(window.location.hash.slice(1));
@@ -107,7 +109,7 @@ export default function App() {
 
   return (
     <div className="relative">
-      <HomePage copy={copy} />
+      <HomePage copy={copy} locale={locale} />
     </div>
   );
 }
