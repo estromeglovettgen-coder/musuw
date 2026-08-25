@@ -1,137 +1,144 @@
-import { useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowsClockwise } from "@phosphor-icons/react/ArrowsClockwise";
 import { Check } from "@phosphor-icons/react/Check";
 import { CheckCircle } from "@phosphor-icons/react/CheckCircle";
-import { ClipboardText } from "@phosphor-icons/react/ClipboardText";
+import { Clock } from "@phosphor-icons/react/Clock";
+import { FileText } from "@phosphor-icons/react/FileText";
+import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
+import { LockKey } from "@phosphor-icons/react/LockKey";
 import { Minus } from "@phosphor-icons/react/Minus";
+import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
+import { Path } from "@phosphor-icons/react/Path";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { Question } from "@phosphor-icons/react/Question";
-import { SealCheck } from "@phosphor-icons/react/SealCheck";
-import { SquaresFour } from "@phosphor-icons/react/SquaresFour";
-import { Star } from "@phosphor-icons/react/Star";
-import {
-  articles,
-  benefits,
-  comparisonGroups,
-  customerMarks,
-  faqs,
-  features,
-  priceBooks,
-  plans,
-  testimonials,
-  workflows
-} from "../data/homeContent";
+import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
+import { Sparkle } from "@phosphor-icons/react/Sparkle";
+import { Stack } from "@phosphor-icons/react/Stack";
+import { UsersThree } from "@phosphor-icons/react/UsersThree";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
+import { priceBooks, plans } from "../data/homeContent";
+import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
 import { Reveal, StaggerGroup, StaggerItem } from "./MotionPrimitives";
 import { ButtonLink, SectionIntro } from "./SiteChrome";
-import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
 
-function formatPlanAmount(symbol, amount) {
-  return `${symbol}${amount.toLocaleString("en-US")}`;
+const journeyIcons = [FolderOpen, Sparkle, FileText, Stack];
+const featureIcons = [Sparkle, FolderOpen, Stack];
+const workflowSmallIcons = [FileText, Stack, ArrowsClockwise];
+const trustIcons = [FileText, LockKey, Clock, Path, UsersThree, ArrowsClockwise];
+const includedIcons = [Sparkle, FileText, FolderOpen, Stack, ShareNetwork, Path];
+
+function formatPlanAmount(locale, symbol, amount) {
+  const numberLocale = locale === "zh-CN" ? "zh-CN" : "en-US";
+  return `${symbol}${amount.toLocaleString(numberLocale)}`;
 }
 
-export function CustomerStrip({ copy }) {
+export function JourneyStrip({ content }) {
   return (
-    <section className="customer-strip" aria-label={copy.customerStrip.label}>
-      <div className="container">
-        <p>{copy.customerStrip.label}</p>
-        <div className="customer-ticker">
-          <div className="customer-track">
-            {[...customerMarks, ...customerMarks, ...customerMarks].map(({ name, icon: Icon }, idx) => (
-              <div className="customer-logo" key={`${name}-${idx}`}>
-                <Icon size={20} weight="duotone" aria-hidden="true" />
-                <span>{name}</span>
+    <section className="journey-strip" aria-label={content.ariaLabel}>
+      <div className="container journey-strip-grid">
+        {content.items.map((item, index) => {
+          const Icon = journeyIcons[index];
+          return (
+            <div className="journey-strip-item" key={item.step}>
+              <span className="journey-strip-icon" aria-hidden="true">
+                <Icon size={20} weight="duotone" />
+              </span>
+              <div>
+                <span className="journey-strip-step">{item.step}</span>
+                <strong>{item.title}</strong>
+                <small>{item.body}</small>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
 function FeatureStory({ feature, index }) {
-  const Icon = feature.icon;
+  const Icon = featureIcons[index];
   const reverse = index % 2 === 1;
   const reduceMotion = useReducedMotion();
 
   return (
-    <Reveal className={`feature-story ${reverse ? "feature-story-reverse" : ""}`} amount={0.16}>
-      <div className="feature-copy">
-        <p className="feature-label">
-          <span className="feature-icon">
-            <Icon size={15} weight="bold" />
+    <Reveal
+      className={`journey-feature-card ${reverse ? "journey-feature-card-reverse" : ""}`}
+      amount={0.14}
+    >
+      <div className="journey-feature-copy">
+        <p className="journey-feature-label">
+          <span aria-hidden="true">
+            <Icon size={17} weight="duotone" />
           </span>
           {feature.label}
         </p>
         <h3>{feature.title}</h3>
-        <p>{feature.description}</p>
-        <ul className="feature-bullets">
+        <p className="journey-feature-body">{feature.body}</p>
+        <ul className="journey-feature-bullets">
           {feature.bullets.map((bullet) => (
             <li key={bullet}>
-              <CheckCircle size={18} weight="fill" aria-hidden="true" />
-              {bullet}
+              <CheckCircle size={17} weight="fill" aria-hidden="true" />
+              <span>{bullet}</span>
             </li>
           ))}
         </ul>
       </div>
+
       <motion.div
-        className="feature-visual"
+        className="journey-feature-visual"
         initial={
           reduceMotion
             ? false
-            : {
-                opacity: 0,
-                x: reverse ? -86 : 86,
-                rotate: reverse ? -1.4 : 1.4
-              }
+            : { opacity: 0, x: reverse ? -54 : 54, rotate: reverse ? -1.2 : 1.2 }
         }
         whileInView={{ opacity: 1, x: 0, rotate: 0 }}
-        whileHover={reduceMotion ? undefined : { y: -6, rotate: reverse ? -0.6 : 0.6 }}
-        viewport={{ once: true, amount: 0.24 }}
-        transition={{
-          type: "spring",
-          stiffness: 92,
-          damping: 18,
-          mass: 0.82
-        }}
+        viewport={{ once: true, amount: 0.22 }}
+        transition={{ type: "spring", stiffness: 90, damping: 20, mass: 0.82 }}
       >
+        <div className="journey-feature-scene-label">{feature.sceneLabel}</div>
+        {/* Placeholder capture: replace the image without changing the scene frame. */}
         <img
+          className="journey-feature-primary-image"
           src={feature.image}
           alt={feature.imageAlt}
-          width="830"
-          height="864"
+          width="3024"
+          height="1898"
           draggable={false}
           loading="lazy"
         />
+        {feature.insetImage ? (
+          <div className="journey-feature-inset">
+            <img
+              src={feature.insetImage}
+              alt={feature.insetAlt}
+              width="3024"
+              height="1898"
+              draggable={false}
+              loading="lazy"
+            />
+          </div>
+        ) : null}
       </motion.div>
     </Reveal>
   );
 }
 
-export function FeaturesSection({ copy }) {
-  const visibleFeatureIndexes = [0, 3, 2];
-  const localizedFeatures = visibleFeatureIndexes.map((sourceIndex) => ({
-    ...features[sourceIndex],
-    ...copy.features.items[sourceIndex]
-  }));
+export function FeaturesSection({ content }) {
   return (
-    <section className="section features-section" id="feature">
+    <section className="section journey-features-section" id="feature">
       <div className="container">
         <Reveal>
           <SectionIntro
-            label={copy.features.intro.label}
-            icon={SealCheck}
-            title={copy.features.intro.title}
-            body={copy.features.intro.body}
+            label={content.intro.label}
+            icon={CheckCircle}
+            title={content.intro.title}
+            body={content.intro.body}
           />
         </Reveal>
-        <div className="feature-stack">
-          {localizedFeatures.map((feature, index) => (
-            <FeatureStory
-              feature={feature}
-              index={index}
-              key={feature.title}
-            />
+        <div className="journey-feature-stack">
+          {content.items.map((feature, index) => (
+            <FeatureStory feature={feature} index={index} key={feature.title} />
           ))}
         </div>
       </div>
@@ -139,71 +146,71 @@ export function FeaturesSection({ copy }) {
   );
 }
 
-export function WorkflowSection({ copy }) {
+export function WorkflowSection({ content }) {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="section workflow-section" id="use-cases">
+    <section className="section journey-workflow-section" id="how-it-works">
       <div className="container">
         <Reveal>
           <SectionIntro
-            label={copy.workflow.intro.label}
-            icon={SquaresFour}
-            title={copy.workflow.intro.title}
-            body={copy.workflow.intro.body}
+            label={content.intro.label}
+            icon={ShareNetwork}
+            title={content.intro.title}
+            body={content.intro.body}
           />
         </Reveal>
-        <StaggerGroup className="workflow-grid" amount={0.12} stagger={0.11}>
-          {workflows.map(({ icon: Icon }, index) => {
-            const { title, body } = copy.workflow.items[index];
-            return (
+
+        <StaggerGroup className="journey-workflow-grid" amount={0.1} stagger={0.1}>
+          {content.largeItems.map((item, index) => (
             <StaggerItem
-              className={`workflow-card ${index < 2 ? "workflow-card-large" : "workflow-card-small"}`}
-              direction={index === 0 ? "left" : index === 1 ? "right" : "up"}
-              distance={index < 2 ? 64 : 52}
-              key={title}
+              className="journey-workflow-card journey-workflow-card-large"
+              direction={index === 0 ? "left" : "right"}
+              distance={52}
+              key={item.title}
             >
-              {index >= 2 && (
-                <span className="workflow-icon">
-                  <Icon size={21} weight="regular" aria-hidden="true" />
-                </span>
-              )}
-              <div>
-                <h3>{title}</h3>
-                <p>{body}</p>
+              <div className="journey-workflow-card-copy">
+                <span>{item.badge}</span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
               </div>
-              {index < 2 ? (
-                <motion.div
-                  className={`workflow-image workflow-image-${index + 1}`}
-                  initial={
-                    reduceMotion
-                      ? false
-                      : { y: 24, opacity: 0.85 }
-                  }
-                  whileInView={{
-                    y: 0,
-                    opacity: 1
-                  }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 90,
-                    damping: 20,
-                    mass: 0.8,
-                    delay: reduceMotion ? 0 : 0.1
-                  }}
-                >
-                  <img
-                    src={index === 0 ? "/images/musuw-wiki-page.jpg" : "/images/musuw-wiki-graph.jpg"}
-                    alt={copy.workflow.imageAlts[index]}
-                    width="3024"
-                    height="1898"
-                    draggable={false}
-                    loading="lazy"
-                  />
-                </motion.div>
-              ) : null}
+              <motion.div
+                className="journey-workflow-media"
+                initial={reduceMotion ? false : { opacity: 0.86, y: 22 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.18 }}
+                transition={{ type: "spring", stiffness: 88, damping: 20, delay: reduceMotion ? 0 : 0.08 }}
+              >
+                {/* Placeholder capture: replace with the final source or scope scene. */}
+                <img
+                  src={item.image}
+                  alt={item.imageAlt}
+                  width="3024"
+                  height="1898"
+                  draggable={false}
+                  loading="lazy"
+                />
+              </motion.div>
             </StaggerItem>
+          ))}
+
+          {content.smallItems.map((item, index) => {
+            const Icon = workflowSmallIcons[index];
+            return (
+              <StaggerItem
+                className="journey-workflow-card journey-workflow-card-small"
+                direction="up"
+                distance={42}
+                key={item.title}
+              >
+                <span className="journey-workflow-small-icon" aria-hidden="true">
+                  <Icon size={22} weight="duotone" />
+                </span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </div>
+              </StaggerItem>
             );
           })}
         </StaggerGroup>
@@ -212,34 +219,74 @@ export function WorkflowSection({ copy }) {
   );
 }
 
-export function BenefitsSection({ copy }) {
+export function UseCasesSection({ content }) {
   return (
-    <section className="section benefits-section">
+    <section className="section journey-use-cases-section" id="use-cases">
       <div className="container">
         <Reveal>
           <SectionIntro
-            label={copy.benefits.intro.label}
-            icon={CheckCircle}
-            title={copy.benefits.intro.title}
-            body={copy.benefits.intro.body}
+            label={content.intro.label}
+            icon={PaperPlaneTilt}
+            title={content.intro.title}
+            body={content.intro.body}
           />
         </Reveal>
-        <StaggerGroup className="benefit-grid" amount={0.2} stagger={0.085}>
-          {benefits.map(({ icon: Icon }, index) => {
-            const { title, body } = copy.benefits.items[index];
-            return (
-            <StaggerItem
-              className={`benefit-item benefit-item-${(index % 3) + 1}`}
-              direction={index % 3 === 0 ? "left" : index % 3 === 2 ? "right" : "up"}
-              distance={48}
-              key={title}
-            >
-              <span>
-                <Icon size={23} weight="duotone" aria-hidden="true" />
-              </span>
-              <h3>{title}</h3>
-              <p>{body}</p>
+
+        <StaggerGroup className="journey-use-case-grid" amount={0.14} stagger={0.12}>
+          {content.items.map((item) => (
+            <StaggerItem className="journey-use-case-card" distance={48} key={item.title}>
+              <div className="journey-use-case-image">
+                {/* Placeholder capture: replace with the final task-specific screenshot. */}
+                <img
+                  src={item.image}
+                  alt={item.imageAlt}
+                  width="3024"
+                  height="1898"
+                  draggable={false}
+                  loading="lazy"
+                />
+              </div>
+              <div className="journey-use-case-copy">
+                <span>{item.category}</span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+                <strong>
+                  <CheckCircle size={18} weight="fill" aria-hidden="true" />
+                  {item.outcome}
+                </strong>
+              </div>
             </StaggerItem>
+          ))}
+        </StaggerGroup>
+      </div>
+    </section>
+  );
+}
+
+export function BenefitsSection({ content }) {
+  return (
+    <section className="section journey-trust-section">
+      <div className="container">
+        <Reveal>
+          <SectionIntro
+            label={content.intro.label}
+            icon={LockKey}
+            title={content.intro.title}
+            body={content.intro.body}
+          />
+        </Reveal>
+
+        <StaggerGroup className="journey-trust-grid" amount={0.16} stagger={0.075}>
+          {content.items.map((item, index) => {
+            const Icon = trustIcons[index];
+            return (
+              <StaggerItem className="journey-trust-item" distance={36} key={item.title}>
+                <span aria-hidden="true">
+                  <Icon size={23} weight="duotone" />
+                </span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+              </StaggerItem>
             );
           })}
         </StaggerGroup>
@@ -248,31 +295,33 @@ export function BenefitsSection({ copy }) {
   );
 }
 
-export function PricingSection({ copy }) {
+export function PricingSection({ content, locale }) {
   const [yearly, setYearly] = useState(false);
-  const priceBook = priceBooks[copy.pricing.currencyCode] ?? priceBooks.USD;
-  const localizedPlans = plans.map((plan, index) => ({
+  const priceBook = locale === "zh-CN" ? priceBooks.CNY : priceBooks.USD;
+  const localizedPlans = content.plans.map((plan, index) => ({
+    ...plans[index],
     ...plan,
-    ...copy.pricing.plans[index],
-    ...priceBook[index]
+    ...priceBook[index],
   }));
 
   return (
-    <section className="section pricing-section" id="pricing">
+    <section className="section journey-pricing-section" id="pricing">
       <div className="container">
-        <Reveal className="pricing-heading">
-          <h2>{copy.pricing.intro.title}</h2>
-          <p>{copy.pricing.intro.body}</p>
+        <Reveal className="journey-pricing-heading">
+          <p className="journey-pricing-label">{content.intro.label}</p>
+          <h2>{content.intro.title}</h2>
+          <p>{content.intro.body}</p>
         </Reveal>
-        <div className="pricing-controls">
-          <div className="billing-toggle" role="group" aria-label={copy.pricing.billingAria}>
+
+        <div className="journey-pricing-controls">
+          <div className="journey-billing-toggle" role="group" aria-label={content.intro.label}>
             <button
               type="button"
               className={!yearly ? "active" : ""}
               aria-pressed={!yearly}
               onClick={() => setYearly(false)}
             >
-              {copy.pricing.monthly}
+              {content.monthly}
             </button>
             <button
               type="button"
@@ -280,74 +329,66 @@ export function PricingSection({ copy }) {
               aria-pressed={yearly}
               onClick={() => setYearly(true)}
             >
-              {copy.pricing.yearly}
-              <span>{copy.pricing.save}</span>
+              {content.yearly}
+              <span>{content.save}</span>
             </button>
           </div>
         </div>
-        <p className="pricing-note" aria-live="polite">
-          {copy.pricing.checkout.note}
-        </p>
-        <div className="pricing-grid">
+        <p className="journey-pricing-note">{content.note}</p>
+
+        <div className="journey-pricing-grid">
           {localizedPlans.map((plan) => (
             <article
-              className="pricing-card"
+              className={`journey-pricing-card ${plan.featured ? "journey-pricing-card-featured" : ""}`}
               data-plan={plan.key}
-              key={plan.name}
+              key={plan.key}
             >
-              <div className="pricing-card-content">
-                <div className="plan-summary">
-                  <div className="plan-heading">
-                    <div className="plan-title-row">
-                      <h3>{plan.name}</h3>
-                      {plan.featured ? <span className="plan-recommended">{copy.pricing.recommended}</span> : null}
-                    </div>
-                    <p className="plan-description">{plan.description}</p>
-                  </div>
-                  <div className="plan-price">
-                    <strong>{formatPlanAmount(copy.pricing.currencySymbol, yearly ? plan.yearlyTotal : plan.monthly)}</strong>
-                    <span>{yearly ? copy.pricing.perYear : copy.pricing.perUserMonth}</span>
-                  </div>
+              <div className="journey-pricing-card-top">
+                <div className="journey-pricing-title-row">
+                  <h3>{plan.name}</h3>
+                  {plan.featured ? <span>{content.recommended}</span> : null}
                 </div>
-                {plan.key === "free" ? (
-                  <ButtonLink
-                    className="pricing-button"
-                    href={APP_LOGIN_URL}
-                    variant="secondary"
-                  >
-                    {copy.pricing.freeAction}
-                  </ButtonLink>
-                ) : plan.available === false ? (
-                  <ButtonLink
-                    className="pricing-button"
-                    href="/contact"
-                    variant="secondary"
-                  >
-                    {copy.pricing.unavailableAction}
-                  </ButtonLink>
-                ) : (
-                  <ButtonLink
-                    className="pricing-button"
-                    href={createProductLoginUrl({
-                      plan: plan.key,
-                      billingPeriod: yearly ? "yearly" : "monthly"
-                    })}
-                    variant="primary"
-                  >
-                    {copy.pricing.checkout.action}
-                  </ButtonLink>
-                )}
-                <div className="plan-includes">
-                  <strong>{copy.pricing.includes}</strong>
-                  <ul>
-                    {plan.features.map((feature) => (
-                      <li key={feature}>
-                        <Check size={18} weight="bold" aria-hidden="true" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <p>{plan.description}</p>
+                <strong className="journey-plan-fit">{plan.fit}</strong>
+              </div>
+
+              <div className="journey-plan-price">
+                <strong>
+                  {formatPlanAmount(
+                    locale,
+                    content.currencySymbol,
+                    yearly ? plan.yearlyTotal : plan.monthly,
+                  )}
+                </strong>
+                <span>{yearly ? content.perYear : content.perMonth}</span>
+              </div>
+
+              {plan.key === "free" ? (
+                <ButtonLink className="journey-pricing-button" href={APP_LOGIN_URL} variant="secondary">
+                  {plan.action}
+                </ButtonLink>
+              ) : (
+                <ButtonLink
+                  className="journey-pricing-button"
+                  href={createProductLoginUrl({
+                    plan: plan.key,
+                    billingPeriod: yearly ? "yearly" : "monthly",
+                  })}
+                >
+                  {plan.action}
+                </ButtonLink>
+              )}
+
+              <div className="journey-plan-details">
+                <strong>{content.includes}</strong>
+                <ul>
+                  {plan.details.map((detail) => (
+                    <li key={detail}>
+                      <Check size={17} weight="bold" aria-hidden="true" />
+                      <span>{detail}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </article>
           ))}
@@ -357,232 +398,76 @@ export function PricingSection({ copy }) {
   );
 }
 
-export function ComparisonSection({ copy }) {
+export function IncludedInEveryPlanSection({ content }) {
   return (
-    <section className="comparison-section">
+    <section className="section journey-included-section">
       <div className="container">
-        <ComparisonTable copy={copy} />
-      </div>
-    </section>
-  );
-}
+        <Reveal className="journey-included-card">
+          <SectionIntro
+            label={content.intro.label}
+            icon={CheckCircle}
+            title={content.intro.title}
+            body={content.intro.body}
+          />
 
-function ComparisonTable({ copy }) {
-  return (
-    <Reveal className="comparison-wrap">
-      <h2>{copy.comparison.title}</h2>
-      <div className="comparison-table" role="table" aria-label={copy.comparison.tableAria}>
-        <div className="comparison-head" role="row">
-          <span role="columnheader">{copy.comparison.firstColumn}</span>
-          {copy.comparison.plans.map((plan) => <span role="columnheader" key={plan}>{plan}</span>)}
-        </div>
-        {comparisonGroups.map((group, groupIndex) => (
-          <div className="comparison-group" key={group.title}>
-            <div className="comparison-group-head" role="row">
-              <h4>{copy.comparison.groups[groupIndex].title}</h4>
-              {copy.comparison.plans.map((plan) => <span key={plan}>{plan}</span>)}
-            </div>
-            {group.rows.map(([_name, ...availability], rowIndex) => {
-              const name = copy.comparison.groups[groupIndex].rows[rowIndex];
+          <div className="journey-included-grid">
+            {content.items.map((item, index) => {
+              const Icon = includedIcons[index];
               return (
-              <div className="comparison-row" role="row" key={name}>
-                <span role="cell">{name}</span>
-                {availability.map((enabled, index) => (
-                  <span role="cell" key={`${name}-${index}`}>
-                    {typeof enabled === "string" ? (
-                      <span className="comparison-value-text">
-                        {copy.comparison.valueLabels[enabled] ?? enabled}
-                      </span>
-                    ) : enabled ? (
-                      <CheckCircle size={19} weight="fill" aria-label={copy.comparison.included} />
-                    ) : (
-                      <Minus size={17} aria-label={copy.comparison.notIncluded} />
-                    )}
+                <div className="journey-included-item" key={item.title}>
+                  <span aria-hidden="true">
+                    <Icon size={21} weight="duotone" />
                   </span>
-                ))}
-              </div>
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
+                  </div>
+                </div>
               );
             })}
           </div>
-        ))}
-      </div>
-    </Reveal>
-  );
-}
 
-export function TestimonialsSection({ copy }) {
-  const localizedTestimonials = testimonials.map((testimonial, index) => ({
-    ...testimonial,
-    ...copy.testimonials.items[index]
-  }));
-  const col1 = localizedTestimonials.filter((_, i) => i % 3 === 0);
-  const col2 = localizedTestimonials.filter((_, i) => i % 3 === 1);
-  const col3 = localizedTestimonials.filter((_, i) => i % 3 === 2);
-
-  return (
-    <section className="section testimonials-section">
-      <div className="container testimonial-frame">
-        <Reveal>
-          <SectionIntro
-            label={copy.testimonials.intro.label}
-            icon={ClipboardText}
-            title={copy.testimonials.intro.title}
-            body={copy.testimonials.intro.body}
-          />
-          <div className="testimonial-rating">
-            <Star size={16} weight="fill" aria-hidden="true" />
-            <span>{copy.testimonials.rating}</span>
+          <div className="journey-plan-differences">
+            <strong>{content.differencesLabel}</strong>
+            <div>
+              {content.differences.map((difference) => (
+                <span key={difference}>{difference}</span>
+              ))}
+            </div>
           </div>
         </Reveal>
-
-        <div className="testimonial-shell">
-          <div className="testimonial-col col-down">
-            <div className="testimonial-track">
-              {[...col1, ...col1].map((testimonial, idx) => (
-                <div className="testimonial-card" key={`c1-${idx}`}>
-                  <p>{testimonial.quote}</p>
-                  <div className="testimonial-person">
-                    <img
-                      src={testimonial.avatar}
-                      alt={testimonial.name}
-                      width="42"
-                      height="42"
-                      draggable={false}
-                      loading="lazy"
-                    />
-                    <div>
-                      <strong>{testimonial.name}</strong>
-                      <span>{testimonial.role}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="testimonial-col col-up">
-            <div className="testimonial-track">
-              {[...col2, ...col2].map((testimonial, idx) => (
-                <div className="testimonial-card" key={`c2-${idx}`}>
-                  <p>{testimonial.quote}</p>
-                  <div className="testimonial-person">
-                    <img
-                      src={testimonial.avatar}
-                      alt={testimonial.name}
-                      width="42"
-                      height="42"
-                      draggable={false}
-                      loading="lazy"
-                    />
-                    <div>
-                      <strong>{testimonial.name}</strong>
-                      <span>{testimonial.role}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="testimonial-col col-down">
-            <div className="testimonial-track">
-              {[...col3, ...col3].map((testimonial, idx) => (
-                <div className="testimonial-card" key={`c3-${idx}`}>
-                  <p>{testimonial.quote}</p>
-                  <div className="testimonial-person">
-                    <img
-                      src={testimonial.avatar}
-                      alt={testimonial.name}
-                      width="42"
-                      height="42"
-                      draggable={false}
-                      loading="lazy"
-                    />
-                    <div>
-                      <strong>{testimonial.name}</strong>
-                      <span>{testimonial.role}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
 }
 
-export function BlogPreviewSection({ copy }) {
-  const localizedArticles = articles.map((article, index) => ({
-    ...article,
-    ...copy.blog.items[index]
-  }));
-  return (
-    <section className="section blog-section" id="blog">
-      <div className="container">
-        <div className="blog-heading">
-          <div>
-            <h2>{copy.blog.title}</h2>
-          </div>
-          <ButtonLink href="/#feature" variant="text" icon>
-            {copy.blog.allPosts}
-          </ButtonLink>
-        </div>
-        <StaggerGroup className="article-grid" amount={0.2} stagger={0.12}>
-          {localizedArticles.map((article) => (
-            <StaggerItem className="article-card" distance={58} key={article.title}>
-              <a href={article.href}>
-                <div className="article-image">
-                  <img
-                    src={article.image}
-                    alt={article.alt}
-                    width="3024"
-                    height="1898"
-                    draggable={false}
-                    loading="lazy"
-                  />
-                </div>
-                <h3>{article.title}</h3>
-                <div>
-                  <span>{article.author}</span>
-                  <time>{article.date}</time>
-                </div>
-              </a>
-            </StaggerItem>
-          ))}
-        </StaggerGroup>
-      </div>
-    </section>
-  );
-}
-
-export function FAQSection({ copy }) {
+export function FAQSection({ content }) {
   const [openIndex, setOpenIndex] = useState(-1);
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="section faq-section" id="faq">
-      <div className="container faq-layout">
-        <Reveal className="faq-intro">
+    <section className="section journey-faq-section" id="faq">
+      <div className="container journey-faq-layout">
+        <Reveal className="journey-faq-intro">
           <p className="section-label">
             <span className="section-label-icon" aria-hidden="true">
               <Question size={20} weight="regular" />
             </span>
-            {copy.faq.label}
+            {content.label}
           </p>
-          <h2>{copy.faq.title}</h2>
-          <p>{copy.faq.body}</p>
+          <h2>{content.title}</h2>
+          <p>{content.body}</p>
         </Reveal>
-        <div className="faq-list">
-          {copy.faq.items.map((faq, index) => {
+
+        <div className="journey-faq-list">
+          {content.items.map((faq, index) => {
             const open = openIndex === index;
             return (
-              <div className={`faq-item ${open ? "open" : ""}`} key={faq.question}>
+              <div className={`journey-faq-item ${open ? "open" : ""}`} key={faq.question}>
                 <button
                   type="button"
                   aria-expanded={open}
-                  aria-controls={`faq-answer-${index}`}
+                  aria-controls={`journey-faq-answer-${index}`}
                   onClick={() => setOpenIndex(open ? -1 : index)}
                 >
                   <span>{faq.question}</span>
@@ -591,12 +476,12 @@ export function FAQSection({ copy }) {
                 <AnimatePresence initial={false}>
                   {open ? (
                     <motion.div
-                      id={`faq-answer-${index}`}
-                      className="faq-answer"
+                      id={`journey-faq-answer-${index}`}
+                      className="journey-faq-answer"
                       initial={reduceMotion ? false : { height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-                      transition={{ duration: reduceMotion ? 0 : 0.28 }}
+                      transition={{ duration: reduceMotion ? 0 : 0.26 }}
                     >
                       <p>{faq.answer}</p>
                     </motion.div>
@@ -611,33 +496,49 @@ export function FAQSection({ copy }) {
   );
 }
 
-export function FinalCTA({ copy }) {
+export function FinalCTA({ content }) {
   return (
-    <section className="final-cta">
+    <section className="journey-final-cta">
       <div className="container">
-        <Reveal className="final-cta-card">
-          <img
-            src="/images/dot-background.png"
-            className="final-cta-bg"
-            alt=""
-            draggable={false}
-            aria-hidden="true"
-          />
-          <div className="final-cta-copy">
-            <h2>{copy.finalCta.title}</h2>
-            <p>{copy.finalCta.body}</p>
-            <ButtonLink href={APP_LOGIN_URL}>{copy.finalCta.action}</ButtonLink>
+        <Reveal className="journey-final-cta-card">
+          <div className="journey-final-cta-copy">
+            <h2>{content.title}</h2>
+            <p>{content.body}</p>
+            <div className="journey-final-cta-actions">
+              <ButtonLink href={APP_LOGIN_URL}>{content.action}</ButtonLink>
+              <ButtonLink href="/#how-it-works" variant="secondary">
+                {content.secondaryAction}
+              </ButtonLink>
+            </div>
           </div>
-          <div className="final-cta-visual" aria-hidden="true">
-            <div className="final-cta-dashboard-frame">
+
+          <div className="journey-final-cta-visual">
+            <div className="journey-final-cta-frame">
+              {/* Placeholder capture: replace with the final first-upload state. */}
               <img
-                src="/images/musuw-query-citation.jpg"
-                alt=""
+                src="/images/musuw-knowledge-base.jpg"
+                alt={content.imageAlt}
                 width="3024"
                 height="1898"
                 draggable={false}
                 loading="lazy"
               />
+            </div>
+            <div className="journey-final-upload-card">
+              <span aria-hidden="true">
+                <FolderOpen size={20} weight="duotone" />
+              </span>
+              <div>
+                <strong>{content.fileName}</strong>
+                <small>{content.fileStatus}</small>
+              </div>
+              <span className="journey-final-upload-check" aria-hidden="true">
+                <CheckCircle size={20} weight="fill" />
+              </span>
+            </div>
+            <div className="journey-final-prompt">
+              <Sparkle size={17} weight="fill" aria-hidden="true" />
+              <span>{content.prompt}</span>
             </div>
           </div>
         </Reveal>
