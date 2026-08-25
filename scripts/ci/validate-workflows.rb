@@ -195,14 +195,22 @@ production_pin_images = production_deploy_steps.find { |step| step.is_a?(Hash) &
 fail_contract "production browser build must cap the Node heap below the 4 GB host RAM" unless production_static_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=3072"
 fail_contract "persistent self-hosted build must not upload a duplicate GitHub npm cache" if production_node_setup&.dig("with", "cache")
 fail_contract "production build must fail closed unless runner and Docker daemon are native x64" unless production_native_preflight&.dig("env", "RUNNER_ARCH") == "${{ runner.arch }}" && production_native_preflight["run"].to_s.include?("docker info") && production_native_preflight["run"].to_s.include?("x86_64")
+fail_contract "production build must fail closed unless the regional Docker Hub mirror is configured" unless production_native_preflight["run"].to_s.include?("mirror.ccs.tencentyun.com") && production_native_preflight["run"].to_s.include?("RegistryConfig.Mirrors")
 fail_contract "production native preflight must run before dependency installation or construction" unless production_build_steps.index(production_native_preflight).to_i < production_build_steps.index(production_node_setup).to_i && production_build_steps.index(production_native_preflight).to_i < production_build_steps.index(production_static_build).to_i
 fail_contract "production workflow must not install QEMU emulation" if JSON.generate(production_build).include?("setup-qemu")
 fail_contract "production must use the official Buildx setup action" unless production_buildx&.fetch("uses", "").start_with?("docker/setup-buildx-action@v3")
-fail_contract "production Buildx must reuse fixed self-hosted state" unless production_buildx&.dig("with", "name") == "musuw-production-native-amd64-v1" && production_buildx&.dig("with", "driver") == "docker-container" && production_buildx&.dig("with", "buildkitd-config") == ".github/buildkitd.production.toml" && production_buildx&.dig("with", "keep-state") == true
+production_buildx_cleanup = production_buildx&.fetch("with", {})&.fetch("cleanup", true)
+fail_contract "production Buildx must recreate from checked-in config while retaining cache state" unless production_buildx&.dig("with", "name") == "musuw-production-native-amd64-v1" && production_buildx&.dig("with", "driver") == "docker-container" && production_buildx&.dig("with", "buildkitd-config") == ".github/buildkitd.production.toml" && production_buildx&.dig("with", "keep-state") == true && production_buildx_cleanup == true
 buildkit_config_path = File.join(ROOT, ".github", "buildkitd.production.toml")
 fail_contract "production BuildKit GC configuration is missing" unless File.file?(buildkit_config_path)
 buildkit_config = File.read(buildkit_config_path)
 fail_contract "production BuildKit cache must enable GC with bounded disk and concurrency" unless buildkit_config.include?("gc = true") && buildkit_config.include?('maxUsedSpace = "10GB"') && buildkit_config.include?('minFreeSpace = "12GB"') && buildkit_config.include?("max-parallelism = 2")
+fail_contract "production BuildKit must pull Docker Hub bases through the regional mirror" unless buildkit_config.include?('[registry."docker.io"]') && buildkit_config.include?('mirrors = ["mirror.ccs.tencentyun.com"]')
+daemon_config_path = File.join(ROOT, ".github", "docker-daemon.production-builder.json")
+fail_contract "production builder Docker daemon configuration is missing" unless File.file?(daemon_config_path)
+daemon_config = JSON.parse(File.read(daemon_config_path))
+fail_contract "production builder daemon must route bootstrap pulls through the regional mirror" unless daemon_config["registry-mirrors"] == ["https://mirror.ccs.tencentyun.com"]
+fail_contract "production builder daemon must not claim GC authority over the Docker-container cache" if daemon_config.key?("builder")
 expected_image_outputs = {
   "app_digest" => "${{ steps.images.outputs.app_digest }}",
   "app_ref" => "${{ steps.images.outputs.app_ref }}",

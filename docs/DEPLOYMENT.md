@@ -28,8 +28,9 @@ for the same production hostname during a cutover.
 
 The single credential inventory is [`external-credentials-registry.yaml`](external-credentials-registry.yaml),
 with the operator playbook in [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md).
-The current launch boundary is Paddle Sandbox only: Live has not been applied
-for or authorized, so a Live-shaped runtime input is a configuration mismatch.
+The current launch boundary is Paddle Sandbox only: Live onboarding is under
+review and has not been authorized, so a Live-shaped runtime input is a
+configuration mismatch.
 
 ## Normal path
 
@@ -45,7 +46,8 @@ for or authorized, so a Live-shaped runtime input is a configuration mismatch.
 4. The production workflow receives the same successful CI result. The trusted
    `musuw-release` runner performs the lightweight exact-SHA authorization, then
    a separate native x86_64 Linux runner with the exact `musuw-build-x64` label
-   verifies both runner and Docker daemon architecture, builds the static
+   verifies runner and Docker daemon architecture plus the required regional
+   Docker Hub mirror, builds the static
    bundles and app/frontend images, pushes them to GHCR, and exports their
    validated immutable digests. The build runner receives no production secret
    or SSH input. Only after it succeeds does `musuw-release` upload the
@@ -158,12 +160,22 @@ server environment secrets, or Tokyo credentials.
 
 The workflow creates or reuses the fixed Docker CLI builder
 `musuw-production-native-amd64-v1`. Its Docker-container volume preserves
-ordinary layers plus Go module/compiler cache mounts across jobs. The checked-in
-BuildKit configuration enables GC with a 10 GB `maxUsedSpace` threshold and a
-12 GB `minFreeSpace` floor, and caps BuildKit at two parallel steps. The browser
-build runs before the image builds with a 3072 MiB Node heap ceiling so the
-4 GB host retains headroom for Docker and existing services. If the builder or
-cache is absent, the same workflow performs a correct cold build.
+ordinary layers plus Go module/compiler cache mounts across releases, while the
+official action recreates the container from the current checked-in config. The checked-in BuildKit
+configuration enables GC with a 10 GB `maxUsedSpace` threshold and a 12 GB
+`minFreeSpace` floor, and caps BuildKit at two parallel steps. The browser build
+runs before the image builds with a 3072 MiB Node heap ceiling so
+the 4 GB host retains headroom for Docker. If the builder or cache is absent,
+the same workflow performs a correct cold build.
+
+The dedicated Tencent build host must install
+`.github/docker-daemon.production-builder.json` as `/etc/docker/daemon.json`
+after `dockerd --validate`, then restart Docker while the runner is idle. The
+daemon uses Tencent Cloud's official regional mirror for the BuildKit bootstrap
+image; `.github/buildkitd.production.toml` uses the same mirror for Dockerfile
+base images. The native preflight rejects a host that lacks the daemon mirror.
+This regional mirror is an infrastructure prerequisite for this Tencent-hosted
+builder, not a new application dependency or a fallback build provider.
 
 Do not export a separate `mode=max` registry cache on this host: its constrained
 uplink would upload intermediate cache records in addition to the release. The

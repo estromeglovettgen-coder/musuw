@@ -4,3 +4,6 @@
   maxUsedSpace = "10GB"
   minFreeSpace = "12GB"
   max-parallelism = 2
+
+[registry."docker.io"]
+  mirrors = ["mirror.ccs.tencentyun.com"]

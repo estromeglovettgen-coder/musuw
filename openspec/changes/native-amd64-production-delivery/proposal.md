@@ -8,7 +8,8 @@ Production images are currently built as `linux/amd64` on an Apple Silicon Docke
 - Route only the heavy production build job to the exact `musuw-build-x64` label and fail closed unless the runner, kernel, and Docker server are native AMD64.
 - Give the build job only package-write access and three browser-visible repository variables; do not attach the production Environment or reference any production/SSH secret.
 - Pass only validated immutable app/frontend digest references from build to the existing Mac deploy job, which continues the forced-command SHA-only Tokyo release seam without rebuilding.
-- Use the official Buildx setup action with a fixed Docker-container builder and `keep-state: true` so ordinary layers and Go cache mounts survive jobs; bound automatic BuildKit GC to a 10 GB maximum-use threshold and a 12 GB free-space floor.
+- Use the official Buildx setup action with one fixed Docker-container builder and `keep-state: true` so ordinary layers and Go cache mounts survive jobs while each container is recreated from the current checked-in configuration; bound automatic BuildKit GC to a 10 GB maximum-use threshold and a 12 GB free-space floor.
+- Route Docker Hub bootstrap and base-image pulls through Tencent Cloud's official regional mirror at both the Docker daemon and BuildKit layers, and fail the native preflight if the daemon-side mirror is missing.
 - Avoid a separate `mode=max` registry cache over the roughly 3 Mbps uplink. Push only the immutable release images and rely on registry blob deduplication plus local BuildKit state.
 - Preserve Dockerfile stable-layer ordering, bounded apt network behavior, and the pinned Go migrate tool.
 
@@ -24,4 +25,4 @@ None.
 
 ## Impact
 
-The change affects the production workflow, app Dockerfile, workflow/Dockerfile contracts, actionlint configuration, deployment documentation, and one BuildKit configuration file. CI and storefront runner routing, application APIs, databases, runtime topology, Tokyo, and the restricted release protocol do not change. Activation requires registering the x86_64 runner with the `musuw-build-x64` custom label and configuring three public repository variables; it does not require Actions billing or another build provider.
+The change affects the production workflow, app Dockerfile, workflow/Dockerfile contracts, actionlint configuration, deployment documentation, and the checked-in Docker daemon and BuildKit configurations. CI and storefront runner routing, application APIs, databases, runtime topology, Tokyo, and the restricted release protocol do not change. Activation requires registering the x86_64 runner with the `musuw-build-x64` custom label, installing the checked-in daemon configuration, and configuring three public repository variables; it does not require Actions billing or another build provider.

@@ -31,15 +31,27 @@ The production workflow SHALL authorize an exact CI-green SHA, build both images
 - **THEN** only the `musuw-release` deploy job receives the restricted SSH/server inputs and passes the refs through the existing exact-SHA forced-command release seam with no server-side build
 
 ### Requirement: Bounded persistent local BuildKit cache
-The x64 build SHALL use the official `docker/setup-buildx-action@v3` with a fixed Docker-container builder name, the checked-in BuildKit configuration, and `keep-state: true`. Both image builds SHALL select that builder. BuildKit SHALL run at most two parallel build steps, and GC SHALL use a 10 GB maximum-use threshold while preserving at least 12 GB free space. The workflow MUST NOT import or export a separate registry cache or upload optional BuildKit record artifacts, while immutable release images MUST still be pushed to GHCR and normal workflow/release evidence MUST remain available.
+The x64 build SHALL use the official `docker/setup-buildx-action@v3` with a fixed Docker-container builder name, the checked-in BuildKit configuration, and `keep-state: true`. Both image builds SHALL select that builder. The action SHALL recreate the container from current repository configuration while retaining the named local cache volume. Docker daemon bootstrap pulls and BuildKit Dockerfile-base pulls SHALL use the checked-in Tencent Cloud regional mirror configuration. BuildKit SHALL run at most two parallel build steps, and GC SHALL use a 10 GB maximum-use threshold while preserving at least 12 GB free space. The workflow MUST NOT import or export a separate registry cache or upload optional BuildKit record artifacts, while immutable release images MUST still be pushed to GHCR and normal workflow/release evidence MUST remain available.
 
 #### Scenario: Warm build reuses local state
 - **WHEN** the persistent x64 runner retains the named builder volume
 - **THEN** BuildKit can reuse unchanged ordinary layers and Go module/compiler cache mounts without uploading a maximum-mode cache artifact
 
+#### Scenario: Warm cache survives the job
+- **WHEN** a trusted production build finishes
+- **THEN** the builder container may be removed while its named local state remains available for the next serialized production build
+
 #### Scenario: Builder state is absent
 - **WHEN** the builder or its local volume does not exist
 - **THEN** the setup action creates it and the workflow performs a correct native cold build whose newly pushed image digests can be deployed
+
+#### Scenario: Direct Docker Hub access is unavailable
+- **WHEN** the native host cannot reach Docker Hub directly but its configured Tencent Cloud mirror is reachable
+- **THEN** both the BuildKit bootstrap image and Dockerfile base images resolve through that mirror without introducing another build provider
+
+#### Scenario: Regional mirror configuration drifts
+- **WHEN** the daemon no longer reports the required regional mirror
+- **THEN** native preflight fails before dependency installation, image construction, or Tokyo mutation
 
 #### Scenario: Cache exceeds the host budget
 - **WHEN** BuildKit cache crosses its configured thresholds

@@ -2,7 +2,7 @@
 
 The current production image build targets `linux/amd64` from an ARM64 GitHub runner container inside Docker Desktop on an Apple Silicon Mac. A failed run stopped advancing during Debian package retrieval for more than fifty minutes; a retry crashed inside amd64 Go runtime code with `SIGSEGV`. Successful historical app builds still spent about 348 seconds compiling Go, 136 seconds installing runtime packages, and 136 seconds exporting/pushing. The Mac listener itself remained online and idle after cancellation. A zero BuildKit-container count was the expected post-job cleanup from `setup-buildx-action`, not a stopped runner.
 
-GitHub-hosted private-repository minutes are exhausted. A separate Tencent lightweight-cloud Linux host is already paid and idle enough for construction: native x86_64, 4 vCPU, 4 GB RAM, 40 GB disk with roughly 24 GB free, Docker 28, and Buildx 0.19. Its inbound bandwidth is adequate but outbound throughput is roughly 2.8 Mbps. Existing BaoTa/nginx/MySQL/PHP/Node services have uncertain ownership and must not be deleted or repurposed. The Tokyo production host, forced-command SSH gate, immutable GHCR digest contract, and server runtime remain unchanged.
+GitHub-hosted private-repository minutes are exhausted. A separate Tencent lightweight-cloud Linux host is already paid and has been reinstalled as a dedicated construction node: native x86_64, 4 vCPU, 4 GB RAM, 40 GB disk, Docker Engine and Buildx. Its public uplink is constrained, and direct Docker Hub registry access from the host timed out while Tencent Cloud's official regional mirror was immediately reachable. The Tokyo production host, forced-command SSH gate, immutable GHCR digest contract, and server runtime remain unchanged.
 
 ## Goals / Non-Goals
 
@@ -13,13 +13,13 @@ GitHub-hosted private-repository minutes are exhausted. A separate Tencent light
 - Make the x64 host build-only: no production Environment, SSH key, Tokyo credential, or untrusted pull-request job.
 - Keep authorization/deploy on the trusted release runner and pass only validated immutable image refs across the boundary.
 - Persist ordinary BuildKit layers and Go cache mounts locally without adding large registry-cache uploads.
-- Bound BuildKit cache pressure so the builder coexists with unknown pre-existing host services.
+- Bound Docker and BuildKit cache pressure to retain disk headroom on the dedicated builder.
 - Preserve exact-SHA provenance, serialized release behavior, server health checks, and cold-cache correctness.
 
 **Non-Goals:**
 
 - Moving CI or storefront to the 4 GB x64 build runner.
-- Deleting, reconfiguring, or depending on the host's pre-existing BaoTa/web/database services.
+- Running application, database, or public web workloads on the build-only host.
 - Making Tokyo a runner or building images on Tokyo.
 - Adding Docker Build Cloud, Depot, another vendor, or a custom builder service.
 - Skipping builds merely because a mutable tag exists, or promising a duration before cold/warm native runs are measured.
@@ -34,13 +34,15 @@ The x64 runner must be registered only to the canonical repository and used only
 
 ### Use the official setup action with fixed persistent state
 
-`docker/setup-buildx-action@v3` currently declares both `name` and `keep-state` in its official action metadata. The workflow uses a fixed `musuw-production-native-amd64-v1` Docker-container builder, the checked-in BuildKit config, and `keep-state: true`. The action's documented cleanup preserves the builder volume, and recreating the same named builder reattaches that state on the persistent self-hosted runner. Both build-push steps explicitly select the action's builder output.
+`docker/setup-buildx-action@v3` declares `name` and `keep-state` in its official action metadata. The workflow uses a fixed `musuw-production-native-amd64-v1` Docker-container builder, the checked-in BuildKit config, and `keep-state: true`. The action removes the container after a job but retains its named BuildKit volume, so the next trusted production job applies the current repository configuration while reusing cached state. Both build-push steps explicitly select the action's builder output.
 
 This is smaller and less error-prone than a custom CLI bootstrap wrapper. Actionlint 1.7.12 understands the current action metadata; the older 1.7.7 unknown-input report is treated as a stale-metadata false positive rather than a reason to remove a supported input.
 
 ### Prefer bounded local cache over maximum-mode registry export
 
-The Docker-container builder volume retains normal layers and BuildKit cache mounts, including `/go/pkg/mod` and `/root/.cache/go-build`, across jobs. `.github/buildkitd.production.toml` enables OCI-worker GC with `reservedSpace = "2GB"`, `maxUsedSpace = "10GB"`, and `minFreeSpace = "12GB"`. These are BuildKit GC thresholds, not a filesystem quota; disk-free monitoring remains an operator responsibility.
+The Docker-container builder volume retains normal layers and BuildKit cache mounts, including `/go/pkg/mod` and `/root/.cache/go-build`, across jobs. `.github/buildkitd.production.toml` enables OCI-worker GC with `reservedSpace = "2GB"`, `maxUsedSpace = "10GB"`, and `minFreeSpace = "12GB"`. These are cache policies, not filesystem quotas; disk-free monitoring remains an operator responsibility. Docker daemon builder GC is intentionally not presented as an authority over this separate Docker-container cache.
+
+The daemon routes the one-time `moby/buildkit` bootstrap pull through `https://mirror.ccs.tencentyun.com`, while BuildKit routes `docker.io` Dockerfile bases through the same official regional mirror. The workflow's native preflight verifies that the daemon mirror is installed before dependency work. This removes the observed direct-Docker-Hub timeout without adding a mirror service or a second artifact pipeline.
 
 The app and frontend build actions do not use `cache-from` or `cache-to`. A `mode=max` registry export would upload intermediate records over the constrained uplink after each build. Optional BuildKit record-artifact upload is also disabled; GitHub job summaries/logs and the repository's release evidence remain. Immutable image push remains mandatory; GHCR's content-addressed registry skips already-present blobs, so unchanged release layers are not uploaded twice. If the local builder state disappears, BuildKit performs a correct cold build and produces new validated image digests. BuildKit is capped at two parallel steps, matching the 4 GB host's memory constraint while retaining limited concurrency.
 
@@ -61,7 +63,8 @@ The constant `production-release` concurrency group with `cancel-in-progress: fa
 ## Risks / Trade-offs
 
 - [The x64 runner is offline or mislabeled] → Authorization may finish, but build remains queued and deploy cannot start; runner service health is an activation prerequisite.
-- [The host's old services consume memory or disk] → Do not delete them; keep builds sequential, enforce the 10 GB/12 GB GC thresholds, and observe available memory/disk during the first cold run.
+- [The 4 GB host reaches memory or disk pressure] → Keep builds sequential, cap BuildKit at two vertices, enforce daemon/BuildKit GC, and observe available memory/disk during the first cold run.
+- [The regional mirror is removed or unavailable] → Fail the preflight when daemon configuration drifts; bounded pull failures stop build before any Tokyo mutation.
 - [A 3 Mbps uplink makes the first image push slow] → Avoid separate registry-cache export; record actual push bytes/time and rely on content-addressed blob reuse in later pushes.
 - [Persistent self-hosted execution expands trust] → Route only trusted production build code, inject no production secrets, and never point general CI or pull requests at `musuw-build-x64`.
 - [Local builder state is lost or GC is aggressive] → A cold build remains correct; only performance is lost, while immutable GHCR releases and production state are unaffected.
@@ -69,11 +72,12 @@ The constant `production-release` concurrency group with `cancel-in-progress: fa
 
 ## Migration Plan
 
-1. Register the native x86_64 runner to the canonical repository with the exact custom label `musuw-build-x64`; verify Docker 28/Buildx 0.19 access and do not install production credentials.
-2. Configure the three browser-visible `VITE_*` repository variables by copying their current public-client values; never use a service-role/admin key.
-3. Merge the workflow, BuildKit configuration, Dockerfile, contracts, and documentation after the separate auth bridge is complete. Do not dispatch from this repository-only change.
-4. Run one CI-green release as the cold native baseline. Record runner architecture, BuildKit disk use, per-stage duration, pushed bytes, and both immutable digests.
-5. Run a later ordinary change and record local cache hits, cache size, remaining disk, and push duration before making a quantitative speed claim.
+1. Register the native x86_64 runner to the canonical repository with the exact custom label `musuw-build-x64`; verify Docker/Buildx access and do not install production credentials.
+2. Install `.github/docker-daemon.production-builder.json`, validate it with `dockerd --validate`, restart Docker while the runner is idle, and verify the regional mirror through `docker info`.
+3. Configure the three browser-visible `VITE_*` repository variables by copying their current public-client values; never use a service-role/admin key.
+4. Merge the workflow, daemon/BuildKit configuration, Dockerfile, contracts, and documentation after the separate auth bridge is complete.
+5. Run one CI-green release as the cold native baseline. Record runner architecture, BuildKit disk use, per-stage duration, pushed bytes, and both immutable digests.
+6. Run a later ordinary change and record local cache hits, cache size, remaining disk, and push duration before making a quantitative speed claim.
 
 Rollback is fail-closed: remove or disable the `musuw-build-x64` runner label to stop construction, or revert the workflow change before another release. Removing the named builder state forces the next job to build cold but does not delete immutable GHCR images or alter production. Never roll back by restoring ARM/QEMU construction or registering Tokyo as a runner.
 
