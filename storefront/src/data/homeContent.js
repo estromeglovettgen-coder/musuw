@@ -157,7 +157,7 @@ export const plans = [
     name: "Free",
     description: "A bounded plan for a personal knowledge base",
     features: [
-      "5 GiB storage",
+      "1 GiB storage",
       "$1.00 monthly AI credit allowance",
       "1 knowledge base, 10 documents",
       "One least-cost model per capability, no video upload"
@@ -168,7 +168,7 @@ export const plans = [
     name: "Plus",
     description: "More room and an expanded platform-approved catalog",
     features: [
-      "20 GiB storage",
+      "10 GiB storage",
       "$1.25 monthly AI credit allowance",
       "No plan cap on knowledge bases or documents",
       "Expanded platform-approved catalog and video upload"
@@ -180,7 +180,7 @@ export const plans = [
     description: "Higher storage and model allowance",
     featured: true,
     features: [
-      "40 GiB storage",
+      "30 GiB storage",
       "$2.50 monthly AI credit allowance",
       "No plan cap on knowledge bases or documents",
       "Expanded platform-approved catalog and video upload"
@@ -191,7 +191,7 @@ export const plans = [
     name: "Max",
     description: "The largest current personal allowance",
     features: [
-      "80 GiB storage",
+      "100 GiB storage",
       "$5.00 monthly AI credit allowance",
       "No plan cap on knowledge bases or documents",
       "Expanded platform-approved catalog and video upload"
@@ -203,7 +203,7 @@ export const comparisonGroups = [
   {
     title: "Workspace limits",
     rows: [
-      ["Storage", "5 GiB", "20 GiB", "40 GiB", "80 GiB"],
+      ["Storage", "1 GiB", "10 GiB", "30 GiB", "100 GiB"],
       ["Knowledge bases", "1", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"],
       ["Documents per knowledge base", "10", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]
     ]
@@ -218,7 +218,8 @@ export const comparisonGroups = [
   {
     title: "Model access",
     rows: [
-      ["Platform-approved model catalog", "One least-cost model per capability", "Expanded platform-approved catalog", "Expanded platform-approved catalog", "Expanded platform-approved catalog"]
+      ["Platform-approved model catalog", "One least-cost model per capability", "Expanded platform-approved catalog", "Expanded platform-approved catalog", "Expanded platform-approved catalog"],
+      ["Advanced model access", false, true, true, true]
     ]
   },
   {
