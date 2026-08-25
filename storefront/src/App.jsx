@@ -27,6 +27,16 @@ export default function App() {
   const locale = useMemo(() => getInitialLocale(), []);
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
   const homeJourney = useMemo(() => getHomeJourney(locale), [locale]);
+  const homeMeta = useMemo(
+    () => ({
+      title: homeJourney.meta.title,
+      description:
+        locale === "zh-CN"
+          ? "把文档和笔记变成可核验的答案，并将可靠知识沉淀到相互连接的 Wiki。"
+          : "Turn documents and notes into answers you can verify, then keep reliable knowledge in a connected Wiki.",
+    }),
+    [homeJourney, locale],
+  );
   const pathname = useMemo(() => window.location.pathname, []);
   const publicDocument = useMemo(() => getPublicDocument(locale, pathname), [locale, pathname]);
   const isHome = pathname === "/";
@@ -34,7 +44,7 @@ export default function App() {
     const meta = publicDocument
       ? getPublicDocumentMeta(locale, pathname)
       : isHome
-        ? homeJourney.meta
+        ? homeMeta
         : {
             title: locale === "zh-CN" ? "页面未找到 | musuw" : "Page not found | musuw",
             description:
@@ -88,7 +98,7 @@ export default function App() {
       document.head.appendChild(structured);
     }
     structured.textContent = structuredDataText({ locale, pathname: normalizedPath });
-  }, [homeJourney, isHome, locale, pathname, publicDocument]);
+  }, [homeMeta, isHome, locale, pathname, publicDocument]);
 
   useEffect(() => {
     const targetId = decodeURIComponent(window.location.hash.slice(1));
