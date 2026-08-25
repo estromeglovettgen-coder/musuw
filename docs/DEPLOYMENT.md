@@ -229,22 +229,27 @@ route delivered it intermittently at roughly 15 KiB/s, exhausting all three
 reduces the producer-equivalent deterministic inner archive from 38.33 MiB to
 11.41 MiB without
 removing a build input. Blob transfers therefore retain a 15-second connect
-bound but use a 900-second total bound and abort when throughput stays below
-1 KiB/s for 120 seconds. Metadata and fresh-redirect API calls keep their
-30-second total bounds. Three fresh attempts remain fail-bounded to well below
-the build job's 90-minute ceiling.
+bound but use four concurrent, non-overlapping HTTP/1.1 byte ranges per fresh
+redirect. Each range must return `206`, the exact `Content-Range` and
+`Content-Length`, and its exact local byte count before the parts are joined and
+the outer size and SHA-256 are checked. Every range uses the same 900-second
+total bound and aborts when throughput stays below 1 KiB/s for 120 seconds.
+Metadata and fresh-redirect API calls keep their 30-second total bounds. Any
+failed range clears the complete partial ZIP and starts the next attempt with a
+new redirect; three fresh attempts remain fail-bounded to well below the build
+job's 90-minute ceiling.
 
 The build job uses `actions: read` to query that exact artifact's metadata from
 the fixed `api.github.com` repository endpoint. It binds artifact id and name to
 the current workflow run, rejects expired or oversized metadata, and requires
 the REST digest to match the upload output. Each bounded attempt obtains a fresh
 short-lived download redirect, accepts only an HTTPS `*.blob.core.windows.net`
-authority, and sends no GitHub Authorization header to that blob host. Only the
-credential-free blob request receives the 900-second/1-KiB-per-second slow-link
-policy; the credentialed GitHub API requests retain their shorter bounds. The
-downloaded ZIP size and outer SHA-256 must match metadata, the ZIP must contain
-exactly `musuw-source.tar.gz`, and that inner file must match the authorization
-job's SHA-256 before extraction. Extraction occurs in an isolated
+authority, and sends no GitHub Authorization header to that blob host. Each
+credential-free range request receives the 900-second/1-KiB-per-second
+slow-link policy; the credentialed GitHub API requests retain their shorter
+bounds. The joined ZIP size and outer SHA-256 must match metadata, the ZIP must
+contain exactly `musuw-source.tar.gz`, and that inner file must match the
+authorization job's SHA-256 before extraction. Extraction occurs in an isolated
 runner-temporary directory with ambient tar options disabled, rejects an unsafe
 tree and special members, preserves executable modes, validates required build
 inputs, and replaces only the exact repository workspace while retaining the

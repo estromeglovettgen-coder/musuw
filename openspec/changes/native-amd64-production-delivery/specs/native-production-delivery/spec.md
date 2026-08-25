@@ -51,7 +51,7 @@ The trusted authorization job SHALL retain the full Git checkout required to pro
 
 #### Scenario: Official blob route is slow but progressing
 - **WHEN** the credential-free artifact blob remains above 1024 bytes per second but needs more than 300 seconds to deliver the bounded source projection
-- **THEN** that attempt may continue for at most 900 seconds while metadata and redirect API calls retain their shorter bounds
+- **THEN** the attempt SHALL use four concurrent non-overlapping HTTP/1.1 byte ranges, each at most 900 seconds with a 120-second low-speed guard; every response SHALL be `206` with the exact expected `Content-Range`, `Content-Length`, and local size, while metadata and redirect API calls retain their shorter bounds
 
 #### Scenario: Deploy prepares the server source manifest
 - **WHEN** validated immutable image refs reach the deploy job

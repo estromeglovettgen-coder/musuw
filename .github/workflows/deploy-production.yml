@@ -364,7 +364,11 @@ jobs:
           }
           cleanup() {
             rm -f -- "$artifact_metadata" "$artifact_zip" "$headers" "$zip_entries" \
-              "$archive" "$entries" "$entry_types"
+              "$archive" "$entries" "$entry_types" \
+              "${artifact_zip}.part.0" "${artifact_zip}.part.1" \
+              "${artifact_zip}.part.2" "${artifact_zip}.part.3" \
+              "${headers}.part.0" "${headers}.part.1" \
+              "${headers}.part.2" "${headers}.part.3"
             cleanup_tree "$source_stage"
             cleanup_tree "$publish_stage"
             if [ "$workspace_committed" = true ]; then
@@ -401,6 +405,10 @@ jobs:
           metadata_size="$(jq -er '.size_in_bytes | select(type == "number" and floor == . and . > 0) | tostring' "$artifact_metadata")"
           [[ "$metadata_size" =~ ^[0-9]+$ ]]
           test "$metadata_size" -le 268435456
+          metadata_size_number=$((10#$metadata_size))
+          test "$metadata_size_number" -ge 4
+          segment_base=$((metadata_size_number / 4))
+          segment_remainder=$((metadata_size_number % 4))
           test "$(jq -er '.digest' "$artifact_metadata")" = "sha256:$SOURCE_ARTIFACT_DIGEST"
 
           # Artifact download locations expire quickly. Every bounded attempt
@@ -442,17 +450,88 @@ jobs:
               esac
 
               : > "$artifact_zip"
-              if blob_status="$(curl -q --proto '=https' --fail --silent --show-error \
-                --connect-timeout 15 --max-time 900 \
-                --speed-limit 1024 --speed-time 120 \
-                --write-out '%{http_code}' \
-                --output "$artifact_zip" "$artifact_url")" && \
-                [ "$blob_status" = 200 ] && \
-                [ "$(stat -c '%s' "$artifact_zip")" = "$metadata_size" ] && \
-                [ "$(sha256sum "$artifact_zip" | awk '{print $1}')" = "$SOURCE_ARTIFACT_DIGEST" ]; then
-                artifact_downloaded=true
+              segment_pids=''
+              segment_start=0
+              for segment in 0 1 2 3; do
+                segment_length=$segment_base
+                if [ "$segment" -lt "$segment_remainder" ]; then
+                  segment_length=$((segment_length + 1))
+                fi
+                segment_end=$((segment_start + segment_length - 1))
+                segment_file="${artifact_zip}.part.${segment}"
+                segment_header="${headers}.part.${segment}"
+                range_start="$segment_start"
+                range_end="$segment_end"
+                (
+                  set -euo pipefail
+                  : > "$segment_file"
+                  : > "$segment_header"
+                  blob_status="$(curl -q --http1.1 --proto '=https' --fail --silent --show-error \
+                    --connect-timeout 15 --max-time 900 \
+                    --speed-limit 1024 --speed-time 120 \
+                    -H "Range: bytes=$range_start-$range_end" \
+                    --write-out '%{http_code}' \
+                    --dump-header "$segment_header" \
+                    --output "$segment_file" "$artifact_url")"
+                  test "$blob_status" = 206
+                  content_range="$(awk '
+                    {
+                      line = $0
+                      if (tolower(line) ~ /^content-range:/) {
+                        count++
+                        sub(/^[^:]*:[[:space:]]*/, "", line)
+                        sub(/\r$/, "", line)
+                        value = line
+                      }
+                    }
+                    END { if (count != 1) exit 1; print value }
+                  ' "$segment_header")"
+                  content_length="$(awk '
+                    {
+                      line = $0
+                      if (tolower(line) ~ /^content-length:/) {
+                        count++
+                        sub(/^[^:]*:[[:space:]]*/, "", line)
+                        sub(/\r$/, "", line)
+                        value = line
+                      }
+                    }
+                    END { if (count != 1) exit 1; print value }
+                  ' "$segment_header")"
+                  test "$content_range" = "bytes $range_start-$range_end/$metadata_size_number"
+                  test "$content_length" = "$segment_length"
+                  test "$(stat -c '%s' "$segment_file")" = "$segment_length"
+                ) &
+                segment_pids="$segment_pids $!"
+                segment_start=$((segment_end + 1))
+              done
+              test "$segment_start" = "$metadata_size_number"
+              segments_ok=true
+              for segment_pid in $segment_pids; do
+                if ! wait "$segment_pid"; then
+                  segments_ok=false
+                fi
+              done
+              if [ "$segments_ok" = true ]; then
+                cat \
+                  "${artifact_zip}.part.0" \
+                  "${artifact_zip}.part.1" \
+                  "${artifact_zip}.part.2" \
+                  "${artifact_zip}.part.3" > "$artifact_zip"
+                if [ "$(stat -c '%s' "$artifact_zip")" = "$metadata_size_number" ] && \
+                  [ "$(sha256sum "$artifact_zip" | awk '{print $1}')" = "$SOURCE_ARTIFACT_DIGEST" ]; then
+                  artifact_downloaded=true
+                fi
+              fi
+              rm -f -- \
+                "${artifact_zip}.part.0" "${artifact_zip}.part.1" \
+                "${artifact_zip}.part.2" "${artifact_zip}.part.3" \
+                "${headers}.part.0" "${headers}.part.1" \
+                "${headers}.part.2" "${headers}.part.3"
+              if [ "$artifact_downloaded" = true ]; then
                 break
               fi
+              : > "$artifact_zip"
             fi
             if [ "$attempt" -lt 3 ]; then
               sleep "$((attempt * 2))"
