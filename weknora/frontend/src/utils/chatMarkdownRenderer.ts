@@ -90,6 +90,22 @@ const FULLWIDTH_IMAGE_CLOSE_RE = new RegExp(
   `(!\\[[^\\]\\n]*\\]\\(${IMAGE_URL_SCHEME}://[^）\\n]*?)）`,
   'gi',
 )
+const MULTILINE_IMAGE_ALT_RE = /!\[([^\]]*(?:\r?\n)[^\]]*)\](\([^\r\n)]*\))/g
+
+/** Keep model-authored image alt text on one line so marked parses the image. */
+export function normalizeMultilineMarkdownImageAlt(content: string): string {
+  if (!content || !content.includes('![') || !/[\r\n]/.test(content)) return content
+
+  const parts = content.split(COMPLETE_MARKDOWN_CODE_RE)
+  for (let i = 0; i < parts.length; i += 2) {
+    parts[i] = parts[i].replace(
+      MULTILINE_IMAGE_ALT_RE,
+      (_match, alt: string, destination: string) =>
+        `![${alt.replace(/\s*\r?\n\s*/g, ' ').trim()}]${destination}`,
+    )
+  }
+  return parts.join('')
+}
 
 /**
  * Repair image Markdown when a model localizes its destination parentheses:
@@ -464,7 +480,8 @@ export function renderChatMarkdown(rawMarkdown: unknown, options: RenderChatMark
   )
   const citationSafeText = stripIncompleteCitationTag(imageContextSafeText)
   const { text: tagSafe, tags } = preserveCitationTags(citationSafeText)
-  const normalizedImageMarkdown = normalizeFullwidthMarkdownImageParentheses(tagSafe)
+  const normalizedImageAlt = normalizeMultilineMarkdownImageAlt(tagSafe)
+  const normalizedImageMarkdown = normalizeFullwidthMarkdownImageParentheses(normalizedImageAlt)
   const imageSafe = replaceIncompleteImageWithPlaceholder(normalizedImageMarkdown)
   const mathSafe = preprocessMathDelimiters(imageSafe)
   const restoredTags = restoreCitationTags(mathSafe, tags)

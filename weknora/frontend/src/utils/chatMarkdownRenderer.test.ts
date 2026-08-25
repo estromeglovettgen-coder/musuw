@@ -84,6 +84,46 @@ test('renderChatMarkdown safely renders an image with fullwidth parentheses', ()
   assert.doesNotMatch(html, /（|）/)
 })
 
+test('renderChatMarkdown renders a Markdown image whose alt text contains blank lines', () => {
+  const renderer = createChatMarkdownRenderer({
+    imageRenderer: ({ href, text }) => `<img src="${href}" alt="${text}">`,
+    isValidImageUrl: (href) => href.startsWith('resource://'),
+  })
+  const html = renderChatMarkdown(
+    [
+      'before',
+      '',
+      '![中文说明。',
+      '',
+      'English description.](resource://image-id)',
+      '',
+      '```md',
+      '![代码内。',
+      '',
+      'Code example.](resource://literal)',
+      '```',
+      '',
+      '[普通链接。',
+      '',
+      'Link text.](https://example.com)',
+      '',
+      'after',
+    ].join('\n'),
+    {
+      renderer,
+      escapeMarkdown: (text) => text,
+      sanitizeHtml: (value) => value,
+      streaming: false,
+    },
+  )
+
+  assert.match(html, /<img src="resource:\/\/image-id" alt="中文说明。 English description\.">/)
+  assert.match(html, /<code class="language-md">!\[代码内。/)
+  assert.doesNotMatch(html, /src="resource:\/\/literal"/)
+  assert.doesNotMatch(html, /<a[^>]*>普通链接/)
+  assert.match(html, /<p>before<\/p>[\s\S]*<p>after<\/p>/)
+})
+
 test('renderChatMarkdown hides an unfinished fullwidth-parenthesis image while streaming', () => {
   const renderer = createChatMarkdownRenderer()
   const html = renderChatMarkdown('before ![流程图]（resource://yB7V7wE1gls7h9WonCDq5Q', {
