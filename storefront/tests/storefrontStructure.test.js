@@ -57,6 +57,8 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
   assert.doesNotMatch(home, /View Plans/);
   assert.equal((home.match(/class="comparison-group-head"/g) ?? []).length, 6);
   assert.match(home, /Workspace limits/);
+  assert.match(home, /Advanced model access/);
+  assert.match(home, /100 GiB/);
   assert.doesNotMatch(footer, /social-links|x\.com\/greeenyang|support@didren\.com/);
   assert.match(footer, />© 2026 musuw\. All rights reserved\.<\/span>/);
   assert.match(contact, /contact-(?:page|layout|cards|card)/);
@@ -83,7 +85,7 @@ test("hidden storefront sections and their source modules remain available for l
   assert.match(homeContent, /export const testimonials\s*=\s*\[/);
 });
 
-test("comparison rows expose only enforced consumer plan facts", () => {
+test("comparison rows expose the approved public plan facts", () => {
   const rows = comparisonGroups.flatMap((group) => group.rows);
   const labels = rows.map(([label]) => label);
   assert.deepEqual(
@@ -104,6 +106,7 @@ test("comparison rows expose only enforced consumer plan facts", () => {
     "Document upload and parsing",
     "Video upload",
     "Platform-approved model catalog",
+    "Advanced model access",
     "Monthly AI credit allowance",
     "Grounded dialogue",
     "Exact citations",
@@ -113,7 +116,7 @@ test("comparison rows expose only enforced consumer plan facts", () => {
     "Portable export",
     "Deletion controls",
   ]);
-  assert.deepEqual(rows[0].slice(1), ["5 GiB", "20 GiB", "40 GiB", "80 GiB"]);
+  assert.deepEqual(rows[0].slice(1), ["1 GiB", "10 GiB", "30 GiB", "100 GiB"]);
   assert.deepEqual(rows[1].slice(1), ["1", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]);
   assert.deepEqual(rows[2].slice(1), ["10", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]);
   assert.deepEqual(rows[3].slice(1), [true, true, true, true]);
@@ -124,8 +127,9 @@ test("comparison rows expose only enforced consumer plan facts", () => {
     "Expanded platform-approved catalog",
     "Expanded platform-approved catalog",
   ]);
-  assert.deepEqual(rows[6].slice(1), ["$1.00", "$1.25", "$2.50", "$5.00"]);
-  rows.slice(7).forEach((row) => assert.deepEqual(row.slice(1), [true, true, true, true]));
+  assert.deepEqual(rows[6].slice(1), [false, true, true, true]);
+  assert.deepEqual(rows[7].slice(1), ["$1.00", "$1.25", "$2.50", "$5.00"]);
+  rows.slice(8).forEach((row) => assert.deepEqual(row.slice(1), [true, true, true, true]));
   assert.doesNotMatch(JSON.stringify(comparisonGroups), /shared workspace administration|priority support|advanced knowledge tools/i);
 });
 
