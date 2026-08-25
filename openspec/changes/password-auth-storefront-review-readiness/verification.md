@@ -1,5 +1,45 @@
 # Verification evidence
 
+## 2026-08-24 production disposable E2E (current evidence)
+
+- One fresh disposable account completed password sign-up once, confirmation
+  once, authenticated-shell entry, logout once, and password re-login once;
+  each shell transition succeeded. Credentials and identity values are omitted.
+- One `Aurora Research Notes` knowledge base was created with a description.
+  `aurora-observation-guide.md` and `aurora-maintenance-window.md` were each
+  uploaded once; parsing, summaries, chunks, and indexes completed for both.
+  The root directory remained present and displayed one direct file plus one
+  first-level `Operations` folder. Expanded and collapsed sidebar states had
+  identical root data.
+- One public Terms webpage parsed successfully. One scoped retrieval answer
+  was non-empty, exposed a knowledge citation, and its source drawer matched
+  `aurora-observation-guide.md`.
+- `aurora-observation-briefing.mp4` was uploaded once with no model override.
+  One worker completed with retry count zero; parsing and summary completed,
+  two chunks and two indexes were materialized, and the override relation was
+  empty. The deployed model was `google/gemini-2.5-flash`. A video-bound
+  answer was non-empty, exposed a knowledge citation, and its source drawer
+  matched `aurora-observation-briefing.mp4`.
+- Independent sessions for `Gemini 3.7 Flash` and `Claude Haiku 4.5` each
+  returned a non-empty completed answer with error=false and pending=false.
+- One native knowledge-base copy completed with source/target documents
+  `3/3`, `Operations` folders `1/1`, chunks `34/34`, vectors `34/34`, URL
+  documents `1/1`, and workers `3/3` with retry count zero. The copied
+  knowledge base was then deleted once through the UI; active same-name
+  knowledge bases changed from `2` to `1`. Database evidence reported one
+  soft-deleted copy, zero active copied documents and chunks, terminal worker
+  success=true, and worker errors=`0`. The surviving source retained four
+  documents, 36 ready chunks, and 36 ready indexes; source unaffected=true.
+  No new release claim is made here.
+- Two readiness-only chats were deleted and two citation chats were retained.
+  The original Aurora fixture, the disposable account, and the active Pro
+  subscription remain intentionally retained. Account deletion=false.
+- The account moved from Free to one monthly Plus checkout and one same-
+  subscription native Pro update. Signed delivery groups were `3` and `2`;
+  every delivery succeeded with attempt count `1`. Final plan state was active
+  monthly Pro, credits available=true, the hosted billing portal opened
+  read-only=true, and Live charge=false.
+
 ## Historical 2026-08-23 reviewer lifecycle (TEST Max baseline)
 
 This block records the earlier TEST Max baseline. It is not the current

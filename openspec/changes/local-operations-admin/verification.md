@@ -5,6 +5,12 @@ loopback-only. No production tenant mutation, payment, refund, account deletion,
 or R2 mutation was performed. One bounded production chat request was made to
 prove the consumer-to-Langfuse trace path.
 
+2026-08-24 clarification: the historical Paddle Live API HTTP result below
+proves only that the then-selected read adapter reached an official endpoint.
+It does not prove domain/account approval, provider authorization, checkout
+readiness, or permission to deploy Live. The current fixed product runtime is a
+complete Sandbox unit and Live remains `not-authorized`.
+
 ## Result
 
 - The rejected Appsmith prototype is not a runtime dependency. `127.0.0.1:4186`

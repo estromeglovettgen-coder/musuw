@@ -1,5 +1,22 @@
 # Verification evidence
 
+## 2026-08-24 production disposable E2E (current video evidence)
+
+- `aurora-observation-briefing.mp4` was uploaded once through the default
+  no-override path. One worker completed with retry count zero; parsing and
+  summary completed, two chunks and two indexes were materialized, and the
+  override relation was empty.
+- The deployed video model was `google/gemini-2.5-flash`. A video-bound answer
+  was non-empty, exposed a knowledge citation, and its source drawer matched
+  `aurora-observation-briefing.mp4`.
+- The corresponding reviewer knowledge base and citation chat are intentionally
+  retained. The separate one-copy knowledge base was deleted once through the
+  UI; active same-name knowledge bases changed from `2` to `1`, the copy had
+  zero active documents and chunks, and the surviving source retained four
+  documents, 36 ready chunks, and 36 ready indexes with source unaffected=true.
+  This does not claim cleanup of the intentionally retained video fixture or a
+  new release.
+
 ## 2026-08-23 typed credit propagation repair
 
 - A deterministic red-first worker-boundary test used the real

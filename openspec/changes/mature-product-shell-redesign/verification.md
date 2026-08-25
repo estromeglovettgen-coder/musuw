@@ -1,5 +1,22 @@
 # Verification evidence
 
+## 2026-08-24 production disposable E2E (current shell evidence)
+
+- The authenticated shell completed one password sign-up/confirmation path,
+  one logout, and one password re-login; each transition succeeded.
+- `Aurora Research Notes` displayed a persistent root directory with one direct
+  file and one first-level `Operations` folder. Sidebar expanded/collapsed
+  data-equivalence=true, and one native knowledge-base copy preserved source /
+  target documents `3/3`, folders `1/1`, chunks `34/34`, and vectors `34/34`.
+- `Gemini 3.7 Flash` and `Claude Haiku 4.5` each completed one independent
+  session with a non-empty answer, error=false, and pending=false. Two
+  readiness-only chats were deleted; two citation chats remain retained.
+- The separate one-copy knowledge base was deleted once through the UI; active
+  same-name knowledge bases changed from `2` to `1`, the copy had zero active
+  documents and chunks, and the surviving source retained four documents, 36
+  ready chunks, and 36 ready indexes with source unaffected=true. No new
+  release claim is made here.
+
 ## 2026-08-22 implementation verification
 
 - The installed Codex Desktop bundle at
