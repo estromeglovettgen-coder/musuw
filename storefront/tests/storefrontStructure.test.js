@@ -11,7 +11,7 @@ import { getPublicDocument } from "../src/legalContent.js";
 
 const root = new URL("../", import.meta.url).pathname;
 
-test("review-ready home hides inherited marquee, testimonials, and footer social links", async (t) => {
+test("review-ready home follows the decision journey without inherited proof or comparison clutter", async (t) => {
   const server = await createServer({
     root,
     appType: "custom",
@@ -26,7 +26,7 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
     server.ssrLoadModule("/src/LegalPage.jsx"),
   ]);
   const copy = getStorefrontCopy("en");
-  const home = renderToStaticMarkup(React.createElement(HomePage, { copy }));
+  const home = renderToStaticMarkup(React.createElement(HomePage, { copy, locale: "en" }));
   const footer = renderToStaticMarkup(React.createElement(SiteFooter, { copy }));
   const contact = renderToStaticMarkup(
     React.createElement(LegalPage, {
@@ -46,17 +46,18 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
   assert.doesNotMatch(home, /customer-(?:strip|ticker|track)/);
   assert.doesNotMatch(home, /testimonials-section|testimonial-(?:shell|card)/);
   assert.match(home, /id="feature"/);
+  assert.match(home, /id="how-it-works"/);
   assert.match(home, /id="use-cases"/);
   assert.match(home, /id="pricing"/);
   assert.match(home, /id="faq"/);
-  assert.equal((home.match(/class="feature-story/g) ?? []).length, 3);
-  assert.match(home, /Grounded Dialogue/);
-  assert.match(home, /Source Library and Upload/);
-  assert.match(home, /Wiki and Graph/);
-  assert.doesNotMatch(home, /Living Knowledge Base/);
+  assert.equal((home.match(/class="journey-feature-card(?:\s|")/g) ?? []).length, 3);
+  assert.match(home, /Grounded answers/);
+  assert.match(home, /Source integrity/);
+  assert.match(home, /Living knowledge/);
+  assert.equal((home.match(/class="journey-included-item"/g) ?? []).length, 6);
+  assert.match(home, /complete evidence loop/i);
+  assert.doesNotMatch(home, /comparison-group-head|Workspace limits/);
   assert.doesNotMatch(home, /View Plans/);
-  assert.equal((home.match(/class="comparison-group-head"/g) ?? []).length, 6);
-  assert.match(home, /Workspace limits/);
   assert.doesNotMatch(footer, /social-links|x\.com\/greeenyang|support@didren\.com/);
   assert.match(footer, />© 2026 musuw\. All rights reserved\.<\/span>/);
   assert.match(contact, /contact-(?:page|layout|cards|card)/);
@@ -71,15 +72,24 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
   assert.match(contactZh, />© 2026 musuw\. All rights reserved\.<\/span>/);
 });
 
-test("hidden storefront sections and their source modules remain available for later reconsideration", () => {
+test("retired homepage sections stay unrendered while their underlying product data remains available", () => {
   const homePage = readFileSync(join(root, "src/HomePage.jsx"), "utf8");
   const homeSections = readFileSync(join(root, "src/components/HomeSections.jsx"), "utf8");
+  const homeJourney = readFileSync(join(root, "src/data/homeJourney.js"), "utf8");
   const homeContent = readFileSync(join(root, "src/data/homeContent.js"), "utf8");
 
-  assert.doesNotMatch(homePage, /<CustomerStrip\b|<TestimonialsSection\b/);
-  assert.match(homeSections, /visibleFeatureIndexes\s*=\s*\[0,\s*3,\s*2\]/);
-  assert.match(homeSections, /export function CustomerStrip\s*\(/);
-  assert.match(homeSections, /export function TestimonialsSection\s*\(/);
+  assert.doesNotMatch(
+    homePage,
+    /<CustomerStrip\b|<TestimonialsSection\b|<ComparisonSection\b|<BlogPreviewSection\b/,
+  );
+  assert.match(homeSections, /export function JourneyStrip\s*\(/);
+  assert.match(homeSections, /export function UseCasesSection\s*\(/);
+  assert.match(homeSections, /export function IncludedInEveryPlanSection\s*\(/);
+  assert.doesNotMatch(homeSections, /export function ComparisonSection\s*\(/);
+  assert.doesNotMatch(homeSections, /export function TestimonialsSection\s*\(/);
+  assert.match(homeJourney, /Grounded answers/);
+  assert.match(homeJourney, /Source integrity/);
+  assert.match(homeJourney, /Living knowledge/);
   assert.match(homeContent, /export const testimonials\s*=\s*\[/);
 });
 
