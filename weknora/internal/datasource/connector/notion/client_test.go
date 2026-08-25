@@ -351,6 +351,7 @@ var _ = time.Now
 func TestDownloadFile_RejectsLoopbackURL(t *testing.T) {
 	secutils.ResetSSRFWhitelistForTest()
 	t.Cleanup(secutils.ResetSSRFWhitelistForTest)
+	t.Setenv("SSRF_WHITELIST", "api.notion.com")
 
 	client, err := newClient("test-token", "https://api.notion.com")
 	if err != nil {

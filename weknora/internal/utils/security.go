@@ -385,6 +385,10 @@ func isIPLikeHostname(hostname string) bool {
 // - Cloud metadata endpoints
 // - Reserved hostnames (localhost, *.local, etc.)
 func isSSRFSafeURL(rawURL string) (bool, string) {
+	return isSSRFSafeURLWithLookup(rawURL, net.LookupIP)
+}
+
+func isSSRFSafeURLWithLookup(rawURL string, lookupIP func(string) ([]net.IP, error)) (bool, string) {
 	if rawURL == "" {
 		return false, "URL is empty"
 	}
@@ -445,7 +449,7 @@ func isSSRFSafeURL(rawURL string) (bool, string) {
 
 	// Perform DNS resolution to check the resolved IP
 	// This prevents DNS rebinding attacks where a domain resolves to internal IPs
-	ips, err := net.LookupIP(hostname)
+	ips, err := lookupIP(hostname)
 	if err != nil {
 		return false, fmt.Sprintf("DNS resolution failed for hostname %s: cannot verify if it resolves to safe IP", hostname)
 	}
