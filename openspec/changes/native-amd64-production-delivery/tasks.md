@@ -10,7 +10,7 @@
 - [x] 2.2 Route production authorize/deploy to `musuw-release` and only build to `musuw-build-x64`, with native architecture preflight and no QEMU
 - [x] 2.3 Remove the production Environment and every secret reference from build; generate build/deploy auth-public input from the same three browser-visible repository variables
 - [x] 2.4 Validate and expose two immutable image digest refs from build, then consume them in deploy without rebuilding
-- [x] 2.5 Package the authorized exact-SHA tree on Mac and deliver one digest-bound same-run Actions Artifact to the run-only Beijing build while retaining authorization and deploy Git contracts
+- [x] 2.5 Package the authorized exact-SHA production source projection on Mac with only the two approved documentation-tree exclusions, deliver one digest-bound same-run Actions Artifact to the run-only Beijing build with bounded slow-link handling, and retain authorization and deploy Git contracts
 
 ## 3. Implement bounded persistent cache
 

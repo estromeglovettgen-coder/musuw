@@ -48,7 +48,9 @@ configuration mismatch.
    a separate native x86_64 Linux runner with the exact `musuw-build-x64` label
    verifies runner and Docker daemon architecture plus the required regional
    Docker Hub mirror. The authorization job packages that already-proven SHA as
-   one deterministic `musuw-source.tar.gz`, validates it, and uploads it through
+   one deterministic production-source projection in `musuw-source.tar.gz`,
+   excluding only the two checked-in documentation asset trees that no build or
+   release consumer reads. It validates the projection and uploads it through
    GitHub's existing immutable Actions Artifact service with a seven-day
    retention window. The build job intentionally contains no `uses:` step, so
    the regional runner does not pre-download Action bundles before its first
@@ -209,19 +211,37 @@ GitHub Action. GitHub Runner prepares every referenced Action before executing
 the first inline command, and the regional Action-archive failure therefore
 cannot be fixed by replacing checkout alone. Authorization
 and the `origin/main` ancestry proof remain on `musuw-release`, where the full
-checkout is required and available. It packages only that exact approved tree
-with `git archive`, deterministic gzip, a fixed root, a 256 MiB cap, safe member
-types, required build inputs, executable-mode proof, and an inner SHA-256. The
+checkout is required and available. It packages an exact-SHA production source
+projection with `git archive`, deterministic gzip, a fixed root, a 256 MiB cap,
+safe member types, required build inputs, executable-mode proof, and an inner
+SHA-256. The only negative pathspecs are
+`:(exclude)weknora/website-docs/**` and
+`:(exclude)weknora/docs/images/**`; build and release consumers such as
+`weknora/docs/docs.go`, the ASR test fixture, the vendored frontend XLSX
+package, and `scripts/weknora-production/lib.sh` remain mandatory. The
 single-file bundle is uploaded once with the official `upload-artifact@v4`
 action, compression disabled, and seven-day retention; it is a bounded transport
 record, not a permanent source backup or a second release authority.
+
+The first full-tree transfer produced a 38.31 MiB outer artifact and the Beijing
+route delivered it intermittently at roughly 15 KiB/s, exhausting all three
+300-second blob attempts before Node or BuildKit started. The exact projection
+reduces the producer-equivalent deterministic inner archive from 38.33 MiB to
+11.41 MiB without
+removing a build input. Blob transfers therefore retain a 15-second connect
+bound but use a 900-second total bound and abort when throughput stays below
+1 KiB/s for 120 seconds. Metadata and fresh-redirect API calls keep their
+30-second total bounds. Three fresh attempts remain fail-bounded to well below
+the build job's 90-minute ceiling.
 
 The build job uses `actions: read` to query that exact artifact's metadata from
 the fixed `api.github.com` repository endpoint. It binds artifact id and name to
 the current workflow run, rejects expired or oversized metadata, and requires
 the REST digest to match the upload output. Each bounded attempt obtains a fresh
 short-lived download redirect, accepts only an HTTPS `*.blob.core.windows.net`
-authority, and sends no GitHub Authorization header to that blob host. The
+authority, and sends no GitHub Authorization header to that blob host. Only the
+credential-free blob request receives the 900-second/1-KiB-per-second slow-link
+policy; the credentialed GitHub API requests retain their shorter bounds. The
 downloaded ZIP size and outer SHA-256 must match metadata, the ZIP must contain
 exactly `musuw-source.tar.gz`, and that inner file must match the authorization
 job's SHA-256 before extraction. Extraction occurs in an isolated

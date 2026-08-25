@@ -148,7 +148,11 @@ jobs:
           bundle_dir="$(mktemp -d "$RUNNER_TEMP/musuw-source-bundle.XXXXXX")"
           archive="$bundle_dir/musuw-source.tar.gz"
           artifact_name="musuw-production-source-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE_SHA"
-          git archive --format=tar --prefix=musuw-source/ "$RELEASE_SHA" | gzip -n > "$archive"
+          git archive --format=tar --prefix=musuw-source/ "$RELEASE_SHA" -- \
+            . \
+            ':(exclude)weknora/website-docs/**' \
+            ':(exclude)weknora/docs/images/**' | \
+            gzip -n > "$archive"
           test -s "$archive"
           archive_size="$(wc -c < "$archive" | awk '{print $1}')"
           [[ "$archive_size" =~ ^[0-9]+$ ]]
@@ -178,10 +182,14 @@ jobs:
             .nvmrc \
             auth/package-lock.json \
             weknora/frontend/package-lock.json \
+            weknora/docs/docs.go \
+            weknora/internal/assets/asr_test.wav \
+            weknora/frontend/packages/xlsx-0.20.2.tgz \
             integration/weknora-production/Dockerfile.app.runtime \
             integration/weknora-production/Dockerfile.frontend \
             .github/buildkitd.production.toml \
-            scripts/weknora-production/build-static.sh; do
+            scripts/weknora-production/build-static.sh \
+            scripts/weknora-production/lib.sh; do
             grep -Fxq "musuw-source/$required_path" "$entries" || {
               printf '%s\n' "authorized source archive is missing: $required_path" >&2
               exit 1
@@ -435,7 +443,8 @@ jobs:
 
               : > "$artifact_zip"
               if blob_status="$(curl -q --proto '=https' --fail --silent --show-error \
-                --connect-timeout 15 --max-time 300 \
+                --connect-timeout 15 --max-time 900 \
+                --speed-limit 1024 --speed-time 120 \
                 --write-out '%{http_code}' \
                 --output "$artifact_zip" "$artifact_url")" && \
                 [ "$blob_status" = 200 ] && \
@@ -490,10 +499,14 @@ jobs:
             .nvmrc \
             auth/package-lock.json \
             weknora/frontend/package-lock.json \
+            weknora/docs/docs.go \
+            weknora/internal/assets/asr_test.wav \
+            weknora/frontend/packages/xlsx-0.20.2.tgz \
             integration/weknora-production/Dockerfile.app.runtime \
             integration/weknora-production/Dockerfile.frontend \
             .github/buildkitd.production.toml \
-            scripts/weknora-production/build-static.sh; do
+            scripts/weknora-production/build-static.sh \
+            scripts/weknora-production/lib.sh; do
             test -f "$source_stage/$required_path" && test ! -L "$source_stage/$required_path" || {
               printf '%s\n' "GitHub source archive is missing a required build input: $required_path" >&2
               exit 1
