@@ -114,7 +114,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: storefront/package-lock.json
       - name: Install storefront dependencies
         run: npm ci --prefix storefront --ignore-scripts
@@ -154,7 +154,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: storefront/package-lock.json
       - name: Install Wrangler from the locked storefront manifest
         run: npm ci --prefix storefront --ignore-scripts

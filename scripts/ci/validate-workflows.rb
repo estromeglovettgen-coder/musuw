@@ -98,6 +98,17 @@ frontend_build = frontend_steps.find { |step| step.is_a?(Hash) && step["name"] =
 fail_contract "frontend build must pin NODE_OPTIONS to a 4096 MiB heap" unless frontend_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
 fail_contract "frontend tests must not inherit the build-only NODE_OPTIONS override" if ci.dig("jobs", "frontend", "env", "NODE_OPTIONS")
 
+expected_npm_cache_policy = "${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}"
+{
+  "frontend" => "weknora/frontend/package-lock.json",
+  "auth" => "auth/package-lock.json",
+  "storefront" => "storefront/package-lock.json",
+  "repository-contracts" => "package-lock.json"
+}.each do |job_name, dependency_path|
+  setup_node = Array(ci.dig("jobs", job_name, "steps")).find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-node@") }
+  fail_contract "self-hosted #{job_name} CI must reuse its persistent npm cache without restoring or uploading a duplicate Actions cache" unless setup_node&.dig("with", "cache") == expected_npm_cache_policy && setup_node&.dig("with", "cache-dependency-path") == dependency_path
+end
+
 go_steps = Array(ci.dig("jobs", "go", "steps"))
 setup_go = go_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-go@") }
 expected_go_cache_policy = "${{ vars.MUSUW_ACTIONS_RUNNER == '' }}"
@@ -126,6 +137,10 @@ fail_contract "source manifest must count Git-tracked source instead of local de
 storefront = documents.fetch("deploy-storefront.yml")
 storefront_on = root_key(storefront, "on")
 storefront_workflow_run = storefront_on.fetch("workflow_run", {})
+%w[build deploy].each do |job_name|
+  setup_node = Array(storefront.dig("jobs", job_name, "steps")).find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-node@") }
+  fail_contract "self-hosted storefront #{job_name} must reuse its persistent npm cache without restoring or uploading a duplicate Actions cache" unless setup_node&.dig("with", "cache") == expected_npm_cache_policy && setup_node&.dig("with", "cache-dependency-path") == "storefront/package-lock.json"
+end
 fail_contract "storefront deploy must listen for completed CI workflow runs on main" unless storefront_workflow_run.dig("workflows") == ["CI"] && storefront_workflow_run.dig("types") == ["completed"] && storefront_workflow_run.dig("branches") == ["main"]
 fail_contract "storefront deploy must retain a manual workflow_dispatch" unless storefront_on.key?("workflow_dispatch")
 fail_contract "storefront deploy must have a build dependency" unless storefront.dig("jobs", "deploy", "needs") == "build"

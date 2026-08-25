@@ -78,7 +78,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: weknora/frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci --prefix weknora/frontend --ignore-scripts
@@ -114,7 +114,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: auth/package-lock.json
       - name: Install auth dependencies
         run: npm ci --prefix auth --ignore-scripts
@@ -139,7 +139,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: storefront/package-lock.json
       - name: Install storefront dependencies
         run: npm ci --prefix storefront --ignore-scripts
@@ -211,7 +211,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: package-lock.json
       - name: Install repository tooling
         run: npm ci --ignore-scripts
