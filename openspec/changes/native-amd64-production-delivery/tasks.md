@@ -33,5 +33,5 @@
 
 - [x] 5.1 Run local workflow contracts, current actionlint, Dockerfile checks, strict OpenSpec validation, static production verification, and adjacent release-seam tests
 - [x] 5.2 After the auth bridge is complete, register/verify `musuw-build-x64`, its exact `.nvmrc` Node toolcache and Docker/Buildx access, retain `MUSUW_ACTIONS_RUNNER=musuw-release`, and configure the three public `VITE_*` repository variables without deleting existing host services
-- [ ] 5.3 Run one CI-green cold native release and record architecture, memory/swap, BuildKit disk use, per-stage duration, pushed bytes, and immutable digests
-- [ ] 5.4 Run a later ordinary change and record local cache hits, remaining disk, and push duration before making a quantitative speed claim
+- [x] 5.3 Superseded before activation by `migrate-builds-to-github-hosted`; no cold Beijing release measurement is claimed
+- [x] 5.4 Superseded with 5.3; no warm Beijing cache measurement or speed claim is retained

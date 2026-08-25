@@ -1,3 +1,5 @@
+> **Superseded:** `migrate-builds-to-github-hosted` modifies this capability for standard hosted construction. The requirements below describe the retired Beijing path and are retained as historical evidence.
+
 ## ADDED Requirements
 
 ### Requirement: Native build-only runner routing

@@ -54,7 +54,7 @@ concurrency:
 jobs:
   workflow-contract:
     name: Workflow contracts
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Check out the exact revision
@@ -67,7 +67,7 @@ jobs:
   frontend:
     name: Frontend tests, types and build
     needs: workflow-contract
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out the exact revision
@@ -78,7 +78,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: weknora/frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci --prefix weknora/frontend --ignore-scripts
@@ -96,7 +96,7 @@ jobs:
   auth:
     name: Auth shell tests, types and build
     needs: workflow-contract
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # Public-only placeholders make the build contract executable without
@@ -114,7 +114,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: auth/package-lock.json
       - name: Install auth dependencies
         run: npm ci --prefix auth --ignore-scripts
@@ -128,7 +128,7 @@ jobs:
   storefront:
     name: Storefront tests and build
     needs: workflow-contract
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out the exact revision
@@ -139,7 +139,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: storefront/package-lock.json
       - name: Install storefront dependencies
         run: npm ci --prefix storefront --ignore-scripts
@@ -152,7 +152,7 @@ jobs:
   go:
     name: Active WeKnora Go tests and build
     needs: workflow-contract
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     defaults:
       run:
@@ -166,7 +166,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: weknora/go.mod
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' }}
+          cache: true
           cache-dependency-path: weknora/go.sum
       - name: Run Go tests
         run: go test ./...
@@ -176,7 +176,7 @@ jobs:
   docreader:
     name: Active DocReader tests
     needs: workflow-contract
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out the exact revision
@@ -200,7 +200,7 @@ jobs:
   repository-contracts:
     name: Release, provenance and secret contracts
     needs: workflow-contract
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out the exact revision
@@ -211,7 +211,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: package-lock.json
       - name: Install repository tooling
         run: npm ci --ignore-scripts

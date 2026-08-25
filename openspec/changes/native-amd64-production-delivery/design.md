@@ -1,3 +1,5 @@
+> **Superseded:** `migrate-builds-to-github-hosted` replaces the runner routing, source transport, regional mirrors, and persistent BuildKit decisions below. This document is retained only as the history of the former Beijing path.
+
 ## Context
 
 The current production image build targets `linux/amd64` from an ARM64 GitHub runner container inside Docker Desktop on an Apple Silicon Mac. A failed run stopped advancing during Debian package retrieval for more than fifty minutes; a retry crashed inside amd64 Go runtime code with `SIGSEGV`. Successful historical app builds still spent about 348 seconds compiling Go, 136 seconds installing runtime packages, and 136 seconds exporting/pushing. The Mac listener itself remained online and idle after cancellation. A zero BuildKit-container count was the expected post-job cleanup from `setup-buildx-action`, not a stopped runner.

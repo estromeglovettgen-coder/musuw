@@ -1,3 +1,5 @@
+> **Superseded:** `migrate-builds-to-github-hosted` replaces this Beijing build design after the repository became public. This change remains as historical evidence; its unrun activation measurements were closed as superseded, not reported as executed.
+
 ## Why
 
 Production images are currently built as `linux/amd64` on an Apple Silicon Docker Desktop runner, so expensive QEMU emulation, intermittent emulation crashes, and disposable builder state make releases slow and unreliable. An already-paid, otherwise idle native x86_64 Linux host can remove that failure mode without consuming exhausted GitHub-hosted minutes or turning the Tokyo production server into a runner.

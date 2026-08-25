@@ -6,21 +6,15 @@ FROM golang:1.26-bookworm AS builder
 
 WORKDIR /app
 
-ARG APT_MIRROR_ARG
-
-ENV GOPROXY=https://mirrors.tencent.com/go/ \
-    GOSUMDB=sum.golang.google.cn
+ENV GOPROXY=https://proxy.golang.org,direct \
+    GOSUMDB=sum.golang.org
 
 RUN printf '%s\n' \
         'Acquire::Retries "5";' \
         'Acquire::http::Timeout "30";' \
         'Acquire::https::Timeout "30";' \
         > /etc/apt/apt.conf.d/80-musuw-network && \
-    if [ -n "$APT_MIRROR_ARG" ]; then \
-        sed -i "s@deb.debian.org@${APT_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
-    else \
-        sed -i 's@http://deb.debian.org@https://deb.debian.org@g' /etc/apt/sources.list.d/debian.sources; \
-    fi && \
+    sed -i 's@http://deb.debian.org@https://deb.debian.org@g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends git build-essential libsqlite3-dev && \
     rm -rf /var/lib/apt/lists/*
@@ -65,19 +59,13 @@ FROM debian:12.12-slim
 
 WORKDIR /app
 
-ARG APT_MIRROR_ARG
-
 RUN useradd -m -s /bin/bash appuser
 RUN printf '%s\n' \
         'Acquire::Retries "5";' \
         'Acquire::http::Timeout "30";' \
         'Acquire::https::Timeout "30";' \
         > /etc/apt/apt.conf.d/80-musuw-network && \
-    if [ -n "$APT_MIRROR_ARG" ]; then \
-        sed -i "s@deb.debian.org@${APT_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
-    else \
-        sed -i 's@http://deb.debian.org@https://deb.debian.org@g' /etc/apt/sources.list.d/debian.sources; \
-    fi && \
+    sed -i 's@http://deb.debian.org@https://deb.debian.org@g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/*
