@@ -255,7 +255,9 @@ domains must remain allowed for runner operation.
 
 Node is not installed during a release. The job reads `.nvmrc`, requires the
 matching x64 Node and npm executables under `RUNNER_TOOL_CACHE`, validates their
-versions and architecture, and adds that existing directory to `GITHUB_PATH`.
+versions and architecture, prepends that directory to the current step's
+`PATH` before invoking npm's `/usr/bin/env node` launcher, and adds the same
+directory to `GITHUB_PATH` for later steps.
 Docker and Buildx are likewise persistent host prerequisites; feature checks
 for checked-in daemon configuration, metadata output, attestations, and
 keep-state cleanup fail before dependency work when the host drifts.

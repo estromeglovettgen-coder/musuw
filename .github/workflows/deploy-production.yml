@@ -555,6 +555,7 @@ jobs:
           node_bin="$RUNNER_TOOL_CACHE/node/$node_version/x64/bin"
           test -x "$node_bin/node"
           test -x "$node_bin/npm"
+          export PATH="$node_bin:$PATH"
           test "$("$node_bin/node" --version)" = "v$node_version"
           test "$("$node_bin/node" -p 'process.arch')" = x64
           [[ "$("$node_bin/npm" --version)" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
