@@ -10,6 +10,7 @@ Production images are currently built as `linux/amd64` on an Apple Silicon Docke
 - Pass only validated immutable app/frontend digest references from build to the existing Mac deploy job, which continues the forced-command SHA-only Tokyo release seam without rebuilding.
 - Use the official Buildx setup action with one fixed Docker-container builder and `keep-state: true` so ordinary layers and Go cache mounts survive jobs while each container is recreated from the current checked-in configuration; bound automatic BuildKit GC to a 10 GB maximum-use threshold and a 12 GB free-space floor.
 - Route Docker Hub bootstrap and base-image pulls through Tencent Cloud's official regional mirror at both the Docker daemon and BuildKit layers, and fail the native preflight if the daemon-side mirror is missing.
+- Route Debian and Go dependency downloads through Tencent Cloud's documented regional mirrors while retaining Go's authenticated mainland checksum endpoint, so cold builds do not depend on unreachable global defaults.
 - Avoid a separate `mode=max` registry cache over the roughly 3 Mbps uplink. Push only the immutable release images and rely on registry blob deduplication plus local BuildKit state.
 - Preserve Dockerfile stable-layer ordering, bounded apt network behavior, and the pinned Go migrate tool.
 

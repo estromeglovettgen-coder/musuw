@@ -412,6 +412,17 @@ if ! grep -Fq "github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1" "$runti
     exit 1
 fi
 
+go_network_env_line="$(grep -n '^ENV GOPROXY=https://mirrors.tencent.com/go/' "$runtime_dockerfile" | cut -d: -f1)"
+first_go_network_line="$(grep -nE '(^|[[:space:]])go (install|mod download|run) ' "$runtime_dockerfile" | cut -d: -f1 | sed -n '1p')"
+if [ -z "$go_network_env_line" ] || [ -z "$first_go_network_line" ] ||
+   [ "$go_network_env_line" -ge "$first_go_network_line" ] ||
+   ! grep -Fq 'GOSUMDB=sum.golang.google.cn' "$runtime_dockerfile" ||
+   grep -Fq 'proxy.golang.org' "$runtime_dockerfile" ||
+   grep -Fq 'GOSUMDB=off' "$runtime_dockerfile"; then
+    printf '%s\n' 'production app Dockerfile does not use the regional Go module mirror with the authenticated mainland checksum endpoint' >&2
+    exit 1
+fi
+
 if ! grep -Fq -- '--mount=type=cache,target=/go/pkg/mod' "$runtime_dockerfile" ||
    ! grep -Fq -- '--mount=type=cache,target=/root/.cache/go-build' "$runtime_dockerfile"; then
     printf '%s\n' 'production app Dockerfile does not use both Go module and compilation caches' >&2
@@ -422,6 +433,29 @@ if [ "$(grep -Fc 'Acquire::Retries "5";' "$runtime_dockerfile")" -lt 2 ] ||
    [ "$(grep -Fc 'Acquire::http::Timeout "30";' "$runtime_dockerfile")" -lt 2 ] ||
    [ "$(grep -Fc 'Acquire::https::Timeout "30";' "$runtime_dockerfile")" -lt 2 ]; then
     printf '%s\n' 'production app Dockerfile lacks bounded apt retry and timeout policy in both stages' >&2
+    exit 1
+fi
+
+if [ "$(grep -Fc 'ARG APT_MIRROR_ARG' "$runtime_dockerfile")" -ne 2 ] ||
+   [ "$(grep -Fc 'sed -i "s@deb.debian.org@${APT_MIRROR_ARG}@g"' "$runtime_dockerfile")" -ne 2 ]; then
+    printf '%s\n' 'production app Dockerfile does not consume the regional apt mirror argument in both stages' >&2
+    exit 1
+fi
+
+if ! awk '
+    /^ARG APT_MIRROR_ARG$/ {
+        stage++
+        mirror_ready = 0
+        next
+    }
+    stage > 0 && /deb\.debian\.org@\$\{APT_MIRROR_ARG\}/ { mirror_ready = 1 }
+    stage > 0 && /apt-get update/ && !first_apt_seen[stage] {
+        first_apt_seen[stage] = 1
+        if (!mirror_ready) bad = 1
+    }
+    END { exit !(stage == 2 && first_apt_seen[1] && first_apt_seen[2] && !bad) }
+' "$runtime_dockerfile"; then
+    printf '%s\n' 'production app Dockerfile applies the regional apt mirror after a stage has already reached the default network' >&2
     exit 1
 fi
 

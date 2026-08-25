@@ -66,7 +66,7 @@ The x64 build SHALL use the official `docker/setup-buildx-action@v3` with a fixe
 - **THEN** the registry can reuse those blobs without a second `mode=max` cache export
 
 ### Requirement: Stable dependency layers and bounded network work
-Volatile release metadata MUST NOT invalidate stable apt/tool or runtime-package layers. Debian network operations SHALL use bounded retries and HTTP/HTTPS timeouts, the migrate tool SHALL be pinned to the application dependency version, and Go build steps SHALL use module/compiler cache mounts.
+Volatile release metadata MUST NOT invalidate stable apt/tool or runtime-package layers. Debian network operations SHALL use bounded retries and HTTP/HTTPS timeouts and SHALL consume the existing regional mirror argument from the production workflow. Before any Go network command, the builder SHALL select Tencent Cloud's documented regional Go module mirror and Go's authenticated mainland checksum endpoint; it MUST NOT disable checksum verification or fall back to `proxy.golang.org`. The migrate tool SHALL be pinned to the application dependency version, and Go build steps SHALL use module/compiler cache mounts.
 
 #### Scenario: Release SHA changes
 - **WHEN** a new authorized SHA changes release metadata
@@ -75,6 +75,14 @@ Volatile release metadata MUST NOT invalidate stable apt/tool or runtime-package
 #### Scenario: Debian mirror stalls
 - **WHEN** apt cannot make progress
 - **THEN** configured retries and per-request timeouts bound the wait and surface failure instead of leaving an unbounded build step
+
+#### Scenario: Global Go module endpoints are unreachable
+- **WHEN** the Beijing builder cannot reach `proxy.golang.org` or `sum.golang.org`
+- **THEN** the pinned migrate tool and complete application module graph resolve through the regional module mirror and authenticated mainland checksum endpoint without disabling verification
+
+#### Scenario: Dependency layers are already warm
+- **WHEN** a later build has unchanged apt inputs, Go module files, migrate version, and source
+- **THEN** BuildKit reuses those layers and cache mounts instead of downloading or compiling them from the beginning
 
 ### Requirement: Serialized activation and safe rollback
 Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially in one build job, with the browser V8 old-space ceiling set to 3072 MiB. Activation SHALL require an online `musuw-build-x64` runner and the three public repository variables, but MUST NOT require Actions billing, Docker Build Cloud, another build provider, deletion of existing host services, or production-host mutation.

@@ -224,6 +224,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
           build-args: |
+            APT_MIRROR_ARG=mirrors.cloud.tencent.com
             VERSION_ARG=0.7.2
             COMMIT_ID_ARG=${{ needs.authorize.outputs.release_sha }}
             BUILD_TIME_ARG=production-native-x64-runner

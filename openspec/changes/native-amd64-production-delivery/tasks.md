@@ -19,6 +19,7 @@
 - [x] 3.4 Pin migrate, preserve Go module/compiler mounts, retain bounded apt behavior, and keep volatile release metadata after stable layers
 - [x] 3.5 Cap the production browser-build Node heap at 3072 MiB and keep browser/image construction sequential in one job
 - [x] 3.6 Route daemon bootstrap and BuildKit base-image pulls through the Tencent Cloud regional mirror, check in the daemon contract, and fail preflight on daemon drift
+- [x] 3.7 Consume the existing regional apt seam and configure Tencent Cloud's documented Go module mirror with Go's authenticated mainland checksum endpoint before every Go dependency command
 
 ## 4. Lock repository contracts and documentation
 

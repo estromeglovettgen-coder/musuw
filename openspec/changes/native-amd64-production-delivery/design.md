@@ -50,6 +50,8 @@ The app and frontend build actions do not use `cache-from` or `cache-to`. A `mod
 
 The app Dockerfile installs apt/tool dependencies before source and release metadata, pins `migrate` to the application dependency version, applies bounded apt retries/timeouts in both stages, and uses Go module/compiler cache mounts. The release SHA reaches the first layer that consumes it, so stable runtime package work remains cache-eligible while the binary and OCI provenance stay bound to the selected revision.
 
+The workflow supplies the Dockerfile's existing `APT_MIRROR_ARG` with Tencent Cloud's regional Debian host. The builder stage sets Tencent Cloud's documented Go module mirror before its first Go network command and uses `sum.golang.google.cn`, which the Go toolchain recognizes as the mainland endpoint for the same authenticated public checksum database. This single configuration covers both the standalone pinned `migrate` build and every later application module download. It is preferred over copying the official `migrate` container binary because that would address only the first failed command, leave `go mod download` on the unreachable default path, and replace the current Go 1.26/PostgreSQL-only build with a separately compiled artifact.
+
 ### Keep production secrets on the deploy side
 
 The build job is not attached to `server-production` and contains no `secrets.*` reference. Its only configuration inputs are three browser-visible repository variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_WEKNORA_OAUTH_CLIENT_ID`; the fixed public origin is written directly. The build token has only `contents: read` and `packages: write`.
@@ -65,6 +67,7 @@ The constant `production-release` concurrency group with `cancel-in-progress: fa
 - [The x64 runner is offline or mislabeled] → Authorization may finish, but build remains queued and deploy cannot start; runner service health is an activation prerequisite.
 - [The 4 GB host reaches memory or disk pressure] → Keep builds sequential, cap BuildKit at two vertices, enforce daemon/BuildKit GC, and observe available memory/disk during the first cold run.
 - [The regional mirror is removed or unavailable] → Fail the preflight when daemon configuration drifts; bounded pull failures stop build before any Tokyo mutation.
+- [A regional Debian or Go dependency endpoint is unavailable] → Bounded network commands fail the build before image publication; checksum authentication stays enabled, and no direct-default fallback silently reintroduces the observed timeout.
 - [A 3 Mbps uplink makes the first image push slow] → Avoid separate registry-cache export; record actual push bytes/time and rely on content-addressed blob reuse in later pushes.
 - [Persistent self-hosted execution expands trust] → Route only trusted production build code, inject no production secrets, and never point general CI or pull requests at `musuw-build-x64`.
 - [Local builder state is lost or GC is aggressive] → A cold build remains correct; only performance is lost, while immutable GHCR releases and production state are unaffected.

@@ -177,6 +177,17 @@ base images. The native preflight rejects a host that lacks the daemon mirror.
 This regional mirror is an infrastructure prerequisite for this Tencent-hosted
 builder, not a new application dependency or a fallback build provider.
 
+The application build also consumes Tencent Cloud's documented regional
+dependency endpoints instead of reaching globally routed defaults from the
+Beijing host. The workflow passes the Dockerfile's existing `APT_MIRROR_ARG`
+seam as `mirrors.cloud.tencent.com`; the builder stage uses
+`https://mirrors.tencent.com/go/` for all Go module fetches and
+`sum.golang.google.cn` for Go's authenticated checksum database endpoint in
+mainland China. Checksum verification remains enabled. This covers the pinned
+`migrate` tool and the application's complete module graph without adding a
+custom proxy, copying an older prebuilt tool binary, or changing the module
+versions recorded by `go.mod` and `go.sum`.
+
 Do not export a separate `mode=max` registry cache on this host: its constrained
 uplink would upload intermediate cache records in addition to the release. The
 two immutable GHCR images are still pushed normally, and GHCR skips blobs it
