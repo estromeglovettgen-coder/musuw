@@ -177,6 +177,10 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **WHEN** an authenticated tenant with a Paddle customer record clicks manage billing
 - **THEN** the server resolves the customer from that tenant, creates a fresh Paddle portal session through the official SDK, and returns only its HTTPS overview URL
 
+#### Scenario: Authenticated Paddle customer initializes Retain
+- **WHEN** the authenticated tenant has a valid Paddle customer ID derived from signed provider state and the complete Paddle unit is configured
+- **THEN** the authenticated billing response supplies that provider customer ID only as the Paddle.js `pwCustomer` value, `Paddle.Initialize()` or `Paddle.Update()` receives it, anonymous public config and request input cannot supply it, and the value grants no entitlement or provider mutation authority
+
 #### Scenario: Portal ownership cannot be proven
 - **WHEN** a request is anonymous or the authenticated tenant has no Paddle customer record
 - **THEN** no portal session is created and no Paddle customer or subscription identifier is exposed

@@ -6,6 +6,7 @@ import {
 } from '@paddle/paddle-js'
 
 let paddlePromise: Promise<Paddle | undefined> | null = null
+let activePwCustomerId: string | undefined
 let completed: (() => void) | undefined
 let activeEventCallback: ((event: PaddleEventData) => void) | undefined
 
@@ -15,6 +16,7 @@ interface PaddleCheckoutInput {
   priceId: string
   tenantId: string
   checkoutBinding: string
+  pwCustomerId?: string
   email?: string
   locale?: string
   onCompleted: () => void
@@ -23,6 +25,7 @@ interface PaddleCheckoutInput {
 export interface PreviewPaddlePricesInput {
   environment: 'sandbox' | 'live'
   clientToken: string
+  pwCustomerId?: string
   priceIds: string[]
 }
 
@@ -46,29 +49,44 @@ function toPaddleLocale(value?: string): string | undefined {
   return 'en'
 }
 
-function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken'>) {
-  if (paddlePromise) return paddlePromise
-  const eventCallback = (event: PaddleEventData) => {
-    activeEventCallback?.(event)
-    if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
-      const callback = completed
-      completed = undefined
-      callback?.()
+function retainCustomerID(value?: string): string | undefined {
+  const candidate = value?.trim()
+  return candidate && /^ctm_[a-z0-9]{26}$/.test(candidate) ? candidate : undefined
+}
+
+async function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken' | 'pwCustomerId'>) {
+  const pwCustomerId = retainCustomerID(input.pwCustomerId)
+  if (!paddlePromise) {
+    const eventCallback = (event: PaddleEventData) => {
+      activeEventCallback?.(event)
+      if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
+        const callback = completed
+        completed = undefined
+        callback?.()
+      }
     }
+    activePwCustomerId = pwCustomerId
+    paddlePromise = initializePaddle({
+      ...(input.environment === 'sandbox' ? { environment: 'sandbox' as const } : {}),
+      token: input.clientToken,
+      pwCustomer: pwCustomerId ? { id: pwCustomerId } : {},
+      eventCallback,
+    }).catch((error) => {
+      paddlePromise = null
+      activePwCustomerId = undefined
+      throw error
+    })
   }
-  paddlePromise = initializePaddle({
-    ...(input.environment === 'sandbox' ? { environment: 'sandbox' as const } : {}),
-    token: input.clientToken,
-    eventCallback,
-  }).catch((error) => {
-    paddlePromise = null
-    throw error
-  })
-  return paddlePromise
+  const paddle = await paddlePromise
+  if (paddle && pwCustomerId !== activePwCustomerId) {
+    paddle.Update({ pwCustomer: pwCustomerId ? { id: pwCustomerId } : {} })
+    activePwCustomerId = pwCustomerId
+  }
+  return paddle
 }
 
 export async function initializePaddlePaymentLink(
-  input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken'>,
+  input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken' | 'pwCustomerId'>,
 ): Promise<void> {
   const paddle = await initialize(input)
   if (!paddle) throw new Error('Paddle.js failed to initialize')

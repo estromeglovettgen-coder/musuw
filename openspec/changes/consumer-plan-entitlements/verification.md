@@ -1,5 +1,28 @@
 # Verification Report: consumer-plan-entitlements
 
+## 2026-08-24 production disposable E2E (current entitlement evidence)
+
+- The same disposable account reported Free first, completed one monthly Plus
+  checkout, and completed one same-subscription native Pro update. Signed
+  delivery groups were `3` and `2`; every delivery succeeded with attempt
+  count `1`. Final entitlement was active monthly Pro, credits available=true,
+  and the hosted billing portal opened read-only=true. Live charge=false.
+- `Gemini 3.7 Flash` and `Claude Haiku 4.5` each completed one independent
+  in-product session with a non-empty answer, error=false, and pending=false.
+- One native knowledge-base copy completed with source/target documents
+  `3/3`, `Operations` folders `1/1`, chunks `34/34`, vectors `34/34`, URL
+  documents `1/1`, and workers `3/3` with retry count zero. The copied
+  knowledge base was then deleted once through the UI; active same-name
+  knowledge bases changed from `2` to `1`. Database evidence reported one
+  soft-deleted copy, zero active copied documents and chunks, terminal worker
+  success=true, and worker errors=`0`. The surviving source retained four
+  documents, 36 ready chunks, and 36 ready indexes; source unaffected=true.
+  No new release claim is made here.
+- Two readiness-only chats were deleted and two citation chats were retained.
+  The original Aurora fixture, disposable account, and active Pro subscription
+  remain intentionally retained. Account deletion=false. Task `4.13` remains
+  unchecked because its account/data-deletion half is not evidenced.
+
 The local baseline below was verified through 2026-08-21 (America/Phoenix)
 against the combined local integration branch. Its earlier CI/push/deployment
 deferral is a historical boundary; the current production evidence is recorded
@@ -89,3 +112,40 @@ current production delivery and Sandbox billing evidence are recorded above.
   proof.
 - Task 4.13 remains unchecked: the fresh checkout and signed activation half is
   proven, but the required stale-data and account/data-deletion half is not.
+
+## 2026-08-24 Paddle Live application-readiness correction (local)
+
+- Paddle's current official pricing-page, `Paddle.Initialize`,
+  `Paddle.Update`, default-payment-link, webhook, account-verification,
+  domain-review, Seller Handbook, setup, and go-live guidance was rechecked.
+- A red-first frontend contract proved `/plans` was rewriting Paddle's
+  display-ready localized preview string by stripping a trailing decimal pair.
+  The plan comparison now renders the returned formatted unit subtotal
+  verbatim, including currency-specific decimals and separators.
+- Red-first handler and frontend contracts added the current official Retain
+  integration. Only a syntactically valid Paddle customer reference derived
+  from the authenticated tenant's signed provider state enters the
+  authenticated, `no-store` billing response. Paddle.js receives it through
+  `pwCustomer`; a later SPA identity change uses `Paddle.Update`. Public config,
+  internal tenant identity, email, and browser request input cannot supply it,
+  and it grants no entitlement or provider-mutation authority. Sandbox may
+  initialize this parameter but does not load Retain features.
+- A fresh read-only Paddle.js `PricePreview` checked the six configured Sandbox
+  mappings without creating a transaction: all six returned, were distinct,
+  exactly matched, active, recurring, categorized for SaaS, and included
+  provider-formatted prices and a currency code.
+- Fresh public probes returned success for the main product/legal surfaces and
+  the app root, `/pay`, and `/checkout`. The anonymous Paddle config remained a
+  three-field projection, reported configured Sandbox, and exposed no server
+  secret, catalog mapping, tenant binding, or customer reference.
+- The full frontend suite passed 558 tests, followed by Vue typecheck and the
+  production build. The affected handler/application-service suites, Go vet,
+  and an all-package compile passed. Storefront passed 53 tests and its
+  production build. Production static preflight, tracked-secret scan,
+  source-manifest integrity, credential-registry checks, strict validation of
+  all three affected OpenSpec changes, and diff whitespace checks passed.
+- The fixed-production preflight and entrypoint still accept only the complete
+  Sandbox unit and reject a complete Live-shaped unit. No Dashboard state,
+  Live catalog, credential, destination, default link, charge, refund, commit,
+  push, or deployment changed. Task 4.13 remains separately open because this
+  task did not delete the retained reviewer account or its fixture.

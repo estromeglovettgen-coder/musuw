@@ -140,6 +140,7 @@ const loadPrices = async () => {
     const previews = await previewPaddlePrices({
       environment: config.environment,
       clientToken: config.client_token,
+      pwCustomerId: config.pw_customer_id,
       priceIds: options.map((option) => option.price_id),
     })
     const next = { ...localizedPrices.value }
@@ -174,7 +175,7 @@ const planPrice = (plan: ConsumerPlan) => {
   if (plan === 'free') return t('entitlement.freePrice')
   const priceId = billing.value?.catalog?.[plan]?.[period.value]?.price_id
   if (priceId && localizedPrices.value[priceId]) {
-    return localizedPrices.value[priceId].replace(/[.,]00(?=[^\d]*$)/, '')
+    return localizedPrices.value[priceId]
   }
   return pricePreviewLoading.value ? '…' : t('entitlement.unavailable')
 }

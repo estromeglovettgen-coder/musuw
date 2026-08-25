@@ -29,7 +29,7 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(document.path, route);
       assert.ok(document.title.length >= 4);
       assert.ok(document.summary.length >= 30);
-      assert.equal(document.updated, "2026-08-23");
+      assert.equal(document.updated, "2026-08-24");
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
 
@@ -90,6 +90,20 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
     for (const provider of ["Supabase", "Resend", "Google", "Cloudflare", "OpenRouter", "Langfuse", "Paddle"]) {
       assert.match(privacy, new RegExp(provider));
     }
+
+    const acceptableUse = flatten(locale, "/acceptable-use");
+    assert.match(
+      acceptableUse,
+      locale === "zh-CN"
+        ? /网页导入.*私人知识索引.*不是流媒体下载.*内容再分发/
+        : /URL imports.*private knowledge indexing.*not a streaming downloader.*content redistribution/i
+    );
+    assert.match(
+      acceptableUse,
+      locale === "zh-CN"
+        ? /视频上传.*私人知识分析.*不是面向公众的视频托管.*流媒体.*再分发/
+        : /Video uploads.*private knowledge analysis.*not a public video hosting.*streaming.*redistribution/i
+    );
 
     const security = flatten(locale, "/security");
     assert.doesNotMatch(

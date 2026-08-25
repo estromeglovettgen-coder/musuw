@@ -27,8 +27,8 @@ scripts/musuw-admin stop
   entitlement 和严格脱敏的支持调查。
 - **知识库与文档**：知识库、文档、解析状态、错误、原文件大小、索引
   计量、存储后端和物理引用。
-- **账单**：由 Paddle 签名事件形成的 Musuw 镜像，以及 Paddle 官方 API
-  返回的 Sandbox/Live 订阅和交易。订阅与交易按能力独立读取；某一项缺少
+- **账单**：由 Paddle 签名事件形成的 Musuw 镜像，以及启动时明确选定的
+  Paddle 环境通过官方 API 返回的订阅和交易。订阅与交易按能力独立读取；某一项缺少
   权限时只把该项标为 unavailable，已授权数据继续展示，也不会把 403
   伪装成 0 条记录或整页失败。
 - **身份**：Musuw 账号镜像和正确的 Supabase 项目标识。只有服务端查询
@@ -55,9 +55,11 @@ scripts/musuw-admin stop
 
 - Musuw scoped management API：TEST 与 PRODUCTION 均 available。平台密钥
   只从 macOS Keychain 对应环境账号读取，不进入页面 JavaScript、日志或仓库。
-- Paddle：Sandbox 与 Live 的订阅、交易官方读取均返回 HTTP 200。浏览器只
-  接收字段白名单投影；套餐仍只由签名 webhook 更新，退款、支付和供应商级
-  配置继续交给 Paddle 官方后台。
+- Paddle：当前固定产品运行时和可接受的支付证据是 Sandbox。历史上某个
+  Live-shaped 运营台配置能够读取 provider API，只证明该读取调用当时可达，
+  不证明 account/domain approval、Live 授权或可售状态。浏览器只接收字段
+  白名单投影；套餐仍只由签名 webhook 更新，退款、支付和供应商级配置继续
+  交给 Paddle 官方后台。
 - Supabase Auth Admin：Musuw Staging `achfnnicetupvtoqiwqd` 与 Musuw
   Production `phtveqtlswzokwsztsvu` 已分别在 TEST/PRODUCTION 进程通过官方
   Admin API。单个进程只读取所选环境凭据；另一项目仅显示 ref 与未选择状态。
@@ -73,12 +75,12 @@ scripts/musuw-admin stop
 [`docs/SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md)。该文档不含
 任何密钥值。
 
-## 2026-08-22 真实浏览器验收
+## 2026-08-22 真实浏览器验收（Paddle 状态已被当前边界取代）
 
-- PRODUCTION 七页全部以真实数据渲染：9 位用户、9 个空间、7 个知识库、
-  20 份文档；Paddle Live、两个 Supabase 项目、R2 和 Langfuse 全部连接。
-  R2 官方清单返回 40 个对象、10,220,178 bytes。Paddle Live 当前真实返回
-  0 个订阅和 0 个交易，不把真实空页伪装成失败。
+- PRODUCTION 七页当时以真实数据渲染；所选 Paddle provider 配置的订阅与交易
+  读取返回可用但为空，不把真实空页伪装成失败。该历史读取不能再标注为
+  “Paddle Live 已连接/授权”；当前固定产品支付环境是完整 Sandbox，Live 为
+  `not-authorized`。其他 Supabase、R2 与 Langfuse 验收结论不受此更正影响。
 - TEST 七页全部通过：7 位用户；Paddle Sandbox 返回 2 个订阅、27 个交易；
   Supabase 与 Langfuse 可用；R2 以“TEST 本地存储”显示为不适用。
 - Chrome 实际打开用户完整详情、严格脱敏调查、文档详情和 `UPDATE:<tenant>`
@@ -99,6 +101,9 @@ scripts/musuw-admin test
 MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE \
   scripts/musuw-admin production
 ```
+
+这里的解锁短语表示运营台将读取真实生产业务数据，不代表 Paddle Live
+provider 已获批或允许用于结账。
 
 PRODUCTION 还要求本机 ignored 文件
 `.runtime/musuw-admin/production.env` 提供独立数据库、后端和供应商配置。

@@ -345,11 +345,12 @@ func TestPaddleSubscriptionUpgradeRejectsDowngradeAndProviderOwnershipMismatch(t
 func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	portal := &paddlePortalSessionCreatorStub{}
+	paddleCustomerID := "ctm_" + strings.Repeat("a", 26)
 	h := &EntitlementHandler{
 		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
 			ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanFree),
 			PlanStatus:         "active",
-			PaddleCustomerID:   "ctm_server_only",
+			PaddleCustomerID:   paddleCustomerID,
 		}},
 		paddle: PaddleConfig{
 			Environment:   "sandbox",
@@ -373,12 +374,14 @@ func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 
 	h.Current(c)
 	require.Equal(t, 200, recorder.Code)
+	assert.Equal(t, "no-store", recorder.Header().Get("Cache-Control"))
 	var response struct {
 		Billing struct {
 			Configured      bool   `json:"configured"`
 			PortalAvailable bool   `json:"portal_available"`
 			Environment     string `json:"environment"`
 			ClientToken     string `json:"client_token"`
+			PWCustomerID    string `json:"pw_customer_id"`
 			TenantID        string `json:"tenant_id"`
 			Prices          map[string]map[string]struct {
 				PriceID string `json:"price_id"`
@@ -391,12 +394,58 @@ func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 	assert.True(t, response.Billing.PortalAvailable)
 	assert.Equal(t, "sandbox", response.Billing.Environment)
 	assert.Equal(t, "test_client_token", response.Billing.ClientToken)
+	assert.Equal(t, paddleCustomerID, response.Billing.PWCustomerID)
 	assert.Equal(t, "42", response.Billing.TenantID)
 	option := response.Billing.Prices["plus"]["monthly"]
 	assert.Equal(t, "pri_plus_monthly", option.PriceID)
 	assert.NotEmpty(t, option.Binding)
 	assert.True(t, h.paddle.validCheckoutBinding(42, option.PriceID, option.Binding))
-	assert.NotContains(t, recorder.Body.String(), "ctm_server_only")
+}
+
+func TestCurrentOmitsRetainCustomerWithoutAuthenticatedTenantOwnedPaddleCustomer(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
+			ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanFree),
+			PlanStatus:         "active",
+		}},
+		paddle: PaddleConfig{
+			Environment:   "sandbox",
+			APIKey:        "pdl_sdbx_apikey_test",
+			ClientToken:   "test_client_token",
+			WebhookSecret: "pdl_ntfset_secret",
+			Prices: map[types.ConsumerPlan]map[string]string{
+				types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+				types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+				types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+			},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entitlements/current", nil)
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+
+	h.Current(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.NotContains(t, recorder.Body.String(), "pw_customer_id")
+}
+
+func TestPaddleCustomerIDForRetainAcceptsOnlyOfficialCustomerIDs(t *testing.T) {
+	valid := "ctm_" + strings.Repeat("a", 26)
+	assert.Equal(t, valid, paddleCustomerIDForRetain("  "+valid+"  "))
+	for _, invalid := range []string{
+		"",
+		"ctm_" + strings.Repeat("a", 25),
+		"ctm_" + strings.Repeat("a", 27),
+		"ctm_" + strings.Repeat("A", 26),
+		"sub_" + strings.Repeat("a", 26),
+		"tenant-owned-id",
+	} {
+		assert.Empty(t, paddleCustomerIDForRetain(invalid))
+	}
 }
 
 func TestPaddleWebhookRejectsUnsignedCheckoutBinding(t *testing.T) {

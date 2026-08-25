@@ -253,6 +253,7 @@ const mountCheckout = async () => {
     const [preview] = await previewPaddlePrices({
       environment: config.environment,
       clientToken: config.client_token,
+      pwCustomerId: config.pw_customer_id,
       priceIds: [option.price_id],
     })
     previewPrice.value = preview?.formattedUnitSubtotal || ''
@@ -263,6 +264,7 @@ const mountCheckout = async () => {
   await openPaddleInlineCheckout({
     environment: config.environment,
     clientToken: config.client_token,
+    pwCustomerId: config.pw_customer_id,
     priceId: option.price_id,
     tenantId: config.tenant_id,
     checkoutBinding: option.checkout_binding,

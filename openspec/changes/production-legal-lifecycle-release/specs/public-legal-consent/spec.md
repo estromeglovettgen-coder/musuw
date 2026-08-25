@@ -34,3 +34,7 @@ rights with Musuw's voluntary terms.
 #### Scenario: Visitor reads purchase terms
 - **WHEN** a visitor opens the Terms, Refund, or Subscription document
 - **THEN** the page distinguishes Musuw product terms from Paddle's Merchant-of-Record terms, explains renewal and cancellation, links Paddle's current buyer/refund/support routes, preserves mandatory rights and Musuw's 30-day money-back guarantee, and does not invent a support deadline
+
+#### Scenario: Reviewer checks URL and video product boundaries
+- **WHEN** a visitor or merchant reviewer opens the Acceptable Use Policy
+- **THEN** URL imports and video uploads are limited to private knowledge indexing or analysis of content the user owns or is authorized to use, and the product does not represent itself as a streaming downloader, public video host, or redistribution service

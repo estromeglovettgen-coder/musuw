@@ -171,6 +171,19 @@ func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, 
 	return response
 }
 
+func paddleCustomerIDForRetain(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) != len("ctm_")+26 || !strings.HasPrefix(value, "ctm_") {
+		return ""
+	}
+	for _, char := range value[len("ctm_"):] {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') {
+			return ""
+		}
+	}
+	return value
+}
+
 type paddlePortalSessionCreator interface {
 	CreateCustomerPortalSession(context.Context, *paddle.CreateCustomerPortalSessionRequest) (*paddle.CustomerPortalSession, error)
 }
@@ -213,6 +226,7 @@ func NewEntitlementHandler(service interfaces.EntitlementService) *EntitlementHa
 }
 
 func (h *EntitlementHandler) Current(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	current, err := h.service.Current(c.Request.Context(), time.Now())
 	if err != nil {
 		_ = c.Error(err)
@@ -220,7 +234,14 @@ func (h *EntitlementHandler) Current(c *gin.Context) {
 	}
 	tenantID, _ := types.TenantIDFromContext(c.Request.Context())
 	portalAvailable := h.portal != nil && strings.TrimSpace(current.PaddleCustomerID) != ""
-	c.JSON(http.StatusOK, gin.H{"data": current, "billing": h.paddle.billingResponse(tenantID, current.Plan, portalAvailable)})
+	billing := h.paddle.billingResponse(tenantID, current.Plan, portalAvailable)
+	if customerID := paddleCustomerIDForRetain(current.PaddleCustomerID); tenantID != 0 && customerID != "" && h.paddle.Configured() && h.paddle.PortalConfigured() {
+		// Paddle Retain requires the authenticated customer's Paddle ID in the
+		// browser. This value is derived from signed provider state, never from
+		// request input, and grants no billing or entitlement authority.
+		billing["pw_customer_id"] = customerID
+	}
+	c.JSON(http.StatusOK, gin.H{"data": current, "billing": billing})
 }
 
 // PaddlePublicConfig exposes only the client-side values required to

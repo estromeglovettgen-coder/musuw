@@ -1,5 +1,33 @@
 # Verification evidence
 
+## 2026-08-24 production disposable E2E (current browser evidence)
+
+- One fresh disposable account completed password sign-up once, confirmation
+  once, authenticated-shell entry, logout once, and password re-login once;
+  each shell transition succeeded. Credentials and identity values are omitted.
+- One `Aurora Research Notes` knowledge base was created with a description.
+  Two Markdown sources and one MP4 source completed parsing, summaries,
+  chunks, indexes, and citation-backed retrieval. The root directory remained
+  visible with one direct file and one first-level `Operations` folder; sidebar
+  expanded/collapsed data-equivalence=true.
+- The account moved from Free to one monthly Plus checkout and one
+  same-subscription native Pro update. Signed delivery groups were `3` and
+  `2`, all with attempt count `1` and success=true. Final plan was active
+  monthly Pro, credits available=true, the hosted billing portal opened
+  read-only=true, and Live charge=false.
+- `Gemini 3.7 Flash` and `Claude Haiku 4.5` each completed one independent
+  session with a non-empty answer, error=false, and pending=false. The video
+  model was `google/gemini-2.5-flash`, with no override and one completed worker
+  at retry count zero.
+- Two readiness-only chats were deleted and two citation chats were retained.
+  The original Aurora fixture, disposable account, and active Pro subscription
+  remain intentionally retained. The separate one-copy knowledge base was
+  deleted once through the UI; active same-name knowledge bases changed from
+  `2` to `1`, the copy was soft-deleted with zero active documents and chunks,
+  and the surviving source retained four documents, 36 ready chunks, and 36
+  ready indexes with source unaffected=true. Worker terminal success=true and
+  worker errors=`0`. Account deletion=false. No new release claim is made here.
+
 ## 2026-08-23 production lifecycle and release
 
 - The complete production revision reached terminal success through exact-SHA
@@ -142,3 +170,40 @@ OpenRouter and reviewer-readiness changes.
 - Support phone task 1.6 remains open. This work is local and uncommitted; it
   made no Paddle Dashboard/default-link change, Live authorization, payment,
   refund, provider-state mutation, push, or deployment.
+
+## 2026-08-24 Paddle domain-review handoff and video boundary (local)
+
+- Paddle's current official Account Verification page separates domain review,
+  business verification where applicable, and identity verification. The
+  Domain Review page requires a clear product, pricing, included features,
+  navigable Terms/Refund/Privacy, operator or sole-proprietor brand, and HTTPS;
+  it may request a test account for a login-only subdomain.
+- The Seller Handbook separately requires buyer-support email and phone. A
+  phone is not listed as a standalone Domain Review form field, so it is not
+  represented as a technical submission gate; its absence remains a concrete
+  policy/approval risk and task 1.6 stays open. No phone, address, business
+  identity, or verification fact was inferred or fabricated.
+- A red-first bilingual legal contract added the matching video boundary:
+  uploads are for private analysis of content the user owns or is authorized to
+  use, not a public hosting, streaming, downloading, or redistribution service.
+  This complements the existing URL-import boundary without denying that the
+  private source must be stored and processed for the requested product flow.
+- `docs/PADDLE_LIVE_READINESS.md` now gives a credential-free handoff covering
+  the public-product main domain and authenticated app domain, normal
+  `/checkout` versus transaction/default-link `/pay`, secure reviewer-account
+  delivery, the support-phone risk, and the post-approval order for Dashboard
+  commercial settings, payout details, six Live recurring prices, client/API
+  credentials, exact notification destination, default payment link, edge
+  allowlisting, Retain, atomic release, signed no-charge proof, and only then a
+  separately authorized real-payment test.
+- Historical handoff and local-admin documents now state that an official Live
+  API read proves connectivity only, not account/domain approval or authority
+  to deploy Live. The metadata registry precisely distinguishes the app
+  `/pay` default-link surface from storefront plan handoff and app checkout.
+- The public deployment still returns success for the required product/legal
+  routes, but this new legal sentence and code work are local and therefore are
+  not claimed as deployed. Storefront passed its production build and all 53
+  tests; the broader frontend, Go, preflight, secret, registry, OpenSpec, and
+  diff checks are recorded in the entitlement verification.
+- No domain/Live application was submitted and no Paddle Dashboard object,
+  provider status, real charge, refund, commit, push, or deployment changed.

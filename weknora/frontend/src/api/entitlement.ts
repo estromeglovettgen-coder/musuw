@@ -19,6 +19,7 @@ export interface PaddleBillingConfig {
   portal_available: boolean
   environment?: 'sandbox' | 'live'
   client_token?: string
+  pw_customer_id?: string
   tenant_id?: string
   catalog?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCatalogOption>>>>
   prices?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCheckoutOption>>>>

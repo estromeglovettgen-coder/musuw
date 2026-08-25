@@ -9,6 +9,10 @@ hash 或供应商响应内容**。
 所有项目的密钥都只在这个注册表登记一次；其他仓库只保留指向当前权威来源的
 索引，不复制值。
 
+域名审核、support phone、`/pay` 与 `/checkout` 的区别、Live Dashboard
+操作顺序和阻断级别见
+[`docs/PADDLE_LIVE_READINESS.md`](PADDLE_LIVE_READINESS.md)。
+
 ## 1. 当前硬边界
 
 - 当前产品阶段只使用 **Paddle Sandbox**。Paddle Live 尚未申请、尚未授权，
@@ -121,8 +125,11 @@ ssh musuw-tokyo \
 | Google OAuth / SMTP | Supabase/OAuth 与邮件设置待按项目确认 | 当前 Musuw 没有 direct Google secret consumer；SMTP 由 Supabase Auth 配置边界管理 | Supabase/Google/provider dashboard；只验证 discovery、callback、OTP delivery，不记录 token 或邮件内容。 |
 
 Paddle 的 destination、domain 和默认链接含义也固定在中央注册表：Sandbox
-notification destination → app webhook；storefront plan CTA → app billing route。
-没有获授权的 Live destination/domain/default link，不得出现在部署输入或客服说明中。
+notification destination → app webhook；storefront plan CTA → app 的认证
+`/plans` → `/checkout`；Paddle transaction/default-payment link → app 的公开
+`/pay`。`/pay` 页面已经存在不等于 Paddle Dashboard 已完成对应环境的绑定；
+provider 状态必须另行核验。没有获授权的 Live destination/domain/default
+link，不得出现在部署输入或客服说明中。
 
 ## 6. 其他本地项目：只登记，不复制
 

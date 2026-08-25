@@ -16,7 +16,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
   "/contact"
 ]);
 
-const updated = "2026-08-23";
+const updated = "2026-08-24";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -464,6 +464,7 @@ const englishDocuments = {
         blocks: [
           p("Do not upload or process material that you lack the right to use. Do not infringe intellectual property, privacy, publicity, confidentiality, contractual, database, or other rights."),
           p("URL imports are for private knowledge indexing of content you own or are authorized to use; they are not a streaming downloader or content redistribution service."),
+          p("Video uploads are for private knowledge analysis of content you own or are authorized to use; musuw is not a public video hosting, streaming, downloading, or redistribution service."),
           p("Do not collect credentials, sensitive data, or personal data deceptively, or use musuw for unlawful surveillance or identification.")
         ]
       },
@@ -1102,6 +1103,7 @@ const chineseDocuments = {
         blocks: [
           p("不得上传或处理您无权使用的材料，不得侵犯知识产权、隐私权、公开权、保密义务、合同权利、数据库权利或其他权利。"),
           p("网页导入仅用于对您拥有或获授权使用的内容建立私人知识索引，不是流媒体下载或内容再分发服务。"),
+          p("视频上传仅用于对您拥有或获授权使用的内容进行私人知识分析；musuw 不是面向公众的视频托管、流媒体播放、下载或内容再分发服务。"),
           p("不得以欺骗方式收集凭据、敏感信息或个人信息，也不得将 musuw 用于非法监控或身份识别。")
         ]
       },

@@ -22,6 +22,10 @@
   fail-closed Paddle.js runtime config, make checkout-sync exhaustion
   recoverable without client-side entitlement authority, and add the bounded
   URL-import ownership/private-indexing disclosure in the product and AUP.
+- [x] 1.8 Add the matching bounded video-upload ownership/private-analysis
+  disclosure and one credential-free Paddle Live readiness handoff that
+  distinguishes the two domains, `/pay` from `/checkout`, Dashboard-only
+  prerequisites, support-phone risk, and the preserved Sandbox-only lock.
 
 ## 2. Local verification
 
@@ -29,6 +33,9 @@
   direct legal-link and no-checkbox continuation scenarios.
 - [x] 2.2 Run frontend, Go, release/source/secret contracts and strict OpenSpec
   validation for the complete current mainline.
+- [x] 2.3 Run the red-first media/Paddle frontend and handler contracts,
+  typecheck/build, static Sandbox-lock verification, registry checks, strict
+  OpenSpec validation, diff whitespace check, and one bounded adversarial review.
 
 ## 3. Production delivery
 
