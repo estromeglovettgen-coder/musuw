@@ -47,7 +47,11 @@ configuration mismatch.
    `musuw-release` runner performs the lightweight exact-SHA authorization, then
    a separate native x86_64 Linux runner with the exact `musuw-build-x64` label
    verifies runner and Docker daemon architecture plus the required regional
-   Docker Hub mirror, builds the static
+   Docker Hub mirror. Because that build job needs the approved source tree but
+   no Git history, it requests the full SHA from GitHub's official repository
+   archive API, follows the returned short-lived location with a separate
+   credential-free request to `codeload.github.com`, validates and stages the
+   single archive tree, then builds the static
    bundles and app/frontend images, pushes them to GHCR, and exports their
    validated immutable digests. The build runner receives no production secret
    or SSH input. Only after it succeeds does `musuw-release` upload the
@@ -187,6 +191,25 @@ mainland China. Checksum verification remains enabled. This covers the pinned
 `migrate` tool and the application's complete module graph without adding a
 custom proxy, copying an older prebuilt tool binary, or changing the module
 versions recorded by `go.mod` and `go.sum`.
+
+The Beijing build job deliberately does not run Git smart HTTP. Authorization
+and the `origin/main` ancestry proof remain on `musuw-release`, where the full
+checkout is required and available. The build job consumes only that approved
+40-character SHA through GitHub's documented `api.github.com` tar-archive
+endpoint and its official `codeload.github.com` redirect. The authenticated API
+request and archive download are separate, so the GitHub token is never sent to
+the redirect host; both requests have bounded connection, transfer, and retry
+limits, and every retry obtains a fresh redirect before GitHub's five-minute
+private-archive URL lifetime. Extraction occurs in an isolated runner-temporary
+directory with ambient tar options disabled, rejects a malformed or multi-root
+archive and special member types before extraction, preserves executable modes,
+validates the required build inputs, and replaces only the exact repository
+workspace after validation while retaining the prior tree until post-move
+checks pass. This removes unnecessary full heads/tags history from the regional
+build path without adding a proxy, unofficial mirror, source cache, or second
+release authority. GitHub's documented self-hosted-runner domains should still
+remain allowed for runner operation; if `github.com` routing later becomes
+stable, that does not justify restoring unused history to the build job.
 
 Do not export a separate `mode=max` registry cache on this host: its constrained
 uplink would upload intermediate cache records in addition to the release. The

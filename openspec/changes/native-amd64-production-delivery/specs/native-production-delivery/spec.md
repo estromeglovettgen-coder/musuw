@@ -30,6 +30,25 @@ The production workflow SHALL authorize an exact CI-green SHA, build both images
 - **WHEN** both immutable refs are available
 - **THEN** only the `musuw-release` deploy job receives the restricted SSH/server inputs and passes the refs through the existing exact-SHA forced-command release seam with no server-side build
 
+### Requirement: Official exact-SHA source archive materialization
+The trusted authorization job SHALL retain the full Git checkout required to prove successful CI and `origin/main` ancestry. The native build job MUST NOT fetch Git history from `github.com`; it SHALL request only the authorized full SHA through GitHub's official REST tar-archive endpoint and download the returned `codeload.github.com` location without forwarding the API credential. Both requests SHALL have bounded connection, transfer, and retry behavior, with a fresh redirect obtained for each attempt before its expiry. The build SHALL validate one safe archive root, reject special member types before extraction, and verify required build inputs and executable modes in runner-temporary staging before replacing only the exact repository workspace. It SHALL retain the prior workspace until the new tree passes post-move validation and restore or preserve the old tree on failure. The deploy job SHALL retain its exact-SHA checkout and existing manifest-backed server upload.
+
+#### Scenario: Git smart HTTP is regionally unavailable
+- **WHEN** the approved source archive endpoints are reachable but `github.com` Git fetch cannot establish a reliable connection
+- **THEN** the native build materializes the approved source tree without fetching branch, tag, or commit history and without adding an unofficial mirror or proxy
+
+#### Scenario: Archive redirect is untrusted
+- **WHEN** the authenticated GitHub archive request does not return an HTTPS `codeload.github.com` location
+- **THEN** the build fails without forwarding its token, installing dependencies, publishing an image, or mutating Tokyo
+
+#### Scenario: Archive tree is malformed or incomplete
+- **WHEN** the downloaded archive has multiple or unsafe roots, a symbolic link, a missing required lockfile/Dockerfile/BuildKit input, or loses the executable build helper
+- **THEN** the staged source is rejected before it can replace the exact runner workspace or begin construction
+
+#### Scenario: Deploy prepares the server source manifest
+- **WHEN** validated immutable image refs reach the deploy job
+- **THEN** the trusted release runner uses its exact-SHA Git checkout to materialize the existing allowlisted source manifest and restricted server upload unchanged
+
 ### Requirement: Bounded persistent local BuildKit cache
 The x64 build SHALL use the official `docker/setup-buildx-action@v3` with a fixed Docker-container builder name, the checked-in BuildKit configuration, and `keep-state: true`. Both image builds SHALL select that builder. The action SHALL recreate the container from current repository configuration while retaining the named local cache volume. Docker daemon bootstrap pulls and BuildKit Dockerfile-base pulls SHALL use the checked-in Tencent Cloud regional mirror configuration. BuildKit SHALL run at most two parallel build steps, and GC SHALL use a 10 GB maximum-use threshold while preserving at least 12 GB free space. The workflow MUST NOT import or export a separate registry cache or upload optional BuildKit record artifacts, while immutable release images MUST still be pushed to GHCR and normal workflow/release evidence MUST remain available.
 

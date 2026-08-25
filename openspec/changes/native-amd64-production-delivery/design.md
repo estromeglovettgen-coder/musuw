@@ -4,6 +4,8 @@ The current production image build targets `linux/amd64` from an ARM64 GitHub ru
 
 GitHub-hosted private-repository minutes are exhausted. A separate Tencent lightweight-cloud Linux host is already paid and has been reinstalled as a dedicated construction node: native x86_64, 4 vCPU, 4 GB RAM, 40 GB disk, Docker Engine and Buildx. Its public uplink is constrained, and direct Docker Hub registry access from the host timed out while Tencent Cloud's official regional mirror was immediately reachable. The Tokyo production host, forced-command SSH gate, immutable GHCR digest contract, and server runtime remain unchanged.
 
+The first native production attempt exposed a separate source-transport mismatch. `actions/checkout` used `fetch-depth: 0`, so it requested every branch and tag even though the build job consumes only one already-authorized source tree. The Beijing route to `github.com:443` then failed during TLS/connect establishment across all of the action's retries, while `api.github.com` and `codeload.github.com` remained promptly reachable. Reducing the fetch depth would reduce bytes only after a connection succeeds; it would not remove the failing Git endpoint.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -38,6 +40,14 @@ The x64 runner must be registered only to the canonical repository and used only
 
 This is smaller and less error-prone than a custom CLI bootstrap wrapper. Actionlint 1.7.12 understands the current action metadata; the older 1.7.7 unknown-input report is treated as a stale-metadata false positive rather than a reason to remove a supported input.
 
+### Materialize the authorized SHA through GitHub's official archive seam
+
+The trusted `musuw-release` authorization job retains its full checkout, successful-CI proof, and `origin/main` ancestry check. The native build job does not repeat those responsibilities or require a Git repository. It accepts only the resulting full SHA, asks GitHub's documented REST tar-archive endpoint for that exact ref, and downloads the returned short-lived `codeload.github.com` location without forwarding the API Authorization header.
+
+Both requests have explicit connection, transfer, and retry bounds. Each retry obtains a fresh redirect before GitHub's five-minute private-archive URL lifetime; the API response must be the expected redirect and the credential-free codeload response must be successful. The archive is extracted first under `RUNNER_TEMP`, must contain one safe top-level tree, only regular files/directories, no symlink, the required lockfiles/Dockerfiles/BuildKit input, and the executable static-build helper. Only the validated tree is copied to a same-filesystem staging directory and moved into the exact expected `GITHUB_WORKSPACE`; the prior tree is retained until post-move validation commits, and an unsuccessful replacement restores or preserves it for recovery. The build continues to inject the authorized SHA explicitly into browser and OCI revision metadata, while deploy retains its own exact-SHA Git checkout because the existing server source-manifest seam uses the Git index.
+
+`fetch-depth: 1` was rejected as the complete fix: it corrects the unnecessary all-history request but still depends on the same intermittently unreachable `github.com` Git transport. A cross-workflow CI artifact was also rejected for the primary path because it adds retention, storage, permission-preserving tar, and artifact-selection contracts when the official immutable-ref archive already supplies the needed tree. No third-party GitHub mirror, custom proxy, or second source authority is introduced.
+
 ### Prefer bounded local cache over maximum-mode registry export
 
 The Docker-container builder volume retains normal layers and BuildKit cache mounts, including `/go/pkg/mod` and `/root/.cache/go-build`, across jobs. `.github/buildkitd.production.toml` enables OCI-worker GC with `reservedSpace = "2GB"`, `maxUsedSpace = "10GB"`, and `minFreeSpace = "12GB"`. These are cache policies, not filesystem quotas; disk-free monitoring remains an operator responsibility. Docker daemon builder GC is intentionally not presented as an authority over this separate Docker-container cache.
@@ -67,6 +77,7 @@ The constant `production-release` concurrency group with `cancel-in-progress: fa
 - [The x64 runner is offline or mislabeled] → Authorization may finish, but build remains queued and deploy cannot start; runner service health is an activation prerequisite.
 - [The 4 GB host reaches memory or disk pressure] → Keep builds sequential, cap BuildKit at two vertices, enforce daemon/BuildKit GC, and observe available memory/disk during the first cold run.
 - [The regional mirror is removed or unavailable] → Fail the preflight when daemon configuration drifts; bounded pull failures stop build before any Tokyo mutation.
+- [The official GitHub source archive endpoints are unavailable] → Bounded requests fail the build before dependency work, image publication, or Tokyo mutation; do not fall back to a mutable branch, unofficial mirror, or custom proxy.
 - [A regional Debian or Go dependency endpoint is unavailable] → Bounded network commands fail the build before image publication; checksum authentication stays enabled, and no direct-default fallback silently reintroduces the observed timeout.
 - [A 3 Mbps uplink makes the first image push slow] → Avoid separate registry-cache export; record actual push bytes/time and rely on content-addressed blob reuse in later pushes.
 - [Persistent self-hosted execution expands trust] → Route only trusted production build code, inject no production secrets, and never point general CI or pull requests at `musuw-build-x64`.

@@ -10,6 +10,7 @@
 - [x] 2.2 Route production authorize/deploy to `musuw-release` and only build to `musuw-build-x64`, with native architecture preflight and no QEMU
 - [x] 2.3 Remove the production Environment and every secret reference from build; generate build/deploy auth-public input from the same three browser-visible repository variables
 - [x] 2.4 Validate and expose two immutable image digest refs from build, then consume them in deploy without rebuilding
+- [x] 2.5 Replace the build-only full-history checkout with GitHub's official bounded exact-SHA REST/codeload archive path while retaining Mac authorization and deploy Git contracts
 
 ## 3. Implement bounded persistent cache
 
@@ -26,6 +27,7 @@
 - [x] 4.1 Add red-first workflow contracts for routing, permissions, native preflight, no secrets/QEMU/hosted dependency, immutable outputs, and local-builder selection
 - [x] 4.2 Add Dockerfile and BuildKit contracts for cache mounts, GC/concurrency limits, apt policy, tool pin, and layer invalidation order
 - [x] 4.3 Configure current actionlint custom labels and document host boundaries, bandwidth choice, activation, cold-cache recovery, and rollback
+- [x] 4.4 Add a red-first contract for credential-separated archive retrieval, safe staging/workspace replacement, required source inputs, and the absence of Git fetch in the build job
 
 ## 5. Verify and activate
 

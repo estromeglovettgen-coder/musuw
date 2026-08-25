@@ -126,19 +126,6 @@ jobs:
       frontend_digest: ${{ steps.images.outputs.frontend_digest }}
       frontend_ref: ${{ steps.images.outputs.frontend_ref }}
     steps:
-      - name: Check out the exact requested revision
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.authorize.outputs.release_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Assert the detached checkout matches the approved SHA
-        env:
-          RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
-        run: |
-          set -euo pipefail
-          actual="$(git rev-parse HEAD)"
-          test "$actual" = "$RELEASE_SHA"
       - name: Assert native AMD64 build execution
         env:
           RUNNER_ARCH: ${{ runner.arch }}
@@ -155,6 +142,205 @@ jobs:
             *mirror.ccs.tencentyun.com*) ;;
             *) printf '%s\n' 'production Docker daemon is missing the required regional Docker Hub mirror' >&2; exit 1 ;;
           esac
+      - name: Materialize the exact approved source archive
+        id: source
+        env:
+          RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            printf '%s\n' 'approved source identity must be a lowercase full Git SHA' >&2
+            exit 1
+          }
+          test "$GITHUB_REPOSITORY" = estromeglovettgen-coder/musuw || {
+            printf '%s\n' 'source materialization is restricted to the canonical repository' >&2
+            exit 1
+          }
+          for command_name in curl tar awk cp find mktemp mv rm; do
+            command -v "$command_name" >/dev/null 2>&1 || {
+              printf '%s\n' "required source materialization command is unavailable: $command_name" >&2
+              exit 1
+            }
+          done
+          unset TAR_OPTIONS
+
+          test ! -L "$GITHUB_WORKSPACE" || {
+            printf '%s\n' 'runner repository workspace must not be a symbolic link' >&2
+            exit 1
+          }
+          test -d "$GITHUB_WORKSPACE" && test -d "$RUNNER_WORKSPACE"
+          workspace="$(cd "$GITHUB_WORKSPACE" && pwd -P)"
+          runner_workspace="$(cd "$RUNNER_WORKSPACE" && pwd -P)"
+          expected_workspace="$runner_workspace/${GITHUB_REPOSITORY##*/}"
+          test "$workspace" = "$expected_workspace" || {
+            printf '%s\n' 'runner repository workspace does not match the exact expected path' >&2
+            exit 1
+          }
+          test "$workspace" != / && test "$workspace" != "$RUNNER_WORKSPACE"
+
+          archive="$(mktemp "$RUNNER_TEMP/musuw-source-archive.XXXXXX.tar.gz")"
+          headers="$(mktemp "$RUNNER_TEMP/musuw-source-headers.XXXXXX")"
+          entries="$(mktemp "$RUNNER_TEMP/musuw-source-archive-entries.XXXXXX")"
+          entry_types="$(mktemp "$RUNNER_TEMP/musuw-source-archive-types.XXXXXX")"
+          source_stage="$(mktemp -d "$RUNNER_TEMP/musuw-source-tree.XXXXXX")"
+          publish_stage="$(mktemp -d "$RUNNER_WORKSPACE/.musuw-source-publish.XXXXXX")"
+          previous_workspace=''
+          previous_workspace_owned=false
+          workspace_swapped=false
+          workspace_committed=false
+          cleanup_tree() {
+            local tree="$1"
+            if [ -n "$tree" ] && [ -d "$tree" ]; then
+              find "$tree" -depth -delete 2>/dev/null || true
+            fi
+          }
+          cleanup() {
+            rm -f -- "$archive" "$headers" "$entries" "$entry_types"
+            cleanup_tree "$source_stage"
+            cleanup_tree "$publish_stage"
+            if [ "$workspace_committed" = true ]; then
+              cleanup_tree "$previous_workspace"
+            elif [ "$workspace_swapped" = true ]; then
+              cleanup_tree "$workspace"
+            fi
+            if [ "$workspace_committed" != true ] && [ "$previous_workspace_owned" = true ]; then
+              if [ ! -e "$workspace" ] && [ ! -L "$workspace" ] && \
+                mv "$previous_workspace" "$workspace" 2>/dev/null; then
+                previous_workspace=''
+                previous_workspace_owned=false
+              else
+                printf '%s\n' 'prior runner workspace was preserved for recovery after a failed source replacement' >&2
+              fi
+            fi
+          }
+          trap cleanup EXIT
+          cd "$RUNNER_TEMP"
+
+          # Private-repository archive locations expire after five minutes.
+          # Each bounded outer attempt therefore obtains a fresh location,
+          # then gives codeload at most 150 seconds to complete. The API token
+          # is sent only to the fixed canonical api.github.com endpoint.
+          archive_downloaded=false
+          for attempt in 1 2 3; do
+            : > "$headers"
+            if api_status="$(curl -q --proto '=https' --fail --silent --show-error \
+              --connect-timeout 15 --max-time 30 \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              --write-out '%{http_code}' \
+              --dump-header "$headers" --output /dev/null \
+              "https://api.github.com/repos/estromeglovettgen-coder/musuw/tarball/$RELEASE_SHA")" && \
+              [ "$api_status" = 302 ]; then
+              archive_url="$(awk '
+                BEGIN { IGNORECASE = 1 }
+                /^location:/ {
+                  sub(/^[^:]*:[[:space:]]*/, "")
+                  sub(/\r$/, "")
+                  value = $0
+                }
+                END { print value }
+              ' "$headers")"
+              case "$archive_url" in
+                "https://codeload.github.com/estromeglovettgen-coder/musuw/legacy.tar.gz/$RELEASE_SHA"|\
+                "https://codeload.github.com/estromeglovettgen-coder/musuw/legacy.tar.gz/$RELEASE_SHA"\?*) ;;
+                *) printf '%s\n' 'GitHub archive API returned an untrusted source location' >&2; exit 1 ;;
+              esac
+
+              # The fresh short-lived location authorizes this exact archive;
+              # intentionally send no Authorization header to codeload.
+              : > "$archive"
+              if codeload_status="$(curl -q --proto '=https' --fail --silent --show-error \
+                --connect-timeout 15 --max-time 150 \
+                --write-out '%{http_code}' \
+                --output "$archive" "$archive_url")" && \
+                [ "$codeload_status" = 200 ] && \
+                tar -tzf "$archive" >/dev/null 2>&1; then
+                archive_downloaded=true
+                break
+              fi
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$((attempt * 2))"
+            fi
+          done
+          [ "$archive_downloaded" = true ] || {
+            printf '%s\n' 'GitHub source archive download failed after three bounded attempts' >&2
+            exit 1
+          }
+          tar -tzf "$archive" > "$entries"
+          awk '
+            BEGIN { root = ""; count = 0 }
+            {
+              entry = $0
+              if (entry == "" || entry ~ /^\// || entry ~ /(^|\/)\.\.(\/|$)/) exit 1
+              split(entry, parts, "/")
+              if (parts[1] == "" || parts[1] == "." || parts[1] == "..") exit 1
+              if (root == "") root = parts[1]
+              if (parts[1] != root) exit 1
+              count++
+            }
+            END { if (count == 0 || root == "") exit 1 }
+          ' "$entries" || {
+            printf '%s\n' 'GitHub source archive has an invalid top-level tree' >&2
+            exit 1
+          }
+          tar -tvzf "$archive" > "$entry_types"
+          awk 'substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }' "$entry_types" || {
+            printf '%s\n' 'GitHub source archive contains an unsupported member type' >&2
+            exit 1
+          }
+          tar -xzf "$archive" --no-same-owner --strip-components=1 -C "$source_stage"
+          test ! -e "$source_stage/.git"
+          test -z "$(find "$source_stage" -type l -print -quit)" || {
+            printf '%s\n' 'GitHub source archive contains an unsupported symbolic link' >&2
+            exit 1
+          }
+          for required_path in \
+            .nvmrc \
+            auth/package-lock.json \
+            weknora/frontend/package-lock.json \
+            integration/weknora-production/Dockerfile.app.runtime \
+            integration/weknora-production/Dockerfile.frontend \
+            .github/buildkitd.production.toml \
+            scripts/weknora-production/build-static.sh; do
+            test -f "$source_stage/$required_path" && test ! -L "$source_stage/$required_path" || {
+              printf '%s\n' "GitHub source archive is missing a required build input: $required_path" >&2
+              exit 1
+            }
+          done
+          test -x "$source_stage/scripts/weknora-production/build-static.sh" || {
+            printf '%s\n' 'GitHub source archive did not preserve executable release inputs' >&2
+            exit 1
+          }
+
+          cp -a "$source_stage/." "$publish_stage/"
+          previous_workspace="$RUNNER_WORKSPACE/.musuw-source-previous.$$"
+          test ! -e "$previous_workspace" && test ! -L "$previous_workspace"
+          if [ -e "$workspace" ]; then
+            mv "$workspace" "$previous_workspace"
+            previous_workspace_owned=true
+          fi
+          if ! mv "$publish_stage" "$workspace"; then
+            printf '%s\n' 'validated source could not replace the runner workspace' >&2
+            exit 1
+          fi
+          publish_stage=''
+          workspace_swapped=true
+          cd "$workspace"
+          test -f .nvmrc
+          test -f auth/package-lock.json
+          test -f weknora/frontend/package-lock.json
+          test -f integration/weknora-production/Dockerfile.app.runtime
+          test -f integration/weknora-production/Dockerfile.frontend
+          test -f .github/buildkitd.production.toml
+          test -x scripts/weknora-production/build-static.sh
+          workspace_committed=true
+          cleanup_tree "$previous_workspace"
+          previous_workspace=''
+          previous_workspace_owned=false
+          printf '%s\n' 'official exact-SHA source archive materialized'
       - name: Set up Node for production browser build
         uses: actions/setup-node@v4
         with:

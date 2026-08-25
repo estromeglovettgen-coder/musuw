@@ -184,6 +184,11 @@ fail_contract "production immutable_ref input must be required" unless productio
 production_text = File.read(File.join(WORKFLOW_DIR, "deploy-production.yml"))
 production_build_steps = Array(production_build["steps"])
 production_deploy_steps = Array(production_deploy["steps"])
+production_authorize_steps = Array(production_authorize["steps"])
+production_authorize_checkout = production_authorize_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/checkout@") }
+production_build_checkout = production_build_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/checkout@") }
+production_source_archive = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "source" }
+production_deploy_checkout = production_deploy_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/checkout@") }
 production_node_setup = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Set up Node for production browser build" }
 production_native_preflight = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Assert native AMD64 build execution" }
 production_static_build = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build production browser bundles on native x64" }
@@ -193,6 +198,29 @@ production_frontend_image = production_build_steps.find { |step| step.is_a?(Hash
 production_images = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "images" }
 production_pin_images = production_deploy_steps.find { |step| step.is_a?(Hash) && step["name"] == "Pin approved GHCR image refs in the server input" }
 fail_contract "production browser build must cap the Node heap below the 4 GB host RAM" unless production_static_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=3072"
+fail_contract "production authorization must retain its full-history checkout for main ancestry proof" unless production_authorize_checkout&.dig("with", "fetch-depth") == 0 && production_authorize_checkout&.dig("with", "persist-credentials") == true
+fail_contract "production build must not depend on the intermittently unreachable Git smart-HTTP endpoint" if production_build_checkout || JSON.generate(production_build).include?("git fetch")
+fail_contract "production build must materialize the authorized SHA through GitHub's official archive API" unless production_source_archive&.dig("env", "RELEASE_SHA") == "${{ needs.authorize.outputs.release_sha }}" && production_source_archive&.dig("env", "GH_TOKEN") == "${{ github.token }}" && production_source_archive["run"].to_s.include?("https://api.github.com/repos/estromeglovettgen-coder/musuw/tarball/$RELEASE_SHA")
+source_archive_run = production_source_archive&.fetch("run", "").to_s
+fail_contract "production source archive must separate the authenticated API request from the credential-free codeload request" unless source_archive_run.include?("https://codeload.github.com/estromeglovettgen-coder/musuw/legacy.tar.gz/$RELEASE_SHA") && source_archive_run.include?("archive_url") && source_archive_run.include?("--dump-header") && !source_archive_run.match?(/curl[^\n]*(?:--location(?:-trusted)?|\s-L(?:\s|$))/)
+%w[--connect-timeout --max-time].each do |option|
+  fail_contract "production source archive is missing bounded curl option #{option}" unless source_archive_run.include?(option)
+end
+fail_contract "production source archive retries must refresh the private-repository redirect before its five-minute expiry" unless source_archive_run.include?("for attempt in 1 2 3") && source_archive_run.scan("--max-time 150").length == 1 && !source_archive_run.include?("--retry-max-time")
+fail_contract "production source archive must require the expected API redirect and a valid archive response" unless source_archive_run.include?('[ "$api_status" = 302 ]') && source_archive_run.include?('[ "$codeload_status" = 200 ]') && source_archive_run.include?('tar -tzf "$archive" >/dev/null 2>&1')
+fail_contract "production source token must be restricted to the fixed canonical API host" unless source_archive_run.include?("test \"$GITHUB_REPOSITORY\" = estromeglovettgen-coder/musuw") && source_archive_run.scan("Authorization: Bearer $GH_TOKEN").length == 1 && source_archive_run.include?("https://api.github.com/repos/estromeglovettgen-coder/musuw/tarball/$RELEASE_SHA")
+fail_contract "production source requests must ignore persistent runner curl configuration" unless source_archive_run.scan("curl -q ").length == 2
+fail_contract "production source archive must reject a mutable or malformed release identity" unless source_archive_run.include?("^[0-9a-f]{40}$")
+fail_contract "production source archive must validate one safe top-level tree before extraction" unless source_archive_run.include?("archive-entries") && source_archive_run.include?("--strip-components=1") && source_archive_run.include?("top-level")
+fail_contract "production source archive must reject special archive members before extraction" unless source_archive_run.include?("unset TAR_OPTIONS") && source_archive_run.include?("tar -tvzf") && source_archive_run.include?("unsupported member type")
+%w[.nvmrc auth/package-lock.json weknora/frontend/package-lock.json integration/weknora-production/Dockerfile.app.runtime integration/weknora-production/Dockerfile.frontend .github/buildkitd.production.toml scripts/weknora-production/build-static.sh].each do |required_path|
+  fail_contract "production source archive does not fail closed without #{required_path}" unless source_archive_run.include?(required_path)
+end
+fail_contract "production source archive must preserve executable release inputs" unless source_archive_run.include?("test -x") && source_archive_run.include?("scripts/weknora-production/build-static.sh")
+fail_contract "production source archive must stage under RUNNER_TEMP and replace only the exact repository workspace" unless source_archive_run.include?("$RUNNER_TEMP/") && source_archive_run.include?('expected_workspace="$runner_workspace/${GITHUB_REPOSITORY##*/}"') && source_archive_run.include?('test "$workspace" = "$expected_workspace"') && source_archive_run.include?("$GITHUB_WORKSPACE")
+fail_contract "production source replacement must preserve its prior workspace until post-move validation commits" unless source_archive_run.include?("previous_workspace_owned=false") && source_archive_run.include?('test ! -e "$previous_workspace" && test ! -L "$previous_workspace"') && source_archive_run.include?('if [ "$workspace_committed" != true ] && [ "$previous_workspace_owned" = true ]') && source_archive_run.index("workspace_swapped=true").to_i < source_archive_run.index("workspace_committed=true").to_i
+fail_contract "production build must materialize source before Node or image construction" unless production_build_steps.index(production_source_archive).to_i < production_build_steps.index(production_node_setup).to_i && production_build_steps.index(production_source_archive).to_i < production_build_steps.index(production_app_image).to_i
+fail_contract "production deploy must retain the exact-SHA Git checkout required by the source-manifest seam" unless production_deploy_checkout&.dig("with", "ref") == "${{ needs.authorize.outputs.release_sha }}" && production_deploy_checkout&.dig("with", "fetch-depth") == 0
 fail_contract "persistent self-hosted build must not upload a duplicate GitHub npm cache" if production_node_setup&.dig("with", "cache")
 fail_contract "production build must fail closed unless runner and Docker daemon are native x64" unless production_native_preflight&.dig("env", "RUNNER_ARCH") == "${{ runner.arch }}" && production_native_preflight["run"].to_s.include?("docker info") && production_native_preflight["run"].to_s.include?("x86_64")
 fail_contract "production build must fail closed unless the regional Docker Hub mirror is configured" unless production_native_preflight["run"].to_s.include?("mirror.ccs.tencentyun.com") && production_native_preflight["run"].to_s.include?("RegistryConfig.Mirrors")

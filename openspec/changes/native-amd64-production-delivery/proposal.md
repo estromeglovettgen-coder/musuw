@@ -6,6 +6,7 @@ Production images are currently built as `linux/amd64` on an Apple Silicon Docke
 
 - Keep CI and storefront on their existing `MUSUW_ACTIONS_RUNNER || ubuntu-latest` route, and keep lightweight production authorization plus deployment on the trusted `musuw-release` Mac runner.
 - Route only the heavy production build job to the exact `musuw-build-x64` label and fail closed unless the runner, kernel, and Docker server are native AMD64.
+- Materialize the already-authorized full SHA on that runner through GitHub's official REST tar-archive endpoint and credential-free `codeload.github.com` download, rather than fetching unused Git history over the regionally unstable Git smart-HTTP route.
 - Give the build job only package-write access and three browser-visible repository variables; do not attach the production Environment or reference any production/SSH secret.
 - Pass only validated immutable app/frontend digest references from build to the existing Mac deploy job, which continues the forced-command SHA-only Tokyo release seam without rebuilding.
 - Use the official Buildx setup action with one fixed Docker-container builder and `keep-state: true` so ordinary layers and Go cache mounts survive jobs while each container is recreated from the current checked-in configuration; bound automatic BuildKit GC to a 10 GB maximum-use threshold and a 12 GB free-space floor.
