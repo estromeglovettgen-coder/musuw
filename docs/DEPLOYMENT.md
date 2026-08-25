@@ -42,11 +42,16 @@ for or authorized, so a Live-shaped runtime input is a configuration mismatch.
    exact SHA,
    builds only `storefront/`, and deploys it to `musuw-site`. It then checks
    both public domains and the documented product handoff.
-4. The production workflow receives the same successful CI result, builds the
-   static bundles and app/frontend images on GitHub, pushes them to GHCR, pins
-   their returned digests in the deployment input, and uploads the allowlisted
-   source bundle through the restricted SSH gate. A manual full-SHA dispatch is
-   retained for an exact rerun; tag and branch-name releases are rejected.
+4. The production workflow receives the same successful CI result. The trusted
+   `musuw-release` runner performs the lightweight exact-SHA authorization, then
+   a separate native x86_64 Linux runner with the exact `musuw-build-x64` label
+   verifies both runner and Docker daemon architecture, builds the static
+   bundles and app/frontend images, pushes them to GHCR, and exports their
+   validated immutable digests. The build runner receives no production secret
+   or SSH input. Only after it succeeds does `musuw-release` upload the
+   allowlisted source bundle and those exact refs through the restricted SSH
+   gate. A manual full-SHA dispatch is retained for an exact rerun; tag and
+   branch-name releases are rejected.
 5. The server receives a short-lived GitHub token over the restricted stdin
    channel, logs in to GHCR using a temporary Docker config, pulls the exact
    digests, recreates only `app` and `frontend` with `--no-build`, and checks
@@ -73,7 +78,7 @@ private keys, dependency directories, generated output, logs, databases,
 volumes or server runtime files.
 
 The restricted SSH key and pinned `known_hosts` entry are supplied only to the
-production job. The gate must reject a mutable ref, an unsafe path, an
+deploy job, never to the native image-build job. The gate must reject a mutable ref, an unsafe path, an
 unallowlisted file or an arbitrary shell command. Runtime secrets, database and
 object-store data, Redis/Neo4j data and tunnel credentials stay on the server;
 the upload never copies or prints their values.
@@ -92,10 +97,14 @@ handoff. A Cloudflare command succeeding without these probes is not enough.
 
 ## Production server
 
-The production job receives a restricted `musuw-deploy` SSH key, pinned host
-keys, the selected full SHA and the two public environment files required by
-the image build. It also uses the ephemeral workflow `GITHUB_TOKEN` for GHCR;
-the server owns all private configuration and never stores that token.
+The native build job receives the selected full SHA, three browser-visible
+repository variables required by the auth shell, and a job-only `GITHUB_TOKEN`
+with `packages: write`. It is not attached to the `server-production`
+Environment. The deploy job receives the restricted `musuw-deploy` SSH key,
+pinned host keys, the existing public server environment file, the same three
+repository variables used to generate `auth-public.env`, the validated image
+refs, and a separate job-only token with `packages: read`. The server owns all
+private configuration and never stores that token.
 
 The fixed production Compose file is the only runtime definition. The update
 sequence is GitHub build/push → upload/verify SHA and manifest → GHCR login →
@@ -133,27 +142,61 @@ changes the Cloudflare Worker.
 
 ## Required repository settings
 
-Jobs use `MUSUW_ACTIONS_RUNNER` when that repository variable is non-empty and
-otherwise use GitHub's `ubuntu-latest` hosted pool. The override is only for a
-temporary, trusted Linux runner with Docker; remove the variable when that
-runner is retired so normal hosted routing resumes. Never expose a self-hosted
-release runner to untrusted pull-request code.
+Production authorization and deploy remain on the trusted `musuw-release`
+runner. Only the heavy image-build job uses the exact `musuw-build-x64` label.
+That runner must be a persistent native x86_64 Linux host with Docker and
+Buildx, and the job fails closed unless `runner.arch`, `uname`, and the Docker
+daemon all report x64/AMD64. It never installs QEMU. The Tokyo production host
+must never be registered as a GitHub Actions runner.
 
-Keep the following values in the target-specific GitHub Environments or on the
-server, never in the repository:
+This path does not require GitHub-hosted minutes, Docker Build Cloud, or another
+build provider. CI and storefront keep the existing
+`MUSUW_ACTIONS_RUNNER || ubuntu-latest` routing and MUST NOT use
+`musuw-build-x64`; the new 4 GB builder is reserved for production construction.
+The build runner must not store or receive the production SSH key, host data,
+server environment secrets, or Tokyo credentials.
+
+The workflow creates or reuses the fixed Docker CLI builder
+`musuw-production-native-amd64-v1`. Its Docker-container volume preserves
+ordinary layers plus Go module/compiler cache mounts across jobs. The checked-in
+BuildKit configuration enables GC with a 10 GB `maxUsedSpace` threshold and a
+12 GB `minFreeSpace` floor, and caps BuildKit at two parallel steps. The browser
+build runs before the image builds with a 3072 MiB Node heap ceiling so the
+4 GB host retains headroom for Docker and existing services. If the builder or
+cache is absent, the same workflow performs a correct cold build.
+
+Do not export a separate `mode=max` registry cache on this host: its constrained
+uplink would upload intermediate cache records in addition to the release. The
+two immutable GHCR images are still pushed normally, and GHCR skips blobs it
+already has by content digest. Optional BuildKit record-artifact upload is
+disabled, while the job summary, logs, image digests, and release manifest stay
+available. The app Dockerfile keeps stable apt/tool and runtime-package layers
+ahead of the release SHA. Public npm downloads use the self-hosted runner's
+ordinary persistent npm cache instead of uploading a duplicate Actions cache.
+
+Keep the following values in GitHub settings or on the server, never in checked-in
+files:
 
 - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- workflow `GITHUB_TOKEN` package-write permission for the production job
+- workflow `GITHUB_TOKEN` package-write permission for the native build job
+  and package-read permission for the deploy job
+- repository variable `MUSUW_ACTIONS_RUNNER=musuw-release` while CI/storefront
+  must avoid the exhausted GitHub-hosted allowance
+- repository variables `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_WEKNORA_OAUTH_CLIENT_ID`; these are
+  browser-visible public-client values, never server/admin credentials
 - the restricted production SSH key and pinned `known_hosts`
-- public build environment files for the application and auth shell
+- the public server environment file; `auth-public.env` is generated from the
+  same three repository variables used by the browser build
 - all database, object-store, model, OIDC, Supabase service and tunnel secrets
 
 The target-specific split is intentionally narrow:
 
-| GitHub Environment | Allowed production inputs |
+| Settings location | Allowed production inputs |
 | --- | --- |
 | `storefront-production` | Cloudflare account ID and Worker-scoped API token only. |
-| `server-production` | Restricted SSH key/host settings, public build environment files, and the job-only `GITHUB_TOKEN` package permission. |
+| Repository variables | Three browser-visible `VITE_*` values shared by native build and deploy. |
+| `server-production` | Restricted SSH key/host settings and the public server input file consumed only by deploy; least-privilege package-read token. |
 
 Private runtime credentials remain on the server; they are not copied into the
 repository, Cloudflare Worker, or browser bundles.

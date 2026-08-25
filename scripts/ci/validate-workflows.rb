@@ -75,8 +75,9 @@ documents.each do |name, document|
   end
   document.fetch("jobs").each do |job_name, job|
     next unless job.is_a?(Hash)
+    next if name == "deploy-production.yml"
 
-    fail_contract "#{name}.jobs.#{job_name} must retain the hosted-runner fallback" unless job["runs-on"] == expected_runner
+    fail_contract "#{name}.jobs.#{job_name} must retain the existing runner-variable fallback" unless job["runs-on"] == expected_runner
   end
 end
 
@@ -157,10 +158,23 @@ production_workflow_run = production_on.fetch("workflow_run", {})
 fail_contract "production deploy must listen for completed CI workflow runs on main" unless production_workflow_run.dig("workflows") == ["CI"] && production_workflow_run.dig("types") == ["completed"] && production_workflow_run.dig("branches") == ["main"]
 fail_contract "production deploy must retain a manual exact-SHA dispatch" unless production_on.key?("workflow_dispatch")
 fail_contract "production deploy must not publish from a tag or ordinary push trigger" if production_on.key?("push")
-fail_contract "production deploy must have an authorization dependency" unless production.dig("jobs", "deploy", "needs") == "authorize"
 fail_contract "production deploy must not cancel an active release" unless production.dig("concurrency", "cancel-in-progress") == false
+production_authorize = production.dig("jobs", "authorize")
+production_build = production.dig("jobs", "build")
+production_deploy = production.dig("jobs", "deploy")
+assert_hash(production_authorize, "deploy-production.yml.jobs.authorize")
+assert_hash(production_build, "deploy-production.yml.jobs.build")
+assert_hash(production_deploy, "deploy-production.yml.jobs.deploy")
+fail_contract "production authorization must remain on the trusted lightweight release runner" unless production_authorize["runs-on"] == "musuw-release"
+fail_contract "production image build must run on the isolated native x64 build runner" unless production_build["runs-on"] == "musuw-build-x64"
+fail_contract "production build must follow authorization" unless production_build["needs"] == "authorize"
+fail_contract "production deploy must wait for authorization and immutable images" unless Array(production_deploy["needs"]) == %w[authorize build]
+fail_contract "production deploy must remain on the restricted Mac runner" unless production_deploy["runs-on"] == "musuw-release"
 fail_contract "production deploy must use its isolated server environment" unless production.dig("jobs", "deploy", "environment") == "server-production"
-fail_contract "production deploy package write must be scoped to the deploy job" unless production.dig("jobs", "deploy", "permissions") == { "contents" => "read", "actions" => "read", "packages" => "write" }
+fail_contract "production build runner must not receive the production environment" if production_build.key?("environment")
+fail_contract "production package write must be scoped to the image-build job" unless production_build["permissions"] == { "contents" => "read", "packages" => "write" }
+fail_contract "constrained build runner must not upload optional BuildKit record artifacts" unless production_build.dig("env", "DOCKER_BUILD_RECORD_UPLOAD") == "false"
+fail_contract "production deploy must receive only read access to GHCR" unless production_deploy["permissions"] == { "contents" => "read", "packages" => "read" }
 fail_contract "production authorization must not receive package write" if production.dig("jobs", "authorize", "permissions", "packages") == "write"
 production_dispatch = production_on.fetch("workflow_dispatch")
 assert_hash(production_dispatch, "deploy-production.yml.workflow_dispatch")
@@ -168,9 +182,51 @@ production_input = production_dispatch.dig("inputs", "immutable_ref")
 assert_hash(production_input, "deploy-production.yml.workflow_dispatch.inputs.immutable_ref")
 fail_contract "production immutable_ref input must be required" unless production_input["required"] == true && production_input["type"] == "string"
 production_text = File.read(File.join(WORKFLOW_DIR, "deploy-production.yml"))
-production_steps = Array(production.dig("jobs", "deploy", "steps"))
-production_static_build = production_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build production browser bundles on GitHub" }
-fail_contract "production browser build must pin NODE_OPTIONS to a 4096 MiB heap" unless production_static_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
+production_build_steps = Array(production_build["steps"])
+production_deploy_steps = Array(production_deploy["steps"])
+production_node_setup = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Set up Node for production browser build" }
+production_native_preflight = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Assert native AMD64 build execution" }
+production_static_build = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build production browser bundles on native x64" }
+production_buildx = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "buildx" }
+production_app_image = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "build_app" }
+production_frontend_image = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "build_frontend" }
+production_images = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "images" }
+production_pin_images = production_deploy_steps.find { |step| step.is_a?(Hash) && step["name"] == "Pin approved GHCR image refs in the server input" }
+fail_contract "production browser build must cap the Node heap below the 4 GB host RAM" unless production_static_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=3072"
+fail_contract "persistent self-hosted build must not upload a duplicate GitHub npm cache" if production_node_setup&.dig("with", "cache")
+fail_contract "production build must fail closed unless runner and Docker daemon are native x64" unless production_native_preflight&.dig("env", "RUNNER_ARCH") == "${{ runner.arch }}" && production_native_preflight["run"].to_s.include?("docker info") && production_native_preflight["run"].to_s.include?("x86_64")
+fail_contract "production native preflight must run before dependency installation or construction" unless production_build_steps.index(production_native_preflight).to_i < production_build_steps.index(production_node_setup).to_i && production_build_steps.index(production_native_preflight).to_i < production_build_steps.index(production_static_build).to_i
+fail_contract "production workflow must not install QEMU emulation" if JSON.generate(production_build).include?("setup-qemu")
+fail_contract "production must use the official Buildx setup action" unless production_buildx&.fetch("uses", "").start_with?("docker/setup-buildx-action@v3")
+fail_contract "production Buildx must reuse fixed self-hosted state" unless production_buildx&.dig("with", "name") == "musuw-production-native-amd64-v1" && production_buildx&.dig("with", "driver") == "docker-container" && production_buildx&.dig("with", "buildkitd-config") == ".github/buildkitd.production.toml" && production_buildx&.dig("with", "keep-state") == true
+buildkit_config_path = File.join(ROOT, ".github", "buildkitd.production.toml")
+fail_contract "production BuildKit GC configuration is missing" unless File.file?(buildkit_config_path)
+buildkit_config = File.read(buildkit_config_path)
+fail_contract "production BuildKit cache must enable GC with bounded disk and concurrency" unless buildkit_config.include?("gc = true") && buildkit_config.include?('maxUsedSpace = "10GB"') && buildkit_config.include?('minFreeSpace = "12GB"') && buildkit_config.include?("max-parallelism = 2")
+expected_image_outputs = {
+  "app_digest" => "${{ steps.images.outputs.app_digest }}",
+  "app_ref" => "${{ steps.images.outputs.app_ref }}",
+  "frontend_digest" => "${{ steps.images.outputs.frontend_digest }}",
+  "frontend_ref" => "${{ steps.images.outputs.frontend_ref }}"
+}
+fail_contract "production build must expose validated immutable image digests and refs" unless production_build["outputs"] == expected_image_outputs
+fail_contract "production build must validate both image digests before publishing job outputs" unless production_images && production_images["run"].to_s.include?("APP_DIGEST") && production_images["run"].to_s.include?("FRONTEND_DIGEST") && production_images["run"].to_s.include?("sha256:")
+fail_contract "production deploy must consume the build job's immutable image refs" unless production_pin_images&.dig("env", "APP_IMAGE") == "${{ needs.build.outputs.app_ref }}" && production_pin_images&.dig("env", "FRONTEND_IMAGE") == "${{ needs.build.outputs.frontend_ref }}"
+fail_contract "production deploy must not rebuild images or browser bundles" if JSON.generate(production_deploy).match?(/build-push-action|setup-buildx-action|Build production browser bundles/)
+fail_contract "production image build must not reference any production secret" if JSON.generate(production_build).match?(/secrets\.|MUSUW_PRODUCTION_SSH|WEKNORA_DEPLOY_SSH|KNOWN_HOSTS/)
+%w[VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY VITE_WEKNORA_OAUTH_CLIENT_ID].each do |public_name|
+  fail_contract "production image build must receive public #{public_name} as a repository variable" unless JSON.generate(production_build).include?("vars.#{public_name}")
+  fail_contract "production deploy must consume the same public #{public_name} repository variable" unless JSON.generate(production_deploy).include?("vars.#{public_name}")
+end
+fail_contract "production workflow must not retain a second auth-public secret source" if production_text.include?("MUSUW_AUTH_PUBLIC_ENV")
+{
+  "application" => production_app_image,
+  "frontend" => production_frontend_image
+}.each do |image_name, step|
+  fail_contract "production #{image_name} image build is missing" unless step
+  fail_contract "production #{image_name} image must select the persistent local builder" unless step.dig("with", "builder") == "${{ steps.buildx.outputs.name }}"
+  fail_contract "production #{image_name} image must not upload a separate registry cache over the constrained uplink" if step.fetch("with", {}).key?("cache-from") || step.fetch("with", {}).key?("cache-to")
+end
 %w[WEKNORA_DEPLOY_KNOWN_HOSTS_FILE WEKNORA_DEPLOY_SSH_KEY WEKNORA_DEPLOY_REMOTE WEKNORA_DEPLOY_REVISION].each do |name|
   fail_contract "production deploy missing #{name} seam" unless production_text.include?(name)
 end

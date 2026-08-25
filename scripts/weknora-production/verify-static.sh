@@ -405,4 +405,40 @@ if ! grep -Fq 'go mod download || go mod download || go mod download' "$repo_roo
     exit 1
 fi
 
+runtime_dockerfile="$repo_root/integration/weknora-production/Dockerfile.app.runtime"
+if ! grep -Fq "github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1" "$runtime_dockerfile" ||
+   grep -Fq "github.com/golang-migrate/migrate/v4/cmd/migrate@latest" "$runtime_dockerfile"; then
+    printf '%s\n' 'production app Dockerfile does not pin the migrate tool to the application dependency version' >&2
+    exit 1
+fi
+
+if ! grep -Fq -- '--mount=type=cache,target=/go/pkg/mod' "$runtime_dockerfile" ||
+   ! grep -Fq -- '--mount=type=cache,target=/root/.cache/go-build' "$runtime_dockerfile"; then
+    printf '%s\n' 'production app Dockerfile does not use both Go module and compilation caches' >&2
+    exit 1
+fi
+
+if [ "$(grep -Fc 'Acquire::Retries "5";' "$runtime_dockerfile")" -lt 2 ] ||
+   [ "$(grep -Fc 'Acquire::http::Timeout "30";' "$runtime_dockerfile")" -lt 2 ] ||
+   [ "$(grep -Fc 'Acquire::https::Timeout "30";' "$runtime_dockerfile")" -lt 2 ]; then
+    printf '%s\n' 'production app Dockerfile lacks bounded apt retry and timeout policy in both stages' >&2
+    exit 1
+fi
+
+commit_arg_lines="$(grep -n '^ARG COMMIT_ID_ARG=' "$runtime_dockerfile" | cut -d: -f1)"
+builder_commit_arg_line="$(printf '%s\n' "$commit_arg_lines" | sed -n '1p')"
+runtime_commit_arg_line="$(printf '%s\n' "$commit_arg_lines" | sed -n '2p')"
+builder_source_line="$(grep -n '^COPY \. \.$' "$runtime_dockerfile" | cut -d: -f1)"
+builder_build_line="$(grep -n 'make build-prod' "$runtime_dockerfile" | cut -d: -f1)"
+runtime_packages_line="$(grep -n 'build-essential postgresql-client' "$runtime_dockerfile" | cut -d: -f1)"
+runtime_label_line="$(grep -n '^LABEL org.opencontainers.image.version=' "$runtime_dockerfile" | cut -d: -f1)"
+if [ -z "$builder_commit_arg_line" ] || [ -z "$runtime_commit_arg_line" ] ||
+   [ "$builder_commit_arg_line" -le "$builder_source_line" ] ||
+   [ "$builder_commit_arg_line" -ge "$builder_build_line" ] ||
+   [ "$runtime_commit_arg_line" -le "$runtime_packages_line" ] ||
+   [ "$runtime_commit_arg_line" -ge "$runtime_label_line" ]; then
+    printf '%s\n' 'volatile release SHA invalidates stable dependency or runtime package layers' >&2
+    exit 1
+fi
+
 printf '%s\n' 'production static contract is green: amd64, staged loopback frontend, edge web alias, file secrets, native Nginx routes'
