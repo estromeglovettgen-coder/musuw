@@ -45,7 +45,7 @@ The hosted build SHALL create a uniquely named job-scoped Docker-container build
 - **THEN** it removes the job-scoped builder and temporary Docker credentials without preserving cross-run state
 
 ### Requirement: Stable dependency layers and bounded network work
-The application Dockerfile SHALL use official Debian HTTPS sources with bounded retries and HTTP/HTTPS timeouts, `proxy.golang.org,direct`, and `sum.golang.org`. It MUST NOT require regional mirror arguments or disable Go checksum verification. The migrate tool SHALL remain pinned to the application dependency version, and Go build steps SHALL retain module/compiler cache mounts within the job-scoped builder.
+The application Dockerfile SHALL use the official signed Debian sources from its pinned base images with bounded retries and HTTP/HTTPS timeouts, `proxy.golang.org,direct`, and `sum.golang.org`. It MUST NOT require regional mirror arguments, force HTTPS before the slim runtime can install CA certificates, or disable Go checksum verification. The migrate tool SHALL remain pinned to the application dependency version, and Go build steps SHALL retain module/compiler cache mounts within the job-scoped builder.
 
 #### Scenario: Official dependency endpoint stalls
 - **WHEN** apt or Go dependency acquisition cannot make progress

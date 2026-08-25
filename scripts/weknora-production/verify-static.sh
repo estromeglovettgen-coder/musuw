@@ -437,8 +437,8 @@ if [ "$(grep -Fc 'Acquire::Retries "5";' "$runtime_dockerfile")" -lt 2 ] ||
     exit 1
 fi
 
-if [ "$(grep -Fc "sed -i 's@http://deb.debian.org@https://deb.debian.org@g'" "$runtime_dockerfile")" -ne 2 ]; then
-    printf '%s\n' 'production app Dockerfile does not upgrade official Debian sources to HTTPS in both stages' >&2
+if grep -Fq "sed -i 's@http://deb.debian.org@https://deb.debian.org@g'" "$runtime_dockerfile"; then
+    printf '%s\n' 'production app Dockerfile must not require HTTPS before the slim runtime installs ca-certificates' >&2
     exit 1
 fi
 
