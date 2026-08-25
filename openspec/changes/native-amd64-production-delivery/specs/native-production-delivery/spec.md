@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Native build-only runner routing
-The production workflow SHALL run lightweight authorization and deployment on `musuw-release` and SHALL run only its heavy construction job on the exact `musuw-build-x64` label. CI and storefront SHALL retain their existing runner-variable fallback and MUST NOT use the x64 production-builder label. No required job SHALL use a GitHub-hosted-only label, and the Tokyo production host MUST NOT be a runner.
+The production workflow SHALL run lightweight authorization and deployment on `musuw-release` and SHALL run only its heavy construction job on the exact `musuw-build-x64` label. CI and storefront SHALL retain their existing runner-variable fallback and MUST NOT use the x64 production-builder label. No required job SHALL use a GitHub-hosted-only label, the Beijing build job MUST contain only inline `run` steps and no `uses:` step, and the Tokyo production host MUST NOT be a runner.
 
 #### Scenario: Production build starts natively
 - **WHEN** an authorized production revision reaches the build job
@@ -11,15 +11,19 @@ The production workflow SHALL run lightweight authorization and deployment on `m
 - **WHEN** no GitHub-hosted private-repository minutes are available
 - **THEN** authorize, native build, and deploy can still be scheduled on their explicit self-hosted labels
 
+#### Scenario: Regional Action archive transport is unavailable
+- **WHEN** the Runner cannot download a referenced Action bundle before job execution
+- **THEN** the native build has no Action reference to prepare and can reach its inline native preflight and official exact-SHA source retrieval
+
 #### Scenario: General CI is scheduled
 - **WHEN** a CI or storefront job is evaluated
 - **THEN** it uses `MUSUW_ACTIONS_RUNNER || ubuntu-latest` and cannot consume `musuw-build-x64`
 
 ### Requirement: Secret-free immutable build handoff
-The production workflow SHALL authorize an exact CI-green SHA, build both images in a distinct x64 job, and deploy only after both image outputs validate. The build job SHALL have only `contents: read` and `packages: write`, MUST NOT attach the production Environment or reference any `secrets.*` value, and SHALL accept only the three documented browser-visible repository variables. Build and deploy SHALL generate auth-public input from those same variables rather than independent secret sources. The deploy job SHALL have only `contents: read` and `packages: read`, SHALL consume the returned immutable refs, and MUST NOT rebuild browser bundles or images.
+The production workflow SHALL authorize an exact CI-green SHA, build both images in a distinct x64 job, and deploy only after both image outputs validate. The build job SHALL have only `contents: read` and `packages: write`, MUST NOT attach the production Environment or reference any `secrets.*` value, and SHALL accept only the three documented browser-visible repository variables. It SHALL authenticate to GHCR over stdin using a runner-temporary Docker configuration, log out, and delete that configuration in an always-running cleanup. Build and deploy SHALL generate auth-public input from those same variables rather than independent secret sources. The deploy job SHALL have only `contents: read` and `packages: read`, SHALL consume the returned immutable refs, and MUST NOT rebuild browser bundles or images.
 
 #### Scenario: Native build succeeds
-- **WHEN** both image pushes return lowercase SHA-256 digests
+- **WHEN** both image pushes write metadata bound to their expected immutable tags, matching descriptor digests, registry-resolvable lowercase SHA-256 digests, and remote tags that resolve to those same digests
 - **THEN** the build job exposes exactly the app/frontend digests and canonical `ghcr.io/...@sha256:...` refs for deploy
 
 #### Scenario: Build output is incomplete or malformed
@@ -50,7 +54,7 @@ The trusted authorization job SHALL retain the full Git checkout required to pro
 - **THEN** the trusted release runner uses its exact-SHA Git checkout to materialize the existing allowlisted source manifest and restricted server upload unchanged
 
 ### Requirement: Bounded persistent local BuildKit cache
-The x64 build SHALL use the official `docker/setup-buildx-action@v3` with a fixed Docker-container builder name, the checked-in BuildKit configuration, and `keep-state: true`. Both image builds SHALL select that builder. The action SHALL recreate the container from current repository configuration while retaining the named local cache volume. Docker daemon bootstrap pulls and BuildKit Dockerfile-base pulls SHALL use the checked-in Tencent Cloud regional mirror configuration. BuildKit SHALL run at most two parallel build steps, and GC SHALL use a 10 GB maximum-use threshold while preserving at least 12 GB free space. The workflow MUST NOT import or export a separate registry cache or upload optional BuildKit record artifacts, while immutable release images MUST still be pushed to GHCR and normal workflow/release evidence MUST remain available.
+The x64 build SHALL use the host's preinstalled official Docker/Buildx CLI with a fixed Docker-container builder name, the checked-in BuildKit configuration, and `docker buildx rm --keep-state` cleanup. Buildx configuration, state, and logs SHALL use the exact private persistent `$RUNNER_WORKSPACE/.musuw-production-buildx-config` directory, while GHCR credentials SHALL use only a separate runner-temporary `DOCKER_CONFIG`. Both image builds SHALL select that builder. Every job SHALL remove an already registered same-name builder with `--keep-state`, recreate the container from current repository configuration, and retain the same-name local cache volume; cleanup SHALL delete the credential configuration without deleting persistent Buildx client state. Docker daemon bootstrap pulls and BuildKit Dockerfile-base pulls SHALL use the checked-in Tencent Cloud regional mirror configuration. BuildKit SHALL run at most two parallel build steps, and GC SHALL use a 10 GB maximum-use threshold while preserving at least 12 GB free space. The workflow MUST NOT import or export a separate registry cache or create optional build-record artifacts, while immutable release images MUST still be pushed to GHCR with minimum provenance and normal workflow/release evidence MUST remain available.
 
 #### Scenario: Warm build reuses local state
 - **WHEN** the persistent x64 runner retains the named builder volume
@@ -58,11 +62,15 @@ The x64 build SHALL use the official `docker/setup-buildx-action@v3` with a fixe
 
 #### Scenario: Warm cache survives the job
 - **WHEN** a trusted production build finishes
-- **THEN** the builder container may be removed while its named local state remains available for the next serialized production build
+- **THEN** always-running CLI cleanup removes the builder container with `--keep-state` while its named local state remains available for the next serialized production build
+
+#### Scenario: Prior build is interrupted before cleanup
+- **WHEN** persistent Buildx metadata still contains the fixed builder at the start of a later serialized job
+- **THEN** setup removes only that fixed builder with `--keep-state` and recreates it from the current checked-in configuration without persisting GHCR credentials
 
 #### Scenario: Builder state is absent
 - **WHEN** the builder or its local volume does not exist
-- **THEN** the setup action creates it and the workflow performs a correct native cold build whose newly pushed image digests can be deployed
+- **THEN** the inline CLI setup creates it and the workflow performs a correct native cold build whose newly pushed image digests can be deployed
 
 #### Scenario: Direct Docker Hub access is unavailable
 - **WHEN** the native host cannot reach Docker Hub directly but its configured Tencent Cloud mirror is reachable
@@ -104,7 +112,7 @@ Volatile release metadata MUST NOT invalidate stable apt/tool or runtime-package
 - **THEN** BuildKit reuses those layers and cache mounts instead of downloading or compiling them from the beginning
 
 ### Requirement: Serialized activation and safe rollback
-Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially in one build job, with the browser V8 old-space ceiling set to 3072 MiB. Activation SHALL require an online `musuw-build-x64` runner and the three public repository variables, but MUST NOT require Actions billing, Docker Build Cloud, another build provider, deletion of existing host services, or production-host mutation.
+Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially in one build job, with the browser V8 old-space ceiling set to 3072 MiB. The browser build SHALL select and verify the exact `.nvmrc` Node version already present in the Runner toolcache and MUST NOT download a runtime. Activation SHALL require an online `musuw-build-x64` runner, its preinstalled Node/Docker/Buildx toolchain, and the three public repository variables, but MUST NOT require Actions billing, Docker Build Cloud, another build provider, deletion of existing host services, or production-host mutation.
 
 #### Scenario: Two releases are requested
 - **WHEN** a release is already active and another is triggered

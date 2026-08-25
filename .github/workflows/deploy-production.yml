@@ -116,8 +116,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      DOCKER_BUILD_RECORD_UPLOAD: "false"
     runs-on: musuw-build-x64
     timeout-minutes: 90
     outputs:
@@ -131,6 +129,31 @@ jobs:
           RUNNER_ARCH: ${{ runner.arch }}
         run: |
           set -euo pipefail
+          test -n "${RUNNER_WORKSPACE:-}"
+          test -n "${GITHUB_ENV:-}"
+          test -d "$RUNNER_WORKSPACE"
+          test ! -L "$RUNNER_WORKSPACE"
+          for command_name in grep install stat; do
+            command -v "$command_name" >/dev/null 2>&1
+          done
+          buildx_config="$RUNNER_WORKSPACE/.musuw-production-buildx-config"
+          case "$buildx_config" in
+            "$RUNNER_WORKSPACE"/.musuw-production-buildx-config) ;;
+            *) printf '%s\n' 'persistent Buildx configuration escaped runner workspace' >&2; exit 1 ;;
+          esac
+          if [ -e "$buildx_config" ] || [ -L "$buildx_config" ]; then
+            test -d "$buildx_config"
+            test ! -L "$buildx_config"
+            test -O "$buildx_config"
+          else
+            install -d -m 700 "$buildx_config"
+          fi
+          chmod 700 "$buildx_config"
+          test -O "$buildx_config"
+          test "$(stat -c '%a' "$buildx_config")" = 700
+          export BUILDX_CONFIG="$buildx_config"
+          printf 'BUILDX_CONFIG=%s\n' "$buildx_config" >> "$GITHUB_ENV"
+
           test "$RUNNER_ARCH" = X64
           test "$(uname -m)" = x86_64
           daemon_arch="$(docker info --format '{{.Architecture}}')"
@@ -142,6 +165,12 @@ jobs:
             *mirror.ccs.tencentyun.com*) ;;
             *) printf '%s\n' 'production Docker daemon is missing the required regional Docker Hub mirror' >&2; exit 1 ;;
           esac
+          docker buildx version
+          docker buildx create --help | grep -Fq -- '--buildkitd-config'
+          docker buildx rm --help | grep -Fq -- '--keep-state'
+          docker buildx build --help | grep -Fq -- '--metadata-file'
+          docker buildx build --help | grep -Fq -- '--attest'
+          docker buildx imagetools inspect --help | grep -Fq -- '--format'
       - name: Materialize the exact approved source archive
         id: source
         env:
@@ -341,10 +370,22 @@ jobs:
           previous_workspace=''
           previous_workspace_owned=false
           printf '%s\n' 'official exact-SHA source archive materialized'
-      - name: Set up Node for production browser build
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
+      - name: Select preinstalled Node for production browser build
+        id: node
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TOOL_CACHE:-}"
+          test -n "${GITHUB_PATH:-}"
+          IFS= read -r node_version < .nvmrc
+          [[ "$node_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf '%s\n' "$node_version" | cmp -s - .nvmrc
+          node_bin="$RUNNER_TOOL_CACHE/node/$node_version/x64/bin"
+          test -x "$node_bin/node"
+          test -x "$node_bin/npm"
+          test "$("$node_bin/node" --version)" = "v$node_version"
+          test "$("$node_bin/node" -p 'process.arch')" = x64
+          [[ "$("$node_bin/npm" --version)" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
+          printf '%s\n' "$node_bin" >> "$GITHUB_PATH"
       - name: Install auth shell dependencies for build-static
         run: npm ci --prefix auth --ignore-scripts
       - name: Set up temporary public build inputs
@@ -382,70 +423,204 @@ jobs:
           WEKNORA_PRODUCTION_RUNTIME_DIR="$RUNTIME_DIR" \
           WEKNORA_PRODUCTION_REVISION="$RELEASE_SHA" \
             bash scripts/weknora-production/build-static.sh
-      - name: Set up persistent native AMD64 BuildKit builder
+      - name: Create persistent native AMD64 BuildKit builder
         id: buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          name: musuw-production-native-amd64-v1
-          driver: docker-container
-          buildkitd-config: .github/buildkitd.production.toml
-          keep-state: true
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Build and push immutable application image
-        id: build_app
-        uses: docker/build-push-action@v6
-        with:
-          context: ./weknora
-          file: ./integration/weknora-production/Dockerfile.app.runtime
-          builder: ${{ steps.buildx.outputs.name }}
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/estromeglovettgen-coder/musuw-app:${{ needs.authorize.outputs.release_sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
-          build-args: |
-            APT_MIRROR_ARG=mirrors.cloud.tencent.com
-            VERSION_ARG=0.7.2
-            COMMIT_ID_ARG=${{ needs.authorize.outputs.release_sha }}
-            BUILD_TIME_ARG=production-native-x64-runner
-            GO_VERSION_ARG=go1.26
-      - name: Build and push immutable frontend image
-        id: build_frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./integration/weknora-production/Dockerfile.frontend
-          builder: ${{ steps.buildx.outputs.name }}
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/estromeglovettgen-coder/musuw-frontend:${{ needs.authorize.outputs.release_sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
-          build-args: |
-            VERSION_ARG=0.7.2
-            REVISION_ARG=${{ needs.authorize.outputs.release_sha }}
-      - name: Validate immutable image outputs
-        id: images
         env:
-          APP_DIGEST: ${{ steps.build_app.outputs.digest }}
-          FRONTEND_DIGEST: ${{ steps.build_frontend.outputs.digest }}
+          BUILDER_NAME: musuw-production-native-amd64-v1
+          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
         run: |
           set -euo pipefail
-          [[ "$APP_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          [[ "$FRONTEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$BUILDX_CONFIG" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config"
+          test -d "$BUILDX_CONFIG"
+          test ! -L "$BUILDX_CONFIG"
+          test -O "$BUILDX_CONFIG"
+          test "$(stat -c '%a' "$BUILDX_CONFIG")" = 700
+          case "$DOCKER_CONFIG" in
+            "$RUNNER_TEMP"/musuw-production-docker-config) ;;
+            *) printf '%s\n' 'temporary Docker configuration escaped runner temp' >&2; exit 1 ;;
+          esac
+          if [ -e "$DOCKER_CONFIG" ] || [ -L "$DOCKER_CONFIG" ]; then
+            test -d "$DOCKER_CONFIG" && test ! -L "$DOCKER_CONFIG"
+            find "$DOCKER_CONFIG" -depth -delete
+          fi
+
+          install -d -m 700 "$DOCKER_CONFIG"
+          if docker buildx inspect --builder "$BUILDER_NAME" >/dev/null 2>&1; then
+            docker buildx rm --force --keep-state "$BUILDER_NAME"
+          fi
+          test -f .github/buildkitd.production.toml
+          test ! -L .github/buildkitd.production.toml
+          created_name="$(docker buildx create \
+            --name "$BUILDER_NAME" \
+            --driver docker-container \
+            --buildkitd-config .github/buildkitd.production.toml \
+            --use)"
+          test "$created_name" = "$BUILDER_NAME"
+          docker buildx inspect --builder "$BUILDER_NAME" --bootstrap
+      - name: Log in to GitHub Container Registry
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -d "$DOCKER_CONFIG"
+          test ! -L "$DOCKER_CONFIG"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "$GHCR_USERNAME" \
+            --password-stdin
+      - name: Build, push, and validate immutable images
+        id: images
+        env:
+          BUILDER_NAME: musuw-production-native-amd64-v1
+          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
+          RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_SERVER_URL" = https://github.com
+          test "$GITHUB_REPOSITORY" = estromeglovettgen-coder/musuw
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          test -d "$DOCKER_CONFIG"
+          test ! -L "$DOCKER_CONFIG"
+          test "$BUILDX_CONFIG" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config"
+          test -d "$BUILDX_CONFIG"
+          test ! -L "$BUILDX_CONFIG"
+          test -O "$BUILDX_CONFIG"
+          test "$(stat -c '%a' "$BUILDX_CONFIG")" = 700
+
+          app_repository=ghcr.io/estromeglovettgen-coder/musuw-app
+          frontend_repository=ghcr.io/estromeglovettgen-coder/musuw-frontend
+          app_tag="$app_repository:$RELEASE_SHA"
+          frontend_tag="$frontend_repository:$RELEASE_SHA"
+          app_metadata="$RUNNER_TEMP/musuw-app-build-metadata.json"
+          frontend_metadata="$RUNNER_TEMP/musuw-frontend-build-metadata.json"
+          provenance="type=provenance,mode=min,inline-only=true,builder-id=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+          rm -f -- "$app_metadata" "$frontend_metadata"
+          cleanup_metadata() {
+            rm -f -- "$app_metadata" "$frontend_metadata"
+          }
+          trap cleanup_metadata EXIT
+
+          extract_registry_digest() {
+            local metadata_path="$1"
+            local expected_tag="$2"
+            local repository="$3"
+            local digest tag_digest
+            test -f "$metadata_path" || return 1
+            test ! -L "$metadata_path" || return 1
+            digest="$(node - "$metadata_path" "$expected_tag" <<'NODE'
+          const fs = require("node:fs");
+          const [metadataPath, expectedTag] = process.argv.slice(2);
+          const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+          if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") {
+            throw new Error("Buildx metadata must be an object");
+          }
+          const digest = metadata["containerimage.digest"];
+          if (typeof digest !== "string" || !/^sha256:[0-9a-f]{64}$/.test(digest)) {
+            throw new Error("Buildx metadata has no valid registry digest");
+          }
+          const descriptor = metadata["containerimage.descriptor"];
+          if (descriptor !== undefined &&
+              (!descriptor || Array.isArray(descriptor) || typeof descriptor !== "object" || descriptor.digest !== digest)) {
+            throw new Error("Buildx descriptor digest does not match the registry digest");
+          }
+          const imageNames = metadata["image.name"];
+          if (typeof imageNames !== "string" ||
+              !imageNames.split(",").map((name) => name.trim()).includes(expectedTag)) {
+            throw new Error("Buildx metadata is not bound to the expected immutable tag");
+          }
+          process.stdout.write(digest);
+          NODE
+            )" || return 1
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+            docker buildx imagetools inspect "$repository@$digest" >/dev/null || return 1
+            tag_digest="$(docker buildx imagetools inspect "$expected_tag" \
+              --format '{{json .Manifest}}' | node -e '
+                const fs = require("node:fs");
+                const manifest = JSON.parse(fs.readFileSync(0, "utf8"));
+                if (!manifest || Array.isArray(manifest) || typeof manifest !== "object" ||
+                    typeof manifest.digest !== "string" || !/^sha256:[0-9a-f]{64}$/.test(manifest.digest)) {
+                  throw new Error("Registry tag has no valid manifest digest");
+                }
+                process.stdout.write(manifest.digest);
+              ')" || return 1
+            test "$tag_digest" = "$digest" || return 1
+            printf '%s' "$digest"
+          }
+
+          docker buildx build \
+            --builder "$BUILDER_NAME" \
+            --platform linux/amd64 \
+            --push \
+            --metadata-file "$app_metadata" \
+            --attest "$provenance" \
+            --tag "$app_tag" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
+            --build-arg APT_MIRROR_ARG=mirrors.cloud.tencent.com \
+            --build-arg VERSION_ARG=0.7.2 \
+            --build-arg COMMIT_ID_ARG="$RELEASE_SHA" \
+            --build-arg BUILD_TIME_ARG=production-native-x64-runner \
+            --build-arg GO_VERSION_ARG=go1.26 \
+            --file ./integration/weknora-production/Dockerfile.app.runtime \
+            ./weknora
+          app_digest="$(extract_registry_digest "$app_metadata" "$app_tag" "$app_repository")"
+
+          docker buildx build \
+            --builder "$BUILDER_NAME" \
+            --platform linux/amd64 \
+            --push \
+            --metadata-file "$frontend_metadata" \
+            --attest "$provenance" \
+            --tag "$frontend_tag" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
+            --build-arg VERSION_ARG=0.7.2 \
+            --build-arg REVISION_ARG="$RELEASE_SHA" \
+            --file ./integration/weknora-production/Dockerfile.frontend \
+            .
+          frontend_digest="$(extract_registry_digest "$frontend_metadata" "$frontend_tag" "$frontend_repository")"
+
           {
-            printf 'app_digest=%s\n' "$APP_DIGEST"
-            printf 'app_ref=ghcr.io/estromeglovettgen-coder/musuw-app@%s\n' "$APP_DIGEST"
-            printf 'frontend_digest=%s\n' "$FRONTEND_DIGEST"
-            printf 'frontend_ref=ghcr.io/estromeglovettgen-coder/musuw-frontend@%s\n' "$FRONTEND_DIGEST"
+            printf 'app_digest=%s\n' "$app_digest"
+            printf 'app_ref=%s@%s\n' "$app_repository" "$app_digest"
+            printf 'frontend_digest=%s\n' "$frontend_digest"
+            printf 'frontend_ref=%s@%s\n' "$frontend_repository" "$frontend_digest"
           } >> "$GITHUB_OUTPUT"
+      - name: Remove temporary registry credentials and builder container
+        if: always()
+        env:
+          BUILDER_NAME: musuw-production-native-amd64-v1
+          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
+        run: |
+          set -uo pipefail
+          cleanup_status=0
+          buildx_config_valid=false
+          if test "${BUILDX_CONFIG:-}" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config" && \
+              test -d "$BUILDX_CONFIG" && test ! -L "$BUILDX_CONFIG" && \
+              test -O "$BUILDX_CONFIG" && test "$(stat -c '%a' "$BUILDX_CONFIG")" = 700; then
+            buildx_config_valid=true
+          else
+            printf '%s\n' 'persistent Buildx configuration failed cleanup validation' >&2
+            cleanup_status=1
+          fi
+          case "$DOCKER_CONFIG" in
+            "$RUNNER_TEMP"/musuw-production-docker-config) ;;
+            *) printf '%s\n' 'temporary Docker cleanup path escaped runner temp' >&2; exit 1 ;;
+          esac
+          if [ -d "$DOCKER_CONFIG" ] && [ ! -L "$DOCKER_CONFIG" ]; then
+            docker logout ghcr.io >/dev/null 2>&1 || cleanup_status=1
+            if [ "$buildx_config_valid" = true ] && \
+                docker buildx inspect --builder "$BUILDER_NAME" >/dev/null 2>&1; then
+              docker buildx rm --force --keep-state "$BUILDER_NAME" || cleanup_status=1
+            fi
+            find "$DOCKER_CONFIG" -depth -delete || cleanup_status=1
+          elif [ -e "$DOCKER_CONFIG" ] || [ -L "$DOCKER_CONFIG" ]; then
+            rm -f -- "$DOCKER_CONFIG" || cleanup_status=1
+          fi
+          exit "$cleanup_status"
       - name: Remove temporary public build inputs
         if: always()
         env:

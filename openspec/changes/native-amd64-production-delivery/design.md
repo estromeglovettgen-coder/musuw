@@ -6,6 +6,8 @@ GitHub-hosted private-repository minutes are exhausted. A separate Tencent light
 
 The first native production attempt exposed a separate source-transport mismatch. `actions/checkout` used `fetch-depth: 0`, so it requested every branch and tag even though the build job consumes only one already-authorized source tree. The Beijing route to `github.com:443` then failed during TLS/connect establishment across all of the action's retries, while `api.github.com` and `codeload.github.com` remained promptly reachable. Reducing the fetch depth would reduce bytes only after a connection succeeds; it would not remove the failing Git endpoint.
 
+After the exact-SHA REST/codeload source path removed that Git dependency, the next attempt failed earlier still: the self-hosted Runner's ActionManager tried to download `docker/setup-buildx-action` from codeload before executing any inline `run` step, and every bounded regional request timed out. GitHub prepares referenced actions at job start, so replacing only checkout or only one Docker action cannot fix this class; any `uses:` in the Beijing job retains an Action download prerequisite before native preflight or source materialization can run.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -34,11 +36,13 @@ CI and storefront retain `${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}`. 
 
 The x64 runner must be registered only to the canonical repository and used only by the trusted CI-green production workflow. Docker socket access is effectively host-privileged, so routing pull-request or general CI jobs to it would violate the isolation boundary. The runner polls GitHub outbound and does not require a new inbound service.
 
-### Use the official setup action with fixed persistent state
+### Use only the preinstalled official CLIs in the regional build job
 
-`docker/setup-buildx-action@v3` declares `name` and `keep-state` in its official action metadata. The workflow uses a fixed `musuw-production-native-amd64-v1` Docker-container builder, the checked-in BuildKit config, and `keep-state: true`. The action removes the container after a job but retains its named BuildKit volume, so the next trusted production job applies the current repository configuration while reusing cached state. Both build-push steps explicitly select the action's builder output.
+The Beijing job contains no `uses:` step. It selects the exact `.nvmrc` version from the Runner-managed Node toolcache, verifies Node, npm, and x64 architecture, and appends only that existing binary directory to `GITHUB_PATH`; it does not download another runtime. Docker Engine and Buildx are host prerequisites and are feature-checked before source or dependency work.
 
-This is smaller and less error-prone than a custom CLI bootstrap wrapper. Actionlint 1.7.12 understands the current action metadata; the older 1.7.7 unknown-input report is treated as a stale-metadata false positive rather than a reason to remove a supported input.
+The workflow binds Buildx configuration, state, and logs to the exact owner-only `$RUNNER_WORKSPACE/.musuw-production-buildx-config` directory while reserving a separate runner-temporary `DOCKER_CONFIG` for the GHCR credential. If persistent Buildx metadata shows that a prior interrupted job left `musuw-production-native-amd64-v1` registered, setup removes that exact builder with `--keep-state` before `docker buildx create` supplies the current checked-in BuildKit config and bootstraps it again. The activation inventory confirmed that no same-name registration or container remains from the former action while its single same-name state volume is present, so the first CLI creation has no name conflict and reuses the intended cache. At job end it logs out of GHCR, executes `docker buildx rm --force --keep-state`, deletes only the temporary Docker credential directory, and retains the persistent Buildx client state. The container is therefore recreated from current repository configuration each job, interrupted registrations are recoverable, and the same-name BuildKit volume retains ordinary layers and cache mounts without persisting a registry token. This is the direct official CLI equivalent of the prior action's cleanup/keep-state behavior and adds no wrapper, dependency, proxy, or service.
+
+Both images are pushed by explicit `docker buildx build` commands using the same fixed builder. Each command retains the former tags, OCI labels, build arguments, native platform, and private-repository default `mode=min,inline-only=true` provenance with the exact GitHub Actions run attempt URL as `builder-id`. Buildx writes a separate metadata file for each push; the workflow requires a matching immutable tag, descriptor/digest consistency, a lowercase SHA-256 digest, successful immutable-ref registry inspection, and the remote tag resolving to that same digest before exposing either canonical digest ref. Every validation failure returns explicitly from the command-substituted shell function rather than relying on Bash `errexit`, whose suppression in that context could otherwise accept a mismatch.
 
 ### Materialize the authorized SHA through GitHub's official archive seam
 
@@ -54,7 +58,7 @@ The Docker-container builder volume retains normal layers and BuildKit cache mou
 
 The daemon routes the one-time `moby/buildkit` bootstrap pull through `https://mirror.ccs.tencentyun.com`, while BuildKit routes `docker.io` Dockerfile bases through the same official regional mirror. The workflow's native preflight verifies that the daemon mirror is installed before dependency work. This removes the observed direct-Docker-Hub timeout without adding a mirror service or a second artifact pipeline.
 
-The app and frontend build actions do not use `cache-from` or `cache-to`. A `mode=max` registry export would upload intermediate records over the constrained uplink after each build. Optional BuildKit record-artifact upload is also disabled; GitHub job summaries/logs and the repository's release evidence remain. Immutable image push remains mandatory; GHCR's content-addressed registry skips already-present blobs, so unchanged release layers are not uploaded twice. If the local builder state disappears, BuildKit performs a correct cold build and produces new validated image digests. BuildKit is capped at two parallel steps, matching the 4 GB host's memory constraint while retaining limited concurrency.
+The app and frontend build commands do not use `cache-from` or `cache-to`. A `mode=max` registry export would upload intermediate records over the constrained uplink after each build. Optional BuildKit record-artifact upload is also disabled; GitHub job summaries/logs and the repository's release evidence remain. Immutable image push remains mandatory; GHCR's content-addressed registry skips already-present blobs, so unchanged release layers are not uploaded twice. If the local builder state disappears, BuildKit performs a correct cold build and produces new validated image digests. BuildKit is capped at two parallel steps, matching the 4 GB host's memory constraint while retaining limited concurrency.
 
 ### Keep volatile metadata after stable dependency work
 
@@ -64,7 +68,7 @@ The workflow supplies the Dockerfile's existing `APT_MIRROR_ARG` with Tencent Cl
 
 ### Keep production secrets on the deploy side
 
-The build job is not attached to `server-production` and contains no `secrets.*` reference. Its only configuration inputs are three browser-visible repository variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_WEKNORA_OAUTH_CLIENT_ID`; the fixed public origin is written directly. The build token has only `contents: read` and `packages: write`.
+The build job is not attached to `server-production` and contains no `secrets.*` reference. Its only configuration inputs are three browser-visible repository variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_WEKNORA_OAUTH_CLIENT_ID`; the fixed public origin is written directly. The build token has only `contents: read` and `packages: write`. GHCR authentication uses stdin and a runner-temporary `DOCKER_CONFIG`, which is logged out and deleted by an `always()` cleanup step.
 
 The deploy job waits for authorization and both image digests, has `contents: read` and `packages: read`, and alone receives the restricted SSH/server inputs. It generates `auth-public.env` from the same three repository variables, eliminating a second configuration source that could drift from the browser bundle. It validates the two canonical `repository@sha256` refs before calling the unchanged release seam with `--no-build` behavior on Tokyo.
 
@@ -78,6 +82,7 @@ The constant `production-release` concurrency group with `cancel-in-progress: fa
 - [The 4 GB host reaches memory or disk pressure] → Keep builds sequential, cap BuildKit at two vertices, enforce daemon/BuildKit GC, and observe available memory/disk during the first cold run.
 - [The regional mirror is removed or unavailable] → Fail the preflight when daemon configuration drifts; bounded pull failures stop build before any Tokyo mutation.
 - [The official GitHub source archive endpoints are unavailable] → Bounded requests fail the build before dependency work, image publication, or Tokyo mutation; do not fall back to a mutable branch, unofficial mirror, or custom proxy.
+- [The preinstalled Node/Docker/Buildx toolchain drifts] → Exact version/architecture and required CLI feature checks fail before dependency work; update the persistent host deliberately rather than downloading tools inside the regional job.
 - [A regional Debian or Go dependency endpoint is unavailable] → Bounded network commands fail the build before image publication; checksum authentication stays enabled, and no direct-default fallback silently reintroduces the observed timeout.
 - [A 3 Mbps uplink makes the first image push slow] → Avoid separate registry-cache export; record actual push bytes/time and rely on content-addressed blob reuse in later pushes.
 - [Persistent self-hosted execution expands trust] → Route only trusted production build code, inject no production secrets, and never point general CI or pull requests at `musuw-build-x64`.
@@ -86,7 +91,7 @@ The constant `production-release` concurrency group with `cancel-in-progress: fa
 
 ## Migration Plan
 
-1. Register the native x86_64 runner to the canonical repository with the exact custom label `musuw-build-x64`; verify Docker/Buildx access and do not install production credentials.
+1. Register the native x86_64 runner to the canonical repository with the exact custom label `musuw-build-x64`; install the exact `.nvmrc` Node release in its Runner toolcache, verify Docker/Buildx access, and do not install production credentials.
 2. Install `.github/docker-daemon.production-builder.json`, validate it with `dockerd --validate`, restart Docker while the runner is idle, and verify the regional mirror through `docker info`.
 3. Configure the three browser-visible `VITE_*` repository variables by copying their current public-client values; never use a service-role/admin key.
 4. Merge the workflow, daemon/BuildKit configuration, Dockerfile, contracts, and documentation after the separate auth bridge is complete.

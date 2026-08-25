@@ -51,7 +51,10 @@ configuration mismatch.
    no Git history, it requests the full SHA from GitHub's official repository
    archive API, follows the returned short-lived location with a separate
    credential-free request to `codeload.github.com`, validates and stages the
-   single archive tree, then builds the static
+   single archive tree. The build job intentionally contains no `uses:` step,
+   so the regional runner does not pre-download Action bundles before its first
+   command. It selects the exact `.nvmrc` Node release already in the runner
+   toolcache, then builds the static
    bundles and app/frontend images, pushes them to GHCR, and exports their
    validated immutable digests. The build runner receives no production secret
    or SSH input. Only after it succeeds does `musuw-release` upload the
@@ -162,10 +165,16 @@ build provider. CI and storefront keep the existing
 The build runner must not store or receive the production SSH key, host data,
 server environment secrets, or Tokyo credentials.
 
-The workflow creates or reuses the fixed Docker CLI builder
+The workflow creates the fixed Docker CLI builder
 `musuw-production-native-amd64-v1`. Its Docker-container volume preserves
-ordinary layers plus Go module/compiler cache mounts across releases, while the
-official action recreates the container from the current checked-in config. The checked-in BuildKit
+ordinary layers plus Go module/compiler cache mounts across releases. Every job
+uses the preinstalled official Buildx CLI and a private, persistent
+`$RUNNER_WORKSPACE/.musuw-production-buildx-config` client-state directory. If
+an interrupted prior job left the fixed builder registered, setup first removes
+that exact builder with `--keep-state`; it then recreates the container from the
+current checked-in config. Normal cleanup removes it the same way while keeping
+both the client-state directory and same-name cache volume.
+The checked-in BuildKit
 configuration enables GC with a 10 GB `maxUsedSpace` threshold and a 12 GB
 `minFreeSpace` floor, and caps BuildKit at two parallel steps. The browser build
 runs before the image builds with a 3072 MiB Node heap ceiling so
@@ -192,7 +201,10 @@ mainland China. Checksum verification remains enabled. This covers the pinned
 custom proxy, copying an older prebuilt tool binary, or changing the module
 versions recorded by `go.mod` and `go.sum`.
 
-The Beijing build job deliberately does not run Git smart HTTP. Authorization
+The Beijing build job deliberately does not run Git smart HTTP or reference a
+GitHub Action. GitHub Runner prepares every referenced Action before executing
+the first inline command, and the regional codeload failure therefore cannot be
+fixed by replacing checkout alone. Authorization
 and the `origin/main` ancestry proof remain on `musuw-release`, where the full
 checkout is required and available. The build job consumes only that approved
 40-character SHA through GitHub's documented `api.github.com` tar-archive
@@ -211,12 +223,36 @@ release authority. GitHub's documented self-hosted-runner domains should still
 remain allowed for runner operation; if `github.com` routing later becomes
 stable, that does not justify restoring unused history to the build job.
 
+Node is not installed during a release. The job reads `.nvmrc`, requires the
+matching x64 Node and npm executables under `RUNNER_TOOL_CACHE`, validates their
+versions and architecture, and adds that existing directory to `GITHUB_PATH`.
+Docker and Buildx are likewise persistent host prerequisites; feature checks
+for checked-in daemon configuration, metadata output, attestations, and
+keep-state cleanup fail before dependency work when the host drifts.
+
+GHCR login uses the job token only over stdin and writes it to a
+runner-temporary `DOCKER_CONFIG`; Buildx configuration, state, and logs instead
+use the separate owner-only `BUILDX_CONFIG`, which never stores the registry
+credential. Activation confirmed that the former action left no same-name
+builder registration or container and retained exactly the same-name state
+volume expected by Buildx. Always-running cleanup logs out, removes the current
+fixed builder container while preserving that named volume, and only then
+deletes the temporary Docker configuration. Each of the two explicit Buildx pushes
+retains the previous tags, labels, arguments, native platform, and
+private-repository `mode=min,inline-only=true` provenance with the exact Actions
+run-attempt URL as builder identity. Build metadata must name the expected
+immutable tag and yield matching descriptor and registry digests; the canonical
+digest and its remote tag are both resolved from GHCR and must match before
+deploy receives it. The digest validator returns failures explicitly at every
+check because Bash `errexit` is not a safe failure boundary inside a function
+invoked through command substitution.
+
 Do not export a separate `mode=max` registry cache on this host: its constrained
 uplink would upload intermediate cache records in addition to the release. The
 two immutable GHCR images are still pushed normally, and GHCR skips blobs it
-already has by content digest. Optional BuildKit record-artifact upload is
-disabled, while the job summary, logs, image digests, and release manifest stay
-available. The app Dockerfile keeps stable apt/tool and runtime-package layers
+already has by content digest. The CLI path creates no optional Docker Action
+build-record artifact, while job logs, image digests, provenance, and the
+release manifest stay available. The app Dockerfile keeps stable apt/tool and runtime-package layers
 ahead of the release SHA. Public npm downloads use the self-hosted runner's
 ordinary persistent npm cache instead of uploading a duplicate Actions cache.
 
