@@ -10,23 +10,26 @@ import {
   WorkflowSection
 } from "./components/HomeSections";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { applyHomepagePlanPresentation } from "./planPresentation";
 
 export function HomePage({ copy }) {
+  const homepageCopy = applyHomepagePlanPresentation(copy);
+
   return (
     <>
-      <SiteHeader copy={copy} />
+      <SiteHeader copy={homepageCopy} />
       <main>
-        <HeroScene copy={copy} />
-        <FeaturesSection copy={copy} />
-        <WorkflowSection copy={copy} />
-        <BenefitsSection copy={copy} />
-        <PricingSection copy={copy} />
-        <ComparisonSection copy={copy} />
-        <BlogPreviewSection copy={copy} />
-        <FAQSection copy={copy} />
-        <FinalCTA copy={copy} />
+        <HeroScene copy={homepageCopy} />
+        <FeaturesSection copy={homepageCopy} />
+        <WorkflowSection copy={homepageCopy} />
+        <BenefitsSection copy={homepageCopy} />
+        <PricingSection copy={homepageCopy} />
+        <ComparisonSection copy={homepageCopy} />
+        <BlogPreviewSection copy={homepageCopy} />
+        <FAQSection copy={homepageCopy} />
+        <FinalCTA copy={homepageCopy} />
       </main>
-      <SiteFooter copy={copy} />
+      <SiteFooter copy={homepageCopy} />
     </>
   );
 }
