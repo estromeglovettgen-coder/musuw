@@ -437,6 +437,11 @@ if [ "$(grep -Fc 'Acquire::Retries "5";' "$runtime_dockerfile")" -lt 2 ] ||
     exit 1
 fi
 
+if [ "$(grep -Fc "sed -i 's@http://deb.debian.org@https://deb.debian.org@g'" "$runtime_dockerfile")" -ne 2 ]; then
+    printf '%s\n' 'production app Dockerfile does not upgrade official Debian sources to HTTPS in both stages' >&2
+    exit 1
+fi
+
 if grep -Fq 'APT_MIRROR_ARG' "$runtime_dockerfile" || grep -Fq 'mirrors.cloud.tencent.com' "$runtime_dockerfile"; then
     printf '%s\n' 'production app Dockerfile still contains a self-hosted regional apt mirror override' >&2
     exit 1

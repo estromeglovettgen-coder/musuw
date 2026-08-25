@@ -18,7 +18,7 @@ The public repository can use standard GitHub-hosted runners without consuming t
 
 ### Modified Capabilities
 
-None.
+- `native-production-delivery`: Replace the superseded self-hosted Beijing construction and source-transport requirements with standard hosted construction while retaining immutable image proof and the restricted deploy seam.
 
 ## Impact
 

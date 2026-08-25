@@ -14,6 +14,7 @@ The repository is public, so standard GitHub-hosted runners are free for this pr
 **Non-Goals:**
 
 - Moving the final SSH deployment off `musuw-release` or changing the server firewall.
+- Unregistering, stopping, or reconfiguring the Beijing runner during this migration and rollback window.
 - Adding larger runners, Docker Build Cloud, a proxy, a second build service, or a new cache backend.
 - Changing production topology, runtime secrets, images, APIs, or data.
 
@@ -47,9 +48,9 @@ The two raw Buildx pushes, immutable tags, provenance, remote digest comparison,
 1. Remove `MUSUW_ACTIONS_RUNNER`, then pin CI and Storefront to `ubuntu-24.04` with official Actions caches.
 2. Commit the durable hosted labels, simplified production build, validator, and documentation changes from an isolated worktree.
 3. Push and require a fresh CI, Storefront, production build, immutable image validation, deploy, and public health success.
-4. Leave both self-hosted runners registered during acceptance. After success, the Beijing build runner can be stopped or removed; `musuw-release` remains required for deploy.
+4. Leave both self-hosted runners registered and unchanged during acceptance and the rollback window. Retiring the Beijing runner is a separate later operation; `musuw-release` remains required for deploy.
 
-Rollback is one workflow revert plus restoring `MUSUW_ACTIONS_RUNNER=musuw-release`; no production data or image needs to be changed.
+While the retained runner remains available, rollback is one workflow revert plus restoring `MUSUW_ACTIONS_RUNNER=musuw-release`; no production data or image needs to be changed. If an operator later retires that runner, rollback additionally requires re-registering `musuw-build-x64` and restoring its documented daemon, mirror, Node toolcache, and persistent-builder prerequisites.
 
 ## Open Questions
 
