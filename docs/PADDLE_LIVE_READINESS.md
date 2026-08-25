@@ -29,13 +29,15 @@ entrypoint 会拒绝缺项、混合环境以及一整套形状正确的 Live 输
   权限，因此“可复用且功能充分”不等于“已经最小权限”；本轮不编辑它，也不以
   缩权为理由新建重复 key。正式接入前先盘点其既有消费者，再把拟保留权限、
   影响和回滚写入同一份变更表。
-- Paddle 官方 Live MCP 曾通过 OAuth 完成本轮只读 inventory；随后 OAuth 刷新
-  健康检查失败，恢复连接前不得把它写成持续可调用。连接健康时，products/prices、
-  client-side tokens、notification destinations 和 checkout domains 的盘点应优先
-  由 MCP 一次完成，不再逐页手工点击。当前卖家 MCP 不提供现有 API key 权限
-  清单或 account settings/default payment link 方法，所以这两类核验仍以
-  Dashboard 为准；payout 和 account verification 同样保持 owner/Dashboard 路径，
-  不自研绕过。重新授予持久 OAuth 访问必须在实际操作前另行确认。
+- Paddle 官方 Live MCP 曾通过 OAuth 完成本轮只读 inventory。现已按 Paddle 官方
+  Codex 命令自动完成 OAuth 重新授权，无需 owner 交互，且没有创建、撤销、删除或
+  重建任何 Paddle resource 或 credential；但重新授权后的全新 Codex 进程仍未形成
+  ready client，只读 health 继续在官方 OAuth/streamable-HTTP 连接层失败。将其记录为
+  Codex 与 Paddle 官方 connector 的兼容性残留，不通过新建 key、修改 OAuth metadata
+  或自研 proxy 绕过。保留官方插件；故障期间 Live 盘点及 account settings、default
+  payment link、payout 和 account verification 核验仅走 owner/Dashboard 路径。
+  connector 恢复后，再优先由 MCP 一次完成 products/prices、client-side tokens、
+  notification destinations 和 checkout domains 的只读盘点。
 - revoked credential 只保留为历史记录，不复活、不删除，也不作为运行时候选。
 - 只有现有资源经官方能力和实际调用范围核验后确实不适用，才可以提出新增或
   替换；在执行前必须给 owner 展示资源用途、权限、消费者、secret 落点、切换、
