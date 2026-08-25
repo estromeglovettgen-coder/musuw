@@ -45,6 +45,10 @@ jobs:
     outputs:
       release_sha: ${{ steps.resolve.outputs.release_sha }}
       ci_workflow_run: ${{ steps.resolve.outputs.ci_workflow_run }}
+      source_artifact_id: ${{ steps.source_artifact.outputs.artifact-id }}
+      source_artifact_name: ${{ steps.source_bundle.outputs.artifact_name }}
+      source_artifact_digest: ${{ steps.source_artifact.outputs.artifact-digest }}
+      source_archive_digest: ${{ steps.source_bundle.outputs.archive_digest }}
     steps:
       - name: Check out the exact requested revision
         uses: actions/checkout@v4
@@ -110,10 +114,122 @@ jobs:
             printf 'release_sha=%s\n' "$actual"
             printf 'ci_workflow_run=%s\n' "$ci_workflow_run"
           } >> "$GITHUB_OUTPUT"
+      - name: Package the exact authorized source tree
+        id: source_bundle
+        env:
+          RELEASE_SHA: ${{ steps.resolve.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          test "$GITHUB_REPOSITORY" = estromeglovettgen-coder/musuw
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          for command_name in awk find git grep gzip mktemp shasum tar wc; do
+            command -v "$command_name" >/dev/null 2>&1
+          done
+          unset TAR_OPTIONS
+
+          bundle_dir=''
+          cleanup_failed_bundle() {
+            local status="$1"
+            if [ "$status" -ne 0 ] && [ -n "$bundle_dir" ]; then
+              case "$bundle_dir" in
+                "$RUNNER_TEMP"/musuw-source-bundle.*)
+                  if [ -d "$bundle_dir" ] && [ ! -L "$bundle_dir" ]; then
+                    find "$bundle_dir" -depth -delete 2>/dev/null || true
+                  fi
+                  ;;
+              esac
+            fi
+            exit "$status"
+          }
+          trap 'cleanup_failed_bundle "$?"' EXIT
+          bundle_dir="$(mktemp -d "$RUNNER_TEMP/musuw-source-bundle.XXXXXX")"
+          archive="$bundle_dir/musuw-source.tar.gz"
+          artifact_name="musuw-production-source-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE_SHA"
+          git archive --format=tar --prefix=musuw-source/ "$RELEASE_SHA" | gzip -n > "$archive"
+          test -s "$archive"
+          archive_size="$(wc -c < "$archive" | awk '{print $1}')"
+          [[ "$archive_size" =~ ^[0-9]+$ ]]
+          test "$archive_size" -le 268435456
+
+          entries="$bundle_dir/tar-entries.txt"
+          entry_types="$bundle_dir/tar-types.txt"
+          tar -tzf "$archive" > "$entries"
+          awk '
+            BEGIN { count = 0 }
+            {
+              entry = $0
+              if (entry == "" || entry ~ /^\// || entry ~ /(^|\/)\.\.(\/|$)/ || entry !~ /^musuw-source\//) exit 1
+              count++
+            }
+            END { if (count == 0) exit 1 }
+          ' "$entries" || {
+            printf '%s\n' 'authorized source archive has an invalid tree' >&2
+            exit 1
+          }
+          tar -tvzf "$archive" > "$entry_types"
+          awk 'substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }' "$entry_types" || {
+            printf '%s\n' 'authorized source archive contains an unsupported member type' >&2
+            exit 1
+          }
+          for required_path in \
+            .nvmrc \
+            auth/package-lock.json \
+            weknora/frontend/package-lock.json \
+            integration/weknora-production/Dockerfile.app.runtime \
+            integration/weknora-production/Dockerfile.frontend \
+            .github/buildkitd.production.toml \
+            scripts/weknora-production/build-static.sh; do
+            grep -Fxq "musuw-source/$required_path" "$entries" || {
+              printf '%s\n' "authorized source archive is missing: $required_path" >&2
+              exit 1
+            }
+          done
+          test "$(git ls-tree "$RELEASE_SHA" scripts/weknora-production/build-static.sh | awk '{print $1}')" = 100755
+          archive_digest="$(shasum -a 256 "$archive" | awk '{print $1}')"
+          [[ "$archive_digest" =~ ^[0-9a-f]{64}$ ]]
+          for output_line in \
+            "bundle_dir=$bundle_dir" \
+            "archive_path=$archive" \
+            "archive_digest=$archive_digest" \
+            "artifact_name=$artifact_name"; do
+            printf '%s\n' "$output_line" >> "$GITHUB_OUTPUT" || {
+              printf '%s\n' 'authorized source bundle outputs could not be published' >&2
+              exit 1
+            }
+          done
+          trap - EXIT
+      - name: Upload the exact authorized source artifact
+        id: source_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_bundle.outputs.artifact_name }}
+          path: ${{ steps.source_bundle.outputs.archive_path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Remove the temporary authorized source bundle
+        if: always()
+        env:
+          BUNDLE_DIR: ${{ steps.source_bundle.outputs.bundle_dir }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BUNDLE_DIR:-}" ]; then
+            case "$BUNDLE_DIR" in
+              "$RUNNER_TEMP"/musuw-source-bundle.*) ;;
+              *) printf '%s\n' 'source bundle cleanup escaped runner temp' >&2; exit 1 ;;
+            esac
+            test -d "$BUNDLE_DIR"
+            test ! -L "$BUNDLE_DIR"
+            find "$BUNDLE_DIR" -depth -delete
+          fi
   build:
     name: Build immutable production images on native AMD64
     needs: authorize
     permissions:
+      actions: read
       contents: read
       packages: write
     runs-on: musuw-build-x64
@@ -175,6 +291,10 @@ jobs:
         id: source
         env:
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
+          SOURCE_ARTIFACT_ID: ${{ needs.authorize.outputs.source_artifact_id }}
+          SOURCE_ARTIFACT_NAME: ${{ needs.authorize.outputs.source_artifact_name }}
+          SOURCE_ARTIFACT_DIGEST: ${{ needs.authorize.outputs.source_artifact_digest }}
+          SOURCE_ARCHIVE_DIGEST: ${{ needs.authorize.outputs.source_archive_digest }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -186,7 +306,14 @@ jobs:
             printf '%s\n' 'source materialization is restricted to the canonical repository' >&2
             exit 1
           }
-          for command_name in curl tar awk cp find mktemp mv rm; do
+          [[ "$SOURCE_ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          expected_artifact_name="musuw-production-source-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE_SHA"
+          test "$SOURCE_ARTIFACT_NAME" = "$expected_artifact_name"
+          [[ "$SOURCE_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$SOURCE_ARCHIVE_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          for command_name in awk cp curl find jq mktemp mv rm sha256sum stat tar unzip zipinfo; do
             command -v "$command_name" >/dev/null 2>&1 || {
               printf '%s\n' "required source materialization command is unavailable: $command_name" >&2
               exit 1
@@ -208,8 +335,11 @@ jobs:
           }
           test "$workspace" != / && test "$workspace" != "$RUNNER_WORKSPACE"
 
+          artifact_metadata="$(mktemp "$RUNNER_TEMP/musuw-source-artifact-metadata.XXXXXX.json")"
+          artifact_zip="$(mktemp "$RUNNER_TEMP/musuw-source-artifact.XXXXXX.zip")"
+          headers="$(mktemp "$RUNNER_TEMP/musuw-source-artifact-headers.XXXXXX")"
+          zip_entries="$(mktemp "$RUNNER_TEMP/musuw-source-artifact-zip-entries.XXXXXX")"
           archive="$(mktemp "$RUNNER_TEMP/musuw-source-archive.XXXXXX.tar.gz")"
-          headers="$(mktemp "$RUNNER_TEMP/musuw-source-headers.XXXXXX")"
           entries="$(mktemp "$RUNNER_TEMP/musuw-source-archive-entries.XXXXXX")"
           entry_types="$(mktemp "$RUNNER_TEMP/musuw-source-archive-types.XXXXXX")"
           source_stage="$(mktemp -d "$RUNNER_TEMP/musuw-source-tree.XXXXXX")"
@@ -225,7 +355,8 @@ jobs:
             fi
           }
           cleanup() {
-            rm -f -- "$archive" "$headers" "$entries" "$entry_types"
+            rm -f -- "$artifact_metadata" "$artifact_zip" "$headers" "$zip_entries" \
+              "$archive" "$entries" "$entry_types"
             cleanup_tree "$source_stage"
             cleanup_tree "$publish_stage"
             if [ "$workspace_committed" = true ]; then
@@ -246,11 +377,28 @@ jobs:
           trap cleanup EXIT
           cd "$RUNNER_TEMP"
 
-          # Private-repository archive locations expire after five minutes.
-          # Each bounded outer attempt therefore obtains a fresh location,
-          # then gives codeload at most 150 seconds to complete. The API token
-          # is sent only to the fixed canonical api.github.com endpoint.
-          archive_downloaded=false
+          metadata_status="$(curl -q --proto '=https' --fail --silent --show-error \
+            --connect-timeout 15 --max-time 30 \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            --write-out '%{http_code}' \
+            --output "$artifact_metadata" \
+            "https://api.github.com/repos/estromeglovettgen-coder/musuw/actions/artifacts/$SOURCE_ARTIFACT_ID")"
+          test "$metadata_status" = 200
+          test "$(jq -er '.id | tostring' "$artifact_metadata")" = "$SOURCE_ARTIFACT_ID"
+          test "$(jq -er '.name' "$artifact_metadata")" = "$SOURCE_ARTIFACT_NAME"
+          test "$(jq -er '.workflow_run.id | tostring' "$artifact_metadata")" = "$GITHUB_RUN_ID"
+          test "$(jq -er 'if .expired == false then "false" else error("artifact expired") end' "$artifact_metadata")" = false
+          metadata_size="$(jq -er '.size_in_bytes | select(type == "number" and floor == . and . > 0) | tostring' "$artifact_metadata")"
+          [[ "$metadata_size" =~ ^[0-9]+$ ]]
+          test "$metadata_size" -le 268435456
+          test "$(jq -er '.digest' "$artifact_metadata")" = "sha256:$SOURCE_ARTIFACT_DIGEST"
+
+          # Artifact download locations expire quickly. Every bounded attempt
+          # obtains a fresh API redirect, validates the official blob host,
+          # then downloads without forwarding the GitHub API credential.
+          artifact_downloaded=false
           for attempt in 1 2 3; do
             : > "$headers"
             if api_status="$(curl -q --proto '=https' --fail --silent --show-error \
@@ -260,33 +408,40 @@ jobs:
               -H "Authorization: Bearer $GH_TOKEN" \
               --write-out '%{http_code}' \
               --dump-header "$headers" --output /dev/null \
-              "https://api.github.com/repos/estromeglovettgen-coder/musuw/tarball/$RELEASE_SHA")" && \
+              "https://api.github.com/repos/estromeglovettgen-coder/musuw/actions/artifacts/$SOURCE_ARTIFACT_ID/zip")" && \
               [ "$api_status" = 302 ]; then
-              archive_url="$(awk '
-                BEGIN { IGNORECASE = 1 }
-                /^location:/ {
-                  sub(/^[^:]*:[[:space:]]*/, "")
-                  sub(/\r$/, "")
-                  value = $0
+              artifact_url="$(awk '
+                {
+                  line = $0
+                  if (tolower(line) ~ /^location:/) {
+                    sub(/^[^:]*:[[:space:]]*/, "", line)
+                    sub(/\r$/, "", line)
+                    value = line
+                  }
                 }
                 END { print value }
               ' "$headers")"
-              case "$archive_url" in
-                "https://codeload.github.com/estromeglovettgen-coder/musuw/legacy.tar.gz/$RELEASE_SHA"|\
-                "https://codeload.github.com/estromeglovettgen-coder/musuw/legacy.tar.gz/$RELEASE_SHA"\?*) ;;
-                *) printf '%s\n' 'GitHub archive API returned an untrusted source location' >&2; exit 1 ;;
+              case "$artifact_url" in
+                https://*/*) ;;
+                *) printf '%s\n' 'GitHub artifact API returned an invalid source location' >&2; exit 1 ;;
+              esac
+              artifact_authority="${artifact_url#https://}"
+              artifact_authority="${artifact_authority%%/*}"
+              case "$artifact_authority" in
+                *[@:]*) printf '%s\n' 'GitHub artifact location contains forbidden authority syntax' >&2; exit 1 ;;
+                ?*.blob.core.windows.net) ;;
+                *) printf '%s\n' 'GitHub artifact location is outside the official blob service' >&2; exit 1 ;;
               esac
 
-              # The fresh short-lived location authorizes this exact archive;
-              # intentionally send no Authorization header to codeload.
-              : > "$archive"
-              if codeload_status="$(curl -q --proto '=https' --fail --silent --show-error \
-                --connect-timeout 15 --max-time 150 \
+              : > "$artifact_zip"
+              if blob_status="$(curl -q --proto '=https' --fail --silent --show-error \
+                --connect-timeout 15 --max-time 300 \
                 --write-out '%{http_code}' \
-                --output "$archive" "$archive_url")" && \
-                [ "$codeload_status" = 200 ] && \
-                tar -tzf "$archive" >/dev/null 2>&1; then
-                archive_downloaded=true
+                --output "$artifact_zip" "$artifact_url")" && \
+                [ "$blob_status" = 200 ] && \
+                [ "$(stat -c '%s' "$artifact_zip")" = "$metadata_size" ] && \
+                [ "$(sha256sum "$artifact_zip" | awk '{print $1}')" = "$SOURCE_ARTIFACT_DIGEST" ]; then
+                artifact_downloaded=true
                 break
               fi
             fi
@@ -294,23 +449,28 @@ jobs:
               sleep "$((attempt * 2))"
             fi
           done
-          [ "$archive_downloaded" = true ] || {
-            printf '%s\n' 'GitHub source archive download failed after three bounded attempts' >&2
+          [ "$artifact_downloaded" = true ] || {
+            printf '%s\n' 'GitHub source artifact download failed after three bounded attempts' >&2
             exit 1
           }
+
+          zipinfo -1 "$artifact_zip" > "$zip_entries"
+          test "$(awk 'END { print NR }' "$zip_entries")" = 1
+          test "$(awk 'NR == 1 { print }' "$zip_entries")" = musuw-source.tar.gz
+          unzip -tqq "$artifact_zip"
+          unzip -p "$artifact_zip" musuw-source.tar.gz > "$archive"
+          test -s "$archive"
+          test "$(stat -c '%s' "$archive")" -le 268435456
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$SOURCE_ARCHIVE_DIGEST"
           tar -tzf "$archive" > "$entries"
           awk '
-            BEGIN { root = ""; count = 0 }
+            BEGIN { count = 0 }
             {
               entry = $0
-              if (entry == "" || entry ~ /^\// || entry ~ /(^|\/)\.\.(\/|$)/) exit 1
-              split(entry, parts, "/")
-              if (parts[1] == "" || parts[1] == "." || parts[1] == "..") exit 1
-              if (root == "") root = parts[1]
-              if (parts[1] != root) exit 1
+              if (entry == "" || entry ~ /^\// || entry ~ /(^|\/)\.\.(\/|$)/ || entry !~ /^musuw-source\//) exit 1
               count++
             }
-            END { if (count == 0 || root == "") exit 1 }
+            END { if (count == 0) exit 1 }
           ' "$entries" || {
             printf '%s\n' 'GitHub source archive has an invalid top-level tree' >&2
             exit 1

@@ -47,20 +47,21 @@ configuration mismatch.
    `musuw-release` runner performs the lightweight exact-SHA authorization, then
    a separate native x86_64 Linux runner with the exact `musuw-build-x64` label
    verifies runner and Docker daemon architecture plus the required regional
-   Docker Hub mirror. Because that build job needs the approved source tree but
-   no Git history, it requests the full SHA from GitHub's official repository
-   archive API, follows the returned short-lived location with a separate
-   credential-free request to `codeload.github.com`, validates and stages the
-   single archive tree. The build job intentionally contains no `uses:` step,
-   so the regional runner does not pre-download Action bundles before its first
-   command. It selects the exact `.nvmrc` Node release already in the runner
-   toolcache, then builds the static
-   bundles and app/frontend images, pushes them to GHCR, and exports their
-   validated immutable digests. The build runner receives no production secret
-   or SSH input. Only after it succeeds does `musuw-release` upload the
-   allowlisted source bundle and those exact refs through the restricted SSH
-   gate. A manual full-SHA dispatch is retained for an exact rerun; tag and
-   branch-name releases are rejected.
+   Docker Hub mirror. The authorization job packages that already-proven SHA as
+   one deterministic `musuw-source.tar.gz`, validates it, and uploads it through
+   GitHub's existing immutable Actions Artifact service with a seven-day
+   retention window. The build job intentionally contains no `uses:` step, so
+   the regional runner does not pre-download Action bundles before its first
+   command. It reads the same-run artifact through GitHub's official REST/blob
+   path, validates its run/id/name/size plus both the outer ZIP and inner source
+   digests, then safely stages the one source tree without Git or codeload. It
+   selects the exact `.nvmrc` Node release already in the runner toolcache, then
+   builds the static bundles and app/frontend images, pushes them to GHCR, and
+   exports their validated immutable digests. The build runner receives no
+   production secret or SSH input. Only after it succeeds does `musuw-release`
+   upload the allowlisted server source bundle and those exact refs through the
+   restricted SSH gate. A manual full-SHA dispatch is retained for an exact
+   rerun; tag and branch-name releases are rejected.
 5. The server receives a short-lived GitHub token over the restricted stdin
    channel, logs in to GHCR using a temporary Docker config, pulls the exact
    digests, recreates only `app` and `frontend` with `--no-build`, and checks
@@ -108,7 +109,9 @@ handoff. A Cloudflare command succeeding without these probes is not enough.
 
 The native build job receives the selected full SHA, three browser-visible
 repository variables required by the auth shell, and a job-only `GITHUB_TOKEN`
-with `packages: write`. It is not attached to the `server-production`
+with `actions: read`, `contents: read`, and `packages: write`. Artifact read is
+needed only to obtain the source bundle created by the authorization job in the
+same workflow run. It is not attached to the `server-production`
 Environment. The deploy job receives the restricted `musuw-deploy` SSH key,
 pinned host keys, the existing public server environment file, the same three
 repository variables used to generate `auth-public.env`, the validated image
@@ -203,25 +206,32 @@ versions recorded by `go.mod` and `go.sum`.
 
 The Beijing build job deliberately does not run Git smart HTTP or reference a
 GitHub Action. GitHub Runner prepares every referenced Action before executing
-the first inline command, and the regional codeload failure therefore cannot be
-fixed by replacing checkout alone. Authorization
+the first inline command, and the regional Action-archive failure therefore
+cannot be fixed by replacing checkout alone. Authorization
 and the `origin/main` ancestry proof remain on `musuw-release`, where the full
-checkout is required and available. The build job consumes only that approved
-40-character SHA through GitHub's documented `api.github.com` tar-archive
-endpoint and its official `codeload.github.com` redirect. The authenticated API
-request and archive download are separate, so the GitHub token is never sent to
-the redirect host; both requests have bounded connection, transfer, and retry
-limits, and every retry obtains a fresh redirect before GitHub's five-minute
-private-archive URL lifetime. Extraction occurs in an isolated runner-temporary
-directory with ambient tar options disabled, rejects a malformed or multi-root
-archive and special member types before extraction, preserves executable modes,
-validates the required build inputs, and replaces only the exact repository
-workspace after validation while retaining the prior tree until post-move
-checks pass. This removes unnecessary full heads/tags history from the regional
-build path without adding a proxy, unofficial mirror, source cache, or second
-release authority. GitHub's documented self-hosted-runner domains should still
-remain allowed for runner operation; if `github.com` routing later becomes
-stable, that does not justify restoring unused history to the build job.
+checkout is required and available. It packages only that exact approved tree
+with `git archive`, deterministic gzip, a fixed root, a 256 MiB cap, safe member
+types, required build inputs, executable-mode proof, and an inner SHA-256. The
+single-file bundle is uploaded once with the official `upload-artifact@v4`
+action, compression disabled, and seven-day retention; it is a bounded transport
+record, not a permanent source backup or a second release authority.
+
+The build job uses `actions: read` to query that exact artifact's metadata from
+the fixed `api.github.com` repository endpoint. It binds artifact id and name to
+the current workflow run, rejects expired or oversized metadata, and requires
+the REST digest to match the upload output. Each bounded attempt obtains a fresh
+short-lived download redirect, accepts only an HTTPS `*.blob.core.windows.net`
+authority, and sends no GitHub Authorization header to that blob host. The
+downloaded ZIP size and outer SHA-256 must match metadata, the ZIP must contain
+exactly `musuw-source.tar.gz`, and that inner file must match the authorization
+job's SHA-256 before extraction. Extraction occurs in an isolated
+runner-temporary directory with ambient tar options disabled, rejects an unsafe
+tree and special members, preserves executable modes, validates required build
+inputs, and replaces only the exact repository workspace while retaining the
+prior tree until post-move checks pass. This avoids Git, codeload, third-party
+mirrors, custom proxies, new storage services, and a second source authority on
+the regional build path. GitHub's documented self-hosted-runner and Artifact
+domains must remain allowed for runner operation.
 
 Node is not installed during a release. The job reads `.nvmrc`, requires the
 matching x64 Node and npm executables under `RUNNER_TOOL_CACHE`, validates their

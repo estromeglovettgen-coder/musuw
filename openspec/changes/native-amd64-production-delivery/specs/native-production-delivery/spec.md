@@ -20,7 +20,7 @@ The production workflow SHALL run lightweight authorization and deployment on `m
 - **THEN** it uses `MUSUW_ACTIONS_RUNNER || ubuntu-latest` and cannot consume `musuw-build-x64`
 
 ### Requirement: Secret-free immutable build handoff
-The production workflow SHALL authorize an exact CI-green SHA, build both images in a distinct x64 job, and deploy only after both image outputs validate. The build job SHALL have only `contents: read` and `packages: write`, MUST NOT attach the production Environment or reference any `secrets.*` value, and SHALL accept only the three documented browser-visible repository variables. It SHALL authenticate to GHCR over stdin using a runner-temporary Docker configuration, log out, and delete that configuration in an always-running cleanup. Build and deploy SHALL generate auth-public input from those same variables rather than independent secret sources. The deploy job SHALL have only `contents: read` and `packages: read`, SHALL consume the returned immutable refs, and MUST NOT rebuild browser bundles or images.
+The production workflow SHALL authorize an exact CI-green SHA, build both images in a distinct x64 job, and deploy only after both image outputs validate. The build job SHALL have only `actions: read`, `contents: read`, and `packages: write`, MUST NOT attach the production Environment or reference any `secrets.*` value, and SHALL accept only the three documented browser-visible repository variables. Artifact read access SHALL be used only for the immutable source bundle produced by the authorization job in the same workflow run. The build SHALL authenticate to GHCR over stdin using a runner-temporary Docker configuration, log out, and delete that configuration in an always-running cleanup. Build and deploy SHALL generate auth-public input from those same variables rather than independent secret sources. The deploy job SHALL have only `contents: read` and `packages: read`, SHALL consume the returned immutable refs, and MUST NOT rebuild browser bundles or images.
 
 #### Scenario: Native build succeeds
 - **WHEN** both image pushes write metadata bound to their expected immutable tags, matching descriptor digests, registry-resolvable lowercase SHA-256 digests, and remote tags that resolve to those same digests
@@ -34,19 +34,19 @@ The production workflow SHALL authorize an exact CI-green SHA, build both images
 - **WHEN** both immutable refs are available
 - **THEN** only the `musuw-release` deploy job receives the restricted SSH/server inputs and passes the refs through the existing exact-SHA forced-command release seam with no server-side build
 
-### Requirement: Official exact-SHA source archive materialization
-The trusted authorization job SHALL retain the full Git checkout required to prove successful CI and `origin/main` ancestry. The native build job MUST NOT fetch Git history from `github.com`; it SHALL request only the authorized full SHA through GitHub's official REST tar-archive endpoint and download the returned `codeload.github.com` location without forwarding the API credential. Both requests SHALL have bounded connection, transfer, and retry behavior, with a fresh redirect obtained for each attempt before its expiry. The build SHALL validate one safe archive root, reject special member types before extraction, and verify required build inputs and executable modes in runner-temporary staging before replacing only the exact repository workspace. It SHALL retain the prior workspace until the new tree passes post-move validation and restore or preserve the old tree on failure. The deploy job SHALL retain its exact-SHA checkout and existing manifest-backed server upload.
+### Requirement: Official same-run exact-SHA source artifact materialization
+The trusted authorization job SHALL retain the full Git checkout required to prove successful CI and `origin/main` ancestry. It SHALL package the authorized tree without executing source as one deterministic, bounded `musuw-source.tar.gz`, validate its fixed safe root, member types, required inputs, and executable mode, compute its inner SHA-256, and upload only that file through GitHub's immutable Actions Artifact service with finite retention. It SHALL expose the artifact id/name, upload digest, and inner digest to the dependent native build. The native build MUST NOT fetch Git history or source from `github.com` or `codeload.github.com`; it SHALL retrieve only that same-run artifact through the fixed official REST endpoint. It SHALL bind metadata to the expected id, name, current workflow run, non-expired state, bounded size, and outer digest. Each bounded download attempt SHALL obtain a fresh redirect, accept only GitHub's official HTTPS blob authority, and MUST NOT forward the API credential to the blob request. The build SHALL require downloaded size and outer digest to match metadata, exactly one ZIP member named `musuw-source.tar.gz`, and the inner digest to match authorization before validating the tar tree. It SHALL reject special members and verify required build inputs and executable modes in runner-temporary staging before replacing only the exact repository workspace. It SHALL retain the prior workspace until the new tree passes post-move validation and restore or preserve the old tree on failure. The deploy job SHALL retain its exact-SHA checkout and existing manifest-backed server upload.
 
-#### Scenario: Git smart HTTP is regionally unavailable
-- **WHEN** the approved source archive endpoints are reachable but `github.com` Git fetch cannot establish a reliable connection
-- **THEN** the native build materializes the approved source tree without fetching branch, tag, or commit history and without adding an unofficial mirror or proxy
+#### Scenario: Git and codeload are regionally unavailable
+- **WHEN** the same-run Actions Artifact API/blob path is reachable but Git smart HTTP and codeload full-archive transfer are unreliable
+- **THEN** the native build materializes the approved source tree without fetching branch, tag, or commit history and without adding an unofficial mirror, proxy, bucket, or registry
 
-#### Scenario: Archive redirect is untrusted
-- **WHEN** the authenticated GitHub archive request does not return an HTTPS `codeload.github.com` location
+#### Scenario: Artifact identity or redirect is untrusted
+- **WHEN** metadata does not match the expected artifact/current run/digests or the fresh download redirect is not an HTTPS official blob authority
 - **THEN** the build fails without forwarding its token, installing dependencies, publishing an image, or mutating Tokyo
 
-#### Scenario: Archive tree is malformed or incomplete
-- **WHEN** the downloaded archive has multiple or unsafe roots, a symbolic link, a missing required lockfile/Dockerfile/BuildKit input, or loses the executable build helper
+#### Scenario: Artifact or archive is malformed or incomplete
+- **WHEN** the downloaded ZIP has an unexpected member/size/digest, or its inner archive has an unsafe root, a symbolic link, a missing required lockfile/Dockerfile/BuildKit input, or loses the executable build helper
 - **THEN** the staged source is rejected before it can replace the exact runner workspace or begin construction
 
 #### Scenario: Deploy prepares the server source manifest
@@ -112,7 +112,7 @@ Volatile release metadata MUST NOT invalidate stable apt/tool or runtime-package
 - **THEN** BuildKit reuses those layers and cache mounts instead of downloading or compiling them from the beginning
 
 ### Requirement: Serialized activation and safe rollback
-Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially in one build job, with the browser V8 old-space ceiling set to 3072 MiB. The browser build SHALL select and verify the exact `.nvmrc` Node version already present in the Runner toolcache and MUST NOT download a runtime. Activation SHALL require an online `musuw-build-x64` runner, its preinstalled Node/Docker/Buildx toolchain, and the three public repository variables, but MUST NOT require Actions billing, Docker Build Cloud, another build provider, deletion of existing host services, or production-host mutation.
+Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially in one build job, with the browser V8 old-space ceiling set to 3072 MiB. The browser build SHALL select and verify the exact `.nvmrc` Node version already present in the Runner toolcache and MUST NOT download a runtime. Activation SHALL require an online `musuw-build-x64` runner, its preinstalled Node/Docker/Buildx toolchain, the repository's existing bounded Actions Artifact facility, and the three public repository variables, but MUST NOT require GitHub-hosted execution minutes, Docker Build Cloud, another build provider, deletion of existing host services, or production-host mutation.
 
 #### Scenario: Two releases are requested
 - **WHEN** a release is already active and another is triggered
