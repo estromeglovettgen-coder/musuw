@@ -14,6 +14,7 @@ import {
   workflows,
 } from "../src/data/homeContent.js";
 import { getStorefrontCopy } from "../src/i18n.js";
+import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
 import { getPublicDocument, PUBLIC_DOCUMENT_PATHS } from "../src/legalContent.js";
 
 const root = new URL("../", import.meta.url).pathname;
@@ -86,25 +87,25 @@ test("public capability copy matches the simplified Query, Knowledge Base, and W
   assert.match(chinese, /精确(?:证据)?引用/);
 });
 
-test("consumer pricing matches the enforced storage and exact monthly AI credit allowances", () => {
+test("consumer pricing displays the approved storage and exact monthly AI credit allowances", () => {
   for (const locale of ["en", "zh-CN"]) {
-    const pricing = getStorefrontCopy(locale).pricing;
+    const pricing = applyHomepagePlanPresentation(getStorefrontCopy(locale)).pricing;
     assert.match(
       pricing.intro.body,
       locale === "zh-CN" ? /存储空间.*模型权限.*每月 AI 额度/ : /storage.*model access.*monthly AI allowance/i,
     );
     assert.equal(pricing.plans.length, 4);
     const freeFeatures = pricing.plans[0].features.join(" ");
-    assert.match(freeFeatures, /5 GiB.*\$1\.00/);
+    assert.match(freeFeatures, /1 GiB.*\$1\.00/);
     assert.match(
       freeFeatures,
       locale === "zh-CN" ? /1 个知识库.*10 篇文档/ : /1 knowledge base.*10 documents/i,
     );
   }
 
-  assert.match(plans[1].features.join(" "), /20 GiB.*\$1\.25.*Expanded platform-approved catalog/i);
-  assert.match(plans[2].features.join(" "), /40 GiB.*\$2\.50.*Expanded platform-approved catalog/i);
-  assert.match(plans[3].features.join(" "), /80 GiB.*\$5\.00.*Expanded platform-approved catalog/i);
+  assert.match(plans[1].features.join(" "), /10 GiB.*\$1\.25.*Expanded platform-approved catalog/i);
+  assert.match(plans[2].features.join(" "), /30 GiB.*\$2\.50.*Expanded platform-approved catalog/i);
+  assert.match(plans[3].features.join(" "), /100 GiB.*\$5\.00.*Expanded platform-approved catalog/i);
 });
 
 test("regional price books expose exact monthly and annual totals for all four plans", () => {
