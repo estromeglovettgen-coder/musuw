@@ -41,6 +41,7 @@ const (
 	QueueQuestion       = "question"
 	QueueSync           = "sync"
 	QueueMaintenance    = "low"
+	QueueBilling        = "billing"
 	QueueWiki           = "wiki"
 )
 
@@ -75,6 +76,11 @@ var queueDefinitions = []QueueDefinition{
 	{Name: QueueGraph, Pool: WorkerPoolEnrichment, Weight: 1, SharedWeight: 1, TaskTypes: []string{TypeChunkExtract}},
 	{Name: QueueQuestion, Pool: WorkerPoolEnrichment, Weight: 1, SharedWeight: 1, TaskTypes: []string{TypeQuestionGeneration}},
 	{Name: QueueSync, Pool: WorkerPoolMaintenance, Weight: 2, TaskTypes: []string{TypeDataSourceSync}},
+	// Billing is a lightweight, latency-sensitive lane served by the existing
+	// maintenance pool. It is deliberately not a new worker service or shared
+	// queue; the logical separation keeps payment events ahead of long-running
+	// maintenance work while preserving the current worker topology.
+	{Name: QueueBilling, Pool: WorkerPoolMaintenance, Weight: 4, TaskTypes: []string{TypePaddleWebhook}},
 	{Name: QueueMaintenance, Pool: WorkerPoolMaintenance, Weight: 1, TaskTypes: []string{
 		TypeFAQImport, TypeKBClone, TypeIndexDelete, TypeKBDelete,
 		TypeKnowledgeListDelete, TypeKnowledgeListReparse, TypeKnowledgeMove,

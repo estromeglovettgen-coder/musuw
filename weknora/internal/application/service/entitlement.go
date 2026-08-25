@@ -53,7 +53,7 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 	if err != nil {
 		return nil, err
 	}
-	plan := types.EffectiveConsumerPlan(tenant)
+	plan := types.EffectiveConsumerPlanAt(tenant, at)
 	limits := types.LimitsForConsumerPlan(plan)
 	current := &types.ConsumerEntitlement{
 		ConsumerPlanLimits:        limits,
@@ -192,7 +192,7 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 		return "", errSubscriptionPaused
 	}
 	now := time.Now().UTC()
-	plan := types.EffectiveConsumerPlan(tenant)
+	plan := types.EffectiveConsumerPlanAt(tenant, now)
 	if paidPlanAccessUnavailable(tenant, plan, now) {
 		return "", errAllowanceRenewalPending
 	}
@@ -274,7 +274,7 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 		return nil, errSubscriptionPaused
 	}
 	at = at.UTC()
-	plan := types.EffectiveConsumerPlan(tenant)
+	plan := types.EffectiveConsumerPlanAt(tenant, at)
 	if paidPlanAccessUnavailable(tenant, plan, at) {
 		return nil, errAllowanceRenewalPending
 	}
@@ -377,9 +377,12 @@ func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uin
 	if err != nil {
 		return false, err
 	}
-	if eventID != "" && (tenant.PaddleLastEventID == eventID ||
-		(tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt))) {
-		logger.Infof(ctx, "Consumer plan event ignored as duplicate or stale tenant_id=%d", tenantID)
+	if eventID != "" && tenant.PaddleLastEventID == eventID {
+		logger.Infof(ctx, "Consumer plan event already durably applied tenant_id=%d", tenantID)
+		return true, nil
+	}
+	if eventID != "" && tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt) {
+		logger.Infof(ctx, "Consumer plan event ignored as stale tenant_id=%d", tenantID)
 		return false, nil
 	}
 	plan = types.NormalizeConsumerPlan(plan)
@@ -465,6 +468,15 @@ func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uin
 			return false, syncErr
 		}
 	}
+	if err == nil && !applied && eventID != "" {
+		latest, reloadErr := s.repo.GetTenantEntitlement(ctx, tenantID)
+		if reloadErr != nil {
+			return false, reloadErr
+		}
+		if latest.PaddleLastEventID == eventID {
+			return true, nil
+		}
+	}
 	return false, err
 }
 
@@ -477,7 +489,7 @@ func (s *entitlementService) syncOpenRouterLimitFromTenant(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("read OpenRouter tenant key for durable restore: %w", err)
 	}
-	plan := types.EffectiveConsumerPlan(tenant)
+	plan := types.EffectiveConsumerPlanAt(tenant, time.Now().UTC())
 	limit, monthlyReset := keyLimitForPlanChange(tenant, plan, tenant.PaddleBillingPeriod, info)
 	if err := s.keys.UpdateKeyLimit(ctx, keyHash, limit, monthlyReset); err != nil {
 		return fmt.Errorf("restore OpenRouter tenant key limit from durable plan: %w", err)
@@ -563,8 +575,12 @@ func entitlementResetAt(tenant *types.Tenant, plan types.ConsumerPlan, at time.T
 }
 
 func paidPlanAccessUnavailable(tenant *types.Tenant, plan types.ConsumerPlan, at time.Time) bool {
-	if tenant == nil || plan == types.ConsumerPlanFree {
+	if tenant == nil {
 		return false
+	}
+	if plan == types.ConsumerPlanFree {
+		return types.NormalizeConsumerPlan(tenant.Plan) != types.ConsumerPlanFree && tenant.PlanStatus == "past_due" &&
+			(tenant.PaddleCurrentPeriodEnd == nil || !tenant.PaddleCurrentPeriodEnd.After(at.UTC()))
 	}
 	switch tenant.PaddleBillingPeriod {
 	case "monthly":

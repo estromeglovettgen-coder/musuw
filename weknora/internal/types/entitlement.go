@@ -93,6 +93,27 @@ func EffectiveConsumerPlan(tenant *Tenant) ConsumerPlan {
 	return ConsumerPlanFree
 }
 
+// EffectiveConsumerPlanAt applies the time-bounded part of Paddle's past_due
+// grace policy. A failed renewal keeps paid access only through the last
+// provider-confirmed paid term; it can never extend that boundary by itself.
+func EffectiveConsumerPlanAt(tenant *Tenant, at time.Time) ConsumerPlan {
+	plan := EffectiveConsumerPlan(tenant)
+	if plan == ConsumerPlanFree || tenant == nil || tenant.PlanStatus != "past_due" {
+		return plan
+	}
+	var paidTermEnd *time.Time
+	switch tenant.PaddleBillingPeriod {
+	case "monthly":
+		paidTermEnd = tenant.OpenRouterCreditPeriodEnd
+	case "yearly":
+		paidTermEnd = tenant.PaddleCurrentPeriodEnd
+	}
+	if paidTermEnd == nil || !paidTermEnd.After(at.UTC()) {
+		return ConsumerPlanFree
+	}
+	return plan
+}
+
 func ConsumerPlanAllowsModel(plan ConsumerPlan, model *Model) bool {
 	if model == nil {
 		return false

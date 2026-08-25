@@ -192,8 +192,8 @@ const planFeatures = (plan: ConsumerPlan) => {
 }
 
 const hasCheckout = (plan: PaidConsumerPlan) => {
-  const option = billing.value?.prices?.[plan]?.[period.value]
-  return Boolean(billingConfigured.value && option?.price_id && option.checkout_binding)
+  const priceId = billing.value?.catalog?.[plan]?.[period.value]?.price_id
+  return Boolean(billingConfigured.value && priceId)
 }
 
 const planActionKind = (plan: ConsumerPlan): 'current' | 'included' | 'choose' | 'unavailable' => {

@@ -18,6 +18,7 @@ import (
 	paddle "github.com/PaddleHQ/paddle-go-sdk/v5"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,11 +37,74 @@ type paddlePortalSessionCreatorStub struct {
 
 type emptyPaddlePortalSessionCreatorStub struct{}
 
+type recordingPaddleWebhookEnqueuer struct {
+	task *asynq.Task
+}
+
+type paddleBillingOperationRepoStub struct {
+	operation *types.PaddleBillingOperation
+}
+
+func (s *paddleBillingOperationRepoStub) Claim(_ context.Context, intent types.PaddleBillingOperationIntent) (*types.PaddleBillingOperation, types.PaddleBillingOperationClaimDisposition, error) {
+	if s.operation != nil {
+		return s.operation, types.PaddleBillingOperationClaimExisting, nil
+	}
+	s.operation = &types.PaddleBillingOperation{
+		ID: 1, TenantID: intent.TenantID, OperationKey: intent.OperationKey,
+		OperationType: intent.OperationType, RequestFingerprint: intent.RequestFingerprint,
+		Plan: intent.Plan, BillingPeriod: intent.BillingPeriod, PriceID: intent.PriceID,
+		SubscriptionID: intent.SubscriptionID, Status: types.PaddleBillingOperationPending,
+	}
+	return s.operation, types.PaddleBillingOperationClaimCreated, nil
+}
+func (s *paddleBillingOperationRepoStub) FindByKey(_ context.Context, tenantID uint64, operationKey string) (*types.PaddleBillingOperation, bool, error) {
+	if s.operation == nil || s.operation.TenantID != tenantID || s.operation.OperationKey != operationKey {
+		return nil, false, nil
+	}
+	return s.operation, true, nil
+}
+func (s *paddleBillingOperationRepoStub) GetByID(context.Context, uint64) (*types.PaddleBillingOperation, error) {
+	return s.operation, nil
+}
+func (s *paddleBillingOperationRepoStub) MarkInFlight(context.Context, uint64) error {
+	s.operation.Status = types.PaddleBillingOperationInFlight
+	return nil
+}
+func (s *paddleBillingOperationRepoStub) RecordPaddleTransaction(_ context.Context, _ uint64, id string) error {
+	s.operation.PaddleTransactionID = id
+	return nil
+}
+func (s *paddleBillingOperationRepoStub) Finish(_ context.Context, _ uint64, status types.PaddleBillingOperationStatus, _, _ string) error {
+	s.operation.Status = status
+	return nil
+}
+func (*paddleBillingOperationRepoStub) FinishMatchingActive(context.Context, uint64, types.PaddleBillingOperationType, string, string, string, types.PaddleBillingOperationStatus, string, string) (bool, error) {
+	return true, nil
+}
+
+func (e *recordingPaddleWebhookEnqueuer) Enqueue(task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+	e.task = task
+	return &asynq.TaskInfo{ID: "queued-paddle-event", Queue: "billing", Type: task.Type()}, nil
+}
+
 type paddleSubscriptionUpdaterStub struct {
 	subscription *paddle.Subscription
 	preview      *paddle.SubscriptionPreview
 	previewReq   *paddle.PreviewSubscriptionUpdateRequest
 	updateReq    *paddle.UpdateSubscriptionRequest
+	updateCalls  int
+}
+
+type paddleTransactionCreatorStub struct {
+	calls   int
+	request *paddle.CreateTransactionRequest
+	result  *paddle.Transaction
+}
+
+func (s *paddleTransactionCreatorStub) CreateTransaction(_ context.Context, request *paddle.CreateTransactionRequest) (*paddle.Transaction, error) {
+	s.calls++
+	s.request = request
+	return s.result, nil
 }
 
 func (s *paddleSubscriptionUpdaterStub) GetSubscription(context.Context, *paddle.GetSubscriptionRequest) (*paddle.Subscription, error) {
@@ -53,6 +117,7 @@ func (s *paddleSubscriptionUpdaterStub) PreviewSubscriptionUpdate(_ context.Cont
 }
 
 func (s *paddleSubscriptionUpdaterStub) UpdateSubscription(_ context.Context, request *paddle.UpdateSubscriptionRequest) (*paddle.Subscription, error) {
+	s.updateCalls++
 	s.updateReq = request
 	return s.subscription, nil
 }
@@ -71,6 +136,13 @@ func (s *paddlePortalSessionCreatorStub) CreateCustomerPortalSession(_ context.C
 			General: paddle.CustomerPortalSessionGeneralURLs{Overview: "https://customer-portal.paddle.com/session-token"},
 		},
 	}, nil
+}
+
+func TestValidPaddleOperationKeyAcceptsBoundedOpaqueKeys(t *testing.T) {
+	assert.True(t, validPaddleOperationKey("00000000-0000-4000-8000-000000000001"))
+	assert.True(t, validPaddleOperationKey("checkout-1780000000000-deadbeef1234"))
+	assert.False(t, validPaddleOperationKey("too-short"))
+	assert.False(t, validPaddleOperationKey("checkout/../../other-tenant"))
 }
 
 func (s entitlementHandlerServiceStub) Current(context.Context, time.Time) (*types.ConsumerEntitlement, error) {
@@ -236,6 +308,7 @@ func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing
 		}},
 		paddle:        config,
 		subscriptions: provider,
+		operations:    &paddleBillingOperationRepoStub{},
 	}
 
 	recorder := httptest.NewRecorder()
@@ -271,7 +344,7 @@ func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing
 
 	recorder = httptest.NewRecorder()
 	c, _ = gin.CreateTestContext(recorder)
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade", strings.NewReader(`{"plan":"pro","customer_id":"ctm_attacker"}`))
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade", strings.NewReader(`{"plan":"pro","operation_key":"00000000-0000-4000-8000-000000000001","customer_id":"ctm_attacker"}`))
 	req.Header.Set("Content-Type", "application/json")
 	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
 
@@ -288,8 +361,24 @@ func TestPaddleSubscriptionUpgradeUsesOwnedSubscriptionAndServerPrice(t *testing
 	customData := *provider.updateReq.CustomData.Value()
 	assert.Equal(t, "42", customData["tenant_id"])
 	assert.Equal(t, config.checkoutBinding(42, "pri_pro_monthly"), customData["musuw_checkout_binding"])
+	assert.Equal(t, "00000000-0000-4000-8000-000000000001", customData["musuw_billing_operation_key"])
 	assert.Equal(t, paddle.ProrationBillingModeProratedImmediately, *provider.updateReq.ProrationBillingMode.Value())
 	assert.Equal(t, paddle.SubscriptionOnPaymentFailurePreventChange, *provider.updateReq.OnPaymentFailure.Value())
+	assert.Equal(t, 1, provider.updateCalls)
+
+	// A retry with the same key reuses the accepted operation even if Paddle
+	// already reflects the target before the signed webhook reaches Musuw.
+	provider.subscription.Items[0].Price.ID = "pri_pro_monthly"
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/subscription-upgrade", strings.NewReader(`{"plan":"pro","operation_key":"00000000-0000-4000-8000-000000000001"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+	h.PaddleSubscriptionUpgrade(c)
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	assert.JSONEq(t, `{"pending":true,"plan":"pro"}`, recorder.Body.String())
+	assert.Equal(t, 1, provider.updateCalls)
 }
 
 func TestPaddleSubscriptionUpgradeRejectsDowngradeAndProviderOwnershipMismatch(t *testing.T) {
@@ -342,7 +431,73 @@ func TestPaddleSubscriptionUpgradeRejectsDowngradeAndProviderOwnershipMismatch(t
 	assert.Nil(t, provider.updateReq)
 }
 
-func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
+func TestPaddleCheckoutIntentCreatesAndReusesOneServerOwnedTransaction(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config := PaddleConfig{
+		Environment: "sandbox", APIKey: "pdl_sdbx_apikey_test", ClientToken: "test_client_token", WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	provider := &paddleTransactionCreatorStub{result: &paddle.Transaction{ID: "txn_server_owned"}}
+	operations := &paddleBillingOperationRepoStub{}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanFree)}},
+		paddle:  config, transactions: provider, operations: operations,
+	}
+	body := `{"plan":"plus","billing_period":"monthly","operation_key":"00000000-0000-4000-8000-000000000001"}`
+	for range 2 {
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/checkout-intent", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+		h.PaddleCheckoutIntent(c)
+		require.Empty(t, c.Errors)
+		assert.JSONEq(t, `{"transaction_id":"txn_server_owned","pending":true}`, recorder.Body.String())
+	}
+	assert.Equal(t, 1, provider.calls)
+	require.NotNil(t, provider.request)
+	require.Len(t, provider.request.Items, 1)
+	assert.Equal(t, "pri_plus_monthly", provider.request.Items[0].TransactionItemFromCatalog.PriceID)
+	assert.Equal(t, "42", provider.request.CustomData["tenant_id"])
+	assert.Equal(t, config.checkoutBinding(42, "pri_plus_monthly"), provider.request.CustomData["musuw_checkout_binding"])
+	assert.Equal(t, "00000000-0000-4000-8000-000000000001", provider.request.CustomData["musuw_billing_operation_key"])
+}
+
+func TestPaddleCheckoutIntentRejectsExistingPastDueSubscriptionAfterGrace(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	provider := &paddleTransactionCreatorStub{result: &paddle.Transaction{ID: "txn_must_not_exist"}}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
+			ConsumerPlanLimits:   types.LimitsForConsumerPlan(types.ConsumerPlanFree),
+			PlanStatus:           "past_due",
+			PaddleSubscriptionID: "sub_existing",
+		}},
+		paddle: PaddleConfig{
+			Environment: "sandbox", APIKey: "pdl_sdbx_apikey_test", ClientToken: "test_client_token", WebhookSecret: "pdl_ntfset_secret",
+			Prices: map[types.ConsumerPlan]map[string]string{
+				types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+				types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+				types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+			},
+		},
+		transactions: provider,
+		operations:   &paddleBillingOperationRepoStub{},
+	}
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/checkout-intent", strings.NewReader(`{"plan":"plus","billing_period":"monthly","operation_key":"00000000-0000-4000-8000-000000000001"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+	h.PaddleCheckoutIntent(c)
+	require.NotEmpty(t, c.Errors)
+	assert.Zero(t, provider.calls)
+}
+
+func TestCurrentReturnsOnlyServerCatalogForCheckoutIntent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	portal := &paddlePortalSessionCreatorStub{}
 	paddleCustomerID := "ctm_" + strings.Repeat("a", 26)
@@ -382,11 +537,9 @@ func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 			Environment     string `json:"environment"`
 			ClientToken     string `json:"client_token"`
 			PWCustomerID    string `json:"pw_customer_id"`
-			TenantID        string `json:"tenant_id"`
-			Prices          map[string]map[string]struct {
+			Catalog         map[string]map[string]struct {
 				PriceID string `json:"price_id"`
-				Binding string `json:"checkout_binding"`
-			} `json:"prices"`
+			} `json:"catalog"`
 		} `json:"billing"`
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
@@ -395,11 +548,10 @@ func TestCurrentReturnsOnlyTenantBoundPaddleCheckoutOptions(t *testing.T) {
 	assert.Equal(t, "sandbox", response.Billing.Environment)
 	assert.Equal(t, "test_client_token", response.Billing.ClientToken)
 	assert.Equal(t, paddleCustomerID, response.Billing.PWCustomerID)
-	assert.Equal(t, "42", response.Billing.TenantID)
-	option := response.Billing.Prices["plus"]["monthly"]
+	option := response.Billing.Catalog["plus"]["monthly"]
 	assert.Equal(t, "pri_plus_monthly", option.PriceID)
-	assert.NotEmpty(t, option.Binding)
-	assert.True(t, h.paddle.validCheckoutBinding(42, option.PriceID, option.Binding))
+	assert.NotContains(t, recorder.Body.String(), "checkout_binding")
+	assert.NotContains(t, recorder.Body.String(), "tenant_id")
 }
 
 func TestCurrentOmitsRetainCustomerWithoutAuthenticatedTenantOwnedPaddleCustomer(t *testing.T) {
@@ -494,6 +646,7 @@ func TestPaddleWebhookRejectsUnsignedCheckoutBinding(t *testing.T) {
 
 func TestPaddleWebhookAppliesServerBoundSubscription(t *testing.T) {
 	calls := 0
+	queue := &recordingPaddleWebhookEnqueuer{}
 	var capturedPeriodEnd *time.Time
 	config := PaddleConfig{
 		Environment:   "sandbox",
@@ -536,12 +689,72 @@ func TestPaddleWebhookAppliesServerBoundSubscription(t *testing.T) {
 		capturePeriodEnd: func(value *time.Time) {
 			capturedPeriodEnd = value
 		},
-	}, paddle: config}
+	}, paddle: config, tasks: queue}
 	h.PaddleWebhook(c)
 	assert.Empty(t, c.Errors)
-	assert.Equal(t, 1, calls)
-	require.NotNil(t, capturedPeriodEnd)
-	assert.Equal(t, periodEnd, capturedPeriodEnd.UTC())
+	assert.Equal(t, 0, calls)
+	require.NotNil(t, queue.task)
+	var payload types.PaddleWebhookTaskPayload
+	require.NoError(t, json.Unmarshal(queue.task.Payload(), &payload))
+	require.NotNil(t, payload.EventPeriodEnd)
+	assert.Equal(t, periodEnd, payload.EventPeriodEnd.UTC())
+	assert.Nil(t, capturedPeriodEnd)
+}
+
+func TestPaddleWebhookQueuesVerifiedWorkBeforeAcknowledging(t *testing.T) {
+	applyCalls := 0
+	queue := &recordingPaddleWebhookEnqueuer{}
+	config := PaddleConfig{
+		Environment:   "sandbox",
+		APIKey:        "pdl_sdbx_apikey_test",
+		ClientToken:   "test_client_token",
+		WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	binding := config.checkoutBinding(42, "pri_plus_monthly")
+	now := time.Now().UTC()
+	body := []byte(fmt.Sprintf(`{
+		"event_id":"evt_queued",
+		"event_type":"subscription.created",
+		"occurred_at":%q,
+		"data":{
+			"id":"sub_queued",
+			"status":"active",
+			"customer_id":"ctm_queued",
+			"custom_data":{"tenant_id":"42","musuw_checkout_binding":%q},
+			"current_billing_period":{"starts_at":%q,"ends_at":%q},
+			"items":[{"price":{"id":"pri_plus_monthly"}}]
+		}
+	}`, now.Format(time.RFC3339Nano), binding, now.Format(time.RFC3339Nano), now.AddDate(0, 1, 0).Format(time.RFC3339Nano)))
+	ts := time.Now().Unix()
+	mac := hmac.New(sha256.New, []byte(config.WebhookSecret))
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d:%s", ts, body)))
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/webhook", bytes.NewReader(body))
+	req.Header.Set("Paddle-Signature", fmt.Sprintf("ts=%d;h1=%s", ts, hex.EncodeToString(mac.Sum(nil))))
+	c.Request = req
+
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{applyCalls: &applyCalls},
+		paddle:  config,
+		tasks:   queue,
+	}
+	h.PaddleWebhook(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.JSONEq(t, `{"ok":true,"queued":true}`, recorder.Body.String())
+	assert.Zero(t, applyCalls, "provider and database work must not run before the webhook response")
+	require.NotNil(t, queue.task)
+	assert.Equal(t, types.TypePaddleWebhook, queue.task.Type())
+	assert.NotContains(t, string(queue.task.Payload()), config.WebhookSecret)
+	assert.NotContains(t, string(queue.task.Payload()), "Paddle-Signature")
 }
 
 func TestPastDueSubscriptionCannotAdvancePaidTerm(t *testing.T) {
@@ -564,6 +777,7 @@ func TestPaddleWebhookRoutesBoundRecurringCompletionToAllowanceRefresh(t *testin
 	for _, period := range []string{"monthly", "yearly"} {
 		t.Run(period, func(t *testing.T) {
 			applyCalls, refreshCalls := 0, 0
+			queue := &recordingPaddleWebhookEnqueuer{}
 			priceID := "pri_plus_" + period
 			binding := config.checkoutBinding(42, priceID)
 			now := time.Now().UTC()
@@ -592,12 +806,16 @@ func TestPaddleWebhookRoutesBoundRecurringCompletionToAllowanceRefresh(t *testin
 			req.Header.Set("Paddle-Signature", fmt.Sprintf("ts=%d;h1=%s", ts, hex.EncodeToString(mac.Sum(nil))))
 			c.Request = req
 
-			h := &EntitlementHandler{service: entitlementHandlerServiceStub{applyCalls: &applyCalls, refreshCalls: &refreshCalls}, paddle: config}
+			h := &EntitlementHandler{service: entitlementHandlerServiceStub{applyCalls: &applyCalls, refreshCalls: &refreshCalls}, paddle: config, tasks: queue}
 			h.PaddleWebhook(c)
 			require.Empty(t, c.Errors)
 			assert.Equal(t, 0, applyCalls)
-			assert.Equal(t, 1, refreshCalls)
-			assert.JSONEq(t, `{"ok":true,"applied":true}`, recorder.Body.String())
+			assert.Equal(t, 0, refreshCalls)
+			require.NotNil(t, queue.task)
+			var payload types.PaddleWebhookTaskPayload
+			require.NoError(t, json.Unmarshal(queue.task.Payload(), &payload))
+			assert.Equal(t, types.PaddleWebhookTaskOperationRefreshPaidAllowance, payload.Operation)
+			assert.JSONEq(t, `{"ok":true,"queued":true}`, recorder.Body.String())
 		})
 	}
 }
@@ -674,4 +892,26 @@ func TestPaddleCancellationStillRequiresKnownServerPrice(t *testing.T) {
 	assert.Equal(t, "plus", string(plan))
 	assert.Equal(t, "paused", status)
 	assert.Equal(t, "monthly", period)
+}
+
+func TestPaddlePlanMappingRejectsMultipleOrUnknownItems(t *testing.T) {
+	config := PaddleConfig{Prices: map[types.ConsumerPlan]map[string]string{types.ConsumerPlanPlus: {"monthly": "pri_plus"}}}
+	event := paddleEvent{EventType: "subscription.created"}
+	item := struct {
+		Price struct {
+			ID string `json:"id"`
+		} `json:"price"`
+	}{}
+	item.Price.ID = "pri_plus"
+	event.Data.Items = []struct {
+		Price struct {
+			ID string `json:"id"`
+		} `json:"price"`
+	}{item, item}
+	_, _, _, _, err := config.planForEvent(event)
+	assert.Error(t, err)
+	event.Data.Items = event.Data.Items[:1]
+	event.Data.Items[0].Price.ID = "pri_unknown"
+	_, _, _, _, err = config.planForEvent(event)
+	assert.Error(t, err)
 }

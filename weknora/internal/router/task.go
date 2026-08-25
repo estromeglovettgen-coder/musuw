@@ -28,24 +28,26 @@ type AsynqTaskParams struct {
 	// enrichment, maintenance, and Wiki work. SharedServer is the elastic tier:
 	// it also subscribes to core/enrichment queues so either stage can borrow
 	// otherwise-idle capacity without consuming the other stage's guarantee.
-	CoreServer           *asynq.Server `name:"coreAsynqServer"`
-	PostProcessServer    *asynq.Server `name:"postProcessAsynqServer"`
-	EnrichmentServer     *asynq.Server `name:"enrichmentAsynqServer"`
-	MaintenanceServer    *asynq.Server `name:"maintenanceAsynqServer"`
-	SharedServer         *asynq.Server `name:"sharedAsynqServer"`
-	WikiServer           *asynq.Server `name:"wikiAsynqServer"`
-	KnowledgeService     interfaces.KnowledgeService
-	KnowledgeBaseService interfaces.KnowledgeBaseService
-	TagService           interfaces.KnowledgeTagService
-	DataSourceService    interfaces.DataSourceService
-	ChunkExtractor       interfaces.TaskHandler `name:"chunkExtractor"`
-	DataTableSummary     interfaces.TaskHandler `name:"dataTableSummary"`
-	ImageMultimodal      interfaces.TaskHandler `name:"imageMultimodal"`
-	KnowledgePostProcess interfaces.TaskHandler `name:"knowledgePostProcess"`
-	WikiIngest           interfaces.TaskHandler `name:"wikiIngest"`
-	TemporaryDocument    interfaces.TemporaryDocumentService
-	DeadLetterRepo       interfaces.TaskDeadLetterRepository
-	SpanTracker          service.SpanTracker
+	CoreServer              *asynq.Server `name:"coreAsynqServer"`
+	PostProcessServer       *asynq.Server `name:"postProcessAsynqServer"`
+	EnrichmentServer        *asynq.Server `name:"enrichmentAsynqServer"`
+	MaintenanceServer       *asynq.Server `name:"maintenanceAsynqServer"`
+	SharedServer            *asynq.Server `name:"sharedAsynqServer"`
+	WikiServer              *asynq.Server `name:"wikiAsynqServer"`
+	KnowledgeService        interfaces.KnowledgeService
+	KnowledgeBaseService    interfaces.KnowledgeBaseService
+	TagService              interfaces.KnowledgeTagService
+	DataSourceService       interfaces.DataSourceService
+	EntitlementService      interfaces.EntitlementService
+	PaddleBillingOperations interfaces.PaddleBillingOperationRepository
+	ChunkExtractor          interfaces.TaskHandler `name:"chunkExtractor"`
+	DataTableSummary        interfaces.TaskHandler `name:"dataTableSummary"`
+	ImageMultimodal         interfaces.TaskHandler `name:"imageMultimodal"`
+	KnowledgePostProcess    interfaces.TaskHandler `name:"knowledgePostProcess"`
+	WikiIngest              interfaces.TaskHandler `name:"wikiIngest"`
+	TemporaryDocument       interfaces.TemporaryDocumentService
+	DeadLetterRepo          interfaces.TaskDeadLetterRepository
+	SpanTracker             service.SpanTracker
 }
 
 // defaultRedisOpTimeout is the previous hard-coded read timeout. The 100ms
@@ -318,6 +320,10 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 	// and both land on QueueWiki, so the dedicated wiki pool serves them.
 	mux.HandleFunc(types.TypeWikiIngest, params.WikiIngest.Handle)
 	mux.HandleFunc(types.TypeWikiFinalize, params.WikiIngest.Handle)
+
+	// Paddle HTTP handlers enqueue only the canonical secret-free projection;
+	// this worker performs the existing idempotent entitlement mutation.
+	mux.HandleFunc(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
 
 	// Run the same mux on every pool. Shared and dedicated servers intentionally
 	// overlap, but Redis dequeue is atomic, so each task still executes once.

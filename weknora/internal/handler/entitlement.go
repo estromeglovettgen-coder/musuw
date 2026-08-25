@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,7 +21,9 @@ import (
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/WeKnora/internal/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 )
 
 const paddleSignatureTolerance = 5 * time.Second
@@ -152,22 +155,6 @@ func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, 
 	}
 	response["client_token"] = c.ClientToken
 	response["catalog"] = catalog
-	if plan != types.ConsumerPlanFree {
-		return response
-	}
-	prices := map[string]map[string]gin.H{}
-	for _, paidPlan := range []types.ConsumerPlan{types.ConsumerPlanPlus, types.ConsumerPlanPro, types.ConsumerPlanMax} {
-		prices[string(paidPlan)] = map[string]gin.H{}
-		for _, period := range []string{"monthly", "yearly"} {
-			priceID := c.Prices[paidPlan][period]
-			prices[string(paidPlan)][period] = gin.H{
-				"price_id":         priceID,
-				"checkout_binding": c.checkoutBinding(tenantID, priceID),
-			}
-		}
-	}
-	response["tenant_id"] = strconv.FormatUint(tenantID, 10)
-	response["prices"] = prices
 	return response
 }
 
@@ -194,16 +181,23 @@ type paddleSubscriptionUpdater interface {
 	UpdateSubscription(context.Context, *paddle.UpdateSubscriptionRequest) (*paddle.Subscription, error)
 }
 
+type paddleTransactionCreator interface {
+	CreateTransaction(context.Context, *paddle.CreateTransactionRequest) (*paddle.Transaction, error)
+}
+
 type EntitlementHandler struct {
 	service       interfaces.EntitlementService
 	paddle        PaddleConfig
 	portal        paddlePortalSessionCreator
 	subscriptions paddleSubscriptionUpdater
+	transactions  paddleTransactionCreator
+	tasks         interfaces.TaskEnqueuer
+	operations    interfaces.PaddleBillingOperationRepository
 }
 
-func NewEntitlementHandler(service interfaces.EntitlementService) *EntitlementHandler {
+func NewEntitlementHandler(service interfaces.EntitlementService, tasks interfaces.TaskEnqueuer, operations interfaces.PaddleBillingOperationRepository) *EntitlementHandler {
 	config := loadPaddleConfig()
-	handler := &EntitlementHandler{service: service, paddle: config}
+	handler := &EntitlementHandler{service: service, paddle: config, tasks: tasks, operations: operations}
 	if !config.PortalConfigured() {
 		return handler
 	}
@@ -222,6 +216,7 @@ func NewEntitlementHandler(service interfaces.EntitlementService) *EntitlementHa
 	}
 	handler.portal = sdk
 	handler.subscriptions = sdk
+	handler.transactions = sdk
 	return handler
 }
 
@@ -312,7 +307,141 @@ func (h *EntitlementHandler) PaddlePortalSession(c *gin.Context) {
 }
 
 type paddleSubscriptionUpgradeRequest struct {
-	Plan types.ConsumerPlan `json:"plan" binding:"required"`
+	Plan         types.ConsumerPlan `json:"plan" binding:"required"`
+	OperationKey string             `json:"operation_key"`
+}
+
+type paddleCheckoutIntentRequest struct {
+	Plan          types.ConsumerPlan `json:"plan" binding:"required"`
+	BillingPeriod string             `json:"billing_period" binding:"required"`
+	OperationKey  string             `json:"operation_key" binding:"required"`
+}
+
+func validPaddleOperationKey(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) < 16 || len(value) > 128 {
+		return false
+	}
+	for _, char := range value {
+		if !((char >= '0' && char <= '9') ||
+			(char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			char == '-' || char == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func paddleBillingOperationFingerprint(operationType types.PaddleBillingOperationType, plan types.ConsumerPlan, period, priceID, subscriptionID string) string {
+	canonical := strings.Join([]string{string(operationType), string(plan), period, priceID, subscriptionID}, "\x00")
+	sum := sha256.Sum256([]byte(canonical))
+	return hex.EncodeToString(sum[:])
+}
+
+func samePaddleBillingOperation(operation *types.PaddleBillingOperation, intent types.PaddleBillingOperationIntent) bool {
+	return operation != nil && operation.OperationType == intent.OperationType &&
+		operation.RequestFingerprint == intent.RequestFingerprint && operation.Plan == intent.Plan &&
+		operation.BillingPeriod == intent.BillingPeriod && operation.PriceID == intent.PriceID &&
+		operation.SubscriptionID == intent.SubscriptionID
+}
+
+func (h *EntitlementHandler) PaddleCheckoutIntent(c *gin.Context) {
+	tenantID, ok := types.TenantIDFromContext(c.Request.Context())
+	if !ok || tenantID == 0 {
+		_ = c.Error(apperrors.NewUnauthorizedError("authentication required"))
+		return
+	}
+	if h.transactions == nil || h.operations == nil || !h.paddle.Configured() || !h.paddle.PortalConfigured() {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is not configured"))
+		return
+	}
+	var request paddleCheckoutIntentRequest
+	if err := c.ShouldBindJSON(&request); err != nil || !validPaddleOperationKey(request.OperationKey) {
+		_ = c.Error(apperrors.NewBadRequestError("a valid checkout operation key is required"))
+		return
+	}
+	request.Plan = types.NormalizeConsumerPlan(request.Plan)
+	request.BillingPeriod = strings.ToLower(strings.TrimSpace(request.BillingPeriod))
+	if request.Plan == types.ConsumerPlanFree || request.BillingPeriod != "monthly" && request.BillingPeriod != "yearly" {
+		_ = c.Error(apperrors.NewBadRequestError("a paid plan and billing period are required"))
+		return
+	}
+	current, err := h.service.Current(c.Request.Context(), time.Now())
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if current.Plan != types.ConsumerPlanFree ||
+		(strings.TrimSpace(current.PaddleSubscriptionID) != "" && current.PlanStatus != "canceled") {
+		_ = c.Error(apperrors.NewConflictError("an existing paid subscription must be managed instead of opening another checkout"))
+		return
+	}
+	priceID := strings.TrimSpace(h.paddle.Prices[request.Plan][request.BillingPeriod])
+	if priceID == "" {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle price is not configured"))
+		return
+	}
+	intent := types.PaddleBillingOperationIntent{
+		TenantID: tenantID, OperationKey: strings.TrimSpace(request.OperationKey),
+		OperationType: types.PaddleBillingOperationCheckout, Plan: request.Plan,
+		BillingPeriod: request.BillingPeriod, PriceID: priceID,
+	}
+	intent.RequestFingerprint = paddleBillingOperationFingerprint(intent.OperationType, intent.Plan, intent.BillingPeriod, intent.PriceID, "")
+	operation, disposition, err := h.operations.Claim(c.Request.Context(), intent)
+	if errors.Is(err, interfaces.ErrPaddleBillingOperationKeyConflict) {
+		_ = c.Error(apperrors.NewConflictError("checkout operation key was already used for another request"))
+		return
+	}
+	if err != nil {
+		logger.Errorf(c.Request.Context(), "Paddle checkout operation claim failed tenant_id=%d: %v", tenantID, err)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable"))
+		return
+	}
+	if !samePaddleBillingOperation(operation, intent) {
+		_ = c.Error(apperrors.NewConflictError("another billing operation is already in progress"))
+		return
+	}
+	if transactionID := strings.TrimSpace(operation.PaddleTransactionID); transactionID != "" {
+		c.JSON(http.StatusOK, gin.H{"transaction_id": transactionID, "pending": true})
+		return
+	}
+	if disposition != types.PaddleBillingOperationClaimCreated {
+		_ = c.Error(apperrors.NewConflictError("checkout creation is already in progress or requires reconciliation"))
+		return
+	}
+	if err := h.operations.MarkInFlight(c.Request.Context(), operation.ID); err != nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable"))
+		return
+	}
+	transaction, providerErr := h.transactions.CreateTransaction(c.Request.Context(), &paddle.CreateTransactionRequest{
+		Items: []paddle.CreateTransactionItems{*paddle.NewCreateTransactionItemsTransactionItemFromCatalog(&paddle.TransactionItemFromCatalog{
+			PriceID: priceID, Quantity: 1,
+		})},
+		CustomData: paddle.CustomData{
+			"tenant_id":                   strconv.FormatUint(tenantID, 10),
+			"musuw_checkout_binding":      h.paddle.checkoutBinding(tenantID, priceID),
+			"musuw_billing_operation_key": intent.OperationKey,
+		},
+	})
+	if providerErr != nil || transaction == nil || !strings.HasPrefix(strings.TrimSpace(transaction.ID), "txn_") {
+		message := "Paddle transaction response is uncertain"
+		if providerErr != nil {
+			message = providerErr.Error()
+		}
+		_ = h.operations.Finish(c.Request.Context(), operation.ID, types.PaddleBillingOperationUncertain, `{}`, message)
+		logger.Errorf(c.Request.Context(), "Paddle checkout transaction result uncertain tenant_id=%d", tenantID)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable; retrying will not create another transaction"))
+		return
+	}
+	transactionID := strings.TrimSpace(transaction.ID)
+	if err := h.operations.RecordPaddleTransaction(c.Request.Context(), operation.ID, transactionID); err != nil {
+		_ = h.operations.Finish(c.Request.Context(), operation.ID, types.PaddleBillingOperationUncertain, `{}`, err.Error())
+		logger.Errorf(c.Request.Context(), "Paddle checkout transaction persistence uncertain tenant_id=%d", tenantID)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable; retrying will not create another transaction"))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"transaction_id": transactionID, "pending": true})
 }
 
 type paddleSubscriptionUpgradeTarget struct {
@@ -395,14 +524,15 @@ func paddlePreviewUpgradeRequest(tenantID uint64, config PaddleConfig, target *p
 	}
 }
 
-func paddleApplyUpgradeRequest(tenantID uint64, config PaddleConfig, target *paddleSubscriptionUpgradeTarget) *paddle.UpdateSubscriptionRequest {
+func paddleApplyUpgradeRequest(tenantID uint64, config PaddleConfig, target *paddleSubscriptionUpgradeTarget, operationKey string) *paddle.UpdateSubscriptionRequest {
 	items := []paddle.UpdateSubscriptionItems{*paddle.NewUpdateSubscriptionItemsSubscriptionUpdateItemFromCatalog(&paddle.SubscriptionUpdateItemFromCatalog{
 		PriceID:  target.priceID,
 		Quantity: 1,
 	})}
 	customData := paddle.CustomData{
-		"tenant_id":              strconv.FormatUint(tenantID, 10),
-		"musuw_checkout_binding": config.checkoutBinding(tenantID, target.priceID),
+		"tenant_id":                   strconv.FormatUint(tenantID, 10),
+		"musuw_checkout_binding":      config.checkoutBinding(tenantID, target.priceID),
+		"musuw_billing_operation_key": strings.TrimSpace(operationKey),
 	}
 	return &paddle.UpdateSubscriptionRequest{
 		SubscriptionID:       target.subscriptionID,
@@ -472,18 +602,74 @@ func (h *EntitlementHandler) PaddleSubscriptionUpgrade(c *gin.Context) {
 		_ = c.Error(apperrors.NewBadRequestError("target plan is required"))
 		return
 	}
+	if !validPaddleOperationKey(request.OperationKey) || h.operations == nil {
+		_ = c.Error(apperrors.NewBadRequestError("a valid upgrade operation key is required"))
+		return
+	}
+	request.Plan = types.NormalizeConsumerPlan(request.Plan)
+	operationKey := strings.TrimSpace(request.OperationKey)
+	existing, found, err := h.operations.FindByKey(c.Request.Context(), tenantID, operationKey)
+	if err != nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription upgrade is temporarily unavailable"))
+		return
+	}
+	if found {
+		if existing.OperationType != types.PaddleBillingOperationUpgrade || existing.Plan != request.Plan {
+			_ = c.Error(apperrors.NewConflictError("upgrade operation key was already used for another request"))
+			return
+		}
+		if existing.Status == types.PaddleBillingOperationInFlight || existing.Status == types.PaddleBillingOperationSucceeded {
+			c.JSON(http.StatusAccepted, gin.H{"pending": true, "plan": existing.Plan})
+			return
+		}
+		_ = c.Error(apperrors.NewConflictError("subscription upgrade requires provider reconciliation"))
+		return
+	}
 	target, err := h.paddleSubscriptionUpgradeTarget(c.Request.Context(), tenantID, request.Plan)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	updated, err := h.subscriptions.UpdateSubscription(c.Request.Context(), paddleApplyUpgradeRequest(tenantID, h.paddle, target))
+	intent := types.PaddleBillingOperationIntent{
+		TenantID: tenantID, OperationKey: operationKey,
+		OperationType: types.PaddleBillingOperationUpgrade, Plan: target.plan,
+		BillingPeriod: target.period, PriceID: target.priceID, SubscriptionID: target.subscriptionID,
+	}
+	intent.RequestFingerprint = paddleBillingOperationFingerprint(intent.OperationType, intent.Plan, intent.BillingPeriod, intent.PriceID, intent.SubscriptionID)
+	operation, disposition, err := h.operations.Claim(c.Request.Context(), intent)
+	if errors.Is(err, interfaces.ErrPaddleBillingOperationKeyConflict) {
+		_ = c.Error(apperrors.NewConflictError("upgrade operation key was already used for another request"))
+		return
+	}
 	if err != nil {
-		logger.Errorf(c.Request.Context(), "Paddle subscription upgrade failed tenant_id=%d target_plan=%s: %v", tenantID, target.plan, err)
 		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription upgrade is temporarily unavailable"))
 		return
 	}
+	if !samePaddleBillingOperation(operation, intent) {
+		_ = c.Error(apperrors.NewConflictError("another billing operation is already in progress"))
+		return
+	}
+	if disposition != types.PaddleBillingOperationClaimCreated {
+		if operation.Status == types.PaddleBillingOperationInFlight || operation.Status == types.PaddleBillingOperationSucceeded {
+			c.JSON(http.StatusAccepted, gin.H{"pending": true, "plan": target.plan})
+			return
+		}
+		_ = c.Error(apperrors.NewConflictError("subscription upgrade requires provider reconciliation"))
+		return
+	}
+	if err := h.operations.MarkInFlight(c.Request.Context(), operation.ID); err != nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription upgrade is temporarily unavailable"))
+		return
+	}
+	updated, err := h.subscriptions.UpdateSubscription(c.Request.Context(), paddleApplyUpgradeRequest(tenantID, h.paddle, target, operationKey))
+	if err != nil {
+		_ = h.operations.Finish(c.Request.Context(), operation.ID, types.PaddleBillingOperationUncertain, `{}`, err.Error())
+		logger.Errorf(c.Request.Context(), "Paddle subscription upgrade failed tenant_id=%d target_plan=%s: %v", tenantID, target.plan, err)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription upgrade is temporarily unavailable; retrying will not submit another change"))
+		return
+	}
 	if updated == nil || strings.TrimSpace(updated.ID) != target.subscriptionID {
+		_ = h.operations.Finish(c.Request.Context(), operation.ID, types.PaddleBillingOperationUncertain, `{}`, "Paddle returned an incomplete subscription update")
 		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle returned an incomplete subscription update"))
 		return
 	}
@@ -516,6 +702,38 @@ type paddleEventData struct {
 	} `json:"items"`
 }
 
+func (h *EntitlementHandler) enqueuePaddleWebhook(c *gin.Context, payload types.PaddleWebhookTaskPayload) bool {
+	if h.tasks == nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle event queue is unavailable"))
+		return false
+	}
+	if err := payload.Validate(); err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("Paddle event shape is invalid"))
+		return false
+	}
+	taskBody, err := json.Marshal(payload)
+	if err != nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle event queue is unavailable"))
+		return false
+	}
+	options := []asynq.Option{
+		asynq.Queue(types.QueueBilling),
+		asynq.MaxRetry(types.PaddleWebhookTaskMaxRetry),
+		asynq.Timeout(types.PaddleWebhookTaskTimeout),
+	}
+	if taskID := utils.PaddleWebhookTaskID(payload.EventID); taskID != "" {
+		options = append(options, asynq.TaskID(taskID))
+	}
+	_, err = h.tasks.Enqueue(asynq.NewTask(types.TypePaddleWebhook, taskBody), options...)
+	if err != nil && !errors.Is(err, asynq.ErrTaskIDConflict) && !errors.Is(err, asynq.ErrDuplicateTask) {
+		logger.Errorf(c.Request.Context(), "Paddle billing event enqueue failed event_id=%s: %v", payload.EventID, err)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle event queue is temporarily unavailable"))
+		return false
+	}
+	logger.Infof(c.Request.Context(), "Paddle billing event queued event_id=%s event_type=%s tenant_id=%d", payload.EventID, payload.EventType, payload.TenantID)
+	return true
+}
+
 type paddleBillingPeriod struct {
 	StartsAt time.Time `json:"starts_at"`
 	EndsAt   time.Time `json:"ends_at"`
@@ -540,7 +758,6 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 		_ = c.Error(apperrors.NewBadRequestError("invalid Paddle event"))
 		return
 	}
-
 	isSubscriptionEvent := isEntitlementPaddleEvent(event.EventType)
 	isRecurringCompletion := event.EventType == "transaction.completed" && event.Data.Status == "completed" && event.Data.Origin == "subscription_recurring"
 	if !isSubscriptionEvent && !isRecurringCompletion {
@@ -565,24 +782,36 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 	if subscriptionID == "" && strings.HasPrefix(event.EventType, "subscription.") {
 		subscriptionID = event.Data.ID
 	}
-	var applied bool
+	payload := types.PaddleWebhookTaskPayload{
+		TenantID: tenantID, Plan: plan, Status: status, BillingPeriod: billingPeriod,
+		EventID: event.EventID, EventType: event.EventType, OccurredAt: event.OccurredAt,
+		CustomerID: event.Data.CustomerID, SubscriptionID: subscriptionID, PriceID: priceID,
+	}
 	if isRecurringCompletion {
 		if event.Data.BillingPeriod == nil || event.Data.BillingPeriod.EndsAt.IsZero() {
 			_ = c.Error(apperrors.NewBadRequestError("Paddle recurring transaction has no billing period"))
 			return
 		}
-		applied, err = h.service.RefreshPaidAllowance(c.Request.Context(), tenantID, plan, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID, event.Data.BillingPeriod.EndsAt)
+		periodEnd := event.Data.BillingPeriod.EndsAt.UTC()
+		payload.Operation = types.PaddleWebhookTaskOperationRefreshPaidAllowance
+		payload.EventPeriodEnd = &periodEnd
 	} else {
-		periodEnd := entitledPaddlePeriodEnd(event.EventType, status, event.Data.CurrentBillingPeriod)
-		applied, err = h.service.ApplyConsumerPlan(c.Request.Context(), tenantID, plan, status, billingPeriod, event.EventID, event.OccurredAt, event.Data.CustomerID, subscriptionID, periodEnd)
+		payload.Operation = types.PaddleWebhookTaskOperationApplyConsumerPlan
+		payload.EventPeriodEnd = entitledPaddlePeriodEnd(event.EventType, status, event.Data.CurrentBillingPeriod)
+		if operationKey := paddleBillingOperationKey(event.Data.CustomData); validPaddleOperationKey(operationKey) {
+			payload.BillingOperationKey = operationKey
+			switch event.EventType {
+			case "subscription.created", "subscription.activated":
+				payload.BillingOperationType = types.PaddleBillingOperationCheckout
+			case "subscription.updated":
+				payload.BillingOperationType = types.PaddleBillingOperationUpgrade
+			}
+		}
 	}
-	if err != nil {
-		_ = c.Error(err)
+	if !h.enqueuePaddleWebhook(c, payload) {
 		return
 	}
-	logger.Infof(c.Request.Context(), "Paddle billing event processed event_id=%s event_type=%s tenant_id=%d plan=%s status=%s billing_period=%s applied=%t",
-		event.EventID, event.EventType, tenantID, plan, status, billingPeriod, applied)
-	c.JSON(http.StatusOK, gin.H{"ok": true, "applied": applied})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "queued": true})
 }
 
 // Paddle sends subscription.updated at the start of renewal, before payment is
@@ -613,18 +842,12 @@ func isEntitlementPaddleEvent(eventType string) bool {
 }
 
 func (c PaddleConfig) planForEvent(event paddleEvent) (types.ConsumerPlan, string, string, string, error) {
-	var matchedPlan types.ConsumerPlan
-	var matchedPrice string
-	var matchedPeriod string
-	for _, item := range event.Data.Items {
-		if plan, period, ok := c.planAndPeriodForPrice(item.Price.ID); ok {
-			matchedPlan = plan
-			matchedPrice = item.Price.ID
-			matchedPeriod = period
-			break
-		}
+	if len(event.Data.Items) != 1 {
+		return "", "", "", "", apperrors.NewBadRequestError("Paddle subscription must contain exactly one known price")
 	}
-	if matchedPlan == "" {
+	matchedPrice := strings.TrimSpace(event.Data.Items[0].Price.ID)
+	matchedPlan, matchedPeriod, ok := c.planAndPeriodForPrice(matchedPrice)
+	if !ok {
 		return "", "", "", "", apperrors.NewBadRequestError("Paddle event contains no known price")
 	}
 	status := event.Data.Status
@@ -652,6 +875,16 @@ func paddleCheckoutBinding(raw json.RawMessage) string {
 		return ""
 	}
 	return strings.TrimSpace(custom.CheckoutBinding)
+}
+
+func paddleBillingOperationKey(raw json.RawMessage) string {
+	var custom struct {
+		OperationKey string `json:"musuw_billing_operation_key"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &custom) != nil {
+		return ""
+	}
+	return strings.TrimSpace(custom.OperationKey)
 }
 
 func paddleTenantID(raw json.RawMessage) (uint64, error) {

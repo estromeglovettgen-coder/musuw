@@ -534,7 +534,7 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 
 		// Calculate storage size required for embeddings
 		totalStorageSize = retrieveEngine.EstimateStorageSize(ctx, embeddingModel, indexInfoList)
-		if tenantInfo.StorageQuota > 0 {
+		if effectiveStorageQuota(tenantInfo, time.Now().UTC()) > 0 {
 			// Re-fetch tenant storage information
 			tenantInfo, err = s.tenantRepo.GetTenantByID(ctx, tenantInfo.ID)
 			if err != nil {
@@ -545,7 +545,7 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 				return
 			}
 			// Check if there's enough storage quota available
-			if tenantInfo.StorageUsed+totalStorageSize > tenantInfo.StorageQuota {
+			if tenantInfo.StorageUsed+totalStorageSize > effectiveStorageQuota(tenantInfo, time.Now().UTC()) {
 				knowledge.ParseStatus = types.ParseStatusFailed
 				knowledge.ErrorMessage = "存储空间不足"
 				knowledge.UpdatedAt = time.Now()

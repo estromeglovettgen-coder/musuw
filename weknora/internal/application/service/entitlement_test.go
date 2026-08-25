@@ -53,7 +53,7 @@ func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context
 	return true, nil
 }
 
-func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, billingPeriod, _ string, _ time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time) (bool, error) {
+func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tenant.Plan = plan
@@ -71,6 +71,11 @@ func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, pla
 		s.tenant.PaddleCurrentPeriodEnd = &value
 	}
 	s.tenant.OpenRouterCreditPeriodEnd = creditPeriodEnd
+	if eventID != "" {
+		s.tenant.PaddleLastEventID = eventID
+		value := occurredAt.UTC()
+		s.tenant.PaddleLastEventAt = &value
+	}
 	return true, nil
 }
 
@@ -352,6 +357,25 @@ func TestApplyConsumerPlanIgnoresInitialPaidStateWithoutConfirmedPeriod(t *testi
 	assert.Empty(t, repo.tenant.PaddleBillingPeriod)
 	assert.Nil(t, repo.tenant.PaddleCurrentPeriodEnd)
 	assert.Nil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+}
+
+func TestApplyConsumerPlanTreatsExactDurableEventReplayAsHandled(t *testing.T) {
+	now := time.Now().UTC()
+	periodEnd := now.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_1",
+		PaddleLastEventID: "evt-applied", PaddleLastEventAt: &now,
+		OpenRouterCreditPeriodEnd: &periodEnd,
+	}}
+	svc := newEntitlementService(repo, nil)
+
+	handled, err := svc.ApplyConsumerPlan(
+		context.Background(), 7, types.ConsumerPlanPlus, "active", "monthly",
+		"evt-applied", now, "ctm_1", "sub_1", &periodEnd,
+	)
+	require.NoError(t, err)
+	assert.True(t, handled, "worker retry must be able to finish the matching billing operation after the event committed")
 }
 
 func TestApplyConsumerPlanDoesNotInitializePaidPlanFromFreeAnniversaryWithoutProviderPeriod(t *testing.T) {

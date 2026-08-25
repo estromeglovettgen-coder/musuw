@@ -2040,7 +2040,8 @@ func (s *knowledgeService) indexFAQChunks(ctx context.Context,
 		size = retrieveEngine.EstimateStorageSize(ctx, embeddingModel, indexInfo)
 		estimateDuration := time.Since(estimateStartTime)
 		logger.Debugf(ctx, "indexFAQChunks: estimated storage size %d bytes in %v", size, estimateDuration)
-		if tenantInfo.StorageQuota > 0 && tenantInfo.StorageUsed+size > tenantInfo.StorageQuota {
+		storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+		if storageQuota > 0 && tenantInfo.StorageUsed+size > storageQuota {
 			return types.NewStorageQuotaExceededError()
 		}
 	}

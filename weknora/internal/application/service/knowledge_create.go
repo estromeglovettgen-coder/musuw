@@ -108,7 +108,8 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 
 	// Check storage quota
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
-	if tenantInfo.StorageQuota > 0 && tenantInfo.StorageUsed >= tenantInfo.StorageQuota {
+	storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+	if storageQuota > 0 && tenantInfo.StorageUsed >= storageQuota {
 		logger.Error(ctx, "Storage quota exceeded")
 		return nil, types.NewStorageQuotaExceededError()
 	}
@@ -362,7 +363,8 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 
 	// Check storage quota
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
-	if tenantInfo.StorageQuota > 0 && tenantInfo.StorageUsed >= tenantInfo.StorageQuota {
+	storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+	if storageQuota > 0 && tenantInfo.StorageUsed >= storageQuota {
 		logger.Error(ctx, "Storage quota exceeded")
 		return nil, types.NewStorageQuotaExceededError()
 	}
@@ -601,7 +603,8 @@ func (s *knowledgeService) createKnowledgeFromFileURL(
 
 	// Check storage quota
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
-	if tenantInfo.StorageQuota > 0 && tenantInfo.StorageUsed >= tenantInfo.StorageQuota {
+	storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+	if storageQuota > 0 && tenantInfo.StorageUsed >= storageQuota {
 		logger.Error(ctx, "Storage quota exceeded")
 		return nil, types.NewStorageQuotaExceededError()
 	}

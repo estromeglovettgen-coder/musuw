@@ -2,6 +2,7 @@ package types
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -38,4 +39,27 @@ func TestFreeModelAllowlist(t *testing.T) {
 	assert.True(t, ConsumerPlanAllowsModel(ConsumerPlanFree, &Model{ID: PlatformKnowledgeBaseEmbeddingModelID, Type: ModelTypeEmbedding}))
 	assert.False(t, ConsumerPlanAllowsModel(ConsumerPlanFree, &Model{ID: "builtin-deepseek-v4-pro", Type: ModelTypeKnowledgeQA}))
 	assert.True(t, ConsumerPlanAllowsModel(ConsumerPlanPlus, &Model{ID: "builtin-deepseek-v4-pro", Type: ModelTypeKnowledgeQA}))
+}
+
+func TestEffectiveConsumerPlanAtBoundsPastDueGraceByConfirmedTerm(t *testing.T) {
+	now := time.Now().UTC()
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
+	assert.Equal(t, ConsumerPlanPro, EffectiveConsumerPlanAt(&Tenant{
+		Plan: ConsumerPlanPro, PlanStatus: "past_due", PaddleBillingPeriod: "yearly", PaddleCurrentPeriodEnd: &future,
+	}, now))
+	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlanAt(&Tenant{
+		Plan: ConsumerPlanPro, PlanStatus: "past_due", PaddleBillingPeriod: "yearly", PaddleCurrentPeriodEnd: &past,
+	}, now))
+	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlanAt(&Tenant{
+		Plan: ConsumerPlanPro, PlanStatus: "past_due",
+	}, now))
+	assert.Equal(t, ConsumerPlanPro, EffectiveConsumerPlanAt(&Tenant{
+		Plan: ConsumerPlanPro, PlanStatus: "past_due", PaddleBillingPeriod: "monthly",
+		PaddleCurrentPeriodEnd: &past, OpenRouterCreditPeriodEnd: &future,
+	}, now))
+	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlanAt(&Tenant{
+		Plan: ConsumerPlanPro, PlanStatus: "past_due", PaddleBillingPeriod: "monthly",
+		PaddleCurrentPeriodEnd: &future, OpenRouterCreditPeriodEnd: &past,
+	}, now))
 }

@@ -14,7 +14,21 @@ func effectivePlanFromContext(ctx context.Context) (types.ConsumerPlan, bool) {
 	if !ok || tenant == nil || tenant.Plan == "" {
 		return types.ConsumerPlanFree, false
 	}
-	return types.EffectiveConsumerPlan(tenant), true
+	return types.EffectiveConsumerPlanAt(tenant, time.Now().UTC()), true
+}
+
+func effectiveStorageQuota(tenant *types.Tenant, at time.Time) int64 {
+	if tenant == nil {
+		return 0
+	}
+	quota := tenant.StorageQuota
+	if types.EffectiveConsumerPlan(tenant) != types.ConsumerPlanFree && types.EffectiveConsumerPlanAt(tenant, at) == types.ConsumerPlanFree {
+		freeQuota := types.LimitsForConsumerPlan(types.ConsumerPlanFree).StorageBytes
+		if quota <= 0 || quota > freeQuota {
+			return freeQuota
+		}
+	}
+	return quota
 }
 
 func (s *knowledgeBaseService) checkCreateKnowledgeBaseEntitlement(ctx context.Context) error {
@@ -42,7 +56,7 @@ func (s *knowledgeService) checkCreateKnowledgeEntitlement(ctx context.Context, 
 	if !ok || tenant == nil || tenant.Plan == "" {
 		return nil
 	}
-	plan := types.EffectiveConsumerPlan(tenant)
+	plan := types.EffectiveConsumerPlanAt(tenant, time.Now().UTC())
 	limits := types.LimitsForConsumerPlan(plan)
 	if IsVideoType(fileType) && !limits.VideoUpload {
 		return apperrors.NewForbiddenError("Free plan does not support video upload")

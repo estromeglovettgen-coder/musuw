@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,9 +11,21 @@ import (
 	"github.com/google/uuid"
 )
 
+// PaddleWebhookTaskID returns a stable, opaque Asynq task ID for one provider
+// event. It is intentionally only a short-term Redis enqueue dedupe; durable
+// event_id / occurred_at idempotency remains in EntitlementService/repository.
+func PaddleWebhookTaskID(eventID string) string {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(eventID))
+	return "paddle-webhook-" + hex.EncodeToString(sum[:16])
+}
+
 // GenerateTaskID generates a unique task ID with multiple collision-resistant elements.
 // The format is: <taskType>_<tenantID>_<timestamp>_<uuid>_<businessID>
-// 
+//
 // Parameters:
 //   - taskType: Type of task (e.g., "faq_import", "kb_clone")
 //   - tenantID: Tenant ID for multi-tenancy isolation
@@ -21,10 +35,10 @@ import (
 func GenerateTaskID(taskType string, tenantID uint64, businessID ...string) string {
 	// Use current timestamp in milliseconds for temporal uniqueness
 	timestamp := time.Now().UnixMilli()
-	
+
 	// Generate a short UUID (first 8 characters for brevity)
 	shortUUID := strings.ReplaceAll(uuid.New().String()[:8], "-", "")
-	
+
 	// Build the task ID components
 	components := []string{
 		sanitizeTaskType(taskType),
@@ -32,12 +46,12 @@ func GenerateTaskID(taskType string, tenantID uint64, businessID ...string) stri
 		strconv.FormatInt(timestamp, 10),
 		shortUUID,
 	}
-	
+
 	// Add business ID if provided
 	if len(businessID) > 0 && businessID[0] != "" {
 		components = append(components, sanitizeBusinessID(businessID[0]))
 	}
-	
+
 	return strings.Join(components, "_")
 }
 
@@ -46,18 +60,18 @@ func GenerateTaskID(taskType string, tenantID uint64, businessID ...string) stri
 func GenerateTaskIDWithPrefix(prefix string, tenantID uint64, businessID ...string) string {
 	timestamp := time.Now().UnixMilli()
 	shortUUID := strings.ReplaceAll(uuid.New().String()[:8], "-", "")
-	
+
 	components := []string{
 		sanitizeTaskType(prefix),
 		strconv.FormatUint(tenantID, 10),
 		strconv.FormatInt(timestamp, 10),
 		shortUUID,
 	}
-	
+
 	if len(businessID) > 0 && businessID[0] != "" {
 		components = append(components, sanitizeBusinessID(businessID[0]))
 	}
-	
+
 	return strings.Join(components, "_")
 }
 

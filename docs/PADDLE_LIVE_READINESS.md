@@ -149,7 +149,9 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
    `subscription.resumed`、`subscription.canceled` 和 `transaction.completed`。
    destination-specific signing secret 只进 server secret store。当前 Live log
    尚无投递证据，必须先完成签名交付验证；保留 Sandbox destination，不混用、
-   不覆盖，也不为相同用途新建第二个 destination。
+   不覆盖，也不为相同用途新建第二个 destination。退款/拒付的 entitlement
+   政策及 `adjustment.created`/`adjustment.updated` 是否需要订阅，明确留到 Live
+   授权前单独评审；当前 Sandbox 不实现一套提前无人使用的财务对账子系统。
 9. **经 owner 确认后设置 Live default payment link 为 `/pay`。** app 域名已获批，
    但 Dashboard 当前值仍为空。拟提交值为 `https://app.musuw.com/pay`；`/checkout` 需要
    已认证计划上下文，不适合 Paddle 生成的 transaction/update-payment 链接。

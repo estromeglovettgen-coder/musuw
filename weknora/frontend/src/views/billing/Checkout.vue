@@ -93,11 +93,13 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import {
   getCurrentEntitlement,
+  createPaddleCheckoutIntent,
   previewPaddleSubscriptionUpgrade,
   upgradePaddleSubscription,
   type BillingPeriod,
   type ConsumerEntitlement,
   type PaddleBillingConfig,
+  type PaddleCheckoutIntent,
   type PaddleSubscriptionUpgradePreview,
   type PaidConsumerPlan,
 } from '@/api/entitlement'
@@ -130,6 +132,10 @@ const totals = ref<CheckoutTotals | null>(null)
 const previewPrice = ref('')
 const upgradePreview = ref<PaddleSubscriptionUpgradePreview | null>(null)
 const upgradeSubmitting = ref(false)
+const checkoutOperationKey = ref<string | null>(null)
+const upgradeOperationKey = ref<string | null>(null)
+const checkoutIntent = ref<PaddleCheckoutIntent | null>(null)
+let checkoutIntentRequest: Promise<PaddleCheckoutIntent> | null = null
 const period = computed<BillingPeriod>(() => route.query.period === 'yearly' ? 'yearly' : 'monthly')
 const targetPlan = computed<PaidConsumerPlan | null>(() => {
   const value = route.query.plan
@@ -198,6 +204,43 @@ const planFeatures = computed(() => {
   ]
 })
 
+const getCheckoutOperationKey = (): string => {
+  if (checkoutOperationKey.value) return checkoutOperationKey.value
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    checkoutOperationKey.value = crypto.randomUUID()
+  } else {
+    // All supported browsers expose randomUUID; keep a deterministic shape for
+    // older embedded WebViews without making the key user-controlled.
+    checkoutOperationKey.value = `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+  return checkoutOperationKey.value
+}
+
+const getUpgradeOperationKey = (): string => {
+  if (upgradeOperationKey.value) return upgradeOperationKey.value
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    upgradeOperationKey.value = crypto.randomUUID()
+  } else {
+    upgradeOperationKey.value = `upgrade-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+  return upgradeOperationKey.value
+}
+
+const getPaddleCheckoutIntent = async (plan: PaidConsumerPlan, billingPeriod: BillingPeriod): Promise<PaddleCheckoutIntent> => {
+  if (checkoutIntent.value) return checkoutIntent.value
+  if (!checkoutIntentRequest) {
+    checkoutIntentRequest = createPaddleCheckoutIntent({
+      plan,
+      billingPeriod,
+      operationKey: getCheckoutOperationKey(),
+    })
+  }
+  const response = await checkoutIntentRequest
+  if (!response?.transaction_id) throw new Error('Paddle checkout transaction unavailable')
+  checkoutIntent.value = response
+  return response
+}
+
 const handlePaddleEvent = (event: PaddleEventData) => {
   const data = event.data
   if (data?.currency_code && data.totals) {
@@ -244,11 +287,11 @@ const refreshAfterPayment = async () => {
 const mountCheckout = async () => {
   const plan = targetPlan.value
   const config = billing.value
-  if (!plan || !config?.configured || !config.environment || !config.client_token || !config.tenant_id) {
+  if (!plan || !config?.configured || !config.environment || !config.client_token) {
     throw new Error('Billing unavailable')
   }
-  const option = config.prices?.[plan]?.[period.value]
-  if (!option?.price_id || !option.checkout_binding) throw new Error('Plan unavailable')
+  const option = config.catalog?.[plan]?.[period.value]
+  if (!option?.price_id) throw new Error('Plan unavailable')
   try {
     const [preview] = await previewPaddlePrices({
       environment: config.environment,
@@ -260,14 +303,13 @@ const mountCheckout = async () => {
   } catch {
     // Paddle checkout itself remains authoritative and can still load.
   }
+  const intent = await getPaddleCheckoutIntent(plan, period.value)
   await nextTick()
   await openPaddleInlineCheckout({
     environment: config.environment,
     clientToken: config.client_token,
     pwCustomerId: config.pw_customer_id,
-    priceId: option.price_id,
-    tenantId: config.tenant_id,
-    checkoutBinding: option.checkout_binding,
+    transactionId: intent.transaction_id,
     email: authStore.user?.email,
     locale: locale.value,
     frameTarget: 'paddle-inline-target',
@@ -306,7 +348,7 @@ const confirmUpgrade = async () => {
   if (!plan || upgradeSubmitting.value) return
   upgradeSubmitting.value = true
   try {
-    await upgradePaddleSubscription(plan)
+    await upgradePaddleSubscription(plan, getUpgradeOperationKey())
     void refreshAfterPayment()
   } catch {
     errorMessage.value = t('entitlement.upgradeFailed')

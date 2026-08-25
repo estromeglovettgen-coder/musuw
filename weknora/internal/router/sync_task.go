@@ -118,17 +118,19 @@ func (e *SyncTaskExecutor) Enqueue(task *asynq.Task, opts ...asynq.Option) (*asy
 type SyncTaskParams struct {
 	dig.In
 
-	Executor             *SyncTaskExecutor
-	KnowledgeService     interfaces.KnowledgeService
-	KnowledgeBaseService interfaces.KnowledgeBaseService
-	TagService           interfaces.KnowledgeTagService
-	DataSourceService    interfaces.DataSourceService
-	ChunkExtractor       interfaces.TaskHandler `name:"chunkExtractor"`
-	DataTableSummary     interfaces.TaskHandler `name:"dataTableSummary"`
-	ImageMultimodal      interfaces.TaskHandler `name:"imageMultimodal"`
-	KnowledgePostProcess interfaces.TaskHandler `name:"knowledgePostProcess"`
-	WikiIngest           interfaces.TaskHandler `name:"wikiIngest"`
-	TemporaryDocument    interfaces.TemporaryDocumentService
+	Executor                *SyncTaskExecutor
+	KnowledgeService        interfaces.KnowledgeService
+	KnowledgeBaseService    interfaces.KnowledgeBaseService
+	TagService              interfaces.KnowledgeTagService
+	DataSourceService       interfaces.DataSourceService
+	EntitlementService      interfaces.EntitlementService
+	PaddleBillingOperations interfaces.PaddleBillingOperationRepository
+	ChunkExtractor          interfaces.TaskHandler `name:"chunkExtractor"`
+	DataTableSummary        interfaces.TaskHandler `name:"dataTableSummary"`
+	ImageMultimodal         interfaces.TaskHandler `name:"imageMultimodal"`
+	KnowledgePostProcess    interfaces.TaskHandler `name:"knowledgePostProcess"`
+	WikiIngest              interfaces.TaskHandler `name:"wikiIngest"`
+	TemporaryDocument       interfaces.TemporaryDocumentService
 }
 
 // RegisterSyncHandlers registers all task handlers on the SyncTaskExecutor.
@@ -153,5 +155,6 @@ func RegisterSyncHandlers(params SyncTaskParams) {
 	params.Executor.RegisterHandler(types.TypeDataSourceSync, params.DataSourceService.ProcessSync)
 	params.Executor.RegisterHandler(types.TypeWikiIngest, params.WikiIngest.Handle)
 	params.Executor.RegisterHandler(types.TypeWikiFinalize, params.WikiIngest.Handle)
+	params.Executor.RegisterHandler(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
 	logger.Infof(context.Background(), "[SyncTask] All task handlers registered (Lite mode, no Redis)")
 }

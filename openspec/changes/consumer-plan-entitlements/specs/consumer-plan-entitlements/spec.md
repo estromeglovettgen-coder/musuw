@@ -155,7 +155,7 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 
 #### Scenario: Duplicate delivery
 - **WHEN** Paddle repeats an already processed signed subscription event
-- **THEN** the endpoint acknowledges it without applying the plan a second time
+- **THEN** the endpoint acknowledges the durable handoff without applying the plan a second time
 
 #### Scenario: Paid tenant opens Usage & billing settings
 - **WHEN** a tenant already has a paid plan whose provider identity resolves or whose paid period is confirmed
@@ -177,9 +177,9 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **WHEN** an authenticated tenant with a Paddle customer record clicks manage billing
 - **THEN** the server resolves the customer from that tenant, creates a fresh Paddle portal session through the official SDK, and returns only its HTTPS overview URL
 
-#### Scenario: Authenticated Paddle customer initializes Retain
-- **WHEN** the authenticated tenant has a valid Paddle customer ID derived from signed provider state and the complete Paddle unit is configured
-- **THEN** the authenticated billing response supplies that provider customer ID only as the Paddle.js `pwCustomer` value, `Paddle.Initialize()` or `Paddle.Update()` receives it, anonymous public config and request input cannot supply it, and the value grants no entitlement or provider mutation authority
+#### Scenario: Authenticated Paddle customer handoff remains non-authoritative
+- **WHEN** the authenticated tenant has a valid Paddle customer ID derived from signed provider state and the complete Sandbox unit is configured
+- **THEN** the authenticated billing response supplies that provider customer ID only as the Paddle.js `pwCustomer` value, `Paddle.Initialize()` or `Paddle.Update()` receives it, anonymous public config and request input cannot supply it, no Retain feature is activated, and the value grants no entitlement or provider mutation authority
 
 #### Scenario: Portal ownership cannot be proven
 - **WHEN** a request is anonymous or the authenticated tenant has no Paddle customer record
@@ -204,3 +204,48 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 #### Scenario: Paid tenant never receives a parallel checkout
 - **WHEN** a tenant already has a paid plan
 - **THEN** the normal portal and higher-tier upgrade flow applies and neither the current plan nor any parallel second-subscription checkout is offered
+
+### Requirement: Verified Paddle webhooks are durable and idempotent
+The system SHALL perform raw-body signature, tenant, binding, price, and event-shape validation synchronously, then enqueue the canonical verified event as durable, retryable background work before acknowledging Paddle. The acknowledgement SHALL complete within Paddle's five-second callback contract and SHALL be successful only after enqueue acceptance (including an idempotent duplicate task ID). The worker SHALL retain the existing tenant `paddle_last_event_id`/`paddle_last_event_at` markers as the final entitlement idempotency and ordering guard; queue task identity SHALL NOT replace those database markers.
+
+#### Scenario: Verified webhook is handed off within the callback contract
+- **WHEN** a correctly signed, known Paddle event passes tenant and checkout-binding validation
+- **THEN** the endpoint enqueues one canonical task keyed by the provider event ID and acknowledges within five seconds without mutating entitlement in the request
+
+#### Scenario: Worker retries a duplicate or interrupted delivery
+- **WHEN** the same event task is redelivered, a worker restarts, or a provider call fails transiently
+- **THEN** Asynq retries the task and the durable tenant event markers apply the entitlement at most once, while exhausted work remains observable through the existing dead-letter path
+
+### Requirement: Checkout and upgrade operations are server-owned and serialized
+The system SHALL create or reuse a server-owned, tenant-bound checkout transaction intent before opening Paddle Checkout and SHALL create or reuse one serialized upgrade operation for a tenant's target plan. A known Paddle transaction SHALL be reused. Because Paddle does not provide a general idempotency key for arbitrary mutations, an uncertain provider response SHALL remain fail-closed, SHALL keep the tenant mutation slot occupied for explicit reconciliation, and SHALL never cause a blind second provider mutation. The signed webhook remains the only authority that grants or changes the durable plan.
+
+#### Scenario: Repeated checkout requests reuse one intent
+- **WHEN** a Free tenant submits the same plan and billing-period checkout request more than once before it resolves
+- **THEN** the server returns or reuses one active tenant-bound Paddle transaction intent and does not create a parallel provider transaction
+
+#### Scenario: Repeated upgrades reuse one serialized operation
+- **WHEN** concurrent authenticated requests ask the same tenant to upgrade to the same or another higher plan
+- **THEN** one tenant-scoped operation is active, later requests reuse or report that operation, and only its provider-confirmed signed webhook can change the plan
+
+#### Scenario: Provider response is uncertain
+- **WHEN** a checkout or upgrade provider call times out after it may have been accepted
+- **THEN** the server records the uncertain result, blocks another mutation for that tenant, and requires explicit provider/operator reconciliation rather than blindly submitting a second mutation
+
+### Requirement: Subscription shape and payment-recovery grace are bounded
+The system SHALL accept, activate, or upgrade only a subscription containing exactly one known server-owned recurring base item. Zero items, multiple base items, unknown prices, or unrecognized add-ons SHALL fail closed without granting or changing entitlement. A `past_due` subscription SHALL remain paid grace through its last confirmed paid-term boundary, SHALL NOT advance that boundary or open a new allowance without a matching successful recurring payment, and SHALL become unavailable only after that confirmed term ends. The current release SHALL remain Paddle Sandbox-only; refund/chargeback entitlement policy, adjustment-event handling, Live cutover, and Retain feature activation are deferred to a later reviewed change.
+
+#### Scenario: Subscription has exactly one known base item
+- **WHEN** Paddle returns a subscription with exactly one active recurring item mapped to a server-owned price
+- **THEN** the subscription may be previewed or updated subject to the existing ownership and plan checks
+
+#### Scenario: Subscription shape is unsafe
+- **WHEN** Paddle returns zero, multiple, or unknown recurring base items, or an unrecognized add-on
+- **THEN** the server refuses activation or upgrade and leaves the durable plan and provider limit unchanged
+
+#### Scenario: Past-due payment remains within paid grace
+- **WHEN** a current subscription is `past_due` but its last confirmed paid-term boundary has not elapsed
+- **THEN** existing paid access remains available, no new allowance is opened, and the unpaid provider period does not move the paid-term boundary
+
+#### Scenario: Sandbox launch defers Live and Retain
+- **WHEN** Live enablement or Retain feature activation is requested before a reviewed follow-up
+- **THEN** the fixed production contract remains the complete Paddle Sandbox unit and no Live or Retain feature is activated

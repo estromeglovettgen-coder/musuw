@@ -5,11 +5,6 @@ export type OpenRouterCreditsStatus = 'available' | 'unavailable' | 'unprovision
 export type PaidConsumerPlan = Exclude<ConsumerPlan, 'free'>
 export type BillingPeriod = 'monthly' | 'yearly'
 
-export interface PaddleCheckoutOption {
-  price_id: string
-  checkout_binding: string
-}
-
 export interface PaddleCatalogOption {
   price_id: string
 }
@@ -20,9 +15,7 @@ export interface PaddleBillingConfig {
   environment?: 'sandbox' | 'live'
   client_token?: string
   pw_customer_id?: string
-  tenant_id?: string
   catalog?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCatalogOption>>>>
-  prices?: Partial<Record<PaidConsumerPlan, Partial<Record<BillingPeriod, PaddleCheckoutOption>>>>
 }
 
 export interface PaddlePublicConfig {
@@ -63,6 +56,16 @@ export interface PaddleSubscriptionUpgradePreview {
   next_billed_at: string
 }
 
+/**
+ * A server-owned Paddle checkout transaction. The browser supplies only the
+ * desired plan, billing period, and a replay key; price selection and
+ * customer binding stay on the authenticated server.
+ */
+export interface PaddleCheckoutIntent {
+  transaction_id: string
+  pending: true
+}
+
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
   return get('/api/v1/entitlements/current') as unknown as Promise<EntitlementResponse>
 }
@@ -79,6 +82,21 @@ export async function previewPaddleSubscriptionUpgrade(plan: PaidConsumerPlan): 
   return post('/api/v1/billing/paddle/subscription-upgrade/preview', { plan }) as Promise<PaddleSubscriptionUpgradePreview>
 }
 
-export async function upgradePaddleSubscription(plan: PaidConsumerPlan): Promise<{ pending: true; plan: PaidConsumerPlan }> {
-  return post('/api/v1/billing/paddle/subscription-upgrade', { plan }) as Promise<{ pending: true; plan: PaidConsumerPlan }>
+export async function upgradePaddleSubscription(plan: PaidConsumerPlan, operationKey: string): Promise<{ pending: true; plan: PaidConsumerPlan }> {
+  return post('/api/v1/billing/paddle/subscription-upgrade', {
+    plan,
+    operation_key: operationKey,
+  }) as Promise<{ pending: true; plan: PaidConsumerPlan }>
+}
+
+export async function createPaddleCheckoutIntent(input: {
+  plan: PaidConsumerPlan
+  billingPeriod: BillingPeriod
+  operationKey: string
+}): Promise<PaddleCheckoutIntent> {
+  return post('/api/v1/billing/paddle/checkout-intent', {
+    plan: input.plan,
+    billing_period: input.billingPeriod,
+    operation_key: input.operationKey,
+  }) as Promise<PaddleCheckoutIntent>
 }
