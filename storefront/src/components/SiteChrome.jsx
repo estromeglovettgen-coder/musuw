@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
 import { List } from "@phosphor-icons/react/List";
@@ -74,12 +74,21 @@ export function ProductEntryLinks({ authenticated = false, copy = defaultCopy })
   );
 }
 
-export function SiteHeader({ copy = defaultCopy }) {
+export function SiteHeader({ copy = defaultCopy, primaryItems }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
   const menuButtonRef = useRef(null);
   const reduceMotion = useReducedMotion();
+  const resolvedPrimaryItems = useMemo(
+    () =>
+      primaryItems ??
+      navItems.map((item, index) => ({
+        href: item.href,
+        label: copy.nav.items[index]?.label ?? item.label,
+      })),
+    [copy, primaryItems],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -128,9 +137,9 @@ export function SiteHeader({ copy = defaultCopy }) {
       <div className="container nav-shell">
         <Brand copy={copy} />
         <nav className="desktop-nav" aria-label={copy.nav.primaryAria}>
-          {navItems.map((item, index) => (
-            <a key={item.label} href={item.href}>
-              {copy.nav.items[index].label}
+          {resolvedPrimaryItems.map((item) => (
+            <a key={`${item.href}-${item.label}`} href={item.href}>
+              {item.label}
             </a>
           ))}
         </nav>
@@ -160,9 +169,13 @@ export function SiteHeader({ copy = defaultCopy }) {
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
             transition={{ duration: 0.22 }}
           >
-            {navItems.map((item, index) => (
-              <a key={item.label} href={item.href} onClick={() => setOpen(false)}>
-                {copy.nav.items[index].label}
+            {resolvedPrimaryItems.map((item) => (
+              <a
+                key={`${item.href}-${item.label}`}
+                href={item.href}
+                onClick={() => setOpen(false)}
+              >
+                {item.label}
                 <ArrowUpRight size={18} aria-hidden="true" />
               </a>
             ))}
