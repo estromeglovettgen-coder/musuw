@@ -358,6 +358,7 @@ func TestTenantInfrastructureRoutesDeclareSpecificCapabilities(t *testing.T) {
 	}{
 		{http.MethodGet, "/api/v1/tenants", types.APIKeyCapabilityManageTenantSettings},
 		{http.MethodGet, "/api/v1/models", types.APIKeyCapabilityManageModels},
+		{http.MethodGet, "/api/v1/models/scene-options/:scene", types.APIKeyCapabilityManageModels},
 		{http.MethodPost, "/api/v1/evaluation", types.APIKeyCapabilityRunEvaluations},
 		{http.MethodGet, "/api/v1/system/info", types.APIKeyCapabilityManageVectorStores},
 		{http.MethodGet, "/api/v1/mcp-services", types.APIKeyCapabilityManageMCPServices},

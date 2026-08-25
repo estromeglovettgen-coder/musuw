@@ -67,8 +67,16 @@ func (s *sessionService) AgentQA(
 		agentConfig.VLMModelID = req.CustomAgent.Config.VLMModelID
 	}
 
-	// Resolve model ID using shared helper (AgentQA requires a model, so error if not found)
-	effectiveModelID, err := s.resolveChatModelID(ctx, req, agentConfig.KnowledgeBases, agentConfig.KnowledgeIDs)
+	// Resolve model after effective search scope is known. Platform-owned builtin
+	// modes use the chat/rag scene policy; Standard/custom agents retain their
+	// configured model through the compatibility helper.
+	consumerScene := consumerSceneForSearchScope(
+		agentConfig.SearchTargets,
+		agentConfig.KnowledgeBases,
+		agentConfig.KnowledgeIDs,
+		agentConfig.WebSearchEnabled,
+	)
+	effectiveModelID, err := s.resolveConsumerChatModel(ctx, req, consumerScene, agentConfig.KnowledgeBases, agentConfig.KnowledgeIDs)
 	if err != nil {
 		return err
 	}
@@ -81,6 +89,12 @@ func (s *sessionService) AgentQA(
 	if err != nil {
 		logger.Warnf(ctx, "Failed to get chat model: %v", err)
 		return fmt.Errorf("failed to get chat model: %w", err)
+	}
+	if req.GenerateTitle && req.Session.Title == "" {
+		// Platform AgentQA title generation runs only after the resolver has
+		// produced the effective model ID; custom-agent titles stay in the
+		// handler's existing setupSSEStream path.
+		s.GenerateTitleAsync(ctx, req.Session, req.Query, effectiveModelID, eventBus)
 	}
 
 	// Get rerank model from custom agent config only when knowledge_search can

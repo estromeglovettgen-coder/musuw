@@ -100,6 +100,46 @@ type settingSpec struct {
 // the new value, no in-memory state bound at init time we cannot
 // re-derive)".
 var registry = map[string]settingSpec{
+	// Consumer scene policy is intentionally represented by the existing
+	// typed settings authority. Keep the paid default order aligned with the
+	// current builtin catalog while placing the existing free model first so
+	// rollout preserves the current default behavior.
+	"consumer_models.chat.free_default": {
+		Type:        "string",
+		Default:     types.PlatformKnowledgeBaseChatModelID,
+		Category:    "models",
+		Description: "消费者 Chat 场景的免费默认模型。仅支持启用的内置 OpenRouter KnowledgeQA 模型。",
+	},
+	"consumer_models.chat.paid_options": {
+		Type:        "string_list",
+		Default:     defaultConsumerPaidModelIDs(),
+		Category:    "models",
+		Description: "消费者 Chat 场景的付费模型候选，按顺序排列，首项为付费默认模型。",
+	},
+	"consumer_models.rag.free_default": {
+		Type:        "string",
+		Default:     types.PlatformKnowledgeBaseChatModelID,
+		Category:    "models",
+		Description: "消费者 RAG 场景的免费默认模型。仅支持启用的内置 OpenRouter KnowledgeQA 模型。",
+	},
+	"consumer_models.rag.paid_options": {
+		Type:        "string_list",
+		Default:     defaultConsumerPaidModelIDs(),
+		Category:    "models",
+		Description: "消费者 RAG 场景的付费模型候选，按顺序排列，首项为付费默认模型。",
+	},
+	"consumer_models.wiki.free_default": {
+		Type:        "string",
+		Default:     types.PlatformKnowledgeBaseChatModelID,
+		Category:    "models",
+		Description: "消费者 Wiki 场景的免费默认模型。仅支持启用的内置 OpenRouter KnowledgeQA 模型。",
+	},
+	"consumer_models.wiki.paid_options": {
+		Type:        "string_list",
+		Default:     defaultConsumerPaidModelIDs(),
+		Category:    "models",
+		Description: "消费者 Wiki 场景的付费模型候选，按顺序排列，首项为付费默认模型。",
+	},
 	// NOTE: file.max_size_mb is intentionally NOT registered. Although
 	// the Go upload handlers accept a runtime override via
 	// systemSettingSvc.GetInt, the actual upload limit is gated end-to-end
@@ -271,6 +311,22 @@ var registry = map[string]settingSpec{
 			"每次调用实时读取，修改后立即生效、无需重启。0 或负数表示关闭默认限制" +
 			"（各模型仍会尊重自身在模型管理里配置的上限）。仅影响后台任务，不影响交互式对话。",
 	},
+}
+
+func defaultConsumerPaidModelIDs() []string {
+	return []string{
+		types.CheapestChatModelID,
+		"builtin-deepseek-v4-pro",
+		"builtin-openrouter-qwen-max",
+		"builtin-openrouter-gpt-luna",
+		"builtin-openrouter-gpt-terra",
+		"builtin-openrouter-gpt-sol",
+		"builtin-openrouter-gemini-flash",
+		"builtin-openrouter-gemini-pro",
+		"builtin-openrouter-claude-haiku",
+		"builtin-openrouter-claude-sonnet",
+		"builtin-openrouter-claude-opus",
+	}
 }
 
 // systemSettingService wires the repository, audit log, and (P2)

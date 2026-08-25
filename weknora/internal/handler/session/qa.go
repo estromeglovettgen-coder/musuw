@@ -66,6 +66,9 @@ type qaRequestContext struct {
 	// what the user had selected on the UI (not server-side resolutions).
 	reqAgentEnabled bool
 	reqAgentID      string
+	// generateTitle is consumed by platform QA services after scene resolution;
+	// custom-agent title generation remains in setupSSEStream for compatibility.
+	generateTitle bool
 }
 
 // buildQARequest converts the qaRequestContext into a types.QARequest for service invocation.
@@ -90,6 +93,7 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		UserMessageID:       rc.userMessageID,
 		WebSearchEnabled:    rc.webSearchEnabled,
 		Attachments:         rc.attachments,
+		GenerateTitle:       rc.generateTitle,
 	}
 }
 
@@ -846,11 +850,29 @@ const (
 	qaModeAgent                // Agent engine with tool calling
 )
 
+// platformTitleResolvedInService reports whether title generation must wait
+// for the platform consumer resolver. Custom agents, including agents whose
+// IDs resemble the builtins, retain the handler's existing early title path.
+func platformTitleResolvedInService(mode qaMode, customAgent *types.CustomAgent) bool {
+	if mode != qaModeNormal && mode != qaModeAgent {
+		return false
+	}
+	if customAgent == nil {
+		return true
+	}
+	return customAgent.ID == types.BuiltinQuickAnswerID || customAgent.ID == types.BuiltinSmartReasoningID
+}
+
 // executeQA is the unified execution flow for both KnowledgeQA and AgentQA modes.
 // It handles message creation, SSE setup, VLM analysis, service invocation, and error handling.
 func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle bool) {
 	ctx := reqCtx.ctx
 	sessionID := reqCtx.sessionID
+	platformTitle := platformTitleResolvedInService(mode, reqCtx.customAgent)
+	// Platform answer modes resolve their model asynchronously inside the
+	// service, so title generation must happen there with the effective ID.
+	// Standard/custom agents retain the existing early title path.
+	reqCtx.generateTitle = generateTitle && platformTitle
 
 	// Persist the input-bar state used for this request so reopening the
 	// session can rehydrate agent / model / KB / web-search / MCP selections.
@@ -903,8 +925,9 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 		logger.Infof(ctx, "Calling agent QA service, session ID: %s", sessionID)
 	}
 
-	// Setup SSE stream
-	streamCtx := h.setupSSEStream(reqCtx, generateTitle)
+	// Setup SSE stream. Only custom-agent mode starts title generation here;
+	// platform modes wait until their resolver-approved model is known.
+	streamCtx := h.setupSSEStream(reqCtx, generateTitle && !platformTitle)
 
 	// Normal mode: register completion handler on EventAgentFinalAnswer
 	// (Agent mode handles completion in the defer block instead)

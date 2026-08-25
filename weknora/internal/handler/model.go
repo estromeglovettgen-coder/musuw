@@ -23,7 +23,8 @@ import (
 // ModelHandler handles HTTP requests for model-related operations
 // It implements the necessary methods to create, retrieve, update, and delete models
 type ModelHandler struct {
-	service interfaces.ModelService
+	service          interfaces.ModelService
+	consumerResolver interfaces.ConsumerModelResolver
 }
 
 // NewModelHandler creates a new instance of ModelHandler
@@ -34,6 +35,57 @@ type ModelHandler struct {
 // Returns a pointer to the newly created ModelHandler
 func NewModelHandler(service interfaces.ModelService) *ModelHandler {
 	return &ModelHandler{service: service}
+}
+
+// NewModelHandlerWithConsumerResolver wires the narrow consumer scene options
+// read path while preserving the legacy constructor used by focused handler
+// tests and platform-only callers.
+func NewModelHandlerWithConsumerResolver(
+	modelService interfaces.ModelService,
+	consumerResolver interfaces.ConsumerModelResolver,
+) *ModelHandler {
+	return &ModelHandler{service: modelService, consumerResolver: consumerResolver}
+}
+
+// ListConsumerSceneOptions returns display-only scene options. The resolver is
+// the authorization authority; this handler never serializes model parameters
+// or credentials and does not alter the filtered /models response.
+func (h *ModelHandler) ListConsumerSceneOptions(c *gin.Context) {
+	ctx := c.Request.Context()
+	if h.consumerResolver == nil {
+		c.Error(errors.NewInternalServerError("consumer model resolver is unavailable"))
+		return
+	}
+	scene := types.ConsumerScene(strings.TrimSpace(c.Param("scene")))
+	if !scene.Valid() {
+		c.Error(errors.NewBadRequestError("invalid consumer model scene"))
+		return
+	}
+	options, err := h.consumerResolver.ListConsumerModelOptions(ctx, scene)
+	if err != nil {
+		if appErr, ok := errors.IsAppError(err); ok {
+			c.Error(appErr)
+			return
+		}
+		logger.ErrorWithFields(ctx, err, nil)
+		c.Error(errors.NewInternalServerError(err.Error()))
+		return
+	}
+	effectiveID := ""
+	for _, option := range options {
+		if option != nil && option.Effective {
+			effectiveID = option.ModelID
+			break
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"scene":              scene,
+			"effective_model_id": effectiveID,
+			"options":            options,
+		},
+	})
 }
 
 // Per-response redaction/stripping for Model now lives in

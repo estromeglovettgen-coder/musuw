@@ -2981,10 +2981,31 @@ export default {
           title: 'Network security',
           description: 'Manage trusted hosts, IPs, and networks that may bypass SSRF protection.'
         },
+        models: {
+          tab: 'Models {count}',
+          title: 'Consumer model policy',
+          description: 'Configure the Free default and ordered paid options for chat, RAG, and Wiki.'
+        },
         other: {
           tab: 'Other {count}',
           title: 'Other settings',
           description: 'Settings in this deployment that are not part of a standard product group.'
+        }
+      },
+      models: {
+        loading: 'Loading model catalog...',
+        empty: 'No active built-in OpenRouter chat models available.',
+        loadFailed: 'Failed to load model catalog.',
+        freeLabel: 'Free default',
+        freePlaceholder: 'Select Free default',
+        paidLabel: 'Paid options',
+        paidPlaceholder: 'Select paid options',
+        paidRequired: 'Select at least one paid option; the first option is the paid default.',
+        paidOrderHint: 'Paid options keep selection order; the first item is the paid default.',
+        scenes: {
+          chat: { label: 'Chat', description: 'Platform chat without retrieval.' },
+          rag: { label: 'RAG', description: 'Answers with knowledge or web retrieval.' },
+          wiki: { label: 'Wiki', description: 'Wiki synthesis.' }
         }
       },
       runtimeTable: {
@@ -3480,6 +3501,7 @@ export default {
     addModelInSettings: 'Go to global settings to add models',
     loadFailed: 'Failed to load model list',
     selectModelPlaceholder: 'Select a model',
+    lockedTag: 'Locked',
     searchPlaceholder: 'Search models...',
     editor: {
       addTitle: 'Add Model',
@@ -4032,6 +4054,15 @@ export default {
   modelSettings: {
     title: 'Model Settings',
     description: 'Manage different types of AI models, including local Ollama and remote APIs',
+    sceneModels: {
+      title: 'Your model by scenario',
+      description: 'Choose the model used for Chat, RAG, and Wiki in this browser. Locked paid models are shown for discovery and require a plan.',
+      scenes: {
+        chat: { label: 'Chat', description: 'Platform chat without retrieval.' },
+        rag: { label: 'RAG', description: 'Answers with knowledge or web retrieval.' },
+        wiki: { label: 'Wiki', description: 'Wiki synthesis.' }
+      }
+    },
     typeShort: {
       chat: 'Chat',
       embedding: 'Embedding',

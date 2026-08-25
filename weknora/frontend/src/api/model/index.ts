@@ -55,6 +55,32 @@ export interface ModelConfig {
   deleted_at?: string | null;
 }
 
+export type ConsumerScene = 'chat' | 'rag' | 'wiki'
+
+export interface ConsumerSceneOption {
+  model_id: string
+  display_name: string
+  selectable: boolean
+  locked: boolean
+  required_plan: string
+  is_scene_default: boolean
+  is_effective: boolean
+}
+
+export interface ConsumerSceneOptionsResponse {
+  scene: ConsumerScene
+  effective_model_id: string
+  options: ConsumerSceneOption[]
+}
+
+/** Safe scene catalog for consumer selectors; never changes the /models contract. */
+export function getConsumerSceneOptions(scene: ConsumerScene): Promise<ConsumerSceneOptionsResponse> {
+  return get(`/api/v1/models/scene-options/${encodeURIComponent(scene)}`).then((response: any) => {
+    if (response?.success && response.data) return response.data as ConsumerSceneOptionsResponse
+    return response as ConsumerSceneOptionsResponse
+  })
+}
+
 // 创建模型
 export function createModel(data: ModelConfig): Promise<ModelConfig> {
   return new Promise((resolve, reject) => {

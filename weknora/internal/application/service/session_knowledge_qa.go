@@ -51,8 +51,22 @@ func (s *sessionService) KnowledgeQA(
 		return err
 	}
 
-	// Resolve chat model ID using shared helper
-	chatModelID, err := s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
+	// Resolve retrieval tenant scope using shared helper.
+	retrievalTenantID := s.resolveRetrievalTenantID(ctx, req)
+
+	// Build unified search targets before selecting a consumer scene. Tag-only
+	// mentions and web search must classify as RAG even when raw ID slices are
+	// empty; this is also the exact scope consumed by the pipeline below.
+	searchTargets, err := s.buildSearchTargets(ctx, retrievalTenantID, knowledgeBaseIDs, knowledgeIDs, req.TagScopes)
+	if err != nil {
+		return fmt.Errorf("build search targets: %w", err)
+	}
+	hasKB := types.HasKnowledgeRetrievalScope(searchTargets, knowledgeBaseIDs, knowledgeIDs)
+	consumerScene := consumerSceneForSearchScope(searchTargets, knowledgeBaseIDs, knowledgeIDs, req.WebSearchEnabled)
+
+	// Platform-owned answer modes are server-resolved after effective scope is
+	// known. Custom agents retain their configured model authority.
+	chatModelID, err := s.resolveConsumerChatModel(ctx, req, consumerScene, knowledgeBaseIDs, knowledgeIDs)
 	if err != nil {
 		return err
 	}
@@ -84,13 +98,11 @@ func (s *sessionService) KnowledgeQA(
 		vlmModelID = req.CustomAgent.Config.VLMModelID
 	}
 
-	// Resolve retrieval tenant scope using shared helper
-	retrievalTenantID := s.resolveRetrievalTenantID(ctx, req)
-
-	// Build unified search targets (computed once, used throughout pipeline)
-	searchTargets, err := s.buildSearchTargets(ctx, retrievalTenantID, knowledgeBaseIDs, knowledgeIDs, req.TagScopes)
-	if err != nil {
-		return fmt.Errorf("build search targets: %w", err)
+	// Normal-mode title generation must use the same effective policy-approved
+	// model as the answer. The handler deliberately does not start this before
+	// KnowledgeQA resolves the scene.
+	if req.GenerateTitle && req.Session.Title == "" {
+		s.GenerateTitleAsync(ctx, req.Session, req.Query, chatModelID, eventBus)
 	}
 
 	// Create chat management object with session settings
@@ -160,7 +172,6 @@ func (s *sessionService) KnowledgeQA(
 	// web search setting. Tag-only mentions leave the raw KB/knowledge ID slices
 	// empty but produce SearchTargets, so the unified targets must participate in
 	// this decision or the request is incorrectly downgraded to pure chat.
-	hasKB := types.HasKnowledgeRetrievalScope(searchTargets, knowledgeBaseIDs, knowledgeIDs)
 	needsRAG := hasKB || req.WebSearchEnabled
 	hasHistory := chatManage.MaxRounds > 0
 

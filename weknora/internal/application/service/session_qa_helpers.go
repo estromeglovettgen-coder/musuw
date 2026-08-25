@@ -152,6 +152,68 @@ func (s *sessionService) resolveChatModelID(
 	return s.selectChatModelID(ctx, session, knowledgeBaseIDs, knowledgeIDs)
 }
 
+// consumerSceneForSearchScope classifies only the effective retrieval scope
+// that has already been resolved by the session setup. It deliberately does
+// not inspect prompts or agent intent: tags and web search are RAG even when
+// the raw KB/document slices are empty.
+func consumerSceneForSearchScope(
+	searchTargets types.SearchTargets,
+	knowledgeBaseIDs []string,
+	knowledgeIDs []string,
+	webSearchEnabled bool,
+) types.ConsumerScene {
+	if webSearchEnabled || types.HasKnowledgeRetrievalScope(searchTargets, knowledgeBaseIDs, knowledgeIDs) {
+		return types.ConsumerSceneRAG
+	}
+	return types.ConsumerSceneChat
+}
+
+// resolveConsumerChatModel applies the scene policy only to platform-owned
+// answer modes. Standard/custom agents keep resolveChatModelID as their model
+// authority. The nil resolver branch is intentionally retained for rollout
+// compatibility and for callers/tests that construct the service directly.
+// Call-site checklist: KnowledgeQA (chat/rag), AgentQA (platform smart), and
+// Wiki ingest/finalize use the resolver; embedding/rerank/VLM/ASR and hidden
+// or custom-agent calls do not.
+func (s *sessionService) resolveConsumerChatModel(
+	ctx context.Context,
+	req *types.QARequest,
+	scene types.ConsumerScene,
+	knowledgeBaseIDs []string,
+	knowledgeIDs []string,
+) (string, error) {
+	// IM is an existing non-consumer channel. Its KnowledgeQA/AgentQA calls
+	// share this service but must retain their legacy model authority; the
+	// resolver's lexical call-site allowlist cannot detect this indirect path.
+	if principal, ok := types.PrincipalFromContext(ctx); ok && principal.Type == types.PrincipalIMUser {
+		return s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
+	}
+	if req.CustomAgent != nil && !isPlatformManagedBuiltinAgentID(req.CustomAgent.ID) {
+		return s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
+	}
+	if s.consumerModelResolver == nil {
+		return s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
+	}
+
+	model, err := s.consumerModelResolver.ResolveConsumerModel(ctx, scene, req.SummaryModelID)
+	if err != nil {
+		return "", err
+	}
+	if model == nil || strings.TrimSpace(model.ID) == "" {
+		return "", fmt.Errorf("consumer scene %s resolved no chat model", scene)
+	}
+
+	// The effective ID is request-scoped and becomes the sole downstream
+	// authority for answer generation, query-understanding, and title calls.
+	req.SummaryModelID = model.ID
+	if req.CustomAgent != nil {
+		req.CustomAgent.Config.ModelID = model.ID
+		req.CustomAgent.Config.QueryUnderstandModelID = model.ID
+	}
+	logger.Infof(ctx, "Resolved platform consumer scene %s to model_id %s", scene, model.ID)
+	return model.ID, nil
+}
+
 // resolveRetrievalTenantID determines the tenant ID to use for retrieval scope.
 // Priority: agent's tenant > context tenant > session tenant.
 func (s *sessionService) resolveRetrievalTenantID(

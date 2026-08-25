@@ -1880,6 +1880,15 @@ export default {
   modelSettings: {
     title: '모델 설정',
     description: '다양한 유형의 AI 모델을 관리합니다. Ollama 로컬 모델과 원격 API를 지원합니다',
+    sceneModels: {
+      title: '시나리오별 모델',
+      description: '이 브라우저에서 사용할 Chat, RAG, Wiki 모델을 선택합니다. 잠긴 유료 모델은 요금제가 필요합니다.',
+      scenes: {
+        chat: { label: 'Chat', description: '검색 없는 플랫폼 채팅입니다.' },
+        rag: { label: 'RAG', description: '지식 또는 웹 검색을 활용한 답변입니다.' },
+        wiki: { label: 'Wiki', description: 'Wiki 합성입니다.' }
+      }
+    },
     copySuffix: ' 사본',
     builtinTag: '기본제공',
     confirmDelete: '모델 "{name}"을(를) 삭제하시겠습니까?',
@@ -2326,6 +2335,7 @@ export default {
     addModelInSettings: '전역 설정에서 모델 추가하기',
     loadFailed: '모델 목록 로드 실패',
     selectModelPlaceholder: '모델을 선택해주세요',
+    lockedTag: '잠김',
     searchPlaceholder: '모델 검색...',
     builtinTag: '내장',
     editor: {
@@ -3114,6 +3124,27 @@ export default {
           tab: '계정 및 액세스 {count}',
           title: '계정 및 액세스',
           description: '시스템 관리자, 공개 가입, 공간 생성 규칙을 관리합니다.'
+        },
+        models: {
+          tab: '모델 {count}',
+          title: '사용자 모델 정책',
+          description: 'Chat, RAG, Wiki의 Free 기본 모델과 정렬된 유료 옵션을 설정합니다.'
+        }
+      },
+      models: {
+        loading: '모델 카탈로그를 불러오는 중…',
+        empty: '사용 가능한 active 내장 OpenRouter 채팅 모델이 없습니다.',
+        loadFailed: '모델 카탈로그를 불러오지 못했습니다.',
+        freeLabel: 'Free 기본 모델',
+        freePlaceholder: 'Free 기본 모델 선택',
+        paidLabel: '유료 옵션',
+        paidPlaceholder: '유료 옵션 선택',
+        paidRequired: '유료 옵션을 하나 이상 선택하세요. 첫 항목이 유료 기본 모델입니다.',
+        paidOrderHint: '유료 옵션의 선택 순서를 유지하며 첫 항목이 유료 기본 모델입니다.',
+        scenes: {
+          chat: { label: 'Chat', description: '검색 없는 플랫폼 채팅입니다.' },
+          rag: { label: 'RAG', description: '지식 또는 웹 검색을 활용한 답변입니다.' },
+          wiki: { label: 'Wiki', description: 'Wiki 합성입니다.' }
         }
       },
       priorityHint: {

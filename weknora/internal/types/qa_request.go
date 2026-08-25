@@ -23,4 +23,8 @@ type QARequest struct {
 	WebSearchEnabled    bool               // Whether web search is enabled for this request
 	QuotedContext       string             // Quoted message content from IM quote-reply (appended at LLM prompt stage, not used for retrieval)
 	Attachments         MessageAttachments // File attachments (processed and ready for prompt injection)
+	// GenerateTitle is an internal runtime hint. The handler keeps title
+	// generation on the same event bus but lets platform services wait until
+	// the effective scene model has been resolved.
+	GenerateTitle bool `json:"-"`
 }

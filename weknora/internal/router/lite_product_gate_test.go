@@ -22,6 +22,7 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "shared kb", method: "GET", path: "/api/v1/shared-knowledge-bases", blocked: false},
 		{name: "model runtime list", method: "GET", path: "/api/v1/models", blocked: false},
 		{name: "model runtime detail", method: "GET", path: "/api/v1/models/builtin-deepseek-v4-flash", blocked: false},
+		{name: "consumer scene options", method: "GET", path: "/api/v1/models/scene-options/chat", blocked: false},
 		{name: "quick answer runtime agent", method: "GET", path: "/api/v1/agents/builtin-quick-answer", blocked: false},
 		{name: "smart reasoning runtime agent", method: "GET", path: "/api/v1/agents/builtin-smart-reasoning", blocked: false},
 		{name: "quick answer suggestions", method: "GET", path: "/api/v1/agents/builtin-quick-answer/suggested-questions", blocked: false},

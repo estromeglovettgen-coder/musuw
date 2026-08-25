@@ -391,6 +391,9 @@ func liteProductRouteBlocked(method, path string) bool {
 		}
 		// A single model detail is the only nested read required by runtime UI.
 		rest := strings.TrimPrefix(path, "/api/v1/models/")
+		if strings.HasPrefix(rest, "scene-options/") {
+			return false
+		}
 		return rest == "" || strings.Contains(rest, "/")
 	}
 

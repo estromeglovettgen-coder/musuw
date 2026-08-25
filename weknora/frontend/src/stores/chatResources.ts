@@ -7,7 +7,13 @@ import {
   BUILTIN_SMART_REASONING_ID,
   type CustomAgent,
 } from '@/api/agent'
-import { listModels, type ModelConfig } from '@/api/model'
+import {
+  getConsumerSceneOptions,
+  listModels,
+  type ConsumerScene,
+  type ConsumerSceneOptionsResponse,
+  type ModelConfig,
+} from '@/api/model'
 import { getCurrentEntitlement, type ConsumerPlan } from '@/api/entitlement'
 import { listWebSearchProviders, type WebSearchProviderEntity } from '@/api/web-search-provider'
 import { useOrganizationStore } from '@/stores/organization'
@@ -57,6 +63,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
   const disabledOwnAgentIds = ref<string[]>([])
   const allModels = ref<ModelConfig[]>([])
   const consumerPlan = ref<ConsumerPlan | null>(null)
+  const consumerSceneOptions = ref<Partial<Record<ConsumerScene, ConsumerSceneOptionsResponse>>>({})
   const webSearchProviders = ref<WebSearchProviderEntity[]>([])
 
   const loadedAt = ref<Partial<Record<ResourceKey, number>>>({})
@@ -74,6 +81,8 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
   const agentKbInflight = new Map<string, Promise<any[]>>()
   const kbDetailCache = new Map<string, { at: number; data: any }>()
   const kbDetailInflight = new Map<string, Promise<any | null>>()
+  const sceneOptionsLoadedAt = new Map<ConsumerScene, number>()
+  const sceneOptionsInflight = new Map<ConsumerScene, Promise<void>>()
 
   const validKnowledgeBases = computed(() => rawKnowledgeBases.value.filter(isKbModelReady))
   const chatModels = computed(() => {
@@ -213,6 +222,39 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     })
   }
 
+  async function ensureConsumerSceneOptions(scene: ConsumerScene, force = false): Promise<void> {
+    const loadedAt = sceneOptionsLoadedAt.get(scene)
+    if (!force && loadedAt && Date.now() - loadedAt < CACHE_TTL_MS) return
+    const existing = sceneOptionsInflight.get(scene)
+    if (existing) return existing
+
+    const request = getConsumerSceneOptions(scene).then((response) => {
+      consumerSceneOptions.value[scene] = response
+      sceneOptionsLoadedAt.set(scene, Date.now())
+    }).finally(() => {
+      sceneOptionsInflight.delete(scene)
+    })
+    sceneOptionsInflight.set(scene, request)
+    return request
+  }
+
+  function isConsumerSceneOptionsFresh(scene: ConsumerScene): boolean {
+    const at = sceneOptionsLoadedAt.get(scene)
+    return !!at && Date.now() - at < CACHE_TTL_MS
+  }
+
+  function invalidateConsumerSceneOptions(scene?: ConsumerScene) {
+    if (scene) {
+      delete consumerSceneOptions.value[scene]
+      sceneOptionsLoadedAt.delete(scene)
+      sceneOptionsInflight.delete(scene)
+      return
+    }
+    consumerSceneOptions.value = {}
+    sceneOptionsLoadedAt.clear()
+    sceneOptionsInflight.clear()
+  }
+
   /** @deprecated 使用 ensureModels；保留别名供对话输入栏调用 */
   async function ensureChatModels(force = false): Promise<void> {
     return ensureModels(force)
@@ -324,6 +366,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
       disabledOwnAgentIds.value = []
       allModels.value = []
       consumerPlan.value = null
+      invalidateConsumerSceneOptions()
       webSearchProviders.value = []
       agentKbCache.clear()
       // 同时丢弃所有 inflight 句柄，否则失效后仍在飞行的请求会把旧数据写回缓存。
@@ -338,6 +381,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
       delete loadedAt.value[k]
       inflight.delete(k)
     })
+    if (keys.includes('models')) invalidateConsumerSceneOptions()
     if (keys.includes('knowledgeBases')) {
       agentKbCache.clear()
       agentKbInflight.clear()
@@ -356,6 +400,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     disabledOwnAgentIds,
     allModels,
     chatModels,
+    consumerSceneOptions,
     webSearchProviders,
     isFresh,
     fetchKnowledgeBasesForList,
@@ -364,11 +409,14 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     ensureAgents,
     ensureModels,
     ensureChatModels,
+    ensureConsumerSceneOptions,
+    isConsumerSceneOptionsFresh,
     ensureWebSearchProviders,
     ensureAgentKnowledgeBases,
     prefetchChatInput,
     fetchKnowledgeBaseById,
     invalidateKnowledgeBaseDetail,
     invalidate,
+    invalidateConsumerSceneOptions,
   }
 })

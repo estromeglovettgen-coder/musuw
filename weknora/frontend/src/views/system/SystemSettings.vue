@@ -66,6 +66,7 @@
         <t-tab-panel value="tenant" :label="sectionTabLabel('tenant')" />
         <t-tab-panel value="runtime" :label="sectionTabLabel('runtime')" />
         <t-tab-panel value="security" :label="sectionTabLabel('security')" />
+        <t-tab-panel value="models" :label="sectionTabLabel('models')" />
         <t-tab-panel
           v-if="hasUnknownSettings"
           value="other"
@@ -95,6 +96,51 @@
           <span>{{ t('system.globalSettings.runtimeTable.setting') }}</span>
           <span>{{ t('system.globalSettings.runtimeTable.value') }}</span>
         </div>
+
+        <section v-if="activeSettingsSection === 'models'" class="consumer-model-policy">
+          <div v-if="modelCatalogLoading" class="loading-state">
+            <t-loading :text="t('system.globalSettings.models.loading')" />
+          </div>
+          <div v-else-if="consumerCatalogOptions.length === 0" class="empty-state">
+            <t-icon name="info-circle" size="24px" />
+            <span>{{ t('system.globalSettings.models.empty') }}</span>
+          </div>
+          <template v-else>
+            <div v-for="scene in consumerScenes" :key="scene" class="setting-row consumer-model-policy__row">
+              <div class="setting-info">
+                <div class="setting-label">
+                  <span>{{ t(`system.globalSettings.models.scenes.${scene}.label`) }}</span>
+                </div>
+                <p class="desc">{{ t(`system.globalSettings.models.scenes.${scene}.description`) }}</p>
+              </div>
+              <div class="setting-control consumer-model-policy__controls">
+                <t-select
+                  :value="consumerPolicy[scene].free"
+                  :options="consumerCatalogOptions"
+                  :placeholder="t('system.globalSettings.models.freePlaceholder')"
+                  :aria-label="t('system.globalSettings.models.freeLabel')"
+                  class="setting-input"
+                  @change="onConsumerSceneFreeChange(scene, $event)"
+                />
+                <t-select
+                  :value="consumerPolicy[scene].paid"
+                  :options="consumerCatalogOptions"
+                  multiple
+                  :placeholder="t('system.globalSettings.models.paidPlaceholder')"
+                  :aria-label="t('system.globalSettings.models.paidLabel')"
+                  class="setting-input setting-input--wide"
+                  @change="onConsumerScenePaidChange(scene, $event)"
+                />
+                <div v-if="consumerPolicy[scene].paid[0]" class="consumer-model-policy__paid-default">
+                  <span>{{ consumerModelDisplayName(consumerPolicy[scene].paid[0]) }}</span>
+                  <t-tag theme="success" variant="light" size="small">{{ t('model.defaultTag') }}</t-tag>
+                </div>
+                <!-- Paid options are ordered; the first item is the paid default. -->
+                <span class="consumer-model-policy__hint">{{ t('system.globalSettings.models.paidOrderHint') }}</span>
+              </div>
+            </div>
+          </template>
+        </section>
 
         <div
           class="settings-group"
@@ -177,11 +223,12 @@
             </div>
           </div>
 
-      <div
-            v-for="item in activeSectionSettings"
-        :key="item.key"
-        class="setting-row"
-      >
+      <template v-if="activeSettingsSection !== 'models'">
+        <div
+          v-for="item in activeSectionSettings"
+          :key="item.key"
+          class="setting-row"
+        >
         <div class="setting-info">
               <div class="setting-label">
             <span>{{ keyLabel(item.key) }}</span>
@@ -404,7 +451,8 @@
             </t-popconfirm>
           </div>
         </div>
-      </div>
+        </div>
+      </template>
         </div>
       </section>
       <div class="sr-only" role="status" aria-live="polite">{{ saveAnnouncement }}</div>
@@ -495,6 +543,8 @@ import {
   resetUserPassword,
   type SystemSettingItem,
 } from '@/api/system'
+import { listModels, type ConsumerScene, type ModelConfig } from '@/api/model'
+import { filterConsumerModelCatalog, normalizeConsumerModelIds } from '@/utils/consumerSceneModels'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -611,7 +661,31 @@ const savedKey = ref<string | null>(null)
 const saveAnnouncement = ref('')
 let savedKeyTimer: ReturnType<typeof setTimeout> | null = null
 
-type SettingsSection = 'access' | 'tenant' | 'runtime' | 'security' | 'other'
+type SettingsSection = 'access' | 'tenant' | 'runtime' | 'security' | 'models' | 'other'
+
+const consumerScenes: readonly ConsumerScene[] = ['chat', 'rag', 'wiki']
+const consumerPolicy = reactive<Record<ConsumerScene, { free: string; paid: string[] }>>({
+  chat: { free: '', paid: [] },
+  rag: { free: '', paid: [] },
+  wiki: { free: '', paid: [] },
+})
+const modelCatalog = ref<ModelConfig[]>([])
+const modelCatalogLoading = ref(false)
+const consumerCatalogOptions = computed(() =>
+  filterConsumerModelCatalog(modelCatalog.value)
+    .map((model) => ({
+      label: model.display_name?.trim() || model.name,
+      value: model.id || '',
+    }))
+    .filter((option) => option.value),
+)
+
+const sceneSettingKey = (scene: ConsumerScene, kind: 'free_default' | 'paid_options') =>
+  `consumer_models.${scene}.${kind}`
+// Fixed V1 policy keys: consumer_models.chat.free_default,
+// consumer_models.chat.paid_options, consumer_models.rag.free_default,
+// consumer_models.rag.paid_options, consumer_models.wiki.free_default,
+// consumer_models.wiki.paid_options.
 
 // Product-oriented order, rather than the registry's alphabetical key order.
 // Unknown/out-of-band rows remain visible in a conditional "Other" tab so the
@@ -638,6 +712,10 @@ const SETTINGS_SECTION_KEYS: Record<Exclude<SettingsSection, 'other'>, readonly 
     'model.max_concurrency',
   ],
   security: ['ssrf.whitelist'],
+  models: consumerScenes.flatMap((scene) => [
+    sceneSettingKey(scene, 'free_default'),
+    sceneSettingKey(scene, 'paid_options'),
+  ]),
 }
 
 const activeSettingsSection = ref<SettingsSection>('access')
@@ -672,6 +750,58 @@ function sectionTabLabel(section: SettingsSection): string {
     ? unknownSettings.value.length
     : SETTINGS_SECTION_KEYS[section].filter((key) => settingsByKey.value.has(key)).length + (section === 'access' ? 2 : 0)
   return t(`system.globalSettings.sections.${section}.tab`, { count })
+}
+
+function consumerSetting(scene: ConsumerScene, kind: 'free_default' | 'paid_options') {
+  return settingsByKey.value.get(sceneSettingKey(scene, kind))
+}
+
+function syncConsumerPolicy() {
+  const catalog = filterConsumerModelCatalog(modelCatalog.value)
+  const allowed = new Set(catalog.map((model) => model.id).filter(Boolean))
+  for (const scene of consumerScenes) {
+    const free = consumerSetting(scene, 'free_default')?.value
+    const paid = consumerSetting(scene, 'paid_options')?.value
+    consumerPolicy[scene].free = typeof free === 'string' && allowed.has(free.trim()) ? free.trim() : ''
+    consumerPolicy[scene].paid = normalizeConsumerModelIds(Array.isArray(paid) ? paid : [], catalog)
+  }
+}
+
+function consumerModelDisplayName(modelId: string): string {
+  const model = filterConsumerModelCatalog(modelCatalog.value).find((item) => item.id === modelId)
+  return model?.display_name?.trim() || model?.name || modelId
+}
+
+function selectedModelId(value: unknown): string {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
+}
+
+async function onConsumerSceneFreeChange(scene: ConsumerScene, value: unknown) {
+  const item = consumerSetting(scene, 'free_default')
+  const id = selectedModelId(value)
+  if (!item || !filterConsumerModelCatalog(modelCatalog.value).some((model) => model.id === id)) {
+    syncConsumerPolicy()
+    return
+  }
+  editValues[item.key] = id
+  await persistSetting(item)
+  syncConsumerPolicy()
+}
+
+async function onConsumerScenePaidChange(scene: ConsumerScene, value: unknown) {
+  const item = consumerSetting(scene, 'paid_options')
+  if (!item) return
+  const values = Array.isArray(value) ? value : [value]
+  const ids = normalizeConsumerModelIds(values, modelCatalog.value)
+  if (ids.length === 0) {
+    MessagePlugin.warning(t('system.globalSettings.models.paidRequired'))
+    syncConsumerPolicy()
+    return
+  }
+  editValues[item.key] = ids
+  await persistSetting(item)
+  syncConsumerPolicy()
 }
 
 function markSettingSaved(item: SystemSettingItem) {
@@ -923,6 +1053,19 @@ async function loadSettings() {
     MessagePlugin.error(msg)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadConsumerModelCatalog() {
+  modelCatalogLoading.value = true
+  try {
+    modelCatalog.value = await listModels()
+    syncConsumerPolicy()
+  } catch (err: any) {
+    modelCatalog.value = []
+    MessagePlugin.error(err?.message || t('system.globalSettings.models.loadFailed'))
+  } finally {
+    modelCatalogLoading.value = false
   }
 }
 
@@ -1279,9 +1422,9 @@ async function onAdminsChange(next: string[]) {
   }
 }
 
-onMounted(() => {
-  loadSettings()
-  loadAdmins()
+onMounted(async () => {
+  await Promise.all([loadSettings(), loadConsumerModelCatalog(), loadAdmins()])
+  syncConsumerPolicy()
 })
 
 onUnmounted(() => {
@@ -1363,6 +1506,34 @@ onUnmounted(() => {
 
 .settings-section-panel {
   min-width: 0;
+}
+
+.consumer-model-policy {
+  display: flex;
+  flex-direction: column;
+}
+
+.consumer-model-policy__controls {
+  align-items: flex-end;
+}
+
+.consumer-model-policy__controls .setting-input + .setting-input {
+  margin-top: 6px;
+}
+
+.consumer-model-policy__hint {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.consumer-model-policy__paid-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .settings-section-intro {

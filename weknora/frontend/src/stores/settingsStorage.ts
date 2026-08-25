@@ -25,7 +25,11 @@ type ReconcilableSettings = {
   selectedAgentId?: string;
   selectedAgentSourceTenantId?: unknown;
   webSearchEnabled?: unknown;
-  conversationModels?: { thinkingEnabled?: unknown; reasoningEffort?: unknown };
+  conversationModels?: {
+    thinkingEnabled?: unknown;
+    reasoningEffort?: unknown;
+    consumerSceneModelIds?: unknown;
+  };
 };
 
 function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
@@ -47,6 +51,9 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
   if (typeof loaded.conversationModels.reasoningEffort !== "string") {
     loaded.conversationModels.reasoningEffort = loaded.conversationModels.thinkingEnabled === false ? "none" : "high";
     reconciledThinking = true;
+  }
+  if (!isStoredSettingsRecord(loaded.conversationModels.consumerSceneModelIds)) {
+    loaded.conversationModels.consumerSceneModelIds = {};
   }
   const thinkingEnabled = loaded.conversationModels.reasoningEffort !== "none";
   if (loaded.conversationModels.thinkingEnabled !== thinkingEnabled) {

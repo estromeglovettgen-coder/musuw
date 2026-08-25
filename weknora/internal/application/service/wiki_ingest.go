@@ -320,17 +320,18 @@ type WikiPendingOp struct {
 // both of which are correctness-critical short-lived flags rather
 // than data the system should survive without.
 type wikiIngestService struct {
-	wikiService    interfaces.WikiPageService
-	kbService      interfaces.KnowledgeBaseService
-	knowledgeSvc   interfaces.KnowledgeService
-	knowledgeRepo  interfaces.KnowledgeRepository
-	chunkRepo      interfaces.ChunkRepository
-	modelService   interfaces.ModelService
-	task           interfaces.TaskEnqueuer
-	audit          interfaces.AuditLogService
-	pendingRepo    interfaces.TaskPendingOpsRepository
-	deadLetterRepo interfaces.TaskDeadLetterRepository
-	redisClient    *redis.Client // nil in Lite mode (no Redis)
+	wikiService           interfaces.WikiPageService
+	kbService             interfaces.KnowledgeBaseService
+	knowledgeSvc          interfaces.KnowledgeService
+	knowledgeRepo         interfaces.KnowledgeRepository
+	chunkRepo             interfaces.ChunkRepository
+	modelService          interfaces.ModelService
+	consumerModelResolver interfaces.ConsumerModelResolver
+	task                  interfaces.TaskEnqueuer
+	audit                 interfaces.AuditLogService
+	pendingRepo           interfaces.TaskPendingOpsRepository
+	deadLetterRepo        interfaces.TaskDeadLetterRepository
+	redisClient           *redis.Client // nil in Lite mode (no Redis)
 	// spanTracker lets per-document map work surface as a
 	// postprocess.wiki subspan in the knowledge trace tree. Async
 	// batch design means we look up the parent attempt by knowledge
@@ -372,22 +373,64 @@ func NewWikiIngestService(
 	deadLetterRepo interfaces.TaskDeadLetterRepository,
 	redisClient *redis.Client,
 	spanTracker SpanTracker,
+	consumerModelResolver interfaces.ConsumerModelResolver,
 ) interfaces.TaskHandler {
 	svc := &wikiIngestService{
-		wikiService:    wikiService,
-		kbService:      kbService,
-		knowledgeSvc:   knowledgeSvc,
-		knowledgeRepo:  knowledgeRepo,
-		chunkRepo:      chunkRepo,
-		modelService:   modelService,
-		task:           task,
-		audit:          audit,
-		pendingRepo:    pendingRepo,
-		deadLetterRepo: deadLetterRepo,
-		redisClient:    redisClient,
-		spanTracker:    spanTracker,
+		wikiService:           wikiService,
+		kbService:             kbService,
+		knowledgeSvc:          knowledgeSvc,
+		knowledgeRepo:         knowledgeRepo,
+		chunkRepo:             chunkRepo,
+		modelService:          modelService,
+		consumerModelResolver: consumerModelResolver,
+		task:                  task,
+		audit:                 audit,
+		pendingRepo:           pendingRepo,
+		deadLetterRepo:        deadLetterRepo,
+		redisClient:           redisClient,
+		spanTracker:           spanTracker,
 	}
 	return svc
+}
+
+// resolveWikiChatModel is the single model-selection boundary shared by Wiki
+// ingest and finalize. The durable WikiConfig candidate remains the request
+// input; when the consumer resolver is present it is validated/resolved before
+// the existing ModelService provider lookup. A nil resolver preserves the
+// legacy candidate/fallback behavior for compatibility and direct test setup.
+func wikiSynthesisModelCandidate(kb *types.KnowledgeBase) string {
+	if kb == nil {
+		return ""
+	}
+	candidate := ""
+	if kb.WikiConfig != nil {
+		candidate = strings.TrimSpace(kb.WikiConfig.SynthesisModelID)
+	}
+	if candidate == "" {
+		candidate = strings.TrimSpace(kb.SummaryModelID)
+	}
+	return candidate
+}
+
+func (s *wikiIngestService) resolveWikiChatModel(ctx context.Context, kb *types.KnowledgeBase) (chat.Chat, error) {
+	if kb == nil {
+		return nil, errors.New("wiki: knowledge base is nil")
+	}
+	candidate := wikiSynthesisModelCandidate(kb)
+	if s.consumerModelResolver != nil {
+		resolved, err := s.consumerModelResolver.ResolveConsumerModel(ctx, types.ConsumerSceneWiki, candidate)
+		if err != nil {
+			return nil, fmt.Errorf("resolve wiki consumer model: %w", err)
+		}
+		if resolved == nil || strings.TrimSpace(resolved.ID) == "" {
+			return nil, errors.New("resolve wiki consumer model: empty model")
+		}
+		candidate = resolved.ID
+	}
+	if candidate == "" {
+		return nil, errors.New("no synthesis model configured")
+	}
+	return s.modelService.GetChatModel(ctx, candidate)
 }
 
 // tracker returns a non-nil span tracker so callers don't have to

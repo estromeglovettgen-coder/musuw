@@ -37,6 +37,32 @@
       </aside>
     </header>
 
+    <section class="consumer-scene-settings" aria-labelledby="consumer-scene-settings-title">
+      <div class="consumer-scene-settings__header">
+        <div>
+          <h3 id="consumer-scene-settings-title">{{ $t('modelSettings.sceneModels.title') }}</h3>
+          <p>{{ $t('modelSettings.sceneModels.description') }}</p>
+        </div>
+        <t-loading v-if="consumerSceneLoading" size="small" />
+      </div>
+      <div class="consumer-scene-settings__grid">
+        <div v-for="scene in consumerScenes" :key="scene" class="consumer-scene-settings__row">
+          <div class="consumer-scene-settings__copy">
+            <strong>{{ $t(`modelSettings.sceneModels.scenes.${scene}.label`) }}</strong>
+            <span>{{ $t(`modelSettings.sceneModels.scenes.${scene}.description`) }}</span>
+          </div>
+          <ModelSelector
+            :all-models="consumerSceneOptionsFor(scene).length ? allModels : []"
+            :scene-options="consumerSceneOptionsFor(scene)"
+            :selected-model-id="consumerSceneCandidate(scene)"
+            :show-add-model="false"
+            :placeholder="$t('model.selectModelPlaceholder')"
+            @update:selected-model-id="onConsumerSceneModelChange(scene, $event)"
+          />
+        </div>
+      </div>
+    </section>
+
     <div class="visual-model-tabs" data-guide="settings-models" role="tablist">
       <button
         v-for="tab in ([
@@ -171,11 +197,17 @@ import { AddIcon, PlayCircleIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
 import ModelEditorDialog from '@/components/ModelEditorDialog.vue'
 import ModelDebugDrawer from '@/components/ModelDebugDrawer.vue'
-import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ModelConfig } from '@/api/model'
+import ModelSelector from '@/components/ModelSelector.vue'
+import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ConsumerScene, type ModelConfig } from '@/api/model'
 import { useAuthStore } from '@/stores/auth'
+import { useChatResourcesStore } from '@/stores/chatResources'
+import { useSettingsStore } from '@/stores/settings'
+import { resolveConsumerSceneCandidate } from '@/utils/consumerSceneModels'
 
 const { t, te } = useI18n()
 const authStore = useAuthStore()
+const chatResources = useChatResourcesStore()
+const settingsStore = useSettingsStore()
 const props = defineProps<{ initialType?: string | null }>()
 type ModelType = 'chat' | 'embedding' | 'rerank' | 'vllm' | 'asr'
 type FilterType = 'all' | ModelType
@@ -186,6 +218,45 @@ const currentModelType = ref<ModelType>('chat')
 const editingModel = ref<any>(null)
 const loading = ref(true)
 const activeTypeFilter = ref<FilterType>('all')
+const consumerScenes: readonly ConsumerScene[] = ['chat', 'rag', 'wiki']
+const consumerSceneLoading = ref(false)
+
+const consumerSceneOptionsFor = (scene: ConsumerScene) =>
+  chatResources.consumerSceneOptions[scene]?.options || []
+
+const consumerSceneCandidate = (scene: ConsumerScene): string => {
+  const response = chatResources.consumerSceneOptions[scene]
+  return resolveConsumerSceneCandidate(
+    response?.options || [],
+    settingsStore.getConsumerSceneModel(scene),
+    response?.effective_model_id,
+  )
+}
+
+const loadConsumerSceneOptions = async () => {
+  consumerSceneLoading.value = true
+  try {
+    await Promise.all(consumerScenes.map(scene => chatResources.ensureConsumerSceneOptions(scene)))
+    for (const scene of consumerScenes) {
+      const selected = consumerSceneCandidate(scene)
+      if (selected && selected !== settingsStore.getConsumerSceneModel(scene)) {
+        settingsStore.updateConsumerSceneModel(scene, selected)
+      }
+    }
+  } catch (error) {
+    // The model catalog remains usable when the optional scene-options endpoint
+    // is unavailable; the server still enforces the resolver on submit.
+    console.warn('Failed to load consumer scene options', error)
+  } finally {
+    consumerSceneLoading.value = false
+  }
+}
+
+const onConsumerSceneModelChange = (scene: ConsumerScene, value: string) => {
+  const option = consumerSceneOptionsFor(scene).find(item => item.model_id === value)
+  if (!option || option.locked || !option.selectable) return
+  settingsStore.updateConsumerSceneModel(scene, value)
+}
 
 const normalizeInitialType = (value?: string | null): FilterType => {
   const key = (value || '').toLowerCase()
@@ -640,7 +711,7 @@ function getModelType(type: ModelType): 'KnowledgeQA' | 'Embedding' | 'Rerank' |
 }
 
 onMounted(() => {
-  loadModels()
+  void Promise.all([loadModels(), loadConsumerSceneOptions()])
 })
 </script>
 
@@ -760,6 +831,71 @@ onMounted(() => {
 
 .visual-model-settings__hint a:hover {
   color: #111827;
+}
+
+.consumer-scene-settings {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: rgb(249 250 251 / 55%);
+}
+
+.consumer-scene-settings__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.consumer-scene-settings__header h3 {
+  margin: 0 0 2px;
+  color: #374151;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.consumer-scene-settings__header p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.consumer-scene-settings__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.consumer-scene-settings__row {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.consumer-scene-settings__copy {
+  min-height: 38px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.consumer-scene-settings__copy strong {
+  color: #374151;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.consumer-scene-settings__copy span {
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
 }
 
 .visual-model-tabs {

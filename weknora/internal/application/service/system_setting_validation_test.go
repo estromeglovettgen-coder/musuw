@@ -1,6 +1,13 @@
 package service
 
-import "testing"
+import (
+	"context"
+	"encoding/json"
+	"sync"
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/types"
+)
 
 func TestValidateWorkerConcurrencyMinimums(t *testing.T) {
 	tests := []struct {
@@ -29,5 +36,85 @@ func TestValidateWorkerConcurrencyMinimums(t *testing.T) {
 				t.Fatalf("unexpected validation error: %v", err)
 			}
 		})
+	}
+}
+
+type consumerSceneSettingRepository struct {
+	mu   sync.RWMutex
+	rows map[string]*types.SystemSetting
+}
+
+func (r *consumerSceneSettingRepository) Get(_ context.Context, key string) (*types.SystemSetting, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.rows[key], nil
+}
+
+func (r *consumerSceneSettingRepository) List(context.Context) ([]*types.SystemSetting, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	rows := make([]*types.SystemSetting, 0, len(r.rows))
+	for _, row := range r.rows {
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+func (r *consumerSceneSettingRepository) Upsert(_ context.Context, setting *types.SystemSetting) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.rows == nil {
+		r.rows = make(map[string]*types.SystemSetting)
+	}
+	r.rows[setting.Key] = setting
+	return nil
+}
+
+func (r *consumerSceneSettingRepository) Delete(_ context.Context, key string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.rows[key]; !ok {
+		return false, nil
+	}
+	delete(r.rows, key)
+	return true, nil
+}
+
+func (r *consumerSceneSettingRepository) value(key string) types.JSON {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if row := r.rows[key]; row != nil {
+		return append(types.JSON(nil), row.Value...)
+	}
+	return nil
+}
+
+func TestConsumerSceneSettingsPreserveOrderAndRejectWrongType(t *testing.T) {
+	repo := &consumerSceneSettingRepository{rows: map[string]*types.SystemSetting{}}
+	svc := NewSystemSettingService(repo, nil, nil, nil)
+	ctx := context.Background()
+	want := []string{"builtin-deepseek-v4-pro", types.CheapestChatModelID}
+	row, err := svc.Update(ctx, "consumer_models.chat.paid_options", want)
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	got, err := row.AsStringList()
+	if err != nil {
+		t.Fatalf("AsStringList returned error: %v", err)
+	}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("order changed: got %#v want %#v", got, want)
+	}
+	if _, err := svc.Update(ctx, "consumer_models.chat.free_default", []string{types.CheapestChatModelID}); err == nil {
+		t.Fatal("expected wrong value type to be rejected")
+	}
+
+	encoded, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted := repo.value("consumer_models.chat.paid_options")
+	if string(persisted) != string(encoded) {
+		t.Fatalf("repository order changed: got %s want %s", persisted, encoded)
 	}
 }

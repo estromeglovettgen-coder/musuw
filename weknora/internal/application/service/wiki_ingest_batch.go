@@ -295,21 +295,14 @@ func (s *wikiIngestService) ProcessWikiIngest(ctx context.Context, t *asynq.Task
 		return fmt.Errorf("wiki ingest: KB %s is not wiki type", kb.ID)
 	}
 
-	var synthesisModelID string
-	if kb.WikiConfig != nil {
-		synthesisModelID = kb.WikiConfig.SynthesisModelID
-	}
-	if synthesisModelID == "" {
-		synthesisModelID = kb.SummaryModelID
-	}
-	if synthesisModelID == "" {
+	if s.consumerModelResolver == nil && wikiSynthesisModelCandidate(kb) == "" {
 		exitStatus = "missing_synthesis_model"
 		return fmt.Errorf("wiki ingest: no synthesis model configured for KB %s", kb.ID)
 	}
-	chatModel, err := s.modelService.GetChatModel(ctx, synthesisModelID)
+	chatModel, err := s.resolveWikiChatModel(ctx, kb)
 	if err != nil {
 		exitStatus = "get_chat_model_failed"
-		return fmt.Errorf("wiki ingest: get chat model: %w", err)
+		return fmt.Errorf("wiki ingest: resolve chat model: %w", err)
 	}
 
 	// Resolve per-KB tunables once. WikiConfig.IngestBatchSize /
@@ -1043,14 +1036,8 @@ func (s *wikiIngestService) ProcessWikiFinalize(ctx context.Context, t *asynq.Ta
 		return nil
 	}
 
-	synthesisModelID := ""
-	if kb.WikiConfig != nil {
-		synthesisModelID = kb.WikiConfig.SynthesisModelID
-	}
-	if synthesisModelID == "" {
-		synthesisModelID = kb.SummaryModelID
-	}
-	if synthesisModelID == "" {
+	legacySynthesisCandidate := wikiSynthesisModelCandidate(kb)
+	if s.consumerModelResolver == nil && legacySynthesisCandidate == "" {
 		// No model to rebuild the index with; still run the pure-text passes,
 		// then drain. Missing model is a config gap, not a transient error.
 		logger.Warnf(ctx, "wiki finalize: no synthesis model for KB %s, skipping index rebuild", payload.KnowledgeBaseID)
@@ -1060,10 +1047,10 @@ func (s *wikiIngestService) ProcessWikiFinalize(ctx context.Context, t *asynq.Ta
 	lang := types.LanguageNameFromContext(ctx)
 
 	indexRebuilt := false
-	if changeDesc.Len() > 0 && synthesisModelID != "" {
-		chatModel, mErr := s.modelService.GetChatModel(ctx, synthesisModelID)
+	if changeDesc.Len() > 0 && (s.consumerModelResolver != nil || legacySynthesisCandidate != "") {
+		chatModel, mErr := s.resolveWikiChatModel(ctx, kb)
 		if mErr != nil {
-			logger.Warnf(ctx, "wiki finalize: get chat model failed: %v", mErr)
+			logger.Warnf(ctx, "wiki finalize: resolve chat model failed: %v", mErr)
 		} else if err := s.rebuildIndexPage(ctx, chatModel, payload, changeDesc.String(), lang,
 			batchCtx.ContentInstructions); err != nil {
 			logger.Warnf(ctx, "wiki finalize: rebuild index failed: %v", err)

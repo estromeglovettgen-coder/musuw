@@ -70,8 +70,9 @@
             model-type="KnowledgeQA"
             :selected-model-id="config.wikiSynthesisModelId"
             :all-models="allModels"
+            :scene-options="wikiSceneOptions"
+            :show-add-model="false"
             @update:selected-model-id="handleWikiModelChange"
-            @add-model="handleAddModel('knowledgeqa')"
             :placeholder="$t('knowledgeEditor.wiki.synthesisModelPlaceholder')"
           />
         </div>
@@ -85,6 +86,7 @@
 import { ref } from 'vue'
 import { useUIStore } from '@/stores/ui'
 import ModelSelector from '@/components/ModelSelector.vue'
+import type { ConsumerSceneOption } from '@/api/model'
 import { useI18n } from 'vue-i18n'
 
 interface ModelConfig {
@@ -100,6 +102,7 @@ interface Props {
   wikiEnabled?: boolean
   ragEnabled?: boolean
   allModels?: any[]
+  wikiSceneOptions?: ConsumerSceneOption[]
 }
 
 const props = defineProps<Props>()
@@ -222,4 +225,3 @@ const handleAddModel = (subSection: string) => {
   align-items: flex-start;
 }
 </style>
-

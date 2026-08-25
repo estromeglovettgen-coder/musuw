@@ -6,6 +6,7 @@ import { isAgentStreamAgentId } from "@/utils/agent-mode";
 import { reconcileLiteChatSettings } from "@/utils/liteChatSettings";
 import { useAuthStore } from "@/stores/auth";
 import { loadAndReconcileSettings } from "@/stores/settingsStorage";
+import type { ConsumerScene } from "@/api/model";
 
 // 定义设置接口
 interface Settings {
@@ -44,6 +45,8 @@ interface ConversationModels {
   selectedChatModelId: string;  // 用户当前选择的对话模型ID
   thinkingEnabled: boolean;
   reasoningEffort: string;
+  /** Consumer scene candidates are browser preferences only; resolver remains authoritative. */
+  consumerSceneModelIds: Partial<Record<ConsumerScene, string>>;
 }
 
 // 单个模型项接口
@@ -108,6 +111,7 @@ const defaultSettings: Settings = {
     selectedChatModelId: "",  // 用户当前选择的对话模型ID
     thinkingEnabled: true,
     reasoningEffort: "high",
+    consumerSceneModelIds: {},
   },
   selectedAgentId: BUILTIN_SMART_REASONING_ID,
   selectedAgentSourceTenantId: null as string | null,  // 共享智能体来源空间 ID
@@ -225,6 +229,23 @@ export const useSettingsStore = defineStore("settings", {
     updateConversationModels(models: Partial<ConversationModels>) {
       const current = this.settings.conversationModels || defaultSettings.conversationModels;
       this.settings.conversationModels = { ...current, ...models };
+      localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+    },
+
+    getConsumerSceneModel(scene: ConsumerScene): string {
+      const models = this.settings.conversationModels || defaultSettings.conversationModels;
+      return models.consumerSceneModelIds?.[scene] || "";
+    },
+
+    updateConsumerSceneModel(scene: ConsumerScene, modelId: string) {
+      const current = this.settings.conversationModels || defaultSettings.conversationModels;
+      this.settings.conversationModels = {
+        ...current,
+        consumerSceneModelIds: {
+          ...(current.consumerSceneModelIds || {}),
+          [scene]: modelId,
+        },
+      };
       localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
     },
     

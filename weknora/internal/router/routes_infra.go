@@ -28,6 +28,9 @@ func RegisterModelRoutes(
 
 		// Consumer catalog reads stay available.
 		models.GET("", g.Viewer(), handler.ListModels)
+		// Scene options must precede /:id so "scene-options" is not treated as
+		// a model identifier. The response is safe display metadata only.
+		models.GET("/scene-options/:scene", g.Viewer(), handler.ListConsumerSceneOptions)
 		models.GET("/:id", g.Viewer(), handler.GetModel)
 
 		// Any operation that can create/change credentials, endpoints, provider

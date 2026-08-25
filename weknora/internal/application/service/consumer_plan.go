@@ -95,6 +95,9 @@ func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types
 
 	plan, ok := effectivePlanFromContext(ctx)
 	if ok {
+		if plan == types.ConsumerPlanFree && model != nil && model.Type == types.ModelTypeKnowledgeQA && s.consumerResolver != nil {
+			return s.consumerResolver.AllowsFreeConsumerModel(ctx, model)
+		}
 		return types.ConsumerPlanAllowsModel(plan, model), nil
 	}
 	if s.entitlement == nil {
@@ -104,5 +107,9 @@ func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types
 	if err != nil {
 		return false, err
 	}
-	return types.ConsumerPlanAllowsModel(current.Plan, model), nil
+	plan = types.NormalizeConsumerPlan(current.Plan)
+	if plan == types.ConsumerPlanFree && model != nil && model.Type == types.ModelTypeKnowledgeQA && s.consumerResolver != nil {
+		return s.consumerResolver.AllowsFreeConsumerModel(ctx, model)
+	}
+	return types.ConsumerPlanAllowsModel(plan, model), nil
 }

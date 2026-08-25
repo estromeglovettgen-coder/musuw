@@ -233,6 +233,7 @@
                     :wiki-enabled="formData.indexingStrategy?.wikiEnabled"
                     :rag-enabled="formData.indexingStrategy?.vectorEnabled || formData.indexingStrategy?.keywordEnabled"
                     :all-models="allModels"
+                    :wiki-scene-options="wikiSceneOptions"
                     @update:config="handleModelConfigUpdate"
                   />
                 </div>
@@ -518,6 +519,7 @@ import KBShareSettings from './settings/KBShareSettings.vue'
 import DataSourceSettings from './settings/DataSourceSettings.vue'
 import KnowledgeBaseActivitySettings from './settings/KnowledgeBaseActivitySettings.vue'
 import { useI18n } from 'vue-i18n'
+import { resolveConsumerSceneCandidate } from '@/utils/consumerSceneModels'
 
 const uiStore = useUIStore()
 const authStore = useAuthStore()
@@ -590,6 +592,7 @@ onBeforeUnmount(() => {
 const saving = ref(false)
 const loading = ref(false)
 const allModels = ref<any[]>([])
+const wikiSceneOptions = computed(() => chatResources.consumerSceneOptions.wiki?.options || [])
 const hasFiles = ref(false)
 const initialStorageProvider = ref<string>('')
 /** Tenant-wide default from Settings → Storage engine (used when creating a KB). */
@@ -894,6 +897,24 @@ const handleModelConfigUpdate = (config: any) => {
   if (formData.value) {
     formData.value.modelConfig = { ...config }
   }
+}
+
+// A policy change can make a stored Wiki synthesis candidate stale. Reconcile
+// only that existing Wiki field to the resolver's effective selectable value;
+// embedding, rerank, and other KB bindings remain untouched.
+const syncWikiSceneCandidate = () => {
+  if (!formData.value || formData.value.type === 'faq') return
+  const response = chatResources.consumerSceneOptions.wiki
+  const options = response?.options || []
+  if (!options.length) return
+  const current = formData.value.modelConfig?.wikiSynthesisModelId || ''
+  const resolved = resolveConsumerSceneCandidate(options, current, response?.effective_model_id)
+  if (!resolved || resolved === current) return
+  formData.value.modelConfig = {
+    ...formData.value.modelConfig,
+    wikiSynthesisModelId: resolved,
+  }
+  if (formData.value.wikiConfig) formData.value.wikiConfig.synthesisModelId = resolved
 }
 
 // 粒度选择器：从 formData.wikiConfig 读出并规范化，未知值回退到 'standard'，
@@ -1492,8 +1513,15 @@ watch(() => props.visible, async (newVal) => {
       currentSection.value = uiStore.kbEditorInitialSection
     }
 
-    await Promise.all([loadAllModels(), loadTenantDefaultStorageProvider()])
-    if (props.kbId) await loadKBData()
+    await Promise.all([
+      loadAllModels(),
+      loadTenantDefaultStorageProvider(),
+      chatResources.ensureConsumerSceneOptions('wiki'),
+    ])
+    if (props.kbId) {
+      await loadKBData()
+      syncWikiSceneCandidate()
+    }
   } else {
     // 关闭弹窗时，延迟重置状态（等待动画结束）
     setTimeout(() => {

@@ -216,6 +216,7 @@ export default defineComponent({
           <ModelSelector
             mode="chat"
             :models="availableModels"
+            :scene-options="sceneOptionsFor(effectiveConsumerScene)"
             :selected-model-id="selectedModelId"
             :selected-model-display-name="selectedModelDisplayName"
             :selected-reasoning-label="selectedReasoningLabel"

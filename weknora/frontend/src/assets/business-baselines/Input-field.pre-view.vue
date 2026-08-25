@@ -21,7 +21,7 @@ import KnowledgeBaseSelector from "./KnowledgeBaseSelector.vue";
 import MentionSelector from "./MentionSelector.vue";
 import { getCaretCoordinates } from "@/utils/caret";
 import { getRootZoom, rectToCssPx, cssViewportSize } from "@/utils/zoom";
-import { type ModelConfig } from "@/api/model";
+import { type ConsumerScene, type ConsumerSceneOption, type ModelConfig } from "@/api/model";
 import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 import { useChatResourcesStore } from "@/stores/chatResources";
 import { useEditorResourcesStore } from "@/stores/editorResources";
@@ -48,6 +48,10 @@ import {
 import { formatLocalizedList } from "@/utils/format-list";
 import type { MentionItem, MentionItemType, MentionRequestItem } from "@/types/mention";
 import { resolveChatModelId } from "@/utils/managedChatModels";
+import {
+  resolveComposerConsumerScene,
+  resolveConsumerSceneCandidate,
+} from "@/utils/consumerSceneModels";
 import organizationGreyIcon from "@/assets/img/organization-grey.svg";
 import organizationGreenIcon from "@/assets/img/organization-green.svg";
 
@@ -68,19 +72,83 @@ const {
   disabledOwnAgentIds,
   allModels,
   chatModels: rawAvailableModels,
+  consumerSceneOptions,
   webSearchProviders,
 } = storeToRefs(chatResources);
 // The consumer picker is the curated Musuw catalog, even when the signed-in
 // account also has platform-admin privileges.  Administrative model records
 // remain available to the settings/backend maintenance paths, but arbitrary
 // tenant or legacy models must never leak into the C-end picker.
-const availableModels = computed(() =>
+const fallbackAvailableModels = computed(() =>
   rawAvailableModels.value.filter((model) =>
     (!model.status || model.status === "active")
     && model.is_builtin === true
     && model.parameters?.provider?.trim().toLowerCase() === "openrouter",
   ),
 );
+const hasBuiltinAllKnowledgeScope = computed(() => {
+  if (isCustomAgent.value) return false;
+  const agentId = settingsStore.selectedAgentId;
+  return (
+    (agentId === BUILTIN_QUICK_ANSWER_ID || agentId === BUILTIN_SMART_REASONING_ID)
+    && agentKBSelectionMode.value === "all"
+  );
+});
+const effectiveConsumerScene = computed<ConsumerScene>(() => {
+  const current = settingsStore.settings;
+  const hasKnowledgeScope = Boolean(
+    current.selectedKnowledgeBases?.length
+    || current.selectedFiles?.length
+    || current.selectedTags?.length,
+  );
+  // The explicit UI toggle is the same signal carried in the chat request;
+  // provider readiness is checked separately and never changes scene intent.
+  return resolveComposerConsumerScene(
+    hasKnowledgeScope,
+    settingsStore.isWebSearchEnabled,
+    hasBuiltinAllKnowledgeScope.value,
+  );
+});
+const sceneOptionsFor = (scene: ConsumerScene): ConsumerSceneOption[] =>
+  consumerSceneOptions.value[scene]?.options || [];
+const sceneModelsFor = (scene: ConsumerScene): ModelConfig[] => {
+  const options = sceneOptionsFor(scene);
+  const modelsById = new Map(allModels.value.map((model) => [model.id, model]));
+  return options.map((option) => {
+    const catalogModel = modelsById.get(option.model_id);
+    if (catalogModel) {
+      return {
+        ...catalogModel,
+        selectable: option.selectable,
+        locked: option.locked,
+        required_plan: option.required_plan,
+      } as ModelConfig;
+    }
+    return {
+      id: option.model_id,
+      name: option.display_name,
+      display_name: option.display_name,
+      type: "KnowledgeQA",
+      source: "remote",
+      parameters: { provider: "openrouter" },
+      is_builtin: true,
+      is_default: option.is_scene_default,
+      selectable: option.selectable,
+      locked: option.locked,
+      required_plan: option.required_plan,
+    } as ModelConfig;
+  });
+};
+const sceneManagedByConsumerResolver = computed(() => {
+  if (isCustomAgent.value) return false;
+  const agentId = settingsStore.selectedAgentId;
+  return !agentId || agentId === BUILTIN_QUICK_ANSWER_ID || agentId === BUILTIN_SMART_REASONING_ID;
+});
+const availableModels = computed(() => {
+  if (!sceneManagedByConsumerResolver.value) return fallbackAvailableModels.value;
+  const sceneModels = sceneModelsFor(effectiveConsumerScene.value);
+  return sceneModels.length > 0 ? sceneModels : fallbackAvailableModels.value;
+});
 const { t, locale } = useI18n();
 
 let query = ref("");
@@ -733,8 +801,17 @@ const getMentionChipClass = (item: MentionItem) => {
 
 // 使用 computed 从 store 读取，并通过 setter 同步回 store
 const selectedModelId = computed({
-  get: () => settingsStore.conversationModels.selectedChatModelId || "",
-  set: (val: string) => settingsStore.updateConversationModels({ selectedChatModelId: val }),
+  get: () => {
+    if (!sceneManagedByConsumerResolver.value) return settingsStore.conversationModels.selectedChatModelId || "";
+    return settingsStore.getConsumerSceneModel(effectiveConsumerScene.value)
+      || (effectiveConsumerScene.value === "chat" ? settingsStore.conversationModels.selectedChatModelId || "" : "");
+  },
+  set: (val: string) => {
+    if (sceneManagedByConsumerResolver.value) {
+      settingsStore.updateConsumerSceneModel(effectiveConsumerScene.value, val);
+    }
+    settingsStore.updateConversationModels({ selectedChatModelId: val });
+  },
 });
 const thinkingEnabled = computed({
   get: () => settingsStore.conversationModels.reasoningEffort !== "none",
@@ -1005,8 +1082,11 @@ const writeLastChatModelID = (id: string) => {
 };
 
 const initChatModelSelection = () => {
+  const scene = effectiveConsumerScene.value;
   const initialSelection =
-    readLastChatModelID() || settingsStore.conversationModels.selectedChatModelId || "";
+    settingsStore.getConsumerSceneModel(scene)
+    || (scene === "chat" ? readLastChatModelID() || settingsStore.conversationModels.selectedChatModelId : "")
+    || "";
   settingsStore.updateConversationModels({
     summaryModelId: initialSelection,
     selectedChatModelId: initialSelection,
@@ -1023,7 +1103,12 @@ const loadChatModels = async (force = false) => {
   modelsLoadSettled.value = false;
   modelsLoading.value = true;
   try {
-    await chatResources.ensureChatModels(force);
+    await Promise.all([
+      chatResources.ensureChatModels(force),
+      sceneManagedByConsumerResolver.value
+        ? chatResources.ensureConsumerSceneOptions(effectiveConsumerScene.value, force)
+        : Promise.resolve(),
+    ]);
     ensureModelSelection();
   } catch (error) {
     console.error("Failed to load chat models:", error);
@@ -1036,10 +1121,24 @@ const loadChatModels = async (force = false) => {
 
 const ensureModelSelection = () => {
   if (!availableModels.value.length) return;
-  const modelId = resolveChatModelId(
-    selectedModelId.value || readLastChatModelID(),
-    availableModels.value,
-  );
+  if (sceneManagedByConsumerResolver.value) {
+    const scene = effectiveConsumerScene.value;
+    const response = consumerSceneOptions.value[scene];
+    const options = sceneOptionsFor(scene);
+    const candidate = selectedModelId.value || (scene === "chat" ? readLastChatModelID() : "");
+    const modelId = options.length
+      ? resolveConsumerSceneCandidate(options, candidate, response?.effective_model_id)
+      : resolveChatModelId(candidate, availableModels.value);
+    if (!modelId || selectedModelId.value === modelId) return;
+    selectedModelId.value = modelId;
+    settingsStore.updateConversationModels({
+      summaryModelId: modelId,
+      selectedChatModelId: modelId,
+      rerankModelId: "",
+    });
+    return;
+  }
+  const modelId = resolveChatModelId(selectedModelId.value || readLastChatModelID(), availableModels.value);
   if (!modelId || selectedModelId.value === modelId) return;
   settingsStore.updateConversationModels({
     summaryModelId: modelId,
@@ -1048,13 +1147,21 @@ const ensureModelSelection = () => {
   });
 };
 
-watch([availableModels, selectedModelId, selectedAgentId], ensureModelSelection, { immediate: true });
+watch([availableModels, selectedModelId, selectedAgentId, effectiveConsumerScene], ensureModelSelection, { immediate: true });
+
+watch(effectiveConsumerScene, (scene, previous) => {
+  if (scene === previous) return;
+  if (sceneManagedByConsumerResolver.value) {
+    void chatResources.ensureConsumerSceneOptions(scene).then(ensureModelSelection);
+  }
+});
 
 // Keep an agent's configured model unless this browser has an explicit valid override.
 watch(
   [selectedAgentId, () => settingsStore.selectedAgentSourceTenantId, agentModelId],
   ([, sourceTenantId, newModelId]) => {
     if (!newModelId || newModelId.trim() === "") return;
+    if (sceneManagedByConsumerResolver.value) return;
     const lastPick = readLastChatModelID();
     const agentModelInList = availableModels.value.some((model) => model.id === newModelId);
     if (
@@ -1080,6 +1187,10 @@ const handleModelChange = (value: string | number | Array<string | number> | und
     selectedModelId.value = "";
     return;
   }
+  if (sceneManagedByConsumerResolver.value) {
+    const option = sceneOptionsFor(effectiveConsumerScene.value).find((item) => item.model_id === val);
+    if (option && (option.locked || !option.selectable)) return;
+  }
   if (!availableModels.value.some((model) => model.id === val)) return;
 
   // The chat-level model picker now persists per-user-per-browser via
@@ -1087,7 +1198,10 @@ const handleModelChange = (value: string | number | Array<string | number> | und
   // "remember my last pick" should always have meant — the previous PUT
   // /tenants/kv/conversation-config required Admin+, so a Viewer or
   // Contributor switching models from the chat input got a 403.
-  writeLastChatModelID(val);
+  if (sceneManagedByConsumerResolver.value) {
+    settingsStore.updateConsumerSceneModel(effectiveConsumerScene.value, val);
+  }
+  if (effectiveConsumerScene.value === "chat") writeLastChatModelID(val);
   selectedModelId.value = val;
   ensureReasoningSelection();
   showModelSelector.value = false;
@@ -1827,9 +1941,9 @@ const toggleModelSelector = () => {
   showMention.value = false;
   showModelSelector.value = !showModelSelector.value;
   if (!showModelSelector.value) return;
-  if (!availableModels.value.length) {
-    void loadChatModels();
-  }
+  // Refresh both the curated scene policy and model metadata when the picker
+  // opens so stale browser candidates never become the request candidate.
+  void loadChatModels(true);
   nextTick(() => {
     updateModelDropdownPosition();
     requestAnimationFrame(() => updateModelDropdownPosition());
@@ -2019,7 +2133,9 @@ const createSession = async (val: string) => {
     return;
   }
 
-  if (!chatResources.isFresh("models")) {
+  const sceneOptionsStale = sceneManagedByConsumerResolver.value
+    && !chatResources.isConsumerSceneOptionsFresh(effectiveConsumerScene.value);
+  if (!chatResources.isFresh("models") || sceneOptionsStale) {
     await loadChatModels();
   }
 

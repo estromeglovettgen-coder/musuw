@@ -1880,6 +1880,15 @@ export default {
   modelSettings: {
     title: 'Настройки моделей',
     description: 'Управление типами AI‑моделей: локальные (Ollama) и удалённые API',
+    sceneModels: {
+      title: 'Модель для сценария',
+      description: 'Выберите модели Chat, RAG и Wiki для этого браузера. Заблокированные платные модели требуют соответствующего плана.',
+      scenes: {
+        chat: { label: 'Chat', description: 'Платформенный чат без поиска.' },
+        rag: { label: 'RAG', description: 'Ответы с поиском по знаниям или в интернете.' },
+        wiki: { label: 'Wiki', description: 'Синтез Wiki.' }
+      }
+    },
     copySuffix: ' копия',
     builtinTag: 'Встроенная',
     confirmDelete: 'Удалить модель «{name}»?',
@@ -2326,6 +2335,7 @@ export default {
     addModelInSettings: 'Перейти в общие настройки для добавления моделей',
     loadFailed: 'Не удалось загрузить список моделей',
     selectModelPlaceholder: 'Выберите модель',
+    lockedTag: 'Заблокировано',
     searchPlaceholder: 'Поиск моделей...',
     builtinTag: 'Built-in',
     editor: {
@@ -3114,6 +3124,27 @@ export default {
           tab: 'Учётные записи и доступ {count}',
           title: 'Учётные записи и доступ',
           description: 'Системные администраторы, открытая регистрация и правила создания пространств.'
+        },
+        models: {
+          tab: 'Модели {count}',
+          title: 'Политика моделей для пользователей',
+          description: 'Настройте бесплатную модель по умолчанию и упорядоченные платные варианты для Chat, RAG и Wiki.'
+        }
+      },
+      models: {
+        loading: 'Загрузка каталога моделей…',
+        empty: 'Нет доступных активных встроенных моделей OpenRouter для чата.',
+        loadFailed: 'Не удалось загрузить каталог моделей.',
+        freeLabel: 'Бесплатная модель по умолчанию',
+        freePlaceholder: 'Выберите бесплатную модель по умолчанию',
+        paidLabel: 'Платные варианты',
+        paidPlaceholder: 'Выберите платные варианты',
+        paidRequired: 'Выберите хотя бы один платный вариант; первый будет платным по умолчанию.',
+        paidOrderHint: 'Порядок платных вариантов сохраняется; первый является платным по умолчанию.',
+        scenes: {
+          chat: { label: 'Chat', description: 'Платформенный чат без поиска.' },
+          rag: { label: 'RAG', description: 'Ответы с поиском по знаниям или в интернете.' },
+          wiki: { label: 'Wiki', description: 'Синтез Wiki.' }
         }
       },
       priorityHint: {

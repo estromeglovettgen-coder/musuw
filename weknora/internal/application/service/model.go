@@ -24,13 +24,14 @@ var ErrModelNotFound = errors.New("model not found")
 
 // modelService implements the model service interface
 type modelService struct {
-	repo          interfaces.ModelRepository
-	kbRepo        interfaces.KnowledgeBaseRepository
-	agentRepo     interfaces.CustomAgentRepository
-	ollamaService *ollama.OllamaService
-	pooler        embedding.EmbedderPooler
-	tenantService interfaces.TenantService
-	entitlement   interfaces.EntitlementService
+	repo             interfaces.ModelRepository
+	kbRepo           interfaces.KnowledgeBaseRepository
+	agentRepo        interfaces.CustomAgentRepository
+	ollamaService    *ollama.OllamaService
+	pooler           embedding.EmbedderPooler
+	tenantService    interfaces.TenantService
+	entitlement      interfaces.EntitlementService
+	consumerResolver interfaces.ConsumerModelResolver
 }
 
 // NewModelService creates a new model service instance
@@ -41,7 +42,7 @@ func NewModelService(repo interfaces.ModelRepository,
 	pooler embedding.EmbedderPooler,
 	tenantService interfaces.TenantService,
 ) interfaces.ModelService {
-	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, nil)
+	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, nil, nil)
 }
 
 func NewModelServiceWithEntitlement(repo interfaces.ModelRepository,
@@ -52,7 +53,23 @@ func NewModelServiceWithEntitlement(repo interfaces.ModelRepository,
 	tenantService interfaces.TenantService,
 	entitlement interfaces.EntitlementService,
 ) interfaces.ModelService {
-	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, entitlement)
+	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, entitlement, nil)
+}
+
+// NewModelServiceWithConsumerResolver installs the scene resolver behind the
+// existing model service. Legacy constructors remain available for tests and
+// non-consumer call sites.
+func NewModelServiceWithConsumerResolver(
+	repo interfaces.ModelRepository,
+	kbRepo interfaces.KnowledgeBaseRepository,
+	agentRepo interfaces.CustomAgentRepository,
+	ollamaService *ollama.OllamaService,
+	pooler embedding.EmbedderPooler,
+	tenantService interfaces.TenantService,
+	entitlement interfaces.EntitlementService,
+	consumerResolver interfaces.ConsumerModelResolver,
+) interfaces.ModelService {
+	return newModelService(repo, kbRepo, agentRepo, ollamaService, pooler, tenantService, entitlement, consumerResolver)
 }
 
 func newModelService(repo interfaces.ModelRepository,
@@ -62,15 +79,17 @@ func newModelService(repo interfaces.ModelRepository,
 	pooler embedding.EmbedderPooler,
 	tenantService interfaces.TenantService,
 	entitlement interfaces.EntitlementService,
+	consumerResolver interfaces.ConsumerModelResolver,
 ) interfaces.ModelService {
 	return &modelService{
-		repo:          repo,
-		kbRepo:        kbRepo,
-		agentRepo:     agentRepo,
-		ollamaService: ollamaService,
-		pooler:        pooler,
-		tenantService: tenantService,
-		entitlement:   entitlement,
+		repo:             repo,
+		kbRepo:           kbRepo,
+		agentRepo:        agentRepo,
+		ollamaService:    ollamaService,
+		pooler:           pooler,
+		tenantService:    tenantService,
+		entitlement:      entitlement,
+		consumerResolver: consumerResolver,
 	}
 }
 

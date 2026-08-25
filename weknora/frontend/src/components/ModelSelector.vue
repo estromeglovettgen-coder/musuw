@@ -64,14 +64,20 @@
               role="option"
               tabindex="-1"
               class="visual-model-selector__chat-option"
-              :class="{ 'is-selected': model.id === selectedModelId, 'is-active': modelIndex(model.id) === activeModelIndex }"
+              :class="{
+                'is-selected': model.id === selectedModelId,
+                'is-active': modelIndex(model.id) === activeModelIndex,
+                'is-locked': model.locked || model.selectable === false,
+              }"
               :aria-selected="model.id === selectedModelId"
+              :aria-disabled="model.locked || model.selectable === false"
               @mouseenter="activeModelIndex = modelIndex(model.id)"
               @click="selectChatModel(model.id || '')"
             >
               <span class="visual-model-selector__chat-option-copy">
                 <strong :title="modelDisplayName(model)">{{ modelDisplayName(model) }}</strong>
               </span>
+              <span v-if="model.locked || model.selectable === false" class="visual-model-selector__chat-lock" :aria-label="$t('model.lockedTag')"><t-icon name="lock-on" /></span>
               <span v-if="model.id === selectedModelId" class="visual-model-selector__chat-check" aria-hidden="true"><t-icon name="check" /></span>
             </button>
             <div v-if="!chatModels.length" class="visual-model-selector__chat-empty">{{ noModelsLabel }}</div>
@@ -124,12 +130,16 @@
       style="width: 100%;"
     >
       <t-option
-        v-for="model in catalogModels"
+        v-for="model in selectorModels"
         :key="model.id"
         :value="model.id"
         :label="modelDisplayName(model)"
       >
-        <div class="visual-model-selector__option">
+        <div
+          class="visual-model-selector__option"
+          :class="{ 'is-locked': sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false }"
+          :aria-disabled="sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false"
+        >
           <span class="visual-model-selector__option-check" aria-hidden="true">
             <t-icon name="check-circle-filled" />
           </span>
@@ -140,11 +150,14 @@
           <span class="visual-model-selector__badges">
             <span v-if="model.is_builtin" class="visual-model-selector__badge">{{ $t('model.builtinTag') }}</span>
             <span v-if="model.is_default" class="visual-model-selector__badge is-default">{{ $t('model.defaultTag') }}</span>
+            <span v-if="sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false" class="visual-model-selector__badge is-locked">
+              <t-icon name="lock-on" /> {{ $t('model.lockedTag') }}
+            </span>
           </span>
         </div>
       </t-option>
 
-      <t-option v-if="!disabled" value="__add_model__" class="visual-model-selector__add-option">
+      <t-option v-if="!disabled && showAddModel" value="__add_model__" class="visual-model-selector__add-option">
         <div class="visual-model-selector__option is-add">
           <span class="visual-model-selector__option-check" aria-hidden="true"><t-icon name="add" /></span>
           <span class="visual-model-selector__option-copy"><strong>{{ $t('model.addModelInSettings') }}</strong></span>
@@ -156,9 +169,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { listModels, type ModelConfig } from '@/api/model'
+import { listModels, type ConsumerSceneOption, type ModelConfig } from '@/api/model'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+
+type ModelSelectorModel = ModelConfig & Partial<Pick<ConsumerSceneOption, 'selectable' | 'locked' | 'required_plan'>>
 
 interface Props {
   modelType?: 'KnowledgeQA' | 'Embedding' | 'Rerank' | 'VLLM' | 'ASR'
@@ -168,7 +184,9 @@ interface Props {
   status?: 'default' | 'success' | 'warning' | 'error'
   allModels?: ModelConfig[]
   mode?: 'catalog' | 'chat'
-  models?: ModelConfig[]
+  models?: ModelSelectorModel[]
+  sceneOptions?: ConsumerSceneOption[]
+  showAddModel?: boolean
   selectedModelDisplayName?: string
   selectedReasoningLabel?: string
   reasoningOptions?: Array<{ value: string; label: string }>
@@ -183,6 +201,8 @@ const props = withDefaults(defineProps<Props>(), {
   status: 'default',
   mode: 'catalog',
   models: () => [],
+  sceneOptions: () => [],
+  showAddModel: true,
   selectedModelDisplayName: '',
   selectedReasoningLabel: '',
   reasoningOptions: () => [],
@@ -202,6 +222,7 @@ const emit = defineEmits<{
 const catalogModels = ref<ModelConfig[]>([])
 const loading = ref(false)
 const { t } = useI18n()
+const router = useRouter()
 
 const placeholderText = computed(() => {
   return props.placeholder || t('model.selectModelPlaceholder')
@@ -217,6 +238,22 @@ watch(() => props.allModels, (newModels) => {
     catalogModels.value = newModels.filter(m => m.type === props.modelType)
   }
 }, { immediate: true })
+
+const sceneOptionById = computed(() => new Map((props.sceneOptions || []).map(option => [option.model_id, option])))
+const sceneOptionFor = (modelId?: string) => modelId ? sceneOptionById.value.get(modelId) : undefined
+const selectorModels = computed<ModelSelectorModel[]>(() => {
+  if (!props.sceneOptions?.length) return catalogModels.value
+  return props.sceneOptions.map((option) => ({
+    id: option.model_id,
+    name: option.display_name,
+    display_name: option.display_name,
+    type: 'KnowledgeQA' as const,
+    source: 'remote' as const,
+    parameters: { provider: 'openrouter' },
+    is_builtin: true,
+    is_default: option.is_scene_default,
+  }))
+})
 
 const selectedCatalogModel = computed(() => {
   if (!props.selectedModelId) return null
@@ -249,6 +286,11 @@ const loadModels = async () => {
 const handleCatalogModelChange = (value: string) => {
   if (value === '__add_model__') {
     emit('add-model')
+    return
+  }
+  const option = sceneOptionFor(value)
+  if (option && (option.locked || !option.selectable)) {
+    router.push('/plans')
     return
   }
   emit('update:selectedModelId', value)
@@ -294,7 +336,15 @@ const openView = (nextView: 'overview' | 'models' | 'reasoning') => {
   })
 }
 const selectChatModel = (value: string) => {
-  if (!chatModels.value.some(model => model.id === value)) return
+  const option = chatModels.value.find(model => model.id === value)
+  if (!option) return
+  const isSceneOption = option.locked !== undefined || option.selectable !== undefined
+  if (isSceneOption) {
+    if (option.locked || !option.selectable) {
+      router.push('/plans')
+      return
+    }
+  }
   emit('select-model', value)
 }
 const selectChatReasoning = (value: string) => {
@@ -507,6 +557,24 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.visual-model-selector__option.is-locked,
+.visual-model-selector__chat-option.is-locked {
+  color: #6b7280;
+}
+
+.visual-model-selector__option.is-locked strong,
+.visual-model-selector__chat-option.is-locked strong {
+  color: #6b7280;
+}
+
+.visual-model-selector__badge.is-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
 /* The chat picker mirrors the compact Codex-style menu: a two-row overview
  * and single-line listbox views.  The caller still owns model availability. */
 .visual-model-selector--chat {
@@ -715,6 +783,20 @@ onMounted(() => {
 
 .visual-model-selector__chat-check :deep(.t-icon) {
   font-size: 16px;
+}
+
+.visual-model-selector__chat-lock {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+}
+
+.visual-model-selector__chat-lock :deep(.t-icon) {
+  font-size: 14px;
 }
 
 .visual-model-selector__chat-empty {

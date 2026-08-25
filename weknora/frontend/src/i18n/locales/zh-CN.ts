@@ -1880,6 +1880,15 @@ export default {
   modelSettings: {
     title: '模型配置',
     description: '管理不同类型的 AI 模型，支持 Ollama 本地模型和远程 API',
+    sceneModels: {
+      title: '按场景选择模型',
+      description: '为当前浏览器选择 Chat、RAG 和 Wiki 使用的模型。付费模型会显示但需要对应套餐。',
+      scenes: {
+        chat: { label: 'Chat', description: '不带检索的平台对话。' },
+        rag: { label: 'RAG', description: '结合知识库或网页检索回答。' },
+        wiki: { label: 'Wiki', description: 'Wiki 内容合成。' }
+      }
+    },
     copySuffix: ' 副本',
     builtinTag: '内置',
     confirmDelete: '确定删除模型「{name}」吗？',
@@ -2326,6 +2335,7 @@ export default {
     addModelInSettings: '前往全局设置添加模型',
     loadFailed: '加载模型列表失败',
     selectModelPlaceholder: '请选择模型',
+    lockedTag: '已锁定',
     searchPlaceholder: '搜索模型...',
     builtinTag: '内置',
     editor: {
@@ -3114,6 +3124,27 @@ export default {
           tab: '账户与访问 {count}',
           title: '账户与访问',
           description: '管理系统管理员、公开注册与用户创建空间的规则。'
+        },
+        models: {
+          tab: '模型 {count}',
+          title: '消费者模型策略',
+          description: '配置 Chat、RAG 与 Wiki 的 Free 默认模型及有序付费选项。'
+        }
+      },
+      models: {
+        loading: '正在加载模型目录…',
+        empty: '没有可用的 active、内置 OpenRouter 对话模型。',
+        loadFailed: '模型目录加载失败。',
+        freeLabel: 'Free 默认模型',
+        freePlaceholder: '选择 Free 默认模型',
+        paidLabel: '付费模型选项',
+        paidPlaceholder: '选择付费模型选项',
+        paidRequired: '至少选择一个付费模型；第一项为付费默认模型。',
+        paidOrderHint: '付费选项会保留选择顺序，第一项为付费默认模型。',
+        scenes: {
+          chat: { label: 'Chat', description: '不带检索的平台对话。' },
+          rag: { label: 'RAG', description: '结合知识库或网页检索回答。' },
+          wiki: { label: 'Wiki', description: 'Wiki 内容合成。' }
         }
       },
       priorityHint: {
