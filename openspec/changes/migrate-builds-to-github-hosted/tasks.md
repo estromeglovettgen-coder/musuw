@@ -16,4 +16,4 @@
 ## 4. Verification and activation
 
 - [x] 4.1 Run workflow syntax, shell, static production, and repository contract checks
-- [ ] 4.2 Push the isolated change and verify fresh CI, Storefront, production build, deployment, and public health
+- [x] 4.2 Push the isolated change and verify fresh CI, Storefront, production build, deployment, and public health
