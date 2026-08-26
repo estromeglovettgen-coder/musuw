@@ -3,9 +3,11 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
 import { List } from "@phosphor-icons/react/List";
 import { X } from "@phosphor-icons/react/X";
-import { footerGroups } from "../data/homeContent";
 import { getStorefrontCopy } from "../i18n";
-import { HOMEPAGE_NAVIGATION } from "../planPresentation";
+import {
+  HOMEPAGE_FOOTER_GROUPS,
+  HOMEPAGE_NAVIGATION,
+} from "../planPresentation";
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";
 import { readStorefrontAuthentication } from "../storefrontAuthStatus";
 
@@ -186,7 +188,7 @@ export function SiteHeader({ copy = defaultCopy, navigation = HOMEPAGE_NAVIGATIO
   );
 }
 
-export function SiteFooter({ copy = defaultCopy, groups = footerGroups }) {
+export function SiteFooter({ copy = defaultCopy, groups = HOMEPAGE_FOOTER_GROUPS }) {
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
