@@ -31,4 +31,4 @@
 - [x] 5.2 Run complete frontend/storefront/auth tests, typecheck, i18n checks, builds, complete Go tests/native build, migrations, docreader, and repository validators
 - [x] 5.3 Perform one bounded adversarial review and fix only current blockers
 - [x] 5.4 Start and verify the local application and loopback operations console on the existing ports
-- [ ] 5.5 Commit and push the coherent `main`, wait for existing CI plus application/storefront production deployments, and run non-destructive release smoke checks
+- [x] 5.5 Commit and push the coherent `main`, wait for existing CI plus application/storefront production deployments, and run non-destructive release smoke checks
