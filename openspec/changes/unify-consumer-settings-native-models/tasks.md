@@ -27,7 +27,8 @@
 
 ## 5. Verification and Local Handoff
 
-- [ ] 5.1 Run strict OpenSpec, focused backend/frontend tests, relevant race tests, and authenticated browser acceptance in both themes
-- [ ] 5.2 Run complete frontend/storefront/auth tests, typecheck, i18n checks, builds, complete Go tests/native build, migrations, docreader, and repository validators
-- [ ] 5.3 Perform one bounded adversarial review and fix only current blockers
-- [ ] 5.4 Leave the coherent change local with the existing development service running; do not commit, push, publish, or deploy
+- [x] 5.1 Run strict OpenSpec, focused backend/frontend tests, relevant race tests, and authenticated browser acceptance in both themes
+- [x] 5.2 Run complete frontend/storefront/auth tests, typecheck, i18n checks, builds, complete Go tests/native build, migrations, docreader, and repository validators
+- [x] 5.3 Perform one bounded adversarial review and fix only current blockers
+- [x] 5.4 Start and verify the local application and loopback operations console on the existing ports
+- [ ] 5.5 Commit and push the coherent `main`, wait for existing CI plus application/storefront production deployments, and run non-destructive release smoke checks

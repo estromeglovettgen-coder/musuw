@@ -69,7 +69,7 @@ All four pages use one shared structural contract: title strip (`pb:12`, `mb:8`,
 - **[A forged stored Rerank/KB model could otherwise fail late]** → Validate at the write seam and again at the runtime resolver seam.
 - **[Some native types currently have only one builtin OpenRouter row]** → Show only real catalog rows; do not fabricate choice. Operators can expand the catalog through the existing builtin model configuration workflow.
 - **[Global dark overrides can regress unrelated pages]** → Scope settings fixes to the current visual classes and add browser/computed-style regression assertions for both themes.
-- **[Existing dirty worktree contains other requested changes]** → Edit only overlapping current files, preserve quota/model work, and leave all changes uncommitted and unpublished.
+- **[Existing dirty worktree contains other requested changes]** → Edit only overlapping current files and preserve quota/model work. The user's final release instruction supersedes the earlier local-only handoff: integrate the authorized homepage branch and latest `main`, commit once coherent, then rely on the existing CI and production deployment workflows.
 
 ## Migration Plan
 
