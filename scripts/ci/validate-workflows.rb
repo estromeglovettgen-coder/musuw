@@ -54,7 +54,7 @@ paths = EXPECTED.map { |name| File.join(WORKFLOW_DIR, name) }
 paths.each { |path| fail_contract "missing #{path}" unless File.file?(path) }
 
 documents = paths.to_h { |path| [File.basename(path), parse_yaml(path)] }
-expected_runner = "${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}"
+expected_runner = "ubuntu-24.04"
 documents.each do |name, document|
   assert_hash(document, name)
   assert_trigger(document, name)
@@ -77,7 +77,7 @@ documents.each do |name, document|
     next unless job.is_a?(Hash)
     next if name == "deploy-production.yml"
 
-    fail_contract "#{name}.jobs.#{job_name} must retain the existing runner-variable fallback" unless job["runs-on"] == expected_runner
+    fail_contract "#{name}.jobs.#{job_name} must use the pinned standard GitHub-hosted runner" unless job["runs-on"] == expected_runner
   end
 end
 
@@ -98,7 +98,7 @@ frontend_build = frontend_steps.find { |step| step.is_a?(Hash) && step["name"] =
 fail_contract "frontend build must pin NODE_OPTIONS to a 4096 MiB heap" unless frontend_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
 fail_contract "frontend tests must not inherit the build-only NODE_OPTIONS override" if ci.dig("jobs", "frontend", "env", "NODE_OPTIONS")
 
-expected_npm_cache_policy = "${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}"
+expected_npm_cache_policy = "npm"
 {
   "frontend" => "weknora/frontend/package-lock.json",
   "auth" => "auth/package-lock.json",
@@ -106,13 +106,13 @@ expected_npm_cache_policy = "${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' 
   "repository-contracts" => "package-lock.json"
 }.each do |job_name, dependency_path|
   setup_node = Array(ci.dig("jobs", job_name, "steps")).find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-node@") }
-  fail_contract "self-hosted #{job_name} CI must reuse its persistent npm cache without restoring or uploading a duplicate Actions cache" unless setup_node&.dig("with", "cache") == expected_npm_cache_policy && setup_node&.dig("with", "cache-dependency-path") == dependency_path
+  fail_contract "hosted #{job_name} CI must use the official npm cache" unless setup_node&.dig("with", "cache") == expected_npm_cache_policy && setup_node&.dig("with", "cache-dependency-path") == dependency_path
 end
 
 go_steps = Array(ci.dig("jobs", "go", "steps"))
 setup_go = go_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-go@") }
-expected_go_cache_policy = "${{ vars.MUSUW_ACTIONS_RUNNER == '' }}"
-fail_contract "self-hosted Go CI must reuse its persistent local cache without restoring or uploading a duplicate Actions cache" unless setup_go&.dig("with", "cache") == expected_go_cache_policy && setup_go&.dig("with", "cache-dependency-path") == "weknora/go.sum"
+expected_go_cache_policy = true
+fail_contract "hosted Go CI must use the official module and build cache" unless setup_go&.dig("with", "cache") == expected_go_cache_policy && setup_go&.dig("with", "cache-dependency-path") == "weknora/go.sum"
 
 docreader_steps = Array(ci.dig("jobs", "docreader", "steps"))
 setup_python = docreader_steps.find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-python@") }
@@ -139,7 +139,7 @@ storefront_on = root_key(storefront, "on")
 storefront_workflow_run = storefront_on.fetch("workflow_run", {})
 %w[build deploy].each do |job_name|
   setup_node = Array(storefront.dig("jobs", job_name, "steps")).find { |step| step.is_a?(Hash) && step["uses"].to_s.start_with?("actions/setup-node@") }
-  fail_contract "self-hosted storefront #{job_name} must reuse its persistent npm cache without restoring or uploading a duplicate Actions cache" unless setup_node&.dig("with", "cache") == expected_npm_cache_policy && setup_node&.dig("with", "cache-dependency-path") == "storefront/package-lock.json"
+  fail_contract "hosted storefront #{job_name} must use the official npm cache" unless setup_node&.dig("with", "cache") == expected_npm_cache_policy && setup_node&.dig("with", "cache-dependency-path") == "storefront/package-lock.json"
 end
 fail_contract "storefront deploy must listen for completed CI workflow runs on main" unless storefront_workflow_run.dig("workflows") == ["CI"] && storefront_workflow_run.dig("types") == ["completed"] && storefront_workflow_run.dig("branches") == ["main"]
 fail_contract "storefront deploy must retain a manual workflow_dispatch" unless storefront_on.key?("workflow_dispatch")
@@ -185,14 +185,14 @@ production_deploy = production.dig("jobs", "deploy")
 assert_hash(production_authorize, "deploy-production.yml.jobs.authorize")
 assert_hash(production_build, "deploy-production.yml.jobs.build")
 assert_hash(production_deploy, "deploy-production.yml.jobs.deploy")
-fail_contract "production authorization must remain on the trusted lightweight release runner" unless production_authorize["runs-on"] == "musuw-release"
-fail_contract "production image build must run on the isolated native x64 build runner" unless production_build["runs-on"] == "musuw-build-x64"
+fail_contract "production authorization must run on the pinned standard GitHub-hosted runner" unless production_authorize["runs-on"] == expected_runner
+fail_contract "production image build must run on the pinned standard GitHub-hosted runner" unless production_build["runs-on"] == expected_runner
 fail_contract "production build must follow authorization" unless production_build["needs"] == "authorize"
 fail_contract "production deploy must wait for authorization and immutable images" unless Array(production_deploy["needs"]) == %w[authorize build]
-fail_contract "production deploy must remain on the restricted Mac runner" unless production_deploy["runs-on"] == "musuw-release"
+fail_contract "production deploy must remain on the restricted release runner" unless production_deploy["runs-on"] == "musuw-release"
 fail_contract "production deploy must use its isolated server environment" unless production.dig("jobs", "deploy", "environment") == "server-production"
 fail_contract "production build runner must not receive the production environment" if production_build.key?("environment")
-fail_contract "production package write and artifact read must be scoped to the image-build job" unless production_build["permissions"] == { "actions" => "read", "contents" => "read", "packages" => "write" }
+fail_contract "production package write must be scoped to the image-build job" unless production_build["permissions"] == { "contents" => "read", "packages" => "write" }
 fail_contract "production deploy must receive only read access to GHCR" unless production_deploy["permissions"] == { "contents" => "read", "packages" => "read" }
 fail_contract "production authorization must not receive package write" if production.dig("jobs", "authorize", "permissions", "packages") == "write"
 production_dispatch = production_on.fetch("workflow_dispatch")
@@ -204,15 +204,11 @@ production_text = File.read(File.join(WORKFLOW_DIR, "deploy-production.yml"))
 production_build_steps = Array(production_build["steps"])
 production_deploy_steps = Array(production_deploy["steps"])
 production_authorize_steps = Array(production_authorize["steps"])
-fail_contract "production build must use only inline run steps so the regional runner never pre-downloads an action" unless production_build_steps.all? { |step| step.is_a?(Hash) && step.key?("run") && !step.key?("uses") }
 production_authorize_checkout = production_authorize_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/checkout@") }
-production_source_bundle = production_authorize_steps.find { |step| step.is_a?(Hash) && step["id"] == "source_bundle" }
-production_source_upload = production_authorize_steps.find { |step| step.is_a?(Hash) && step["id"] == "source_artifact" }
-production_source_cleanup = production_authorize_steps.find { |step| step.is_a?(Hash) && step["name"] == "Remove the temporary authorized source bundle" }
 production_build_checkout = production_build_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/checkout@") }
-production_source_archive = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "source" }
+production_build_checkout_assert = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Assert the detached checkout matches the authorized SHA" }
 production_deploy_checkout = production_deploy_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/checkout@") }
-production_node_setup = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "node" }
+production_node_setup = production_build_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/setup-node@") }
 production_native_preflight = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Assert native AMD64 build execution" }
 production_static_build = production_build_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build production browser bundles on native x64" }
 production_buildx = production_build_steps.find { |step| step.is_a?(Hash) && step["id"] == "buildx" }
@@ -224,87 +220,38 @@ fail_contract "production browser build must cap the Node heap below the 4 GB ho
 fail_contract "production authorization must retain its full-history checkout for main ancestry proof" unless production_authorize_checkout&.dig("with", "fetch-depth") == 0 && production_authorize_checkout&.dig("with", "persist-credentials") == true
 expected_authorize_outputs = {
   "release_sha" => "${{ steps.resolve.outputs.release_sha }}",
-  "ci_workflow_run" => "${{ steps.resolve.outputs.ci_workflow_run }}",
-  "source_artifact_id" => "${{ steps.source_artifact.outputs.artifact-id }}",
-  "source_artifact_name" => "${{ steps.source_bundle.outputs.artifact_name }}",
-  "source_artifact_digest" => "${{ steps.source_artifact.outputs.artifact-digest }}",
-  "source_archive_digest" => "${{ steps.source_bundle.outputs.archive_digest }}"
+  "ci_workflow_run" => "${{ steps.resolve.outputs.ci_workflow_run }}"
 }
-fail_contract "production authorization must expose the exact immutable source artifact identity" unless production_authorize["outputs"] == expected_authorize_outputs
-source_bundle_run = production_source_bundle&.fetch("run", "").to_s
-expected_source_projection_excludes = [
-  ":(exclude)weknora/website-docs/**",
-  ":(exclude)weknora/docs/images/**"
-].freeze
-normalized_source_bundle_run = source_bundle_run.gsub(/\\\n[ \t]*/, " ").gsub(/[ \t]+/, " ")
-expected_source_projection_pipeline = 'git archive --format=tar --prefix=musuw-source/ "$RELEASE_SHA" -- . ' \
-  "':(exclude)weknora/website-docs/**' ':(exclude)weknora/docs/images/**' | gzip -n > \"$archive\""
-negative_source_pathspecs = source_bundle_run.scan(/:(?:\([^)]*exclude[^)]*\)|[!\^])[^\s'\"]+/)
-fail_contract "production authorization must create one deterministic exact-SHA production source projection without executing source" unless production_source_bundle&.dig("env", "RELEASE_SHA") == "${{ steps.resolve.outputs.release_sha }}" && source_bundle_run.include?('archive="$bundle_dir/musuw-source.tar.gz"') && normalized_source_bundle_run.include?(expected_source_projection_pipeline) && negative_source_pathspecs == expected_source_projection_excludes && source_bundle_run.include?("shasum -a 256") && source_bundle_run.include?("archive_digest=") && !source_bundle_run.include?("provenance.json")
-%w[weknora/docs/docs.go weknora/internal/assets/asr_test.wav weknora/frontend/packages/xlsx-0.20.2.tgz scripts/weknora-production/lib.sh].each do |required_path|
-  fail_contract "production source projection does not prove retention of #{required_path}" unless source_bundle_run.include?(required_path)
-end
-fail_contract "production source bundle must validate safe members, required inputs, executable mode, size, and ambient tar state before upload" unless source_bundle_run.include?("unset TAR_OPTIONS") && source_bundle_run.include?("tar -tvzf") && source_bundle_run.include?("unsupported member type") && source_bundle_run.include?("scripts/weknora-production/build-static.sh") && source_bundle_run.include?('git ls-tree "$RELEASE_SHA"') && source_bundle_run.include?("100755") && source_bundle_run.include?("268435456")
-fail_contract "production source bundle must clean its temporary tree on validation or output failure without masking the failure" unless source_bundle_run.include?("cleanup_failed_bundle") && source_bundle_run.include?('trap \'cleanup_failed_bundle "$?"\' EXIT') && source_bundle_run.include?('local status="$1"') && source_bundle_run.include?('exit "$status"') && source_bundle_run.include?("outputs could not be published") && source_bundle_run.include?("trap - EXIT")
-fail_contract "production source artifact must use the existing official immutable upload action" unless production_source_upload&.fetch("uses", "").start_with?("actions/upload-artifact@v4") && production_source_upload&.dig("with", "name") == "${{ steps.source_bundle.outputs.artifact_name }}" && production_source_upload&.dig("with", "path") == "${{ steps.source_bundle.outputs.archive_path }}" && production_source_upload&.dig("with", "if-no-files-found") == "error" && production_source_upload&.dig("with", "compression-level") == 0 && production_source_upload&.dig("with", "retention-days") == 7
-source_cleanup_run = production_source_cleanup&.fetch("run", "").to_s
-fail_contract "production authorization must always remove its uploaded source bundle staging tree" unless production_source_cleanup&.fetch("if", nil) == "always()" && production_source_cleanup&.dig("env", "BUNDLE_DIR") == "${{ steps.source_bundle.outputs.bundle_dir }}" && source_cleanup_run.include?('"$RUNNER_TEMP"/musuw-source-bundle.*') && source_cleanup_run.include?('find "$BUNDLE_DIR" -depth -delete')
-fail_contract "production build must not depend on Git or codeload for source delivery" if production_build_checkout || JSON.generate(production_build).match?(/git fetch|codeload\.github\.com|\/tarball\//)
-fail_contract "production build must materialize the authorized SHA only from its same-run Actions artifact" unless production_source_archive&.dig("env", "RELEASE_SHA") == "${{ needs.authorize.outputs.release_sha }}" && production_source_archive&.dig("env", "SOURCE_ARTIFACT_ID") == "${{ needs.authorize.outputs.source_artifact_id }}" && production_source_archive&.dig("env", "SOURCE_ARTIFACT_NAME") == "${{ needs.authorize.outputs.source_artifact_name }}" && production_source_archive&.dig("env", "SOURCE_ARTIFACT_DIGEST") == "${{ needs.authorize.outputs.source_artifact_digest }}" && production_source_archive&.dig("env", "SOURCE_ARCHIVE_DIGEST") == "${{ needs.authorize.outputs.source_archive_digest }}" && production_source_archive&.dig("env", "GH_TOKEN") == "${{ github.token }}"
-source_archive_run = production_source_archive&.fetch("run", "").to_s
-fail_contract "production artifact metadata must bind id, name, current run, expiry, size, and outer digest" unless source_archive_run.include?("https://api.github.com/repos/estromeglovettgen-coder/musuw/actions/artifacts/$SOURCE_ARTIFACT_ID") && source_archive_run.include?("$GITHUB_RUN_ID") && source_archive_run.include?("expired") && source_archive_run.include?("size_in_bytes") && source_archive_run.include?("SOURCE_ARTIFACT_DIGEST")
-fail_contract "production artifact download must refresh a trusted short-lived redirect and never forward the API token" unless source_archive_run.include?("/actions/artifacts/$SOURCE_ARTIFACT_ID/zip") && source_archive_run.include?("for attempt in 1 2 3") && source_archive_run.include?("--dump-header") && source_archive_run.include?("tolower(line)") && source_archive_run.include?(".blob.core.windows.net") && source_archive_run.scan("Authorization: Bearer $GH_TOKEN").length == 2 && !source_archive_run.match?(/curl[^\n]*(?:--location(?:-trusted)?|\s-L(?:\s|$))/)
-normalized_source_archive_run = source_archive_run.gsub(/\\\n[ \t]*/, " ").gsub(/[ \t]+/, " ")
-fail_contract "production source API requests must retain their short 15s connect and 30s total bounds" unless source_archive_run.scan("--connect-timeout 15").length == 3 && source_archive_run.scan("--max-time 30").length == 2
-fail_contract "production blob transfer must use four parallel non-overlapping HTTP/1.1 range requests" unless source_archive_run.include?("--http1.1") && source_archive_run.include?("for segment in 0 1 2 3") && source_archive_run.include?("-H \"Range: bytes=$range_start-$range_end\"") && source_archive_run.include?("test \"$blob_status\" = 206") && source_archive_run.include?("content-range") && source_archive_run.include?("content-length") && source_archive_run.include?("segments_ok=true") && source_archive_run.include?("wait \"$segment_pid\"") && source_archive_run.include?("${artifact_zip}.part.0") && source_archive_run.include?("${artifact_zip}.part.3")
-fail_contract "production blob transfer must use the exact bounded slow-link policy" unless source_archive_run.scan("--max-time 900").length == 1 && source_archive_run.scan("--speed-limit 1024").length == 1 && source_archive_run.scan("--speed-time 120").length == 1 && normalized_source_archive_run.include?("--connect-timeout 15 --max-time 900 --speed-limit 1024 --speed-time 120")
-fail_contract "production source token must be restricted to fixed canonical API requests" unless source_archive_run.include?("test \"$GITHUB_REPOSITORY\" = estromeglovettgen-coder/musuw") && source_archive_run.scan("https://api.github.com/repos/estromeglovettgen-coder/musuw/actions/artifacts/$SOURCE_ARTIFACT_ID").length == 2
-fail_contract "production source requests must ignore persistent runner curl configuration" unless source_archive_run.scan("curl -q ").length == 3
-fail_contract "production source archive must reject a mutable or malformed release identity" unless source_archive_run.include?("^[0-9a-f]{40}$")
-fail_contract "production source artifact must validate one ZIP entry plus outer and inner SHA-256 digests" unless source_archive_run.include?("zipinfo") && source_archive_run.include?("musuw-source.tar.gz") && source_archive_run.include?("sha256sum") && source_archive_run.include?("SOURCE_ARCHIVE_DIGEST") && source_archive_run.include?("unzip -p")
-fail_contract "production source archive must validate one safe top-level tree before extraction" unless source_archive_run.include?("archive-entries") && source_archive_run.include?("--strip-components=1") && source_archive_run.include?("top-level")
-fail_contract "production source archive must reject special archive members before extraction" unless source_archive_run.include?("unset TAR_OPTIONS") && source_archive_run.include?("tar -tvzf") && source_archive_run.include?("unsupported member type")
-%w[.nvmrc auth/package-lock.json weknora/frontend/package-lock.json weknora/docs/docs.go weknora/internal/assets/asr_test.wav weknora/frontend/packages/xlsx-0.20.2.tgz integration/weknora-production/Dockerfile.app.runtime integration/weknora-production/Dockerfile.frontend .github/buildkitd.production.toml scripts/weknora-production/build-static.sh scripts/weknora-production/lib.sh].each do |required_path|
-  fail_contract "production source archive does not fail closed without #{required_path}" unless source_archive_run.include?(required_path)
-end
-fail_contract "production source archive must preserve executable release inputs" unless source_archive_run.include?("test -x") && source_archive_run.include?("scripts/weknora-production/build-static.sh")
-fail_contract "production source archive must stage under RUNNER_TEMP and replace only the exact repository workspace" unless source_archive_run.include?("$RUNNER_TEMP/") && source_archive_run.include?('expected_workspace="$runner_workspace/${GITHUB_REPOSITORY##*/}"') && source_archive_run.include?('test "$workspace" = "$expected_workspace"') && source_archive_run.include?("$GITHUB_WORKSPACE")
-fail_contract "production source replacement must preserve its prior workspace until post-move validation commits" unless source_archive_run.include?("previous_workspace_owned=false") && source_archive_run.include?('test ! -e "$previous_workspace" && test ! -L "$previous_workspace"') && source_archive_run.include?('if [ "$workspace_committed" != true ] && [ "$previous_workspace_owned" = true ]') && source_archive_run.index("workspace_swapped=true").to_i < source_archive_run.index("workspace_committed=true").to_i
-fail_contract "production build must materialize source before Node or image construction" unless production_build_steps.index(production_source_archive).to_i < production_build_steps.index(production_node_setup).to_i && production_build_steps.index(production_source_archive).to_i < production_build_steps.index(production_images).to_i
+fail_contract "production authorization must expose only the approved release and CI identities" unless production_authorize["outputs"] == expected_authorize_outputs
+fail_contract "production authorization must not retain the regional source-artifact transport" if JSON.generate(production_authorize).match?(/source_bundle|source_artifact|upload-artifact/)
+fail_contract "production build must check out the exact authorized SHA without persisted credentials" unless production_build_checkout&.dig("with", "ref") == "${{ needs.authorize.outputs.release_sha }}" && production_build_checkout&.dig("with", "persist-credentials") == false
+fail_contract "production build must not retain the regional artifact downloader" if JSON.generate(production_build).match?(/SOURCE_ARTIFACT|SOURCE_ARCHIVE|blob\.core\.windows\.net|Range: bytes|actions\/artifacts/)
 fail_contract "production deploy must retain the exact-SHA Git checkout required by the source-manifest seam" unless production_deploy_checkout&.dig("with", "ref") == "${{ needs.authorize.outputs.release_sha }}" && production_deploy_checkout&.dig("with", "fetch-depth") == 0
-node_setup_run = production_node_setup&.fetch("run", "").to_s
-fail_contract "production browser build must select the exact checked-in Node version from the native runner toolcache" unless node_setup_run.include?(".nvmrc") && node_setup_run.include?('$RUNNER_TOOL_CACHE/node/$node_version/x64/bin') && node_setup_run.include?("node\" --version") && node_setup_run.include?("process.arch") && node_setup_run.include?("npm\" --version") && node_setup_run.include?("$GITHUB_PATH")
-node_path_export = 'export PATH="$node_bin:$PATH"'
-fail_contract "production Node validation must expose the selected toolcache directory before invoking npm's env-based Node launcher" unless node_setup_run.include?(node_path_export) && node_setup_run.index(node_path_export).to_i < node_setup_run.index('"$node_bin/npm" --version').to_i && node_setup_run.index(node_path_export).to_i < node_setup_run.index('>> "$GITHUB_PATH"').to_i
-fail_contract "production Node selection must not download another runtime" if node_setup_run.match?(%r{https?://|\bcurl\b|\bwget\b})
+node_cache_paths = production_node_setup&.dig("with", "cache-dependency-path").to_s
+fail_contract "production browser build must use official Node setup for the exact checked-in version and lockfiles" unless production_node_setup&.dig("with", "node-version-file") == ".nvmrc" && production_node_setup&.dig("with", "cache") == "npm" && node_cache_paths.include?("auth/package-lock.json") && node_cache_paths.include?("weknora/frontend/package-lock.json")
 fail_contract "production build must fail closed unless runner and Docker daemon are native x64" unless production_native_preflight&.dig("env", "RUNNER_ARCH") == "${{ runner.arch }}" && production_native_preflight["run"].to_s.include?("docker info") && production_native_preflight["run"].to_s.include?("x86_64")
-fail_contract "production build must fail closed unless the regional Docker Hub mirror is configured" unless production_native_preflight["run"].to_s.include?("mirror.ccs.tencentyun.com") && production_native_preflight["run"].to_s.include?("RegistryConfig.Mirrors")
-native_preflight_run = production_native_preflight&.fetch("run", "").to_s
-fail_contract "production Buildx client state must use the exact persistent runner-workspace directory with private permissions" unless native_preflight_run.include?('buildx_config="$RUNNER_WORKSPACE/.musuw-production-buildx-config"') && native_preflight_run.include?('test ! -L "$buildx_config"') && native_preflight_run.include?('test -O "$buildx_config"') && native_preflight_run.include?('chmod 700 "$buildx_config"') && native_preflight_run.include?("stat -c '%a'") && native_preflight_run.include?('printf \'BUILDX_CONFIG=%s\\n\' "$buildx_config" >> "$GITHUB_ENV"')
-fail_contract "production native preflight must run before dependency installation or construction" unless production_build_steps.index(production_native_preflight).to_i < production_build_steps.index(production_node_setup).to_i && production_build_steps.index(production_native_preflight).to_i < production_build_steps.index(production_static_build).to_i
+checkout_assert_run = production_build_checkout_assert&.fetch("run", "").to_s
+fail_contract "production build must assert the checked-out authorized SHA before construction" unless production_build_checkout_assert&.dig("env", "RELEASE_SHA") == "${{ needs.authorize.outputs.release_sha }}" && checkout_assert_run.include?('test "$(git rev-parse HEAD)" = "$RELEASE_SHA"')
+fail_contract "production exact-SHA checkout must be asserted before dependency installation or construction" unless production_build_steps.index(production_build_checkout).to_i < production_build_steps.index(production_build_checkout_assert).to_i && production_build_steps.index(production_build_checkout_assert).to_i < production_build_steps.index(production_node_setup).to_i && production_build_steps.index(production_node_setup).to_i < production_build_steps.index(production_static_build).to_i
 image_build_run = production_images&.fetch("run", "").to_s
-fail_contract "production application build must consume the existing regional apt mirror seam" unless image_build_run.include?("--build-arg APT_MIRROR_ARG=mirrors.cloud.tencent.com")
+fail_contract "production hosted build must not route through a regional apt mirror" if image_build_run.include?("APT_MIRROR_ARG") || production_text.include?("mirrors.cloud.tencent.com")
 fail_contract "production workflow must not install QEMU emulation" if JSON.generate(production_build).include?("setup-qemu")
 buildx_setup_run = production_buildx&.fetch("run", "").to_s
-fail_contract "production Buildx must recover an interrupted fixed builder, retain its cache state, then recreate it from checked-in config" unless production_buildx&.dig("env", "BUILDER_NAME") == "musuw-production-native-amd64-v1" && buildx_setup_run.include?('test "$BUILDX_CONFIG" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config"') && buildx_setup_run.include?('docker buildx inspect --builder "$BUILDER_NAME"') && buildx_setup_run.include?('docker buildx rm --force --keep-state "$BUILDER_NAME"') && buildx_setup_run.index('docker buildx rm --force --keep-state "$BUILDER_NAME"').to_i < buildx_setup_run.index("docker buildx create").to_i && buildx_setup_run.include?("docker buildx create") && buildx_setup_run.include?('--name "$BUILDER_NAME"') && buildx_setup_run.include?("--driver docker-container") && buildx_setup_run.include?("--buildkitd-config .github/buildkitd.production.toml") && buildx_setup_run.include?("docker buildx inspect --builder \"$BUILDER_NAME\" --bootstrap")
+expected_builder_name = "musuw-production-${{ github.run_id }}-${{ github.run_attempt }}"
+fail_contract "production Buildx must create a fresh job-scoped native builder from checked-in config" unless production_buildx&.dig("env", "BUILDER_NAME") == expected_builder_name && production_buildx&.dig("env", "DOCKER_CONFIG") == "${{ runner.temp }}/musuw-production-docker-config" && buildx_setup_run.include?("docker buildx create") && buildx_setup_run.include?('--name "$BUILDER_NAME"') && buildx_setup_run.include?("--driver docker-container") && buildx_setup_run.include?("--buildkitd-config .github/buildkitd.production.toml") && buildx_setup_run.include?("docker buildx inspect --builder \"$BUILDER_NAME\" --bootstrap") && !buildx_setup_run.include?("--keep-state") && !buildx_setup_run.include?("BUILDX_CONFIG")
 registry_login_run = production_registry_login&.fetch("run", "").to_s
 fail_contract "production GHCR login must use the job token over stdin in an isolated Docker config" unless production_registry_login&.dig("env", "DOCKER_CONFIG") == "${{ runner.temp }}/musuw-production-docker-config" && production_registry_login&.dig("env", "GHCR_USERNAME") == "${{ github.actor }}" && production_registry_login&.dig("env", "GHCR_TOKEN") == "${{ github.token }}" && registry_login_run.include?("docker login ghcr.io") && registry_login_run.include?("--password-stdin")
 cleanup_run = production_build_cleanup&.fetch("run", "").to_s
-fail_contract "production builder cleanup must always log out and remove the container while retaining named cache and persistent Buildx client state" unless production_build_cleanup&.fetch("if", "").to_s == "always()" && production_build_cleanup&.dig("env", "DOCKER_CONFIG") == "${{ runner.temp }}/musuw-production-docker-config" && cleanup_run.include?('test "${BUILDX_CONFIG:-}" = "$RUNNER_WORKSPACE/.musuw-production-buildx-config"') && cleanup_run.include?("docker logout ghcr.io") && cleanup_run.include?('docker buildx rm --force --keep-state "$BUILDER_NAME"') && cleanup_run.include?('find "$DOCKER_CONFIG" -depth -delete') && !cleanup_run.include?('find "$BUILDX_CONFIG"')
+fail_contract "production builder cleanup must always log out and remove the job-scoped builder and Docker config" unless production_build_cleanup&.fetch("if", "").to_s == "always()" && production_build_cleanup&.dig("env", "BUILDER_NAME") == expected_builder_name && production_build_cleanup&.dig("env", "DOCKER_CONFIG") == "${{ runner.temp }}/musuw-production-docker-config" && cleanup_run.include?("docker logout ghcr.io") && cleanup_run.include?('docker buildx rm --force "$BUILDER_NAME"') && cleanup_run.include?('find "$DOCKER_CONFIG" -depth -delete') && !cleanup_run.include?("--keep-state") && !cleanup_run.include?("BUILDX_CONFIG")
 fail_contract "production cleanup must run after both image builds" unless production_build_steps.index(production_images).to_i < production_build_steps.index(production_build_cleanup).to_i
-production_build_steps.select { |step| step.fetch("run", "").to_s.include?("docker buildx") }.each do |step|
-  fail_contract "every production Buildx step must bind or assert the isolated persistent BUILDX_CONFIG: #{step["name"]}" unless step["run"].to_s.include?("BUILDX_CONFIG")
-end
+fail_contract "production build must not retain persistent Buildx client state" if JSON.generate(production_build).include?("BUILDX_CONFIG") || JSON.generate(production_build).include?("--keep-state")
 buildkit_config_path = File.join(ROOT, ".github", "buildkitd.production.toml")
 fail_contract "production BuildKit GC configuration is missing" unless File.file?(buildkit_config_path)
 buildkit_config = File.read(buildkit_config_path)
-fail_contract "production BuildKit cache must enable GC with bounded disk and concurrency" unless buildkit_config.include?("gc = true") && buildkit_config.include?('maxUsedSpace = "10GB"') && buildkit_config.include?('minFreeSpace = "12GB"') && buildkit_config.include?("max-parallelism = 2")
-fail_contract "production BuildKit must pull Docker Hub bases through the regional mirror" unless buildkit_config.include?('[registry."docker.io"]') && buildkit_config.include?('mirrors = ["mirror.ccs.tencentyun.com"]')
+fail_contract "production BuildKit must enable job-scoped GC with bounded concurrency" unless buildkit_config.include?("gc = true") && buildkit_config.include?("max-parallelism = 2")
+fail_contract "production BuildKit must not retain self-hosted disk floors or regional mirrors" if buildkit_config.match?(/maxUsedSpace|minFreeSpace|registry\.|mirror/i)
 daemon_config_path = File.join(ROOT, ".github", "docker-daemon.production-builder.json")
-fail_contract "production builder Docker daemon configuration is missing" unless File.file?(daemon_config_path)
-daemon_config = JSON.parse(File.read(daemon_config_path))
-fail_contract "production builder daemon must route bootstrap pulls through the regional mirror" unless daemon_config["registry-mirrors"] == ["https://mirror.ccs.tencentyun.com"]
-fail_contract "production builder daemon must not claim GC authority over the Docker-container cache" if daemon_config.key?("builder")
+fail_contract "production must not retain a self-hosted Docker daemon mirror configuration" if File.exist?(daemon_config_path)
 expected_image_outputs = {
   "app_digest" => "${{ steps.images.outputs.app_digest }}",
   "app_ref" => "${{ steps.images.outputs.app_ref }}",
@@ -315,7 +262,7 @@ fail_contract "production build must expose validated immutable image digests an
 fail_contract "production build must execute exactly two sequential native Buildx pushes with metadata files" unless image_build_run.scan("docker buildx build").length == 2 && image_build_run.scan("--platform linux/amd64").length == 2 && image_build_run.scan("--push").length == 2 && image_build_run.scan("--metadata-file").length == 2 && image_build_run.scan('--builder "$BUILDER_NAME"').length == 2
 fail_contract "production image pushes must retain private-repository minimum provenance and the exact GitHub run attempt builder identity" unless image_build_run.include?('type=provenance,mode=min,inline-only=true,builder-id=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT') && image_build_run.include?('[[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]') && image_build_run.scan('--attest "$provenance"').length == 2
 fail_contract "production image pushes must retain source and revision OCI labels" unless image_build_run.scan("org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY").length == 2 && image_build_run.scan("org.opencontainers.image.revision=$RELEASE_SHA").length == 2
-%w[VERSION_ARG=0.7.2 COMMIT_ID_ARG= BUILD_TIME_ARG=production-native-x64-runner GO_VERSION_ARG=go1.26 REVISION_ARG=].each do |build_arg|
+%w[VERSION_ARG=0.7.2 COMMIT_ID_ARG= BUILD_TIME_ARG=production-github-hosted-amd64 GO_VERSION_ARG=go1.26 REVISION_ARG=].each do |build_arg|
   fail_contract "production image build is missing #{build_arg}" unless image_build_run.include?(build_arg)
 end
 fail_contract "production image build must bind both exact immutable tags" unless image_build_run.include?("musuw-app") && image_build_run.include?("musuw-frontend") && image_build_run.include?('$app_repository:$RELEASE_SHA') && image_build_run.include?('$frontend_repository:$RELEASE_SHA')
@@ -323,7 +270,7 @@ fail_contract "production image metadata and remote immutable ref must strictly 
 fail_contract "production digest validator must fail explicitly inside command substitution instead of relying on Bash errexit" unless image_build_run.include?('test -f "$metadata_path" || return 1') && image_build_run.include?('digest="$(node - "$metadata_path" "$expected_tag" <<\'NODE\'') && image_build_run.include?(')" || return 1') && image_build_run.include?('docker buildx imagetools inspect "$repository@$digest" >/dev/null || return 1')
 fail_contract "production remote immutable tag must resolve to the same validated digest and fail closed" unless image_build_run.include?('docker buildx imagetools inspect "$expected_tag"') && image_build_run.include?("--format '{{json .Manifest}}'") && image_build_run.include?("manifest.digest") && image_build_run.include?('test "$tag_digest" = "$digest" || return 1')
 fail_contract "production image build must validate both image digests before publishing job outputs" unless image_build_run.include?("app_digest") && image_build_run.include?("frontend_digest") && image_build_run.include?("app_ref") && image_build_run.include?("frontend_ref")
-fail_contract "production image build must not upload a separate registry cache over the constrained uplink" if image_build_run.include?("cache-from") || image_build_run.include?("cache-to") || image_build_run.include?("mode=max")
+fail_contract "production image build must not publish a separate registry cache" if image_build_run.include?("cache-from") || image_build_run.include?("cache-to") || image_build_run.include?("mode=max")
 fail_contract "production deploy must consume the build job's immutable image refs" unless production_pin_images&.dig("env", "APP_IMAGE") == "${{ needs.build.outputs.app_ref }}" && production_pin_images&.dig("env", "FRONTEND_IMAGE") == "${{ needs.build.outputs.frontend_ref }}"
 fail_contract "production deploy must not rebuild images or browser bundles" if JSON.generate(production_deploy).match?(/build-push-action|setup-buildx-action|Build production browser bundles/)
 fail_contract "production image build must not reference any production secret" if JSON.generate(production_build).match?(/secrets\.|MUSUW_PRODUCTION_SSH|WEKNORA_DEPLOY_SSH|KNOWN_HOSTS/)

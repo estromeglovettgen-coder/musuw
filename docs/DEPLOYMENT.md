@@ -43,27 +43,19 @@ configuration mismatch.
    exact SHA,
    builds only `storefront/`, and deploys it to `musuw-site`. It then checks
    both public domains and the documented product handoff.
-4. The production workflow receives the same successful CI result. The trusted
-   `musuw-release` runner performs the lightweight exact-SHA authorization, then
-   a separate native x86_64 Linux runner with the exact `musuw-build-x64` label
-   verifies runner and Docker daemon architecture plus the required regional
-   Docker Hub mirror. The authorization job packages that already-proven SHA as
-   one deterministic production-source projection in `musuw-source.tar.gz`,
-   excluding only the two checked-in documentation asset trees that no build or
-   release consumer reads. It validates the projection and uploads it through
-   GitHub's existing immutable Actions Artifact service with a seven-day
-   retention window. The build job intentionally contains no `uses:` step, so
-   the regional runner does not pre-download Action bundles before its first
-   command. It reads the same-run artifact through GitHub's official REST/blob
-   path, validates its run/id/name/size plus both the outer ZIP and inner source
-   digests, then safely stages the one source tree without Git or codeload. It
-   selects the exact `.nvmrc` Node release already in the runner toolcache, then
-   builds the static bundles and app/frontend images, pushes them to GHCR, and
-   exports their validated immutable digests. The build runner receives no
-   production secret or SSH input. Only after it succeeds does `musuw-release`
-   upload the allowlisted server source bundle and those exact refs through the
-   restricted SSH gate. A manual full-SHA dispatch is retained for an exact
-   rerun; tag and branch-name releases are rejected.
+4. The production workflow receives the same successful CI result. Its
+   authorization and native AMD64 image-build jobs run on `ubuntu-24.04`.
+   Authorization proves that the selected full SHA belongs to canonical
+   `origin/main` and has successful CI. The build then uses official
+   `actions/checkout` for exactly that SHA with persisted credentials disabled,
+   verifies `HEAD`, installs the `.nvmrc` Node release with official
+   `actions/setup-node`, and builds through global Debian and Go endpoints. It
+   pushes the app and frontend images to GHCR and validates their immutable
+   digests. The hosted build receives no production secret or SSH input. Only
+   after it succeeds does the final `musuw-release` job upload the allowlisted
+   server source bundle and those exact refs through the restricted SSH gate. A
+   manual full-SHA dispatch is retained for an exact rerun; tag and branch-name
+   releases are rejected.
 5. The server receives a short-lived GitHub token over the restricted stdin
    channel, logs in to GHCR using a temporary Docker config, pulls the exact
    digests, recreates only `app` and `frontend` with `--no-build`, and checks
@@ -109,12 +101,11 @@ handoff. A Cloudflare command succeeding without these probes is not enough.
 
 ## Production server
 
-The native build job receives the selected full SHA, three browser-visible
+The hosted build job receives the selected full SHA, three browser-visible
 repository variables required by the auth shell, and a job-only `GITHUB_TOKEN`
-with `actions: read`, `contents: read`, and `packages: write`. Artifact read is
-needed only to obtain the source bundle created by the authorization job in the
-same workflow run. It is not attached to the `server-production`
-Environment. The deploy job receives the restricted `musuw-deploy` SSH key,
+with `contents: read` and `packages: write`. It is not attached to the
+`server-production` Environment. The deploy job receives the restricted
+`musuw-deploy` SSH key,
 pinned host keys, the existing public server environment file, the same three
 repository variables used to generate `auth-public.env`, the validated image
 refs, and a separate job-only token with `packages: read`. The server owns all
@@ -156,154 +147,40 @@ changes the Cloudflare Worker.
 
 ## Required repository settings
 
-Production authorization and deploy remain on the trusted `musuw-release`
-runner. Only the heavy image-build job uses the exact `musuw-build-x64` label.
-That runner must be a persistent native x86_64 Linux host with Docker and
-Buildx, and the job fails closed unless `runner.arch`, `uname`, and the Docker
-daemon all report x64/AMD64. It never installs QEMU. The Tokyo production host
-must never be registered as a GitHub Actions runner.
+All CI jobs, Storefront build/deploy, and production authorize/build jobs are
+pinned to `ubuntu-24.04`. The repository variable `MUSUW_ACTIONS_RUNNER` has
+been deleted and is no longer required. Only the final production deploy job
+runs on `musuw-release`; the Tokyo production host must never be registered as
+a GitHub Actions runner.
 
-This path does not require GitHub-hosted minutes, Docker Build Cloud, or another
-build provider. CI and storefront keep the existing
-`MUSUW_ACTIONS_RUNNER || ubuntu-latest` routing and MUST NOT use
-`musuw-build-x64`; the new 4 GB builder is reserved for production construction.
-The build runner must not store or receive the production SSH key, host data,
-server environment secrets, or Tokyo credentials.
+Production authorization retains the exact-SHA ancestry and successful-CI
+proof. Production construction checks out that exact SHA with official
+`actions/checkout`, disables persisted checkout credentials, and verifies
+`HEAD` before installing dependencies or pushing images. There is no production
+source Artifact, custom ranged downloader, Git/codeload workaround, or Beijing
+builder dependency.
 
-The workflow creates the fixed Docker CLI builder
-`musuw-production-native-amd64-v1`. Its Docker-container volume preserves
-ordinary layers plus Go module/compiler cache mounts across releases. Every job
-uses the preinstalled official Buildx CLI and a private, persistent
-`$RUNNER_WORKSPACE/.musuw-production-buildx-config` client-state directory. If
-an interrupted prior job left the fixed builder registered, setup first removes
-that exact builder with `--keep-state`; it then recreates the container from the
-current checked-in config. Normal cleanup removes it the same way while keeping
-both the client-state directory and same-name cache volume.
-The checked-in BuildKit
-configuration enables GC with a 10 GB `maxUsedSpace` threshold and a 12 GB
-`minFreeSpace` floor, and caps BuildKit at two parallel steps. The browser build
-runs before the image builds with a 3072 MiB Node heap ceiling so
-the 4 GB host retains headroom for Docker. If the builder or cache is absent,
-the same workflow performs a correct cold build.
-
-The dedicated Tencent build host must install
-`.github/docker-daemon.production-builder.json` as `/etc/docker/daemon.json`
-after `dockerd --validate`, then restart Docker while the runner is idle. The
-daemon uses Tencent Cloud's official regional mirror for the BuildKit bootstrap
-image; `.github/buildkitd.production.toml` uses the same mirror for Dockerfile
-base images. The native preflight rejects a host that lacks the daemon mirror.
-This regional mirror is an infrastructure prerequisite for this Tencent-hosted
-builder, not a new application dependency or a fallback build provider.
-
-The application build also consumes Tencent Cloud's documented regional
-dependency endpoints instead of reaching globally routed defaults from the
-Beijing host. The workflow passes the Dockerfile's existing `APT_MIRROR_ARG`
-seam as `mirrors.cloud.tencent.com`; the builder stage uses
-`https://mirrors.tencent.com/go/` for all Go module fetches and
-`sum.golang.google.cn` for Go's authenticated checksum database endpoint in
-mainland China. Checksum verification remains enabled. This covers the pinned
-`migrate` tool and the application's complete module graph without adding a
-custom proxy, copying an older prebuilt tool binary, or changing the module
-versions recorded by `go.mod` and `go.sum`.
-
-The Beijing build job deliberately does not run Git smart HTTP or reference a
-GitHub Action. GitHub Runner prepares every referenced Action before executing
-the first inline command, and the regional Action-archive failure therefore
-cannot be fixed by replacing checkout alone. Authorization
-and the `origin/main` ancestry proof remain on `musuw-release`, where the full
-checkout is required and available. It packages an exact-SHA production source
-projection with `git archive`, deterministic gzip, a fixed root, a 256 MiB cap,
-safe member types, required build inputs, executable-mode proof, and an inner
-SHA-256. The only negative pathspecs are
-`:(exclude)weknora/website-docs/**` and
-`:(exclude)weknora/docs/images/**`; build and release consumers such as
-`weknora/docs/docs.go`, the ASR test fixture, the vendored frontend XLSX
-package, and `scripts/weknora-production/lib.sh` remain mandatory. The
-single-file bundle is uploaded once with the official `upload-artifact@v4`
-action, compression disabled, and seven-day retention; it is a bounded transport
-record, not a permanent source backup or a second release authority.
-
-The first full-tree transfer produced a 38.31 MiB outer artifact and the Beijing
-route delivered it intermittently at roughly 15 KiB/s, exhausting all three
-300-second blob attempts before Node or BuildKit started. The exact projection
-reduces the producer-equivalent deterministic inner archive from 38.33 MiB to
-11.41 MiB without
-removing a build input. Blob transfers therefore retain a 15-second connect
-bound but use four concurrent, non-overlapping HTTP/1.1 byte ranges per fresh
-redirect. Each range must return `206`, the exact `Content-Range` and
-`Content-Length`, and its exact local byte count before the parts are joined and
-the outer size and SHA-256 are checked. Every range uses the same 900-second
-total bound and aborts when throughput stays below 1 KiB/s for 120 seconds.
-Metadata and fresh-redirect API calls keep their 30-second total bounds. Any
-failed range clears the complete partial ZIP and starts the next attempt with a
-new redirect; three fresh attempts remain fail-bounded to well below the build
-job's 90-minute ceiling.
-
-The build job uses `actions: read` to query that exact artifact's metadata from
-the fixed `api.github.com` repository endpoint. It binds artifact id and name to
-the current workflow run, rejects expired or oversized metadata, and requires
-the REST digest to match the upload output. Each bounded attempt obtains a fresh
-short-lived download redirect, accepts only an HTTPS `*.blob.core.windows.net`
-authority, and sends no GitHub Authorization header to that blob host. Each
-credential-free range request receives the 900-second/1-KiB-per-second
-slow-link policy; the credentialed GitHub API requests retain their shorter
-bounds. The joined ZIP size and outer SHA-256 must match metadata, the ZIP must
-contain exactly `musuw-source.tar.gz`, and that inner file must match the
-authorization job's SHA-256 before extraction. Extraction occurs in an isolated
-runner-temporary directory with ambient tar options disabled, rejects an unsafe
-tree and special members, preserves executable modes, validates required build
-inputs, and replaces only the exact repository workspace while retaining the
-prior tree until post-move checks pass. This avoids Git, codeload, third-party
-mirrors, custom proxies, new storage services, and a second source authority on
-the regional build path. GitHub's documented self-hosted-runner and Artifact
-domains must remain allowed for runner operation.
-
-Node is not installed during a release. The job reads `.nvmrc`, requires the
-matching x64 Node and npm executables under `RUNNER_TOOL_CACHE`, validates their
-versions and architecture, prepends that directory to the current step's
-`PATH` before invoking npm's `/usr/bin/env node` launcher, and adds the same
-directory to `GITHUB_PATH` for later steps.
-Docker and Buildx are likewise persistent host prerequisites; feature checks
-for checked-in daemon configuration, metadata output, attestations, and
-keep-state cleanup fail before dependency work when the host drifts.
+The hosted build validates native AMD64 Docker, installs the `.nvmrc` Node
+version with official `actions/setup-node`, and uses global Debian and Go
+sources. It does not require Tencent Docker daemon, BuildKit, APT or Go mirrors,
+preinstalled Node, or persistent runner toolcache state. BuildKit state is
+job-scoped and removed during cleanup; no cross-run BuildKit cache is retained.
 
 GHCR login uses the job token only over stdin and writes it to a
-runner-temporary `DOCKER_CONFIG`; Buildx configuration, state, and logs instead
-use the separate owner-only `BUILDX_CONFIG`, which never stores the registry
-credential. Activation confirmed that the former action left no same-name
-builder registration or container and retained exactly the same-name state
-volume expected by Buildx. Always-running cleanup logs out, removes the current
-fixed builder container while preserving that named volume, and only then
-deletes the temporary Docker configuration. Each of the two explicit Buildx pushes
-retains the previous tags, labels, arguments, native platform, and
-private-repository `mode=min,inline-only=true` provenance with the exact Actions
-run-attempt URL as builder identity. Build metadata must name the expected
-immutable tag and yield matching descriptor and registry digests; the canonical
-digest and its remote tag are both resolved from GHCR and must match before
-deploy receives it. The digest validator returns failures explicitly at every
-check because Bash `errexit` is not a safe failure boundary inside a function
-invoked through command substitution.
-
-Do not export a separate `mode=max` registry cache on this host: its constrained
-uplink would upload intermediate cache records in addition to the release. The
-two immutable GHCR images are still pushed normally, and GHCR skips blobs it
-already has by content digest. The CLI path creates no optional Docker Action
-build-record artifact, while job logs, image digests, provenance, and the
-release manifest stay available. The app Dockerfile keeps stable apt/tool and runtime-package layers
-ahead of the release SHA. Whenever `MUSUW_ACTIONS_RUNNER` selects the persistent
-self-hosted runner, Node CI and storefront jobs use its ordinary persistent npm
-cache and Go CI uses its local module/compiler caches instead of restoring and
-uploading duplicate Actions caches. The official npm and Go Actions caches remain
-enabled only for the `ubuntu-latest` fallback, whose filesystem is disposable.
+runner-temporary `DOCKER_CONFIG`. Each of the two explicit Buildx pushes keeps
+the existing immutable tags, labels, build arguments, native platform and
+provenance. Build metadata must name the expected immutable tag and yield
+matching descriptor and registry digests; the canonical digest and its remote
+tag are resolved from GHCR and must match before deploy receives them. The
+hosted build must not store or receive the production SSH key, host data,
+server environment secrets, or Tokyo credentials.
 
 Keep the following values in GitHub settings or on the server, never in checked-in
 files:
 
 - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- workflow `GITHUB_TOKEN` package-write permission for the native build job
+- workflow `GITHUB_TOKEN` package-write permission for the hosted build job
   and package-read permission for the deploy job
-- repository variable `MUSUW_ACTIONS_RUNNER=musuw-release` while CI/storefront
-  must avoid the exhausted GitHub-hosted allowance
 - repository variables `VITE_SUPABASE_URL`,
   `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_WEKNORA_OAUTH_CLIENT_ID`; these are
   browser-visible public-client values, never server/admin credentials

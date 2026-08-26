@@ -42,7 +42,7 @@ jobs:
           github.event.workflow_run.repository.full_name == 'estromeglovettgen-coder/musuw'
         )
       )
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       release_sha: ${{ steps.resolve.outputs.release_sha }}
@@ -114,7 +114,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: storefront/package-lock.json
       - name: Install storefront dependencies
         run: npm ci --prefix storefront --ignore-scripts
@@ -135,7 +135,7 @@ jobs:
     name: Deploy storefront Worker
     needs: build
     environment: storefront-production
-    runs-on: ${{ vars.MUSUW_ACTIONS_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out the exact revision
@@ -154,7 +154,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: ${{ vars.MUSUW_ACTIONS_RUNNER == '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: storefront/package-lock.json
       - name: Install Wrangler from the locked storefront manifest
         run: npm ci --prefix storefront --ignore-scripts
