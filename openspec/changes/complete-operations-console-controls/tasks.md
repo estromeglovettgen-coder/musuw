@@ -34,4 +34,4 @@
 - [x] 6.1 Run focused and full backend/frontend tests, typecheck, builds, scripts, repository contracts, and strict OpenSpec validation
 - [x] 6.2 Perform authenticated browser acceptance for matrix data, policy rejection, TEST/PRODUCTION/TEST switching, selector stacking, and KB/chat dark/light surfaces
 - [x] 6.3 Perform one bounded adversarial review and fix only current blockers
-- [ ] 6.4 Commit and push `main`, wait for CI and application/storefront deployments, run release smoke checks, and leave both loopback consoles healthy with TEST on 4186 and PRODUCTION on 4187
+- [x] 6.4 Commit and push `main`, wait for CI and application/storefront deployments, run release smoke checks, and leave both loopback consoles healthy with TEST on 4186 and PRODUCTION on 4187
