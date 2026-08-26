@@ -3,12 +3,21 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
 import { List } from "@phosphor-icons/react/List";
 import { X } from "@phosphor-icons/react/X";
-import { footerGroups, navItems } from "../data/homeContent";
+import { footerGroups } from "../data/homeContent";
 import { getStorefrontCopy } from "../i18n";
+import { HOMEPAGE_NAVIGATION } from "../planPresentation";
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";
 import { readStorefrontAuthentication } from "../storefrontAuthStatus";
 
 const defaultCopy = getStorefrontCopy("en");
+const navigationLabels = Object.freeze({
+  en: Object.freeze(["Features", "Examples", "Pricing", "Security", "Contact"]),
+  zh: Object.freeze(["功能", "场景", "定价", "安全", "联系"]),
+});
+
+function publicNavigationLabels(copy) {
+  return copy?.pricing?.currencyCode === "CNY" ? navigationLabels.zh : navigationLabels.en;
+}
 
 export function Brand({ copy = defaultCopy }) {
   return (
@@ -74,12 +83,13 @@ export function ProductEntryLinks({ authenticated = false, copy = defaultCopy })
   );
 }
 
-export function SiteHeader({ copy = defaultCopy, navigation = navItems }) {
+export function SiteHeader({ copy = defaultCopy, navigation = HOMEPAGE_NAVIGATION }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
   const menuButtonRef = useRef(null);
   const reduceMotion = useReducedMotion();
+  const labels = publicNavigationLabels(copy);
 
   useEffect(() => {
     let mounted = true;
@@ -130,7 +140,7 @@ export function SiteHeader({ copy = defaultCopy, navigation = navItems }) {
         <nav className="desktop-nav" aria-label={copy.nav.primaryAria}>
           {navigation.map((item, index) => (
             <a key={item.href} href={item.href}>
-              {copy.nav.items[index].label}
+              {labels[index] ?? item.label}
             </a>
           ))}
         </nav>
@@ -162,7 +172,7 @@ export function SiteHeader({ copy = defaultCopy, navigation = navItems }) {
           >
             {navigation.map((item, index) => (
               <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
-                {copy.nav.items[index].label}
+                {labels[index] ?? item.label}
                 <ArrowUpRight size={18} aria-hidden="true" />
               </a>
             ))}
