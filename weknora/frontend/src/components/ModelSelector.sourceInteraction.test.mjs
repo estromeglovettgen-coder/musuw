@@ -5,6 +5,7 @@ import test from 'node:test'
 const selector = readFileSync(new URL('./ModelSelector.vue', import.meta.url), 'utf8')
 const composer = readFileSync(new URL('./Input-field.vue', import.meta.url), 'utf8')
 const finalClosure = readFileSync(new URL('../assets/musuw-final-contract-closure.css', import.meta.url), 'utf8')
+const themeClosure = readFileSync(new URL('../assets/musuw-final-theme-closure.css', import.meta.url), 'utf8')
 const lucide = readFileSync(new URL('../assets/musuw-reference-lucide-precision.css', import.meta.url), 'utf8')
 
 test('chat selector preserves the source hover flyout and viewport placement contract', () => {
@@ -158,4 +159,25 @@ test('consumer scene catalog uses the reference CustomSelect surface', () => {
   assert.doesNotMatch(selector, /consumer-pro|PRO/)
   const lockedRule = selector.match(/\.visual-model-selector__consumer-option\.is-locked\s*\{([^}]*)\}/)?.[1] || ''
   assert.doesNotMatch(lockedRule, /opacity:/)
+})
+
+test('consumer scene dropdown raises its open selector above sibling rows in dark and light themes', () => {
+  // Every selector receives a dark-theme stacking context.  The active root
+  // must therefore opt into a strictly higher layer; otherwise a later row
+  // paints over the open menu even though the menu itself has z-index: 50.
+  assert.match(selector, /:class="\{[\s\S]*'is-open':\s*[^,}]*consumerSelectOpen[\s\S]*\}/)
+  assert.match(themeClosure, /\.visual-model-selector--consumer-scene,\s*\.visual-general-settings__select\s*\{[\s\S]*z-index:\s*2;/)
+  assert.match(themeClosure, /\.visual-model-selector--consumer-scene\.is-open\s*\{[\s\S]*z-index:\s*3;/)
+  assert.match(themeClosure, /\.visual-model-selector--consumer-scene\.is-open\s*\{[\s\S]*z-index:\s*3;[\s\S]*\}/)
+})
+
+test('consumer scene dropdown flips above when the settings scroll viewport would clip it', () => {
+  assert.match(selector, /ref="consumerDropdownRef"/)
+  assert.match(selector, /'is-above':\s*consumerSelectPlacement === 'above'/)
+  assert.match(selector, /const updateConsumerSelectPlacement = \(\) =>/)
+  assert.match(selector, /closest\('\.visual-settings-content'\)/)
+  assert.match(selector, /Math\.min\(window\.innerHeight, containerRect\?\.bottom \?\? window\.innerHeight\)/)
+  assert.match(selector, /availableBelow < dropdownHeight && availableAbove > availableBelow/)
+  assert.match(selector, /\.visual-model-selector__consumer-dropdown\.is-above\s*\{[\s\S]*top:\s*auto;[\s\S]*bottom:\s*calc\(100% \+ 6px\);/)
+  assert.match(selector, /transform-origin:\s*bottom right;/)
 })

@@ -309,6 +309,23 @@ func liteOperationsAdminRouteAllowed(method, path string) bool {
 		return true
 	}
 
+	const consumerModelPolicy = "/api/v1/system/admin/consumer-model-policy"
+	if path == consumerModelPolicy {
+		return method == http.MethodGet
+	}
+	if method == http.MethodPut && strings.HasPrefix(path, consumerModelPolicy+"/") {
+		parts := strings.Split(strings.TrimPrefix(path, consumerModelPolicy+"/"), "/")
+		if len(parts) != 1 {
+			return false
+		}
+		for _, scene := range []string{"rag", "rerank", "wiki", "vision", "asr"} {
+			if parts[0] == scene {
+				return true
+			}
+		}
+		return false
+	}
+
 	const tenantPrefix = "/api/v1/system/admin/tenants/"
 	if strings.HasPrefix(path, tenantPrefix) {
 		parts := strings.Split(strings.TrimPrefix(path, tenantPrefix), "/")

@@ -93,7 +93,12 @@ scripts/musuw-admin stop
 
 ## TEST / PRODUCTION 切换
 
-环境在进程启动时锁定，浏览器内不能切换 datasource：
+环境仍在单个进程启动时锁定；运营台顶部环境菜单提供一键切换。切换会在本机
+通过受保护的 `POST /admin-api/environment` 重启运营台进程，旧进程先退出、
+新进程只打开目标环境的一个只读数据库连接池，浏览器等待目标环境健康后自动
+刷新并重新建立本机会话。切换期间不会同时打开 TEST 与 PRODUCTION 两套数据源。
+
+TEST 可以直接切回；切到 PRODUCTION 时页面会明确要求输入下面的确认短语：
 
 ```sh
 scripts/musuw-admin test
@@ -102,13 +107,36 @@ MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE \
   scripts/musuw-admin production
 ```
 
-这里的解锁短语表示运营台将读取真实生产业务数据，不代表 Paddle Live
+这里的解锁短语只表示运营台将读取真实生产业务数据，不代表 Paddle Live
 provider 已获批或允许用于结账。
 
 PRODUCTION 还要求本机 ignored 文件
 `.runtime/musuw-admin/production.env` 提供独立数据库、后端和供应商配置。
-缺文件、缺解锁短语或数据库不是只读时都 fail closed；TEST 凭据不会自动
-复制到 PRODUCTION。自动测试不得写生产数据。
+在真正重启前，服务还会先调用现有启动器的受控
+`prepare-production-tunnel` seam，验证生产端口确实由本启动器拥有：使用
+`musuw-tokyo`（可用 `MUSUW_ADMIN_PRODUCTION_SSH_TARGET` 覆盖）固定受限 SSH
+alias，强制 BatchMode 与严格校验 known_hosts，不要求 root 登录；通过该受限用户
+执行 `sudo -n docker inspect` 获取固定 `weknora-v072-production-postgres` 容器
+IPv4，再由同一用户通过 ControlMaster 建立 loopback forward。即使端口已有 TCP
+监听，也不会把陌生进程当作生产隧道；归属校验或隧道准备失败会立即返回明确错误，
+不会先返回 202 再让页面等待超时。
+随后才用无凭据的短探针确认目标 PostgreSQL 端口和后端 `/health` 可达。缺文件、
+缺解锁短语、切换请求校验失败或数据库不是只读时都
+fail closed；
+切换子进程只继承必要的本机非密钥启动参数，TEST 凭据、数据库地址和供应商
+secret 不会自动复制到 PRODUCTION。命令行仍可作为一键切换失败时的本机回退，
+自动测试不得写生产数据。
+
+隧道的本地端口默认取 `MUSUW_ADMIN_DATABASE_URL` 中的端口（未指定时回退到
+历史端口 `15433`），远端 PostgreSQL 端口默认 `5432`。如现有 SSH/Compose
+配置使用其他端口，只能通过非密钥的
+`MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT` 或 `MUSUW_ADMIN_PRODUCTION_DB_PORT`
+覆盖。切回 TEST 或执行 `scripts/musuw-admin stop` 会通过同一 ControlMaster
+关闭隧道；不会启动第二个运营台进程或数据库池。
+
+如果目标进程在旧进程退出后未能通过 `/healthz`，启动器会保留目标失败日志，
+停止失败进程，并最多直接恢复切换前的目标一次；恢复失败才会报告运营台不可用，
+不会递归重启或反复构建。
 
 ## 写操作与安全边界
 

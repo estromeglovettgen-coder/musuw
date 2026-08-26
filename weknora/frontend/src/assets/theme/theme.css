@@ -582,4 +582,36 @@
   --td-brand-color-active: var(--td-brand-color-5);
   --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 28%, transparent);
   --td-brand-color-disabled: #3d5d8a;
+
+  /* WikiBrowser/graph still consumes TDesign semantic tokens.  The generic
+     dark token bridge intentionally excludes graph tabs, so provide the same
+     dark surfaces locally instead of letting TDesign fall back to its light
+     defaults (white canvas, text and borders). */
+  --td-bg-color-page: var(--musuw-canvas);
+  --td-bg-color-sidebar: var(--musuw-sidebar);
+  --td-bg-color-settings-modal: var(--musuw-sidebar);
+  --td-bg-color-container: var(--musuw-surface);
+  --td-bg-color-container-select: var(--musuw-surface);
+  --td-bg-color-container-hover: var(--musuw-surface-hover);
+  --td-bg-color-container-active: #282a30;
+  --td-bg-color-secondarycontainer: #202227;
+  --td-bg-color-secondarycontainer-hover: #282a30;
+  --td-bg-color-secondarycontainer-active: #30333a;
+  --td-bg-color-component: #25272c;
+  --td-bg-color-component-hover: #2d3036;
+  --td-bg-color-component-active: #35383f;
+  --td-bg-color-component-disabled: #202227;
+  --td-component-stroke: var(--musuw-line);
+  --td-component-border: var(--musuw-line-strong);
+  --td-font-gray-1: var(--musuw-ink);
+  --td-font-gray-2: var(--musuw-muted-strong);
+  --td-font-gray-3: var(--musuw-muted);
+  --td-font-gray-4: #858585;
+  --td-text-color-primary: var(--musuw-ink);
+  --td-text-color-secondary: var(--musuw-muted-strong);
+  --td-text-color-placeholder: var(--musuw-muted);
+  --td-text-color-disabled: var(--td-font-gray-4);
+  --td-text-color-anti: #ffffff;
+  --td-text-color-brand: var(--td-brand-color);
+  --td-text-color-link: var(--td-brand-color);
 }

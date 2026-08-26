@@ -1,5 +1,5 @@
 <template>
-  <div class="visual-model-selector" :class="{ 'visual-model-selector--chat': mode === 'chat', 'visual-model-selector--consumer-scene': isConsumerSceneSelector }">
+  <div class="visual-model-selector" :class="{ 'visual-model-selector--chat': mode === 'chat', 'visual-model-selector--consumer-scene': isConsumerSceneSelector, 'is-open': isConsumerSceneSelector && consumerSelectOpen }">
     <template v-if="mode === 'chat'">
       <section
         ref="chatPanelRef"
@@ -221,7 +221,14 @@
       </button>
 
       <Transition name="visual-model-selector__consumer-fade">
-        <div v-if="consumerSelectOpen" class="visual-model-selector__consumer-dropdown" role="listbox" :aria-label="placeholderText">
+        <div
+          v-if="consumerSelectOpen"
+          ref="consumerDropdownRef"
+          class="visual-model-selector__consumer-dropdown"
+          :class="{ 'is-above': consumerSelectPlacement === 'above' }"
+          role="listbox"
+          :aria-label="placeholderText"
+        >
           <div v-if="loading" class="visual-model-selector__consumer-state">{{ $t('common.loading') }}</div>
           <div v-else-if="status === 'error'" class="visual-model-selector__consumer-state">{{ $t('model.loadFailed') }}</div>
           <template v-else-if="selectorModels.length">
@@ -397,7 +404,9 @@ const selectorModels = computed<ModelSelectorModel[]>(() => {
 })
 
 const consumerSelectRef = ref<HTMLElement | null>(null)
+const consumerDropdownRef = ref<HTMLElement | null>(null)
 const consumerSelectOpen = ref(false)
+const consumerSelectPlacement = ref<'below' | 'above'>('below')
 const consumerSelectedLabel = computed(() => {
   const selected = selectorModels.value.find(model => model.id === props.selectedModelId)
   return selected ? modelDisplayName(selected) : placeholderText.value
@@ -447,9 +456,33 @@ const handleCatalogModelChange = (value: string) => {
   }
   emit('update:selectedModelId', value)
 }
+const updateConsumerSelectPlacement = () => {
+  if (!consumerSelectOpen.value) return
+  const root = consumerSelectRef.value
+  const dropdown = consumerDropdownRef.value
+  const control = root?.querySelector<HTMLElement>('.visual-model-selector__consumer-control')
+  if (!root || !dropdown || !control) return
+
+  const controlRect = control.getBoundingClientRect()
+  const container = root.closest('.visual-settings-content')
+  const containerRect = container?.getBoundingClientRect()
+  const topBoundary = Math.max(0, containerRect?.top ?? 0)
+  const bottomBoundary = Math.min(window.innerHeight, containerRect?.bottom ?? window.innerHeight)
+  const dropdownHeight = Math.min(dropdown.scrollHeight, 256)
+  const availableBelow = bottomBoundary - controlRect.bottom - 6
+  const availableAbove = controlRect.top - topBoundary - 6
+  consumerSelectPlacement.value = availableBelow < dropdownHeight && availableAbove > availableBelow
+    ? 'above'
+    : 'below'
+}
 const toggleConsumerSelect = () => {
   if (props.disabled) return
-  consumerSelectOpen.value = !consumerSelectOpen.value
+  const willOpen = !consumerSelectOpen.value
+  consumerSelectOpen.value = willOpen
+  if (willOpen) {
+    consumerSelectPlacement.value = 'below'
+    nextTick(updateConsumerSelectPlacement)
+  }
 }
 const closeConsumerSelect = () => { consumerSelectOpen.value = false }
 const selectConsumerModel = (value: string) => {
@@ -640,11 +673,15 @@ onMounted(() => {
     loadModels()
   }
   window.addEventListener('resize', updateSubmenuPlacement)
+  window.addEventListener('resize', updateConsumerSelectPlacement)
+  document.addEventListener('scroll', updateConsumerSelectPlacement, true)
   document.addEventListener('click', handleConsumerOutsideClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateSubmenuPlacement)
+  window.removeEventListener('resize', updateConsumerSelectPlacement)
+  document.removeEventListener('scroll', updateConsumerSelectPlacement, true)
   document.removeEventListener('click', handleConsumerOutsideClick)
 })
 </script>
@@ -751,6 +788,11 @@ onUnmounted(() => {
 .visual-model-selector__consumer-fade-leave-to {
   opacity: 0;
   transform: scale(.95);
+}
+.visual-model-selector__consumer-dropdown.is-above {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform-origin: bottom right;
 }
 .visual-model-selector__consumer-state {
   padding: 8px 12px;

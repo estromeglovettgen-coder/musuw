@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -7,14 +7,24 @@ import test from 'node:test'
 import {
   clampPage,
   clampPageSize,
+  environmentSwitchDecision,
+  environmentSwitchPreflight,
+  environmentSwitchReachability,
+  prepareProductionTunnel,
+  productionTunnelPreparationOptions,
+  environmentSwitchSpawnOptions,
+  isEnvironmentSwitchRequest,
+  modelPolicyRequestPlan,
   isPublicConsoleAsset,
   isSafeOperationsPath,
   parseEnvFile,
+  productionDatabaseConnectionString,
   readKeychainSecret,
   readLangfuseData,
   readPaddleData,
   readR2Inventory,
   readSupabaseAdminData,
+  switchEnvironmentProcessEnv,
   unavailableProviderState,
 } from './musuw-admin-server.mjs'
 
@@ -34,6 +44,382 @@ test('pagination is finite and bounded', () => {
   assert.equal(clampPage('-1'), 1)
   assert.equal(clampPageSize('500'), 100)
   assert.equal(clampPageSize('0'), 25)
+})
+
+test('production database loader takes its password from the protected read-only secret file', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'musuw-admin-production-secret-'))
+  const passwordPath = join(directory, 'production-ro-password')
+  try {
+    writeFileSync(passwordPath, 'authoritative-password', { mode: 0o600 })
+    chmodSync(passwordPath, 0o600)
+    const connectionString = productionDatabaseConnectionString({
+      MUSUW_ADMIN_DATABASE_URL: 'postgresql://musuw_operations_ro:stale-password@127.0.0.1:25432/WeKnora?sslmode=disable',
+    }, { passwordPath })
+    const parsed = new URL(connectionString)
+    assert.equal(parsed.username, 'musuw_operations_ro')
+    assert.equal(parsed.password, 'authoritative-password')
+    assert.equal(parsed.hostname, '127.0.0.1')
+    assert.equal(parsed.port, '25432')
+
+    chmodSync(passwordPath, 0o644)
+    assert.throws(() => productionDatabaseConnectionString({
+      MUSUW_ADMIN_DATABASE_URL: 'postgresql://musuw_operations_ro:stale-password@127.0.0.1:25432/WeKnora',
+    }, { passwordPath }), /permissions are unsafe/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('environment switch decisions fail closed and require explicit production confirmation', () => {
+  assert.deepEqual(environmentSwitchDecision({ currentTarget: 'test', target: 'production' }), {
+    ok: false,
+    status: 403,
+    error: 'production switch confirmation required',
+  })
+  assert.deepEqual(environmentSwitchDecision({ currentTarget: 'test', target: 'production', confirmation: 'I_UNDERSTAND_THIS_IS_LIVE' }), {
+    ok: true,
+    target: 'production',
+  })
+  assert.deepEqual(environmentSwitchDecision({ currentTarget: 'production', target: 'production', confirmation: 'I_UNDERSTAND_THIS_IS_LIVE' }), {
+    ok: false,
+    status: 409,
+    error: 'target environment is already selected',
+  })
+  assert.deepEqual(environmentSwitchDecision({ currentTarget: 'test', target: 'staging' }), {
+    ok: false,
+    status: 400,
+    error: 'target must be test or production',
+  })
+})
+
+test('environment switch route is an exact POST-only local control endpoint', () => {
+  assert.equal(isEnvironmentSwitchRequest('POST', '/admin-api/environment'), true)
+  assert.equal(isEnvironmentSwitchRequest('GET', '/admin-api/environment'), false)
+  assert.equal(isEnvironmentSwitchRequest('POST', '/admin-api/environment/'), false)
+  assert.equal(isEnvironmentSwitchRequest('POST', '/api/v1/system/admin/environment'), false)
+})
+
+test('model policy route exposes only the five fixed safe boundaries', () => {
+  assert.deepEqual(modelPolicyRequestPlan('GET', '/admin-api/model-policy'), {
+    method: 'GET',
+    upstreamPath: '/api/v1/system/admin/consumer-model-policy',
+  })
+  assert.deepEqual(modelPolicyRequestPlan('PUT', '/admin-api/model-policy/rag'), {
+    method: 'PUT',
+    scene: 'rag',
+    upstreamPath: '/api/v1/system/admin/consumer-model-policy/rag',
+  })
+  for (const scene of ['rag', 'rerank', 'wiki', 'vision', 'asr']) {
+    assert.equal(modelPolicyRequestPlan('PUT', `/admin-api/model-policy/${scene}`)?.scene, scene)
+  }
+  assert.equal(modelPolicyRequestPlan('PUT', '/admin-api/model-policy/chat'), null)
+  assert.equal(modelPolicyRequestPlan('PUT', '/admin-api/model-policy/embedding'), null)
+  assert.equal(modelPolicyRequestPlan('POST', '/admin-api/model-policy/rag'), null)
+  assert.equal(modelPolicyRequestPlan('GET', '/admin-api/model-policy/rag'), null)
+  assert.equal(modelPolicyRequestPlan('GET', '/admin-api/model-policy/'), null)
+})
+
+test('environment switch child receives only non-secret runtime inputs', () => {
+  const source = {
+    PATH: '/usr/local/bin',
+    HOME: '/Users/operator',
+    MUSUW_ADMIN_PORT: '4186',
+    MUSUW_ADMIN_TEST_DB_HOST: '127.0.0.1',
+    MUSUW_ADMIN_TEST_DB_PORT: '15432',
+    MUSUW_ADMIN_TEST_BACKEND_URL: 'http://127.0.0.1:18090',
+    MUSUW_ADMIN_DATABASE_URL: 'postgres://must-not-cross-targets',
+    MUSUW_ADMIN_BACKEND_URL: 'https://must-not-cross-targets',
+    MUSUW_PADDLE_API_KEY: 'must-not-cross-targets',
+    NODE_OPTIONS: '--require=must-not-cross-targets',
+  }
+  const testEnvironment = switchEnvironmentProcessEnv('test', source)
+  assert.deepEqual(testEnvironment, {
+    PATH: '/usr/local/bin',
+    HOME: '/Users/operator',
+    MUSUW_ADMIN_TEST_DB_HOST: '127.0.0.1',
+    MUSUW_ADMIN_TEST_DB_PORT: '15432',
+    MUSUW_ADMIN_TEST_BACKEND_URL: 'http://127.0.0.1:18090',
+    MUSUW_ADMIN_PORT: '4186',
+  })
+
+  const productionEnvironment = switchEnvironmentProcessEnv('production', source)
+  assert.equal(productionEnvironment.MUSUW_ADMIN_PRODUCTION_UNLOCK, 'I_UNDERSTAND_THIS_IS_LIVE')
+  assert.equal('MUSUW_ADMIN_DATABASE_URL' in productionEnvironment, false)
+  assert.equal('MUSUW_ADMIN_BACKEND_URL' in productionEnvironment, false)
+  assert.equal('MUSUW_PADDLE_API_KEY' in productionEnvironment, false)
+  assert.equal('NODE_OPTIONS' in productionEnvironment, false)
+})
+
+test('environment switch preflight requires an isolated runtime for each target', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'musuw-admin-switch-'))
+  try {
+    assert.deepEqual(environmentSwitchPreflight('test', { repoRoot: directory }), {
+      ok: false,
+      status: 503,
+      error: 'TEST runtime is not configured',
+    })
+    assert.deepEqual(environmentSwitchPreflight('production', { repoRoot: directory }), {
+      ok: false,
+      status: 503,
+      error: 'PRODUCTION runtime is not configured',
+    })
+
+    const testRuntime = join(directory, '.runtime', 'weknora')
+    const productionRuntime = join(directory, '.runtime', 'musuw-admin')
+    mkdirSync(testRuntime, { recursive: true })
+    mkdirSync(productionRuntime, { recursive: true })
+    writeFileSync(join(testRuntime, 'candidate.env'), 'DB_NAME=test\n')
+    writeFileSync(join(testRuntime, 'paddle-sandbox.env'), 'MUSUW_PADDLE_ENVIRONMENT=sandbox\n')
+    writeFileSync(join(productionRuntime, 'production.env'), 'MUSUW_ADMIN_DATABASE_URL=postgres://db\nMUSUW_ADMIN_BACKEND_URL=http://backend\n')
+    assert.deepEqual(environmentSwitchPreflight('test', { repoRoot: directory }), { ok: true, target: 'test' })
+    assert.deepEqual(environmentSwitchPreflight('production', { repoRoot: directory }), { ok: true, target: 'production' })
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('environment switch reachability fails before spawn when the target database is unavailable', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'musuw-admin-reachability-'))
+  try {
+    const testRuntime = join(directory, '.runtime', 'weknora')
+    const productionRuntime = join(directory, '.runtime', 'musuw-admin')
+    mkdirSync(testRuntime, { recursive: true })
+    mkdirSync(productionRuntime, { recursive: true })
+    writeFileSync(join(testRuntime, 'candidate.env'), 'DB_NAME=test\nDB_USER=operator\nDB_PASSWORD=ignored\n')
+    writeFileSync(join(testRuntime, 'paddle-sandbox.env'), 'MUSUW_PADDLE_ENVIRONMENT=sandbox\n')
+    writeFileSync(join(productionRuntime, 'production.env'), 'MUSUW_ADMIN_DATABASE_URL=postgresql://operator:ignored@db.example.invalid:25432/WeKnora\nMUSUW_ADMIN_BACKEND_URL=https://backend.example.invalid\n')
+
+    const unavailable = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      prepareTunnel: async () => ({ ok: true }),
+      tcpProbe: async () => ({ ok: false }),
+      backendProbe: async () => ({ ok: true }),
+    })
+    assert.deepEqual(unavailable, {
+      ok: false,
+      status: 503,
+      error: 'PRODUCTION database is unavailable; check the configured database tunnel and retry',
+    })
+
+    const backendUnavailable = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      prepareTunnel: async () => ({ ok: true }),
+      tcpProbe: async () => ({ ok: true }),
+      backendProbe: async () => ({ ok: false }),
+    })
+    assert.deepEqual(backendUnavailable, {
+      ok: false,
+      status: 503,
+      error: 'PRODUCTION backend is unavailable; check the configured backend and retry',
+    })
+
+    const reachable = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      prepareTunnel: async () => ({ ok: true }),
+      tcpProbe: async () => ({ ok: true }),
+      backendProbe: async () => ({ ok: true }),
+    })
+    assert.deepEqual(reachable, { ok: true, target: 'production' })
+
+    const overridePorts = []
+    const overrideReachability = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      sourceEnv: { MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT: '26543' },
+      prepareTunnel: async () => ({ ok: true }),
+      tcpProbe: async ({ port }) => {
+        overridePorts.push(port)
+        return { ok: true }
+      },
+      backendProbe: async () => ({ ok: true }),
+    })
+    assert.deepEqual(overrideReachability, { ok: true, target: 'production' })
+    assert.deepEqual(overridePorts, [26543])
+
+    let probes = 0
+    let preparations = 0
+    const tunnelReady = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      tcpProbe: async () => ({ ok: ++probes > 0 }),
+      backendProbe: async () => ({ ok: true }),
+      prepareTunnel: async () => {
+        preparations += 1
+        return { ok: true }
+      },
+    })
+    assert.deepEqual(tunnelReady, { ok: true, target: 'production' })
+    assert.equal(preparations, 1)
+    assert.equal(probes, 1)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('production reachability never trusts a TCP listener before tunnel ownership is verified', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'musuw-admin-tunnel-ownership-'))
+  try {
+    const productionRuntime = join(directory, '.runtime', 'musuw-admin')
+    mkdirSync(productionRuntime, { recursive: true })
+    writeFileSync(join(productionRuntime, 'production.env'), 'MUSUW_ADMIN_DATABASE_URL=postgresql://operator:ignored@127.0.0.1:25432/WeKnora\nMUSUW_ADMIN_BACKEND_URL=https://backend.example.invalid\n')
+
+    let databaseProbes = 0
+    const stranger = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      prepareTunnel: async () => ({
+        ok: false,
+        status: 503,
+        error: 'PRODUCTION tunnel port is already in use by an unowned listener',
+      }),
+      tcpProbe: async () => {
+        databaseProbes += 1
+        return { ok: true }
+      },
+      backendProbe: async () => ({ ok: true }),
+    })
+    assert.deepEqual(stranger, {
+      ok: false,
+      status: 503,
+      error: 'PRODUCTION tunnel port is already in use by an unowned listener',
+    })
+    assert.equal(databaseProbes, 0)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('production reachability verifies the owned tunnel before database and backend probes', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'musuw-admin-tunnel-order-'))
+  try {
+    const productionRuntime = join(directory, '.runtime', 'musuw-admin')
+    mkdirSync(productionRuntime, { recursive: true })
+    writeFileSync(join(productionRuntime, 'production.env'), 'MUSUW_ADMIN_DATABASE_URL=postgresql://operator:ignored@127.0.0.1:25432/WeKnora\nMUSUW_ADMIN_BACKEND_URL=https://backend.example.invalid\n')
+
+    const events = []
+    const reachable = await environmentSwitchReachability('production', {
+      repoRoot: directory,
+      prepareTunnel: async () => {
+        events.push('tunnel')
+        return { ok: true }
+      },
+      tcpProbe: async () => {
+        events.push('database')
+        return { ok: true }
+      },
+      backendProbe: async () => {
+        events.push('backend')
+        return { ok: true }
+      },
+    })
+    assert.deepEqual(reachable, { ok: true, target: 'production' })
+    assert.deepEqual(events, ['tunnel', 'database', 'backend'])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('environment switch spawn uses fixed script arguments and no shell', () => {
+  const plan = environmentSwitchSpawnOptions({
+    target: 'production',
+    repoRoot: '/repo',
+    port: 4186,
+    sourceEnv: { PATH: '/bin', HOME: '/home/operator' },
+  })
+  assert.equal(plan.command, '/repo/scripts/musuw-admin')
+  assert.deepEqual(plan.args, ['production'])
+  assert.equal(plan.options.cwd, '/repo')
+  assert.equal(plan.options.detached, true)
+  assert.equal(plan.options.stdio, 'ignore')
+  assert.equal(plan.options.shell, undefined)
+  assert.equal(plan.options.env.MUSUW_ADMIN_PRODUCTION_UNLOCK, 'I_UNDERSTAND_THIS_IS_LIVE')
+})
+
+test('production tunnel preparation uses a fixed no-shell launcher and clean non-secret environment', () => {
+  const plan = productionTunnelPreparationOptions({
+    repoRoot: '/repo',
+    sourceEnv: {
+      PATH: '/bin',
+      HOME: '/home/operator',
+      MUSUW_ADMIN_PRODUCTION_SSH_TARGET: 'musuw-tokyo',
+      MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT: '25432',
+      MUSUW_ADMIN_PRODUCTION_DB_PORT: '5432',
+      MUSUW_ADMIN_PRODUCTION_CONTAINER: 'weknora-v072-production-postgres',
+      MUSUW_ADMIN_DATABASE_URL: 'postgres://must-not-cross-targets',
+      MUSUW_ADMIN_PLATFORM_KEY: 'must-not-cross-targets',
+    },
+  })
+  assert.equal(plan.command, '/repo/scripts/musuw-admin')
+  assert.deepEqual(plan.args, ['prepare-production-tunnel'])
+  assert.equal(plan.options.cwd, '/repo')
+  assert.equal(plan.options.shell, false)
+  assert.equal(plan.options.env.MUSUW_ADMIN_PRODUCTION_SSH_TARGET, 'musuw-tokyo')
+  assert.equal(plan.options.env.MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT, '25432')
+  assert.equal(plan.options.env.MUSUW_ADMIN_PRODUCTION_DB_PORT, '5432')
+  assert.equal(plan.options.env.MUSUW_ADMIN_PRODUCTION_CONTAINER, 'weknora-v072-production-postgres')
+  assert.equal('MUSUW_ADMIN_DATABASE_URL' in plan.options.env, false)
+  assert.equal('MUSUW_ADMIN_PLATFORM_KEY' in plan.options.env, false)
+})
+
+test('production tunnel preparation reports only a fixed safe error', () => {
+  const calls = []
+  const result = prepareProductionTunnel({
+    repoRoot: '/repo',
+    sourceEnv: { PATH: '/bin', HOME: '/home/operator' },
+    executor: (command, args, options) => {
+      calls.push({ command, args, options })
+      throw new Error('private SSH output must not escape')
+    },
+  })
+  assert.deepEqual(result, {
+    ok: false,
+    status: 503,
+    error: 'PRODUCTION tunnel could not be prepared; check the configured SSH alias and retry',
+  })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].options.shell, false)
+})
+
+test('admin launcher keeps the historical production tunnel safety contract', () => {
+  const source = readFileSync(new URL('./musuw-admin', import.meta.url), 'utf8')
+  assert.match(source, /production_ssh_target_default=musuw-tokyo/)
+  assert.match(source, /production_container_default=weknora-v072-production-postgres/)
+  assert.match(source, /StrictHostKeyChecking=yes/)
+  assert.match(source, /BatchMode=yes/)
+  assert.match(source, /ExitOnForwardFailure=yes/)
+  assert.match(source, /-M -S \"\$ssh_control_socket\" -f -N/)
+  assert.match(source, /-L \"127\.0\.0\.1:\$\{tunnel_port\}:\$\{container_ip\}:\$\{remote_db_port\}\"/)
+  assert.match(source, /require_pinned_ssh_target/)
+  assert.match(source, /sudo -n docker inspect/)
+  assert.match(source, /safe_ssh_target/)
+  assert.match(source, /safe_container_name/)
+  assert.match(source, /prepare-production-tunnel\)/)
+  assert.match(source, /stop_tunnel/)
+  assert.match(source, /env -i/)
+  assert.doesNotMatch(source, /StrictHostKeyChecking=no/)
+})
+
+test('an occupied production port is accepted only for the validated launcher-owned tunnel', () => {
+  const source = readFileSync(new URL('./musuw-admin', import.meta.url), 'utf8')
+  const occupiedStart = source.indexOf('if tcp_port_is_busy')
+  const occupiedEnd = source.indexOf('  rm -f "$ssh_control_socket"', occupiedStart)
+  const occupiedBranch = source.slice(occupiedStart, occupiedEnd)
+  assert.match(occupiedBranch, /existing_port/)
+  assert.match(occupiedBranch, /ssh .* -S "\$ssh_control_socket" -O check "\$ssh_target"/)
+  assert.match(occupiedBranch, /require_pinned_ssh_target "\$ssh_target"/)
+  assert.match(occupiedBranch, /discover_production_container_ip "\$ssh_target" "\$container"/)
+  assert.match(occupiedBranch, /return 0/)
+  assert.match(occupiedBranch, /production tunnel port .*already in use/)
+})
+
+test('launcher has a one-shot rollback path when target startup health fails', () => {
+  const source = readFileSync(new URL('./musuw-admin', import.meta.url), 'utf8')
+  assert.match(source, /previous_target=/)
+  assert.match(source, /restore_previous_target\(\)/)
+  assert.match(source, /wait_for_health; then[\s\S]*restore_previous_target "\$previous_target"/)
+  assert.doesNotMatch(source, /restore_previous_target[\s\S]*start_console "\$previous_target"/)
+})
+
+test('environment switch detaches the restart child so the old server can exit', () => {
+  const source = readFileSync(new URL('./musuw-admin-server.mjs', import.meta.url), 'utf8')
+  assert.match(source, /child\.unref\(\)/)
 })
 
 test('an unimplemented official provider never becomes available from credential presence alone', () => {
@@ -139,6 +525,13 @@ test('production provider credentials never fall back to plaintext runtime envir
   }
 })
 
+test('production operations runtime is authoritative and cannot be overridden by the parent process environment', () => {
+  const source = readFileSync(new URL('./musuw-admin-server.mjs', import.meta.url), 'utf8')
+  const productionBranch = source.slice(source.indexOf("if (target === 'production')"), source.indexOf('const candidate ='))
+  assert.match(productionBranch, /const runtime = parseEnvFile\(runtimePath\)/)
+  assert.doesNotMatch(productionBranch, /\.\.\.process\.env/)
+})
+
 test('host development loads Paddle and Langfuse server secrets from Keychain instead of ignored env files', () => {
   const source = readFileSync(new URL('./musuw-dev', import.meta.url), 'utf8')
   assert.match(source, /com\.musuw\.local-admin\.paddle-api-key/)
@@ -149,6 +542,18 @@ test('host development loads Paddle and Langfuse server secrets from Keychain in
   assert.match(source, /musuw-admin-test/)
   assert.doesNotMatch(source, /load_env_file "\$paddle_sandbox_env"/)
 	assert.match(source, /export LANGFUSE_ENVIRONMENT=test/)
+})
+
+test('admin launcher starts each target with a clean environment', () => {
+  const source = readFileSync(new URL('./musuw-admin', import.meta.url), 'utf8')
+  assert.match(source, /run_with_runtime_env/)
+  assert.match(source, /--replace-process/)
+  assert.match(source, /env -i/)
+  assert.match(source, /MUSUW_ADMIN_TEST_DB_HOST=/)
+  assert.match(source, /MUSUW_ADMIN_TEST_BACKEND_URL=/)
+  assert.doesNotMatch(source, /MUSUW_ADMIN_DATABASE_URL=.*env/)
+  assert.doesNotMatch(source, /MUSUW_ADMIN_BACKEND_URL=.*env/)
+  assert.doesNotMatch(source, /MUSUW_PADDLE_API_KEY=.*env/)
 })
 
 test('production operations keeps Paddle on the authorized Sandbox unit', () => {

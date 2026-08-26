@@ -45,22 +45,41 @@
         </div>
         <div class="ops-topbar__actions">
           <t-popup placement="bottom-right" trigger="click">
-            <button class="ops-environment" type="button" :class="`is-${config?.target || 'test'}`">
-              <span class="ops-environment__dot" />
-              {{ config?.environment || '连接中' }}
-              <ChevronDownIcon size="15" />
+            <button
+              class="ops-environment"
+              type="button"
+              :class="[`is-${config?.target || 'test'}`, { 'is-switching': switching }]"
+              :disabled="switching"
+              :aria-busy="switching"
+            >
+              <RefreshIcon v-if="switching" size="15" class="ops-spin" />
+              <span v-else class="ops-environment__dot" />
+              {{ switching ? `切换到 ${switchTargetLabel}…` : (config?.environment || '连接中') }}
+              <ChevronDownIcon v-if="!switching" size="15" />
             </button>
             <template #content>
               <div class="ops-env-menu">
-                <button type="button" class="is-current">
+                <button type="button" class="is-current" :disabled="switching">
                   <span>{{ config?.environment || '当前环境' }}</span>
-                  <CheckIcon size="16" />
+                  <RefreshIcon v-if="switching" size="16" class="ops-spin" />
+                  <CheckIcon v-else size="16" />
                 </button>
-                <button type="button" @click="explainEnvironmentSwitch">
-                  <span>{{ config?.target === 'production' ? 'TEST' : 'PRODUCTION' }}</span>
-                  <LockOnIcon size="15" />
+                <button
+                  type="button"
+                  :class="{ 'is-production': alternateTarget === 'production' }"
+                  :disabled="switching || !config"
+                  @click="switchEnvironment(alternateTarget)"
+                >
+                  <span>{{ alternateTargetLabel }}</span>
+                  <ChevronDownIcon size="15" class="ops-env-menu__switch-icon" />
                 </button>
-                <p>环境由启动命令锁定，浏览器内不能切换数据源。</p>
+                <p v-if="switching" class="ops-env-menu__status" role="status" aria-live="polite">
+                  正在切换到 {{ switchTargetLabel }}，请稍候…
+                </p>
+                <p v-else-if="switchError" class="ops-env-menu__status is-error" role="alert">
+                  {{ switchError }}
+                </p>
+                <p v-else>切换会重启本机运营台，并保持当前页面。</p>
               </div>
             </template>
           </t-popup>
@@ -78,6 +97,16 @@
       </header>
 
       <main class="ops-main">
+        <div v-if="switching" class="ops-environment-status" role="status" aria-live="polite">
+          <RefreshIcon size="15" class="ops-spin" />
+          <span>正在切换到 {{ switchTargetLabel }}，请稍候…</span>
+        </div>
+        <div v-else-if="switchError" class="ops-environment-status is-error" role="alert">
+          <span>{{ switchError }}</span>
+          <button type="button" class="ops-environment-status__action" @click="recoverEnvironment">
+            恢复当前环境
+          </button>
+        </div>
         <div v-if="bootstrapError" class="ops-bootstrap-error">
           <t-alert theme="error" title="运营中台启动失败" :message="bootstrapError">
             <template #operation>
@@ -106,15 +135,15 @@ import {
   CloudIcon,
   DashboardIcon,
   FileIcon,
-  LockOnIcon,
   MoneyIcon,
   RefreshIcon,
+  SettingIcon,
   SystemLogIcon,
   UserSafetyIcon,
   UsergroupIcon,
 } from 'tdesign-icons-vue-next'
 import { operationsApi } from './api'
-import type { OperationsConfig } from './types'
+import type { EnvironmentTarget, OperationsConfig } from './types'
 import OverviewPage from './pages/OverviewPage.vue'
 import UsersPage from './pages/UsersPage.vue'
 import KnowledgePage from './pages/KnowledgePage.vue'
@@ -122,13 +151,15 @@ import BillingPage from './pages/BillingPage.vue'
 import IdentityPage from './pages/IdentityPage.vue'
 import StoragePage from './pages/StoragePage.vue'
 import LogsPage from './pages/LogsPage.vue'
+import ModelsPolicyPage from './pages/ModelsPolicyPage.vue'
 
-type PageKey = 'overview' | 'users' | 'knowledge' | 'billing' | 'identity' | 'storage' | 'logs'
+type PageKey = 'overview' | 'users' | 'knowledge' | 'model-policy' | 'billing' | 'identity' | 'storage' | 'logs'
 
 const navigation = [
   { key: 'overview' as const, label: '概览', icon: markRaw(DashboardIcon), component: markRaw(OverviewPage) },
   { key: 'users' as const, label: '用户', icon: markRaw(UsergroupIcon), component: markRaw(UsersPage) },
   { key: 'knowledge' as const, label: '知识库与文档', icon: markRaw(FileIcon), component: markRaw(KnowledgePage) },
+  { key: 'model-policy' as const, label: '模型策略', icon: markRaw(SettingIcon), component: markRaw(ModelsPolicyPage) },
   { key: 'billing' as const, label: '账单', icon: markRaw(MoneyIcon), component: markRaw(BillingPage) },
   { key: 'identity' as const, label: '身份', icon: markRaw(UserSafetyIcon), component: markRaw(IdentityPage) },
   { key: 'storage' as const, label: '存储', icon: markRaw(CloudIcon), component: markRaw(StoragePage) },
@@ -142,8 +173,16 @@ const config = ref<OperationsConfig | null>(null)
 const bootstrapError = ref('')
 const refreshKey = ref(0)
 const busyChildren = ref(0)
+const switching = ref(false)
+const switchTarget = ref<EnvironmentTarget | null>(null)
+const switchError = ref('')
+let switchPollTimer: ReturnType<typeof setTimeout> | null = null
 const refreshing = computed(() => busyChildren.value > 0)
 const activeNavigation = computed(() => navigation.find((item) => item.key === currentPage.value) || navigation[0])
+const alternateTarget = computed<EnvironmentTarget>(() => (config.value?.target === 'production' ? 'test' : 'production'))
+const environmentLabel = (target: EnvironmentTarget) => (target === 'production' ? 'PRODUCTION' : 'TEST')
+const alternateTargetLabel = computed(() => environmentLabel(alternateTarget.value))
+const switchTargetLabel = computed(() => (switchTarget.value ? environmentLabel(switchTarget.value) : '目标环境'))
 
 function navigate(page: PageKey) {
   currentPage.value = page
@@ -174,8 +213,70 @@ function setBusy(value: boolean) {
   busyChildren.value = Math.max(0, busyChildren.value + (value ? 1 : -1))
 }
 
-function explainEnvironmentSwitch() {
-  MessagePlugin.info('为防止串用数据源，环境只能通过 scripts/musuw-admin test|production 切换。')
+function clearSwitchPollTimer() {
+  if (switchPollTimer) {
+    clearTimeout(switchPollTimer)
+    switchPollTimer = null
+  }
+}
+
+function wait(milliseconds: number) {
+  return new Promise<void>((resolve) => {
+    switchPollTimer = setTimeout(() => {
+      switchPollTimer = null
+      resolve()
+    }, milliseconds)
+  })
+}
+
+async function healthMatches(target: EnvironmentTarget) {
+  try {
+    const health = await Promise.race([
+      operationsApi.health(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health check timeout')), 1000)),
+    ])
+    return health.environment === environmentLabel(target)
+  } catch {
+    return false
+  }
+}
+
+async function waitForEnvironment(target: EnvironmentTarget) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    if (await healthMatches(target)) return true
+    await wait(Math.min(500, Math.max(0, deadline - Date.now())))
+  }
+  return false
+}
+
+async function switchEnvironment(target: EnvironmentTarget) {
+  if (switching.value || !config.value || target === config.value.target) return
+  switching.value = true
+  switchTarget.value = target
+  switchError.value = ''
+  try {
+    await operationsApi.switchEnvironment(target)
+    if (!(await waitForEnvironment(target))) {
+      throw new Error(`切换到 ${environmentLabel(target)} 超时（30 秒）。当前环境未确认改变。`)
+    }
+    switching.value = false
+    switchTarget.value = null
+    // Reloading the current URL keeps its hash route intact after the process restarts.
+    window.location.reload()
+  } catch (error) {
+    switchError.value = error instanceof Error ? error.message : `切换到 ${environmentLabel(target)} 失败`
+    MessagePlugin.error(switchError.value)
+  } finally {
+    clearSwitchPollTimer()
+    switching.value = false
+    switchTarget.value = null
+  }
+}
+
+function recoverEnvironment() {
+  switchError.value = ''
+  void bootstrap()
 }
 
 onMounted(() => {
@@ -184,5 +285,8 @@ onMounted(() => {
   bootstrap()
 })
 
-onBeforeUnmount(() => window.removeEventListener('hashchange', handleHashChange))
+onBeforeUnmount(() => {
+  clearSwitchPollTimer()
+  window.removeEventListener('hashchange', handleHashChange)
+})
 </script>

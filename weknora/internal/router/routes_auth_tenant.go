@@ -270,6 +270,15 @@ func RegisterSystemAdminRoutes(
 		g.apiKeyRoute(adminRoutes, http.MethodDelete, "/settings/:key",
 			apiKeyPlatform(types.APIKeyCapabilitySystemSettingsManage), handler.ResetSystemSetting)
 
+		// Narrow consumer model-policy control plane used by the loopback
+		// operations console. Unlike /settings, this exposes exactly five model
+		// boundaries and safe display metadata from the builtin catalog.
+		g.apiKeyRoute(adminRoutes, http.MethodGet, "/consumer-model-policy",
+			apiKeyPlatform(types.APIKeyCapabilitySystemRuntimeRead, types.APIKeyCapabilitySystemRuntimeManage),
+			handler.GetConsumerModelPolicy)
+		g.apiKeyRoute(adminRoutes, http.MethodPut, "/consumer-model-policy/:scene",
+			apiKeyPlatform(types.APIKeyCapabilitySystemRuntimeManage), handler.UpdateConsumerModelPolicy)
+
 		// Runtime operations: live asynq queue depths, safe task projections,
 		// and state-checked task actions for the SystemAdmin dashboard. Lite
 		// mode returns available=false.

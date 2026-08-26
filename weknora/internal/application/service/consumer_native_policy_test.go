@@ -200,6 +200,25 @@ func TestFreeGenericGateAllowsTypedCompatibilityDefaultWhenPolicyIsInvalid(t *te
 }
 
 func TestNativeConsumerSettingRegistryContainsOnlyNewTypedBoundaries(t *testing.T) {
+	expectedPaidDefaults := map[types.ConsumerScene][]string{
+		types.ConsumerSceneRerank: {
+			types.CheapestRerankModelID,
+			"builtin-openrouter-rerank-nemotron-free",
+			"builtin-openrouter-rerank-qwen3",
+		},
+		types.ConsumerSceneVision: {
+			types.PlatformKnowledgeBaseVLMModelID,
+			"builtin-openrouter-vlm-minimax-m3-free",
+			"builtin-openrouter-vlm-qwen-3-7-flash",
+			"builtin-openrouter-vlm-gemma-4-free",
+		},
+		types.ConsumerSceneASR: {
+			types.PlatformKnowledgeBaseASRModelID,
+			"builtin-openrouter-asr-whisper-turbo",
+			"builtin-openrouter-asr-qwen-0-6b",
+			"builtin-openrouter-asr-gpt-4o-mini",
+		},
+	}
 	for _, scene := range []types.ConsumerScene{
 		types.ConsumerSceneRerank,
 		types.ConsumerSceneVision,
@@ -214,8 +233,8 @@ func TestNativeConsumerSettingRegistryContainsOnlyNewTypedBoundaries(t *testing.
 		assert.Equal(t, scene.CompatibilityDefaultID(), free.Default)
 		defaults, ok := paid.Default.([]string)
 		require.True(t, ok)
-		require.Len(t, defaults, 1)
-		assert.Equal(t, scene.CompatibilityDefaultID(), defaults[0])
+		assert.Equal(t, expectedPaidDefaults[scene], defaults)
+		assert.Equal(t, scene.CompatibilityDefaultID(), defaults[0], "the compatibility model remains the paid default")
 	}
 	assert.NotContains(t, registry, "consumer_models.embedding.free_default")
 	assert.NotContains(t, registry, "consumer_models.embedding.paid_options")

@@ -363,17 +363,37 @@ func defaultConsumerPaidModelIDs() []string {
 		"builtin-openrouter-claude-haiku",
 		"builtin-openrouter-claude-sonnet",
 		"builtin-openrouter-claude-opus",
+		"builtin-openrouter-nemotron-lightning-free",
+		"builtin-openrouter-glm-5-2-free",
+		"builtin-openrouter-minimax-m3-free",
+		"builtin-openrouter-ling-flash",
+		"builtin-openrouter-qwen-3-7-flash",
+		"builtin-openrouter-gpt-5-nano",
 	}
 }
 
 func defaultConsumerPaidModelIDsForType(modelType types.ModelType) []string {
 	switch modelType {
 	case types.ModelTypeRerank:
-		return []string{types.CheapestRerankModelID}
+		return []string{
+			types.CheapestRerankModelID,
+			"builtin-openrouter-rerank-nemotron-free",
+			"builtin-openrouter-rerank-qwen3",
+		}
 	case types.ModelTypeVLLM:
-		return []string{types.PlatformKnowledgeBaseVLMModelID}
+		return []string{
+			types.PlatformKnowledgeBaseVLMModelID,
+			"builtin-openrouter-vlm-minimax-m3-free",
+			"builtin-openrouter-vlm-qwen-3-7-flash",
+			"builtin-openrouter-vlm-gemma-4-free",
+		}
 	case types.ModelTypeASR:
-		return []string{types.PlatformKnowledgeBaseASRModelID}
+		return []string{
+			types.PlatformKnowledgeBaseASRModelID,
+			"builtin-openrouter-asr-whisper-turbo",
+			"builtin-openrouter-asr-qwen-0-6b",
+			"builtin-openrouter-asr-gpt-4o-mini",
+		}
 	default:
 		return defaultConsumerPaidModelIDs()
 	}

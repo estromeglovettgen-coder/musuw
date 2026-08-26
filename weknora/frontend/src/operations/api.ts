@@ -1,11 +1,18 @@
 import type {
   BillingData,
   DocumentRow,
+  EnvironmentSwitchResult,
+  EnvironmentTarget,
   IdentityData,
   InvestigationData,
   KnowledgeBaseRow,
   LangfuseData,
+  ModelPolicyData,
+  ModelPolicyScene,
+  ModelPolicySceneKey,
+  ModelPolicyUpdate,
   OperationsConfig,
+  OperationsHealth,
   OverviewData,
   PageResult,
   StorageData,
@@ -13,6 +20,8 @@ import type {
   UserRow,
 } from './types'
 import { setOperationsCsrfHeader } from '@/utils/request'
+
+export const PRODUCTION_ENVIRONMENT_CONFIRMATION = 'I_UNDERSTAND_THIS_IS_LIVE'
 
 function csrfToken() {
   const match = document.cookie.match(/(?:^|;\s*)musuw_admin_csrf=([^;]+)/)
@@ -54,6 +63,21 @@ export const operationsApi = {
     setOperationsCsrfHeader(csrf_token)
     return config
   },
+  health: () => request<OperationsHealth>('/healthz'),
+  switchEnvironment: (target: EnvironmentTarget) =>
+    request<EnvironmentSwitchResult>('/admin-api/environment', {
+      method: 'POST',
+      body: JSON.stringify({
+        target,
+        ...(target === 'production' ? { confirmation: PRODUCTION_ENVIRONMENT_CONFIRMATION } : {}),
+      }),
+    }),
+  modelPolicy: () => request<ModelPolicyData>('/admin-api/model-policy'),
+  updateModelPolicy: (scene: ModelPolicySceneKey, body: ModelPolicyUpdate) =>
+    request<ModelPolicyScene>(`/admin-api/model-policy/${encodeURIComponent(scene)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   overview: () => request<OverviewData>('/admin-api/overview'),
   users: (params: { page?: number; page_size?: number; q?: string; plan?: string; state?: string }) =>
     request<PageResult<UserRow>>(`/admin-api/users${queryString(params)}`),

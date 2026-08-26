@@ -387,7 +387,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	var models []Model
 	require.NoError(t, db.Order("id").Find(&models).Error)
-	require.Len(t, models, 15)
+	require.Len(t, models, 29)
 
 	byID := make(map[string]Model, len(models))
 	defaultByType := make(map[ModelType]int)
@@ -437,4 +437,36 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.True(t, vlm.Parameters.SupportsVision)
 	assert.Equal(t, "openai", vlm.Parameters.InterfaceType)
 	assert.Equal(t, "openai/whisper-large-v3", byID["builtin-openrouter-asr"].Name)
+
+	// The consumer model-policy catalog intentionally includes a bounded set of
+	// current OpenRouter free and low-cost choices.  These are real provider
+	// slugs, not UI placeholders; every row still flows through the same
+	// built-in model repository and plan policy as the original catalog.
+	additionalModels := map[string]struct {
+		name      string
+		modelType ModelType
+	}{
+		"builtin-openrouter-nemotron-lightning-free": {"nvidia/nemotron-3.5-lightning:free", ModelTypeKnowledgeQA},
+		"builtin-openrouter-glm-5-2-free":            {"z-ai/glm-5.2:free", ModelTypeKnowledgeQA},
+		"builtin-openrouter-minimax-m3-free":         {"minimax/minimax-m3:free", ModelTypeKnowledgeQA},
+		"builtin-openrouter-ling-flash":              {"inclusionai/ling-3.0-flash", ModelTypeKnowledgeQA},
+		"builtin-openrouter-qwen-3-7-flash":          {"qwen/qwen3.7-flash", ModelTypeKnowledgeQA},
+		"builtin-openrouter-gpt-5-nano":              {"openai/gpt-5-nano", ModelTypeKnowledgeQA},
+		"builtin-openrouter-rerank-nemotron-free":    {"nvidia/llama-nemotron-rerank-vl-1b-v2:free", ModelTypeRerank},
+		"builtin-openrouter-rerank-qwen3":            {"qwen/qwen3-reranker-8b", ModelTypeRerank},
+		"builtin-openrouter-vlm-minimax-m3-free":     {"minimax/minimax-m3:free", ModelTypeVLLM},
+		"builtin-openrouter-vlm-qwen-3-7-flash":      {"qwen/qwen3.7-flash", ModelTypeVLLM},
+		"builtin-openrouter-vlm-gemma-4-free":        {"google/gemma-4-26b-a4b-it:free", ModelTypeVLLM},
+		"builtin-openrouter-asr-whisper-turbo":       {"openai/whisper-large-v3-turbo", ModelTypeASR},
+		"builtin-openrouter-asr-qwen-0-6b":           {"qwen/qwen3-asr-0.6b", ModelTypeASR},
+		"builtin-openrouter-asr-gpt-4o-mini":         {"openai/gpt-4o-mini-transcribe", ModelTypeASR},
+	}
+	for id, expected := range additionalModels {
+		model, ok := byID[id]
+		require.True(t, ok, "missing real OpenRouter catalog row %s", id)
+		assert.Equal(t, expected.name, model.Name)
+		assert.Equal(t, expected.modelType, model.Type)
+		assert.Equal(t, "openrouter", model.Parameters.Provider)
+		assert.False(t, model.IsDefault)
+	}
 }

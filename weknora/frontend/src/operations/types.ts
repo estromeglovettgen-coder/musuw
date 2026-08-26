@@ -14,6 +14,51 @@ export interface OperationsConfig {
   links: Record<string, string>
 }
 
+export type EnvironmentTarget = OperationsConfig['target']
+
+export interface OperationsHealth {
+  status: 'ok'
+  environment: EnvironmentName
+}
+
+export interface EnvironmentSwitchResult {
+  target: EnvironmentTarget
+  status: 'switching'
+}
+
+/**
+ * Safe model metadata returned to the local operations console.  The policy
+ * route intentionally carries display/type data only; provider parameters and
+ * credentials remain behind the existing model services.
+ */
+export type ModelPolicySceneKey = 'rag' | 'rerank' | 'wiki' | 'vision' | 'asr'
+export type ModelPolicyModelType = 'KnowledgeQA' | 'Rerank' | 'VLLM' | 'ASR'
+
+export interface ModelPolicyOption {
+  model_id: string
+  display_name: string
+  model_type: ModelPolicyModelType
+}
+
+export interface ModelPolicyScene {
+  scene: ModelPolicySceneKey
+  label: string
+  description: string
+  model_type: ModelPolicyModelType
+  free_default_model_id: string
+  paid_model_ids: string[]
+  options: ModelPolicyOption[]
+}
+
+export interface ModelPolicyData {
+  scenes: ModelPolicyScene[]
+}
+
+export interface ModelPolicyUpdate {
+  free_default_model_id?: string
+  paid_model_ids?: string[]
+}
+
 export interface PageResult<T> {
   rows: T[]
   total: number

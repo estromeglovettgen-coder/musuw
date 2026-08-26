@@ -193,6 +193,31 @@ func TestConsumerModelResolverRegistryDefaultsRemainValidAndDeduplicated(t *test
 	}
 }
 
+func TestConsumerModelPolicyDefaultsExposeExpandedOpenRouterCatalog(t *testing.T) {
+	assert.Subset(t, defaultConsumerPaidModelIDs(), []string{
+		"builtin-openrouter-nemotron-lightning-free",
+		"builtin-openrouter-glm-5-2-free",
+		"builtin-openrouter-minimax-m3-free",
+		"builtin-openrouter-ling-flash",
+		"builtin-openrouter-qwen-3-7-flash",
+		"builtin-openrouter-gpt-5-nano",
+	})
+	assert.Subset(t, defaultConsumerPaidModelIDsForType(types.ModelTypeRerank), []string{
+		"builtin-openrouter-rerank-nemotron-free",
+		"builtin-openrouter-rerank-qwen3",
+	})
+	assert.Subset(t, defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), []string{
+		"builtin-openrouter-vlm-minimax-m3-free",
+		"builtin-openrouter-vlm-qwen-3-7-flash",
+		"builtin-openrouter-vlm-gemma-4-free",
+	})
+	assert.Subset(t, defaultConsumerPaidModelIDsForType(types.ModelTypeASR), []string{
+		"builtin-openrouter-asr-whisper-turbo",
+		"builtin-openrouter-asr-qwen-0-6b",
+		"builtin-openrouter-asr-gpt-4o-mini",
+	})
+}
+
 func TestConsumerModelResolverInvalidPolicyNeverExpandsPaidCatalog(t *testing.T) {
 	flash := consumerSceneModel(types.CheapestChatModelID, "Flash")
 	pro := consumerSceneModel("builtin-deepseek-v4-pro", "Pro")

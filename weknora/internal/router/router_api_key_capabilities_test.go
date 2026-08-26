@@ -60,6 +60,8 @@ func TestPlatformControlPlaneRoutesDeclarePlatformCapabilities(t *testing.T) {
 	}{
 		{http.MethodGet, "/api/v1/system/admin/settings", types.APIKeyCapabilitySystemSettingsRead},
 		{http.MethodPut, "/api/v1/system/admin/settings/:key", types.APIKeyCapabilitySystemSettingsManage},
+		{http.MethodGet, "/api/v1/system/admin/consumer-model-policy", types.APIKeyCapabilitySystemRuntimeRead},
+		{http.MethodPut, "/api/v1/system/admin/consumer-model-policy/:scene", types.APIKeyCapabilitySystemRuntimeManage},
 		{http.MethodGet, "/api/v1/system/admin/runtime/queues", types.APIKeyCapabilitySystemRuntimeRead},
 		{http.MethodPost, "/api/v1/system/admin/runtime/queues/:queue/tasks/:task_id/actions/:action", types.APIKeyCapabilitySystemRuntimeManage},
 		{http.MethodDelete, "/api/v1/system/admin/runtime/queues/:queue/archived", types.APIKeyCapabilitySystemRuntimeManage},
@@ -79,6 +81,26 @@ func TestPlatformControlPlaneRoutesDeclarePlatformCapabilities(t *testing.T) {
 	}
 	if _, ok := g.apiKeyAuthorizer.Lookup(http.MethodPost, "/api/v1/system/admin/api-keys"); ok {
 		t.Fatal("platform API keys must not create other platform API keys")
+	}
+}
+
+func TestConsumerModelPolicyRuntimeCapabilityDoesNotWidenGeneralSettings(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	g := &rbacGuards{}
+	v1 := gin.New().Group("/api/v1")
+	RegisterSystemAdminRoutes(v1, &handler.SystemHandler{}, nil, g)
+
+	policy, ok := g.apiKeyAuthorizer.Lookup(http.MethodGet, "/api/v1/system/admin/consumer-model-policy")
+	if !ok || !policy.PlatformOnly || !policyHasCapability(policy, types.APIKeyCapabilitySystemRuntimeRead) {
+		t.Fatalf("model policy read policy = %#v, ok=%v", policy, ok)
+	}
+	if policyHasCapability(policy, types.APIKeyCapabilitySystemSettingsRead) || policyHasCapability(policy, types.APIKeyCapabilitySystemSettingsManage) {
+		t.Fatalf("model policy route must not inherit general settings capability: %#v", policy.Capabilities)
+	}
+
+	settingsPolicy, ok := g.apiKeyAuthorizer.Lookup(http.MethodGet, "/api/v1/system/admin/settings")
+	if !ok || policyHasCapability(settingsPolicy, types.APIKeyCapabilitySystemRuntimeRead) || policyHasCapability(settingsPolicy, types.APIKeyCapabilitySystemRuntimeManage) {
+		t.Fatalf("general settings route was widened by runtime capability: %#v, ok=%v", settingsPolicy, ok)
 	}
 }
 

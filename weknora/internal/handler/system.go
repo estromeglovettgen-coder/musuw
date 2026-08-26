@@ -74,6 +74,10 @@ type SystemHandler struct {
 	knowledgeRepo     interfaces.KnowledgeRepository
 	knowledgeSpanRepo repository.KnowledgeSpanRepository
 	deadLetterRepo    interfaces.TaskDeadLetterRepository
+	// modelRepo backs only the narrow consumer model-policy control endpoint.
+	// Reading the repository directly avoids applying one tenant's plan filter
+	// to the platform-wide builtin catalog.
+	modelRepo interfaces.ModelRepository
 }
 
 // NewSystemHandler creates a new system handler
@@ -95,6 +99,7 @@ func NewSystemHandler(cfg *config.Config,
 	knowledgeRepo interfaces.KnowledgeRepository,
 	knowledgeSpanRepo repository.KnowledgeSpanRepository,
 	deadLetterRepo interfaces.TaskDeadLetterRepository,
+	modelRepo interfaces.ModelRepository,
 ) *SystemHandler {
 	return &SystemHandler{
 		cfg:                cfg,
@@ -115,6 +120,7 @@ func NewSystemHandler(cfg *config.Config,
 		knowledgeRepo:      knowledgeRepo,
 		knowledgeSpanRepo:  knowledgeSpanRepo,
 		deadLetterRepo:     deadLetterRepo,
+		modelRepo:          modelRepo,
 	}
 }
 

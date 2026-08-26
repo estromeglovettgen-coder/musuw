@@ -211,6 +211,120 @@ builtin_models:
         supported_efforts: [max, xhigh, high, medium, low]
         default_effort: high
 
+  - id: builtin-openrouter-nemotron-lightning-free
+    tenant_id: 10000
+    name: nvidia/nemotron-3.5-lightning:free
+    display_name: Nemotron 3.5 Lightning (Free)
+    type: KnowledgeQA
+    source: remote
+    description: NVIDIA Nemotron 3.5 Lightning through OpenRouter · free tool-capable long-context reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: false
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-glm-5-2-free
+    tenant_id: 10000
+    name: z-ai/glm-5.2:free
+    display_name: GLM 5.2 (Free)
+    type: KnowledgeQA
+    source: remote
+    description: GLM 5.2 through OpenRouter · free multilingual tool-capable reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: false
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-minimax-m3-free
+    tenant_id: 10000
+    name: minimax/minimax-m3:free
+    display_name: MiniMax M3 (Free)
+    type: KnowledgeQA
+    source: remote
+    description: MiniMax M3 through OpenRouter · free multimodal tool-capable reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-ling-flash
+    tenant_id: 10000
+    name: inclusionai/ling-3.0-flash
+    display_name: Ling 3.0 Flash
+    type: KnowledgeQA
+    source: remote
+    description: Ling 3.0 Flash through OpenRouter · very-low-cost tool-capable reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: false
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-qwen-3-7-flash
+    tenant_id: 10000
+    name: qwen/qwen3.7-flash
+    display_name: Qwen 3.7 Flash
+    type: KnowledgeQA
+    source: remote
+    description: Qwen 3.7 Flash through OpenRouter · low-cost multimodal tool-capable reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high, medium, low]
+        default_effort: medium
+
+  - id: builtin-openrouter-gpt-5-nano
+    tenant_id: 10000
+    name: openai/gpt-5-nano
+    display_name: GPT-5 Nano
+    type: KnowledgeQA
+    source: remote
+    description: GPT-5 Nano through OpenRouter · low-cost multimodal structured reasoning
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: false
+        supported_efforts: [high, medium, low, minimal]
+        default_effort: low
+
   - id: builtin-openrouter-embedding
     tenant_id: 10000
     name: qwen/qwen3-embedding-8b
@@ -239,6 +353,32 @@ builtin_models:
       base_url: https://openrouter.ai/api/v1
       provider: openrouter
 
+  - id: builtin-openrouter-rerank-nemotron-free
+    tenant_id: 10000
+    name: nvidia/llama-nemotron-rerank-vl-1b-v2:free
+    display_name: Nemotron Rerank VL 1B V2 (Free)
+    type: Rerank
+    source: remote
+    description: NVIDIA multimodal reranker through OpenRouter · free text and visual-document reranking
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+
+  - id: builtin-openrouter-rerank-qwen3
+    tenant_id: 10000
+    name: qwen/qwen3-reranker-8b
+    display_name: Qwen3 Reranker 8B
+    type: Rerank
+    source: remote
+    description: Qwen3 Reranker 8B through OpenRouter · multilingual relevance reranking
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+
   - id: builtin-openrouter-vlm
     tenant_id: 10000
     name: google/gemini-2.5-flash
@@ -254,6 +394,51 @@ builtin_models:
       interface_type: openai
       supports_vision: true
 
+  - id: builtin-openrouter-vlm-minimax-m3-free
+    tenant_id: 10000
+    name: minimax/minimax-m3:free
+    type: VLLM
+    source: remote
+    display_name: MiniMax M3 Vision (Free)
+    description: MiniMax M3 · free image and video understanding through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      interface_type: openai
+      supports_vision: true
+
+  - id: builtin-openrouter-vlm-qwen-3-7-flash
+    tenant_id: 10000
+    name: qwen/qwen3.7-flash
+    type: VLLM
+    source: remote
+    display_name: Qwen 3.7 Flash Vision
+    description: Qwen 3.7 Flash · low-cost image and video understanding through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      interface_type: openai
+      supports_vision: true
+
+  - id: builtin-openrouter-vlm-gemma-4-free
+    tenant_id: 10000
+    name: google/gemma-4-26b-a4b-it:free
+    type: VLLM
+    source: remote
+    display_name: Gemma 4 26B Vision (Free)
+    description: Gemma 4 26B · free image and video understanding through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      interface_type: openai
+      supports_vision: true
+
   - id: builtin-openrouter-asr
     tenant_id: 10000
     name: openai/whisper-large-v3
@@ -261,6 +446,45 @@ builtin_models:
     source: remote
     description: Whisper Large V3 · multilingual speech transcription
     is_default: true
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+
+  - id: builtin-openrouter-asr-whisper-turbo
+    tenant_id: 10000
+    name: openai/whisper-large-v3-turbo
+    type: ASR
+    source: remote
+    display_name: Whisper Large V3 Turbo
+    description: Whisper Large V3 Turbo · low-cost multilingual speech transcription through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+
+  - id: builtin-openrouter-asr-qwen-0-6b
+    tenant_id: 10000
+    name: qwen/qwen3-asr-0.6b
+    type: ASR
+    source: remote
+    display_name: Qwen3 ASR 0.6B
+    description: Qwen3 ASR 0.6B · very-low-cost multilingual transcription through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+
+  - id: builtin-openrouter-asr-gpt-4o-mini
+    tenant_id: 10000
+    name: openai/gpt-4o-mini-transcribe
+    type: ASR
+    source: remote
+    display_name: GPT-4o Mini Transcribe
+    description: GPT-4o Mini Transcribe · cost-efficient high-quality transcription through OpenRouter
+    is_default: false
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
