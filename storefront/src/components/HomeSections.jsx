@@ -29,6 +29,36 @@ function formatPlanAmount(symbol, amount) {
   return `${symbol}${amount.toLocaleString("en-US")}`;
 }
 
+const PUBLIC_COMPARISON_CAPABILITIES = new Set([
+  "Storage",
+  "Knowledge bases",
+  "Documents per knowledge base",
+  "Video upload",
+  "Advanced model access"
+]);
+
+function getPublicComparisonRows(copy) {
+  const localizedNames = new Map();
+
+  comparisonGroups.forEach((group, groupIndex) => {
+    group.rows.forEach(([sourceName], rowIndex) => {
+      localizedNames.set(
+        sourceName,
+        copy.comparison.groups[groupIndex]?.rows[rowIndex] ?? sourceName
+      );
+    });
+  });
+
+  return comparisonGroups
+    .flatMap((group) => group.rows)
+    .filter(([sourceName]) => PUBLIC_COMPARISON_CAPABILITIES.has(sourceName))
+    .map(([sourceName, ...availability]) => ({
+      sourceName,
+      name: localizedNames.get(sourceName) ?? sourceName,
+      availability
+    }));
+}
+
 export function CustomerStrip({ copy }) {
   return (
     <section className="customer-strip" aria-label={copy.customerStrip.label}>
@@ -368,43 +398,66 @@ export function ComparisonSection({ copy }) {
 }
 
 function ComparisonTable({ copy }) {
+  const rows = getPublicComparisonRows(copy);
+  const chinese = copy.pricing.currencyCode === "CNY";
+  const sharedCapabilities = chinese
+    ? "所有方案都包含有依据的回答、精确引用、AI 整理的 Wiki、知识图谱、资料历史、导出与删除控制。"
+    : "Every plan includes grounded answers, exact citations, an AI-organized Wiki, a knowledge graph, source history, export, and deletion controls.";
+  const noPlanCap = chinese ? "套餐不限" : "No plan cap";
+
   return (
     <Reveal className="comparison-wrap">
-      <h2>{copy.comparison.title}</h2>
-      <div className="comparison-table" role="table" aria-label={copy.comparison.tableAria}>
+      <h2 style={{ margin: 0, textAlign: "center" }}>{copy.comparison.title}</h2>
+      <p
+        className="comparison-description"
+        style={{
+          maxWidth: "760px",
+          margin: "18px auto 48px",
+          color: "var(--ink-soft)",
+          fontSize: "16px",
+          lineHeight: 1.55,
+          textAlign: "center"
+        }}
+      >
+        {sharedCapabilities}
+      </p>
+      <div
+        className="comparison-table"
+        role="table"
+        aria-label={copy.comparison.tableAria}
+        style={{
+          width: "100%",
+          minWidth: "820px",
+          marginLeft: 0,
+          overflow: "hidden"
+        }}
+      >
         <div className="comparison-head" role="row">
           <span role="columnheader">{copy.comparison.firstColumn}</span>
           {copy.comparison.plans.map((plan) => <span role="columnheader" key={plan}>{plan}</span>)}
         </div>
-        {comparisonGroups.map((group, groupIndex) => (
-          <div className="comparison-group" key={group.title}>
-            <div className="comparison-group-head" role="row">
-              <h4>{copy.comparison.groups[groupIndex].title}</h4>
-              {copy.comparison.plans.map((plan) => <span key={plan}>{plan}</span>)}
+        <div role="rowgroup">
+          {rows.map(({ sourceName, name, availability }) => (
+            <div className="comparison-row" role="row" key={sourceName}>
+              <span role="cell">{name}</span>
+              {availability.map((enabled, index) => (
+                <span role="cell" key={`${sourceName}-${index}`}>
+                  {typeof enabled === "string" ? (
+                    <span className="comparison-value-text">
+                      {enabled === "No plan-specific cap"
+                        ? noPlanCap
+                        : copy.comparison.valueLabels[enabled] ?? enabled}
+                    </span>
+                  ) : enabled ? (
+                    <CheckCircle size={19} weight="fill" aria-label={copy.comparison.included} />
+                  ) : (
+                    <Minus size={17} aria-label={copy.comparison.notIncluded} />
+                  )}
+                </span>
+              ))}
             </div>
-            {group.rows.map(([_name, ...availability], rowIndex) => {
-              const name = copy.comparison.groups[groupIndex].rows[rowIndex];
-              return (
-              <div className="comparison-row" role="row" key={name}>
-                <span role="cell">{name}</span>
-                {availability.map((enabled, index) => (
-                  <span role="cell" key={`${name}-${index}`}>
-                    {typeof enabled === "string" ? (
-                      <span className="comparison-value-text">
-                        {copy.comparison.valueLabels[enabled] ?? enabled}
-                      </span>
-                    ) : enabled ? (
-                      <CheckCircle size={19} weight="fill" aria-label={copy.comparison.included} />
-                    ) : (
-                      <Minus size={17} aria-label={copy.comparison.notIncluded} />
-                    )}
-                  </span>
-                ))}
-              </div>
-              );
-            })}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </Reveal>
   );

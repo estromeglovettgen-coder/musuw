@@ -43,6 +43,7 @@ test("review-ready home keeps the original template while focusing on the second
       document: getPublicDocument("zh-CN", "/contact"),
     }),
   );
+  const comparison = home.match(/<section class="comparison-section"[\s\S]*?<\/section>/)?.[0] ?? "";
 
   assert.doesNotMatch(home, /customer-(?:strip|ticker|track)/);
   assert.doesNotMatch(home, /testimonials-section|testimonial-(?:shell|card)/);
@@ -58,8 +59,22 @@ test("review-ready home keeps the original template while focusing on the second
   assert.match(home, /Knowledge compounds/);
   assert.match(home, /A second brain/);
   assert.doesNotMatch(home, /Source Library and Upload|Living Knowledge Base/);
-  assert.equal((home.match(/class="comparison-group-head"/g) ?? []).length, 6);
-  assert.match(home, /Advanced models/);
+  assert.equal((comparison.match(/class="comparison-group-head"/g) ?? []).length, 0);
+  assert.equal((comparison.match(/class="comparison-row"/g) ?? []).length, 5);
+  for (const label of [
+    "Storage",
+    "Knowledge bases",
+    "Documents per knowledge base",
+    "Video ingestion",
+    "Advanced models",
+  ]) {
+    assert.match(comparison, new RegExp(`>${label}<`));
+  }
+  assert.match(
+    comparison,
+    /Every plan includes grounded answers, exact citations, an AI-organized Wiki, a knowledge graph, source history, export, and deletion controls\./,
+  );
+  assert.doesNotMatch(comparison, /Monthly AI usage|Model catalog|Document upload and parsing|>\$0\.40</);
   assert.match(home, /100 GiB/);
   assert.match(home, /<video/);
   assert.doesNotMatch(home, /hero-float/);
@@ -90,6 +105,7 @@ test("hidden storefront sections and their source modules remain available for l
 
   assert.doesNotMatch(homePage, /<CustomerStrip\b|<TestimonialsSection\b|<WorkflowSection\b/);
   assert.match(homeSections, /visibleFeatureIndexes\s*=\s*\[0,\s*3,\s*2\]/);
+  assert.match(homeSections, /PUBLIC_COMPARISON_CAPABILITIES/);
   assert.match(homeSections, /export function CustomerStrip\s*\(/);
   assert.match(homeSections, /export function TestimonialsSection\s*\(/);
   assert.match(homeSections, /export function WorkflowSection\s*\(/);
