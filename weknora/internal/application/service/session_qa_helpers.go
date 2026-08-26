@@ -240,6 +240,34 @@ func (s *sessionService) resolveConsumerRerankModelID(ctx context.Context, candi
 	return model.ID, nil
 }
 
+// resolveAgentRerankModelID selects the reranker for AgentQA. Platform-owned
+// builtin agents on Lite use the current consumer tenant's retrieval setting
+// as the resolver candidate; custom agents, IM, and Standard keep the agent's
+// configured rerank model as their authority.
+func (s *sessionService) resolveAgentRerankModelID(ctx context.Context, req *types.QARequest) (string, error) {
+	if req == nil || req.CustomAgent == nil {
+		return "", nil
+	}
+	configuredID := strings.TrimSpace(req.CustomAgent.Config.RerankModelID)
+	if !isLiteProductEdition() || !consumerRerankAllowedForRequest(ctx, req.CustomAgent) {
+		return configuredID, nil
+	}
+
+	candidate := ""
+	if tenant, ok := types.TenantInfoFromContext(ctx); ok && tenant.RetrievalConfig != nil {
+		candidate = tenant.RetrievalConfig.RerankModelID
+	} else if tenantID, ok := types.TenantIDFromContext(ctx); ok && tenantID != 0 && s.tenantService != nil {
+		// AgentQA may receive only the tenant ID in lightweight/API contexts.
+		// Resolve that ID explicitly; never use the builtin agent's source tenant.
+		if tenant, err := s.tenantService.GetTenantByID(ctx, tenantID); err == nil && tenant != nil && tenant.RetrievalConfig != nil {
+			candidate = tenant.RetrievalConfig.RerankModelID
+		} else if err != nil {
+			logger.Warnf(ctx, "Failed to load consumer tenant retrieval config: %v", err)
+		}
+	}
+	return s.resolveConsumerRerankModelID(ctx, candidate)
+}
+
 // consumerRerankAllowedForRequest identifies the platform-owned browser/API
 // retrieval path. IM is an existing integration channel and keeps its own
 // retrieval model authority, just like custom agents do.

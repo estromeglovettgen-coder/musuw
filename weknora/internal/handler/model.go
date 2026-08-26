@@ -57,7 +57,14 @@ func (h *ModelHandler) ListConsumerSceneOptions(c *gin.Context) {
 		return
 	}
 	scene := types.ConsumerScene(strings.TrimSpace(c.Param("scene")))
-	if !scene.Valid() {
+	configurable := false
+	for _, supported := range types.ConsumerScenes() {
+		if scene == supported {
+			configurable = true
+			break
+		}
+	}
+	if !configurable {
 		c.Error(errors.NewBadRequestError("invalid consumer model scene"))
 		return
 	}

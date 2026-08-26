@@ -36,7 +36,7 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
     "path === '/checkout'",
   ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'userprofile'/)
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile'/)
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 

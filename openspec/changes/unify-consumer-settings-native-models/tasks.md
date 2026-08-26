@@ -14,7 +14,7 @@
 
 - [x] 3.1 Preserve effective search-scope classification and Wiki KnowledgeQA resolution; Lite platform answer paths always resolve the Agent (`rag`) policy regardless of retrieval scope, while RAG still invokes real Embedding and Rerank stages
 - [x] 3.2 Apply authorized Agent Model (`rag` scene), Wiki, VLLM, and ASR selections at new knowledge-base setup while preserving platform-owned KB Embedding identity
-- [x] 3.3 Connect authorized Rerank selection to the existing tenant retrieval configuration and platform RAG runtime
+- [x] 3.3 Connect authorized Rerank selection to the existing tenant retrieval configuration and platform RAG runtime; Lite platform builtin AgentQA `knowledge_search` resolves the current consumer tenant candidate through `ConsumerSceneRerank` before engine creation, while custom agents, IM, and Standard retain agent configuration authority
 - [x] 3.4 Keep custom agents, IM, evaluation, shared-owner embedding, and unrelated internal calls outside the consumer resolver
 
 ## 4. ZIP4 Settings and Theme Translation

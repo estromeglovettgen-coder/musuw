@@ -102,7 +102,7 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
     assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
   }
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/);
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'userprofile'/);
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile'/);
 
   // Standard routes remain in the bundle/source for quick restoration.
   assert.match(router, /AgentList\.vue/);

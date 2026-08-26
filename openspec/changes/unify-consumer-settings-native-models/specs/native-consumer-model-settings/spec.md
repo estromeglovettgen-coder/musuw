@@ -59,6 +59,8 @@ The system SHALL apply consumer selections through the existing session, retriev
 - **WHEN** the consumer stores an authorized Rerank choice in the existing tenant retrieval configuration
 - **THEN** platform RAG resolves and invokes that Rerank model before answer generation
 
+Lite platform builtin AgentQA with an enabled `knowledge_search` tool SHALL resolve the Rerank candidate from the current consumer tenant's `RetrievalConfig` through `ConsumerSceneRerank` before passing it to the agent engine; custom agents, IM, and Standard retain agent configuration authority.
+
 ### Requirement: Non-consumer model authorities remain untouched
 The expanded consumer resolver MUST NOT override custom-agent, IM, evaluation, shared-owner embedding, or unrelated internal/background model authority.
 

@@ -97,21 +97,15 @@ func (s *sessionService) AgentQA(
 		s.GenerateTitleAsync(ctx, req.Session, req.Query, effectiveModelID, eventBus)
 	}
 
-	// Get rerank model from custom agent config only when knowledge_search can
-	// actually run. A disabled KB scope makes all KB tools ineffective, so it
-	// must not force users to configure an otherwise-unused rerank model.
+	// Initialize rerank only when knowledge_search can actually run. Lite
+	// platform builtins resolve the current consumer tenant policy; custom
+	// agents, IM, and Standard retain their configured model authority.
 	var rerankModel rerank.Reranker
 	if agentRequiresRerankModel(req.CustomAgent) {
-		// Rerank model is resolved purely from the agent config now.
-		// We used to fall back to ConversationConfig.RerankModelID at
-		// the tenant level, but that path encouraged "leave rerank
-		// blank on the agent and inherit silently" which made debugging
-		// retrieval quality a guessing game across tenant settings vs
-		// agent settings. Forcing the agent to declare its own rerank
-		// model puts the configuration where the user actually edits
-		// the agent. If a Wiki-only agent doesn't need reranking,
-		// agentRequiresRerankModel() below already lets it pass.
-		rerankModelID := req.CustomAgent.Config.RerankModelID
+		rerankModelID, err := s.resolveAgentRerankModelID(ctx, req)
+		if err != nil {
+			return err
+		}
 		if rerankModelID == "" {
 			logger.Warnf(ctx, "No rerank model configured for custom agent %s, but knowledge_search tool is enabled", req.CustomAgent.ID)
 			return errors.New("rerank model is not configured: please set rerank_model_id on the agent")

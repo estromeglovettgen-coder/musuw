@@ -47,7 +47,7 @@ Paid options remain ordered and the first item is the paid default. The SystemAd
 
 - The product-facing Agent Model continues to send its browser candidate through `summary_model_id`; the backend retains the internal `rag` key because it classifies the effective retrieval scope before resolving. Lite platform answer paths always resolve that same Agent (`rag`) KnowledgeQA policy, even when the effective retrieval scope is empty; the scope classifier still controls retrieval behavior, and no request is switched to a separate Chat policy.
 - Wiki continues to store its candidate in `WikiConfig.SynthesisModelID` and resolves at both synthesis entry points.
-- Rerank uses the existing tenant `RetrievalConfig.RerankModelID`; selection updates that existing configuration and the runtime resolver validates it before the platform RAG rerank stage.
+- Rerank uses the existing tenant `RetrievalConfig.RerankModelID`; selection updates that existing configuration and the runtime resolver validates it before the platform RAG rerank stage. Lite platform builtin AgentQA with `knowledge_search` enabled uses the current consumer tenant candidate through `ConsumerSceneRerank` before engine creation, while custom agents, IM, and Standard retain agent configuration authority.
 - New knowledge-base creation may carry the chosen Agent Model (`rag` scene), Wiki, VLLM, and ASR IDs. The knowledge-base module resolves them before persistence and then all ingestion/search calls continue reading the persisted KB fields.
 - Embedding remains entirely platform/KB-owned. Existing and new KB vector identity follows the current platform default and existing KB editor invariants; it is not exposed on this consumer settings surface.
 

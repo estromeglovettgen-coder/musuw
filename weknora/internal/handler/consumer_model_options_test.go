@@ -33,7 +33,7 @@ func TestListConsumerSceneOptionsReturnsSafeContract(t *testing.T) {
 	h := NewModelHandlerWithConsumerResolver(nil, resolver)
 	r := gin.New()
 	r.GET("/api/v1/models/scene-options/:scene", h.ListConsumerSceneOptions)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/models/scene-options/chat", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/models/scene-options/rag", nil)
 	recorder := httptest.NewRecorder()
 	r.ServeHTTP(recorder, req)
 
@@ -43,11 +43,28 @@ func TestListConsumerSceneOptionsReturnsSafeContract(t *testing.T) {
 	assert.Equal(t, true, body["success"])
 	data, ok := body["data"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "chat", data["scene"])
+	assert.Equal(t, "rag", data["scene"])
 	assert.Equal(t, "free-model", data["effective_model_id"])
 	assert.NotContains(t, strings.ToLower(recorder.Body.String()), "provider")
 	assert.NotContains(t, strings.ToLower(recorder.Body.String()), "api_key")
 	assert.NotContains(t, strings.ToLower(recorder.Body.String()), "parameters")
+}
+
+func TestListConsumerSceneOptionsRejectsHiddenChatScene(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewModelHandlerWithConsumerResolver(nil, &consumerOptionsResolverStub{})
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": c.Errors.Last().Error()})
+		}
+	})
+	r.GET("/api/v1/models/scene-options/:scene", h.ListConsumerSceneOptions)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/models/scene-options/chat", nil)
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestListConsumerSceneOptionsRejectsUnknownScene(t *testing.T) {
