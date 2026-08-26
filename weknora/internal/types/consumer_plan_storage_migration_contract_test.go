@@ -23,28 +23,28 @@ func readMigrationContract(t *testing.T, path string) string {
 	return strings.ToLower(string(raw))
 }
 
-func assertConsumerPlanStorageBackfill(t *testing.T, sql, path string) {
+func assertConsumerPlanStorageSafeRemap(t *testing.T, sql, path string, down bool) {
 	t.Helper()
-	compact := strings.Join(strings.Fields(sql), " ")
-	for _, want := range []string{
-		"when lower(trim(coalesce(plan, ''))) = 'plus' then " + consumerPlanPlusStorageBytes,
-		"when lower(trim(coalesce(plan, ''))) = 'pro' then " + consumerPlanProStorageBytes,
-		"when lower(trim(coalesce(plan, ''))) = 'max' then " + consumerPlanMaxStorageBytes,
-	} {
-		if !strings.Contains(compact, want) {
-			t.Errorf("%s must normalize and map %q", path, want)
+	if got := strings.Count(sql, "update tenants"); got != 4 {
+		t.Errorf("%s must contain four bounded plan updates, got %d", path, got)
+	}
+	currentDefaults := []string{"5368709120", "21474836480", "42949672960", "85899345920"}
+	revisedDefaults := []string{consumerPlanFreeStorageBytes, consumerPlanPlusStorageBytes, consumerPlanProStorageBytes, consumerPlanMaxStorageBytes}
+	if down {
+		currentDefaults, revisedDefaults = revisedDefaults, currentDefaults
+	}
+	for index, plan := range []string{"free", "plus", "pro", "max"} {
+		for _, want := range []string{
+			"plan = '" + plan + "'",
+			"set storage_quota = " + revisedDefaults[index],
+			"and storage_quota = " + currentDefaults[index],
+		} {
+			if !strings.Contains(sql, want) {
+				t.Errorf("%s must contain bounded mapping %q", path, want)
+			}
 		}
 	}
-	for _, want := range []string{
-		"update tenants",
-		"case",
-		consumerPlanFreeStorageBytes,
-		consumerPlanPlusStorageBytes,
-		consumerPlanProStorageBytes,
-		consumerPlanMaxStorageBytes,
-		"else " + consumerPlanFreeStorageBytes,
-		"where deleted_at is null",
-	} {
+	for _, want := range []string{"where deleted_at is null"} {
 		if !strings.Contains(sql, want) {
 			t.Errorf("%s must contain %q", path, want)
 		}
@@ -53,6 +53,7 @@ func assertConsumerPlanStorageBackfill(t *testing.T, sql, path string) {
 		"delete from",
 		"truncate",
 		"drop table",
+		"set storage_quota = case",
 		"storage_used =",
 		"open_router_used_microusd =",
 	} {
@@ -73,8 +74,8 @@ func TestConsumerPlanStorageQuotaMigrationsHavePairedBackfillAndRollback(t *test
 	}{
 		{
 			name:        "postgres",
-			upPath:      filepath.Join(root, "versioned", "000089_consumer_plan_storage_quota.up.sql"),
-			downPath:    filepath.Join(root, "versioned", "000089_consumer_plan_storage_quota.down.sql"),
+			upPath:      filepath.Join(root, "versioned", "000089_consumer_storage_quotas.up.sql"),
+			downPath:    filepath.Join(root, "versioned", "000089_consumer_storage_quotas.down.sql"),
 			defaultUp:   "alter column storage_quota set default " + consumerPlanFreeStorageBytes,
 			defaultDown: "alter column storage_quota set default 5368709120",
 		},
@@ -94,17 +95,13 @@ func TestConsumerPlanStorageQuotaMigrationsHavePairedBackfillAndRollback(t *test
 		t.Run(tc.name, func(t *testing.T) {
 			up := readMigrationContract(t, tc.upPath)
 			down := readMigrationContract(t, tc.downPath)
-			assertConsumerPlanStorageBackfill(t, up, tc.upPath)
+			assertConsumerPlanStorageSafeRemap(t, up, tc.upPath, false)
+			assertConsumerPlanStorageSafeRemap(t, down, tc.downPath, true)
 			if tc.defaultUp != "" && !strings.Contains(up, tc.defaultUp) {
 				t.Errorf("%s must set the fresh storage default to 1 GiB", tc.upPath)
 			}
 			if tc.defaultDown != "" && !strings.Contains(down, tc.defaultDown) {
 				t.Errorf("%s must restore the previous storage default", tc.downPath)
-			}
-			for _, forbidden := range []string{"delete from", "truncate", "drop table", "storage_used =", "open_router_used_microusd ="} {
-				if strings.Contains(down, forbidden) {
-					t.Errorf("%s must not contain destructive/usage mutation %q", tc.downPath, forbidden)
-				}
 			}
 		})
 	}

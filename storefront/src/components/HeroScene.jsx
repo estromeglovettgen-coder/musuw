@@ -12,8 +12,7 @@ import { ButtonLink } from "./SiteChrome";
 import { APP_LOGIN_URL } from "../productHandoff";
 import {
   sampleCursorScroll,
-  sampleHeroVisibility,
-  sampleOverlayScroll
+  sampleHeroVisibility
 } from "./heroMotion";
 
 export function HeroScene({ copy }) {
@@ -55,12 +54,6 @@ export function HeroScene({ copy }) {
   );
   const sceneSkewX = useTransform(smoothSceneProgress, (value) =>
     reduceMotion ? 0 : sampleHeroVisibility(value).skewX
-  );
-  const activityY = useTransform(scrollY, (value) =>
-    reduceMotion ? 0 : sampleOverlayScroll(value).activityY
-  );
-  const deliverableY = useTransform(scrollY, (value) =>
-    reduceMotion ? 0 : sampleOverlayScroll(value).deliverableY
   );
   const cursorX = useTransform(smoothScrollY, (value) =>
     reduceMotion ? 0 : sampleCursorScroll(value).translateX
@@ -148,7 +141,7 @@ export function HeroScene({ copy }) {
           transition={subtitleTransition}
         >
           <ButtonLink href={APP_LOGIN_URL}>{copy.hero.getStarted}</ButtonLink>
-          <ButtonLink href="/contact" variant="secondary">
+          <ButtonLink href="/#blog" variant="secondary">
             {copy.hero.talkToSales}
           </ButtonLink>
         </motion.div>
@@ -167,54 +160,26 @@ export function HeroScene({ copy }) {
             style={{ transform: sceneTransform }}
           >
             <div className="dashboard-frame">
-              <img
-                src="/images/musuw-wiki-page.jpg"
-                width="3024"
-                height="1898"
-                draggable={false}
-                alt={copy.hero.dashboardAlt}
-              />
+              {/* Replace these placeholder sources with the final product walkthrough. */}
+              <video
+                autoPlay={!reduceMotion}
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                poster="/images/musuw-query-citation.jpg"
+                aria-label={copy.hero.dashboardAlt}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover"
+                }}
+              >
+                <source src="/media/musuw-overview.webm" type="video/webm" />
+                <source src="/media/musuw-overview.mp4" type="video/mp4" />
+              </video>
             </div>
-
-            <motion.div
-              className="hero-float hero-float-activity"
-              style={{
-                y: activityY,
-                WebkitBackdropFilter: "blur(5px)",
-                backdropFilter: "blur(5px)"
-              }}
-              initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={springScaleTransition}
-            >
-              <img
-                src="/images/musuw-query-citation.jpg"
-                width="3024"
-                height="1898"
-                draggable={false}
-                alt={copy.hero.activityAlt}
-              />
-            </motion.div>
-
-            <motion.div
-              className="hero-float hero-float-deliverable"
-              style={{
-                y: deliverableY,
-                WebkitBackdropFilter: "blur(5px)",
-                backdropFilter: "blur(5px)"
-              }}
-              initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={springScaleTransition}
-            >
-              <img
-                src="/images/musuw-wiki-graph.jpg"
-                width="3024"
-                height="1898"
-                draggable={false}
-                alt={copy.hero.deliverableAlt}
-              />
-            </motion.div>
           </motion.div>
 
           <div className="hero-cursor-viewport" aria-hidden="true">
@@ -228,7 +193,6 @@ export function HeroScene({ copy }) {
               style={{ transform: cursorTransform }}
             />
           </div>
-
         </motion.div>
       </div>
     </section>

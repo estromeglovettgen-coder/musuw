@@ -3,12 +3,23 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
 import { List } from "@phosphor-icons/react/List";
 import { X } from "@phosphor-icons/react/X";
-import { footerGroups, navItems } from "../data/homeContent";
 import { getStorefrontCopy } from "../i18n";
+import {
+  HOMEPAGE_FOOTER_GROUPS,
+  HOMEPAGE_NAVIGATION,
+} from "../planPresentation";
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";
 import { readStorefrontAuthentication } from "../storefrontAuthStatus";
 
 const defaultCopy = getStorefrontCopy("en");
+const navigationLabels = Object.freeze({
+  en: Object.freeze(["Features", "Examples", "Pricing", "Security", "Contact"]),
+  zh: Object.freeze(["功能", "场景", "定价", "安全", "联系"]),
+});
+
+function publicNavigationLabels(copy) {
+  return copy?.pricing?.currencyCode === "CNY" ? navigationLabels.zh : navigationLabels.en;
+}
 
 export function Brand({ copy = defaultCopy }) {
   return (
@@ -74,12 +85,13 @@ export function ProductEntryLinks({ authenticated = false, copy = defaultCopy })
   );
 }
 
-export function SiteHeader({ copy = defaultCopy }) {
+export function SiteHeader({ copy = defaultCopy, navigation = HOMEPAGE_NAVIGATION }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
   const menuButtonRef = useRef(null);
   const reduceMotion = useReducedMotion();
+  const labels = publicNavigationLabels(copy);
 
   useEffect(() => {
     let mounted = true;
@@ -128,9 +140,9 @@ export function SiteHeader({ copy = defaultCopy }) {
       <div className="container nav-shell">
         <Brand copy={copy} />
         <nav className="desktop-nav" aria-label={copy.nav.primaryAria}>
-          {navItems.map((item, index) => (
-            <a key={item.label} href={item.href}>
-              {copy.nav.items[index].label}
+          {navigation.map((item, index) => (
+            <a key={item.href} href={item.href}>
+              {labels[index] ?? item.label}
             </a>
           ))}
         </nav>
@@ -160,9 +172,9 @@ export function SiteHeader({ copy = defaultCopy }) {
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
             transition={{ duration: 0.22 }}
           >
-            {navItems.map((item, index) => (
-              <a key={item.label} href={item.href} onClick={() => setOpen(false)}>
-                {copy.nav.items[index].label}
+            {navigation.map((item, index) => (
+              <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
+                {labels[index] ?? item.label}
                 <ArrowUpRight size={18} aria-hidden="true" />
               </a>
             ))}
@@ -176,14 +188,14 @@ export function SiteHeader({ copy = defaultCopy }) {
   );
 }
 
-export function SiteFooter({ copy = defaultCopy }) {
+export function SiteFooter({ copy = defaultCopy, groups = HOMEPAGE_FOOTER_GROUPS }) {
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
         <div className="footer-brand">
           <Brand copy={copy} />
         </div>
-        {footerGroups.map((group, groupIndex) => (
+        {groups.map((group, groupIndex) => (
           <div className="footer-group" key={group.title}>
             <h3>{copy.footer.groups[groupIndex].title}</h3>
             {group.links.map(([label, href], linkIndex) => (

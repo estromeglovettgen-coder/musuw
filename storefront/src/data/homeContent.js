@@ -218,7 +218,8 @@ export const comparisonGroups = [
   {
     title: "Model access",
     rows: [
-      ["Platform-approved model catalog", "One least-cost model per capability", "Expanded platform-approved catalog", "Expanded platform-approved catalog", "Expanded platform-approved catalog"]
+      ["Platform-approved model catalog", "One least-cost model per capability", "Expanded platform-approved catalog", "Expanded platform-approved catalog", "Expanded platform-approved catalog"],
+      ["Advanced model access", false, true, true, true]
     ]
   },
   {

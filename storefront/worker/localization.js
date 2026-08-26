@@ -1,5 +1,6 @@
 import { getStorefrontCopy } from "../src/i18n.js";
 import { getPublicDocumentMeta } from "../src/legalContent.js";
+import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
 import {
   SITE_LOGO_ALT,
   SITE_LOGO_URL,
@@ -56,7 +57,7 @@ function withDocumentLocale(html, locale, pathname = "/") {
   const meta =
     legalMeta ??
     (isHome
-      ? copy.meta
+      ? applyHomepagePlanPresentation(copy).meta
       : {
           title: locale === "zh-CN" ? "页面未找到 | musuw" : "Page not found | musuw",
           description:
