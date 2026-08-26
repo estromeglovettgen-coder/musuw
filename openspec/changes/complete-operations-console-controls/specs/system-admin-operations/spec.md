@@ -2,31 +2,31 @@
 
 ### Requirement: TEST and PRODUCTION remain process-isolated environments
 
-The local operations console SHALL run exactly one selected TEST or PRODUCTION
-process and one read-only database pool at a time. The browser MAY request the
-opposite fixed target through an exact loopback control endpoint. The endpoint
-MUST require the current SameSite operator session, exact Origin and Host, CSRF
-token, valid target configuration, and a single in-flight switch. It MUST
-restart through the existing launcher with fixed no-shell arguments and a
-clean target-specific environment. The browser MUST NOT supply datasource
-URLs, credentials, arbitrary commands, or mix both environments in one
-process. PRODUCTION runtime values MUST come from its separate ignored runtime
-file and the database connection MUST remain read-only.
+The local operations launcher SHALL manage two independent console processes on
+fixed loopback origins: TEST on port 4186 and PRODUCTION on port 4187. Each
+process MUST have its own target-specific runtime, read-only database pool,
+operator session store, and cookie names. Both processes MAY remain healthy at
+the same time. The browser MUST switch environments by navigating to the other
+fixed origin; it MUST NOT POST a target header, share a proxy or datasource,
+reload a process, or poll a restart. Neither process may accept browser-supplied
+datasource URLs, credentials, arbitrary commands, or a mixed target runtime.
+PRODUCTION runtime values MUST come from its separate ignored runtime file and
+the database connection MUST remain read-only.
 
 #### Scenario: Operator switches environments once
 
 - **WHEN** the operator clicks the alternate TEST or PRODUCTION environment
-- **THEN** the console starts the existing isolated target process, polls its
-  health, and reloads the same console page when that target is ready
+- **THEN** the console navigates directly to that target's fixed loopback origin
+  and the already-running target is immediately available without restarting
+  either process
 
-#### Scenario: Switch request is not locally authorized
+#### Scenario: Cross-target control cannot mix environments
 
-- **WHEN** a request lacks the session, exact Origin/Host, CSRF token, valid
-  opposite target, production confirmation, or configured target runtime
-- **THEN** it fails closed without starting a child process or changing the
-  current environment
+- **WHEN** a request attempts to select a target through an API body, target
+  header, shared proxy, or a session/cookie from the other fixed origin
+- **THEN** it fails closed without changing either process or datasource
 
-#### Scenario: Production tunnel ownership is verified before restart
+#### Scenario: Production tunnel ownership is verified before startup
 
 - **WHEN** an authorized switch targets PRODUCTION, regardless of whether the
   configured local database port already accepts TCP connections
@@ -36,13 +36,11 @@ file and the database connection MUST remain read-only.
   before probing the database; an unowned listener or failed preparation
   returns an actionable 503 and leaves the current environment running
 
-#### Scenario: Target startup failure restores the previous console
+#### Scenario: Target startup failure leaves the other process healthy
 
-- **WHEN** the target process fails its post-restart `/healthz` check after the
-  previous process has been stopped
-- **THEN** the launcher preserves the target failure log and makes one direct
-  attempt to restore the previous target without recursive rebuilds; a healthy
-  rollback leaves the console serving the previous environment
+- **WHEN** either target process fails its startup health check
+- **THEN** the launcher preserves that target's failure log and leaves the other
+  already-running process and its datasource untouched
 
 ### Requirement: Operators can manage the real consumer model policy
 

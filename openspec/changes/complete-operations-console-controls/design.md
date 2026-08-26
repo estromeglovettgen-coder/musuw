@@ -1,13 +1,12 @@
 ## Context
 
-The operations console runs on loopback and intentionally creates only one
-read-only PostgreSQL pool for its selected environment. The existing launcher
-already owns environment-specific runtime files, production unlock handling,
-frontend build, old-process shutdown, and startup on port 4186. The browser
-previously displayed the alternate environment as a non-actionable hint.
-Production PostgreSQL is reached through the repository's existing pinned Tokyo
-SSH configuration, so the launcher also owns a temporary loopback tunnel
-lifecycle.
+The operations console runs on loopback and needs both TEST and PRODUCTION
+available without waiting for a frontend rebuild. The launcher owns two
+environment-specific runtime files, process records, fixed ports (TEST 4186,
+PRODUCTION 4187), production unlock handling, frontend build, and temporary
+Tokyo SSH tunnel lifecycle. Each server process owns one read-only PostgreSQL
+pool and one target-specific session namespace. The browser previously
+displayed the alternate environment as a non-actionable hint.
 
 Consumer model policy already lives in ten typed system-setting keys for five
 fixed boundaries: `rag`, `rerank`, `wiki`, `vision`, and `asr`. Chat is an
@@ -19,8 +18,9 @@ builtin catalog, not a new policy store or placeholder IDs.
 
 **Goals:**
 
-- Change environments with one menu click while retaining one process and one
-  read-only database pool at a time.
+- Change environments with one menu click by navigating between two already
+  healthy, fixed-origin processes while retaining one target per process and a
+  read-only database pool in each.
 - Render and update the five real model policies from existing authorities.
 - Offer a broader, cost-conscious catalog without inventing model IDs or
   exposing provider credentials.
@@ -28,39 +28,38 @@ builtin catalog, not a new policy store or placeholder IDs.
 
 **Non-Goals:**
 
-- In-browser database URLs, credentials, arbitrary shell commands, two live
-  environment pools, arbitrary system-setting access, Chat/Embedding/TTS
+- In-browser database URLs, credentials, arbitrary shell commands, shared
+  cross-target sessions/proxies, arbitrary system-setting access, Chat/Embedding/TTS
   policy rows, provider configuration, or KB behavior changes.
 
 ## Decisions
 
-### 1. Restart the existing launcher instead of introducing a supervisor
+### 1. Keep two fixed-origin processes instead of restarting on every click
 
-`POST /admin-api/environment` accepts only the opposite fixed target. The
-loopback server reuses its SameSite session, exact Origin/Host, and CSRF token,
-performs target configuration and reachability preflight, enforces a single
-in-flight switch, and spawns the existing launcher with fixed arguments, no
-shell, detached stdio, and a cleaned environment. Production preflight always
-invokes the launcher's fixed `prepare-production-tunnel` command before
-trusting the local DB port. That command reuses the existing
-`musuw-tokyo` restricted SSH alias (or a validated non-secret override), requires
-BatchMode and strict host-key checking, uses the restricted account's `sudo -n`
-permission to discover the fixed production PostgreSQL container's validated
-IPv4, and establishes the ControlMaster loopback forward as that same account.
-The browser
-polls public `/healthz` until the requested target is ready, then reloads the
-current hash route.
+The launcher has per-target `start`, `stop`, and `status` paths and a `start`
+mode that brings up TEST on 4186 and PRODUCTION on 4187. Starting one target
+never stops or changes the other. Each child receives only its target-specific
+clean environment and writes target-specific pid/log/session state. The
+browser environment menu is a same-host, cross-port navigation link; it does
+not call a switch endpoint, add a target header, or reuse the other port's
+session cookie. The server uses target-specific cookie names because browsers
+scope cookies by host rather than port.
 
-Production's existing unlock phrase is supplied by the console implementation
-as a fixed confirmation contract; operators do not type a second prompt. The
-phrase is not treated as a secret—the SameSite/Origin/CSRF boundary authorizes
-the local action. Production runtime values remain authoritative from the
-ignored production runtime file and cannot be overridden by TEST parent
-variables.
+PRODUCTION startup still invokes the launcher's fixed
+`prepare-production-tunnel` command before trusting the local DB port. That
+command reuses the existing `musuw-tokyo` restricted SSH alias (or a validated
+non-secret override), requires BatchMode and strict host-key checking, uses the
+restricted account's `sudo -n` permission to discover the fixed production
+PostgreSQL container's validated IPv4, and establishes the ControlMaster
+loopback forward as that same account. A failed target startup preserves its
+log and leaves the already-running other target untouched. Production runtime
+values remain authoritative from the ignored production runtime file and
+cannot be overridden by TEST variables.
 
-Alternative rejected: keep TEST and PRODUCTION pools in one process. It would
-make credential mixing possible and add synchronization, lifecycle, and
-recovery mechanisms solely to avoid a bounded restart.
+Alternative rejected: restart one process and poll for the other target. It
+makes a normal environment click wait on a cold frontend build, drops the
+operator session, and provides no benefit once the two isolated processes are
+already safe to run concurrently.
 
 ### 2. Expose a narrow model-policy control plane
 
@@ -97,13 +96,11 @@ provider credentials.
 
 ## Risks / Trade-offs
 
-- **Target startup can fail after the old server stops.** Static and
-  reachability preflight reject missing runtime files, unavailable tunnels, and
-  unreachable backends before spawning; the launcher prepares production before
-  stopping the current console. If the target still fails its health check, the
-  launcher preserves that log and makes one direct attempt to restore the
-  previous target without recursive rebuilds. Zero-downtime would require a
-  second temporary listener/pool and is intentionally not added.
+- **One target can fail to start.** Static runtime and tunnel-ownership checks
+  reject missing files or unavailable production forwarding before spawning.
+  The target process then validates its read-only database session and health;
+  a failed startup preserves its log while the other target remains healthy,
+  so no rollback or cross-target restart is required.
 - **A future catalog row could be unsafe.** Both reads and writes reapply the
   active+builtin+OpenRouter+native-type filter; no provider parameters or
   credentials enter browser DTOs.
@@ -115,8 +112,9 @@ provider credentials.
 
 ## Migration Plan
 
-1. Deploy the narrow backend route before or with the local console build.
-2. Restart the local console in TEST and verify the five-row matrix.
-3. Exercise TEST → PRODUCTION → TEST switching and leave the console on TEST.
-4. Rollback by removing the local controls/routes; stored policy settings need
+1. Deploy the local console build and launch both fixed target processes.
+2. Verify each target's health and five-row matrix independently.
+3. Exercise TEST → PRODUCTION → TEST navigation and leave the default entry on
+   TEST (4186).
+4. Rollback by stopping the affected target process; stored policy settings need
    no migration and remain valid for the existing runtime resolver.

@@ -2,9 +2,8 @@
 
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { createConnection } from 'node:net'
 import { extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
@@ -14,38 +13,15 @@ const { Pool } = pg
 const scriptDir = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = resolve(scriptDir, '..')
 
-const DEFAULT_PORT = 4186
-const SESSION_COOKIE = 'musuw_admin_session'
-const CSRF_COOKIE = 'musuw_admin_csrf'
+const TARGET_PORTS = Object.freeze({ test: 4186, production: 4187 })
 const PAGE_SIZE_MAX = 100
 const API_TIMEOUT_MS = 12_000
-const ENVIRONMENT_REACHABILITY_TIMEOUT_MS = 2_500
-const PRODUCTION_TUNNEL_DEFAULT_PORT = 15_433
 const PRODUCTION_RO_PASSWORD_PATH = resolve(repoRoot, '.runtime/musuw-admin/production-ro-password')
 const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000
 const PLATFORM_KEY_SERVICE = 'com.musuw.local-admin.platform-key'
 const ENVIRONMENT_SWITCH_PATH = '/admin-api/environment'
 const MODEL_POLICY_PATH = '/admin-api/model-policy'
 const UPSTREAM_MODEL_POLICY_PATH = '/api/v1/system/admin/consumer-model-policy'
-const PRODUCTION_SWITCH_CONFIRMATION = 'I_UNDERSTAND_THIS_IS_LIVE'
-const SWITCH_ENVIRONMENT_KEYS = Object.freeze([
-  'PATH',
-  'HOME',
-  'TMPDIR',
-  'TMP',
-  'TEMP',
-  'MUSUW_ADMIN_TEST_DB_HOST',
-  'MUSUW_ADMIN_TEST_DB_PORT',
-  'MUSUW_ADMIN_TEST_BACKEND_URL',
-  'MUSUW_ADMIN_PRODUCTION_SSH_TARGET',
-  'MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT',
-  'MUSUW_ADMIN_PRODUCTION_DB_PORT',
-  'MUSUW_ADMIN_PRODUCTION_CONTAINER',
-  'MUSUW_R2_ACCOUNT_ID',
-  'MUSUW_R2_TEST_BUCKET',
-  'MUSUW_R2_PREFIX',
-  'MUSUW_LANGFUSE_HOST',
-])
 const PROVIDER_KEY_SERVICES = Object.freeze({
   paddle: 'com.musuw.local-admin.paddle-api-key',
   supabase: 'com.musuw.local-admin.supabase-secret-key',
@@ -56,6 +32,40 @@ const PROVIDER_KEY_SERVICES = Object.freeze({
 })
 const PUBLIC_BRAND_ASSETS = new Set(['/favicon.ico', '/musuw-logo.png'])
 const PUBLIC_ASSET_PREFIXES = ['/assets/', '/tdesign-icons/']
+
+export function targetCookieNames(target) {
+  if (!['test', 'production'].includes(target)) throw new Error('target must be test or production')
+  return {
+    session: 'musuw_admin_session_' + target,
+    csrf: 'musuw_admin_csrf_' + target,
+  }
+}
+
+export function targetPort(target) {
+  if (!Object.hasOwn(TARGET_PORTS, target)) throw new Error('target must be test or production')
+  return TARGET_PORTS[target]
+}
+
+export function targetListenPort(target, configuredPort = undefined) {
+  const expectedPort = targetPort(target)
+  const rawPort = configuredPort == null || configuredPort === ''
+    ? String(expectedPort)
+    : String(configuredPort).trim()
+  if (!/^\d+$/.test(rawPort)) throw new Error('MUSUW_ADMIN_PORT must be an integer between 1024 and 65535')
+  const port = Number(rawPort)
+  if (!Number.isInteger(port) || port < 1024 || port > 65_535) {
+    throw new Error('MUSUW_ADMIN_PORT must be an integer between 1024 and 65535')
+  }
+  if (port !== expectedPort) {
+    throw new Error(`${target.toUpperCase()} operations must listen on fixed port ${expectedPort}`)
+  }
+  return port
+}
+
+export function targetSessionToken(target, cookies = {}) {
+  const { session } = targetCookieNames(target)
+  return typeof cookies?.[session] === 'string' ? cookies[session] : ''
+}
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -89,26 +99,6 @@ export function parseEnvFile(path) {
   return values
 }
 
-export function environmentSwitchDecision({ currentTarget, target, confirmation } = {}) {
-  if (!['test', 'production'].includes(currentTarget)) {
-    return { ok: false, status: 400, error: 'current environment is invalid' }
-  }
-  if (!['test', 'production'].includes(target)) {
-    return { ok: false, status: 400, error: 'target must be test or production' }
-  }
-  if (target === currentTarget) {
-    return { ok: false, status: 409, error: 'target environment is already selected' }
-  }
-  if (target === 'production' && confirmation !== PRODUCTION_SWITCH_CONFIRMATION) {
-    return { ok: false, status: 403, error: 'production switch confirmation required' }
-  }
-  return { ok: true, target }
-}
-
-export function isEnvironmentSwitchRequest(method, pathname) {
-  return method === 'POST' && pathname === ENVIRONMENT_SWITCH_PATH
-}
-
 export function modelPolicyRequestPlan(method, pathname) {
   method = String(method || '').toUpperCase()
   pathname = String(pathname || '')
@@ -119,87 +109,6 @@ export function modelPolicyRequestPlan(method, pathname) {
   const scene = pathname.slice(MODEL_POLICY_PATH.length + 1)
   if (!['rag', 'rerank', 'wiki', 'vision', 'asr'].includes(scene)) return null
   return { method, scene, upstreamPath: `${UPSTREAM_MODEL_POLICY_PATH}/${scene}` }
-}
-
-export function environmentSwitchPreflight(target, { repoRoot: root = repoRoot } = {}) {
-  const readable = (path) => {
-    try {
-      readFileSync(path, 'utf8')
-      return true
-    } catch {
-      return false
-    }
-  }
-  if (target === 'test') {
-    const candidateRuntime = resolve(root, '.runtime/weknora/candidate.env')
-    const paddleRuntime = resolve(root, '.runtime/weknora/paddle-sandbox.env')
-    if (!readable(candidateRuntime) || !readable(paddleRuntime)) {
-      return { ok: false, status: 503, error: 'TEST runtime is not configured' }
-    }
-    return { ok: true, target }
-  }
-  if (target === 'production') {
-    const runtimePath = resolve(root, '.runtime/musuw-admin/production.env')
-    let runtime
-    try {
-      runtime = parseEnvFile(runtimePath)
-    } catch {
-      runtime = {}
-    }
-    if (!runtime.MUSUW_ADMIN_DATABASE_URL || !runtime.MUSUW_ADMIN_BACKEND_URL) {
-      return { ok: false, status: 503, error: 'PRODUCTION runtime is not configured' }
-    }
-    return { ok: true, target }
-  }
-  return { ok: false, status: 400, error: 'target must be test or production' }
-}
-
-function parseReachabilityPort(value, fallback = 5432) {
-  const raw = String(value || fallback).trim()
-  if (!/^\d+$/.test(raw)) return null
-  const port = Number(raw)
-  return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null
-}
-
-function normalizeReachabilityHost(hostname) {
-  return String(hostname || '').replace(/^\[|\]$/g, '')
-}
-
-function targetReachabilityConfig(target, { repoRoot: root = repoRoot, sourceEnv = process.env } = {}) {
-  if (target === 'test') {
-    const backendBaseUrl = String(sourceEnv.MUSUW_ADMIN_TEST_BACKEND_URL || 'http://127.0.0.1:18090').replace(/\/$/, '')
-    const dbHost = normalizeReachabilityHost(sourceEnv.MUSUW_ADMIN_TEST_DB_HOST || '127.0.0.1')
-    const dbPort = parseReachabilityPort(sourceEnv.MUSUW_ADMIN_TEST_DB_PORT || '15432', 15432)
-    if (!dbHost || !dbPort) return { ok: false, status: 503, error: 'TEST runtime is unavailable; check the configured runtime and retry' }
-    try {
-      const backend = new URL(backendBaseUrl)
-      if (!['http:', 'https:'].includes(backend.protocol) || backend.username || backend.password) throw new Error('unsupported backend URL')
-      return { ok: true, target, dbHost, dbPort, backendBaseUrl: backend.toString().replace(/\/$/, '') }
-    } catch {
-      return { ok: false, status: 503, error: 'TEST runtime is unavailable; check the configured runtime and retry' }
-    }
-  }
-  if (target === 'production') {
-    try {
-      const runtime = parseEnvFile(resolve(root, '.runtime/musuw-admin/production.env'))
-      const database = new URL(String(runtime.MUSUW_ADMIN_DATABASE_URL || ''))
-      const backend = new URL(String(runtime.MUSUW_ADMIN_BACKEND_URL || ''))
-      const configuredTunnelPort = sourceEnv.MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT || database.port || String(PRODUCTION_TUNNEL_DEFAULT_PORT)
-      const dbPort = parseReachabilityPort(configuredTunnelPort, null)
-      if (!['postgres:', 'postgresql:'].includes(database.protocol) || !database.hostname || !dbPort) throw new Error('invalid production database URL')
-      if (!['http:', 'https:'].includes(backend.protocol) || backend.username || backend.password) throw new Error('unsupported backend URL')
-      return {
-        ok: true,
-        target,
-        dbHost: normalizeReachabilityHost(database.hostname),
-        dbPort,
-        backendBaseUrl: backend.toString().replace(/\/$/, ''),
-      }
-    } catch {
-      return { ok: false, status: 503, error: 'PRODUCTION runtime is unavailable; check the configured runtime and retry' }
-    }
-  }
-  return { ok: false, status: 400, error: 'target must be test or production' }
 }
 
 export function productionDatabaseConnectionString(runtime, { passwordPath = PRODUCTION_RO_PASSWORD_PATH } = {}) {
@@ -228,177 +137,6 @@ export function productionDatabaseConnectionString(runtime, { passwordPath = PRO
   }
   database.password = password
   return database.toString()
-}
-
-function probeDatabaseTCP({ host, port, timeoutMs = ENVIRONMENT_REACHABILITY_TIMEOUT_MS } = {}) {
-  return new Promise((resolveProbe) => {
-    let settled = false
-    const finish = (ok) => {
-      if (settled) return
-      settled = true
-      resolveProbe({ ok })
-    }
-    let socket
-    try {
-      socket = createConnection({ host, port })
-    } catch {
-      finish(false)
-      return
-    }
-    socket.setTimeout(timeoutMs, () => {
-      socket.destroy()
-      finish(false)
-    })
-    socket.once('connect', () => {
-      socket.end()
-      finish(true)
-    })
-    socket.once('error', () => {
-      socket.destroy()
-      finish(false)
-    })
-  })
-}
-
-async function probeBackendHealth({ baseUrl, timeoutMs = ENVIRONMENT_REACHABILITY_TIMEOUT_MS } = {}) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const endpoint = new URL('/health', baseUrl)
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    })
-    return { ok: response.ok }
-  } catch {
-    return { ok: false }
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-export async function environmentSwitchReachability(target, {
-  repoRoot: root = repoRoot,
-  sourceEnv = process.env,
-  tcpProbe = probeDatabaseTCP,
-  backendProbe = probeBackendHealth,
-  prepareTunnel = null,
-} = {}) {
-  const config = targetReachabilityConfig(target, { repoRoot: root, sourceEnv })
-  if (!config.ok) return config
-
-  // A production database port can be occupied by any local process.  Never
-  // treat a successful TCP handshake as proof that it is our production
-  // tunnel: the launcher-owned ControlMaster must be prepared and validated
-  // before probing that port.  The route supplies the fixed no-shell
-  // `prepare-production-tunnel` seam; callers that omit it fail closed.
-  if (target === 'production') {
-    if (typeof prepareTunnel !== 'function') {
-      return {
-        ok: false,
-        status: 503,
-        error: 'PRODUCTION tunnel could not be prepared; check the configured SSH alias and retry',
-      }
-    }
-    let preparation
-    try {
-      preparation = await prepareTunnel()
-    } catch {
-      preparation = { ok: false }
-    }
-    if (!preparation?.ok) {
-      return {
-        ok: false,
-        status: 503,
-        error: preparation?.error || 'PRODUCTION tunnel could not be prepared; check the configured SSH alias and retry',
-      }
-    }
-  }
-
-  let database
-  try {
-    database = await tcpProbe({ host: config.dbHost, port: config.dbPort, timeoutMs: ENVIRONMENT_REACHABILITY_TIMEOUT_MS })
-  } catch {
-    database = { ok: false }
-  }
-  if (!database?.ok) {
-    return {
-      ok: false,
-      status: 503,
-      error: `${target.toUpperCase()} database is unavailable; check the configured database tunnel and retry`,
-    }
-  }
-  let backend
-  try {
-    backend = await backendProbe({ baseUrl: config.backendBaseUrl, timeoutMs: ENVIRONMENT_REACHABILITY_TIMEOUT_MS })
-  } catch {
-    backend = { ok: false }
-  }
-  if (!backend?.ok) {
-    return {
-      ok: false,
-      status: 503,
-      error: `${target.toUpperCase()} backend is unavailable; check the configured backend and retry`,
-    }
-  }
-  return { ok: true, target }
-}
-
-export function switchEnvironmentProcessEnv(target, source = process.env) {
-  const environment = {}
-  for (const key of SWITCH_ENVIRONMENT_KEYS) {
-    if (typeof source[key] === 'string' && source[key] !== '') environment[key] = source[key]
-  }
-  environment.PATH ||= '/usr/bin:/bin:/usr/sbin:/sbin'
-  environment.MUSUW_ADMIN_PORT = String(source.MUSUW_ADMIN_PORT || DEFAULT_PORT)
-  if (target === 'production') environment.MUSUW_ADMIN_PRODUCTION_UNLOCK = PRODUCTION_SWITCH_CONFIRMATION
-  return environment
-}
-
-export function environmentSwitchSpawnOptions({ target, repoRoot: root = repoRoot, port = DEFAULT_PORT, sourceEnv = process.env } = {}) {
-  if (!['test', 'production'].includes(target)) throw new Error('target must be test or production')
-  return {
-    command: resolve(root, 'scripts/musuw-admin'),
-    args: [target],
-    options: {
-      cwd: root,
-      detached: true,
-      stdio: 'ignore',
-      env: {
-        ...switchEnvironmentProcessEnv(target, sourceEnv),
-        MUSUW_ADMIN_PORT: String(port),
-      },
-    },
-  }
-}
-
-export function productionTunnelPreparationOptions({ repoRoot: root = repoRoot, sourceEnv = process.env } = {}) {
-  return {
-    command: resolve(root, 'scripts/musuw-admin'),
-    args: ['prepare-production-tunnel'],
-    options: {
-      cwd: root,
-      env: switchEnvironmentProcessEnv('production', sourceEnv),
-      shell: false,
-      stdio: ['ignore', 'ignore', 'ignore'],
-      timeout: 20_000,
-    },
-  }
-}
-
-export function prepareProductionTunnel({ repoRoot: root = repoRoot, sourceEnv = process.env, executor = execFileSync } = {}) {
-  const plan = productionTunnelPreparationOptions({ repoRoot: root, sourceEnv })
-  try {
-    executor(plan.command, plan.args, plan.options)
-    return { ok: true }
-  } catch {
-    return {
-      ok: false,
-      status: 503,
-      error: 'PRODUCTION tunnel could not be prepared; check the configured SSH alias and retry',
-    }
-  }
 }
 
 export function clampPageSize(value, fallback = 25) {
@@ -1203,10 +941,7 @@ async function start() {
   const target = (process.argv[2] || 'test').toLowerCase()
   if (!['test', 'production'].includes(target)) throw new Error(`unknown environment: ${target}`)
   const runtime = loadRuntime(target)
-  const port = Number.parseInt(process.env.MUSUW_ADMIN_PORT || String(DEFAULT_PORT), 10)
-  if (!Number.isInteger(port) || port < 1024 || port > 65_535) {
-    throw new Error('MUSUW_ADMIN_PORT must be an integer between 1024 and 65535')
-  }
+  const port = targetListenPort(target, process.env.MUSUW_ADMIN_PORT)
   const host = '127.0.0.1'
   const assetDir = resolve(process.env.MUSUW_ADMIN_ASSET_DIR || resolve(repoRoot, 'weknora/frontend/dist'))
   const operationsHtml = resolve(assetDir, 'operations.html')
@@ -1254,24 +989,25 @@ async function start() {
   }
   const queries = createQueries(pool)
   const sessions = new Map()
-  let switchInProgress = false
+  const cookieNames = targetCookieNames(target)
   const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`])
   const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`])
 
   function ensureSession(request, response, pathname) {
     const cookies = parseCookies(request.headers.cookie)
-    const current = sessions.get(cookies[SESSION_COOKIE])
+    const sessionToken = targetSessionToken(target, cookies)
+    const current = sessions.get(sessionToken)
     if (current && Date.now() - current.createdAt <= SESSION_MAX_AGE_MS) {
-      return { id: cookies[SESSION_COOKIE], ...current }
+      return { id: sessionToken, ...current }
     }
-    if (current) sessions.delete(cookies[SESSION_COOKIE])
+    if (current) sessions.delete(sessionToken)
     if (request.method !== 'GET' || !['/', '/operations.html'].includes(pathname)) return null
     const id = randomBytes(32).toString('base64url')
     const csrf = randomBytes(24).toString('base64url')
     sessions.set(id, { csrf, createdAt: Date.now() })
     response.setHeader('Set-Cookie', [
-      `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Strict`,
-      `${CSRF_COOKIE}=${csrf}; Path=/; SameSite=Strict`,
+      `${cookieNames.session}=${id}; Path=/; HttpOnly; SameSite=Strict`,
+      `${cookieNames.csrf}=${csrf}; Path=/; SameSite=Strict`,
     ])
     return { id, csrf }
   }
@@ -1280,74 +1016,6 @@ async function start() {
     const origin = request.headers.origin || ''
     const csrf = request.headers['x-musuw-csrf'] || ''
     return allowedOrigins.has(origin) && safeEqual(String(csrf), session.csrf)
-  }
-
-  async function switchEnvironment(request, response, session) {
-    if (request.method !== 'POST') return writeJSON(response, 405, { error: 'method not allowed' })
-    if (!session) return writeJSON(response, 401, { error: 'operator session required' })
-    if (!validMutation(request, session)) return writeJSON(response, 403, { error: 'same-origin confirmation token required' })
-    if (switchInProgress) return writeJSON(response, 409, { error: 'another environment switch is already in progress' })
-
-    // Reserve the single-flight slot before reading the request body.  Two
-    // concurrent POSTs must not both pass validation while the first one is
-    // still awaiting its body or reachability probe.
-    switchInProgress = true
-    let handedOff = false
-    try {
-      let body
-      try {
-        body = await parseJSONBody(request, 4 * 1024)
-      } catch {
-        return writeJSON(response, 400, { error: 'invalid environment switch request' })
-      }
-      if (!body || typeof body !== 'object' || Array.isArray(body)) {
-        return writeJSON(response, 400, { error: 'invalid environment switch request' })
-      }
-      const bodyKeys = Object.keys(body)
-      if (bodyKeys.some((key) => !['target', 'confirmation'].includes(key))) {
-        return writeJSON(response, 400, { error: 'invalid environment switch request' })
-      }
-      const decision = environmentSwitchDecision({
-        currentTarget: runtime.target,
-        target: body.target,
-        confirmation: body.confirmation,
-      })
-      if (!decision.ok) return writeJSON(response, decision.status, { error: decision.error })
-      const preflight = environmentSwitchPreflight(decision.target)
-      if (!preflight.ok) return writeJSON(response, preflight.status, { error: preflight.error })
-
-      const reachability = await environmentSwitchReachability(decision.target, {
-        sourceEnv: process.env,
-        prepareTunnel: decision.target === 'production'
-          ? () => prepareProductionTunnel({ sourceEnv: process.env })
-          : null,
-      })
-      if (!reachability.ok) {
-        return writeJSON(response, reachability.status, { error: reachability.error })
-      }
-      let child
-      const plan = environmentSwitchSpawnOptions({ target: decision.target, port, sourceEnv: process.env })
-      child = spawn(plan.command, plan.args, plan.options)
-      child.once('error', (error) => {
-        switchInProgress = false
-        console.error('[musuw-admin] environment switch process failed:', publicError(error))
-      })
-      child.once('exit', (code) => {
-        if (code !== 0) switchInProgress = false
-      })
-      // The restart script must outlive this process.  Detached + ignored stdio
-      // prevents descriptor inheritance; unref ensures the old server can exit
-      // immediately after acknowledging the switch instead of waiting on the
-      // long-lived replacement process.
-      child.unref()
-      handedOff = true
-      return writeJSON(response, 202, { data: { target: decision.target, status: 'switching' } })
-    } catch (error) {
-      console.error('[musuw-admin] environment switch could not start:', publicError(error))
-      return writeJSON(response, 500, { error: 'environment switch could not start' })
-    } finally {
-      if (!handedOff) switchInProgress = false
-    }
   }
 
   async function proxyOperationsRequest(request, response, url, session) {
@@ -1426,8 +1094,9 @@ async function start() {
         return await proxyOperationsRequest(request, response, url, session)
       }
       if (url.pathname.startsWith('/admin-api/')) {
-        if (isEnvironmentSwitchRequest(request.method, url.pathname)) return await switchEnvironment(request, response, session)
-        if (url.pathname === ENVIRONMENT_SWITCH_PATH) return writeJSON(response, 405, { error: 'method not allowed' })
+        if (url.pathname === ENVIRONMENT_SWITCH_PATH) {
+          return writeJSON(response, 410, { error: 'environment switching is navigation-only' })
+        }
         const modelPolicyPlan = modelPolicyRequestPlan(request.method, url.pathname)
         if (modelPolicyPlan) return await proxyModelPolicyRequest(request, response, url, session, modelPolicyPlan)
         if (url.pathname === MODEL_POLICY_PATH || url.pathname.startsWith(`${MODEL_POLICY_PATH}/`)) {

@@ -5,33 +5,25 @@ import test from 'node:test'
 
 const root = process.cwd()
 const app = fs.readFileSync(path.join(root, 'src/operations/OperationsApp.vue'), 'utf8')
-const api = fs.readFileSync(path.join(root, 'src/operations/api.ts'), 'utf8')
 const types = fs.readFileSync(path.join(root, 'src/operations/types.ts'), 'utf8')
 
-test('environment menu submits one-click TEST/PRODUCTION switch requests', () => {
-  assert.match(app, /switchEnvironment/)
+test('environment menu navigates between the two fixed local origins', () => {
   assert.match(app, /TEST/)
   assert.match(app, /PRODUCTION/)
-  assert.match(api, /switchEnvironment/)
-  assert.match(api, /['"]\/admin-api\/environment['"]/)
-  assert.match(api, /method:\s*['"]POST['"]/)
-  assert.match(api, /I_UNDERSTAND_THIS_IS_LIVE/)
-  assert.match(api, /target === ['"]production['"]/)
-  assert.match(api, /confirmation:\s*PRODUCTION_ENVIRONMENT_CONFIRMATION/)
+  assert.match(app, /4187/)
+  assert.match(app, /location\.assign/)
+  assert.doesNotMatch(app, /operationsApi\.switchEnvironment/)
+  assert.doesNotMatch(app, /waitForEnvironment/)
+  assert.doesNotMatch(app, /location\.reload/)
 })
 
-test('switch UI reports progress, polls health, preserves hash on reload, and recovers after timeout', () => {
-  assert.match(app, /switching/)
-  assert.match(app, /health|healthz/)
-  assert.match(app, /30_000|30 seconds|30 秒/)
-  assert.match(app, /location\.reload/)
-  assert.match(app, /恢复当前环境|恢复|重试/)
-  assert.match(app, /role=["']status["']/)
-  assert.match(app, /role=["']alert["']/)
+test('environment UI does not expose a restart timeout or cross-target switch state', () => {
+  assert.doesNotMatch(app, /switchTarget|switchError|switchPollTimer/)
+  assert.doesNotMatch(app, /healthMatches|healthz/)
+  assert.doesNotMatch(app, /30_000|30 seconds|30 秒/)
 })
 
-test('environment switch result is typed as a target and switching status', () => {
+test('environment policy keeps the typed target contract', () => {
   assert.match(types, /EnvironmentTarget/)
-  assert.match(types, /EnvironmentSwitchResult/)
-  assert.match(types, /status:\s*['"]switching['"]/)
+  assert.match(types, /EnvironmentName/)
 })

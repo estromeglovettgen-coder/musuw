@@ -2,19 +2,20 @@
 
 Musuw 运营中台是仓库内的 TDesign Vue Next 多入口应用，复用腾讯
 TDesign 的组件与交互规范，不再运行 Appsmith，也不维护第二套业务
-CRUD、权限系统或数据同步层。服务只监听 `127.0.0.1:4186`，不会部署到
-公网。
+CRUD、权限系统或数据同步层。服务只监听 `127.0.0.1` 的两个固定本地端口
+（TEST `4186`、PRODUCTION `4187`），不会部署到公网。
 
 ```sh
-scripts/musuw-admin test
+scripts/musuw-admin start
 scripts/musuw-admin status
 scripts/musuw-admin logs
-scripts/musuw-admin stop
+scripts/musuw-admin stop all
 ```
 
-入口：<http://127.0.0.1:4186>
+入口：<http://127.0.0.1:4186>（TEST）和
+<http://127.0.0.1:4187>（PRODUCTION）
 
-启动器先执行前端类型检查和生产构建，再启动本机 Node 服务。旧
+启动器先执行一次前端类型检查和生产构建，再分别启动两个本机 Node 服务。旧
 `musuw-appsmith` 容器会被删除；Docker volume `musuw_appsmith_stacks`
 和镜像暂时保留，便于确认无遗漏后恢复或单独清理，但它们已不再参与运行。
 
@@ -93,50 +94,45 @@ scripts/musuw-admin stop
 
 ## TEST / PRODUCTION 切换
 
-环境仍在单个进程启动时锁定；运营台顶部环境菜单提供一键切换。切换会在本机
-通过受保护的 `POST /admin-api/environment` 重启运营台进程，旧进程先退出、
-新进程只打开目标环境的一个只读数据库连接池，浏览器等待目标环境健康后自动
-刷新并重新建立本机会话。切换期间不会同时打开 TEST 与 PRODUCTION 两套数据源。
+启动器同时维护两个完全隔离的进程：TEST 固定在 4186，PRODUCTION 固定在
+4187。运营台顶部环境菜单只导航到另一个已运行的本地 origin，不发起重启、
+轮询或跨环境代理请求，因此切换是即时的。每个进程独立持有只读数据库池、
+运行时配置、日志、pid 文件和会话 cookie 名；浏览器按端口切换时不会复用另一
+环境的会话。
 
-TEST 可以直接切回；切到 PRODUCTION 时页面会明确要求输入下面的确认短语：
+推荐用一次命令启动两个环境：
 
 ```sh
-scripts/musuw-admin test
-
-MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE \
-  scripts/musuw-admin production
+scripts/musuw-admin start
 ```
 
-这里的解锁短语只表示运营台将读取真实生产业务数据，不代表 Paddle Live
-provider 已获批或允许用于结账。
+执行 `start` 或 `production` 即表示本机操作者明确选择启动只读生产运营台；
+它只读取生产业务数据，不代表 Paddle Live provider 已获批或允许用于结账。
 
 PRODUCTION 还要求本机 ignored 文件
 `.runtime/musuw-admin/production.env` 提供独立数据库、后端和供应商配置。
-在真正重启前，服务还会先调用现有启动器的受控
+在 PRODUCTION 启动前，服务还会先调用现有启动器的受控
 `prepare-production-tunnel` seam，验证生产端口确实由本启动器拥有：使用
 `musuw-tokyo`（可用 `MUSUW_ADMIN_PRODUCTION_SSH_TARGET` 覆盖）固定受限 SSH
 alias，强制 BatchMode 与严格校验 known_hosts，不要求 root 登录；通过该受限用户
 执行 `sudo -n docker inspect` 获取固定 `weknora-v072-production-postgres` 容器
 IPv4，再由同一用户通过 ControlMaster 建立 loopback forward。即使端口已有 TCP
 监听，也不会把陌生进程当作生产隧道；归属校验或隧道准备失败会立即返回明确错误，
-不会先返回 202 再让页面等待超时。
-随后才用无凭据的短探针确认目标 PostgreSQL 端口和后端 `/health` 可达。缺文件、
-缺解锁短语、切换请求校验失败或数据库不是只读时都
-fail closed；
-切换子进程只继承必要的本机非密钥启动参数，TEST 凭据、数据库地址和供应商
-secret 不会自动复制到 PRODUCTION。命令行仍可作为一键切换失败时的本机回退，
-自动测试不得写生产数据。
+不会启动 PRODUCTION 进程。
+PRODUCTION 进程启动时会建立独立 PostgreSQL 连接池，并通过
+`SHOW transaction_read_only` 确认数据库会话为只读；初始化或健康检查失败只会
+停止 PRODUCTION。缺文件、隧道归属失败、跨环境请求或数据库不是只读时都
+fail closed；TEST 凭据、数据库地址和供应商 secret 不会自动复制到
+PRODUCTION。单独启动或停止一个 target 不会终止另一个 target。
 
 隧道的本地端口默认取 `MUSUW_ADMIN_DATABASE_URL` 中的端口（未指定时回退到
 历史端口 `15433`），远端 PostgreSQL 端口默认 `5432`。如现有 SSH/Compose
 配置使用其他端口，只能通过非密钥的
 `MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT` 或 `MUSUW_ADMIN_PRODUCTION_DB_PORT`
-覆盖。切回 TEST 或执行 `scripts/musuw-admin stop` 会通过同一 ControlMaster
-关闭隧道；不会启动第二个运营台进程或数据库池。
-
-如果目标进程在旧进程退出后未能通过 `/healthz`，启动器会保留目标失败日志，
-停止失败进程，并最多直接恢复切换前的目标一次；恢复失败才会报告运营台不可用，
-不会递归重启或反复构建。
+覆盖。执行 `scripts/musuw-admin stop production` 会停止 PRODUCTION 并关闭同一
+ControlMaster；`scripts/musuw-admin stop test` 只停止 TEST，`stop all` 停止
+两个 target。若一个 target 启动失败，启动器会保留该 target 的失败日志并保持
+另一个已运行 target 不变。
 
 ## 写操作与安全边界
 

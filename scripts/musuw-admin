@@ -3,33 +3,34 @@ set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 runtime_dir="$repo_root/.runtime/musuw-admin"
-pid_file="$runtime_dir/server.pid"
-target_file="$runtime_dir/target"
-log_file="$runtime_dir/server.log"
+process_state_dir="$runtime_dir/processes"
+test_port=4186
+production_port=4187
 tunnel_target_file="$runtime_dir/production-tunnel-target"
 tunnel_port_file="$runtime_dir/production-tunnel-port"
 server_script="$repo_root/scripts/musuw-admin-server.mjs"
 listen_host=127.0.0.1
-listen_port=4186
 legacy_container=musuw-appsmith
 production_tunnel_default_port=15433
 production_remote_db_default_port=5432
 production_container_default=weknora-v072-production-postgres
 production_ssh_target_default=musuw-tokyo
 admin_uid=$(id -u)
-ssh_control_socket="/tmp/musuw-admin-ssh-${admin_uid}.sock"
+repo_instance_id=$(printf '%s' "$repo_root" | cksum | awk '{print $1}')
+ssh_control_socket="/tmp/musuw-admin-${repo_instance_id}-${admin_uid}.sock"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/musuw-admin test|production|stop|status|logs
+Usage: scripts/musuw-admin start|test|production|stop|status|logs
 
-  test        Build and start the source-controlled TEST operations console.
-  production  Start against explicit production runtime config (locked).
+  start       Build and start both isolated consoles (TEST 4186, PRODUCTION 4187).
+  test        Build and start only the source-controlled TEST console on 4186.
+  production  Build and start only the isolated read-only PRODUCTION console on 4187.
   prepare-production-tunnel
               Prepare the existing pinned Tokyo SSH tunnel without restarting the console.
-  stop        Stop the operations server. The retired Appsmith volume is preserved.
-  status      Show the selected environment, process state, and loopback URL.
-  logs        Show the last 100 server log lines.
+  stop        Stop both operation consoles and the production tunnel.
+  status      Show both process states, health, ports, and tunnel ownership.
+  logs        Show the last 100 lines from each target log.
 EOF
 }
 
@@ -132,21 +133,48 @@ production_remote_db_port() {
   printf '%s' "$configured_port"
 }
 
+target_port() {
+  case "$1" in
+    test) printf '%s' "$test_port" ;;
+    production) printf '%s' "$production_port" ;;
+    *) return 1 ;;
+  esac
+}
+
+target_state_dir() {
+  case "$1" in
+    test|production) printf '%s/%s' "$process_state_dir" "$1" ;;
+    *) return 1 ;;
+  esac
+}
+
 server_pid() {
+  target=$1
+  target_dir=$(target_state_dir "$target")
+  pid_file="$target_dir/server.pid"
   [ -r "$pid_file" ] || return 1
   pid=$(sed -n '1p' "$pid_file")
   case "$pid" in
     ''|*[!0-9]*) return 1 ;;
   esac
   command_line=$(ps -p "$pid" -o command= 2>/dev/null || true)
-  case "$command_line" in
-    *musuw-admin-server.mjs*) printf '%s\n' "$pid" ;;
-    *) return 1 ;;
-  esac
+  printf '%s\n' "$command_line" | awk -v target="$target" '
+    {
+      for (i = 1; i < NF; i++) {
+        if ($i ~ /musuw-admin-server\.mjs$/ && $(i + 1) == target) found = 1
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  ' || return 1
+  printf '%s\n' "$pid"
 }
 
 stop_server() {
-  if pid=$(server_pid); then
+  target=$1
+  target_dir=$(target_state_dir "$target")
+  pid_file="$target_dir/server.pid"
+  target_file="$target_dir/target"
+  if pid=$(server_pid "$target"); then
     kill "$pid" 2>/dev/null || true
     attempt=0
     while kill -0 "$pid" 2>/dev/null && [ "$attempt" -lt 40 ]; do
@@ -173,6 +201,7 @@ retire_appsmith() {
 }
 
 port_is_busy() {
+  listen_port=$1
   command -v lsof >/dev/null 2>&1 || return 1
   lsof -nP -iTCP:"$listen_port" -sTCP:LISTEN >/dev/null 2>&1
 }
@@ -321,13 +350,29 @@ tunnel_status() {
   fi
 }
 
+health_is_target() {
+  health_payload=$1
+  health_target=$2
+  case "$health_target" in
+    test) expected_label=TEST ;;
+    production) expected_label=PRODUCTION ;;
+    *) return 1 ;;
+  esac
+  observed_status=$(printf '%s' "$health_payload" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+  observed_environment=$(printf '%s' "$health_payload" | sed -n 's/.*"environment"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+  [ "$observed_status" = ok ] && [ "$observed_environment" = "$expected_label" ]
+}
+
 wait_for_health() {
+  target=$1
+  listen_port=$(target_port "$target")
   attempt=0
   while [ "$attempt" -lt 100 ]; do
-    if curl --fail --silent --max-time 1 "http://$listen_host:$listen_port/healthz" >/dev/null 2>&1; then
+    health_payload=$(curl --fail --silent --max-time 1 "http://$listen_host:$listen_port/healthz" 2>/dev/null || true)
+    if health_is_target "$health_payload" "$target"; then
       return 0
     fi
-    if ! server_pid >/dev/null 2>&1; then
+    if ! server_pid "$target" >/dev/null 2>&1; then
       return 1
     fi
     attempt=$((attempt + 1))
@@ -339,6 +384,7 @@ wait_for_health() {
 run_with_runtime_env() {
   runtime_target=$1
   shift
+  runtime_port=$(target_port "$runtime_target")
   replace_process=no
   if [ "${1:-}" = '--replace-process' ]; then
     replace_process=yes
@@ -352,14 +398,10 @@ run_with_runtime_env() {
       exec env -i \
         "PATH=${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" \
         "HOME=${HOME:-/tmp}" \
-        "MUSUW_ADMIN_PORT=$listen_port" \
+        "MUSUW_ADMIN_PORT=$runtime_port" \
         "MUSUW_ADMIN_TEST_DB_HOST=${MUSUW_ADMIN_TEST_DB_HOST:-}" \
         "MUSUW_ADMIN_TEST_DB_PORT=${MUSUW_ADMIN_TEST_DB_PORT:-}" \
         "MUSUW_ADMIN_TEST_BACKEND_URL=${MUSUW_ADMIN_TEST_BACKEND_URL:-}" \
-        "MUSUW_ADMIN_PRODUCTION_SSH_TARGET=${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-}" \
-        "MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT=${MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT:-}" \
-        "MUSUW_ADMIN_PRODUCTION_DB_PORT=${MUSUW_ADMIN_PRODUCTION_DB_PORT:-}" \
-        "MUSUW_ADMIN_PRODUCTION_CONTAINER=${MUSUW_ADMIN_PRODUCTION_CONTAINER:-}" \
         "MUSUW_R2_ACCOUNT_ID=${MUSUW_R2_ACCOUNT_ID:-}" \
         "MUSUW_R2_TEST_BUCKET=${MUSUW_R2_TEST_BUCKET:-}" \
         "MUSUW_R2_PREFIX=${MUSUW_R2_PREFIX:-}" \
@@ -369,14 +411,10 @@ run_with_runtime_env() {
     env -i \
       "PATH=${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" \
       "HOME=${HOME:-/tmp}" \
-      "MUSUW_ADMIN_PORT=$listen_port" \
+      "MUSUW_ADMIN_PORT=$runtime_port" \
       "MUSUW_ADMIN_TEST_DB_HOST=${MUSUW_ADMIN_TEST_DB_HOST:-}" \
       "MUSUW_ADMIN_TEST_DB_PORT=${MUSUW_ADMIN_TEST_DB_PORT:-}" \
       "MUSUW_ADMIN_TEST_BACKEND_URL=${MUSUW_ADMIN_TEST_BACKEND_URL:-}" \
-      "MUSUW_ADMIN_PRODUCTION_SSH_TARGET=${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-}" \
-      "MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT=${MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT:-}" \
-      "MUSUW_ADMIN_PRODUCTION_DB_PORT=${MUSUW_ADMIN_PRODUCTION_DB_PORT:-}" \
-      "MUSUW_ADMIN_PRODUCTION_CONTAINER=${MUSUW_ADMIN_PRODUCTION_CONTAINER:-}" \
       "MUSUW_R2_ACCOUNT_ID=${MUSUW_R2_ACCOUNT_ID:-}" \
       "MUSUW_R2_TEST_BUCKET=${MUSUW_R2_TEST_BUCKET:-}" \
       "MUSUW_R2_PREFIX=${MUSUW_R2_PREFIX:-}" \
@@ -388,7 +426,7 @@ run_with_runtime_env() {
     exec env -i \
       "PATH=${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" \
       "HOME=${HOME:-/tmp}" \
-      "MUSUW_ADMIN_PORT=$listen_port" \
+      "MUSUW_ADMIN_PORT=$runtime_port" \
       "MUSUW_ADMIN_PRODUCTION_SSH_TARGET=${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-}" \
       "MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT=${MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT:-}" \
       "MUSUW_ADMIN_PRODUCTION_DB_PORT=${MUSUW_ADMIN_PRODUCTION_DB_PORT:-}" \
@@ -398,7 +436,7 @@ run_with_runtime_env() {
   env -i \
     "PATH=${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" \
     "HOME=${HOME:-/tmp}" \
-    "MUSUW_ADMIN_PORT=$listen_port" \
+    "MUSUW_ADMIN_PORT=$runtime_port" \
     "MUSUW_ADMIN_PRODUCTION_SSH_TARGET=${MUSUW_ADMIN_PRODUCTION_SSH_TARGET:-}" \
     "MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT=${MUSUW_ADMIN_PRODUCTION_TUNNEL_PORT:-}" \
     "MUSUW_ADMIN_PRODUCTION_DB_PORT=${MUSUW_ADMIN_PRODUCTION_DB_PORT:-}" \
@@ -409,13 +447,19 @@ run_with_runtime_env() {
 launch_console_process() {
   launch_target=$1
   append_log=${2:-no}
+  launch_port=$(target_port "$launch_target")
+  launch_dir=$(target_state_dir "$launch_target")
+  launch_log="$launch_dir/server.log"
+  launch_pid_file="$launch_dir/server.pid"
+  launch_target_file="$launch_dir/target"
+  mkdir -p "$launch_dir"
   if [ "$append_log" != yes ]; then
-    : > "$log_file"
+    : > "$launch_log"
   fi
-  run_with_runtime_env "$launch_target" --replace-process nohup node "$server_script" "$launch_target" >>"$log_file" 2>&1 &
+  run_with_runtime_env "$launch_target" --replace-process nohup node "$server_script" "$launch_target" >>"$launch_log" 2>&1 &
   launch_pid=$!
-  printf '%s\n' "$launch_pid" > "$pid_file"
-  printf '%s\n' "$launch_target" > "$target_file"
+  printf '%s\n' "$launch_pid" > "$launch_pid_file"
+  printf '%s\n' "$launch_target" > "$launch_target_file"
 }
 
 validate_target() {
@@ -433,101 +477,116 @@ validate_target() {
   esac
 }
 
-restore_previous_target() {
-  restore_target=$1
-  case "$restore_target" in
-    test) stop_tunnel ;;
-    production)
-      MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE prepare_production_tunnel || return 1
-      ;;
-    *) return 1 ;;
-  esac
-  launch_console_process "$restore_target" yes
-  if wait_for_health; then
-    return 0
-  fi
-  tail -n 20 "$log_file" >&2 2>/dev/null || true
-  stop_server
-  if [ "$restore_target" = production ]; then
-    stop_tunnel
-  fi
-  return 1
-}
-
 start_console() {
   target=$1
+  build_assets=${2:-yes}
   validate_target "$target"
   command -v node >/dev/null 2>&1 || die 'Node.js is required'
   command -v npm >/dev/null 2>&1 || die 'npm is required'
   command -v curl >/dev/null 2>&1 || die 'curl is required'
+  listen_port=$(target_port "$target")
+  target_dir=$(target_state_dir "$target")
+  target_log="$target_dir/server.log"
+  case "$target" in
+    test) target_label=TEST ;;
+    production) target_label=PRODUCTION ;;
+  esac
 
-  previous_target=''
-  if previous_pid=$(server_pid); then
-    previous_target=$(sed -n '1p' "$target_file" 2>/dev/null || true)
-    case "$previous_target" in
-      test|production) : ;;
-      *) previous_target='' ;;
-    esac
+  # Starting one target is idempotent and never stops or mutates the other.
+  if server_pid "$target" >/dev/null 2>&1 && wait_for_health "$target"; then
+    printf 'Musuw operations (%s): already healthy at http://%s:%s\n' "$target" "$listen_host" "$listen_port"
+    return 0
+  fi
+  stop_server "$target"
+
+  mkdir -p "$runtime_dir" "$target_dir"
+  if [ "$build_assets" = yes ]; then
+    run_with_runtime_env "$target" npm --prefix "$repo_root/weknora/frontend" run build-with-types
   fi
 
-  mkdir -p "$runtime_dir"
-  run_with_runtime_env "$target" npm --prefix "$repo_root/weknora/frontend" run build-with-types
-
-  # Prepare production before stopping the current console.  A failed SSH
-  # handshake, host-key check, container lookup, or port forward therefore
-  # leaves the current TEST process untouched.
+  # Production tunnel preparation is target-local.  A failed handshake,
+  # host-key check, container lookup, or port forward leaves TEST untouched.
   if [ "$target" = production ]; then
     prepare_production_tunnel
-  else
-    stop_tunnel
   fi
 
-  stop_server
-  retire_appsmith
-  port_is_busy && die "port $listen_port is already in use"
-
+  port_is_busy "$listen_port" && die "port $listen_port is already in use"
   launch_console_process "$target"
-  if ! wait_for_health; then
-    tail -n 20 "$log_file" >&2 2>/dev/null || true
-    stop_server
+  if ! wait_for_health "$target"; then
+    tail -n 20 "$target_log" >&2 2>/dev/null || true
+    stop_server "$target"
     if [ "$target" = production ]; then
       stop_tunnel
     fi
-    if [ -n "$previous_target" ] && restore_previous_target "$previous_target"; then
-      die "operations server did not become healthy; restored $previous_target"
-    fi
-    die 'operations server did not become healthy within 10 seconds'
+    die "$target_label operations server did not become healthy within 10 seconds"
   fi
   printf 'Musuw operations (%s): http://%s:%s\n' "$target" "$listen_host" "$listen_port"
 }
 
+start_all() {
+  validate_target test
+  MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE validate_target production
+  command -v node >/dev/null 2>&1 || die 'Node.js is required'
+  command -v npm >/dev/null 2>&1 || die 'npm is required'
+  command -v curl >/dev/null 2>&1 || die 'curl is required'
+  mkdir -p "$runtime_dir" "$process_state_dir"
+  # Build the shared static bundle once; each server still receives a clean
+  # target-specific environment and owns its own process/pool/session state.
+  run_with_runtime_env test npm --prefix "$repo_root/weknora/frontend" run build-with-types
+  retire_appsmith
+  start_console test no
+  MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE start_console production no
+}
+
 show_status() {
-  if ! pid=$(server_pid); then
-    printf 'Musuw operations: stopped\n'
-    printf 'SSH tunnel: %s\n' "$(tunnel_status)"
-    return
-  fi
-  target=$(sed -n '1p' "$target_file" 2>/dev/null || printf 'unknown')
-  health=$(curl --silent --max-time 1 "http://$listen_host:$listen_port/healthz" 2>/dev/null || printf '{"status":"unreachable"}')
-  printf 'Musuw operations: target=%s pid=%s url=http://%s:%s health=%s\n' "$target" "$pid" "$listen_host" "$listen_port" "$health"
+  for target in test production; do
+    listen_port=$(target_port "$target")
+    if pid=$(server_pid "$target"); then
+      health=$(curl --silent --max-time 1 "http://$listen_host:$listen_port/healthz" 2>/dev/null || true)
+      if ! health_is_target "$health" "$target"; then
+        health='{"status":"unexpected-target"}'
+      fi
+      printf 'Musuw operations: target=%s pid=%s url=http://%s:%s health=%s\n' "$target" "$pid" "$listen_host" "$listen_port" "$health"
+    else
+      printf 'Musuw operations: target=%s stopped url=http://%s:%s\n' "$target" "$listen_host" "$listen_port"
+    fi
+  done
   printf 'SSH tunnel: %s\n' "$(tunnel_status)"
+}
+
+show_logs() {
+  for target in test production; do
+    target_log="$(target_state_dir "$target")/server.log"
+    if [ -r "$target_log" ]; then
+      printf '%s\n' "--- $target ---"
+      tail -n 100 "$target_log"
+    fi
+  done
 }
 
 command=${1:-}
 case "$command" in
-  test|production) start_console "$command" ;;
+  start) start_all ;;
+  test|production)
+    if [ "$command" = production ]; then
+      MUSUW_ADMIN_PRODUCTION_UNLOCK=I_UNDERSTAND_THIS_IS_LIVE start_console "$command"
+    else
+      start_console "$command"
+    fi
+    ;;
   prepare-production-tunnel) prepare_production_tunnel ;;
   stop)
     mkdir -p "$runtime_dir"
-    stop_server
-    stop_tunnel
+    case "${2:-all}" in
+      test) stop_server test ;;
+      production) stop_server production; stop_tunnel ;;
+      all) stop_server test; stop_server production; stop_tunnel ;;
+      *) die 'stop target must be test, production, or all' ;;
+    esac
     printf 'Musuw operations: stopped (retired Appsmith data volume preserved)\n'
     ;;
   status) show_status ;;
-  logs)
-    [ -r "$log_file" ] || die 'no operations log exists'
-    tail -n 100 "$log_file"
-    ;;
+  logs) show_logs ;;
   -h|--help|help|'') usage ;;
   *) usage >&2; exit 2 ;;
 esac

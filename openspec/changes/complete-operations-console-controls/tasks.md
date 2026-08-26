@@ -5,10 +5,10 @@
 
 ## 2. Operations Environment Switch
 
-- [x] 2.1 Add the exact loopback POST switch endpoint with session, Origin, CSRF, target validation, preflight, and single-flight behavior
-- [x] 2.2 Restart through the existing launcher using fixed no-shell arguments, clean target-specific environment, detached lifecycle, and production runtime authority
-- [x] 2.3 Add one-click console state, health polling, current-hash reload, timeout recovery, and operator documentation
-- [x] 2.4 Restore the existing pinned Tokyo restricted-SSH ControlMaster tunnel preparation, `sudo -n` container lookup, ownership checks, and TEST/PRODUCTION/stop lifecycle without accepting unowned local listeners
+- [x] 2.1 Add fixed-origin TEST/PRODUCTION server identity, target-specific session/cookie names, and reject cross-target target-selection requests
+- [x] 2.2 Add per-target launcher start/stop/status lifecycle (TEST 4186, PRODUCTION 4187) with clean environments and no cross-target process termination
+- [x] 2.3 Add one-click environment navigation with no restart/poll and keep 4186 as the default TEST entry
+- [x] 2.4 Preserve the pinned Tokyo restricted-SSH ControlMaster tunnel preparation, `sudo -n` container lookup, ownership checks, and independent target startup
 
 ## 3. Real Consumer Model Policy Matrix
 
@@ -34,4 +34,4 @@
 - [x] 6.1 Run focused and full backend/frontend tests, typecheck, builds, scripts, repository contracts, and strict OpenSpec validation
 - [x] 6.2 Perform authenticated browser acceptance for matrix data, policy rejection, TEST/PRODUCTION/TEST switching, selector stacking, and KB/chat dark/light surfaces
 - [x] 6.3 Perform one bounded adversarial review and fix only current blockers
-- [x] 6.4 Commit and push `main`, wait for CI and application/storefront deployments, run release smoke checks, and leave the loopback console healthy on port 4186 in TEST
+- [ ] 6.4 Commit and push `main`, wait for CI and application/storefront deployments, run release smoke checks, and leave both loopback consoles healthy with TEST on 4186 and PRODUCTION on 4187

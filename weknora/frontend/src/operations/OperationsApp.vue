@@ -48,38 +48,28 @@
             <button
               class="ops-environment"
               type="button"
-              :class="[`is-${config?.target || 'test'}`, { 'is-switching': switching }]"
-              :disabled="switching"
-              :aria-busy="switching"
+              :class="`is-${config?.target || 'test'}`"
             >
-              <RefreshIcon v-if="switching" size="15" class="ops-spin" />
-              <span v-else class="ops-environment__dot" />
-              {{ switching ? `切换到 ${switchTargetLabel}…` : (config?.environment || '连接中') }}
-              <ChevronDownIcon v-if="!switching" size="15" />
+              <span class="ops-environment__dot" />
+              {{ config?.environment || '连接中' }}
+              <ChevronDownIcon size="15" />
             </button>
             <template #content>
               <div class="ops-env-menu">
-                <button type="button" class="is-current" :disabled="switching">
+                <button type="button" class="is-current">
                   <span>{{ config?.environment || '当前环境' }}</span>
-                  <RefreshIcon v-if="switching" size="16" class="ops-spin" />
-                  <CheckIcon v-else size="16" />
+                  <CheckIcon size="16" />
                 </button>
                 <button
                   type="button"
                   :class="{ 'is-production': alternateTarget === 'production' }"
-                  :disabled="switching || !config"
+                  :disabled="!config"
                   @click="switchEnvironment(alternateTarget)"
                 >
                   <span>{{ alternateTargetLabel }}</span>
                   <ChevronDownIcon size="15" class="ops-env-menu__switch-icon" />
                 </button>
-                <p v-if="switching" class="ops-env-menu__status" role="status" aria-live="polite">
-                  正在切换到 {{ switchTargetLabel }}，请稍候…
-                </p>
-                <p v-else-if="switchError" class="ops-env-menu__status is-error" role="alert">
-                  {{ switchError }}
-                </p>
-                <p v-else>切换会重启本机运营台，并保持当前页面。</p>
+                <p>两个环境常驻运行，点击后立即切换并保留当前页面。</p>
               </div>
             </template>
           </t-popup>
@@ -97,16 +87,6 @@
       </header>
 
       <main class="ops-main">
-        <div v-if="switching" class="ops-environment-status" role="status" aria-live="polite">
-          <RefreshIcon size="15" class="ops-spin" />
-          <span>正在切换到 {{ switchTargetLabel }}，请稍候…</span>
-        </div>
-        <div v-else-if="switchError" class="ops-environment-status is-error" role="alert">
-          <span>{{ switchError }}</span>
-          <button type="button" class="ops-environment-status__action" @click="recoverEnvironment">
-            恢复当前环境
-          </button>
-        </div>
         <div v-if="bootstrapError" class="ops-bootstrap-error">
           <t-alert theme="error" title="运营中台启动失败" :message="bootstrapError">
             <template #operation>
@@ -128,7 +108,6 @@
 
 <script setup lang="ts">
 import { computed, markRaw, onBeforeUnmount, onMounted, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -173,16 +152,16 @@ const config = ref<OperationsConfig | null>(null)
 const bootstrapError = ref('')
 const refreshKey = ref(0)
 const busyChildren = ref(0)
-const switching = ref(false)
-const switchTarget = ref<EnvironmentTarget | null>(null)
-const switchError = ref('')
-let switchPollTimer: ReturnType<typeof setTimeout> | null = null
 const refreshing = computed(() => busyChildren.value > 0)
 const activeNavigation = computed(() => navigation.find((item) => item.key === currentPage.value) || navigation[0])
 const alternateTarget = computed<EnvironmentTarget>(() => (config.value?.target === 'production' ? 'test' : 'production'))
 const environmentLabel = (target: EnvironmentTarget) => (target === 'production' ? 'PRODUCTION' : 'TEST')
 const alternateTargetLabel = computed(() => environmentLabel(alternateTarget.value))
-const switchTargetLabel = computed(() => (switchTarget.value ? environmentLabel(switchTarget.value) : '目标环境'))
+
+const environmentPorts: Record<EnvironmentTarget, string> = {
+  test: '4186',
+  production: '4187',
+}
 
 function navigate(page: PageKey) {
   currentPage.value = page
@@ -213,70 +192,11 @@ function setBusy(value: boolean) {
   busyChildren.value = Math.max(0, busyChildren.value + (value ? 1 : -1))
 }
 
-function clearSwitchPollTimer() {
-  if (switchPollTimer) {
-    clearTimeout(switchPollTimer)
-    switchPollTimer = null
-  }
-}
-
-function wait(milliseconds: number) {
-  return new Promise<void>((resolve) => {
-    switchPollTimer = setTimeout(() => {
-      switchPollTimer = null
-      resolve()
-    }, milliseconds)
-  })
-}
-
-async function healthMatches(target: EnvironmentTarget) {
-  try {
-    const health = await Promise.race([
-      operationsApi.health(),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health check timeout')), 1000)),
-    ])
-    return health.environment === environmentLabel(target)
-  } catch {
-    return false
-  }
-}
-
-async function waitForEnvironment(target: EnvironmentTarget) {
-  const deadline = Date.now() + 30_000
-  while (Date.now() < deadline) {
-    if (await healthMatches(target)) return true
-    await wait(Math.min(500, Math.max(0, deadline - Date.now())))
-  }
-  return false
-}
-
-async function switchEnvironment(target: EnvironmentTarget) {
-  if (switching.value || !config.value || target === config.value.target) return
-  switching.value = true
-  switchTarget.value = target
-  switchError.value = ''
-  try {
-    await operationsApi.switchEnvironment(target)
-    if (!(await waitForEnvironment(target))) {
-      throw new Error(`切换到 ${environmentLabel(target)} 超时（30 秒）。当前环境未确认改变。`)
-    }
-    switching.value = false
-    switchTarget.value = null
-    // Reloading the current URL keeps its hash route intact after the process restarts.
-    window.location.reload()
-  } catch (error) {
-    switchError.value = error instanceof Error ? error.message : `切换到 ${environmentLabel(target)} 失败`
-    MessagePlugin.error(switchError.value)
-  } finally {
-    clearSwitchPollTimer()
-    switching.value = false
-    switchTarget.value = null
-  }
-}
-
-function recoverEnvironment() {
-  switchError.value = ''
-  void bootstrap()
+function switchEnvironment(target: EnvironmentTarget) {
+  if (!config.value || target === config.value.target) return
+  const targetUrl = new URL(window.location.href)
+  targetUrl.port = environmentPorts[target]
+  window.location.assign(targetUrl.href)
 }
 
 onMounted(() => {
@@ -286,7 +206,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  clearSwitchPollTimer()
   window.removeEventListener('hashchange', handleHashChange)
 })
 </script>

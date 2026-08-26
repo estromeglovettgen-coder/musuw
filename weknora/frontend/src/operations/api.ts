@@ -1,8 +1,6 @@
 import type {
   BillingData,
   DocumentRow,
-  EnvironmentSwitchResult,
-  EnvironmentTarget,
   IdentityData,
   InvestigationData,
   KnowledgeBaseRow,
@@ -12,7 +10,6 @@ import type {
   ModelPolicySceneKey,
   ModelPolicyUpdate,
   OperationsConfig,
-  OperationsHealth,
   OverviewData,
   PageResult,
   StorageData,
@@ -20,12 +17,10 @@ import type {
   UserRow,
 } from './types'
 import { setOperationsCsrfHeader } from '@/utils/request'
-
-export const PRODUCTION_ENVIRONMENT_CONFIRMATION = 'I_UNDERSTAND_THIS_IS_LIVE'
+import { operationsCsrfToken } from './csrf'
 
 function csrfToken() {
-  const match = document.cookie.match(/(?:^|;\s*)musuw_admin_csrf=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : ''
+  return operationsCsrfToken(document.cookie, window.location.port)
 }
 
 let synchronizedCsrfToken = ''
@@ -63,15 +58,6 @@ export const operationsApi = {
     setOperationsCsrfHeader(csrf_token)
     return config
   },
-  health: () => request<OperationsHealth>('/healthz'),
-  switchEnvironment: (target: EnvironmentTarget) =>
-    request<EnvironmentSwitchResult>('/admin-api/environment', {
-      method: 'POST',
-      body: JSON.stringify({
-        target,
-        ...(target === 'production' ? { confirmation: PRODUCTION_ENVIRONMENT_CONFIRMATION } : {}),
-      }),
-    }),
   modelPolicy: () => request<ModelPolicyData>('/admin-api/model-policy'),
   updateModelPolicy: (scene: ModelPolicySceneKey, body: ModelPolicyUpdate) =>
     request<ModelPolicyScene>(`/admin-api/model-policy/${encodeURIComponent(scene)}`, {

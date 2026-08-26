@@ -16,16 +16,6 @@ export interface OperationsConfig {
 
 export type EnvironmentTarget = OperationsConfig['target']
 
-export interface OperationsHealth {
-  status: 'ok'
-  environment: EnvironmentName
-}
-
-export interface EnvironmentSwitchResult {
-  target: EnvironmentTarget
-  status: 'switching'
-}
-
 /**
  * Safe model metadata returned to the local operations console.  The policy
  * route intentionally carries display/type data only; provider parameters and
