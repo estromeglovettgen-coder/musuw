@@ -72,13 +72,13 @@ func NormalizeConsumerPlan(plan ConsumerPlan) ConsumerPlan {
 func LimitsForConsumerPlan(plan ConsumerPlan) ConsumerPlanLimits {
 	switch NormalizeConsumerPlan(plan) {
 	case ConsumerPlanPlus:
-		return ConsumerPlanLimits{Plan: ConsumerPlanPlus, StorageBytes: 20 * consumerGiB, MonthlyOpenRouterMicrousd: 1_250_000, VideoUpload: true}
+		return ConsumerPlanLimits{Plan: ConsumerPlanPlus, StorageBytes: 10 * consumerGiB, MonthlyOpenRouterMicrousd: 1_250_000, VideoUpload: true}
 	case ConsumerPlanPro:
-		return ConsumerPlanLimits{Plan: ConsumerPlanPro, StorageBytes: 40 * consumerGiB, MonthlyOpenRouterMicrousd: 2_500_000, VideoUpload: true}
+		return ConsumerPlanLimits{Plan: ConsumerPlanPro, StorageBytes: 30 * consumerGiB, MonthlyOpenRouterMicrousd: 2_500_000, VideoUpload: true}
 	case ConsumerPlanMax:
-		return ConsumerPlanLimits{Plan: ConsumerPlanMax, StorageBytes: 80 * consumerGiB, MonthlyOpenRouterMicrousd: 5_000_000, VideoUpload: true}
+		return ConsumerPlanLimits{Plan: ConsumerPlanMax, StorageBytes: 100 * consumerGiB, MonthlyOpenRouterMicrousd: 5_000_000, VideoUpload: true}
 	default:
-		return ConsumerPlanLimits{Plan: ConsumerPlanFree, StorageBytes: 5 * consumerGiB, MonthlyOpenRouterMicrousd: 1_000_000, MaxKnowledgeBases: 1, MaxDocumentsPerKB: 10}
+		return ConsumerPlanLimits{Plan: ConsumerPlanFree, StorageBytes: 1 * consumerGiB, MonthlyOpenRouterMicrousd: 1_000_000, MaxKnowledgeBases: 1, MaxDocumentsPerKB: 10}
 	}
 }
 
