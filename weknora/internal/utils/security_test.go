@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"net"
 	"os"
 	"strings"
@@ -248,6 +249,51 @@ func TestSSRFWhitelistExtraMerge(t *testing.T) {
 					tc.host, tc.main, tc.extra, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSSRFWhitelistCIDRUsesSSRFResolver(t *testing.T) {
+	SetSSRFWhitelistFromRaw("93.184.216.0/24")
+	t.Cleanup(ResetSSRFWhitelistForTest)
+
+	lookup := func(host string) ([]net.IP, error) {
+		if host != "example.com" {
+			t.Fatalf("lookup host = %q, want example.com", host)
+		}
+		return []net.IP{net.ParseIP("93.184.216.34")}, nil
+	}
+
+	if !isSSRFWhitelistedWithLookup("example.com", lookup) {
+		t.Fatal("CIDR whitelist did not use the SSRF resolver result")
+	}
+}
+
+func TestDialResolvedIPsUsesValidatedAddress(t *testing.T) {
+	client, server := net.Pipe()
+	t.Cleanup(func() {
+		_ = client.Close()
+		_ = server.Close()
+	})
+
+	var dialedAddress string
+	conn, err := dialResolvedIPs(
+		context.Background(),
+		"tcp",
+		"443",
+		[]net.IPAddr{{IP: net.ParseIP("93.184.216.34")}},
+		func(_ context.Context, _, address string) (net.Conn, error) {
+			dialedAddress = address
+			return client, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("dialResolvedIPs() error = %v", err)
+	}
+	if conn != client {
+		t.Fatal("dialResolvedIPs() did not return the validated connection")
+	}
+	if dialedAddress != "93.184.216.34:443" {
+		t.Fatalf("dialed address = %q, want validated IP address", dialedAddress)
 	}
 }
 

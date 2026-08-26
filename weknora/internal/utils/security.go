@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"log"
@@ -385,7 +386,26 @@ func isIPLikeHostname(hostname string) bool {
 // - Cloud metadata endpoints
 // - Reserved hostnames (localhost, *.local, etc.)
 func isSSRFSafeURL(rawURL string) (bool, string) {
-	return isSSRFSafeURLWithLookup(rawURL, net.LookupIP)
+	return isSSRFSafeURLWithLookup(rawURL, lookupIPForSSRF)
+}
+
+// ssrfDNSResolver deliberately uses Go's DNS implementation instead of the
+// platform resolver. On macOS, a local fake-IP proxy can leave stale synthetic
+// answers in mDNSResponder even after its fake-IP filter is corrected. The Go
+// resolver reads the active nameserver directly, so the SSRF decision observes
+// the current DNS answer while retaining the same per-address restrictions.
+var ssrfDNSResolver = &net.Resolver{PreferGo: true}
+
+func lookupIPForSSRF(host string) ([]net.IP, error) {
+	addrs, err := ssrfDNSResolver.LookupIPAddr(context.Background(), host)
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		ips = append(ips, addr.IP)
+	}
+	return ips, nil
 }
 
 func isSSRFSafeURLWithLookup(rawURL string, lookupIP func(string) ([]net.IP, error)) (bool, string) {
@@ -858,7 +878,7 @@ func NewSSRFSafeHTTPClient(config SSRFSafeHTTPClientConfig) *http.Client {
 // against DNS rebinding attacks during the connection phase.
 func SSRFSafeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	// Parse host and port
-	host, _, err := net.SplitHostPort(addr)
+	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address %s: %w", addr, err)
 	}
@@ -889,7 +909,7 @@ func SSRFSafeDialContext(ctx context.Context, network, addr string) (net.Conn, e
 	}
 
 	// Resolve the hostname to IP addresses
-	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	ips, err := ssrfDNSResolver.LookupIPAddr(ctx, host)
 	if err != nil {
 		return nil, fmt.Errorf("DNS resolution failed for %s: %w", host, err)
 	}
@@ -901,13 +921,45 @@ func SSRFSafeDialContext(ctx context.Context, network, addr string) (net.Conn, e
 		}
 	}
 
-	// If we get here, all IPs are safe. Connect using the standard dialer.
-	// We dial the original address so that proper connection routing happens.
+	// If we get here, all IPs are safe. Dial one of those exact validated
+	// addresses so a second platform-DNS lookup cannot rebind the hostname to a
+	// restricted destination between validation and connection.
 	dialer := &net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
-	return dialer.DialContext(ctx, network, addr)
+	return dialResolvedIPs(ctx, network, port, ips, dialer.DialContext)
+}
+
+type ssrfDialContextFunc func(context.Context, string, string) (net.Conn, error)
+
+func dialResolvedIPs(
+	ctx context.Context,
+	network string,
+	port string,
+	ips []net.IPAddr,
+	dial ssrfDialContextFunc,
+) (net.Conn, error) {
+	if len(ips) == 0 {
+		return nil, errors.New("DNS resolution returned no addresses")
+	}
+
+	var lastErr error
+	for _, ipAddr := range ips {
+		if ipAddr.IP == nil {
+			continue
+		}
+		resolvedAddr := net.JoinHostPort(ipAddr.String(), port)
+		conn, err := dial(ctx, network, resolvedAddr)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		return nil, errors.New("DNS resolution returned no usable addresses")
+	}
+	return nil, fmt.Errorf("all validated addresses failed: %w", lastErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1114,6 +1166,10 @@ func mergeSSRFWhitelistRaws(primary, extra string) string {
 // IsSSRFWhitelisted checks whether the given hostname (or IP string) is
 // covered by the SSRF_WHITELIST environment variable.
 func IsSSRFWhitelisted(hostname string) bool {
+	return isSSRFWhitelistedWithLookup(hostname, lookupIPForSSRF)
+}
+
+func isSSRFWhitelistedWithLookup(hostname string, lookupIP func(string) ([]net.IP, error)) bool {
 	wl := loadSSRFWhitelist()
 	if wl == nil {
 		return false
@@ -1143,7 +1199,7 @@ func IsSSRFWhitelisted(hostname string) bool {
 
 	// Also resolve and check resolved IPs against CIDR whitelist
 	if net.ParseIP(hostname) == nil && len(wl.cidrNets) > 0 {
-		if ips, err := net.LookupIP(hostname); err == nil {
+		if ips, err := lookupIP(hostname); err == nil {
 			for _, ip := range ips {
 				for _, cidr := range wl.cidrNets {
 					if cidr.Contains(ip) {
