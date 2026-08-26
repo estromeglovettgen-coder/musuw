@@ -74,7 +74,7 @@ export function ProductEntryLinks({ authenticated = false, copy = defaultCopy })
   );
 }
 
-export function SiteHeader({ copy = defaultCopy }) {
+export function SiteHeader({ copy = defaultCopy, navigation = navItems }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
@@ -128,8 +128,8 @@ export function SiteHeader({ copy = defaultCopy }) {
       <div className="container nav-shell">
         <Brand copy={copy} />
         <nav className="desktop-nav" aria-label={copy.nav.primaryAria}>
-          {navItems.map((item, index) => (
-            <a key={item.label} href={item.href}>
+          {navigation.map((item, index) => (
+            <a key={item.href} href={item.href}>
               {copy.nav.items[index].label}
             </a>
           ))}
@@ -160,8 +160,8 @@ export function SiteHeader({ copy = defaultCopy }) {
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
             transition={{ duration: 0.22 }}
           >
-            {navItems.map((item, index) => (
-              <a key={item.label} href={item.href} onClick={() => setOpen(false)}>
+            {navigation.map((item, index) => (
+              <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
                 {copy.nav.items[index].label}
                 <ArrowUpRight size={18} aria-hidden="true" />
               </a>
@@ -176,14 +176,14 @@ export function SiteHeader({ copy = defaultCopy }) {
   );
 }
 
-export function SiteFooter({ copy = defaultCopy }) {
+export function SiteFooter({ copy = defaultCopy, groups = footerGroups }) {
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
         <div className="footer-brand">
           <Brand copy={copy} />
         </div>
-        {footerGroups.map((group, groupIndex) => (
+        {groups.map((group, groupIndex) => (
           <div className="footer-group" key={group.title}>
             <h3>{copy.footer.groups[groupIndex].title}</h3>
             {group.links.map(([label, href], linkIndex) => (
