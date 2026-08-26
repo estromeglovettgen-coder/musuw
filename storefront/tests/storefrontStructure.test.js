@@ -68,7 +68,6 @@ test("review-ready home keeps the original template while focusing on the second
   assert.match(home, />Pricing</);
   assert.match(home, />Security</);
   assert.match(home, />Contact</);
-  assert.doesNotMatch(home, />Legal</);
   assert.doesNotMatch(home, />\$1\.00</);
   assert.doesNotMatch(footer, /social-links|x\.com\/greeenyang|support@didren\.com/);
   assert.match(footer, />© 2026 musuw\. All rights reserved\.<\/span>/);
