@@ -8,10 +8,11 @@ import test from "node:test";
 import { comparisonGroups } from "../src/data/homeContent.js";
 import { getStorefrontCopy } from "../src/i18n.js";
 import { getPublicDocument } from "../src/legalContent.js";
+import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
 
 const root = new URL("../", import.meta.url).pathname;
 
-test("review-ready home hides inherited marquee, testimonials, and footer social links", async (t) => {
+test("review-ready home keeps the original template while focusing on the second-brain story", async (t) => {
   const server = await createServer({
     root,
     appType: "custom",
@@ -46,19 +47,29 @@ test("review-ready home hides inherited marquee, testimonials, and footer social
   assert.doesNotMatch(home, /customer-(?:strip|ticker|track)/);
   assert.doesNotMatch(home, /testimonials-section|testimonial-(?:shell|card)/);
   assert.match(home, /id="feature"/);
-  assert.match(home, /id="use-cases"/);
+  assert.doesNotMatch(home, /id="use-cases"/);
+  assert.match(home, /id="blog"/);
   assert.match(home, /id="pricing"/);
   assert.match(home, /id="faq"/);
   assert.equal((home.match(/class="feature-story/g) ?? []).length, 3);
-  assert.match(home, /Grounded Dialogue/);
-  assert.match(home, /Source Library and Upload/);
-  assert.match(home, /Wiki and Graph/);
-  assert.doesNotMatch(home, /Living Knowledge Base/);
-  assert.doesNotMatch(home, /View Plans/);
+  assert.match(home, /Grounded answers/);
+  assert.match(home, /AI-organized Wiki/);
+  assert.match(home, /Knowledge graph/);
+  assert.match(home, /Knowledge compounds/);
+  assert.match(home, /A second brain/);
+  assert.doesNotMatch(home, /Source Library and Upload|Living Knowledge Base/);
   assert.equal((home.match(/class="comparison-group-head"/g) ?? []).length, 6);
-  assert.match(home, /Workspace limits/);
-  assert.match(home, /Advanced model access/);
+  assert.match(home, /Advanced models/);
   assert.match(home, /100 GiB/);
+  assert.match(home, /<video/);
+  assert.doesNotMatch(home, /hero-float/);
+  assert.match(home, />Features</);
+  assert.match(home, />Examples</);
+  assert.match(home, />Pricing</);
+  assert.match(home, />Security</);
+  assert.match(home, />Contact</);
+  assert.doesNotMatch(home, />Legal</);
+  assert.doesNotMatch(home, />\$1\.00</);
   assert.doesNotMatch(footer, /social-links|x\.com\/greeenyang|support@didren\.com/);
   assert.match(footer, />© 2026 musuw\. All rights reserved\.<\/span>/);
   assert.match(contact, /contact-(?:page|layout|cards|card)/);
@@ -78,14 +89,15 @@ test("hidden storefront sections and their source modules remain available for l
   const homeSections = readFileSync(join(root, "src/components/HomeSections.jsx"), "utf8");
   const homeContent = readFileSync(join(root, "src/data/homeContent.js"), "utf8");
 
-  assert.doesNotMatch(homePage, /<CustomerStrip\b|<TestimonialsSection\b/);
+  assert.doesNotMatch(homePage, /<CustomerStrip\b|<TestimonialsSection\b|<WorkflowSection\b/);
   assert.match(homeSections, /visibleFeatureIndexes\s*=\s*\[0,\s*3,\s*2\]/);
   assert.match(homeSections, /export function CustomerStrip\s*\(/);
   assert.match(homeSections, /export function TestimonialsSection\s*\(/);
+  assert.match(homeSections, /export function WorkflowSection\s*\(/);
   assert.match(homeContent, /export const testimonials\s*=\s*\[/);
 });
 
-test("comparison rows expose the approved public plan facts", () => {
+test("comparison rows retain the approved plan facts behind the public presentation", () => {
   const rows = comparisonGroups.flatMap((group) => group.rows);
   const labels = rows.map(([label]) => label);
   assert.deepEqual(
@@ -133,24 +145,22 @@ test("comparison rows expose the approved public plan facts", () => {
   assert.doesNotMatch(JSON.stringify(comparisonGroups), /shared workspace administration|priority support|advanced knowledge tools/i);
 });
 
-test("both storefront locales use the annual billing badge and truthful paid-plan catalog", () => {
+test("homepage plan copy exposes user-facing capacity and model access without provider-dollar amounts", () => {
   for (const locale of ["en", "zh-CN"]) {
-    const copy = getStorefrontCopy(locale);
+    const rawCopy = getStorefrontCopy(locale);
+    const copy = applyHomepagePlanPresentation(rawCopy);
     assert.ok(copy.pricing.save);
-    assert.match(copy.pricing.save, locale === "en" ? /^Save on annual billing$/ : /按年付费/);
-    assert.doesNotMatch(JSON.stringify(copy.pricing.plans), /all configured|全部已配置/i);
-    assert.match(JSON.stringify(copy.pricing.plans), /platform-approved|平台批准/i);
-    const allowanceFeatures = copy.pricing.plans.map((plan) => plan.features[1]);
+    assert.equal(copy.pricing.plans.length, 4);
     assert.deepEqual(
-      allowanceFeatures,
+      copy.pricing.plans.map((plan) => plan.features[0]),
       locale === "en"
-        ? [
-            "$1.00 monthly AI credit allowance",
-            "$1.25 monthly AI credit allowance",
-            "$2.50 monthly AI credit allowance",
-            "$5.00 monthly AI credit allowance",
-          ]
-        : ["$1.00 每月 AI 额度", "$1.25 每月 AI 额度", "$2.50 每月 AI 额度", "$5.00 每月 AI 额度"],
+        ? ["1 GiB storage", "10 GiB storage", "30 GiB storage", "100 GiB storage"]
+        : ["1 GiB 存储空间", "10 GiB 存储空间", "30 GiB 存储空间", "100 GiB 存储空间"],
     );
+    assert.match(copy.pricing.plans[0].features.join(" "), locale === "en" ? /Standard models/ : /标准模型/);
+    copy.pricing.plans.slice(1).forEach((plan) => {
+      assert.match(plan.features.join(" "), locale === "en" ? /Advanced models/ : /高级模型/);
+    });
+    assert.doesNotMatch(copy.pricing.plans.flatMap((plan) => plan.features).join(" "), /\$\d/);
   }
 });
