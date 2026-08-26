@@ -16,10 +16,10 @@ func TestPlanLimits(t *testing.T) {
 		maxDocs       int64
 		video         bool
 	}{
-		{ConsumerPlanFree, 5, 1_000_000, 1, 10, false},
-		{ConsumerPlanPlus, 20, 1_250_000, 0, 0, true},
-		{ConsumerPlanPro, 40, 2_500_000, 0, 0, true},
-		{ConsumerPlanMax, 80, 5_000_000, 0, 0, true},
+		{ConsumerPlanFree, 1, 1_000_000, 1, 10, false},
+		{ConsumerPlanPlus, 10, 1_250_000, 0, 0, true},
+		{ConsumerPlanPro, 30, 2_500_000, 0, 0, true},
+		{ConsumerPlanMax, 100, 5_000_000, 0, 0, true},
 	}
 
 	for _, tt := range tests {
