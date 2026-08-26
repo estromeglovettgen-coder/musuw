@@ -425,6 +425,7 @@ func liteProductRouteBlocked(method, path string) bool {
 		"/api/v1/datasource",
 		"/api/v1/data-sources",
 		"/api/v1/weknora-cloud",
+		"/api/v1/weknoracloud",
 		"/api/v1/system/admin",
 		"/api/v1/skills",
 		"/api/v1/shared-agents",

@@ -100,6 +100,7 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "data sources legacy prefix", method: "GET", path: "/api/v1/datasource", blocked: true},
 		{name: "data sources plural prefix", method: "GET", path: "/api/v1/data-sources", blocked: true},
 		{name: "weknora cloud", method: "GET", path: "/api/v1/weknora-cloud", blocked: true},
+		{name: "weknora cloud credentials", method: "POST", path: "/api/v1/weknoracloud/credentials", blocked: true},
 		{name: "operations tenant entitlement", method: "GET", path: "/api/v1/system/admin/tenants/7/entitlement", blocked: false},
 		{name: "operations tenant status and quota", method: "PATCH", path: "/api/v1/system/admin/tenants/7", blocked: false},
 		{name: "operations tenant credits", method: "PUT", path: "/api/v1/system/admin/tenants/7/openrouter-credits", blocked: false},

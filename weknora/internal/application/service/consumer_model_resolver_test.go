@@ -7,6 +7,7 @@ import (
 	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,8 @@ func consumerSceneModel(id, display string) *types.Model {
 		Type:        types.ModelTypeKnowledgeQA,
 		Status:      types.ModelStatusActive,
 		IsBuiltin:   true,
-		Parameters:  types.ModelParameters{Provider: "openrouter"},
+		Source:      types.ModelSourceRemote,
+		Parameters:  types.ModelParameters{Provider: "openrouter", BaseURL: provider.OpenRouterBaseURL},
 	}
 }
 
@@ -257,6 +259,11 @@ func TestConsumerModelResolverRejectsUnsafeCatalogRows(t *testing.T) {
 		{name: "disabled", mutate: func(model *types.Model) { model.Status = types.ModelStatusDownloading }},
 		{name: "nonbuiltin", mutate: func(model *types.Model) { model.IsBuiltin = false }},
 		{name: "non-openrouter", mutate: func(model *types.Model) { model.Parameters.Provider = "openai" }},
+		{name: "local source", mutate: func(model *types.Model) { model.Source = types.ModelSourceLocal }},
+		{name: "non-openrouter endpoint", mutate: func(model *types.Model) {
+			model.Source = types.ModelSourceRemote
+			model.Parameters.BaseURL = "https://api.openai.com/v1"
+		}},
 		{name: "wrong type", mutate: func(model *types.Model) { model.Type = types.ModelTypeEmbedding }},
 	}
 	for _, tc := range tests {
@@ -319,6 +326,7 @@ func TestConsumerModelResolverUsesEntitlementWhenPlanContextIsAbsent(t *testing.
 }
 
 func TestFreeGenericGateAllowsConfiguredSceneDefaultUnionOnly(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	flash := consumerSceneModel(types.CheapestChatModelID, "Flash")
 	pro := consumerSceneModel("builtin-deepseek-v4-pro", "Pro")
 	qwen := consumerSceneModel("builtin-openrouter-qwen-max", "Qwen")
@@ -332,7 +340,11 @@ func TestFreeGenericGateAllowsConfiguredSceneDefaultUnionOnly(t *testing.T) {
 	}}
 	repo := &consumerSceneModelRepo{models: []*types.Model{flash, pro, qwen}}
 	resolver := NewConsumerModelResolver(repo, settings, nil)
-	svc := NewModelServiceWithConsumerResolver(repo, nil, nil, nil, nil, nil, nil, resolver)
+	svc := NewModelServiceWithConsumerResolver(
+		repo, nil, nil, nil, nil, nil,
+		&consumerSceneResolverEntitlement{plan: types.ConsumerPlanFree},
+		resolver,
+	)
 	ctx := contextWithConsumerPlan(1, types.ConsumerPlanFree)
 
 	models, err := svc.ListModels(ctx)

@@ -54,6 +54,13 @@ func TestRemoteAPIVLMPredictVideoUsesOpenRouterVideoURL(t *testing.T) {
 	if requestBody["model"] != OpenRouterGeminiVideoModel {
 		t.Fatalf("model = %#v", requestBody["model"])
 	}
+	if _, ok := requestBody["reasoning_effort"]; ok {
+		t.Fatalf("legacy reasoning_effort unexpectedly present: %#v", requestBody["reasoning_effort"])
+	}
+	reasoning := requestBody["reasoning"].(map[string]any)
+	if reasoning["effort"] != "none" {
+		t.Fatalf("reasoning = %#v, want effort none", reasoning)
+	}
 	providerRouting := requestBody["provider"].(map[string]any)
 	if providerRouting["allow_fallbacks"] != true {
 		t.Fatalf("allow_fallbacks = %#v", providerRouting["allow_fallbacks"])
@@ -101,6 +108,13 @@ func TestRemoteAPIVLMPredictVideoRoutesQwenToAlibaba(t *testing.T) {
 	}
 	if requestBody["model"] != OpenRouterQwenVideoModel {
 		t.Fatalf("model = %#v", requestBody["model"])
+	}
+	if _, ok := requestBody["reasoning_effort"]; ok {
+		t.Fatalf("legacy reasoning_effort unexpectedly present: %#v", requestBody["reasoning_effort"])
+	}
+	reasoning := requestBody["reasoning"].(map[string]any)
+	if reasoning["effort"] != "none" {
+		t.Fatalf("reasoning = %#v, want effort none", reasoning)
 	}
 	providerOnly := requestBody["provider"].(map[string]any)["only"].([]any)
 	if len(providerOnly) != 1 || providerOnly[0] != "alibaba" {

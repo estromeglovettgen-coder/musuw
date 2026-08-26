@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/assert"
@@ -150,11 +151,15 @@ func (r *planModelRepo) List(context.Context, uint64, types.ModelType, types.Mod
 }
 
 func TestFreePlanFiltersAndRejectsPaidModels(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	cheap := platformOpenRouterTestModel(types.CheapestChatModelID)
 	paid := platformOpenRouterTestModel("builtin-deepseek-v4-pro")
 	repo := &planModelRepo{models: []*types.Model{cheap, paid}}
 	repo.model = paid
-	svc := NewModelService(repo, nil, nil, nil, nil, nil)
+	svc := NewModelServiceWithEntitlement(
+		repo, nil, nil, nil, nil, nil,
+		&consumerSceneResolverEntitlement{plan: types.ConsumerPlanFree},
+	)
 	ctx := contextWithConsumerPlan(1, types.ConsumerPlanFree)
 
 	models, err := svc.ListModels(ctx)
@@ -169,6 +174,7 @@ func TestFreePlanFiltersAndRejectsPaidModels(t *testing.T) {
 }
 
 func TestFreePlanFiltersPaidModelsForBackgroundContext(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	cheap := platformOpenRouterTestModel(types.CheapestChatModelID)
 	paid := platformOpenRouterTestModel("builtin-deepseek-v4-pro")
 	repo := &planModelRepo{models: []*types.Model{cheap, paid}}
@@ -191,8 +197,10 @@ func platformOpenRouterTestModel(id string) *types.Model {
 		Type:      types.ModelTypeKnowledgeQA,
 		Status:    types.ModelStatusActive,
 		IsBuiltin: true,
+		Source:    types.ModelSourceRemote,
 		Parameters: types.ModelParameters{
 			Provider: "openrouter",
+			BaseURL:  provider.OpenRouterBaseURL,
 		},
 	}
 }

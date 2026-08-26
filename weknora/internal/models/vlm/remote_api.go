@@ -64,6 +64,15 @@ type RemoteAPIVLM struct {
 	temperature float32
 }
 
+type openRouterReasoning struct {
+	Effort string `json:"effort"`
+}
+
+type openRouterImageRequest struct {
+	openai.ChatCompletionRequest
+	Reasoning *openRouterReasoning `json:"reasoning,omitempty"`
+}
+
 // NewRemoteAPIVLM creates a remote-API backed VLM instance.
 func NewRemoteAPIVLM(config *Config) (*RemoteAPIVLM, error) {
 	if err := validateVLMBaseURL(config.BaseURL); err != nil {
@@ -166,7 +175,6 @@ func (v *RemoteAPIVLM) Predict(ctx context.Context, imgBytesList [][]byte, promp
 		MaxTokens:   defaultMaxToks,
 		Temperature: v.temperature,
 	}
-
 	totalImageSize := 0
 	for _, img := range imgBytesList {
 		totalImageSize += len(img)
@@ -174,7 +182,16 @@ func (v *RemoteAPIVLM) Predict(ctx context.Context, imgBytesList [][]byte, promp
 	logger.Infof(ctx, "[VLM] Calling OpenAI-compatible API, model=%s, baseURL=%s, numImages=%d, totalImageSize=%d",
 		v.modelName, v.baseURL, len(imgBytesList), totalImageSize)
 
-	resp, err := v.client.CreateChatCompletion(ctx, req)
+	var resp openai.ChatCompletionResponse
+	var err error
+	if v.provider == provider.ProviderOpenRouter {
+		// OpenRouter's native control is the nested reasoning object. Its
+		// reasoning_effort compatibility field is not supported by every model
+		// and can be rejected even when reasoning itself is optional.
+		resp, err = v.createOpenRouterImageCompletion(ctx, req)
+	} else {
+		resp, err = v.client.CreateChatCompletion(ctx, req)
+	}
 	if err != nil {
 		return "", fmt.Errorf("OpenAI VLM request: %w", err)
 	}
@@ -185,6 +202,47 @@ func (v *RemoteAPIVLM) Predict(ctx context.Context, imgBytesList [][]byte, promp
 	content := resp.Choices[0].Message.Content
 	logger.Infof(ctx, "[VLM] OpenAI response received, len=%d", len(content))
 	return content, nil
+}
+
+func (v *RemoteAPIVLM) createOpenRouterImageCompletion(
+	ctx context.Context,
+	req openai.ChatCompletionRequest,
+) (openai.ChatCompletionResponse, error) {
+	payload := openRouterImageRequest{
+		ChatCompletionRequest: req,
+		Reasoning:             &openRouterReasoning{Effort: "none"},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return openai.ChatCompletionResponse{}, fmt.Errorf("marshal OpenRouter VLM request: %w", err)
+	}
+	endpoint := strings.TrimRight(v.baseURL, "/") + "/chat/completions"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return openai.ChatCompletionResponse{}, fmt.Errorf("create OpenRouter VLM request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+v.apiKey)
+
+	httpResp, err := v.httpClient.Do(httpReq)
+	if err != nil {
+		return openai.ChatCompletionResponse{}, err
+	}
+	defer httpResp.Body.Close()
+	if httpResp.StatusCode < http.StatusOK || httpResp.StatusCode >= http.StatusMultipleChoices {
+		detail, _ := io.ReadAll(io.LimitReader(httpResp.Body, 8192))
+		return openai.ChatCompletionResponse{}, fmt.Errorf(
+			"OpenRouter VLM request returned %s: %s",
+			httpResp.Status,
+			strings.TrimSpace(string(detail)),
+		)
+	}
+
+	var decoded openai.ChatCompletionResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&decoded); err != nil {
+		return openai.ChatCompletionResponse{}, fmt.Errorf("decode OpenRouter VLM response: %w", err)
+	}
+	return decoded, nil
 }
 
 func (v *RemoteAPIVLM) GetModelName() string { return v.modelName }
@@ -230,6 +288,9 @@ func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mime
 		"max_tokens":  defaultMaxToks,
 		"temperature": v.temperature,
 	}
+	// Keep video ingestion non-reasoning with OpenRouter's native nested
+	// control, matching the image path above.
+	payload["reasoning"] = map[string]string{"effort": "none"}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("marshal OpenRouter video request: %w", err)

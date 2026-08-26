@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 )
+
+var errLiteModelEntitlementUnavailable = errors.New("lite model entitlement service is unavailable")
 
 func effectivePlanFromContext(ctx context.Context) (types.ConsumerPlan, bool) {
 	tenant, ok := types.TenantInfoFromContext(ctx)
@@ -77,6 +81,28 @@ func (s *knowledgeService) checkCreateKnowledgeEntitlement(ctx context.Context, 
 	return nil
 }
 
+// IsOpenRouterConsumerModel is the shared runtime invariant for models
+// reachable from a Lite consumer request. Provider alone is not sufficient:
+// Model.Source controls the factory branch ("local" would instantiate Ollama
+// even when Parameters.Provider says "openrouter"), and a platform builtin
+// with a modified BaseURL could otherwise send the tenant child key to an
+// arbitrary OpenAI-compatible endpoint. Both fields are therefore required;
+// accepting an empty BaseURL would let OpenAI-compatible factories silently
+// fall back to api.openai.com, bypassing the OpenRouter allowance.
+func IsOpenRouterConsumerModel(model *types.Model) bool {
+	if model == nil || !model.IsBuiltin ||
+		model.Parameters.Provider != string(provider.ProviderOpenRouter) {
+		return false
+	}
+	if model.Source != types.ModelSourceRemote {
+		return false
+	}
+	if baseURL := strings.TrimRight(model.Parameters.BaseURL, "/"); baseURL != strings.TrimRight(provider.OpenRouterBaseURL, "/") {
+		return false
+	}
+	return true
+}
+
 func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types.Model) (bool, error) {
 	// SystemAdmin maintains the shared platform model catalog and therefore
 	// bypasses consumer restrictions.
@@ -84,13 +110,23 @@ func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types
 		return true, nil
 	}
 
-	// Musuw consumers never own arbitrary model infrastructure. Regardless of
+	// Lite consumers never own arbitrary model infrastructure. Regardless of
 	// paid plan, runtime inference must resolve to a platform builtin model that
-	// is routed through OpenRouter. This turns the hidden custom-model UI into a
-	// backend invariant: a manually inserted/custom remote/Ollama model cannot be
-	// used by a C-end tenant even if some mutation route is accidentally exposed.
-	if model == nil || !model.IsBuiltin || !strings.EqualFold(strings.TrimSpace(model.Parameters.Provider), "openrouter") {
+	// is routed through OpenRouter. Standard WeKnora keeps its existing model
+	// authority and does not enter the consumer scene policy.
+	if !isLiteProductEdition() {
+		// Preserve the existing nil-row guard used by ListModels while leaving
+		// all non-nil Standard model authorities untouched.
+		return model != nil, nil
+	}
+	if !IsOpenRouterConsumerModel(model) {
 		return false, nil
+	}
+	// The entitlement service is also the OpenRouter Meter injected into every
+	// native model factory. Allowing a Lite model without it would fall back to
+	// the catalog credential and bypass the tenant child-key allowance.
+	if s.entitlement == nil {
+		return false, errLiteModelEntitlementUnavailable
 	}
 
 	plan, ok := effectivePlanFromContext(ctx)
@@ -99,9 +135,6 @@ func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types
 			return s.consumerResolver.AllowsFreeConsumerModel(ctx, model)
 		}
 		return types.ConsumerPlanAllowsModel(plan, model), nil
-	}
-	if s.entitlement == nil {
-		return true, nil
 	}
 	current, err := s.entitlement.Current(ctx, time.Now())
 	if err != nil {

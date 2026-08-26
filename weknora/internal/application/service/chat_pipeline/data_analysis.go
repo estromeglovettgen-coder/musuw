@@ -122,10 +122,7 @@ Return your response in the specified JSON format.`, chatManage.Query, knowledge
 	modelCtx := types.WithLLMCallMetadata(ctx, "data_analysis_plan", "")
 	response, err := chatModel.Chat(modelCtx, []chat.Message{
 		{Role: "user", Content: analysisPrompt},
-	}, &chat.ChatOptions{
-		Temperature: 0.1,
-		Format:      formatSchema,
-	})
+	}, dataAnalysisChatOptions(formatSchema))
 	if err != nil {
 		logger.Errorf(ctx, "Failed to generate analysis response: %v", err)
 		return next()
@@ -156,6 +153,15 @@ Return your response in the specified JSON format.`, chatManage.Query, knowledge
 	chatManage.MergeResult = append(chatManage.MergeResult, analysisResult)
 
 	return next()
+}
+
+func dataAnalysisChatOptions(format json.RawMessage) *chat.ChatOptions {
+	thinking := false
+	return &chat.ChatOptions{
+		Temperature: 0.1,
+		Format:      format,
+		Thinking:    &thinking,
+	}
 }
 
 func isDataFile(filename string) bool {

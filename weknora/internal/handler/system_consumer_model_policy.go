@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/gin-gonic/gin"
@@ -75,8 +76,7 @@ func configurableConsumerScene(raw string) (types.ConsumerScene, bool) {
 func safeConsumerPolicyCatalog(models []*types.Model) map[types.ModelType][]consumerModelPolicyOptionResponse {
 	byType := make(map[types.ModelType][]consumerModelPolicyOptionResponse)
 	for _, model := range models {
-		if model == nil || model.Status != types.ModelStatusActive || !model.IsBuiltin ||
-			!strings.EqualFold(strings.TrimSpace(model.Parameters.Provider), "openrouter") {
+		if model == nil || model.Status != types.ModelStatusActive || !service.IsOpenRouterConsumerModel(model) {
 			continue
 		}
 		displayName := strings.TrimSpace(model.DisplayName)

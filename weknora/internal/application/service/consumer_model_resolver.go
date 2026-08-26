@@ -238,11 +238,9 @@ func (s *consumerModelResolver) catalog(ctx context.Context, modelType types.Mod
 }
 
 func validConsumerCatalogModel(model *types.Model) bool {
-	return model != nil &&
+	return IsOpenRouterConsumerModel(model) &&
 		model.Type != "" &&
-		model.Status == types.ModelStatusActive &&
-		model.IsBuiltin &&
-		strings.EqualFold(strings.TrimSpace(model.Parameters.Provider), "openrouter")
+		model.Status == types.ModelStatusActive
 }
 
 func (s *consumerModelResolver) policy(

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	modelprovider "github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
@@ -59,7 +60,10 @@ func policyModel(id, name string, modelType types.ModelType, active, builtin boo
 	}
 	return &types.Model{
 		ID: id, Name: name, DisplayName: name, Type: modelType, Status: status, IsBuiltin: builtin,
-		Parameters: types.ModelParameters{Provider: provider, APIKey: "must-not-leak"},
+		Source: types.ModelSourceRemote,
+		Parameters: types.ModelParameters{
+			Provider: provider, BaseURL: modelprovider.OpenRouterBaseURL, APIKey: "must-not-leak",
+		},
 	}
 }
 
@@ -78,7 +82,7 @@ func newConsumerPolicyTestHandler() (*SystemHandler, *consumerPolicySettingsStub
 	}}
 	repo := &consumerPolicyModelRepoStub{models: []*types.Model{
 		policyModel("rag-free", "RAG Free", types.ModelTypeKnowledgeQA, true, true, "openrouter"),
-		policyModel("rag-paid", "RAG Paid", types.ModelTypeKnowledgeQA, true, true, "OpenRouter"),
+		policyModel("rag-paid", "RAG Paid", types.ModelTypeKnowledgeQA, true, true, "openrouter"),
 		policyModel("rank", "Rerank", types.ModelTypeRerank, true, true, "openrouter"),
 		policyModel("vision", "Vision", types.ModelTypeVLLM, true, true, "openrouter"),
 		policyModel("asr", "ASR", types.ModelTypeASR, true, true, "openrouter"),
@@ -86,8 +90,29 @@ func newConsumerPolicyTestHandler() (*SystemHandler, *consumerPolicySettingsStub
 		policyModel("custom", "Custom", types.ModelTypeKnowledgeQA, true, false, "openrouter"),
 		policyModel("inactive", "Inactive", types.ModelTypeKnowledgeQA, false, true, "openrouter"),
 		policyModel("unsafe", "Unsafe", types.ModelTypeKnowledgeQA, true, true, "openai"),
+		policyModelWithMutation("unsafe-local", "Unsafe Local", types.ModelTypeKnowledgeQA, func(model *types.Model) {
+			model.Source = types.ModelSourceLocal
+		}),
+		policyModelWithMutation("unsafe-blank-source", "Unsafe Blank Source", types.ModelTypeKnowledgeQA, func(model *types.Model) {
+			model.Source = ""
+		}),
+		policyModelWithMutation("unsafe-missing-endpoint", "Unsafe Missing Endpoint", types.ModelTypeKnowledgeQA, func(model *types.Model) {
+			model.Parameters.BaseURL = ""
+		}),
+		policyModelWithMutation("unsafe-wrong-endpoint", "Unsafe Endpoint", types.ModelTypeKnowledgeQA, func(model *types.Model) {
+			model.Parameters.BaseURL = "https://api.openai.com/v1"
+		}),
+		policyModelWithMutation("unsafe-mixed-provider", "Unsafe Mixed Provider", types.ModelTypeKnowledgeQA, func(model *types.Model) {
+			model.Parameters.Provider = "OpenRouter"
+		}),
 	}}
 	return &SystemHandler{systemSettingSvc: settings, modelRepo: repo}, settings
+}
+
+func policyModelWithMutation(id, name string, modelType types.ModelType, mutate func(*types.Model)) *types.Model {
+	model := policyModel(id, name, modelType, true, true, "openrouter")
+	mutate(model)
+	return model
 }
 
 func TestGetConsumerModelPolicyReturnsFiveSafeRealCatalogs(t *testing.T) {
@@ -118,7 +143,9 @@ func TestGetConsumerModelPolicyReturnsFiveSafeRealCatalogs(t *testing.T) {
 			t.Fatalf("scene[%d] = %q, want %q", i, scene.Scene, wantScenes[i])
 		}
 		for _, option := range scene.Options {
-			if option.ModelType != scene.ModelType || option.ModelID == "embedding" || option.ModelID == "custom" || option.ModelID == "inactive" || option.ModelID == "unsafe" {
+			if option.ModelType != scene.ModelType || option.ModelID == "embedding" || option.ModelID == "custom" || option.ModelID == "inactive" ||
+				option.ModelID == "unsafe" || option.ModelID == "unsafe-local" || option.ModelID == "unsafe-blank-source" || option.ModelID == "unsafe-missing-endpoint" ||
+				option.ModelID == "unsafe-wrong-endpoint" || option.ModelID == "unsafe-mixed-provider" {
 				t.Fatalf("unsafe or wrong-typed option leaked: %#v", option)
 			}
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/Tencent/WeKnora/internal/models/provider"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,8 @@ func typedConsumerModel(id string, modelType types.ModelType) *types.Model {
 		Type:        modelType,
 		Status:      types.ModelStatusActive,
 		IsBuiltin:   true,
-		Parameters:  types.ModelParameters{Provider: "openrouter"},
+		Source:      types.ModelSourceRemote,
+		Parameters:  types.ModelParameters{Provider: "openrouter", BaseURL: provider.OpenRouterBaseURL},
 	}
 }
 
@@ -162,6 +164,7 @@ func TestConsumerModelResolverRejectsWrongTypedCandidateAndUsesTypedFallback(t *
 }
 
 func TestFreeGenericGateUsesConfiguredTypedDefaultUnion(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	rankFree := typedConsumerModel("rank-free", types.ModelTypeRerank)
 	rankPaid := typedConsumerModel("rank-paid", types.ModelTypeRerank)
 	rankDefault := typedConsumerModel(types.CheapestRerankModelID, types.ModelTypeRerank)
@@ -170,7 +173,7 @@ func TestFreeGenericGateUsesConfiguredTypedDefaultUnion(t *testing.T) {
 		types.ConsumerSceneRerank.PaidOptionsKey(): nativeSceneSettingList(types.ConsumerSceneRerank.PaidOptionsKey(), []string{rankPaid.ID}),
 	}}
 	resolver := NewConsumerModelResolver(&typedConsumerSceneModelRepo{models: []*types.Model{rankFree, rankPaid, rankDefault}}, settings, nil)
-	svc := &modelService{consumerResolver: resolver}
+	svc := &modelService{consumerResolver: resolver, entitlement: &consumerSceneResolverEntitlement{}}
 
 	allowed, err := svc.consumerPlanAllowsModel(contextWithConsumerPlan(1, types.ConsumerPlanFree), rankFree)
 	require.NoError(t, err)
@@ -184,6 +187,7 @@ func TestFreeGenericGateUsesConfiguredTypedDefaultUnion(t *testing.T) {
 }
 
 func TestFreeGenericGateAllowsTypedCompatibilityDefaultWhenPolicyIsInvalid(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	rankDefault := typedConsumerModel(types.CheapestRerankModelID, types.ModelTypeRerank)
 	settings := &consumerSceneSettings{rows: map[string]*types.SystemSetting{
 		types.ConsumerSceneRerank.FreeDefaultKey(): nativeSceneSettingString(types.ConsumerSceneRerank.FreeDefaultKey(), rankDefault.ID),
@@ -192,7 +196,7 @@ func TestFreeGenericGateAllowsTypedCompatibilityDefaultWhenPolicyIsInvalid(t *te
 		types.ConsumerSceneRerank.PaidOptionsKey(): nativeSceneSettingList(types.ConsumerSceneRerank.PaidOptionsKey(), []string{"stale"}),
 	}}
 	resolver := NewConsumerModelResolver(&typedConsumerSceneModelRepo{models: []*types.Model{rankDefault}}, settings, nil)
-	svc := &modelService{consumerResolver: resolver}
+	svc := &modelService{consumerResolver: resolver, entitlement: &consumerSceneResolverEntitlement{}}
 
 	allowed, err := svc.consumerPlanAllowsModel(contextWithConsumerPlan(1, types.ConsumerPlanFree), rankDefault)
 	require.NoError(t, err)
