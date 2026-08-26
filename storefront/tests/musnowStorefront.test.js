@@ -14,7 +14,10 @@ import {
   workflows,
 } from "../src/data/homeContent.js";
 import { getStorefrontCopy } from "../src/i18n.js";
-import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
+import {
+  applyHomepagePlanPresentation,
+  HOMEPAGE_NAVIGATION,
+} from "../src/planPresentation.js";
 import { getPublicDocument, PUBLIC_DOCUMENT_PATHS } from "../src/legalContent.js";
 
 const root = new URL("../", import.meta.url).pathname;
@@ -30,14 +33,15 @@ function collectStrings(value, result = []) {
 
 test("public copy presents the exact lowercase musuw brand without stale names or fabricated proof", () => {
   for (const locale of ["en", "zh-CN"]) {
-    const copy = getStorefrontCopy(locale);
+    const copy = applyHomepagePlanPresentation(getStorefrontCopy(locale));
     const allCopy = collectStrings(copy).join("\n");
 
     assert.match(copy.meta.title, /musuw/);
     assert.doesNotMatch(allCopy, /Musnow/);
-    assert.match(copy.meta.description, locale === "zh-CN" ? /知识/ : /knowledge/i);
-    assert.match(allCopy, locale === "zh-CN" ? /精确引用|准确引用/ : /exact citations?/i);
+    assert.match(copy.meta.description, locale === "zh-CN" ? /知识|第二大脑/ : /knowledge|second brain/i);
+    assert.match(allCopy, locale === "zh-CN" ? /精确引用|原文引用/ : /exact (?:source )?citations?/i);
     assert.match(allCopy, locale === "zh-CN" ? /知识图谱/ : /knowledge graph/i);
+    assert.match(allCopy, locale === "zh-CN" ? /知识复利|越用越强/ : /knowledge compounds?|gets better with use/i);
     assert.match(allCopy, locale === "zh-CN" ? /导出/ : /export/i);
     assert.doesNotMatch(allCopy, /ClientHub|client portal/);
     assert.doesNotMatch(allCopy, /1,000\+|4\.8\s+Trusted|深受服务团队信赖/);
@@ -48,7 +52,7 @@ test("public copy presents the exact lowercase musuw brand without stale names o
   assert.doesNotMatch(dataSource, /Jonathan Hayes|Clearframe Agency|Portivio|ClientHub/);
 });
 
-test("public capability copy matches the simplified Query, Knowledge Base, and Wiki product path", () => {
+test("public capability copy matches the grounded answer, AI Wiki, graph, and compounding product path", () => {
   const englishDefaults = collectStrings({
     benefits,
     comparisonGroups,
@@ -62,45 +66,48 @@ test("public capability copy matches the simplified Query, Knowledge Base, and W
     .flatMap((locale) => PUBLIC_DOCUMENT_PATHS.map((path) => getPublicDocument(locale, path)))
     .map((document) => collectStrings(document).join("\n"))
     .join("\n");
-  const allVisibleCopy = [
-    englishDefaults,
-    collectStrings(getStorefrontCopy("en")).join("\n"),
-    collectStrings(getStorefrontCopy("zh-CN")).join("\n"),
-    publicDocuments,
-  ].join("\n");
+  const homepageEnglish = collectStrings(applyHomepagePlanPresentation(getStorefrontCopy("en"))).join("\n");
+  const homepageChinese = collectStrings(applyHomepagePlanPresentation(getStorefrontCopy("zh-CN"))).join("\n");
+  const allVisibleCopy = [englishDefaults, homepageEnglish, homepageChinese, publicDocuments].join("\n");
 
   assert.doesNotMatch(
     allVisibleCopy,
     /reviewable (?:changes|knowledge|high-impact changes)|answer review|saved-answer review|review decisions|accept(?:ed)?,? or reject|accepted, rejected|review before acceptance|review contradictions|review high-impact changes|change control|visible diffs|可审查变更|可审查的重要变更|可以审核的知识|答案(?:保存与)?审核|审查决定|接受或拒绝|接受、拒绝|接受前先审核|审核相互矛盾的信息|审核高影响变化|变化控制/i,
   );
 
-  const english = collectStrings(getStorefrontCopy("en")).join("\n");
-  assert.match(english, /upload(?:ing)?.*pars(?:e|ing)|pars(?:e|ing).*upload/i);
-  assert.match(english, /retrieval.*questions?|questions?.*retrieval/i);
-  assert.match(english, /graph (?:view )?(?:inside|within) Wiki|in-Wiki graph/i);
-  assert.match(english, /exact (?:source |evidence )?citations?/i);
+  assert.match(homepageEnglish, /knowledge-base RAG/i);
+  assert.match(homepageEnglish, /AI-organized Wiki/i);
+  assert.match(homepageEnglish, /backlinks/i);
+  assert.match(homepageEnglish, /save strong AI answers back into the knowledge base/i);
+  assert.match(homepageEnglish, /exact source citations/i);
 
-  const chinese = collectStrings(getStorefrontCopy("zh-CN")).join("\n");
-  assert.match(chinese, /上传.*解析|解析.*上传/);
-  assert.match(chinese, /检索.*问答|问答.*检索/);
-  assert.match(chinese, /Wiki 内.*图谱|图谱.*Wiki/);
-  assert.match(chinese, /精确(?:证据)?引用/);
+  assert.match(homepageChinese, /知识库 RAG/);
+  assert.match(homepageChinese, /AI 整理的 Wiki/);
+  assert.match(homepageChinese, /反向链接/);
+  assert.match(homepageChinese, /回答重新保存进知识库/);
+  assert.match(homepageChinese, /精确原文引用/);
 });
 
-test("consumer pricing displays the approved storage and exact monthly AI credit allowances", () => {
+test("consumer pricing presents public capacity and model access without provider-dollar amounts", () => {
   for (const locale of ["en", "zh-CN"]) {
     const pricing = applyHomepagePlanPresentation(getStorefrontCopy(locale)).pricing;
     assert.match(
       pricing.intro.body,
-      locale === "zh-CN" ? /存储空间.*模型权限.*每月 AI 额度/ : /storage.*model access.*monthly AI allowance/i,
+      locale === "zh-CN" ? /更多存储.*视频导入.*高级模型/ : /more storage.*video ingestion.*advanced models/i,
     );
     assert.equal(pricing.plans.length, 4);
-    const freeFeatures = pricing.plans[0].features.join(" ");
-    assert.match(freeFeatures, /1 GiB.*\$1\.00/);
-    assert.match(
-      freeFeatures,
-      locale === "zh-CN" ? /1 个知识库.*10 篇文档/ : /1 knowledge base.*10 documents/i,
+    assert.deepEqual(
+      pricing.plans.map((plan) => plan.features[0]),
+      locale === "zh-CN"
+        ? ["1 GiB 存储空间", "10 GiB 存储空间", "30 GiB 存储空间", "100 GiB 存储空间"]
+        : ["1 GiB storage", "10 GiB storage", "30 GiB storage", "100 GiB storage"],
     );
+    const freeFeatures = pricing.plans[0].features.join(" ");
+    assert.match(freeFeatures, locale === "zh-CN" ? /标准模型/ : /Standard models/);
+    pricing.plans.slice(1).forEach((plan) => {
+      assert.match(plan.features.join(" "), locale === "zh-CN" ? /高级模型/ : /Advanced models/);
+    });
+    assert.doesNotMatch(pricing.plans.flatMap((plan) => plan.features).join(" "), /\$\d/);
   }
 
   assert.match(plans[1].features.join(" "), /10 GiB.*\$1\.25.*Expanded platform-approved catalog/i);
@@ -126,12 +133,11 @@ test("regional price books expose exact monthly and annual totals for all four p
   assert.notEqual(plans[3].available, false);
 });
 
-test("existing homepage structure points only to real musuw product evidence", () => {
+test("existing homepage structure keeps the smooth hero and removes the repeated workflow section", () => {
   const homePage = readFileSync(join(root, "src/HomePage.jsx"), "utf8");
   const sectionOrder = [
     "HeroScene",
     "FeaturesSection",
-    "WorkflowSection",
     "BenefitsSection",
     "PricingSection",
     "ComparisonSection",
@@ -145,6 +151,19 @@ test("existing homepage structure points only to real musuw product evidence", (
     assert.ok(index > previousIndex, `${section} must remain in the approved homepage order`);
     previousIndex = index;
   }
+  assert.doesNotMatch(homePage, /<WorkflowSection\b/);
+
+  const heroSource = readFileSync(join(root, "src/components/HeroScene.jsx"), "utf8");
+  assert.match(heroSource, /className="dashboard-scene"/);
+  assert.match(heroSource, /sampleHeroVisibility/);
+  assert.match(heroSource, /<video/);
+  assert.match(heroSource, /musuw-overview\.webm/);
+  assert.doesNotMatch(heroSource, /hero-float/);
+
+  assert.deepEqual(
+    HOMEPAGE_NAVIGATION.map(({ label }) => label),
+    ["Features", "Examples", "Pricing", "Security", "Contact"],
+  );
 
   const expectedAssets = new Set([
     "/images/musuw-query-citation.jpg",
@@ -156,7 +175,8 @@ test("existing homepage structure points only to real musuw product evidence", (
     "index.html",
     "src/data/homeContent.js",
     "src/components/HeroScene.jsx",
-    "src/components/HomeSections.jsx"
+    "src/components/HomeSections.jsx",
+    "src/planPresentation.js",
   ].map((path) => readFileSync(join(root, path), "utf8")).join("\n");
   const referencedAssets = new Set(
     [...evidenceSources.matchAll(/\/images\/(musuw-[a-z-]+\.jpg)/g)]
@@ -165,7 +185,7 @@ test("existing homepage structure points only to real musuw product evidence", (
   assert.deepEqual(
     [...referencedAssets].sort(),
     [...expectedAssets].sort(),
-    "homepage evidence closure must contain only current Query, Knowledge Base, Wiki page, and in-Wiki graph captures"
+    "homepage evidence closure must contain only current Query, Knowledge Base, Wiki page, and graph captures"
   );
   for (const asset of expectedAssets) {
     const file = join(root, "public", asset.replace(/^\//, ""));
