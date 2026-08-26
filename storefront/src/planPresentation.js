@@ -1,6 +1,6 @@
 export const HOMEPAGE_NAVIGATION = Object.freeze([
   Object.freeze({ label: "Features", href: "/#feature" }),
-  Object.freeze({ label: "Examples", href: "/#examples" }),
+  Object.freeze({ label: "Examples", href: "/#blog" }),
   Object.freeze({ label: "Pricing", href: "/#pricing" }),
   Object.freeze({ label: "Security", href: "/security" }),
   Object.freeze({ label: "Contact", href: "/contact" }),
@@ -11,7 +11,7 @@ export const HOMEPAGE_FOOTER_GROUPS = Object.freeze([
     title: "Product",
     links: Object.freeze([
       Object.freeze(["Features", "/#feature"]),
-      Object.freeze(["Examples", "/#examples"]),
+      Object.freeze(["Examples", "/#blog"]),
       Object.freeze(["Pricing", "/#pricing"]),
     ]),
   }),
@@ -73,20 +73,7 @@ const HOMEPAGE_COPY = Object.freeze({
             "Continuous conversation context",
           ]),
         }),
-        Object.freeze({
-          label: "AI-organized Wiki",
-          title: "Turn raw sources into structured knowledge.",
-          description:
-            "AI analyzes uploaded material, produces readable summaries, extracts entities, and assembles related pages without replacing the original sources.",
-          image: "/images/musuw-wiki-page.jpg",
-          imageAlt: "musuw Wiki page with AI-generated summaries, entities, categories, and source links",
-          bullets: Object.freeze([
-            "AI summaries",
-            "Entity extraction",
-            "Structured Wiki pages",
-            "Original sources preserved",
-          ]),
-        }),
+        Object.freeze({}),
         Object.freeze({
           label: "Knowledge graph",
           title: "Reveal the connections hidden across your knowledge.",
@@ -99,6 +86,20 @@ const HOMEPAGE_COPY = Object.freeze({
             "Entity relationships",
             "Cross-source connections",
             "Evidence-backed paths",
+          ]),
+        }),
+        Object.freeze({
+          label: "AI-organized Wiki",
+          title: "Turn raw sources into structured knowledge.",
+          description:
+            "AI analyzes uploaded material, produces readable summaries, extracts entities, and assembles related pages without replacing the original sources.",
+          image: "/images/musuw-wiki-page.jpg",
+          imageAlt: "musuw Wiki page with AI-generated summaries, entities, categories, and source links",
+          bullets: Object.freeze([
+            "AI summaries",
+            "Entity extraction",
+            "Structured Wiki pages",
+            "Original sources preserved",
           ]),
         }),
       ]),
@@ -163,19 +164,25 @@ const HOMEPAGE_COPY = Object.freeze({
       tableAria: "musuw plan comparison",
       firstColumn: "Capability",
       groupCopy: Object.freeze([
-        Object.freeze({
-          title: "Capacity",
-          rows: Object.freeze(["Storage", "Knowledge bases", "Documents per knowledge base"]),
-        }),
-        Object.freeze({
-          title: "Access",
-          rows: Object.freeze(["Video ingestion", "Advanced models"]),
-        }),
+        Object.freeze({ title: "Capacity", rows: Object.freeze(["Storage", "Knowledge bases", "Documents per knowledge base"]) }),
+        Object.freeze({ title: "Ingestion", rows: Object.freeze(["Document upload and parsing", "Video ingestion"]) }),
+        Object.freeze({ title: "Models", rows: Object.freeze(["Model catalog", "Advanced models"]) }),
+        Object.freeze({ title: "AI and answers", rows: Object.freeze(["Monthly AI usage", "Grounded answers", "Exact citations"]) }),
+        Object.freeze({ title: "Connected knowledge", rows: Object.freeze(["Wiki", "Source history", "Knowledge graph"]) }),
+        Object.freeze({ title: "Data controls", rows: Object.freeze(["Export", "Deletion controls"]) }),
       ]),
+      valueLabels: Object.freeze({
+        "$1.00": "Light",
+        "$1.25": "Regular",
+        "$2.50": "High",
+        "$5.00": "Highest",
+        "One least-cost model per capability": "Standard models",
+        "Expanded platform-approved catalog": "Expanded catalog",
+      }),
     }),
     blog: Object.freeze({
       title: "Built for knowledge that matters",
-      allPosts: "Start free",
+      allPosts: "Explore features",
       items: Object.freeze([
         Object.freeze({
           title: "Compare sources without losing the evidence.",
@@ -282,14 +289,7 @@ const HOMEPAGE_COPY = Object.freeze({
           imageAlt: "带精确知识库引用和详细证据侧栏的 musuw 智能体回答",
           bullets: Object.freeze(["知识库 RAG", "精确原文引用", "证据侧栏", "连续对话上下文"]),
         }),
-        Object.freeze({
-          label: "AI 整理的 Wiki",
-          title: "把原始资料整理成结构化知识。",
-          description: "AI 会分析上传内容、生成可读摘要、提取实体并组织关联页面，同时保留原始资料不被覆盖。",
-          image: "/images/musuw-wiki-page.jpg",
-          imageAlt: "包含 AI 摘要、实体、分类和资料链接的 musuw Wiki 页面",
-          bullets: Object.freeze(["AI 摘要", "实体提取", "结构化 Wiki 页面", "保留原始资料"]),
-        }),
+        Object.freeze({}),
         Object.freeze({
           label: "知识图谱",
           title: "发现隐藏在知识中的紧密连接。",
@@ -297,6 +297,14 @@ const HOMEPAGE_COPY = Object.freeze({
           image: "/images/musuw-wiki-graph.jpg",
           imageAlt: "展示反向链接、关联实体和跨资料关系的 musuw 知识图谱",
           bullets: Object.freeze(["反向链接", "实体关系", "跨资料连接", "有证据的路径"]),
+        }),
+        Object.freeze({
+          label: "AI 整理的 Wiki",
+          title: "把原始资料整理成结构化知识。",
+          description: "AI 会分析上传内容、生成可读摘要、提取实体并组织关联页面，同时保留原始资料不被覆盖。",
+          image: "/images/musuw-wiki-page.jpg",
+          imageAlt: "包含 AI 摘要、实体、分类和资料链接的 musuw Wiki 页面",
+          bullets: Object.freeze(["AI 摘要", "实体提取", "结构化 Wiki 页面", "保留原始资料"]),
         }),
       ]),
     }),
@@ -341,12 +349,24 @@ const HOMEPAGE_COPY = Object.freeze({
       firstColumn: "能力",
       groupCopy: Object.freeze([
         Object.freeze({ title: "容量", rows: Object.freeze(["存储空间", "知识库数量", "每个知识库的文档数"]) }),
-        Object.freeze({ title: "权限", rows: Object.freeze(["视频导入", "高级模型"]) }),
+        Object.freeze({ title: "资料导入", rows: Object.freeze(["文档上传与解析", "视频导入"]) }),
+        Object.freeze({ title: "模型", rows: Object.freeze(["模型目录", "高级模型"]) }),
+        Object.freeze({ title: "AI 与回答", rows: Object.freeze(["每月 AI 使用量", "有依据的回答", "精确引用"]) }),
+        Object.freeze({ title: "相互连接的知识", rows: Object.freeze(["Wiki", "资料历史", "知识图谱"]) }),
+        Object.freeze({ title: "数据控制", rows: Object.freeze(["导出", "删除控制"]) }),
       ]),
+      valueLabels: Object.freeze({
+        "$1.00": "轻量",
+        "$1.25": "常规",
+        "$2.50": "高频",
+        "$5.00": "最高",
+        "One least-cost model per capability": "标准模型",
+        "Expanded platform-approved catalog": "扩展模型目录",
+      }),
     }),
     blog: Object.freeze({
       title: "适合真正重要的知识工作",
-      allPosts: "免费开始",
+      allPosts: "查看功能",
       items: Object.freeze([
         Object.freeze({
           title: "对比多份资料，同时不丢失证据。",
@@ -418,24 +438,6 @@ const HOMEPAGE_COPY = Object.freeze({
   }),
 });
 
-const PUBLIC_COMPARISON_GROUPS = Object.freeze([
-  Object.freeze({
-    title: "Capacity",
-    rows: Object.freeze([
-      Object.freeze(["Storage", "1 GiB", "10 GiB", "30 GiB", "100 GiB"]),
-      Object.freeze(["Knowledge bases", "1", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]),
-      Object.freeze(["Documents per knowledge base", "10", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]),
-    ]),
-  }),
-  Object.freeze({
-    title: "Access",
-    rows: Object.freeze([
-      Object.freeze(["Video ingestion", false, true, true, true]),
-      Object.freeze(["Advanced models", false, true, true, true]),
-    ]),
-  }),
-]);
-
 function mergeItems(items = [], overrides = []) {
   return items.map((item, index) => ({
     ...item,
@@ -502,13 +504,13 @@ export function applyHomepagePlanPresentation(copy) {
       title: content.comparison.title,
       tableAria: content.comparison.tableAria,
       firstColumn: content.comparison.firstColumn,
-      dataGroups: PUBLIC_COMPARISON_GROUPS,
       valueLabels: {
         ...copy.comparison.valueLabels,
         "1 GiB": "1 GiB",
         "10 GiB": "10 GiB",
         "30 GiB": "30 GiB",
         "100 GiB": "100 GiB",
+        ...content.comparison.valueLabels,
       },
       groups: content.comparison.groupCopy.map((group) => ({
         title: group.title,
