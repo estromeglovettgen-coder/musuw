@@ -15,6 +15,15 @@
   --mvp-paperclip: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m16%206-8.414%208.586a2%202%200%200%200%202.829%202.829l8.414-8.586a4%204%200%201%200-5.657-5.657l-8.379%208.551a6%206%200%201%200%208.485%208.485l8.379-8.551%22%2F%3E%3C%2Fsvg%3E");
   --mvp-settings: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9.671%204.136a2.34%202.34%200%200%201%204.659%200%202.34%202.34%200%200%200%203.319%201.915%202.34%202.34%200%200%201%202.33%204.033%202.34%202.34%200%200%200%200%203.831%202.34%202.34%200%200%201-2.33%204.033%202.34%202.34%200%200%200-3.319%201.915%202.34%202.34%200%200%201-4.659%200%202.34%202.34%200%200%200-3.32-1.915%202.34%202.34%200%200%201-2.33-4.033%202.34%202.34%200%200%200%200-3.831A2.34%202.34%200%200%201%206.35%206.051a2.34%202.34%200%200%200%203.319-1.915%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E");
   --mvp-logout: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m16%2017%205-5-5-5%22%2F%3E%3Cpath%20d%3D%22M21%2012H9%22%2F%3E%3Cpath%20d%3D%22M9%2021H5a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2h4%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-gauge: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%2014%204-4%22%2F%3E%3Cpath%20d%3D%22M3.34%2019a10%2010%200%201%201%2017.32%200%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-sparkles: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.017%202.814a1%201%200%200%201%201.966%200l1.051%205.558a2%202%200%200%200%201.594%201.594l5.558%201.051a1%201%200%200%201%200%201.966l-5.558%201.051a2%202%200%200%200-1.594%201.594l-1.051%205.558a1%201%200%200%201-1.966%200l-1.051-5.558a2%202%200%200%200-1.594-1.594l-5.558-1.051a1%201%200%200%201%200-1.966l5.558-1.051a2%202%200%200%200%201.594-1.594z%2F%3E%3Cpath%20d%3D%22M20%202v4%22%2F%3E%3Cpath%20d%3D%22M22%204h-4%22%2F%3E%3Ccircle%20cx%3D%224%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-crown: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m2%204%203%2016h14l3-16-6%207-4-7-4%207-6-7z%22%2F%3E%3Cpath%20d%3D%22M4%2020h16%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-x: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M18%206%206%2018%22%2F%3E%3Cpath%20d%3D%22m6%206%2012%2012%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-chevron-down: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-chevron-right: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m9%2018%206-6-6-6%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-check: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%206%209%2017l-5-5%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-check-chat: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%206%209%2017l-5-5%22%2F%3E%3C%2Fsvg%3E");
+  --mvp-lock: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2218%22%20height%3D%2211%22%20x%3D%223%22%20y%3D%2211%22%20rx%3D%222%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M7%2011V7a5%205%200%200%201%2010%200v4%22%2F%3E%3C%2Fsvg%3E");
 }
 
 /* Shared monochrome-mask primitive. */
@@ -122,6 +131,123 @@
 .visual-user-menu__item:has(.t-icon-logout)::before { width: 16px; height: 16px; }
 .visual-user-menu__item:has(.t-icon-setting)::before { -webkit-mask-image: var(--mvp-settings); mask-image: var(--mvp-settings); }
 .visual-user-menu__item:has(.t-icon-logout)::before { -webkit-mask-image: var(--mvp-logout); mask-image: var(--mvp-logout); }
+
+.visual-user-menu__item:has(.t-icon-chart-line) > .t-icon,
+.visual-user-menu__item:has(.t-icon-arrow-up) > .t-icon,
+.visual-user-menu__item:has(.t-icon-crown) > .t-icon,
+.visual-settings-close > .t-icon,
+.visual-model-selector__consumer-control > .t-icon,
+.visual-model-selector__consumer-check > .t-icon,
+.visual-model-selector__consumer-lock > .t-icon,
+.visual-general-settings__select-control > .t-icon,
+.visual-general-settings__select-option > .t-icon { display: none !important; }
+
+.visual-user-menu__item:has(.t-icon-chart-line)::before,
+.visual-user-menu__item:has(.t-icon-arrow-up)::before,
+.visual-user-menu__item:has(.t-icon-crown)::before,
+.visual-settings-close::before,
+.visual-model-selector__consumer-control::after,
+.visual-model-selector__consumer-check::before,
+.visual-model-selector__consumer-lock::before,
+.visual-general-settings__select-control::after,
+.visual-general-settings__select-option:has(.visual-general-settings__select-check)::after,
+.visual-model-selector__chat-row::after,
+.visual-model-selector__chat-check::before,
+.visual-model-selector__chat-lock::before {
+  content: "";
+  display: block;
+  flex: 0 0 auto;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.visual-user-menu__item:has(.t-icon-chart-line)::before {
+  width: 16px;
+  height: 16px;
+  -webkit-mask-image: var(--mvp-gauge);
+  mask-image: var(--mvp-gauge);
+}
+.visual-user-menu__item:has(.t-icon-arrow-up)::before {
+  width: 16px;
+  height: 16px;
+  -webkit-mask-image: var(--mvp-sparkles);
+  mask-image: var(--mvp-sparkles);
+}
+.visual-user-menu__item:has(.t-icon-crown)::before {
+  width: 16px;
+  height: 16px;
+  -webkit-mask-image: var(--mvp-crown);
+  mask-image: var(--mvp-crown);
+}
+.visual-settings-close::before {
+  width: 14px;
+  height: 14px;
+  -webkit-mask-image: var(--mvp-x);
+  mask-image: var(--mvp-x);
+}
+.visual-model-selector__consumer-control::after {
+  width: 14px;
+  height: 14px;
+  transition: transform 150ms ease, color 150ms ease;
+  -webkit-mask-image: var(--mvp-chevron-down);
+  mask-image: var(--mvp-chevron-down);
+}
+.visual-model-selector__consumer-control[aria-expanded="true"]::after { transform: rotate(180deg); }
+.visual-model-selector__consumer-check::before {
+  width: 14px;
+  height: 14px;
+  -webkit-mask-image: var(--mvp-check);
+  mask-image: var(--mvp-check);
+}
+.visual-model-selector__consumer-lock::before {
+  width: 14px;
+  height: 14px;
+  -webkit-mask-image: var(--mvp-lock);
+  mask-image: var(--mvp-lock);
+}
+.visual-general-settings__select-control::after {
+  width: 14px;
+  height: 14px;
+  transition: transform 150ms ease, color 150ms ease;
+  -webkit-mask-image: var(--mvp-chevron-down);
+  mask-image: var(--mvp-chevron-down);
+}
+.visual-general-settings__select-control[aria-expanded="true"]::after { transform: rotate(180deg); }
+.visual-general-settings__select-option:has(.visual-general-settings__select-check)::after {
+  width: 14px;
+  height: 14px;
+  -webkit-mask-image: var(--mvp-check);
+  mask-image: var(--mvp-check);
+}
+
+/* QAPanel.tsx: ChevronRight / Check / Lock use Lucide's exact 14px paths. */
+.visual-model-selector__chat-row-trailing > .t-icon,
+.visual-model-selector__chat-check > .t-icon,
+.visual-model-selector__chat-lock > .t-icon { display: none !important; }
+.visual-model-selector__chat-row-trailing::after,
+.visual-model-selector__chat-check::before,
+.visual-model-selector__chat-lock::before {
+  width: 14px;
+  height: 14px;
+}
+.visual-model-selector__chat-row-trailing::after {
+  color: #9ca3af;
+  -webkit-mask-image: var(--mvp-chevron-right);
+  mask-image: var(--mvp-chevron-right);
+}
+.visual-model-selector__chat-check::before {
+  -webkit-mask-image: var(--mvp-check-chat);
+  mask-image: var(--mvp-check-chat);
+}
+.visual-model-selector__chat-lock::before {
+  -webkit-mask-image: var(--mvp-lock);
+  mask-image: var(--mvp-lock);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .visual-manual-editor__tool,

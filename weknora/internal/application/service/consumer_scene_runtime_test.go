@@ -67,6 +67,7 @@ func TestConsumerSceneForSearchScopeClassifiesEffectiveScope(t *testing.T) {
 }
 
 func TestResolveConsumerChatModelPropagatesEffectivePlatformID(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "effective-platform"}}
 	svc := &sessionService{consumerModelResolver: resolver}
 	req := &types.QARequest{
@@ -81,6 +82,44 @@ func TestResolveConsumerChatModelPropagatesEffectivePlatformID(t *testing.T) {
 	require.Equal(t, "effective-platform", req.CustomAgent.Config.ModelID)
 	require.Equal(t, "effective-platform", req.CustomAgent.Config.QueryUnderstandModelID)
 	require.Equal(t, []consumerResolverCall{{scene: types.ConsumerSceneRAG, requestedID: "browser-candidate"}}, resolver.calls)
+}
+
+func TestResolveConsumerChatModelUsesAgentSceneForLitePlatformChat(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "effective-agent"}}
+	svc := &sessionService{consumerModelResolver: resolver}
+	req := &types.QARequest{
+		SummaryModelID: "browser-agent-candidate",
+		CustomAgent:    &types.CustomAgent{ID: types.BuiltinQuickAnswerID},
+	}
+
+	modelID, err := svc.resolveConsumerChatModel(context.Background(), req, types.ConsumerSceneChat, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, "effective-agent", modelID)
+	require.Equal(t, "effective-agent", req.SummaryModelID)
+	require.Equal(t, "effective-agent", req.CustomAgent.Config.ModelID)
+	require.Equal(t, "effective-agent", req.CustomAgent.Config.QueryUnderstandModelID)
+	require.Equal(t, []consumerResolverCall{{scene: types.ConsumerSceneRAG, requestedID: "browser-agent-candidate"}}, resolver.calls)
+}
+
+func TestResolveConsumerChatModelPreservesStandardAuthority(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
+	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "must-not-be-used"}}
+	svc := &sessionService{
+		consumerModelResolver: resolver,
+		modelService: &stubModelService{modelsByID: map[string]*types.Model{
+			"standard-model": {ID: "standard-model", Type: types.ModelTypeKnowledgeQA},
+		}},
+	}
+	req := &types.QARequest{
+		SummaryModelID: "standard-model",
+		CustomAgent:    &types.CustomAgent{ID: types.BuiltinSmartReasoningID},
+	}
+
+	modelID, err := svc.resolveConsumerChatModel(context.Background(), req, types.ConsumerSceneRAG, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, "standard-model", modelID)
+	require.Empty(t, resolver.calls)
 }
 
 func TestResolveConsumerChatModelBypassesCustomAgent(t *testing.T) {
@@ -128,6 +167,53 @@ func TestResolveConsumerChatModelBypassesResolverForIMPrincipal(t *testing.T) {
 	require.Empty(t, resolver.calls)
 }
 
+func TestResolveConsumerRerankModelUsesTypedSceneResolver(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "effective-rerank", Type: types.ModelTypeRerank}}
+	svc := &sessionService{consumerModelResolver: resolver}
+
+	modelID, err := svc.resolveConsumerRerankModelID(context.Background(), "tenant-retrieval-candidate")
+	require.NoError(t, err)
+	require.Equal(t, "effective-rerank", modelID)
+	require.Equal(t, []consumerResolverCall{{scene: types.ConsumerSceneRerank, requestedID: "tenant-retrieval-candidate"}}, resolver.calls)
+}
+
+func TestResolveConsumerRerankModelPreservesStandardAuthority(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
+	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "must-not-be-used", Type: types.ModelTypeRerank}}
+	svc := &sessionService{consumerModelResolver: resolver}
+
+	modelID, err := svc.resolveConsumerRerankModelID(context.Background(), "standard-rerank")
+	require.NoError(t, err)
+	require.Equal(t, "standard-rerank", modelID)
+	require.Empty(t, resolver.calls)
+}
+
+func TestConsumerRerankAllowedForRequestBypassesIMPrincipal(t *testing.T) {
+	ctx := types.WithPrincipal(context.Background(), types.Principal{Type: types.PrincipalIMUser, ID: "im-user"})
+
+	require.False(t, consumerRerankAllowedForRequest(ctx, nil))
+	require.False(t, consumerRerankAllowedForRequest(ctx, &types.CustomAgent{ID: types.BuiltinSmartReasoningID}))
+}
+
+func TestConsumerRerankAllowedForRequestKeepsPlatformAndCustomBoundaries(t *testing.T) {
+	ctx := context.Background()
+
+	require.True(t, consumerRerankAllowedForRequest(ctx, nil))
+	require.True(t, consumerRerankAllowedForRequest(ctx, &types.CustomAgent{ID: types.BuiltinSmartReasoningID}))
+	require.False(t, consumerRerankAllowedForRequest(ctx, &types.CustomAgent{ID: "custom-agent"}))
+}
+
+func TestResolveConsumerRerankModelRejectsWrongNativeType(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "wrong-type", Type: types.ModelTypeKnowledgeQA}}
+	svc := &sessionService{consumerModelResolver: resolver}
+
+	_, err := svc.resolveConsumerRerankModelID(context.Background(), "candidate")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "non-rerank")
+}
+
 type recordingWikiModelService struct {
 	stubModelService
 	lastChatModelID string
@@ -139,6 +225,7 @@ func (s *recordingWikiModelService) GetChatModel(_ context.Context, modelID stri
 }
 
 func TestResolveWikiChatModelUsesSharedSceneResolverAndDurableCandidate(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 	modelService := &recordingWikiModelService{stubModelService: stubModelService{chatModel: &captureChatModel{}}}
 	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "effective-wiki"}}
 	svc := &wikiIngestService{modelService: modelService, consumerModelResolver: resolver}
@@ -152,6 +239,19 @@ func TestResolveWikiChatModelUsesSharedSceneResolverAndDurableCandidate(t *testi
 	require.Equal(t, "wiki-candidate", resolver.calls[0].requestedID)
 	require.Equal(t, types.ConsumerSceneWiki, resolver.calls[0].scene)
 	require.Equal(t, "effective-wiki", modelService.lastChatModelID)
+}
+
+func TestResolveWikiChatModelPreservesStandardAuthority(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
+	modelService := &recordingWikiModelService{stubModelService: stubModelService{chatModel: &captureChatModel{}}}
+	resolver := &recordingConsumerModelResolver{model: &types.Model{ID: "must-not-be-used"}}
+	svc := &wikiIngestService{modelService: modelService, consumerModelResolver: resolver}
+	kb := &types.KnowledgeBase{WikiConfig: &types.WikiConfig{SynthesisModelID: "standard-wiki"}}
+
+	_, err := svc.resolveWikiChatModel(context.Background(), kb)
+	require.NoError(t, err)
+	require.Equal(t, "standard-wiki", modelService.lastChatModelID)
+	require.Empty(t, resolver.calls)
 }
 
 func TestResolveWikiChatModelFallsBackToSummaryWithoutResolver(t *testing.T) {

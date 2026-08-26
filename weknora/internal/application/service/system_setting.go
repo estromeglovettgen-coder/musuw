@@ -101,9 +101,10 @@ type settingSpec struct {
 // re-derive)".
 var registry = map[string]settingSpec{
 	// Consumer scene policy is intentionally represented by the existing
-	// typed settings authority. Keep the paid default order aligned with the
-	// current builtin catalog while placing the existing free model first so
-	// rollout preserves the current default behavior.
+	// typed settings authority. Keep paid defaults aligned with the current
+	// builtin catalog while retaining the existing platform defaults for
+	// rollout compatibility. Chat remains registered for the existing runtime
+	// path, but is not a consumer settings row.
 	"consumer_models.chat.free_default": {
 		Type:        "string",
 		Default:     types.PlatformKnowledgeBaseChatModelID,
@@ -139,6 +140,42 @@ var registry = map[string]settingSpec{
 		Default:     defaultConsumerPaidModelIDs(),
 		Category:    "models",
 		Description: "消费者 Wiki 场景的付费模型候选，按顺序排列，首项为付费默认模型。",
+	},
+	"consumer_models.rerank.free_default": {
+		Type:        "string",
+		Default:     types.CheapestRerankModelID,
+		Category:    "models",
+		Description: "消费者 Rerank 场景的免费默认模型。仅支持启用的内置 OpenRouter Rerank 模型。",
+	},
+	"consumer_models.rerank.paid_options": {
+		Type:        "string_list",
+		Default:     defaultConsumerPaidModelIDsForType(types.ModelTypeRerank),
+		Category:    "models",
+		Description: "消费者 Rerank 场景的付费模型候选，按顺序排列，首项为付费默认模型。",
+	},
+	"consumer_models.vision.free_default": {
+		Type:        "string",
+		Default:     types.PlatformKnowledgeBaseVLMModelID,
+		Category:    "models",
+		Description: "消费者视觉理解场景的免费默认模型。仅支持启用的内置 OpenRouter VLLM 模型。",
+	},
+	"consumer_models.vision.paid_options": {
+		Type:        "string_list",
+		Default:     defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM),
+		Category:    "models",
+		Description: "消费者视觉理解场景的付费模型候选，按顺序排列，首项为付费默认模型。",
+	},
+	"consumer_models.asr.free_default": {
+		Type:        "string",
+		Default:     types.PlatformKnowledgeBaseASRModelID,
+		Category:    "models",
+		Description: "消费者语音识别场景的免费默认模型。仅支持启用的内置 OpenRouter ASR 模型。",
+	},
+	"consumer_models.asr.paid_options": {
+		Type:        "string_list",
+		Default:     defaultConsumerPaidModelIDsForType(types.ModelTypeASR),
+		Category:    "models",
+		Description: "消费者语音识别场景的付费模型候选，按顺序排列，首项为付费默认模型。",
 	},
 	// NOTE: file.max_size_mb is intentionally NOT registered. Although
 	// the Go upload handlers accept a runtime override via
@@ -213,15 +250,15 @@ var registry = map[string]settingSpec{
 	// NOT retroactively resize already-existing tenants (they keep the
 	// quota stored on their row at creation; superusers can edit
 	// individual tenants via the existing tenant-update path).
-	// 0 or negative = use the consumer Free-plan default (5 GiB).
+	// 0 or negative = use the consumer Free-plan default (1 GiB).
 	"tenant.default_storage_quota_gb": {
 		Type:     "int",
 		EnvName:  "WEKNORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
-		Default:  int64(5),
+		Default:  int64(1),
 		Category: "tenant",
 		Description: "新建空间时默认分配的存储配额（GB），包含向量、原文、文本、索引等。" +
 			"仅在创建时读取，修改后只对之后新建的空间生效，不会回写已存在的空间。" +
-			"0 或负数表示使用免费版默认值 5GB。",
+			"0 或负数表示使用免费版默认值 1GB。",
 	},
 	// tenant.auto_create_api_key restores the legacy behaviour where creating
 	// a tenant also minted a full-access API key and returned its plaintext
@@ -326,6 +363,19 @@ func defaultConsumerPaidModelIDs() []string {
 		"builtin-openrouter-claude-haiku",
 		"builtin-openrouter-claude-sonnet",
 		"builtin-openrouter-claude-opus",
+	}
+}
+
+func defaultConsumerPaidModelIDsForType(modelType types.ModelType) []string {
+	switch modelType {
+	case types.ModelTypeRerank:
+		return []string{types.CheapestRerankModelID}
+	case types.ModelTypeVLLM:
+		return []string{types.PlatformKnowledgeBaseVLMModelID}
+	case types.ModelTypeASR:
+		return []string{types.PlatformKnowledgeBaseASRModelID}
+	default:
+		return defaultConsumerPaidModelIDs()
 	}
 }
 

@@ -55,11 +55,27 @@ export interface ModelConfig {
   deleted_at?: string | null;
 }
 
-export type ConsumerScene = 'chat' | 'rag' | 'wiki'
+/**
+ * Fixed consumer resolver boundaries. `chat` remains an internal compatibility
+ * scene for the composer/runtime and is intentionally not exposed by the
+ * consumer settings page. The five settings controls are the native model
+ * seams that users can safely choose.
+ */
+export type ConsumerScene = 'chat' | 'rag' | 'wiki' | 'rerank' | 'vision' | 'asr'
+export type ConsumerConfigurableScene = Exclude<ConsumerScene, 'chat'>
+export const CONSUMER_CONFIGURABLE_SCENES: readonly ConsumerConfigurableScene[] = [
+  'rag',
+  'rerank',
+  'wiki',
+  'vision',
+  'asr',
+]
 
 export interface ConsumerSceneOption {
   model_id: string
   display_name: string
+  /** Native WeKnora interface for this scene; no provider configuration is exposed. */
+  model_type: ModelConfig['type']
   selectable: boolean
   locked: boolean
   required_plan: string

@@ -29,7 +29,7 @@ Keep plan/status, optional Paddle identifiers, and the last Paddle-confirmed ent
 
 ### Put the complete plan matrix in one pure Go definition
 
-One `PlanLimits` function owns plan names, storage, monthly credits, Free content gates, and the least-cost built-in IDs. Services and the response DTO consume it. Pro and Max storage follow the same four-GiB-per-listed-dollar rule as Plus: 40 and 80 GiB. Database values identify the plan; limits are not duplicated in rows.
+One `PlanLimits` function owns plan names, storage, monthly credits, Free content gates, and the least-cost built-in IDs. Services and the response DTO consume it. The later `adjust-consumer-plan-limits` change updates storage to 1/10/30/100 GiB and Free monthly credit to USD 0.40 while retaining the paid credit allowances. Database values identify the plan; limits are not duplicated in rows.
 
 ### Enforce at existing service boundaries
 
@@ -78,11 +78,11 @@ Generic WeKnora deployments may leave Paddle unconfigured. The shared shape vali
 - [Paddle delivery order varies] → Use event occurrence time and event ID for plan state, and the paid billing-period end for allowance idempotency so unrelated newer events cannot suppress a successful renewal.
 - [A prorated upgrade payment fails or the current Paddle subscription no longer matches the tenant] → Use Paddle's `prevent_change`, fail closed, and leave both the durable plan and existing OpenRouter key limit unchanged.
 - [Disposable Sandbox data contains stale provider IDs] → Delete the test account through the existing product lifecycle and validate a fresh Sandbox checkout; do not add a cross-environment subscription-recovery subsystem.
-- [Existing tenants currently have larger storage quotas] → Migration assigns Free and 5 GiB unless an explicit paid plan is set; files are never deleted when usage exceeds the new quota, but new uploads remain blocked.
+- [Existing tenants have a prior storage matrix] → The superseding limit migration maps persisted Free/Plus/Pro/Max plans to 1/10/30/100 GiB; files are never deleted when usage exceeds the new quota, but new uploads remain blocked.
 
 ## Migration Plan
 
-1. Keep tenant entitlement columns with Free defaults in PostgreSQL and SQLite; update existing rows to Free/5 GiB without deleting data.
+1. Keep tenant entitlement columns with Free defaults in PostgreSQL and SQLite; the superseding limit migration updates existing rows to 1/10/30/100 GiB by persisted plan without deleting data.
 2. Deploy backend enforcement, tenant child-key provisioning, and the read-only entitlement UI with Paddle disabled by default.
 3. Configure `OPENROUTER_MANAGEMENT_API_KEY` and the existing 32-byte `SYSTEM_AES_KEY`; child keys are created lazily, so there is no bulk migration or provider-side scan.
 4. Add the narrow checkout-intent and upgrade-operation state, the retryable verified-webhook handoff, and the exactly-one-known-base-item check. Keep the existing tenant event markers as final idempotency and do not add a refund/chargeback engine, reconciliation subsystem, or usage ledger.

@@ -39,6 +39,17 @@ func TestValidateWorkerConcurrencyMinimums(t *testing.T) {
 	}
 }
 
+func TestDefaultStorageSettingMatchesFreePlan(t *testing.T) {
+	spec, ok := registry["tenant.default_storage_quota_gb"]
+	if !ok {
+		t.Fatal("tenant.default_storage_quota_gb is not registered")
+	}
+	want := types.LimitsForConsumerPlan(types.ConsumerPlanFree).StorageBytes / (1024 * 1024 * 1024)
+	if got, ok := spec.Default.(int64); !ok || got != want {
+		t.Fatalf("default storage setting = %#v, want %d GiB", spec.Default, want)
+	}
+}
+
 type consumerSceneSettingRepository struct {
 	mu   sync.RWMutex
 	rows map[string]*types.SystemSetting

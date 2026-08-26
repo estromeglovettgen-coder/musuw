@@ -65,35 +65,8 @@
 }
 .visual-chat-composer__model .t-icon { color: #6b7280 !important; }
 
-/* Match the installed Codex picker's compact 280px single-line menu while the
- * frozen controller continues to own safe viewport positioning. */
-.visual-chat-composer__model-menu {
-  width: 280px !important;
-  min-width: min(180px, calc(100vw - 32px)) !important;
-  max-width: min(280px, calc(100vw - 32px)) !important;
-  padding: 8px !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 17px !important;
-  background: #fff !important;
-  box-shadow: 0 14px 32px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 6%) !important;
-}
-.visual-chat-composer__model-menu > header {
-  min-height: 24px !important;
-  padding: 1px 2px 4px !important;
-  font-size: 9px !important;
-  line-height: 14px !important;
-}
-.visual-chat-composer__model-menu > header > span {
-  min-width: 0 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-.visual-chat-composer__model-menu > header button {
-  flex: 0 0 auto !important;
-  padding: 3px 4px !important;
-  font-size: 9px !important;
-}
+/* The current authority uses a 224px card. Its complete chrome and positioning
+ * live beside the Vue component so this late closure layer cannot override it. */
 .visual-chat-composer__model-options > button {
   min-height: 30px !important;
   padding: 6px 8px !important;
@@ -221,10 +194,4 @@
 :root[theme-mode="dark"] .visual-chat-composer__model-picker .t-icon {
   color: var(--mvc-muted, #a9adb5) !important;
 }
-:root[theme-mode="dark"] .visual-chat-composer__model-menu {
-  border-color: var(--mvc-line, #31343a) !important;
-  background: var(--mvc-surface, #1d1f23) !important;
-  color: var(--mvc-text, #f2f2f2) !important;
-}
-
 /* Native semantic status colors are deliberately not neutralized here. */

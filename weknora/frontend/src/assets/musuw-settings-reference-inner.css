@@ -490,3 +490,62 @@
 }
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .t-table th,
 :root[theme-mode="dark"] .visual-settings-content .t-table th { background: var(--mvc-hover, #25272c) !important; color: var(--mvc-muted, #c2c2c2) !important; }
+
+/* Consumer UserProfile keeps the SettingsModal source row geometry.  The
+ * legacy settings bridge above remains available to Standard pages; these
+ * later, scoped rules prevent it from flattening the consumer profile rows
+ * rendered in the same dialog. */
+.visual-settings-content .user-profile .section-header {
+  margin: 0 0 16px !important;
+  padding: 0 !important;
+}
+.visual-settings-content .user-profile .section-header h2 {
+  margin: 0 0 4px !important;
+  color: #111827 !important;
+  font-size: 16px !important;
+  line-height: 24px !important;
+  font-weight: 700 !important;
+}
+.visual-settings-content .user-profile .section-header .section-description {
+  margin: 0 !important;
+  color: #777 !important;
+  font-size: 13px !important;
+  line-height: 20px !important;
+}
+.visual-settings-content .user-profile .setting-row {
+  min-height: 64px !important;
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+.visual-settings-content .user-profile .setting-info {
+  min-width: 0 !important;
+  flex: 1 !important;
+  padding: 0 !important;
+}
+.visual-settings-content .user-profile .setting-info label {
+  display: block !important;
+  margin: 0 !important;
+  color: #111827 !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600 !important;
+}
+.visual-settings-content .user-profile .setting-info .desc {
+  margin: 2px 0 0 !important;
+  color: #777 !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+.visual-settings-content .user-profile .setting-control {
+  flex-shrink: 0 !important;
+  width: auto !important;
+  max-width: 52% !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+}

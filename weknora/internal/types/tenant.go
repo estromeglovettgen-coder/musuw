@@ -96,8 +96,8 @@ type Tenant struct {
 	RetrieverEngines RetrieverEngines `yaml:"retriever_engines"   json:"retriever_engines"   gorm:"type:json"`
 	// Business
 	Business string `yaml:"business"            json:"business"`
-	// Storage quota (Bytes), default is the consumer Free plan's 5 GiB.
-	StorageQuota int64 `yaml:"storage_quota"       json:"storage_quota"       gorm:"default:5368709120"`
+	// Storage quota (Bytes), default is the consumer Free plan's 1 GiB.
+	StorageQuota int64 `yaml:"storage_quota"       json:"storage_quota"       gorm:"default:1073741824"`
 	// Storage used (Bytes)
 	StorageUsed int64 `yaml:"storage_used"        json:"storage_used"        gorm:"default:0"`
 	// Consumer entitlement. Billing identifiers and provider spend are never

@@ -1,41 +1,39 @@
 <template>
-  <section class="visual-model-settings">
-    <header class="visual-model-settings__header">
-      <div class="visual-model-settings__heading">
-        <div>
-          <h2>{{ $t('modelSettings.title') }}</h2>
-          <p>{{ $t('modelSettings.description') }}</p>
-        </div>
-        <button
-          v-if="authStore.hasRole('admin')"
-          type="button"
-          class="visual-model-settings__debug"
-          @click="showDebugDrawer = true"
-        >
-          <play-circle-icon />
-          <span>{{ $t('modelSettings.actions.debugModel') }}</span>
-        </button>
+  <section class="visual-model-settings" :class="{ 'is-lite': authStore.isLiteMode }">
+    <header class="visual-settings-page-header visual-model-settings__header">
+      <div class="visual-settings-page-header__copy">
+        <h2 class="visual-settings-page-header__title">{{ $t('modelSettings.title') }}</h2>
+        <p class="visual-settings-page-header__description">{{ $t('modelSettings.description') }}</p>
       </div>
-
-      <aside class="visual-model-settings__hint" role="note">
-        <div>
-          <strong>{{ $t('modelSettings.builtinModels.title') }}</strong>
-          <p>
-            {{ $t(authStore.isSystemAdmin
-              ? 'modelSettings.builtinModels.descriptionAdmin'
-              : 'modelSettings.builtinModels.description') }}
-          </p>
-        </div>
-        <a
-          href="https://github.com/estromeglovettgen-coder/musuw/blob/main/weknora/docs/BUILTIN_MODELS.md"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {{ $t('modelSettings.builtinModels.viewGuide') }}
-          <t-icon name="link" />
-        </a>
-      </aside>
+      <button
+        v-if="!authStore.isLiteMode && authStore.hasRole('admin')"
+        type="button"
+        class="visual-model-settings__debug"
+        @click="showDebugDrawer = true"
+      >
+        <play-circle-icon />
+        <span>{{ $t('modelSettings.actions.debugModel') }}</span>
+      </button>
     </header>
+
+    <aside v-if="!authStore.isLiteMode" class="visual-model-settings__hint" role="note">
+      <div>
+        <strong>{{ $t('modelSettings.builtinModels.title') }}</strong>
+        <p>
+          {{ $t(authStore.isSystemAdmin
+            ? 'modelSettings.builtinModels.descriptionAdmin'
+            : 'modelSettings.builtinModels.description') }}
+        </p>
+      </div>
+      <a
+        href="https://github.com/estromeglovettgen-coder/musuw/blob/main/weknora/docs/BUILTIN_MODELS.md"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {{ $t('modelSettings.builtinModels.viewGuide') }}
+        <t-icon name="link" />
+      </a>
+    </aside>
 
     <section class="consumer-scene-settings" aria-labelledby="consumer-scene-settings-title">
       <div class="consumer-scene-settings__header">
@@ -52,7 +50,6 @@
             <span>{{ $t(`modelSettings.sceneModels.scenes.${scene}.description`) }}</span>
           </div>
           <ModelSelector
-            :all-models="consumerSceneOptionsFor(scene).length ? allModels : []"
             :scene-options="consumerSceneOptionsFor(scene)"
             :selected-model-id="consumerSceneCandidate(scene)"
             :show-add-model="false"
@@ -63,7 +60,8 @@
       </div>
     </section>
 
-    <div class="visual-model-tabs" data-guide="settings-models" role="tablist">
+    <template v-if="!authStore.isLiteMode">
+      <div class="visual-model-tabs" data-guide="settings-models" role="tablist">
       <button
         v-for="tab in ([
           { value: 'all', label: $t('common.all'), count: allLegacyModels.length },
@@ -84,9 +82,9 @@
         <span>{{ tab.label }}</span>
         <small>{{ tab.count }}</small>
       </button>
-    </div>
+      </div>
 
-    <div class="visual-model-settings__content">
+      <div class="visual-model-settings__content">
       <div v-if="loading" class="visual-model-settings__loading">
         <t-loading size="small" />
       </div>
@@ -178,7 +176,8 @@
           <span>{{ $t('modelSettings.actions.addModel') }}</span>
         </button>
       </div>
-    </div>
+      </div>
+    </template>
 
     <ModelEditorDialog
       v-model:visible="showDialog"
@@ -198,7 +197,8 @@ import { useI18n } from 'vue-i18n'
 import ModelEditorDialog from '@/components/ModelEditorDialog.vue'
 import ModelDebugDrawer from '@/components/ModelDebugDrawer.vue'
 import ModelSelector from '@/components/ModelSelector.vue'
-import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ConsumerScene, type ModelConfig } from '@/api/model'
+import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ConsumerConfigurableScene, type ModelConfig } from '@/api/model'
+import { getTenantRetrievalConfig, updateTenantRetrievalConfig, type RetrievalConfig } from '@/api/retrieval'
 import { useAuthStore } from '@/stores/auth'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useSettingsStore } from '@/stores/settings'
@@ -218,19 +218,53 @@ const currentModelType = ref<ModelType>('chat')
 const editingModel = ref<any>(null)
 const loading = ref(true)
 const activeTypeFilter = ref<FilterType>('all')
-const consumerScenes: readonly ConsumerScene[] = ['chat', 'rag', 'wiki']
+// Only user-safe native seams belong on the consumer page. Standalone Chat is
+// an internal compatibility path for the fixed platform agent; Embedding is
+// bound to the KB vector index and must never become a browser preference.
+const consumerScenes: readonly ConsumerConfigurableScene[] = ['rag', 'rerank', 'wiki', 'vision', 'asr']
 const consumerSceneLoading = ref(false)
+const defaultRetrievalConfig: RetrievalConfig = {
+  embedding_top_k: 50,
+  vector_threshold: 0.15,
+  keyword_threshold: 0.3,
+  rerank_top_k: 10,
+  rerank_threshold: 0.2,
+  rerank_model_id: '',
+}
+const retrievalConfig = ref<RetrievalConfig>({ ...defaultRetrievalConfig })
 
-const consumerSceneOptionsFor = (scene: ConsumerScene) =>
+const consumerSceneOptionsFor = (scene: ConsumerConfigurableScene) =>
   chatResources.consumerSceneOptions[scene]?.options || []
 
-const consumerSceneCandidate = (scene: ConsumerScene): string => {
+const consumerSceneCandidate = (scene: ConsumerConfigurableScene): string => {
   const response = chatResources.consumerSceneOptions[scene]
+  const storedCandidate = scene === 'rerank'
+    ? retrievalConfig.value.rerank_model_id
+    : settingsStore.getConsumerSceneModel(scene)
   return resolveConsumerSceneCandidate(
     response?.options || [],
-    settingsStore.getConsumerSceneModel(scene),
+    storedCandidate,
     response?.effective_model_id,
   )
+}
+
+const loadRetrievalConfig = async () => {
+  try {
+    const response: any = await getTenantRetrievalConfig()
+    const data = response?.data ?? response
+    if (data && typeof data === 'object') {
+      retrievalConfig.value = {
+        ...defaultRetrievalConfig,
+        ...data,
+        rerank_model_id: typeof data.rerank_model_id === 'string' ? data.rerank_model_id : '',
+      }
+    }
+  } catch (error) {
+    // Keep the deterministic server default when the existing retrieval seam
+    // is temporarily unavailable; selecting another scene does not broaden
+    // the safe scene-options catalog.
+    console.warn('Failed to load tenant retrieval config', error)
+  }
 }
 
 const loadConsumerSceneOptions = async () => {
@@ -239,7 +273,7 @@ const loadConsumerSceneOptions = async () => {
     await Promise.all(consumerScenes.map(scene => chatResources.ensureConsumerSceneOptions(scene)))
     for (const scene of consumerScenes) {
       const selected = consumerSceneCandidate(scene)
-      if (selected && selected !== settingsStore.getConsumerSceneModel(scene)) {
+      if (scene !== 'rerank' && selected && selected !== settingsStore.getConsumerSceneModel(scene)) {
         settingsStore.updateConsumerSceneModel(scene, selected)
       }
     }
@@ -252,9 +286,31 @@ const loadConsumerSceneOptions = async () => {
   }
 }
 
-const onConsumerSceneModelChange = (scene: ConsumerScene, value: string) => {
+const onConsumerSceneModelChange = async (scene: ConsumerConfigurableScene, value: string) => {
   const option = consumerSceneOptionsFor(scene).find(item => item.model_id === value)
   if (!option || option.locked || !option.selectable) return
+
+  if (scene === 'rerank') {
+    const nextConfig: RetrievalConfig = {
+      ...retrievalConfig.value,
+      rerank_model_id: value,
+    }
+    try {
+      const response: any = await updateTenantRetrievalConfig(nextConfig)
+      const data = response?.data ?? response
+      retrievalConfig.value = {
+        ...nextConfig,
+        ...(data && typeof data === 'object' ? data : {}),
+        rerank_model_id: typeof data?.rerank_model_id === 'string'
+          ? data.rerank_model_id
+          : value,
+      }
+    } catch (error: any) {
+      MessagePlugin.error(error?.message || t('modelSettings.toasts.saveFailed'))
+    }
+    return
+  }
+
   settingsStore.updateConsumerSceneModel(scene, value)
 }
 
@@ -404,6 +460,13 @@ const emptyHint = computed(() => {
 
 // 加载模型列表
 const loadModels = async () => {
+  if (authStore.isLiteMode) {
+    // Lite users only receive the narrow, permission-aware scene-options
+    // responses above; never fetch the legacy tenant model catalog here.
+    allModels.value = []
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     const models = await listModels()
@@ -711,7 +774,7 @@ function getModelType(type: ModelType): 'KnowledgeQA' | 'Embedding' | 'Rerank' |
 }
 
 onMounted(() => {
-  void Promise.all([loadModels(), loadConsumerSceneOptions()])
+  void Promise.all([loadModels(), loadConsumerSceneOptions(), loadRetrievalConfig()])
 })
 </script>
 
@@ -724,34 +787,37 @@ onMounted(() => {
 }
 
 .visual-model-settings__header {
-  margin-bottom: 20px;
-  padding-right: 40px;
-}
-
-.visual-model-settings__heading {
+  margin: 0 0 8px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid #f3f4f6;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
 }
 
-.visual-model-settings__heading > div {
+.visual-settings-page-header__copy {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
-.visual-model-settings__heading h2 {
-  margin: 0 0 4px;
+.visual-settings-page-header__title {
+  margin: 0;
   color: #111827;
   font-size: 16px;
   line-height: 24px;
   font-weight: 700;
 }
 
-.visual-model-settings__heading p {
-  margin: 0;
+.visual-settings-page-header__description {
+  margin: 2px 0 0;
   color: #9ca3af;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
+}
+
+.visual-model-settings__heading > div {
+  min-width: 0;
 }
 
 .visual-model-settings__debug {
@@ -841,6 +907,31 @@ onMounted(() => {
   background: rgb(249 250 251 / 55%);
 }
 
+.visual-model-settings.is-lite .consumer-scene-settings {
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.visual-model-settings.is-lite .consumer-scene-settings__header {
+  margin-bottom: 16px;
+}
+
+.visual-model-settings.is-lite .consumer-scene-settings__header h3 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.visual-model-settings.is-lite .consumer-scene-settings__header p {
+  color: #777;
+  font-size: 13px;
+  line-height: 20px;
+}
+
 .consumer-scene-settings__header {
   display: flex;
   align-items: flex-start;
@@ -865,22 +956,31 @@ onMounted(() => {
 }
 
 .consumer-scene-settings__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .consumer-scene-settings__row {
   min-width: 0;
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 9px;
-  background: #fff;
+  min-height: 64px;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: transparent;
 }
+.consumer-scene-settings__row:last-child { border-bottom: 0; }
 
 .consumer-scene-settings__copy {
-  min-height: 38px;
-  margin-bottom: 8px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -890,6 +990,19 @@ onMounted(() => {
   color: #374151;
   font-size: 11px;
   line-height: 16px;
+}
+
+.visual-model-settings.is-lite .consumer-scene-settings__copy strong {
+  color: #111827;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.visual-model-settings.is-lite .consumer-scene-settings__copy span {
+  color: #777;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .consumer-scene-settings__copy span {
@@ -1166,12 +1279,12 @@ onMounted(() => {
 
 @media (max-width: 760px) {
   .visual-model-grid { grid-template-columns: 1fr; }
+  .consumer-scene-settings__row { align-items: flex-start; flex-direction: column; gap: 10px; }
   .visual-model-settings__hint { flex-direction: column; }
 }
 
 @media (max-width: 520px) {
-  .visual-model-settings__header { padding-right: 28px; }
-  .visual-model-settings__heading { flex-direction: column; gap: 10px; }
+  .visual-model-settings__header { flex-direction: column; gap: 10px; }
   .visual-model-settings__debug { align-self: flex-start; }
 }
 </style>

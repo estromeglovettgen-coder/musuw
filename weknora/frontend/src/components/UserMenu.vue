@@ -69,7 +69,14 @@ const usageRemainingPercent = computed<number | null>(() => {
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining)) return null
   return clampPercent((remaining / total) * 100)
 })
-const toggleMenu = () => { menuVisible.value = !menuVisible.value }
+const handleTriggerClick = () => {
+  if (uiStore.sidebarCollapsed) {
+    uiStore.expandSidebar()
+    menuVisible.value = false
+    return
+  }
+  menuVisible.value = !menuVisible.value
+}
 const handleQuickNav = (section: string, query: Record<string, string> = {}) => {
   menuVisible.value = false
   uiStore.openSettings()
@@ -275,9 +282,9 @@ onUnmounted(() => {
 
 <template>
   <div ref="menuRef" class="visual-user-menu" :class="{ 'is-collapsed': uiStore.sidebarCollapsed }">
-    <button type="button" class="visual-user-menu__trigger" data-guide="user-menu" :aria-expanded="menuVisible" @click="toggleMenu">
+    <button type="button" class="visual-user-menu__trigger" data-guide="user-menu" :aria-expanded="menuVisible" @click="handleTriggerClick">
       <span class="visual-user-menu__avatar">
-        <img v-if="userAvatar" :src="userAvatar" :alt="$t('common.avatar')" />
+        <img v-if="userAvatar && !authStore.isLiteMode" :src="userAvatar" :alt="$t('common.avatar')" />
         <span v-else>{{ userInitial }}</span>
       </span>
       <template v-if="!uiStore.sidebarCollapsed">
@@ -295,8 +302,7 @@ onUnmounted(() => {
       </template>
     </button>
 
-    <Transition name="visual-user-menu-pop">
-      <div v-if="menuVisible" class="visual-user-menu__dropdown" @click.stop>
+    <div v-if="menuVisible && !uiStore.sidebarCollapsed" class="visual-user-menu__dropdown" @click.stop>
         <div
           class="visual-user-menu__account is-clickable"
           role="button"
@@ -305,8 +311,8 @@ onUnmounted(() => {
           @keydown.enter.prevent="handleQuickNav('userprofile')"
           @keydown.space.prevent="handleQuickNav('userprofile')"
         >
-          <span class="visual-user-menu__avatar is-small"><img v-if="userAvatar" :src="userAvatar" alt="" /><span v-else>{{ userInitial }}</span></span>
-          <span class="visual-user-menu__account-copy"><strong>{{ userName }}</strong><small>{{ userEmail }}</small></span>
+          <span class="visual-user-menu__avatar is-small"><img v-if="userAvatar && !authStore.isLiteMode" :src="userAvatar" alt="" /><span v-else>{{ userInitial }}</span></span>
+          <span class="visual-user-menu__account-copy"><strong>{{ userName }}</strong></span>
           <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
         </div>
 
@@ -323,8 +329,7 @@ onUnmounted(() => {
           <t-icon v-if="showTenantSwitcher" name="chevron-right" class="visual-user-menu__tenant-trail" />
         </div>
 
-        <div class="visual-user-menu__divider" />
-        <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>
+        <div class="visual-user-menu__divider visual-user-menu__divider--dashed" />
         <button type="button" class="visual-user-menu__item visual-user-menu__usage-item" @click="handleQuickNav('usage')">
           <t-icon name="chart-line" />
           <span>{{ $t('entitlement.usageMenu') }}</span>
@@ -332,8 +337,9 @@ onUnmounted(() => {
           <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>
         <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openPlans">
-          <t-icon name="arrow-up" /><span>{{ entitlement?.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
+          <t-icon v-if="entitlement?.plan === 'free'" name="arrow-up" /><t-icon v-else name="crown" /><span>{{ entitlement?.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
         </button>
+        <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__item" @click="handleQuickNav('tenant')"><t-icon name="user-circle" /><span>{{ $t('settings.workspaceSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode && canManageMembers" type="button" class="visual-user-menu__item" @click="handleQuickNav('members')"><t-icon name="usergroup" /><span>{{ $t('tenantMember.title') }}</span></button>
         <button v-if="!authStore.isLiteMode && canManageModels" type="button" class="visual-user-menu__item" @click="handleQuickNav('models')"><t-icon name="control-platform" /><span>{{ $t('settings.modelManagement') }}</span></button>
@@ -348,10 +354,9 @@ onUnmounted(() => {
           <button type="button" class="visual-user-menu__item" @click="openGithub"><t-icon name="logo-github" /><span>{{ $t('common.github') }}</span><t-icon name="jump" class="visual-user-menu__external" /></button>
         </template>
 
-        <div class="visual-user-menu__divider" />
+        <div v-if="!authStore.isLiteMode" class="visual-user-menu__divider" />
         <button type="button" class="visual-user-menu__item is-danger" @click="handleLogout"><t-icon name="logout" /><span>{{ $t('auth.logout') }}</span></button>
-      </div>
-    </Transition>
+    </div>
 
     <Teleport to="body">
       <div
@@ -385,7 +390,8 @@ onUnmounted(() => {
 .visual-user-menu__trigger[aria-expanded='true'] { background: rgb(229 231 235 / 90%); box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-user-menu.is-collapsed .visual-user-menu__trigger { justify-content: center; padding: 6px 2px; }
 .visual-user-menu__avatar { flex: 0 0 30px; width: 30px; height: 30px; overflow: hidden; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #000; color: #fff; font-size: 12px; line-height: 1; font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); position: relative; }
-.visual-user-menu__avatar.is-small { flex-basis: 28px; width: 28px; height: 28px; }
+.visual-user-menu.is-collapsed .visual-user-menu__avatar { flex-basis: 32px; width: 32px; height: 32px; }
+.visual-user-menu__avatar.is-small { flex-basis: 24px; width: 24px; height: 24px; background: #4a80e8; font-weight: 500; }
 .visual-user-menu__avatar img { width: 100%; height: 100%; object-fit: cover; }
 .visual-user-menu__identity { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 1px; }
 .visual-user-menu__identity strong,.visual-user-menu__identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -393,14 +399,13 @@ onUnmounted(() => {
 .visual-user-menu__identity small { max-width: 150px; color: #9ca3af; font-size: 10px; line-height: 14px; font-weight: 400; }
 .visual-user-menu__caret { flex: 0 0 14px; width: 14px; height: 14px; font-size: 14px; color: #9ca3af; transition: transform 200ms ease; }
 .visual-user-menu__caret.is-open { transform: rotate(180deg); color: #374151; }
-.visual-user-menu__dropdown { position: absolute; left: 0; right: 0; bottom: 56px; z-index: 3000; max-height: min(620px, calc(100vh - 88px)); overflow-y: auto; padding: 8px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 16px; background: #fff; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%),0 8px 10px -6px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 3px; text-align: left; }
-.visual-user-menu.is-collapsed .visual-user-menu__dropdown { left: calc(100% + 8px); right: auto; bottom: 0; width: 264px; }
-.visual-user-menu__account { width: 100%; padding: 8px; border: 0; border-radius: 12px; background: #f9fafb; display: flex; align-items: center; gap: 9px; color: #374151; font: inherit; text-align: left; cursor: default; }
+.visual-user-menu__dropdown { position: absolute; left: 0; right: 0; bottom: 56px; z-index: 3000; max-height: min(620px, calc(100vh - 88px)); overflow-y: auto; padding: 6px; box-sizing: border-box; border: 1px solid rgb(229 231 235 / 90%); border-radius: 16px; background: #fff; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%),0 8px 10px -6px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.visual-user-menu__account { width: 100%; padding: 6px 10px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; gap: 8px; color: #374151; font: inherit; text-align: left; cursor: default; }
 .visual-user-menu__account.is-clickable { cursor: pointer; }
 .visual-user-menu__account.is-clickable:hover { background: #f3f4f6; }
 .visual-user-menu__account-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .visual-user-menu__account-copy strong,.visual-user-menu__account-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.visual-user-menu__account-copy strong { color: #111827; font-size: 12px; line-height: 16px; }
+.visual-user-menu__account-copy strong { color: #111827; font-size: 12px; line-height: 16px; font-weight: 500; }
 .visual-user-menu__account-copy small { color: #9ca3af; font-size: 10px; line-height: 14px; }
 .visual-user-menu__guide { flex: 0 0 26px; width: 26px; height: 26px; padding: 5px; border: 0; border-radius: 8px; background: transparent; color: #9ca3af; cursor: pointer; }
 .visual-user-menu__guide:hover { background: #e5e7eb; color: #374151; }
@@ -412,8 +417,9 @@ onUnmounted(() => {
 .visual-user-menu__tenant-copy strong { overflow: hidden; color: #111827; font-size: 11px; line-height: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .visual-user-menu__tenant-copy small { color: #9ca3af; font-size: 9px; line-height: 13px; }
 .visual-user-menu__tenant-trail { flex: 0 0 12px; font-size: 12px; color: #9ca3af; }
-.visual-user-menu__divider { height: 1px; margin: 4px 2px; background: #f3f4f6; }
-.visual-user-menu__item { width: 100%; min-height: 34px; padding: 7px 9px; border: 0; border-radius: 10px; display: flex; align-items: center; gap: 8px; background: transparent; color: #4b5563; font: inherit; font-size: 11px; line-height: 18px; font-weight: 500; text-align: left; cursor: pointer; }
+.visual-user-menu__divider { height: 1px; margin: 4px; background: #f3f4f6; }
+.visual-user-menu__divider--dashed { height: 0; border-top: 1px dashed #e5e7eb; background: transparent; }
+.visual-user-menu__item { width: 100%; min-height: 34px; padding: 8px 12px; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: #4b5563; font: inherit; font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; cursor: pointer; }
 .visual-user-menu__item:hover { background: #f3f4f6; color: #111827; }
 .visual-user-menu__item.visual-user-menu__usage-item { gap: 8px; }
 .visual-user-menu__usage-item > small { flex: 0 0 auto; margin-left: auto; color: #8b919b; font-size: 10px; line-height: 14px; font-weight: 500; white-space: nowrap; }
@@ -425,9 +431,7 @@ onUnmounted(() => {
 .visual-user-menu__item :deep(.t-icon) { flex: 0 0 16px; width: 16px; height: 16px; font-size: 16px; }
 .visual-user-menu__item > span { min-width: 0; flex: 1; }
 .visual-user-menu__external { margin-left: auto; flex-basis: 12px !important; width: 12px !important; height: 12px !important; font-size: 12px !important; color: #9ca3af; }
-.visual-user-menu-pop-enter-active,.visual-user-menu-pop-leave-active { transition: opacity 100ms ease,transform 100ms ease; }
-.visual-user-menu-pop-enter-from,.visual-user-menu-pop-leave-to { opacity: 0; transform: translateY(4px) scale(.96); }
-@media (prefers-reduced-motion: reduce) { .visual-user-menu__trigger,.visual-user-menu-pop-enter-active,.visual-user-menu-pop-leave-active { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .visual-user-menu__trigger { transition: none !important; } }
 </style>
 
 <style lang="less">

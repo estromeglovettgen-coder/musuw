@@ -417,7 +417,7 @@ func (s *wikiIngestService) resolveWikiChatModel(ctx context.Context, kb *types.
 		return nil, errors.New("wiki: knowledge base is nil")
 	}
 	candidate := wikiSynthesisModelCandidate(kb)
-	if s.consumerModelResolver != nil {
+	if s.consumerModelResolver != nil && isLiteProductEdition() {
 		resolved, err := s.consumerModelResolver.ResolveConsumerModel(ctx, types.ConsumerSceneWiki, candidate)
 		if err != nil {
 			return nil, fmt.Errorf("resolve wiki consumer model: %w", err)

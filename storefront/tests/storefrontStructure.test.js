@@ -113,7 +113,7 @@ test("comparison rows expose only enforced consumer plan facts", () => {
     "Portable export",
     "Deletion controls",
   ]);
-  assert.deepEqual(rows[0].slice(1), ["5 GiB", "20 GiB", "40 GiB", "80 GiB"]);
+  assert.deepEqual(rows[0].slice(1), ["1 GiB", "10 GiB", "30 GiB", "100 GiB"]);
   assert.deepEqual(rows[1].slice(1), ["1", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]);
   assert.deepEqual(rows[2].slice(1), ["10", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]);
   assert.deepEqual(rows[3].slice(1), [true, true, true, true]);
@@ -124,7 +124,7 @@ test("comparison rows expose only enforced consumer plan facts", () => {
     "Expanded platform-approved catalog",
     "Expanded platform-approved catalog",
   ]);
-  assert.deepEqual(rows[6].slice(1), ["$1.00", "$1.25", "$2.50", "$5.00"]);
+  assert.deepEqual(rows[6].slice(1), ["$0.40", "$1.25", "$2.50", "$5.00"]);
   rows.slice(7).forEach((row) => assert.deepEqual(row.slice(1), [true, true, true, true]));
   assert.doesNotMatch(JSON.stringify(comparisonGroups), /shared workspace administration|priority support|advanced knowledge tools/i);
 });
@@ -141,12 +141,12 @@ test("both storefront locales use the annual billing badge and truthful paid-pla
       allowanceFeatures,
       locale === "en"
         ? [
-            "$1.00 monthly AI credit allowance",
+            "$0.40 monthly AI credit allowance",
             "$1.25 monthly AI credit allowance",
             "$2.50 monthly AI credit allowance",
             "$5.00 monthly AI credit allowance",
           ]
-        : ["$1.00 每月 AI 额度", "$1.25 每月 AI 额度", "$2.50 每月 AI 额度", "$5.00 每月 AI 额度"],
+        : ["$0.40 每月 AI 额度", "$1.25 每月 AI 额度", "$2.50 每月 AI 额度", "$5.00 每月 AI 额度"],
     );
   }
 });

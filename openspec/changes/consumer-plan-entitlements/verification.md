@@ -1,5 +1,7 @@
 # Verification Report: consumer-plan-entitlements
 
+> Historical evidence below records the matrix verified at those dates. The unreleased `adjust-consumer-plan-limits` change supersedes those numeric limits for the next release; this report is intentionally not rewritten as new evidence.
+
 ## 2026-08-24 production disposable E2E (current entitlement evidence)
 
 - The same disposable account reported Free first, completed one monthly Plus

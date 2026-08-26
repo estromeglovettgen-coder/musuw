@@ -1,0 +1,5 @@
+-- The quota backfill is intentionally not reversed: an operator may have
+-- adjusted a tenant quota after the migration, and the previous value cannot
+-- be recovered without a second quota history table. Fresh SQLite databases
+-- use the default in 000000_init.up.sql; this incremental rollback is a safe
+-- no-op that does not touch stored usage or tenant data.

@@ -28,7 +28,7 @@ func TestApplyConsumerPlanUpdatesQuotaAndIgnoresOlderBillingEvent(t *testing.T) 
 	var stored types.Tenant
 	require.NoError(t, db.First(&stored, tenant.ID).Error)
 	assert.Equal(t, types.ConsumerPlanPro, stored.Plan)
-	assert.Equal(t, int64(40*1024*1024*1024), stored.StorageQuota)
+	assert.Equal(t, types.LimitsForConsumerPlan(types.ConsumerPlanPro).StorageBytes, stored.StorageQuota)
 	require.NotNil(t, stored.PaddleCurrentPeriodEnd)
 	assert.Equal(t, periodEnd, stored.PaddleCurrentPeriodEnd.UTC())
 }

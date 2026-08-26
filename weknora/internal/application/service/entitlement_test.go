@@ -164,8 +164,8 @@ func TestFreeAllowanceRefreshesOnRegistrationAnniversaryWithoutStacking(t *testi
 	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
 		Hash:                   "hash-7",
 		LimitMicrousd:          1_000_000,
-		LimitRemainingMicrousd: 400_000,
-		UsageMicrousd:          600_000,
+		LimitRemainingMicrousd: 700_000,
+		UsageMicrousd:          300_000,
 	}}
 	svc := newEntitlementService(repo, manager)
 
@@ -173,9 +173,9 @@ func TestFreeAllowanceRefreshesOnRegistrationAnniversaryWithoutStacking(t *testi
 	// not one allowance for every inactive month.
 	current, err := svc.Current(entitlementContext(7, "user-123"), time.Date(2026, 12, 15, 12, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
-	assert.Equal(t, int64(1_600_000), manager.updateLimit)
+	assert.Equal(t, int64(700_000), manager.updateLimit)
 	assert.Equal(t, 1, manager.updateCalls)
-	assert.Equal(t, int64(1_000_000), current.OpenRouterRemainingMicrousd)
+	assert.Equal(t, int64(400_000), current.OpenRouterRemainingMicrousd)
 	assert.Zero(t, current.OpenRouterUsedMicrousd)
 	require.NotNil(t, current.OpenRouterResetsAt)
 	assert.Equal(t, time.Date(2026, 12, 28, 9, 30, 0, 0, time.UTC), current.OpenRouterResetsAt.UTC())
@@ -591,7 +591,7 @@ func TestCancelAfterPauseStartsFullFreeAllowance(t *testing.T) {
 	applied, err := svc.ApplyConsumerPlan(context.Background(), 7, types.ConsumerPlanFree, "canceled", "yearly", "evt-canceled", now, "ctm_1", "sub_1", nil)
 	require.NoError(t, err)
 	assert.True(t, applied)
-	assert.Equal(t, int64(3_000_000), manager.updateLimit)
+	assert.Equal(t, int64(2_400_000), manager.updateLimit)
 	assert.Equal(t, 1, manager.updateCalls)
 	assert.Nil(t, repo.tenant.PaddleCurrentPeriodEnd)
 }
@@ -849,6 +849,21 @@ func TestEntitlementServiceProvisionsProviderLimitedTenantKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sk-child", key)
 	assert.Equal(t, 1, manager.createCalls)
+}
+
+func TestEntitlementServiceProvisionsFreeKeyAtNewAllowance(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: time.Now().UTC(),
+	}}
+	manager := &keyManagerStub{created: &modelopenrouter.ManagedKey{Key: "sk-child", Hash: "hash-7"}}
+	svc := newEntitlementService(repo, manager)
+
+	_, err := svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(400_000), manager.createLimit)
+	assert.False(t, manager.createReset)
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
 }
 
 func TestEntitlementServiceUsesProviderUsageAndSynchronizesPlanLimit(t *testing.T) {

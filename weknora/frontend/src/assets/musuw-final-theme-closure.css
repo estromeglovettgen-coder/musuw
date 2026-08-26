@@ -209,4 +209,177 @@
   .t-dialog:has(.invitation-list) .my-invitations-desc,
   .t-dialog:has(.invitation-list) .invitation-card-meta { color: var(--mvc-muted) !important; }
 
+  /* Settings panes: the reference keeps one title/row rhythm across General,
+   * Usage, Models and User profile. These late rules neutralize the legacy
+   * white-only component styles without changing their behavior or data flow.
+   */
+  .visual-settings-modal,
+  .visual-settings-sidebar,
+  .visual-settings-content,
+  .visual-settings-content__inner,
+  .visual-general-settings,
+  .visual-model-settings,
+  .usage-billing,
+  .user-profile {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-page) !important;
+    color: var(--mvc-text) !important;
+  }
+  .visual-settings-sidebar { background: var(--mvc-sidebar) !important; }
+  .visual-settings-close,
+  .visual-general-settings__select-control,
+  .visual-model-selector__consumer-control,
+  .usage-billing__secondary {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-muted-strong) !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
+  }
+  .visual-settings-close:hover,
+  .visual-general-settings__select-control:hover,
+  .visual-general-settings__select-control:focus-visible,
+  .visual-model-selector__consumer-control:hover,
+  .visual-model-selector__consumer-control:focus-visible,
+  .usage-billing__secondary:hover {
+    border-color: var(--mvc-line-strong) !important;
+    background: var(--mvc-hover) !important;
+    color: var(--mvc-text-strong) !important;
+  }
+  .visual-settings-nav__item,
+  .visual-settings-nav__item > span,
+  .visual-general-settings__select-value,
+  .visual-model-selector__consumer-value,
+  .usage-billing__copy,
+  .usage-billing__row,
+  .user-profile .setting-control .info-value { color: var(--mvc-muted-strong) !important; }
+  .visual-settings-nav__item.is-active { background: var(--mvc-hover) !important; color: var(--mvc-text-strong) !important; border-color: var(--mvc-line-strong) !important; }
+  .visual-settings-nav__item:hover { background: var(--mvc-hover) !important; color: var(--mvc-text-strong) !important; }
+  .visual-settings-close .t-icon,
+  .visual-general-settings__select-control > .t-icon,
+  .visual-model-selector__consumer-control > .t-icon { color: var(--mvc-muted) !important; }
+
+  .visual-general-settings__select-dropdown,
+  .visual-model-selector__consumer-dropdown,
+  .visual-model-selector__chat-panel,
+  .visual-model-selector__chat-flyout,
+  .visual-chat-composer__model-menu {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-text) !important;
+    box-shadow: var(--mvc-shadow) !important;
+  }
+  .visual-general-settings__select-option,
+  .visual-model-selector__consumer-option,
+  .visual-model-selector__chat-option { color: var(--mvc-muted-strong) !important; }
+  .visual-general-settings__select-option:hover,
+  .visual-general-settings__select-option.is-selected,
+  .visual-model-selector__consumer-option:hover,
+  .visual-model-selector__consumer-option:focus-visible,
+  .visual-model-selector__consumer-option.is-selected,
+  .visual-model-selector__chat-option:hover,
+  .visual-model-selector__chat-option.is-active,
+  .visual-model-selector__chat-option.is-selected {
+    background: var(--mvc-hover) !important;
+    color: var(--mvc-text-strong) !important;
+  }
+  .visual-general-settings__select-check,
+  .visual-model-selector__consumer-check,
+  .visual-model-selector__chat-check { color: var(--mvc-text-strong) !important; }
+  .visual-model-selector__consumer-option.is-locked,
+  .visual-model-selector__consumer-lock,
+  .visual-model-selector__chat-lock,
+  .visual-model-selector__consumer-state,
+  .visual-model-selector__chat-empty { color: var(--mvc-muted) !important; }
+  .visual-model-selector__consumer-option.is-locked:hover,
+  .visual-model-selector__consumer-option.is-locked:focus-visible,
+  .visual-model-selector__chat-option.is-locked:hover,
+  .visual-model-selector__chat-option.is-locked.is-active { background: var(--mvc-surface-raised) !important; }
+
+  .visual-model-settings .consumer-scene-settings,
+  .visual-model-settings .consumer-scene-settings__row,
+  .visual-model-settings .visual-model-tabs,
+  .visual-general-settings .visual-setting-row,
+  .user-profile .setting-row,
+  .usage-billing__row { border-color: var(--mvc-line) !important; }
+  .visual-model-settings .consumer-scene-settings { background: transparent !important; }
+  .visual-model-settings .consumer-scene-settings__copy strong,
+  .visual-model-settings .consumer-scene-settings__header h3,
+  .visual-general-settings__header h2,
+  .visual-settings-content :is(.section-header h2, h2, h3),
+  .usage-billing__section > h3,
+  .usage-billing__copy strong,
+  .usage-billing__meter-meta > strong,
+  .user-profile .setting-info label { color: var(--mvc-text-strong) !important; }
+  .visual-model-settings .consumer-scene-settings__copy span,
+  .visual-model-settings .consumer-scene-settings__header p,
+  .visual-general-settings__header p,
+  .visual-settings-content :is(.section-description, .setting-info .desc, .visual-setting-row__copy p),
+  .usage-billing__copy small,
+  .usage-billing__meter-meta > small,
+  .user-profile .setting-info .desc { color: var(--mvc-muted) !important; }
+  .usage-billing__card,
+  .user-profile .settings-group {
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-text) !important;
+  }
+  .usage-billing__notice--action { border-color: var(--mvc-line) !important; background: var(--mvc-surface-raised) !important; }
+  .usage-billing__meter { background: var(--mvc-hover) !important; }
+  .usage-billing__meter span { background: var(--mvc-text-strong) !important; }
+
+  /* Keep dropdowns and selectors above the scrolling title/row layers. The
+   * content viewport remains scrollable; child surfaces never clip a popup. */
+  .visual-settings-content__inner,
+  .visual-model-settings,
+  .consumer-scene-settings,
+  .consumer-scene-settings__grid,
+  .consumer-scene-settings__row,
+  .visual-general-settings,
+  .visual-general-settings .visual-setting-list { overflow: visible !important; }
+  .visual-model-selector--consumer-scene,
+  .visual-general-settings__select { z-index: 2; }
+
+}
+
+/* All four consumer settings pages use one title strip.  Keep the cadence in
+ * this final shared layer so child components cannot drift back to their
+ * legacy h2/h3 spacing while their business cards remain unchanged. */
+.visual-settings-content .visual-settings-page-header {
+  margin: 0 0 8px !important;
+  padding: 0 0 12px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  background: transparent !important;
+}
+.visual-settings-content .visual-settings-page-header__copy { min-width: 0 !important; }
+.visual-settings-content .visual-settings-page-header__title {
+  margin: 0 !important;
+  color: #111827 !important;
+  font-size: 16px !important;
+  line-height: 24px !important;
+  font-weight: 700 !important;
+  letter-spacing: normal !important;
+}
+.visual-settings-content .visual-settings-page-header__description {
+  margin: 2px 0 0 !important;
+  color: #9ca3af !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
+/* The profile bridge predates the shared title strip and is more specific;
+ * explicitly align it with the same contract. */
+.visual-settings-content .user-profile .visual-settings-page-header {
+  margin: 0 0 8px !important;
+  padding: 0 0 12px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+
+:root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header {
+  border-bottom-color: var(--mvc-line) !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__title {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__description {
+  color: var(--mvc-muted) !important;
 }

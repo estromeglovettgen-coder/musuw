@@ -1,32 +1,35 @@
 <template>
   <section class="usage-billing">
-    <header class="usage-billing__header">
-      <h2>{{ $t('entitlement.usageTitle') }}</h2>
-      <p>{{ $t('entitlement.usageDescription') }}</p>
+    <header class="visual-settings-page-header usage-billing__page-header">
+      <div class="visual-settings-page-header__copy">
+        <h2 class="visual-settings-page-header__title">{{ $t('entitlement.usageTitle') }}</h2>
+        <p class="visual-settings-page-header__description">{{ $t('entitlement.usageDescription') }}</p>
+      </div>
     </header>
 
     <div v-if="entitlementLoading" class="usage-billing__loading">{{ $t('common.loading') }}</div>
 
     <template v-else-if="entitlement">
-      <section class="usage-billing__group" aria-labelledby="usage-plan-title">
+      <section class="usage-billing__section" aria-labelledby="usage-plan-title">
         <h3 id="usage-plan-title">{{ $t('entitlement.currentPlan') }}</h3>
-        <div class="usage-billing__row">
-          <div class="usage-billing__copy">
-            <strong>{{ planName }}</strong>
-            <small>{{ $t(`entitlement.planDescriptions.${entitlement.plan}`) }}</small>
+        <div class="usage-billing__card">
+          <div class="usage-billing__row usage-billing__row--split">
+            <div class="usage-billing__copy">
+              <strong class="usage-billing__plan-name">{{ planName }}</strong>
+            </div>
+            <button type="button" class="usage-billing__secondary" @click="openPlans">
+              {{ entitlement.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}
+            </button>
           </div>
-          <button type="button" class="usage-billing__primary" @click="openPlans">
-            {{ entitlement.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}
-          </button>
-        </div>
-        <div v-if="entitlement.plan !== 'free' && portalAvailable" class="usage-billing__row">
-          <div class="usage-billing__copy">
-            <strong>{{ $t('entitlement.manageBilling') }}</strong>
-            <small>{{ $t('entitlement.manageDescription') }}</small>
+          <div v-if="entitlement.plan !== 'free' && portalAvailable" class="usage-billing__row usage-billing__row--split">
+            <div class="usage-billing__copy">
+              <strong class="usage-billing__quota-title">{{ $t('entitlement.manageBilling') }}</strong>
+              <small>{{ $t('entitlement.manageDescription') }}</small>
+            </div>
+            <button type="button" class="usage-billing__secondary" :disabled="portalOpening" @click="handlePortal">
+              {{ $t('entitlement.managePlan') }}
+            </button>
           </div>
-          <button type="button" class="usage-billing__secondary" :disabled="portalOpening" @click="handlePortal">
-            {{ $t('entitlement.managePlan') }}
-          </button>
         </div>
       </section>
 
@@ -35,41 +38,52 @@
         <button type="button" class="usage-billing__secondary" @click="openPlans">{{ $t('entitlement.viewPlans') }}</button>
       </p>
 
-      <section class="usage-billing__group" :aria-label="$t('entitlement.usageLimits')">
+      <section class="usage-billing__section usage-billing__section--allowance" :aria-label="$t('entitlement.usageLimits')">
         <h3>{{ $t('entitlement.usageLimits') }}</h3>
-        <div class="usage-billing__row">
-          <div class="usage-billing__copy">
-            <strong>{{ $t('entitlement.monthlyAllowance') }}</strong>
-            <small v-if="formattedResetAt">{{ $t('entitlement.resetsAt', { month: formattedResetAt }) }}</small>
-          </div>
-          <div class="usage-billing__meter-control">
-            <div class="usage-billing__meter" role="progressbar" :aria-valuenow="creditsRemainingPercent ?? undefined" aria-valuemin="0" aria-valuemax="100">
-              <span :style="{ width: `${creditsRemainingPercent ?? 0}%` }" />
+        <div class="usage-billing__card">
+          <div class="usage-billing__row usage-billing__row--meter">
+            <div class="usage-billing__copy">
+              <strong class="usage-billing__quota-title">{{ $t('entitlement.monthlyAllowance') }}</strong>
             </div>
-            <strong v-if="creditsRemainingPercent !== null">{{ creditsRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
-            <strong v-else class="is-muted">{{ entitlement.openrouter_credits_status === 'pending' ? $t('entitlement.billingPendingShort') : $t('entitlement.unavailable') }}</strong>
-          </div>
+            <div class="usage-billing__meter-control">
+              <div class="usage-billing__meter-meta">
+                <small v-if="formattedResetAt">{{ $t('entitlement.resetsAt', { month: formattedResetAt }) }}</small>
+                <small v-else />
+                <strong v-if="creditsRemainingPercent !== null">{{ creditsRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
+                <strong v-else class="is-muted">{{ entitlement.openrouter_credits_status === 'pending' ? $t('entitlement.billingPendingShort') : $t('entitlement.unavailable') }}</strong>
+              </div>
+              <div class="usage-billing__meter" role="progressbar" :aria-valuenow="creditsRemainingPercent ?? undefined" aria-valuemin="0" aria-valuemax="100">
+                <span :style="{ width: `${creditsRemainingPercent ?? 0}%` }" />
+              </div>
+            </div>
         </div>
-
-        <div v-if="storageRemainingPercent !== null" class="usage-billing__row">
-          <div class="usage-billing__copy">
-            <strong>{{ $t('entitlement.storage') }}</strong>
-            <small>{{ $t('entitlement.storageRemaining') }}</small>
-          </div>
-          <div class="usage-billing__meter-control">
-            <div class="usage-billing__meter" role="progressbar" :aria-valuenow="storageRemainingPercent" aria-valuemin="0" aria-valuemax="100">
-              <span :style="{ width: `${storageRemainingPercent}%` }" />
-            </div>
-            <strong>{{ storageRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
-          </div>
         </div>
       </section>
 
-      <section class="usage-billing__group" :aria-label="$t('entitlement.planLimits')">
+      <section v-if="storageRemainingPercent !== null" class="usage-billing__section usage-billing__section--storage" :aria-label="$t('entitlement.storage')">
+        <h3>{{ $t('entitlement.storage') }}</h3>
+        <div class="usage-billing__card">
+          <div class="usage-billing__row usage-billing__row--meter">
+            <div class="usage-billing__meter-control">
+              <div class="usage-billing__meter-meta">
+                <small class="usage-billing__storage-usage">{{ $t('entitlement.storageUsage', { used: formattedStorageUsed, total: formattedStorageTotal }) }}</small>
+                <strong>{{ storageRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
+              </div>
+              <div class="usage-billing__meter" role="progressbar" :aria-valuenow="storageRemainingPercent" aria-valuemin="0" aria-valuemax="100">
+                <span :style="{ width: `${Math.max(4, storageRemainingPercent)}%` }" />
+              </div>
+            </div>
+        </div>
+        </div>
+      </section>
+
+      <section v-if="!authStore.isLiteMode" class="usage-billing__section" :aria-label="$t('entitlement.planLimits')">
         <h3>{{ $t('entitlement.planLimits') }}</h3>
-        <div class="usage-billing__row is-compact"><span>{{ $t('entitlement.knowledgeBases') }}</span><strong>{{ formatLimit(entitlement.max_knowledge_bases) }}</strong></div>
-        <div class="usage-billing__row is-compact"><span>{{ $t('entitlement.documentsPerKb') }}</span><strong>{{ formatLimit(entitlement.max_documents_per_kb) }}</strong></div>
-        <div class="usage-billing__row is-compact"><span>{{ $t('entitlement.videoAccess') }}</span><strong>{{ entitlement.video_upload ? $t('entitlement.included') : $t('entitlement.notIncluded') }}</strong></div>
+        <div class="usage-billing__card">
+          <div class="usage-billing__row is-compact"><span>{{ $t('entitlement.knowledgeBases') }}</span><strong>{{ formatLimit(entitlement.max_knowledge_bases) }}</strong></div>
+          <div class="usage-billing__row is-compact"><span>{{ $t('entitlement.documentsPerKb') }}</span><strong>{{ formatLimit(entitlement.max_documents_per_kb) }}</strong></div>
+          <div class="usage-billing__row is-compact"><span>{{ $t('entitlement.videoAccess') }}</span><strong>{{ entitlement.video_upload ? $t('entitlement.included') : $t('entitlement.notIncluded') }}</strong></div>
+        </div>
       </section>
     </template>
 
@@ -88,9 +102,11 @@ import {
   type ConsumerEntitlement,
   type PaddleBillingConfig,
 } from '@/api/entitlement'
+import { useAuthStore } from '@/stores/auth'
 
 const { locale, t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
 const entitlementLoading = ref(true)
@@ -115,6 +131,15 @@ const storageRemainingPercent = computed<number | null>(() => {
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(used)) return null
   return clampPercent(((total - used) / total) * 100)
 })
+const formatStorageBytes = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+  const gibibytes = value / 1024 ** 3
+  if (gibibytes >= 1) return `${new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }).format(gibibytes)} GiB`
+  const mebibytes = value / 1024 ** 2
+  return `${new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }).format(mebibytes)} MiB`
+}
+const formattedStorageUsed = computed(() => formatStorageBytes(Number(entitlement.value?.storage_used || 0)))
+const formattedStorageTotal = computed(() => formatStorageBytes(Number(entitlement.value?.storage_bytes || 0)))
 const formattedResetAt = computed(() => {
   const raw = entitlement.value?.openrouter_resets_at
   if (!raw) return ''
@@ -159,30 +184,56 @@ onMounted(() => { void loadEntitlement() })
 </script>
 
 <style scoped lang="less">
-.usage-billing { width: 100%; max-width: 640px; color: #202123; }
-.usage-billing__header { margin-bottom: 22px; }
-.usage-billing__header h2 { margin: 0; font-size: 22px; line-height: 30px; font-weight: 650; letter-spacing: -.02em; }
-.usage-billing__header p { margin: 5px 0 0; color: #6f737a; font-size: 13px; line-height: 20px; }
-.usage-billing__loading,.usage-billing__notice { color: #7a7f87; font-size: 12px; line-height: 18px; }
-.usage-billing__notice--action { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fafafa; }
-.usage-billing__group { margin-top: 18px; overflow: hidden; border: 1px solid #e5e5e5; border-radius: 14px; background: #fff; }
-.usage-billing__group h3 { margin: 0; padding: 13px 16px 11px; border-bottom: 1px solid #eeeeee; font-size: 12px; line-height: 18px; font-weight: 650; }
-.usage-billing__row { min-height: 58px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 22px; border-bottom: 1px solid #f0f0f0; }
+.usage-billing { width: 100%; max-width: 640px; color: #111827; animation: usage-billing-fade 150ms ease-out; }
+.usage-billing__page-header {
+  margin: 0 0 8px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.usage-billing__page-header .visual-settings-page-header__title {
+  margin: 0;
+  color: #111827;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+}
+.usage-billing__page-header .visual-settings-page-header__description {
+  margin: 2px 0 0;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 16px;
+}
+@keyframes usage-billing-fade { from { opacity: 0; } to { opacity: 1; } }
+.usage-billing__loading,.usage-billing__notice { color: #9ca3af; font-size: 12px; line-height: 18px; }
+.usage-billing__notice--action { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fafafa; }
+.usage-billing__section { margin-top: 20px; }
+.usage-billing__section:first-child { margin-top: 0; }
+.usage-billing__section > h3 { margin: 0 0 8px; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; }
+.usage-billing__section--allowance,.usage-billing__section--storage { padding-top: 4px; }
+.usage-billing__section--allowance > h3 { margin-bottom: 12px; }
+.usage-billing__card { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 16px; background: #fff; }
+.usage-billing__row { padding: 16px; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; border-bottom: 1px solid #f3f4f6; }
 .usage-billing__row:last-child { border-bottom: 0; }
+.usage-billing__row--meter { padding: 14px; gap: 8px; }
+.usage-billing__row--split { flex-direction: row; align-items: center; justify-content: space-between; gap: 22px; }
 .usage-billing__copy { min-width: 0; display: grid; gap: 2px; }
-.usage-billing__copy strong { color: #202123; font-size: 13px; line-height: 18px; font-weight: 600; }
-.usage-billing__copy small { color: #858a92; font-size: 11px; line-height: 16px; }
-.usage-billing__meter-control { min-width: 206px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-.usage-billing__meter-control > strong { min-width: 84px; color: #555b64; font-size: 11px; line-height: 16px; font-weight: 500; text-align: right; white-space: nowrap; }
-.usage-billing__meter-control > strong.is-muted { color: #9da1a8; }
-.usage-billing__meter { width: 96px; height: 6px; overflow: hidden; border-radius: 999px; background: #ececec; }
-.usage-billing__meter span { display: block; height: 100%; border-radius: inherit; background: #202123; transition: width 180ms ease; }
-.usage-billing__row.is-compact { min-height: 42px; padding-block: 8px; color: #686e77; font-size: 12px; }
-.usage-billing__row.is-compact strong { color: #202123; font-weight: 600; }
-.usage-billing__primary,.usage-billing__secondary { flex: 0 0 auto; min-height: 34px; padding: 0 14px; border-radius: 9px; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
-.usage-billing__primary { border: 1px solid #111827; background: #111827; color: #fff; }
-.usage-billing__secondary { border: 1px solid #dedede; background: #fff; color: #202123; }
-.usage-billing__primary:disabled,.usage-billing__secondary:disabled { opacity: .55; cursor: wait; }
-@media (max-width: 640px) { .usage-billing__row { align-items: flex-start; flex-direction: column; gap: 10px; } .usage-billing__meter-control { width: 100%; min-width: 0; justify-content: flex-start; } }
-@media (prefers-reduced-motion: reduce) { .usage-billing__meter span { transition: none; } }
+.usage-billing__copy strong { color: #111827; }
+.usage-billing__plan-name { font-size: 14px; line-height: 20px; font-weight: 500; }
+.usage-billing__quota-title { font-size: 12px; line-height: 16px; font-weight: 600; }
+.usage-billing__copy small { color: #9ca3af; font-size: 11px; line-height: 16px; }
+.usage-billing__meter-control { width: 100%; min-width: 0; display: grid; gap: 6px; }
+.usage-billing__meter-meta { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.usage-billing__meter-meta > small { min-width: 0; overflow: hidden; color: #9ca3af; font-size: 11px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.usage-billing__meter-meta > strong { flex: 0 0 auto; color: #111827; font-family: var(--app-font-family-mono); font-size: 12px; line-height: 16px; font-weight: 700; text-align: right; white-space: nowrap; }
+.usage-billing__meter-meta > strong.is-muted { color: #9da1a8; }
+.usage-billing__storage-usage { color: #6b7280 !important; }
+.usage-billing__meter { width: 100%; height: 6px; overflow: hidden; border-radius: 999px; background: #f3f4f6; }
+.usage-billing__meter span { display: block; height: 100%; border-radius: inherit; background: #111827; transition: width 180ms ease; }
+.usage-billing__row.is-compact { min-height: 42px; padding-block: 8px; flex-direction: row; align-items: center; justify-content: space-between; color: #6b7280; font-size: 12px; }
+.usage-billing__row.is-compact strong { color: #111827; font-weight: 600; }
+.usage-billing__secondary { flex: 0 0 auto; padding: 6px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; color: #374151; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); font: inherit; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; }
+.usage-billing__secondary:hover { border-color: #d1d5db; background: #f9fafb; }
+.usage-billing__secondary:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 640px) { .usage-billing__row--split { align-items: flex-start; flex-direction: column; gap: 10px; } }
+@media (prefers-reduced-motion: reduce) { .usage-billing { animation: none; } .usage-billing__meter span { transition: none; } }
 </style>

@@ -1,6 +1,16 @@
 package router
 
-import "testing"
+import (
+	"bytes"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/handler"
+	"github.com/gin-gonic/gin"
+)
 
 func TestLiteProductRouteBlocked(t *testing.T) {
 	t.Parallel()
@@ -35,6 +45,8 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "system info", method: "GET", path: "/api/v1/system/info", blocked: false},
 		{name: "organization read for kb sharing", method: "GET", path: "/api/v1/organizations/3", blocked: false},
 		{name: "organization kb shares", method: "GET", path: "/api/v1/organizations/3/shares", blocked: false},
+		{name: "consumer retrieval config read", method: "GET", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
+		{name: "consumer retrieval config write", method: "PUT", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
 
 		// Hidden auth/workspace surfaces.
 		{name: "native register", method: "POST", path: "/api/v1/auth/register", blocked: true},
@@ -73,6 +85,8 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "tenant update", method: "PUT", path: "/api/v1/tenants/7", blocked: true},
 		{name: "tenant members", method: "GET", path: "/api/v1/tenants/7/members", blocked: true},
 		{name: "tenant api keys", method: "GET", path: "/api/v1/tenants/7/api-keys", blocked: true},
+		{name: "other tenant kv key", method: "GET", path: "/api/v1/tenants/kv/other", blocked: true},
+		{name: "retrieval config wrong verb", method: "POST", path: "/api/v1/tenants/kv/retrieval-config", blocked: true},
 		{name: "my invitations", method: "GET", path: "/api/v1/me/invitations", blocked: true},
 		{name: "evaluation", method: "GET", path: "/api/v1/evaluation", blocked: true},
 		{name: "mcp", method: "GET", path: "/api/v1/mcp-services", blocked: true},
@@ -113,6 +127,172 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 			t.Parallel()
 			if got := liteProductRouteBlocked(tt.method, tt.path); got != tt.blocked {
 				t.Fatalf("liteProductRouteBlocked(%q, %q) = %v, want %v", tt.method, tt.path, got, tt.blocked)
+			}
+		})
+	}
+}
+
+func TestLiteTemporaryAttachmentRequestBlocked(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		agentID  string
+		sourceID string
+		blocked  bool
+	}{
+		{name: "no agent", blocked: false},
+		{name: "builtin runtime agent", agentID: liteSmartReasoningAgentID, blocked: false},
+		{name: "custom agent", agentID: "custom-agent", blocked: true},
+		{name: "shared agent source", agentID: liteSmartReasoningAgentID, sourceID: "42", blocked: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var body bytes.Buffer
+			form := multipart.NewWriter(&body)
+			if tt.agentID != "" {
+				if err := form.WriteField("agent_id", tt.agentID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tt.sourceID != "" {
+				if err := form.WriteField("agent_source_tenant_id", tt.sourceID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := form.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/sessions/session-1/attachments", &body)
+			req.Header.Set("Content-Type", form.FormDataContentType())
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = req
+
+			if got := liteTemporaryAttachmentRequestBlocked(c); got != tt.blocked {
+				t.Fatalf("liteTemporaryAttachmentRequestBlocked() = %v, want %v", got, tt.blocked)
+			}
+		})
+	}
+}
+
+func TestLiteProductGateTemporaryAttachmentRequest(t *testing.T) {
+	// liteProductGate reads the process-wide build edition. Keep this request-
+	// level test serial and restore it immediately so unrelated router tests do
+	// not observe a different product mode.
+	originalEdition := handler.Edition
+	handler.Edition = "lite"
+	t.Cleanup(func() { handler.Edition = originalEdition })
+
+	tests := []struct {
+		name         string
+		agentID      string
+		sourceID     string
+		wantStatus   int
+		wantSentinel bool
+	}{
+		{name: "empty agent", wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "quick answer", agentID: liteQuickAnswerAgentID, wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "smart reasoning", agentID: liteSmartReasoningAgentID, wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "custom agent", agentID: "custom-agent", wantStatus: http.StatusNotFound},
+		{name: "nonzero source tenant", agentID: liteSmartReasoningAgentID, sourceID: "42", wantStatus: http.StatusNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var body bytes.Buffer
+			form := multipart.NewWriter(&body)
+			file, err := form.CreateFormFile("file", "notes.txt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := file.Write([]byte("multipart sentinel")); err != nil {
+				t.Fatal(err)
+			}
+			if tt.agentID != "" {
+				if err := form.WriteField("agent_id", tt.agentID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tt.sourceID != "" {
+				if err := form.WriteField("agent_source_tenant_id", tt.sourceID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := form.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/sessions/session-1/attachments", &body)
+			req.Header.Set("Content-Type", form.FormDataContentType())
+			recorder := httptest.NewRecorder()
+			router := gin.New()
+			router.Use(liteProductGate())
+			router.POST("/api/v1/sessions/:session_id/attachments", func(c *gin.Context) {
+				f, header, err := c.Request.FormFile("file")
+				if err != nil {
+					c.String(http.StatusBadRequest, "file: %v", err)
+					return
+				}
+				defer f.Close()
+				contents, err := io.ReadAll(f)
+				if err != nil {
+					c.String(http.StatusBadRequest, "read: %v", err)
+					return
+				}
+				if header.Filename != "notes.txt" || string(contents) != "multipart sentinel" {
+					c.String(http.StatusBadRequest, "multipart payload changed")
+					return
+				}
+				c.Status(http.StatusNoContent)
+			})
+
+			// The middleware must run before the route's sentinel, while preserving
+			// the parsed multipart form for the native handler on allowed requests.
+			router.ServeHTTP(recorder, req)
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d (body=%s)", recorder.Code, tt.wantStatus, recorder.Body.String())
+			}
+			if got := recorder.Code == http.StatusNoContent; got != tt.wantSentinel {
+				t.Fatalf("sentinel reached = %v, want %v", got, tt.wantSentinel)
+			}
+		})
+	}
+}
+
+func TestLiteProductGateRetrievalConfigRouteBoundary(t *testing.T) {
+	// Keep this middleware-level check serial because the product edition is a
+	// process-wide build setting. Restore it before any other router test runs.
+	originalEdition := handler.Edition
+	handler.Edition = "lite"
+	t.Cleanup(func() { handler.Edition = originalEdition })
+
+	router := gin.New()
+	router.Use(liteProductGate())
+	sentinel := func(c *gin.Context) { c.Status(http.StatusNoContent) }
+	router.GET("/api/v1/tenants/kv/retrieval-config", sentinel)
+	router.PUT("/api/v1/tenants/kv/retrieval-config", sentinel)
+	router.GET("/api/v1/tenants/kv/other", sentinel)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		want   int
+	}{
+		{name: "read retrieval config", method: http.MethodGet, path: "/api/v1/tenants/kv/retrieval-config", want: http.StatusNoContent},
+		{name: "write retrieval config", method: http.MethodPut, path: "/api/v1/tenants/kv/retrieval-config", want: http.StatusNoContent},
+		{name: "wrong verb", method: http.MethodPost, path: "/api/v1/tenants/kv/retrieval-config", want: http.StatusNotFound},
+		{name: "other tenant kv key", method: http.MethodGet, path: "/api/v1/tenants/kv/other", want: http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+			if recorder.Code != tt.want {
+				t.Fatalf("status = %d, want %d (body=%s)", recorder.Code, tt.want, recorder.Body.String())
 			}
 		})
 	}

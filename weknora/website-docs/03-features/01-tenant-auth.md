@@ -66,7 +66,7 @@ type Tenant struct {
     Status                  string               `json:"status" gorm:"default:'active'"`
     RetrieverEngines        RetrieverEngines     `json:"retriever_engines" gorm:"type:json"`
     Business                string               `json:"business"`
-    StorageQuota            int64                `json:"storage_quota" gorm:"default:10737418240"` // 默认 10GB
+    StorageQuota            int64                `json:"storage_quota" gorm:"default:1073741824"` // 消费者 Free 默认 1 GiB
     StorageUsed             int64                `json:"storage_used"  gorm:"default:0"`
     ContextConfig           *ContextConfig       `json:"context_config" gorm:"type:jsonb"`
     WebSearchConfig         *WebSearchConfig     `json:"web_search_config" gorm:"type:jsonb"`
@@ -81,7 +81,7 @@ type Tenant struct {
 }
 ```
 
-租户是配额（`StorageQuota` / `StorageUsed`，默认 10GB）与各类租户级配置（检索引擎、Web 搜索、解析引擎、凭证、存储引擎、聊天历史等）的挂载点。
+租户是配额（`StorageQuota` / `StorageUsed`，消费者 Free 默认 1 GiB）与各类租户级配置（检索引擎、Web 搜索、解析引擎、凭证、存储引擎、聊天历史等）的挂载点。
 
 ### 1.2 User（用户）
 

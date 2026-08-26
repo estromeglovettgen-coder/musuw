@@ -1,9 +1,11 @@
 <template>
   <div class="user-profile">
-    <div class="section-header">
-      <h2>{{ $t('userProfile.title') }}</h2>
-      <p class="section-description">{{ $t('userProfile.description') }}</p>
-    </div>
+    <header class="visual-settings-page-header section-header">
+      <div class="visual-settings-page-header__copy">
+        <h2 class="visual-settings-page-header__title">{{ $t('userProfile.title') }}</h2>
+        <p class="visual-settings-page-header__description section-description">{{ $t('userProfile.description') }}</p>
+      </div>
+    </header>
 
     <!-- Loading -->
     <div v-if="loading" class="loading-inline">
@@ -114,22 +116,24 @@ onMounted(loadInfo)
 }
 
 .section-header {
-  margin-bottom: 22px;
+  margin: 0 0 8px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid #f3f4f6;
 
   h2 {
     margin: 0;
-    color: #202123;
-    font-size: 22px;
-    line-height: 30px;
-    font-weight: 650;
-    letter-spacing: -.02em;
+    color: #111827;
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 700;
+    letter-spacing: normal;
   }
 
   .section-description {
-    margin: 5px 0 0;
-    color: #6f737a;
-    font-size: 13px;
-    line-height: 20px;
+    margin: 2px 0 0;
+    color: #9ca3af;
+    font-size: 12px;
+    line-height: 16px;
   }
 }
 
@@ -150,7 +154,7 @@ onMounted(loadInfo)
 .settings-group {
   overflow: hidden;
   border: 1px solid #e5e5e5;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #fff;
   display: flex;
   flex-direction: column;
@@ -160,9 +164,9 @@ onMounted(loadInfo)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 58px;
-  padding: 12px 16px;
-  gap: 22px;
+  min-height: 64px;
+  padding: 14px 16px;
+  gap: 16px;
   border-bottom: 1px solid #f0f0f0;
 
   &:last-child {
@@ -176,17 +180,17 @@ onMounted(loadInfo)
 
   label {
     display: block;
-    color: #202123;
-    font-size: 13px;
-    line-height: 18px;
+    color: #111827;
+    font-size: 14px;
+    line-height: 20px;
     font-weight: 600;
   }
 
   .desc {
     margin: 2px 0 0;
-    color: #858a92;
-    font-size: 11px;
-    line-height: 16px;
+    color: #777;
+    font-size: 12px;
+    line-height: 18px;
   }
 }
 
@@ -198,7 +202,7 @@ onMounted(loadInfo)
   align-items: center;
 
   .info-value {
-    color: #555b64;
+    color: #374151;
     font-size: 12px;
     line-height: 18px;
     text-align: right;

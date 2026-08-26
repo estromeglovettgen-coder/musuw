@@ -33,7 +33,7 @@ test('save button labels distinguish create from save-and-close', () => {
   )
 })
 
-test('create delegates model and capability defaults to the server', () => {
+test('create forwards only the four consumer scene candidates and leaves embedding platform-owned', () => {
   assert.doesNotMatch(source, /applyDefaultModelsIfEmpty|type ModelConfig/)
   assert.match(
     source,
@@ -50,6 +50,17 @@ test('create delegates model and capability defaults to the server', () => {
   assert.ok(createOpenBranch, 'expected the zero-config create open branch')
   assert.doesNotMatch(createOpenBranch, /loadAllModels|loadTenantDefaultStorageProvider|kbEditorInitialSection/)
 
+  assert.ok(source.includes('const consumerSceneModelsForCreate = () => {'))
+  assert.match(source, /settingsStore\.getConsumerSceneModel\('rag'\)/)
+  assert.match(source, /settingsStore\.getConsumerSceneModel\('wiki'\)/)
+  assert.match(source, /settingsStore\.getConsumerSceneModel\('vision'\)/)
+  assert.match(source, /settingsStore\.getConsumerSceneModel\('asr'\)/)
+  assert.match(source, /payload\.summary_model_id = rag/)
+  assert.match(source, /payload\.wiki_config = \{ synthesis_model_id: wiki \}/)
+  assert.match(source, /payload\.vlm_config = \{ enabled: true, model_id: vision \}/)
+  assert.match(source, /payload\.asr_config = \{ enabled: true, model_id: asr \}/)
+  assert.doesNotMatch(source, /payload\.embedding_model_id/)
+
   const settingsRefreshWatcher = source.slice(
     source.indexOf('watch(\n  () => uiStore.showSettingsModal'),
     source.indexOf('</script>'),
@@ -64,10 +75,7 @@ test('create mode reuses the existing TDesign description field and API payload'
     /<t-textarea[\s\S]*?v-model="formData\.description"[\s\S]*?:placeholder="\$t\('knowledgeEditor\.basic\.descriptionPlaceholder'\)"[\s\S]*?:maxlength="200"[\s\S]*?:autosize="\{ minRows: 2, maxRows: 4 \}"/,
   )
   assert.doesNotMatch(source, /visual-kb-create-textarea|<textarea/)
-  assert.match(
-    source,
-    /createKnowledgeBase\(\{\s*name: formData\.value\.name\.trim\(\),\s*description: formData\.value\.description\.trim\(\),\s*\}\)/,
-  )
+  assert.match(source, /createKnowledgeBase\(\{[\s\S]*name: formData\.value\.name\.trim\(\),[\s\S]*description: formData\.value\.description\.trim\(\),[\s\S]*\.\.\.consumerSceneModelsForCreate\(\),[\s\S]*\}\)/)
 })
 
 test('create dialog is a compact content-driven modal with mobile-safe bounds', () => {

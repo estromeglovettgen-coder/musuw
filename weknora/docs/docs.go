@@ -19495,7 +19495,7 @@ const docTemplate = `{
                     ]
                 },
                 "storage_quota": {
-                    "description": "Storage quota (Bytes), default is 10GB, including vector, original file, text, index, etc.",
+                    "description": "Storage quota (Bytes), default is the consumer Free plan's 1 GiB, including vector, original file, text, index, etc.",
                     "type": "integer"
                 },
                 "storage_used": {

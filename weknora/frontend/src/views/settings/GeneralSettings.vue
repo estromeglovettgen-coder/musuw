@@ -1,8 +1,10 @@
 <template>
   <section class="visual-general-settings">
-    <header class="visual-general-settings__header">
-      <h2>{{ $t('general.title') }}</h2>
-      <p>{{ $t('general.description') }}</p>
+    <header class="visual-settings-page-header visual-general-settings__header">
+      <div class="visual-settings-page-header__copy">
+        <h2 class="visual-settings-page-header__title">{{ $t('general.title') }}</h2>
+        <p class="visual-settings-page-header__description">{{ $t('general.description') }}</p>
+      </div>
     </header>
 
     <div class="visual-setting-list">
@@ -12,36 +14,114 @@
           <p>{{ $t('language.languageDescription') }}</p>
         </div>
         <div class="visual-setting-row__control">
-          <t-select
-            id="visual-language-select"
-            v-model="localLanguage"
-            :placeholder="$t('language.selectLanguage')"
-            @change="handleLanguageChange"
-          >
-            <t-option value="zh-CN" :label="$t('language.zhCN')">{{ $t('language.zhCN') }}</t-option>
-            <t-option value="en-US" :label="$t('language.enUS')">{{ $t('language.enUS') }}</t-option>
-            <t-option value="ru-RU" :label="$t('language.ruRU')">{{ $t('language.ruRU') }}</t-option>
-            <t-option value="ko-KR" :label="$t('language.koKR')">{{ $t('language.koKR') }}</t-option>
-          </t-select>
+          <div ref="preferenceSelectRoot" class="visual-general-settings__select">
+            <button
+              id="visual-language-select"
+              type="button"
+              class="visual-general-settings__select-control"
+              :aria-expanded="openPreferenceSelect === 'language'"
+              aria-haspopup="listbox"
+              @click.stop="togglePreferenceSelect('language')"
+            >
+              <span class="visual-general-settings__select-value">{{ languageLabel }}</span>
+              <t-icon name="chevron-down" aria-hidden="true" />
+            </button>
+            <Transition name="visual-general-settings__select-fade">
+              <div v-if="openPreferenceSelect === 'language'" class="visual-general-settings__select-dropdown" role="listbox" :aria-label="$t('language.selectLanguage')">
+                <button
+                  v-for="option in languageOptions"
+                  :key="option.value"
+                  type="button"
+                  role="option"
+                  class="visual-general-settings__select-option"
+                  :class="{ 'is-selected': option.value === localLanguage }"
+                  :aria-selected="option.value === localLanguage"
+                  @click="handlePreferenceSelect('language', option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                  <t-icon v-if="option.value === localLanguage" class="visual-general-settings__select-check" name="check" aria-hidden="true" />
+                </button>
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
 
-      <div v-if="!authStore.isLiteMode" class="visual-setting-row">
+      <div class="visual-setting-row">
         <div class="visual-setting-row__copy">
           <label for="visual-theme-select">{{ $t('theme.theme') }}</label>
           <p>{{ $t('theme.themeDescription') }}</p>
         </div>
         <div class="visual-setting-row__control">
-          <t-select
-            id="visual-theme-select"
-            v-model="localTheme"
-            :placeholder="$t('theme.selectTheme')"
-            @change="handleThemeChange"
-          >
-            <t-option value="light" :label="$t('theme.light')">{{ $t('theme.light') }}</t-option>
-            <t-option value="dark" :label="$t('theme.dark')">{{ $t('theme.dark') }}</t-option>
-            <t-option value="system" :label="$t('theme.system')">{{ $t('theme.system') }}</t-option>
-          </t-select>
+          <div class="visual-general-settings__select">
+            <button
+              id="visual-theme-select"
+              type="button"
+              class="visual-general-settings__select-control"
+              :aria-expanded="openPreferenceSelect === 'theme'"
+              aria-haspopup="listbox"
+              @click.stop="togglePreferenceSelect('theme')"
+            >
+              <span class="visual-general-settings__select-value">{{ themeLabel }}</span>
+              <t-icon name="chevron-down" aria-hidden="true" />
+            </button>
+            <Transition name="visual-general-settings__select-fade">
+              <div v-if="openPreferenceSelect === 'theme'" class="visual-general-settings__select-dropdown" role="listbox" :aria-label="$t('theme.selectTheme')">
+                <button
+                  v-for="option in themeOptions"
+                  :key="option.value"
+                  type="button"
+                  role="option"
+                  class="visual-general-settings__select-option"
+                  :class="{ 'is-selected': option.value === localTheme }"
+                  :aria-selected="option.value === localTheme"
+                  @click="handlePreferenceSelect('theme', option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                  <t-icon v-if="option.value === localTheme" class="visual-general-settings__select-check" name="check" aria-hidden="true" />
+                </button>
+              </div>
+            </Transition>
+          </div>
+        </div>
+      </div>
+
+      <div class="visual-setting-row">
+        <div class="visual-setting-row__copy">
+          <label for="visual-theme-color-select">{{ $t('theme.color') }}</label>
+          <p>{{ $t('theme.colorDescription') }}</p>
+        </div>
+        <div class="visual-setting-row__control">
+          <div class="visual-general-settings__select">
+            <button
+              id="visual-theme-color-select"
+              type="button"
+              class="visual-general-settings__select-control"
+              :aria-expanded="openPreferenceSelect === 'themeColor'"
+              aria-haspopup="listbox"
+              @click.stop="togglePreferenceSelect('themeColor')"
+            >
+              <span class="visual-general-settings__select-value">{{ themeColorLabel }}</span>
+              <t-icon name="chevron-down" aria-hidden="true" />
+            </button>
+            <Transition name="visual-general-settings__select-fade">
+              <div v-if="openPreferenceSelect === 'themeColor'" class="visual-general-settings__select-dropdown" role="listbox" :aria-label="$t('theme.selectColor')">
+                <button
+                  v-for="option in themeColorOptions"
+                  :key="option.value"
+                  type="button"
+                  role="option"
+                  class="visual-general-settings__select-option"
+                  :class="{ 'is-selected': option.value === localThemeColor }"
+                  :aria-selected="option.value === localThemeColor"
+                  @click="handlePreferenceSelect('themeColor', option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                  <t-icon v-if="option.value === localThemeColor" class="visual-general-settings__select-check" name="check" aria-hidden="true" />
+                </button>
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
 
@@ -113,11 +193,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { normalizeLocale, persistLocalePreference } from '@/i18n/locale'
-import { useTheme, type ThemeMode } from '@/composables/useTheme'
+import { useTheme, type ThemeColor, type ThemeMode } from '@/composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import {
   useFont,
@@ -132,7 +212,7 @@ import {
 
 const { t, locale } = useI18n()
 const authStore = useAuthStore()
-const { currentTheme, setTheme } = useTheme()
+const { currentTheme, currentThemeColor, setTheme, setThemeColor } = useTheme()
 const {
   currentSans,
   currentMono,
@@ -144,11 +224,16 @@ const {
 
 const localLanguage = ref(locale.value)
 const localTheme = ref<ThemeMode>(currentTheme.value)
+const localThemeColor = ref<ThemeColor>(currentThemeColor.value)
 const localSansFont = ref<FontKey>(currentSans.value)
 const localMonoFont = ref<MonoFontKey>(currentMono.value)
 const localFontSize = ref<FontSizeKey>(currentSize.value)
+type PreferenceSelect = 'language' | 'theme' | 'themeColor'
+const openPreferenceSelect = ref<PreferenceSelect | null>(null)
+const preferenceSelectRoot = ref<HTMLElement | null>(null)
 
 watch(currentTheme, (value) => { localTheme.value = value })
+watch(currentThemeColor, (value) => { localThemeColor.value = value })
 watch(currentSans, (value) => { localSansFont.value = value })
 watch(currentMono, (value) => { localMonoFont.value = value })
 watch(currentSize, (value) => { localFontSize.value = value })
@@ -171,6 +256,24 @@ const monoFontOptions = computed<{ value: MonoFontKey; label: string; preview: s
 
 const currentSansStack = computed(() => SANS_STACKS[localSansFont.value] ?? SANS_STACKS.system)
 const currentMonoStack = computed(() => MONO_STACKS[localMonoFont.value] ?? MONO_STACKS.system)
+const languageOptions = computed(() => [
+  { value: 'zh-CN', label: t('language.zhCN') },
+  { value: 'en-US', label: t('language.enUS') },
+  { value: 'ru-RU', label: t('language.ruRU') },
+  { value: 'ko-KR', label: t('language.koKR') },
+] as const)
+const themeOptions = computed(() => [
+  { value: 'light' as const, label: t('theme.light') },
+  { value: 'dark' as const, label: t('theme.dark') },
+  { value: 'system' as const, label: t('theme.system') },
+])
+const themeColorOptions = computed(() => [
+  { value: 'musuw' as const, label: t('theme.musuw') },
+  { value: 'weknora' as const, label: t('theme.weknora') },
+])
+const languageLabel = computed(() => languageOptions.value.find(option => option.value === localLanguage.value)?.label || t('language.selectLanguage'))
+const themeLabel = computed(() => themeOptions.value.find(option => option.value === localTheme.value)?.label || t('theme.selectTheme'))
+const themeColorLabel = computed(() => themeColorOptions.value.find(option => option.value === localThemeColor.value)?.label || t('theme.selectColor'))
 
 onMounted(() => {
   let savedLocale: string | null = null
@@ -182,8 +285,30 @@ onMounted(() => {
   const normalized = normalizeLocale(savedLocale)
   localLanguage.value = normalized || locale.value
   if (normalized) locale.value = normalized
-
+  document.addEventListener('click', handlePreferenceOutsideClick)
 })
+
+onUnmounted(() => document.removeEventListener('click', handlePreferenceOutsideClick))
+
+const togglePreferenceSelect = (key: PreferenceSelect) => {
+  openPreferenceSelect.value = openPreferenceSelect.value === key ? null : key
+}
+
+const handlePreferenceOutsideClick = (event: MouseEvent) => {
+  if (!preferenceSelectRoot.value?.contains(event.target as Node)) openPreferenceSelect.value = null
+}
+
+const handlePreferenceSelect = (key: PreferenceSelect, value: string) => {
+  openPreferenceSelect.value = null
+  if (key === 'language') {
+    localLanguage.value = value
+    handleLanguageChange()
+  } else if (key === 'theme') {
+    handleThemeChange(value as ThemeMode)
+  } else {
+    handleThemeColorChange(value as ThemeColor)
+  }
+}
 
 const handleLanguageChange = () => {
   const persisted = persistLocalePreference(localLanguage.value)
@@ -198,6 +323,14 @@ const handleLanguageChange = () => {
 const handleThemeChange = (value: ThemeMode) => {
   if (!setTheme(value)) {
     localTheme.value = currentTheme.value
+    return
+  }
+  MessagePlugin.success(t('common.success'))
+}
+
+const handleThemeColorChange = (value: ThemeColor) => {
+  if (!setThemeColor(value)) {
+    localThemeColor.value = currentThemeColor.value
     return
   }
   MessagePlugin.success(t('common.success'))
@@ -238,8 +371,9 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 }
 
 .visual-general-settings__header {
-  margin: 0 0 32px;
-  padding-right: 40px;
+  margin: 0 0 8px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid #f3f4f6;
 }
 .visual-general-settings__header h2 {
   margin: 0;
@@ -249,21 +383,23 @@ const handleFontSizeChange = (value: FontSizeKey) => {
   font-weight: 700;
 }
 .visual-general-settings__header p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #9ca3af;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
 }
 
 .visual-setting-list {
   width: 100%;
   min-width: 0;
-  overflow: hidden;
-  border: 1px solid #e5e5e5;
-  border-radius: 14px;
+  /* Dropdown menus are rendered inside this list; keep their popup surface
+   * visible instead of clipping it at the row container. */
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: transparent;
 }
 
 .visual-setting-row {
@@ -271,13 +407,13 @@ const handleFontSizeChange = (value: FontSizeKey) => {
   min-width: 0;
   min-height: 64px;
   margin: 0;
-  padding: 12px 16px;
+  padding: 14px 0;
   box-sizing: border-box;
-  border-bottom: 1px solid #f0f0f0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 192px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
   align-items: center;
-  gap: 22px;
+  justify-content: space-between;
+  gap: 16px;
 }
 .visual-setting-row:last-child { border-bottom: 0; }
 
@@ -286,22 +422,103 @@ const handleFontSizeChange = (value: FontSizeKey) => {
   display: block;
   margin: 0;
   color: #111827;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
 }
 .visual-setting-row__copy p {
   margin: 2px 0 0;
-  color: #858a92;
-  font-size: 11px;
-  line-height: 16px;
+  color: #777;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .visual-setting-row__control {
-  width: 192px;
+  width: min(280px, 100%);
   min-width: 0;
-  justify-self: end;
+  flex: 0 0 auto;
 }
+.visual-general-settings__select {
+  position: relative;
+  width: min(280px, 100%);
+  min-width: min(210px, 100%);
+  user-select: none;
+}
+.visual-general-settings__select-control {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  background: #fff;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.visual-general-settings__select-control:hover,
+.visual-general-settings__select-control:focus-visible {
+  outline: none;
+  border-color: #d1d5db;
+  background: #fff;
+}
+.visual-general-settings__select-control[aria-expanded='true'] { color: #1f2937; }
+.visual-general-settings__select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; }
+.visual-general-settings__select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 288px;
+  max-width: min(288px, calc(100vw - 32px));
+  max-height: 256px;
+  overflow-y: auto;
+  padding: 6px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.visual-general-settings__select-option {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+.visual-general-settings__select-option:hover,
+.visual-general-settings__select-option:focus-visible { outline: none; background: #f9fafb; }
+.visual-general-settings__select-option.is-selected { background: #f3f4f6; color: #111827; font-weight: 600; }
+.visual-general-settings__select-fade-enter-active,
+.visual-general-settings__select-fade-leave-active { transition: opacity 100ms ease, transform 100ms ease; transform-origin: top right; }
+.visual-general-settings__select-fade-enter-from,
+.visual-general-settings__select-fade-leave-to { opacity: 0; transform: scale(.95); }
 .visual-setting-row__control.is-stacked { display: flex; flex-direction: column; gap: 6px; }
 .visual-setting-row__control.is-switch { display: flex; justify-content: flex-end; }
 .visual-setting-row__control :deep(.t-select) { width: 100%; }
@@ -345,10 +562,14 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 }
 
 @media (max-width: 720px) {
-  .visual-setting-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .visual-setting-row__control { width: min(280px, 100%); justify-self: start; }
+  .visual-setting-row { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .visual-setting-row__control { width: min(280px, 100%); min-width: 0; }
+}
+@media (min-width: 640px) {
+  .visual-general-settings__select-control,
+  .visual-general-settings__select-option { font-size: 14px; }
 }
 @media (max-width: 520px) {
-  .visual-general-settings__header { padding-right: 28px; }
+  .visual-general-settings__header { padding-right: 0; }
 }
 </style>

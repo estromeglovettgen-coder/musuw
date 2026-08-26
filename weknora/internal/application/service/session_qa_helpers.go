@@ -191,11 +191,16 @@ func (s *sessionService) resolveConsumerChatModel(
 	if req.CustomAgent != nil && !isPlatformManagedBuiltinAgentID(req.CustomAgent.ID) {
 		return s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
 	}
-	if s.consumerModelResolver == nil {
+	if s.consumerModelResolver == nil || !isLiteProductEdition() {
 		return s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
 	}
 
-	model, err := s.consumerModelResolver.ResolveConsumerModel(ctx, scene, req.SummaryModelID)
+	// Lite exposes one platform agent, so its KnowledgeQA answer model is the
+	// same policy candidate for both retrieval and non-retrieval requests. Keep
+	// consumerSceneForSearchScope's classification for pipeline behavior, but
+	// do not let an empty retrieval scope select a separate Chat policy.
+	resolverScene := types.ConsumerSceneRAG
+	model, err := s.consumerModelResolver.ResolveConsumerModel(ctx, resolverScene, req.SummaryModelID)
 	if err != nil {
 		return "", err
 	}
@@ -210,8 +215,39 @@ func (s *sessionService) resolveConsumerChatModel(
 		req.CustomAgent.Config.ModelID = model.ID
 		req.CustomAgent.Config.QueryUnderstandModelID = model.ID
 	}
-	logger.Infof(ctx, "Resolved platform consumer scene %s to model_id %s", scene, model.ID)
+	logger.Infof(ctx, "Resolved platform consumer scene %s to model_id %s", resolverScene, model.ID)
 	return model.ID, nil
+}
+
+// resolveConsumerRerankModelID applies the consumer scene policy only to the
+// platform-owned RAG path. Custom agents retain their own rerank authority and
+// do not call this helper. The resolver validates the native type and plan
+// before the retrieval pipeline can invoke a provider.
+func (s *sessionService) resolveConsumerRerankModelID(ctx context.Context, candidate string) (string, error) {
+	if s.consumerModelResolver == nil || !isLiteProductEdition() {
+		return strings.TrimSpace(candidate), nil
+	}
+	model, err := s.consumerModelResolver.ResolveConsumerModel(ctx, types.ConsumerSceneRerank, strings.TrimSpace(candidate))
+	if err != nil {
+		return "", err
+	}
+	if model == nil || strings.TrimSpace(model.ID) == "" {
+		return "", fmt.Errorf("consumer rerank scene resolved no model")
+	}
+	if model.Type != types.ModelTypeRerank {
+		return "", fmt.Errorf("consumer rerank scene resolved a non-rerank model")
+	}
+	return model.ID, nil
+}
+
+// consumerRerankAllowedForRequest identifies the platform-owned browser/API
+// retrieval path. IM is an existing integration channel and keeps its own
+// retrieval model authority, just like custom agents do.
+func consumerRerankAllowedForRequest(ctx context.Context, customAgent *types.CustomAgent) bool {
+	if principal, ok := types.PrincipalFromContext(ctx); ok && principal.Type == types.PrincipalIMUser {
+		return false
+	}
+	return customAgent == nil || isPlatformManagedBuiltinAgentID(customAgent.ID)
 }
 
 // resolveRetrievalTenantID determines the tenant ID to use for retrieval scope.

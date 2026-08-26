@@ -43,6 +43,7 @@ test('Paddle customer portal stays server-authenticated and redirects with a fre
   assert.match(entitlementApi, /post\('\/api\/v1\/billing\/paddle\/portal-session'\)/)
   assert.match(usageSettings, /billing\.value\?\.portal_available\s*===\s*true/)
   assert.match(usageSettings, /window\.location\.assign\(response\.authorization_url\)/)
+  assert.match(usageSettings, /router\.push\('\/plans'\)/)
   const start = entitlementApi.indexOf('export async function createPaddlePortalSession')
   const end = entitlementApi.indexOf('\nexport async function', start + 1)
   const portalMethod = entitlementApi.slice(start, end)

@@ -1,5 +1,7 @@
 # Research and product audit
 
+> This is historical launch research. The unreleased `adjust-consumer-plan-limits` change supersedes the numeric storage matrix and Free allowance below; the original observations remain unchanged.
+
 ## First-principles decision
 
 The reviewer job is not "discover every authentication method." It is to enter

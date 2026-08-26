@@ -295,7 +295,8 @@ func (s *wikiIngestService) ProcessWikiIngest(ctx context.Context, t *asynq.Task
 		return fmt.Errorf("wiki ingest: KB %s is not wiki type", kb.ID)
 	}
 
-	if s.consumerModelResolver == nil && wikiSynthesisModelCandidate(kb) == "" {
+	consumerWikiResolver := s.consumerModelResolver != nil && isLiteProductEdition()
+	if !consumerWikiResolver && wikiSynthesisModelCandidate(kb) == "" {
 		exitStatus = "missing_synthesis_model"
 		return fmt.Errorf("wiki ingest: no synthesis model configured for KB %s", kb.ID)
 	}
@@ -1037,7 +1038,8 @@ func (s *wikiIngestService) ProcessWikiFinalize(ctx context.Context, t *asynq.Ta
 	}
 
 	legacySynthesisCandidate := wikiSynthesisModelCandidate(kb)
-	if s.consumerModelResolver == nil && legacySynthesisCandidate == "" {
+	consumerWikiResolver := s.consumerModelResolver != nil && isLiteProductEdition()
+	if !consumerWikiResolver && legacySynthesisCandidate == "" {
 		// No model to rebuild the index with; still run the pure-text passes,
 		// then drain. Missing model is a config gap, not a transient error.
 		logger.Warnf(ctx, "wiki finalize: no synthesis model for KB %s, skipping index rebuild", payload.KnowledgeBaseID)
@@ -1047,7 +1049,7 @@ func (s *wikiIngestService) ProcessWikiFinalize(ctx context.Context, t *asynq.Ta
 	lang := types.LanguageNameFromContext(ctx)
 
 	indexRebuilt := false
-	if changeDesc.Len() > 0 && (s.consumerModelResolver != nil || legacySynthesisCandidate != "") {
+	if changeDesc.Len() > 0 && (consumerWikiResolver || legacySynthesisCandidate != "") {
 		chatModel, mErr := s.resolveWikiChatModel(ctx, kb)
 		if mErr != nil {
 			logger.Warnf(ctx, "wiki finalize: resolve chat model failed: %v", mErr)

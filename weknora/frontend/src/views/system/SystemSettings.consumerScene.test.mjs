@@ -4,15 +4,9 @@ import test from 'node:test'
 
 const source = readFileSync(new URL('./SystemSettings.vue', import.meta.url), 'utf8')
 
-test('SystemSettings exposes a fixed Models policy section backed by the six scene settings', () => {
+test('SystemSettings exposes a fixed Models policy section backed by the ten typed scene settings', () => {
   for (const token of [
     'value="models"',
-    "consumer_models.chat.free_default",
-    "consumer_models.chat.paid_options",
-    "consumer_models.rag.free_default",
-    "consumer_models.rag.paid_options",
-    "consumer_models.wiki.free_default",
-    "consumer_models.wiki.paid_options",
     'filterConsumerModelCatalog',
     'listModels',
     'ordered',
@@ -22,6 +16,10 @@ test('SystemSettings exposes a fixed Models policy section backed by the six sce
     'paidRequired',
     'Promise.all([loadSettings(), loadConsumerModelCatalog(), loadAdmins()])',
   ]) assert.ok(source.includes(token), `models policy surface lost ${token}`)
+  const declaration = source.match(/const consumerScenes[^\n]*/)?.[0] || ''
+  assert.match(declaration, /\['rag',\s*'rerank',\s*'wiki',\s*'vision',\s*'asr'\]/)
+  assert.doesNotMatch(declaration, /chat|embedding|tts/)
+  assert.ok(source.includes('`consumer_models.${scene}.${kind}`'))
 })
 
 test('SystemSettings policy controls only persist values selected from the safe catalog', () => {
@@ -33,4 +31,11 @@ test('SystemSettings policy controls only persist values selected from the safe 
   assert.match(source, /@change="onConsumerScenePaidChange/)
   assert.match(source, /normalizeConsumerModelIds/)
   assert.ok(modelsSection.length > 0)
+})
+
+test('legacy Chat policy keys stay hidden during rolling upgrades', () => {
+  assert.match(source, /HIDDEN_COMPATIBILITY_SETTING_KEYS/)
+  assert.match(source, /consumer_models\.chat\.free_default/)
+  assert.match(source, /consumer_models\.chat\.paid_options/)
+  assert.match(source, /\.\.\.HIDDEN_COMPATIBILITY_SETTING_KEYS/)
 })

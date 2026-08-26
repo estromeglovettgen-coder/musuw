@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     retriever_engines TEXT NOT NULL DEFAULT '[]',
     status VARCHAR(50) DEFAULT 'active',
     business VARCHAR(255) NOT NULL,
-    storage_quota BIGINT NOT NULL DEFAULT 5368709120,
+    storage_quota BIGINT NOT NULL DEFAULT 1073741824,
     storage_used BIGINT NOT NULL DEFAULT 0,
     agent_config TEXT DEFAULT NULL,
     context_config TEXT,

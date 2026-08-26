@@ -25,16 +25,40 @@ export default defineComponent({
     const authStore = useAuthStore()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const modelPickerView = ref<'overview' | 'models' | 'reasoning'>('overview')
+      const modelPickerWidth = ref<number | null>(null)
+      const modelPickerStyle = computed(() => modelPickerWidth.value ? { width: `${modelPickerWidth.value}px` } : {})
       const visualModelDropdownStyle = computed(() => {
         const source = (state as any).modelDropdownStyle
         const style = source && typeof source === 'object' && 'value' in source ? source.value : source
-        // Keep the legacy anchor positioning (including max-height) but let
-        // ModelSelector size its overview to its two rows.  Forcing height to
-        // max-height leaves a large empty panel when only the overview is open.
+        // Reading the legacy style keeps this computed value responsive to the
+        // controller's scroll/resize updates. The reference card itself is
+        // always right-aligned six pixels above the capsule.
+        void style
+        const button = (state as any).modelButtonRef?.value as HTMLElement | undefined
+        if (button && typeof window !== 'undefined') {
+          const rect = button.getBoundingClientRect()
+          const menuWidth = Math.min(224, Math.max(0, window.innerWidth - 32))
+          const rightInset = Math.min(
+            Math.max(16, window.innerWidth - rect.right),
+            Math.max(16, window.innerWidth - menuWidth - 16),
+          )
+          const bottomInset = window.innerHeight - rect.top + 6
+          return {
+            position: 'fixed',
+            top: 'auto',
+            left: 'auto',
+            right: `${rightInset}px`,
+            bottom: `${bottomInset}px`,
+            width: 'min(224px, calc(100vw - 32px))',
+          }
+        }
         return {
-          ...style,
-          width: 'min(280px, calc(100vw - 32px))',
-          '--visual-model-menu-max-height': style.maxHeight,
+          position: 'fixed',
+          top: 'auto',
+          left: 'auto',
+          right: '16px',
+          bottom: '16px',
+          width: 'min(224px, calc(100vw - 32px))',
         }
       })
       const handleNativeInput = (event: Event) => {
@@ -51,28 +75,42 @@ export default defineComponent({
       }
       const openModelPicker = () => {
         modelPickerView.value = 'overview'
+        const wasOpen = !!(state as any).showModelSelector?.value
+        if (wasOpen) {
+          modelPickerWidth.value = null
+        } else {
+          const button = (state as any).modelButtonRef?.value as HTMLElement | undefined
+          modelPickerWidth.value = button?.getBoundingClientRect().width || null
+        }
         ;(state as any).toggleModelSelector?.()
+        if (!wasOpen) {
+          void nextTick(() => requestAnimationFrame(() => { modelPickerWidth.value = 224 }))
+        }
       }
       const restoreModelPickerFocus = () => {
         void nextTick(() => (state as any).modelButtonRef?.value?.focus?.())
       }
       const closeModelPicker = () => {
         ;(state as any).closeModelSelector?.()
+        modelPickerWidth.value = null
         restoreModelPickerFocus()
       }
       const selectModelFromPicker = (value: string) => {
         ;(state as any).handleModelChange?.(value)
+        if (!(state as any).showModelSelector?.value) modelPickerWidth.value = null
         restoreModelPickerFocus()
       }
       const selectReasoningFromPicker = (value: string) => {
         ;(state as any).selectReasoningEffort?.(value)
         ;(state as any).closeModelSelector?.()
+        modelPickerWidth.value = null
         restoreModelPickerFocus()
       }
       return {
         ...state,
         authStore,
         modelPickerView,
+        modelPickerStyle,
         visualModelDropdownStyle,
         openModelPicker,
         closeModelPicker,
@@ -183,13 +221,15 @@ export default defineComponent({
             ref="modelButtonRef"
             type="button"
             class="visual-chat-composer__model-picker"
+            :class="{ 'is-open': showModelSelector }"
+            :style="modelPickerStyle"
             :aria-expanded="showModelSelector"
             :aria-label="`${selectedModelDisplayName} ${selectedReasoningLabel}`"
             @click.stop="openModelPicker"
           >
             <span class="visual-chat-composer__model-picker-copy">
               <span class="visual-chat-composer__model-picker-model" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
-              <span class="visual-chat-composer__model-picker-effort">{{ selectedReasoningLabel }}</span>
+              <span v-if="reasoningEffort !== 'none' && selectedReasoningLabel" class="visual-chat-composer__model-picker-effort">{{ selectedReasoningLabel }}</span>
             </span>
             <t-loading v-if="modelsLoading" size="small" />
             <t-icon v-else name="chevron-down" />
@@ -206,29 +246,31 @@ export default defineComponent({
     </div>
 
     <Teleport to="body">
-      <div v-if="showModelSelector" class="visual-chat-composer__overlay" @click="closeModelPicker">
-        <div class="visual-chat-composer__model-menu" :style="visualModelDropdownStyle" @click.stop>
+      <div class="visual-chat-composer__overlay" :class="{ 'is-visible': showModelSelector }" @click="closeModelPicker">
+        <Transition name="visual-chat-composer__model-menu-motion">
+        <div v-if="showModelSelector" class="visual-chat-composer__model-menu" :style="visualModelDropdownStyle" @click.stop>
           <!-- ModelSelector owns the keyboard listbox (the old native shape was
                v-for="model in availableModels"); the frozen controller still
                provides availableModels, modelPickerView === 'overview',
                modelPickerView === 'models', modelPickerView = 'reasoning',
                and modelPickerView = 'models' as its unchanged business contract. -->
-          <ModelSelector
-            mode="chat"
-            :models="availableModels"
-            :scene-options="sceneOptionsFor(effectiveConsumerScene)"
-            :selected-model-id="selectedModelId"
-            :selected-model-display-name="selectedModelDisplayName"
-            :selected-reasoning-label="selectedReasoningLabel"
-            :reasoning-options="reasoningOptions"
-            :reasoning-effort="reasoningEffort"
-            :view="modelPickerView"
-            @select-model="selectModelFromPicker"
-            @select-reasoning="selectReasoningFromPicker"
-            @update:view="modelPickerView = $event"
-            @close="closeModelPicker"
-          />
+              <ModelSelector
+                mode="chat"
+                :models="availableModels"
+                :scene-options="sceneOptionsFor(effectiveConsumerScene)"
+                :selected-model-id="selectedModelId"
+                :selected-model-display-name="selectedModelDisplayName"
+                :selected-reasoning-label="selectedReasoningLabel"
+                :reasoning-options="reasoningOptions"
+                :reasoning-effort="reasoningEffort"
+                :view="modelPickerView"
+                @select-model="selectModelFromPicker"
+                @select-reasoning="selectReasoningFromPicker"
+                @update:view="modelPickerView = $event"
+                @close="closeModelPicker"
+              />
         </div>
+        </Transition>
       </div>
     </Teleport>
 
@@ -289,13 +331,16 @@ export default defineComponent({
 .visual-chat-composer__disabled-hint { display: flex; align-items: center; gap: 6px; }
 .visual-chat-composer__disabled-hint button { padding: 0; border: 0; background: transparent; color: #2563eb; font: inherit; text-decoration: underline; cursor: pointer; }
 .visual-chat-composer__actions { flex: 0 0 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
-.visual-chat-composer__model-picker { min-width: 0; max-width: min(300px, 42vw); min-height: 32px; padding: 5px 10px 5px 12px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; gap: 8px; background: rgb(229 231 235 / 78%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; transition: background-color 150ms ease, color 150ms ease; }
-.visual-chat-composer__model-picker:hover,.visual-chat-composer__model-picker[aria-expanded='true'] { background: #e5e7eb; color: #111827; }
+.visual-chat-composer__model-picker { min-width: 0; width: fit-content; padding: 6px 12px; border: 1px solid transparent; border-radius: 999px; outline: none; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; background: #f0f1f4; color: #111827; box-shadow: 0 1px rgb(0 0 0 / 5%); font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; transition: width 200ms cubic-bezier(.16,1,.3,1), background-color 200ms cubic-bezier(.16,1,.3,1), color 200ms cubic-bezier(.16,1,.3,1), box-shadow 200ms cubic-bezier(.16,1,.3,1); }
+.visual-chat-composer__model-picker:not(.is-open):hover { background: #e6e8eb; }
+.visual-chat-composer__model-picker:not(.is-open):active { background: #e0e2e6; }
+.visual-chat-composer__model-picker.is-open { width: 224px; max-width: min(224px, calc(100vw - 32px)); padding: 6px 14px; justify-content: space-between; gap: 0; background: #e5e7eb; color: #111827; box-shadow: 0 0 0 1px rgb(209 213 219 / 80%), 0 1px 2px 0 rgb(0 0 0 / 5%); }
 .visual-chat-composer__model-picker-copy { min-width: 0; display: inline-flex; align-items: baseline; gap: 6px; }
-.visual-chat-composer__model-picker-model,.visual-chat-composer__model-picker-effort { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.visual-chat-composer__model-picker-model { max-width: 190px; font-weight: 500; }
-.visual-chat-composer__model-picker-effort { color: #8b9099; }
-.visual-chat-composer__model-picker > :deep(.t-icon) { flex: 0 0 14px; color: #8b9099; font-size: 14px; }
+.visual-chat-composer__model-picker-model,.visual-chat-composer__model-picker-effort { min-width: 0; white-space: nowrap; }
+.visual-chat-composer__model-picker-model { font-weight: 400; }
+.visual-chat-composer__model-picker-effort { color: #4b5563; }
+.visual-chat-composer__model-picker > :deep(.t-icon) { flex: 0 0 14px; color: #6b7280; font-size: 14px; transition: transform 200ms cubic-bezier(.16,1,.3,1), color 200ms cubic-bezier(.16,1,.3,1); }
+.visual-chat-composer__model-picker.is-open > :deep(.t-icon) { transform: rotate(180deg); color: #111827; }
 .visual-chat-composer__submit { flex: 0 0 auto; display: flex; align-items: center; }
 .visual-chat-composer__send { width: 32px; height: 32px; padding: 8px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #111827; color: #fff; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); transition: all 150ms ease; }
 .visual-chat-composer__send:hover:not(:disabled) { background: #000; }
@@ -305,17 +350,18 @@ export default defineComponent({
 .visual-chat-composer__send :deep(.t-icon) { font-size: 14px; }
 .visual-chat-composer__stop-square { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
 
-.visual-chat-composer__overlay { position: fixed; inset: 0; z-index: 9998; background: transparent; }
-.visual-chat-composer__model-menu { position: fixed; z-index: 9999; box-sizing: border-box; overflow: hidden; border: 1px solid #dfe2e7; border-radius: 17px; background: #fff; box-shadow: 0 14px 32px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 6%); width: min(280px, calc(100vw - 32px)); min-width: min(180px, calc(100vw - 32px)); max-height: min(340px,60vh); padding: 8px !important; display: flex; flex-direction: column; animation: visual-chat-composer-picker-in 160ms cubic-bezier(.23,1,.32,1); }
-.visual-chat-composer__model-menu :deep(.visual-model-selector--chat) { min-height: 0; max-height: 100%; flex: 1 1 auto; overflow: hidden; }
-.visual-chat-composer__model-menu :deep(.visual-model-selector__chat-panel) { min-height: 0; max-height: 100%; flex: 1 1 auto; display: flex; flex-direction: column; }
-.visual-chat-composer__model-menu :deep(.visual-model-selector__chat-header) { flex: 0 0 auto; }
-.visual-chat-composer__model-menu :deep(.visual-model-selector__chat-list) { min-height: 0; flex: 0 1 auto; }
-@keyframes visual-chat-composer-picker-in { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
+.visual-chat-composer__overlay { position: fixed; inset: 0; z-index: 9998; background: transparent; pointer-events: none; }
+.visual-chat-composer__overlay.is-visible { pointer-events: auto; }
+.visual-chat-composer__model-menu { position: fixed; z-index: 9999; box-sizing: border-box; overflow: visible; width: min(224px, calc(100vw - 32px)); min-width: min(224px, calc(100vw - 32px)); display: flex; flex-direction: column; transform-origin: bottom right; }
+.visual-chat-composer__model-menu :deep(.visual-model-selector--chat) { min-height: 0; width: 100%; flex: 1 1 auto; overflow: visible; }
+.visual-chat-composer__model-menu-motion-enter-active,
+.visual-chat-composer__model-menu-motion-leave-active { transition: opacity 180ms cubic-bezier(.16,1,.3,1), transform 180ms cubic-bezier(.16,1,.3,1); }
+.visual-chat-composer__model-menu-motion-enter-from { opacity: 0; transform: translate(8px, 3px) scale(.96); }
+.visual-chat-composer__model-menu-motion-leave-to { opacity: 0; transform: translate(6px, 2px) scale(.97); }
 
 @media (max-width: 768px) { .visual-chat-composer__surface { border-radius: 16px; } .visual-chat-composer__tools { gap: 12px; } }
 @media (min-width: 640px) { .visual-chat-composer__tools { gap: 16px; } }
-@media (max-width: 620px) { .visual-chat-composer__toolbar { align-items: flex-end; } .visual-chat-composer__model-picker { max-width: min(240px, 52vw); } .visual-chat-composer__model-picker-model { max-width: 120px; } }
+@media (max-width: 620px) { .visual-chat-composer__toolbar { align-items: flex-end; } .visual-chat-composer__model-picker { max-width: min(240px, 52vw); } }
 @media (max-width: 430px) { .visual-chat-composer__toolbar { align-items: flex-start; flex-wrap: wrap; } .visual-chat-composer__tools { flex: 1 1 100%; } .visual-chat-composer__actions { margin-left: auto; } .visual-chat-composer__model-picker { max-width: calc(100vw - 102px); } }
-@media (prefers-reduced-motion: reduce) { .visual-chat-composer__surface,.visual-chat-composer__send,.visual-chat-composer__model-picker { transition: none !important; } .visual-chat-composer__model-menu { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .visual-chat-composer__surface,.visual-chat-composer__send,.visual-chat-composer__model-picker,.visual-chat-composer__model-menu { transition: none !important; } }
 </style>

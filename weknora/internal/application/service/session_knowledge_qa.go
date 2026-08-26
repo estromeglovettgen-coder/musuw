@@ -63,6 +63,25 @@ func (s *sessionService) KnowledgeQA(
 	}
 	hasKB := types.HasKnowledgeRetrievalScope(searchTargets, knowledgeBaseIDs, knowledgeIDs)
 	consumerScene := consumerSceneForSearchScope(searchTargets, knowledgeBaseIDs, knowledgeIDs, req.WebSearchEnabled)
+	var rerankModelID string
+	if isLiteProductEdition() && (hasKB || req.WebSearchEnabled) &&
+		consumerRerankAllowedForRequest(ctx, req.CustomAgent) {
+		// Platform RAG reads the existing tenant retrieval configuration. The
+		// consumer resolver is the runtime authority for the selected ID; custom
+		// agents are deliberately excluded and keep their own rerank config.
+		var candidate string
+		if s.tenantService != nil {
+			if tenant, tenantErr := s.tenantService.GetTenantByID(ctx, retrievalTenantID); tenantErr == nil && tenant != nil && tenant.RetrievalConfig != nil {
+				candidate = tenant.RetrievalConfig.RerankModelID
+			} else if tenantErr != nil {
+				logger.Warnf(ctx, "Failed to load retrieval config for platform RAG: %v", tenantErr)
+			}
+		}
+		rerankModelID, err = s.resolveConsumerRerankModelID(ctx, candidate)
+		if err != nil {
+			return err
+		}
+	}
 
 	// Platform-owned answer modes are server-resolved after effective scope is
 	// known. Custom agents retain their configured model authority.
@@ -127,6 +146,7 @@ func (s *sessionService) KnowledgeQA(
 			VectorThreshold:         s.cfg.Conversation.VectorThreshold,
 			KeywordThreshold:        s.cfg.Conversation.KeywordThreshold,
 			EmbeddingTopK:           s.cfg.Conversation.EmbeddingTopK,
+			RerankModelID:           rerankModelID,
 			RerankTopK:              s.cfg.Conversation.RerankTopK,
 			RerankThreshold:         s.cfg.Conversation.RerankThreshold,
 			ChatModelID:             chatModelID,
@@ -864,24 +884,45 @@ func (s *sessionService) SearchKnowledge(ctx context.Context,
 		},
 	}
 
-	// Get default models
-	models, err := s.modelService.ListModels(ctx)
-	if err != nil {
-		logger.Errorf(ctx, "Failed to get models: %v", err)
-		return nil, err
+	// Use the existing tenant RetrievalConfig candidate, but let the
+	// server-authoritative consumer resolver validate its native type, plan,
+	// and catalog membership before the rerank stage can invoke a provider.
+	// IM search remains an internal integration path and owns its configured
+	// retrieval model.  The consumer scene resolver is only authoritative for
+	// the platform's browser/API retrieval path; applying it to IM would
+	// silently override that integration's model selection.
+	useConsumerRerank := s.consumerModelResolver != nil && isLiteProductEdition()
+	if principal, principalOK := types.PrincipalFromContext(ctx); principalOK && principal.Type == types.PrincipalIMUser {
+		useConsumerRerank = false
 	}
-
-	// Use rerank model from RetrievalConfig if set, otherwise auto-select the first available
-	if rc != nil && rc.RerankModelID != "" {
-		chatManage.RerankModelID = rc.RerankModelID
+	if useConsumerRerank {
+		candidate := ""
+		if rc != nil {
+			candidate = rc.RerankModelID
+		}
+		chatManage.RerankModelID, err = s.resolveConsumerRerankModelID(ctx, candidate)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		for _, model := range models {
-			if model == nil {
-				continue
-			}
-			if model.Type == types.ModelTypeRerank {
-				chatManage.RerankModelID = model.ID
-				break
+		// Legacy/direct service construction keeps its historical fallback when
+		// the resolver is not wired (production container wiring always is).
+		models, listErr := s.modelService.ListModels(ctx)
+		if listErr != nil {
+			logger.Errorf(ctx, "Failed to get models: %v", listErr)
+			return nil, listErr
+		}
+		if rc != nil && rc.RerankModelID != "" {
+			chatManage.RerankModelID = rc.RerankModelID
+		} else {
+			for _, model := range models {
+				if model == nil {
+					continue
+				}
+				if model.Type == types.ModelTypeRerank {
+					chatManage.RerankModelID = model.ID
+					break
+				}
 			}
 		}
 	}

@@ -1882,11 +1882,14 @@ export default {
     description: '다양한 유형의 AI 모델을 관리합니다. Ollama 로컬 모델과 원격 API를 지원합니다',
     sceneModels: {
       title: '시나리오별 모델',
-      description: '이 브라우저에서 사용할 Chat, RAG, Wiki 모델을 선택합니다. 잠긴 유료 모델은 요금제가 필요합니다.',
+      description: '이 브라우저에서 사용할 에이전트, Rerank, Wiki, 비전 및 음성 모델을 선택합니다. 잠긴 유료 모델은 요금제가 필요합니다.',
       scenes: {
-        chat: { label: 'Chat', description: '검색 없는 플랫폼 채팅입니다.' },
-        rag: { label: 'RAG', description: '지식 또는 웹 검색을 활용한 답변입니다.' },
-        wiki: { label: 'Wiki', description: 'Wiki 합성입니다.' }
+        chat: { label: 'Chat', description: '내부 플랫폼 에이전트 대화입니다.' },
+        rag: { label: '에이전트 모델', description: '지식 베이스, Wiki 또는 웹 검색 결과를 바탕으로 최종 답변을 생성합니다.' },
+        rerank: { label: 'Rerank', description: '검색 결과를 다시 정렬합니다.' },
+        wiki: { label: 'Wiki', description: 'Wiki 콘텐츠를 합성합니다.' },
+        vision: { label: '비전', description: '이미지 및 문서를 이해합니다.' },
+        asr: { label: '음성', description: '오디오를 텍스트로 변환합니다.' }
       }
     },
     copySuffix: ' 사본',
@@ -2196,7 +2199,12 @@ export default {
     light: '라이트',
     dark: '다크',
     system: '시스템 설정',
-    selectTheme: '테마 선택'
+    selectTheme: '테마 선택',
+    color: '브랜드 색상',
+    colorDescription: '라이트/다크 모드와 별도로 제품 브랜드 색상을 선택하세요',
+    musuw: 'Musuw 블루',
+    weknora: 'WeKnora 그린',
+    selectColor: '브랜드 색상 선택'
   },
   general: {
     title: '일반 설정',
@@ -2262,6 +2270,7 @@ export default {
     account: '계정',
     monthlyAllowance: '월간 한도',
     storageRemaining: '저장 공간 잔여',
+    storageUsage: '{used} / {total} 사용',
     remaining: '남음',
     unavailable: '사용할 수 없음',
     resetsAt: '{month}에 초기화',
@@ -2850,7 +2859,7 @@ export default {
         tenant: {
           max_owned_per_user: '슈퍼유저가 아닌 사용자가 셀프 서비스로 소유할 수 있는 최대 워크스페이스 수입니다. 워크스페이스 생성 시마다 읽으며 저장 즉시 적용됩니다. 0은 내장 기본값 10을 사용하고, 음수는 제한을 완전히 해제합니다(공개 배포에는 권장하지 않음).',
           self_service_creation_enabled: '비슈퍼유저가 공간을 직접 만들 수 있는지 설정합니다. 비활성화하면 일반 사용자는 초대로만 기존 공간에 참여할 수 있으며, 크로스 워크스페이스 슈퍼유저는 계속 만들 수 있습니다.',
-          default_storage_quota_gb: '신규 워크스페이스 생성 시 기본으로 할당되는 저장 용량(GB)으로, 벡터·원본·텍스트·인덱스 등을 포함합니다. 생성 시에만 읽으며, 변경은 이후 생성되는 워크스페이스에만 적용되고 기존 워크스페이스에는 소급되지 않습니다. 0 또는 음수는 내장 기본값 5GB를 사용합니다.',
+          default_storage_quota_gb: '신규 워크스페이스 생성 시 기본으로 할당되는 저장 용량(GB)으로, 벡터·원본·텍스트·인덱스 등을 포함합니다. 생성 시에만 읽으며, 변경은 이후 생성되는 워크스페이스에만 적용되고 기존 워크스페이스에는 소급되지 않습니다. 0 또는 음수는 내장 기본값 1GB를 사용합니다.',
           auto_create_api_key: '신규 워크스페이스에 full_access API Key를 자동 생성하고 생성 응답에 평문 token을 반환합니다. 기존 동작에 의존하는 연동에만 사용하세요. 기본값은 비활성화입니다.'
         },
         ssrf: {
@@ -3128,7 +3137,7 @@ export default {
         models: {
           tab: '모델 {count}',
           title: '사용자 모델 정책',
-          description: 'Chat, RAG, Wiki의 Free 기본 모델과 정렬된 유료 옵션을 설정합니다.'
+          description: '에이전트, Rerank, Wiki, 비전 및 음성의 Free 기본 모델과 정렬된 유료 옵션을 설정합니다.'
         }
       },
       models: {
@@ -3142,9 +3151,12 @@ export default {
         paidRequired: '유료 옵션을 하나 이상 선택하세요. 첫 항목이 유료 기본 모델입니다.',
         paidOrderHint: '유료 옵션의 선택 순서를 유지하며 첫 항목이 유료 기본 모델입니다.',
         scenes: {
-          chat: { label: 'Chat', description: '검색 없는 플랫폼 채팅입니다.' },
-          rag: { label: 'RAG', description: '지식 또는 웹 검색을 활용한 답변입니다.' },
-          wiki: { label: 'Wiki', description: 'Wiki 합성입니다.' }
+          chat: { label: 'Chat', description: '내부 플랫폼 에이전트 대화입니다.' },
+          rag: { label: '에이전트 모델', description: '지식 베이스, Wiki 또는 웹 검색 결과를 바탕으로 최종 답변을 생성합니다.' },
+          rerank: { label: 'Rerank', description: '검색 결과를 다시 정렬합니다.' },
+          wiki: { label: 'Wiki', description: 'Wiki 콘텐츠를 합성합니다.' },
+          vision: { label: '비전', description: '이미지 및 문서를 이해합니다.' },
+          asr: { label: '음성', description: '오디오를 텍스트로 변환합니다.' }
         }
       },
       priorityHint: {

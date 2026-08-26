@@ -107,6 +107,7 @@ const effectiveConsumerScene = computed<ConsumerScene>(() => {
     hasKnowledgeScope,
     settingsStore.isWebSearchEnabled,
     hasBuiltinAllKnowledgeScope.value,
+    authStore.isLiteMode && !isCustomAgent.value,
   );
 });
 const sceneOptionsFor = (scene: ConsumerScene): ConsumerSceneOption[] =>

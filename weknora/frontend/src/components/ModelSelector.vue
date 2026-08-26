@@ -1,7 +1,8 @@
 <template>
-  <div class="visual-model-selector" :class="{ 'visual-model-selector--chat': mode === 'chat' }">
+  <div class="visual-model-selector" :class="{ 'visual-model-selector--chat': mode === 'chat', 'visual-model-selector--consumer-scene': isConsumerSceneSelector }">
     <template v-if="mode === 'chat'">
       <section
+        ref="chatPanelRef"
         class="visual-model-selector__chat-panel"
         :aria-label="chatPanelLabel"
         @keydown="handlePanelKeydown"
@@ -12,13 +13,16 @@
             type="button"
             class="visual-model-selector__chat-row"
             aria-haspopup="listbox"
-            @click="openView('models')"
+            @mouseenter="hoverOpen('models')"
+            @click="toggleHover('models')"
+            @keydown.enter.stop.prevent="toggleHover('models')"
+            @keydown.space.stop.prevent="toggleHover('models')"
           >
-            <span class="visual-model-selector__chat-row-copy">
-              <span class="visual-model-selector__chat-row-label">{{ modelLabel }}</span>
+            <span class="visual-model-selector__chat-row-label">{{ modelLabel }}</span>
+            <div class="visual-model-selector__chat-row-trailing">
               <span class="visual-model-selector__chat-row-value" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
-            </span>
-            <t-icon name="chevron-right" aria-hidden="true" />
+              <t-icon name="chevron-right" aria-hidden="true" />
+            </div>
           </button>
           <button
             type="button"
@@ -26,13 +30,16 @@
             :class="{ 'is-disabled': !reasoningOptions.length }"
             :aria-disabled="!reasoningOptions.length"
             aria-haspopup="listbox"
-            @click="reasoningOptions.length && openView('reasoning')"
+            @mouseenter="reasoningOptions.length && hoverOpen('reasoning')"
+            @click="reasoningOptions.length && toggleHover('reasoning')"
+            @keydown.enter.stop.prevent="reasoningOptions.length && toggleHover('reasoning')"
+            @keydown.space.stop.prevent="reasoningOptions.length && toggleHover('reasoning')"
           >
-            <span class="visual-model-selector__chat-row-copy">
-              <span class="visual-model-selector__chat-row-label">{{ reasoningLabel }}</span>
+            <span class="visual-model-selector__chat-row-label">{{ reasoningLabel }}</span>
+            <div class="visual-model-selector__chat-row-trailing">
               <span class="visual-model-selector__chat-row-value" :title="selectedReasoningLabel">{{ selectedReasoningLabel }}</span>
-            </span>
-            <t-icon name="chevron-right" aria-hidden="true" />
+              <t-icon name="chevron-right" aria-hidden="true" />
+            </div>
           </button>
         </template>
 
@@ -78,7 +85,7 @@
                 <strong :title="modelDisplayName(model)">{{ modelDisplayName(model) }}</strong>
               </span>
               <span v-if="model.locked || model.selectable === false" class="visual-model-selector__chat-lock" :aria-label="$t('model.lockedTag')"><t-icon name="lock-on" /></span>
-              <span v-if="model.id === selectedModelId" class="visual-model-selector__chat-check" aria-hidden="true"><t-icon name="check" /></span>
+              <span v-if="model.id === selectedModelId && !model.locked && model.selectable !== false" class="visual-model-selector__chat-check" aria-hidden="true"><t-icon name="check" /></span>
             </button>
             <div v-if="!chatModels.length" class="visual-model-selector__chat-empty">{{ noModelsLabel }}</div>
           </div>
@@ -100,7 +107,7 @@
               type="button"
               role="option"
               tabindex="-1"
-              class="visual-model-selector__chat-option"
+              class="visual-model-selector__chat-option is-reasoning"
               :class="{ 'is-selected': option.value === reasoningEffort, 'is-active': index === activeReasoningIndex }"
               :aria-selected="option.value === reasoningEffort"
               @mouseenter="activeReasoningIndex = index"
@@ -114,8 +121,135 @@
             <div v-if="!reasoningOptions.length" class="visual-model-selector__chat-empty">{{ noReasoningLabel }}</div>
           </div>
         </template>
+
+        <Transition name="visual-model-selector__chat-flyout">
+          <div
+            v-if="view === 'overview' && hoveredSubmenu"
+            :key="hoveredSubmenu"
+            class="visual-model-selector__chat-flyout"
+            :class="[`is-${submenuPlacement}`, `is-${hoveredSubmenu === 'models' ? 'models' : 'reasoning'}`]"
+          >
+          <div
+            v-if="hoveredSubmenu === 'models'"
+            :id="modelListId"
+            ref="flyoutModelListRef"
+            class="visual-model-selector__chat-list"
+            role="listbox"
+            tabindex="0"
+            :aria-label="modelLabel"
+            :aria-activedescendant="activeModelId"
+            @keydown="handleModelKeydown"
+          >
+            <div class="visual-model-selector__chat-flyout-heading">{{ modelLabel }}</div>
+            <button
+              v-for="model in chatModels"
+              :id="modelOptionId(model.id || '')"
+              :key="model.id"
+              type="button"
+              role="option"
+              tabindex="-1"
+              class="visual-model-selector__chat-option"
+              :class="{
+                'is-selected': model.id === selectedModelId,
+                'is-active': modelIndex(model.id) === activeModelIndex,
+                'is-locked': model.locked || model.selectable === false,
+              }"
+              :aria-selected="model.id === selectedModelId"
+              :aria-disabled="model.locked || model.selectable === false"
+              @mouseenter="activeModelIndex = modelIndex(model.id)"
+              @click="selectChatModel(model.id || '')"
+            >
+              <span class="visual-model-selector__chat-option-copy">
+                <strong :title="modelDisplayName(model)">{{ modelDisplayName(model) }}</strong>
+              </span>
+              <span v-if="model.locked || model.selectable === false" class="visual-model-selector__chat-lock" :aria-label="$t('model.lockedTag')"><t-icon name="lock-on" /></span>
+              <span v-if="model.id === selectedModelId && !model.locked && model.selectable !== false" class="visual-model-selector__chat-check" aria-hidden="true"><t-icon name="check" /></span>
+            </button>
+            <div v-if="!chatModels.length" class="visual-model-selector__chat-empty">{{ noModelsLabel }}</div>
+          </div>
+
+          <div
+            v-else
+            ref="flyoutReasoningListRef"
+            class="visual-model-selector__chat-list"
+            role="listbox"
+            tabindex="0"
+            :aria-label="reasoningLabel"
+            :aria-activedescendant="activeReasoningId"
+            @keydown="handleReasoningKeydown"
+          >
+            <div class="visual-model-selector__chat-flyout-heading">{{ reasoningLabel }}</div>
+            <button
+              v-for="(option, index) in reasoningOptions"
+              :id="reasoningOptionId(option.value)"
+              :key="option.value"
+              type="button"
+              role="option"
+              tabindex="-1"
+              class="visual-model-selector__chat-option is-reasoning"
+              :class="{ 'is-selected': option.value === reasoningEffort, 'is-active': index === activeReasoningIndex }"
+              :aria-selected="option.value === reasoningEffort"
+              @mouseenter="activeReasoningIndex = index"
+              @click="selectChatReasoning(option.value)"
+            >
+              <span class="visual-model-selector__chat-option-copy">
+                <strong>{{ option.label }}</strong>
+              </span>
+              <span v-if="option.value === reasoningEffort" class="visual-model-selector__chat-check" aria-hidden="true"><t-icon name="check" /></span>
+            </button>
+            <div v-if="!reasoningOptions.length" class="visual-model-selector__chat-empty">{{ noReasoningLabel }}</div>
+          </div>
+          </div>
+        </Transition>
       </section>
     </template>
+
+    <div v-else-if="isConsumerSceneSelector" ref="consumerSelectRef" class="visual-model-selector__consumer">
+      <button
+        type="button"
+        class="visual-model-selector__consumer-control"
+        :aria-expanded="consumerSelectOpen"
+        aria-haspopup="listbox"
+        :aria-label="placeholderText"
+        :aria-busy="loading || status === 'error'"
+        :disabled="disabled"
+        @click="toggleConsumerSelect"
+        @keydown.esc.prevent="closeConsumerSelect"
+      >
+        <span class="visual-model-selector__consumer-value" :title="consumerSelectedLabel">{{ consumerSelectedLabel }}</span>
+        <t-icon name="chevron-down" aria-hidden="true" />
+      </button>
+
+      <Transition name="visual-model-selector__consumer-fade">
+        <div v-if="consumerSelectOpen" class="visual-model-selector__consumer-dropdown" role="listbox" :aria-label="placeholderText">
+          <div v-if="loading" class="visual-model-selector__consumer-state">{{ $t('common.loading') }}</div>
+          <div v-else-if="status === 'error'" class="visual-model-selector__consumer-state">{{ $t('model.loadFailed') }}</div>
+          <template v-else-if="selectorModels.length">
+            <button
+              v-for="model in selectorModels"
+              :key="model.id"
+              type="button"
+              role="option"
+              class="visual-model-selector__consumer-option"
+              :class="{
+                'is-selected': model.id === selectedModelId && !sceneOptionFor(model.id)?.locked && sceneOptionFor(model.id)?.selectable !== false,
+                'is-locked': sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false,
+              }"
+              :aria-selected="model.id === selectedModelId"
+              :aria-disabled="sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false"
+              @click="selectConsumerModel(model.id || '')"
+            >
+              <span class="visual-model-selector__consumer-option-copy">
+                <strong :title="modelDisplayName(model)">{{ modelDisplayName(model) }}</strong>
+              </span>
+              <span v-if="model.id === selectedModelId && !sceneOptionFor(model.id)?.locked && sceneOptionFor(model.id)?.selectable !== false" class="visual-model-selector__consumer-check" aria-hidden="true"><t-icon name="check" /></span>
+              <span v-if="sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false" class="visual-model-selector__consumer-lock" :aria-label="$t('model.lockedTag')"><t-icon name="lock-on" aria-hidden="true" /></span>
+            </button>
+          </template>
+          <div v-else class="visual-model-selector__consumer-state">{{ placeholderText }}</div>
+        </div>
+      </Transition>
+    </div>
 
     <t-select
       v-else
@@ -157,7 +291,7 @@
         </div>
       </t-option>
 
-      <t-option v-if="!disabled && showAddModel" value="__add_model__" class="visual-model-selector__add-option">
+      <t-option v-if="!disabled && showAddModel && !authStore.isLiteMode" value="__add_model__" class="visual-model-selector__add-option">
         <div class="visual-model-selector__option is-add">
           <span class="visual-model-selector__option-check" aria-hidden="true"><t-icon name="add" /></span>
           <span class="visual-model-selector__option-copy"><strong>{{ $t('model.addModelInSettings') }}</strong></span>
@@ -168,13 +302,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { listModels, type ConsumerSceneOption, type ModelConfig } from '@/api/model'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
-type ModelSelectorModel = ModelConfig & Partial<Pick<ConsumerSceneOption, 'selectable' | 'locked' | 'required_plan'>>
+type ModelSelectorModel = ModelConfig & Partial<Pick<ConsumerSceneOption, 'selectable' | 'locked' | 'required_plan' | 'model_type'>>
 
 interface Props {
   modelType?: 'KnowledgeQA' | 'Embedding' | 'Rerank' | 'VLLM' | 'ASR'
@@ -223,6 +358,7 @@ const catalogModels = ref<ModelConfig[]>([])
 const loading = ref(false)
 const { t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const placeholderText = computed(() => {
   return props.placeholder || t('model.selectModelPlaceholder')
@@ -241,18 +377,30 @@ watch(() => props.allModels, (newModels) => {
 
 const sceneOptionById = computed(() => new Map((props.sceneOptions || []).map(option => [option.model_id, option])))
 const sceneOptionFor = (modelId?: string) => modelId ? sceneOptionById.value.get(modelId) : undefined
+const isConsumerSceneSelector = computed(() => props.mode === 'catalog' && !props.showAddModel)
 const selectorModels = computed<ModelSelectorModel[]>(() => {
+  if (isConsumerSceneSelector.value) {
+    return props.sceneOptions.map((option) => ({
+      id: option.model_id,
+      name: option.display_name,
+      display_name: option.display_name,
+      type: option.model_type,
+      model_type: option.model_type,
+      source: 'remote' as const,
+      parameters: { provider: 'openrouter' },
+      is_builtin: true,
+      is_default: option.is_scene_default,
+    }))
+  }
   if (!props.sceneOptions?.length) return catalogModels.value
-  return props.sceneOptions.map((option) => ({
-    id: option.model_id,
-    name: option.display_name,
-    display_name: option.display_name,
-    type: 'KnowledgeQA' as const,
-    source: 'remote' as const,
-    parameters: { provider: 'openrouter' },
-    is_builtin: true,
-    is_default: option.is_scene_default,
-  }))
+  return catalogModels.value
+})
+
+const consumerSelectRef = ref<HTMLElement | null>(null)
+const consumerSelectOpen = ref(false)
+const consumerSelectedLabel = computed(() => {
+  const selected = selectorModels.value.find(model => model.id === props.selectedModelId)
+  return selected ? modelDisplayName(selected) : placeholderText.value
 })
 
 const selectedCatalogModel = computed(() => {
@@ -262,7 +410,10 @@ const selectedCatalogModel = computed(() => {
 void selectedCatalogModel
 
 const loadModels = async () => {
-  if (props.allModels) {
+  // Consumer scene selectors are display-only projections of the safe
+  // scene-options endpoint. They must never fall back to /models, whose
+  // semantics intentionally filter locked models out.
+  if (props.allModels || isConsumerSceneSelector.value) {
     return
   }
 
@@ -285,6 +436,7 @@ const loadModels = async () => {
 
 const handleCatalogModelChange = (value: string) => {
   if (value === '__add_model__') {
+    if (authStore.isLiteMode) return
     emit('add-model')
     return
   }
@@ -294,6 +446,26 @@ const handleCatalogModelChange = (value: string) => {
     return
   }
   emit('update:selectedModelId', value)
+}
+const toggleConsumerSelect = () => {
+  if (props.disabled) return
+  consumerSelectOpen.value = !consumerSelectOpen.value
+}
+const closeConsumerSelect = () => { consumerSelectOpen.value = false }
+const selectConsumerModel = (value: string) => {
+  if (!value) return
+  const option = sceneOptionFor(value)
+  if (option && (option.locked || option.selectable === false)) {
+    handleCatalogModelChange(value)
+    return
+  }
+  handleCatalogModelChange(value)
+  closeConsumerSelect()
+}
+const handleConsumerOutsideClick = (event: MouseEvent) => {
+  if (!consumerSelectOpen.value) return
+  const target = event.target as Node
+  if (!consumerSelectRef.value?.contains(target)) closeConsumerSelect()
 }
 // Keep the native catalog callback name stable for the management surfaces;
 // the chat branch emits its own select-model event and never mutates catalog state.
@@ -311,6 +483,12 @@ const activeReasoningIndex = ref(0)
 const modelListRef = ref<HTMLElement | null>(null)
 const reasoningListRef = ref<HTMLElement | null>(null)
 const overviewFirstRef = ref<HTMLButtonElement | null>(null)
+const chatPanelRef = ref<HTMLElement | null>(null)
+const flyoutModelListRef = ref<HTMLElement | null>(null)
+const flyoutReasoningListRef = ref<HTMLElement | null>(null)
+const hoveredSubmenu = ref<'models' | 'reasoning' | null>(null)
+const submenuPlacement = ref<'right' | 'left'>('right')
+let hoverTask = 0
 const modelListId = `visual-model-list-${Math.random().toString(36).slice(2, 9)}`
 
 // `props.models` is deliberately the caller-owned, plan-filtered catalog.  The
@@ -328,7 +506,33 @@ const activeReasoningId = computed(() => {
 })
 const modelIndex = (id?: string) => chatModels.value.findIndex(model => model.id === id)
 
+const updateSubmenuPlacement = () => {
+  const panelRect = chatPanelRef.value?.getBoundingClientRect()
+  if (!panelRect) return
+  const spaceOnRight = window.innerWidth - panelRect.right
+  submenuPlacement.value = spaceOnRight >= 235 ? 'right' : 'left'
+}
+
+const hoverOpen = (nextView: 'models' | 'reasoning') => {
+  const task = ++hoverTask
+  queueMicrotask(() => {
+    if (task !== hoverTask) return
+    hoveredSubmenu.value = nextView
+    nextTick(updateSubmenuPlacement)
+  })
+}
+
+const toggleHover = (nextView: 'models' | 'reasoning') => {
+  hoverTask += 1
+  if (hoveredSubmenu.value === nextView) {
+    hoveredSubmenu.value = null
+    return
+  }
+  hoverOpen(nextView)
+}
+
 const openView = (nextView: 'overview' | 'models' | 'reasoning') => {
+  hoveredSubmenu.value = null
   emit('update:view', nextView)
   nextTick(() => {
     if (nextView === 'models') modelListRef.value?.focus()
@@ -409,6 +613,7 @@ const handlePanelKeydown = (event: KeyboardEvent) => {
 }
 
 watch(() => props.view, (view) => {
+  if (view !== 'overview') hoveredSubmenu.value = null
   if (view === 'overview') {
     nextTick(() => overviewFirstRef.value?.focus())
   }
@@ -434,6 +639,13 @@ onMounted(() => {
   if (props.mode === 'catalog' && !props.allModels) {
     loadModels()
   }
+  window.addEventListener('resize', updateSubmenuPlacement)
+  document.addEventListener('click', handleConsumerOutsideClick)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateSubmenuPlacement)
+  document.removeEventListener('click', handleConsumerOutsideClick)
 })
 </script>
 
@@ -443,19 +655,211 @@ onMounted(() => {
   min-width: 0;
 }
 
+.visual-model-selector--consumer-scene {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(280px, 100%);
+  min-width: min(210px, 100%);
+}
+
+.visual-model-selector__consumer {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+
+.visual-model-selector__consumer-control {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  background: #fff;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.visual-model-selector__consumer-control:hover,
+.visual-model-selector__consumer-control:focus-visible {
+  outline: none;
+  border-color: #d1d5db;
+  background: #fff;
+}
+
+.visual-model-selector__consumer-control:focus-visible {
+  box-shadow: 0 0 0 2px rgb(17 24 39 / 8%);
+}
+
+.visual-model-selector__consumer-control:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.visual-model-selector__consumer-control[aria-expanded='true'] { color: #1f2937; }
+
+.visual-model-selector__consumer-control > :deep(.t-icon) {
+  flex: 0 0 14px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.visual-model-selector__consumer-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1f2937;
+}
+
+.visual-model-selector__consumer-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 288px;
+  max-width: min(288px, calc(100vw - 32px));
+  max-height: 256px;
+  overflow-y: auto;
+  padding: 6px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.visual-model-selector__consumer-fade-enter-active,
+.visual-model-selector__consumer-fade-leave-active {
+  transition: opacity 100ms ease, transform 100ms ease;
+  transform-origin: top right;
+}
+.visual-model-selector__consumer-fade-enter-from,
+.visual-model-selector__consumer-fade-leave-to {
+  opacity: 0;
+  transform: scale(.95);
+}
+.visual-model-selector__consumer-state {
+  padding: 8px 12px;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.visual-model-selector__consumer-option {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.visual-model-selector__consumer-option:hover,
+.visual-model-selector__consumer-option:focus-visible {
+  outline: none;
+  background: #f9fafb;
+}
+
+.visual-model-selector__consumer-option.is-selected {
+  background: #f3f4f6;
+  color: #111827;
+  font-weight: 600;
+}
+
+.visual-model-selector__consumer-option.is-locked {
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.visual-model-selector__consumer-option.is-locked:hover,
+.visual-model-selector__consumer-option.is-locked:focus-visible { background: #f9fafb; }
+
+.visual-model-selector__consumer-option-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.visual-model-selector__consumer-option-copy strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: inherit;
+}
+
+.visual-model-selector__consumer-check,
+.visual-model-selector__consumer-lock {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.visual-model-selector__consumer-check {
+  width: 14px;
+  height: 14px;
+  justify-content: center;
+  color: #374151;
+}
+
+.visual-model-selector__consumer-check :deep(.t-icon) { font-size: 14px; }
+
+.visual-model-selector__consumer-lock {
+  width: 16px;
+  height: 16px;
+  justify-content: center;
+  color: #6b7280;
+}
+
+.visual-model-selector__consumer-lock :deep(.t-icon) { font-size: 14px; }
+
+@media (min-width: 640px) {
+  .visual-model-selector__consumer-control,
+  .visual-model-selector__consumer-option,
+  .visual-model-selector__consumer-state { font-size: 14px; line-height: 20px; }
+}
+
 .visual-model-selector__control {
   width: 100%;
 }
 
 .visual-model-selector__control :deep(.t-input) {
   min-height: 32px;
+  padding: 8px 14px;
   border-color: #e5e7eb;
-  border-radius: 9px;
+  border-radius: 12px;
   background: #fff;
-  box-shadow: none;
-  color: #4b5563;
-  font-size: 11px;
-  line-height: 18px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 16px;
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -471,14 +875,16 @@ onMounted(() => {
 
 .visual-model-selector__control :deep(.t-input__inner) {
   font: inherit;
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .visual-model-selector__option {
   min-width: 0;
   width: 100%;
   min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -557,15 +963,11 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.visual-model-selector__option.is-locked,
-.visual-model-selector__chat-option.is-locked {
-  color: #6b7280;
-}
+.visual-model-selector__option.is-locked { color: #6b7280; }
+.visual-model-selector__chat-option.is-locked { color: #9ca3af; cursor: not-allowed; }
 
-.visual-model-selector__option.is-locked strong,
-.visual-model-selector__chat-option.is-locked strong {
-  color: #6b7280;
-}
+.visual-model-selector__option.is-locked strong { color: #6b7280; }
+.visual-model-selector__chat-option.is-locked strong { color: #9ca3af; }
 
 .visual-model-selector__badge.is-locked {
   display: inline-flex;
@@ -588,26 +990,37 @@ onMounted(() => {
   --chat-picker-copy: #374151;
   --chat-picker-muted: #6b7280;
   --chat-picker-subtle: #9ca3af;
-  --chat-picker-hover: #f5f6f8;
-  --chat-picker-selected: #f0f2f4;
-  --chat-picker-selected-hover: #eaedf0;
+  --chat-picker-hover: #f9fafb;
+  --chat-picker-selected: #f3f4f6;
+  --chat-picker-selected-hover: #f3f4f6;
   --chat-picker-soft: #f3f4f6;
   --chat-picker-focus-ring: rgb(17 24 39 / 20%);
-  width: 100%;
   min-width: 0;
+  position: relative;
+  overflow: visible;
   color: var(--chat-picker-ink);
+  width: 224px;
+  max-width: min(224px, calc(100vw - 32px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgb(229 231 235 / 90%);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
 }
 
 .visual-model-selector__chat-row {
   width: 100%;
-  min-height: 44px;
-  padding: 7px 8px 7px 10px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -626,37 +1039,69 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.visual-model-selector__chat-row-copy {
+.visual-model-selector__chat-row-trailing {
   min-width: 0;
-  flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: minmax(76px, 34%) minmax(0, 1fr);
-  align-items: baseline;
-  gap: 12px;
+  margin-left: auto;
+  padding-right: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .visual-model-selector__chat-row-label {
-  color: var(--chat-picker-ink);
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 600;
+  color: var(--chat-picker-title);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
 }
 
 .visual-model-selector__chat-row-value {
   min-width: 0;
+  max-width: 90px;
   overflow: hidden;
-  color: var(--chat-picker-muted);
-  font-size: 14px;
-  line-height: 20px;
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.visual-model-selector__chat-row > :deep(.t-icon) {
-  flex: 0 0 16px;
+.visual-model-selector__chat-row-trailing > :deep(.t-icon) {
+  flex: 0 0 14px;
   color: var(--chat-picker-subtle);
-  font-size: 16px;
+  font-size: 14px;
 }
+
+/* The reference chat picker keeps the two-row overview visible while a
+ * submenu flies out on hover.  Placement is selected by the script from the
+ * available viewport width so the menu never disappears behind the edge. */
+.visual-model-selector__chat-flyout {
+  position: absolute;
+  bottom: 0;
+  z-index: 3;
+  width: 224px;
+  max-width: min(224px, calc(100vw - 32px));
+  padding: 6px;
+  box-sizing: border-box;
+  border: 1px solid rgb(229 231 235 / 90%);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
+  transition: opacity 160ms cubic-bezier(.16,1,.3,1), transform 160ms cubic-bezier(.16,1,.3,1);
+}
+
+.visual-model-selector__chat-flyout.is-right { left: 100%; margin-left: 6px; transform-origin: left bottom; }
+.visual-model-selector__chat-flyout.is-left { right: 100%; margin-right: 6px; transform-origin: right bottom; }
+.visual-model-selector__chat-flyout.is-models { max-height: 256px; overflow-y: auto; }
+.visual-model-selector__chat-flyout.is-reasoning { width: 192px; max-width: min(192px, calc(100vw - 32px)); }
+.visual-model-selector__chat-flyout .visual-model-selector__chat-list { max-height: none; overflow: visible; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.visual-model-selector__chat-flyout-heading { padding: 4px 10px; color: #9ca3af; font-size: 11px; line-height: 16px; font-weight: 500; }
+.visual-model-selector__chat-flyout.is-right { --chat-flyout-enter-x: -10px; --chat-flyout-exit-x: -6px; }
+.visual-model-selector__chat-flyout.is-left { --chat-flyout-enter-x: 10px; --chat-flyout-exit-x: 6px; }
+.visual-model-selector__chat-flyout-enter-active,
+.visual-model-selector__chat-flyout-leave-active { transition: opacity 160ms cubic-bezier(.16,1,.3,1), transform 160ms cubic-bezier(.16,1,.3,1); }
+.visual-model-selector__chat-flyout-enter-from { opacity: 0; transform: translateX(var(--chat-flyout-enter-x)) scale(.96); }
+.visual-model-selector__chat-flyout-leave-to { opacity: 0; transform: translateX(var(--chat-flyout-exit-x)) scale(.97); }
 
 .visual-model-selector__chat-header {
   min-height: 36px;
@@ -723,10 +1168,9 @@ onMounted(() => {
 
 .visual-model-selector__chat-option {
   width: 100%;
-  min-height: 40px;
-  padding: 6px 10px 6px 11px;
+  padding: 6px 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -753,6 +1197,9 @@ onMounted(() => {
   background: var(--chat-picker-selected-hover);
 }
 
+.visual-model-selector__chat-option.is-locked:hover,
+.visual-model-selector__chat-option.is-locked.is-active { background: rgb(249 250 251 / 50%); }
+
 .visual-model-selector__chat-option-copy {
   min-width: 0;
   flex: 1 1 auto;
@@ -763,32 +1210,37 @@ onMounted(() => {
   min-width: 0;
   display: block;
   overflow: hidden;
-  color: var(--chat-picker-ink);
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 650;
+  color: var(--chat-picker-copy);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.visual-model-selector__chat-option.is-selected:not(.is-locked) strong { color: var(--chat-picker-title); font-weight: 500; }
+.visual-model-selector__chat-option.is-reasoning strong { color: var(--chat-picker-title); line-height: 15px; }
+
 .visual-model-selector__chat-check {
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--chat-picker-copy);
+  color: var(--chat-picker-title);
 }
 
 .visual-model-selector__chat-check :deep(.t-icon) {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .visual-model-selector__chat-lock {
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -808,16 +1260,6 @@ onMounted(() => {
 }
 
 @media (max-width: 430px) {
-  .visual-model-selector__chat-row-copy {
-    grid-template-columns: minmax(64px, 30%) minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  .visual-model-selector__chat-row-label,
-  .visual-model-selector__chat-row-value {
-    font-size: 13px;
-  }
-
   .visual-model-selector__chat-list {
     max-height: min(250px, calc(var(--visual-model-menu-max-height, 340px) - 52px), 52vh);
   }
@@ -834,6 +1276,9 @@ onMounted(() => {
   --chat-picker-selected-hover: #373b42;
   --chat-picker-soft: #303238;
   --chat-picker-focus-ring: rgb(138 180 248 / 55%);
+  background: #202124;
+  border-color: rgb(95 99 104 / 90%);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -848,6 +1293,9 @@ onMounted(() => {
     --chat-picker-selected-hover: #373b42;
     --chat-picker-soft: #303238;
     --chat-picker-focus-ring: rgb(138 180 248 / 55%);
+    background: #202124;
+    border-color: rgb(95 99 104 / 90%);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
   }
 }
 
@@ -855,5 +1303,7 @@ onMounted(() => {
   .visual-model-selector__control :deep(.t-input) {
     transition: none !important;
   }
+
+  .visual-model-selector__chat-flyout { transition: none !important; }
 }
 </style>

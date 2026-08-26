@@ -29,10 +29,9 @@ test('QAPanel.tsx composer tokens remain mechanically translated', () => {
     'gap: 12px;', 'gap: 16px;', 'width: 18px;', 'height: 18px;',
     'width: 32px;', 'height: 32px;', 'border-radius: 8px;',
   ])
-  expectTokens('./musuw-final-contract-closure.css', [
-    'max-width: 160px !important;', 'border-radius: 999px !important;',
-    '.visual-chat-composer__model-menu', 'width: 280px !important;',
-    'max-width: min(280px, calc(100vw - 32px)) !important;',
+  expectTokens('../components/Input-field.vue', [
+    'width: min(224px, calc(100vw - 32px));', 'transform-origin: bottom right;',
+    'translate(8px, 3px) scale(.96)', 'translate(6px, 2px) scale(.97)',
   ])
   expectTokens('./musuw-qapanel-reference-final.css', [
     '--mvc-icon-at-sign', 'width: 256px !important;', 'border-radius: 12px !important;',
@@ -107,21 +106,21 @@ test('KnowledgeBase.tsx list tokens remain mechanically translated while native 
 
 test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
   expectTokens('../views/settings/Settings.vue', [
-    'width: min(1240px, 100%);', 'height: min(780px, calc(100dvh - 48px));', 'border-radius: 18px;',
-    'flex: 0 0 280px;', 'padding: 26px 16px 18px;',
+    'width: min(896px, 100%);', 'height: 580px;', 'border-radius: 24px;',
+    'flex: 0 0 192px;', 'padding: 16px 12px 12px;',
     'filterSettingsNavigation(navItems.value, settingsSearchQuery.value)',
   ])
 })
 
 test('Lite personal settings share the Codex-style grouped-row geometry', () => {
   expectTokens('../views/settings/GeneralSettings.vue', [
-    'max-width: 640px;', 'border: 1px solid #e5e5e5;', 'border-radius: 14px;', 'min-height: 64px;',
+    'max-width: 640px;', 'border-radius: 0;', 'min-height: 64px;',
   ])
   expectTokens('../views/settings/UsageBillingSettings.vue', [
-    'max-width: 640px;', 'usage-billing__group', 'border-radius: 14px;',
+    'max-width: 640px;', 'usage-billing__section', 'usage-billing__card', 'border-radius: 16px;',
   ])
   expectTokens('../views/settings/UserProfile.vue', [
-    'max-width: 640px;', 'settings-group', 'border-radius: 14px;',
+    'max-width: 640px;', 'settings-group', 'border-radius: 16px;',
   ])
 })
 

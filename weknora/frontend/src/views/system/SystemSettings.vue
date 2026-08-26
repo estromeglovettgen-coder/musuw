@@ -101,7 +101,7 @@
           <div v-if="modelCatalogLoading" class="loading-state">
             <t-loading :text="t('system.globalSettings.models.loading')" />
           </div>
-          <div v-else-if="consumerCatalogOptions.length === 0" class="empty-state">
+          <div v-else-if="!consumerScenes.some((scene) => consumerCatalogOptionsFor(scene).length > 0)" class="empty-state">
             <t-icon name="info-circle" size="24px" />
             <span>{{ t('system.globalSettings.models.empty') }}</span>
           </div>
@@ -116,7 +116,7 @@
               <div class="setting-control consumer-model-policy__controls">
                 <t-select
                   :value="consumerPolicy[scene].free"
-                  :options="consumerCatalogOptions"
+                  :options="consumerCatalogOptionsFor(scene)"
                   :placeholder="t('system.globalSettings.models.freePlaceholder')"
                   :aria-label="t('system.globalSettings.models.freeLabel')"
                   class="setting-input"
@@ -124,7 +124,7 @@
                 />
                 <t-select
                   :value="consumerPolicy[scene].paid"
-                  :options="consumerCatalogOptions"
+                  :options="consumerCatalogOptionsFor(scene)"
                   multiple
                   :placeholder="t('system.globalSettings.models.paidPlaceholder')"
                   :aria-label="t('system.globalSettings.models.paidLabel')"
@@ -132,7 +132,7 @@
                   @change="onConsumerScenePaidChange(scene, $event)"
                 />
                 <div v-if="consumerPolicy[scene].paid[0]" class="consumer-model-policy__paid-default">
-                  <span>{{ consumerModelDisplayName(consumerPolicy[scene].paid[0]) }}</span>
+                  <span>{{ consumerModelDisplayName(consumerPolicy[scene].paid[0], scene) }}</span>
                   <t-tag theme="success" variant="light" size="small">{{ t('model.defaultTag') }}</t-tag>
                 </div>
                 <!-- Paid options are ordered; the first item is the paid default. -->
@@ -543,7 +543,7 @@ import {
   resetUserPassword,
   type SystemSettingItem,
 } from '@/api/system'
-import { listModels, type ConsumerScene, type ModelConfig } from '@/api/model'
+import { listModels, type ConsumerConfigurableScene, type ModelConfig } from '@/api/model'
 import { filterConsumerModelCatalog, normalizeConsumerModelIds } from '@/utils/consumerSceneModels'
 import { useAuthStore } from '@/stores/auth'
 
@@ -663,29 +663,29 @@ let savedKeyTimer: ReturnType<typeof setTimeout> | null = null
 
 type SettingsSection = 'access' | 'tenant' | 'runtime' | 'security' | 'models' | 'other'
 
-const consumerScenes: readonly ConsumerScene[] = ['chat', 'rag', 'wiki']
-const consumerPolicy = reactive<Record<ConsumerScene, { free: string; paid: string[] }>>({
-  chat: { free: '', paid: [] },
+const consumerScenes: readonly ConsumerConfigurableScene[] = ['rag', 'rerank', 'wiki', 'vision', 'asr']
+const consumerPolicy = reactive<Record<ConsumerConfigurableScene, { free: string; paid: string[] }>>({
   rag: { free: '', paid: [] },
+  rerank: { free: '', paid: [] },
   wiki: { free: '', paid: [] },
+  vision: { free: '', paid: [] },
+  asr: { free: '', paid: [] },
 })
 const modelCatalog = ref<ModelConfig[]>([])
 const modelCatalogLoading = ref(false)
-const consumerCatalogOptions = computed(() =>
-  filterConsumerModelCatalog(modelCatalog.value)
+const consumerCatalogOptionsFor = (scene: ConsumerConfigurableScene) =>
+  filterConsumerModelCatalog(modelCatalog.value, scene)
     .map((model) => ({
       label: model.display_name?.trim() || model.name,
       value: model.id || '',
     }))
-    .filter((option) => option.value),
-)
+    .filter((option) => option.value)
 
-const sceneSettingKey = (scene: ConsumerScene, kind: 'free_default' | 'paid_options') =>
+const sceneSettingKey = (scene: ConsumerConfigurableScene, kind: 'free_default' | 'paid_options') =>
   `consumer_models.${scene}.${kind}`
-// Fixed V1 policy keys: consumer_models.chat.free_default,
-// consumer_models.chat.paid_options, consumer_models.rag.free_default,
-// consumer_models.rag.paid_options, consumer_models.wiki.free_default,
-// consumer_models.wiki.paid_options.
+// Fixed V1 policy keys cover only the five user-configurable native seams:
+// rag/wiki KnowledgeQA, rerank, vision (VLLM), and asr. Chat remains an
+// internal platform-agent compatibility path and Embedding is KB-owned.
 
 // Product-oriented order, rather than the registry's alphabetical key order.
 // Unknown/out-of-band rows remain visible in a conditional "Other" tab so the
@@ -719,7 +719,18 @@ const SETTINGS_SECTION_KEYS: Record<Exclude<SettingsSection, 'other'>, readonly 
 }
 
 const activeSettingsSection = ref<SettingsSection>('access')
-const knownSettingKeys = new Set(Object.values(SETTINGS_SECTION_KEYS).flat())
+// Older deployments may still return the internal Chat policy keys. They are
+// accepted for rolling-upgrade compatibility, but Chat is not a consumer
+// setting and must never render as a fifth/sixth Models row or leak into the
+// diagnostic "Other" tab.
+const HIDDEN_COMPATIBILITY_SETTING_KEYS = [
+  'consumer_models.chat.free_default',
+  'consumer_models.chat.paid_options',
+] as const
+const knownSettingKeys = new Set([
+  ...Object.values(SETTINGS_SECTION_KEYS).flat(),
+  ...HIDDEN_COMPATIBILITY_SETTING_KEYS,
+])
 const settingsByKey = computed(() => new Map(settings.value.map((item) => [item.key, item])))
 const unknownSettings = computed(() => settings.value.filter((item) => !knownSettingKeys.has(item.key)))
 const hasUnknownSettings = computed(() => unknownSettings.value.length > 0)
@@ -752,23 +763,23 @@ function sectionTabLabel(section: SettingsSection): string {
   return t(`system.globalSettings.sections.${section}.tab`, { count })
 }
 
-function consumerSetting(scene: ConsumerScene, kind: 'free_default' | 'paid_options') {
+function consumerSetting(scene: ConsumerConfigurableScene, kind: 'free_default' | 'paid_options') {
   return settingsByKey.value.get(sceneSettingKey(scene, kind))
 }
 
 function syncConsumerPolicy() {
-  const catalog = filterConsumerModelCatalog(modelCatalog.value)
-  const allowed = new Set(catalog.map((model) => model.id).filter(Boolean))
   for (const scene of consumerScenes) {
+    const catalog = filterConsumerModelCatalog(modelCatalog.value, scene)
+    const allowed = new Set(catalog.map((model) => model.id).filter(Boolean))
     const free = consumerSetting(scene, 'free_default')?.value
     const paid = consumerSetting(scene, 'paid_options')?.value
     consumerPolicy[scene].free = typeof free === 'string' && allowed.has(free.trim()) ? free.trim() : ''
-    consumerPolicy[scene].paid = normalizeConsumerModelIds(Array.isArray(paid) ? paid : [], catalog)
+    consumerPolicy[scene].paid = normalizeConsumerModelIds(Array.isArray(paid) ? paid : [], catalog, scene)
   }
 }
 
-function consumerModelDisplayName(modelId: string): string {
-  const model = filterConsumerModelCatalog(modelCatalog.value).find((item) => item.id === modelId)
+function consumerModelDisplayName(modelId: string, scene?: ConsumerConfigurableScene): string {
+  const model = filterConsumerModelCatalog(modelCatalog.value, scene).find((item) => item.id === modelId)
   return model?.display_name?.trim() || model?.name || modelId
 }
 
@@ -777,10 +788,10 @@ function selectedModelId(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-async function onConsumerSceneFreeChange(scene: ConsumerScene, value: unknown) {
+async function onConsumerSceneFreeChange(scene: ConsumerConfigurableScene, value: unknown) {
   const item = consumerSetting(scene, 'free_default')
   const id = selectedModelId(value)
-  if (!item || !filterConsumerModelCatalog(modelCatalog.value).some((model) => model.id === id)) {
+  if (!item || !filterConsumerModelCatalog(modelCatalog.value, scene).some((model) => model.id === id)) {
     syncConsumerPolicy()
     return
   }
@@ -789,11 +800,11 @@ async function onConsumerSceneFreeChange(scene: ConsumerScene, value: unknown) {
   syncConsumerPolicy()
 }
 
-async function onConsumerScenePaidChange(scene: ConsumerScene, value: unknown) {
+async function onConsumerScenePaidChange(scene: ConsumerConfigurableScene, value: unknown) {
   const item = consumerSetting(scene, 'paid_options')
   if (!item) return
   const values = Array.isArray(value) ? value : [value]
-  const ids = normalizeConsumerModelIds(values, modelCatalog.value)
+  const ids = normalizeConsumerModelIds(values, modelCatalog.value, scene)
   if (ids.length === 0) {
     MessagePlugin.warning(t('system.globalSettings.models.paidRequired'))
     syncConsumerPolicy()

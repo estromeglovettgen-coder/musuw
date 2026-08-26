@@ -147,8 +147,8 @@ no empty full-screen rectangle is reserved around a small screenshot.
 The comparison keeps its current visual component but replaces generic rows
 with auditable groups: workspace limits, source ingestion, model access, monthly
 AI allowance, connected knowledge, and account/data controls. Values match the
-current server contract: Free has 5 GiB, one knowledge base, ten documents, no
-video, and the least-cost model set; Plus/Pro/Max have 20/40/80 GiB, larger
+current server contract: Free has 1 GiB, one knowledge base, ten documents, no
+video, and the least-cost model set; Plus/Pro/Max have 10/30/100 GiB, larger
 monthly allowance, no plan cap on knowledge-base/document count, video, and the
 configured paid model catalog. All plans keep grounded chat, citations, Wiki,
 graph, export, and deletion. Unsupported team administration and uncommitted

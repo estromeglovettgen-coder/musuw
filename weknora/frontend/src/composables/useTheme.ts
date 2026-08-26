@@ -6,8 +6,10 @@ import {
 } from './preferenceStorage'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
+export type ThemeColor = 'musuw' | 'weknora'
 
 const THEME_KEY = 'theme'
+const THEME_COLOR_KEY = 'theme_color'
 
 function loadTheme(): ThemeMode {
   const v = loadPreference(THEME_KEY)
@@ -15,8 +17,18 @@ function loadTheme(): ThemeMode {
   return 'light'
 }
 
+function isThemeColor(value: string | null): value is ThemeColor {
+  return value === 'musuw' || value === 'weknora'
+}
+
+function loadThemeColor(): ThemeColor {
+  const value = loadPreference(THEME_COLOR_KEY)
+  return isThemeColor(value) ? value : 'musuw'
+}
+
 // Shared reactive state across all consumers
 const currentTheme = ref<ThemeMode>(loadTheme())
+const currentThemeColor = ref<ThemeColor>(loadThemeColor())
 
 let lastEffective: 'light' | 'dark' | null = null
 
@@ -57,6 +69,10 @@ function applyTheme(mode: ThemeMode) {
   syncWailsNativeChrome(effective)
 }
 
+function applyThemeColor(color: ThemeColor) {
+  document.documentElement.setAttribute('theme-color', color)
+}
+
 export function useTheme() {
   function setTheme(mode: ThemeMode): boolean {
     if (mode !== 'light' && mode !== 'dark' && mode !== 'system') return false
@@ -66,13 +82,23 @@ export function useTheme() {
     return true
   }
 
-  return { currentTheme, setTheme }
+  function setThemeColor(color: ThemeColor): boolean {
+    if (!isThemeColor(color)) return false
+    currentThemeColor.value = color
+    savePreference(THEME_COLOR_KEY, color)
+    applyThemeColor(color)
+    return true
+  }
+
+  return { currentTheme, currentThemeColor, setTheme, setThemeColor }
 }
 
 /** Call once in main.ts to initialise theme and listen for OS changes. */
 export function initTheme() {
   currentTheme.value = loadTheme()
+  currentThemeColor.value = loadThemeColor()
   applyTheme(currentTheme.value)
+  applyThemeColor(currentThemeColor.value)
 
   // React to OS theme changes when user chose "system"
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -86,5 +112,7 @@ export function initTheme() {
 export function reloadThemeFromStorage() {
   migratePreferencesIntoUser()
   currentTheme.value = loadTheme()
+  currentThemeColor.value = loadThemeColor()
   applyTheme(currentTheme.value)
+  applyThemeColor(currentThemeColor.value)
 }

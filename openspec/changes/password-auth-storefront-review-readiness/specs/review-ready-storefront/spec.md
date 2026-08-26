@@ -51,11 +51,11 @@ and account/data controls, and SHALL omit unsupported team or support promises.
 
 #### Scenario: Free is compared with paid plans
 - **WHEN** a visitor reads the comparison
-- **THEN** Free shows 5 GiB, one knowledge base, ten documents, no video, and the entry model set while all four plans show grounded chat, citations, Wiki, graph, export, and deletion
+- **THEN** Free shows 1 GiB, one knowledge base, ten documents, no video, and the entry model set while all four plans show grounded chat, citations, Wiki, graph, export, and deletion
 
 #### Scenario: Paid tiers are compared
 - **WHEN** a visitor compares Plus, Pro, and Max
-- **THEN** storage is 20, 40, and 80 GiB, monthly AI allowance increases according to the current entitlement contract, and all three show the configured paid models, video ingestion, and no plan cap on knowledge-base or document count
+- **THEN** storage is 10, 30, and 100 GiB, monthly AI allowance increases according to the current entitlement contract, and all three show the configured paid models, video ingestion, and no plan cap on knowledge-base or document count
 
 #### Scenario: Localized price is unavailable
 - **WHEN** Paddle PricePreview or an allowed checkout mapping is unavailable

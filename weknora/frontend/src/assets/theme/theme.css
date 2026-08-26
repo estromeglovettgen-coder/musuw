@@ -469,3 +469,117 @@
   border-color: var(--td-brand-color);
   box-shadow: 0 0 0 3px var(--td-brand-color-focus);
 }
+
+:root[theme-color="musuw"] {
+  --td-brand-color-1: #eef4ff;
+  --td-brand-color-2: #dce8fb;
+  --td-brand-color-3: #b9d1f4;
+  --td-brand-color-4: #86b0e7;
+  --td-brand-color-5: #4a83dd;
+  --td-brand-color-6: #0b57d0;
+  --td-brand-color-7: #0a4ebc;
+  --td-brand-color-8: #083f98;
+  --td-brand-color-9: #063376;
+  --td-brand-color-10: #04254f;
+  --td-brand-color: var(--td-brand-color-6);
+  --td-brand-color-light: var(--td-brand-color-1);
+  --td-brand-color-hover: var(--td-brand-color-7);
+  --td-brand-color-active: var(--td-brand-color-8);
+  --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 24%, transparent);
+  --td-brand-color-disabled: var(--td-brand-color-3);
+}
+
+:root[theme-color="weknora"] {
+  --td-brand-color-1: #e9f8ec;
+  --td-brand-color-2: #09f479;
+  --td-brand-color-3: #08dd6e;
+  --td-brand-color-4: #07c05f;
+  --td-brand-color-5: #06b04d;
+  --td-brand-color-6: #049b38;
+  --td-brand-color-7: #038626;
+  --td-brand-color-8: #027218;
+  --td-brand-color-9: #015e0d;
+  --td-brand-color-10: #004b05;
+  --td-brand-color: var(--td-brand-color-4);
+  --td-brand-color-light: var(--td-brand-color-1);
+  --td-brand-color-hover: var(--td-brand-color-3);
+  --td-brand-color-active: var(--td-brand-color-5);
+  --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 24%, transparent);
+  --td-brand-color-disabled: #8ce0af;
+}
+
+:root[theme-mode="dark"][theme-color="musuw"] {
+  --td-brand-color-1: rgba(124, 169, 232, 0.14);
+  --td-brand-color-2: #1f4478;
+  --td-brand-color-3: #285a9d;
+  --td-brand-color-4: #3974bd;
+  --td-brand-color-5: #6195d4;
+  --td-brand-color-6: #8ab4ff;
+  --td-brand-color-7: #a7c7ff;
+  --td-brand-color-8: #bfd7ff;
+  --td-brand-color-9: #d8e7ff;
+  --td-brand-color-10: #eff5ff;
+  --td-brand-color: var(--td-brand-color-6);
+  --td-brand-color-light: var(--td-brand-color-1);
+  --td-brand-color-hover: var(--td-brand-color-7);
+  --td-brand-color-active: var(--td-brand-color-5);
+  --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 28%, transparent);
+  --td-brand-color-disabled: #3d5d8a;
+}
+
+:root[theme-mode="dark"][theme-color="weknora"] {
+  --td-brand-color-1: #06b04d20;
+  --td-brand-color-2: #015e0d;
+  --td-brand-color-3: #027218;
+  --td-brand-color-4: #038626;
+  --td-brand-color-5: #049b38;
+  --td-brand-color-6: #06b04d;
+  --td-brand-color-7: #07c05f;
+  --td-brand-color-8: #08dd6e;
+  --td-brand-color-9: #09f479;
+  --td-brand-color-10: #a6fccf;
+  --td-brand-color: var(--td-brand-color-6);
+  --td-brand-color-light: var(--td-brand-color-1);
+  --td-brand-color-hover: var(--td-brand-color-5);
+  --td-brand-color-active: var(--td-brand-color-7);
+  --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 28%, transparent);
+  --td-brand-color-disabled: #1a6b3b;
+}
+
+.visual-knowledge-page.is-graph-tab {
+  --td-brand-color-1: #eef4ff;
+  --td-brand-color-2: #dce8fb;
+  --td-brand-color-3: #b9d1f4;
+  --td-brand-color-4: #86b0e7;
+  --td-brand-color-5: #4a83dd;
+  --td-brand-color-6: #0b57d0;
+  --td-brand-color-7: #0a4ebc;
+  --td-brand-color-8: #083f98;
+  --td-brand-color-9: #063376;
+  --td-brand-color-10: #04254f;
+  --td-brand-color: var(--td-brand-color-6);
+  --td-brand-color-light: var(--td-brand-color-1);
+  --td-brand-color-hover: var(--td-brand-color-7);
+  --td-brand-color-active: var(--td-brand-color-8);
+  --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 24%, transparent);
+  --td-brand-color-disabled: var(--td-brand-color-3);
+}
+
+:root[theme-mode="dark"] .visual-knowledge-page.is-graph-tab {
+  --td-brand-color-1: rgba(124, 169, 232, 0.14);
+  --td-brand-color-2: #1f4478;
+  --td-brand-color-3: #285a9d;
+  --td-brand-color-4: #3974bd;
+  --td-brand-color-5: #6195d4;
+  --td-brand-color-6: #8ab4ff;
+  --td-brand-color-7: #a7c7ff;
+  --td-brand-color-8: #bfd7ff;
+  --td-brand-color-9: #d8e7ff;
+  --td-brand-color-10: #eff5ff;
+  --td-brand-color: var(--td-brand-color-6);
+  --td-brand-color-light: var(--td-brand-color-1);
+  --td-brand-color-hover: var(--td-brand-color-7);
+  --td-brand-color-active: var(--td-brand-color-5);
+  --td-brand-color-focus: color-mix(in srgb, var(--td-brand-color) 28%, transparent);
+  --td-brand-color-disabled: #3d5d8a;
+}

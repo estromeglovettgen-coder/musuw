@@ -95,7 +95,7 @@ func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types
 
 	plan, ok := effectivePlanFromContext(ctx)
 	if ok {
-		if plan == types.ConsumerPlanFree && model != nil && model.Type == types.ModelTypeKnowledgeQA && s.consumerResolver != nil {
+		if plan == types.ConsumerPlanFree && model != nil && model.Type != types.ModelTypeEmbedding && s.consumerResolver != nil {
 			return s.consumerResolver.AllowsFreeConsumerModel(ctx, model)
 		}
 		return types.ConsumerPlanAllowsModel(plan, model), nil
@@ -108,7 +108,7 @@ func (s *modelService) consumerPlanAllowsModel(ctx context.Context, model *types
 		return false, err
 	}
 	plan = types.NormalizeConsumerPlan(current.Plan)
-	if plan == types.ConsumerPlanFree && model != nil && model.Type == types.ModelTypeKnowledgeQA && s.consumerResolver != nil {
+	if plan == types.ConsumerPlanFree && model != nil && model.Type != types.ModelTypeEmbedding && s.consumerResolver != nil {
 		return s.consumerResolver.AllowsFreeConsumerModel(ctx, model)
 	}
 	return types.ConsumerPlanAllowsModel(plan, model), nil

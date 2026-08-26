@@ -86,9 +86,10 @@ test('chat picker keeps locked scene options visible but navigates instead of se
 
 test('chat picker keeps long names in a single aligned column and adapts to narrow screens', () => {
   for (const token of [
-    'grid-template-columns: minmax(76px, 34%) minmax(0, 1fr)',
+    'display: flex',
+    'gap: 4px',
     'min-height: 44px',
-    'min-height: 40px',
+    'padding: 6px 10px',
     'text-overflow: ellipsis',
     'white-space: nowrap',
     '@media (max-width: 430px)',
@@ -96,10 +97,13 @@ test('chat picker keeps long names in a single aligned column and adapts to narr
     'max-height: min(250px, calc(var(--visual-model-menu-max-height, 340px) - 52px), 48vh)',
     'overflow-y: auto',
     'visualModelDropdownStyle',
-    "'--visual-model-menu-max-height': style.maxHeight",
+    'window.innerHeight - rect.top + 6',
+    'window.innerWidth - rect.right',
     ':style="visualModelDropdownStyle"',
-    'width: min(280px, calc(100vw - 32px))',
+    'width: min(224px, calc(100vw - 32px))',
   ]) assert.ok(inputField.includes(token) || source.includes(token), `layout contract lost ${token}`)
+  const optionRule = source.match(/\.visual-model-selector__chat-option\s*\{([\s\S]*?)\n\}/)?.[1] || ''
+  assert.doesNotMatch(optionRule, /min-height:/, 'reference flyout rows must keep their source compact height')
   assert.equal(inputField.includes('height: style.maxHeight'), false, 'overview must size to content')
   assert.equal(inputField.includes('visual-model-selector__chat-search-wrap'), false, 'legacy search layout must stay removed')
 })

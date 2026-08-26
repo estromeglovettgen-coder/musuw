@@ -417,7 +417,7 @@ Chunk 类型（`internal/types/chunk.go`）：`text`、`parent_text`、`image_oc
 
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
-| `storage_quota` | 10737418240（10GB） | 租户总配额 |
+| `storage_quota` | 1073741824（1 GiB） | 消费者 Free 租户默认总配额 |
 | `storage_used` | 0 | 已用量（涵盖原始文件、文本、向量与索引占用） |
 
 创建 KB 与上传知识前都会执行配额检查（`internal/handler/knowledgebase.go` 创建校验链），超限拒绝写入；每条知识记录自身 `file_size` 与 `storage_size`，删除时回收用量。

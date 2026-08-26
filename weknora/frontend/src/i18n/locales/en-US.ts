@@ -2984,7 +2984,7 @@ export default {
         models: {
           tab: 'Models {count}',
           title: 'Consumer model policy',
-          description: 'Configure the Free default and ordered paid options for chat, RAG, and Wiki.'
+          description: 'Configure Free defaults and ordered paid options for the agent, Rerank, Wiki, vision, and speech.'
         },
         other: {
           tab: 'Other {count}',
@@ -3003,9 +3003,12 @@ export default {
         paidRequired: 'Select at least one paid option; the first option is the paid default.',
         paidOrderHint: 'Paid options keep selection order; the first item is the paid default.',
         scenes: {
-          chat: { label: 'Chat', description: 'Platform chat without retrieval.' },
-          rag: { label: 'RAG', description: 'Answers with knowledge or web retrieval.' },
-          wiki: { label: 'Wiki', description: 'Wiki synthesis.' }
+          chat: { label: 'Chat', description: 'Internal platform-agent conversation.' },
+          rag: { label: 'Agent model', description: 'Generates the final answer from knowledge-base, Wiki, or web retrieval results.' },
+          rerank: { label: 'Rerank', description: 'Re-ranks retrieved results.' },
+          wiki: { label: 'Wiki', description: 'Wiki content synthesis.' },
+          vision: { label: 'Vision', description: 'Image and document understanding.' },
+          asr: { label: 'Speech', description: 'Audio transcription.' }
         }
       },
       runtimeTable: {
@@ -3256,7 +3259,7 @@ export default {
         tenant: {
           max_owned_per_user: 'Maximum number of workspaces a non-superuser may own via self-service creation. Read on every workspace creation and takes effect immediately after saving. 0 uses the built-in default of 10; a negative value disables the cap entirely (not recommended on public deployments).',
           self_service_creation_enabled: 'Whether non-superusers may create workspaces themselves. When disabled, regular users can only join existing workspaces by invitation; cross-workspace superusers remain exempt. Takes effect immediately.',
-          default_storage_quota_gb: 'Default storage quota (GB) assigned when a new workspace is created, covering vectors, originals, text, indexes, and related data. Read only at creation time — changes apply to newly created workspaces only and do not retroactively update existing workspaces. 0 or a negative value uses the built-in default of 5 GB.',
+          default_storage_quota_gb: 'Default storage quota (GB) assigned when a new workspace is created, covering vectors, originals, text, indexes, and related data. Read only at creation time — changes apply to newly created workspaces only and do not retroactively update existing workspaces. 0 or a negative value uses the built-in default of 1 GB.',
           auto_create_api_key: 'Automatically creates a full_access API key for a new workspace and returns its plaintext token in the create response. Use only for integrations that depend on the legacy behavior; it is disabled by default and explicit API-key creation is recommended.'
         },
         asynq: {
@@ -3778,7 +3781,7 @@ export default {
     pricingTitle: 'Upgrade your plan',
     pricingDescription: 'Start free and upgrade anytime. Prices and payment methods adapt to your region.',
     planDescriptions: { free: 'Explore the complete personal knowledge workflow.', plus: 'For ongoing personal research and answers.', pro: 'More allowance for frequent knowledge work.', max: 'Our highest current allowance for intensive use.' },
-    allowanceLevels: { free: '$1.00', plus: '$1.25', pro: '$2.50', max: '$5.00' },
+    allowanceLevels: { free: '$0.40', plus: '$1.25', pro: '$2.50', max: '$5.00' },
     freePrice: 'Free',
     perMonth: '/ month',
     perYear: '/ year',
@@ -3802,6 +3805,7 @@ export default {
     account: 'Account',
     monthlyAllowance: 'Monthly allowance',
     storageRemaining: 'Storage remaining',
+    storageUsage: 'Used {used} / {total}',
     remaining: 'remaining',
     unavailable: 'Unavailable',
     resetsAt: 'Resets {month}',
@@ -3865,7 +3869,12 @@ export default {
     light: 'Light',
     dark: 'Dark',
     system: 'Follow System',
-    selectTheme: 'Select theme'
+    selectTheme: 'Select theme',
+    color: 'Brand color',
+    colorDescription: 'Choose the product brand color without changing light or dark mode',
+    musuw: 'Musuw blue',
+    weknora: 'WeKnora green',
+    selectColor: 'Select brand color'
   },
   font: {
     uiFont: 'Interface Font',
@@ -4056,11 +4065,16 @@ export default {
     description: 'Manage different types of AI models, including local Ollama and remote APIs',
     sceneModels: {
       title: 'Your model by scenario',
-      description: 'Choose the model used for Chat, RAG, and Wiki in this browser. Locked paid models are shown for discovery and require a plan.',
+      description: 'Choose the models used for the agent, Rerank, Wiki, vision, and speech in this browser. Locked paid models remain visible for discovery and require a plan.',
       scenes: {
-        chat: { label: 'Chat', description: 'Platform chat without retrieval.' },
-        rag: { label: 'RAG', description: 'Answers with knowledge or web retrieval.' },
-        wiki: { label: 'Wiki', description: 'Wiki synthesis.' }
+        // Chat is retained only as an internal compatibility key; the
+        // consumer settings page intentionally renders the five native seams.
+        chat: { label: 'Chat', description: 'Internal platform-agent conversation.' },
+        rag: { label: 'Agent model', description: 'Generates the final answer from knowledge-base, Wiki, or web retrieval results.' },
+        rerank: { label: 'Rerank', description: 'Re-ranks retrieved results.' },
+        wiki: { label: 'Wiki', description: 'Wiki content synthesis.' },
+        vision: { label: 'Vision', description: 'Image and document understanding.' },
+        asr: { label: 'Speech', description: 'Audio transcription.' }
       }
     },
     typeShort: {

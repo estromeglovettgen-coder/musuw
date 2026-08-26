@@ -181,7 +181,7 @@ const planPrice = (plan: ConsumerPlan) => {
 }
 
 const planFeatures = (plan: ConsumerPlan) => {
-  const storage = { free: 5, plus: 20, pro: 40, max: 80 }[plan]
+  const storage = { free: 1, plus: 10, pro: 30, max: 100 }[plan]
   const features = [
     t('entitlement.featureStorage', { amount: storage }),
     t('entitlement.featureAllowance', { level: t(`entitlement.allowanceLevels.${plan}`) }),

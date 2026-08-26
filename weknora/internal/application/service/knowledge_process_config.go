@@ -211,7 +211,11 @@ func hasPlatformVLM(config types.VLMConfig) bool {
 	return config.Enabled && strings.TrimSpace(config.ModelID) != ""
 }
 
-func requiresPlatformVLM() bool {
+// isLiteProductEdition reports whether the process is serving the Musuw Lite
+// consumer surface. The edition is process-wide (not tenant-scoped); Standard
+// WeKnora keeps its existing model authorities and never enters the consumer
+// scene resolver.
+func isLiteProductEdition() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("MUSUW_PRODUCT_EDITION"))) {
 	case "lite":
 		return true
@@ -219,6 +223,10 @@ func requiresPlatformVLM() bool {
 		return false
 	}
 	return configuredProductEdition == "lite"
+}
+
+func requiresPlatformVLM() bool {
+	return isLiteProductEdition()
 }
 
 func hasUsableVLM(config types.VLMConfig) bool {

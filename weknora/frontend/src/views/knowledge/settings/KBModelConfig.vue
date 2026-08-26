@@ -25,40 +25,6 @@
         </div>
       </div>
 
-      <!-- Embedding 嵌入模型: RAG 检索启用时必填; 纯 Wiki 时可选(用于目录归类相似度) -->
-      <div v-if="ragEnabled !== false || wikiEnabled" class="setting-row" data-guide="kb-create-embedding">
-        <div class="setting-info">
-          <label>
-            {{ $t('knowledgeEditor.models.embeddingLabel') }}
-            <span v-if="ragEnabled" class="required">*</span>
-            <span v-else-if="wikiEnabled" class="optional">{{ $t('knowledgeEditor.models.embeddingOptional') }}</span>
-          </label>
-          <p class="desc">
-            {{ (wikiEnabled && ragEnabled === false)
-              ? $t('knowledgeEditor.models.embeddingWikiOptionalDesc')
-              : $t('knowledgeEditor.models.embeddingDesc') }}
-          </p>
-          <t-alert
-            v-if="ragEnabled && hasFiles"
-            theme="warning"
-            :message="$t('knowledgeEditor.models.embeddingLocked')"
-            style="margin-top: 8px;"
-          />
-        </div>
-        <div class="setting-control">
-          <ModelSelector
-            ref="embeddingSelectorRef"
-            model-type="Embedding"
-            :selected-model-id="config.embeddingModelId"
-            :all-models="allModels"
-            :disabled="ragEnabled && hasFiles"
-            @update:selected-model-id="handleEmbeddingChange"
-            @add-model="handleAddModel('embedding')"
-            :placeholder="$t('knowledgeEditor.models.embeddingPlaceholder')"
-          />
-        </div>
-      </div>
-
       <!-- Wiki 合成模型 (仅当 Wiki 启用时显示) -->
       <div v-if="wikiEnabled" class="setting-row">
         <div class="setting-info">
@@ -115,19 +81,10 @@ const uiStore = useUIStore()
 const { t } = useI18n()
 
 const llmSelectorRef = ref<InstanceType<typeof ModelSelector>>()
-const embeddingSelectorRef = ref<InstanceType<typeof ModelSelector>>()
-
 const handleLLMChange = (modelId: string) => {
   emit('update:config', {
     ...props.config,
     llmModelId: modelId
-  })
-}
-
-const handleEmbeddingChange = (modelId: string) => {
-  emit('update:config', {
-    ...props.config,
-    embeddingModelId: modelId
   })
 }
 

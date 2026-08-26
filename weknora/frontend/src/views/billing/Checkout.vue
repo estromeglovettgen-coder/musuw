@@ -194,7 +194,7 @@ const nextBilledDate = computed(() => {
 const planFeatures = computed(() => {
   const plan = targetPlan.value
   if (!plan) return []
-  const storage = { plus: 20, pro: 40, max: 80 }[plan]
+  const storage = { plus: 10, pro: 30, max: 100 }[plan]
   return [
     t('entitlement.featureStorage', { amount: storage }),
     t('entitlement.featureAllowance', { level: t(`entitlement.allowanceLevels.${plan}`) }),

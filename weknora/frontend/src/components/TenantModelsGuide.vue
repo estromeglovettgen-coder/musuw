@@ -12,6 +12,7 @@ import {
   markContextualGuideDone,
 } from '@/config/contextualGuides'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import type { SpotlightGuideStep } from '@/types/spotlightGuide'
 
 const props = withDefaults(
@@ -30,6 +31,7 @@ const stepI18nPrefix = computed(() =>
 )
 
 const uiStore = useUIStore()
+const authStore = useAuthStore()
 const active = ref(false)
 let settingsOpenedByGuide = false
 
@@ -70,9 +72,9 @@ const onStepChange = ({ toKey }: { toKey: string }) => {
 let waitGlobalTimer: ReturnType<typeof setTimeout> | null = null
 
 const tryOpen = () => {
-  if (active.value || !props.when || isContextualGuideDone('tenantModels')) return
+  if (active.value || !props.when || authStore.isLiteMode || isContextualGuideDone('tenantModels')) return
   openTimer = setTimeout(() => {
-    if (!props.when || isContextualGuideDone('tenantModels')) return
+    if (!props.when || authStore.isLiteMode || isContextualGuideDone('tenantModels')) return
     active.value = true
   }, 500)
 }
@@ -86,13 +88,13 @@ const scheduleOpen = () => {
     clearTimeout(waitGlobalTimer)
     waitGlobalTimer = null
   }
-  if (!props.when || isContextualGuideDone('tenantModels')) return
+  if (!props.when || authStore.isLiteMode || isContextualGuideDone('tenantModels')) return
   if (isGlobalUserGuideDone()) {
     tryOpen()
     return
   }
   const poll = () => {
-    if (!props.when || isContextualGuideDone('tenantModels')) return
+    if (!props.when || authStore.isLiteMode || isContextualGuideDone('tenantModels')) return
     if (isGlobalUserGuideDone()) {
       tryOpen()
       return
@@ -103,9 +105,9 @@ const scheduleOpen = () => {
 }
 
 watch(
-  () => props.when,
-  (val) => {
-    if (!val) {
+  () => [props.when, authStore.isLiteMode] as const,
+  ([val, isLite]) => {
+    if (!val || isLite) {
       if (openTimer) clearTimeout(openTimer)
       if (waitGlobalTimer) clearTimeout(waitGlobalTimer)
       openTimer = null

@@ -109,7 +109,7 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
   assert.match(router, /OrganizationList\.vue/);
 });
 
-test("Lite Settings exposes General, Usage, Models, and User Profile while General exposes Language only", () => {
+test("Lite Settings exposes General, Usage, Models, and User Profile while General exposes theme controls", () => {
   assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'/);
   assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models'\) return 'general'/);
   assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/);
@@ -119,12 +119,12 @@ test("Lite Settings exposes General, Usage, Models, and User Profile while Gener
 
   assert.match(generalSettings, /language\.language/);
   assert.match(generalSettings, /handleLanguageChange/);
-  for (const standardOnlyControl of ['theme.theme', 'font.uiFont', 'font.monoFont', 'font.fontSize']) {
+  for (const standardOnlyControl of ['font.uiFont', 'font.monoFont', 'font.fontSize']) {
     assert.ok(generalSettings.includes(standardOnlyControl), `standard preference source lost ${standardOnlyControl}`);
   }
   assert.ok(
-    (generalSettings.match(/v-if="!authStore\.isLiteMode"/g) || []).length >= 4,
-    'theme/font controls must remain Standard-only in General Settings',
+    (generalSettings.match(/v-if="!authStore\.isLiteMode"/g) || []).length >= 3,
+    'font controls must remain Standard-only in General Settings',
   );
   assert.doesNotMatch(generalSettings, /isAutoCheckUpdateEnabled|toggleAutoCheckUpdate/);
 });

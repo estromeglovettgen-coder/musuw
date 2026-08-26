@@ -25,3 +25,19 @@ test('composer selects scene options from known retrieval intent and keeps the r
   assert.match(baseline, /isConsumerSceneOptionsFresh/)
   assert.match(baseline, /sceneOptionsStale/)
 })
+
+test('Lite platform agent pins the model picker and candidate storage to rag', () => {
+  assert.match(baseline, /authStore\.isLiteMode && !isCustomAgent\.value/)
+  assert.match(baseline, /resolveComposerConsumerScene\([\s\S]*authStore\.isLiteMode && !isCustomAgent\.value[\s\S]*\)/)
+  assert.match(baseline, /settingsStore\.getConsumerSceneModel\(scene\)/)
+  assert.match(baseline, /settingsStore\.updateConsumerSceneModel\(effectiveConsumerScene\.value, val\)/)
+  assert.doesNotMatch(baseline, /ensureConsumerSceneOptions\(\s*["']chat["']/)
+  assert.doesNotMatch(baseline, /getConsumerSceneModel\(\s*["']chat["']/)
+  assert.doesNotMatch(baseline, /updateConsumerSceneModel\(\s*["']chat["']/)
+})
+
+test('custom agents stay on the existing non-consumer model path', () => {
+  assert.match(baseline, /if \(isCustomAgent\.value\) return false/)
+  assert.match(baseline, /if \(!sceneManagedByConsumerResolver\.value\) return settingsStore\.conversationModels\.selectedChatModelId \|\| ""/)
+  assert.match(baseline, /sceneManagedByConsumerResolver\.value\s*\n\s*\? chatResources\.ensureConsumerSceneOptions/)
+})

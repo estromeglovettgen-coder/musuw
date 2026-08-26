@@ -35,7 +35,8 @@ type TenantHandler struct {
 	// Reading goes DB > ENV >
 	// in-code default, so a SystemAdmin's UI override applies on the
 	// very next CreateTenant call.
-	systemSettingSvc interfaces.SystemSettingService
+	systemSettingSvc      interfaces.SystemSettingService
+	consumerModelResolver interfaces.ConsumerModelResolver
 }
 
 // NewTenantHandler creates a new tenant handler instance with the provided service
@@ -63,15 +64,17 @@ func NewTenantHandler(
 	kbService interfaces.KnowledgeBaseService,
 	config *config.Config,
 	systemSettingSvc interfaces.SystemSettingService,
+	consumerModelResolver interfaces.ConsumerModelResolver,
 ) *TenantHandler {
 	return &TenantHandler{
-		service:          service,
-		apiKeyService:    apiKeyService,
-		userService:      userService,
-		memberService:    memberService,
-		kbService:        kbService,
-		config:           config,
-		systemSettingSvc: systemSettingSvc,
+		service:               service,
+		apiKeyService:         apiKeyService,
+		userService:           userService,
+		memberService:         memberService,
+		kbService:             kbService,
+		config:                config,
+		systemSettingSvc:      systemSettingSvc,
+		consumerModelResolver: consumerModelResolver,
 	}
 }
 
@@ -325,10 +328,10 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 			ctx,
 			"tenant.default_storage_quota_gb",
 			"WEKNORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
-			5,
+			1,
 		)
 		if gb <= 0 {
-			gb = 5
+			gb = 1
 		}
 		tenantData.StorageQuota = gb * 1024 * 1024 * 1024
 	}
@@ -1703,6 +1706,28 @@ func (h *TenantHandler) updateTenantRetrievalConfigInternal(c *gin.Context) {
 		logger.Error(ctx, "Workspace is empty")
 		c.Error(errors.NewBadRequestError("Workspace is empty"))
 		return
+	}
+
+	// The retrieval selector is a Musuw Lite consumer surface. Standard
+	// WeKnora keeps the existing tenant retrieval configuration authority even
+	// though the shared container wires the resolver for Lite.
+	if h.consumerModelResolver != nil && strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		resolved, resolveErr := h.consumerModelResolver.ResolveConsumerModel(
+			ctx, types.ConsumerSceneRerank, cfg.RerankModelID,
+		)
+		if resolveErr != nil {
+			if appErr, ok := errors.IsAppError(resolveErr); ok {
+				c.Error(appErr)
+			} else {
+				c.Error(errors.NewBadRequestError("invalid rerank model"))
+			}
+			return
+		}
+		if resolved == nil || resolved.Type != types.ModelTypeRerank || strings.TrimSpace(resolved.ID) == "" {
+			c.Error(errors.NewBadRequestError("invalid rerank model"))
+			return
+		}
+		cfg.RerankModelID = resolved.ID
 	}
 
 	tenant.RetrievalConfig = &cfg

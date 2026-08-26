@@ -306,7 +306,9 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 		targetPeriodEnd = &value
 		// Existing keys may still use OpenRouter's UTC-calendar reset. Preserve
 		// their current remaining credit while moving them to the personal cycle.
-		remaining := clampMicrousd(info.LimitRemainingMicrousd, 0, allowance)
+		// Do not cap this legacy in-flight grant to the new plan allowance: the
+		// lower Free allowance starts at the next personal boundary.
+		remaining := nonNegativeMicrousd(info.LimitRemainingMicrousd)
 		targetLimit = info.UsageMicrousd + remaining
 	} else if !periodEnd.After(at) {
 		value := nextPersonalCreditPeriodEnd(*periodEnd, at)

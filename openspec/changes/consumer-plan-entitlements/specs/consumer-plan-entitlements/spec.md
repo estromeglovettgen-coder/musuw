@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Four tenant-scoped consumer plans
-The system SHALL assign each consumer tenant exactly one active plan and SHALL use the following limits: Free = 5 GiB storage and USD 1.00 monthly OpenRouter credit; Plus = 20 GiB and USD 1.25; Pro = 40 GiB and USD 2.50; Max = 80 GiB and USD 5.00. New and existing tenants without an explicit paid entitlement SHALL be Free.
+The system SHALL assign each consumer tenant exactly one active plan and SHALL use the following limits: Free = 1 GiB storage and USD 0.40 monthly OpenRouter credit; Plus = 10 GiB and USD 1.25; Pro = 30 GiB and USD 2.50; Max = 100 GiB and USD 5.00. New and existing tenants without an explicit paid entitlement SHALL be Free.
 
 #### Scenario: New consumer signs in
 - **WHEN** a Google user receives a new home tenant
-- **THEN** the tenant has the Free plan, 5 GiB storage, and USD 1.00 of OpenRouter credit for the personal month anchored to that tenant's registration time
+- **THEN** the tenant has the Free plan, 1 GiB storage, and USD 0.40 of OpenRouter credit for the personal month anchored to that tenant's registration time
 
 #### Scenario: Paid plan is synchronized
 - **WHEN** a verified billing event activates Plus, Pro, or Max for a tenant

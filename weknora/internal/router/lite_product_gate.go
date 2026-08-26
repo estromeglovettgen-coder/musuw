@@ -170,6 +170,46 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 	return false
 }
 
+// liteTemporaryAttachmentRequestBlocked closes the attachment-upload side
+// door to hidden/custom agents. The normal Lite composer uploads through this
+// endpoint with one of the two platform-owned runtime agents; an attacker can
+// otherwise submit a multipart agent_id here and make the parser worker load
+// that agent's ASR/VLM configuration before the subsequent chat request.
+func liteTemporaryAttachmentRequestBlocked(c *gin.Context) bool {
+	if c.Request.Method != http.MethodPost {
+		return false
+	}
+	const prefix = "/api/v1/sessions/"
+	const suffix = "/attachments"
+	path := strings.TrimSpace(c.Request.URL.Path)
+	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, suffix) {
+		return false
+	}
+	if strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(path, prefix), suffix)) == "" {
+		return false
+	}
+
+	// Parse only the multipart form used by the upload route. Non-multipart
+	// requests are left to the native handler so its existing 400 response is
+	// preserved; malformed multipart requests cannot reach model resolution.
+	if c.Request.MultipartForm == nil && strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data") {
+		if err := c.Request.ParseMultipartForm(2 << 20); err != nil {
+			return false
+		}
+	}
+	agentID := strings.TrimSpace(c.PostForm("agent_id"))
+	if agentID != "" && !liteRuntimeAgentIDAllowed(agentID) {
+		return true
+	}
+
+	sourceTenantID := strings.TrimSpace(c.PostForm("agent_source_tenant_id"))
+	if sourceTenantID == "" || sourceTenantID == "0" {
+		return false
+	}
+	parsed, err := strconv.ParseUint(sourceTenantID, 10, 64)
+	return err != nil || parsed != 0
+}
+
 // liteProductGate is the server-side product exposure boundary for Musuw Lite.
 //
 // Frontend hiding is UX only. This middleware is authoritative for authenticated
@@ -228,6 +268,11 @@ func liteProductGate() gin.HandlerFunc {
 		// request. Limit those fields here so knowing a hidden Agent/tool ID cannot
 		// turn the exposed chat box into a management-feature execution backdoor.
 		if liteChatRequestBlocked(c) {
+			abortLiteProductRoute(c)
+			return
+		}
+
+		if liteTemporaryAttachmentRequestBlocked(c) {
 			abortLiteProductRoute(c)
 			return
 		}
@@ -439,6 +484,13 @@ func liteProductRouteBlocked(method, path string) bool {
 
 	// KB share routes are intentionally NOT blocked: they are part of the
 	// exposed Knowledge Base UI. Shared-KB reads are allowed for the same reason.
+
+	// Retrieval configuration is the one tenant KV entry used by the Lite model
+	// settings surface. Keep the exception exact and method-scoped: all other
+	// tenant/KV keys remain part of hidden workspace administration.
+	if path == "/api/v1/tenants/kv/retrieval-config" {
+		return method != http.MethodGet && method != http.MethodPut
+	}
 
 	// Workspace lifecycle/settings/member/invitation/API-key administration is
 	// not a Musuw Lite surface. The current tenant identity already comes from

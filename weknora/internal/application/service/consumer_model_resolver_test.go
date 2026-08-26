@@ -141,11 +141,11 @@ func TestConsumerSceneSettingRegistry(t *testing.T) {
 		paid := registry[scene.PaidOptionsKey()]
 		assert.Equal(t, "string", free.Type)
 		assert.Equal(t, "string_list", paid.Type)
-		assert.Equal(t, types.CheapestChatModelID, free.Default)
+		assert.Equal(t, scene.CompatibilityDefaultID(), free.Default)
 		defaults, ok := paid.Default.([]string)
 		require.True(t, ok)
 		require.NotEmpty(t, defaults)
-		assert.Equal(t, types.CheapestChatModelID, defaults[0])
+		assert.Equal(t, scene.CompatibilityDefaultID(), defaults[0])
 	}
 }
 

@@ -505,6 +505,7 @@ import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKn
 import { updateKBConfig, type KBModelConfigRequest } from '@/api/initialization'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
+import { useSettingsStore } from '@/stores/settings'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import KBModelConfig from './settings/KBModelConfig.vue'
@@ -525,6 +526,7 @@ const uiStore = useUIStore()
 const authStore = useAuthStore()
 const chatResources = useChatResourcesStore()
 const editorResources = useEditorResourcesStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
 // Props
@@ -747,13 +749,31 @@ watch(
   }
 )
 
-// Creation only collects user-facing metadata. The server still owns every
-// model and pipeline default, so the browser never selects or serializes one.
+// Creation keeps the zero-configuration editor, but carries the browser's
+// already-resolved native scene candidates when available. The server remains
+// authoritative: it validates every ID through the consumer resolver and
+// falls back to deterministic defaults. Embedding is intentionally absent;
+// vector identity is platform-owned and cannot be changed from this UI.
 const initFormData = (type: 'document' | 'faq' = 'document') => ({
   type,
   name: '',
   description: '',
 })
+
+const consumerSceneModelsForCreate = () => {
+  const payload: Record<string, unknown> = {}
+  const rag = settingsStore.getConsumerSceneModel('rag').trim()
+  const wiki = settingsStore.getConsumerSceneModel('wiki').trim()
+  const vision = settingsStore.getConsumerSceneModel('vision').trim()
+  const asr = settingsStore.getConsumerSceneModel('asr').trim()
+
+  if (rag) payload.summary_model_id = rag
+  if (wiki) payload.wiki_config = { synthesis_model_id: wiki }
+  if (vision) payload.vlm_config = { enabled: true, model_id: vision }
+  if (asr) payload.asr_config = { enabled: true, model_id: asr }
+
+  return payload
+}
 
 // 加载所有模型
 const loadAllModels = async (force = false) => {
@@ -1092,8 +1112,9 @@ const validateForm = (): boolean => {
     return false
   }
 
-  // Creation is server-owned zero configuration: the client only supplies
-  // metadata and must not depend on model/settings endpoints being available.
+  // Creation is server-owned zero configuration. The client may forward the
+  // four persisted scene candidates during submit, but does not require any
+  // model/settings endpoint while opening the modal.
   if (editorMode.value === 'create') return true
 
   // 验证索引策略 — 文档类型至少需要开启一种
@@ -1307,10 +1328,13 @@ const doSubmit = async () => {
   saving.value = true
   try {
     if (editorMode.value === 'create') {
-      // Creation is server-owned zero configuration; only metadata is sent.
+      // Keep creation metadata-first while forwarding only the four native
+      // consumer scene candidates. The API/service validates these IDs and
+      // supplies all defaults, including the immutable embedding model.
       const result: any = await createKnowledgeBase({
         name: formData.value.name.trim(),
         description: formData.value.description.trim(),
+        ...consumerSceneModelsForCreate(),
       })
       if (!result.success || !result.data?.id) {
         throw new Error(result.message || t('knowledgeEditor.messages.createFailed'))
@@ -1500,8 +1524,9 @@ watch(() => props.visible, async (newVal) => {
     resetState()
     
     if (props.mode === 'create') {
-      // Metadata-only create: all capabilities and model bindings are applied
-      // by CreateKnowledgeBase on the server.
+      // Keep create lightweight: scene candidates are read from the existing
+      // browser settings store only when submit runs; all model bindings are
+      // validated and completed by CreateKnowledgeBase on the server.
       currentSection.value = 'basic'
       formData.value = initFormData(props.initialType || 'document')
       hasFiles.value = false

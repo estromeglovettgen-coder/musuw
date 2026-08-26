@@ -30,7 +30,7 @@ WeKnora（维娜拉）是腾讯开源的知识库问答系统，做的事情是�
 
 | 概念 | 说明 |
 | --- | --- |
-| 租户 Tenant | 即「工作空间」。持有存储配额（`StorageQuota`，默认 10GB）、全局检索参数（`RetrievalConfig`）、上下文配置（`ContextConfig`）、解析引擎配置（`ParserEngineConfig`）、存储引擎配置（`StorageEngineConfig`）与检索引擎列表（`RetrieverEngines`）。所有知识库、模型、Agent、会话都归属某个租户 |
+| 租户 Tenant | 即「工作空间」。持有存储配额（`StorageQuota`，消费者 Free 默认 1 GiB）、全局检索参数（`RetrievalConfig`）、上下文配置（`ContextConfig`）、解析引擎配置（`ParserEngineConfig`）、存储引擎配置（`StorageEngineConfig`）与检索引擎列表（`RetrieverEngines`）。所有知识库、模型、Agent、会话都归属某个租户 |
 | 用户 User | 全局唯一的 `Username`/`Email`，`TenantID` 指向其「主租户」；`IsSystemAdmin` 标记平台级管理员，`CanAccessAllTenants` 标记跨租户超管 |
 | 成员 TenantMember | 用户与租户的多对多关系，携带角色 `Role` 与状态（`active` / `invited` / `suspended`） |
 | 角色 TenantRole | 四级：`owner`（40，完全控制）> `admin`（30，管理成员/模型/集成）> `contributor`（20，创建知识库与 Agent）> `viewer`（10，只读） |

@@ -29,25 +29,26 @@ const kbTaskCleanupTimeout = 5 * time.Second
 
 // knowledgeBaseService implements the knowledge base service interface
 type knowledgeBaseService struct {
-	repo            interfaces.KnowledgeBaseRepository
-	kgRepo          interfaces.KnowledgeRepository
-	chunkRepo       interfaces.ChunkRepository
-	shareRepo       interfaces.KBShareRepository
-	kbShareService  interfaces.KBShareService
-	modelService    interfaces.ModelService
-	retrieveEngine  interfaces.RetrieveEngineRegistry
-	ownership       retriever.TenantStoreOwnership
-	tenantRepo      interfaces.TenantRepository
-	fileSvc         interfaces.FileService
-	storageResolver interfaces.StorageBackendResolver
-	graphEngine     interfaces.RetrieveGraphRepository
-	asynqClient     interfaces.TaskEnqueuer
-	taskInspector   interfaces.TaskInspector
-	taskPendingRepo interfaces.TaskPendingOpsRepository
-	dsRepo          interfaces.DataSourceRepository
-	syncLogRepo     interfaces.SyncLogRepository
-	dsScheduler     *datasource.Scheduler
-	audit           interfaces.AuditLogService
+	repo                  interfaces.KnowledgeBaseRepository
+	kgRepo                interfaces.KnowledgeRepository
+	chunkRepo             interfaces.ChunkRepository
+	shareRepo             interfaces.KBShareRepository
+	kbShareService        interfaces.KBShareService
+	modelService          interfaces.ModelService
+	retrieveEngine        interfaces.RetrieveEngineRegistry
+	ownership             retriever.TenantStoreOwnership
+	tenantRepo            interfaces.TenantRepository
+	fileSvc               interfaces.FileService
+	storageResolver       interfaces.StorageBackendResolver
+	graphEngine           interfaces.RetrieveGraphRepository
+	asynqClient           interfaces.TaskEnqueuer
+	taskInspector         interfaces.TaskInspector
+	taskPendingRepo       interfaces.TaskPendingOpsRepository
+	dsRepo                interfaces.DataSourceRepository
+	syncLogRepo           interfaces.SyncLogRepository
+	dsScheduler           *datasource.Scheduler
+	audit                 interfaces.AuditLogService
+	consumerModelResolver interfaces.ConsumerModelResolver
 }
 
 // NewKnowledgeBaseService creates a new knowledge base service
@@ -70,27 +71,29 @@ func NewKnowledgeBaseService(repo interfaces.KnowledgeBaseRepository,
 	syncLogRepo interfaces.SyncLogRepository,
 	dsScheduler *datasource.Scheduler,
 	audit interfaces.AuditLogService,
+	consumerModelResolver interfaces.ConsumerModelResolver,
 ) interfaces.KnowledgeBaseService {
 	return &knowledgeBaseService{
-		repo:            repo,
-		kgRepo:          kgRepo,
-		chunkRepo:       chunkRepo,
-		shareRepo:       shareRepo,
-		kbShareService:  kbShareService,
-		modelService:    modelService,
-		retrieveEngine:  retrieveEngine,
-		ownership:       ownership,
-		tenantRepo:      tenantRepo,
-		fileSvc:         fileSvc,
-		storageResolver: storageResolver,
-		graphEngine:     graphEngine,
-		asynqClient:     asynqClient,
-		taskInspector:   taskInspector,
-		taskPendingRepo: taskPendingRepo,
-		dsRepo:          dsRepo,
-		syncLogRepo:     syncLogRepo,
-		dsScheduler:     dsScheduler,
-		audit:           audit,
+		repo:                  repo,
+		kgRepo:                kgRepo,
+		chunkRepo:             chunkRepo,
+		shareRepo:             shareRepo,
+		kbShareService:        kbShareService,
+		modelService:          modelService,
+		retrieveEngine:        retrieveEngine,
+		ownership:             ownership,
+		tenantRepo:            tenantRepo,
+		fileSvc:               fileSvc,
+		storageResolver:       storageResolver,
+		graphEngine:           graphEngine,
+		asynqClient:           asynqClient,
+		taskInspector:         taskInspector,
+		taskPendingRepo:       taskPendingRepo,
+		dsRepo:                dsRepo,
+		syncLogRepo:           syncLogRepo,
+		dsScheduler:           dsScheduler,
+		audit:                 audit,
+		consumerModelResolver: consumerModelResolver,
 	}
 }
 
@@ -134,8 +137,12 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 	if uid, ok := types.UserIDFromContext(ctx); ok && !types.IsSyntheticUserID(uid) {
 		kb.CreatorID = uid
 	}
+	consumerCandidates := requestedConsumerModels(kb)
 	kb.ApplyPlatformKnowledgeBaseDefaults()
 	kb.EnsureDefaults()
+	if err := s.applyConsumerKnowledgeBaseModels(ctx, kb, consumerCandidates); err != nil {
+		return nil, err
+	}
 	if err := s.ensurePlatformKnowledgeBaseModels(ctx, kb); err != nil {
 		return nil, err
 	}
@@ -178,6 +185,112 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 	return kb, nil
 }
 
+// consumerKnowledgeBaseModels captures only the model candidates supplied by
+// a new-KB request. Embedding is intentionally absent: vector identity remains
+// platform/KB-owned and is always filled by ApplyPlatformKnowledgeBaseDefaults.
+type consumerKnowledgeBaseModels struct {
+	rag    string
+	wiki   string
+	vision string
+	asr    string
+}
+
+func requestedConsumerModels(kb *types.KnowledgeBase) consumerKnowledgeBaseModels {
+	if kb == nil {
+		return consumerKnowledgeBaseModels{}
+	}
+	models := consumerKnowledgeBaseModels{
+		rag: strings.TrimSpace(kb.SummaryModelID),
+		asr: strings.TrimSpace(kb.ASRConfig.ModelID),
+	}
+	if kb.WikiConfig != nil {
+		models.wiki = strings.TrimSpace(kb.WikiConfig.SynthesisModelID)
+	}
+	// The editor historically sent the same vision ID in both fields. Prefer
+	// VLMConfig (the runtime source of truth) and accept the image-processing
+	// field for compatibility with older clients.
+	models.vision = strings.TrimSpace(kb.VLMConfig.ModelID)
+	if models.vision == "" {
+		models.vision = strings.TrimSpace(kb.ImageProcessingConfig.ModelID)
+	}
+	return models
+}
+
+// applyConsumerKnowledgeBaseModels resolves the four model candidates that a
+// new knowledge base may carry. Existing model resolver/entitlement rules are
+// the only authorization authority. A nil resolver keeps direct legacy/test
+// construction on the platform defaults; production wiring always supplies
+// the resolver from the container.
+func (s *knowledgeBaseService) applyConsumerKnowledgeBaseModels(
+	ctx context.Context,
+	kb *types.KnowledgeBase,
+	candidates consumerKnowledgeBaseModels,
+) error {
+	// Consumer scene bindings are a Lite product surface. Standard WeKnora
+	// callers (including evaluation, web-search compression, and other
+	// internal KB creation paths) retain the existing platform/agent model
+	// authority even though the shared container wires the resolver globally.
+	if s.consumerModelResolver == nil || !isLiteProductEdition() || kb == nil || kb.IsTemporary {
+		return nil
+	}
+
+	// RAG answer generation and the optional Wiki synthesis stage are the only
+	// text-model bindings persisted on a new document KB. A standalone Chat
+	// model is never accepted here.
+	if kb.Type == types.KnowledgeBaseTypeDocument {
+		rag, err := s.resolveNewKnowledgeBaseModel(ctx, types.ConsumerSceneRAG, candidates.rag)
+		if err != nil {
+			return err
+		}
+		kb.SummaryModelID = rag.ID
+	}
+
+	if kb.Type == types.KnowledgeBaseTypeDocument || kb.Type == types.KnowledgeBaseTypeWiki {
+		wiki, err := s.resolveNewKnowledgeBaseModel(ctx, types.ConsumerSceneWiki, candidates.wiki)
+		if err != nil {
+			return err
+		}
+		if kb.WikiConfig == nil {
+			kb.WikiConfig = &types.WikiConfig{}
+		}
+		kb.WikiConfig.SynthesisModelID = wiki.ID
+	}
+
+	if kb.Type == types.KnowledgeBaseTypeDocument {
+		vision, err := s.resolveNewKnowledgeBaseModel(ctx, types.ConsumerSceneVision, candidates.vision)
+		if err != nil {
+			return err
+		}
+		kb.ImageProcessingConfig.ModelID = vision.ID
+		kb.VLMConfig.ModelID = vision.ID
+
+		asr, err := s.resolveNewKnowledgeBaseModel(ctx, types.ConsumerSceneASR, candidates.asr)
+		if err != nil {
+			return err
+		}
+		kb.ASRConfig.ModelID = asr.ID
+	}
+	return nil
+}
+
+func (s *knowledgeBaseService) resolveNewKnowledgeBaseModel(
+	ctx context.Context,
+	scene types.ConsumerScene,
+	candidate string,
+) (*types.Model, error) {
+	model, err := s.consumerModelResolver.ResolveConsumerModel(ctx, scene, strings.TrimSpace(candidate))
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s consumer model: %w", scene, err)
+	}
+	if model == nil || strings.TrimSpace(model.ID) == "" {
+		return nil, fmt.Errorf("resolve %s consumer model: resolved no model", scene)
+	}
+	if model.Type != scene.ModelType() {
+		return nil, fmt.Errorf("resolve %s consumer model: model type mismatch", scene)
+	}
+	return model, nil
+}
+
 // ensurePlatformKnowledgeBaseModels prevents a name-only create from
 // persisting a knowledge base that cannot ingest or answer documents. The
 // browser never chooses these models: their IDs are platform-owned defaults,
@@ -194,10 +307,23 @@ func (s *knowledgeBaseService) ensurePlatformKnowledgeBaseModels(ctx context.Con
 		id        string
 		modelType types.ModelType
 	}{
-		{types.PlatformKnowledgeBaseChatModelID, types.ModelTypeKnowledgeQA},
 		{types.PlatformKnowledgeBaseEmbeddingModelID, types.ModelTypeEmbedding},
-		{types.PlatformKnowledgeBaseVLMModelID, types.ModelTypeVLLM},
-		{types.PlatformKnowledgeBaseASRModelID, types.ModelTypeASR},
+	}
+	// When the consumer resolver is wired, RAG/Wiki/VLLM/ASR IDs have already
+	// been checked against their typed catalog and current plan above. Do not
+	// probe the legacy fixed IDs through ModelService here: a valid Free policy
+	// may intentionally choose a different model, and GetModelByID enforces the
+	// same plan gate. The platform-owned embedding identity remains immutable
+	// and must still be present for vector indexing.
+	if s.consumerModelResolver == nil || !isLiteProductEdition() {
+		requirements = append([]struct {
+			id        string
+			modelType types.ModelType
+		}{
+			{types.PlatformKnowledgeBaseChatModelID, types.ModelTypeKnowledgeQA},
+			{types.PlatformKnowledgeBaseVLMModelID, types.ModelTypeVLLM},
+			{types.PlatformKnowledgeBaseASRModelID, types.ModelTypeASR},
+		}, requirements...)
 	}
 
 	for _, requirement := range requirements {

@@ -1882,11 +1882,16 @@ export default {
     description: '管理不同类型的 AI 模型，支持 Ollama 本地模型和远程 API',
     sceneModels: {
       title: '按场景选择模型',
-      description: '为当前浏览器选择 Chat、RAG 和 Wiki 使用的模型。付费模型会显示但需要对应套餐。',
+      description: '为当前浏览器选择智能体、Rerank、Wiki、视觉和语音场景使用的模型。付费模型会显示但需要对应套餐。',
       scenes: {
-        chat: { label: 'Chat', description: '不带检索的平台对话。' },
-        rag: { label: 'RAG', description: '结合知识库或网页检索回答。' },
-        wiki: { label: 'Wiki', description: 'Wiki 内容合成。' }
+        // Chat remains an internal compatibility key for existing sessions;
+        // it is intentionally not rendered by the consumer settings page.
+        chat: { label: 'Chat', description: '平台内部智能体对话。' },
+        rag: { label: '智能体模型', description: '负责结合知识库、Wiki 或网页检索结果生成最终回答。' },
+        rerank: { label: 'Rerank', description: '对检索结果重新排序。' },
+        wiki: { label: 'Wiki', description: 'Wiki 内容合成。' },
+        vision: { label: '视觉', description: '图片、文档等视觉内容理解。' },
+        asr: { label: '语音', description: '音频转文字。' }
       }
     },
     copySuffix: ' 副本',
@@ -2196,7 +2201,12 @@ export default {
     light: '浅色',
     dark: '深色',
     system: '跟随系统',
-    selectTheme: '选择主题'
+    selectTheme: '选择主题',
+    color: '品牌色',
+    colorDescription: '选择产品品牌色，不改变浅色或深色模式',
+    musuw: 'Musuw 蓝',
+    weknora: 'WeKnora 绿',
+    selectColor: '选择品牌色'
   },
   general: {
     title: '常规设置',
@@ -2238,7 +2248,7 @@ export default {
     pricingTitle: '升级你的套餐',
     pricingDescription: '从免费版开始，随时升级。价格和支付方式会按所在地区自动显示。',
     planDescriptions: { free: '体验完整的个人知识工作流。', plus: '适合持续整理和问答的个人用户。', pro: '更高额度，适合高频知识工作。', max: '为重度使用提供当前最高额度。' },
-    allowanceLevels: { free: '$1.00', plus: '$1.25', pro: '$2.50', max: '$5.00' },
+    allowanceLevels: { free: '$0.40', plus: '$1.25', pro: '$2.50', max: '$5.00' },
     freePrice: '免费',
     perMonth: '/ 月',
     perYear: '/ 年',
@@ -2262,6 +2272,7 @@ export default {
     account: '账号',
     monthlyAllowance: '当前额度',
     storageRemaining: '存储剩余',
+    storageUsage: '已使用 {used} / {total}',
     remaining: '剩余',
     unavailable: '暂不可用',
     resetsAt: '{month} 重置',
@@ -2850,7 +2861,7 @@ export default {
         tenant: {
           max_owned_per_user: '每个非超管用户通过自助创建可拥有的最大空间数。每次创建空间时实时读取，修改后立即生效。0 表示使用内置默认值 10；负数表示完全关闭限制（不建议在公开部署使用）。',
           self_service_creation_enabled: '是否允许非超管用户主动创建空间。关闭后，普通用户只能通过邀请加入已有空间；跨空间超管仍可创建。修改后立即生效。',
-          default_storage_quota_gb: '新建空间时默认分配的存储配额（GB），包含向量、原文、文本、索引等。仅在创建时读取，修改后只对之后新建的空间生效，不会回写已存在的空间。0 或负数表示使用内置默认值 5GB。',
+          default_storage_quota_gb: '新建空间时默认分配的存储配额（GB），包含向量、原文、文本、索引等。仅在创建时读取，修改后只对之后新建的空间生效，不会回写已存在的空间。0 或负数表示使用内置默认值 1GB。',
           auto_create_api_key: '为新空间自动生成 full_access API Key，并在创建响应中返回明文 token。仅用于兼容依赖旧行为的集成；默认关闭，建议通过 API Key 管理显式创建。'
         },
         ssrf: {
@@ -3128,7 +3139,7 @@ export default {
         models: {
           tab: '模型 {count}',
           title: '消费者模型策略',
-          description: '配置 Chat、RAG 与 Wiki 的 Free 默认模型及有序付费选项。'
+          description: '配置智能体、Rerank、Wiki、视觉与语音的 Free 默认模型及有序付费选项。'
         }
       },
       models: {
@@ -3142,9 +3153,12 @@ export default {
         paidRequired: '至少选择一个付费模型；第一项为付费默认模型。',
         paidOrderHint: '付费选项会保留选择顺序，第一项为付费默认模型。',
         scenes: {
-          chat: { label: 'Chat', description: '不带检索的平台对话。' },
-          rag: { label: 'RAG', description: '结合知识库或网页检索回答。' },
-          wiki: { label: 'Wiki', description: 'Wiki 内容合成。' }
+          chat: { label: 'Chat', description: '平台内部智能体对话。' },
+          rag: { label: '智能体模型', description: '负责结合知识库、Wiki 或网页检索结果生成最终回答。' },
+          rerank: { label: 'Rerank', description: '对检索结果重新排序。' },
+          wiki: { label: 'Wiki', description: 'Wiki 内容合成。' },
+          vision: { label: '视觉', description: '图片、文档等视觉内容理解。' },
+          asr: { label: '语音', description: '音频转文字。' }
         }
       },
       priorityHint: {

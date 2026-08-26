@@ -37,12 +37,12 @@ test('Lite settings expose consumer models without exposing system administratio
 
 test('settings traps focus only when it is a modal and restores the launcher', () => {
   for (const token of [
-    ':aria-modal="isSettingsRoute ? undefined : \'true\'"',
+    'aria-modal="true"',
     'ref="settingsDialogRef"',
-    'ref="settingsSearchInputRef"',
     '@keydown.tab="handleDialogTab"',
     'lastFocusedElement',
-    'settingsSearchInputRef.value?.focus()',
+    'settingsDialogRef.value?.focus()',
     'lastFocusedElement?.focus()',
   ]) assert.ok(settingsSource.includes(token), `settings focus contract lost ${token}`)
+  assert.equal(settingsSource.includes('settingsSearchInputRef'), false)
 })

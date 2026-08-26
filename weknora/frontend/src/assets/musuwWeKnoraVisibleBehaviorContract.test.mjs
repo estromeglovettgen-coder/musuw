@@ -84,7 +84,7 @@ test('Lite UserMenu cannot reopen management surfaces and keeps valid interactiv
   ]) assert.ok(userMenu.includes(token), `Standard UserMenu source lost ${token}`)
 })
 
-test('Lite Settings exposes General, Usage, Models, and User Profile; Standard settings remain recoverable', () => {
+test('Lite Settings exposes General, Usage, Models, and User Profile with theme controls; Standard settings remain recoverable', () => {
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
@@ -97,7 +97,9 @@ test('Lite Settings exposes General, Usage, Models, and User Profile; Standard s
 
   assert.ok(general.includes('id="visual-language-select"'))
   assert.ok(general.includes('handleLanguageChange'))
-  for (const standardOnly of ['visual-theme-select', 'visual-sans-font-select', 'visual-mono-font-select']) {
+  assert.ok(general.includes('id="visual-theme-select"'))
+  assert.ok(general.includes('id="visual-theme-color-select"'))
+  for (const standardOnly of ['visual-sans-font-select', 'visual-mono-font-select']) {
     const index = general.indexOf(standardOnly)
     assert.ok(index >= 0, `Standard preference source lost ${standardOnly}`)
     assert.match(general.slice(Math.max(0, index - 260), index), /v-if="!authStore\.isLiteMode"/)
