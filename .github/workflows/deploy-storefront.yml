@@ -226,12 +226,14 @@ jobs:
             grep -Eiq 'window\.__MUSUW_LOCALE__[[:space:]]*=[[:space:]]*"(en|zh-CN)"' "$body"
             printf '%s release=%s content-language=%s\n' "$origin" "$RELEASE_SHA" "$(grep -i '^content-language:' "$headers" | tr -d '\r' | tr '\n' ' ')" | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
           done
-          # The product handoff is a separate service; this is only a reachability
-          # probe and deliberately does not mutate or assert its application UI.
+      - name: Probe product auth handoff without coupling storefront health
+        id: auth_handoff
+        continue-on-error: true
+        run: |
           curl --fail --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
             -D "$RUNNER_TEMP/musuw-app-auth-start-headers.txt" -o /dev/null https://app.musuw.com/auth/start
       - name: Roll back Cloudflare Worker after deploy or smoke failure
-        if: failure()
+        if: failure() && (steps.deploy_worker.outcome == 'failure' || steps.smoke.outcome == 'failure')
         working-directory: storefront
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -272,6 +274,7 @@ jobs:
           CI_WORKFLOW_RUN: ${{ needs.build.outputs.ci_workflow_run }}
           DEPLOY_OUTCOME: ${{ steps.deploy_worker.outcome }}
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          AUTH_HANDOFF_OUTCOME: ${{ steps.auth_handoff.outcome }}
         run: |
           set -euo pipefail
           repository_provenance='third_party/weknora/active-upstream-source.json'
@@ -293,11 +296,15 @@ jobs:
           [ -s "$RUNNER_TEMP/musuw-storefront-current-deployments.json" ] && current_json="$(cat "$RUNNER_TEMP/musuw-storefront-current-deployments.json")"
           deployed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           health_result=failed
-          auth_handoff=failed
+          auth_handoff=unchecked
+          if [ "$AUTH_HANDOFF_OUTCOME" = success ]; then
+            auth_handoff=reachable
+          elif [ "$AUTH_HANDOFF_OUTCOME" = failure ]; then
+            auth_handoff=unreachable
+          fi
           worker_version_id=''
           if [ "$DEPLOY_OUTCOME" = success ] && [ "$SMOKE_OUTCOME" = success ]; then
             health_result=healthy
-            auth_handoff=reachable
             [[ "$CI_WORKFLOW_RUN" =~ ^[0-9]+$ ]]
             [[ "$source_checksum" =~ ^[0-9a-fA-F]{64}$ ]]
             worker_version_id="$(jq -er '
