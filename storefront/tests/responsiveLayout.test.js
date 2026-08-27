@@ -52,16 +52,23 @@ test("storefront responsive media and final CTA rules stay bounded", () => {
   assert.match(mobile, /\.final-cta-dashboard-frame\s*\{[^}]*aspect-ratio:\s*16\s*\/\s*10\s*;/s);
 });
 
-test("comparison group headings keep the plan columns aligned before the desktop breakpoint", () => {
-  const styles = readFileSync(join(root, "src/styles.css"), "utf8");
-  const desktopStart = styles.indexOf("@media (min-width: 1081px)");
-  assert.notEqual(desktopStart, -1);
-  const baseStyles = styles.slice(0, desktopStart);
-  const groupHead = cssRule(baseStyles, "\\.comparison-group-head");
+test("marketing comparison and pricing stay aligned across desktop and mobile", () => {
+  const styles = readFileSync(join(root, "src/marketing-refresh.css"), "utf8");
+  const mobile = mediaBlock(styles, "max-width: 767px");
+  const desktopRow = cssRule(styles, "\\.comparison-feature-row");
+  const description = cssRule(styles, "\\.plan-description");
 
-  assert.match(groupHead, /display:\s*grid\s*;/s);
   assert.match(
-    groupHead,
-    /grid-template-columns:\s*minmax\(260px,\s*1\.8fr\)\s+repeat\(4,\s*minmax\(100px,\s*0\.65fr\)\)\s*;/s,
+    desktopRow,
+    /grid-template-columns:\s*minmax\(220px,\s*1\.35fr\)\s+repeat\(4,\s*minmax\(110px,\s*0\.75fr\)\)\s*;/s,
   );
+  assert.match(description, /white-space:\s*nowrap\s*;/s);
+  assert.match(styles, /\.billing-discount-badge[\s\S]*background:\s*#e7f6ec\s*;/s);
+  assert.match(styles, /billing-discount-badge/);
+  assert.match(mobile, /\.comparison-plan-header\s*\{[^}]*display:\s*none\s*;/s);
+  assert.match(
+    mobile,
+    /\.comparison-feature-row\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)\s*;/s,
+  );
+  assert.match(mobile, /\.platform-grid\s*\{[^}]*grid-template-columns:\s*1fr\s*;/s);
 });
