@@ -5,20 +5,37 @@ import { List } from "@phosphor-icons/react/List";
 import { X } from "@phosphor-icons/react/X";
 import { getStorefrontCopy } from "../i18n";
 import {
-  HOMEPAGE_FOOTER_GROUPS,
-  HOMEPAGE_NAVIGATION,
-} from "../planPresentation";
+  MARKETING_FOOTER_GROUPS,
+  MARKETING_NAVIGATION,
+} from "../homepageMarketingRefresh";
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";
 import { readStorefrontAuthentication } from "../storefrontAuthStatus";
 
 const defaultCopy = getStorefrontCopy("en");
 const navigationLabels = Object.freeze({
-  en: Object.freeze(["Features", "Examples", "Pricing", "Security", "Contact"]),
-  zh: Object.freeze(["功能", "场景", "定价", "安全", "联系"]),
+  en: Object.freeze(["Features", "Platform", "Pricing", "Security", "Contact"]),
+  zh: Object.freeze(["功能", "平台", "定价", "安全", "联系"]),
 });
 
 function publicNavigationLabels(copy) {
   return copy?.pricing?.currencyCode === "CNY" ? navigationLabels.zh : navigationLabels.en;
+}
+
+const footerLabels = Object.freeze({
+  en: Object.freeze([
+    Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing"]) }),
+    Object.freeze({ title: "Trust", links: Object.freeze(["FAQ", "Security", "Contact"]) }),
+    Object.freeze({ title: "Legal", links: Object.freeze(["Terms", "Privacy", "Refunds"]) }),
+  ]),
+  zh: Object.freeze([
+    Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价"]) }),
+    Object.freeze({ title: "信任", links: Object.freeze(["常见问题", "安全", "联系"]) }),
+    Object.freeze({ title: "法律", links: Object.freeze(["服务条款", "隐私", "退款"]) }),
+  ]),
+});
+
+function publicFooterLabels(copy) {
+  return copy?.pricing?.currencyCode === "CNY" ? footerLabels.zh : footerLabels.en;
 }
 
 export function Brand({ copy = defaultCopy }) {
@@ -85,7 +102,7 @@ export function ProductEntryLinks({ authenticated = false, copy = defaultCopy })
   );
 }
 
-export function SiteHeader({ copy = defaultCopy, navigation = HOMEPAGE_NAVIGATION }) {
+export function SiteHeader({ copy = defaultCopy, navigation = MARKETING_NAVIGATION }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
@@ -188,7 +205,9 @@ export function SiteHeader({ copy = defaultCopy, navigation = HOMEPAGE_NAVIGATIO
   );
 }
 
-export function SiteFooter({ copy = defaultCopy, groups = HOMEPAGE_FOOTER_GROUPS }) {
+export function SiteFooter({ copy = defaultCopy, groups = MARKETING_FOOTER_GROUPS }) {
+  const labels = publicFooterLabels(copy);
+
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
@@ -197,10 +216,10 @@ export function SiteFooter({ copy = defaultCopy, groups = HOMEPAGE_FOOTER_GROUPS
         </div>
         {groups.map((group, groupIndex) => (
           <div className="footer-group" key={group.title}>
-            <h3>{copy.footer.groups[groupIndex].title}</h3>
+            <h3>{labels[groupIndex]?.title ?? group.title}</h3>
             {group.links.map(([label, href], linkIndex) => (
               <a href={href} key={label}>
-                {copy.footer.groups[groupIndex].links[linkIndex]}
+                {labels[groupIndex]?.links[linkIndex] ?? label}
               </a>
             ))}
           </div>
