@@ -87,7 +87,7 @@ test("public capability copy follows the RAG, agent, Wiki, graph, model, import,
   assert.match(homepageEnglish, /AI Wiki/);
   assert.match(homepageEnglish, /Backlinks/);
   assert.match(homepageEnglish, /30\+ leading models/);
-  assert.match(homepageEnglish, /Web and video import/);
+  assert.match(homepageEnglish, /One-click web and video import/);
   assert.match(homepageEnglish, /Save useful answers back to the knowledge base/i);
   assert.match(homepageEnglish, /Exact citations/i);
 
