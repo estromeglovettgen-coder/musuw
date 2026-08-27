@@ -12,7 +12,6 @@ const migratedViewFiles = [
   '../views/chat/index.vue',
   '../components/menu.vue',
   '../components/Input-field.vue',
-  '../components/manual-knowledge-editor.vue',
   '../components/UserMenu.vue',
   '../components/SessionSidebarRow.vue',
   '../components/SessionSourceFilter.vue',
@@ -44,7 +43,6 @@ const migratedViewFiles = [
   '../views/knowledge/components/TagEditDialog.vue',
   '../views/knowledge/components/BatchTagDialog.vue',
   '../views/knowledge/components/KbTagManageDrawer.vue',
-  '../views/settings/Settings.vue',
   '../views/settings/GeneralSettings.vue',
   '../views/settings/ModelSettings.vue',
 ]
@@ -73,6 +71,24 @@ test('migrated views own their own visual-prefixed geometry', () => {
     assert.match(source, /class="(?:[^"\n]*\s)?visual-[^"\n]+"/, `${path} has no direct visual root`)
     assert.match(source, /<style/, `${path} has no direct view stylesheet`)
   }
+})
+
+test('settings delegates its shell geometry to the shared visual settings shell', () => {
+  const settings = read('../views/settings/Settings.vue')
+  const shell = read('../views/settings/components/VisualSettingsShell.vue')
+
+  assert.match(settings, /<VisualSettingsShell/)
+  assert.doesNotMatch(settings, /<style/)
+  assert.match(shell, /class="visual-settings-overlay"/)
+  assert.match(shell, /class="visual-settings-modal"/)
+  assert.match(shell, /<style/)
+})
+
+test('manual editor delegates its shell geometry to SettingDrawer', () => {
+  const source = read('../components/manual-knowledge-editor.vue')
+  assert.match(source, /<SettingDrawer/)
+  assert.match(source, /class="manual-editor"/)
+  assert.doesNotMatch(source, /visual-manual-editor__overlay/)
 })
 
 test('shared primitive layer is scoped only to rebuilt visual surfaces', () => {

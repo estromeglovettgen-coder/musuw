@@ -108,13 +108,13 @@ export default defineComponent({
 </template>
 
 <style scoped lang="less">
-.visual-sidebar { width: 256px; min-width: 256px; height: 100%; min-height: 0; padding: 12px; box-sizing: border-box; border-right: 1px solid rgb(229 231 235 / 80%); background: #fbfbfb; color: #374151; display: flex; flex-direction: column; position: relative; overflow: hidden; user-select: none; transition: width 200ms ease,min-width 200ms ease; }
+.visual-sidebar { --resource-nav-idle: #374151; --resource-nav-hover: #030712; --resource-nav-hover-bg: rgb(229 231 235 / 50%); --resource-nav-active: rgb(229 231 235 / 90%); --resource-nav-active-text: #030712; width: 256px; min-width: 256px; height: 100%; min-height: 0; padding: 12px; box-sizing: border-box; border-right: 1px solid rgb(229 231 235 / 80%); background: #fbfbfb; color: #374151; display: flex; flex-direction: column; position: relative; overflow: hidden; user-select: none; transition: width 200ms ease,min-width 200ms ease; }
 .visual-sidebar.is-collapsed { width: 56px; min-width: 56px; padding: 14px 8px; align-items: center; justify-content: space-between; overflow: visible; }
 :global(html.wails-desktop) .visual-sidebar:not(.is-collapsed),:global(html.wails-desktop) .visual-sidebar.is-collapsed { padding-top: 30px; }
 .visual-sidebar__header { flex: 0 0 auto; margin-bottom: 10px; padding: 6px 4px; display: flex; align-items: center; justify-content: space-between; }
 .visual-sidebar__brand { width: 44px; height: 40px; padding: 0; border: 0; display: flex; align-items: center; background: transparent; color: #111827; cursor: pointer; }
 .visual-sidebar__mark { flex: 0 0 44px; width: 44px; height: 40px; border: 0; display: inline-flex; align-items: center; justify-content: center; overflow: visible; }
-.visual-sidebar__collapsed-logo { flex: 0 0 26px; width: 26px; height: 26px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); overflow: hidden; }
+.visual-sidebar__collapsed-logo { flex: 0 0 32px; width: 32px; height: 32px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); overflow: hidden; }
 .visual-sidebar__mark img,.visual-sidebar__collapsed-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .visual-sidebar__mark { transition: transform 150ms ease; }
 .visual-sidebar__brand:hover .visual-sidebar__mark { transform: scale(1.05); }
@@ -124,13 +124,16 @@ export default defineComponent({
 .visual-sidebar__header-icon :deep(.t-icon) { font-size: 16px; }
 .visual-sidebar__tenant-selector { flex: 0 0 auto; margin: -2px 2px 8px; }
 .visual-sidebar__primary-actions { flex: 0 0 auto; margin-bottom: 8px; padding: 0 2px; display: flex; flex-direction: column; gap: 4px; }
-.visual-sidebar__primary { width: 100%; min-height: 36px; padding: 8px 12px; box-sizing: border-box; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; text-align: left; cursor: pointer; transition: all 150ms ease; }
+.visual-sidebar__primary { width: 100%; min-height: 36px; padding: 8px 12px; box-sizing: border-box; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: var(--resource-nav-idle); font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; text-align: left; cursor: pointer; transition: color 150ms ease, background-color 150ms ease; }
 .visual-sidebar__primary.is-new { border: 1px solid rgb(229 231 235 / 80%); background: #fff; color: #111827; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); font-weight: 500; }
 .visual-sidebar__primary.is-new:hover { background: #f9fafb; }
 .visual-sidebar__primary.is-new > span { font-size: 13px; font-weight: 600; }
-.visual-sidebar__primary.is-kb,.visual-sidebar__primary.is-native { justify-content: space-between; }
-.visual-sidebar__primary.is-kb:hover,.visual-sidebar__primary.is-native:hover { color: #030712; background: rgb(229 231 235 / 50%); }
-.visual-sidebar__primary.is-kb.is-active,.visual-sidebar__primary.is-native.is-active { color: #030712; background: rgb(229 231 235 / 90%); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-sidebar__primary.is-kb,
+.visual-sidebar__primary.is-native { justify-content: space-between; color: var(--resource-nav-idle); }
+.visual-sidebar__primary.is-kb:hover,
+.visual-sidebar__primary.is-native:hover { color: var(--resource-nav-hover); background: var(--resource-nav-hover-bg); }
+.visual-sidebar__primary.is-kb.is-active,
+.visual-sidebar__primary.is-native.is-active { color: var(--resource-nav-active-text); background: var(--resource-nav-active); font-weight: 700; box-shadow: none; }
 .visual-sidebar__primary-copy { min-width: 0; display: inline-flex; align-items: center; gap: 8px; }
 .visual-sidebar__primary :deep(.t-icon) { flex: 0 0 16px; width: 16px; height: 16px; font-size: 16px; }
 .visual-sidebar__primary-copy > span:last-child { font-size: 13px; }
@@ -155,10 +158,25 @@ export default defineComponent({
 .visual-sidebar__collapsed-nav { width: 36px; height: 36px; padding: 9px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #4b5563; cursor: pointer; transition: color 150ms ease,background-color 150ms ease; }
 .visual-sidebar__collapsed-nav.is-new { background: #f3f4f6; color: #111827; }
 .visual-sidebar__collapsed-nav:hover { background: #e5e7eb; color: #111827; }
-.visual-sidebar__collapsed-nav.is-active { background: #111827; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-sidebar__collapsed-nav.is-active { background: var(--resource-nav-active); color: var(--resource-nav-active-text); box-shadow: none; }
 .visual-sidebar__collapsed-nav :deep(.t-icon) { font-size: 16px; }
 .visual-sidebar__collapsed-user { width: 100%; display: flex; justify-content: center; }
 .visual-sidebar__drag-handle { position: absolute; top: 0; right: -3px; z-index: 20; width: 6px; height: 100%; cursor: ew-resize; }
 @media (max-width: 760px) { .visual-sidebar:not(.is-collapsed) { position: absolute; inset: 0 auto 0 0; z-index: 1000; box-shadow: 12px 0 36px rgb(15 23 42 / 14%); } }
 @media (prefers-reduced-motion: reduce) { .visual-sidebar,.visual-sidebar * { transition: none !important; } }
+
+:global(:root[theme-mode="dark"] .visual-sidebar) {
+  --resource-nav-idle: #d0d1d3;
+  --resource-nav-hover: #f2f2f2;
+  --resource-nav-hover-bg: #343539;
+  --resource-nav-active: #3b3c40;
+  --resource-nav-active-text: #f5f5f5;
+}
+:global(:root[theme-mode="dark"] .visual-sidebar__primary.is-kb),
+:global(:root[theme-mode="dark"] .visual-sidebar__primary.is-native) { color: var(--resource-nav-idle) !important; }
+:global(:root[theme-mode="dark"] .visual-sidebar__primary.is-kb:hover),
+:global(:root[theme-mode="dark"] .visual-sidebar__primary.is-native:hover) { color: var(--resource-nav-hover) !important; background: var(--resource-nav-hover-bg) !important; }
+:global(:root[theme-mode="dark"] .visual-sidebar__primary.is-kb.is-active),
+:global(:root[theme-mode="dark"] .visual-sidebar__primary.is-native.is-active),
+:global(:root[theme-mode="dark"] .visual-sidebar__collapsed-nav.is-active) { color: var(--resource-nav-active-text) !important; background: var(--resource-nav-active) !important; box-shadow: none !important; }
 </style>

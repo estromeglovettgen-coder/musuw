@@ -62,7 +62,7 @@ export const useMenuStore = defineStore('menuStore', () => {
   // Musuw Lite is deliberately fail-closed: only product-approved top-level
   // entries are visible. A newly-added upstream menu item must be explicitly
   // reviewed before it can appear in the consumer product.
-  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases'])
+  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases', 'agents'])
 
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()

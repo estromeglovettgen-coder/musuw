@@ -16,6 +16,13 @@ test('consumer model settings show exactly the five real configurable boundaries
   assert.match(source, /updateConsumerSceneModel/)
 })
 
+test('consumer scene controls are presentation-hidden while their persisted/runtime seam remains intact', () => {
+  assert.match(source, /<section\s+v-if="false"\s+class="consumer-scene-settings"\s+data-persisted-capability="consumer-scene-models"/)
+  assert.match(source, /const consumerScenes/)
+  assert.match(source, /getConsumerSceneModel/)
+  assert.match(source, /updateConsumerSceneModel/)
+})
+
 test('consumer settings options come only from the typed scene-options API', () => {
   assert.match(source, /ensureConsumerSceneOptions\(scene\)/)
   assert.doesNotMatch(source, /all-models=/)

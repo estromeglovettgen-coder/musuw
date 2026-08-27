@@ -5,7 +5,7 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('settings shell follows the supplied SettingsModal geometry', () => {
-  const source = read('../views/settings/Settings.vue')
+  const source = read('../views/settings/components/VisualSettingsShell.vue')
   assert.match(source, /width: min\(896px, 100%\);/)
   assert.match(source, /height: 580px;/)
   assert.match(source, /max-height: 92vh;/)
@@ -20,24 +20,26 @@ test('settings shell follows the supplied SettingsModal geometry', () => {
 })
 
 test('settings shell exposes only source tabs plus a close circle in every mode', () => {
-  const source = read('../views/settings/Settings.vue')
-  assert.match(source, /<button[^>]*class="visual-settings-close"[^>]*@click="handleClose"/)
-  assert.match(source, /class="visual-settings-overlay"[^>]*@click\.self="handleClose"/)
-  assert.match(source, /class="visual-settings-close"[^>]*:title="\$t\('general\.close'\)"/)
-  assert.doesNotMatch(source, /visual-settings-fade/)
+  const shell = read('../views/settings/components/VisualSettingsShell.vue')
+  const settings = read('../views/settings/Settings.vue')
+  assert.match(shell, /<button[^>]*class="visual-settings-close"[^>]*@click="emit\('close'\)"/)
+  assert.match(shell, /class="visual-settings-overlay"[^>]*@click\.self="emit\('close'\)"/)
+  assert.match(shell, /class="visual-settings-close"[^>]*:title="\$t\('general\.close'\)"/)
+  assert.doesNotMatch(shell, /visual-settings-fade/)
   for (const legacy of ['visual-settings-back', 'visual-settings-search', 'visual-settings-title', 'visual-settings-nav__group']) {
-    assert.equal(source.includes(legacy), false, `${legacy} is not in SettingsModal source`)
+    assert.equal(shell.includes(legacy), false, `${legacy} is not in SettingsModal source`)
   }
-  assert.match(source, /\{ key: 'general',[\s\S]*\{ key: 'usage',[\s\S]*\{ key: 'models',[\s\S]*\{ key: 'userprofile'/)
-  assert.equal((source.match(/key: 'system-audit-log'/g) || []).length, 1)
+  assert.match(settings, /\{ key: 'general',[\s\S]*\{ key: 'usage',[\s\S]*\{ key: 'models',[\s\S]*\{ key: 'userprofile'/)
+  assert.equal((settings.match(/key: 'system-audit-log'/g) || []).length, 1)
 })
 
 test('settings navigation is the source plain-text stack and close button uses the source transition', () => {
-  const source = read('../views/settings/Settings.vue')
-  const nav = source.match(/<nav class="visual-settings-nav"[\s\S]*?<\/nav>/)?.[0] || ''
-  assert.doesNotMatch(nav, /t-icon|visual-settings-nav__emoji|emoji/)
-  assert.match(nav, /<span>\{\{ item\.label \}\}<\/span>/)
-  assert.match(source, /\.visual-settings-close\s*\{[\s\S]*transition: all 150ms ease;/)
+  const settings = read('../views/settings/Settings.vue')
+  const shell = read('../views/settings/components/VisualSettingsShell.vue')
+  const navSlot = settings.match(/<template #nav>[\s\S]*?<\/template>/)?.[0] || ''
+  assert.doesNotMatch(navSlot, /t-icon|visual-settings-nav__emoji|emoji/)
+  assert.match(navSlot, /<span>\{\{ item\.label \}\}<\/span>/)
+  assert.match(shell, /\.visual-settings-close\s*\{[\s\S]*transition: all 150ms ease;/)
 })
 
 test('left avatar menu keeps the reference profile and divider treatment', () => {
@@ -129,7 +131,7 @@ test('consumer scene loading and errors stay on the source CustomSelect branch',
 test('user profile keeps the plain source settings group without navigation icons', () => {
   const source = read('../views/settings/UserProfile.vue')
   const cascade = read('./musuw-settings-reference-inner.css')
-  assert.match(source, /class="visual-settings-page-header section-header"/)
+  assert.match(source, /class="visual-settings-page-header"/)
   assert.match(source, /class="settings-group"/)
   assert.doesNotMatch(source, /t-icon|visual-settings-nav/)
   assert.match(source, /border-radius: 16px;/)

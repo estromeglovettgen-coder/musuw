@@ -3,6 +3,9 @@
     :visible="dialogVisible"
     :title="mode === 'add' ? t('mcpServiceDialog.addTitle') : t('mcpServiceDialog.editTitle')"
     :class="`mcp-drawer mcp-drawer--${formData.transport_type}`"
+    width="512px"
+    :resizable="false"
+    storage-key="mcp-service-drawer"
     :confirm-loading="submitting"
     @update:visible="(v: boolean) => dialogVisible = v"
     @confirm="handleSubmit"
@@ -20,13 +23,22 @@
 
     <!-- 副标题：transport 类型名 + 启用状态 mini chip -->
     <template #subtitle>
-      <span>{{ transportLabel }}</span>
       <span
         class="subtitle-tag"
         :class="formData.enabled ? 'subtitle-tag--ok' : 'subtitle-tag--muted'"
       >
+        {{ transportLabel }} ·
         {{ formData.enabled ? t('mcpSettings.enabled', '已启用') : t('mcpSettings.disabled', '已禁用') }}
       </span>
+      <button
+        type="button"
+        class="mcp-drawer__close"
+        :aria-label="t('common.close', '关闭')"
+        :title="t('common.close', '关闭')"
+        @click.stop="handleClose"
+      >
+        <t-icon name="close" />
+      </button>
     </template>
 
     <!--
@@ -63,9 +75,9 @@
         从代码导入：粘贴标准 mcpServers JSON，纯前端解析后填回表单。
         不自动提交；用户检查后再点保存。
       -->
-      <section class="setting-drawer__section code-import">
+      <section class="mcp-drawer__section mcp-drawer__code-import setting-drawer__section">
         <button type="button" class="code-import__toggle" @click="codeImportOpen = !codeImportOpen">
-          <t-icon :name="codeImportOpen ? 'chevron-down' : 'chevron-right'" />
+          <t-icon :name="codeImportOpen ? 'chevron-down' : 'chevron-up'" />
           <span>{{ t('mcpServiceDialog.codeImport.toggle') }}</span>
         </button>
         <div v-if="codeImportOpen" class="code-import__body">
@@ -75,7 +87,7 @@
           </p>
           <t-textarea
             v-model="codeImportText"
-            :autosize="{ minRows: 5, maxRows: 14 }"
+            :autosize="{ minRows: 6, maxRows: 14 }"
             :placeholder="codeImportPlaceholder"
             class="code-import__textarea"
           />
@@ -89,7 +101,7 @@
       </section>
 
       <!-- Section 1 — 基本信息 -->
-      <section class="setting-drawer__section">
+      <section class="mcp-drawer__section setting-drawer__section">
         <h4 class="setting-drawer__section-title">{{ t('mcpServiceDialog.basicSection', '基本信息') }}</h4>
 
         <div class="form-item">
@@ -99,11 +111,7 @@
 
         <div class="form-item">
           <label class="form-label">{{ t('mcpServiceDialog.description') }}</label>
-          <t-textarea
-            v-model="formData.description"
-            :autosize="{ minRows: 2, maxRows: 5 }"
-            :placeholder="t('mcpServiceDialog.descriptionPlaceholder')"
-          />
+          <t-input v-model="formData.description" :placeholder="t('mcpServiceDialog.descriptionPlaceholder')" />
         </div>
 
         <div class="form-item">
@@ -118,13 +126,13 @@
       </section>
 
       <!-- Section 2 — 连接配置（transport + url） -->
-      <section class="setting-drawer__section">
+      <section class="mcp-drawer__section setting-drawer__section">
         <h4 class="setting-drawer__section-title">{{ t('mcpServiceDialog.connectionSection', '连接配置') }}</h4>
 
         <div class="form-item">
           <label class="form-label required">{{ t('mcpServiceDialog.transportType') }}</label>
           <!-- 紧凑 pill segmented，与 ModelEditorDialog 来源切换 / Storage MinIO 部署模式同款 -->
-          <div class="source-options" role="radiogroup">
+          <div class="mcp-drawer__transport-options source-options" role="radiogroup">
             <button
               type="button"
               class="source-option"
@@ -190,21 +198,21 @@
         </div>
       </section>
 
-      <!-- Section 3 — 认证配置（无 / API Key / Bearer Token / OAuth） -->
-      <section class="setting-drawer__section">
+      <!-- Section 3 — 认证配置（无 / API Key / OAuth） -->
+      <section class="mcp-drawer__section setting-drawer__section">
         <h4 class="setting-drawer__section-title">{{ t('mcpServiceDialog.authConfig') }}</h4>
 
         <div class="form-item">
           <label class="form-label">{{ t('mcpServiceDialog.authType', '认证方式') }}</label>
           <!-- 展开式 pill segmented，与上方传输类型同款，避免再点开下拉 -->
-          <div class="source-options" role="radiogroup">
+          <div class="mcp-drawer__auth-options source-options" role="radiogroup">
             <button
               v-for="opt in authTypeOptions"
               :key="opt.value"
               type="button"
               class="source-option"
               :class="{ 'is-active': formData.auth_config.auth_type === opt.value }"
-              @click="formData.auth_config.auth_type = opt.value as '' | 'api_key' | 'bearer' | 'oauth'"
+              @click="formData.auth_config.auth_type = opt.value as '' | 'api_key' | 'oauth'"
             >
               <span class="source-option__label">{{ opt.label }}</span>
             </button>
@@ -291,10 +299,11 @@
 
       <!-- Section 4 — 高级配置（超时/重试），改用带后缀单位的轻量数字输入框，
            不再用 t-input-number 的加减器（步进按钮在这里没必要，用户更倾向直接键入）。 -->
-      <section class="setting-drawer__section">
+      <section class="mcp-drawer__section setting-drawer__section">
         <h4 class="setting-drawer__section-title">{{ t('mcpServiceDialog.advancedConfig') }}</h4>
 
-        <div class="form-item">
+        <div class="mcp-drawer__advanced-grid">
+          <div class="form-item">
           <label class="form-label">{{ t('mcpServiceDialog.timeoutSec') }}</label>
           <t-input
             v-model="advancedTimeoutText"
@@ -309,8 +318,8 @@
               <span class="number-input__unit">{{ t('mcpServiceDialog.unitSecond', '秒') }}</span>
             </template>
           </t-input>
-        </div>
-        <div class="form-item">
+          </div>
+          <div class="form-item">
           <label class="form-label">{{ t('mcpServiceDialog.retryCount') }}</label>
           <t-input
             v-model="advancedRetryCountText"
@@ -325,8 +334,8 @@
               <span class="number-input__unit">{{ t('mcpServiceDialog.unitTimes', '次') }}</span>
             </template>
           </t-input>
-        </div>
-        <div class="form-item">
+          </div>
+          <div class="form-item">
           <label class="form-label">{{ t('mcpServiceDialog.retryDelaySec') }}</label>
           <t-input
             v-model="advancedRetryDelayText"
@@ -341,11 +350,12 @@
               <span class="number-input__unit">{{ t('mcpServiceDialog.unitSecond', '秒') }}</span>
             </template>
           </t-input>
+          </div>
         </div>
       </section>
 
       <!-- Section 5 — 测试结果（内联，避免在抽屉上再叠一个居中弹窗） -->
-      <section v-if="testResult" ref="testResultSection" class="setting-drawer__section">
+      <section v-if="testResult" ref="testResultSection" class="mcp-drawer__section setting-drawer__section">
         <div class="test-result-header">
           <h4 class="setting-drawer__section-title">{{ t('mcpServiceDialog.testResultTitle', '测试结果') }}</h4>
           <t-button
@@ -1063,6 +1073,38 @@ const handleClose = () => {
 
 <style scoped lang="less">
 // ---- 抽屉内容 — 与 ModelEditorDialog 同款约定 ----
+.mcp-drawer__section {
+  width: 100%;
+}
+
+.mcp-drawer__code-import {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--td-bg-color-secondarycontainer) 40%, transparent);
+
+  .code-import__toggle {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  .code-import__body {
+    margin-top: 0;
+    padding: 4px 14px 14px;
+    border-top: 1px solid var(--td-component-stroke);
+  }
+}
+
+.mcp-drawer__advanced-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
 .form-item {
   margin-bottom: 0;
 }
@@ -1237,6 +1279,11 @@ const handleClose = () => {
   border-radius: 8px;
 }
 
+.mcp-drawer__transport-options,
+.mcp-drawer__auth-options {
+  width: 100%;
+}
+
 .source-option {
   display: inline-flex;
   align-items: center;
@@ -1344,19 +1391,595 @@ const handleClose = () => {
 }
 </style>
 
-<!--
-  Non-scoped block: per-transport header-icon coloring. Mirrors the matching
-  .service-card--{transport} .service-card__badge in McpSettings so the
-  list-card → drawer hand-off stays visually continuous.
--->
 <style lang="less">
-.mcp-drawer--sse .setting-drawer__header-icon {
-  background: rgba(17, 128, 83, 0.12);
-  color: #118053;
+body .t-drawer.mcp-drawer {
+  border-left: 1px solid #e5e7eb !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: -18px 0 50px rgb(15 23 42 / 16%) !important;
 }
 
-.mcp-drawer--http-streamable .setting-drawer__header-icon {
-  background: rgba(0, 82, 217, 0.1);
-  color: #0052D9;
+body .mcp-drawer {
+  .t-drawer__mask {
+    background: rgb(0 0 0 / 42%) !important;
+    backdrop-filter: blur(3px);
+  }
+
+  .t-drawer__content-wrapper,
+  .t-drawer__content {
+    background: #fff !important;
+    color: #374151 !important;
+  }
+
+  .t-drawer__header {
+    min-height: 60px !important;
+    padding: 14px 20px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    background: #fff !important;
+  }
+
+  .setting-drawer__header {
+    position: relative;
+    width: 100%;
+    gap: 10px;
+    padding-right: 38px;
+  }
+
+  .setting-drawer__header-icon {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px !important;
+    background: #f3f4f6 !important;
+    color: #4b5563 !important;
+    font-size: 14px;
+  }
+
+  .setting-drawer__header-text {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .setting-drawer__title {
+    color: #111827 !important;
+    font-size: 14px;
+    font-weight: 700 !important;
+  }
+
+  .setting-drawer__subtitle {
+    display: inline-flex;
+    align-items: center;
+    color: #6b7280 !important;
+  }
+
+  .t-drawer__close-btn {
+    right: 14px;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #6b7280;
+
+    &:hover,
+    &:focus-visible {
+      background: #f3f4f6;
+      color: #111827;
+    }
+  }
+
+  .t-drawer__body {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .setting-drawer__body {
+    padding: 20px;
+  }
+
+  .t-drawer__footer {
+    padding: 14px 20px !important;
+    border-top: 1px solid #e5e7eb !important;
+    background: #fafafa !important;
+    box-shadow: none !important;
+  }
+
+  .setting-drawer__footer {
+    padding: 0;
+  }
+
+  .setting-drawer__section {
+    gap: 12px !important;
+    padding: 4px 0 12px !important;
+    border-bottom: 0 !important;
+  }
+
+  .setting-drawer__section-title {
+    margin-bottom: 2px !important;
+    color: #111827 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+
+    &::before {
+      width: 4px !important;
+      height: 14px !important;
+      background: #111827 !important;
+    }
+  }
+
+  .mcp-drawer__code-import {
+    gap: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px;
+    background: #fafafa !important;
+
+    .code-import__toggle {
+      min-height: 40px;
+      padding: 10px 14px;
+      color: #374151 !important;
+      font-size: 12px;
+      font-weight: 600;
+
+      &:hover,
+      &:focus-visible {
+        background: #f3f4f6;
+        color: #111827 !important;
+      }
+    }
+
+    .code-import__body {
+      border-top-color: #e5e7eb;
+      background: #fff;
+    }
+  }
+
+  .form-label {
+    color: #374151 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 17px !important;
+  }
+
+  .form-desc,
+  .number-input__unit {
+    color: #9ca3af !important;
+    font-size: 10px !important;
+    line-height: 16px !important;
+  }
+
+  .t-input,
+  .t-textarea__inner,
+  .t-select-input,
+  .t-input-number {
+    border-color: #e5e7eb !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+    font-size: 12px !important;
+  }
+
+  .t-input {
+    min-height: 36px;
+  }
+
+  .t-input__inner,
+  .t-textarea__inner {
+    color: #111827 !important;
+
+    &::placeholder {
+      color: #9ca3af !important;
+      opacity: 1;
+    }
+  }
+
+  .t-input:hover,
+  .t-textarea__inner:hover,
+  .t-select-input:hover {
+    border-color: #d1d5db !important;
+  }
+
+  .t-input.t-is-focused,
+  .t-select-input.t-is-focused,
+  .t-textarea__inner:focus {
+    border-color: #6b7280 !important;
+    box-shadow: 0 0 0 2px rgb(17 24 39 / 5%) !important;
+  }
+
+  .mcp-drawer__transport-options {
+    display: flex !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+
+    .source-option {
+      flex: 1;
+      justify-content: center;
+      height: 36px !important;
+      border: 1px solid #e5e7eb !important;
+      border-radius: 12px !important;
+      background: #fff !important;
+      color: #6b7280 !important;
+      font-size: 12px !important;
+
+      &:hover:not(.is-active) {
+        border-color: #d1d5db !important;
+        background: #f9fafb !important;
+        color: #111827 !important;
+      }
+
+      &.is-active {
+        border-color: #111827 !important;
+        background: #111827 !important;
+        color: #fff !important;
+        font-weight: 700 !important;
+        box-shadow: none !important;
+      }
+    }
+  }
+
+  .mcp-drawer__auth-options {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px !important;
+    padding: 4px !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    background: #f3f4f6 !important;
+
+    .source-option {
+      justify-content: center;
+      width: 100%;
+      height: auto !important;
+      min-height: 32px;
+      padding: 6px 8px !important;
+      border: 0 !important;
+      border-radius: 8px !important;
+      color: #6b7280 !important;
+      font-size: 11px !important;
+      line-height: 1.25;
+      text-align: center;
+
+      &:hover:not(.is-active) {
+        background: rgb(255 255 255 / 68%) !important;
+        color: #111827 !important;
+      }
+
+      &.is-active {
+        background: #fff !important;
+        color: #111827 !important;
+        font-weight: 700 !important;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+      }
+    }
+  }
+
+  .vision-toggle .t-switch.t-is-checked {
+    background: #10b981 !important;
+  }
+
+  .custom-headers-header .t-button--variant-text.t-button--theme-primary {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: #111827 !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: transparent !important;
+      background: #f3f4f6 !important;
+      color: #111827 !important;
+    }
+  }
+
+  .t-button {
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .t-button--theme-primary {
+    border-color: #111827 !important;
+    background: #111827 !important;
+    color: #fff !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: #000 !important;
+      background: #000 !important;
+    }
+  }
+
+  .t-button--variant-outline:not(.t-button--theme-danger) {
+    border-color: #e5e7eb !important;
+    background: #fff !important;
+    color: #374151 !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: #d1d5db !important;
+      background: #f3f4f6 !important;
+      color: #111827 !important;
+    }
+  }
+
+  .subtitle-tag {
+    height: 20px;
+    margin-left: 0;
+    padding: 1px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    font-size: 10px;
+
+    &--ok {
+      border-color: #a7f3d0;
+      background: #ecfdf5;
+      color: #047857;
+    }
+
+    &--muted {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+  }
+
+  .mcp-drawer__close {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #6b7280;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: #f3f4f6;
+      color: #111827;
+      outline: none;
+    }
+  }
+}
+
+:root[theme-mode="dark"] body .mcp-drawer {
+  color: var(--mvc-text, #f2f2f2) !important;
+
+  .t-drawer__mask {
+    background: rgb(0 0 0 / 58%) !important;
+  }
+
+  .t-drawer__content-wrapper,
+  .t-drawer__content,
+  .t-drawer__body,
+  .t-drawer__header {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface, #1d1f23) !important;
+    color: var(--mvc-text, #f2f2f2) !important;
+  }
+
+  .t-drawer__header {
+    border-bottom-color: var(--mvc-line, #31343a) !important;
+  }
+
+  .t-drawer__footer {
+    border-top-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface-raised, #202227) !important;
+    color: var(--mvc-text, #f2f2f2) !important;
+  }
+
+  .setting-drawer__header-icon,
+  .t-drawer__close-btn {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-hover, #25272c) !important;
+    color: var(--mvc-muted-strong, #dedede) !important;
+  }
+
+  .t-drawer__close-btn:hover,
+  .t-drawer__close-btn:focus-visible {
+    border-color: var(--mvc-line-strong, #484c54) !important;
+    background: var(--mvc-active, #30333a) !important;
+    color: var(--mvc-text-strong, #fff) !important;
+  }
+
+  .setting-drawer__title,
+  .setting-drawer__section-title,
+  .form-label {
+    color: var(--mvc-text-strong, #fff) !important;
+  }
+
+  .setting-drawer__subtitle,
+  .form-desc,
+  .number-input__unit {
+    color: var(--mvc-muted, #c2c2c2) !important;
+  }
+
+  .setting-drawer__section-title::before {
+    background: var(--mvc-text, #f2f2f2) !important;
+  }
+
+  .mcp-drawer__code-import {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface-raised, #202227) !important;
+
+    .code-import__toggle {
+      color: var(--mvc-muted-strong, #dedede) !important;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--mvc-hover, #25272c) !important;
+        color: var(--mvc-text-strong, #fff) !important;
+      }
+    }
+
+    .code-import__body {
+      border-top-color: var(--mvc-line, #31343a) !important;
+      background: var(--mvc-surface, #1d1f23) !important;
+    }
+  }
+
+  .t-input,
+  .t-textarea__inner,
+  .t-select-input,
+  .t-input-number {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface-raised, #202227) !important;
+    color: var(--mvc-text, #f2f2f2) !important;
+  }
+
+  .t-input__inner,
+  .t-textarea__inner {
+    color: var(--mvc-text, #f2f2f2) !important;
+    caret-color: var(--mvc-text, #f2f2f2) !important;
+
+    &::placeholder {
+      color: var(--mvc-faint, #9c9c9c) !important;
+    }
+  }
+
+  .t-input:hover,
+  .t-textarea__inner:hover,
+  .t-select-input:hover,
+  .t-input.t-is-focused,
+  .t-select-input.t-is-focused,
+  .t-textarea__inner:focus {
+    border-color: var(--mvc-line-strong, #484c54) !important;
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 5%) !important;
+  }
+
+  .mcp-drawer__transport-options .source-option {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface-raised, #202227) !important;
+    color: var(--mvc-muted, #c2c2c2) !important;
+
+    &:hover:not(.is-active) {
+      border-color: var(--mvc-line-strong, #484c54) !important;
+      background: var(--mvc-hover, #25272c) !important;
+      color: var(--mvc-text-strong, #fff) !important;
+    }
+
+    &.is-active {
+      border-color: #f2f2f2 !important;
+      background: #f2f2f2 !important;
+      color: #111214 !important;
+    }
+  }
+
+  .mcp-drawer__auth-options {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-hover, #25272c) !important;
+  }
+
+  .source-option.is-active {
+    background: var(--mvc-active, #30333a) !important;
+    color: var(--mvc-text-strong, #fff) !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important;
+  }
+
+  .mcp-drawer__auth-options .source-option:not(.is-active) {
+    color: var(--mvc-muted, #c2c2c2) !important;
+
+    &:hover {
+      background: var(--mvc-active, #30333a) !important;
+      color: var(--mvc-text-strong, #fff) !important;
+    }
+  }
+
+  .custom-headers-header .t-button--variant-text.t-button--theme-primary {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--mvc-text-strong, #fff) !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: transparent !important;
+      background: var(--mvc-hover, #25272c) !important;
+      color: var(--mvc-text-strong, #fff) !important;
+    }
+  }
+
+  .t-button--theme-primary {
+    border-color: #f2f2f2 !important;
+    background: #f2f2f2 !important;
+    color: #111214 !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: #fff !important;
+      background: #fff !important;
+      color: #111214 !important;
+    }
+  }
+
+  .t-button--variant-outline:not(.t-button--theme-danger) {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface, #1d1f23) !important;
+    color: var(--mvc-muted-strong, #dedede) !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--mvc-line-strong, #484c54) !important;
+      background: var(--mvc-hover, #25272c) !important;
+      color: var(--mvc-text-strong, #fff) !important;
+    }
+  }
+
+  .subtitle-tag--ok {
+    border-color: rgb(16 185 129 / 45%);
+    background: rgb(16 185 129 / 15%);
+    color: #6ee7b7;
+  }
+
+  .subtitle-tag--muted {
+    border-color: var(--mvc-line, #31343a);
+    background: var(--mvc-hover, #25272c);
+    color: var(--mvc-muted, #c2c2c2);
+  }
+
+  .mcp-drawer__close {
+    border-color: var(--mvc-line, #31343a);
+    background: var(--mvc-hover, #25272c);
+    color: var(--mvc-muted-strong, #dedede);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--mvc-line-strong, #484c54);
+      background: var(--mvc-active, #30333a);
+      color: var(--mvc-text-strong, #fff);
+    }
+  }
+}
+
+:root[theme-mode="dark"] body .t-drawer.mcp-drawer {
+  border-left-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface, #1d1f23) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+  box-shadow: -18px 0 50px rgb(0 0 0 / 36%) !important;
+}
+
+/* Keep these selectors flat and high-specificity: global Musuw precision
+   layers set the same controls to light colors with !important. */
+:root[theme-mode="dark"] body .mcp-drawer .t-input {
+  border-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface-raised, #202227) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+}
+
+:root[theme-mode="dark"] body .mcp-drawer .source-option.is-active {
+  color: var(--mvc-text-strong, #fff) !important;
+}
+
+:root[theme-mode="dark"] body .mcp-drawer .t-drawer__footer {
+  border-top-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface-raised, #202227) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
 }
 </style>

@@ -1,6 +1,6 @@
 # Musuw 密钥与官方集成清单
 
-最后核对：2026-08-23（America/Phoenix）。本文件只记录变量名、服务/账号标签、
+最后核对：2026-08-26（America/Phoenix）。本文件只记录变量名、服务/账号标签、
 文件名、权限、消费者和健康证明，**绝不记录密钥值、邮件地址、完整主机/IP、
 hash 或供应商响应内容**。
 
@@ -28,6 +28,9 @@ hash 或供应商响应内容**。
 - 浏览器只能接收 publishable/client/catalog 值；server secret、management/admin、
   webhook signing、SSH/deploy 和 OAuth secret 只能从 Keychain、GitHub Environment
   或服务器 `0600` 文件进入受控进程。
+- TikHub 社交链接入库只读取后端进程的 `TIKHUB_API_KEY`。供应商地址由代码固定，
+  密钥不得进入前端 runtime config、用户请求、任务 payload、日志或数据库字段；
+  未配置密钥时应明确拒绝社交平台解析，同时继续保留普通网页 URL 入库。
 
 ## 2. 本机 macOS Keychain（只检查存在性）
 
@@ -120,6 +123,7 @@ ssh musuw-tokyo \
 | Cloudflare Worker | 不适用 | GitHub `storefront-production` 只含 Worker-scoped account/token | GitHub Environment + Cloudflare dashboard；仅 Wrangler 部署，Worker 不拿 server/model/billing secret。 |
 | Cloudflare R2 | 本地存储，故意无 TEST key | production protected files | R2 S3 API；应用只返回对象/计量 metadata。 |
 | Langfuse | test Keychain pair | production protected pair | Langfuse 项目；trace health 只返回 count/status，排除 input/output/prompt/content/attachments。 |
+| TikHub | operator-managed server key | protected backend runtime when deployed | TikHub dashboard 是权威；只供 WeKnora 社交分享入库 importer，浏览器和任务队列均不得得到密钥；健康证明只保留脱敏状态与 request ID。 |
 | GitHub/GHCR/SSH | CI ephemeral token | `server-production` restricted SSH + pinned known hosts；GHCR token 为 job-only | GitHub Environment 和 workflow 是权威；固定 release gate、exact digest pull、health check。 |
 | Tencent VectorDB / Alibaba Cloud | optional/independent inventory | Tokyo 当前无此 active consumer | 各自 provider dashboard；仅在明确启用的独立项目中使用，不能从示例变量推断已配置。 |
 | Google OAuth / SMTP | Supabase/OAuth 与邮件设置待按项目确认 | 当前 Musuw 没有 direct Google secret consumer；SMTP 由 Supabase Auth 配置边界管理 | Supabase/Google/provider dashboard；只验证 discovery、callback、OTP delivery，不记录 token 或邮件内容。 |

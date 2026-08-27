@@ -74,20 +74,22 @@ export default defineComponent({
           <p class="visual-knowledge-header__subtitle">{{ kbInfo?.description || $t('knowledgeEditor.document.subtitle') }}</p>
         </div>
 
-        <div v-if="isWiki" class="visual-knowledge-tabs" role="tablist">
-          <button type="button" :class="{ 'is-active': activeKbTab === 'documents' }" role="tab" :aria-selected="activeKbTab === 'documents'" @click="activeKbTab = 'documents'">
-            <t-icon name="file" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabDocuments') }}<template v-if="typeof total === 'number'"> ({{ total }})</template></span>
-          </button>
-          <button type="button" :class="{ 'is-active': activeKbTab === 'wiki' }" role="tab" :aria-selected="activeKbTab === 'wiki'" @click="activeKbTab = 'wiki'">
-            <t-icon name="book" /><span>Wiki</span><t-tooltip v-if="wikiIsIndexing" :content="wikiIndexingTip" placement="bottom"><t-loading size="small" /></t-tooltip>
-          </button>
-          <t-tooltip :content="$t('knowledgeEditor.wikiBrowser.tabGraphTip')" placement="bottom">
-            <button type="button" :class="{ 'is-active': activeKbTab === 'graph' }" role="tab" :aria-selected="activeKbTab === 'graph'" @click="activeKbTab = 'graph'">
-              <t-icon name="chart-bubble" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span><t-tooltip v-if="wikiIsIndexing" :content="wikiIndexingTip" placement="bottom"><t-loading size="small" /></t-tooltip>
+        <div class="visual-knowledge-header__actions">
+          <div v-if="isWiki" class="visual-knowledge-tabs" role="tablist">
+            <button type="button" :class="{ 'is-active': activeKbTab === 'documents' }" role="tab" :aria-selected="activeKbTab === 'documents'" @click="activeKbTab = 'documents'">
+              <t-icon name="file" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabDocuments') }}<template v-if="typeof total === 'number'"> ({{ total }})</template></span>
             </button>
-          </t-tooltip>
+            <button type="button" :class="{ 'is-active': activeKbTab === 'wiki' }" role="tab" :aria-selected="activeKbTab === 'wiki'" @click="activeKbTab = 'wiki'">
+              <t-icon name="book" /><span>Wiki</span><t-tooltip v-if="wikiIsIndexing" :content="wikiIndexingTip" placement="bottom"><t-loading size="small" /></t-tooltip>
+            </button>
+            <t-tooltip :content="$t('knowledgeEditor.wikiBrowser.tabGraphTip')" placement="bottom">
+              <button type="button" :class="{ 'is-active': activeKbTab === 'graph' }" role="tab" :aria-selected="activeKbTab === 'graph'" @click="activeKbTab = 'graph'">
+                <t-icon name="chart-bubble" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span><t-tooltip v-if="wikiIsIndexing" :content="wikiIndexingTip" placement="bottom"><t-loading size="small" /></t-tooltip>
+              </button>
+            </t-tooltip>
+          </div>
+          <span v-else class="visual-knowledge-header__plain-tab">{{ $t('knowledgeEditor.document.title') }}</span>
         </div>
-        <span v-else class="visual-knowledge-header__plain-tab">{{ $t('knowledgeEditor.document.title') }}</span>
       </header>
 
       <div v-if="unsupportedFileTypes.length || missingStorageEngine" class="visual-knowledge-alerts">
@@ -222,6 +224,7 @@ export default defineComponent({
 .visual-knowledge-page { width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 20px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; overflow: hidden; background: rgb(249 250 251 / 30%); color: #374151; }
 .visual-knowledge-header { flex: 0 0 auto; padding-bottom: 16px; border-bottom: 1px solid rgb(229 231 235 / 80%); display: flex; flex-direction: column; gap: 16px; }
 .visual-knowledge-header__copy { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.visual-knowledge-header__actions { display: flex; align-items: center; gap: 8px; }
 .visual-knowledge-breadcrumb { min-width: 0; display: flex; align-items: center; gap: 8px; color: #6b7280; font-size: 12px; line-height: 18px; font-weight: 600; }
 .visual-knowledge-breadcrumb button { font: inherit; }
 .visual-knowledge-breadcrumb__back { padding: 0; border: 0; display: inline-flex; align-items: center; gap: 4px; background: transparent; color: #6b7280; cursor: pointer; }
@@ -245,6 +248,8 @@ export default defineComponent({
 .visual-knowledge-alerts button { min-height: 30px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #6b7280; font: inherit; font-size: 11px; cursor: pointer; }
 .visual-knowledge-alerts button:disabled { cursor: default; }
 .visual-knowledge-alerts strong { color: #374151; }
+:global(:root[theme-mode="dark"] .visual-knowledge-alerts button) { border-color: var(--mvc-line); background: var(--mvc-surface-raised); color: var(--mvc-text); }
+:global(:root[theme-mode="dark"] .visual-knowledge-alerts strong) { color: var(--mvc-text-strong); }
 .visual-knowledge-wiki-host { min-height: 0; flex: 1 1 auto; overflow: hidden; }
 .visual-knowledge-documents { min-height: 0; flex: 1 1 auto; display: flex; gap: 12px; }
 .visual-knowledge-documents__tree { flex: 0 0 auto; }

@@ -1,41 +1,36 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="visible" class="settings-overlay" @click.self="handleClose">
-        <div class="settings-modal">
-          <!-- 关闭按钮 -->
-          <button class="close-btn" @click="handleClose" :aria-label="$t('common.close')">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-            </svg>
-          </button>
+  <VisualSettingsShell
+    :visible="visible"
+    :dialog-label="editorMode === 'create' ? $t('agent.editor.createTitle') : $t('agent.editor.editTitle')"
+    :content-label="navItems.find((item) => item.key === currentSection)?.label || $t('agent.editor.basicInfo')"
+    modal-class="agent-editor-modal"
+    content-class="agent-editor-content"
+    @close="handleClose"
+  >
+    <template #nav>
+      <div class="agent-editor-tabs" data-guide="agent-editor-sidebar" role="tablist" aria-orientation="vertical">
+        <button
+          v-for="(item, index) in navItems"
+          :key="index"
+          type="button"
+          role="tab"
+          class="visual-settings-nav__item"
+          :class="{ 'is-active': currentSection === item.key }"
+          :aria-selected="currentSection === item.key"
+          :data-guide="`agent-editor-nav-${item.key}`"
+          @click="currentSection = item.key"
+          @keydown.enter.prevent="currentSection = item.key"
+          @keydown.space.prevent="currentSection = item.key"
+        >
+          <span class="nav-label">{{ item.label }}</span>
+          <span v-if="item.key === 'prompts' && promptNavItems.length > 1" class="nav-badge">
+            {{ promptNavItems.length }}
+          </span>
+        </button>
+      </div>
+    </template>
 
-          <div class="settings-container">
-            <!-- 左侧导航 -->
-            <div class="settings-sidebar">
-              <div class="sidebar-header">
-                <h2 class="sidebar-title">{{ editorMode === 'create' ? $t('agent.editor.createTitle') :
-                  $t('agent.editor.editTitle') }}</h2>
-              </div>
-              <div class="settings-nav" data-guide="agent-editor-sidebar">
-                <template v-for="group in navGroups" :key="group.key">
-                  <div class="nav-group-title">{{ group.label }}</div>
-                  <div v-for="(item, index) in group.items" :key="index"
-                    :class="['nav-item', { 'active': currentSection === item.key }]"
-                    :data-guide="`agent-editor-nav-${item.key}`" @click="currentSection = item.key">
-                    <t-icon :name="item.icon" class="nav-icon" />
-                    <span class="nav-label">{{ item.label }}</span>
-                    <span v-if="item.key === 'prompts' && promptNavItems.length > 1" class="nav-badge">
-                      {{ promptNavItems.length }}
-                    </span>
-                  </div>
-                </template>
-              </div>
-            </div>
-
-            <!-- 右侧内容区域 -->
-            <div class="settings-content">
-              <div ref="contentWrapperRef" class="content-wrapper" :class="{ 'content-wrapper--prompts': currentSection === 'prompts' }">
+    <div ref="contentWrapperRef" class="content-wrapper" :class="{ 'content-wrapper--prompts': currentSection === 'prompts' }">
                 <!-- 基础设置 -->
                 <div v-show="currentSection === 'basic'" class="section">
                   <div class="section-header">
@@ -53,14 +48,14 @@
 
                   <div class="settings-group">
                     <!-- 智能体 ID（用于 API 集成） -->
-                    <div v-if="editorMode === 'edit' && editorAgent?.id" class="setting-row">
+                    <div v-if="false" data-agent-hidden-field="agent-id" class="setting-row">
                       <div class="setting-info">
                         <label>{{ $t('agent.editor.agentId') }}</label>
                         <p class="desc">{{ $t('agent.editor.agentIdDesc') }}</p>
                       </div>
                       <div class="setting-control">
                         <div class="agent-id-field">
-                          <code class="agent-id-value" :title="editorAgent.id">{{ editorAgent.id }}</code>
+                          <code class="agent-id-value" :title="editorAgent?.id">{{ editorAgent?.id }}</code>
                           <t-tooltip :content="$t('common.copy')" placement="top">
                             <t-button theme="default" size="small" variant="text" class="agent-id-copy"
                               @click="copyAgentId">
@@ -72,7 +67,7 @@
                     </div>
 
                     <!-- 集成渠道状态（编辑模式，配置在集成中心） -->
-                    <div v-if="editorMode === 'edit' && editorAgent?.id" class="setting-row">
+                    <div v-if="false" data-agent-hidden-field="integrations" class="setting-row">
                       <div class="setting-info">
                         <label>{{ $t('integrations.agentEditor.label') }}</label>
                         <p class="desc">{{ isPostCreateSession ? $t('agent.editor.postCreateHint.integrationDesc') : $t('integrations.agentEditor.desc') }}</p>
@@ -111,29 +106,6 @@
                       </div>
                     </div>
 
-                    <!-- 智能体类型（仅智能推理模式下显示） -->
-                    <div v-if="isAgentMode && agentTypePresets.length > 0" class="setting-row setting-row--emphasize"
-                      data-guide="agent-create-agent-type">
-                      <div class="setting-info">
-                        <label>{{ $t('agentEditor.agentType.label') }}</label>
-                        <p class="desc">{{ $t('agentEditor.agentType.desc') }}</p>
-                        <p v-if="activeAgentTypePreset" class="desc agent-type-preset-desc">{{
-                          agentTypePresetDescription(activeAgentTypePreset) }}</p>
-                      </div>
-                      <div class="setting-control">
-                        <t-select :value="agentType" @change="onAgentTypeChange" :disabled="isBuiltinAgent"
-                          :placeholder="$t('agentEditor.agentType.label')" :options="agentTypeSelectOptions"
-                          :popup-props="{ overlayClassName: 'agent-type-popup' }" class="agent-type-select">
-                          <template #option="{ option }">
-                            <div class="agent-type-option">
-                              <span class="agent-type-option-label">{{ option.label }}</span>
-                              <span v-if="option.desc" class="agent-type-option-desc">{{ option.desc }}</span>
-                            </div>
-                          </template>
-                        </t-select>
-                      </div>
-                    </div>
-
                     <!-- 名称 -->
                     <div class="setting-row" data-guide="agent-create-name">
                       <div class="setting-info">
@@ -165,6 +137,27 @@
                         <t-textarea v-model="formData.description"
                           :placeholder="$t('agent.editor.descriptionPlaceholder')"
                           :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isBuiltinAgent" />
+                      </div>
+                    </div>
+
+                    <!-- 模型（对用户只暴露主对话模型；其余模型参数保留原生默认/旧值） -->
+                    <div
+                      class="setting-row"
+                      data-guide="agent-create-model"
+                      data-agent-field="summary_model"
+                      :class="{ 'setting-row--field-highlight': highlightedField === 'summary_model' }"
+                    >
+                      <div class="setting-info">
+                        <label>{{ $t('agent.editor.model') }} <span class="required">*</span></label>
+                        <p class="desc">{{ $t('agentEditor.desc.model') }}</p>
+                      </div>
+                      <div class="setting-control">
+                        <ModelSelector model-type="KnowledgeQA" :selected-model-id="formData.config.model_id"
+                          :all-models="allModels"
+                          :scene-options="authStore.isLiteMode ? agentModelSceneOptions : []"
+                          :show-add-model="!authStore.isLiteMode"
+                          @update:selected-model-id="(val: string) => formData.config.model_id = val"
+                          :placeholder="$t('agent.editor.modelPlaceholder')" />
                       </div>
                     </div>
 
@@ -253,6 +246,8 @@
                       </div>
                     </div>
 
+                    <!-- 高级提示词保留原生字段和值，但不向 C 端暴露编辑入口 -->
+                    <div v-if="false" data-agent-hidden-prompts="advanced">
                     <!-- 上下文模板（仅普通模式） -->
                     <div v-if="!isAgentMode" v-show="activePromptAnchor === 'context'"
                       class="setting-row setting-row-vertical prompts-panel__pane">
@@ -551,13 +546,14 @@
                       </div>
                     </div>
 
+                    </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- 模型配置 -->
-                <div v-show="currentSection === 'model'" class="section">
+                <!-- 模型高级参数保留原生默认/旧值，但不向 C 端暴露 -->
+                <div v-if="false" data-agent-hidden-section="model" class="section">
                   <div class="section-header">
                     <h2>{{ $t('agent.editor.modelConfig') }}</h2>
                     <p class="section-description">{{ $t('agent.editor.modelConfigDesc') }}</p>
@@ -1360,7 +1356,7 @@
                     </div>
 
                     <!-- 支持的文件类型（限制用户可选择的文件类型） -->
-                    <div v-if="hasKnowledgeBase" class="setting-row">
+                    <div v-if="false" data-agent-hidden-field="supported-file-types" class="setting-row">
                       <div class="setting-info">
                         <label>{{ $t('agentEditor.fileTypes.label') }}</label>
                         <p class="desc">{{ $t('agentEditor.fileTypes.desc') }}</p>
@@ -1610,31 +1606,25 @@
                 </div>
               </div>
 
-              <!-- 底部操作栏 -->
-              <div class="settings-footer">
-                <p v-if="isPostCreateSession" class="settings-footer-note">
-                  <t-icon name="check-circle-filled" class="settings-footer-note__icon" />
-                  <span>
-                    <strong>{{ $t('agent.editor.postCreateHint.title') }}</strong>
-                    {{ $t('agent.editor.postCreateHint.footer') }}
-                  </span>
-                </p>
-                <div class="settings-footer-actions">
-                  <t-button variant="outline" @click="handleClose">{{ props.readOnly ? $t('common.close') :
-                    $t('common.cancel')
-                    }}</t-button>
-                  <t-button v-if="!props.readOnly" theme="primary" data-guide="agent-create-submit" :loading="saving"
-                    @click="handleSave">{{
-                    saveButtonLabel
-                    }}</t-button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <template #footer>
+      <p v-if="isPostCreateSession" class="settings-footer-note">
+        <t-icon name="check-circle-filled" class="settings-footer-note__icon" />
+        <span>
+          <strong>{{ $t('agent.editor.postCreateHint.title') }}</strong>
+          {{ $t('agent.editor.postCreateHint.footer') }}
+        </span>
+      </p>
+      <div class="settings-footer-actions">
+        <t-button variant="outline" @click="handleClose">{{ props.readOnly ? $t('common.close') :
+          $t('common.cancel')
+          }}</t-button>
+        <t-button v-if="!props.readOnly" theme="primary" data-guide="agent-create-submit" :loading="saving"
+          @click="handleSave">{{
+          saveButtonLabel
+          }}</t-button>
       </div>
-    </Transition>
-  </Teleport>
+    </template>
+  </VisualSettingsShell>
 
   <AgentCreateContextualGuide :when="visible && editorMode === 'create'" :is-agent-mode="isAgentMode" />
 </template>
@@ -1643,6 +1633,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import AgentCreateContextualGuide from '@/components/AgentCreateContextualGuide.vue';
+import VisualSettingsShell from '@/views/settings/components/VisualSettingsShell.vue';
 import {
   AGENT_EDITOR_FOCUS_SECTION_EVENT,
   markContextualGuideDone,
@@ -1764,7 +1755,7 @@ const VALID_HIGHLIGHT_FIELDS: AgentNotReadyReasonKey[] = ['summary_model', 'rera
 
 const sectionForHighlightField = (field: AgentNotReadyReasonKey): string => {
   if (field === 'allowed_tools') return 'tools';
-  return 'model';
+  return 'basic';
 };
 
 const FIELD_FLASH_DURATION_MS = 2400;
@@ -1836,6 +1827,7 @@ onBeforeUnmount(() => {
 
 const saving = ref(false);
 const allModels = ref<ModelConfig[]>([]);
+const agentModelSceneOptions = computed(() => chatResources.consumerSceneOptions.rag?.options || []);
 const kbOptions = ref<{ label: string; value: string; type?: 'document' | 'faq'; count?: number; shared?: boolean; orgName?: string; ragEnabled?: boolean; wikiEnabled?: boolean; capabilities?: KBCapabilities }[]>([]);
 
 // 智能体类型预设（仅 smart-reasoning 模式下展示）
@@ -2225,63 +2217,13 @@ const fallbackPromptTextareaRef = ref<any>(null);
 const navItems = computed(() => {
   const items: { key: string; icon: string; label: string }[] = [
     { key: 'basic', icon: 'info-circle', label: t('agent.editor.basicInfo') },
+    { key: 'knowledge', icon: 'folder', label: t('agent.editor.knowledgeConfig') },
     { key: 'prompts', icon: 'file-paste', label: t('agent.editor.promptsConfig') },
-    { key: 'model', icon: 'control-platform', label: t('agent.editor.modelConfig') },
-    { key: 'suggestions', icon: 'help-circle', label: t('agentEditor.questionSuggestions.navLabel') },
   ];
-  // 多轮对话（仅普通模式显示，Agent模式内部自动控制）
-  if (!isAgentMode.value) {
-    items.push({ key: 'conversation', icon: 'chat', label: t('agent.editor.conversationSettings') });
-  }
-  // 知识库与检索
-  items.push({ key: 'knowledge', icon: 'folder', label: t('agent.editor.knowledgeConfig') });
-  if (hasKnowledgeBase.value) {
-    items.push({ key: 'retrieval', icon: 'search', label: t('agent.editor.retrievalStrategy') });
-  }
-  items.push({ key: 'websearch', icon: 'internet', label: t('agent.editor.webSearchConfig') });
-  items.push({ key: 'multimodal', icon: 'attach', label: t('agentEditor.imageUpload.navLabel') });
-  // Agent 模式能力
   if (isAgentMode.value) {
-    items.push({ key: 'tools', icon: 'tools', label: t('agent.editor.toolsConfig') });
     items.push({ key: 'mcp', icon: 'server', label: t('agentEditor.mcp.label') });
   }
-  if (isAgentMode.value && skillsAvailable.value) {
-    items.push({ key: 'skills', icon: 'lightbulb', label: t('agent.editor.skillsConfig') });
-  }
-  // 发布（仅编辑模式）
-  if (editorMode.value === 'edit' && editorAgent.value?.id && !editorAgent.value?.is_builtin && !authStore.isLiteMode) {
-    items.push({ key: 'share', icon: 'share', label: t('knowledgeEditor.sidebar.share') });
-  }
   return items;
-});
-
-// 左侧导航分组（参考「头像-设置」的分组方式）
-const navGroups = computed(() => {
-  const itemMap = new Map(navItems.value.map((item) => [item.key, item]));
-  const pickItems = (keys: string[]) =>
-    keys.map((key) => itemMap.get(key)).filter(Boolean) as typeof navItems.value;
-  return [
-    {
-      key: 'basic',
-      label: t('agentEditor.navGroups.basic'),
-      items: pickItems(['basic', 'prompts', 'model', 'conversation', 'suggestions']),
-    },
-    {
-      key: 'knowledge',
-      label: t('agentEditor.navGroups.knowledge'),
-      items: pickItems(['knowledge', 'retrieval', 'websearch']),
-    },
-    {
-      key: 'capability',
-      label: t('agentEditor.navGroups.capability'),
-      items: pickItems(['multimodal', 'tools', 'mcp', 'skills']),
-    },
-    {
-      key: 'integration',
-      label: t('agentEditor.navGroups.integration'),
-      items: pickItems(['share']),
-    },
-  ].filter((group) => group.items.length > 0);
 });
 
 // 初始数据
@@ -2299,7 +2241,7 @@ const defaultFormData = {
     rerank_model_id: '',
     temperature: 0.7,
     max_completion_tokens: 2048,
-    thinking: true,
+    thinking: false, // 默认禁用思考模式
     citation_enabled: true, // 默认输出知识库/网页来源引用
     // Agent模式设置
     max_iterations: 10,
@@ -2417,33 +2359,15 @@ const removeStarterSuggestion = (index: number) => {
   formData.value.config.question_suggestions.starters.items.splice(index, 1);
 };
 
-const applyDefaultModelsIfEmpty = () => {
+const applyDefaultChatModelIfEmpty = () => {
   if (props.mode !== 'create' || !formData.value) return
-  const pick = (type: ModelConfig['type']) => {
-    const list = allModels.value.filter((m) => m.type === type)
-    return list.find((m) => m.is_default) || list[0]
-  }
-  const chat = pick('KnowledgeQA')
-  const rerank = pick('Rerank')
-  const vlm = pick('VLLM')
-  const asr = pick('ASR')
-  if (!formData.value.config.model_id && chat?.id) {
-    formData.value.config.model_id = chat.id
-  }
-  if (!formData.value.config.query_understand_model_id && chat?.id) {
-    formData.value.config.query_understand_model_id = chat.id
-  }
-  if (!formData.value.config.question_suggestions.follow_ups.model_id && chat?.id) {
-    formData.value.config.question_suggestions.follow_ups.model_id = chat.id
-  }
-  if (!formData.value.config.rerank_model_id && rerank?.id) {
-    formData.value.config.rerank_model_id = rerank.id
-  }
-  if (!formData.value.config.vlm_model_id && vlm?.id) {
-    formData.value.config.vlm_model_id = vlm.id
-  }
-  if (!formData.value.config.asr_model_id && asr?.id) {
-    formData.value.config.asr_model_id = asr.id
+  const chat =
+    allModels.value.find((m) => m.type === 'KnowledgeQA' && m.is_default)
+    || allModels.value.find((m) => m.type === 'KnowledgeQA')
+  const modelID = chat?.id
+    || (authStore.isLiteMode ? chatResources.consumerSceneOptions.rag?.effective_model_id : '')
+  if (!formData.value.config.model_id && modelID) {
+    formData.value.config.model_id = modelID
   }
 }
 
@@ -2484,46 +2408,11 @@ const showRewritePrompts = computed(() =>
 
 const promptNavItems = computed(() => {
   type PromptNavItem = { key: string; label: string; customized?: boolean };
-  const items: PromptNavItem[] = [
-    {
-      key: 'system',
-      label: t('agentEditor.promptNav.system'),
-      customized: !!formData.value.config.system_prompt?.trim(),
-    },
-  ];
-  if (!isAgentMode.value) {
-    items.push({
-      key: 'context',
-      label: t('agentEditor.promptNav.context'),
-      customized: !!formData.value.config.context_template?.trim(),
-    });
-    items.push({
-      key: 'intent',
-      label: t('agentEditor.promptNav.intent'),
-      customized: hasAnyIntentCustomized.value,
-    });
-    if (showRewritePrompts.value) {
-      items.push(
-        {
-          key: 'rewrite-system',
-          label: t('agentEditor.promptNav.rewriteSystem'),
-          customized: !!formData.value.config.rewrite_prompt_system?.trim(),
-        },
-        {
-          key: 'rewrite-user',
-          label: t('agentEditor.promptNav.rewriteUser'),
-          customized: !!formData.value.config.rewrite_prompt_user?.trim(),
-        },
-      );
-    }
-    if (hasKnowledgeBase.value) {
-      items.push({
-        key: 'fallback',
-        label: t('agentEditor.promptNav.fallback'),
-      });
-    }
-  }
-  return items;
+  return [{
+    key: 'system',
+    label: t('agentEditor.promptNav.system'),
+    customized: !!formData.value.config.system_prompt?.trim(),
+  }];
 });
 
 const syncActivePromptAnchor = () => {
@@ -3063,7 +2952,7 @@ watch(() => props.visible, async (val) => {
           formData.value.description = getPresetDefaultDescription(preset);
         }
       }
-      applyDefaultModelsIfEmpty()
+      applyDefaultChatModelIfEmpty()
     }
 
     if (props.initialHighlightField) {
@@ -3279,6 +3168,9 @@ watch(hasKnowledgeBase, (hasKB, oldHasKB) => {
 
 // 监听运行模式变化，自动切换页面
 watch(isAgentMode, (isAgent) => {
+  if (!isAgent && currentSection.value === 'mcp') {
+    currentSection.value = 'basic';
+  }
   // 如果当前在高级设置页面但切换到了Agent模式，切换到基础设置
   if (isAgent && currentSection.value === 'advanced') {
     currentSection.value = 'basic';
@@ -3360,6 +3252,7 @@ const loadDependencies = async () => {
   try {
     await Promise.all([
       chatResources.ensureModels(),
+      authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('rag') : Promise.resolve(),
       chatResources.ensureKnowledgeBases(),
       chatResources.ensureWebSearchProviders(),
       editorResources.prefetchAgentEditorDeps(),
@@ -4268,7 +4161,7 @@ const handleSave = async () => {
 
   if (!formData.value.config.model_id) {
     MessagePlugin.error(t('agent.editor.modelRequired'));
-    currentSection.value = 'model';
+    currentSection.value = 'basic';
     return;
   }
 
@@ -5971,11 +5864,89 @@ const handleSave = async () => {
   background: rgba(0, 180, 42, 0.1);
 }
 
+/* AgentEditor contributes only form-specific layout. The overlay, modal,
+ * sidebar, navigation, content and footer are the shared Settings shell. */
+.agent-editor-tabs {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.content-wrapper {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 32px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  scroll-padding-bottom: 24px;
+}
+
+.content-wrapper--prompts {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 28px;
+}
+
+.settings-footer-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-footer-actions :deep(.t-button) {
+  min-height: 36px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .content-wrapper { padding: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-editor-modal,
+  .agent-editor-modal .section { animation: none !important; transition: none !important; }
+}
+
 </style>
 
 <!-- Non-scoped styles: TDesign teleports the popup outside this component, so
      scoped selectors can't reach .agent-type-popup .t-select-option. -->
 <style lang="less">
+:root[theme-mode="dark"] .agent-editor-modal {
+  .t-input,
+  .t-textarea__inner,
+  .t-input-number,
+  .t-select-input,
+  .t-select-input .t-input {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface, #1a1b1f) !important;
+    color: var(--mvc-text, #f2f2f2) !important;
+    box-shadow: none !important;
+  }
+
+  .t-input__inner,
+  .t-textarea__inner,
+  .t-input-number input,
+  .t-select-input input {
+    color: var(--mvc-text, #f2f2f2) !important;
+    caret-color: var(--mvc-text, #f2f2f2) !important;
+  }
+
+  .t-input__inner::placeholder,
+  .t-textarea__inner::placeholder,
+  .t-input-number input::placeholder,
+  .t-select-input input::placeholder {
+    color: var(--mvc-faint, #8b8d94) !important;
+  }
+}
+
 .agent-type-popup {
   .t-select-option {
     // 默认 option 是 32px 单行；我们要双行显示，取消固定高度并放宽 padding

@@ -461,6 +461,13 @@ body .t-message {
   font-size: 12px !important;
 }
 
+:root[theme-mode="dark"] body .t-message {
+  border-color: #3f3f46 !important;
+  background: #18181b !important;
+  color: #f4f4f5 !important;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 36%) !important;
+}
+
 /* Rebuilt surfaces use neutral/black controls rather than TDesign brand blue. */
 :where([class^="visual-"], [class*=" visual-"]) .t-switch.t-is-checked,
 .settings-modal .t-switch.t-is-checked { background: #111827 !important; }

@@ -131,7 +131,7 @@ import InputField from '../../components/Input-field.vue';
 import botmsg from './components/botmsg.vue';
 import usermsg from './components/usermsg.vue';
 import { getMessageList, getSession } from "@/api/chat/index";
-import { getSuggestedQuestions, BUILTIN_SMART_REASONING_ID } from "@/api/agent/index";
+import { getSuggestedQuestions } from "@/api/agent/index";
 import { deleteTemporaryAttachment, uploadTemporaryAttachment } from '@/api/chat/temporary-attachments';
 import { useStream } from '../../api/chat/streame'
 import { useMenuStore } from '@/stores/menu';
@@ -663,7 +663,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
     prepareForNewOutgoingMessage();
     isReplying.value = true;
     loading.value = true;
-    const selectedAgentId = props.embeddedMode ? props.agentId : BUILTIN_SMART_REASONING_ID;
+    const selectedAgentId = props.embeddedMode ? props.agentId : (useSettingsStoreInstance.selectedAgentId || '');
     const selectedAgentSourceTenantId = props.embeddedMode
         ? undefined
         : (useSettingsStoreInstance.selectedAgentSourceTenantId || undefined);
@@ -781,7 +781,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
     // Get agent mode status from settings store (prefer selectedAgentId for builtins)
     const agentEnabled = props.embeddedMode
         ? (props.agentId && props.agentId !== 'builtin-quick-answer')
-        : true;
+        : useSettingsStoreInstance.isAgentStreamMode;
 
     // Get web search status from settings store
     const webSearchEnabled = props.embeddedMode ? false : useSettingsStoreInstance.isWebSearchEnabled;

@@ -22,22 +22,24 @@ test('chat selector preserves the source hover flyout and viewport placement con
   }
 })
 
-test('chat model capsule expands to the source width while open', () => {
+test('combined Agent/model/reasoning capsule keeps the source pill geometry while open', () => {
   assert.match(composer, /:class="\{[^}]*'is-open': showModelSelector/)
-  assert.match(composer, /visual-chat-composer__model-picker\.is-open[^}]*width:/)
-  assert.match(composer, /visual-chat-composer__model-picker\.is-open[^}]*gap:\s*0/)
+  assert.match(composer, /class="visual-chat-composer__combined-picker"/)
+  assert.match(composer, /visual-chat-composer__combined-picker\.is-open/)
   for (const token of [
-    'background: #f0f1f4',
+    'background: #eaebef',
     'background: #e5e7eb',
     'width: min(224px',
-    'padding: 6px 14px',
-    'box-shadow: 0 1px rgb(0 0 0 / 5%)',
-    'box-shadow: 0 0 0 1px rgb(209 213 219 / 80%), 0 1px 2px 0 rgb(0 0 0 / 5%)',
+    'padding: 6px 12px',
+    'box-shadow: 0 1px 2px rgb(0 0 0 / 5%)',
+    'box-shadow: 0 0 0 1px rgb(209 213 219 / 80%)',
     'gap: 6px',
     'border: 1px solid transparent',
     'border-radius: 999px',
-    'cubic-bezier(.16,1,.3,1)',
     'overflow: hidden',
+    'visual-chat-composer__combined-picker-agent',
+    'visual-chat-composer__combined-picker-model',
+    'visual-chat-composer__combined-picker-effort',
   ]) {
     assert.ok(composer.includes(token), `capsule source token lost ${token}`)
   }

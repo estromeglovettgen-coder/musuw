@@ -56,7 +56,12 @@ test('composer presents every native resource and generation control in the new 
     'allSelectedItems.length',
   ]) assert.ok(source.includes(token), `Input-field lost control surface: ${token}`)
   assert.equal(source.includes('__thinking-switch'), false)
-  assert.equal(source.includes('<AgentSelector'), false)
+  assert.equal(source.includes('<AgentSelector'), false, 'composer must not mount a second agent popup')
+  assert.ok(source.includes(':agents="enabledAgents"'), 'shared model picker must receive native agents')
+  assert.ok(source.includes('@select-agent="selectAgentFromPicker"'), 'shared model picker must preserve native agent selection')
+  assert.ok(source.includes('class="visual-chat-composer__combined-picker"'))
+  assert.equal(source.includes('agentPickerOpen'), false)
+  assert.equal(source.includes('v-for="agent in enabledAgents"'), false)
 })
 
 test('agent-disabled mention control preserves native remediation and native warning behavior without becoming unhoverable', () => {

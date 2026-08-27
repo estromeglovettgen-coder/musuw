@@ -1,11 +1,14 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, type SetupContext } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LegacyInputFieldBusiness from '@/assets/business-baselines/Input-field.pre-view.vue'
 import AttachmentUpload from './AttachmentUpload.vue'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import MentionSelector from './MentionSelector.vue'
 import ModelSelector from './ModelSelector.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useOrganizationStore } from '@/stores/organization'
+import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent'
 
 const legacy = LegacyInputFieldBusiness as any
 const legacySetup = legacy.setup
@@ -23,10 +26,31 @@ export default defineComponent({
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const authStore = useAuthStore()
+    const orgStore = useOrganizationStore()
+    const { t } = useI18n()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const modelPickerView = ref<'overview' | 'models' | 'reasoning'>('overview')
-      const modelPickerWidth = ref<number | null>(null)
-      const modelPickerStyle = computed(() => modelPickerWidth.value ? { width: `${modelPickerWidth.value}px` } : {})
+      const selectedAgentPresentation = computed(() => {
+        const selectedAgentRef = (state as any).selectedAgent
+        const selectedAgent = selectedAgentRef && typeof selectedAgentRef === 'object' && 'value' in selectedAgentRef
+          ? selectedAgentRef.value
+          : selectedAgentRef
+        const selectedAgentIdRef = (state as any).selectedAgentId
+        const selectedAgentId = selectedAgentIdRef && typeof selectedAgentIdRef === 'object' && 'value' in selectedAgentIdRef
+          ? selectedAgentIdRef.value
+          : selectedAgentIdRef
+        return { agent: selectedAgent, id: selectedAgent?.id || selectedAgentId }
+      })
+      const selectedAgentDisplayName = computed(() => {
+        const { agent: selectedAgent, id: agentId } = selectedAgentPresentation.value
+        if (agentId === BUILTIN_QUICK_ANSWER_ID) return t('input.normalMode')
+        if (agentId === BUILTIN_SMART_REASONING_ID) return t('input.agentMode')
+        return selectedAgent?.name || t('input.agentMode')
+      })
+      const isBuiltinAgentSelected = computed(() =>
+        selectedAgentPresentation.value.id === BUILTIN_QUICK_ANSWER_ID
+        || selectedAgentPresentation.value.id === BUILTIN_SMART_REASONING_ID,
+      )
       const visualModelDropdownStyle = computed(() => {
         const source = (state as any).modelDropdownStyle
         const style = source && typeof source === 'object' && 'value' in source ? source.value : source
@@ -75,43 +99,37 @@ export default defineComponent({
       }
       const openModelPicker = () => {
         modelPickerView.value = 'overview'
-        const wasOpen = !!(state as any).showModelSelector?.value
-        if (wasOpen) {
-          modelPickerWidth.value = null
-        } else {
-          const button = (state as any).modelButtonRef?.value as HTMLElement | undefined
-          modelPickerWidth.value = button?.getBoundingClientRect().width || null
-        }
         ;(state as any).toggleModelSelector?.()
-        if (!wasOpen) {
-          void nextTick(() => requestAnimationFrame(() => { modelPickerWidth.value = 224 }))
-        }
       }
       const restoreModelPickerFocus = () => {
         void nextTick(() => (state as any).modelButtonRef?.value?.focus?.())
       }
       const closeModelPicker = () => {
         ;(state as any).closeModelSelector?.()
-        modelPickerWidth.value = null
         restoreModelPickerFocus()
       }
       const selectModelFromPicker = (value: string) => {
         ;(state as any).handleModelChange?.(value)
-        if (!(state as any).showModelSelector?.value) modelPickerWidth.value = null
         restoreModelPickerFocus()
       }
       const selectReasoningFromPicker = (value: string) => {
         ;(state as any).selectReasoningEffort?.(value)
         ;(state as any).closeModelSelector?.()
-        modelPickerWidth.value = null
         restoreModelPickerFocus()
+      }
+      const selectAgentFromPicker = async (agent: unknown, sourceTenantId?: string) => {
+        await (state as any).handleSelectAgent?.(agent, sourceTenantId)
+        closeModelPicker()
       }
       return {
         ...state,
         authStore,
+        orgStore,
         modelPickerView,
-        modelPickerStyle,
+        selectedAgentDisplayName,
+        isBuiltinAgentSelected,
         visualModelDropdownStyle,
+        selectAgentFromPicker,
         openModelPicker,
         closeModelPicker,
         selectModelFromPicker,
@@ -220,16 +238,21 @@ export default defineComponent({
             v-if="!embeddedMode"
             ref="modelButtonRef"
             type="button"
-            class="visual-chat-composer__model-picker"
+            class="visual-chat-composer__combined-picker"
             :class="{ 'is-open': showModelSelector }"
-            :style="modelPickerStyle"
             :aria-expanded="showModelSelector"
-            :aria-label="`${selectedModelDisplayName} ${selectedReasoningLabel}`"
+            :aria-label="isBuiltinAgentSelected
+              ? selectedAgentDisplayName
+              : `${selectedAgentDisplayName} ${selectedModelDisplayName} ${selectedReasoningLabel}`"
             @click.stop="openModelPicker"
           >
-            <span class="visual-chat-composer__model-picker-copy">
-              <span class="visual-chat-composer__model-picker-model" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
-              <span v-if="reasoningEffort !== 'none' && selectedReasoningLabel" class="visual-chat-composer__model-picker-effort">{{ selectedReasoningLabel }}</span>
+            <span class="visual-chat-composer__combined-picker-copy">
+              <span class="visual-chat-composer__combined-picker-agent" :title="selectedAgentDisplayName">{{ selectedAgentDisplayName }}</span>
+              <template v-if="!isBuiltinAgentSelected">
+                <span class="visual-chat-composer__combined-picker-dot" aria-hidden="true">·</span>
+                <span class="visual-chat-composer__combined-picker-model" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
+                <span v-if="reasoningEffort !== 'none' && selectedReasoningLabel" class="visual-chat-composer__combined-picker-effort">{{ selectedReasoningLabel }}</span>
+              </template>
             </span>
             <t-loading v-if="modelsLoading" size="small" />
             <t-icon v-else name="chevron-down" />
@@ -255,6 +278,7 @@ export default defineComponent({
                modelPickerView === 'models', modelPickerView = 'reasoning',
                and modelPickerView = 'models' as its unchanged business contract. -->
               <ModelSelector
+                class="visual-chat-composer__native-model-selector"
                 mode="chat"
                 :models="availableModels"
                 :scene-options="sceneOptionsFor(effectiveConsumerScene)"
@@ -263,7 +287,13 @@ export default defineComponent({
                 :selected-reasoning-label="selectedReasoningLabel"
                 :reasoning-options="reasoningOptions"
                 :reasoning-effort="reasoningEffort"
+                :agents="enabledAgents"
+                :shared-agents="orgStore.sharedAgents"
+                :selected-agent-id="selectedAgentId"
+                :selected-agent-source-tenant-id="settingsStore.selectedAgentSourceTenantId || undefined"
+                :selected-agent-display-name="selectedAgentDisplayName"
                 :view="modelPickerView"
+                @select-agent="selectAgentFromPicker"
                 @select-model="selectModelFromPicker"
                 @select-reasoning="selectReasoningFromPicker"
                 @update:view="modelPickerView = $event"
@@ -331,16 +361,17 @@ export default defineComponent({
 .visual-chat-composer__disabled-hint { display: flex; align-items: center; gap: 6px; }
 .visual-chat-composer__disabled-hint button { padding: 0; border: 0; background: transparent; color: #2563eb; font: inherit; text-decoration: underline; cursor: pointer; }
 .visual-chat-composer__actions { flex: 0 0 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
-.visual-chat-composer__model-picker { min-width: 0; width: fit-content; padding: 6px 12px; border: 1px solid transparent; border-radius: 999px; outline: none; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; background: #f0f1f4; color: #111827; box-shadow: 0 1px rgb(0 0 0 / 5%); font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; transition: width 200ms cubic-bezier(.16,1,.3,1), background-color 200ms cubic-bezier(.16,1,.3,1), color 200ms cubic-bezier(.16,1,.3,1), box-shadow 200ms cubic-bezier(.16,1,.3,1); }
-.visual-chat-composer__model-picker:not(.is-open):hover { background: #e6e8eb; }
-.visual-chat-composer__model-picker:not(.is-open):active { background: #e0e2e6; }
-.visual-chat-composer__model-picker.is-open { width: 224px; max-width: min(224px, calc(100vw - 32px)); padding: 6px 14px; justify-content: space-between; gap: 0; background: #e5e7eb; color: #111827; box-shadow: 0 0 0 1px rgb(209 213 219 / 80%), 0 1px 2px 0 rgb(0 0 0 / 5%); }
-.visual-chat-composer__model-picker-copy { min-width: 0; display: inline-flex; align-items: baseline; gap: 6px; }
-.visual-chat-composer__model-picker-model,.visual-chat-composer__model-picker-effort { min-width: 0; white-space: nowrap; }
-.visual-chat-composer__model-picker-model { font-weight: 400; }
-.visual-chat-composer__model-picker-effort { color: #4b5563; }
-.visual-chat-composer__model-picker > :deep(.t-icon) { flex: 0 0 14px; color: #6b7280; font-size: 14px; transition: transform 200ms cubic-bezier(.16,1,.3,1), color 200ms cubic-bezier(.16,1,.3,1); }
-.visual-chat-composer__model-picker.is-open > :deep(.t-icon) { transform: rotate(180deg); color: #111827; }
+.visual-chat-composer__combined-picker { min-width: 0; max-width: min(360px, 48vw); width: fit-content; padding: 6px 12px; border: 1px solid transparent; border-radius: 999px; outline: none; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; background: #eaebef; color: #1f2937; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+.visual-chat-composer__combined-picker:not(.is-open):hover { background: #dfe1e7; }
+.visual-chat-composer__combined-picker:not(.is-open):active { background: #d6d8df; }
+.visual-chat-composer__combined-picker.is-open { background: #e5e7eb; color: #111827; box-shadow: 0 0 0 1px rgb(209 213 219 / 80%), 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-chat-composer__combined-picker-copy { min-width: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.visual-chat-composer__combined-picker-agent { min-width: 0; max-width: 120px; overflow: hidden; color: #111827; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.visual-chat-composer__combined-picker-dot { color: #9ca3af; }
+.visual-chat-composer__combined-picker-model,.visual-chat-composer__combined-picker-effort { flex: 0 1 auto; min-width: 0; overflow: hidden; color: #4b5563; text-overflow: ellipsis; white-space: nowrap; }
+.visual-chat-composer__combined-picker-effort { flex: 0 0 auto; color: #6b7280; }
+.visual-chat-composer__combined-picker > :deep(.t-icon:last-child) { flex: 0 0 14px; color: #6b7280; font-size: 14px; transition: transform 150ms ease, color 150ms ease; }
+.visual-chat-composer__combined-picker.is-open > :deep(.t-icon:last-child) { transform: rotate(180deg); color: #111827; }
 .visual-chat-composer__submit { flex: 0 0 auto; display: flex; align-items: center; }
 .visual-chat-composer__send { width: 32px; height: 32px; padding: 8px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #111827; color: #fff; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); transition: all 150ms ease; }
 .visual-chat-composer__send:hover:not(:disabled) { background: #000; }
@@ -361,7 +392,14 @@ export default defineComponent({
 
 @media (max-width: 768px) { .visual-chat-composer__surface { border-radius: 16px; } .visual-chat-composer__tools { gap: 12px; } }
 @media (min-width: 640px) { .visual-chat-composer__tools { gap: 16px; } }
-@media (max-width: 620px) { .visual-chat-composer__toolbar { align-items: flex-end; } .visual-chat-composer__model-picker { max-width: min(240px, 52vw); } }
-@media (max-width: 430px) { .visual-chat-composer__toolbar { align-items: flex-start; flex-wrap: wrap; } .visual-chat-composer__tools { flex: 1 1 100%; } .visual-chat-composer__actions { margin-left: auto; } .visual-chat-composer__model-picker { max-width: calc(100vw - 102px); } }
-@media (prefers-reduced-motion: reduce) { .visual-chat-composer__surface,.visual-chat-composer__send,.visual-chat-composer__model-picker,.visual-chat-composer__model-menu { transition: none !important; } }
+@media (max-width: 620px) { .visual-chat-composer__toolbar { align-items: flex-end; } .visual-chat-composer__combined-picker { max-width: min(280px, 60vw); } }
+@media (max-width: 430px) { .visual-chat-composer__toolbar { align-items: flex-start; flex-wrap: wrap; } .visual-chat-composer__tools { flex: 1 1 100%; } .visual-chat-composer__actions { margin-left: auto; } .visual-chat-composer__combined-picker { max-width: calc(100vw - 102px); } .visual-chat-composer__combined-picker-agent { max-width: 72px; } }
+
+:root[theme-mode="dark"] .visual-chat-composer__combined-picker { background: #27272a; color: #e4e4e7; }
+:root[theme-mode="dark"] .visual-chat-composer__combined-picker:hover { background: #323238; }
+:root[theme-mode="dark"] .visual-chat-composer__combined-picker.is-open { background: #3f3f46; color: #fff; box-shadow: 0 0 0 1px #52525b; }
+:root[theme-mode="dark"] .visual-chat-composer__combined-picker-agent { color: #f4f4f5; }
+:root[theme-mode="dark"] .visual-chat-composer__combined-picker-model,
+:root[theme-mode="dark"] .visual-chat-composer__combined-picker-effort { color: #d4d4d8; }
+@media (prefers-reduced-motion: reduce) { .visual-chat-composer__surface,.visual-chat-composer__send,.visual-chat-composer__combined-picker,.visual-chat-composer__model-menu { transition: none !important; } }
 </style>

@@ -8,7 +8,7 @@ const finalContract = readFileSync(new URL('../assets/musuw-final-contract-closu
 
 const chatTemplate = source.slice(source.indexOf('<template v-if="mode === \'chat\'">'), source.indexOf('\n    <t-select'))
 
-test('chat picker mirrors the compact Codex two-row/listbox contract', () => {
+test('chat picker mirrors the compact native agent/model/reasoning listbox contract', () => {
   for (const token of [
     "mode === 'chat'",
     "view === 'overview'",
@@ -18,12 +18,14 @@ test('chat picker mirrors the compact Codex two-row/listbox contract', () => {
     'aria-activedescendant',
     'handleModelKeydown',
     'handleReasoningKeydown',
+    'handleAgentKeydown',
     'ArrowDown',
     'ArrowUp',
     "event.key === 'Escape'",
     "event.key === ' '",
     'v-for="model in chatModels"',
     'v-for="(option, index) in reasoningOptions"',
+    'v-for="(option, index) in chatAgentOptions"',
     'max-height: min(250px, calc(var(--visual-model-menu-max-height, 340px) - 52px), 48vh)',
     'props.models.filter(model => !!model.id)',
     "props.mode === 'catalog' && !props.allModels",
@@ -38,6 +40,11 @@ test('chat picker mirrors the compact Codex two-row/listbox contract', () => {
     source.indexOf('const handleReasoningKeydown'),
     source.indexOf('const handlePanelKeydown'),
   )
+  const agentKeyboard = source.slice(
+    source.indexOf('const handleAgentKeydown'),
+    source.indexOf('const handleModelKeydown'),
+  )
+  assert.match(agentKeyboard, /event\.key === ' '/, 'agent listbox Space must select the active option')
   assert.match(modelKeyboard, /event\.key === ' '/, 'model listbox Space must select the active option')
   assert.match(reasoningKeyboard, /event\.key === ' '/, 'reasoning listbox Space must select the active option')
 
@@ -69,7 +76,15 @@ test('chat picker preserves the native business state and keeps catalog mode int
     const haystack = `${source}\n${inputField}`
     assert.ok(haystack.includes(token), `business contract lost ${token}`)
   }
-  assert.equal(inputField.includes('<AgentSelector'), false)
+  assert.equal(inputField.includes('<AgentSelector'), false, 'agent candidates must not own a second popup component')
+  assert.ok(source.includes('class="visual-model-selector__chat-row is-agent"'))
+  assert.ok(source.includes("hoverOpen('agents')"))
+  assert.ok(source.includes("emit('select-agent', option.agent, option.sourceTenantId)"))
+  assert.ok(inputField.includes(':agents="enabledAgents"'))
+  assert.ok(inputField.includes(':shared-agents="orgStore.sharedAgents"'))
+  assert.ok(inputField.includes('@select-agent="selectAgentFromPicker"'))
+  assert.equal(inputField.includes('agentPickerOpen'), false, 'agent selection must not gain a second open state')
+  assert.equal(inputField.includes('v-for="agent in enabledAgents"'), false, 'composer must not duplicate native agent selection')
   assert.equal(inputField.includes('__thinking-switch'), false)
 })
 
@@ -93,6 +108,9 @@ test('chat picker keeps long names in a single aligned column and adapts to narr
     'text-overflow: ellipsis',
     'white-space: nowrap',
     '@media (max-width: 430px)',
+    '@media (max-width: 540px)',
+    'bottom: calc(100% + 6px)',
+    'right: 0 !important',
     'calc(100vw - 32px)',
     'max-height: min(250px, calc(var(--visual-model-menu-max-height, 340px) - 52px), 48vh)',
     'overflow-y: auto',
@@ -101,6 +119,8 @@ test('chat picker keeps long names in a single aligned column and adapts to narr
     'window.innerWidth - rect.right',
     ':style="visualModelDropdownStyle"',
     'width: min(224px, calc(100vw - 32px))',
+    'visual-chat-composer__combined-picker',
+    'visual-model-selector__chat-row is-agent',
   ]) assert.ok(inputField.includes(token) || source.includes(token), `layout contract lost ${token}`)
   const optionRule = source.match(/\.visual-model-selector__chat-option\s*\{([\s\S]*?)\n\}/)?.[1] || ''
   assert.doesNotMatch(optionRule, /min-height:/, 'reference flyout rows must keep their source compact height')
@@ -117,7 +137,32 @@ test('chat picker owns complete light and dark surface tokens', () => {
     '@media (prefers-color-scheme: dark)',
   ]) assert.ok(source.includes(token), `theme contract lost ${token}`)
   for (const token of [
-    ':root[theme-mode="dark"] .visual-chat-composer__model-picker',
-    ':root[theme-mode="dark"] .visual-chat-composer__model-picker-effort',
-  ]) assert.ok(finalContract.includes(token), `composer theme contract lost ${token}`)
+    ':root[theme-mode="dark"] .visual-chat-composer__combined-picker',
+  ]) assert.ok(inputField.includes(token), `composer theme contract lost ${token}`)
+})
+
+test('agent candidates reuse the model flyout shell, rows, checkmark, placement, and open state', () => {
+  for (const token of [
+    "const hoveredSubmenu = ref<'agents' | 'models' | 'reasoning' | null>",
+    "const hoverOpen = (nextView: 'agents' | 'models' | 'reasoning')",
+    "const toggleHover = (nextView: 'agents' | 'models' | 'reasoning')",
+    "hoveredSubmenu === 'agents'",
+    'visual-model-selector__chat-flyout',
+    'visual-model-selector__chat-list',
+    'visual-model-selector__chat-option',
+    'visual-model-selector__chat-check',
+    'updateSubmenuPlacement',
+    'submenuPlacement',
+  ]) assert.ok(source.includes(token), `agent picker failed to reuse ${token}`)
+
+  for (const forbidden of [
+    'agent-selector-overlay',
+    'agent-selector-dropdown',
+    'detailPanelStyle',
+    'activeDetail',
+    'AgentAvatar',
+    'manageAgents',
+    'builtinAgents)',
+    'customAgents)',
+  ]) assert.equal(source.includes(forbidden), false, `agent picker retained independent UI ${forbidden}`)
 })

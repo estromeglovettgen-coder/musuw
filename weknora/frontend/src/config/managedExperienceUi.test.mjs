@@ -24,16 +24,16 @@ const sidebarBusiness = read("../assets/business-baselines/menu.pre-view.vue");
 
 /**
  * Musuw product exposure policy:
- * - Lite is the consumer surface: New Chat + Knowledge Base are the only
- *   top-level product entries; Settings exposes General, Usage, Models, and User Profile.
+ * - Lite is the consumer surface: New Chat + Knowledge Base + Agents are the
+ *   top-level product entries; Settings also exposes MCP for tenant admins.
  * - Standard keeps the complete upstream WeKnora source surface so operators
  *   can restore it by switching edition instead of reconstructing deleted code.
  * - Security-sensitive enforcement is server-side; these tests lock the
  *   frontend non-discoverability/deep-link contract only.
  */
 
-test("Lite sidebar is fail-closed to New Chat and Knowledge Base", () => {
-  assert.match(menuStore, /const liteVisiblePaths = new Set\(\['creatChat', 'knowledge-bases'\]\)/);
+test("Lite sidebar exposes native Agents alongside chat and knowledge bases", () => {
+  assert.match(menuStore, /const liteVisiblePaths = new Set\(\['creatChat', 'knowledge-bases', 'agents'\]\)/);
   assert.match(menuStore, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/);
   assert.match(sidebar, /!authStore\.isLiteMode && showSessionSourceFilter && !batchMode/);
 
@@ -82,6 +82,17 @@ test("Lite conversation restore cannot re-enable hidden capabilities", () => {
   );
 });
 
+test("conversation restore keeps the Agent that handled the last request", () => {
+  assert.match(settingsStore, /const restoredAgentID = typeof state\.agent_id === "string"/);
+  assert.match(settingsStore, /this\.settings\.selectedAgentId = restoredAgentID/);
+  assert.match(settingsStore, /restoredAgentID === BUILTIN_QUICK_ANSWER_ID/);
+  assert.match(settingsStore, /restoredAgentID === BUILTIN_SMART_REASONING_ID/);
+  assert.doesNotMatch(
+    settingsStore,
+    /applyLastRequestState\([\s\S]{0,300}this\.settings\.selectedAgentId = BUILTIN_SMART_REASONING_ID/,
+  );
+});
+
 test("Lite sidebar does not request hidden IM or embed channel metadata", () => {
   assert.match(
     sidebarBusiness,
@@ -95,6 +106,7 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
     "path.startsWith('/platform/chat/')",
     "path === '/platform/knowledge-bases'",
     "path.startsWith('/platform/knowledge-bases/')",
+    "path === '/platform/agents'",
     "path === '/platform/settings'",
     "path === '/plans'",
     "path === '/checkout'",
@@ -102,20 +114,21 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
     assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
   }
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/);
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile'/);
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mcp'/);
 
   // Standard routes remain in the bundle/source for quick restoration.
   assert.match(router, /AgentList\.vue/);
   assert.match(router, /OrganizationList\.vue/);
 });
 
-test("Lite Settings exposes General, Usage, Models, and User Profile while General exposes theme controls", () => {
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models'\) return 'general'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/);
+test("Lite Settings exposes consumer sections and MCP for tenant admins while General keeps theme controls", () => {
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'[\s\S]*key: 'mcp'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/);
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/);
   assert.match(settingsView, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/);
   assert.match(settingsView, /<ModelSettings v-else-if="currentSection === 'models'"/);
   assert.match(settingsView, /<UsageBillingSettings v-else-if="currentSection === 'usage'"/);
+  assert.match(settingsView, /<McpSettings v-else-if="currentSection === 'mcp'"/);
 
   assert.match(generalSettings, /language\.language/);
   assert.match(generalSettings, /handleLanguageChange/);
@@ -148,13 +161,16 @@ test("Lite UserMenu keeps account exit but does not rediscover management surfac
   assert.match(userMenu, /handoffToExternalAuth\('logout'\)/);
 });
 
-test("Lite chat exposes one Codex-style model/reasoning picker without Agent management", () => {
+test("Lite chat exposes one native Agent/model/reasoning picker without duplicating Agent state", () => {
   assert.match(inputField, /v-if="!authStore\.isLiteMode" type="button" @click\.stop\.prevent="handleGoToAgentSettings\('knowledge'\)"/);
-  assert.match(inputField, /class="visual-chat-composer__model-picker"/);
+  assert.match(inputField, /class="visual-chat-composer__combined-picker"/);
+  assert.doesNotMatch(inputField, /<AgentSelector\b/);
+  assert.match(inputField, /<ModelSelector[\s\S]*:agents="enabledAgents"/);
+  assert.match(inputField, /@select-agent="selectAgentFromPicker"/);
   assert.match(inputField, /modelPickerView === 'overview'/);
   assert.match(inputField, /modelPickerView === 'models'/);
   assert.match(inputField, /modelPickerView = 'reasoning'/);
-  assert.doesNotMatch(inputField, /<AgentSelector\b|__thinking-switch|__add_model__/);
+  assert.doesNotMatch(inputField, /agentPickerOpen|v-for="agent in enabledAgents"|__thinking-switch|__add_model__/);
 });
 
 test("Lite Knowledge Base keeps diagnostics visible without opening hidden admin settings", () => {
@@ -172,11 +188,12 @@ test("Lite tenantless fallback does not expose workspace create or invitation ma
   assert.match(workspaceOnboarding, /handleLogout/);
 });
 
-test("Lite disables Command Palette as an alternate discovery path", () => {
+test("Lite disables the Command Palette while loading the now-exposed MCP catalog", () => {
   assert.match(commandPaletteStore, /const auth = useAuthStore\(\)/);
   assert.match(commandPaletteStore, /if \(auth\.isLiteMode\) \{[\s\S]*open\.value = false[\s\S]*return/);
   assert.match(commandPalette, /<RetrievalSettings v-if="drawerVisible && !authStore\.isLiteMode"/);
-  assert.match(inputBusiness, /if \(authStore\.isLiteMode\) \{[\s\S]*mcpServices\.value = \[\][\s\S]*return/);
+  assert.match(inputBusiness, /const loadMCPServices = async \(\) => \{\s*try \{\s*mcpServices\.value = await listMCPServices\(\)/);
+  assert.doesNotMatch(inputBusiness, /const loadMCPServices = async \(\) => \{\s*if \(authStore\.isLiteMode\)/);
 });
 
 test("chat and Knowledge Base business surfaces remain present inside the exposed product", () => {

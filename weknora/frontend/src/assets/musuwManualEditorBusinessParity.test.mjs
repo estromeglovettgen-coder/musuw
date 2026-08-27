@@ -13,15 +13,18 @@ test('frozen manual editor controller remains the original implementation', () =
   )
 })
 
-test('rebuilt manual editor reuses normalized frozen setup and has no active SettingDrawer shell', () => {
+test('manual editor reuses the frozen controller inside the native SettingDrawer shell', () => {
   const source = read('../components/manual-knowledge-editor.vue')
   assert.match(source, /import LegacyManualEditorBusiness from .*manual-knowledge-editor\.pre-view\.vue/)
+  assert.match(source, /import SettingDrawer from .*SettingDrawer\.vue/)
   assert.match(source, /const legacySetup = legacy\.setup/)
-  assert.match(source, /return \{ \.\.\.state, \.\.\.adapterState \}/)
-  assert.match(source, /class="visual-manual-editor"/)
+  assert.match(source, /return \{ \.\.\.state \}/, 'the wrapper must remove the virtual controller __isScriptSetup marker')
+  assert.doesNotMatch(source, /adapterState|setup:\s*legacy\.setup/)
+  assert.match(source, /components:\s*\{[\s\S]*?SettingDrawer/)
   for (const token of ['<SettingDrawer', 'class="manual-editor"', 'class="setting-drawer__section"']) {
-    assert.equal(source.includes(token), false, `manual editor still exposes ${token}`)
+    assert.ok(source.includes(token), `manual editor lost native drawer token: ${token}`)
   }
+  assert.doesNotMatch(source, /visual-manual-editor__overlay/)
 })
 
 test('rebuilt manual editor keeps edit preview markdown status and save workflows visible', () => {
@@ -31,6 +34,7 @@ test('rebuilt manual editor keeps edit preview markdown status and save workflow
     'form.kbId',
     'form.status',
     'toolbarGroups',
+    'Number(groupIndex) < toolbarGroups.length - 1',
     'handleToolbarAction(btn.action)',
     "activeTab === 'edit'",
     "activeTab === 'preview'",
@@ -42,20 +46,32 @@ test('rebuilt manual editor keeps edit preview markdown status and save workflow
   ]) assert.ok(source.includes(token), `manual editor active View lost ${token}`)
 })
 
-test('rebuilt manual editor keeps the native persistent resize contract', () => {
+test('manual editor delegates persistent resizing to SettingDrawer', () => {
   const source = read('../components/manual-knowledge-editor.vue')
   for (const token of [
-    "'setting-drawer:width:manual-markdown-editor'",
-    'MANUAL_DRAWER_DEFAULT_WIDTH = 760',
-    'MANUAL_DRAWER_MIN_WIDTH = 560',
-    'MANUAL_DRAWER_MAX_WIDTH = 1280',
-    'clampDrawerWidth',
-    'loadStoredDrawerWidth',
-    'persistDrawerWidth',
-    'onResizeStart',
-    'onResizeMove',
-    'onResizeEnd',
-    'window.localStorage.setItem',
-    'visual-manual-editor__resize-handle',
+    'width="760px"',
+    ':min-width="560"',
+    ':max-width="1280"',
+    'storage-key="setting-drawer:width:manual-markdown-editor"',
   ]) assert.ok(source.includes(token), `manual editor lost resize contract: ${token}`)
+  for (const customState of ['onResizeStart', 'onResizeMove', 'onResizeEnd', 'window.localStorage.setItem']) {
+    assert.equal(source.includes(customState), false, `manual editor still owns drawer state: ${customState}`)
+  }
+})
+
+test('manual editor consumes the shared dark card surfaces without repainting other drawers', () => {
+  const source = read('../components/manual-knowledge-editor.vue')
+  assert.match(source, /class="manual-editor-drawer"/)
+  assert.match(
+    source,
+    /:root\[theme-mode="dark"\] body \.t-drawer\.manual-editor-drawer > \.t-drawer__content-wrapper[\s\S]*?background:\s*var\(--mvc-surface\)\s*!important;/,
+  )
+  assert.match(
+    source,
+    /:root\[theme-mode="dark"\] body \.manual-editor-drawer \.t-input,[\s\S]*?\.manual-editor-drawer \.t-textarea__inner[\s\S]*?background:\s*var\(--mvc-surface-raised\)\s*!important;/,
+  )
+  assert.match(
+    source,
+    /:root\[theme-mode="dark"\] body \.manual-editor-drawer \.t-drawer__footer[\s\S]*?background:\s*var\(--mvc-surface-raised\)\s*!important;/,
+  )
 })

@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const finalTheme = readFileSync(new URL('./musuw-final-theme-closure.css', import.meta.url), 'utf8')
+const reachableSurface = readFileSync(new URL('./musuw-reachable-surface-final.css', import.meta.url), 'utf8')
+const composer = readFileSync(new URL('../components/Input-field.vue', import.meta.url), 'utf8')
 const closureStart = finalTheme.indexOf('/* Chat dark contrast closure.')
 const chatDark = closureStart >= 0 ? finalTheme.slice(closureStart) : ''
 
@@ -32,8 +34,8 @@ test('dark model picker keeps row values and option lock/selection states legibl
   assert.match(chatDark, /\.visual-model-selector__chat-option-copy strong[\s\S]*?color:\s*inherit\s*!important;/)
   assert.match(chatDark, /\.visual-model-selector__chat-option\.is-selected[\s\S]*?background:\s*var\(--mvc-active\)\s*!important;/)
   assert.match(chatDark, /\.visual-model-selector__chat-option\.is-locked:hover[\s\S]*?background:\s*var\(--mvc-surface-raised\)\s*!important;/)
-  assert.match(chatDark, /\.visual-chat-composer__model-picker\.is-open[\s\S]*?box-shadow:\s*0 0 0 1px var\(--mvc-line-strong\)/)
-  assert.match(chatDark, /\.visual-chat-composer__model-picker:focus-visible[\s\S]*?outline:/)
+  assert.match(composer, /:root\[theme-mode="dark"\] \.visual-chat-composer__combined-picker\.is-open[\s\S]*?box-shadow:/)
+  assert.match(finalTheme, /\.visual-model-selector__chat-panel,[\s\S]*?\.visual-model-selector__chat-flyout,[\s\S]*?background:\s*var\(--mvc-surface\)\s*!important;/)
 })
 
 test('dark chat messages and rich markdown never reuse light text or white surfaces', () => {
@@ -57,4 +59,8 @@ test('dark chat header, request metadata and upload cards own every interactive 
   assert.match(chatDark, /\.visual-request-info-popup \.t-popup__content[\s\S]*?background:\s*var\(--mvc-surface\)\s*!important;/)
   assert.match(chatDark, /\.visual-attachment-card[\s\S]*?background:\s*var\(--mvc-surface-raised\)\s*!important;/)
   assert.match(chatDark, /\.visual-attachment-card__remove:hover[\s\S]*?background:\s*var\(--mvc-hover\)\s*!important;/)
+})
+
+test('teleported feedback uses a dark surface in dark mode', () => {
+  assert.match(reachableSurface, /:root\[theme-mode="dark"\] body \.t-message\s*\{[\s\S]*?background:\s*#18181b\s*!important;[\s\S]*?color:\s*#f4f4f5\s*!important;/)
 })

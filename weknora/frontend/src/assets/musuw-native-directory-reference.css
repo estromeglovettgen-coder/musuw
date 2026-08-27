@@ -169,7 +169,7 @@
 
 .agent-card .card-header,
 .org-card .card-header {
-  min-height: 28px !important;
+  min-height: 24px !important;
   margin: 0 !important;
   padding: 0 !important;
   display: flex !important;
@@ -200,9 +200,9 @@
 .agent-card .builtin-avatar,
 .org-card .org-avatar,
 .agent-card .agent-avatar-small {
-  flex: 0 0 30px !important;
-  width: 30px !important;
-  height: 30px !important;
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  height: 24px !important;
   border: 1px solid #f3f4f6 !important;
   border-radius: 9px !important;
   display: inline-flex !important;
@@ -215,7 +215,7 @@
 .agent-card .card-content,
 .org-card .card-content {
   min-height: 0 !important;
-  margin: 8px 0 0 !important;
+  margin: 6px 0 0 !important;
   padding: 0 !important;
 }
 .agent-card .card-description,
@@ -231,7 +231,7 @@
 }
 .agent-card .card-bottom,
 .org-card .card-bottom {
-  min-height: 34px !important;
+  min-height: 20px !important;
   margin-top: 12px !important;
   padding-top: 12px !important;
   border-top: 1px solid #f3f4f6 !important;
@@ -268,9 +268,10 @@
 .agent-card .agent-favorite-star,
 .agent-card .more-wrap,
 .org-card .more-wrap {
-  width: 28px !important;
-  height: 28px !important;
-  padding: 6px !important;
+  width: 24px !important;
+  height: 24px !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
   border: 0 !important;
   border-radius: 8px !important;
   background: transparent !important;
@@ -561,4 +562,9 @@
   background: var(--mvc-hover, #25272c) !important;
   border-color: var(--mvc-line, #31343a) !important;
   color: var(--mvc-text-strong, #fff) !important;
+}
+:root[theme-mode="dark"] .agent-card:hover,
+:root[theme-mode="dark"] .org-card:hover {
+  border-color: var(--mvc-line-strong, #484c54) !important;
+  box-shadow: var(--mvc-shadow) !important;
 }

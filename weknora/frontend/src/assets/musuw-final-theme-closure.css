@@ -369,14 +369,14 @@
     color: inherit !important;
   }
   body .wiki-graph-search-dropdown,
-  body .wiki-graph-help-popup,
-  body .wiki-graph-drawer {
+  body .wiki-graph-help-popup {
     border-color: var(--mvc-line) !important;
     background: var(--mvc-surface) !important;
     color: var(--mvc-text) !important;
   }
   body .wiki-graph-search-dropdown .t-popup__content,
   body .wiki-graph-help-popup .t-popup__content,
+  body .wiki-graph-drawer .t-drawer__content-wrapper,
   body .wiki-graph-drawer .t-drawer__content,
   body .wiki-graph-drawer .t-drawer__header,
   body .wiki-graph-drawer .t-drawer__footer {
@@ -1428,4 +1428,37 @@
   .visual-attachment-card__progress > span {
     background: var(--mvc-muted-strong) !important;
   }
+}
+
+/* TDesign owns drawer open/closed state on the content wrapper. Its fixed,
+ * viewport-sized root is only a positioning shell and must never become a
+ * painted panel: a closed wrapper remains mounted with visibility:hidden.
+ * Keep display/visibility native; put fill, border and shadow on the panel. */
+body .t-drawer.t-drawer--right.mcp-drawer {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+body .t-drawer.t-drawer--right.mcp-drawer > .t-drawer__content-wrapper {
+  border-left: 1px solid #e5e7eb !important;
+  background: #fff !important;
+  box-shadow: -18px 0 50px rgb(15 23 42 / 16%) !important;
+}
+body .t-drawer.t-drawer--right.wiki-graph-drawer {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+body .t-drawer.t-drawer--right.wiki-graph-drawer > .t-drawer__content-wrapper {
+  box-shadow: -4px 0 16px rgb(0 0 0 / 8%) !important;
+}
+:root[theme-mode="dark"] body .t-drawer.t-drawer--right.mcp-drawer {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] body .t-drawer.t-drawer--right.mcp-drawer > .t-drawer__content-wrapper {
+  border-left-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface, #1d1f23) !important;
+  box-shadow: -18px 0 50px rgb(0 0 0 / 36%) !important;
 }

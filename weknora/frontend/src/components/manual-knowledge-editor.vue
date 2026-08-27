@@ -1,333 +1,644 @@
 <script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref, type SetupContext } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
+import SettingDrawer from '@/components/settings/SettingDrawer.vue'
 import LegacyManualEditorBusiness from '@/assets/business-baselines/manual-knowledge-editor.pre-view.vue'
 
 const legacy = LegacyManualEditorBusiness as any
 const legacySetup = legacy.setup
-const MANUAL_DRAWER_WIDTH_KEY = 'setting-drawer:width:manual-markdown-editor'
-const MANUAL_DRAWER_DEFAULT_WIDTH = 760
-const MANUAL_DRAWER_MIN_WIDTH = 560
-const MANUAL_DRAWER_MAX_WIDTH = 1280
-
-const clampDrawerWidth = (value: number) =>
-  Math.max(MANUAL_DRAWER_MIN_WIDTH, Math.min(MANUAL_DRAWER_MAX_WIDTH, Math.round(value)))
-
-const loadStoredDrawerWidth = () => {
-  if (typeof window === 'undefined') return MANUAL_DRAWER_DEFAULT_WIDTH
-  try {
-    const raw = window.localStorage.getItem(MANUAL_DRAWER_WIDTH_KEY)
-    const parsed = raw ? Number(raw) : NaN
-    return Number.isFinite(parsed) ? clampDrawerWidth(parsed) : MANUAL_DRAWER_DEFAULT_WIDTH
-  } catch {
-    return MANUAL_DRAWER_DEFAULT_WIDTH
-  }
-}
 
 export default defineComponent({
   ...legacy,
   name: 'ManualKnowledgeEditor',
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
-    const drawerWidthPx = ref(loadStoredDrawerWidth())
-    const drawerResizing = ref(false)
-    let resizeStartX = 0
-    let resizeStartWidth = MANUAL_DRAWER_DEFAULT_WIDTH
-
-    const persistDrawerWidth = () => {
-      if (typeof window === 'undefined') return
-      try {
-        window.localStorage.setItem(MANUAL_DRAWER_WIDTH_KEY, String(clampDrawerWidth(drawerWidthPx.value)))
-      } catch {
-        // Keep the live width when storage is unavailable.
-      }
-    }
-
-    const onResizeMove = (event: MouseEvent) => {
-      drawerWidthPx.value = clampDrawerWidth(resizeStartWidth + resizeStartX - event.clientX)
-    }
-
-    const cleanupResize = () => {
-      document.removeEventListener('mousemove', onResizeMove)
-      document.removeEventListener('mouseup', onResizeEnd)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      drawerResizing.value = false
-    }
-
-    function onResizeEnd() {
-      cleanupResize()
-      persistDrawerWidth()
-    }
-
-    const onResizeStart = (event: MouseEvent) => {
-      drawerResizing.value = true
-      resizeStartX = event.clientX
-      resizeStartWidth = drawerWidthPx.value
-      document.addEventListener('mousemove', onResizeMove)
-      document.addEventListener('mouseup', onResizeEnd)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    }
-
-    const onWindowResize = () => {
-      drawerWidthPx.value = clampDrawerWidth(drawerWidthPx.value)
-    }
-
-    onMounted(() => {
-      window.addEventListener('resize', onWindowResize, { passive: true })
-    })
-
-    onUnmounted(() => {
-      window.removeEventListener('resize', onWindowResize)
-      cleanupResize()
-    })
-
-    const adapterState = {
-      drawerWidthPx,
-      drawerResizing,
-      onResizeStart,
-    }
-
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
-      return { ...state, ...adapterState }
+      return { ...state }
     }
     return state
+  },
+  components: {
+    ...(legacy.components || {}),
+    SettingDrawer,
   },
 })
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="visual-manual-editor">
-      <div v-if="visible" class="visual-manual-editor__overlay" @click.self="handleClose">
-        <div
-          class="visual-manual-editor__resize-handle"
-          :class="{ 'is-active': drawerResizing }"
-          :style="{ right: `${drawerWidthPx}px` }"
-          role="separator"
-          aria-orientation="vertical"
-          @mousedown.prevent="onResizeStart"
+  <SettingDrawer
+    class="manual-editor-drawer"
+    :visible="visible"
+    :title="dialogTitle"
+    :description="$t('manualEditor.description')"
+    icon="edit-1"
+    width="760px"
+    :min-width="560"
+    :max-width="1280"
+    storage-key="setting-drawer:width:manual-markdown-editor"
+    :hide-footer="!initialLoaded"
+    @update:visible="(v: boolean) => { visible = v }"
+  >
+    <template #footer-left>
+      <div class="manual-editor-footer-meta">
+        <t-tag size="small" theme="warning" variant="light" v-if="form.status === 'draft'">
+          {{ $t('manualEditor.status.draftTag') }}
+        </t-tag>
+        <t-tag size="small" theme="success" variant="light" v-else>
+          {{ $t('manualEditor.status.publishedTag') }}
+        </t-tag>
+      </div>
+    </template>
+
+    <template #footer-right>
+      <div class="manual-editor-footer-actions">
+        <t-button
+          theme="default"
+          variant="outline"
+          class="manual-editor-cancel-btn"
+          :disabled="saving"
+          @click="handleClose"
         >
-          <span />
+          {{ $t('manualEditor.actions.cancel') }}
+        </t-button>
+        <t-button
+          variant="outline"
+          theme="default"
+          @click="handleSave('draft')"
+          :loading="saving && savingAction === 'draft'"
+          :disabled="saving && savingAction !== 'draft'"
+        >
+          {{ $t('manualEditor.actions.saveDraft') }}
+        </t-button>
+        <t-button
+          theme="primary"
+          @click="handleSave('publish')"
+          :loading="saving && savingAction === 'publish'"
+          :disabled="saving && savingAction !== 'publish'"
+        >
+          {{ $t('manualEditor.actions.publish') }}
+        </t-button>
+      </div>
+    </template>
+
+    <div class="manual-editor" v-if="initialLoaded">
+      <section class="setting-drawer__section">
+        <h4 class="setting-drawer__section-title">{{ $t('manualEditor.section.basic') }}</h4>
+
+        <div class="form-item">
+          <label class="form-label required">{{ $t('manualEditor.form.titleLabel') }}</label>
+          <t-input
+            v-model="form.title"
+            maxlength="100"
+            :placeholder="$t('manualEditor.form.titlePlaceholder')"
+            showLimitNumber
+          />
         </div>
 
-        <aside
-          class="visual-manual-editor"
-          :class="{ 'is-resizing': drawerResizing }"
-          :style="{ width: `${drawerWidthPx}px` }"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="dialogTitle"
-        >
-          <header class="visual-manual-editor__header">
-            <div class="visual-manual-editor__heading">
-              <span class="visual-manual-editor__heading-icon"><t-icon name="edit-1" /></span>
-              <div>
-                <h3>{{ dialogTitle }}</h3>
-                <p>{{ $t('manualEditor.description') }}</p>
-              </div>
+        <div class="form-item">
+          <label class="form-label required">{{ $t('manualEditor.form.knowledgeBaseLabel') }}</label>
+          <div class="kb-row">
+            <t-select
+              v-model="form.kbId"
+              :disabled="kbDisabled"
+              :loading="kbLoading"
+              :options="kbOptions"
+              :placeholder="$t('manualEditor.form.knowledgeBasePlaceholder')"
+              :popup-props="{ attach: 'body', zIndex: 2600 }"
+            >
+              <template #empty>
+                <div style="padding: 20px; text-align: center; color: var(--td-text-color-placeholder);">
+                  {{ $t('manualEditor.noDocumentKnowledgeBases') }}
+                </div>
+              </template>
+            </t-select>
+            <div class="status-row" v-if="mode === 'edit'">
+              <t-tag size="small" theme="warning" variant="light" v-if="form.status === 'draft'">
+                {{ $t('manualEditor.status.draftTag') }}
+              </t-tag>
+              <t-tag size="small" theme="success" variant="light" v-else>
+                {{ $t('manualEditor.status.publishedTag') }}
+              </t-tag>
             </div>
-            <button type="button" class="visual-manual-editor__close" :aria-label="$t('common.close')" @click="handleClose">
-              <t-icon name="close" />
-            </button>
-          </header>
+          </div>
+          <p v-if="lastUpdatedText" class="form-desc">{{ lastUpdatedText }}</p>
+        </div>
+      </section>
 
-          <div class="visual-manual-editor__content">
-            <div v-if="!initialLoaded" class="visual-manual-editor__loading">
-              <t-loading size="medium" :text="$t('manualEditor.loading.preparing')" />
+      <section class="setting-drawer__section editor-section">
+        <h4 class="setting-drawer__section-title">{{ $t('manualEditor.section.content') }}</h4>
+
+        <div class="editor-area">
+          <div class="editor-toolbar">
+            <div class="editor-toolbar__format">
+              <template v-for="(group, groupIndex) in toolbarGroups" :key="group.key">
+                <div class="toolbar-group">
+                  <template v-for="btn in group.buttons" :key="btn.key">
+                    <t-tooltip :content="btn.tooltip" placement="top">
+                      <button
+                        type="button"
+                        class="toolbar-btn"
+                        :class="`btn-${btn.key}`"
+                        @mousedown.prevent
+                        @click="handleToolbarAction(btn.action)"
+                      >
+                        <t-icon :name="btn.icon" size="18px" />
+                      </button>
+                    </t-tooltip>
+                  </template>
+                </div>
+                <div
+                  v-if="Number(groupIndex) < toolbarGroups.length - 1"
+                  class="toolbar-divider"
+                ></div>
+              </template>
             </div>
-
-            <template v-else>
-              <section class="visual-manual-editor__section">
-                <h4>{{ $t('manualEditor.section.basic') }}</h4>
-                <div class="visual-manual-editor__field">
-                  <label>{{ $t('manualEditor.form.titleLabel') }}</label>
-                  <t-input
-                    v-model="form.title"
-                    maxlength="100"
-                    :placeholder="$t('manualEditor.form.titlePlaceholder')"
-                    show-limit-number
-                  />
-                </div>
-
-                <div class="visual-manual-editor__field">
-                  <label>{{ $t('manualEditor.form.knowledgeBaseLabel') }}</label>
-                  <div class="visual-manual-editor__kb-row">
-                    <t-select
-                      v-model="form.kbId"
-                      :disabled="kbDisabled"
-                      :loading="kbLoading"
-                      :options="kbOptions"
-                      :placeholder="$t('manualEditor.form.knowledgeBasePlaceholder')"
-                      :popup-props="{ attach: 'body', zIndex: 3400 }"
-                    >
-                      <template #empty>
-                        <div class="visual-manual-editor__select-empty">{{ $t('manualEditor.noDocumentKnowledgeBases') }}</div>
-                      </template>
-                    </t-select>
-                    <span
-                      v-if="mode === 'edit'"
-                      class="visual-manual-editor__status"
-                      :class="form.status === 'draft' ? 'is-draft' : 'is-published'"
-                    >
-                      {{ form.status === 'draft' ? $t('manualEditor.status.draftTag') : $t('manualEditor.status.publishedTag') }}
-                    </span>
-                  </div>
-                  <p v-if="lastUpdatedText">{{ lastUpdatedText }}</p>
-                </div>
-              </section>
-
-              <section class="visual-manual-editor__section is-editor">
-                <h4>{{ $t('manualEditor.section.content') }}</h4>
-                <div class="visual-manual-editor__editor">
-                  <div class="visual-manual-editor__toolbar">
-                    <div class="visual-manual-editor__format-tools">
-                      <template v-for="(group, groupIndex) in toolbarGroups" :key="group.key">
-                        <div class="visual-manual-editor__tool-group">
-                          <t-tooltip v-for="btn in group.buttons" :key="btn.key" :content="btn.tooltip" placement="top">
-                            <button
-                              type="button"
-                              class="visual-manual-editor__tool"
-                              :aria-label="btn.tooltip"
-                              @mousedown.prevent
-                              @click="handleToolbarAction(btn.action)"
-                            >
-                              <t-icon :name="btn.icon" />
-                            </button>
-                          </t-tooltip>
-                        </div>
-                        <span v-if="Number(groupIndex) < toolbarGroups.length - 1" class="visual-manual-editor__divider" />
-                      </template>
-                    </div>
-                    <button
-                      type="button"
-                      class="visual-manual-editor__view-toggle"
-                      :disabled="saving"
-                      @click="toggleEditorView"
-                    >
-                      <t-icon :name="viewToggleIcon" />
-                      <span>{{ viewToggleLabel }}</span>
-                    </button>
-                  </div>
-
-                  <div v-show="activeTab === 'edit'" class="visual-manual-editor__pane">
-                    <t-textarea
-                      v-if="!contentLoading"
-                      ref="textareaComponent"
-                      v-model="form.content"
-                      :placeholder="$t('manualEditor.form.contentPlaceholder')"
-                      class="visual-manual-editor__textarea"
-                    />
-                    <div v-else class="visual-manual-editor__pane-loading">
-                      <t-loading size="small" :text="$t('manualEditor.loading.content')" />
-                    </div>
-                  </div>
-
-                  <div v-show="activeTab === 'preview'" class="visual-manual-editor__pane is-preview">
-                    <div class="visual-manual-editor__preview" v-html="previewHTML" />
-                  </div>
-                </div>
-              </section>
-            </template>
+            <div class="editor-toolbar__view">
+              <t-button
+                variant="text"
+                theme="primary"
+                size="small"
+                :class="['toggle-view-btn', { 'is-preview': isPreviewMode }]"
+                :disabled="saving"
+                @click="toggleEditorView"
+              >
+                <template #icon><t-icon :name="viewToggleIcon" /></template>
+                {{ viewToggleLabel }}
+              </t-button>
+            </div>
           </div>
 
-          <footer v-if="initialLoaded" class="visual-manual-editor__footer">
-            <span
-              class="visual-manual-editor__status"
-              :class="form.status === 'draft' ? 'is-draft' : 'is-published'"
-            >
-              {{ form.status === 'draft' ? $t('manualEditor.status.draftTag') : $t('manualEditor.status.publishedTag') }}
-            </span>
-            <div class="visual-manual-editor__footer-actions">
-              <button type="button" class="visual-manual-editor__button" :disabled="saving" @click="handleClose">
-                {{ $t('manualEditor.actions.cancel') }}
-              </button>
-              <button
-                type="button"
-                class="visual-manual-editor__button"
-                :disabled="saving && savingAction !== 'draft'"
-                @click="handleSave('draft')"
-              >
-                <t-loading v-if="saving && savingAction === 'draft'" size="small" />
-                <span>{{ $t('manualEditor.actions.saveDraft') }}</span>
-              </button>
-              <button
-                type="button"
-                class="visual-manual-editor__button is-primary"
-                :disabled="saving && savingAction !== 'publish'"
-                @click="handleSave('publish')"
-              >
-                <t-loading v-if="saving && savingAction === 'publish'" size="small" />
-                <span>{{ $t('manualEditor.actions.publish') }}</span>
-              </button>
+          <div class="editor-pane" v-show="activeTab === 'edit'">
+            <t-textarea
+              ref="textareaComponent"
+              v-if="!contentLoading"
+              v-model="form.content"
+              :placeholder="$t('manualEditor.form.contentPlaceholder')"
+              class="editor-textarea"
+            />
+            <div v-else class="loading-placeholder">
+              <t-loading size="small" :text="$t('manualEditor.loading.content')" />
             </div>
-          </footer>
-        </aside>
-
-        <div v-if="drawerResizing" class="visual-manual-editor__resize-shield" aria-hidden="true" />
-      </div>
-    </Transition>
-  </Teleport>
+          </div>
+          <div class="editor-pane editor-pane--preview" v-show="activeTab === 'preview'">
+            <div class="preview-container" v-html="previewHTML" />
+          </div>
+        </div>
+      </section>
+    </div>
+    <div v-else class="loading-wrapper">
+      <t-loading size="medium" :text="$t('manualEditor.loading.preparing')" />
+    </div>
+  </SettingDrawer>
 </template>
 
 <style scoped lang="less">
-.visual-manual-editor__overlay { position: fixed; inset: 0; z-index: 3300; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 18%); backdrop-filter: blur(2px); }
-.visual-manual-editor { max-width: 100vw; height: 100%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #e5e7eb; background: #fff; box-shadow: -18px 0 50px rgb(15 23 42 / 12%); color: #374151; }
-.visual-manual-editor__header { flex: 0 0 auto; padding: 18px 20px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-.visual-manual-editor__heading { min-width: 0; display: flex; gap: 10px; }
-.visual-manual-editor__heading-icon { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; color: #6b7280; }
-.visual-manual-editor__heading h3 { margin: 0; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; }
-.visual-manual-editor__heading p { margin: 3px 0 0; color: #9ca3af; font-size: 10px; line-height: 16px; }
-.visual-manual-editor__close { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; }
-.visual-manual-editor__close:hover { background: #f3f4f6; color: #374151; }
-.visual-manual-editor__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 0 20px; }
-.visual-manual-editor__loading { min-height: 260px; display: flex; align-items: center; justify-content: center; }
-.visual-manual-editor__section { padding: 16px 0; border-bottom: 1px solid #f3f4f6; display: flex; flex-direction: column; gap: 12px; }
-.visual-manual-editor__section.is-editor { border-bottom: 0; }
-.visual-manual-editor__section > h4 { margin: 0; color: #374151; font-size: 10px; line-height: 16px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-.visual-manual-editor__field { display: flex; flex-direction: column; gap: 6px; }
-.visual-manual-editor__field > label { color: #4b5563; font-size: 10px; line-height: 15px; font-weight: 600; }
-.visual-manual-editor__field > label::after { content: ' *'; color: #dc2626; }
-.visual-manual-editor__field > p { margin: 0; color: #9ca3af; font-size: 9px; line-height: 14px; }
-.visual-manual-editor__field :deep(.t-input),.visual-manual-editor__field :deep(.t-select-input) { min-height: 34px; border-color: #e5e7eb; border-radius: 8px; background: #fff; box-shadow: none !important; font-size: 11px; }
-.visual-manual-editor__kb-row { display: flex; align-items: center; gap: 8px; }
-.visual-manual-editor__kb-row :deep(.t-select) { min-width: 0; flex: 1; }
-.visual-manual-editor__select-empty { padding: 18px; color: #9ca3af; font-size: 10px; text-align: center; }
-.visual-manual-editor__status { flex: 0 0 auto; padding: 2px 6px; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 9px; line-height: 14px; font-weight: 600; }
-.visual-manual-editor__status.is-published { background: #f0fdf4; color: #047857; }
-.visual-manual-editor__status.is-draft { background: #fffbeb; color: #b45309; }
-.visual-manual-editor__editor { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 11px; background: #fff; }
-.visual-manual-editor__editor:focus-within { border-color: #d1d5db; box-shadow: 0 0 0 2px rgb(17 24 39 / 5%); }
-.visual-manual-editor__toolbar { min-height: 40px; padding: 5px 7px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f9fafb; }
-.visual-manual-editor__format-tools { min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.visual-manual-editor__tool-group { display: flex; gap: 2px; }
-.visual-manual-editor__divider { flex: 0 0 1px; width: 1px; height: 18px; background: #e5e7eb; }
-.visual-manual-editor__tool { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #6b7280; cursor: pointer; }
-.visual-manual-editor__tool:hover { background: #eceef1; color: #111827; }
-.visual-manual-editor__tool :deep(.t-icon) { font-size: 13px; }
-.visual-manual-editor__view-toggle { min-height: 28px; padding: 5px 8px; border: 0; border-radius: 7px; display: inline-flex; align-items: center; gap: 5px; background: #2d3138; color: #fff; font: inherit; font-size: 9px; font-weight: 600; cursor: pointer; }
-.visual-manual-editor__view-toggle:hover:not(:disabled) { background: #111827; }
-.visual-manual-editor__pane { min-height: 390px; }
-.visual-manual-editor__textarea :deep(.t-textarea),.visual-manual-editor__textarea :deep(.t-textarea__inner) { border: 0 !important; border-radius: 0 !important; background: #fff !important; box-shadow: none !important; }
-.visual-manual-editor__textarea :deep(.t-textarea__inner) { width: 100%; min-height: 390px; max-height: 58vh; padding: 14px; box-sizing: border-box; resize: none; color: #374151; font: 11px/1.7 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
-.visual-manual-editor__pane-loading { min-height: 390px; display: flex; align-items: center; justify-content: center; }
-.visual-manual-editor__pane.is-preview { overflow-y: auto; max-height: 58vh; padding: 16px; box-sizing: border-box; background: #fff; }
-.visual-manual-editor__preview { color: #374151; font-size: 12px; line-height: 1.75; word-break: break-word; }
-.visual-manual-editor__preview :deep(h1),.visual-manual-editor__preview :deep(h2),.visual-manual-editor__preview :deep(h3) { color: #111827; line-height: 1.35; }
-.visual-manual-editor__preview :deep(pre) { overflow-x: auto; padding: 10px; border-radius: 8px; background: #f3f4f6; }
-.visual-manual-editor__preview :deep(code) { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
-.visual-manual-editor__footer { flex: 0 0 60px; min-height: 60px; padding: 11px 20px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f9fafb; }
-.visual-manual-editor__footer-actions { margin-left: auto; display: flex; gap: 7px; }
-.visual-manual-editor__button { min-height: 34px; padding: 6px 11px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
-.visual-manual-editor__button.is-primary { border-color: #111827; background: #111827; color: #fff; }
-.visual-manual-editor__button:disabled { opacity: .5; cursor: default; }
-.visual-manual-editor__resize-handle { position: fixed; top: 0; bottom: 0; z-index: 3302; width: 12px; margin-right: -6px; display: flex; align-items: center; justify-content: center; cursor: col-resize; }
-.visual-manual-editor__resize-handle > span { width: 2px; height: 48px; border-radius: 1px; background: #d1d5db; opacity: .55; transition: opacity 150ms ease, background-color 150ms ease; }
-.visual-manual-editor__resize-handle:hover > span,.visual-manual-editor__resize-handle.is-active > span { background: #6b7280; opacity: 1; }
-.visual-manual-editor__resize-shield { position: fixed; inset: 0; z-index: 3301; cursor: col-resize; }
-.visual-manual-editor.is-resizing .visual-manual-editor__content { pointer-events: none; user-select: none; }
-.visual-manual-editor-enter-active,.visual-manual-editor-leave-active { transition: opacity 160ms ease; }
-.visual-manual-editor-enter-from,.visual-manual-editor-leave-to { opacity: 0; }
-@media (max-width: 760px) { .visual-manual-editor { width: 100% !important; } .visual-manual-editor__resize-handle { display: none; } .visual-manual-editor__content { padding-inline: 14px; } .visual-manual-editor__footer { padding-inline: 14px; } }
-@media (prefers-reduced-motion: reduce) { .visual-manual-editor-enter-active,.visual-manual-editor-leave-active,.visual-manual-editor__resize-handle > span { transition: none !important; } }
+/* 复用模型管理同款 SettingDrawer：分组 section / header 图标 / footer 按钮 / 拖拽调宽。
+   这里只负责本编辑器特有的内容样式。内容内联渲染（无 teleport），scoped 生效。 */
+.manual-editor {
+  display: flex;
+  flex-direction: column;
+  --manual-editor-accent: var(--musuw-accent);
+  --manual-editor-accent-soft: var(--musuw-accent-soft);
+}
+
+.manual-editor-footer-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--td-text-color-placeholder);
+}
+
+.manual-editor-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+
+  :deep(.t-button) {
+    min-width: 88px;
+  }
+}
+
+.manual-editor-cancel-btn {
+  border-color: transparent;
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--td-text-color-secondary);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+
+  &:hover {
+    border-color: var(--td-component-stroke);
+    background: var(--td-bg-color-container-hover);
+    color: var(--td-text-color-primary);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--td-text-color-primary);
+
+  &.required::after {
+    content: '*';
+    margin-left: 4px;
+    color: var(--td-error-color);
+  }
+}
+
+.form-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--td-text-color-placeholder);
+}
+
+.kb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  :deep(.t-select) {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 内容分组：让编辑区占满，无需依赖父级 flex 链路，直接用视口高度，稳健 */
+.editor-section {
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  background: var(--td-bg-color-secondarycontainer);
+  border-bottom: 1px solid var(--td-component-stroke);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.editor-toolbar__format {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+
+  &::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+.editor-toolbar__view {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  border-left: 1px solid var(--td-component-stroke);
+}
+
+.toggle-view-btn {
+  min-width: 92px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 7px;
+  background: var(--td-bg-color-container);
+  color: var(--td-text-color-secondary);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover {
+    border-color: var(--manual-editor-accent);
+    background: var(--manual-editor-accent-soft);
+    color: var(--manual-editor-accent);
+    box-shadow: none;
+  }
+
+  &.is-preview {
+    border-color: var(--manual-editor-accent);
+    background: var(--manual-editor-accent-soft);
+    color: var(--manual-editor-accent);
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+
+  :deep(.t-button__icon) {
+    margin-right: 5px;
+    font-size: 15px;
+  }
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--td-component-stroke);
+  margin: 0 4px;
+}
+
+.toolbar-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--td-text-color-secondary);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .t-icon {
+    color: var(--td-text-color-secondary);
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.toolbar-btn:hover {
+  background: var(--manual-editor-accent-soft);
+  color: var(--manual-editor-accent);
+
+  .t-icon {
+    color: var(--manual-editor-accent);
+  }
+}
+
+.toolbar-btn.active {
+  background: var(--manual-editor-accent-soft);
+  color: var(--manual-editor-accent);
+
+  .t-icon {
+    color: var(--manual-editor-accent);
+  }
+}
+
+.toolbar-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--manual-editor-accent) 24%, transparent);
+}
+
+.toolbar-btn:active {
+  background: var(--manual-editor-accent-soft);
+  transform: translateY(0.5px);
+}
+
+.editor-area {
+  /* 抽屉为整屏高，减去 header/footer/基本信息分组的大致高度，
+     让编辑区占据剩余空间且不必撑满父级 flex 链路。 */
+  height: calc(100vh - 360px);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--td-bg-color-container);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus-within {
+    border-color: var(--manual-editor-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--manual-editor-accent) 12%, transparent);
+  }
+}
+
+.editor-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--td-bg-color-container);
+}
+
+:deep(.editor-textarea) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .t-textarea__inner {
+    flex: 1;
+    height: 100% !important;
+    resize: none;
+    border: none;
+    border-radius: 0;
+    padding: 14px 16px;
+    font-family: var(--app-font-family-mono);
+    font-size: 14px;
+    line-height: 1.7;
+    background: var(--td-bg-color-container);
+
+    &:focus {
+      box-shadow: none;
+    }
+  }
+}
+
+.editor-pane--preview {
+  background: var(--td-bg-color-container);
+}
+
+.preview-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--td-bg-color-container);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--td-text-color-primary);
+
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  :deep(code) {
+    background: var(--td-bg-color-container-hover);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: var(--app-font-family-mono);
+  }
+
+  :deep(pre) {
+    background: var(--td-bg-color-container-hover);
+    padding: 12px;
+    border-radius: 6px;
+    overflow: auto;
+  }
+
+  :deep(blockquote) {
+    border-left: 4px solid var(--manual-editor-accent);
+    padding-left: 12px;
+    color: var(--td-text-color-secondary);
+    margin: 16px 0;
+    background: var(--manual-editor-accent-soft);
+  }
+
+  :deep(a) {
+    color: var(--manual-editor-accent);
+  }
+}
+
+.loading-wrapper,
+.loading-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 280px;
+  padding: 20px;
+}
+
+.empty-preview {
+  color: var(--td-text-color-placeholder);
+}
+</style>
+
+<style lang="less">
+:root[theme-mode="dark"] body .t-drawer.manual-editor-drawer {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[theme-mode="dark"] body .t-drawer.manual-editor-drawer > .t-drawer__content-wrapper {
+  border-left: 1px solid var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: -18px 0 50px rgb(0 0 0 / 36%) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-drawer__header,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-drawer__body {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .setting-drawer__header-icon {
+  border: 1px solid var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-muted-strong) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .setting-drawer__title,
+:root[theme-mode="dark"] body .manual-editor-drawer .setting-drawer__section-title,
+:root[theme-mode="dark"] body .manual-editor-drawer .form-label {
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .setting-drawer__subtitle,
+:root[theme-mode="dark"] body .manual-editor-drawer .form-desc,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-input__suffix {
+  color: var(--mvc-muted) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .setting-drawer__section,
+:root[theme-mode="dark"] body .manual-editor-drawer .editor-toolbar {
+  border-color: var(--mvc-line) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-input,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-textarea__inner {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: none !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-input:hover,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input:hover,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-textarea__inner:hover {
+  border-color: var(--mvc-line-strong) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-input__inner,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-textarea__inner {
+  color: var(--mvc-text) !important;
+  caret-color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-input__inner::placeholder,
+:root[theme-mode="dark"] body .manual-editor-drawer .t-textarea__inner::placeholder {
+  color: var(--mvc-faint) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .editor-area,
+:root[theme-mode="dark"] body .manual-editor-drawer .editor-pane,
+:root[theme-mode="dark"] body .manual-editor-drawer .preview-container {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .editor-toolbar {
+  background: var(--mvc-hover) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .toolbar-btn {
+  color: var(--mvc-muted-strong) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .toolbar-btn:hover,
+:root[theme-mode="dark"] body .manual-editor-drawer .toolbar-btn:focus-visible {
+  background: var(--mvc-active) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-drawer__footer {
+  border-top-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: 0 -1px 0 var(--mvc-line) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-drawer__footer .t-button--theme-default {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .manual-editor-drawer .t-drawer__footer .t-button--theme-primary {
+  border-color: var(--mvc-text-strong) !important;
+  background: var(--mvc-text-strong) !important;
+  color: var(--mvc-page) !important;
+}
 </style>

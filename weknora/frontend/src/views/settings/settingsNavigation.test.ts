@@ -4,6 +4,7 @@ import test from 'node:test'
 import { filterSettingsNavigation } from './settingsNavigation'
 
 const settingsSource = readFileSync(new URL('./Settings.vue', import.meta.url), 'utf8')
+const settingsShellSource = readFileSync(new URL('./components/VisualSettingsShell.vue', import.meta.url), 'utf8')
 
 const authorizedItems = [
   { key: 'general', label: '常规设置' },
@@ -22,14 +23,14 @@ test('settings search never synthesizes a hidden section', () => {
   assert.deepEqual(filterSettingsNavigation(authorizedItems, 'system-global'), [])
 })
 
-test('Lite settings expose consumer models without exposing system administration', () => {
+test('Lite settings expose consumer models and admin MCP without exposing system administration', () => {
   assert.match(
     settingsSource,
-    /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models'\) return 'general'/,
+    /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/,
   )
   assert.match(
     settingsSource,
-    /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/,
+    /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/,
   )
   assert.match(settingsSource, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
   assert.match(settingsSource, /const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS/)
@@ -38,11 +39,13 @@ test('Lite settings expose consumer models without exposing system administratio
 test('settings traps focus only when it is a modal and restores the launcher', () => {
   for (const token of [
     'aria-modal="true"',
-    'ref="settingsDialogRef"',
+    'ref="dialogRef"',
     '@keydown.tab="handleDialogTab"',
     'lastFocusedElement',
-    'settingsDialogRef.value?.focus()',
+    'dialogRef.value?.focus()',
     'lastFocusedElement?.focus()',
-  ]) assert.ok(settingsSource.includes(token), `settings focus contract lost ${token}`)
+  ]) assert.ok(settingsShellSource.includes(token), `shared settings focus contract lost ${token}`)
+  assert.match(settingsSource, /<VisualSettingsShell[\s\S]*?@close="handleClose"/)
+  assert.match(settingsSource, /import VisualSettingsShell from '.\/components\/VisualSettingsShell\.vue'/)
   assert.equal(settingsSource.includes('settingsSearchInputRef'), false)
 })

@@ -12,7 +12,7 @@ test('editing a knowledge base closes the editor after a successful save', () =>
   assert.match(source, /emit\('success', kbId\)\s*handleClose\(\)/)
 })
 
-test('a successful create closes instead of exposing configuration', () => {
+test('a successful configured create closes after using the native create contract', () => {
   const doSubmit = source.slice(
     source.indexOf('const doSubmit = async () => {'),
     source.indexOf('// 重置所有状态'),
@@ -24,20 +24,22 @@ test('a successful create closes instead of exposing configuration', () => {
   assert.ok(createBranch, 'expected to find the create branch')
   assert.match(createBranch, /handleClose\(\)/)
   assert.doesNotMatch(createBranch, /savedKbId\.value|loadKBData\(createdKbId\)/)
+  assert.match(createBranch, /indexing_strategy:/)
+  assert.match(createBranch, /wiki_config:/)
 })
 
-test('save button labels distinguish create from save-and-close', () => {
+test('save button labels match the reference create and edit actions', () => {
   assert.match(
     source,
-    /const saveButtonLabel = computed\(\(\) =>\s*editorMode\.value === 'create'\s*\? t\('knowledgeEditor\.buttons\.create'\)\s*: t\('knowledgeEditor\.buttons\.saveAndClose'\)\s*\)/
+    /const saveButtonLabel = computed\(\(\) =>\s*editorMode\.value === 'create'\s*\? t\('knowledgeEditor\.buttons\.confirmCreate'\)\s*: t\('knowledgeEditor\.buttons\.save'\)\s*\)/
   )
 })
 
-test('create forwards only the four consumer scene candidates and leaves embedding platform-owned', () => {
+test('create exposes native RAG, Wiki, Wiki instructions, and summary model while leaving embedding platform-owned', () => {
   assert.doesNotMatch(source, /applyDefaultModelsIfEmpty|type ModelConfig/)
   assert.match(
     source,
-    /const initFormData = \(type: 'document' \| 'faq' = 'document'\) => \(\{\s*type,\s*name: '',\s*description: '',\s*\}\)/,
+    /const initFormData = \(type: 'document' \| 'faq' = 'document'\) => \(\{[\s\S]*indexingStrategy:[\s\S]*wikiConfig:[\s\S]*modelConfig:/,
   )
 
   const visibilityWatcher = source.slice(
@@ -48,7 +50,8 @@ test('create forwards only the four consumer scene candidates and leaves embeddi
     /if \(props\.mode === 'create'\) \{([\s\S]*?)^\s{4}\}/m,
   )?.[1]
   assert.ok(createOpenBranch, 'expected the zero-config create open branch')
-  assert.doesNotMatch(createOpenBranch, /loadAllModels|loadTenantDefaultStorageProvider|kbEditorInitialSection/)
+  assert.match(createOpenBranch, /loadAllModels/)
+  assert.doesNotMatch(createOpenBranch, /loadTenantDefaultStorageProvider|kbEditorInitialSection/)
 
   assert.ok(source.includes('const consumerSceneModelsForCreate = () => {'))
   assert.match(source, /settingsStore\.getConsumerSceneModel\('rag'\)/)
@@ -60,6 +63,10 @@ test('create forwards only the four consumer scene candidates and leaves embeddi
   assert.match(source, /payload\.vlm_config = \{ enabled: true, model_id: vision \}/)
   assert.match(source, /payload\.asr_config = \{ enabled: true, model_id: asr \}/)
   assert.doesNotMatch(source, /payload\.embedding_model_id/)
+  assert.match(source, /data-guide="kb-create-indexing"/)
+  assert.match(source, /v-model="formData\.wikiConfig\.contentInstructions"/)
+  assert.match(source, /v-model="formData\.wikiConfig\.extractionInstructions"/)
+  assert.match(source, /:selected-model-id="formData\.modelConfig\.llmModelId"/)
 
   const settingsRefreshWatcher = source.slice(
     source.indexOf('watch(\n  () => uiStore.showSettingsModal'),
@@ -68,23 +75,65 @@ test('create forwards only the four consumer scene candidates and leaves embeddi
   assert.match(settingsRefreshWatcher, /editorMode\.value !== 'create'/)
 })
 
-test('create mode reuses the existing TDesign description field and API payload', () => {
-  assert.match(source, /v-if="editorMode === 'create'" class="zero-config-create"/)
+test('create mode reuses native TDesign fields and API payload', () => {
+  assert.match(source, /<form v-if="formData" class="kb-config-form" @submit\.prevent="handleSubmit">/)
   assert.match(
     source,
-    /<t-textarea[\s\S]*?v-model="formData\.description"[\s\S]*?:placeholder="\$t\('knowledgeEditor\.basic\.descriptionPlaceholder'\)"[\s\S]*?:maxlength="200"[\s\S]*?:autosize="\{ minRows: 2, maxRows: 4 \}"/,
+    /<t-textarea[\s\S]*?v-model="formData\.description"[\s\S]*?:placeholder="\$t\('knowledgeEditor\.basic\.descriptionPlaceholder'\)"[\s\S]*?:maxlength="200"/,
   )
   assert.doesNotMatch(source, /visual-kb-create-textarea|<textarea/)
-  assert.match(source, /createKnowledgeBase\(\{[\s\S]*name: formData\.value\.name\.trim\(\),[\s\S]*description: formData\.value\.description\.trim\(\),[\s\S]*\.\.\.consumerSceneModelsForCreate\(\),[\s\S]*\}\)/)
+  assert.match(source, /const sceneModels = consumerSceneModelsForCreate\(\)[\s\S]*createKnowledgeBase\(\{[\s\S]*name: formData\.value\.name\.trim\(\),[\s\S]*description: formData\.value\.description\.trim\(\),[\s\S]*\.\.\.sceneModels,[\s\S]*indexing_strategy:[\s\S]*wiki_config:/)
 })
 
-test('create dialog is a compact content-driven modal with mobile-safe bounds', () => {
+test('create dialog is a scrollable consumer settings modal with mobile-safe bounds', () => {
   assert.match(source, /role="dialog"/)
   assert.match(source, /aria-modal="true"/)
-  assert.match(source, /:aria-labelledby="editorMode === 'create' \? 'kb-create-title' : 'kb-edit-title'"/)
-  assert.match(source, /<h2 id="kb-create-title" class="sidebar-title"/)
-  assert.match(source, /\.settings-modal--compact\s*\{[^}]*width:\s*min\(448px, calc\(100vw - 32px\)\);[^}]*height:\s*auto;[^}]*min-height:\s*0;[^}]*max-height:\s*calc\(100dvh - 32px\);/s)
-  assert.match(source, /\.zero-config-create\s*\{[^}]*min-height:\s*0;[^}]*flex:\s*0 1 auto;/s)
+  assert.match(source, /aria-labelledby="kb-config-title"/)
+  assert.match(source, /<h2 id="kb-config-title">/)
+  assert.match(source, /\.kb-config-form\s*\{[^}]*min-height:\s*0;[^}]*flex:\s*1 1 auto;[^}]*overflow-y:\s*auto;/s)
+})
+
+test('create and edit mechanically share the reference knowledge-base configuration surface', () => {
+  const template = source.slice(0, source.indexOf('<script setup'))
+
+  assert.match(template, /class="kb-config-overlay"/)
+  assert.match(template, /class="kb-config-modal"/)
+  assert.match(template, /id="kb-config-title"[\s\S]*?editorMode === 'create'[\s\S]*?knowledgeEditor\.titleCreate[\s\S]*?knowledgeEditor\.titleEdit/)
+  assert.match(template, /knowledgeEditor\.modalDescription/)
+  assert.match(template, /<form v-if="formData" class="kb-config-form" @submit\.prevent="handleSubmit">/)
+  assert.doesNotMatch(template, /settings-container|settings-sidebar|settings-nav|currentSection ===/)
+  assert.doesNotMatch(template, /:autofocus="editorMode === 'create'"/)
+
+  const orderedFields = [
+    'data-guide="kb-create-indexing"',
+    'class="kb-config-granularity"',
+    'v-model="formData.wikiConfig.contentInstructions"',
+    'v-model="formData.wikiConfig.extractionInstructions"',
+    'data-guide="kb-create-name"',
+    'v-model="formData.description"',
+    'data-guide="kb-create-llm"',
+  ]
+  let previousIndex = -1
+  for (const field of orderedFields) {
+    const index = template.indexOf(field)
+    assert.ok(index > previousIndex, `expected ${field} after the preceding reference field`)
+    previousIndex = index
+  }
+
+  assert.match(source, /\.kb-config-modal\s*\{[\s\S]*?width:\s*min\(672px, calc\(100vw - 24px\)\);[\s\S]*?max-height:\s*90dvh;[\s\S]*?border-radius:\s*24px;/)
+  assert.match(source, /\.kb-config-header\s*\{[\s\S]*?padding:\s*24px 32px 16px;/)
+  assert.match(source, /\.kb-config-form\s*\{[\s\S]*?padding:\s*20px 32px;[\s\S]*?gap:\s*24px;/)
+  assert.match(source, /\.kb-config-textarea :deep\(\.t-textarea__info_wrapper\)\s*\{\s*display:\s*none;/)
+  assert.match(source, /:root\[theme-mode="dark"\] body \.kb-config-modal/)
+  assert.match(source, /:root\[theme-mode="dark"\] body \.kb-config-field/)
+  assert.match(source, /:root\[theme-mode="dark"\] body \.kb-config-summary-model \.visual-model-selector__control \.t-input/)
+})
+
+test('consumer editor does not call the unimplemented whole-library rebuild endpoint', () => {
+  assert.match(source, /const isIndexingLocked = computed\(\(\) => editorMode\.value === 'edit' && hasFiles\.value\)/)
+  assert.doesNotMatch(source, /const isIndexingLocked[^\n]*authStore\.isLiteMode/)
+  assert.doesNotMatch(source, /rebuildKBIndex/)
+  assert.doesNotMatch(source, /rebuildConfirmTitle|rebuildConfirmBody/)
 })
 
 test('description is explicitly optional in every shipped locale', () => {

@@ -6,9 +6,9 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('sidebar keeps the reference 256px expanded and 56px collapsed geometry', () => {
   const source = read('../components/menu.vue')
-  assert.ok(source.includes('.visual-sidebar { width: 256px; min-width: 256px;'))
-  assert.ok(source.includes('.visual-sidebar.is-collapsed { width: 56px; min-width: 56px; padding: 14px 8px;'))
-  assert.ok(source.includes('.visual-sidebar__collapsed-logo { width: 32px; height: 32px; flex-basis: 32px;'))
+  assert.match(source, /\.visual-sidebar\s*\{[^}]*width:\s*256px;[^}]*min-width:\s*256px;/)
+  assert.match(source, /\.visual-sidebar\.is-collapsed\s*\{[^}]*width:\s*56px;[^}]*min-width:\s*56px;[^}]*padding:\s*14px 8px;/)
+  assert.match(source, /\.visual-sidebar__collapsed-logo\s*\{[^}]*flex:\s*0 0 32px;[^}]*width:\s*32px;[^}]*height:\s*32px;/)
 })
 
 test('knowledge detail shell and document toolbar follow the exported reference geometry', () => {

@@ -3,8 +3,6 @@ import { ref, computed } from 'vue'
 import { listKnowledgeBases, getKnowledgeBaseById } from '@/api/knowledge-base'
 import {
   listAgents,
-  getAgentById,
-  BUILTIN_SMART_REASONING_ID,
   type CustomAgent,
 } from '@/api/agent'
 import {
@@ -45,15 +43,6 @@ function isLiteProductMode(): boolean {
     return window.localStorage.getItem('weknora_lite_mode') === 'true'
   } catch {
     return false
-  }
-}
-
-async function loadLiteRuntimeAgents(): Promise<CustomAgent[]> {
-  try {
-    const response: any = await getAgentById(BUILTIN_SMART_REASONING_ID)
-    return response?.data ? [response.data] : []
-  } catch {
-    return []
   }
 }
 
@@ -148,7 +137,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
 
   /**
    * 智能体列表（支持 creator 筛选）。creator=all 时写入缓存。
-   * Lite 不枚举 Agent 管理面，只读取聊天真正需要的两个内置运行时 Agent。
+   * Lite 使用原生租户 Agent 列表，但不加载跨租户共享 Agent。
    */
   async function fetchAgentsForList(
     params?: { creator?: ListCreatorFilter },
@@ -157,14 +146,21 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     const creator = params?.creator ?? 'all'
 
     if (isLiteProductMode()) {
-      if (!force && isFresh('agents')) {
+      if (creator === 'all' && !force && isFresh('agents')) {
         return { data: agents.value, disabled_own_agent_ids: [] }
       }
-      const data = await loadLiteRuntimeAgents()
-      agents.value = data
-      disabledOwnAgentIds.value = []
-      loadedAt.value.agents = Date.now()
-      return { data, disabled_own_agent_ids: [] }
+      const response = await listAgents({ creator }) as {
+        data?: CustomAgent[]
+        disabled_own_agent_ids?: string[]
+      }
+      const data = response.data || []
+      const disabled = response.disabled_own_agent_ids || []
+      if (creator === 'all') {
+        agents.value = data
+        disabledOwnAgentIds.value = disabled
+        loadedAt.value.agents = Date.now()
+      }
+      return { data, disabled_own_agent_ids: disabled }
     }
 
     const orgStore = useOrganizationStore()
@@ -279,6 +275,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     if (isLiteProductMode()) {
       await Promise.all([
         ensureKnowledgeBases(force),
+        ensureAgents(force),
         ensureModels(force),
       ])
       return

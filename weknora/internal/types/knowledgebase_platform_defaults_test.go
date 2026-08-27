@@ -38,3 +38,31 @@ func TestApplyPlatformKnowledgeBaseDefaultsDoesNotTurnFAQIntoDocument(t *testing
 	require.False(t, kb.IndexingStrategy.WikiEnabled)
 	require.False(t, kb.IndexingStrategy.GraphEnabled)
 }
+
+func TestApplyPlatformKnowledgeBaseDefaultsPreservesExplicitConsumerIndexingAndWikiChoices(t *testing.T) {
+	kb := &KnowledgeBase{
+		Type: KnowledgeBaseTypeDocument,
+		IndexingStrategy: IndexingStrategy{
+			VectorEnabled:  false,
+			KeywordEnabled: false,
+			WikiEnabled:    true,
+			GraphEnabled:   true,
+		},
+		WikiConfig: &WikiConfig{
+			ExtractionGranularity:  WikiExtractionFocused,
+			ContentInstructions:    "Use a concise editorial style.",
+			ExtractionInstructions: "Prioritize products and versions.",
+		},
+	}
+
+	kb.ApplyPlatformKnowledgeBaseDefaults()
+
+	require.False(t, kb.IndexingStrategy.VectorEnabled)
+	require.False(t, kb.IndexingStrategy.KeywordEnabled)
+	require.True(t, kb.IndexingStrategy.WikiEnabled)
+	require.True(t, kb.IndexingStrategy.GraphEnabled)
+	require.Equal(t, WikiExtractionFocused, kb.WikiConfig.ExtractionGranularity)
+	require.Equal(t, "Use a concise editorial style.", kb.WikiConfig.ContentInstructions)
+	require.Equal(t, "Prioritize products and versions.", kb.WikiConfig.ExtractionInstructions)
+	require.Equal(t, PlatformKnowledgeBaseChatModelID, kb.WikiConfig.SynthesisModelID)
+}

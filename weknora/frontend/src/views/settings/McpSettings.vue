@@ -1,11 +1,13 @@
 <template>
   <div class="mcp-settings">
-    <div class="section-header">
-      <h2>{{ $t('mcpSettings.title') }}</h2>
-      <p class="section-description">
-        {{ $t('mcpSettings.description') }}
-      </p>
-    </div>
+    <header class="visual-settings-page-header">
+      <div class="visual-settings-page-header__copy">
+        <h2 class="visual-settings-page-header__title">{{ $t('mcpSettings.title') }}</h2>
+        <p class="visual-settings-page-header__description">
+          {{ $t('mcpSettings.description') }}
+        </p>
+      </div>
+    </header>
 
     <div v-if="loading" class="loading-container">
       <t-loading :text="$t('common.loading')" />
@@ -22,9 +24,6 @@
       </div>
 
       <div v-else class="services-grid">
-        <!-- 与 ModelSettings / WebSearchSettings 同形的卡片：左侧 transport 徽章 +
-             标题 / 副标题 / url 三段式。开关挂在标题行右侧，三点菜单 hover 才出现。
-             SettingCard 当前没有其它消费者了，但保留组件供未来需要时复用。 -->
         <div
           v-for="service in services"
           :key="service.id"
@@ -41,13 +40,17 @@
           @click="onServiceCardClick($event, service)"
           @keydown.enter="onServiceCardClick($event, service)"
         >
-          <div class="service-card__badge" :aria-label="getTransportTypeLabel(service.transport_type)">
-            <t-icon :name="getTransportTypeIcon(service.transport_type)" size="18px" />
-          </div>
-          <div class="service-card__body">
-            <div class="service-card__header">
-              <h3 class="service-card__title" :title="service.name">{{ service.name }}</h3>
-              <!-- 单一状态徽章：内置优先（builtin 永远启用、不可关），否则用 enabled。 -->
+          <div class="service-card__main">
+            <div class="service-card__top">
+              <div class="service-card__identity">
+                <div
+                  class="service-card__badge"
+                  :aria-label="getTransportTypeLabel(service.transport_type)"
+                >
+                  <t-icon :name="getTransportTypeIcon(service.transport_type)" size="16px" />
+                </div>
+                <h3 class="service-card__title" :title="service.name">{{ service.name }}</h3>
+              </div>
               <span
                 v-if="service.is_builtin"
                 class="service-card__pill service-card__pill--warning"
@@ -62,33 +65,36 @@
                 <span class="service-card__status-dot" />
                 {{ service.enabled ? $t('common.on') : $t('common.off') }}
               </span>
-              <div
-                v-if="(service.is_builtin ? getBuiltinServiceOptions() : getServiceOptions(service)).length > 0"
-                class="service-card__actions"
-                @click.stop
-              >
-                <t-dropdown
-                  :options="service.is_builtin ? getBuiltinServiceOptions() : getServiceOptions(service)"
-                  placement="bottom-right"
-                  attach="body"
-                  trigger="click"
-                  @click="(data: any) => handleMenuAction({ value: data.value }, service)"
-                >
-                  <t-button variant="text" shape="square" size="small" class="service-card__more">
-                    <t-icon name="ellipsis" />
-                  </t-button>
-                </t-dropdown>
-              </div>
             </div>
-            <div class="service-card__subtitle">
+            <div class="service-card__type-row">
               <span class="service-card__type">{{ getTransportTypeLabel(service.transport_type) }}</span>
-              <template v-if="service.description">
-                <span class="service-card__sep">·</span>
-                <span class="service-card__desc" :title="service.description">{{ service.description }}</span>
-              </template>
+              <span class="service-card__sep" aria-hidden="true">·</span>
             </div>
+            <p v-if="service.description" class="service-card__desc" :title="service.description">
+              {{ service.description }}
+            </p>
+          </div>
+
+          <div class="service-card__footer">
             <div v-if="service.url" class="service-card__url" :title="service.url">
               {{ service.url }}
+            </div>
+            <div
+              v-if="(service.is_builtin ? getBuiltinServiceOptions() : getServiceOptions(service)).length > 0"
+              class="service-card__actions"
+              @click.stop
+            >
+              <t-dropdown
+                :options="service.is_builtin ? getBuiltinServiceOptions() : getServiceOptions(service)"
+                placement="bottom-right"
+                attach="body"
+                trigger="click"
+                @click="(data: any) => handleMenuAction({ value: data.value }, service)"
+              >
+                <t-button variant="text" shape="square" size="small" class="service-card__more">
+                  <t-icon name="ellipsis" />
+                </t-button>
+              </t-dropdown>
             </div>
           </div>
         </div>
@@ -319,65 +325,89 @@ onMounted(() => {
 
 <style scoped lang="less">
 .mcp-settings {
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  height: 100%;
+  min-height: 0;
+  color: var(--td-text-color-primary);
 }
 
 .section-header {
-  margin-bottom: 28px;
+  padding-bottom: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--td-component-stroke);
 
   h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0 0 8px 0;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.4;
   }
 
   .section-description {
-    font-size: 14px;
+    margin: 4px 0 0;
     color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.6;
-  }
-}
-
-.loading-container {
-  padding: 40px 0;
-  text-align: center;
-}
-
-.list-section-header {
-  margin-bottom: 16px;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0 0 4px 0;
-  }
-
-  p {
-    font-size: 13px;
-    color: var(--td-text-color-placeholder);
-    margin: 0;
+    font-size: 12px;
     line-height: 1.5;
   }
 }
 
+.loading-container {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  text-align: center;
+}
+
+.list-section-header {
+  margin-bottom: 12px;
+
+  h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  p {
+    margin: 2px 0 0;
+    color: var(--td-text-color-placeholder);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+}
+
 .empty-state {
-  padding: 80px 0;
+  display: flex;
+  flex: 1;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
   text-align: center;
 
   :deep(.t-empty__description) {
-    font-size: 14px;
+    margin: 0;
     color: var(--td-text-color-placeholder);
-    margin-bottom: 16px;
+    font-size: 12px;
   }
 }
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
+  flex: 1;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  padding-bottom: 16px;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .service-card--add {
     width: 100%;
@@ -385,64 +415,64 @@ onMounted(() => {
   }
 }
 
-// Transport-distinguished card. 与 ModelSettings / WebSearchSettings 同形。
 .service-card {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 14px 14px 12px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 10px;
-  background: var(--td-bg-color-container);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  flex-direction: column;
+  justify-content: space-between;
   min-width: 0;
+  min-height: 140px;
+  padding: 16px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 16px;
+  background: var(--td-bg-color-container);
+  text-align: left;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 
   &--builtin {
-    background: var(--td-bg-color-secondarycontainer);
+    background: var(--td-bg-color-container);
   }
 
   &--clickable {
     cursor: pointer;
 
     &:hover {
-      border-color: var(--td-brand-color-3, var(--td-brand-color));
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+      border-color: var(--td-component-border);
+      box-shadow: 0 3px 10px rgb(15 23 42 / 6%);
     }
 
     &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
+      outline: 2px solid var(--td-text-color-primary);
       outline-offset: 2px;
     }
   }
 
   &--builtin:not(.service-card--clickable):hover {
-    box-shadow: none;
     border-color: var(--td-component-stroke);
+    box-shadow: none;
   }
 
   &--add {
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 68px;
+    min-height: 140px;
     border-style: dashed;
-    background: transparent;
-    color: var(--td-text-color-placeholder);
+    background: color-mix(in srgb, var(--td-bg-color-secondarycontainer) 50%, transparent);
+    color: var(--td-text-color-secondary);
     cursor: pointer;
     font: inherit;
     text-align: center;
 
     &:hover,
     &:focus-visible {
-      color: var(--td-brand-color);
-      border-color: var(--td-brand-color);
-      background: color-mix(in srgb, var(--td-brand-color) 6%, transparent);
-      box-shadow: none;
+      color: var(--td-text-color-primary);
+      border-color: var(--td-component-border);
+      background: var(--td-bg-color-secondarycontainer);
     }
 
     &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
+      outline: 2px solid var(--td-text-color-primary);
       outline-offset: 2px;
     }
 
@@ -452,164 +482,124 @@ onMounted(() => {
       justify-content: center;
       width: 32px;
       height: 32px;
-      border-radius: 8px;
-      background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
-      color: var(--td-brand-color);
-      font-size: 18px;
+      border: 1px solid var(--td-component-stroke);
+      border-radius: 999px;
+      background: var(--td-bg-color-container);
+      color: currentColor;
+      transition: transform 150ms ease;
+    }
+
+    &:hover &__icon,
+    &:focus-visible &__icon {
+      transform: scale(1.05);
     }
 
     &__label {
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 12px;
+      font-weight: 600;
       line-height: 1.4;
     }
   }
 }
 
-.service-card__actions {
-  flex-shrink: 0;
+.service-card__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.service-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.service-card__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .service-card__badge {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
   display: flex;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  margin-top: 1px;
-  background: rgba(0, 82, 217, 0.1);
-  color: #0052D9;
-}
-
-// 三种 transport 的徽章配色：sse 流式 → 绿，http-streamable → 蓝，stdio → 橙
-.service-card--sse .service-card__badge {
-  background: rgba(17, 128, 83, 0.12);
-  color: #118053;
-}
-.service-card--http-streamable .service-card__badge {
-  background: rgba(0, 82, 217, 0.1);
-  color: #0052D9;
-}
-.service-card--stdio .service-card__badge {
-  background: rgba(184, 92, 0, 0.12);
-  color: #B85C00;
-}
-
-.service-card__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.service-card__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+  background: var(--td-bg-color-component);
+  color: var(--td-text-color-secondary);
 }
 
 .service-card__title {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--td-text-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.service-card__pill {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
-  border-radius: 3px;
-
-  &--warning {
-    color: var(--td-warning-color-7, #B85C00);
-    background: var(--td-warning-color-1, #FEF3E6);
-  }
-}
-
-// On/Off 状态徽章 —— 用 dot+文字而非 t-switch，避免误触；翻转启用状态由
-// 三点菜单里的 toggle 项触发，实际 API 调用走 handleToggleEnabled 同一路径。
+.service-card__pill,
 .service-card__status {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 1px 8px 1px 6px;
+  gap: 6px;
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 999px;
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--td-text-color-placeholder);
   font-size: 11px;
   font-weight: 500;
-  line-height: 16px;
-  border-radius: 10px;
-  background: var(--td-bg-color-secondarycontainer);
+  line-height: 1.2;
+  white-space: nowrap;
+}
 
+.service-card__status {
   &--on {
+    border-color: rgb(16 185 129 / 25%);
+    background: rgb(16 185 129 / 8%);
     color: var(--td-success-color-7, #118053);
-
-    .service-card__status-dot {
-      background: var(--td-success-color, #118053);
-    }
   }
+}
 
-  &--off {
-    color: var(--td-text-color-placeholder);
-
-    .service-card__status-dot {
-      background: var(--td-gray-color-5);
-    }
-  }
+.service-card__pill--warning {
+  border-color: rgb(245 158 11 / 25%);
+  background: rgb(245 158 11 / 8%);
+  color: var(--td-warning-color-7, #b85c00);
 }
 
 .service-card__status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  background: var(--td-gray-color-5);
 }
 
-.service-card__more {
-  flex-shrink: 0;
-  color: var(--td-text-color-placeholder);
-  padding: 2px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-
-  &:hover,
-  &:focus-visible {
-    background: var(--td-bg-color-secondarycontainer);
-    color: var(--td-text-color-primary);
-  }
+.service-card__status--on .service-card__status-dot {
+  background: var(--td-success-color, #118053);
 }
 
-// switch 始终显示（它是状态锚点）；三点按钮只在 hover/focus 时出现。
-.service-card:hover .service-card__more,
-.service-card:focus-within .service-card__more,
-.service-card__actions:focus-within .service-card__more {
-  opacity: 1;
-}
-
-.service-card__subtitle {
+.service-card__type-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 12px;
-  line-height: 1.4;
+  gap: 3px;
+  margin-top: 10px;
   color: var(--td-text-color-secondary);
-  min-width: 0;
-}
-
-.service-card__type {
+  font-size: 11px;
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .service-card__sep {
@@ -617,20 +607,142 @@ onMounted(() => {
 }
 
 .service-card__desc {
+  display: -webkit-box;
+  min-height: 33px;
+  margin: 4px 0 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--td-text-color-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.service-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--td-bg-color-component);
 }
 
 .service-card__url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--td-text-color-placeholder);
-  white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
+  white-space: nowrap;
+}
+
+.service-card__actions {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.service-card:hover .service-card__actions,
+.service-card:focus-within .service-card__actions,
+.service-card__actions:focus-within {
+  opacity: 1;
+}
+
+.service-card__more {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--td-text-color-placeholder);
+  transition: background-color 150ms ease, color 150ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--td-bg-color-component);
+    color: var(--td-text-color-primary);
+  }
+}
+
+:root[theme-mode="dark"] .mcp-settings {
+  color: var(--mvc-text, #f2f2f2);
+
+  .section-header,
+  .service-card__footer {
+    border-color: var(--mvc-line, #31343a);
+  }
+
+  .section-header h2,
+  .list-section-header h3,
+  .service-card__title {
+    color: var(--mvc-text-strong, #fff);
+  }
+
+  .section-description,
+  .list-section-header p,
+  .service-card__type-row,
+  .service-card__desc {
+    color: var(--mvc-muted, #c2c2c2);
+  }
+}
+
+:root[theme-mode="dark"] .service-card {
+  border-color: var(--mvc-line, #31343a);
+  background: var(--mvc-surface, #1d1f23);
+  color: var(--mvc-text, #f2f2f2);
+
+  &--clickable:hover {
+    border-color: var(--mvc-line-strong, #484c54);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 24%);
+  }
+
+  &--add {
+    background: color-mix(in srgb, var(--mvc-surface, #1d1f23) 70%, transparent);
+    color: var(--mvc-muted-strong, #dedede);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--mvc-line-strong, #484c54);
+      background: var(--mvc-hover, #25272c);
+      color: var(--mvc-text-strong, #fff);
+    }
+
+    &__icon {
+      border-color: var(--mvc-line, #31343a);
+      background: var(--mvc-surface-raised, #202227);
+    }
+  }
+
+  .service-card__badge,
+  .service-card__more:hover,
+  .service-card__more:focus-visible {
+    border-color: var(--mvc-line, #31343a);
+    background: var(--mvc-hover, #25272c);
+    color: var(--mvc-muted-strong, #dedede);
+  }
+
+  .service-card__url,
+  .service-card__sep,
+  .service-card__more {
+    color: var(--mvc-faint, #9c9c9c);
+  }
+
+  .service-card__status--off {
+    border-color: var(--mvc-line, #31343a);
+    background: var(--mvc-hover, #25272c);
+    color: var(--mvc-muted, #c2c2c2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-card,
+  .service-card__actions,
+  .service-card--add__icon {
+    transition: none;
+  }
 }
 </style>

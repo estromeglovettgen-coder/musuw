@@ -86,7 +86,7 @@
         </div>
       </div>
 
-      <div class="visual-setting-row">
+      <div v-if="false" class="visual-setting-row" data-persisted-setting="theme-color">
         <div class="visual-setting-row__copy">
           <label for="visual-theme-color-select">{{ $t('theme.color') }}</label>
           <p>{{ $t('theme.colorDescription') }}</p>

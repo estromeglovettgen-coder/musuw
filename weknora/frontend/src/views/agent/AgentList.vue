@@ -4,13 +4,23 @@
       :count-mine="agents.length" :count-by-org="effectiveSharedCountByOrg" :count-favorites="agentFavoritesCount"
       :count-recents="agentRecentsCount" />
     <div class="agent-list-content">
-      <div class="header" style="--wails-draggable: drag">
+      <div class="header agents-panel__header" style="--wails-draggable: drag">
         <div class="header-title" style="--wails-draggable: drag">
           <div class="title-row" style="--wails-draggable: drag">
+            <t-icon name="control-platform" class="agents-panel__title-icon" aria-hidden="true" />
             <h2 style="--wails-draggable: drag">{{ $t('agent.title') }}</h2>
-            <t-tooltip v-if="authStore.hasRole('contributor')" :content="$t('agent.createAgent')" placement="bottom">
-              <t-button variant="text" theme="default" size="small" class="header-action-btn"
-                data-guide="agent-list-create" style="--wails-draggable: no-drag" @click="handleCreateAgent">
+          </div>
+          <p class="header-subtitle" style="--wails-draggable: drag">{{ $t('agent.subtitle') }}</p>
+        </div>
+        <div class="agents-panel__toolbar" style="--wails-draggable: no-drag">
+          <label class="agents-panel__search">
+            <t-icon name="search" size="16px" aria-hidden="true" />
+            <input v-model="agentSearchQuery" type="search" :placeholder="$t('common.search')"
+              :aria-label="$t('common.search')" />
+          </label>
+          <t-tooltip v-if="authStore.hasRole('contributor')" :content="$t('agent.createAgent')" placement="bottom">
+            <t-button theme="default" size="small" class="header-action-btn agent-create-header-btn"
+              data-guide="agent-list-create" style="--wails-draggable: no-drag" @click="handleCreateAgent">
                 <template #icon>
                   <span class="btn-icon-wrapper">
                     <svg class="sparkles-icon" width="19" height="19" viewBox="0 0 20 20" fill="none"
@@ -30,10 +40,9 @@
                     </svg>
                   </span>
                 </template>
+                <span class="agent-create-header-label">{{ $t('agent.createAgent') }}</span>
               </t-button>
             </t-tooltip>
-          </div>
-          <p class="header-subtitle" style="--wails-draggable: drag">{{ $t('agent.subtitle') }}</p>
         </div>
       </div>
       <div class="agent-list-main">
@@ -158,7 +167,8 @@
               'agent-mode-normal': agent.config?.agent_mode === 'quick-answer',
               'agent-mode-agent': agent.config?.agent_mode === 'smart-reasoning',
               'shared-agent-card': !agent.isMine
-            }" @click="handleCardClick(agent)">
+            }" role="button" tabindex="0" @click="handleCardClick(agent)"
+              @keydown.enter.prevent="handleCardClick(agent)" @keydown.space.prevent="handleCardClick(agent)">
               <!-- 装饰星星 -->
               <div class="card-decoration">
                 <svg class="star-icon" width="24" height="24" viewBox="0 0 20 20" fill="none"
@@ -199,9 +209,11 @@
                   :visible="openMoreAgentId === agent.id" trigger="hover" overlayClassName="card-more-popup"
                   destroy-on-close placement="bottom-right" @visible-change="onVisibleChange"
                   @update:visible="(v: boolean) => { if (!v) openMoreAgentId = null }">
-                  <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === agent.id }"
-                    @click="toggleMore($event, agent.id)">
-                    <img class="more-icon" src="@/assets/img/more.png" alt="" />
+                  <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === agent.id }" role="button"
+                    tabindex="0" :aria-label="$t('common.more')" @click="toggleMore($event, agent.id)"
+                    @keydown.enter.stop.prevent="toggleMore($event, agent.id)"
+                    @keydown.space.stop.prevent="toggleMore($event, agent.id)">
+                    <t-icon class="more-icon" name="ellipsis" aria-hidden="true" />
                   </div>
                   <template #content>
                     <div class="popup-menu">
@@ -226,8 +238,11 @@
                   overlayClassName="card-more-popup" destroy-on-close placement="bottom-right"
                   @update:visible="(v: boolean) => { if (!v) openMoreAgentId = null }">
                   <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === 'shared-' + agent.share_id }"
-                    @click.stop="toggleMore($event, 'shared-' + agent.share_id)">
-                    <img class="more-icon" src="@/assets/img/more.png" alt="" />
+                    role="button" tabindex="0" :aria-label="$t('common.more')"
+                    @click.stop="toggleMore($event, 'shared-' + agent.share_id)"
+                    @keydown.enter.stop.prevent="toggleMore($event, 'shared-' + agent.share_id)"
+                    @keydown.space.stop.prevent="toggleMore($event, 'shared-' + agent.share_id)">
+                    <t-icon class="more-icon" name="ellipsis" aria-hidden="true" />
                   </div>
                   <template #content>
                     <div class="popup-menu">
@@ -243,6 +258,10 @@
                 <div class="card-description">{{ agent.description || $t('agent.noDescription') }}</div>
               </div>
               <div class="card-bottom">
+                <div class="agent-card-meta" aria-label="">
+                  <span><t-icon name="control-platform" aria-hidden="true" />{{ agentModelLabel(agent) }}</span>
+                  <span><t-icon name="folder" aria-hidden="true" />{{ agentKbScopeLabel(agent) }}</span>
+                </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
                     <t-tag v-if="agent.isMine && agent.disabled_by_me" theme="default" size="small"
@@ -359,7 +378,8 @@
               'is-builtin': agent.is_builtin,
               'agent-mode-normal': agent.config?.agent_mode === 'quick-answer',
               'agent-mode-agent': agent.config?.agent_mode === 'smart-reasoning'
-            }" @click="handleCardClick(agent)">
+            }" role="button" tabindex="0" @click="handleCardClick(agent)"
+              @keydown.enter.prevent="handleCardClick(agent)" @keydown.space.prevent="handleCardClick(agent)">
               <!-- 装饰星星 -->
               <div class="card-decoration">
                 <svg class="star-icon" width="24" height="24" viewBox="0 0 20 20" fill="none"
@@ -400,9 +420,11 @@
                   :visible="openMoreAgentId === agent.id" trigger="hover" overlayClassName="card-more-popup"
                   destroy-on-close placement="bottom-right" @visible-change="onVisibleChange"
                   @update:visible="(v: boolean) => { if (!v) openMoreAgentId = null }">
-                  <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === agent.id }"
-                    @click="toggleMore($event, agent.id)">
-                    <img class="more-icon" src="@/assets/img/more.png" alt="" />
+                  <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === agent.id }" role="button"
+                    tabindex="0" :aria-label="$t('common.more')" @click="toggleMore($event, agent.id)"
+                    @keydown.enter.stop.prevent="toggleMore($event, agent.id)"
+                    @keydown.space.stop.prevent="toggleMore($event, agent.id)">
+                    <t-icon class="more-icon" name="ellipsis" aria-hidden="true" />
                   </div>
                   <template #content>
                     <div class="popup-menu">
@@ -438,6 +460,10 @@
 
               <!-- 卡片底部 -->
               <div class="card-bottom">
+                <div class="agent-card-meta" aria-label="">
+                  <span><t-icon name="control-platform" aria-hidden="true" />{{ agentModelLabel(agent) }}</span>
+                  <span><t-icon name="folder" aria-hidden="true" />{{ agentKbScopeLabel(agent) }}</span>
+                </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
                     <t-tag v-if="agent.disabled_by_me" theme="default" size="small" class="disabled-badge">{{
@@ -546,7 +572,9 @@
             <div v-show="!isSpaceAgentCollapsed(shared)" class="agent-card shared-agent-card" :class="{
               'agent-mode-normal': shared.agent?.config?.agent_mode === 'quick-answer',
               'agent-mode-agent': shared.agent?.config?.agent_mode === 'smart-reasoning'
-            }" @click="handleSpaceAgentCardClick(shared)">
+            }" role="button" tabindex="0" @click="handleSpaceAgentCardClick(shared)"
+              @keydown.enter.prevent="handleSpaceAgentCardClick(shared)"
+              @keydown.space.prevent="handleSpaceAgentCardClick(shared)">
               <div class="card-decoration">
                 <svg class="star-icon" width="24" height="24" viewBox="0 0 20 20" fill="none"
                   xmlns="http://www.w3.org/2000/svg">
@@ -574,8 +602,11 @@
                   overlayClassName="card-more-popup" destroy-on-close placement="bottom-right"
                   @update:visible="(v: boolean) => { if (!v) openMoreAgentId = null }">
                   <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === 'shared-tab-' + shared.share_id }"
-                    @click.stop="toggleMore($event, 'shared-tab-' + shared.share_id)">
-                    <img class="more-icon" src="@/assets/img/more.png" alt="" />
+                    role="button" tabindex="0" :aria-label="$t('common.more')"
+                    @click.stop="toggleMore($event, 'shared-tab-' + shared.share_id)"
+                    @keydown.enter.stop.prevent="toggleMore($event, 'shared-tab-' + shared.share_id)"
+                    @keydown.space.stop.prevent="toggleMore($event, 'shared-tab-' + shared.share_id)">
+                    <t-icon class="more-icon" name="ellipsis" aria-hidden="true" />
                   </div>
                   <template #content>
                     <div class="popup-menu">
@@ -591,6 +622,10 @@
                 <div class="card-description">{{ shared.agent?.description || $t('agent.noDescription') }}</div>
               </div>
               <div class="card-bottom">
+                <div class="agent-card-meta" aria-label="">
+                  <span><t-icon name="control-platform" aria-hidden="true" />{{ agentModelLabel(shared.agent) }}</span>
+                  <span><t-icon name="folder" aria-hidden="true" />{{ agentKbScopeLabel(shared.agent) }}</span>
+                </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
                     <t-tag v-if="shared.disabled_by_me" theme="default" size="small" class="disabled-badge">{{
@@ -878,6 +913,7 @@ const agentRecentsCount = computed(
   () => pins.recents.value.filter((e) => e.type === 'agent').length
 )
 const agents = ref<AgentWithUI[]>([])
+const agentSearchQuery = ref('')
 const sharedAgents = computed<SharedAgentInfo[]>(() => orgStore.sharedAgents || [])
 const allAgentsCount = computed(() => agents.value.length + sharedAgents.value.length)
 
@@ -976,11 +1012,20 @@ const recentsAgentList = computed<DisplayAgent[]>(() => {
     .filter((x): x is DisplayAgent => x !== null)
 })
 
+const matchesAgentSearch = (agent: any) => {
+  const query = agentSearchQuery.value.trim().toLowerCase()
+  if (!query) return true
+  const name = String(agent?.name || '').toLowerCase()
+  const description = String(agent?.description || '').toLowerCase()
+  const model = String(agent?.config?.model_id || '').toLowerCase()
+  return [name, description, model].some((value) => value.includes(query))
+}
+
 const filteredAgents = computed<DisplayAgent[]>(() => {
-  if (spaceSelection.value === 'favorites') return favoritesAgentList.value
-  if (spaceSelection.value === 'recents') return recentsAgentList.value
+  if (spaceSelection.value === 'favorites') return favoritesAgentList.value.filter(matchesAgentSearch)
+  if (spaceSelection.value === 'recents') return recentsAgentList.value.filter(matchesAgentSearch)
   if (spaceSelection.value === 'mine') {
-    return agents.value.map(a => ({ ...a, isMine: true as const }))
+    return agents.value.map(a => ({ ...a, isMine: true as const })).filter(matchesAgentSearch)
   }
   if (spaceSelection.value !== 'all') return []
   const list: DisplayAgent[] = []
@@ -1021,7 +1066,7 @@ const filteredAgents = computed<DisplayAgent[]>(() => {
       showMore: false
     } as DisplayAgent)
   })
-  return list
+  return list.filter(matchesAgentSearch)
 })
 
 // 「工作空间」视图下的稳定排序：本空间内「我创建」在前、「同事创建 / 内建」
@@ -1036,12 +1081,12 @@ const sortedMineAgents = computed(() => {
     else if (isMyAgent(a)) own.push(a)
     else teammate.push(a)
   })
-  return [...builtin, ...own, ...teammate]
+  return [...builtin, ...own, ...teammate].filter(matchesAgentSearch)
 })
 
 // 空间视角下的稳定排序：我自己创建的（is_mine）放前面，其余按 permission 切分。
 const sortedSpaceAgentsList = computed(() => {
-  return [...spaceAgentsList.value].sort((a, b) => {
+  return [...spaceAgentsList.value].filter(matchesAgentSearch).sort((a, b) => {
     const aMine = a.is_mine ? 0 : 1
     const bMine = b.is_mine ? 0 : 1
     if (aMine !== bMine) return aMine - bMine
@@ -1074,6 +1119,20 @@ const sharedAgentMcpScopeText = computed(() => {
   if (c.mcp_selection_mode === 'selected' && c.mcp_services?.length) return t('agent.shareScope.mcpSelected', { count: c.mcp_services.length })
   return t('agent.shareScope.mcpNone')
 })
+
+const agentConfigForCard = (agent: unknown): CustomAgent['config'] | undefined =>
+  (agent as Partial<CustomAgent> | null | undefined)?.config
+
+const agentModelLabel = (agent: unknown) =>
+  agentConfigForCard(agent)?.model_id || t('input.notConfigured')
+
+const agentKbScopeLabel = (agent: unknown) => {
+  const config = agentConfigForCard(agent)
+  if (!config || config.kb_selection_mode === 'none') return t('agent.shareScope.kbNone')
+  if (config.kb_selection_mode === 'all') return t('agent.shareScope.kbAll')
+  if (config.knowledge_bases?.length) return t('agent.shareScope.kbSelected', { count: config.knowledge_bases.length })
+  return t('agent.shareScope.kbNone')
+}
 const editorVisible = ref(false)
 const editorMode = ref<'create' | 'edit'>('create')
 const editingAgent = ref<CustomAgent | null>(null)
@@ -1585,6 +1644,7 @@ defineExpose({
   display: flex;
   position: relative;
   min-height: 0;
+  background: rgb(249 250 251 / 30%);
 }
 
 .agent-list-content {
@@ -1646,13 +1706,62 @@ defineExpose({
     gap: 8px;
   }
 
+  .agents-panel__title-icon {
+    width: 20px;
+    height: 20px;
+    color: #374151;
+    font-size: 20px;
+  }
+
   h2 {
     margin: 0;
     color: var(--td-text-color-primary);
     font-family: var(--app-font-family);
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
     line-height: 32px;
+  }
+}
+
+.agents-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.agents-panel__search {
+  width: 224px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--td-bg-color-container);
+  color: var(--td-text-color-placeholder);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus-within {
+    border-color: var(--td-brand-color);
+    box-shadow: 0 0 0 2px var(--td-brand-color-focus, rgba(0, 82, 217, 0.12));
+  }
+
+  input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--td-text-color-primary);
+    font: inherit;
+    font-size: 12px;
+
+    &::placeholder {
+      color: var(--td-text-color-placeholder);
+    }
   }
 }
 
@@ -1772,6 +1881,34 @@ defineExpose({
   }
 }
 
+.agent-create-header-btn {
+  min-width: auto !important;
+  width: auto !important;
+  height: 34px !important;
+  padding: 0 14px !important;
+  gap: 6px;
+  border-color: #111827 !important;
+  border-radius: 10px !important;
+  background: #111827 !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+
+  &:hover,
+  &:focus,
+  &:active {
+    border-color: #000 !important;
+    background: #000 !important;
+    color: #fff !important;
+  }
+
+  .agent-create-header-label {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+}
+
 .agent-tabs {
   display: flex;
   align-items: center;
@@ -1855,15 +1992,13 @@ defineExpose({
   & > * {
     pointer-events: auto;
   }
-  // 同 KB 列表：下滑到当前分组时标题吸顶到滚动容器顶部，box-shadow 向上/
-  // 向下延伸背景以封掉 sticky 边缘的 subpixel 残缝。
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: var(--td-bg-color-container);
-  box-shadow: 0 -8px 0 0 var(--td-bg-color-container),
-    0 4px 0 0 var(--td-bg-color-container);
-  padding: 6px 4px 6px 0;
+  // 与视觉稿一致：分组只是轻量标签，不做粗条或吸顶遮挡。
+  position: static;
+  top: auto;
+  z-index: auto;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 2px;
   color: var(--td-text-color-secondary);
   font-family: var(--app-font-family);
   font-size: 13px;
@@ -1930,7 +2065,7 @@ defineExpose({
 
 .agent-card-wrap {
   display: grid;
-  gap: 12px;
+  gap: 18px;
   grid-template-columns: 1fr;
   animation: contentFadeIn 0.32s ease-out;
 }
@@ -1951,26 +2086,27 @@ defineExpose({
   }
 }
 
-/* 与知识库列表卡片统一尺寸：紧凑行高、148px 卡片高 */
+/* Mechanical translation of the reference Agent card: 12px radius, 18px
+ * inset, neutral surface, compact title/description/meta stack. */
 .agent-card {
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   overflow: hidden;
   box-sizing: border-box;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  background: var(--td-bg-color-container);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  background: #fff;
   position: relative;
   cursor: pointer;
-  transition: all 0.25s ease;
-  padding: 12px 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  height: 136px;
-  min-height: 136px;
+  height: auto;
+  min-height: 154px;
 
   &:hover {
-    border-color: var(--td-brand-color);
-    box-shadow: 0 4px 12px rgba(7, 192, 95, 0.12);
+    border-color: #9ca3af;
+    box-shadow: 0 8px 18px rgb(17 24 39 / 9%);
   }
 
   .agent-favorite-star {
@@ -2008,42 +2144,8 @@ defineExpose({
     opacity: 1;
   }
 
-  // 普通模式样式
-  &.agent-mode-normal {
-    background: linear-gradient(135deg, var(--td-bg-color-container) 0%, rgba(7, 192, 95, 0.04) 100%);
-
-    &:hover {
-      border-color: var(--td-brand-color);
-      background: linear-gradient(135deg, var(--td-bg-color-container) 0%, rgba(7, 192, 95, 0.08) 100%);
-    }
-
-    .card-decoration {
-      color: rgba(7, 192, 95, 0.35);
-    }
-
-    &:hover .card-decoration {
-      color: rgba(7, 192, 95, 0.5);
-    }
-  }
-
-  // Agent 模式样式
-  &.agent-mode-agent {
-    background: linear-gradient(135deg, var(--td-bg-color-container) 0%, rgba(124, 77, 255, 0.04) 100%);
-
-    &:hover {
-      border-color: var(--td-brand-color);
-      box-shadow: 0 4px 12px rgba(124, 77, 255, 0.12);
-      background: linear-gradient(135deg, var(--td-bg-color-container) 0%, rgba(124, 77, 255, 0.08) 100%);
-    }
-
-    .card-decoration {
-      color: rgba(124, 77, 255, 0.35);
-    }
-
-    &:hover .card-decoration {
-      color: rgba(124, 77, 255, 0.5);
-    }
-  }
+  &.agent-mode-normal,
+  &.agent-mode-agent { background: #fff; }
 
   // 确保内容在装饰之上
   .card-header,
@@ -2099,10 +2201,7 @@ defineExpose({
 }
 
 .card-decoration {
-  position: absolute;
-  top: 12px;
-  right: 44px;
-  display: flex;
+  display: none;
   align-items: flex-start;
   gap: 4px;
   pointer-events: none;
@@ -2273,6 +2372,36 @@ defineExpose({
   border-top: .5px solid var(--td-component-stroke);
 }
 
+.agent-card-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+
+  span {
+    min-width: 0;
+    max-width: 48%;
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    background: #f5f5f5;
+    color: #4b5563;
+    font-size: 11px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :deep(.t-icon) { flex: 0 0 12px; font-size: 12px; }
+}
+
+.agent-card-meta + .bottom-left { display: none; }
+
 .bottom-left {
   display: flex;
   align-items: center;
@@ -2396,6 +2525,14 @@ defineExpose({
 
 // 响应式布局
 @media (min-width: 900px) {
+  .agent-list-container > .agent-list-content {
+    padding: 32px !important;
+  }
+
+  .agent-list-container .agent-list-main {
+    padding: 24px 4px 12px 2px !important;
+  }
+
   .agent-card-wrap {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2409,21 +2546,35 @@ defineExpose({
 
 @media (min-width: 1600px) {
   .agent-card-wrap {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (min-width: 1900px) {
   .agent-card-wrap {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (min-width: 2200px) {
   .agent-card-wrap {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
+
+:root[theme-mode="dark"] .agent-list-container { background: #121214; }
+:root[theme-mode="dark"] .agent-list-content > .header { background: var(--mvc-page, #151619) !important; }
+:root[theme-mode="dark"] .agent-list-content .agents-panel__title-icon { color: #d4d4d8; }
+:root[theme-mode="dark"] .agent-card,
+:root[theme-mode="dark"] .agent-card.agent-mode-normal,
+:root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: #27272a; background: #18181b; color: #a1a1aa; box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important; }
+:root[theme-mode="dark"] .agent-card .card-bottom { gap: 6px !important; }
+:root[theme-mode="dark"] .agent-card:hover {
+  background: var(--mvc-hover, #25272c) !important;
+  border-color: var(--mvc-line-strong, #484c54) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] .agent-card-meta span { background: #27272a; color: #d4d4d8; }
 
 // 删除确认对话框样式
 :deep(.del-agent-dialog) {

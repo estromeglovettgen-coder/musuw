@@ -1,5 +1,5 @@
 import { safeRemoveItem, safeSetItem } from "@/composables/preferenceStorage";
-import { BUILTIN_SMART_REASONING_ID } from "@/api/agent";
+import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 
 export const SETTINGS_STORAGE_KEY = "WeKnora_settings";
 
@@ -38,8 +38,8 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
   loaded.selectedSkills ||= (loaded.selectedTools as string[] | undefined) || [];
   loaded.selectedFileKbMap ||= {};
 
-  // The consumer UI has one full-capability Agent. Keep the old boolean and the
-  // new effort value consistent while migrating existing browser preferences.
+  // Keep the stored reasoning controls internally consistent while migrating
+  // old browser preferences.
   let reconciledThinking = false;
   if (!isStoredSettingsRecord(loaded.conversationModels)) {
     loaded.conversationModels = { thinkingEnabled: true };
@@ -61,13 +61,19 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
     reconciledThinking = true;
   }
 
-  const reconciledAgentMode =
-    loaded.selectedAgentId !== BUILTIN_SMART_REASONING_ID ||
-    loaded.selectedAgentSourceTenantId !== null ||
-    loaded.isAgentEnabled !== true;
-  loaded.selectedAgentId = BUILTIN_SMART_REASONING_ID;
+  const storedAgentID = typeof loaded.selectedAgentId === "string"
+    ? loaded.selectedAgentId.trim()
+    : "";
+  const reconciledAgentMode = !storedAgentID || loaded.selectedAgentSourceTenantId !== null;
+  loaded.selectedAgentId = storedAgentID || BUILTIN_SMART_REASONING_ID;
   loaded.selectedAgentSourceTenantId = null;
-  loaded.isAgentEnabled = true;
+  if (loaded.selectedAgentId === BUILTIN_QUICK_ANSWER_ID) {
+    loaded.isAgentEnabled = false;
+  } else if (loaded.selectedAgentId === BUILTIN_SMART_REASONING_ID) {
+    loaded.isAgentEnabled = true;
+  } else if (typeof loaded.isAgentEnabled !== "boolean") {
+    loaded.isAgentEnabled = true;
+  }
 
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) {
@@ -91,7 +97,7 @@ function resetStoredSettings<T extends ReconcilableSettings>(
   return reconcileLoadedSettings(cloneSettings(defaultSettings));
 }
 
-/** Load settings from localStorage, reconcile builtin agent mode, fall back on corruption. */
+/** Load settings from localStorage, reconcile native Agent state, fall back on corruption. */
 export function loadAndReconcileSettings<T extends ReconcilableSettings>(
   defaultSettings: T,
 ): T {

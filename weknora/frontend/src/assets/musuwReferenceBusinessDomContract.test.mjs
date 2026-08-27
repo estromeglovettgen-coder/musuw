@@ -41,13 +41,20 @@ test('rebuilt high-visibility Views own their active DOM directly', () => {
     ['../views/chat/index.vue', 'class="visual-chat-view"', ['class="chat"', 'class="chat_scroll_box"', 'class="msg_list"', 'class="input-container"']],
     ['../views/knowledge/KnowledgeBase.vue', 'class="visual-knowledge-page"', ['class="knowledge-layout"', 'class="document-header"', 'class="doc-filter-bar"', 'class="doc-card-list"']],
     ['../views/knowledge/KnowledgeBaseList.vue', 'class="visual-kb-list"', ['class="kb-list-container"', 'class="kb-list-content"', 'class="kb-card-wrap"']],
-    ['../components/manual-knowledge-editor.vue', 'class="visual-manual-editor"', ['<SettingDrawer', 'class="manual-editor"', 'class="setting-drawer__section"']],
   ]
   for (const [path, root, legacy] of cases) {
     const source = read(path)
     assert.ok(source.includes(root), `${path} lost ${root}`)
     for (const token of legacy) assert.equal(source.includes(token), false, `${path} still exposes ${token}`)
   }
+})
+
+test('manual knowledge editor composes the existing native SettingDrawer', () => {
+  const source = read('../components/manual-knowledge-editor.vue')
+  for (const token of ['<SettingDrawer', 'class="manual-editor"', 'class="setting-drawer__section"']) {
+    assert.ok(source.includes(token), `manual editor lost ${token}`)
+  }
+  assert.equal(source.includes('visual-manual-editor__overlay'), false)
 })
 
 test('active KnowledgeBase keeps Graph as an untouched WikiBrowser-hosted business surface', () => {

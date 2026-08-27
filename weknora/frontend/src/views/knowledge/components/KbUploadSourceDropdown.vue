@@ -83,17 +83,61 @@
             </header>
 
             <div class="visual-url-modal__body">
-              <label class="visual-url-modal__label" for="visual-url-import-input">
-                {{ t('knowledgeBase.urlLabel') }}
-              </label>
-              <t-input
-                id="visual-url-import-input"
-                v-model="urlInputValue"
-                :placeholder="t('knowledgeBase.urlPlaceholder')"
-                clearable
-                autofocus
-                @enter="handleUrlDialogConfirm"
-              />
+              <div class="visual-url-modal__input-heading">
+                <label class="visual-url-modal__label" for="visual-url-import-input">
+                  {{ t('knowledgeBase.urlLabel') }}
+                </label>
+              </div>
+              <div class="visual-url-modal__textarea-wrap">
+                <t-textarea
+                  id="visual-url-import-input"
+                  v-model="urlInputValue"
+                  :placeholder="t('knowledgeBase.urlPlaceholder')"
+                  :autosize="{ minRows: 3, maxRows: 3 }"
+                  autofocus
+                />
+                <button
+                  v-if="urlInputValue"
+                  type="button"
+                  class="visual-url-modal__clear"
+                  :aria-label="t('knowledgeBase.urlClear')"
+                  @click="clearUrlInput"
+                >
+                  <t-icon name="close" aria-hidden="true" />
+                  <span>{{ t('knowledgeBase.urlClear') }}</span>
+                </button>
+              </div>
+              <div
+                class="visual-url-modal__platforms"
+                :aria-label="t('knowledgeBase.urlSupportedPlatforms')"
+              >
+                <span class="visual-url-modal__platforms-label">
+                  {{ t('knowledgeBase.urlSupportedPlatforms') }}
+                </span>
+                <div class="visual-url-modal__platform-list" role="list">
+                  <span class="visual-url-modal__platform" role="listitem">
+                    <t-icon name="logo-instagram" aria-hidden="true" />
+                    <span>Instagram</span>
+                  </span>
+                  <span class="visual-url-modal__platform" role="listitem">
+                    <t-icon name="logo-twitter" aria-hidden="true" />
+                    <span>X</span>
+                  </span>
+                  <span class="visual-url-modal__platform" role="listitem">
+                    <span class="visual-url-modal__platform-mark" aria-hidden="true">小</span>
+                    <span>小红书</span>
+                  </span>
+                  <span class="visual-url-modal__platform" role="listitem" data-platform-label="抖音·TikTok">
+                    <span class="visual-url-modal__platform-mark" aria-hidden="true">抖·TK</span>
+                    <span>{{ t('knowledgeBase.douyinTikTok') }}</span>
+                  </span>
+                  <span class="visual-url-modal__platform" role="listitem">
+                    <t-icon name="logo-youtube" aria-hidden="true" />
+                    <span>YouTube</span>
+                  </span>
+                </div>
+              </div>
+              <p class="visual-url-modal__hint">{{ t('knowledgeBase.urlInputHint') }}</p>
               <p class="visual-url-modal__notice">{{ t('knowledgeBase.urlUsageNotice') }}</p>
             </div>
 
@@ -247,15 +291,17 @@ const handleUrlDialogConfirm = () => {
     MessagePlugin.warning(t('knowledgeBase.urlRequired'))
     return
   }
-  try {
-    new URL(url)
-  } catch {
-    MessagePlugin.warning(t('knowledgeBase.invalidURL'))
+  if (new TextEncoder().encode(url).length > 4096) {
+    MessagePlugin.warning(t('knowledgeBase.urlTooLong'))
     return
   }
   urlDialogVisible.value = false
   urlInputValue.value = ''
   emit('url', url)
+}
+
+const clearUrlInput = () => {
+  urlInputValue.value = ''
 }
 
 const handleUrlDialogCancel = () => {
@@ -443,22 +489,139 @@ defineExpose({ openUrlDialog })
   padding: 20px;
 }
 
+.visual-url-modal__input-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .visual-url-modal__label {
   display: block;
-  margin: 0 0 8px;
+  margin: 0;
   color: #374151;
   font-size: 12px;
   line-height: 18px;
   font-weight: 600;
 }
 
-.visual-url-modal__body :deep(.t-input) {
-  min-height: 38px;
+.visual-url-modal__textarea-wrap {
+  position: relative;
+}
+
+.visual-url-modal__clear {
+  border: 0;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  min-height: 24px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.visual-url-modal__clear :deep(.t-icon) {
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+}
+
+.visual-url-modal__clear:hover {
+  color: #374151;
+}
+
+.visual-url-modal__body :deep(.t-textarea) {
   border-color: #e5e7eb;
   border-radius: 11px;
   background: #fff;
   color: #1f2937;
   font-size: 12px;
+}
+
+.visual-url-modal__body :deep(.t-textarea__inner) {
+  min-height: 96px;
+  padding: 10px 72px 10px 12px;
+  color: #1f2937;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.visual-url-modal__platforms {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid #f0f1f3;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.visual-url-modal__platforms-label {
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.visual-url-modal__platform-list {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.visual-url-modal__platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.visual-url-modal__platform :deep(.t-icon) {
+  width: 14px;
+  height: 14px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.visual-url-modal__platform-mark {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: #9ca3af;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.visual-url-modal__hint {
+  margin: 10px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 17px;
 }
 
 .visual-url-modal__notice {
@@ -498,6 +661,113 @@ defineExpose({ openUrlDialog })
   border: 1px solid #111827;
   background: #111827;
   color: #fff;
+}
+
+:root[theme-mode="dark"] .visual-upload-menu {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+
+:root[theme-mode="dark"] .visual-upload-menu__item {
+  color: var(--mvc-muted-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-upload-menu__item:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-upload-menu__item :deep(.t-icon) {
+  color: var(--mvc-muted) !important;
+}
+
+:root[theme-mode="dark"] .visual-upload-menu__item:hover :deep(.t-icon) {
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__header {
+  border-bottom-color: var(--mvc-line) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__header h3,
+:root[theme-mode="dark"] .visual-url-modal__label {
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__header p,
+:root[theme-mode="dark"] .visual-url-modal__hint,
+:root[theme-mode="dark"] .visual-url-modal__notice,
+:root[theme-mode="dark"] .visual-url-modal__platforms {
+  color: var(--mvc-muted) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__close,
+:root[theme-mode="dark"] .visual-url-modal__clear {
+  color: var(--mvc-muted) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__close:hover,
+:root[theme-mode="dark"] .visual-url-modal__clear:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__body :deep(.t-textarea),
+:root[theme-mode="dark"] .visual-url-modal__body :deep(.t-textarea__inner) {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+  caret-color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__body :deep(.t-textarea__inner::placeholder) {
+  color: var(--mvc-faint) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__platforms {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__platforms-label {
+  color: var(--mvc-muted-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__platform :deep(.t-icon),
+:root[theme-mode="dark"] .visual-url-modal__platform-mark {
+  border-color: var(--mvc-line-strong) !important;
+  color: var(--mvc-muted) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__footer {
+  border-top-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__button.is-secondary {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__button.is-secondary:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] .visual-url-modal__button.is-primary {
+  border-color: #f2f2f2 !important;
+  background: #f2f2f2 !important;
+  color: #111214 !important;
 }
 
 .visual-url-modal-enter-active,

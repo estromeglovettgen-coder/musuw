@@ -238,8 +238,8 @@ const triggerImageUpload = () => {
 const atButtonRef = ref<HTMLElement>();
 
 const selectedAgentId = computed({
-  get: () => BUILTIN_SMART_REASONING_ID,
-  set: () => settingsStore.selectAgent(BUILTIN_SMART_REASONING_ID),
+  get: () => settingsStore.selectedAgentId || BUILTIN_SMART_REASONING_ID,
+  set: (agentId: string) => settingsStore.selectAgent(agentId),
 });
 const selectedAgent = computed(() => {
   // When a shared-agent source tenant is set, resolve from sharedAgents FIRST.
@@ -953,10 +953,6 @@ const loadFiles = async () => {
 };
 
 const loadMCPServices = async () => {
-  if (authStore.isLiteMode) {
-    mcpServices.value = [];
-    return;
-  }
   try {
     mcpServices.value = await listMCPServices();
   } catch (error) {

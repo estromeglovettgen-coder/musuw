@@ -1,0 +1,262 @@
+package service
+
+import (
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/hibiken/asynq"
+	"github.com/stretchr/testify/require"
+)
+
+func TestParseSocialShareInputRoutesSupportedWorks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		platform string
+		objectID string
+		url      string
+	}{
+		{
+			name:     "douyin URL embedded in Chinese share text",
+			input:    "复制打开抖音，看看【示例】 https://v.douyin.com/AbCdEf12/ 复制此链接",
+			platform: "douyin",
+			url:      "https://v.douyin.com/AbCdEf12",
+		},
+		{
+			name:     "tiktok video",
+			input:    "https://www.tiktok.com/@creator/video/1234567890123456789?lang=en#comments",
+			platform: "tiktok",
+			objectID: "1234567890123456789",
+			url:      "https://www.tiktok.com/@creator/video/1234567890123456789",
+		},
+		{
+			name:     "youtube watch keeps only the video ID query",
+			input:    "看这个：https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=provider-token",
+			platform: "youtube",
+			objectID: "dQw4w9WgXcQ",
+			url:      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		},
+		{
+			name:     "youtube shorts",
+			input:    "https://youtube.com/shorts/aqz-KE-bpKQ/",
+			platform: "youtube",
+			objectID: "aqz-KE-bpKQ",
+			url:      "https://youtube.com/shorts/aqz-KE-bpKQ",
+		},
+		{
+			name:     "xiaohongshu note",
+			input:    "https://www.xiaohongshu.com/explore/64f123456789abcdef123456?xsec_token=secret",
+			platform: "xiaohongshu",
+			objectID: "64f123456789abcdef123456",
+			url:      "https://www.xiaohongshu.com/explore/64f123456789abcdef123456",
+		},
+		{
+			name:     "xiaohongshu discovery item",
+			input:    "https://www.xiaohongshu.com/discovery/item/64f123456789abcdef123456",
+			platform: "xiaohongshu",
+			objectID: "64f123456789abcdef123456",
+			url:      "https://www.xiaohongshu.com/discovery/item/64f123456789abcdef123456",
+		},
+		{
+			name:     "xiaohongshu official short link uses share_text",
+			input:    "复制链接：https://xhslink.cn/a/AbCdEf12/",
+			platform: "xiaohongshu",
+			url:      "https://xhslink.cn/a/AbCdEf12",
+		},
+		{
+			name:     "xiaohongshu mobile short link uses share_text",
+			input:    "https://xhslink.com/m/AbCdEf12",
+			platform: "xiaohongshu",
+			url:      "https://xhslink.com/m/AbCdEf12",
+		},
+		{
+			name:     "instagram reel",
+			input:    "https://www.instagram.com/reel/C0ffee_1234/?igsh=secret",
+			platform: "instagram",
+			objectID: "C0ffee_1234",
+			url:      "https://www.instagram.com/reel/C0ffee_1234",
+		},
+		{
+			name:     "x status",
+			input:    "https://x.com/example/status/1234567890123456789?s=20",
+			platform: "x",
+			objectID: "1234567890123456789",
+			url:      "https://x.com/example/status/1234567890123456789",
+		},
+		{
+			name:     "x id-only status",
+			input:    "https://x.com/i/status/1234567890123456789",
+			platform: "x",
+			objectID: "1234567890123456789",
+			url:      "https://x.com/i/status/1234567890123456789",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			route, cleanedURL, err := ParseSocialShareInput(tc.input)
+			require.NoError(t, err)
+			require.NotNil(t, route)
+			require.Equal(t, tc.platform, string(route.Platform))
+			require.Equal(t, tc.objectID, route.ObjectID)
+			require.Equal(t, tc.url, route.InputURL)
+			require.Equal(t, tc.url, cleanedURL)
+			require.NotContains(t, route.InputURL, "secret")
+			require.NotContains(t, route.InputURL, "provider-token")
+		})
+	}
+}
+
+func TestParseSocialShareInputCleansZeroWidthAndTrailingPunctuation(t *testing.T) {
+	t.Parallel()
+
+	route, cleanedURL, err := ParseSocialShareInput("复制：https://www\u200b.tiktok.com/@creator/video/1234567890123456789。")
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Equal(t, "https://www.tiktok.com/@creator/video/1234567890123456789", cleanedURL)
+	require.Equal(t, cleanedURL, route.InputURL)
+
+	route, cleanedURL, err = ParseSocialShareInput("打开链接https://v.douyin.com/AbCdEf12/复制此文本")
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Equal(t, "https://v.douyin.com/AbCdEf12", cleanedURL)
+}
+
+func TestParseSocialShareInputRejectsNoOrMultipleURLs(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := ParseSocialShareInput("请打开这篇分享，但这里没有链接")
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrNoHTTPURL), "unexpected error: %v", err)
+
+	first := "https://example.com/a"
+	second := "https://example.com/b"
+	_, _, err = ParseSocialShareInput("两个链接：" + first + " 和 " + second)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrMultipleHTTPURLs), "unexpected error: %v", err)
+	require.NotContains(t, err.Error(), first)
+	require.NotContains(t, err.Error(), second)
+}
+
+func TestParseSocialShareInputRejectsOversizedInput(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := ParseSocialShareInput(strings.Repeat("a", 4097))
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrSocialInputTooLong), "unexpected error: %v", err)
+}
+
+func TestParseSocialShareInputUnknownHostFallsBackToGenericURL(t *testing.T) {
+	t.Parallel()
+
+	route, cleanedURL, err := ParseSocialShareInput("普通网页：https://example.com/article?id=42#section")
+	require.NoError(t, err)
+	require.Nil(t, route)
+	require.Equal(t, "https://example.com/article?id=42", cleanedURL)
+}
+
+func TestExtractSingleHTTPURLDoesNotClassifyHost(t *testing.T) {
+	t.Parallel()
+
+	cleanedURL, err := ExtractSingleHTTPURL("普通分享：https://www.youtube.com/channel/UC1234567890。")
+	require.NoError(t, err)
+	require.Equal(t, "https://www.youtube.com/channel/UC1234567890", cleanedURL)
+}
+
+type socialURLTaskCapture struct {
+	task    *asynq.Task
+	options []asynq.Option
+}
+
+func (c *socialURLTaskCapture) Enqueue(task *asynq.Task, options ...asynq.Option) (*asynq.TaskInfo, error) {
+	c.task = task
+	c.options = options
+	return &asynq.TaskInfo{ID: "social-task", Queue: types.QueueDefault}, nil
+}
+
+func TestCreateKnowledgeFromURLNormalizesShareTextAndDisablesSocialRetries(t *testing.T) {
+	repo := &createKnowledgeFileRepoStub{}
+	task := &socialURLTaskCapture{}
+	svc := &knowledgeService{
+		repo:      repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		fileSvc:   &createKnowledgeFileServiceStub{},
+		task:      task,
+	}
+
+	knowledge, err := svc.CreateKnowledgeFromURL(
+		newCreateKnowledgeFileContext(),
+		"kb-1",
+		"复制打开抖音：https://v.douyin.com/AbCdEf12/复制此文本",
+		"",
+		"",
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, knowledge)
+	require.Equal(t, "https://v.douyin.com/AbCdEf12", knowledge.Source)
+	require.NotNil(t, task.task)
+	require.NotContains(t, string(task.task.Payload()), "复制打开抖音")
+	var payload types.DocumentProcessPayload
+	require.NoError(t, json.Unmarshal(task.task.Payload(), &payload))
+	require.Equal(t, knowledge.Source, payload.URL)
+	_, _, maxRetry := parseDocumentProcessOpts(t, task.options)
+	require.NotNil(t, maxRetry)
+	require.Zero(t, *maxRetry)
+}
+
+func TestParseSocialShareInputKnownHostBadPathFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	badURLs := []string{
+		"https://www.youtube.com/channel/UC1234567890",
+		"https://www.instagram.com/explore/",
+		"https://x.com/example/likes/1234567890123456789",
+		"https://www.tiktok.com/@creator",
+		"https://www.xiaohongshu.com/user/profile/64f123456789abcdef123456",
+		"https://www.xiaohongshu.com/discovery/item/not-a-note-id",
+		"https://xhslink.cn/profile/AbCdEf12",
+		"https://www.douyin.com/user/MS4wLjABAAAA",
+	}
+	for _, rawURL := range badURLs {
+		rawURL := rawURL
+		t.Run(rawURL, func(t *testing.T) {
+			_, _, err := ParseSocialShareInput(rawURL)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrUnsupportedSocialURL), "unexpected error: %v", err)
+			require.NotContains(t, err.Error(), rawURL)
+		})
+	}
+}
+
+func TestParseSocialShareInputUsesExactHostBoundaries(t *testing.T) {
+	t.Parallel()
+
+	route, cleanedURL, err := ParseSocialShareInput("https://www.youtube.com.evil.example/watch?v=dQw4w9WgXcQ")
+	require.NoError(t, err)
+	require.Nil(t, route)
+	require.Equal(t, "https://www.youtube.com.evil.example/watch?v=dQw4w9WgXcQ", cleanedURL)
+}
+
+func TestSocialURLDedupeSourceUsesStableWorkID(t *testing.T) {
+	t.Parallel()
+
+	first, firstURL, err := ParseSocialShareInput("https://x.com/old-name/status/1234567890123456789")
+	require.NoError(t, err)
+	second, secondURL, err := ParseSocialShareInput("https://twitter.com/new-name/status/1234567890123456789")
+	require.NoError(t, err)
+	require.NotEqual(t, firstURL, secondURL)
+	require.Equal(t, socialURLDedupeSource(first, firstURL), socialURLDedupeSource(second, secondURL))
+
+	generic := "https://example.com/article"
+	require.Equal(t, generic, socialURLDedupeSource(nil, generic))
+}

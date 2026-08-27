@@ -233,7 +233,11 @@ func (h *KnowledgeHandler) handleDuplicateKnowledgeError(c *gin.Context,
 ) bool {
 	if dupErr, ok := err.(*types.DuplicateKnowledgeError); ok {
 		ctx := c.Request.Context()
-		logger.Warnf(ctx, "Detected duplicate %s: %s", duplicateType, secutils.SanitizeForLog(dupErr.Error()))
+		duplicateKnowledgeID := "unknown"
+		if dupErr.Knowledge != nil {
+			duplicateKnowledgeID = secutils.SanitizeForLog(dupErr.Knowledge.ID)
+		}
+		logger.Warnf(ctx, "Detected duplicate %s: knowledge_id=%s", duplicateType, duplicateKnowledgeID)
 		c.JSON(http.StatusConflict, gin.H{
 			"success": false,
 			"message": dupErr.Error(),
@@ -471,6 +475,11 @@ func (h *KnowledgeHandler) CreateKnowledgeFromURL(c *gin.Context) {
 	}
 
 	// Parse URL from request body
+	// Bound the JSON envelope before decoding. The share field itself has a
+	// stricter 4096-byte service contract; this outer cap also covers optional
+	// process settings without letting an access logger/decoder read an
+	// unbounded body into memory.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
 	var req struct {
 		URL              string                           `json:"url" binding:"required"`
 		FileName         string                           `json:"file_name"`
@@ -487,23 +496,15 @@ func (h *KnowledgeHandler) CreateKnowledgeFromURL(c *gin.Context) {
 		return
 	}
 
-	logger.Infof(ctx, "Received URL request: %s, file_name: %s, file_type: %s",
-		secutils.SanitizeForLog(req.URL),
-		secutils.SanitizeForLog(req.FileName),
-		secutils.SanitizeForLog(req.FileType),
-	)
-
-	// SSRF validation for user-supplied URL
-	if err := secutils.ValidateURLForSSRF(req.URL); err != nil {
-		logger.Warnf(ctx, "SSRF validation failed for knowledge URL: %v", err)
-		c.Error(errors.NewBadRequestError(secutils.FormatSSRFError("URL", req.URL, err)))
-		return
-	}
-
+	// Do not log the URL field: it may be a full Chinese share message or a
+	// signed provider URL. CreateKnowledgeFromURL performs extraction and SSRF
+	// validation after removing copy/paste artefacts, so this handler does not
+	// reject a valid share message before the service sees it.
 	logger.Infof(ctx,
-		"Creating knowledge from URL, knowledge base ID: %s, URL: %s",
+		"Received URL request: knowledge_base_id=%s file_name_present=%t file_type_present=%t",
 		secutils.SanitizeForLog(kbID),
-		secutils.SanitizeForLog(req.URL),
+		req.FileName != "",
+		req.FileType != "",
 	)
 
 	// Create knowledge entry from the URL

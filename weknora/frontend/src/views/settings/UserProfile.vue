@@ -1,9 +1,9 @@
 <template>
   <div class="user-profile">
-    <header class="visual-settings-page-header section-header">
+    <header class="visual-settings-page-header">
       <div class="visual-settings-page-header__copy">
         <h2 class="visual-settings-page-header__title">{{ $t('userProfile.title') }}</h2>
-        <p class="visual-settings-page-header__description section-description">{{ $t('userProfile.description') }}</p>
+        <p class="visual-settings-page-header__description">{{ $t('userProfile.description') }}</p>
       </div>
     </header>
 

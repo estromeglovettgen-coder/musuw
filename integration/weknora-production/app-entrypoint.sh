@@ -34,6 +34,7 @@ export JWT_SECRET="$(read_required_secret /run/secrets/jwt_secret jwt-secret)"
 export OIDC_AUTH_CLIENT_ID="$(read_required_secret /run/secrets/oidc_client_id oidc-client-id)"
 export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_secret oidc-client-secret)"
 export OPENROUTER_MANAGEMENT_API_KEY="$(read_required_secret /run/secrets/openrouter_management_api_key openrouter-management-api-key)"
+export TIKHUB_API_KEY="$(read_required_secret /run/secrets/tikhub_api_key tikhub-api-key)"
 export MUSUW_PADDLE_API_KEY="$(read_required_secret /run/secrets/paddle_api_key paddle-api-key)"
 export MUSUW_PADDLE_WEBHOOK_SECRET="$(read_required_secret /run/secrets/paddle_webhook_secret paddle-webhook-secret)"
 musuw_paddle_validate_production_launch \

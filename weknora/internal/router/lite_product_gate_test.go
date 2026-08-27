@@ -37,8 +37,16 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "smart reasoning runtime agent", method: "GET", path: "/api/v1/agents/builtin-smart-reasoning", blocked: false},
 		{name: "quick answer suggestions", method: "GET", path: "/api/v1/agents/builtin-quick-answer/suggested-questions", blocked: false},
 		{name: "smart reasoning suggestions", method: "GET", path: "/api/v1/agents/builtin-smart-reasoning/suggested-questions", blocked: false},
+		{name: "agent enumeration", method: "GET", path: "/api/v1/agents", blocked: false},
+		{name: "agent placeholders", method: "GET", path: "/api/v1/agents/placeholders", blocked: false},
+		{name: "agent type presets", method: "GET", path: "/api/v1/agents/type-presets", blocked: false},
+		{name: "custom agent read", method: "GET", path: "/api/v1/agents/custom-agent-id", blocked: false},
+		{name: "custom agent create", method: "POST", path: "/api/v1/agents", blocked: false},
+		{name: "custom agent update", method: "PUT", path: "/api/v1/agents/custom-agent-id", blocked: false},
+		{name: "custom agent delete", method: "DELETE", path: "/api/v1/agents/custom-agent-id", blocked: false},
+		{name: "custom agent copy", method: "POST", path: "/api/v1/agents/custom-agent-id/copy", blocked: false},
 		{name: "kb initialization read", method: "GET", path: "/api/v1/initialization/config/1", blocked: false},
-		{name: "kb initialization update", method: "PUT", path: "/api/v1/initialization/config/1", blocked: true},
+		{name: "kb initialization update", method: "PUT", path: "/api/v1/initialization/config/1", blocked: false},
 		{name: "kb initialize", method: "POST", path: "/api/v1/initialization/initialize/1", blocked: true},
 		{name: "parser catalog", method: "GET", path: "/api/v1/system/parser-engines", blocked: false},
 		{name: "storage status", method: "GET", path: "/api/v1/system/storage-engine-status", blocked: false},
@@ -47,6 +55,10 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "organization kb shares", method: "GET", path: "/api/v1/organizations/3/shares", blocked: false},
 		{name: "consumer retrieval config read", method: "GET", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
 		{name: "consumer retrieval config write", method: "PUT", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
+		{name: "native prompt templates read", method: "GET", path: "/api/v1/tenants/kv/prompt-templates", blocked: false},
+		{name: "native prompt templates write", method: "PUT", path: "/api/v1/tenants/kv/prompt-templates", blocked: true},
+		{name: "native agent storage config read", method: "GET", path: "/api/v1/tenants/kv/storage-engine-config", blocked: false},
+		{name: "native agent storage config write", method: "PUT", path: "/api/v1/tenants/kv/storage-engine-config", blocked: true},
 
 		// Hidden auth/workspace surfaces.
 		{name: "native register", method: "POST", path: "/api/v1/auth/register", blocked: true},
@@ -64,15 +76,10 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "model create", method: "POST", path: "/api/v1/models", blocked: true},
 		{name: "model update", method: "PUT", path: "/api/v1/models/1", blocked: true},
 		{name: "model credentials", method: "DELETE", path: "/api/v1/models/1/credentials/api_key", blocked: true},
-		{name: "agent enumeration", method: "GET", path: "/api/v1/agents", blocked: true},
-		{name: "agent placeholders", method: "GET", path: "/api/v1/agents/placeholders", blocked: true},
-		{name: "agent type presets", method: "GET", path: "/api/v1/agents/type-presets", blocked: true},
-		{name: "custom agent read", method: "GET", path: "/api/v1/agents/custom-agent-id", blocked: true},
-		{name: "internal deep researcher read", method: "GET", path: "/api/v1/agents/builtin-deep-researcher", blocked: true},
-		{name: "agent create", method: "POST", path: "/api/v1/agents", blocked: true},
-		{name: "agent update", method: "PUT", path: "/api/v1/agents/builtin-quick-answer", blocked: true},
+		{name: "native built-in agent read", method: "GET", path: "/api/v1/agents/builtin-deep-researcher", blocked: false},
 		{name: "agent share read", method: "GET", path: "/api/v1/agents/builtin-quick-answer/shares", blocked: true},
 		{name: "agent im channels", method: "GET", path: "/api/v1/agents/builtin-quick-answer/im-channels", blocked: true},
+		{name: "agent unknown nested route", method: "GET", path: "/api/v1/agents/custom-agent-id/unknown", blocked: true},
 		{name: "shared agents", method: "GET", path: "/api/v1/shared-agents", blocked: true},
 		{name: "im channel management", method: "GET", path: "/api/v1/im-channels", blocked: true},
 		{name: "embed channel management", method: "GET", path: "/api/v1/embed-channels", blocked: true},
@@ -89,10 +96,14 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "retrieval config wrong verb", method: "POST", path: "/api/v1/tenants/kv/retrieval-config", blocked: true},
 		{name: "my invitations", method: "GET", path: "/api/v1/me/invitations", blocked: true},
 		{name: "evaluation", method: "GET", path: "/api/v1/evaluation", blocked: true},
-		{name: "mcp", method: "GET", path: "/api/v1/mcp-services", blocked: true},
-		{name: "mcp oauth callback", method: "GET", path: "/api/v1/mcp-oauth/callback", blocked: true},
-		{name: "agent tool approval", method: "POST", path: "/api/v1/agent/tool-approvals/123", blocked: true},
-		{name: "agent mcp oauth resolution", method: "POST", path: "/api/v1/agent/mcp-oauth-resolutions/123", blocked: true},
+		{name: "mcp", method: "GET", path: "/api/v1/mcp-services", blocked: false},
+		{name: "mcp create", method: "POST", path: "/api/v1/mcp-services", blocked: false},
+		{name: "mcp update", method: "PUT", path: "/api/v1/mcp-services/mcp-1", blocked: false},
+		{name: "mcp tools", method: "GET", path: "/api/v1/mcp-services/mcp-1/tools", blocked: false},
+		{name: "mcp credentials", method: "PUT", path: "/api/v1/mcp-services/mcp-1/credentials", blocked: false},
+		{name: "mcp oauth callback", method: "GET", path: "/api/v1/mcp-oauth/callback", blocked: false},
+		{name: "agent tool approval", method: "POST", path: "/api/v1/agent/tool-approvals/123", blocked: false},
+		{name: "agent mcp oauth resolution", method: "POST", path: "/api/v1/agent/mcp-oauth-resolutions/123", blocked: false},
 		{name: "web search catalog", method: "GET", path: "/api/v1/web-search/providers", blocked: true},
 		{name: "web search management", method: "GET", path: "/api/v1/web-search-providers", blocked: true},
 		{name: "vector stores", method: "GET", path: "/api/v1/vector-stores", blocked: true},
@@ -149,7 +160,7 @@ func TestLiteTemporaryAttachmentRequestBlocked(t *testing.T) {
 	}{
 		{name: "no agent", blocked: false},
 		{name: "builtin runtime agent", agentID: liteSmartReasoningAgentID, blocked: false},
-		{name: "custom agent", agentID: "custom-agent", blocked: true},
+		{name: "custom agent", agentID: "custom-agent", blocked: false},
 		{name: "shared agent source", agentID: liteSmartReasoningAgentID, sourceID: "42", blocked: true},
 	}
 
@@ -201,7 +212,7 @@ func TestLiteProductGateTemporaryAttachmentRequest(t *testing.T) {
 		{name: "empty agent", wantStatus: http.StatusNoContent, wantSentinel: true},
 		{name: "quick answer", agentID: liteQuickAnswerAgentID, wantStatus: http.StatusNoContent, wantSentinel: true},
 		{name: "smart reasoning", agentID: liteSmartReasoningAgentID, wantStatus: http.StatusNoContent, wantSentinel: true},
-		{name: "custom agent", agentID: "custom-agent", wantStatus: http.StatusNotFound},
+		{name: "custom agent", agentID: "custom-agent", wantStatus: http.StatusNoContent, wantSentinel: true},
 		{name: "nonzero source tenant", agentID: liteSmartReasoningAgentID, sourceID: "42", wantStatus: http.StatusNotFound},
 	}
 
@@ -279,6 +290,10 @@ func TestLiteProductGateRetrievalConfigRouteBoundary(t *testing.T) {
 	sentinel := func(c *gin.Context) { c.Status(http.StatusNoContent) }
 	router.GET("/api/v1/tenants/kv/retrieval-config", sentinel)
 	router.PUT("/api/v1/tenants/kv/retrieval-config", sentinel)
+	router.GET("/api/v1/tenants/kv/prompt-templates", sentinel)
+	router.PUT("/api/v1/tenants/kv/prompt-templates", sentinel)
+	router.GET("/api/v1/tenants/kv/storage-engine-config", sentinel)
+	router.PUT("/api/v1/tenants/kv/storage-engine-config", sentinel)
 	router.GET("/api/v1/tenants/kv/other", sentinel)
 
 	tests := []struct {
@@ -289,6 +304,10 @@ func TestLiteProductGateRetrievalConfigRouteBoundary(t *testing.T) {
 	}{
 		{name: "read retrieval config", method: http.MethodGet, path: "/api/v1/tenants/kv/retrieval-config", want: http.StatusNoContent},
 		{name: "write retrieval config", method: http.MethodPut, path: "/api/v1/tenants/kv/retrieval-config", want: http.StatusNoContent},
+		{name: "read prompt templates", method: http.MethodGet, path: "/api/v1/tenants/kv/prompt-templates", want: http.StatusNoContent},
+		{name: "write prompt templates", method: http.MethodPut, path: "/api/v1/tenants/kv/prompt-templates", want: http.StatusNotFound},
+		{name: "read storage config", method: http.MethodGet, path: "/api/v1/tenants/kv/storage-engine-config", want: http.StatusNoContent},
+		{name: "write storage config", method: http.MethodPut, path: "/api/v1/tenants/kv/storage-engine-config", want: http.StatusNotFound},
 		{name: "wrong verb", method: http.MethodPost, path: "/api/v1/tenants/kv/retrieval-config", want: http.StatusNotFound},
 		{name: "other tenant kv key", method: http.MethodGet, path: "/api/v1/tenants/kv/other", want: http.StatusNotFound},
 	}

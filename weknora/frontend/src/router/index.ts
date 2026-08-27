@@ -103,6 +103,7 @@ function isAllowedLitePath(path: string) {
     path.startsWith('/platform/chat/') ||
     path === '/platform/knowledge-bases' ||
     path.startsWith('/platform/knowledge-bases/') ||
+    path === '/platform/agents' ||
     path === '/platform/settings' ||
     path === '/onboarding/workspace'
   )
@@ -466,7 +467,7 @@ router.beforeEach(async (to, from, next) => {
       const section = typeof to.query.section === 'string' ? to.query.section : ''
       const tab = typeof to.query.tab === 'string' ? to.query.tab : ''
       if (
-        (section && section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile') ||
+        (section && section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mcp') ||
         tab
       ) {
         next({ path: '/platform/settings' })

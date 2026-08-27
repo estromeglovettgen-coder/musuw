@@ -118,11 +118,6 @@ func liteAgentScopedKnowledgeRequestBlocked(c *gin.Context) bool {
 		strings.TrimSpace(c.Query("agent_source_tenant_id")) != ""
 }
 
-func liteRuntimeAgentIDAllowed(agentID string) bool {
-	agentID = strings.TrimSpace(agentID)
-	return agentID == "" || agentID == liteQuickAnswerAgentID || agentID == liteSmartReasoningAgentID
-}
-
 func liteChatRequestBlocked(c *gin.Context) bool {
 	if c.Request.Method != http.MethodPost {
 		return false
@@ -152,29 +147,32 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return false
 	}
-	if !liteRuntimeAgentIDAllowed(req.AgentID) || req.AgentSourceTenantID != 0 {
+	// Local agents (built-in or tenant-owned custom) are resolved by the native
+	// service using the request tenant context. A non-zero source tenant is the
+	// shared-agent selector and remains a hidden Lite capability.
+	if req.AgentSourceTenantID != 0 {
 		return true
 	}
 	if req.WebSearchEnabled {
 		return true
 	}
-	if len(req.MCPServiceIDs) > 0 || len(req.SkillNames) > 0 {
+	// MCP fields are passed through to the native runtime. Quick-answer simply
+	// ignores them because it uses the normal RAG path; smart/custom agent
+	// configuration decides whether and which services can actually run.
+	if len(req.SkillNames) > 0 {
 		return true
 	}
 	for _, item := range req.MentionedItems {
-		switch strings.ToLower(strings.TrimSpace(item.Type)) {
-		case "mcp", "skill":
+		if strings.EqualFold(strings.TrimSpace(item.Type), "skill") {
 			return true
 		}
 	}
 	return false
 }
 
-// liteTemporaryAttachmentRequestBlocked closes the attachment-upload side
-// door to hidden/custom agents. The normal Lite composer uploads through this
-// endpoint with one of the two platform-owned runtime agents; an attacker can
-// otherwise submit a multipart agent_id here and make the parser worker load
-// that agent's ASR/VLM configuration before the subsequent chat request.
+// liteTemporaryAttachmentRequestBlocked keeps shared-agent attachment uploads
+// out of Lite. Local built-in and tenant-owned custom agents are resolved by
+// the native service from the authenticated tenant context.
 func liteTemporaryAttachmentRequestBlocked(c *gin.Context) bool {
 	if c.Request.Method != http.MethodPost {
 		return false
@@ -197,11 +195,6 @@ func liteTemporaryAttachmentRequestBlocked(c *gin.Context) bool {
 			return false
 		}
 	}
-	agentID := strings.TrimSpace(c.PostForm("agent_id"))
-	if agentID != "" && !liteRuntimeAgentIDAllowed(agentID) {
-		return true
-	}
-
 	sourceTenantID := strings.TrimSpace(c.PostForm("agent_source_tenant_id"))
 	if sourceTenantID == "" || sourceTenantID == "0" {
 		return false
@@ -265,8 +258,8 @@ func liteProductGate() gin.HandlerFunc {
 		}
 
 		// Both native QA endpoints accept Agent/MCP/Skill overrides in their JSON
-		// request. Limit those fields here so knowing a hidden Agent/tool ID cannot
-		// turn the exposed chat box into a management-feature execution backdoor.
+		// request. Shared-agent selectors and Skills stay hidden; local custom
+		// agents and smart-agent MCP remain native, tenant-scoped capabilities.
 		if liteChatRequestBlocked(c) {
 			abortLiteProductRoute(c)
 			return
@@ -285,12 +278,31 @@ func liteProductGate() gin.HandlerFunc {
 	}
 }
 
-func liteRuntimeAgentPathAllowed(path string) bool {
-	for _, id := range []string{liteQuickAnswerAgentID, liteSmartReasoningAgentID} {
-		base := "/api/v1/agents/" + id
-		if path == base || path == base+"/suggested-questions" {
-			return true
+func liteAgentPathAllowed(method, path string) bool {
+	const base = "/api/v1/agents"
+	if path == base {
+		return method == http.MethodGet || method == http.MethodPost
+	}
+	for _, suffix := range []string{"/placeholders", "/type-presets"} {
+		if path == base+suffix {
+			return method == http.MethodGet
 		}
+	}
+	if !strings.HasPrefix(path, base+"/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, base+"/"), "/")
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		return false
+	}
+	if len(parts) == 1 {
+		return method == http.MethodGet || method == http.MethodPut || method == http.MethodDelete
+	}
+	if len(parts) == 2 && parts[1] == "copy" {
+		return method == http.MethodPost
+	}
+	if len(parts) == 2 && parts[1] == "suggested-questions" {
+		return method == http.MethodGet
 	}
 	return false
 }
@@ -414,10 +426,6 @@ func liteProductRouteBlocked(method, path string) bool {
 	// Entire management-only route families.
 	for _, prefix := range []string{
 		"/api/v1/evaluation",
-		"/api/v1/mcp-services",
-		"/api/v1/mcp-oauth",
-		"/api/v1/agent/tool-approvals",
-		"/api/v1/agent/mcp-oauth-resolutions",
 		"/api/v1/web-search",
 		"/api/v1/web-search-providers",
 		"/api/v1/vector-stores",
@@ -460,18 +468,11 @@ func liteProductRouteBlocked(method, path string) bool {
 		return rest == "" || strings.Contains(rest, "/")
 	}
 
-	// Agent management itself is not a Lite product surface. The browser only
-	// needs the two built-in runtime modes used by the conversation composer.
-	// Do not expose GET /agents because it would enumerate custom/internal
-	// agents even though their UI is hidden.
-	if path == "/api/v1/agents" {
-		return true
-	}
-	if strings.HasPrefix(path, "/api/v1/agents/") {
-		if method != http.MethodGet {
-			return true
-		}
-		return !liteRuntimeAgentPathAllowed(path)
+	// Native agent cards/editor and the conversation picker are exposed in
+	// Lite. Route-level RBAC still controls list/detail/create/update/delete;
+	// shares and channel management remain hidden below.
+	if strings.HasPrefix(path, "/api/v1/agents") {
+		return !liteAgentPathAllowed(method, path)
 	}
 
 	// Standalone organization management is hidden, but KB sharing is an
@@ -503,11 +504,17 @@ func liteProductRouteBlocked(method, path string) bool {
 	// KB share routes are intentionally NOT blocked: they are part of the
 	// exposed Knowledge Base UI. Shared-KB reads are allowed for the same reason.
 
-	// Retrieval configuration is the one tenant KV entry used by the Lite model
-	// settings surface. Keep the exception exact and method-scoped: all other
-	// tenant/KV keys remain part of hidden workspace administration.
+	// These are the only tenant KV entries consumed by exposed Lite surfaces:
+	// retrieval settings, the native prompt defaults, and the read-only storage
+	// selection that the upstream Agent editor loads with its other dependencies.
 	if path == "/api/v1/tenants/kv/retrieval-config" {
 		return method != http.MethodGet && method != http.MethodPut
+	}
+	if path == "/api/v1/tenants/kv/prompt-templates" {
+		return method != http.MethodGet
+	}
+	if path == "/api/v1/tenants/kv/storage-engine-config" {
+		return method != http.MethodGet
 	}
 
 	// Workspace lifecycle/settings/member/invitation/API-key administration is
@@ -537,14 +544,14 @@ func liteProductRouteBlocked(method, path string) bool {
 		}
 	}
 
-	// The consumer workflow may read the resolved KB configuration, but every
-	// initialization write is a model-management surface. In particular,
-	// InitializeByKB can create/update raw provider models internally, bypassing
-	// the ordinary /models route guard, so Lite must fail it closed.
+	// The consumer workflow may read and update the resolved KB configuration.
+	// Route-level OwnedKB/KBAccess guards remain authoritative; the legacy
+	// InitializeByKB operation still stays hidden because it can create/update
+	// raw provider models internally.
 	if path == "/api/v1/initialization" || strings.HasPrefix(path, "/api/v1/initialization/") {
 		rest := strings.TrimPrefix(path, "/api/v1/initialization/")
 		if strings.HasPrefix(rest, "config/") {
-			return method != http.MethodGet
+			return method != http.MethodGet && method != http.MethodPut
 		}
 		return true
 	}

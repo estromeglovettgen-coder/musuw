@@ -296,17 +296,32 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 	kbID string, rawURL string, fileName string, fileType string, enableMultimodel *bool, title string, tagIDs []string, channel string,
 	processOverrides *types.KnowledgeProcessOverrides,
 ) (*types.Knowledge, error) {
+	// Accept either a naked URL or a copied share message. Classification is
+	// deliberately pure and happens before file detection/SSRF checks so a
+	// known social host cannot be sent to the generic WebParser path. The
+	// parser's errors contain no input, which keeps pasted share text out of
+	// logs and public error payloads.
+	socialRoute, cleanedURL, parseErr := ParseSocialShareInput(rawURL)
+	if parseErr != nil {
+		logger.Warnf(ctx, "Rejected URL share input: %v", parseErr)
+		return nil, werrors.NewBadRequestError(parseErr.Error())
+	}
 	logger.Info(ctx, "Start creating knowledge from URL")
-	logger.Infof(ctx, "Knowledge base ID: %s, URL: %s", kbID, rawURL)
-
-	// Route to file_url logic when the URL points to a downloadable file
-	if isFileURL(rawURL, fileName, fileType) {
-		return s.createKnowledgeFromFileURL(
-			ctx, kbID, rawURL, fileName, fileType, enableMultimodel, title, tagIDs, channel, processOverrides,
-		)
+	url := cleanedURL
+	if socialRoute != nil {
+		logger.Infof(ctx, "Recognized social URL: platform=%s object_id_present=%t", socialRoute.Platform, socialRoute.ObjectID != "")
 	}
 
-	url := rawURL
+	// Route to file_url logic when the URL points to a downloadable file
+	// A recognized social work always follows the social document path. File
+	// hints are retained for ordinary URLs only, preserving the existing direct
+	// file import behavior without allowing a social page to be downloaded as a
+	// generic file.
+	if socialRoute == nil && isFileURL(url, fileName, fileType) {
+		return s.createKnowledgeFromFileURL(
+			ctx, kbID, url, fileName, fileType, enableMultimodel, title, tagIDs, channel, processOverrides,
+		)
+	}
 
 	// Get knowledge base configuration
 	logger.Info(ctx, "Getting knowledge base configuration")
@@ -327,16 +342,21 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		return nil, ErrInvalidURL
 	}
 
-	// SSRF protection: validate URL is safe to fetch (uses centralised entry-point with whitelist support)
-	if err := secutils.ValidateURLForSSRF(url); err != nil {
-		logger.Errorf(ctx, "URL rejected for SSRF protection: %s, err: %v", url, err)
-		return nil, ErrInvalidURL
+	// Ordinary URLs are fetched by Musuw and therefore need the central SSRF
+	// gate. Recognized social URLs are only sent as data to TikHub's fixed API
+	// host; the exact host/path router above is their allowlist, and any media
+	// URL returned by TikHub is validated separately before download.
+	if socialRoute == nil {
+		if err := secutils.ValidateURLForSSRF(url); err != nil {
+			logger.Errorf(ctx, "URL rejected for SSRF protection: host_path=%s, err: %v", urlForLog(url), err)
+			return nil, ErrInvalidURL
+		}
 	}
 
 	// Check if URL already exists in the knowledge base
 	tenantID := ctx.Value(types.TenantIDContextKey).(uint64)
 	logger.Infof(ctx, "Checking if URL exists, tenant ID: %d", tenantID)
-	fileHash := calculateStr(url)
+	fileHash := calculateStr(socialURLDedupeSource(socialRoute, url))
 	exists, existingKnowledge, err := s.repo.CheckKnowledgeExists(ctx, tenantID, kbID, &types.KnowledgeCheckParams{
 		Type:     "url",
 		URL:      url,
@@ -347,7 +367,7 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		return nil, err
 	}
 	if exists {
-		logger.Infof(ctx, "URL already exists: %s", url)
+		logger.Infof(ctx, "URL already exists: host_path=%s", urlForLog(url))
 		// Update creation time for existing knowledge
 		existingKnowledge.CreatedAt = time.Now()
 		existingKnowledge.UpdatedAt = time.Now()
@@ -439,12 +459,20 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		return knowledge, nil
 	}
 
-	task := asynq.NewTask(
-		types.TypeDocumentProcess,
-		payloadBytes,
-		documentProcessTaskOptions(s.config, asynq.MaxRetry(3))...,
-	)
-	info, err := s.task.Enqueue(task)
+	taskOpts := documentProcessTaskOptions(s.config)
+	var enqueueOpts []asynq.Option
+	if socialRoute != nil {
+		// A social task performs a paid TikHub call in the worker. Never let a
+		// provider timeout/error re-enter Asynq's automatic retry loop.
+		taskOpts = documentProcessTaskOptions(s.config, asynq.MaxRetry(0))
+		// The Lite-mode synchronous enqueuer receives options at Enqueue time
+		// (it cannot inspect asynq.Task's private opts), so pass the same safety
+		// options there as well. Redis-backed Asynq merges these with the task
+		// options and the last value remains MaxRetry(0).
+		enqueueOpts = taskOpts
+	}
+	task := asynq.NewTask(types.TypeDocumentProcess, payloadBytes, taskOpts...)
+	info, err := s.task.Enqueue(task, enqueueOpts...)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to enqueue URL process task: %v", err)
 		s.markKnowledgeEnqueueFailed(ctx, knowledge)
@@ -514,7 +542,7 @@ func (s *knowledgeService) createKnowledgeFromFileURL(
 	processOverrides *types.KnowledgeProcessOverrides,
 ) (*types.Knowledge, error) {
 	logger.Info(ctx, "Start creating knowledge from file URL")
-	logger.Infof(ctx, "Knowledge base ID: %s, file URL: %s", kbID, fileURL)
+	logger.Infof(ctx, "Knowledge base ID: %s, file URL host_path: %s", kbID, urlForLog(fileURL))
 
 	// Get knowledge base configuration
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, kbID)
@@ -537,7 +565,7 @@ func (s *knowledgeService) createKnowledgeFromFileURL(
 		return nil, ErrInvalidURL
 	}
 	if err := secutils.ValidateURLForSSRF(fileURL); err != nil {
-		logger.Errorf(ctx, "File URL rejected for SSRF protection: %s, err: %v", fileURL, err)
+		logger.Errorf(ctx, "File URL rejected for SSRF protection: host_path=%s, err: %v", urlForLog(fileURL), err)
 		return nil, ErrInvalidURL
 	}
 
@@ -588,7 +616,7 @@ func (s *knowledgeService) createKnowledgeFromFileURL(
 		return nil, err
 	}
 	if exists {
-		logger.Infof(ctx, "File URL already exists: %s", fileURL)
+		logger.Infof(ctx, "File URL already exists: host_path=%s", urlForLog(fileURL))
 		existingKnowledge.CreatedAt = time.Now()
 		existingKnowledge.UpdatedAt = time.Now()
 		if err := s.repo.UpdateKnowledge(ctx, existingKnowledge); err != nil {

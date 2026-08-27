@@ -90,6 +90,7 @@ export default defineComponent({
                 @open="handleCardClick(kb)"
                 @favorite="toggleFavoriteKb(kb.id, $event)"
                 @pin="handleTogglePinById(kb.id)"
+                @edit="uiStore.openEditKB(kb.id)"
                 @duplicate="handleDuplicateById(kb.id)"
                 @delete="handleDeleteById(kb.id)"
               />
@@ -128,6 +129,7 @@ export default defineComponent({
                 @open="handleCardClick(kb)"
                 @favorite="toggleFavoriteKb(kb.id, $event)"
                 @pin="handleTogglePin(kb)"
+                @edit="uiStore.openEditKB(kb.id)"
                 @duplicate="handleDuplicate(kb)"
                 @delete="handleDelete(kb)"
               />
@@ -218,7 +220,7 @@ export default defineComponent({
 .visual-kb-upload-status__copy .is-error { color: #dc2626; }
 .visual-kb-upload-status__bar { height: 2px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #e5e7eb; }
 .visual-kb-upload-status__bar span { display: block; height: 100%; background: #6b7280; transition: width 140ms linear; }
-.visual-kb-list__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 2px 4px 12px 2px; scrollbar-width: thin; }
+.visual-kb-list__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 24px 4px 12px 2px; scrollbar-width: thin; }
 .visual-kb-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
 .visual-reference-kb-card-host { min-width: 0; }
 .visual-kb-section { grid-column: 1 / -1; min-height: 28px; margin-top: 4px; padding: 4px 2px; border: 0; display: flex; align-items: center; gap: 6px; background: transparent; color: #9ca3af; font: inherit; font-size: 11px; font-weight: 600; text-align: left; cursor: pointer; }
@@ -261,6 +263,9 @@ export default defineComponent({
 @media (max-width: 760px) { .visual-kb-workspace > :deep(.list-space-sidebar) { display: none; } }
 @media (max-width: 600px) { .visual-kb-list__header { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .visual-kb-list__create,.visual-kb-upload-status__bar span,.visual-shared-detail-enter-active,.visual-shared-detail-leave-active,.visual-shared-detail-enter-active .visual-shared-detail,.visual-shared-detail-leave-active .visual-shared-detail { transition: none !important; } }
+:root[theme-mode="dark"] .visual-kb-workspace,
+:root[theme-mode="dark"] .visual-kb-list { background: var(--mvc-page, #151619) !important; }
+:root[theme-mode="dark"] .visual-kb-list__header { background: var(--mvc-page, #151619) !important; }
 </style>
 
 <style>

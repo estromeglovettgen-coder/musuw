@@ -534,9 +534,20 @@ export const useSettingsStore = defineStore("settings", {
       if (!state) return;
       this._isApplyingSessionState = true;
       try {
-        this.settings.isAgentEnabled = true;
-        this.settings.selectedAgentId = BUILTIN_SMART_REASONING_ID;
-        this.settings.selectedAgentSourceTenantId = null;
+        const restoredAgentID = typeof state.agent_id === "string" ? state.agent_id.trim() : "";
+        if (restoredAgentID) {
+          this.settings.selectedAgentId = restoredAgentID;
+          this.settings.selectedAgentSourceTenantId = null;
+          if (restoredAgentID === BUILTIN_QUICK_ANSWER_ID) {
+            this.settings.isAgentEnabled = false;
+          } else if (restoredAgentID === BUILTIN_SMART_REASONING_ID) {
+            this.settings.isAgentEnabled = true;
+          } else {
+            this.settings.isAgentEnabled = state.agent_enabled ?? true;
+          }
+        } else if (typeof state.agent_enabled === "boolean") {
+          this.settings.isAgentEnabled = state.agent_enabled;
+        }
         if (state.model_id !== undefined) {
           const current = this.settings.conversationModels || defaultSettings.conversationModels;
           this.settings.conversationModels = { ...current, selectedChatModelId: state.model_id || "" };

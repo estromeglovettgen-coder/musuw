@@ -153,7 +153,7 @@ mkdir -m 700 "$secret_dir"
 
 # Deliberately synthetic values: this test proves file mounts and interpolation
 # only. It never reads an operator credential or prints a secret value.
-for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
+for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     printf '%s\n' 'static-verification-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -228,7 +228,7 @@ printf '%s\n' \
 } > "$runtime_dir/production.public.env"
 
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null
-if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET|OPENROUTER_MANAGEMENT_API_KEY|MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET|LANGFUSE_PUBLIC_KEY|LANGFUSE_SECRET_KEY)=' "$runtime_dir/production.env"; then
+if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET|OPENROUTER_MANAGEMENT_API_KEY|TIKHUB_API_KEY|MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET|LANGFUSE_PUBLIC_KEY|LANGFUSE_SECRET_KEY)=' "$runtime_dir/production.env"; then
     printf '%s\n' 'production runtime env contains a credential value instead of only a file path' >&2
     exit 1
 fi
@@ -351,14 +351,14 @@ jq -e '
     exit 1
 }
 
-for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
+for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     jq -e --arg secret "$secret" '.secrets[$secret].file | type == "string"' "$config_json" >/dev/null || {
         printf '%s\n' 'production Compose does not use a file-backed required secret' >&2
         exit 1
     }
 done
 
-for secret in openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
+for secret in openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     jq -e --arg secret "$secret" \
         '[.services.app.secrets[]?.source] | index($secret) != null' "$config_json" >/dev/null || {
         printf '%s\n' 'production app does not mount a required platform model secret' >&2
@@ -366,7 +366,7 @@ for secret in openrouter_management_api_key paddle_api_key paddle_webhook_secret
     }
 done
 
-for export_name in OPENROUTER_MANAGEMENT_API_KEY MUSUW_PADDLE_API_KEY MUSUW_PADDLE_WEBHOOK_SECRET LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY; do
+for export_name in OPENROUTER_MANAGEMENT_API_KEY TIKHUB_API_KEY MUSUW_PADDLE_API_KEY MUSUW_PADDLE_WEBHOOK_SECRET LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY; do
     grep -Fq "export ${export_name}=\"\$(read_required_secret" "$repo_root/integration/weknora-production/app-entrypoint.sh" || {
         printf '%s\n' 'production entrypoint does not export a required server-only platform secret' >&2
         exit 1

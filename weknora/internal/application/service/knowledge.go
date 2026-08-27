@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"reflect"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/config"
 	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
+	"github.com/Tencent/WeKnora/internal/infrastructure/tikhub"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -68,6 +70,11 @@ type knowledgeService struct {
 	kbShareService  interfaces.KBShareService
 	imageResolver   *docparser.ImageResolver
 	taskPendingRepo interfaces.TaskPendingOpsRepository
+	tikhubImporter  *tikhub.TikHubImporter
+	// tikhubMediaClient is nil in production, which makes the worker construct
+	// the repository's SSRF-safe client. Tests may inject a local transport
+	// without weakening the production path.
+	tikhubMediaClient *http.Client
 
 	// In-memory fallbacks for Lite mode (no Redis)
 	memFAQProgress      sync.Map // taskID -> *types.FAQImportProgress
@@ -119,6 +126,13 @@ func NewKnowledgeService(
 	spanTracker SpanTracker,
 	audit interfaces.AuditLogService,
 ) (interfaces.KnowledgeService, error) {
+	if imageResolver == nil {
+		imageResolver = docparser.NewImageResolver()
+	}
+	tikhubImporter, err := tikhub.NewFromEnv()
+	if err != nil && !errors.Is(err, tikhub.ErrMissingAPIKey) {
+		return nil, fmt.Errorf("initialize TikHub importer: %w", err)
+	}
 	return &knowledgeService{
 		config:          config,
 		repo:            repo,
@@ -145,6 +159,7 @@ func NewKnowledgeService(
 		wikiRepo:        wikiRepo,
 		wikiService:     wikiService,
 		taskPendingRepo: taskPendingRepo,
+		tikhubImporter:  tikhubImporter,
 		spanTracker:     spanTracker,
 		audit:           audit,
 	}, nil

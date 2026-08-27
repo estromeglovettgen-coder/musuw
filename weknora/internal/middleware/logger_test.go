@@ -88,6 +88,9 @@ func TestShouldLogBodies(t *testing.T) {
 	if !shouldLogBodies("/api/v1/knowledge-bases") {
 		t.Fatal("failed ordinary API bodies should remain observable")
 	}
+	if shouldLogBodies("/api/v1/knowledge-bases/kb-1/knowledge/url") {
+		t.Fatal("URL/share-text import bodies must not be copied into access logs")
+	}
 }
 
 func TestShouldLogBodyPayload(t *testing.T) {
@@ -102,5 +105,8 @@ func TestShouldLogBodyPayload(t *testing.T) {
 	}
 	if shouldLogBodyPayload("/api/v1/billing/paddle/webhook", 500) {
 		t.Fatal("payment webhook bodies must stay omitted even on failure")
+	}
+	if shouldLogBodyPayload("/api/v1/knowledge-bases/kb-1/knowledge/url", 400) {
+		t.Fatal("URL/share-text import bodies must stay omitted even on failure")
 	}
 }

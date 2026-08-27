@@ -9,11 +9,12 @@ const pageFiles = [
   'UsageBillingSettings.vue',
   'ModelSettings.vue',
   'UserProfile.vue',
+  'McpSettings.vue',
 ]
 
 const readPage = (file) => readFileSync(join(root, 'src/views/settings', file), 'utf8')
 
-test('all four consumer settings pages share one title-strip DOM contract', () => {
+test('all five Lite settings pages share the General title-strip DOM contract', () => {
   for (const file of pageFiles) {
     const source = readPage(file)
     assert.match(source, /<(?:header|div) class="[^"]*visual-settings-page-header[^"]*">/)
@@ -21,15 +22,35 @@ test('all four consumer settings pages share one title-strip DOM contract', () =
     assert.match(source, /<h2 class="visual-settings-page-header__title">/)
     assert.match(source, /<p class="visual-settings-page-header__description[^"]*">/)
   }
+
+  for (const file of ['UserProfile.vue', 'McpSettings.vue']) {
+    const source = readPage(file)
+    assert.doesNotMatch(source, /class="visual-settings-page-header section-header"/)
+    assert.doesNotMatch(source, /class="visual-settings-page-header__description section-description"/)
+  }
+})
+
+test('consumer-only presentation hides brand color and scene model rows without deleting persisted capability code', () => {
+  const general = readPage('GeneralSettings.vue')
+  assert.match(general, /<div\s+v-if="false"\s+class="visual-setting-row"\s+data-persisted-setting="theme-color">/)
+  assert.match(general, /localThemeColor/)
+  assert.match(general, /handleThemeColorChange/)
+
+  const models = readPage('ModelSettings.vue')
+  assert.match(models, /<section\s+v-if="false"\s+class="consumer-scene-settings"\s+data-persisted-capability="consumer-scene-models"/)
+  assert.match(models, /getConsumerSceneModel/)
+  assert.match(models, /updateConsumerSceneModel/)
 })
 
 test('the shared title strip keeps the reference cadence and borders', () => {
-  const closure = readFileSync(join(root, 'src/assets/musuw-final-theme-closure.css'), 'utf8')
-  const titleRule = closure.match(/\.visual-settings-content \.visual-settings-page-header\s*\{([^}]*)\}/)?.[1] || ''
+  const shell = readFileSync(join(root, 'src/views/settings/components/VisualSettingsShell.vue'), 'utf8')
+  const titleRule = shell.match(/\.visual-settings-content \.visual-settings-page-header,\s*\.visual-settings-content \.section-header\s*\{([^}]*)\}/)?.[1] || ''
   assert.match(titleRule, /margin:\s*0 0 8px !important/)
   assert.match(titleRule, /padding:\s*0 0 12px !important/)
   assert.match(titleRule, /border-bottom:\s*1px solid #f3f4f6 !important/)
-  assert.match(closure, /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header\s*\{[\s\S]*border-bottom-color: var\(--mvc-line\)/)
+  assert.match(shell, /\.visual-settings-content \.visual-settings-page-header__title,\s*\.visual-settings-content \.section-header h2\s*\{[\s\S]*font-size:\s*16px !important;[\s\S]*line-height:\s*24px !important;/)
+  assert.match(shell, /\.visual-settings-content \.visual-settings-page-header__description,\s*\.visual-settings-content \.section-description\s*\{[\s\S]*font-size:\s*12px !important;[\s\S]*line-height:\s*16px !important;/)
+  assert.match(shell, /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header,\s*:root\[theme-mode="dark"\] \.visual-settings-content \.section-header\s*\{[\s\S]*border-bottom-color:\s*var\(--mvc-line/)
 })
 
 test('usage title is mounted before plan cards and models title is not Lite-gated', () => {

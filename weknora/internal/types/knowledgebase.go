@@ -167,14 +167,22 @@ func (kb *KnowledgeBase) ApplyPlatformKnowledgeBaseDefaults() {
 	if kb.Type != KnowledgeBaseTypeDocument {
 		return
 	}
+	explicitIndexing := !kb.IndexingStrategy.IsZero()
 
 	kb.SummaryModelID = PlatformKnowledgeBaseChatModelID
 	kb.EmbeddingModelID = PlatformKnowledgeBaseEmbeddingModelID
 	kb.ImageProcessingConfig = ImageProcessingConfig{ModelID: PlatformKnowledgeBaseVLMModelID}
 	kb.VLMConfig = VLMConfig{Enabled: true, ModelID: PlatformKnowledgeBaseVLMModelID}
 	kb.ASRConfig = ASRConfig{Enabled: true, ModelID: PlatformKnowledgeBaseASRModelID}
-	kb.IndexingStrategy = IndexingStrategy{
-		VectorEnabled: true, KeywordEnabled: true, WikiEnabled: true, GraphEnabled: true,
+	if !explicitIndexing {
+		kb.IndexingStrategy = IndexingStrategy{
+			VectorEnabled: true, KeywordEnabled: true, WikiEnabled: true, GraphEnabled: true,
+		}
+	} else {
+		// RAG and Wiki are native user choices. Graph remains the hidden
+		// platform default, so an explicit consumer strategy only controls
+		// the two visible pipelines.
+		kb.IndexingStrategy.GraphEnabled = true
 	}
 	// Reuse WeKnora's native GraphSettings example as the hidden extraction
 	// seed; an enabled config with empty tags/nodes/relations cannot drive the
@@ -193,9 +201,14 @@ func (kb *KnowledgeBase) ApplyPlatformKnowledgeBaseDefaults() {
 			{Node1: "Romeo and Juliet", Node2: "Verona", Type: "Setting"},
 		},
 	}
-	kb.WikiConfig = &WikiConfig{
-		SynthesisModelID:      PlatformKnowledgeBaseChatModelID,
-		ExtractionGranularity: WikiExtractionStandard,
+	if kb.WikiConfig == nil {
+		kb.WikiConfig = &WikiConfig{}
+	}
+	if kb.WikiConfig.SynthesisModelID == "" {
+		kb.WikiConfig.SynthesisModelID = PlatformKnowledgeBaseChatModelID
+	}
+	if kb.WikiConfig.ExtractionGranularity == "" {
+		kb.WikiConfig.ExtractionGranularity = WikiExtractionStandard
 	}
 }
 

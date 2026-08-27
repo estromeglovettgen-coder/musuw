@@ -35,7 +35,12 @@
       </a>
     </aside>
 
-    <section class="consumer-scene-settings" aria-labelledby="consumer-scene-settings-title">
+    <section
+      v-if="false"
+      class="consumer-scene-settings"
+      data-persisted-capability="consumer-scene-models"
+      aria-labelledby="consumer-scene-settings-title"
+    >
       <div class="consumer-scene-settings__header">
         <div>
           <h3 id="consumer-scene-settings-title">{{ $t('modelSettings.sceneModels.title') }}</h3>

@@ -53,11 +53,15 @@ func TestLiteChatRequestBlocked(t *testing.T) {
 		{name: "no explicit agent", body: `{"query":"hello"}`, blocked: false},
 		{name: "quick answer", body: `{"query":"hello","agent_id":"builtin-quick-answer"}`, blocked: false},
 		{name: "smart reasoning", body: `{"query":"hello","agent_id":"builtin-smart-reasoning"}`, blocked: false},
-		{name: "hidden custom agent", body: `{"query":"hello","agent_id":"hidden-agent"}`, blocked: true},
+		{name: "custom agent", body: `{"query":"hello","agent_id":"custom-agent"}`, blocked: false},
 		{name: "shared agent tenant", body: `{"query":"hello","agent_id":"builtin-quick-answer","agent_source_tenant_id":7}`, blocked: true},
-		{name: "mcp override", body: `{"query":"hello","agent_id":"builtin-smart-reasoning","mcp_service_ids":["mcp-1"]}`, blocked: true},
+		{name: "smart MCP override", body: `{"query":"hello","agent_id":"builtin-smart-reasoning","mcp_service_ids":["mcp-1"]}`, blocked: false},
+		{name: "custom smart MCP override", body: `{"query":"hello","agent_id":"custom-agent","mcp_service_ids":["mcp-1"]}`, blocked: false},
+		{name: "quick answer MCP override reaches runtime", body: `{"query":"hello","agent_id":"builtin-quick-answer","mcp_service_ids":["mcp-1"]}`, blocked: false},
+		{name: "MCP override without agent reaches runtime", body: `{"query":"hello","mcp_service_ids":["mcp-1"]}`, blocked: false},
 		{name: "skill override", body: `{"query":"hello","agent_id":"builtin-smart-reasoning","skill_names":["skill-1"]}`, blocked: true},
-		{name: "mcp mention", body: `{"query":"hello","mentioned_items":[{"type":"mcp","id":"mcp-1"}]}`, blocked: true},
+		{name: "smart MCP mention", body: `{"query":"hello","agent_id":"builtin-smart-reasoning","mentioned_items":[{"type":"mcp","id":"mcp-1"}]}`, blocked: false},
+		{name: "MCP mention without agent reaches runtime", body: `{"query":"hello","mentioned_items":[{"type":"mcp","id":"mcp-1"}]}`, blocked: false},
 		{name: "skill mention", body: `{"query":"hello","mentioned_items":[{"type":"skill","id":"skill-1"}]}`, blocked: true},
 		{name: "web search override", body: `{"query":"hello","web_search_enabled":true}`, blocked: true},
 		{name: "disabled web search", body: `{"query":"hello","web_search_enabled":false}`, blocked: false},
@@ -79,9 +83,9 @@ func TestLiteChatRequestBlocked(t *testing.T) {
 		})
 	}
 
-	c := liteGateTestContext(http.MethodPost, "/api/v1/agent-chat/session-1", `{"query":"hello","agent_id":"hidden-agent"}`)
-	if !liteChatRequestBlocked(c) {
-		t.Fatal("agent-chat must enforce the same hidden Agent gate")
+	c := liteGateTestContext(http.MethodPost, "/api/v1/agent-chat/session-1", `{"query":"hello","agent_id":"custom-agent"}`)
+	if liteChatRequestBlocked(c) {
+		t.Fatal("agent-chat must allow a tenant-local custom Agent")
 	}
 }
 

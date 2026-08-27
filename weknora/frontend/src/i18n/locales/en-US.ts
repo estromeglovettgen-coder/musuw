@@ -441,15 +441,20 @@ export default {
     goToParserSettings: 'Configure',
     importURL: 'Import from URL',
     addDocument: 'Add Document',
-    importURLTitle: 'Import from URL',
-    urlRequired: 'Please enter a URL',
+    importURLTitle: 'Import a URL or share message',
+    urlRequired: 'Please enter a URL or share message',
     invalidURL: 'Please enter a valid URL',
     urlImportSuccess: 'URL imported successfully!',
     urlImportFailed: 'URL import failed!',
     urlExists: 'This URL already exists',
-    urlLabel: 'URL Address',
-    urlPlaceholder: 'Enter webpage URL, e.g., https://example.com',
-    urlTip: 'Supports importing various webpage contents. The system will automatically extract and parse text content from the webpage',
+    urlLabel: 'URL or share message',
+    urlPlaceholder: 'Paste a URL or a platform share message',
+    urlTip: 'Paste a URL or share message from a supported platform',
+    urlSupportedPlatforms: 'Supported',
+    urlInputHint: 'Auto-detects the link; videos are imported as files and posts as documents. Public single posts only.',
+    urlClear: 'Clear',
+    urlTooLong: 'The URL or share message must be 4 KB or smaller',
+    douyinTikTok: 'Douyin · TikTok',
     urlUsageNotice: 'Only import content you own or are authorized to use. URL import creates a private knowledge index; it is not a streaming downloader or content redistribution service.',
     typeURL: 'URL',
     typeManual: 'Manual',
@@ -920,7 +925,7 @@ export default {
       basicInfo: 'Basic Info',
       basicInfoDesc: 'Configure agent name, description, and run mode',
       promptsConfig: 'Prompts',
-      promptsConfigDesc: 'Configure system, context, intent, rewrite, and fallback prompts',
+      promptsConfigDesc: 'Configure the agent system prompt',
       modelConfig: 'Model Config',
       modelConfigDesc: 'Configure chat model, auxiliary models (ReRank), and generation parameters',
       toolsConfig: 'Tools',
@@ -1533,6 +1538,7 @@ export default {
   },
   common: {
     add: 'Add',
+    search: 'Search',
     me: 'Me',
     confirm: 'Confirm',
     cancel: 'Cancel',
@@ -1789,6 +1795,7 @@ export default {
     },
     menu: {
       viewDetails: 'View Details',
+      editConfig: 'Edit Configuration',
       duplicate: 'Duplicate'
     },
     pin: {
@@ -2101,7 +2108,8 @@ export default {
       }
     },
     titleCreate: 'Create Knowledge Base',
-    titleEdit: 'Knowledge Base Settings',
+    titleEdit: 'Edit Knowledge Base Configuration',
+    modalDescription: 'Configure the processing pipeline, indexing strategy, and extraction parameters',
     navGroups: {
       basic: 'Basics',
       processing: 'Indexing & Parsing',
@@ -2351,6 +2359,7 @@ export default {
     },
     buttons: {
       create: 'Create Knowledge Base',
+      confirmCreate: 'Confirm Create',
       save: 'Save Configuration',
       saveAndClose: 'Save and Close',
     },
@@ -4042,6 +4051,9 @@ export default {
     manageAndTest: 'Manage and test MCP service connections',
     addService: 'Add Service',
     empty: 'No MCP services',
+    noDescription: 'No description',
+    enableHint: 'Click to enable service',
+    disableHint: 'Click to disable service',
     actions: {
       test: 'Test Connection'
     },

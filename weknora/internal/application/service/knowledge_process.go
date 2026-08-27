@@ -332,8 +332,8 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 
 		// 打印图片详细信息
 		for imgIdx, img := range chunkData.Images {
-			logger.Infof(ctx, "[DocReader]   图片 #%d: URL=%s", imgIdx, img.URL)
-			logger.Infof(ctx, "[DocReader]   图片 #%d: OriginalURL=%s", imgIdx, img.OriginalURL)
+			logger.Infof(ctx, "[DocReader]   图片 #%d: URL=%s", imgIdx, urlForLog(img.URL))
+			logger.Infof(ctx, "[DocReader]   图片 #%d: OriginalURL=%s", imgIdx, urlForLog(img.OriginalURL))
 			if img.Caption != "" {
 				captionPreview := img.Caption
 				if len(captionPreview) > 100 {
@@ -2648,10 +2648,14 @@ func (s *knowledgeService) ReparseKnowledge(
 			return existing, werrors.NewInternalServerError("Failed to submit processing task")
 		}
 
+		maxRetry := asynq.MaxRetry(3)
+		if route, _, parseErr := ParseSocialShareInput(existing.Source); parseErr == nil && route != nil {
+			maxRetry = asynq.MaxRetry(0)
+		}
 		task := asynq.NewTask(
 			types.TypeDocumentProcess,
 			payloadBytes,
-			documentProcessTaskOptions(s.config, asynq.MaxRetry(3))...,
+			documentProcessTaskOptions(s.config, maxRetry)...,
 		)
 		info, err := s.task.Enqueue(task)
 		if err != nil {
@@ -2943,7 +2947,7 @@ func (s *knowledgeService) UpdateImageInfo(
 		}
 		if cImageInfo[0].OriginalURL != image.OriginalURL {
 			logger.Warnf(ctx, "Skipping chunk ID: %s, image URL mismatch: %s != %s",
-				child.ID, cImageInfo[0].OriginalURL, image.OriginalURL)
+				child.ID, urlForLog(cImageInfo[0].OriginalURL), urlForLog(image.OriginalURL))
 			continue
 		}
 
@@ -2981,7 +2985,7 @@ func (s *knowledgeService) UpdateImageInfo(
 			ImageInfo:       imageInfo,
 		}
 		addChunk = append(addChunk, captionChunk)
-		logger.Infof(ctx, "Created new caption chunk ID: %s for image URL: %s", captionChunk.ID, image.OriginalURL)
+		logger.Infof(ctx, "Created new caption chunk ID: %s for image URL: %s", captionChunk.ID, urlForLog(image.OriginalURL))
 	}
 
 	// Create a new OCR chunk if it doesn't exist and we have OCR data
@@ -2997,7 +3001,7 @@ func (s *knowledgeService) UpdateImageInfo(
 			ImageInfo:       imageInfo,
 		}
 		addChunk = append(addChunk, ocrChunk)
-		logger.Infof(ctx, "Created new OCR chunk ID: %s for image URL: %s", ocrChunk.ID, image.OriginalURL)
+		logger.Infof(ctx, "Created new OCR chunk ID: %s for image URL: %s", ocrChunk.ID, urlForLog(image.OriginalURL))
 	}
 	logger.Infof(ctx, "Updated %d chunks out of %d total chunks", len(updateChunk), len(chunkChildren)+1)
 
@@ -3266,6 +3270,29 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 	}
 	ctx = withAttempt(ctx, attempt)
 
+	// A recognized social URL is converted exactly once into a stored Markdown
+	// or video artifact before the existing file pipeline runs. Ordinary URLs
+	// return handled=false and retain the WebParser behavior below. Provider
+	// failures are terminal for this paid attempt: returning nil prevents a
+	// queue retry from issuing the same billed request again.
+	if payload.URL != "" {
+		resumeMaterializedTikHubArtifact(&payload, knowledge)
+	}
+	var socialImages []docparser.StoredImage
+	if payload.URL != "" {
+		handled, images, socialErr := s.prepareTikHubArtifact(ctx, &payload, kb, knowledge, eff)
+		socialImages = images
+		if handled && socialErr != nil {
+			logger.GetLogger(ctx).WithField("knowledge_id", knowledge.ID).
+				WithField("reason", socialImportFailureReason(socialErr)).Error("social link import failed")
+			knowledge.ParseStatus = types.ParseStatusFailed
+			knowledge.ErrorMessage = socialImportPublicMessage(socialErr)
+			knowledge.UpdatedAt = time.Now()
+			_ = s.repo.UpdateKnowledge(ctx, knowledge)
+			return nil
+		}
+	}
+
 	// 检查多模态配置（仅对文件导入）
 	if payload.FilePath != "" && !payload.EnableMultimodel && IsImageType(payload.FileType) {
 		logger.GetLogger(ctx).WithField("knowledge_id", knowledge.ID).
@@ -3475,7 +3502,7 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 	}
 
 	// Step 2: Store images and update markdown references
-	var storedImages []docparser.StoredImage
+	storedImages := append([]docparser.StoredImage(nil), socialImages...)
 
 	if s.imageResolver != nil && convertResult != nil {
 		fileSvc := s.resolveFileService(ctx, kb)
@@ -3487,7 +3514,7 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 		if updatedMarkdown != "" {
 			convertResult.MarkdownContent = updatedMarkdown
 		}
-		storedImages = images
+		storedImages = append(storedImages, images...)
 
 		// Resolve remote http(s) images (e.g. markdown external URLs) → download + upload to storage.
 		// ResolveAndStore handles inline bytes and base64; ResolveRemoteImages handles http/https URLs.

@@ -101,14 +101,17 @@ test('KnowledgeBase.tsx list tokens remain mechanically translated while native 
     'visual-reference-kb-card__pinned',
   ])
   const card = read('../views/knowledge/components/KnowledgeBaseListReferenceCard.vue')
-  assert.equal(card.includes('min-height: 154px;'), false, 'reference KB cards have no fixed minimum height')
+  assert.equal(card.includes('min-height: 154px;'), true, 'KB cards define the shared Agent/KB minimum height')
 })
 
 test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
-  expectTokens('../views/settings/Settings.vue', [
+  expectTokens('../views/settings/components/VisualSettingsShell.vue', [
     'width: min(896px, 100%);', 'height: 580px;', 'border-radius: 24px;',
     'flex: 0 0 192px;', 'padding: 16px 12px 12px;',
+  ])
+  expectTokens('../views/settings/Settings.vue', [
     'filterSettingsNavigation(navItems.value, settingsSearchQuery.value)',
+    '<VisualSettingsShell',
   ])
 })
 

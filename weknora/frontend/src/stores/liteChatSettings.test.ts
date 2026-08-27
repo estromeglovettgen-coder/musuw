@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { reconcileLiteChatSettings } from '../utils/liteChatSettings'
 
-test('Lite activation removes every stale hidden chat capability', () => {
+test('Lite activation keeps MCP selections but removes hidden skills/tools', () => {
   const standardSettings = {
     webSearchEnabled: true,
     selectedMCPServices: ['mcp-1'],
@@ -16,7 +16,7 @@ test('Lite activation removes every stale hidden chat capability', () => {
   const liteSettings = reconcileLiteChatSettings(standardSettings)
 
   assert.equal(liteSettings.webSearchEnabled, false)
-  assert.deepEqual(liteSettings.selectedMCPServices, [])
+  assert.deepEqual(liteSettings.selectedMCPServices, ['mcp-1'])
   assert.deepEqual(liteSettings.selectedSkills, [])
   assert.deepEqual(liteSettings.selectedTools, [])
   assert.equal(liteSettings.selectedAgentSourceTenantId, null)

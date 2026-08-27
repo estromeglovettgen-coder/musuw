@@ -903,7 +903,7 @@ func resolveRemoteImagePass(
 			if errors.Is(err, errRemoteImageIsIcon) {
 				stats.iconSkips++
 			} else {
-				log.Printf("WARN: skipped %s remote image %s: %v", spec.Syntax, imgURL, err)
+				log.Printf("WARN: skipped %s remote image %s", spec.Syntax, remoteImageLogRef(imgURL))
 			}
 			continue
 		}
@@ -930,6 +930,14 @@ func resolveRemoteImagePass(
 
 	stats.report(spec.Syntax)
 	return markdown, images
+}
+
+func remoteImageLogRef(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return "invalid-url"
+	}
+	return parsed.Scheme + "://" + parsed.Host + parsed.EscapedPath()
 }
 
 // htmlAttrSrc normalizes an HTML src attribute value into the URL to request.

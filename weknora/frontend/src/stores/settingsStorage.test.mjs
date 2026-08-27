@@ -39,15 +39,22 @@ function reconcileLoadedSettings(loaded) {
     reconciledThinking = true;
   }
 
+  const storedAgentID = typeof loaded.selectedAgentId === "string"
+    ? loaded.selectedAgentId.trim()
+    : "";
+  const reconciledAgentMode = !storedAgentID || loaded.selectedAgentSourceTenantId !== null;
+  loaded.selectedAgentId = storedAgentID || BUILTIN_SMART_REASONING_ID;
+  loaded.selectedAgentSourceTenantId = null;
+  if (loaded.selectedAgentId === BUILTIN_QUICK_ANSWER_ID) {
+    loaded.isAgentEnabled = false;
+  } else if (loaded.selectedAgentId === BUILTIN_SMART_REASONING_ID) {
+    loaded.isAgentEnabled = true;
+  } else if (typeof loaded.isAgentEnabled !== "boolean") {
+    loaded.isAgentEnabled = true;
+  }
+
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) delete loaded.enableMemory;
-  const reconciledAgentMode =
-    loaded.selectedAgentId !== BUILTIN_SMART_REASONING_ID ||
-    loaded.selectedAgentSourceTenantId !== null ||
-    loaded.isAgentEnabled !== true;
-  loaded.selectedAgentId = BUILTIN_SMART_REASONING_ID;
-  loaded.selectedAgentSourceTenantId = null;
-  loaded.isAgentEnabled = true;
   if (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking) {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
   }
@@ -153,7 +160,7 @@ test("valid stored WebSearch preference is preserved in both directions", () => 
   }
 });
 
-test("consumer settings normalize old Agent selections to the full-capability builtin", () => {
+test("consumer settings preserve a tenant-local Agent selection and remove shared scope", () => {
   const store = installMockLocalStorage();
   store[SETTINGS_STORAGE_KEY] = JSON.stringify({
     selectedAgentId: "custom-agent",
@@ -163,13 +170,13 @@ test("consumer settings normalize old Agent selections to the full-capability bu
     conversationModels: { thinkingEnabled: true },
   });
   const loaded = loadAndReconcileSettings(makeDefaults());
-  assert.equal(loaded.selectedAgentId, BUILTIN_SMART_REASONING_ID);
+  assert.equal(loaded.selectedAgentId, "custom-agent");
   assert.equal(loaded.isAgentEnabled, true);
   assert.equal(loaded.selectedAgentSourceTenantId, null);
   assert.equal(loaded.webSearchEnabled, false);
 });
 
-test("both legacy builtin modes normalize to the full-capability builtin", () => {
+test("both native builtin modes retain their own execution mode", () => {
   const store = installMockLocalStorage();
   store[SETTINGS_STORAGE_KEY] = JSON.stringify({
     selectedAgentId: BUILTIN_SMART_REASONING_ID,
@@ -188,8 +195,8 @@ test("both legacy builtin modes normalize to the full-capability builtin", () =>
     conversationModels: { thinkingEnabled: true },
   });
   const quick = loadAndReconcileSettings(makeDefaults());
-  assert.equal(quick.selectedAgentId, BUILTIN_SMART_REASONING_ID);
-  assert.equal(quick.isAgentEnabled, true);
+  assert.equal(quick.selectedAgentId, BUILTIN_QUICK_ANSWER_ID);
+  assert.equal(quick.isAgentEnabled, false);
 });
 
 test("first-Musuw thinking preference is backfilled but existing value is preserved", () => {
@@ -213,10 +220,11 @@ test("first-Musuw thinking preference is backfilled but existing value is preser
   assert.equal(preserved.conversationModels.reasoningEffort, "none");
 });
 
-test("source code locks the consumer Agent while preserving the WebSearch preference", () => {
-  assert.match(settingsStorageSource, /loaded\.selectedAgentId\s*=\s*BUILTIN_SMART_REASONING_ID/);
+test("source code preserves native local Agents while removing shared scope", () => {
+  assert.match(settingsStorageSource, /loaded\.selectedAgentId\s*=\s*storedAgentID \|\| BUILTIN_SMART_REASONING_ID/);
   assert.match(settingsStorageSource, /loaded\.selectedAgentSourceTenantId\s*=\s*null/);
-  assert.match(settingsStorageSource, /loaded\.isAgentEnabled\s*=\s*true/);
+  assert.match(settingsStorageSource, /loaded\.selectedAgentId === BUILTIN_QUICK_ANSWER_ID/);
+  assert.match(settingsStorageSource, /loaded\.selectedAgentId === BUILTIN_SMART_REASONING_ID/);
   assert.doesNotMatch(settingsStorageSource, /webSearchEnabled\s*=/);
   assert.doesNotMatch(settingsStorageSource, /withAuthorityDefaults/);
   assert.match(settingsStorageSource, /thinkingEnabled/);

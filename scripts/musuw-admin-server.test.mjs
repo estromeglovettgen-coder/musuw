@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import {
+  registerPoolErrorHandler,
   clampPage,
   clampPageSize,
   modelPolicyRequestPlan,
@@ -23,6 +24,21 @@ import {
   targetSessionToken,
   unavailableProviderState,
 } from './musuw-admin-server.mjs'
+
+test('an idle database connection error is observed instead of terminating the console', () => {
+  let handler
+  const pool = {
+    on(event, callback) {
+      assert.equal(event, 'error')
+      handler = callback
+    },
+  }
+  const observed = []
+
+  registerPoolErrorHandler(pool, (message) => observed.push(message))
+  assert.doesNotThrow(() => handler(new Error('connection interrupted')))
+  assert.deepEqual(observed, ['[musuw-admin] database connection interrupted'])
+})
 
 test('parseEnvFile handles comments, exports, and quoted values', () => {
   const directory = mkdtempSync(join(tmpdir(), 'musuw-admin-test-'))

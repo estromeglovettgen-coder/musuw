@@ -21,10 +21,11 @@ const INITIAL_MUSUW_BASELINE_COMMIT = '76bc44e15433e598c2c131e6873754e5ec5f4f5e'
 const PRE_UI_BUSINESS_BASELINE_COMMIT = '367a0c76e48fcf8a3762c33b672cfa2e16b679f4'
 const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b909'
 const OPENROUTER_VIDEO_INGESTION_COMMIT = '22052ccf08c5ab2e370d94ea2508359aa367d0fe'
+const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
 
 const LOCKED_BUSINESS_BLOBS = {
-  './business-baselines/ChatIndex.pre-view.vue': '3e606571962c8d0b3838610b4cc7977ddbe3021e',
-  './business-baselines/Input-field.pre-view.vue': 'aebc20d7e4fc51fe3ec5a192c18e02458707fecf',
+  './business-baselines/ChatIndex.pre-view.vue': 'bfe05d85e3a516bd64afa6d69bfa6f9dddf3e5c5',
+  './business-baselines/Input-field.pre-view.vue': 'bfa653c206ebb7d579e294e18f8220ffb83f5682',
   './business-baselines/KnowledgeBase.pre-view.vue': '75996e898b170fe61e0c32eac39ca71b79bee9a0',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
@@ -42,12 +43,13 @@ const INITIAL_MUSUW_BYTE_IDENTICAL = {
 const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   inputField: {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
+    change: NATIVE_AGENT_MCP_EXPOSURE_CHANGE,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native multi-model request flow constrained by the server-authoritative fixed consumer scene policy, with one consumer Agent and model-specific reasoning effort',
+    authority: 'WeKnora v0.7.2 native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy',
   },
   chatParent: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 Agent chat flow forwarding the consumer-selected model and reasoning effort',
+    authority: 'WeKnora v0.7.2 Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort',
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
@@ -89,6 +91,7 @@ test('first Musuw byte-identical controllers remain byte-identical where upstrea
 
 test('upstream behavior restorations are explicit and locked, never inferred from visual code', () => {
   assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.commit, NATIVE_MULTI_MODEL_RESTORE_COMMIT)
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.change, NATIVE_AGENT_MCP_EXPOSURE_CHANGE)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.resultingBlob,
     gitBlobSha(read('./business-baselines/Input-field.pre-view.vue')),

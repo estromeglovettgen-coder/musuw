@@ -35,10 +35,16 @@ const emit = defineEmits<{
   open: []
   favorite: [event: MouseEvent]
   pin: []
+  edit: []
   duplicate: []
   delete: []
   details: []
 }>()
+
+const requestEdit = () => {
+  props.kb.showMore = false
+  emit('edit')
+}
 
 const requestDuplicate = () => {
   props.kb.showMore = false
@@ -88,8 +94,10 @@ const requestDelete = () => {
         <button type="button" class="visual-reference-kb-card__more" :aria-label="$t('common.more')" @click.stop><t-icon name="ellipsis" /></button>
         <template #content>
           <div class="visual-reference-kb-card-menu" @click.stop>
+            <button v-if="canManage" type="button" @click="requestEdit"><t-icon name="setting" /><span>{{ $t('knowledgeList.menu.editConfig') }}</span></button>
             <button v-if="!shared" type="button" @click="emit('pin')"><t-icon :name="kb.is_pinned ? 'pin-filled' : 'pin'" /><span>{{ kb.is_pinned ? $t('knowledgeList.pin.unpin') : $t('knowledgeList.pin.pin') }}</span></button>
             <button v-if="canDuplicate" type="button" @click="requestDuplicate"><t-icon name="file-copy" /><span>{{ $t('knowledgeList.menu.duplicate') }}</span></button>
+            <span v-if="canManage" class="visual-reference-kb-card-menu__separator" aria-hidden="true" />
             <button v-if="canManage" type="button" class="is-danger" @click="requestDelete"><t-icon name="delete" /><span>{{ $t('common.delete') }}</span></button>
           </div>
         </template>
@@ -122,6 +130,7 @@ const requestDelete = () => {
 .visual-reference-kb-card {
   position: relative;
   min-width: 0;
+  min-height: 154px;
   padding: 18px;
   box-sizing: border-box;
   border: 1px solid rgb(229 231 235 / 90%);
@@ -133,9 +142,9 @@ const requestDelete = () => {
   color: #1f2937;
   cursor: pointer;
   box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
-.visual-reference-kb-card:hover { border-color: #9ca3af; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%),0 2px 4px -2px rgb(0 0 0 / 10%); }
+.visual-reference-kb-card:hover { border-color: #d1d5db; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%),0 2px 4px -2px rgb(0 0 0 / 10%); transform: none; }
 .visual-reference-kb-card.is-highlighted { border-color: #9ca3af; box-shadow: 0 0 0 2px rgb(17 24 39 / 8%),0 1px 2px rgb(0 0 0 / 5%); }
 .visual-reference-kb-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .visual-reference-kb-card__title { min-width: 0; flex: 1; padding-right: 42px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -163,14 +172,34 @@ const requestDelete = () => {
 .visual-reference-kb-card__origin { min-width: 0; max-width: 130px; display: inline-flex; align-items: center; gap: 4px; color: #9ca3af; font-size: 10px; line-height: 14px; }
 .visual-reference-kb-card__origin :deep(.t-icon) { flex: 0 0 12px; font-size: 12px; }
 .visual-reference-kb-card__origin span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[theme-mode="dark"] .visual-reference-kb-card { border-color: #27272a; background: #18181b; color: #d4d4d8; box-shadow: 0 1px 2px rgb(0 0 0 / 28%); }
+:root[theme-mode="dark"] .visual-reference-kb-card:hover { border-color: var(--mvc-line-strong, #484c54) !important; background: var(--mvc-hover, #25272c) !important; box-shadow: var(--mvc-shadow) !important; transform: none !important; }
+:root[theme-mode="dark"] .visual-reference-kb-card.is-highlighted { border-color: #71717a; box-shadow: 0 0 0 2px rgb(244 244 245 / 7%); }
+:root[theme-mode="dark"] .visual-reference-kb-card__title strong { color: #f4f4f5; }
+:root[theme-mode="dark"] .visual-reference-kb-card__description { color: #a1a1aa; }
+:root[theme-mode="dark"] .visual-reference-kb-card__footer { border-color: #27272a; }
+:root[theme-mode="dark"] .visual-reference-kb-card__badge,
+:root[theme-mode="dark"] .visual-reference-kb-card__state { background: #27272a; color: #d4d4d8; }
+:root[theme-mode="dark"] .visual-reference-kb-card__badge :deep(.t-icon) { color: #a1a1aa; }
+:root[theme-mode="dark"] .visual-reference-kb-card__favorite { color: #71717a; }
+:root[theme-mode="dark"] .visual-reference-kb-card__favorite:hover,
+:root[theme-mode="dark"] .visual-reference-kb-card__more:hover { background: #27272a; color: #f4f4f5; }
+:root[theme-mode="dark"] .visual-reference-kb-card__more,
+:root[theme-mode="dark"] .visual-reference-kb-card__origin { color: #a1a1aa; }
 @keyframes visual-kb-card-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .visual-reference-kb-card,.visual-reference-kb-card__favorite,.visual-reference-kb-card__more { transition: none !important; } .visual-reference-kb-card__spinner { animation: none; } }
 </style>
 
 <style lang="less">
-.visual-reference-kb-card-menu { width: 128px; padding: 4px; }
-.visual-reference-kb-card-menu button { width: 100%; min-height: 32px; padding: 8px 12px; border: 0; border-radius: 8px; display: flex; align-items: center; gap: 8px; background: transparent; color: #374151; font-size: 12px; text-align: left; cursor: pointer; }
+.visual-reference-kb-card-menu { width: 144px; padding: 4px; }
+.visual-reference-kb-card-menu button { width: 100%; min-height: 32px; padding: 8px 12px; border: 0; border-radius: 0; display: flex; align-items: center; gap: 8px; background: transparent; color: #374151; font-size: 12px; text-align: left; cursor: pointer; }
 .visual-reference-kb-card-menu button:hover { background: #f9fafb; }
+.visual-reference-kb-card-menu__separator { height: 1px; margin: 4px 0; display: block; background: #f3f4f6; }
 .visual-reference-kb-card-menu button.is-danger { color: #dc2626; }
 .visual-reference-kb-card-menu button.is-danger:hover { background: #fef2f2; }
+:root[theme-mode="dark"] body .visual-reference-kb-card-menu button { color: #e4e4e7; }
+:root[theme-mode="dark"] body .visual-reference-kb-card-menu button:hover { background: #3f3f46; }
+:root[theme-mode="dark"] body .visual-reference-kb-card-menu__separator { background: #3f3f46; }
+:root[theme-mode="dark"] body .visual-reference-kb-card-menu button.is-danger { color: #f87171; }
+:root[theme-mode="dark"] body .visual-reference-kb-card-menu button.is-danger:hover { background: rgb(127 29 29 / 30%); }
 </style>

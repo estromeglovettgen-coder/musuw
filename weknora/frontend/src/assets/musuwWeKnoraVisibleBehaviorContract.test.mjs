@@ -31,20 +31,21 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
     "path.startsWith('/platform/chat/')",
     "path === '/platform/knowledge-bases'",
     "path.startsWith('/platform/knowledge-bases/')",
+    "path === '/platform/agents'",
     "path === '/platform/settings'",
     "path === '/plans'",
     "path === '/checkout'",
   ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile'/)
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mcp'/)
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
-test('sidebar keeps Standard definitions but Lite exposes only New Chat and Knowledge Base', () => {
+test('sidebar keeps Standard definitions while Lite exposes chat, knowledge bases, and native Agents', () => {
   const store = read('../stores/menu.ts')
   const sidebar = read('../components/menu.vue')
 
-  assert.match(store, /liteVisiblePaths\s*=\s*new Set\(\['creatChat',\s*'knowledge-bases'\]\)/)
+  assert.match(store, /liteVisiblePaths\s*=\s*new Set\(\['creatChat',\s*'knowledge-bases',\s*'agents'\]\)/)
   assert.match(store, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/)
   for (const path of ['agents', 'organizations', 'settings', 'logout']) {
     assert.ok(store.includes(`path: '${path}'`), `Standard menu source lost ${path}`)
@@ -84,12 +85,12 @@ test('Lite UserMenu cannot reopen management surfaces and keeps valid interactiv
   ]) assert.ok(userMenu.includes(token), `Standard UserMenu source lost ${token}`)
 })
 
-test('Lite Settings exposes General, Usage, Models, and User Profile with theme controls; Standard settings remain recoverable', () => {
+test('Lite Settings also exposes native MCP for admins; Standard settings remain recoverable', () => {
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models'\) return 'general'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/)
+  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)/)
   assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'/)
   assert.match(settings, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
   assert.ok(settings.includes('<ModelSettings v-else-if="currentSection === \'models\'"'))
@@ -115,7 +116,7 @@ test('Lite Settings exposes General, Usage, Models, and User Profile with theme 
   ]) assert.ok(settings.includes(component), `Standard Settings source lost ${component}`)
 })
 
-test('exposed chat keeps native model/thinking behavior without exposing Agent or WebSearch management discovery', () => {
+test('exposed chat keeps native model/thinking/Agent behavior without exposing WebSearch management discovery', () => {
   const input = read('../components/Input-field.vue')
   const baseline = read('./business-baselines/Input-field.pre-view.vue')
   const resources = read('../stores/chatResources.ts')
@@ -129,11 +130,10 @@ test('exposed chat keeps native model/thinking behavior without exposing Agent o
     assert.ok(baseline.includes(token), `allowed chat controller lost native behavior ${token}`)
   }
 
-  // Lite runtime loads only the product's full-capability built-in Agent and
-  // never enumerates the Agent management or web-search provider surfaces.
-  assert.equal(resources.includes('BUILTIN_QUICK_ANSWER_ID'), false)
-  assert.ok(resources.includes('BUILTIN_SMART_REASONING_ID'))
-  assert.ok(resources.includes('getAgentById(BUILTIN_SMART_REASONING_ID)'))
+  // Lite now loads the native tenant Agent list but still does not fetch
+  // cross-tenant shared Agents or web-search provider management surfaces.
+  assert.match(resources, /if \(isLiteProductMode\(\)\)[\s\S]*await listAgents\(\{ creator \}\)/)
+  assert.match(resources, /ensureKnowledgeBases\(force\),[\s\S]*ensureAgents\(force\),[\s\S]*ensureModels\(force\)/)
   assert.match(resources, /if \(isLiteProductMode\(\)\)[\s\S]*webSearchProviders\.value = \[\]/)
   assert.match(commandPalette, /if \(auth\.isLiteMode\) \{[\s\S]*open\.value = false[\s\S]*return/)
 })

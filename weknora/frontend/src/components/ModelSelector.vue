@@ -11,6 +11,21 @@
           <button
             ref="overviewFirstRef"
             type="button"
+            class="visual-model-selector__chat-row is-agent"
+            aria-haspopup="listbox"
+            @mouseenter="hoverOpen('agents')"
+            @click="toggleHover('agents')"
+            @keydown.enter.stop.prevent="toggleHover('agents')"
+            @keydown.space.stop.prevent="toggleHover('agents')"
+          >
+            <span class="visual-model-selector__chat-row-label">{{ agentLabel }}</span>
+            <div class="visual-model-selector__chat-row-trailing">
+              <span class="visual-model-selector__chat-row-value" :title="selectedAgentDisplayName">{{ selectedAgentDisplayName }}</span>
+              <t-icon name="chevron-right" aria-hidden="true" />
+            </div>
+          </button>
+          <button
+            type="button"
             class="visual-model-selector__chat-row"
             aria-haspopup="listbox"
             @mouseenter="hoverOpen('models')"
@@ -127,10 +142,45 @@
             v-if="view === 'overview' && hoveredSubmenu"
             :key="hoveredSubmenu"
             class="visual-model-selector__chat-flyout"
-            :class="[`is-${submenuPlacement}`, `is-${hoveredSubmenu === 'models' ? 'models' : 'reasoning'}`]"
+            :class="[`is-${submenuPlacement}`, `is-${hoveredSubmenu}`]"
           >
           <div
-            v-if="hoveredSubmenu === 'models'"
+            v-if="hoveredSubmenu === 'agents'"
+            :id="agentListId"
+            ref="flyoutAgentListRef"
+            class="visual-model-selector__chat-list"
+            role="listbox"
+            tabindex="0"
+            :aria-label="agentLabel"
+            :aria-activedescendant="activeAgentId"
+            @keydown="handleAgentKeydown"
+          >
+            <button
+              v-for="(option, index) in chatAgentOptions"
+              :id="agentOptionId(option.key)"
+              :key="option.key"
+              type="button"
+              role="option"
+              tabindex="-1"
+              class="visual-model-selector__chat-option"
+              :class="{
+                'is-selected': isAgentOptionSelected(option),
+                'is-active': index === activeAgentIndex,
+              }"
+              :aria-selected="isAgentOptionSelected(option)"
+              @mouseenter="activeAgentIndex = index"
+              @click="selectChatAgent(option)"
+            >
+              <span class="visual-model-selector__chat-option-copy">
+                <strong :title="option.agent.name">{{ option.agent.name }}</strong>
+              </span>
+              <span v-if="isAgentOptionSelected(option)" class="visual-model-selector__chat-check" aria-hidden="true"><t-icon name="check" /></span>
+            </button>
+            <div v-if="!chatAgentOptions.length" class="visual-model-selector__chat-empty">{{ noAgentsLabel }}</div>
+          </div>
+
+          <div
+            v-else-if="hoveredSubmenu === 'models'"
             :id="modelListId"
             ref="flyoutModelListRef"
             class="visual-model-selector__chat-list"
@@ -315,8 +365,15 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent'
+import type { SharedAgentInfo } from '@/api/organization'
 
 type ModelSelectorModel = ModelConfig & Partial<Pick<ConsumerSceneOption, 'selectable' | 'locked' | 'required_plan' | 'model_type'>>
+type ChatAgentOption = {
+  key: string
+  agent: CustomAgent
+  sourceTenantId?: string
+}
 
 interface Props {
   modelType?: 'KnowledgeQA' | 'Embedding' | 'Rerank' | 'VLLM' | 'ASR'
@@ -333,6 +390,11 @@ interface Props {
   selectedReasoningLabel?: string
   reasoningOptions?: Array<{ value: string; label: string }>
   reasoningEffort?: string
+  agents?: CustomAgent[]
+  sharedAgents?: SharedAgentInfo[]
+  selectedAgentId?: string
+  selectedAgentSourceTenantId?: string
+  selectedAgentDisplayName?: string
   view?: 'overview' | 'models' | 'reasoning'
 }
 
@@ -349,6 +411,11 @@ const props = withDefaults(defineProps<Props>(), {
   selectedReasoningLabel: '',
   reasoningOptions: () => [],
   reasoningEffort: 'none',
+  agents: () => [],
+  sharedAgents: () => [],
+  selectedAgentId: '',
+  selectedAgentSourceTenantId: '',
+  selectedAgentDisplayName: '',
   view: 'overview',
 })
 
@@ -357,6 +424,7 @@ const emit = defineEmits<{
   'add-model': []
   'select-model': [value: string]
   'select-reasoning': [value: string]
+  'select-agent': [agent: CustomAgent, sourceTenantId?: string]
   'update:view': [value: 'overview' | 'models' | 'reasoning']
   close: []
 }>()
@@ -504,31 +572,63 @@ const handleConsumerOutsideClick = (event: MouseEvent) => {
 // the chat branch emits its own select-model event and never mutates catalog state.
 const handleModelChange = handleCatalogModelChange
 
-const chatPanelLabel = computed(() => `${t('input.modelLabel')} / ${t('input.reasoningEffort')}`)
+const agentLabel = computed(() => t('agent.title'))
 const modelLabel = computed(() => t('input.modelLabel'))
 const reasoningLabel = computed(() => t('input.reasoningEffort'))
+const chatPanelLabel = computed(() => `${agentLabel.value} / ${modelLabel.value} / ${reasoningLabel.value}`)
 const backLabel = computed(() => t('input.back'))
+const noAgentsLabel = computed(() => t('agent.noAgents'))
 const noModelsLabel = computed(() => t('input.noModel'))
 const noReasoningLabel = computed(() => t('input.noReasoningEfforts'))
 
+const activeAgentIndex = ref(0)
 const activeModelIndex = ref(0)
 const activeReasoningIndex = ref(0)
 const modelListRef = ref<HTMLElement | null>(null)
 const reasoningListRef = ref<HTMLElement | null>(null)
 const overviewFirstRef = ref<HTMLButtonElement | null>(null)
 const chatPanelRef = ref<HTMLElement | null>(null)
+const flyoutAgentListRef = ref<HTMLElement | null>(null)
 const flyoutModelListRef = ref<HTMLElement | null>(null)
 const flyoutReasoningListRef = ref<HTMLElement | null>(null)
-const hoveredSubmenu = ref<'models' | 'reasoning' | null>(null)
+const hoveredSubmenu = ref<'agents' | 'models' | 'reasoning' | null>(null)
 const submenuPlacement = ref<'right' | 'left'>('right')
 let hoverTask = 0
 const modelListId = `visual-model-list-${Math.random().toString(36).slice(2, 9)}`
+const agentListId = `visual-agent-list-${Math.random().toString(36).slice(2, 9)}`
 
 // `props.models` is deliberately the caller-owned, plan-filtered catalog.  The
 // picker only presents this array; it never fetches or synthesizes records.
 const chatModels = computed(() => props.models.filter(model => !!model.id))
+const chatAgentOptions = computed<ChatAgentOption[]>(() => {
+  const own = props.agents.map((agent) => {
+    if (agent.id === BUILTIN_QUICK_ANSWER_ID) {
+      return { key: `own-${agent.id}`, agent: { ...agent, name: t('input.normalMode') } }
+    }
+    if (agent.id === BUILTIN_SMART_REASONING_ID) {
+      return { key: `own-${agent.id}`, agent: { ...agent, name: t('input.agentMode') } }
+    }
+    return { key: `own-${agent.id}`, agent }
+  })
+  const shared = props.sharedAgents
+    .filter(sharedAgent => !sharedAgent.disabled_by_me)
+    .map((sharedAgent) => {
+      const sourceTenantId = String(sharedAgent.source_tenant_id)
+      const agent: CustomAgent = { is_builtin: false, config: {}, ...sharedAgent.agent }
+      return { key: `shared-${sourceTenantId}-${agent.id}`, agent, sourceTenantId }
+    })
+  return [...own, ...shared]
+})
+const agentOptionId = (key: string) => `${agentListId}-option-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 const modelOptionId = (id: string) => `${modelListId}-option-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 const reasoningOptionId = (value: string) => `${modelListId}-reasoning-${value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+const isAgentOptionSelected = (option: ChatAgentOption) =>
+  option.agent.id === props.selectedAgentId
+  && (option.sourceTenantId || '') === (props.selectedAgentSourceTenantId || '')
+const activeAgentId = computed(() => {
+  const option = chatAgentOptions.value[activeAgentIndex.value]
+  return option ? agentOptionId(option.key) : undefined
+})
 const activeModelId = computed(() => {
   const model = chatModels.value[activeModelIndex.value]
   return model?.id ? modelOptionId(model.id) : undefined
@@ -543,10 +643,11 @@ const updateSubmenuPlacement = () => {
   const panelRect = chatPanelRef.value?.getBoundingClientRect()
   if (!panelRect) return
   const spaceOnRight = window.innerWidth - panelRect.right
-  submenuPlacement.value = spaceOnRight >= 235 ? 'right' : 'left'
+  const submenuWidth = hoveredSubmenu.value === 'agents' ? 256 : hoveredSubmenu.value === 'reasoning' ? 192 : 224
+  submenuPlacement.value = spaceOnRight >= submenuWidth + 11 ? 'right' : 'left'
 }
 
-const hoverOpen = (nextView: 'models' | 'reasoning') => {
+const hoverOpen = (nextView: 'agents' | 'models' | 'reasoning') => {
   const task = ++hoverTask
   queueMicrotask(() => {
     if (task !== hoverTask) return
@@ -555,13 +656,19 @@ const hoverOpen = (nextView: 'models' | 'reasoning') => {
   })
 }
 
-const toggleHover = (nextView: 'models' | 'reasoning') => {
+const toggleHover = (nextView: 'agents' | 'models' | 'reasoning') => {
   hoverTask += 1
   if (hoveredSubmenu.value === nextView) {
     hoveredSubmenu.value = null
     return
   }
-  hoverOpen(nextView)
+  hoveredSubmenu.value = nextView
+  nextTick(() => {
+    updateSubmenuPlacement()
+    if (nextView === 'agents') flyoutAgentListRef.value?.focus()
+    if (nextView === 'models') flyoutModelListRef.value?.focus()
+    if (nextView === 'reasoning') flyoutReasoningListRef.value?.focus()
+  })
 }
 
 const openView = (nextView: 'overview' | 'models' | 'reasoning') => {
@@ -571,6 +678,9 @@ const openView = (nextView: 'overview' | 'models' | 'reasoning') => {
     if (nextView === 'models') modelListRef.value?.focus()
     if (nextView === 'reasoning') reasoningListRef.value?.focus()
   })
+}
+const selectChatAgent = (option: ChatAgentOption) => {
+  emit('select-agent', option.agent, option.sourceTenantId)
 }
 const selectChatModel = (value: string) => {
   const option = chatModels.value.find(model => model.id === value)
@@ -587,6 +697,15 @@ const selectChatModel = (value: string) => {
 const selectChatReasoning = (value: string) => {
   if (!props.reasoningOptions.some(option => option.value === value)) return
   emit('select-reasoning', value)
+}
+const moveAgentActive = (delta: number) => {
+  const count = chatAgentOptions.value.length
+  if (!count) return
+  activeAgentIndex.value = (activeAgentIndex.value + delta + count) % count
+  nextTick(() => {
+    const active = activeAgentId.value ? document.getElementById(activeAgentId.value) : null
+    active?.scrollIntoView({ block: 'nearest' })
+  })
 }
 const moveModelActive = (delta: number) => {
   const count = chatModels.value.length
@@ -606,6 +725,22 @@ const moveReasoningActive = (delta: number) => {
     const active = option ? document.getElementById(reasoningOptionId(option.value)) : null
     active?.scrollIntoView({ block: 'nearest' })
   })
+}
+const handleAgentKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
+    event.stopPropagation()
+  }
+  if (event.key === 'ArrowDown') { event.preventDefault(); moveAgentActive(1) }
+  else if (event.key === 'ArrowUp') { event.preventDefault(); moveAgentActive(-1) }
+  else if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    const option = chatAgentOptions.value[activeAgentIndex.value]
+    if (option) selectChatAgent(option)
+  } else if (event.key === 'Escape') {
+    event.preventDefault()
+    hoveredSubmenu.value = null
+    nextTick(() => overviewFirstRef.value?.focus())
+  }
 }
 const handleModelKeydown = (event: KeyboardEvent) => {
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
@@ -659,6 +794,13 @@ watch(() => props.view, (view) => {
     nextTick(() => reasoningListRef.value?.focus())
   }
 }, { immediate: true })
+watch(
+  [chatAgentOptions, () => props.selectedAgentId, () => props.selectedAgentSourceTenantId],
+  () => {
+    activeAgentIndex.value = Math.max(0, chatAgentOptions.value.findIndex(isAgentOptionSelected))
+  },
+  { immediate: true },
+)
 watch(() => props.models, () => { activeModelIndex.value = Math.max(0, chatModels.value.findIndex(model => model.id === props.selectedModelId)) }, { deep: true })
 
 defineExpose({
@@ -1019,7 +1161,7 @@ onUnmounted(() => {
   color: #92400e;
 }
 
-/* The chat picker mirrors the compact Codex-style menu: a two-row overview
+/* The chat picker mirrors the compact Codex-style menu: a three-row overview
  * and single-line listbox views.  The caller still owns model availability. */
 .visual-model-selector--chat {
   width: 100%;
@@ -1134,6 +1276,7 @@ onUnmounted(() => {
 
 .visual-model-selector__chat-flyout.is-right { left: 100%; margin-left: 6px; transform-origin: left bottom; }
 .visual-model-selector__chat-flyout.is-left { right: 100%; margin-right: 6px; transform-origin: right bottom; }
+.visual-model-selector__chat-flyout.is-agents { width: 256px; max-width: min(256px, calc(100vw - 32px)); max-height: 320px; overflow-y: auto; }
 .visual-model-selector__chat-flyout.is-models { max-height: 256px; overflow-y: auto; }
 .visual-model-selector__chat-flyout.is-reasoning { width: 192px; max-width: min(192px, calc(100vw - 32px)); }
 .visual-model-selector__chat-flyout .visual-model-selector__chat-list { max-height: none; overflow: visible; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -1299,6 +1442,18 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 18px;
   text-align: center;
+}
+
+@media (max-width: 540px) {
+  .visual-model-selector__chat-flyout,
+  .visual-model-selector__chat-flyout.is-left,
+  .visual-model-selector__chat-flyout.is-right {
+    right: 0 !important;
+    bottom: calc(100% + 6px);
+    left: auto !important;
+    margin: 0 !important;
+    transform-origin: right bottom;
+  }
 }
 
 @media (max-width: 430px) {

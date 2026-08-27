@@ -321,6 +321,10 @@ function publicError(error) {
   return error instanceof Error ? error.message : 'unexpected error'
 }
 
+export function registerPoolErrorHandler(pool, log = console.error) {
+  pool.on('error', (error) => log(`[musuw-admin] database ${publicError(error)}`))
+}
+
 function parseJSONBody(request, maxBytes = 64 * 1024) {
   return new Promise((resolveBody, rejectBody) => {
     let size = 0
@@ -982,6 +986,7 @@ async function start() {
     connectionTimeoutMillis: 60_000,
     options: '-c default_transaction_read_only=on -c statement_timeout=12000',
   })
+  registerPoolErrorHandler(pool)
   const readOnly = await pool.query('SHOW transaction_read_only')
   if (readOnly.rows[0]?.transaction_read_only !== 'on') {
     await pool.end().catch(() => {})

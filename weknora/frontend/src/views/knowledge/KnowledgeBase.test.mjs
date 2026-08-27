@@ -33,3 +33,23 @@ test("knowledge detail derives folder data independently from the collapsed side
   assert.match(source, /currentChildFolders:\s*computed\([\s\S]*?childFolders\(/);
   assert.doesNotMatch(source.slice(0, source.indexOf('<template>')), /folderTreeCollapsed/);
 });
+
+test("knowledge detail does not duplicate settings in the top-right header", () => {
+  assert.doesNotMatch(source, /class="visual-knowledge-header__settings"/);
+  assert.match(
+    source,
+    /missingStorageEngine[\s\S]*?@click="handleOpenKBSettings"/,
+    "the native missing-storage remediation must retain its settings hand-off",
+  );
+});
+
+test("knowledge detail remediation alerts use the shared dark card surface", () => {
+  assert.match(
+    source,
+    /:global\(:root\[theme-mode="dark"\] \.visual-knowledge-alerts button\)\s*\{[\s\S]*?border-color:\s*var\(--mvc-line\)[\s\S]*?background:\s*var\(--mvc-surface-raised\)[\s\S]*?color:\s*var\(--mvc-text\)/,
+  );
+  assert.match(
+    source,
+    /:global\(:root\[theme-mode="dark"\] \.visual-knowledge-alerts strong\)\s*\{[\s\S]*?color:\s*var\(--mvc-text-strong\)/,
+  );
+});

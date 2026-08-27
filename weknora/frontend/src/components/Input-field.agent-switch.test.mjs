@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const inputField = readFileSync(new URL("./Input-field.vue", import.meta.url), "utf8");
+const modelSelector = readFileSync(new URL("./ModelSelector.vue", import.meta.url), "utf8");
 const inputBusiness = readFileSync(new URL("../assets/business-baselines/Input-field.pre-view.vue", import.meta.url), "utf8");
 const settingsStore = readFileSync(new URL("../stores/settings.ts", import.meta.url), "utf8");
 const streamClient = readFileSync(new URL("../api/chat/streame.ts", import.meta.url), "utf8");
@@ -32,13 +33,18 @@ test("shared-agent web search button waits for source readiness metadata", () =>
   assert.match(showWebSearchButton, /selectedSharedAgent\.value\?\.web_search_ready/);
 });
 
-test("consumer chat locks the full-capability Agent and sends model-specific reasoning effort", () => {
+test("consumer chat can select a native agent and sends model-specific reasoning effort", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
   assert.match(settingsStore, /thinkingEnabled:\s*true/);
   assert.match(settingsStore, /reasoningEffort:\s*"high"/);
   assert.match(settingsStore, /selectedAgentId:\s*BUILTIN_SMART_REASONING_ID/);
   assert.match(inputBusiness, /const thinkingEnabled = computed/);
-  assert.match(inputBusiness, /get: \(\) => BUILTIN_SMART_REASONING_ID/);
+  assert.match(inputBusiness, /const selectedAgentId = computed\(\{/);
+  assert.doesNotMatch(inputBusiness, /get: \(\) => BUILTIN_SMART_REASONING_ID/);
+  assert.match(inputBusiness, /const enabledAgents = computed/);
+  assert.match(inputBusiness, /const handleSelectAgent = async/);
+  assert.match(inputBusiness, /const loadMCPServices = async \(\) => \{\s*try \{/);
+  assert.doesNotMatch(inputBusiness, /const loadMCPServices = async \(\) => \{\s*if \(authStore\.isLiteMode\)/);
   assert.match(inputBusiness, /const reasoningEffort = computed/);
   assert.match(inputBusiness, /const reasoningOptions = computed/);
   assert.match(inputBusiness, /reasoning\.supported_efforts/);
@@ -48,7 +54,15 @@ test("consumer chat locks the full-capability Agent and sends model-specific rea
   assert.match(inputField, /v-for="model in availableModels"/);
   assert.match(inputField, /modelPickerView = 'models'/);
   assert.match(inputField, /modelPickerView = 'reasoning'/);
-  assert.doesNotMatch(inputField, /__add_model__|__thinking-switch|<AgentSelector/);
+  assert.doesNotMatch(inputField, /__add_model__|__thinking-switch/);
+  assert.match(inputField, /class="visual-chat-composer__combined-picker"/);
+  assert.match(modelSelector, /class="visual-model-selector__chat-row is-agent"/);
+  assert.match(inputField, /<ModelSelector[\s\S]*:agents="enabledAgents"/);
+  assert.match(inputField, /<ModelSelector[\s\S]*:shared-agents="orgStore\.sharedAgents"/);
+  assert.match(inputField, /<ModelSelector[\s\S]*:selected-agent-id="selectedAgentId"/);
+  assert.match(inputField, /<ModelSelector[\s\S]*@select-agent="selectAgentFromPicker"/);
+  assert.match(inputField, /handleSelectAgent\?\.\(agent, sourceTenantId\)/);
+  assert.doesNotMatch(inputField, /AgentSelector|agentPickerAnchorRef|agentPickerOpen|closeAgentSubmenu|v-for="agent in enabledAgents"/);
   assert.match(inputBusiness, /emit\(["']send-msg["'],[\s\S]*reasoningEffort\.value/);
   assert.match(chatView, /thinking: any, reasoningEffort: any\) => sendMsg\(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort\)/);
   assert.match(chatBusiness, /thinking:\s*thinkingEnabled/);
@@ -57,6 +71,75 @@ test("consumer chat locks the full-capability Agent and sends model-specific rea
   assert.match(streamClient, /postBody\.thinking = params\.thinking/);
   assert.match(streamClient, /reasoning_effort\?:\s*string/);
   assert.match(streamClient, /postBody\.reasoning_effort = params\.reasoning_effort/);
+});
+
+test("consumer chat routes the downstream request through the selected native agent", () => {
+  const sendStart = chatBusiness.indexOf("const sendMsg = async");
+  const sendEnd = chatBusiness.indexOf("onMounted", sendStart);
+  const sendBlock = chatBusiness.slice(sendStart, sendEnd);
+
+  assert.notEqual(sendStart, -1);
+  assert.notEqual(sendEnd, -1);
+  assert.match(
+    sendBlock,
+    /const selectedAgentId = props\.embeddedMode \? props\.agentId : \(useSettingsStoreInstance\.selectedAgentId \|\| ''\);/,
+  );
+  assert.match(
+    sendBlock,
+    /const selectedAgentSourceTenantId = props\.embeddedMode\s*\? undefined\s*:\s*\(useSettingsStoreInstance\.selectedAgentSourceTenantId \|\| undefined\);/,
+  );
+  assert.match(
+    sendBlock,
+    /const agentEnabled = props\.embeddedMode\s*\? \(props\.agentId && props\.agentId !== 'builtin-quick-answer'\)\s*:\s*useSettingsStoreInstance\.isAgentStreamMode;/,
+  );
+  assert.match(sendBlock, /agent_enabled:\s*agentEnabled/);
+  assert.match(sendBlock, /agent_id:\s*selectedAgentId/);
+  assert.match(sendBlock, /agent_source_tenant_id:\s*selectedAgentSourceTenantId/);
+  assert.doesNotMatch(sendBlock, /const selectedAgentId = BUILTIN_SMART_REASONING_ID|const agentEnabled = true/);
+});
+
+test("combined selector mechanically preserves native labels, hover entry, and the source capsule shape", () => {
+  const capsuleStart = inputField.indexOf('class="visual-chat-composer__combined-picker"');
+  const capsuleEnd = inputField.indexOf('</button>', capsuleStart);
+  const capsule = inputField.slice(capsuleStart, capsuleEnd);
+  const agentRowStart = modelSelector.indexOf('class="visual-model-selector__chat-row is-agent"');
+  const agentRowEnd = modelSelector.indexOf('</button>', agentRowStart);
+  const agentRow = modelSelector.slice(agentRowStart, agentRowEnd);
+
+  assert.notEqual(capsuleStart, -1);
+  assert.notEqual(capsuleEnd, -1);
+  assert.notEqual(agentRowStart, -1);
+  assert.notEqual(agentRowEnd, -1);
+  assert.match(inputField, /BUILTIN_QUICK_ANSWER_ID/);
+  assert.match(inputField, /BUILTIN_SMART_REASONING_ID/);
+  assert.match(inputField, /selectedAgentDisplayName[\s\S]*?t\('input\.normalMode'\)[\s\S]*?t\('input\.agentMode'\)/);
+  assert.match(inputField, /const isBuiltinAgentSelected = computed[\s\S]*?BUILTIN_QUICK_ANSWER_ID[\s\S]*?BUILTIN_SMART_REASONING_ID/);
+  assert.match(capsule, /\{\{ selectedAgentDisplayName \}\}/);
+  assert.match(capsule, /<template v-if="!isBuiltinAgentSelected">[\s\S]*?combined-picker-dot[\s\S]*?combined-picker-model[\s\S]*?combined-picker-effort[\s\S]*?<\/template>/);
+  assert.match(inputField, /:aria-label="isBuiltinAgentSelected\s*\? selectedAgentDisplayName/);
+  assert.match(agentRow, /@mouseenter="hoverOpen\('agents'\)"/);
+  assert.match(agentRow, /@click="toggleHover\('agents'\)"/);
+  assert.match(agentRow, /@keydown\.enter\.stop\.prevent="toggleHover\('agents'\)"/);
+  assert.match(modelSelector, /const hoveredSubmenu = ref<'agents' \| 'models' \| 'reasoning' \| null>/);
+  assert.doesNotMatch(capsule, /control-platform|combined-picker-icon/);
+  assert.doesNotMatch(agentRow, /control-platform|<t-icon[^>]+(?:robot|chat|app)/);
+  assert.doesNotMatch(inputField, /const modelPickerWidth|modelPickerStyle/);
+  for (const token of [
+    'width: fit-content',
+    'padding: 6px 12px',
+    'border-radius: 999px',
+    'font-size: 12px',
+    'line-height: 18px',
+    '@media (max-width: 430px)',
+    ':root[theme-mode="dark"] .visual-chat-composer__combined-picker',
+  ]) assert.ok(inputField.includes(token), `combined selector source token lost ${token}`);
+  for (const token of [
+    'width: 224px',
+    'padding: 6px',
+    'border-radius: 16px',
+    '.visual-model-selector__chat-flyout.is-agents',
+    'width: 256px',
+  ]) assert.ok(modelSelector.includes(token), `shared picker source token lost ${token}`);
 });
 
 test("model selector distinguishes the initial catalog load from missing configuration", () => {

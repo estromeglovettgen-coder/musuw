@@ -85,6 +85,13 @@ func sanitizeQuery(raw string) string {
 // data that field-level JSON redaction cannot safely inspect. Keep request
 // metadata, but never persist those request or response bodies.
 func shouldLogBodies(path string) bool {
+	// URL imports accept arbitrary pasted share text. Even field-level
+	// redaction cannot safely sanitize provider URLs, signed query strings, or
+	// Chinese copy text, so keep this request/response body out of access logs
+	// on both success and failure.
+	if strings.HasPrefix(path, "/api/v1/knowledge-bases/") && strings.HasSuffix(path, "/knowledge/url") {
+		return false
+	}
 	return path != "/api/v1/auth" &&
 		!strings.HasPrefix(path, "/api/v1/auth/") &&
 		path != "/api/v1/billing/paddle/webhook"
