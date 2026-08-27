@@ -67,7 +67,7 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /AI Wiki/);
   assert.match(home, /Knowledge Graph/);
   assert.match(home, /30\+ leading models/);
-  assert.match(home, /Web and video import/);
+  assert.match(home, /One-click web and video import/);
   assert.match(home, /Knowledge that maintains itself/);
   assert.match(home, /Turn scattered sources/);
   assert.match(home, /into knowledge that works\./);
