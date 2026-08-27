@@ -135,12 +135,12 @@ const MARKETING_COPY = Object.freeze({
         Object.freeze({
           title: "30+ leading models",
           body:
-            "Access 30+ leading models and providers through one managed interface, then choose the right capability for each task.",
+            "Access 30+ leading models through managed provider connections, then choose the right capability for each task.",
         }),
         Object.freeze({
-          title: "Web and video import",
+          title: "One-click web and video import",
           body:
-            "Turn webpages, YouTube videos, TikTok or Douyin links, and other supported sources into searchable text or transcripts.",
+            "Send webpages, YouTube videos, TikTok or Douyin links, and other supported sources straight into the knowledge base as searchable text or transcripts.",
         }),
         Object.freeze({
           title: "Knowledge that maintains itself",
@@ -204,7 +204,7 @@ const MARKETING_COPY = Object.freeze({
         Object.freeze({
           question: "Which models can I use?",
           answer:
-            "Musuw provides managed access to 30+ leading models and providers. Available models depend on the plan and the current platform catalog shown in the product.",
+            "Musuw provides access to 30+ leading models through managed provider connections. Available models depend on the plan and the current catalog shown in the product.",
         }),
         Object.freeze({
           question: "Is my content used to train models?",
@@ -306,7 +306,7 @@ const MARKETING_COPY = Object.freeze({
         }),
         Object.freeze({
           title: "30+ 主流模型接入",
-          body: "Musuw 提供 30+ 主流模型与供应商接入，在同一界面统一使用与切换，按任务选择合适能力。",
+          body: "Musuw 提供 30+ 主流模型的托管接入，在同一界面统一使用与切换，按任务选择合适能力。",
         }),
         Object.freeze({
           title: "社媒文章与视频一键入库",
@@ -368,7 +368,7 @@ const MARKETING_COPY = Object.freeze({
         }),
         Object.freeze({
           question: "可以使用哪些模型？",
-          answer: "Musuw 提供 30+ 主流模型与供应商的托管接入。具体可用模型取决于套餐和产品中当前展示的平台目录。",
+          answer: "Musuw 提供 30+ 主流模型的托管接入。具体可用模型取决于套餐和产品中当前展示的平台目录。",
         }),
         Object.freeze({
           question: "我的内容会被用于训练模型吗？",
