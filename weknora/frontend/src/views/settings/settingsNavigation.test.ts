@@ -49,3 +49,9 @@ test('settings traps focus only when it is a modal and restores the launcher', (
   assert.match(settingsSource, /import VisualSettingsShell from '.\/components\/VisualSettingsShell\.vue'/)
   assert.equal(settingsSource.includes('settingsSearchInputRef'), false)
 })
+
+test('closing a cold settings route has a deterministic in-app fallback', () => {
+  assert.match(settingsSource, /router\.options\.history\.state\.back/)
+  assert.match(settingsSource, /previousRoutePath !== '\/platform\/settings'/)
+  assert.match(settingsSource, /router\.replace\('\/platform\/knowledge-bases'\)/)
+})

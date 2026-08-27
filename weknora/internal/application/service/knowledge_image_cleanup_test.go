@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"testing"
+
+	"github.com/Tencent/WeKnora/internal/types"
 )
 
 func TestCollectImageURLs(t *testing.T) {
@@ -88,6 +90,69 @@ func TestCollectImageURLs(t *testing.T) {
 				if url != tt.wantURLs[i] {
 					t.Errorf("collectImageURLs()[%d] = %q, want %q", i, url, tt.wantURLs[i])
 				}
+			}
+		})
+	}
+}
+
+func TestShouldPreserveExtractedImagesForFileBackedURLMarkdown(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		knowledge *types.Knowledge
+		want      bool
+	}{
+		{
+			name: "file-backed social markdown",
+			knowledge: &types.Knowledge{
+				Type:     "url",
+				FilePath: "resource://tenant/social.md",
+				FileName: "social.md",
+				FileType: "md",
+			},
+			want: true,
+		},
+		{
+			name: "case-insensitive markdown extension",
+			knowledge: &types.Knowledge{
+				Type:     "url",
+				FilePath: "resource://tenant/social",
+				FileName: "social.MD",
+			},
+			want: true,
+		},
+		{
+			name:      "url without materialized file",
+			knowledge: &types.Knowledge{Type: "url", FileName: "social.md", FileType: "md"},
+			want:      false,
+		},
+		{
+			name: "file-backed video",
+			knowledge: &types.Knowledge{
+				Type:     "url",
+				FilePath: "resource://tenant/social.mp4",
+				FileName: "social.mp4",
+				FileType: "mp4",
+			},
+			want: false,
+		},
+		{
+			name: "ordinary uploaded markdown",
+			knowledge: &types.Knowledge{
+				Type:     "file",
+				FilePath: "resource://tenant/document.md",
+				FileName: "document.md",
+				FileType: "md",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldPreserveExtractedImagesForReparse(tt.knowledge); got != tt.want {
+				t.Fatalf("shouldPreserveExtractedImagesForReparse() = %v, want %v", got, tt.want)
 			}
 		})
 	}

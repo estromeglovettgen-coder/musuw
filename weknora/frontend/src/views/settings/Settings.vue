@@ -243,9 +243,15 @@ const handleClose = () => {
   if (route.path === '/platform/settings') {
     const section = route.query.section
     if (section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
-      void router.push('/platform/knowledge-bases')
+      void router.replace('/platform/knowledge-bases')
     } else {
-      router.back()
+      const previousPath = router.options.history.state.back
+      const previousRoutePath = typeof previousPath === 'string' ? previousPath.split(/[?#]/, 1)[0] : ''
+      if (previousRoutePath.startsWith('/platform/') && previousRoutePath !== '/platform/settings') {
+        router.back()
+      } else {
+        void router.replace('/platform/knowledge-bases')
+      }
     }
   }
 }

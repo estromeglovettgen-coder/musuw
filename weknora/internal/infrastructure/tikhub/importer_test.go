@@ -14,6 +14,12 @@ import (
 	"testing"
 )
 
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
 func TestTikHubImporterFetchesTikTokAndDouyinShareURLs(t *testing.T) {
 	t.Parallel()
 
@@ -191,6 +197,24 @@ func TestTikHubImporterFetchesXiaohongshuImageAndConditionallyVideo(t *testing.T
 	}
 	if !strings.Contains(imageResult.Markdown, "![image 1](https://img.example/one.jpg)") {
 		t.Fatalf("image markdown = %q", imageResult.Markdown)
+	}
+}
+
+func TestXHSResponseIsVideoScansContradictoryTypeFields(t *testing.T) {
+	t.Parallel()
+
+	// The image-first response can expose a normal/image type before a nested
+	// video marker. A video marker anywhere in the type fields must win rather
+	// than being short-circuited by the first non-video value.
+	response := map[string]any{
+		"type":      "normal",
+		"note_type": "video",
+		"media": map[string]any{
+			"media_type": "image",
+		},
+	}
+	if !xhsResponseIsVideo(response) {
+		t.Fatal("xhsResponseIsVideo() = false, want true when any type field is video")
 	}
 }
 
@@ -633,22 +657,22 @@ func TestResultAndRouteCanBeJSONEncoded(t *testing.T) {
 func TestTikHubImporterPropagatesContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
-	}))
-	defer server.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	_, err := NewTikHubImporterForTest(server.URL, "token", server.Client()).Fetch(ctx, Route{Platform: PlatformTikTok, InputURL: "https://www.tiktok.com/t/abc"})
+	const privateShareToken = "private-share-token"
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return nil, &url.Error{Op: http.MethodGet, URL: req.URL.String(), Err: context.Canceled}
+	})}
+	_, err := NewTikHubImporterForTest("https://api.tikhub.test", "token", client).Fetch(
+		context.Background(),
+		Route{Platform: PlatformTikTok, InputURL: "https://www.tiktok.com/t/" + privateShareToken},
+	)
 	if err == nil {
 		t.Fatal("Fetch() succeeded with canceled context")
 	}
-	if errors.Is(err, context.Canceled) {
-		return
-	}
-	if !strings.Contains(err.Error(), "context canceled") {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context cancellation", err)
+	}
+	if strings.Contains(err.Error(), privateShareToken) || strings.Contains(err.Error(), "share_url=") {
+		t.Fatalf("cancellation error leaked request query: %v", err)
 	}
 }
 

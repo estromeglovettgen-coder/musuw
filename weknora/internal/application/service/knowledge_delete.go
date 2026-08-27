@@ -55,6 +55,19 @@ func deleteExtractedImages(ctx context.Context, fileSvc interfaces.FileService, 
 	}
 }
 
+// shouldPreserveExtractedImagesForReparse identifies social Markdown that was
+// materialized into a durable source file. Reparse reads that same file, so
+// deleting its referenced image resources before the worker runs would leave
+// the new chunks pointing at missing objects. Normal knowledge deletion does
+// not call this helper and continues deleting extracted images as before.
+func shouldPreserveExtractedImagesForReparse(knowledge *types.Knowledge) bool {
+	if knowledge == nil || !strings.EqualFold(strings.TrimSpace(knowledge.Type), "url") || strings.TrimSpace(knowledge.FilePath) == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(knowledge.FileType), "md") ||
+		strings.HasSuffix(strings.ToLower(strings.TrimSpace(knowledge.FileName)), ".md")
+}
+
 // DeleteKnowledge deletes a knowledge entry and all related resources
 func (s *knowledgeService) DeleteKnowledge(ctx context.Context, id string) error {
 	// Get the knowledge entry
@@ -754,8 +767,12 @@ func (s *knowledgeService) cleanupKnowledgeResources(ctx context.Context, knowle
 		cleanupErr = errors.Join(cleanupErr, err)
 	}
 
-	// Delete extracted images after chunks are deleted
-	deleteExtractedImages(ctx, fileSvc, imageURLs)
+	// A materialized social Markdown source still references its extracted
+	// images; keep those objects so the queued file reparse can reuse them.
+	// DeleteKnowledge has its own cleanup path and remains destructive.
+	if !shouldPreserveExtractedImagesForReparse(knowledge) {
+		deleteExtractedImages(ctx, fileSvc, imageURLs)
+	}
 
 	namespace := types.NameSpace{KnowledgeBase: knowledge.KnowledgeBaseID, Knowledge: knowledge.ID}
 	if err := s.graphEngine.DelGraph(ctx, []types.NameSpace{namespace}); err != nil {

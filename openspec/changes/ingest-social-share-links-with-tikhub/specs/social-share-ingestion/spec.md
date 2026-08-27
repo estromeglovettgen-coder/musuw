@@ -48,9 +48,13 @@ The system SHALL normalize a successful TikHub response into either an existing 
 - **WHEN** TikHub returns a text/image post or note
 - **THEN** the worker persists Markdown with image references as an existing document file and continues through the existing image, chunk, embedding, and index pipeline
 
-#### Scenario: Unsupported multi-video result
-- **WHEN** a response contains multiple videos or an unsupported mixed-media carousel
-- **THEN** the worker fails explicitly rather than silently dropping assets
+#### Scenario: Reprocess a materialized document
+- **WHEN** a persisted social Markdown document is reprocessed
+- **THEN** the worker preserves the durable images still referenced by that source file
+
+#### Scenario: Multiple renditions of one video
+- **WHEN** a response contains multiple playable renditions of one video
+- **THEN** the worker selects the lowest known resolution or bitrate, and otherwise preserves the provider's playable order
 
 ### Requirement: Paid-call safety
 The system MUST keep TikHub credentials server-side, MUST NOT probe endpoints to discover the platform, and MUST NOT automatically retry a social TikHub call.

@@ -214,8 +214,11 @@ func (i *TikHubImporter) get(ctx context.Context, endpoint string, params url.Va
 	resp, err := i.client.Do(req)
 	if err != nil {
 		// Do not wrap url.Error: it contains the full query/share text.
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, err
+		if errors.Is(err, context.Canceled) {
+			return nil, context.Canceled
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, context.DeadlineExceeded
 		}
 		return nil, errors.New("TikHub request failed")
 	}
@@ -636,13 +639,15 @@ func stringValue(value any) string {
 }
 
 func xhsResponseIsVideo(data any) bool {
+	// A response may contain contradictory type fields (for example a legacy
+	// top-level `type: normal` alongside `note_type: video`). Scan all known
+	// fields before deciding that the note is an image; a video marker anywhere
+	// in the response must win.
 	for _, key := range []string{"type", "note_type", "media_type"} {
 		for _, value := range valuesByKey(data, key) {
 			switch strings.ToLower(strings.TrimSpace(stringValue(value))) {
 			case "video", "video_note", "2":
 				return true
-			case "normal", "image", "image_note", "0", "1":
-				return false
 			}
 		}
 	}
