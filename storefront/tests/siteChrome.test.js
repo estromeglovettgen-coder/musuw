@@ -60,3 +60,33 @@ test("product entry links expose the same guest and authenticated actions on des
   assert.match(explicitNewTab, /target="_blank"/);
   assert.match(explicitNewTab, /rel="noreferrer"/);
 });
+
+test("language selection is one compact ZH and EN dropdown", async (t) => {
+  const server = await createServer({
+    root,
+    appType: "custom",
+    logLevel: "silent",
+    server: { middlewareMode: true },
+  });
+  t.after(() => server.close());
+
+  const { LanguageSwitcher } = await server.ssrLoadModule(
+    "/src/components/SiteChrome.jsx",
+  );
+  const english = renderToStaticMarkup(
+    React.createElement(LanguageSwitcher, { locale: "en" }),
+  );
+  const chinese = renderToStaticMarkup(
+    React.createElement(LanguageSwitcher, { locale: "zh-CN" }),
+  );
+
+  for (const markup of [english, chinese]) {
+    assert.equal((markup.match(/<select\b/g) ?? []).length, 1);
+    assert.equal((markup.match(/<option\b/g) ?? []).length, 2);
+    assert.match(markup, /<option value="zh-CN"(?: selected="")?>ZH<\/option>/);
+    assert.match(markup, /<option value="en"(?: selected="")?>EN<\/option>/);
+    assert.doesNotMatch(markup, /lang-btn|lang-globe-icon|<button/);
+  }
+  assert.match(english, /<option value="en" selected="">EN<\/option>/);
+  assert.match(chinese, /<option value="zh-CN" selected="">ZH<\/option>/);
+});

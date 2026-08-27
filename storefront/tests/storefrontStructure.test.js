@@ -69,15 +69,18 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /30\+ leading models/);
   assert.match(home, /One-click web and video import/);
   assert.match(home, /Knowledge that maintains itself/);
-  assert.match(home, /Turn scattered sources/);
-  assert.match(home, /into knowledge that works\./);
-  assert.equal((comparison.match(/class="comparison-feature-row"/g) ?? []).length, 5);
+  assert.match(home, /Turn scattered documents/);
+  assert.match(home, /into intelligent knowledge assets/);
+  assert.match(home, /href="\/contact"[^>]*><span>Contact<\/span>/);
+  assert.doesNotMatch(home, /Watch demo|href="\/#demo"/);
+  assert.equal((comparison.match(/class="comparison-feature-row"/g) ?? []).length, 6);
   assert.doesNotMatch(comparison, /comparison-group-head|Monthly AI usage|Model catalog|Document upload and parsing|>\$0\.40</);
   for (const label of [
     "Storage",
     "Knowledge bases",
     "Documents / knowledge base",
     "Video import",
+    "Multi-platform link import",
     "Advanced models",
   ]) {
     assert.match(comparison, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -150,6 +153,7 @@ test("comparison rows retain the approved plan facts behind the public presentat
     "Documents per knowledge base",
     "Document upload and parsing",
     "Video upload",
+    "Multi-platform link import",
     "Platform-approved model catalog",
     "Advanced model access",
     "Monthly AI credit allowance",
@@ -166,15 +170,16 @@ test("comparison rows retain the approved plan facts behind the public presentat
   assert.deepEqual(rows[2].slice(1), ["10", "No plan-specific cap", "No plan-specific cap", "No plan-specific cap"]);
   assert.deepEqual(rows[3].slice(1), [true, true, true, true]);
   assert.deepEqual(rows[4].slice(1), [false, true, true, true]);
-  assert.deepEqual(rows[5].slice(1), [
+  assert.deepEqual(rows[5].slice(1), [false, true, true, true]);
+  assert.deepEqual(rows[6].slice(1), [
     "One least-cost model per capability",
     "Expanded platform-approved catalog",
     "Expanded platform-approved catalog",
     "Expanded platform-approved catalog",
   ]);
-  assert.deepEqual(rows[6].slice(1), [false, true, true, true]);
-  assert.deepEqual(rows[7].slice(1), ["$0.40", "$1.25", "$2.50", "$5.00"]);
-  rows.slice(8).forEach((row) => assert.deepEqual(row.slice(1), [true, true, true, true]));
+  assert.deepEqual(rows[7].slice(1), [false, true, true, true]);
+  assert.deepEqual(rows[8].slice(1), ["$0.40", "$1.25", "$2.50", "$5.00"]);
+  rows.slice(9).forEach((row) => assert.deepEqual(row.slice(1), [true, true, true, true]));
 });
 
 test("homepage pricing copy is aligned, localized, and provider-cost free", () => {

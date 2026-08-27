@@ -17,12 +17,17 @@ import {
   MARKETING_NAVIGATION,
 } from "./homepageMarketingRefresh";
 
-export function HomePage({ copy }) {
+export function HomePage({ copy, locale, onLocaleChange }) {
   const homepageCopy = applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy));
 
   return (
     <>
-      <SiteHeader copy={homepageCopy} navigation={MARKETING_NAVIGATION} />
+      <SiteHeader
+        copy={homepageCopy}
+        navigation={MARKETING_NAVIGATION}
+        locale={locale}
+        onLocaleChange={onLocaleChange}
+      />
       <main>
         <HeroScene copy={homepageCopy} />
         <FeaturesSection copy={homepageCopy} />

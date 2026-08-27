@@ -26,6 +26,7 @@ const PUBLIC_COMPARISON_CAPABILITIES = Object.freeze([
   "Knowledge bases",
   "Documents per knowledge base",
   "Video upload",
+  "Multi-platform link import",
   "Advanced model access",
 ]);
 
@@ -64,14 +65,14 @@ export function PlatformSection({ copy }) {
             body={copy.platform.intro.body}
           />
         </Reveal>
-        <StaggerGroup className="benefit-grid platform-grid" amount={0.18} stagger={0.075}>
+        <StaggerGroup className="benefit-grid platform-grid" amount={0.12} stagger={0.06}>
           {copy.platform.cards.map(({ title, body }, index) => {
             const Icon = PLATFORM_ICONS[index];
             return (
               <StaggerItem
                 className="benefit-item platform-card"
-                direction={index % 3 === 0 ? "left" : index % 3 === 2 ? "right" : "up"}
-                distance={42}
+                direction="up"
+                distance={18}
                 key={title}
               >
                 <span>
@@ -102,7 +103,6 @@ export function MarketingPricingSection({ copy }) {
       <div className="container">
         <Reveal className="pricing-heading">
           <h2>{copy.pricing.intro.title}</h2>
-          <p>{copy.pricing.intro.body}</p>
         </Reveal>
         <div className="pricing-controls">
           <div className="billing-toggle" role="group" aria-label={copy.pricing.billingAria}>
@@ -116,7 +116,7 @@ export function MarketingPricingSection({ copy }) {
             </button>
             <button
               type="button"
-              className={yearly ? "active" : ""}
+              className={`billing-toggle-yearly ${yearly ? "active" : ""}`}
               aria-pressed={yearly}
               onClick={() => setYearly(true)}
             >
@@ -125,9 +125,6 @@ export function MarketingPricingSection({ copy }) {
             </button>
           </div>
         </div>
-        <p className="pricing-note" aria-live="polite">
-          {copy.pricing.checkout.note}
-        </p>
         <div className="pricing-grid">
           {localizedPlans.map((plan) => (
             <article className="pricing-card" data-plan={plan.key} key={plan.name}>
@@ -204,9 +201,11 @@ export function MarketingComparisonSection({ copy }) {
       <div className="container">
         <Reveal className="comparison-refresh">
           <div className="comparison-intro">
-            <span className="comparison-eyebrow">{copy.comparison.eyebrow}</span>
+            {copy.comparison.eyebrow ? (
+              <span className="comparison-eyebrow">{copy.comparison.eyebrow}</span>
+            ) : null}
             <h2>{copy.comparison.title}</h2>
-            <p>{copy.comparison.description}</p>
+            {copy.comparison.description ? <p>{copy.comparison.description}</p> : null}
           </div>
           <div className="comparison-panel" role="table" aria-label={copy.comparison.tableAria}>
             <div className="comparison-plan-header" role="row">
@@ -245,7 +244,7 @@ export function MarketingComparisonSection({ copy }) {
                           </span>
                         ) : value ? (
                           <span className="comparison-included" aria-label={copy.comparison.included}>
-                            <Check size={15} weight="bold" aria-hidden="true" />
+                            <Check size={19} weight="bold" aria-hidden="true" />
                           </span>
                         ) : (
                           <span

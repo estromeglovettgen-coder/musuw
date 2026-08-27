@@ -65,7 +65,7 @@ function renderBlock(block, index) {
   return <p key={index}>{block.text}</p>;
 }
 
-function ContactPage({ document, copy, locale }) {
+function ContactPage({ document, copy, locale, onLocaleChange }) {
   const [draftState, setDraftState] = useState("idle");
   const [draftHref, setDraftHref] = useState("");
   const isChinese = locale === "zh-CN";
@@ -149,7 +149,7 @@ function ContactPage({ document, copy, locale }) {
 
   return (
     <>
-      <SiteHeader copy={copy} />
+      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} />
       <main className="contact-page">
         <div className="container contact-layout">
           <section className="contact-intro">
@@ -233,9 +233,9 @@ function ContactPage({ document, copy, locale }) {
   );
 }
 
-export function LegalPage({ document, copy, locale }) {
+export function LegalPage({ document, copy, locale, onLocaleChange }) {
   if (document.path === "/contact") {
-    return <ContactPage document={document} copy={copy} locale={locale} />;
+    return <ContactPage document={document} copy={copy} locale={locale} onLocaleChange={onLocaleChange} />;
   }
 
   const labels = locale === "zh-CN"
@@ -244,7 +244,7 @@ export function LegalPage({ document, copy, locale }) {
 
   return (
     <>
-      <SiteHeader copy={copy} />
+      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} />
       <main className="legal-page">
         <div className="legal-glow" aria-hidden="true" />
         <div className="container legal-layout">
@@ -314,10 +314,10 @@ export function LegalPage({ document, copy, locale }) {
   );
 }
 
-export function NotFoundPage({ copy, locale }) {
+export function NotFoundPage({ copy, locale, onLocaleChange }) {
   return (
     <>
-      <SiteHeader copy={copy} />
+      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} />
       <main className="not-found-page">
         <div>
           <span>404</span>

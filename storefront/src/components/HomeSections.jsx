@@ -34,6 +34,7 @@ const PUBLIC_COMPARISON_CAPABILITIES = new Set([
   "Knowledge bases",
   "Documents per knowledge base",
   "Video upload",
+  "Multi-platform link import",
   "Advanced model access"
 ]);
 
@@ -82,7 +83,6 @@ export function CustomerStrip({ copy }) {
 function FeatureStory({ feature, index }) {
   const Icon = feature.icon;
   const reverse = index % 2 === 1;
-  const reduceMotion = useReducedMotion();
 
   return (
     <Reveal className={`feature-story ${reverse ? "feature-story-reverse" : ""}`} amount={0.16}>
@@ -104,27 +104,7 @@ function FeatureStory({ feature, index }) {
           ))}
         </ul>
       </div>
-      <motion.div
-        className="feature-visual"
-        initial={
-          reduceMotion
-            ? false
-            : {
-                opacity: 0,
-                x: reverse ? -86 : 86,
-                rotate: reverse ? -1.4 : 1.4
-              }
-        }
-        whileInView={{ opacity: 1, x: 0, rotate: 0 }}
-        whileHover={reduceMotion ? undefined : { y: -6, rotate: reverse ? -0.6 : 0.6 }}
-        viewport={{ once: true, amount: 0.24 }}
-        transition={{
-          type: "spring",
-          stiffness: 92,
-          damping: 18,
-          mass: 0.82
-        }}
-      >
+      <div className="feature-visual">
         <img
           src={feature.image}
           alt={feature.imageAlt}
@@ -133,7 +113,7 @@ function FeatureStory({ feature, index }) {
           draggable={false}
           loading="lazy"
         />
-      </motion.div>
+      </div>
     </Reveal>
   );
 }
@@ -292,7 +272,6 @@ export function PricingSection({ copy }) {
       <div className="container">
         <Reveal className="pricing-heading">
           <h2>{copy.pricing.intro.title}</h2>
-          <p>{copy.pricing.intro.body}</p>
         </Reveal>
         <div className="pricing-controls">
           <div className="billing-toggle" role="group" aria-label={copy.pricing.billingAria}>
@@ -315,9 +294,6 @@ export function PricingSection({ copy }) {
             </button>
           </div>
         </div>
-        <p className="pricing-note" aria-live="polite">
-          {copy.pricing.checkout.note}
-        </p>
         <div className="pricing-grid">
           {localizedPlans.map((plan) => (
             <article
@@ -403,7 +379,7 @@ function ComparisonTable({ copy }) {
   const sharedCapabilities = chinese
     ? "所有方案都包含有依据的回答、精确引用、AI 整理的 Wiki、知识图谱、资料历史、导出与删除控制。"
     : "Every plan includes grounded answers, exact citations, an AI-organized Wiki, a knowledge graph, source history, export, and deletion controls.";
-  const noPlanCap = chinese ? "套餐不限" : "No plan cap";
+  const noPlanCap = chinese ? "不限" : "Unlimited";
 
   return (
     <Reveal className="comparison-wrap">

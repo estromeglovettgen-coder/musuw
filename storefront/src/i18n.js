@@ -778,6 +778,31 @@ export function getStorefrontCopy(locale) {
   return storefrontTranslations[locale] ?? storefrontTranslations.en;
 }
 
+export function persistLocalePreference(locale) {
+  if (typeof window === "undefined") return;
+  const normalized = locale === "zh-CN" || locale === "zh" ? "zh-CN" : "en";
+  window.__MUSUW_LOCALE__ = normalized;
+  document.cookie = `musuw_locale=${encodeURIComponent(normalized)}; path=/; max-age=31536000; SameSite=Lax`;
+  try {
+    localStorage.setItem("musuw_locale", normalized);
+  } catch {}
+}
+
 export function getInitialLocale() {
-  return typeof window !== "undefined" && window.__MUSUW_LOCALE__ === "zh-CN" ? "zh-CN" : "en";
+  if (typeof window !== "undefined") {
+    if (window.__MUSUW_LOCALE__ === "zh-CN" || window.__MUSUW_LOCALE__ === "zh") return "zh-CN";
+    if (window.__MUSUW_LOCALE__ === "en") return "en";
+    const cookieMatch = document.cookie.match(/(?:^|;\s*)musuw_locale=([^;]+)/);
+    if (cookieMatch) {
+      const val = decodeURIComponent(cookieMatch[1]);
+      if (val === "zh-CN" || val === "zh") return "zh-CN";
+      if (val === "en") return "en";
+    }
+    try {
+      const stored = localStorage.getItem("musuw_locale");
+      if (stored === "zh-CN" || stored === "zh") return "zh-CN";
+      if (stored === "en") return "en";
+    } catch {}
+  }
+  return "en";
 }

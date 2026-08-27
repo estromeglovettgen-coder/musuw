@@ -87,6 +87,24 @@ export function ButtonLink({
   );
 }
 
+export function LanguageSwitcher({ locale = "en", onLocaleChange }) {
+  const isZh = locale === "zh-CN" || locale === "zh";
+
+  return (
+    <div className="lang-switcher">
+      <select
+        className="lang-select"
+        value={isZh ? "zh-CN" : "en"}
+        onChange={(event) => onLocaleChange?.(event.target.value)}
+        aria-label={isZh ? "选择语言" : "Select language"}
+      >
+        <option value="zh-CN">ZH</option>
+        <option value="en">EN</option>
+      </select>
+    </div>
+  );
+}
+
 export function ProductEntryLinks({ authenticated = false, copy = defaultCopy }) {
   if (authenticated) {
     return <ButtonLink href={APP_URL}>{copy.nav.openApp}</ButtonLink>;
@@ -102,13 +120,19 @@ export function ProductEntryLinks({ authenticated = false, copy = defaultCopy })
   );
 }
 
-export function SiteHeader({ copy = defaultCopy, navigation = MARKETING_NAVIGATION }) {
+export function SiteHeader({
+  copy = defaultCopy,
+  navigation = MARKETING_NAVIGATION,
+  locale,
+  onLocaleChange,
+}) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
   const menuButtonRef = useRef(null);
   const reduceMotion = useReducedMotion();
   const labels = publicNavigationLabels(copy);
+  const currentLocale = locale || (copy?.pricing?.currencyCode === "CNY" ? "zh-CN" : "en");
 
   useEffect(() => {
     let mounted = true;
@@ -164,6 +188,7 @@ export function SiteHeader({ copy = defaultCopy, navigation = MARKETING_NAVIGATI
           ))}
         </nav>
         <div className="nav-actions">
+          <LanguageSwitcher locale={currentLocale} onLocaleChange={onLocaleChange} />
           <ProductEntryLinks authenticated={authenticated} copy={copy} />
           <button
             aria-controls={mobileNavId}

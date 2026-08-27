@@ -141,7 +141,7 @@ export function HeroScene({ copy }) {
           transition={subtitleTransition}
         >
           <ButtonLink href={APP_LOGIN_URL}>{copy.hero.getStarted}</ButtonLink>
-          <ButtonLink href="/#demo" variant="secondary">
+          <ButtonLink href="/contact" variant="secondary">
             {copy.hero.talkToSales}
           </ButtonLink>
         </motion.div>

@@ -212,7 +212,8 @@ export const comparisonGroups = [
     title: "Source ingestion",
     rows: [
       ["Document upload and parsing", true, true, true, true],
-      ["Video upload", false, true, true, true]
+      ["Video upload", false, true, true, true],
+      ["Multi-platform link import", false, true, true, true]
     ]
   },
   {

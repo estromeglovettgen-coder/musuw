@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HomePage } from "./HomePage";
-import { getInitialLocale, getStorefrontCopy } from "./i18n";
+import { getInitialLocale, getStorefrontCopy, persistLocalePreference } from "./i18n";
 import { LegalPage, NotFoundPage } from "./LegalPage";
 import { getPublicDocument, getPublicDocumentMeta } from "./legalContent";
 import { applyHomepagePlanPresentation } from "./planPresentation";
@@ -25,7 +25,7 @@ function setMeta(attribute, key, content) {
 }
 
 export default function App() {
-  const locale = useMemo(() => getInitialLocale(), []);
+  const [locale, setLocale] = useState(() => getInitialLocale());
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
   const homeMeta = useMemo(
     () => applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy)).meta,
@@ -34,6 +34,13 @@ export default function App() {
   const pathname = useMemo(() => window.location.pathname, []);
   const publicDocument = useMemo(() => getPublicDocument(locale, pathname), [locale, pathname]);
   const isHome = pathname === "/";
+
+  const handleLocaleChange = useCallback((nextLocale) => {
+    const normalized = nextLocale === "zh-CN" || nextLocale === "zh" ? "zh-CN" : "en";
+    setLocale(normalized);
+    persistLocalePreference(normalized);
+  }, []);
+
   useEffect(() => {
     const meta = publicDocument
       ? getPublicDocumentMeta(locale, pathname)
@@ -104,16 +111,16 @@ export default function App() {
   }, []);
 
   if (publicDocument) {
-    return <LegalPage copy={copy} document={publicDocument} locale={locale} />;
+    return <LegalPage copy={copy} document={publicDocument} locale={locale} onLocaleChange={handleLocaleChange} />;
   }
 
   if (!isHome) {
-    return <NotFoundPage copy={copy} locale={locale} />;
+    return <NotFoundPage copy={copy} locale={locale} onLocaleChange={handleLocaleChange} />;
   }
 
   return (
     <div className="relative">
-      <HomePage copy={copy} />
+      <HomePage copy={copy} locale={locale} onLocaleChange={handleLocaleChange} />
     </div>
   );
 }
