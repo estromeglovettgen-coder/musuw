@@ -1,37 +1,38 @@
 import { HeroScene } from "./components/HeroScene";
 import {
-  BenefitsSection,
-  BlogPreviewSection,
-  ComparisonSection,
   FAQSection,
   FeaturesSection,
   FinalCTA,
-  PricingSection
 } from "./components/HomeSections";
-import { SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
-  applyHomepagePlanPresentation,
-  HOMEPAGE_FOOTER_GROUPS,
-  HOMEPAGE_NAVIGATION
-} from "./planPresentation";
+  MarketingComparisonSection,
+  MarketingPricingSection,
+  PlatformSection,
+} from "./components/HomeRefreshSections";
+import { SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { applyHomepagePlanPresentation } from "./planPresentation";
+import {
+  applyHomepageMarketingRefresh,
+  MARKETING_FOOTER_GROUPS,
+  MARKETING_NAVIGATION,
+} from "./homepageMarketingRefresh";
 
 export function HomePage({ copy }) {
-  const homepageCopy = applyHomepagePlanPresentation(copy);
+  const homepageCopy = applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy));
 
   return (
     <>
-      <SiteHeader copy={homepageCopy} navigation={HOMEPAGE_NAVIGATION} />
+      <SiteHeader copy={homepageCopy} navigation={MARKETING_NAVIGATION} />
       <main>
         <HeroScene copy={homepageCopy} />
         <FeaturesSection copy={homepageCopy} />
-        <BenefitsSection copy={homepageCopy} />
-        <PricingSection copy={homepageCopy} />
-        <ComparisonSection copy={homepageCopy} />
-        <BlogPreviewSection copy={homepageCopy} />
+        <PlatformSection copy={homepageCopy} />
+        <MarketingPricingSection copy={homepageCopy} />
+        <MarketingComparisonSection copy={homepageCopy} />
         <FAQSection copy={homepageCopy} />
         <FinalCTA copy={homepageCopy} />
       </main>
-      <SiteFooter copy={homepageCopy} groups={HOMEPAGE_FOOTER_GROUPS} />
+      <SiteFooter copy={homepageCopy} groups={MARKETING_FOOTER_GROUPS} />
     </>
   );
 }
