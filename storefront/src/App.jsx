@@ -4,6 +4,7 @@ import { getInitialLocale, getStorefrontCopy } from "./i18n";
 import { LegalPage, NotFoundPage } from "./LegalPage";
 import { getPublicDocument, getPublicDocumentMeta } from "./legalContent";
 import { applyHomepagePlanPresentation } from "./planPresentation";
+import { applyHomepageMarketingRefresh } from "./homepageMarketingRefresh";
 import {
   SITE_LOGO_ALT,
   SITE_LOGO_URL,
@@ -26,7 +27,10 @@ function setMeta(attribute, key, content) {
 export default function App() {
   const locale = useMemo(() => getInitialLocale(), []);
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
-  const homeMeta = useMemo(() => applyHomepagePlanPresentation(copy).meta, [copy]);
+  const homeMeta = useMemo(
+    () => applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy)).meta,
+    [copy],
+  );
   const pathname = useMemo(() => window.location.pathname, []);
   const publicDocument = useMemo(() => getPublicDocument(locale, pathname), [locale, pathname]);
   const isHome = pathname === "/";
