@@ -141,13 +141,13 @@ export function HeroScene({ copy }) {
           transition={subtitleTransition}
         >
           <ButtonLink href={APP_LOGIN_URL}>{copy.hero.getStarted}</ButtonLink>
-          <ButtonLink href="/#blog" variant="secondary">
+          <ButtonLink href="/#demo" variant="secondary">
             {copy.hero.talkToSales}
           </ButtonLink>
         </motion.div>
       </div>
 
-      <div className="container hero-stage">
+      <div className="container hero-stage" id="demo">
         <motion.div
           className="dashboard-entry"
           initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
