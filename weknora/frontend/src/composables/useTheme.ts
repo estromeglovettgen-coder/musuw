@@ -61,11 +61,21 @@ function syncWailsNativeChrome(effective: 'light' | 'dark') {
   }
 }
 
+/** The inline canvas in index.html exists only for the pre-paint window.
+ * Once Vue owns the theme, release it so the shared CSS tokens remain the
+ * sole runtime authority across theme switches. */
+function releaseBootCanvas() {
+  document.documentElement.style?.removeProperty('background')
+  document.documentElement.style?.removeProperty('color-scheme')
+  document.body?.style?.removeProperty('background')
+}
+
 function applyTheme(mode: ThemeMode) {
   const effective = mode === 'system' ? getSystemTheme() : mode
   if (lastEffective === effective) return
   lastEffective = effective
   document.documentElement.setAttribute('theme-mode', effective)
+  releaseBootCanvas()
   syncWailsNativeChrome(effective)
 }
 

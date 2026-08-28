@@ -17,11 +17,20 @@
 <body>
 <script>
 (function(){
-  var t=localStorage.getItem('WeKnora_theme')||'light';
+  var userId='anon';
+  try{
+    var rawUser=localStorage.getItem('weknora_user');
+    var parsedUser=rawUser?JSON.parse(rawUser):null;
+    if(parsedUser&&parsedUser.id)userId=String(parsedUser.id);
+  }catch(_){}
+  var legacyThemeKey='WeKnora_theme';
+  var userThemeKey=legacyThemeKey.replace('_theme','_'+userId+'_theme');
+  var anonThemeKey=legacyThemeKey.replace('_theme','_anon_theme');
+  var t=localStorage.getItem(userThemeKey)||localStorage.getItem(anonThemeKey)||localStorage.getItem(legacyThemeKey)||'light';
   if(t==='system')t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
   document.documentElement.setAttribute('theme-mode',t);
-  /* 与 theme.css 中 --td-bg-color-page 一致，避免样式加载后整页背景从 #fff 跳到 #eee 触发重绘闪动 */
-  var bg=t==='dark'?'#181818':'#eee';
+  /* 与 theme.css 的 --musuw-canvas 完全一致，避免 CSS 接管时发生首屏跳色。 */
+  var bg=t==='dark'?'#151619':'#fff';
   document.documentElement.style.background=bg;
   document.documentElement.style.minHeight='100%';
   document.documentElement.style.colorScheme=t==='dark'?'dark':'light';
@@ -32,10 +41,10 @@
     if(w){
       if(t==='dark'){
         if(w.WindowSetDarkTheme)w.WindowSetDarkTheme();
-        if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(24,24,24,255);
+        if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(21,22,25,255);
       }else{
         if(w.WindowSetLightTheme)w.WindowSetLightTheme();
-        if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(238,238,238,255);
+        if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(251,252,254,255);
       }
     }
   }catch(_){}
@@ -67,15 +76,6 @@
 -->
 <script src="/tdesign-icons/0.4.1/fonts/index.js"></script>
 <div id="app"></div>
-<script>
-(function(){
-  var t=localStorage.getItem('WeKnora_theme')||'light';
-  if(t==='system')t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
-  var bg=t==='dark'?'#181818':'#eee';
-  var el=document.getElementById('app');
-  if(el){ el.style.background=bg; el.style.minHeight='100%'; }
-})();
-</script>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
