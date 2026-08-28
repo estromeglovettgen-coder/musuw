@@ -1,41 +1,45 @@
 ## ADDED Requirements
 
-### Requirement: Standard hosted build execution
-CI, Storefront build and deployment, production authorization, and production image construction SHALL run on pinned standard GitHub-hosted AMD64 Linux. The repository MUST NOT route those jobs through a repository variable or require the Beijing build runner.
+### Requirement: Standard hosted delivery execution
+CI, Storefront, production authorization, production image construction, and final production deployment SHALL run on pinned standard GitHub-hosted AMD64 Linux. The repository MUST NOT route delivery through a repository variable, local runner, Beijing runner, Tokyo runner, tunnel, VPN, proxy, or second build service.
 
-#### Scenario: Canonical CI starts
-- **WHEN** a pull request or main push matches the CI paths
-- **THEN** every CI job runs on `ubuntu-24.04` with official Actions caches enabled
+#### Scenario: Canonical main delivery starts
+- **WHEN** a canonical main revision passes CI
+- **THEN** every downstream construction and deployment job runs on `ubuntu-24.04` without a self-hosted runner dependency
 
-#### Scenario: Production construction starts
-- **WHEN** an authorized CI-green main revision enters production construction
-- **THEN** authorization and native AMD64 image construction run on `ubuntu-24.04` without a `musuw-build-x64` dependency
+#### Scenario: Final deployment starts
+- **WHEN** both immutable image digests have passed registry validation
+- **THEN** a GitHub-hosted job connects directly to Tokyo using the protected SSH key, pinned `known_hosts`, and restricted `musuw-deploy` account
 
 ### Requirement: Exact authorized source on hosted construction
-Production authorization SHALL continue to prove the selected full SHA belongs to canonical `origin/main` and has successful CI. The build SHALL use official checkout for exactly that authorized SHA, disable persisted checkout credentials, and fail before construction when `HEAD` differs.
+Production authorization SHALL prove that the selected full SHA belongs to canonical `origin/main` and has successful CI. Construction and deployment SHALL use official checkout for exactly that authorized SHA, disable persisted credentials where ancestry access is unnecessary, and fail before mutation when `HEAD` differs.
 
-#### Scenario: Authorized source is built
+#### Scenario: Authorized source is built and deployed
 - **WHEN** authorization emits a CI-green main SHA
-- **THEN** the build checks out and verifies that exact SHA without a custom source artifact or ranged blob downloader
+- **THEN** build and deploy independently check out and verify that exact SHA without a custom source artifact or ranged downloader
 
 #### Scenario: Source identity differs
-- **WHEN** the hosted build checkout does not equal the authorized SHA
-- **THEN** the job fails before installing dependencies or pushing an image
+- **WHEN** either hosted checkout does not equal the authorized SHA
+- **THEN** the job fails before image publication or production mutation
 
-### Requirement: Hosted-native toolchain and network path
-The production build SHALL validate native AMD64 Docker execution, install the exact `.nvmrc` Node version with the official setup action, use global Debian and Go endpoints, and use only job-scoped BuildKit state. It MUST NOT require Tencent daemon, BuildKit, APT, or Go mirrors or persistent self-hosted toolcache state.
+### Requirement: Official Docker construction with scoped cache
+The production build SHALL use official Docker setup, login, and build/push actions. The app and frontend images SHALL use distinct GitHub Actions cache scopes with maximum-mode export. Cache export failure MAY be ignored as an optimization failure, but checkout, construction, push, digest validation, and deploy SHALL remain fail-closed.
 
-#### Scenario: Cold hosted build
-- **WHEN** a new standard runner begins production construction with no prior workspace or cache
-- **THEN** it obtains the required Node and Buildx toolchain and can build both images from official sources
+#### Scenario: Repeated hosted build
+- **WHEN** a later authorized SHA reuses unchanged application or frontend layers
+- **THEN** each image imports only its own GHA cache scope and exports updated layers to that same scope
 
-### Requirement: Immutable release contract remains unchanged
-Production releases SHALL remain serialized and SHALL retain immutable GHCR tags, remote digest validation, provenance, least-privilege package permissions, isolated production environments, and the restricted exact-SHA server release seam. Only the final SSH deploy job SHALL remain on `musuw-release`.
+#### Scenario: Cache is absent or export fails
+- **WHEN** no prior cache exists or the cache backend cannot accept an export
+- **THEN** the workflow builds from source and continues only if both pushed images and remote digests validate
+
+### Requirement: Immutable restricted release contract
+Production releases SHALL remain serialized and SHALL retain immutable GHCR tags, action-produced digests, remote tag-to-digest equality checks, minimum provenance, OCI source/revision labels, least-privilege package permissions, the isolated production Environment, finite SSH preparation/upload retries, and the restricted exact-SHA server release seam.
 
 #### Scenario: Hosted images pass validation
-- **WHEN** both hosted builds push their immutable tags and their remote digests match build metadata
-- **THEN** the restricted deploy job receives only the approved digest references and releases them through the existing server gate
+- **WHEN** both official build actions push immutable tags and each remote tag resolves to its emitted digest
+- **THEN** the hosted deploy job receives only the approved `repository@sha256` references and releases them through the existing two-verb server gate
 
-#### Scenario: Hosted construction fails
-- **WHEN** checkout, dependency acquisition, image construction, push, or digest validation fails
-- **THEN** the deploy job does not run and the current production release remains unchanged
+#### Scenario: Construction or direct SSH fails
+- **WHEN** checkout, construction, push, digest validation, preparation, upload, or activation fails
+- **THEN** the workflow reports failure without introducing an alternate network or deployment path

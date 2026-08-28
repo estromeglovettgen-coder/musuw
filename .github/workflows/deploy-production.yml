@@ -47,7 +47,7 @@ jobs:
       ci_workflow_run: ${{ steps.resolve.outputs.ci_workflow_run }}
     steps:
       - name: Check out the exact requested revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.immutable_ref }}
           fetch-depth: 0
@@ -119,9 +119,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     outputs:
-      app_digest: ${{ steps.images.outputs.app_digest }}
+      app_digest: ${{ steps.app_image.outputs.digest }}
       app_ref: ${{ steps.images.outputs.app_ref }}
-      frontend_digest: ${{ steps.images.outputs.frontend_digest }}
+      frontend_digest: ${{ steps.frontend_image.outputs.digest }}
       frontend_ref: ${{ steps.images.outputs.frontend_ref }}
     steps:
       - name: Assert native AMD64 build execution
@@ -136,13 +136,8 @@ jobs:
             x86_64|amd64) ;;
             *) printf '%s\n' "production Docker daemon is not native AMD64: $daemon_arch" >&2; exit 1 ;;
           esac
-          docker buildx version
-          docker buildx create --help | grep -Fq -- '--buildkitd-config'
-          docker buildx build --help | grep -Fq -- '--metadata-file'
-          docker buildx build --help | grep -Fq -- '--attest'
-          docker buildx imagetools inspect --help | grep -Fq -- '--format'
       - name: Check out the exact authorized revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.authorize.outputs.release_sha }}
           fetch-depth: 1
@@ -155,7 +150,7 @@ jobs:
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
       - name: Set up Node for production browser build
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -199,102 +194,76 @@ jobs:
           WEKNORA_PRODUCTION_RUNTIME_DIR="$RUNTIME_DIR" \
           WEKNORA_PRODUCTION_REVISION="$RELEASE_SHA" \
             bash scripts/weknora-production/build-static.sh
-      - name: Create job-scoped native AMD64 BuildKit builder
+      - name: Set up official native AMD64 Buildx builder
         id: buildx
-        env:
-          BUILDER_NAME: musuw-production-${{ github.run_id }}-${{ github.run_attempt }}
-          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
-        run: |
-          set -euo pipefail
-          case "$DOCKER_CONFIG" in
-            "$RUNNER_TEMP"/musuw-production-docker-config) ;;
-            *) printf '%s\n' 'temporary Docker configuration escaped runner temp' >&2; exit 1 ;;
-          esac
-          if [ -e "$DOCKER_CONFIG" ] || [ -L "$DOCKER_CONFIG" ]; then
-            test -d "$DOCKER_CONFIG" && test ! -L "$DOCKER_CONFIG"
-            find "$DOCKER_CONFIG" -depth -delete
-          fi
-          install -d -m 700 "$DOCKER_CONFIG"
-          test -f .github/buildkitd.production.toml
-          test ! -L .github/buildkitd.production.toml
-          created_name="$(docker buildx create \
-            --name "$BUILDER_NAME" \
-            --driver docker-container \
-            --buildkitd-config .github/buildkitd.production.toml \
-            --use)"
-          test "$created_name" = "$BUILDER_NAME"
-          docker buildx inspect --builder "$BUILDER_NAME" --bootstrap
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker-container
+          buildkitd-config: .github/buildkitd.production.toml
+          cleanup: true
       - name: Log in to GitHub Container Registry
-        env:
-          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test -d "$DOCKER_CONFIG"
-          test ! -L "$DOCKER_CONFIG"
-          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
-            --username "$GHCR_USERNAME" \
-            --password-stdin
-      - name: Build, push, and validate immutable images
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          logout: true
+      - name: Build and push immutable application image
+        id: app_image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./weknora
+          file: ./integration/weknora-production/Dockerfile.app.runtime
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/estromeglovettgen-coder/musuw-app:${{ needs.authorize.outputs.release_sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
+          build-args: |
+            VERSION_ARG=0.7.2
+            COMMIT_ID_ARG=${{ needs.authorize.outputs.release_sha }}
+            BUILD_TIME_ARG=production-github-hosted-amd64
+            GO_VERSION_ARG=go1.26
+          provenance: mode=min
+          cache-from: type=gha,scope=musuw-app-amd64
+          cache-to: type=gha,mode=max,scope=musuw-app-amd64,ignore-error=true
+      - name: Build and push immutable frontend image
+        id: frontend_image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./integration/weknora-production/Dockerfile.frontend
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/estromeglovettgen-coder/musuw-frontend:${{ needs.authorize.outputs.release_sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
+          build-args: |
+            VERSION_ARG=0.7.2
+            REVISION_ARG=${{ needs.authorize.outputs.release_sha }}
+          provenance: mode=min
+          cache-from: type=gha,scope=musuw-frontend-amd64
+          cache-to: type=gha,mode=max,scope=musuw-frontend-amd64,ignore-error=true
+      - name: Validate immutable image digests
         id: images
         env:
-          BUILDER_NAME: musuw-production-${{ github.run_id }}-${{ github.run_attempt }}
-          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
+          APP_DIGEST: ${{ steps.app_image.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend_image.outputs.digest }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$GITHUB_SERVER_URL" = https://github.com
-          test "$GITHUB_REPOSITORY" = estromeglovettgen-coder/musuw
-          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
-          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
-          test -d "$DOCKER_CONFIG"
-          test ! -L "$DOCKER_CONFIG"
           app_repository=ghcr.io/estromeglovettgen-coder/musuw-app
           frontend_repository=ghcr.io/estromeglovettgen-coder/musuw-frontend
           app_tag="$app_repository:$RELEASE_SHA"
           frontend_tag="$frontend_repository:$RELEASE_SHA"
-          app_metadata="$RUNNER_TEMP/musuw-app-build-metadata.json"
-          frontend_metadata="$RUNNER_TEMP/musuw-frontend-build-metadata.json"
-          provenance="type=provenance,mode=min,inline-only=true,builder-id=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
-          rm -f -- "$app_metadata" "$frontend_metadata"
-          cleanup_metadata() {
-            rm -f -- "$app_metadata" "$frontend_metadata"
-          }
-          trap cleanup_metadata EXIT
-
-          extract_registry_digest() {
-            local metadata_path="$1"
+          validate_registry_digest() {
+            local digest="$1"
             local expected_tag="$2"
             local repository="$3"
-            local digest tag_digest
-            test -f "$metadata_path" || return 1
-            test ! -L "$metadata_path" || return 1
-            digest="$(node - "$metadata_path" "$expected_tag" <<'NODE'
-          const fs = require("node:fs");
-          const [metadataPath, expectedTag] = process.argv.slice(2);
-          const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
-          if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") {
-            throw new Error("Buildx metadata must be an object");
-          }
-          const digest = metadata["containerimage.digest"];
-          if (typeof digest !== "string" || !/^sha256:[0-9a-f]{64}$/.test(digest)) {
-            throw new Error("Buildx metadata has no valid registry digest");
-          }
-          const descriptor = metadata["containerimage.descriptor"];
-          if (descriptor !== undefined &&
-              (!descriptor || Array.isArray(descriptor) || typeof descriptor !== "object" || descriptor.digest !== digest)) {
-            throw new Error("Buildx descriptor digest does not match the registry digest");
-          }
-          const imageNames = metadata["image.name"];
-          if (typeof imageNames !== "string" ||
-              !imageNames.split(",").map((name) => name.trim()).includes(expectedTag)) {
-            throw new Error("Buildx metadata is not bound to the expected immutable tag");
-          }
-          process.stdout.write(digest);
-          NODE
-            )" || return 1
+            local tag_digest
             [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
             docker buildx imagetools inspect "$repository@$digest" >/dev/null || return 1
             tag_digest="$(docker buildx imagetools inspect "$expected_tag" \
@@ -308,71 +277,13 @@ jobs:
                 process.stdout.write(manifest.digest);
               ')" || return 1
             test "$tag_digest" = "$digest" || return 1
-            printf '%s' "$digest"
           }
-
-          docker buildx build \
-            --builder "$BUILDER_NAME" \
-            --platform linux/amd64 \
-            --push \
-            --metadata-file "$app_metadata" \
-            --attest "$provenance" \
-            --tag "$app_tag" \
-            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
-            --build-arg VERSION_ARG=0.7.2 \
-            --build-arg COMMIT_ID_ARG="$RELEASE_SHA" \
-            --build-arg BUILD_TIME_ARG=production-github-hosted-amd64 \
-            --build-arg GO_VERSION_ARG=go1.26 \
-            --file ./integration/weknora-production/Dockerfile.app.runtime \
-            ./weknora
-          app_digest="$(extract_registry_digest "$app_metadata" "$app_tag" "$app_repository")"
-
-          docker buildx build \
-            --builder "$BUILDER_NAME" \
-            --platform linux/amd64 \
-            --push \
-            --metadata-file "$frontend_metadata" \
-            --attest "$provenance" \
-            --tag "$frontend_tag" \
-            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
-            --build-arg VERSION_ARG=0.7.2 \
-            --build-arg REVISION_ARG="$RELEASE_SHA" \
-            --file ./integration/weknora-production/Dockerfile.frontend \
-            .
-          frontend_digest="$(extract_registry_digest "$frontend_metadata" "$frontend_tag" "$frontend_repository")"
-
+          validate_registry_digest "$APP_DIGEST" "$app_tag" "$app_repository"
+          validate_registry_digest "$FRONTEND_DIGEST" "$frontend_tag" "$frontend_repository"
           {
-            printf 'app_digest=%s\n' "$app_digest"
-            printf 'app_ref=%s@%s\n' "$app_repository" "$app_digest"
-            printf 'frontend_digest=%s\n' "$frontend_digest"
-            printf 'frontend_ref=%s@%s\n' "$frontend_repository" "$frontend_digest"
+            printf 'app_ref=%s@%s\n' "$app_repository" "$APP_DIGEST"
+            printf 'frontend_ref=%s@%s\n' "$frontend_repository" "$FRONTEND_DIGEST"
           } >> "$GITHUB_OUTPUT"
-      - name: Remove temporary registry credentials and builder container
-        if: always()
-        env:
-          BUILDER_NAME: musuw-production-${{ github.run_id }}-${{ github.run_attempt }}
-          DOCKER_CONFIG: ${{ runner.temp }}/musuw-production-docker-config
-        run: |
-          set -uo pipefail
-          cleanup_status=0
-          case "$DOCKER_CONFIG" in
-            "$RUNNER_TEMP"/musuw-production-docker-config) ;;
-            *) printf '%s\n' 'temporary Docker cleanup path escaped runner temp' >&2; exit 1 ;;
-          esac
-          if [ -d "$DOCKER_CONFIG" ] && [ ! -L "$DOCKER_CONFIG" ]; then
-            docker logout ghcr.io >/dev/null 2>&1 || cleanup_status=1
-          elif [ -e "$DOCKER_CONFIG" ] || [ -L "$DOCKER_CONFIG" ]; then
-            rm -f -- "$DOCKER_CONFIG" || cleanup_status=1
-          fi
-          if docker buildx inspect --builder "$BUILDER_NAME" >/dev/null 2>&1; then
-            docker buildx rm --force "$BUILDER_NAME" || cleanup_status=1
-          fi
-          if [ -d "$DOCKER_CONFIG" ] && [ ! -L "$DOCKER_CONFIG" ]; then
-            find "$DOCKER_CONFIG" -depth -delete || cleanup_status=1
-          fi
-          exit "$cleanup_status"
       - name: Remove temporary public build inputs
         if: always()
         env:
@@ -391,11 +302,11 @@ jobs:
     permissions:
       contents: read
       packages: read
-    runs-on: musuw-release
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out the exact requested revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.authorize.outputs.release_sha }}
           fetch-depth: 0
@@ -565,7 +476,7 @@ jobs:
           sha256sum "$RUNNER_TEMP/musuw-production-release-manifest.json" > "$RUNNER_TEMP/musuw-production-release-manifest.json.sha256"
       - name: Upload production release evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-release-${{ needs.authorize.outputs.release_sha }}
           path: |

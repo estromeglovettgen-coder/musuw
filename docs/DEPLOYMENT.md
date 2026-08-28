@@ -51,11 +51,12 @@ Live/Sandbox unit is a configuration error.
    verifies `HEAD`, installs the `.nvmrc` Node release with official
    `actions/setup-node`, and builds through global Debian and Go endpoints. It
    pushes the app and frontend images to GHCR and validates their immutable
-   digests. The hosted build receives no production secret or SSH input. Only
-   after it succeeds does the final `musuw-release` job upload the allowlisted
-   server source bundle and those exact refs through the restricted SSH gate. A
-   manual full-SHA dispatch is retained for an exact rerun; tag and branch-name
-   releases are rejected.
+   digests. Official Docker actions use separate GitHub Actions cache scopes
+   for the two images. The hosted build receives no production secret or SSH
+   input. Only after it succeeds does a final `ubuntu-24.04` job upload the
+   allowlisted server source bundle and those exact refs through the restricted
+   SSH gate. A manual full-SHA dispatch is retained for an exact rerun; tag and
+   branch-name releases are rejected.
 5. The server receives a short-lived GitHub token over the restricted stdin
    channel, logs in to GHCR using a temporary Docker config, pulls the exact
    digests, recreates only `app` and `frontend` with `--no-build`, and checks
@@ -109,7 +110,9 @@ with `contents: read` and `packages: write`. It is not attached to the
 pinned host keys, the existing public server environment file, the same three
 repository variables used to generate `auth-public.env`, the validated image
 refs, and a separate job-only token with `packages: read`. The server owns all
-private configuration and never stores that token.
+private configuration and never stores that token. The deploy job also runs on
+standard GitHub-hosted `ubuntu-24.04`; no local or self-hosted runner is part of
+the normal path.
 
 The fixed production Compose file is the only runtime definition. The update
 sequence is GitHub build/push → upload/verify SHA and manifest → GHCR login →
@@ -147,11 +150,10 @@ changes the Cloudflare Worker.
 
 ## Required repository settings
 
-All CI jobs, Storefront build/deploy, and production authorize/build jobs are
-pinned to `ubuntu-24.04`. The repository variable `MUSUW_ACTIONS_RUNNER` has
-been deleted and is no longer required. Only the final production deploy job
-runs on `musuw-release`; the Tokyo production host must never be registered as
-a GitHub Actions runner.
+All CI jobs, Storefront build/deploy, and production authorize/build/deploy
+jobs are pinned to `ubuntu-24.04`. The repository variable
+`MUSUW_ACTIONS_RUNNER` and the `musuw-release` runner label are not required.
+The Tokyo production host must never be registered as a GitHub Actions runner.
 
 Production authorization retains the exact-SHA ancestry and successful-CI
 proof. Production construction checks out that exact SHA with official
@@ -163,17 +165,20 @@ builder dependency.
 The hosted build validates native AMD64 Docker, installs the `.nvmrc` Node
 version with official `actions/setup-node`, and uses global Debian and Go
 sources. It does not require Tencent Docker daemon, BuildKit, APT or Go mirrors,
-preinstalled Node, or persistent runner toolcache state. BuildKit state is
-job-scoped and removed during cleanup; no cross-run BuildKit cache is retained.
+preinstalled Node, or persistent runner-local state. Official
+`docker/setup-buildx-action`, `docker/login-action`, and
+`docker/build-push-action` own setup and cleanup. App and frontend layers use
+separate `type=gha,mode=max` scopes so they cannot overwrite each other's
+cache. Cache export failure is non-fatal; source construction, image push,
+digest validation, and deployment are still fail-closed.
 
-GHCR login uses the job token only over stdin and writes it to a
-runner-temporary `DOCKER_CONFIG`. Each of the two explicit Buildx pushes keeps
-the existing immutable tags, labels, build arguments, native platform and
-provenance. Build metadata must name the expected immutable tag and yield
-matching descriptor and registry digests; the canonical digest and its remote
-tag are resolved from GHCR and must match before deploy receives them. The
-hosted build must not store or receive the production SSH key, host data,
-server environment secrets, or Tokyo credentials.
+GHCR login uses the job token through the official login action and its
+always-running logout cleanup. Each official Buildx push keeps the immutable
+tag, labels, build arguments, native platform and minimum provenance. The
+action digest and its remote immutable tag are resolved from GHCR and must
+match before deploy receives them. The hosted build must not store or receive
+the production SSH key, host data, server environment secrets, or Tokyo
+credentials.
 
 Keep the following values in GitHub settings or on the server, never in checked-in
 files:

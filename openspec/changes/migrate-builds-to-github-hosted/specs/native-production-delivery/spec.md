@@ -1,67 +1,63 @@
 ## MODIFIED Requirements
 
-### Requirement: Native build-only runner routing
-The production workflow SHALL run authorization and native AMD64 image construction on pinned standard `ubuntu-24.04` runners and SHALL run only the final restricted deployment on `musuw-release`. CI and Storefront SHALL also use pinned standard `ubuntu-24.04` runners. No job SHALL require `musuw-build-x64`, repository-variable runner routing, QEMU, or the Tokyo production host as a runner.
+### Requirement: Hosted-only production runner routing
+The production workflow SHALL run authorization, native AMD64 image construction, and final restricted deployment on pinned standard `ubuntu-24.04` runners. CI and Storefront SHALL use the same pinned hosted label. No job SHALL require `musuw-build-x64`, `musuw-release`, repository-variable runner routing, QEMU, or the Tokyo production host as a runner.
 
-#### Scenario: Production build starts natively
-- **WHEN** an authorized production revision reaches construction
+#### Scenario: Production construction starts natively
+- **WHEN** an authorized revision reaches construction
 - **THEN** a fresh hosted job verifies X64 runner, x86_64 kernel, and AMD64 Docker server architecture before building
 
-#### Scenario: General CI is scheduled
-- **WHEN** a CI or Storefront job is evaluated
-- **THEN** it runs on `ubuntu-24.04` without reading a runner-selection repository variable
+#### Scenario: Production deployment is scheduled
+- **WHEN** both validated image references are ready
+- **THEN** the deploy job is scheduled on `ubuntu-24.04` and receives production SSH inputs only through `server-production`
 
 ### Requirement: Secret-free immutable build handoff
-The production workflow SHALL authorize one exact CI-green SHA, build both images in a distinct hosted job, and deploy only after both image outputs validate. The build job SHALL have only `contents: read` and `packages: write`, MUST NOT attach the production Environment or reference a `secrets.*` value, and SHALL accept only the three documented browser-visible repository variables. GHCR authentication SHALL use the job token over stdin and a runner-temporary Docker configuration that always-running cleanup removes. The deploy job SHALL retain only `contents: read` and `packages: read`, consume validated immutable image references, and MUST NOT rebuild them.
+The build job SHALL have only `contents: read` and `packages: write`, MUST NOT attach the production Environment or reference a production `secrets.*` value, and SHALL accept only the three documented browser-visible repository variables. Official GHCR login SHALL use the job token and logout cleanup. The deploy job SHALL retain only `contents: read` and `packages: read`, consume validated immutable image references, and MUST NOT rebuild them.
 
 #### Scenario: Hosted build succeeds
-- **WHEN** both image pushes produce metadata bound to their expected immutable tags and matching remote registry digests
-- **THEN** the build exposes only canonical app/frontend digest references to deploy
+- **WHEN** both image actions emit valid digests and the immutable tags resolve to those digests
+- **THEN** the build exposes canonical app/frontend digest references to deploy
 
 #### Scenario: Build output is incomplete or malformed
-- **WHEN** either image build, metadata check, or remote digest comparison fails
+- **WHEN** either digest is missing, malformed, or differs from the remote immutable tag
 - **THEN** deploy does not run and the current production release remains unchanged
 
-### Requirement: Official same-run exact-SHA source artifact materialization
-The authorization job SHALL retain the full checkout needed to prove successful canonical CI and `origin/main` ancestry. The hosted build SHALL use official `actions/checkout` for exactly the emitted full SHA with persisted credentials disabled and SHALL assert `HEAD` matches before dependency installation or construction. It MUST NOT use the retired source projection, Actions Artifact transport, REST/blob downloader, or ranged requests. The deploy job SHALL retain its own exact-SHA checkout for the manifest-backed restricted upload.
+### Requirement: Official exact-SHA source materialization
+Authorization SHALL retain the full checkout needed for canonical CI and `origin/main` ancestry proof. The hosted build and deploy SHALL use official checkout for exactly the authorized SHA and assert `HEAD` before using source. The workflow MUST NOT use a source projection, Actions Artifact source transport, REST/blob downloader, or ranged request.
 
-#### Scenario: Authorized source is constructed
+#### Scenario: Authorized source is materialized
 - **WHEN** authorization emits a CI-green canonical SHA
-- **THEN** the hosted build checks out and verifies that SHA directly before using source
+- **THEN** the hosted jobs check out and verify that SHA directly before construction or deployment
 
-#### Scenario: Source identity differs
-- **WHEN** the build checkout does not equal the authorized SHA
-- **THEN** the job fails before dependencies, image publication, or production mutation
-
-### Requirement: Bounded persistent local BuildKit cache
-The hosted build SHALL create a uniquely named job-scoped Docker-container builder from the checked-in BuildKit configuration, select it for both native image builds, and remove it without `--keep-state` during always-running cleanup. GHCR credentials SHALL use a separate runner-temporary `DOCKER_CONFIG`. BuildKit SHALL enable GC and run at most two parallel steps. The workflow MUST NOT retain persistent client state, a fixed cache volume, a regional registry mirror, or a separate registry-cache export.
+### Requirement: Bounded official BuildKit cache
+The hosted build SHALL use `docker/setup-buildx-action` with the checked-in BuildKit configuration and cleanup enabled. App and frontend build actions SHALL use separate `type=gha` scopes with `mode=max`; they MUST NOT publish mutable registry cache tags, retain persistent runner-local state, configure a regional mirror, or use a custom Docker credential lifecycle.
 
 #### Scenario: Fresh hosted job starts
-- **WHEN** construction starts without prior runner state
-- **THEN** the job creates and bootstraps its isolated builder from checked-in configuration
+- **WHEN** construction starts without runner-local state
+- **THEN** the official action creates a bounded Docker-container builder and imports any available image-specific GHA cache
 
 #### Scenario: Hosted job finishes or fails
-- **WHEN** always-running cleanup executes
-- **THEN** it removes the job-scoped builder and temporary Docker credentials without preserving cross-run state
+- **WHEN** official post actions run
+- **THEN** they remove the builder and GHCR login from the ephemeral runner without a custom cleanup protocol
 
 ### Requirement: Stable dependency layers and bounded network work
-The application Dockerfile SHALL use the official signed Debian sources from its pinned base images with bounded retries and HTTP/HTTPS timeouts, `proxy.golang.org,direct`, and `sum.golang.org`. It MUST NOT require regional mirror arguments, force HTTPS before the slim runtime can install CA certificates, or disable Go checksum verification. The migrate tool SHALL remain pinned to the application dependency version, and Go build steps SHALL retain module/compiler cache mounts within the job-scoped builder.
+The application Dockerfile SHALL use official signed Debian sources from pinned base images with bounded retries and HTTP/HTTPS timeouts, `proxy.golang.org,direct`, and `sum.golang.org`. It MUST NOT require regional mirror arguments or disable Go checksum verification. Go module/compiler mounts and the external GHA layer cache SHALL preserve reusable dependency work without changing release identity.
 
 #### Scenario: Official dependency endpoint stalls
 - **WHEN** apt or Go dependency acquisition cannot make progress
 - **THEN** bounded retries or request timeouts surface failure and deploy remains unrun
 
-#### Scenario: Release SHA changes
-- **WHEN** a later authorized SHA changes release metadata
-- **THEN** the compiled application and OCI revision remain bound to that exact SHA
+#### Scenario: Release SHA changes without dependency changes
+- **WHEN** a later authorized revision changes only release metadata or application source
+- **THEN** BuildKit may reuse unchanged dependency layers while the compiled application and OCI revision remain bound to the new exact SHA
 
-### Requirement: Serialized activation and safe rollback
-Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially in one hosted build job with the browser V8 old-space ceiling set to 3072 MiB. Official Node setup SHALL install the exact `.nvmrc` version. The final restricted deploy SHALL remain on `musuw-release`. During hosted acceptance and its rollback window, the former Beijing runner SHALL remain registered and unchanged but SHALL NOT be required by any job.
+### Requirement: Serialized activation and safe rerun
+Production releases SHALL remain serialized in one non-cancelling concurrency group. Browser bundles and both images SHALL be built sequentially with the browser V8 old-space ceiling set to 3072 MiB. The final restricted deploy SHALL run on GitHub-hosted Ubuntu and retain the existing finite preparation and upload retries. It MUST NOT blindly retry the final activation command after an ambiguous lost response.
 
 #### Scenario: Two releases are requested
 - **WHEN** a release is active and another is triggered
 - **THEN** the second release cannot construct or deploy concurrently
 
-#### Scenario: Hosted construction fails
-- **WHEN** the cold hosted job exceeds its resource budget or otherwise fails
-- **THEN** deploy remains unrun and workflow rollback can reuse the retained former runner prerequisites
+#### Scenario: Hosted SSH delivery fails
+- **WHEN** the direct hosted connection exhausts its finite safe retries or activation returns failure
+- **THEN** the release fails visibly and an operator may rerun the exact CI-green SHA without adding an alternate delivery system
