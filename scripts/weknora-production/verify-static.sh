@@ -447,18 +447,14 @@ if grep -Fq 'APT_MIRROR_ARG' "$runtime_dockerfile" || grep -Fq 'mirrors.cloud.te
     exit 1
 fi
 
-commit_arg_lines="$(grep -n '^ARG COMMIT_ID_ARG=' "$runtime_dockerfile" | cut -d: -f1)"
-builder_commit_arg_line="$(printf '%s\n' "$commit_arg_lines" | sed -n '1p')"
-runtime_commit_arg_line="$(printf '%s\n' "$commit_arg_lines" | sed -n '2p')"
-builder_source_line="$(grep -n '^COPY \. \.$' "$runtime_dockerfile" | cut -d: -f1)"
-builder_build_line="$(grep -n 'make build-prod' "$runtime_dockerfile" | cut -d: -f1)"
+runtime_revision_arg_line="$(grep -n '^ARG IMAGE_REVISION_ARG=' "$runtime_dockerfile" | cut -d: -f1)"
 runtime_packages_line="$(grep -n 'build-essential postgresql-client' "$runtime_dockerfile" | cut -d: -f1)"
 runtime_label_line="$(grep -n '^LABEL org.opencontainers.image.version=' "$runtime_dockerfile" | cut -d: -f1)"
-if [ -z "$builder_commit_arg_line" ] || [ -z "$runtime_commit_arg_line" ] ||
-   [ "$builder_commit_arg_line" -le "$builder_source_line" ] ||
-   [ "$builder_commit_arg_line" -ge "$builder_build_line" ] ||
-   [ "$runtime_commit_arg_line" -le "$runtime_packages_line" ] ||
-   [ "$runtime_commit_arg_line" -ge "$runtime_label_line" ]; then
+if grep -Fq 'ARG COMMIT_ID_ARG=' "$runtime_dockerfile" ||
+   ! grep -Fq 'COMMIT_ID=runtime' "$runtime_dockerfile" ||
+   [ -z "$runtime_revision_arg_line" ] ||
+   [ "$runtime_revision_arg_line" -le "$runtime_packages_line" ] ||
+   [ "$runtime_revision_arg_line" -ge "$runtime_label_line" ]; then
     printf '%s\n' 'volatile release SHA invalidates stable dependency or runtime package layers' >&2
     exit 1
 fi

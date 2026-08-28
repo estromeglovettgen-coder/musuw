@@ -34,13 +34,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . .
 
 ARG VERSION_ARG=0.7.2
-ARG COMMIT_ID_ARG=local
 ARG BUILD_TIME_ARG=production-source-build
 ARG GO_VERSION_ARG=go1.26
 ARG PRODUCT_EDITION_ARG=lite
 
 ENV VERSION=${VERSION_ARG} \
-    COMMIT_ID=${COMMIT_ID_ARG} \
+    COMMIT_ID=runtime \
     BUILD_TIME=${BUILD_TIME_ARG} \
     GO_VERSION=${GO_VERSION_ARG} \
     EDITION=${PRODUCT_EDITION_ARG}
@@ -96,9 +95,9 @@ COPY --from=builder /app/WeKnora ./WeKnora
 
 RUN chmod +x ./WeKnora ./scripts/*.sh
 
-ARG COMMIT_ID_ARG=local
+ARG IMAGE_REVISION_ARG=local
 LABEL org.opencontainers.image.version="v0.7.2" \
-      org.opencontainers.image.revision="${COMMIT_ID_ARG}"
+      org.opencontainers.image.revision="${IMAGE_REVISION_ARG}"
 
 EXPOSE 8080
 ENTRYPOINT ["./scripts/docker-entrypoint.sh"]

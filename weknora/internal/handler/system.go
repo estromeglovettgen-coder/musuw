@@ -421,6 +421,20 @@ var (
 	GoVersion = "unknown"
 )
 
+var productionRevisionPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+// runtimeCommitID keeps source compilation cacheable across releases while
+// preserving exact production provenance. The release pipeline injects the
+// authorized full Git SHA through the existing production environment file;
+// local and non-production builds keep the compiled fallback.
+func runtimeCommitID() string {
+	revision := strings.TrimSpace(os.Getenv("WEKNORA_PRODUCTION_REVISION"))
+	if productionRevisionPattern.MatchString(revision) {
+		return revision
+	}
+	return CommitID
+}
+
 // GetSystemInfo godoc
 // @Summary      获取系统信息
 // @Description  获取系统版本、构建信息和引擎配置
@@ -471,7 +485,7 @@ func (h *SystemHandler) GetSystemInfo(c *gin.Context) {
 	response := GetSystemInfoResponse{
 		Version:             Version,
 		Edition:             Edition,
-		CommitID:            CommitID,
+		CommitID:            runtimeCommitID(),
 		BuildTime:           BuildTime,
 		GoVersion:           GoVersion,
 		KeywordIndexEngine:  keywordIndexEngine,
