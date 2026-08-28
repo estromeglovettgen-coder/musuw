@@ -81,6 +81,24 @@ stored here.
   occurred. Paddle owns checkout, tax, currency conversion, payment methods,
   dunning, receipts, refunds, and recovery. Musuw only mints a signed checkout
   binding, validates signed events, and mirrors entitlement state.
-- Payout/bank configuration remains intentionally untouched. A real public
-  buyer-support phone and Retain DKIM/Return-Path DNS remain owner-controlled
-  compliance/deliverability follow-ups; neither is represented as complete.
+- Payout/bank configuration remains intentionally untouched. The owner supplied
+  and authorized the real buyer-support phone now published on both localized
+  Contact pages. Retain DKIM/Return-Path DNS remains an owner-controlled
+  deliverability follow-up and is not represented as complete.
+
+## 2026-08-27 historical-binding diagnosis
+
+- A real authenticated Plus-to-Pro attempt reproduced the generic checkout
+  error. The Live public config and current entitlement endpoints both returned
+  HTTP 200, while the server-owned subscription-upgrade preview returned HTTP
+  503.
+- Sanitized production evidence classified the provider lookup as not found,
+  not authentication, permission, rate-limit, or timeout failure. The tenant
+  has a pre-Live customer/subscription binding and an unexpired locally mirrored
+  Plus entitlement; Live Paddle therefore cannot update that historical test
+  subscription.
+- The application correctly fails closed instead of creating a parallel Live
+  subscription or treating the browser as entitlement authority. The safe
+  resolution is an explicitly authorized cleanup of disposable pre-Live test
+  account state, or a fresh Free account for the initial Live checkout. No
+  tenant state was deleted or rewritten during this diagnosis.

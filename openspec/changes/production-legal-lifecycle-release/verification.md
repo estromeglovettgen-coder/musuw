@@ -207,3 +207,21 @@ OpenRouter and reviewer-readiness changes.
   diff checks are recorded in the entitlement verification.
 - No domain/Live application was submitted and no Paddle Dashboard object,
   provider status, real charge, refund, commit, push, or deployment changed.
+
+## 2026-08-27 authorized support-phone publication
+
+- The owner supplied and explicitly authorized the real public buyer-support
+  phone. The unique `LEGAL_OPERATOR` source now publishes it only in the
+  English and Chinese Contact support block, with the visible international
+  format and a normalized `tel:` action; no duplicate footer, secret registry,
+  address, KYC identity, or payment field was added.
+- Red-first legal-content and rendered-storefront contracts failed before the
+  phone existed, then passed after the minimal implementation. The complete
+  storefront production build and all 54 storefront tests passed, as did the
+  tracked secret scan and diff check.
+- Exact-revision CI and Cloudflare storefront delivery for the phone revision
+  reached terminal success. A real Chrome session then rendered both localized
+  Contact pages and verified the visible number and matching clickable `tel:`
+  link. Task 1.6 is complete.
+- This publication made no Paddle credential, catalog, destination, checkout,
+  entitlement, real payment, refund, payout, bank, or provider-state mutation.

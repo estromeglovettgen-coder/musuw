@@ -15,7 +15,7 @@
 - [x] 1.5 Standardize the English and Chinese public storefront footer on the
   exact copyright line `© 2026 musuw. All rights reserved.` through a red-first
   rendered-footer contract and the shared localized footer source.
-- [ ] 1.6 Publish a support phone only after the owner supplies and authorizes a
+- [x] 1.6 Publish a support phone only after the owner supplies and authorizes a
   verified real public business number. Do not invent a phone, address, or KYC
   identity; until then this remains an explicit Paddle review-risk gap.
 - [x] 1.7 Add the public Paddle default-payment-link landing page using only

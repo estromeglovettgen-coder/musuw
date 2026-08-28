@@ -8,7 +8,7 @@ Paddle 资源 ID、credential 值、网络地址或供应商响应原文。
 
 | 阶段 | 当前结论 | 仍需完成 |
 | --- | --- | --- |
-| 网站域名送审 | **`app.musuw.com` 已通过** | 所有公开产品、价格、法律与联系页面已上线；主域若未显示 approved，仍须单独确认。Paddle Seller Handbook 要求同时公开 buyer-support email 和 phone，当前没有经 owner 核验并授权公开的真实 support phone；Domain Review 页面没有把 phone 列为独立表单硬门槛，但缺失仍是审核风险。 |
+| 网站域名送审 | **`app.musuw.com` 已通过** | 所有公开产品、价格、法律与联系页面已上线；主域若未显示 approved，仍须单独确认。Owner 已提供并授权真实 buyer-support phone，英文和中文 Contact 页面均已公开并验证可点击；Domain Review 页面没有把 phone 列为独立表单硬门槛。 |
 | Paddle account verification | **Verification passed** | 2026-08-27 已在 owner 登录的 Live onboarding 页面重新核验；无需重复提交，也不得从代码推断、读取或代填企业/个人资料。 |
 | Live 配置与正式收款 | **Live 已部署并通过无扣款验收** | 3 products/6 prices、Live client/API key、唯一 11-event destination、exact signing secret、`/pay`、Retain 和东京运行时已作为一个 Live-only 单元上线；真实 Checkout 已打开到 Paddle 付款表单后停止，官方 simulation 连续成功。Payout/bank 仍是未触碰的 owner-only 范围。 |
 
@@ -125,9 +125,10 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
 2. **保持已通过的 account verification，不重复提交。** 2026-08-27 登录后的
    Live onboarding 页面显示 `Verification passed`。没有新的官方补件请求时不
    重复上传；仓库不能读取、判断、代填或保存 business/individual/identity 材料。
-3. **补齐真实 support phone。** 这不是当前 Domain Review 帮助页列出的独立
-   表单字段，但 Seller Handbook 明确要求 buyer-support email 与 phone 都在
-   网站清楚可见。没有 owner 提供并授权的真实号码时不得编造。
+3. **保持真实 support phone 公开可达。** 这不是当前 Domain Review 帮助页列出的
+   独立表单字段，但 Seller Handbook 明确要求 buyer-support email 与 phone 都在
+   网站清楚可见。Owner 已提供并授权当前号码；英文和中文 Contact 页面均显示
+   该号码及标准 `tel:` 链接。号码变更仍须由 owner 明确授权，不能推断或编造。
 4. **核对 Live 基础商业选项。** 在 Dashboard 确认 balance currency、
    默认 tax-inclusive/exclusive 行为及要启用的 payment methods。balance currency
    应结合真实 payout account 选择；Paddle 仍负责买家本地币种转换、税额和各
@@ -198,7 +199,7 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
 | 项目 | 阻断级别 | 当前状态 |
 | --- | --- | --- |
 | 公开产品、价格、功能、Terms/Refund/Privacy、HTTPS | 域名审核硬要求 | 公开首页、Contact、Terms、Refund、Privacy 及应用套餐页均已上线并完成公网复核。 |
-| 真实 support phone | Seller Handbook 合规要求/审批风险；不是 Domain Review 页面列出的独立提交字段 | 缺失，等待 owner 提供并授权；不可伪造。 |
+| 真实 support phone | Seller Handbook 合规要求/审批风险；不是 Domain Review 页面列出的独立提交字段 | Owner 已提供并授权；英文和中文 Contact 页面已公开并通过真实浏览器验证显示与 `tel:` 链接。 |
 | reviewer account | Paddle 对登录产品可能要求 | 现有专用英文 fixture；仅可由主交付线程通过安全渠道传凭据。 |
 | business/identity information | account verification 硬阻断 | Dashboard 已显示 verification passed；资料仍属 owner-only，不能读取或从仓库推断。 |
 | 六个 Live recurring prices | Live 结账和 webhook 映射硬阻断 | 3 products/6 active recurring prices 已与运行时六映射和浏览器月/年价格逐项核验；未重复创建。 |
