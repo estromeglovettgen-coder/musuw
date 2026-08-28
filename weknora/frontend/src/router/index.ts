@@ -182,6 +182,12 @@ const router = createRouter({
       meta: { requiresInit: false, requiresAuth: false }
     },
     {
+      path: "/retain",
+      name: "paddleRetainLanding",
+      component: () => import("../views/billing/RetainLanding.vue"),
+      meta: { requiresInit: false, requiresAuth: false }
+    },
+    {
       path: "/platform",
       name: "Platform",
       redirect: authenticatedEntryPath,
