@@ -104,10 +104,14 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(contact, /Billing and refunds/);
   assert.match(contact, /Privacy and security/);
   assert.match(contact, /Merchant review/);
+  assert.match(contact, /\+86 19176942082/);
+  assert.match(contact, /href="tel:\+8619176942082"/);
   assert.match(contactZh, /客户支持/);
   assert.match(contactZh, /账单与退款/);
   assert.match(contactZh, /隐私与安全/);
   assert.match(contactZh, /支付审核/);
+  assert.match(contactZh, /\+86 19176942082/);
+  assert.match(contactZh, /href="tel:\+8619176942082"/);
   assert.match(contactZh, />© 2026 musuw\. All rights reserved\.<\/span>/);
 });
 

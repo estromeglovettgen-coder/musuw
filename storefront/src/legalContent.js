@@ -2,6 +2,7 @@ export const LEGAL_OPERATOR = Object.freeze({
   englishName: "Hangzhou Didren Technology Co., Ltd.",
   chineseName: "杭州地底人科技有限公司",
   supportEmail: "support@didren.com",
+  supportPhone: "+86 19176942082",
   productName: "musuw"
 });
 
@@ -28,6 +29,7 @@ const contact = (label = LEGAL_OPERATOR.supportEmail) => ({
   address: LEGAL_OPERATOR.supportEmail
 });
 const link = (label, href) => ({ type: "link", label, href });
+const phone = (label) => link(label, `tel:${LEGAL_OPERATOR.supportPhone.replaceAll(" ", "")}`);
 const PADDLE_LINKS = Object.freeze({
   buyerTerms: "https://www.paddle.com/legal/buyer-terms",
   refundPolicy: "https://www.paddle.com/legal/refund-policy",
@@ -648,8 +650,9 @@ const englishDocuments = {
       {
         heading: "Customer support",
         blocks: [
-          p(`Email ${LEGAL_OPERATOR.supportEmail}. Include the product, account, and transaction context needed to help; do not send passwords or full card numbers.`),
-          contact("Email customer support")
+          p(`Email ${LEGAL_OPERATOR.supportEmail} or call ${LEGAL_OPERATOR.supportPhone}. Include the product, account, and transaction context needed to help; do not send passwords or full card numbers.`),
+          contact("Email customer support"),
+          phone(`Call ${LEGAL_OPERATOR.supportPhone}`)
         ]
       },
       {
@@ -1278,8 +1281,9 @@ const chineseDocuments = {
       {
         heading: "客户支持",
         blocks: [
-          p(`请发送邮件至 ${LEGAL_OPERATOR.supportEmail}，并提供必要的产品、账户和交易背景；请勿发送密码或完整银行卡号。`),
-          contact("发送支持邮件")
+          p(`请发送邮件至 ${LEGAL_OPERATOR.supportEmail} 或致电 ${LEGAL_OPERATOR.supportPhone}，并提供必要的产品、账户和交易背景；请勿发送密码或完整银行卡号。`),
+          contact("发送支持邮件"),
+          phone(`致电 ${LEGAL_OPERATOR.supportPhone}`)
         ]
       },
       {

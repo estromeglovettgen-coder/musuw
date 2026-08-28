@@ -22,6 +22,7 @@ test("every merchant-review document is public and complete in English and Chine
 
   assert.equal(LEGAL_OPERATOR.englishName, "Hangzhou Didren Technology Co., Ltd.");
   assert.equal(LEGAL_OPERATOR.supportEmail, "support@didren.com");
+  assert.equal(LEGAL_OPERATOR.supportPhone, "+86 19176942082");
   assert.deepEqual(PUBLIC_DOCUMENT_PATHS, requiredRoutes);
   for (const route of requiredRoutes) {
     for (const locale of ["en", "zh-CN"]) {
@@ -52,6 +53,10 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
     assert.match(all, /Hangzhou Didren Technology Co\., Ltd\./);
     assert.match(all, /杭州地底人科技有限公司/);
     assert.match(all, /support@didren\.com/);
+
+    const contactPage = flatten(locale, "/contact");
+    assert.match(contactPage, /\+86 19176942082/);
+    assert.match(contactPage, /tel:\+8619176942082/);
     assert.doesNotMatch(all, locale === "zh-CN" ? /3\s*个工作日/ : /three business days/i);
 
     const refund = flatten(locale, "/refund-policy");
