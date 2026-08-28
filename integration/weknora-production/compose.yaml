@@ -56,6 +56,7 @@ services:
       REDIS_DB: ${REDIS_DB:-0}
       REDIS_PREFIX: ${REDIS_PREFIX:-stream:}
       WEKNORA_REDIS_NAMESPACE: ${WEKNORA_REDIS_NAMESPACE:?set WEKNORA_REDIS_NAMESPACE in production.env}
+      WEKNORA_HOUSEKEEPING_ENABLED: "true"
       DOCREADER_ADDR: ${DOCREADER_ADDR:-docreader:50051}
       DOCREADER_TRANSPORT: ${DOCREADER_TRANSPORT:-grpc}
       STORAGE_TYPE: s3
@@ -115,6 +116,9 @@ services:
         mode: 0400
       - source: oidc_client_secret
         target: oidc_client_secret
+        mode: 0400
+      - source: supabase_service_role_key
+        target: supabase_service_role_key
         mode: 0400
       - source: openrouter_management_api_key
         target: openrouter_management_api_key
@@ -325,6 +329,8 @@ secrets:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/oidc_client_id
   oidc_client_secret:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/oidc_client_secret
+  supabase_service_role_key:
+    file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/supabase_service_role_key
   searxng_secret:
     file: ${WEKNORA_PRODUCTION_SECRET_DIR:?set WEKNORA_PRODUCTION_SECRET_DIR in production.env}/searxng_secret
   openrouter_management_api_key:

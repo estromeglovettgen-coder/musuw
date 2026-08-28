@@ -40,6 +40,7 @@ type AsynqTaskParams struct {
 	DataSourceService       interfaces.DataSourceService
 	EntitlementService      interfaces.EntitlementService
 	PaddleBillingOperations interfaces.PaddleBillingOperationRepository
+	AccountErasure          interfaces.AccountErasureService
 	ChunkExtractor          interfaces.TaskHandler `name:"chunkExtractor"`
 	DataTableSummary        interfaces.TaskHandler `name:"dataTableSummary"`
 	ImageMultimodal         interfaces.TaskHandler `name:"imageMultimodal"`
@@ -305,6 +306,10 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 
 	// Register KB delete handler
 	mux.HandleFunc(types.TypeKBDelete, params.KnowledgeBaseService.ProcessKBDelete)
+
+	// Account erasure reuses the maintenance pool and existing dead-letter
+	// visibility; it is not a second worker service or queue topology.
+	mux.HandleFunc(types.TypeAccountErasure, params.AccountErasure.Process)
 
 	// Register image multimodal handler
 	mux.HandleFunc(types.TypeImageMultimodal, params.ImageMultimodal.Handle)

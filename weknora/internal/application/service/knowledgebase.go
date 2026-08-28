@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 	"time"
@@ -857,10 +858,24 @@ func (s *knowledgeBaseService) applyUserKBPins(
 	})
 }
 
-// DeleteKnowledgeBase deletes a knowledge base by its ID
-// This method marks the knowledge base as deleted and enqueues an async task
-// to handle the heavy cleanup operations (embeddings, chunks, files, graph data)
+// DeleteKnowledgeBase deletes a knowledge base by its ID.
+//
+// The ordinary product path intentionally retains its historical
+// best-effort semantics. Account erasure uses the optional
+// DeleteKnowledgeBaseForAccountErasure extension below, which turns the same
+// existing lifecycle into a fail-closed, retryable cleanup.
 func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id string) error {
+	return s.deleteKnowledgeBase(ctx, id, false)
+}
+
+// DeleteKnowledgeBaseForAccountErasure is the strict account-lifecycle seam.
+// It reuses this service's existing queue, storage, vector and graph cleanup
+// rather than introducing a second deletion state machine.
+func (s *knowledgeBaseService) DeleteKnowledgeBaseForAccountErasure(ctx context.Context, id string) error {
+	return s.deleteKnowledgeBase(ctx, id, true)
+}
+
+func (s *knowledgeBaseService) deleteKnowledgeBase(ctx context.Context, id string, strict bool) error {
 	if id == "" {
 		logger.Error(ctx, "Knowledge base ID is empty")
 		return errors.New("knowledge base ID cannot be empty")
@@ -871,6 +886,9 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 	// Get tenant ID from context
 	tenantID := types.MustTenantIDFromContext(ctx)
 	tenantInfo, _ := types.TenantInfoFromContext(ctx)
+	if strict && tenantInfo == nil {
+		return errors.New("tenant info is required for strict knowledge-base deletion")
+	}
 
 	// Load the KB before soft-delete so we can snapshot its VectorStoreID
 	// into the async cleanup payload. GORM's soft-delete filter hides the
@@ -885,6 +903,42 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 	var vectorStoreIDSnapshot *string
 	if kb != nil {
 		vectorStoreIDSnapshot = kb.VectorStoreID
+	}
+
+	// Strict account erasure already runs inside the durable account-erasure
+	// worker. Reuse the existing cleanup implementation directly instead of
+	// nesting a second queue/state machine; a failure leaves the KB active so
+	// the outer task has all metadata required for an idempotent retry.
+	var dataSourceIDs []string
+	if strict {
+		if err := s.cleanupTasksForKnowledgeBaseStrict(ctx, id, nil, nil); err != nil {
+			return fmt.Errorf("prepare knowledge-base task cleanup: %w", err)
+		}
+		if s.shareRepo != nil {
+			if err := s.shareRepo.DeleteByKnowledgeBaseID(ctx, id); err != nil {
+				return fmt.Errorf("delete knowledge-base shares: %w", err)
+			}
+		}
+		var dsErr error
+		dataSourceIDs, dsErr = s.deleteDataSourcesForKnowledgeBaseStrict(ctx, id)
+		if dsErr != nil {
+			return fmt.Errorf("delete knowledge-base data sources: %w", dsErr)
+		}
+	}
+
+	if strict {
+		payload := types.KBDeletePayload{
+			TenantID:         tenantID,
+			KnowledgeBaseID:  id,
+			DataSourceIDs:    dataSourceIDs,
+			EffectiveEngines: tenantInfo.GetEffectiveEngines(),
+			VectorStoreID:    vectorStoreIDSnapshot,
+			Strict:           true,
+		}
+		langfuse.InjectTracing(ctx, &payload)
+		if err := s.processKBDeleteStrict(ctx, payload); err != nil {
+			return fmt.Errorf("strict knowledge-base cleanup: %w", err)
+		}
 	}
 
 	// Step 1: Delete the knowledge base record first (mark as deleted)
@@ -917,8 +971,10 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 	s.cleanupTasksForKnowledgeBase(kbCleanupCtx, id, nil, nil)
 	cancelKBCleanup()
 
-	// Step 1b: Remove all organization shares for this KB so org settings no longer show them
-	if s.shareRepo != nil {
+	// Step 1b: Remove all organization shares for this KB so org settings no longer show them.
+	// The strict path already completed this before enqueueing its durable task;
+	// keep the ordinary path's best-effort behaviour unchanged.
+	if !strict && s.shareRepo != nil {
 		if delErr := s.shareRepo.DeleteByKnowledgeBaseID(ctx, id); delErr != nil {
 			logger.Warnf(ctx, "Failed to delete KB shares for knowledge base %s: %v", id, delErr)
 		}
@@ -926,7 +982,9 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 
 	// Step 1c: Stop and soft-delete all data sources bound to this KB so cron
 	// schedules and in-flight sync logs do not keep running against a deleted KB.
-	dataSourceIDs := s.deleteDataSourcesForKnowledgeBase(ctx, id)
+	if !strict {
+		dataSourceIDs = s.deleteDataSourcesForKnowledgeBase(ctx, id)
+	}
 	if len(dataSourceIDs) > 0 {
 		dsCancelCtx, cancelDSCancel := context.WithTimeout(
 			context.WithoutCancel(ctx), kbTaskCleanupTimeout,
@@ -935,7 +993,13 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 		cancelDSCancel()
 	}
 
-	// Step 2: Enqueue async task for heavy cleanup operations
+	// Step 2: Enqueue async task for heavy cleanup operations. Strict account
+	// deletion already completed the same cleanup inside its outer durable
+	// worker; this ordinary branch preserves the historical best-effort path.
+	if strict {
+		logger.Infof(ctx, "Strict knowledge base cleanup completed, ID: %s", id)
+		return nil
+	}
 	payload := types.KBDeletePayload{
 		TenantID:         tenantID,
 		KnowledgeBaseID:  id,
@@ -973,6 +1037,9 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
 		logger.Errorf(ctx, "Failed to unmarshal KB delete payload: %v", err)
 		return err
+	}
+	if payload.Strict {
+		return s.processKBDeleteStrict(ctx, payload)
 	}
 
 	tenantID := payload.TenantID
@@ -1133,6 +1200,252 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 	return nil
 }
 
+// processKBDeleteStrict is the account-erasure variant of ProcessKBDelete.
+// It deliberately keeps the same queue payload and service dependencies, but
+// changes the failure contract: no knowledge row is soft-deleted until every
+// vector, physical file/image, chunk, graph and accounting step that can
+// affect the product's active state has either succeeded or been proven
+// already absent. A retry therefore still has the row (and image metadata)
+// needed to finish cleanup.
+func (s *knowledgeBaseService) processKBDeleteStrict(
+	ctx context.Context,
+	payload types.KBDeletePayload,
+) (retErr error) {
+	if strings.TrimSpace(payload.KnowledgeBaseID) == "" || payload.TenantID == 0 {
+		return errors.New("strict KB delete payload is missing tenant or knowledge base")
+	}
+	ctx = context.WithValue(ctx, types.TenantIDContextKey, payload.TenantID)
+	kbID := payload.KnowledgeBaseID
+	var knowledgeIDs []string
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), kbTaskCleanupTimeout)
+		defer cancel()
+		if err := s.cleanupTasksForKnowledgeBaseStrict(cleanupCtx, kbID, knowledgeIDs, payload.DataSourceIDs); err != nil {
+			if retErr == nil {
+				retErr = err
+			} else {
+				retErr = errors.Join(retErr, err)
+			}
+		}
+	}()
+
+	if s.kgRepo == nil {
+		return errors.New("strict KB delete knowledge repository is unavailable")
+	}
+	knowledgeList, err := s.kgRepo.ListKnowledgeByKnowledgeBaseID(ctx, payload.TenantID, kbID)
+	if err != nil {
+		return fmt.Errorf("list knowledge for strict KB delete: %w", err)
+	}
+	knowledgeIDs = make([]string, 0, len(knowledgeList))
+	for _, knowledge := range knowledgeList {
+		if knowledge != nil && strings.TrimSpace(knowledge.ID) != "" {
+			knowledgeIDs = append(knowledgeIDs, knowledge.ID)
+		}
+	}
+	if err := s.cleanupTasksForKnowledgeBaseStrict(ctx, kbID, knowledgeIDs, payload.DataSourceIDs); err != nil {
+		return fmt.Errorf("clean queued work for strict KB delete: %w", err)
+	}
+	if len(knowledgeList) == 0 {
+		return nil
+	}
+
+	type groupKey struct {
+		embeddingModelID string
+		typeName         string
+	}
+	embeddingGroups := make(map[groupKey][]string)
+	for _, knowledge := range knowledgeList {
+		if knowledge == nil || strings.TrimSpace(knowledge.ID) == "" {
+			continue
+		}
+		// Wiki-only rows legitimately have no embedding model and therefore no
+		// vector material to delete.
+		if strings.TrimSpace(knowledge.EmbeddingModelID) == "" {
+			continue
+		}
+		key := groupKey{embeddingModelID: knowledge.EmbeddingModelID, typeName: knowledge.Type}
+		embeddingGroups[key] = append(embeddingGroups[key], knowledge.ID)
+	}
+	if len(embeddingGroups) > 0 {
+		// An unbound store with no captured effective engine would otherwise
+		// create an empty composite engine whose delete is a silent no-op. In
+		// strict account erasure that is indistinguishable from orphaning the
+		// user's vectors, so retain the rows and let the outer task retry.
+		hasBoundStore := payload.VectorStoreID != nil && strings.TrimSpace(*payload.VectorStoreID) != ""
+		if !hasBoundStore && len(payload.EffectiveEngines) == 0 {
+			return errors.New("strict KB delete vector cleanup engine configuration is unavailable")
+		}
+		// Resolve and delete vectors first. The factory enforces the bound
+		// store's tenant ownership; unknown/unavailable engines remain retryable.
+		if s.retrieveEngine == nil {
+			return errors.New("strict KB delete retrieve engine is unavailable")
+		}
+		retrieveEngine, err := retriever.CreateRetrieveEngineFromPayload(
+			ctx,
+			s.retrieveEngine,
+			s.ownership,
+			payload.TenantID,
+			payload.EffectiveEngines,
+			payload.VectorStoreID,
+		)
+		if err != nil {
+			return fmt.Errorf("resolve vector cleanup engine: %w", err)
+		}
+		for key, ids := range embeddingGroups {
+			if s.modelService == nil {
+				return errors.New("strict KB delete model service is unavailable")
+			}
+			embeddingModel, err := s.modelService.GetEmbeddingModel(ctx, key.embeddingModelID)
+			if err != nil {
+				return fmt.Errorf("resolve embedding model for strict KB delete: %w", err)
+			}
+			if embeddingModel == nil {
+				return errors.New("strict KB delete embedding model is unavailable")
+			}
+			if err := retrieveEngine.DeleteByKnowledgeIDList(ctx, ids, embeddingModel.GetDimensions(), key.typeName); err != nil {
+				return fmt.Errorf("delete vectors for strict KB delete: %w", err)
+			}
+		}
+	}
+
+	// Capture image references before touching chunks. Invalid metadata is a
+	// hard error in strict mode: silently dropping it would make a successful
+	// local purge impossible to distinguish from an orphaned object.
+	if s.chunkRepo == nil {
+		return errors.New("strict KB delete chunk repository is unavailable")
+	}
+	chunkImageInfos, err := s.chunkRepo.ListImageInfoByKnowledgeIDs(ctx, payload.TenantID, knowledgeIDs)
+	if err != nil {
+		return fmt.Errorf("list image metadata for strict KB delete: %w", err)
+	}
+	imageInfoStrs := make([]string, 0, len(chunkImageInfos))
+	for _, info := range chunkImageInfos {
+		imageInfoStrs = append(imageInfoStrs, info.ImageInfo)
+	}
+	imageURLs, err := collectImageURLsStrict(imageInfoStrs)
+	if err != nil {
+		return fmt.Errorf("parse image_info for strict KB delete: %w", err)
+	}
+
+	// Delete physical files and extracted images before chunks. Keeping chunk
+	// metadata until these calls succeed makes retries safe even for local file
+	// drivers that do not expose an object-exists probe.
+	if s.fileSvc == nil {
+		for _, knowledge := range knowledgeList {
+			if knowledge != nil && strings.TrimSpace(knowledge.FilePath) != "" {
+				return errors.New("strict KB delete file service is unavailable")
+			}
+		}
+		if len(imageURLs) > 0 {
+			return errors.New("strict KB delete file service is unavailable")
+		}
+	}
+	for _, knowledge := range knowledgeList {
+		if knowledge == nil || strings.TrimSpace(knowledge.FilePath) == "" {
+			continue
+		}
+		if err := deleteFileIdempotent(ctx, s.fileSvc, knowledge.FilePath); err != nil {
+			return fmt.Errorf("delete source file for strict KB delete: %w", err)
+		}
+	}
+	for _, imageURL := range imageURLs {
+		if err := deleteFileIdempotent(ctx, s.fileSvc, imageURL); err != nil {
+			return fmt.Errorf("delete extracted image for strict KB delete: %w", err)
+		}
+	}
+
+	for _, knowledgeID := range knowledgeIDs {
+		if err := s.chunkRepo.DeleteChunksByKnowledgeID(ctx, payload.TenantID, knowledgeID); err != nil {
+			return fmt.Errorf("delete chunks for strict KB delete: %w", err)
+		}
+	}
+
+	if s.graphEngine == nil {
+		return errors.New("strict KB delete graph repository is unavailable")
+	}
+	namespaces := make([]types.NameSpace, 0, len(knowledgeList))
+	for _, knowledge := range knowledgeList {
+		if knowledge == nil {
+			continue
+		}
+		namespaces = append(namespaces, types.NameSpace{
+			KnowledgeBase: knowledge.KnowledgeBaseID,
+			Knowledge:     knowledge.ID,
+		})
+	}
+	if len(namespaces) > 0 {
+		if err := s.graphEngine.DelGraph(ctx, namespaces); err != nil {
+			return fmt.Errorf("delete graph for strict KB delete: %w", err)
+		}
+	}
+
+	// Account erasure hard-deletes the tenant after this worker completes, so
+	// updating its storage counter would be wasted work and, on a retry between
+	// the counter update and row deletion, could be applied twice.
+	if err := s.kgRepo.DeleteKnowledgeList(ctx, payload.TenantID, knowledgeIDs); err != nil {
+		return fmt.Errorf("delete knowledge rows for strict KB delete: %w", err)
+	}
+	return nil
+}
+
+// collectImageURLsStrict is the fail-closed counterpart of the ordinary
+// best-effort parser. It treats malformed JSON and nil image entries as
+// retryable errors rather than silently losing the only reference to an
+// extracted object.
+func collectImageURLsStrict(imageInfos []string) ([]string, error) {
+	seen := make(map[string]struct{})
+	urls := make([]string, 0)
+	for _, info := range imageInfos {
+		if strings.TrimSpace(info) == "" {
+			continue
+		}
+		var images []*types.ImageInfo
+		if err := json.Unmarshal([]byte(info), &images); err != nil {
+			return nil, err
+		}
+		for _, image := range images {
+			if image == nil {
+				return nil, errors.New("image_info contains a null image entry")
+			}
+			if image.URL == "" {
+				continue
+			}
+			if _, ok := seen[image.URL]; ok {
+				continue
+			}
+			seen[image.URL] = struct{}{}
+			urls = append(urls, image.URL)
+		}
+	}
+	return urls, nil
+}
+
+// deleteFileIdempotent treats an object that is already gone as success. This
+// is required for strict retries after a worker crashed between deleting a
+// physical object and deleting the corresponding knowledge row. Provider
+// drivers vary in their not-found wording, so only well-known absence errors
+// are normalized; all other failures remain retryable.
+func deleteFileIdempotent(ctx context.Context, fileSvc interfaces.FileService, path string) error {
+	if fileSvc == nil {
+		return errors.New("file service is unavailable")
+	}
+	err := fileSvc.DeleteFile(ctx, path)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "file not found") ||
+		strings.Contains(lower, "resource not found") ||
+		strings.Contains(lower, "object not found") ||
+		strings.Contains(lower, "no such file") {
+		return nil
+	}
+	return err
+}
+
 // cancelTasksForKnowledgeBase removes queue work for a deleted KB when the
 // configured task backend supports knowledge-base-wide inspection. Queue
 // cleanup is an optimization: the soft-deleted database row remains the
@@ -1176,6 +1489,32 @@ func (s *knowledgeBaseService) cleanupTasksForKnowledgeBase(
 	s.cancelTasksForKnowledgeBase(ctx, kbID, knowledgeIDs, dataSourceIDs)
 }
 
+// cleanupTasksForKnowledgeBaseStrict is the fail-closed counterpart used by
+// account erasure. The durable task-pending repository is authoritative when
+// present; the Redis inspector is an optimization in Lite mode, so its
+// absence is acceptable, but an implementation error is not.
+func (s *knowledgeBaseService) cleanupTasksForKnowledgeBaseStrict(
+	ctx context.Context,
+	kbID string,
+	knowledgeIDs []string,
+	dataSourceIDs []string,
+) error {
+	if strings.TrimSpace(kbID) == "" {
+		return errors.New("knowledge base ID is required for strict task cleanup")
+	}
+	if cleaner, ok := s.taskPendingRepo.(interfaces.TaskPendingOpsScopeCleaner); ok {
+		if err := cleaner.DeleteByScope(ctx, types.TaskScopeKnowledgeBase, kbID); err != nil {
+			return err
+		}
+	}
+	if canceller, ok := s.taskInspector.(interfaces.KnowledgeBaseTaskCanceller); ok {
+		if _, _, err := canceller.CancelTasksForKnowledgeBase(ctx, kbID, knowledgeIDs, dataSourceIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // deleteDataSourcesForKnowledgeBase mirrors DataSourceService.DeleteDataSource for
 // every data source attached to the KB. Errors on individual sources are logged
 // but do not fail KB deletion — the KB record is already soft-deleted.
@@ -1210,6 +1549,47 @@ func (s *knowledgeBaseService) deleteDataSourcesForKnowledgeBase(ctx context.Con
 		logger.Infof(ctx, "Data source deleted with knowledge base: ds=%s kb=%s", ds.ID, kbID)
 	}
 	return dataSourceIDs
+}
+
+// deleteDataSourcesForKnowledgeBaseStrict performs the same existing
+// datasource lifecycle as ordinary KB deletion, but propagates every failure
+// so account erasure cannot purge a tenant while a datasource or its pending
+// sync work is still live. Already-soft-deleted rows are naturally absent on
+// a retry, making the operation idempotent.
+func (s *knowledgeBaseService) deleteDataSourcesForKnowledgeBaseStrict(
+	ctx context.Context,
+	kbID string,
+) ([]string, error) {
+	if s.dsRepo == nil {
+		return nil, nil
+	}
+	dataSources, err := s.dsRepo.FindByKnowledgeBase(ctx, kbID)
+	if err != nil {
+		return nil, err
+	}
+	dataSourceIDs := make([]string, 0, len(dataSources))
+	for _, ds := range dataSources {
+		if ds == nil || strings.TrimSpace(ds.ID) == "" {
+			continue
+		}
+		dataSourceIDs = append(dataSourceIDs, ds.ID)
+		// Cancel sync logs before soft-deleting the datasource. If cancellation
+		// fails, the active row and its ID remain discoverable on the next
+		// strict retry; deleting first would lose the only durable reference
+		// needed to stop an in-flight sync.
+		if s.syncLogRepo != nil {
+			if err := s.syncLogRepo.CancelPendingByDataSource(ctx, ds.ID); err != nil {
+				return dataSourceIDs, err
+			}
+		}
+		if err := s.dsRepo.Delete(ctx, ds.ID); err != nil {
+			return dataSourceIDs, err
+		}
+		if s.dsScheduler != nil {
+			s.dsScheduler.Remove(ds.ID)
+		}
+	}
+	return dataSourceIDs, nil
 }
 
 // SetEmbeddingModel sets the embedding model for a knowledge base

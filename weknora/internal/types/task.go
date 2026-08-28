@@ -84,6 +84,7 @@ var queueDefinitions = []QueueDefinition{
 	{Name: QueueMaintenance, Pool: WorkerPoolMaintenance, Weight: 1, TaskTypes: []string{
 		TypeFAQImport, TypeKBClone, TypeIndexDelete, TypeKBDelete,
 		TypeKnowledgeListDelete, TypeKnowledgeListReparse, TypeKnowledgeMove,
+		TypeAccountErasure,
 	}},
 	{Name: QueueWiki, Pool: WorkerPoolWiki, Weight: 1, TaskTypes: []string{TypeWikiIngest, TypeWikiFinalize}},
 }
@@ -252,6 +253,7 @@ const (
 	TypeWikiIngest               = "wiki:ingest"                // Wiki 页面同步任务
 	TypeWikiFinalize             = "wiki:finalize"              // Wiki KB 级收尾任务（防抖：索引重建/死链清理/交叉链接）
 	TypeTemporaryDocumentProcess = "temporary_document:process" // 会话临时文档解析任务
+	TypeAccountErasure           = "account:erase"              // durable consumer account erasure
 )
 
 // ExtractChunkPayload represents the extract chunk task payload
@@ -408,6 +410,11 @@ type KBDeletePayload struct {
 	KnowledgeBaseID  string                  `json:"knowledge_base_id"`
 	DataSourceIDs    []string                `json:"data_source_ids,omitempty"`
 	EffectiveEngines []RetrieverEngineParams `json:"effective_engines"`
+	// Strict is set only by the account-erasure lifecycle. Ordinary KB deletes
+	// retain their historical best-effort semantics; strict workers return an
+	// error on any external cleanup failure and leave the knowledge rows in
+	// place so Asynq can retry safely.
+	Strict bool `json:"strict,omitempty"`
 	// VectorStoreID is the bound store snapshot taken at enqueue time (before
 	// soft-delete) so the async worker can resolve the right store. nil means
 	// the KB had no binding — falls back to EffectiveEngines.

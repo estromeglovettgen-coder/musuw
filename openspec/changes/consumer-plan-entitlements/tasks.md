@@ -44,3 +44,11 @@
 - [ ] 4.18 Verify stateless repeated checkout input, repeated upgrades across replicas, uncertain subscription-update responses, upgrade-operation reuse, unsafe multi-item/unknown-item subscriptions, and signed-webhook authority in the Paddle Sandbox
 - [x] 4.19 Implement the separately reviewed Live full-refund/chargeback entitlement policy through signed adjustment events and the minimum official provider-state read for reversal; add no financial ledger or payment write
 - [x] 4.20 Verify refund, chargeback, reversal, and official Retain behavior through local signed policy fixtures plus provider-supported no-charge Live evidence; never create a real financial action
+
+## 5. Consumer account erasure
+
+- [x] 5.1 Add failing backend contract tests for operations-only target deletion, SystemAdmin/platform-capability routing, shared-owner/system-admin rejection, Paddle read-only billing preflight, immediate login/token fencing, deterministic enqueue, and retry/idempotency
+- [x] 5.2 Persist the bound OIDC provider subject plus one deletion-request fence in PostgreSQL and SQLite, and prevent a mismatched subject from taking over an existing email
+- [x] 5.3 Implement one account-erasure service/task that reuses knowledge, OpenRouter, storage, queue, and tenant cleanup, removes ordinary foreign memberships, calls the server-only Supabase Admin delete API, and hard-purges the local personal tenant/user in an explicit dependency order
+- [x] 5.4 Add one visible destructive button only to the local operations user console, with one irreversible confirmation and a clear Paddle-billing blocker; expose no self-service profile action
+- [x] 5.5 Verify focused tests, race/static contracts, full relevant backend/frontend tests, production build, migration symmetry, and a synthetic no-funds erasure/re-registration lifecycle; do not delete a real production account

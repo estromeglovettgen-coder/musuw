@@ -1,5 +1,34 @@
 # Verification Report: consumer-plan-entitlements
 
+## 2026-08-28 operations-only account erasure (pre-release)
+
+- The only product action is one visible `彻底注销` button in the existing
+  operations user console. The backend route remains under the SystemAdmin
+  control plane and tenant-management capability. There is no consumer profile
+  action, personal-email confirmation flow, or browser-supplied provider,
+  billing, or tenant coordinate.
+- Preflight performs only an official Paddle subscription read. Billable
+  active, trialing, past-due, or paused state blocks deletion; the erasure path
+  cannot cancel, refund, charge, transfer, or otherwise mutate Paddle state.
+- One persisted deletion fence revokes local tokens and drives one existing
+  maintenance task. Recovery reuses existing housekeeping and the same
+  deterministic task identity; no second queue, operation state machine, or
+  dead-letter system was added. Knowledge, file, vector, graph, OpenRouter,
+  Supabase Admin, and local-row cleanup reuse their existing service/provider
+  boundaries and fail closed before final identity removal.
+- PostgreSQL and SQLite migration-pair tests, focused account-erasure tests,
+  race-enabled service/repository/handler/router/type tests, server build,
+  frontend test/typecheck/build, operations static contract, production static
+  preflight, workflow/deploy contracts, strict OpenSpec validation, and the
+  staged secret-prefix scan passed. A current-schema synthetic lifecycle
+  hard-purged the personal tenant/user and then registered the same local email
+  and username under a fresh provider subject.
+- The complete local Go suite now passes every package except the unchanged
+  Feishu Wiki log-format assertion already reproduced on the clean baseline;
+  the previously environment-blocked DeepSeek package passes after the local
+  Clash DIRECT/fake-IP exclusion. No real production user was deleted and no
+  provider identity or financial object was mutated for this evidence.
+
 ## 2026-08-27 Paddle Live entitlement and Retain evidence
 
 - The separately reviewed Live cutover deployed the same signed-event

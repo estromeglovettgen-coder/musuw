@@ -138,6 +138,16 @@ type KnowledgeBaseService interface {
 	ProcessKBDelete(ctx context.Context, t *asynq.Task) error
 }
 
+// StrictKnowledgeBaseDeleter is an optional extension used by account
+// erasure. Ordinary knowledge-base deletion intentionally remains
+// best-effort for backwards compatibility, while the account lifecycle must
+// keep the database row until every external resource cleanup has succeeded.
+// Keeping this as a separate interface avoids widening the long-standing
+// KnowledgeBaseService test/adapter contract.
+type StrictKnowledgeBaseDeleter interface {
+	DeleteKnowledgeBaseForAccountErasure(ctx context.Context, id string) error
+}
+
 // KnowledgeBaseRepository defines the knowledge base repository interface
 // Responsible for knowledge base data persistence and retrieval,
 // serving as a bridge between the service layer and data storage

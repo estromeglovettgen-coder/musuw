@@ -30,7 +30,7 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(document.path, route);
       assert.ok(document.title.length >= 4);
       assert.ok(document.summary.length >= 30);
-      assert.equal(document.updated, "2026-08-24");
+      assert.equal(document.updated, "2026-08-27");
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
 
@@ -92,6 +92,50 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
       : [/collect/i, /purpose/i, /retain/i, /international/i, /rights/i, /delete/i]) {
       assert.match(privacy, concept);
     }
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /客服渠道|support@didren\.com/
+        : /support channel|support@didren\.com/i,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /获授权的运营人员.*受限内部功能/
+        : /authorized operations staff.*restricted/i,
+    );
+    assert.doesNotMatch(
+      privacy,
+      locale === "zh-CN" ? /设置.*用户信息.*删除账号/ : /Settings.*Profile.*Delete account/i,
+    );
+    assert.doesNotMatch(
+      privacy,
+      locale === "zh-CN"
+        ? /标准化邮箱/
+        : /exact normalized current account email/i,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /Paddle.*商户记录方|商户记录方.*Paddle/
+        : /Paddle.*Merchant of Record|Merchant of Record.*Paddle/i,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /发票.*交易记录|交易记录.*发票/
+        : /invoices?.*transaction records?|transaction records?.*invoices?/i,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /税务.*会计.*反欺诈.*拒付|反欺诈.*拒付.*争议/
+        : /tax.*accounting.*fraud.*chargeback|fraud.*chargeback.*dispute/i,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN" ? /各自.*留存期限/ : /own retention periods/i,
+    );
     for (const provider of ["Supabase", "Resend", "Google", "Cloudflare", "OpenRouter", "Langfuse", "Paddle"]) {
       assert.match(privacy, new RegExp(provider));
     }

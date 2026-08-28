@@ -1,6 +1,6 @@
 ## Context
 
-Musuw already has tenant storage quotas, tenant-scoped repositories, native model factories, one OpenRouter-backed provider path, and an Asynq/Redis worker topology. It lacks a consumer plan source of truth, per-tenant model/spend enforcement, and a real relationship between the storefront's four price cards and product behavior. Paddle Live has not been authorized for launch; the current checked deployment stage therefore uses Sandbox as one complete environment unit, while payment setup remains optional outside Musuw's fixed production overlay and must not weaken enforcement. This delta adds the smallest reliable handoff for signed webhooks, stateless signed checkout input, a durable paid-upgrade operation identity, and the exact one-item subscription invariant without introducing a financial reconciliation subsystem or general billing ledger.
+Musuw already has tenant storage quotas, tenant-scoped repositories, native model factories, one OpenRouter-backed provider path, and an Asynq/Redis worker topology. It lacks a consumer plan source of truth, per-tenant model/spend enforcement, and a real relationship between the storefront's four price cards and product behavior. The sibling `enable-paddle-live-production` change has since authorized and deployed the fixed production Live unit, while Sandbox remains development/test-only. This delta adds the smallest reliable handoff for signed webhooks, stateless signed checkout input, a durable paid-upgrade operation identity, and the exact one-item subscription invariant without introducing a financial reconciliation subsystem or general billing ledger.
 
 ## Goals / Non-Goals
 
@@ -12,6 +12,7 @@ Musuw already has tenant storage quotas, tenant-scoped repositories, native mode
 - Keep account and usage settings compact, place plan comparison on a dedicated page, and add the smallest secure Paddle-hosted checkout, self-service portal, and subscription synchronization seam for configured environments.
 - Acknowledge verified webhooks within Paddle's five-second callback contract after durable, retryable handoff; leave tenant database event markers as the final entitlement idempotency guard.
 - Delegate initial self-service transaction creation to Paddle.js and serialize only the paid subscription-update mutation; never blindly repeat that provider mutation after an uncertain response.
+- Give operations one bounded account-erasure action that removes Musuw-controlled active product state without inventing billing or identity flows already owned by Paddle and Supabase.
 
 **Non-Goals:**
 
@@ -19,7 +20,8 @@ Musuw already has tenant storage quotas, tenant-scoped repositories, native mode
 - User-supplied API keys, request-price estimates, a general-purpose queue, or historical usage events; the existing Asynq queue is used only for bounded billing handoff and retry.
 - Restoring the video feature skipped in Task 2.
 - Building admin subscription management, a custom checkout UI, or custom invoice/payment-method/cancellation screens.
-- Paddle Live cutover or Retain feature activation; both require a later reviewed change after the Sandbox launch stage.
+- Re-implementing the separately reviewed Paddle Live cutover or Paddle Retain; this change consumes those provider-owned production capabilities through the existing integration seams.
+- Silently canceling, refunding, or otherwise mutating an active Paddle subscription; erasing immutable provider invoices; deleting a Google identity; or promising immediate physical removal from bounded backups and legally required fraud, tax, dispute, and security records.
 
 ## Decisions
 
@@ -40,6 +42,16 @@ Knowledge-base creation, all upload entry points, model listing/resolution, and 
 On first inference, the entitlement service uses OpenRouter's official Go SDK to create one child key named for the tenant with `limit_reset: null`. Its absolute limit is lifetime usage plus the current period allowance. The existing tenant-row transaction installs the first winner and the first credit-period end together; a concurrent loser is deleted at OpenRouter. No shared inference key or BYOK fallback exists. The stored key is encrypted at rest and never serialized to consumers.
 
 A small transport wrapper obtains that tenant key, replaces the outbound authorization header, and injects the documented stable `user` identifier into JSON requests. Existing chat, embedding, rerank, vision, and speech clients receive this HTTP client; provider behavior and response parsing otherwise remain unchanged. OpenRouter HTTP/SSE credit exhaustion is converted into one typed terminal error so chat closes cleanly and ingestion uses WeKnora's native failed/reparse lifecycle without futile retries.
+
+### Erase one personal account through existing lifecycle seams
+
+Expose one `DELETE /api/v1/system/admin/users/:user_id` action only in the existing local operations console and SystemAdmin control plane. The route uses the existing SystemAdmin/platform-key tenant-management authority; the selected user ID comes from the managed-user row and the request contains no tenant, Paddle, or provider coordinate. System-administrator targets, organization owners, and personal workspaces with another active member fail closed; ordinary workspace and organization memberships are removed automatically without deleting shared state.
+
+The user row carries only the two identity coordinates required for deletion (`identity_provider` and the provider subject) plus one `deletion_requested_at` fence. OIDC login stores or validates the Supabase subject when it already owns the same verified email. A deletion request first performs a read-only Paddle subscription lookup; when a customer is bound, the official customer-filtered subscription inventory is authoritative even if the local subscription ID is absent. A provider subscription in an active, trialing, past-due, or paused lifecycle blocks deletion and returns the existing Paddle hosted-portal path; a provider-confirmed terminal subscription, empty customer inventory, or an official not-found result for disposable pre-launch data may proceed. An unavailable or ambiguous provider read fails closed. The deletion endpoint never submits a Paddle mutation.
+
+After preflight, one existing task keyed by user ID is the durable coordinator. The request atomically marks the user inactive/deletion-pending and revokes all local tokens, then enqueues the task; the durable marker lets the existing housekeeping loop restore a missed enqueue without adding a parallel queue, dead-letter subsystem, or operation state machine. Lite mode honors the same task ID while work is in flight. Login, refresh, checkout, and inference reject the fenced user. The worker is idempotent: it removes memberships in other workspaces and organizations, runs the existing strict knowledge-base cleanup to completion for the owned personal workspace, removes the OpenRouter child key before local tenant state, deletes tenant-scoped objects/credentials/API tokens/tasks and user-scoped sessions/preferences, calls Supabase's server-only Admin user deletion by the bound subject, then hard-deletes the local tenant and user rows so their unique email and username are reusable. A transient provider, storage, database, or queue failure retries and leaves the account fenced; it never reports completion while active product state remains.
+
+The erasure repository owns one explicit, tested dependency order for Musuw-controlled rows instead of scattering `DELETE` statements through handlers. Multi-purpose rows that must survive for tax, dispute, anti-fraud, or security obligations are detached from the user and minimized rather than presented as active product data. The operations UI uses a visible destructive button plus one irreversible confirmation and reports acceptance only after the server persists the fence. No browser receives a Supabase admin credential, Paddle identifier, or provider secret.
 
 ### Query usage and synchronize plan changes at the provider
 
@@ -79,6 +91,9 @@ Generic WeKnora deployments may leave Paddle unconfigured. The shared shape vali
 - [Paddle delivery order varies] → Use event occurrence time and event ID for plan state, and the paid billing-period end for allowance idempotency so unrelated newer events cannot suppress a successful renewal.
 - [A prorated upgrade payment fails or the current Paddle subscription no longer matches the tenant] → Use Paddle's `prevent_change`, fail closed, and leave both the durable plan and existing OpenRouter key limit unchanged.
 - [Disposable Sandbox data contains stale provider IDs] → Delete the test account through the existing product lifecycle and validate a fresh Sandbox checkout; do not add a cross-environment subscription-recovery subsystem.
+- [Deletion races login, checkout, or a worker retry] → Persist one deletion fence before acknowledging, revoke all sessions, reject new product work for fenced users, and make the single erasure task idempotent.
+- [A customer is still billable] → Read the subscription through Paddle's official API and fail closed to the hosted Customer Portal; never hide a billing mutation in account erasure.
+- [A cleanup dependency is unavailable] → Keep the account inaccessible, retry the same durable task, and retain dead-letter visibility; never hard-delete the final identity row before dependent active product state is gone.
 - [Existing tenants have a prior storage matrix] → The superseding limit migration maps persisted Free/Plus/Pro/Max plans to 1/10/30/100 GiB; files are never deleted when usage exceeds the new quota, but new uploads remain blocked.
 
 ## Migration Plan
@@ -89,6 +104,7 @@ Generic WeKnora deployments may leave Paddle unconfigured. The shared shape vali
 4. Add stateless signed checkout input, the narrow upgrade-operation state, the retryable verified-webhook handoff, and the exactly-one-known-base-item check. Keep the existing tenant event markers as final idempotency and do not add an initial checkout operation, refund/chargeback engine, reconciliation subsystem, or usage ledger.
 5. Keep the verified Sandbox unit for development/test. For production, apply the sibling Live change as one unit: matching Live API key and `live_` client token, exact Live destination secret, and all six Live recurring price IDs; resolve the catalog through Live and prove the exact destination with a signed no-charge simulation before calling billing operational.
 6. Validate Free and paid behavior with separate tenants and one bounded OpenRouter request after the management key is available.
+7. Add identity coordinates and the deletion fence, deploy the operations-only erasure endpoint and worker, and verify it against synthetic local/provider fakes before enabling the server-only Supabase Admin secret. Do not delete any production account during release verification.
 
 Rollback is code rollback plus leaving additive columns in place; no user objects or usage records are deleted.
 

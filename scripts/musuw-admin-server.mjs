@@ -163,6 +163,7 @@ export function isSafeOperationsPath(method, pathname) {
   if (method === 'GET' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/tasks$/.test(pathname)) return true
   if (method === 'GET' && /^\/api\/v1\/system\/admin\/tenants\/\d+\/entitlement$/.test(pathname)) return true
   if (method === 'GET' && /^\/api\/v1\/system\/admin\/users\/[0-9a-f-]+\/investigation$/.test(pathname)) return true
+  if (method === 'DELETE' && /^\/api\/v1\/system\/admin\/users\/[0-9a-f-]+$/.test(pathname)) return true
   if (method === 'PATCH' && /^\/api\/v1\/system\/admin\/tenants\/\d+$/.test(pathname)) return true
   if (method === 'PUT' && /^\/api\/v1\/system\/admin\/tenants\/\d+\/openrouter-credits$/.test(pathname)) return true
   if (method === 'POST' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/tasks\/[0-9a-z:_-]+\/actions\/(retry|run-now|run_now)$/.test(pathname)) return true

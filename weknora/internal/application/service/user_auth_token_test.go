@@ -136,7 +136,7 @@ func newAuthTestUserService(tokenRepo *stubAuthTokenRepo) *userService {
 	return &userService{
 		userRepo: &stubUserRepoForAuth{
 			users: map[string]*types.User{
-				"user-1": {ID: "user-1", TenantID: 1},
+				"user-1": {ID: "user-1", TenantID: 1, IsActive: true},
 			},
 		},
 		tokenRepo: tokenRepo,
@@ -340,5 +340,113 @@ func TestUserIDFromSignedTokenAcceptsExpiredToken(t *testing.T) {
 	}
 	if userID != "user-1" {
 		t.Fatalf("userIDFromSignedToken(expired) = %q, want user-1", userID)
+	}
+}
+
+func TestValidateTokenRejectsDeletionPendingUser(t *testing.T) {
+	ctx := context.Background()
+	tokenRepo := &stubAuthTokenRepo{tokens: map[string]*types.AuthToken{}}
+	svc := newAuthTestUserService(tokenRepo)
+	requestedAt := time.Now()
+	svc.userRepo.(*stubUserRepoForAuth).users["user-1"].DeletionRequestedAt = &requestedAt
+	accessJWT := signTestJWT(jwt.MapClaims{
+		"user_id": "user-1",
+		"type":    "access",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	tokenRepo.tokens[accessJWT] = &types.AuthToken{UserID: "user-1", Token: accessJWT, TokenType: "access_token"}
+
+	_, _, err := svc.ValidateToken(ctx, accessJWT)
+	if !errors.Is(err, ErrAccountDeletionPending) {
+		t.Fatalf("ValidateToken() error = %v, want ErrAccountDeletionPending", err)
+	}
+}
+
+func TestValidateTokenRejectsInactiveUser(t *testing.T) {
+	ctx := context.Background()
+	tokenRepo := &stubAuthTokenRepo{tokens: map[string]*types.AuthToken{}}
+	svc := newAuthTestUserService(tokenRepo)
+	svc.userRepo.(*stubUserRepoForAuth).users["user-1"].IsActive = false
+	accessJWT := signTestJWT(jwt.MapClaims{
+		"user_id": "user-1",
+		"type":    "access",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	tokenRepo.tokens[accessJWT] = &types.AuthToken{UserID: "user-1", Token: accessJWT, TokenType: "access_token"}
+
+	_, _, err := svc.ValidateToken(ctx, accessJWT)
+	if !errors.Is(err, ErrAccountInactive) {
+		t.Fatalf("ValidateToken() error = %v, want ErrAccountInactive", err)
+	}
+}
+
+func TestRefreshTokenRejectsDeletionPendingUserWithoutRevoking(t *testing.T) {
+	ctx := context.Background()
+	tokenRepo := &stubAuthTokenRepo{tokens: map[string]*types.AuthToken{}}
+	svc := newAuthTestUserService(tokenRepo)
+	requestedAt := time.Now()
+	svc.userRepo.(*stubUserRepoForAuth).users["user-1"].DeletionRequestedAt = &requestedAt
+	refreshJWT := signTestJWT(jwt.MapClaims{
+		"user_id": "user-1",
+		"type":    "refresh",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	record := &types.AuthToken{UserID: "user-1", Token: refreshJWT, TokenType: "refresh_token"}
+	tokenRepo.tokens[refreshJWT] = record
+
+	_, _, err := svc.RefreshToken(ctx, refreshJWT)
+	if !errors.Is(err, ErrAccountDeletionPending) {
+		t.Fatalf("RefreshToken() error = %v, want ErrAccountDeletionPending", err)
+	}
+	if record.IsRevoked {
+		t.Fatal("RefreshToken() revoked the existing token before applying the deletion fence")
+	}
+}
+
+func TestRefreshTokenRejectsInactiveUserWithoutRevoking(t *testing.T) {
+	ctx := context.Background()
+	tokenRepo := &stubAuthTokenRepo{tokens: map[string]*types.AuthToken{}}
+	svc := newAuthTestUserService(tokenRepo)
+	svc.userRepo.(*stubUserRepoForAuth).users["user-1"].IsActive = false
+	refreshJWT := signTestJWT(jwt.MapClaims{
+		"user_id": "user-1",
+		"type":    "refresh",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	record := &types.AuthToken{UserID: "user-1", Token: refreshJWT, TokenType: "refresh_token"}
+	tokenRepo.tokens[refreshJWT] = record
+
+	_, _, err := svc.RefreshToken(ctx, refreshJWT)
+	if !errors.Is(err, ErrAccountInactive) {
+		t.Fatalf("RefreshToken() error = %v, want ErrAccountInactive", err)
+	}
+	if record.IsRevoked {
+		t.Fatal("RefreshToken() revoked the existing token before applying the inactive fence")
+	}
+}
+
+func TestGenerateTokensRejectsDeletionPendingUser(t *testing.T) {
+	svc := newAuthTestUserService(&stubAuthTokenRepo{tokens: map[string]*types.AuthToken{}})
+	requestedAt := time.Now()
+	user := svc.userRepo.(*stubUserRepoForAuth).users["user-1"]
+	user.DeletionRequestedAt = &requestedAt
+
+	accessToken, refreshToken, err := svc.GenerateTokens(context.Background(), user)
+	if !errors.Is(err, ErrAccountDeletionPending) {
+		t.Fatalf("GenerateTokens() error = %v, want ErrAccountDeletionPending", err)
+	}
+	if accessToken != "" || refreshToken != "" {
+		t.Fatalf("GenerateTokens() returned tokens for deletion-pending user: access=%q refresh=%q", accessToken, refreshToken)
+	}
+}
+
+func TestSwitchTenantRejectsInactiveUserBeforeMembershipLookup(t *testing.T) {
+	svc := newAuthTestUserService(&stubAuthTokenRepo{tokens: map[string]*types.AuthToken{}})
+	user := svc.userRepo.(*stubUserRepoForAuth).users["user-1"]
+	user.IsActive = false
+
+	_, err := svc.SwitchTenant(context.Background(), user, 42, "")
+	if !errors.Is(err, ErrAccountInactive) {
+		t.Fatalf("SwitchTenant() error = %v, want ErrAccountInactive", err)
 	}
 }

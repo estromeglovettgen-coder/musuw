@@ -48,6 +48,7 @@
             <div><strong>{{ selected.username || '未命名用户' }}</strong><span>{{ selected.email }}</span></div>
             <t-tag :theme="selected.is_active ? 'success' : 'danger'" variant="light">{{ selected.is_active ? '活跃' : '停用' }}</t-tag>
             <t-button theme="primary" @click="openManage">管理用户</t-button>
+            <t-button theme="danger" variant="outline" :disabled="selected.is_system_admin || erasing" @click="eraseVisible = true">彻底注销</t-button>
           </div>
         </section>
         <section class="ops-drawer-section"><h3>账号与空间</h3><dl class="ops-definition">
@@ -95,6 +96,28 @@
         </t-form>
       </div>
     </t-dialog>
+
+    <t-dialog
+      v-model:visible="eraseVisible"
+      header="彻底注销用户"
+      width="520px"
+      :close-on-overlay-click="!erasing"
+      :close-btn="!erasing"
+      :cancel-btn="{ content: '取消', disabled: erasing }"
+      :confirm-btn="{ content: '确认彻底注销', theme: 'danger', loading: erasing, disabled: erasing }"
+      @confirm="submitErasure"
+    >
+      <div v-if="selected" class="manage-form">
+        <div class="ops-callout is-danger">
+          <ErrorCircleIcon class="ops-callout__icon" />
+          <div>
+            <strong>此操作不可撤销</strong>
+            <span>将立即停用 {{ selected.email || selected.id }}，并异步清理账号、个人空间和可删除的产品数据。</span>
+          </div>
+        </div>
+        <p class="ops-muted">Paddle 仍可计费的订阅会直接阻止注销；本操作不会代为取消订阅、退款或产生任何资金动作。</p>
+      </div>
+    </t-dialog>
   </div>
 </template>
 
@@ -114,6 +137,7 @@ const selected = ref<UserRow | null>(null), drawerVisible = ref(false), detailLo
 const entitlement = ref<TenantEntitlement | null>(null), investigation = ref<InvestigationData | null>(null)
 const detailError = ref(''), investigationError = ref('')
 const manageVisible = ref(false), managing = ref(false)
+const eraseVisible = ref(false), erasing = ref(false)
 const manage = reactive({ status: 'active', quotaGiB: 5, creditMode: 'keep', creditUsd: 0, confirmation: '' })
 
 const columns = [
@@ -160,6 +184,23 @@ async function submitManage() {
     manageVisible.value = false; await load(); if (selected.value) await openUser(rows.value.find((row) => row.id === selected.value?.id) || selected.value)
   } catch (manageError) { MessagePlugin.error(manageError instanceof Error ? manageError.message : '更新失败') }
   finally { managing.value = false }
+}
+async function submitErasure() {
+  if (!selected.value || erasing.value) return
+  erasing.value = true
+  try {
+    const result = await operationsApi.eraseUser(selected.value.id)
+    if (result.accepted !== true) throw new Error('注销任务未被接受')
+    MessagePlugin.success('注销任务已接受，账号已停用并进入清理流程')
+    eraseVisible.value = false
+    drawerVisible.value = false
+    selected.value = null
+    await load()
+  } catch (eraseError) {
+    MessagePlugin.error(eraseError instanceof Error ? eraseError.message : '注销失败')
+  } finally {
+    erasing.value = false
+  }
 }
 onMounted(load)
 watch(() => props.refreshKey, load)

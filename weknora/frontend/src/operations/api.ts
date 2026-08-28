@@ -78,6 +78,8 @@ export const operationsApi = {
     request<TenantEntitlement>(`/api/v1/system/admin/tenants/${tenantId}/entitlement`),
   investigation: (userId: string) =>
     request<InvestigationData>(`/api/v1/system/admin/users/${encodeURIComponent(userId)}/investigation`),
+  eraseUser: (userId: string) =>
+    request<{ accepted: boolean }>(`/api/v1/system/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
   updateTenant: (tenantId: number, body: { status?: string; storage_quota_bytes?: number }) =>
     request(`/api/v1/system/admin/tenants/${tenantId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   updateCredits: (tenantId: number, body: { reset?: boolean; remaining_microusd?: number }) =>

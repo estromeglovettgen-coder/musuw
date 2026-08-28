@@ -17,7 +17,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
   "/contact"
 ]);
 
-const updated = "2026-08-24";
+const updated = "2026-08-27";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -85,7 +85,7 @@ const englishDocuments = {
         blocks: [
           p("You retain ownership of notes, documents, prompts, saved answers, and other material you submit to musuw. You grant us a limited, non-exclusive license to host, copy, process, transmit, and display that content only as needed to provide, secure, support, and improve the service for you, or as required by law."),
           p("You confirm that you have the rights and permissions needed to upload and process your content. You must not upload content that unlawfully infringes intellectual property, privacy, confidentiality, or other rights."),
-          p("You can request export or deletion through the product controls when available or by contacting support. Deletion is subject to legal retention, security logs, dispute records, and normal backup rotation as explained in the Privacy Policy.")
+          p(`You can export content through the available product controls. To request account deletion, contact ${LEGAL_OPERATOR.supportEmail} or the published support channel. Authorized operations staff use a restricted internal deletion control; the workflow removes Musuw-controlled active product data subject to the retention boundary in the Privacy Policy.`)
         ]
       },
       {
@@ -264,7 +264,8 @@ const englishDocuments = {
         heading: "8. Retention",
         blocks: [
           p("We retain account and knowledge content while your account is active or as needed to provide the service. After a verified deletion request or account closure, we delete or de-identify content from active systems without undue delay, subject to lawful retention, security investigations, disputes, and normal backup rotation."),
-          p("Transaction, tax, accounting, fraud-prevention, and legal records are retained for the periods required or permitted by applicable law. Security logs and support records are retained only as long as reasonably needed for their purpose."),
+          p("Account deletion does not cancel or refund an active Paddle subscription. Paddle is the Merchant of Record and may retain invoices, transaction records, and tax, accounting, fraud-prevention, chargeback, and dispute records for the periods required or permitted by applicable law and its provider terms. Musuw retains only the minimum corresponding records needed for legal, accounting, fraud-prevention, security, or dispute obligations, detaches or minimizes them where possible, and does not present them as active account data. These Paddle and Musuw records follow their own retention periods; we do not promise immediate physical disappearance from Paddle or bounded backups."),
+          p("Security logs and support records are retained only as long as reasonably needed for their purpose."),
           p("When data is no longer needed, we delete, de-identify, or securely isolate it. De-identified information may be retained where it cannot reasonably be linked back to you.")
         ]
       },
@@ -273,7 +274,8 @@ const englishDocuments = {
         blocks: [
           p("Depending on where you live, you may have rights to be informed, access data, correct inaccurate data, delete data, restrict or object to processing, obtain portable data, withdraw consent, and appeal or complain to a data-protection authority."),
           p("Residents of California may also have rights to know, delete, correct, limit use of sensitive information where applicable, opt out of sale or sharing, and receive equal service. musuw does not sell or share personal information for cross-context behavioral advertising."),
-          p(`To exercise a right, withdraw consent, or close your account, email ${LEGAL_OPERATOR.supportEmail} from the account address with “Privacy request” or “Account deletion” in the subject. You may delete individual documents and knowledge bases with the product controls. We may request proportionate verification and may decline or limit a request only where law permits. Authorized agents must provide valid authority.`),
+          p(`To request account closure, email ${LEGAL_OPERATOR.supportEmail} with “Privacy request” or “Account deletion” in the subject, or use the published support channel. You may delete individual documents and knowledge bases with the product controls. We may request proportionate verification and may decline or limit a request only where law permits. Authorized agents must provide valid authority.`),
+          p("Authorized operations staff use a restricted internal account-deletion control. The product does not expose a self-service account-deletion action in user settings."),
           p("We will respond within the period required by applicable law. You may appeal a denied request by replying with “Privacy appeal” in the subject line. You may also complain to your local supervisory or consumer-protection authority.")
         ]
       },
@@ -598,7 +600,7 @@ const englishDocuments = {
       {
         heading: "5. Data lifecycle",
         blocks: [
-          p("You can delete individual documents and knowledge bases through product controls. Where a data type has an export action, you can use it directly; for an account-wide copy or deletion request, contact support for verified coordination across identity, application, object-storage, and provider records. Legal retention, fraud-prevention, dispute records, security logs, and backup rotation may delay complete removal as described in the Privacy Policy."),
+          p(`You can delete individual documents and knowledge bases through product controls. Where a data type has an export action, you can use it directly. To request full account deletion, contact ${LEGAL_OPERATOR.supportEmail} or the published support channel. Authorized operations staff submit the restricted deletion workflow; legal retention, fraud-prevention, dispute records, security logs, and backup rotation may delay complete removal as described in the Privacy Policy.`),
           link("Read the Privacy Policy", "/privacy")
         ]
       },
@@ -731,7 +733,7 @@ const chineseDocuments = {
         blocks: [
           p("您保留对提交至 musuw 的笔记、文档、提示词、已保存答案及其他材料的所有权。您授予我们有限、非独占的许可，仅为向您提供、保护、支持和改进服务或履行法律义务之需要，对这些内容进行托管、复制、处理、传输和展示。"),
           p("您确认有权上传和处理相关内容。不得上传非法侵犯知识产权、隐私权、保密义务或其他权利的材料。"),
-          p("功能可用时，您可通过产品控制申请导出或删除，也可联系支持。删除可能受法定留存、安全日志、争议记录和正常备份轮换限制，详见隐私政策。")
+          p(`您可通过产品控制导出内容。如需注销账户，请联系 ${LEGAL_OPERATOR.supportEmail} 或已公布的客服渠道。获授权的运营人员通过受限内部功能提交注销，流程会移除 Musuw 控制的活动产品数据，但受隐私政策所述留存边界约束。`)
         ]
       },
       {
@@ -909,7 +911,8 @@ const chineseDocuments = {
         heading: "8. 保留与删除",
         blocks: [
           p("账户处于活动状态或提供服务所需期间，我们会保留账户和知识内容。收到经核验的删除请求或账户关闭后，我们会在不无故拖延的情况下从活动系统删除或去标识化，但可能受法定留存、安全调查、争议和正常备份轮换限制。"),
-          p("交易、税务、会计、反欺诈和法律记录按适用法律要求或允许的期限保留。安全日志和支持记录仅在实现其目的所合理需要的期限内保留。"),
+          p("账户注销不会取消或退款仍可计费的 Paddle 订阅。Paddle 是订单的商户记录方，可能依据适用法律及其服务条款在法定或允许期限内保留发票、交易记录、税务、会计、反欺诈、拒付和争议记录。musuw 仅为履行法律、会计、反欺诈、安全或争议义务保留相应最小记录，并在可行时脱离账户、最小化，不会作为活跃账户数据展示。这些 Paddle 和 musuw 记录按各自留存期限处理；我们不承诺立即从 Paddle 或受限备份中物理消失。"),
+          p("安全日志和支持记录仅在实现其目的所合理需要的期限内保留。"),
           p("信息不再需要时，我们会删除、去标识化或安全隔离。无法合理重新关联到您的去标识化信息可继续保留。")
         ]
       },
@@ -918,7 +921,8 @@ const chineseDocuments = {
         blocks: [
           p("根据您所在地区，您可能享有知情、查阅、复制、更正、删除、限制或拒绝处理、获取可携带副本、撤回同意，以及申诉或向监管机构投诉等权利。"),
           p("加利福尼亚居民还可能享有知情、删除、更正、在适用时限制敏感信息使用、选择退出出售或共享，以及不受差别待遇的权利。musuw 不出售个人信息，也不为跨场景行为广告共享个人信息。"),
-          p(`行使权利、撤回同意或注销账户时，请使用账户邮箱向 ${LEGAL_OPERATOR.supportEmail} 发送邮件，并以“Privacy request”或“Account deletion”为主题。您可通过产品控件删除单篇文档或知识库。我们可能进行适度身份核验，仅在法律允许时拒绝或限制请求。授权代理人须提供有效授权。`),
+          p(`如需注销账户，请向 ${LEGAL_OPERATOR.supportEmail} 发送主题为“Privacy request”或“Account deletion”的邮件，或使用已公布的客服渠道。您可通过产品控件删除单篇文档或知识库。我们可能进行适度身份核验，仅在法律允许时拒绝或限制请求。授权代理人须提供有效授权。`),
+          p("获授权的运营人员通过受限内部功能执行账户注销；用户设置中不提供自助注销入口。"),
           p("我们将在适用法律规定期限内答复。若请求被拒绝，可回复邮件并以“隐私申诉”为主题提出申诉，也可向所在地个人信息保护、数据保护或消费者保护机构投诉。")
         ]
       },
@@ -1230,7 +1234,7 @@ const chineseDocuments = {
       {
         heading: "5. 数据生命周期",
         blocks: [
-          p("您可通过产品控件删除单篇文档和知识库；数据类型提供导出操作时可直接使用。账户级副本或删除请求请联系支持，由我们在核验后协调身份、应用、对象存储和服务商记录。法定留存、反欺诈、争议记录、安全日志和备份轮换可能按隐私政策说明延迟彻底移除。"),
+          p(`您可通过产品控件删除单篇文档和知识库；数据类型提供导出操作时可直接使用。如需完整注销账户，请联系 ${LEGAL_OPERATOR.supportEmail} 或已公布的客服渠道。获授权的运营人员通过受限内部功能提交注销；法定留存、反欺诈、争议记录、安全日志和备份轮换可能按隐私政策说明延迟彻底移除。`),
           link("查看隐私政策", "/privacy")
         ]
       },

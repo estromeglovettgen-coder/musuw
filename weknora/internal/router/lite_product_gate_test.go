@@ -68,6 +68,7 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "native lite auto setup", method: "POST", path: "/api/v1/auth/auto-setup", blocked: true},
 		{name: "workspace switch", method: "POST", path: "/api/v1/auth/switch-tenant", blocked: true},
 		{name: "workspace preference mutation", method: "PUT", path: "/api/v1/auth/me/preferences", blocked: true},
+		{name: "self-service account deletion hidden", method: "DELETE", path: "/api/v1/auth/me", blocked: true},
 		{name: "invite registration", method: "POST", path: "/api/v1/auth/register-by-invite", blocked: true},
 		{name: "invite lookup", method: "POST", path: "/api/v1/auth/invitations/lookup", blocked: true},
 
@@ -116,6 +117,7 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "operations tenant status and quota", method: "PATCH", path: "/api/v1/system/admin/tenants/7", blocked: false},
 		{name: "operations tenant credits", method: "PUT", path: "/api/v1/system/admin/tenants/7/openrouter-credits", blocked: false},
 		{name: "operations user investigation", method: "GET", path: "/api/v1/system/admin/users/user-7/investigation", blocked: false},
+		{name: "operations user erasure", method: "DELETE", path: "/api/v1/system/admin/users/user-7", blocked: false},
 		{name: "operations audit", method: "GET", path: "/api/v1/system/admin/audit-log", blocked: false},
 		{name: "operations consumer model policy", method: "GET", path: "/api/v1/system/admin/consumer-model-policy", blocked: false},
 		{name: "operations consumer model policy update", method: "PUT", path: "/api/v1/system/admin/consumer-model-policy/rag", blocked: false},

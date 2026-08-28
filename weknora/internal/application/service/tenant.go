@@ -214,6 +214,21 @@ func (s *tenantService) DeleteTenant(ctx context.Context, id uint64) error {
 	return nil
 }
 
+// DeleteTenantProviderCredentials removes only tenant-scoped provider
+// credentials. Account erasure keeps the tenant and membership rows present
+// until its repository can re-check shared membership and delete the local
+// graph in one transaction.
+func (s *tenantService) DeleteTenantProviderCredentials(ctx context.Context, id uint64) error {
+	if id == 0 {
+		return errors.New("tenant ID cannot be 0")
+	}
+	tenant, err := s.repo.GetTenantByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	return s.deleteOpenRouterTenantKey(ctx, tenant)
+}
+
 func (s *tenantService) ListAllTenants(ctx context.Context) ([]*types.Tenant, error) {
 	tenants, err := s.repo.ListTenants(ctx)
 	if err != nil {

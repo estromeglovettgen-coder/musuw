@@ -51,7 +51,7 @@ func TestPlatformControlPlaneRoutesDeclarePlatformCapabilities(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	g := &rbacGuards{}
 	v1 := gin.New().Group("/api/v1")
-	RegisterSystemAdminRoutes(v1, &handler.SystemHandler{}, nil, g)
+	RegisterSystemAdminRoutes(v1, &handler.SystemHandler{}, handler.NewAccountErasureHandler(nil), nil, g)
 
 	cases := []struct {
 		method     string
@@ -69,6 +69,7 @@ func TestPlatformControlPlaneRoutesDeclarePlatformCapabilities(t *testing.T) {
 		{http.MethodPatch, "/api/v1/system/admin/tenants/:id", types.APIKeyCapabilitySystemTenantsManage},
 		{http.MethodPut, "/api/v1/system/admin/tenants/:id/openrouter-credits", types.APIKeyCapabilitySystemTenantsManage},
 		{http.MethodGet, "/api/v1/system/admin/users/:user_id/investigation", types.APIKeyCapabilitySystemTenantsRead},
+		{http.MethodDelete, "/api/v1/system/admin/users/:user_id", types.APIKeyCapabilitySystemTenantsManage},
 	}
 	for _, tc := range cases {
 		policy := mustLookupAPIKeyPolicy(t, g, tc.method, tc.path)
@@ -88,7 +89,7 @@ func TestConsumerModelPolicyRuntimeCapabilityDoesNotWidenGeneralSettings(t *test
 	gin.SetMode(gin.TestMode)
 	g := &rbacGuards{}
 	v1 := gin.New().Group("/api/v1")
-	RegisterSystemAdminRoutes(v1, &handler.SystemHandler{}, nil, g)
+	RegisterSystemAdminRoutes(v1, &handler.SystemHandler{}, nil, nil, g)
 
 	policy, ok := g.apiKeyAuthorizer.Lookup(http.MethodGet, "/api/v1/system/admin/consumer-model-policy")
 	if !ok || !policy.PlatformOnly || !policyHasCapability(policy, types.APIKeyCapabilitySystemRuntimeRead) {

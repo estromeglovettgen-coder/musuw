@@ -86,6 +86,17 @@ type User struct {
 	TenantID uint64 `json:"tenant_id"  gorm:"index"`
 	// Whether the user is active
 	IsActive bool `json:"is_active"  gorm:"default:true"`
+	// IdentityProvider and IdentitySubject bind a local account to the
+	// verified external identity used for OIDC sign-in. They are deliberately
+	// omitted from API responses: the pair is an authentication coordinate,
+	// not user-facing profile data. Empty values preserve compatibility with
+	// password-only accounts and rows created before the identity migration.
+	IdentityProvider string `json:"-" gorm:"type:varchar(32);not null;default:''"`
+	IdentitySubject  string `json:"-" gorm:"type:varchar(255);not null;default:''"`
+	// DeletionRequestedAt is the authentication fence raised before account
+	// erasure starts. Any non-nil value makes every login/session path reject
+	// the account until the row is permanently removed.
+	DeletionRequestedAt *time.Time `json:"-" gorm:"index"`
 	// Whether the user can access all workspaces (cross-workspace access)
 	CanAccessAllTenants bool `json:"can_access_all_tenants" gorm:"default:false"`
 	// Whether the user is a system administrator (independent of workspace roles)

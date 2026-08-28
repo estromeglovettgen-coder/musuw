@@ -38,7 +38,40 @@ var (
 	// It is exported so HTTP handlers can translate the failure to a 400
 	// without exposing bcrypt or persistence errors.
 	ErrPasswordPolicy = errors.New("password must be 8-32 characters and contain at least one letter and one number")
+
+	// ErrAccountInactive and ErrAccountDeletionPending are returned by every
+	// token/login gate when a local identity can no longer authenticate. They
+	// are exported so callers that need to map the failure can do so without
+	// matching error strings. In particular, a deletion fence is checked
+	// before any token is minted or rotated.
+	ErrAccountInactive        = errors.New("account is inactive")
+	ErrAccountDeletionPending = errors.New("account deletion pending")
+	// ErrOIDCIdentityMismatch is returned when an existing local account is
+	// presented with a different provider/subject pair. Email alone is not an
+	// authority for account linking, so the callback fails closed.
+	ErrOIDCIdentityMismatch = errors.New("OIDC identity does not match account")
+	// ErrOIDCIdentityBindingInvalid marks a partially persisted provider /
+	// subject pair. Such a row is not silently repaired from a new login.
+	ErrOIDCIdentityBindingInvalid = errors.New("stored OIDC identity binding is incomplete")
 )
+
+// authenticationFenceError centralises the account lifecycle checks shared
+// by password/OIDC login and all token/session paths. A nil or inactive user
+// is never allowed to mint, refresh, validate, or switch a session. The
+// deletion fence wins when both flags are present so callers can distinguish
+// a deliberate erasure request from an ordinary administrative disablement.
+func authenticationFenceError(user *types.User) error {
+	if user == nil {
+		return errors.New("user is required")
+	}
+	if user.DeletionRequestedAt != nil {
+		return ErrAccountDeletionPending
+	}
+	if !user.IsActive {
+		return ErrAccountInactive
+	}
+	return nil
+}
 
 // ValidatePasswordPolicy keeps administrative password resets aligned with
 // the registration form's documented policy. Password bytes are never logged
@@ -224,8 +257,10 @@ func (s *userService) Login(ctx context.Context, req *types.LoginRequest) (*type
 		}, nil
 	}
 
-	// Check if user is active
-	if !user.IsActive {
+	// Check the account lifecycle fence before doing any credential work. A
+	// deletion-pending account is intentionally indistinguishable from an
+	// administratively disabled account at the public login boundary.
+	if authenticationFenceError(user) != nil {
 		logger.Warn(ctx, "User account is disabled")
 		return &types.LoginResponse{
 			Success: false,
@@ -498,6 +533,13 @@ func (s *userService) LoginWithOIDC(
 	if strings.TrimSpace(userInfo.Email) == "" {
 		return nil, errors.New("OIDC provider did not return email")
 	}
+	if strings.TrimSpace(userInfo.Subject) == "" {
+		// OIDC's `sub` is the stable external identity coordinate. Without it
+		// we cannot safely bind or compare the local account, so fail closed
+		// instead of falling back to email-only account matching.
+		return nil, errors.New("OIDC provider did not return subject")
+	}
+	identityProvider := oidcIdentityProvider(cfg)
 
 	user, err := s.userRepo.GetUserByEmail(ctx, userInfo.Email)
 	if err != nil && !isUserLookupNotFound(err) {
@@ -505,14 +547,23 @@ func (s *userService) LoginWithOIDC(
 	}
 	isNewUser := false
 	if isUserLookupNotFound(err) || user == nil {
-		user, err = s.provisionOIDCUser(ctx, userInfo, provisioning)
+		user, err = s.provisionOIDCUser(ctx, userInfo, provisioning, identityProvider)
 		if err != nil {
 			return nil, err
 		}
 		isNewUser = true
+	} else {
+		// Do not mutate a disabled or deletion-pending row while attempting
+		// to bind a newly observed external identity.
+		if fenceErr := authenticationFenceError(user); fenceErr != nil {
+			return &types.OIDCCallbackResponse{Success: false, Message: "Account is disabled"}, nil
+		}
+		if err := s.bindOIDCIdentity(ctx, user, identityProvider, userInfo.Subject); err != nil {
+			return nil, err
+		}
 	}
 
-	if !user.IsActive {
+	if authenticationFenceError(user) != nil {
 		return &types.OIDCCallbackResponse{Success: false, Message: "Account is disabled"}, nil
 	}
 
@@ -720,6 +771,9 @@ func (s *userService) GenerateTokens(
 	ctx context.Context,
 	user *types.User,
 ) (accessToken, refreshToken string, err error) {
+	if err := authenticationFenceError(user); err != nil {
+		return "", "", err
+	}
 	return s.generateTokensForTenant(ctx, user, s.resolveLoginTenantID(ctx, user))
 }
 
@@ -866,6 +920,13 @@ func (s *userService) generateTokensForTenant(
 	user *types.User,
 	activeTenantID uint64,
 ) (accessToken, refreshToken string, err error) {
+	// Keep this guard in the shared implementation as well as the public
+	// GenerateTokens wrapper: SwitchTenant and OIDC login call this helper
+	// directly, and no caller should be able to bypass the lifecycle fence.
+	if err := authenticationFenceError(user); err != nil {
+		return "", "", err
+	}
+
 	// Generate access token (expires in 24 hours)
 	accessClaims := jwt.MapClaims{
 		"user_id":   user.ID,
@@ -940,6 +1001,9 @@ func (s *userService) SwitchTenant(
 ) (*types.LoginResponse, error) {
 	if user == nil {
 		return nil, errors.New("user is required")
+	}
+	if err := authenticationFenceError(user); err != nil {
+		return nil, err
 	}
 	if targetTenantID == 0 {
 		return nil, errors.New("target workspace ID is required")
@@ -1047,6 +1111,9 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 	}
 	if user == nil {
 		return nil, 0, errors.New("token user no longer exists")
+	}
+	if err := authenticationFenceError(user); err != nil {
+		return nil, 0, err
 	}
 
 	// Extract active tenant from the JWT. Anything missing or unparseable
@@ -1175,6 +1242,9 @@ func (s *userService) RefreshToken(
 	}
 	if user == nil {
 		return "", "", errors.New("refresh token user no longer exists")
+	}
+	if err := authenticationFenceError(user); err != nil {
+		return "", "", err
 	}
 
 	// Revoke old refresh token
@@ -1448,6 +1518,83 @@ func (s *userService) fetchOIDCUserInfo(ctx context.Context, endpoint, accessTok
 	return claims, nil
 }
 
+// oidcIdentityProvider returns the stable provider key stored alongside an
+// OIDC subject. Supabase is the only provider with a first-party identity
+// deletion API in the account-erasure coordinator, so recognize its standard
+// host/path forms explicitly; other OIDC issuers remain provider-neutral and
+// use the generic "oidc" key. The display label is intentionally ignored — it
+// is operator-facing text and can change without changing the issuer.
+func oidcIdentityProvider(cfg *config.OIDCAuthConfig) string {
+	if cfg == nil {
+		return "oidc"
+	}
+	endpoints := []string{
+		cfg.IssuerURL,
+		cfg.DiscoveryURL,
+		cfg.AuthorizationEndpoint,
+		cfg.TokenEndpoint,
+		cfg.UserInfoEndpoint,
+	}
+	for _, raw := range endpoints {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			continue
+		}
+		host := strings.ToLower(parsed.Hostname())
+		path := strings.ToLower(parsed.Path)
+		if host == "supabase.co" || strings.HasSuffix(host, ".supabase.co") || strings.Contains(path, "/auth/v1") {
+			return "supabase"
+		}
+	}
+	return "oidc"
+}
+
+// bindOIDCIdentity records the external identity on first login and verifies
+// it on every subsequent login. Existing rows are never relinked by email:
+// a mismatched or partially populated pair fails closed. Password accounts
+// retain empty identity fields until they explicitly complete OIDC login.
+func (s *userService) bindOIDCIdentity(
+	ctx context.Context,
+	user *types.User,
+	provider string,
+	subject string,
+) error {
+	if user == nil {
+		return errors.New("user is required")
+	}
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	subject = strings.TrimSpace(subject)
+	if provider == "" || subject == "" {
+		return errors.New("OIDC identity provider and subject are required")
+	}
+
+	storedProvider := strings.ToLower(strings.TrimSpace(user.IdentityProvider))
+	storedSubject := strings.TrimSpace(user.IdentitySubject)
+	switch {
+	case storedProvider == "" && storedSubject == "":
+		user.IdentityProvider = provider
+		user.IdentitySubject = subject
+		user.UpdatedAt = time.Now()
+		if s.userRepo == nil {
+			return errors.New("user repository unavailable")
+		}
+		if err := s.userRepo.UpdateUser(ctx, user); err != nil {
+			return fmt.Errorf("failed to bind OIDC identity: %w", err)
+		}
+		return nil
+	case storedProvider == "" || storedSubject == "":
+		return ErrOIDCIdentityBindingInvalid
+	case storedProvider != provider || storedSubject != subject:
+		return ErrOIDCIdentityMismatch
+	default:
+		return nil
+	}
+}
+
 // provisionOIDCUser auto-creates a local account for a first-time OIDC
 // login. The provisioning mode is decided by the caller (the OIDC callback
 // handler resolves it from the same auth.default_tenant_mode system-setting
@@ -1458,6 +1605,7 @@ func (s *userService) provisionOIDCUser(
 	ctx context.Context,
 	info *types.OIDCUserInfo,
 	provisioning types.TenantProvisioningMode,
+	identityProvider string,
 ) (*types.User, error) {
 	username := s.generateOIDCUsername(ctx, info)
 	randomPassword, err := generateRandomString(32)
@@ -1473,6 +1621,13 @@ func (s *userService) provisionOIDCUser(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-provision OIDC user: %w", err)
+	}
+	if err := s.bindOIDCIdentity(ctx, user, identityProvider, info.Subject); err != nil {
+		_ = s.userRepo.DeleteUser(ctx, user.ID)
+		if user.TenantID != 0 {
+			_ = s.tenantService.DeleteTenant(ctx, user.TenantID)
+		}
+		return nil, fmt.Errorf("failed to bind OIDC identity: %w", err)
 	}
 	return user, nil
 }

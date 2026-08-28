@@ -46,8 +46,22 @@ type HousekeepingService struct {
 	// falls back to the span/updated_at heuristics alone.
 	inspector interfaces.TaskInspector
 
+	// accountErasure reuses this existing five-minute sweep as a durable
+	// outbox recovery hook. It is configured after construction to keep the
+	// long-standing constructor/test surface stable.
+	accountErasure interfaces.AccountErasureService
+
 	mu      sync.Mutex
 	started bool
+}
+
+// SetAccountErasureService attaches the deletion-fence recovery hook before
+// Start. Container initialization is single-threaded, so no separate lock is
+// needed beyond the service's existing lifecycle mutex.
+func (h *HousekeepingService) SetAccountErasureService(svc interfaces.AccountErasureService) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.accountErasure = svc
 }
 
 // NewHousekeepingService constructs a HousekeepingService. It does NOT start
@@ -91,6 +105,7 @@ func (h *HousekeepingService) Start(ctx context.Context) error {
 	h.cron.Start()
 	h.started = true
 	logger.Infof(ctx, "[Housekeeping] started with 5-minute sweep")
+	go h.recoverPendingAccountErasures(context.Background())
 	return nil
 }
 
@@ -109,6 +124,7 @@ func (h *HousekeepingService) Stop() {
 // runSweep is exported on the type for testability — tests can drive a
 // single sweep without waiting for the cron tick.
 func (h *HousekeepingService) runSweep(ctx context.Context) {
+	h.recoverPendingAccountErasures(ctx)
 	threshold := h.staleThreshold()
 	cutoff := time.Now().Add(-threshold)
 
@@ -208,6 +224,15 @@ func (h *HousekeepingService) runSweep(ctx context.Context) {
 		logger.Warnf(ctx, "[Housekeeping] summary sweep failed: %v", resSummary.Error)
 	} else if resSummary.RowsAffected > 0 {
 		logger.Infof(ctx, "[Housekeeping] recovered %d stuck summary rows", resSummary.RowsAffected)
+	}
+}
+
+func (h *HousekeepingService) recoverPendingAccountErasures(ctx context.Context) {
+	if h == nil || h.accountErasure == nil {
+		return
+	}
+	if err := h.accountErasure.RecoverPending(ctx); err != nil {
+		logger.Warnf(ctx, "[Housekeeping] account deletion recovery failed: %v", err)
 	}
 }
 

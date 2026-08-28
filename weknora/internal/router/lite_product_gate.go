@@ -361,9 +361,12 @@ func liteOperationsAdminRouteAllowed(method, path string) bool {
 	}
 
 	const userPrefix = "/api/v1/system/admin/users/"
-	if method == http.MethodGet && strings.HasPrefix(path, userPrefix) {
+	if strings.HasPrefix(path, userPrefix) {
 		parts := strings.Split(strings.TrimPrefix(path, userPrefix), "/")
-		return len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "investigation"
+		if len(parts) == 1 && method == http.MethodDelete {
+			return strings.TrimSpace(parts[0]) != ""
+		}
+		return method == http.MethodGet && len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "investigation"
 	}
 
 	const runtimeQueues = "/api/v1/system/admin/runtime/queues"
@@ -417,6 +420,9 @@ func liteProductRouteBlocked(method, path string) bool {
 		if path == blockedAuthPath {
 			return true
 		}
+	}
+	if path == "/api/v1/auth/me" && method == http.MethodDelete {
+		return true
 	}
 
 	if liteOperationsAdminRouteAllowed(method, path) {

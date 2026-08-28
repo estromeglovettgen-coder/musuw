@@ -176,6 +176,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewTaskPendingOpsRepository))
 	must(container.Provide(repository.NewTaskDeadLetterRepository))
 	must(container.Provide(repository.NewPaddleBillingOperationRepository))
+	must(container.Provide(repository.NewAccountErasureRepository))
 
 	// MCP manager for managing MCP client connections
 	logger.Debugf(ctx, "[Container] Registering MCP manager...")
@@ -205,6 +206,9 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewDatasetService))
 	must(container.Provide(service.NewEvaluationService))
 	must(container.Provide(service.NewUserService))
+	must(container.Provide(service.NewPaddleAccountErasureGuard))
+	must(container.Provide(service.NewSupabaseIdentityAdmin))
+	must(container.Provide(service.NewAccountErasureService))
 	must(container.Provide(service.NewSystemSettingService))
 	must(container.Provide(service.NewWeKnoraCloudService))
 
@@ -320,6 +324,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Invoke(startAuditLogRetention))
 	logger.Debugf(ctx, "[Container] Audit log retention runner registered")
 	must(container.Provide(service.NewHousekeepingService))
+	must(container.Invoke(configureAccountErasureRecovery))
 	must(container.Invoke(startHousekeepingService))
 	logger.Debugf(ctx, "[Container] Knowledge housekeeping runner registered")
 	must(container.Provide(chatpipeline.NewEventManager))
@@ -359,6 +364,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewEvaluationHandler))
 	must(container.Provide(handler.NewInitializationHandler))
 	must(container.Provide(handler.NewAuthHandler))
+	must(container.Provide(handler.NewAccountErasureHandler))
 	must(container.Provide(handler.NewSystemHandler))
 	must(container.Provide(handler.NewMCPServiceHandler))
 	must(container.Provide(handler.NewMCPCredentialsHandler))
@@ -1670,6 +1676,12 @@ func startHousekeepingService(svc *service.HousekeepingService, cleaner interfac
 		svc.Stop()
 		return nil
 	})
+}
+
+func configureAccountErasureRecovery(svc *service.HousekeepingService, erasure interfaces.AccountErasureService) {
+	if svc != nil {
+		svc.SetAccountErasureService(erasure)
+	}
 }
 
 // startTemporaryDocumentCleanup removes expired session attachments and their

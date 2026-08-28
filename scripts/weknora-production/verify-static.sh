@@ -153,7 +153,7 @@ mkdir -m 700 "$secret_dir"
 
 # Deliberately synthetic values: this test proves file mounts and interpolation
 # only. It never reads an operator credential or prints a secret value.
-for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
+for name in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret supabase_service_role_key searxng_secret openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     printf '%s\n' 'static-verification-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -314,9 +314,14 @@ jq -e '
   (.services.app.environment.RETRIEVE_DRIVER == "postgres") and
   (.services.app.environment.STREAM_MANAGER_TYPE == "redis") and
   (.services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-production") and
+  (.services.app.environment.WEKNORA_HOUSEKEEPING_ENABLED == "true") and
   (.services.app.environment.MUSUW_PADDLE_ENVIRONMENT == "live") and
   (.services.app.environment.MUSUW_PADDLE_CLIENT_TOKEN == "live_static-client-token") and
   (.services.app.environment.MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID == "pri_static_plus_monthly") and
+  (.services.app.environment.MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID == "pri_static_plus_yearly") and
+  (.services.app.environment.MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID == "pri_static_pro_monthly") and
+  (.services.app.environment.MUSUW_PADDLE_PRO_YEARLY_PRICE_ID == "pri_static_pro_yearly") and
+  (.services.app.environment.MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID == "pri_static_max_monthly") and
   (.services.app.environment.MUSUW_PADDLE_MAX_YEARLY_PRICE_ID == "pri_static_max_yearly") and
   ([.services.app.volumes[] | select(
     .target == "/opt/weknora-production/paddle-runtime-contract.sh" and
@@ -351,14 +356,14 @@ jq -e '
     exit 1
 }
 
-for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret searxng_secret openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
+for secret in db_password redis_password system_aes_key jwt_secret neo4j_auth oidc_client_id oidc_client_secret supabase_service_role_key searxng_secret openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     jq -e --arg secret "$secret" '.secrets[$secret].file | type == "string"' "$config_json" >/dev/null || {
         printf '%s\n' 'production Compose does not use a file-backed required secret' >&2
         exit 1
     }
 done
 
-for secret in openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
+for secret in supabase_service_role_key openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key; do
     jq -e --arg secret "$secret" \
         '[.services.app.secrets[]?.source] | index($secret) != null' "$config_json" >/dev/null || {
         printf '%s\n' 'production app does not mount a required platform model secret' >&2
@@ -366,7 +371,7 @@ for secret in openrouter_management_api_key tikhub_api_key paddle_api_key paddle
     }
 done
 
-for export_name in OPENROUTER_MANAGEMENT_API_KEY TIKHUB_API_KEY MUSUW_PADDLE_API_KEY MUSUW_PADDLE_WEBHOOK_SECRET LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY; do
+for export_name in MUSUW_SUPABASE_SERVICE_ROLE_KEY OPENROUTER_MANAGEMENT_API_KEY TIKHUB_API_KEY MUSUW_PADDLE_API_KEY MUSUW_PADDLE_WEBHOOK_SECRET LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY; do
     grep -Fq "export ${export_name}=\"\$(read_required_secret" "$repo_root/integration/weknora-production/app-entrypoint.sh" || {
         printf '%s\n' 'production entrypoint does not export a required server-only platform secret' >&2
         exit 1

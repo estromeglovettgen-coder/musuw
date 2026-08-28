@@ -59,6 +59,7 @@ type RouterParams struct {
 	ModelCredentialsHandler      *handler.ModelCredentialsHandler
 	EvaluationHandler            *handler.EvaluationHandler
 	AuthHandler                  *handler.AuthHandler
+	AccountErasureHandler        *handler.AccountErasureHandler
 	InitializationHandler        *handler.InitializationHandler
 	SystemHandler                *handler.SystemHandler
 	MCPServiceHandler            *handler.MCPServiceHandler
@@ -270,7 +271,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterEvaluationRoutes(v1, params.EvaluationHandler, rbacGuards)
 		RegisterInitializationRoutes(v1, params.InitializationHandler, rbacGuards)
 		RegisterSystemRoutes(v1, params.SystemHandler, rbacGuards)
-		RegisterSystemAdminRoutes(v1, params.SystemHandler, params.AuditLogHandler, rbacGuards)
+		RegisterSystemAdminRoutes(v1, params.SystemHandler, params.AccountErasureHandler, params.AuditLogHandler, rbacGuards)
 		RegisterMCPServiceRoutes(v1, params.MCPServiceHandler, params.MCPCredentialsHandler, params.MCPOAuthHandler, rbacGuards)
 		RegisterWebSearchRoutes(v1, params.WebSearchHandler, rbacGuards)
 		RegisterWebSearchProviderRoutes(v1, params.WebSearchProviderHandler, params.WebSearchCredentialsHandler, rbacGuards)

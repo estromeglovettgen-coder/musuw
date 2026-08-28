@@ -220,6 +220,7 @@ test('allowlist admits only scoped operations routes and methods', () => {
     ['GET', '/api/v1/system/admin/runtime/queues/knowledge/tasks'],
     ['GET', '/api/v1/system/admin/tenants/10005/entitlement'],
     ['GET', '/api/v1/system/admin/users/7c67173c-7113-4766-98b9-61f47ed182c9/investigation'],
+    ['DELETE', '/api/v1/system/admin/users/7c67173c-7113-4766-98b9-61f47ed182c9'],
     ['PATCH', '/api/v1/system/admin/tenants/10005'],
     ['PUT', '/api/v1/system/admin/tenants/10005/openrouter-credits'],
     ['POST', '/api/v1/system/admin/runtime/queues/knowledge/tasks/abc:123/actions/retry'],
@@ -234,6 +235,7 @@ test('allowlist admits only scoped operations routes and methods', () => {
     ['POST', '/api/v1/system/admin/tenants/10005'],
     ['DELETE', '/api/v1/system/admin/runtime/queues/knowledge/tasks/abc'],
     ['GET', '/api/v1/system/admin/users/not-an-id/investigation'],
+    ['DELETE', '/api/v1/system/admin/users/not-an-id'],
     ['PATCH', '/api/v1/system/admin/tenants/10005/../../settings'],
   ]
   for (const [method, path] of denied) assert.equal(isSafeOperationsPath(method, path), false, `${method} ${path}`)
