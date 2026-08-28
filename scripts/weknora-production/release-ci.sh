@@ -23,7 +23,7 @@ runtime_dir="${WEKNORA_PRODUCTION_RUNTIME_DIR:-/opt/weknora/runtime}"
 current_link='/opt/weknora/current'
 release_id="musuw-$revision"
 manifest_script="$script_dir/source-manifest.sh"
-for command_name in awk bash curl date docker find jq sha256sum; do
+for command_name in awk bash curl date docker find install jq ln mktemp mv readlink sha256sum sleep; do
     weknora_production_require_command "$command_name"
 done
 for required in \
@@ -37,6 +37,121 @@ done
 
 [ -d "$runtime_dir" ] && [ ! -L "$runtime_dir" ] || die 'production runtime directory is unavailable or unsafe'
 
+# Bind rollback to the exact release that currently serves production. A
+# failed candidate may replace app/frontend containers before it is healthy,
+# so preserving only the current symlink is not sufficient.
+[ -L "$current_link" ] || die 'current production release is unavailable or unsafe'
+previous_source="$(readlink -f "$current_link")"
+case "$previous_source" in
+    "$release_root"/musuw-*/source) ;;
+    *) die 'current production release target is outside the fixed release root' ;;
+esac
+[ -d "$previous_source" ] && [ ! -L "$previous_source" ] || die 'current production source is unavailable or unsafe'
+
+docker_config=''
+rollback_dir=''
+runtime_mutated=0
+compose_mutated=0
+previous_revision=''
+
+restore_runtime_snapshot() {
+    local runtime_file
+    [ -n "$rollback_dir" ] && [ -d "$rollback_dir" ] || return 1
+    for runtime_file in production.public.env auth-public.env production.env; do
+        [ -f "$rollback_dir/$runtime_file" ] && [ ! -L "$rollback_dir/$runtime_file" ] || return 1
+        install -m 600 "$rollback_dir/$runtime_file" "$runtime_dir/$runtime_file" || return 1
+    done
+}
+
+rollback_wait_for_healthy() {
+    local container="$1"
+    local expected_revision="$2"
+    local expected_image="$3"
+    local deadline=$(( $(date +%s) + 240 ))
+    local status image_revision image_reference
+
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        status="$(docker inspect "$container" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+        case "$status" in
+            healthy) break ;;
+            unhealthy|exited|dead) return 1 ;;
+        esac
+        sleep 2
+    done
+    status="$(docker inspect "$container" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+    [ "$status" = healthy ] || return 1
+    image_revision="$(docker inspect "$container" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true)"
+    image_reference="$(docker inspect "$container" --format '{{.Config.Image}}' 2>/dev/null || true)"
+    [ "$image_revision" = "$expected_revision" ] && [ "$image_reference" = "$expected_image" ]
+}
+
+rollback_production() {
+    local previous_compose="$previous_source/scripts/weknora-production/compose.sh"
+    local previous_env="$rollback_dir/production.env"
+    local previous_app_image previous_frontend_image app_port frontend_port
+
+    restore_runtime_snapshot || return 1
+    [ -x "$previous_compose" ] || return 1
+    previous_app_image="$(weknora_production_env_value "$previous_env" WEKNORA_PRODUCTION_APP_IMAGE || true)"
+    previous_frontend_image="$(weknora_production_env_value "$previous_env" WEKNORA_PRODUCTION_FRONTEND_IMAGE || true)"
+    app_port="$(weknora_production_env_value "$previous_env" WEKNORA_PRODUCTION_APP_PORT || true)"
+    frontend_port="$(weknora_production_env_value "$previous_env" WEKNORA_PRODUCTION_FRONTEND_PORT || true)"
+    [[ "$previous_app_image" =~ ^ghcr\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$ ]] || return 1
+    [[ "$previous_frontend_image" =~ ^ghcr\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$ ]] || return 1
+    case "$app_port:$frontend_port" in
+        *[!0-9:]*|:*|*:) return 1 ;;
+    esac
+
+    DOCKER_CONFIG="$docker_config" WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+    WEKNORA_PRODUCTION_REVISION="$previous_revision" \
+        "$previous_compose" --edge up -d --no-build --no-deps --force-recreate app frontend || return 1
+    rollback_wait_for_healthy weknora-v072-production-app "$previous_revision" "$previous_app_image" || return 1
+    rollback_wait_for_healthy weknora-v072-production-frontend "$previous_revision" "$previous_frontend_image" || return 1
+    curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 "http://127.0.0.1:${app_port}/health" >/dev/null || return 1
+    curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 "http://127.0.0.1:${frontend_port}/health" >/dev/null || return 1
+}
+
+cleanup() {
+    local status=$?
+    local rollback_status=0
+    trap - EXIT
+    set +e
+    if [ "$status" -ne 0 ] && [ "${runtime_mutated:-0}" -eq 1 ]; then
+        if [ "${compose_mutated:-0}" -eq 1 ]; then
+            rollback_production
+            rollback_status=$?
+        else
+            restore_runtime_snapshot
+            rollback_status=$?
+        fi
+        if [ "$rollback_status" -ne 0 ]; then
+            printf '%s\n' 'automatic production rollback failed' >&2
+        fi
+    fi
+    if [ -n "${docker_config:-}" ] && [ -d "$docker_config" ]; then
+        DOCKER_CONFIG="$docker_config" docker logout ghcr.io >/dev/null 2>&1 || true
+        find "$docker_config" -depth -delete 2>/dev/null || true
+    fi
+    if [ -n "${rollback_dir:-}" ] && [ -d "$rollback_dir" ]; then
+        find "$rollback_dir" -depth -delete 2>/dev/null || true
+    fi
+    unset ghcr_username ghcr_token docker_config rollback_dir
+    exit "$status"
+}
+trap cleanup EXIT
+
+rollback_dir="$(mktemp -d "$runtime_dir/release-rollback.XXXXXX")"
+chmod 700 "$rollback_dir"
+for runtime_file in production.public.env auth-public.env production.env; do
+    [ -f "$runtime_dir/$runtime_file" ] && [ ! -L "$runtime_dir/$runtime_file" ] || \
+        die 'existing production runtime configuration is unavailable or unsafe'
+    install -m 600 "$runtime_dir/$runtime_file" "$rollback_dir/$runtime_file"
+done
+previous_revision="$(weknora_production_env_value "$rollback_dir/production.env" WEKNORA_PRODUCTION_REVISION || true)"
+[[ "$previous_revision" =~ ^[0-9a-f]{40}$ ]] || die 'existing production revision is unavailable or unsafe'
+[ "$previous_source" = "$release_root/musuw-$previous_revision/source" ] || \
+    die 'current production source does not match its runtime revision'
+
 # The runner streams a short-lived GitHub token over the restricted SSH
 # connection. Keep it out of argv, logs and the persistent runtime directory;
 # Docker reads the credential only from this temporary config during pull.
@@ -48,17 +163,6 @@ esac
 [ -n "$ghcr_token" ] || die 'GHCR token is empty'
 docker_config="$(mktemp -d /run/musuw-ghcr.XXXXXX)"
 chmod 700 "$docker_config"
-cleanup() {
-    local status=$?
-    trap - EXIT
-    if [ -n "${docker_config:-}" ] && [ -d "$docker_config" ]; then
-        DOCKER_CONFIG="$docker_config" docker logout ghcr.io >/dev/null 2>&1 || true
-        find "$docker_config" -depth -delete 2>/dev/null || true
-    fi
-    unset ghcr_username ghcr_token docker_config
-    exit "$status"
-}
-trap cleanup EXIT
 
 # The manifest is checked again after rsync and before touching server runtime
 # state. It binds the exact release directory to this caller-supplied SHA.
@@ -68,6 +172,7 @@ source_bundle_sha256="$(
         bash "$manifest_script" verify "$repo_root"
 )"
 
+runtime_mutated=1
 install -m 600 "$repo_root/deploy/production.public.env" "$runtime_dir/production.public.env"
 install -m 600 "$repo_root/deploy/auth-public.env" "$runtime_dir/auth-public.env"
 
@@ -86,6 +191,7 @@ DOCKER_CONFIG="$docker_config" WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
 
 # The fixed native Compose project replaces only the application/frontend
 # services; named data services and volumes remain authoritative on the host.
+compose_mutated=1
 DOCKER_CONFIG="$docker_config" WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
 WEKNORA_PRODUCTION_REVISION="$revision" \
     "$script_dir/compose.sh" --edge up -d --no-build --no-deps --force-recreate app frontend
@@ -125,9 +231,11 @@ curl -fsS --connect-timeout 10 --retry 6 --retry-delay 2 https://app.musuw.com/a
 next_link="$runtime_dir/current.next.$$"
 ln -s "$repo_root" "$next_link"
 mv -Tf "$next_link" "$current_link"
+runtime_mutated=0
+compose_mutated=0
 
 # Immutable releases leave old app/frontend images behind. Reclaim only images
 # that no running container uses; named volumes and live images are untouched.
-docker image prune -a -f >/dev/null
+docker image prune -a -f >/dev/null || true
 
 printf '%s\n' "simple release green: $release_id source_bundle_sha256=$source_bundle_sha256"

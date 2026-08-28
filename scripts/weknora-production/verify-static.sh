@@ -228,6 +228,17 @@ printf '%s\n' \
 } > "$runtime_dir/production.public.env"
 
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null
+for expected_runtime_public in \
+    'MUSUW_DEPLOYMENT_ENVIRONMENT=production' \
+    'MUSUW_AUTH_PUBLIC_ORIGIN=https://app.musuw.com' \
+    'MUSUW_SUPABASE_URL=https://identity.example' \
+    'MUSUW_SUPABASE_PUBLISHABLE_KEY=static-public-browser-key' \
+    'MUSUW_WEKNORA_OAUTH_CLIENT_ID=static-native-oidc-client'; do
+    grep -Fqx "$expected_runtime_public" "$runtime_dir/production.env" || {
+        printf '%s\n' 'production runtime did not derive the complete browser startup configuration' >&2
+        exit 1
+    }
+done
 if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|OIDC_AUTH_CLIENT_SECRET|SEARXNG_SECRET|OPENROUTER_MANAGEMENT_API_KEY|TIKHUB_API_KEY|MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET|LANGFUSE_PUBLIC_KEY|LANGFUSE_SECRET_KEY)=' "$runtime_dir/production.env"; then
     printf '%s\n' 'production runtime env contains a credential value instead of only a file path' >&2
     exit 1
@@ -308,6 +319,11 @@ jq -e '
   (.services.frontend.ports[0].published == "4191") and
   (.services.frontend.ports[0].target == 8080) and
   (.services.frontend.environment.APP_HOST == "weknora-v072-production-app") and
+  (.services.frontend.environment.MUSUW_DEPLOYMENT_ENVIRONMENT == "production") and
+  (.services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "https://app.musuw.com") and
+  (.services.frontend.environment.MUSUW_SUPABASE_URL == "https://identity.example") and
+  (.services.frontend.environment.MUSUW_SUPABASE_PUBLISHABLE_KEY == "static-public-browser-key") and
+  (.services.frontend.environment.MUSUW_WEKNORA_OAUTH_CLIENT_ID == "static-native-oidc-client") and
   ((.services.frontend.networks | has("edge")) | not) and
   (.services.app.environment.APP_EXTERNAL_URL == "https://app.musuw.com") and
   (.services.app.environment.FRONTEND_BASE_URL == "https://app.musuw.com") and

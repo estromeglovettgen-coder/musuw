@@ -4,6 +4,41 @@
 操作顺序和非敏感验证结论；不得加入审核账号凭据、个人/企业核验资料、
 Paddle 资源 ID、credential 值、网络地址或供应商响应原文。
 
+> 生产 Live readiness 与 staging Sandbox commissioning 是两个独立边界。本文件
+> 中的 Live 结论只适用于 `app.musuw.com`/production；它不能替代
+> [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) 的 Sandbox 端到端验收，也不能
+> 允许 staging 写入或修改任何 Live catalog、destination、secret、价格、默认链接
+> 或资金设置。Staging 必须先走 staging-only、完整人工 Sandbox E2E，再用相同 SHA
+> 和 digest 手动 promote。
+
+## Staging Sandbox readiness（独立、不收费）
+
+Staging 的 Sandbox unit 必须一次性核对并保持成组：SDK mode `sandbox`、Sandbox
+API URL、`test_` client token、`pdl_sdbx_apikey_` server API key、`pdl_ntfset_`
+destination secret、Plus/Pro/Max monthly/yearly 六个 distinct recurring USD
+prices、approved `staging.app.musuw.com` checkout domain、Sandbox `/pay` default
+payment link，以及 Paddle-owned location tax、currency 和 payment-method 设置。
+这些值只进入 staging protected runtime/GitHub `staging` Environment；不得复制到
+production Live files or browser bundles。
+
+The staging destination exposes the exact public
+`POST /api/v1/billing/paddle/webhook` path (Cloudflare Access bypass only for this
+path) and the reviewed 11-event set: the nine subscription/transaction events plus
+`adjustment.created` and `adjustment.updated`. The origin verifies the raw body
+signature before queueing existing billing work and acknowledging; unsigned,
+unknown-price, wrong-quantity, non-recurring or queue-failed events must not grant
+entitlement and must remain retryable.
+
+Use only official Sandbox success/decline cards and Paddle simulations with a fresh
+test identity. The manual gate covers first purchase, upgrade, cancel/period-end
+degrade, resume, duplicate/retry/out-of-order/signature handling, local plan and
+membership, OpenRouter personal-period allowance, customer portal and provider
+billing history. Browser callbacks and API responses never grant a plan. Do not
+enter a real card, create a Live entity, or perform a real charge, refund,
+chargeback, transfer, payout or withdrawal. Keep only status/count/SHA/digest and
+non-sensitive timing evidence. Full details and rollback are in
+[`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md).
+
 ## 当前结论
 
 | 阶段 | 当前结论 | 仍需完成 |

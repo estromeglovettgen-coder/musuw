@@ -43,7 +43,8 @@ type KeyInfo struct {
 }
 
 type sdkKeyManager struct {
-	client *openroutersdk.OpenRouter
+	client      *openroutersdk.OpenRouter
+	workspaceID string
 }
 
 func NewKeyManagerFromEnv() KeyManager {
@@ -56,14 +57,19 @@ func NewKeyManagerFromEnv() KeyManager {
 	if key == "" {
 		return nil
 	}
-	return newSDKKeyManager(key, openroutersdk.ServerList[openroutersdk.ServerProduction], &http.Client{Timeout: 10 * time.Second})
+	workspaceID := strings.TrimSpace(os.Getenv("OPENROUTER_WORKSPACE_ID"))
+	return newSDKKeyManagerWithWorkspace(key, workspaceID, openroutersdk.ServerList[openroutersdk.ServerProduction], &http.Client{Timeout: 10 * time.Second})
 }
 
 func newSDKKeyManager(managementKey, baseURL string, client openroutersdk.HTTPClient) *sdkKeyManager {
+	return newSDKKeyManagerWithWorkspace(managementKey, "", baseURL, client)
+}
+
+func newSDKKeyManagerWithWorkspace(managementKey, workspaceID, baseURL string, client openroutersdk.HTTPClient) *sdkKeyManager {
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &sdkKeyManager{client: openroutersdk.New(
+	return &sdkKeyManager{workspaceID: strings.TrimSpace(workspaceID), client: openroutersdk.New(
 		openroutersdk.WithSecurity(strings.TrimSpace(managementKey)),
 		openroutersdk.WithServerURL(strings.TrimRight(baseURL, "/")),
 		openroutersdk.WithClient(client),
@@ -84,11 +90,15 @@ func (m *sdkKeyManager) CreateKey(ctx context.Context, name string, limitMicrous
 		value := operations.CreateKeysLimitResetMonthly
 		reset = optionalnullable.From(&value)
 	}
-	response, err := m.client.APIKeys.Create(ctx, operations.CreateKeysRequest{
+	request := operations.CreateKeysRequest{
 		Name:       name,
 		Limit:      optionalnullable.From(&limitUSD),
 		LimitReset: reset,
-	}, operations.WithRetries(retry.Config{Strategy: "none"}))
+	}
+	if m.workspaceID != "" {
+		request.WorkspaceID = &m.workspaceID
+	}
+	response, err := m.client.APIKeys.Create(ctx, request, operations.WithRetries(retry.Config{Strategy: "none"}))
 	if err != nil {
 		return nil, managementSDKError("create key", err)
 	}

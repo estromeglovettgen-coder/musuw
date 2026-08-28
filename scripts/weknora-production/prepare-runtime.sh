@@ -62,9 +62,7 @@ public_oidc_client_id="$(weknora_production_require_env_value "$auth_public_env"
 auth_public_origin="$(weknora_production_require_env_value "$auth_public_env" VITE_AUTH_PUBLIC_ORIGIN)"
 [ "$auth_public_origin" = 'https://app.musuw.com' ] || weknora_production_die 'production auth public origin must remain https://app.musuw.com'
 supabase_url="$(weknora_production_require_env_value "$auth_public_env" VITE_SUPABASE_URL)"
-for key in VITE_SUPABASE_PUBLISHABLE_KEY; do
-    weknora_production_require_env_value "$auth_public_env" "$key" >/dev/null
-done
+supabase_publishable_key="$(weknora_production_require_env_value "$auth_public_env" VITE_SUPABASE_PUBLISHABLE_KEY)"
 case "$supabase_url" in
     https://*) ;;
     *) weknora_production_die 'Supabase browser URL must use HTTPS' ;;
@@ -77,7 +75,7 @@ case "$supabase_host" in
 esac
 secret_oidc_client_id="$(weknora_production_read_secret "$secret_dir/oidc_client_id")"
 [ "$public_oidc_client_id" = "$secret_oidc_client_id" ] || weknora_production_die 'public auth bundle client id does not match its file-backed native OIDC client id'
-unset public_oidc_client_id secret_oidc_client_id
+unset secret_oidc_client_id
 
 tmp_env="$(mktemp "$runtime_dir/production.env.XXXXXX")"
 trap 'find "$tmp_env" -type f -delete 2>/dev/null || true' EXIT
@@ -188,7 +186,13 @@ weknora_production_assert_exact_volume searxng-config "$(weknora_production_requ
 
 printf '%s\n' "WEKNORA_PRODUCTION_SECRET_DIR=$secret_dir" >> "$tmp_env"
 printf '%s\n' "SSRF_WHITELIST_EXTRA=searxng,qdrant,milvus,weaviate,doris-fe,doris-be,$supabase_host" >> "$tmp_env"
-unset supabase_url supabase_authority supabase_host
+printf '%s\n' \
+    'MUSUW_DEPLOYMENT_ENVIRONMENT=production' \
+    "MUSUW_AUTH_PUBLIC_ORIGIN=$auth_public_origin" \
+    "MUSUW_SUPABASE_URL=$supabase_url" \
+    "MUSUW_SUPABASE_PUBLISHABLE_KEY=$supabase_publishable_key" \
+    "MUSUW_WEKNORA_OAUTH_CLIENT_ID=$public_oidc_client_id" >> "$tmp_env"
+unset auth_public_origin public_oidc_client_id supabase_url supabase_publishable_key supabase_authority supabase_host
 mv "$tmp_env" "$output_env"
 trap - EXIT
 

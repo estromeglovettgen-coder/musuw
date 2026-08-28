@@ -1,0 +1,279 @@
+# Thin staging-only overlay. Render it with the official upstream Compose file
+# through scripts/weknora-staging/compose.sh. Images are immutable GHCR digests
+# supplied by the release record; Docker never builds on the server.
+services:
+  frontend:
+    platform: linux/amd64
+    image: ${WEKNORA_STAGING_FRONTEND_IMAGE:?set WEKNORA_STAGING_FRONTEND_IMAGE}
+    build: !reset null
+    container_name: weknora-v072-staging-frontend
+    ports: !override
+      - "127.0.0.1:${WEKNORA_STAGING_FRONTEND_PORT:-4192}:8080"
+    expose:
+      - "8080"
+    environment: !override
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+      APP_HOST: weknora-v072-staging-app
+      APP_PORT: "8080"
+      APP_SCHEME: http
+      MUSUW_DEPLOYMENT_ENVIRONMENT: staging
+      MUSUW_AUTH_PUBLIC_ORIGIN: ${MUSUW_AUTH_PUBLIC_ORIGIN:?set MUSUW_AUTH_PUBLIC_ORIGIN}
+      MUSUW_SUPABASE_URL: ${MUSUW_SUPABASE_URL:?set MUSUW_SUPABASE_URL}
+      MUSUW_SUPABASE_PUBLISHABLE_KEY: ${MUSUW_SUPABASE_PUBLISHABLE_KEY:?set MUSUW_SUPABASE_PUBLISHABLE_KEY}
+      MUSUW_WEKNORA_OAUTH_CLIENT_ID: ${MUSUW_WEKNORA_OAUTH_CLIENT_ID:?set MUSUW_WEKNORA_OAUTH_CLIENT_ID}
+    depends_on: !override
+      app:
+        condition: service_healthy
+    networks: !override
+      WeKnora-network: {}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    cpus: ${WEKNORA_STAGING_FRONTEND_CPUS:-0.125}
+    mem_limit: ${WEKNORA_STAGING_FRONTEND_MEMORY:-128m}
+    pids_limit: ${WEKNORA_STAGING_FRONTEND_PIDS:-128}
+
+  app:
+    platform: linux/amd64
+    image: ${WEKNORA_STAGING_APP_IMAGE:?set WEKNORA_STAGING_APP_IMAGE}
+    build: !reset null
+    container_name: weknora-v072-staging-app
+    ports: !override
+      - "127.0.0.1:${WEKNORA_STAGING_APP_PORT:-18092}:8080"
+    env_file: !override
+      - ${WEKNORA_STAGING_RUNTIME_DIR:?set WEKNORA_STAGING_RUNTIME_DIR}/staging.env
+    environment: !override
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      GIN_MODE: ${GIN_MODE:-release}
+      TZ: ${TZ:-Asia/Shanghai}
+      AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
+      AUTO_RECOVER_DIRTY: ${AUTO_RECOVER_DIRTY:-true}
+      DB_DRIVER: ${DB_DRIVER:-postgres}
+      RETRIEVE_DRIVER: ${RETRIEVE_DRIVER:-postgres}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:?set DB_USER in staging.env}
+      DB_NAME: ${DB_NAME:?set DB_NAME in staging.env}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
+      STREAM_MANAGER_TYPE: ${STREAM_MANAGER_TYPE:-redis}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PREFIX: ${REDIS_PREFIX:-stream:}
+      WEKNORA_REDIS_NAMESPACE: weknora-v072-staging
+      WEKNORA_HOUSEKEEPING_ENABLED: "true"
+      DOCREADER_ADDR: ${DOCREADER_ADDR:-docreader:50051}
+      DOCREADER_TRANSPORT: ${DOCREADER_TRANSPORT:-grpc}
+      STORAGE_TYPE: s3
+      S3_ENDPOINT: ${MUSUW_STAGING_R2_ENDPOINT:?set MUSUW_STAGING_R2_ENDPOINT}
+      S3_REGION: auto
+      S3_BUCKET_NAME: ${MUSUW_STAGING_R2_BUCKET:?set MUSUW_STAGING_R2_BUCKET}
+      S3_PATH_PREFIX: weknora
+      S3_USE_SSL: "true"
+      S3_FORCE_PATH_STYLE: "true"
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://jp.cloud.langfuse.com}
+      LANGFUSE_RELEASE: ${LANGFUSE_RELEASE:-musuw-staging}
+      LANGFUSE_ENVIRONMENT: staging
+      LOCAL_STORAGE_BASE_DIR: /data/files
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+      APP_EXTERNAL_URL: ${APP_EXTERNAL_URL:?set APP_EXTERNAL_URL in staging.env}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL in staging.env}
+      NEO4J_ENABLE: "false"
+      WEKNORA_AUTH_DEFAULT_TENANT_MODE: ${WEKNORA_AUTH_DEFAULT_TENANT_MODE:-create_personal}
+      OIDC_AUTH_ENABLE: ${OIDC_AUTH_ENABLE:-true}
+      OIDC_AUTH_ISSUER_URL: ${OIDC_AUTH_ISSUER_URL:?set OIDC_AUTH_ISSUER_URL in staging.env}
+      OIDC_AUTH_DISCOVERY_URL: ${OIDC_AUTH_DISCOVERY_URL:?set OIDC_AUTH_DISCOVERY_URL in staging.env}
+      OIDC_AUTH_PROVIDER_DISPLAY_NAME: ${OIDC_AUTH_PROVIDER_DISPLAY_NAME:-Musuw}
+      OIDC_AUTH_SCOPES: ${OIDC_AUTH_SCOPES:-openid profile email}
+      OIDC_USER_INFO_MAPPING_USER_NAME: ${OIDC_USER_INFO_MAPPING_USER_NAME:-name}
+      OIDC_USER_INFO_MAPPING_EMAIL: ${OIDC_USER_INFO_MAPPING_EMAIL:-email}
+      MUSUW_DEPLOYMENT_ENVIRONMENT: staging
+      MUSUW_PADDLE_ENVIRONMENT: sandbox
+      MUSUW_PADDLE_API_URL: ${MUSUW_PADDLE_API_URL:-https://sandbox-api.paddle.com}
+      MUSUW_PADDLE_CLIENT_TOKEN: ${MUSUW_PADDLE_CLIENT_TOKEN:?set MUSUW_PADDLE_CLIENT_TOKEN}
+      MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID: ${MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID:?set MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID}
+      MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID: ${MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID:?set MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID}
+      MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID: ${MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID:?set MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID}
+      MUSUW_PADDLE_PRO_YEARLY_PRICE_ID: ${MUSUW_PADDLE_PRO_YEARLY_PRICE_ID:?set MUSUW_PADDLE_PRO_YEARLY_PRICE_ID}
+      MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID: ${MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID:?set MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID}
+      MUSUW_PADDLE_MAX_YEARLY_PRICE_ID: ${MUSUW_PADDLE_MAX_YEARLY_PRICE_ID:?set MUSUW_PADDLE_MAX_YEARLY_PRICE_ID}
+      OPENROUTER_WORKSPACE_ID: ${OPENROUTER_WORKSPACE_ID:?set OPENROUTER_WORKSPACE_ID}
+      SSRF_WHITELIST_EXTRA: ${SSRF_WHITELIST_EXTRA:?generated by prepare-runtime.sh}
+    entrypoint: ["/bin/sh", "/opt/weknora-staging/app-entrypoint.sh"]
+    command: ["./WeKnora"]
+    volumes: !override
+      - data-files:/data/files
+      - docreader-tmp:/tmp/docreader:ro
+      - ../weknora/config/config.yaml:/app/config/config.yaml:ro
+      - ../integration/weknora-staging/app-entrypoint.sh:/opt/weknora-staging/app-entrypoint.sh:ro
+      - ../integration/weknora-production/paddle-runtime-contract.sh:/opt/weknora-staging/paddle-runtime-contract.sh:ro
+    secrets:
+      - source: db_password
+        target: db_password
+        mode: 0400
+      - source: redis_password
+        target: redis_password
+        mode: 0400
+      - source: system_aes_key
+        target: system_aes_key
+        mode: 0400
+      - source: jwt_secret
+        target: jwt_secret
+        mode: 0400
+      - source: oidc_client_id
+        target: oidc_client_id
+        mode: 0400
+      - source: oidc_client_secret
+        target: oidc_client_secret
+        mode: 0400
+      - source: supabase_service_role_key
+        target: supabase_service_role_key
+        mode: 0400
+      - source: openrouter_management_api_key
+        target: openrouter_management_api_key
+        mode: 0400
+      - source: paddle_api_key
+        target: paddle_api_key
+        mode: 0400
+      - source: paddle_webhook_secret
+        target: paddle_webhook_secret
+        mode: 0400
+      - source: r2_access_key_id
+        target: r2_access_key_id
+        mode: 0400
+      - source: r2_secret_access_key
+        target: r2_secret_access_key
+        mode: 0400
+    depends_on: !override
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      docreader:
+        condition: service_healthy
+    networks: !override
+      WeKnora-network: {}
+    restart: unless-stopped
+    cpus: ${WEKNORA_STAGING_APP_CPUS:-0.75}
+    mem_limit: ${WEKNORA_STAGING_APP_MEMORY:-768m}
+    pids_limit: ${WEKNORA_STAGING_APP_PIDS:-256}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  docreader:
+    platform: linux/amd64
+    image: wechatopenai/weknora-docreader@sha256:b9c4636b65b5d4947d5e09cd311ba6cf37f1f2da37c51d4be2b911d432f12abe
+    build: !reset null
+    container_name: weknora-v072-staging-docreader
+    environment: !override
+      TZ: ${TZ:-Asia/Shanghai}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DOCREADER_IMAGE_OUTPUT_DIR: /tmp/docreader
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+      DOCREADER_GRPC_PORT: "50051"
+    volumes: !override
+      - docreader-tmp:/tmp/docreader
+    networks: !override
+      WeKnora-network: {}
+    restart: unless-stopped
+    cpus: ${WEKNORA_STAGING_DOCREADER_CPUS:-0.25}
+    mem_limit: ${WEKNORA_STAGING_DOCREADER_MEMORY:-384m}
+    pids_limit: ${WEKNORA_STAGING_DOCREADER_PIDS:-128}
+
+  postgres:
+    platform: linux/amd64
+    image: paradedb/paradedb:v0.22.2-pg17
+    container_name: weknora-v072-staging-postgres
+    environment: !override
+      POSTGRES_USER: ${DB_USER:?set DB_USER in staging.env}
+      POSTGRES_DB: ${DB_NAME:?set DB_NAME in staging.env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes: !override
+      - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - source: db_password
+        target: db_password
+        mode: 0400
+    networks: !override
+      WeKnora-network: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:?set DB_USER in staging.env} -d ${DB_NAME:?set DB_NAME in staging.env}"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    stop_grace_period: 1m
+    cpus: ${WEKNORA_STAGING_POSTGRES_CPUS:-0.25}
+    mem_limit: ${WEKNORA_STAGING_POSTGRES_MEMORY:-384m}
+    pids_limit: ${WEKNORA_STAGING_POSTGRES_PIDS:-128}
+
+  redis:
+    platform: linux/amd64
+    image: redis:7.0-alpine
+    container_name: weknora-v072-staging-redis
+    entrypoint: ["/bin/sh", "/opt/weknora-production/redis-entrypoint.sh"]
+    command: []
+    volumes:
+      - redis-data:/data
+      - ../integration/weknora-production/redis-entrypoint.sh:/opt/weknora-production/redis-entrypoint.sh:ro
+    secrets:
+      - source: redis_password
+        target: redis_password
+        mode: 0400
+    networks: !override
+      WeKnora-network: {}
+    restart: unless-stopped
+    cpus: ${WEKNORA_STAGING_REDIS_CPUS:-0.125}
+    mem_limit: ${WEKNORA_STAGING_REDIS_MEMORY:-128m}
+    pids_limit: ${WEKNORA_STAGING_REDIS_PIDS:-128}
+
+networks:
+  WeKnora-network:
+    name: weknora-v072-staging-internal
+    driver: bridge
+
+volumes:
+  postgres-data:
+    external: true
+    name: ${WEKNORA_STAGING_POSTGRES_VOLUME:?set WEKNORA_STAGING_POSTGRES_VOLUME}
+  data-files:
+    external: true
+    name: ${WEKNORA_STAGING_FILES_VOLUME:?set WEKNORA_STAGING_FILES_VOLUME}
+  docreader-tmp:
+    external: true
+    name: ${WEKNORA_STAGING_DOCREADER_TMP_VOLUME:?set WEKNORA_STAGING_DOCREADER_TMP_VOLUME}
+  redis-data:
+    external: true
+    name: ${WEKNORA_STAGING_REDIS_VOLUME:?set WEKNORA_STAGING_REDIS_VOLUME}
+
+secrets:
+  # On Tokyo MUSUW_STAGING_SECRET_DIR is fixed to
+  # /opt/weknora/staging-runtime/secrets; local fixtures may override it.
+  db_password:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/db_password
+  redis_password:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/redis_password
+  system_aes_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/system_aes_key
+  jwt_secret:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/jwt_secret
+  oidc_client_id:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/oidc_client_id
+  oidc_client_secret:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/oidc_client_secret
+  supabase_service_role_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/supabase_service_role_key
+  openrouter_management_api_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/openrouter_management_api_key
+  paddle_api_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/paddle_api_key
+  paddle_webhook_secret:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/paddle_webhook_secret
+  r2_access_key_id:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/r2_access_key_id
+  r2_secret_access_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/r2_secret_access_key

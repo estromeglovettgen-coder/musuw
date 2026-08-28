@@ -39,6 +39,13 @@ grep -Fq 'compose.sh" --edge pull app frontend' "$release_ci" || fail 'release h
 grep -Fq 'docker login ghcr.io' "$release_ci" || fail 'release helper does not authenticate to GHCR through stdin'
 grep -Fq 'mktemp -d /run/musuw-ghcr.' "$release_ci" || fail 'GHCR Docker config is not created in the temporary runtime filesystem'
 grep -Fq 'find "$docker_config" -depth -delete' "$release_ci" || fail 'GHCR Docker config is not removed on exit'
+grep -Fq 'rollback_production' "$release_ci" || fail 'release helper has no automatic app/frontend rollback'
+grep -Fq 'previous_source=' "$release_ci" || fail 'release helper does not bind rollback to the prior current release'
+grep -Fq 'compose_mutated=1' "$release_ci" || fail 'release helper does not track the production mutation boundary'
+for runtime_file in production.public.env auth-public.env production.env; do
+    grep -Fq "$runtime_file" "$release_ci" || fail "release rollback does not preserve $runtime_file"
+done
+grep -Fq 'automatic production rollback failed' "$release_ci" || fail 'release helper does not report a failed rollback honestly'
 grep -Fq -- '--no-build' "$release_ci" || fail 'release helper still permits a server-side build'
 if grep -Fq 'build-images.sh' "$release_ci"; then
     fail 'release helper still invokes the removed server image build'

@@ -5,6 +5,12 @@ interface ImportMetaEnv {
   readonly VITE_WEKNORA_OAUTH_CLIENT_ID: string;
 }
 
+interface Window {
+  __RUNTIME_CONFIG__?: {
+    auth?: unknown;
+  };
+}
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }

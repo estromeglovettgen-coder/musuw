@@ -9,7 +9,10 @@ on:
       - 'storefront/**'
       - 'weknora/**'
       - 'scripts/**'
+      - 'scripts/weknora-staging/**'
+      - 'scripts/weknora-staging-deploy.sh'
       - 'integration/weknora-production/**'
+      - 'integration/weknora-staging/**'
       - 'third_party/weknora/**'
       - 'openspec/**'
       - 'AGENTS.md'
@@ -31,7 +34,10 @@ on:
       - 'storefront/**'
       - 'weknora/**'
       - 'scripts/**'
+      - 'scripts/weknora-staging/**'
+      - 'scripts/weknora-staging-deploy.sh'
       - 'integration/weknora-production/**'
+      - 'integration/weknora-staging/**'
       - 'third_party/weknora/**'
       - 'openspec/**'
       - 'AGENTS.md'
@@ -233,3 +239,9 @@ jobs:
           bash scripts/weknora-production/deploy-ci-seams-contract.test.sh
           bash scripts/weknora-production/musuw-deploy-gate-simulation.test.sh
           # verify-static.sh renders both base and edge scripts/weknora-production/compose.sh config.
+      - name: Run isolated staging runtime and gate contracts
+        run: |
+          bash scripts/weknora-staging/contract.test.sh
+          bash scripts/weknora-staging/verify-static.sh
+          bash scripts/weknora-staging/capacity-preflight.test.sh
+          bash scripts/weknora-staging/gate-simulation.test.sh

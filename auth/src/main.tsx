@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthApp, getAuthCopy } from "./AuthApp";
-import { authConfigFromEnvironment } from "./config";
+import { authConfigFromRuntimeOrEnvironment } from "./config";
 import { getInitialAuthLocale } from "./locale";
 import { createAuthRuntime } from "./runtime";
 import { createSupabaseIdentityClient } from "./supabase";
@@ -16,7 +16,14 @@ if (root === null) {
 
 let content: React.ReactNode;
 try {
-  const config = authConfigFromEnvironment(import.meta.env);
+  const runtimeConfig = (window as Window & {
+    __RUNTIME_CONFIG__?: { auth?: unknown };
+  }).__RUNTIME_CONFIG__;
+  const config = authConfigFromRuntimeOrEnvironment(
+    import.meta.env,
+    runtimeConfig?.auth,
+    import.meta.env.PROD,
+  );
   const runtime = createAuthRuntime({
     config,
     createIdentityClient: (identityConfig) =>

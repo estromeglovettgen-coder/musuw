@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# Read-only deployed staging acceptance. It prints operational status only and
+# never expands a secret, public token, webhook secret, or personal payload.
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$script_dir/lib.sh"
+
+fail() { weknora_staging_die "$1"; }
+
+runtime_dir="$(weknora_staging_runtime_dir)"
+staging_env="$runtime_dir/staging.env"
+weknora_staging_require_file "$staging_env"
+weknora_staging_require_command docker
+weknora_staging_require_command curl
+weknora_staging_require_command jq
+[ -x "$script_dir/capacity-preflight.sh" ] || fail 'staging capacity preflight is unavailable'
+
+# Recheck host capacity and production health after staging has started. The
+# guard reads Docker state and host memory metadata only, never production
+# environment or secret files.
+"$script_dir/capacity-preflight.sh"
+
+revision="$(weknora_staging_revision)"
+expected_app="$(weknora_staging_require_env_value "$staging_env" WEKNORA_STAGING_APP_IMAGE)"
+expected_frontend="$(weknora_staging_require_env_value "$staging_env" WEKNORA_STAGING_FRONTEND_IMAGE)"
+runner_expected_app="${WEKNORA_STAGING_EXPECTED_APP_IMAGE:-}"
+runner_expected_frontend="${WEKNORA_STAGING_EXPECTED_FRONTEND_IMAGE:-}"
+weknora_staging_require_immutable_image "$expected_app"
+weknora_staging_require_immutable_image "$expected_frontend"
+weknora_staging_require_immutable_image "$runner_expected_app"
+weknora_staging_require_immutable_image "$runner_expected_frontend"
+[ "$expected_app" = "$runner_expected_app" ] || fail 'staging app release record differs from the runner-approved digest'
+[ "$expected_frontend" = "$runner_expected_frontend" ] || fail 'staging frontend release record differs from the runner-approved digest'
+
+wait_for_healthy() {
+    local container="$1" deadline status
+    deadline=$(( $(date +%s) + 30 ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        status="$(docker inspect "$container" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+        [ "$status" = healthy ] && return 0
+        case "$status" in unhealthy|exited|dead) fail "staging container is unhealthy: $container" ;; esac
+        sleep 1
+    done
+    fail "staging container health timed out: $container"
+}
+
+for container in \
+    weknora-v072-staging-postgres \
+    weknora-v072-staging-redis \
+    weknora-v072-staging-docreader \
+    weknora-v072-staging-app \
+    weknora-v072-staging-frontend; do
+    docker inspect "$container" >/dev/null 2>&1 || fail "staging container is missing: $container"
+    project="$(docker inspect "$container" --format '{{index .Config.Labels "com.docker.compose.project"}}')"
+    [ "$project" = weknora-v072-staging ] || fail "staging container has the wrong Compose project: $container"
+done
+wait_for_healthy weknora-v072-staging-postgres
+wait_for_healthy weknora-v072-staging-app
+wait_for_healthy weknora-v072-staging-frontend
+
+assert_resource_limits() {
+    local container="$1" inspection memory nano_cpus pids_limit
+    inspection="$(docker inspect "$container" --format '{{.HostConfig.Memory}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.PidsLimit}}' 2>/dev/null || true)"
+    [ -n "$inspection" ] || fail "staging resource metadata is unavailable: $container"
+    IFS='|' read -r memory nano_cpus pids_limit <<< "$inspection"
+    case "$memory" in ''|*[!0-9]*) fail "staging memory limit is invalid: $container" ;; esac
+    case "$nano_cpus" in ''|*[!0-9]*) fail "staging CPU limit is invalid: $container" ;; esac
+    case "$pids_limit" in ''|*[!0-9]*) fail "staging PID limit is invalid: $container" ;; esac
+    [ "$memory" -gt 0 ] || fail "staging memory limit is missing: $container"
+    [ "$nano_cpus" -gt 0 ] || fail "staging CPU limit is missing: $container"
+    [ "$pids_limit" -gt 0 ] || fail "staging PID limit is missing: $container"
+}
+for container in \
+    weknora-v072-staging-postgres \
+    weknora-v072-staging-redis \
+    weknora-v072-staging-docreader \
+    weknora-v072-staging-app \
+    weknora-v072-staging-frontend; do
+    assert_resource_limits "$container"
+done
+
+actual_app="$(docker inspect weknora-v072-staging-app --format '{{.Config.Image}}')"
+actual_frontend="$(docker inspect weknora-v072-staging-frontend --format '{{.Config.Image}}')"
+[ "$actual_app" = "$expected_app" ] || fail 'staging app digest does not match the release record'
+[ "$actual_frontend" = "$expected_frontend" ] || fail 'staging frontend digest does not match the release record'
+for container in weknora-v072-staging-app weknora-v072-staging-frontend; do
+    image_revision="$(docker inspect "$container" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+    [ "$image_revision" = "$revision" ] || fail "staging image revision does not match requested SHA: $container"
+done
+
+service_names="$(docker ps --filter label=com.docker.compose.project=weknora-v072-staging --format '{{.Names}}' | sort | tr '\n' ' ')"
+[ "$service_names" = 'weknora-v072-staging-app weknora-v072-staging-docreader weknora-v072-staging-frontend weknora-v072-staging-postgres weknora-v072-staging-redis ' ] || fail 'staging started services are not the five-service native stack'
+
+app_env="$(docker inspect weknora-v072-staging-app --format '{{range .Config.Env}}{{println .}}{{end}}')"
+frontend_env="$(docker inspect weknora-v072-staging-frontend --format '{{range .Config.Env}}{{println .}}{{end}}')"
+printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_DEPLOYMENT_ENVIRONMENT=staging' || fail 'staging deployment selector is missing at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=sandbox' || fail 'staging Paddle selector is not Sandbox at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'NEO4J_ENABLE=false' || fail 'staging unexpectedly enables Neo4j at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'WEKNORA_REDIS_NAMESPACE=weknora-v072-staging' || fail 'staging Redis namespace is not isolated at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'APP_EXTERNAL_URL=https://staging.app.musuw.com' || fail 'staging external origin is not dotted HTTPS'
+workspace_id="$(weknora_staging_require_env_value "$staging_env" OPENROUTER_WORKSPACE_ID)"
+[[ "$workspace_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]] || fail 'staging OpenRouter workspace ID is invalid'
+printf '%s\n' "$app_env" | grep -Fqx "OPENROUTER_WORKSPACE_ID=$workspace_id" || fail 'staging OpenRouter workspace is not isolated at runtime'
+workspace_pin_file="$runtime_dir/openrouter-workspace-id"
+weknora_staging_require_file "$workspace_pin_file"
+[ -O "$workspace_pin_file" ] || fail 'staging OpenRouter workspace pin ownership is unsafe'
+[ "$(weknora_staging_file_mode "$workspace_pin_file")" = 600 ] || fail 'staging OpenRouter workspace pin permissions are unsafe'
+workspace_pin="$(awk 'NR == 1 { value = $0 } END { if (NR != 1) exit 1; print value }' "$workspace_pin_file")" ||
+    fail 'staging OpenRouter workspace pin must contain exactly one line'
+[ "$workspace_id" = "$workspace_pin" ] || fail 'staging OpenRouter runtime differs from the server pin'
+
+printf '%s\n' "$app_env" | grep -Fqx 'S3_BUCKET_NAME=musuw-staging' || fail 'staging app does not point at the commissioned R2 test bucket'
+r2_endpoint="$(weknora_staging_require_env_value "$staging_env" MUSUW_STAGING_R2_ENDPOINT)"
+case "$r2_endpoint" in https://*.r2.cloudflarestorage.com) ;; *) fail 'staging R2 endpoint is invalid at promotion verification' ;; esac
+printf '%s\n' "$app_env" | grep -Fqx "S3_ENDPOINT=$r2_endpoint" || fail 'staging app R2 endpoint differs from the release environment'
+printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' || fail 'staging app Supabase project has drifted'
+printf '%s\n' "$frontend_env" | grep -Fqx 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' || fail 'staging frontend Supabase project has drifted'
+printf '%s\n' "$frontend_env" | grep -Fqx 'MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.app.musuw.com' || fail 'staging browser auth origin has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'FRONTEND_BASE_URL=https://staging.app.musuw.com' || fail 'staging backend frontend origin has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_ISSUER_URL=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1' || fail 'staging OIDC issuer has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_DISCOVERY_URL=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/.well-known/openid-configuration' || fail 'staging OIDC discovery URL has drifted'
+
+app_port="$(weknora_staging_require_env_value "$staging_env" WEKNORA_STAGING_APP_PORT)"
+frontend_port="$(weknora_staging_require_env_value "$staging_env" WEKNORA_STAGING_FRONTEND_PORT)"
+curl -fsS --connect-timeout 5 "http://127.0.0.1:${app_port}/health" >/dev/null
+curl -fsS --connect-timeout 5 "http://127.0.0.1:${frontend_port}/health" >/dev/null
+
+headers_have_noindex() {
+    local path="$1" headers
+    # Preserve response headers even when a fixture/static asset is a 404; the
+    # noindex contract applies to error responses on every public surface too.
+    headers="$(curl -sS --connect-timeout 5 -D - -o /dev/null "http://127.0.0.1:${frontend_port}${path}")"
+    printf '%s\n' "$headers" | grep -Eiq '^X-Robots-Tag:[[:space:]]*noindex[[:space:]]*,[[:space:]]*nofollow[[:space:]]*$' || fail "staging response lacks noindex header: $path"
+}
+headers_have_noindex '/'
+headers_have_noindex '/auth/start'
+headers_have_noindex '/api/v1/billing/paddle/public-config'
+headers_have_noindex '/assets/'
+
+paddle_json="$(mktemp)"
+trap 'rm -f "$paddle_json"' EXIT
+curl -fsS --connect-timeout 5 "http://127.0.0.1:${frontend_port}/api/v1/billing/paddle/public-config" > "$paddle_json"
+jq -e '(.configured == true) and (.environment == "sandbox") and (.client_token | type == "string" and startswith("test_"))' "$paddle_json" >/dev/null || fail 'staging public Paddle config is not a configured Sandbox unit'
+
+for volume in \
+    weknora-v072-staging-postgres-data \
+    weknora-v072-staging-data-files \
+    weknora-v072-staging-docreader-tmp \
+    weknora-v072-staging-redis-data; do
+    docker volume inspect "$volume" >/dev/null 2>&1 || fail "staging volume is missing: $volume"
+done
+docker network inspect weknora-v072-staging-internal >/dev/null 2>&1 || fail 'staging internal network is missing'
+
+printf '%s\n' 'staging deployed green: five-service health, noindex, Sandbox public config, isolated volumes/network, same digest release record'

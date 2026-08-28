@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+# Static staging acceptance. It renders Compose with synthetic, non-secret
+# fixtures and validates the source/gate contract without creating Docker
+# resources or contacting a server/provider.
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd "$script_dir/../.." && pwd -P)"
+staging_root="$repo_root/integration/weknora-staging"
+# shellcheck source=lib.sh
+. "$script_dir/lib.sh"
+
+fail() { printf '%s\n' "$1" >&2; exit 1; }
+
+for required in \
+    "$staging_root/compose.yaml" "$staging_root/compose.edge.yaml" "$staging_root/app-entrypoint.sh" \
+    "$staging_root/staging.env.example" "$staging_root/auth-public.env.example" \
+    "$script_dir/lib.sh" "$script_dir/source-manifest.sh" "$script_dir/capacity-preflight.sh" "$script_dir/capacity-preflight.test.sh" "$script_dir/prepare-runtime.sh" \
+    "$script_dir/compose.sh" "$script_dir/release-ci.sh" "$script_dir/verify-deployed.sh" \
+    "$repo_root/scripts/weknora-staging-deploy.sh" \
+    "$script_dir/server/musuw-staging-deploy-gate" \
+    "$script_dir/server/musuw-staging-deploy-ssh-gate" \
+    "$script_dir/server/bootstrap-musuw-staging-deploy.sh" \
+    "$script_dir/server/verify-musuw-staging-deploy-gate.sh"; do
+    [ -f "$required" ] && [ ! -L "$required" ] || fail 'staging static inputs are incomplete'
+done
+
+for script in "$script_dir"/*.sh "$script_dir/server"/*.sh "$repo_root/scripts/weknora-staging-deploy.sh"; do
+    bash -n "$script" || fail "staging shell syntax is invalid: $script"
+done
+
+grep -Fq 'MUSUW_DEPLOYMENT_ENVIRONMENT: staging' "$staging_root/compose.yaml" || fail 'staging selector is missing'
+grep -Fq 'MUSUW_PADDLE_ENVIRONMENT: sandbox' "$staging_root/compose.yaml" || fail 'staging Paddle selector is not Sandbox'
+grep -Fq 'MUSUW_PADDLE_API_URL: ${MUSUW_PADDLE_API_URL:-https://sandbox-api.paddle.com}' "$staging_root/compose.yaml" || fail 'staging Paddle API URL is not Sandbox'
+grep -Fq 'NEO4J_ENABLE: "false"' "$staging_root/compose.yaml" || fail 'staging unexpectedly enables Neo4j'
+grep -Fq 'MUSUW_STAGING_R2_BUCKET' "$staging_root/compose.yaml" || fail 'staging R2 bucket is not explicit'
+grep -Fq '/opt/weknora/staging-runtime/secrets' "$staging_root/compose.yaml" || fail 'staging fixed secret root is missing'
+grep -Fq '/opt/weknora-staging/app-entrypoint.sh' "$staging_root/compose.yaml" || fail 'staging does not mount its Sandbox-only entrypoint'
+grep -Fq 'musuw_paddle_validate_configuration' "$staging_root/app-entrypoint.sh" || fail 'staging entrypoint does not call generic Paddle validator'
+grep -Fq 'sandbox' "$staging_root/app-entrypoint.sh" || fail 'staging entrypoint does not select Paddle Sandbox'
+if grep -Fq 'musuw_paddle_validate_production_launch' "$staging_root/app-entrypoint.sh"; then
+    fail 'staging entrypoint calls the production Live-only Paddle wrapper'
+fi
+if grep -Fq '/opt/weknora-production/app-entrypoint.sh' "$staging_root/compose.yaml"; then
+    fail 'staging Compose mounts an unused production app entrypoint'
+fi
+if grep -Fq 'integration/weknora-production/app-entrypoint.sh' "$script_dir/source-manifest.sh"; then
+    fail 'staging source manifest carries an unused production app entrypoint'
+fi
+if grep -Eiq 'tikhub_api_key|TIKHUB_API_KEY' "$staging_root/app-entrypoint.sh" "$staging_root/compose.yaml" "$script_dir/prepare-runtime.sh"; then
+    fail 'staging runtime reads or mounts TikHub credentials'
+fi
+grep -Fq 'staging-web' "$staging_root/compose.edge.yaml" || fail 'staging edge alias is missing'
+grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'staging tunnel network is missing'
+grep -Fq 'HostConfig.Memory' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert memory limits'
+grep -Fq 'capacity-preflight.sh' "$script_dir/release-ci.sh" || fail 'staging release helper has no capacity preflight'
+
+tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/musuw-staging-static.XXXXXX")"
+trap 'find "$tmp_root" -depth -delete 2>/dev/null || true' EXIT
+runtime_dir="$tmp_root/runtime"
+secret_dir="$runtime_dir/secrets"
+mkdir -m 700 -p "$secret_dir"
+for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key; do
+    printf '%s\n' 'staging-static-placeholder' > "$secret_dir/$name"
+    chmod 600 "$secret_dir/$name"
+done
+workspace_id='00000000-0000-4000-8000-000000000001'
+printf '%s\n' "$workspace_id" > "$runtime_dir/openrouter-workspace-id"
+chmod 600 "$runtime_dir/openrouter-workspace-id"
+
+revision='0123456789abcdef0123456789abcdef01234567'
+cat > "$runtime_dir/staging.public.env" <<EOF
+WEKNORA_STAGING_RELEASE_ID=weknora-v072-staging
+WEKNORA_STAGING_REVISION=$revision
+WEKNORA_STAGING_APP_IMAGE=ghcr.io/estromeglovettgen-coder/musuw-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+WEKNORA_STAGING_FRONTEND_IMAGE=ghcr.io/estromeglovettgen-coder/musuw-frontend@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+WEKNORA_STAGING_FRONTEND_PORT=4192
+WEKNORA_STAGING_APP_PORT=18092
+WEKNORA_STAGING_POSTGRES_VOLUME=weknora-v072-staging-postgres-data
+WEKNORA_STAGING_FILES_VOLUME=weknora-v072-staging-data-files
+WEKNORA_STAGING_DOCREADER_TMP_VOLUME=weknora-v072-staging-docreader-tmp
+WEKNORA_STAGING_REDIS_VOLUME=weknora-v072-staging-redis-data
+MUSUW_STAGING_SECRET_DIR=$secret_dir
+MUSUW_STAGING_R2_ENDPOINT=https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com
+MUSUW_STAGING_R2_BUCKET=musuw-staging
+DB_DRIVER=postgres
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=weknora_staging
+DB_NAME=WeKnoraStaging
+REDIS_ADDR=redis:6379
+STREAM_MANAGER_TYPE=redis
+REDIS_DB=0
+REDIS_PREFIX=stream:
+WEKNORA_REDIS_NAMESPACE=weknora-v072-staging
+NEO4J_ENABLE=false
+STORAGE_TYPE=s3
+LOCAL_STORAGE_BASE_DIR=/data/files
+MAX_FILE_SIZE_MB=50
+GIN_MODE=release
+LOG_LEVEL=info
+TZ=Asia/Shanghai
+AUTO_MIGRATE=true
+AUTO_RECOVER_DIRTY=true
+DISABLE_REGISTRATION=false
+WEKNORA_AUTH_DEFAULT_TENANT_MODE=create_personal
+APP_EXTERNAL_URL=https://staging.app.musuw.com
+FRONTEND_BASE_URL=https://staging.app.musuw.com
+OIDC_AUTH_ENABLE=true
+OIDC_AUTH_ISSUER_URL=https://identity-staging.example/auth/v1
+OIDC_AUTH_DISCOVERY_URL=https://identity-staging.example/auth/v1/.well-known/openid-configuration
+OIDC_AUTH_PROVIDER_DISPLAY_NAME=Musuw
+OIDC_AUTH_SCOPES=openid profile email
+OIDC_USER_INFO_MAPPING_USER_NAME=name
+OIDC_USER_INFO_MAPPING_EMAIL=email
+MUSUW_PADDLE_ENVIRONMENT=sandbox
+MUSUW_PADDLE_API_URL=https://sandbox-api.paddle.com
+MUSUW_PADDLE_CLIENT_TOKEN=test_static-client-token
+MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID=pri_static_plus_monthly
+MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID=pri_static_plus_yearly
+MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID=pri_static_pro_monthly
+MUSUW_PADDLE_PRO_YEARLY_PRICE_ID=pri_static_pro_yearly
+MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID=pri_static_max_monthly
+MUSUW_PADDLE_MAX_YEARLY_PRICE_ID=pri_static_max_yearly
+OPENROUTER_WORKSPACE_ID=$workspace_id
+LANGFUSE_ENABLED=false
+LANGFUSE_HOST=https://jp.cloud.langfuse.com
+LANGFUSE_RELEASE=musuw-staging
+LANGFUSE_ENVIRONMENT=staging
+EOF
+cat > "$runtime_dir/auth-public.env" <<'EOF'
+MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.app.musuw.com
+MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co
+MUSUW_SUPABASE_PUBLISHABLE_KEY=static-sandbox-publishable-key
+MUSUW_WEKNORA_OAUTH_CLIENT_ID=static-staging-oidc-client
+EOF
+
+replace_env_value() {
+    local path="$1" key="$2" value="$3" tmp
+    tmp="$path.tmp"
+    awk -v key="$key" -v value="$value" 'index($0, key "=") == 1 { print key "=" value; next } { print }' "$path" > "$tmp"
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$path"
+}
+
+expect_prepare_rejects() {
+    local label="$1"
+    if WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir" \
+        WEKNORA_STAGING_PUBLIC_ENV="$runtime_dir/staging.public.env" \
+        WEKNORA_STAGING_AUTH_PUBLIC_ENV="$runtime_dir/auth-public.env" \
+        "$script_dir/prepare-runtime.sh" >/dev/null 2>&1; then
+        fail "staging runtime accepted $label"
+    fi
+}
+
+replace_env_value "$runtime_dir/staging.public.env" MUSUW_STAGING_R2_BUCKET musuw-production
+expect_prepare_rejects 'the production R2 bucket'
+replace_env_value "$runtime_dir/staging.public.env" MUSUW_STAGING_R2_BUCKET musuw-staging
+
+replace_env_value "$runtime_dir/auth-public.env" MUSUW_SUPABASE_URL https://production-identity.example
+replace_env_value "$runtime_dir/staging.public.env" OIDC_AUTH_ISSUER_URL https://production-identity.example/auth/v1
+replace_env_value "$runtime_dir/staging.public.env" OIDC_AUTH_DISCOVERY_URL https://production-identity.example/auth/v1/.well-known/openid-configuration
+expect_prepare_rejects 'a non-staging Supabase project'
+replace_env_value "$runtime_dir/auth-public.env" MUSUW_SUPABASE_URL https://achfnnicetupvtoqiwqd.supabase.co
+replace_env_value "$runtime_dir/staging.public.env" OIDC_AUTH_ISSUER_URL https://achfnnicetupvtoqiwqd.supabase.co/auth/v1
+replace_env_value "$runtime_dir/staging.public.env" OIDC_AUTH_DISCOVERY_URL https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/.well-known/openid-configuration
+
+printf '%s\n' '00000000-0000-4000-8000-000000000002' > "$runtime_dir/openrouter-workspace-id"
+expect_prepare_rejects 'an OpenRouter workspace different from the server pin'
+printf '%s\n' "$workspace_id" > "$runtime_dir/openrouter-workspace-id"
+
+WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir" \
+WEKNORA_STAGING_PUBLIC_ENV="$runtime_dir/staging.public.env" \
+WEKNORA_STAGING_AUTH_PUBLIC_ENV="$runtime_dir/auth-public.env" \
+    "$script_dir/prepare-runtime.sh" >/dev/null
+weknora_staging_require_unique_env_keys "$runtime_dir/staging.env" || fail 'generated staging environment contains duplicate keys'
+
+config_json="$runtime_dir/compose.json"
+edge_config_json="$runtime_dir/compose-edge.json"
+WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir" \
+    "$script_dir/compose.sh" config --format json > "$config_json"
+WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir" \
+    "$script_dir/compose.sh" --edge config --format json > "$edge_config_json"
+
+jq -e '
+    ([.services | keys[]] | sort) == ["app", "docreader", "frontend", "postgres", "redis"] and
+    ([.services[] | select(has("build"))] | length) == 0 and
+    (.services.frontend.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$")) and
+    (.services.app.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$")) and
+    .services.frontend.ports[0].host_ip == "127.0.0.1" and .services.frontend.ports[0].published == "4192" and
+    .services.app.ports[0].host_ip == "127.0.0.1" and .services.app.ports[0].published == "18092" and
+    .services.app.environment.MUSUW_DEPLOYMENT_ENVIRONMENT == "staging" and
+    .services.app.environment.MUSUW_PADDLE_ENVIRONMENT == "sandbox" and
+    .services.app.environment.MUSUW_PADDLE_API_URL == "https://sandbox-api.paddle.com" and
+    .services.app.environment.OPENROUTER_WORKSPACE_ID == "00000000-0000-4000-8000-000000000001" and
+    .services.app.environment.S3_BUCKET_NAME == "musuw-staging" and
+    .services.app.environment.NEO4J_ENABLE == "false" and
+    .services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-staging" and
+    .services.app.environment.APP_EXTERNAL_URL == "https://staging.app.musuw.com" and
+    .services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "https://staging.app.musuw.com" and
+    ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 5 and
+    ([.services[].cpus | tonumber] | add) <= 1.5 and
+    ([.services[].mem_limit | tonumber] | add) <= 1932735283
+' "$config_json" >/dev/null || fail 'staging Compose topology/resource contract failed'
+
+jq -e '
+    .networks.edge.external == true and .networks.edge.name == "musnow-production_edge" and
+    (.services.frontend.networks.edge.aliases | index("staging-web")) and
+    (.networks["WeKnora-network"].name == "weknora-v072-staging-internal") and
+    ([.volumes[].name] | all(test("^weknora-v072-staging-"))) and
+    ([.secrets[].file] | all(startswith("'"$secret_dir"'")))
+' "$edge_config_json" >/dev/null || fail 'staging edge/data/secret isolation contract failed'
+
+# Verify that the fixture itself cannot be expanded into an app credential
+# environment and that generated browser config names remain public-only.
+if grep -Eq '^(DB_PASSWORD|MUSUW_PADDLE_API_KEY|MUSUW_PADDLE_WEBHOOK_SECRET|OPENROUTER_MANAGEMENT_API_KEY|TIKHUB_API_KEY)=' "$runtime_dir/staging.env"; then
+    fail 'staging runtime env contains a server credential value'
+fi
+if grep -Eq '^VITE_' "$runtime_dir/auth-public.env"; then
+    fail 'staging auth public env retains build-time VITE aliases'
+fi
+
+printf '%s\n' 'staging static contract green: five-service native stack, isolated resources, Sandbox selector, immutable images, edge alias, metadata-only secrets'

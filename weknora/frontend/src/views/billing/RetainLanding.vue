@@ -8,7 +8,7 @@
         Build private knowledge spaces, ask better questions, and keep your work moving in one focused workspace.
       </p>
       <nav class="retain-landing__actions" aria-label="Musuw links">
-        <a class="retain-landing__primary" href="https://app.musuw.com/auth/start">Sign in to musuw</a>
+        <a class="retain-landing__primary" href="/auth/start">Sign in to musuw</a>
         <a class="retain-landing__secondary" href="https://musuw.com/">Visit musuw.com</a>
       </nav>
     </section>

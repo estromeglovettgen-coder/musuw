@@ -1,3 +1,5 @@
+import { publicOriginFromValue } from "./config";
+
 /**
  * The auth shell owns only Supabase identity and the standard OAuth 2.1
  * continuation into WeKnora.  It deliberately does not know any Musnow
@@ -396,16 +398,7 @@ function isTrustedCallbackOrigin(callback: URL, publicOrigin: string): boolean {
   }
 
   try {
-    const configured = new URL(publicOrigin);
-    if (
-      configured.username !== "" ||
-      configured.password !== "" ||
-      configured.pathname !== "/" ||
-      configured.search !== "" ||
-      configured.hash !== ""
-    ) {
-      return false;
-    }
+    const configured = new URL(publicOriginFromValue(publicOrigin));
 
     const configuredLocal =
       configured.protocol === "http:" &&
@@ -421,9 +414,6 @@ function isTrustedCallbackOrigin(callback: URL, publicOrigin: string): boolean {
 
     return (
       configured.protocol === "https:" &&
-      (configured.hostname === "app.musuw.com" ||
-        configured.hostname === "staging-app.musuw.com") &&
-      (configured.port === "" || configured.port === "443") &&
       callback.protocol === "https:" &&
       callback.hostname === configured.hostname &&
       (callback.port === "" || callback.port === "443")

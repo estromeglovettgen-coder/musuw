@@ -12,10 +12,14 @@ hash 或供应商响应内容**。
 域名审核、support phone、`/pay` 与 `/checkout` 的区别、Live Dashboard
 操作顺序和阻断级别见
 [`docs/PADDLE_LIVE_READINESS.md`](PADDLE_LIVE_READINESS.md)。
+Staging 的独立 Compose、Sandbox 和发布门见
+[`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md)。
 
 ## 1. 当前硬边界
 
-- 正式生产使用一个完整的 **Paddle Live** 单元；Sandbox 仅供开发和测试。
+- 正式生产使用一个完整的 **Paddle Live** 单元；`staging.app.musuw.com` 使用
+  独立的 Paddle Sandbox 测试单元。Sandbox 证据不能证明 Live 已获批或改变
+  production 配置。
 - Live 的环境选择、client token、六个价格 ID、API key、webhook secret、
   notification destination 和默认付款链接必须属于同一个 Live 账户。
   Live 与 Sandbox 不可混用。
@@ -70,9 +74,13 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 | `.runtime/weknora/auth-public.env` | Supabase publishable/OIDC 公共值；不提交。 |
 | `.runtime/weknora/paddle-sandbox.env` | Paddle Sandbox environment、client token、六个价格 ID；API key/webhook secret 由 Keychain 注入。 |
 | `.runtime/weknora/secrets/*` | OIDC、数据库、Redis、AES、JWT 等服务运行 secret；仅本机受控进程读取。 |
+| `/opt/weknora/staging-runtime/staging.public.env` | Tokyo staging 的非密钥 Compose/Paddle/Supabase/OpenRouter/R2 选择；由 `staging` Environment 受控输入生成。 |
+| `/opt/weknora/staging-runtime/auth-public.env` | staging browser public origin、Supabase public coordinates 和 OAuth client ID；不含 service/API key。 |
+| `/opt/weknora/staging-runtime/secrets/*` | staging 独立数据库、Redis、OIDC、Supabase service、OpenRouter、Paddle Sandbox、R2 等 server-only secret，regular non-symlink、非空、`0600`。 |
 
-旧的 `candidate`/迁移目录不是生产权威。部署前必须从当前 Live provider 状态
-重新生成生产公开环境并运行静态校验；Sandbox 本地输入不能覆盖 Live。
+旧的 `candidate`/迁移目录不是生产权威。部署前必须从对应 provider 环境
+重新生成公开环境并运行静态校验；staging Sandbox 输入不能覆盖 production Live，
+也不能把 staging 文件复制到 production 目录。
 
 仓库顶层 `.env.example` 中的 `DEEPSEEK_*`、`MUSNOW_*` 和旧 Paddle fallback
 变量只是空模板/兼容名，不是当前生产 authority；任何仍引用它们的测试或旧快照
@@ -102,6 +110,23 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 `production.env`。任何生产公开 env 都必须从受控的 Live public contract
 生成，不能手工把 candidate 或历史迁移文件复制过去。
 
+### 4.1 Staging server files
+
+Staging uses `/opt/weknora/staging-runtime/secrets` and its own
+`staging.public.env`/`auth-public.env`. It has separate PostgreSQL and Redis
+volumes/namespace, file and DocReader temporary volumes, R2 test bucket,
+Supabase test project, Paddle Sandbox account/destination and OpenRouter test
+workspace. The file names mirror the production contract where needed, but the
+values and provider resources are never shared. The staging Compose project is
+`weknora-v072-staging`; production remains `weknora-v072-production`.
+
+The GitHub `staging` Environment contains only the staging SSH key/known-hosts,
+restricted remote/port, and public runtime files. The release workflow accepts
+only `staging-only` or an explicit `promote`; a promote run downloads the prior
+staging record, verifies the current staging digest through the remote gate, and
+then uses the unchanged production Live inputs. No secret value is emitted into
+the release record, CI log, browser bundle or artifact.
+
 安全地只检查文件与权限：
 
 ```sh
@@ -116,23 +141,25 @@ ssh musuw-tokyo \
 
 | 提供商/类别 | TEST/Sandbox | PROD/Live | 权威、消费者和健康证明 |
 | --- | --- | --- | --- |
-| Paddle | Sandbox public client/catalog、server API key、webhook destination 可用 | 一套 Live public client/catalog、server API key 与 exact destination | Paddle 控制台是唯一权威；production frontend、checkout、portal/upgrade API 和 webhook 必须使用同一 Live；健康证明只保留状态/count/price metadata 与无扣款结果。 |
-| Supabase Auth | TEST public auth + Auth Admin | Production public auth + Auth Admin | Supabase dashboard/project 是权威；auth shell、OIDC discovery/callback、运营台 Auth Admin；不记录 session/token。 |
-| OpenRouter | 候选运行时只读 metadata | production management key + encrypted tenant child key | 官方 usage/limit 是额度权威；entrypoint、entitlement service 和 model transport；tenant key 不进浏览器。 |
+| Paddle | Staging 专用 Sandbox public client/catalog、server API key、webhook destination | 一套 Live public client/catalog、server API key 与 exact destination | Paddle 控制台是唯一权威；production 与 staging 的 frontend、checkout、portal/upgrade API 和 webhook 必须各自使用同一环境；健康证明只保留状态/count/price metadata 与无扣款结果。 |
+| Supabase Auth | staging test public auth + Auth Admin | Production public auth + Auth Admin | Supabase dashboard/project 是权威；auth shell、OIDC discovery/callback、运营台 Auth Admin；两项目不共享用户/会话，不记录 session/token。 |
+| OpenRouter | staging 独立 test workspace/child-key 管理 | production management key + encrypted tenant child key | 官方 usage/limit 是额度权威；entrypoint、entitlement service 和 model transport；tenant key 不进浏览器，两个 workspace 不混用。 |
 | Cloudflare Worker | 不适用 | GitHub `storefront-production` 只含 Worker-scoped account/token | GitHub Environment + Cloudflare dashboard；仅 Wrangler 部署，Worker 不拿 server/model/billing secret。 |
-| Cloudflare R2 | 本地存储，故意无 TEST key | production protected files | R2 S3 API；应用只返回对象/计量 metadata。 |
+| Cloudflare R2 | staging 专用 test bucket 与 protected files | production protected files/bucket | R2 S3 API；应用只返回对象/计量 metadata，staging 对象绝不迁移到 Live。 |
 | Langfuse | test Keychain pair | production protected pair | Langfuse 项目；trace health 只返回 count/status，排除 input/output/prompt/content/attachments。 |
 | TikHub | operator-managed server key | protected backend runtime when deployed | TikHub dashboard 是权威；只供 WeKnora 社交分享入库 importer，浏览器和任务队列均不得得到密钥；健康证明只保留脱敏状态与 request ID。 |
-| GitHub/GHCR/SSH | CI ephemeral token | `server-production` restricted SSH + pinned known hosts；GHCR token 为 job-only | GitHub Environment 和 workflow 是权威；固定 release gate、exact digest pull、health check。 |
+| GitHub/GHCR/SSH | `staging` Environment、restricted staging SSH + pinned known hosts；GHCR token 为 job-only | `server-production` restricted SSH + pinned known hosts；GHCR token 为 job-only | GitHub Environment 和 workflow 是权威；staging-only→人工 Sandbox E2E→exact-digest promote，固定 release gate、health check。 |
 | Tencent VectorDB / Alibaba Cloud | optional/independent inventory | Tokyo 当前无此 active consumer | 各自 provider dashboard；仅在明确启用的独立项目中使用，不能从示例变量推断已配置。 |
 | Google OAuth / SMTP | Supabase/OAuth 与邮件设置待按项目确认 | 当前 Musuw 没有 direct Google secret consumer；SMTP 由 Supabase Auth 配置边界管理 | Supabase/Google/provider dashboard；只验证 discovery、callback、OTP delivery，不记录 token 或邮件内容。 |
 
 Paddle 的 destination、domain 和默认链接含义也固定在中央注册表：Live
-production destination → app webhook；storefront plan CTA → app 的认证
-`/plans` → `/checkout`；Paddle transaction/default-payment link → app 的公开
-`/pay`。`/pay` 页面已经存在不等于 Paddle Dashboard 已完成对应环境的绑定；
-provider 状态必须另行核验。未批准或未保存的 destination/domain/default link
-不得被部署记录当作已完成。
+production destination → production app webhook；Sandbox destination → staging
+app webhook；storefront plan CTA → app 的认证 `/plans` → `/checkout`；Paddle
+transaction/default-payment link → 对应环境的公开 `/pay`。`/pay` 页面已经存在不
+等于 Paddle Dashboard 已完成对应环境的绑定；provider 状态必须另行核验。未批准
+或未保存的 destination/domain/default link 不得被部署记录当作已完成。Staging 的
+exact `POST /api/v1/billing/paddle/webhook` 可绕过 Cloudflare Access，但始终由
+origin 验证 raw-body 签名；不得把 webhook secret 放入 browser/public env。
 
 ## 6. 其他本地项目：只登记，不复制
 
@@ -166,6 +193,18 @@ Musuw 的 production env。AiToEarn 发现有 tracked env 文件，需由其 own
 4. 撤销旧 credential；登记状态、能力、权限和验证时间，仍不登记值。
 5. 若值曾出现在终端输出、DOM snapshot、截图、日志或 git diff，立即按已泄露处理
    并轮换，不能只删除视觉证据。
+
+Staging 轮换遵循同样的边界，但只在 Sandbox/test provider 和 GitHub `staging`
+Environment 内操作：先验证完整 Sandbox unit（SDK mode/API URL、client token、
+API key、destination secret、六个 recurring prices、approved domain/default link、
+tax/currency/payment methods），再用全新测试身份完成完整 Paddle E2E。只有支付、
+升级、取消/到期、恢复、签名 webhook 的重试/幂等/乱序、会员身份、OpenRouter 个人
+额度及 portal/history 全部通过，才可用同 SHA/同 digest promote；staging 任何
+失败都不能触碰 production Live。Paddle webhook 的 exact public path 可 bypass
+Access，其他交互路径按现有 Access 策略保护。
+
+验收证据只记录环境、状态、计数、SHA、digest、项目/volume 名称和时间戳；不得
+输出 secret、完整 webhook body、客户 PII、支付资料、session 或 provider token。
 
 本地校验入口：
 

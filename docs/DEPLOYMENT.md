@@ -27,10 +27,11 @@ Kong runtime intact as a stopped recovery copy and never run both connectors
 for the same production hostname during a cutover.
 
 The single credential inventory is [`external-credentials-registry.yaml`](external-credentials-registry.yaml),
-with the operator playbook in [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md).
-The reviewed production boundary is one complete Paddle Live unit. Sandbox is
-development/test-only, and either a Sandbox production input or a mixed
-Live/Sandbox unit is a configuration error.
+with the operator playbook in [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md)
+and the staging runbook in [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md). The
+reviewed production boundary is one complete Paddle Live unit. Staging is a
+separate Sandbox test unit; a Sandbox value in production or a mixed Live/Sandbox
+unit is a configuration error.
 
 ## Normal path
 
@@ -43,36 +44,51 @@ Live/Sandbox unit is a configuration error.
    exact SHA,
    builds only `storefront/`, and deploys it to `musuw-site`. It then checks
    both public domains and the documented product handoff.
-4. The production workflow receives the same successful CI result. Its
-   authorization and native AMD64 image-build jobs run on `ubuntu-24.04`.
-   Authorization proves that the selected full SHA belongs to canonical
-   `origin/main` and has successful CI. The build then uses official
-   `actions/checkout` for exactly that SHA with persisted credentials disabled,
-   verifies `HEAD`, installs the `.nvmrc` Node release with official
-   `actions/setup-node`, and builds through global Debian and Go endpoints. It
-   pushes the app and frontend images to GHCR and validates their immutable
-   digests. Official Docker actions use separate GitHub Actions cache scopes
-   for the two images. The hosted build receives no production secret or SSH
-   input. Only after it succeeds does a final `ubuntu-24.04` job upload the
-   allowlisted server source bundle and those exact refs through the restricted
-   SSH gate. A manual full-SHA dispatch is retained for an exact rerun; tag and
-   branch-name releases are rejected.
-5. The server receives a short-lived GitHub token over the restricted stdin
+4. The production workflow receives the same successful CI result and builds
+   the app/frontend pair exactly once on native `ubuntu-24.04`. Authorization
+   proves that the selected full SHA belongs to canonical `origin/main` and has
+   successful CI; the build pushes both immutable GHCR digests and records them.
+   The hosted build receives no production or staging secret and no SSH input.
+   The workflow then runs `staging-only` through the independent GitHub
+   `staging` Environment and restricted staging SSH gate. `workflow_run` is
+   staging-only by default; it never promotes production.
+5. Operators complete the full Paddle Sandbox billing/entitlement acceptance
+   in [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md), including purchase,
+   upgrade, cancellation/expiry, recovery, signed webhook retry/idempotency and
+   ordering, membership, OpenRouter allowance, customer portal and history.
+   Only after every item is green may a manual `promote` dispatch provide the
+   exact staging run ID and the same full SHA and select
+   `full-sandbox-e2e-green`. Promotion downloads and validates the prior staging
+   deployment record, verifies the currently running staging SHA/digest pair
+   through the remote gate, compares both refs, verifies that
+   `server-production` still has a required reviewer, and only after the owner
+   approves that Environment enters production. Promote does not rebuild or
+   resolve mutable tags; an automatic smoke result never claims full E2E acceptance.
+6. Production receives a short-lived GitHub token over the restricted stdin
    channel, logs in to GHCR using a temporary Docker config, pulls the exact
    digests, recreates only `app` and `frontend` with `--no-build`, and checks
-   `/health`. The token and temporary config are removed at exit.
-   A short maintenance window is expected. A failed command is reported as a
-   failed release; correct the source and run the normal path again.
+   `/health`. The token and temporary config are removed at exit. A failed
+   staging or promotion command is reported as failed; production data, Live
+   billing, runtime secrets, and named volumes remain untouched.
 
-There is one server Compose project and one source path. Do not add parallel
-projects, temporary runtime modes, extra release state, or a second deployment
-protocol.
+There are two server Compose projects and two current-release roots. Production
+is `weknora-v072-production`; staging is `weknora-v072-staging`. They share only
+the deliberately shared Cloudflare edge network and the immutable app/frontend
+image digests. PostgreSQL, Redis, Redis namespace, files, DocReader temporary
+data, runtime directories, Supabase projects, Paddle environments, OpenRouter
+workspaces, R2 buckets, secrets, and current pointers are separate. Do not add
+parallel repositories, temporary runtime modes, extra release state, or a second
+deployment protocol.
 
 The delivery intentionally has no release-transaction ledger, backup
 choreography, blue/green stack, secondary edge/readiness path, or server-side
-build. A failed release is reported as failed; recovery is a manual dispatch
-of the exact full SHA that passed CI. The server keeps its existing data,
-runtime secrets, and named volumes in place.
+build. Staging failure stops only the staging project and retains its test data
+for review. Production preflight failure performs no runtime mutation. If an
+app/frontend replacement later fails health or public checks, the release
+helper restores the prior runtime files and recreates the prior immutable image
+pair from the prior release source; the current pointer and Live unit remain on
+the prior release. A failed automatic restore escalates to the existing manual
+stop-and-retain-disk procedure.
 
 ## Source and upload boundary
 
@@ -100,6 +116,24 @@ actions hand off to `https://app.musuw.com/auth/start`.
 After deployment, check both domains, the HTML language signal and the auth
 handoff. A Cloudflare command succeeding without these probes is not enough.
 
+## Staging edge and application
+
+`staging.app.musuw.com` is an exact, separate Cloudflare hostname. Cloudflare
+terminates TLS and the existing Tunnel routes it to the staging frontend's
+`staging-web` alias; production's `web` alias and `app.musuw.com` route remain
+unchanged. No staging app, database, Redis or DocReader port is publicly bound.
+Reuse Cloudflare Access when it can protect the hostname without another network
+layer, but explicitly bypass Access only for the public
+`POST /api/v1/billing/paddle/webhook` destination (and the minimum health probes
+needed for verification). The origin always verifies Paddle's raw-body signature.
+
+Every staging workspace, auth, API and static response must carry
+`X-Robots-Tag: noindex, nofollow`. Verify the exact host over HTTPS, check the
+noindex header on `/`, `/auth/start`, `/api/v1/billing/paddle/public-config` and
+an asset, and confirm the public config reports Sandbox without exposing server
+credentials. See [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) for the full
+edge, Compose and provider checklist.
+
 ## Production server
 
 The hosted build job receives the selected full SHA, three browser-visible
@@ -114,11 +148,14 @@ private configuration and never stores that token. The deploy job also runs on
 standard GitHub-hosted `ubuntu-24.04`; no local or self-hosted runner is part of
 the normal path.
 
-The fixed production Compose file is the only runtime definition. The update
-sequence is GitHub build/push → upload/verify SHA and manifest → GHCR login →
-pull exact digests → `docker compose up -d --no-build --force-recreate app
-frontend` → health checks. Keep named volumes and server-owned runtime files
-in place; the server never builds images or prunes its build cache.
+The fixed production Compose files remain the production runtime definition. The
+update sequence is GitHub build/push → upload/verify SHA and manifest → GHCR
+login → pull exact digests → `docker compose up -d --no-build --force-recreate
+app frontend` → health checks. Keep named volumes and server-owned runtime files
+in place; the server never builds images or prunes its build cache. Staging uses
+its own overlay, project name and runtime root as documented in
+[`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md); it never changes this
+production sequence.
 
 On a fresh host, install the tunnel token with
 `scripts/weknora-production/install-tunnel-token.sh` (the token file is
@@ -142,6 +179,9 @@ curl -fsS https://www.musuw.com/
 curl -fsS https://app.musuw.com/
 curl -fsS https://app.musuw.com/health
 curl -fsS https://app.musuw.com/auth/start
+# Staging probes are read-only and must report Sandbox/noindex.
+curl -fsS https://staging.app.musuw.com/health
+curl -fsSI https://staging.app.musuw.com/ | grep -i '^x-robots-tag:.*noindex'
 ```
 
 The public storefront and the server release are independent: a green
@@ -200,7 +240,8 @@ The target-specific split is intentionally narrow:
 | --- | --- |
 | `storefront-production` | Cloudflare account ID and Worker-scoped API token only. |
 | Repository variables | Three browser-visible `VITE_*` values shared by native build and deploy. |
-| `server-production` | Restricted SSH key/host settings and the public server input file consumed only by deploy; least-privilege package-read token. |
+| `staging` | Staging SSH key/host settings, staging public/auth runtime files, and job-only GHCR read token; never production credentials. |
+| `server-production` | Required account-owner reviewer plus restricted SSH key/host settings and the public server input file consumed only by deploy; least-privilege package-read token. |
 
 Private runtime credentials remain on the server; they are not copied into the
 repository, Cloudflare Worker, or browser bundles.
@@ -221,6 +262,21 @@ resolve all six recurring prices through the Live API, verify the existing
 approved app domain/default payment link, and accept official signed no-charge
 simulation from that exact destination before calling billing healthy. Never
 rotate one field in isolation.
+
+Staging keeps a separate Sandbox unit in `/opt/weknora/staging-runtime`: its
+`staging.public.env` and `auth-public.env` contain only public coordinates, while
+database/Redis/AES/JWT/OIDC/Supabase service, OpenRouter, Paddle Sandbox and R2
+credentials stay in the staging `secrets/` directory. The six Sandbox price IDs,
+Sandbox destination and approved `staging.app.musuw.com` checkout domain are
+validated together. Staging acceptance must finish before a manual exact-digest
+promotion; it must never alter this production Live unit.
+
+The staging public identities are not arbitrary URLs or names. Runtime preflight
+requires the commissioned Supabase test project and `musuw-staging` R2 bucket,
+and compares `OPENROUTER_WORKSPACE_ID` with the root-owned mode-0600
+`/opt/weknora/staging-runtime/openrouter-workspace-id` pin. A mismatch stops the
+release before the application starts. The pin contains non-secret resource
+identity only; the OpenRouter management key remains file-backed under `secrets/`.
 
 Sandbox data is disposable and is never migrated into Live. Do not add a
 parallel subscription-recovery path or repair billing state with SQL. Only a

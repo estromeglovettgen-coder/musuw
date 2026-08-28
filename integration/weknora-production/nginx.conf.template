@@ -19,6 +19,7 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location = /health {
+        include /etc/nginx/musuw-noindex.conf;
         proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/health;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
@@ -26,6 +27,7 @@ server {
     }
 
     location = /musuw-widget.js {
+        include /etc/nginx/musuw-noindex.conf;
         root /usr/share/nginx/html;
         add_header Cache-Control "public, max-age=3600" always;
     }
@@ -33,15 +35,18 @@ server {
     # Backward-compatible path for already-installed third-party snippets.
     location = /weknora-widget.js {
         return 308 /musuw-widget.js;
+        include /etc/nginx/musuw-noindex.conf;
     }
 
     location = /embed.html {
+        include /etc/nginx/musuw-noindex.conf;
         internal;
         root /usr/share/nginx/html;
         add_header Cache-Control "no-cache, must-revalidate" always;
     }
 
     location ^~ /embed/ {
+        include /etc/nginx/musuw-noindex.conf;
         root /usr/share/nginx/html;
         try_files $uri $uri/ /embed.html;
         add_header Cache-Control "no-cache, must-revalidate" always;
@@ -53,11 +58,13 @@ server {
     }
 
     location ^~ /assets/ {
+        include /etc/nginx/musuw-noindex.conf;
         root /usr/share/nginx/html;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 
     location / {
+        include /etc/nginx/musuw-noindex.conf;
         root /usr/share/nginx/html;
         index index.html;
         try_files $uri $uri/ /index.html;
@@ -65,6 +72,7 @@ server {
     }
 
     location = /files {
+        include /etc/nginx/musuw-noindex.conf;
         proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/files;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -74,6 +82,7 @@ server {
     }
 
     location ^~ /r/ {
+        include /etc/nginx/musuw-noindex.conf;
         proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -83,6 +92,7 @@ server {
     }
 
     location /api/ {
+        include /etc/nginx/musuw-noindex.conf;
         proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -104,6 +114,7 @@ server {
 
     error_page 500 502 503 504 /50x.html;
     location = /50x.html {
+        include /etc/nginx/musuw-noindex.conf;
         root /usr/share/nginx/html;
     }
 }

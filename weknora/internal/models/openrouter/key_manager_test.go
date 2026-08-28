@@ -24,6 +24,7 @@ func TestKeyManagerUsesOfficialLimitResetModes(t *testing.T) {
 			assert.Equal(t, "musuw-tenant-7", body["name"])
 			assert.Equal(t, 1.25, body["limit"])
 			assert.Equal(t, "monthly", body["limit_reset"])
+			assert.NotContains(t, body, "workspace_id")
 			created = true
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"hash":"hash-7","limit":1.25,"limit_remaining":1.25,"usage_monthly":0},"key":"sk-child"}`))
@@ -60,6 +61,41 @@ func TestKeyManagerUsesOfficialLimitResetModes(t *testing.T) {
 	assert.Equal(t, int64(100_000), info.UsageMonthlyMicrousd)
 	assert.False(t, info.MonthlyReset)
 	require.NoError(t, manager.DeleteKey(context.Background(), key.Hash))
+}
+
+func TestKeyManagerCreateKeyTargetsConfiguredWorkspace(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/keys", r.URL.Path)
+		require.Equal(t, "Bearer management-secret", r.Header.Get("Authorization"))
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "workspace-staging", body["workspace_id"])
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"hash":"hash-staging","limit":1.25,"limit_remaining":1.25},"key":"sk-child"}`))
+	}))
+	defer server.Close()
+
+	manager := newSDKKeyManagerWithWorkspace("management-secret", "workspace-staging", server.URL, server.Client())
+	key, err := manager.CreateKey(context.Background(), "musuw-tenant-staging", 1_250_000, false)
+	require.NoError(t, err)
+	assert.Equal(t, "hash-staging", key.Hash)
+}
+
+func TestKeyManagerWorkspaceIDIsNotLeakedInErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/keys", r.URL.Path)
+		http.Error(w, "provider unavailable", http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	workspaceID := "workspace-secret-marker"
+	manager := newSDKKeyManagerWithWorkspace("management-secret", workspaceID, server.URL, server.Client())
+	_, err := manager.CreateKey(context.Background(), "musuw-tenant-staging", 1_250_000, false)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), workspaceID)
 }
 
 func TestDeleteKeyTreatsMissingManagedKeyAsAlreadyDeleted(t *testing.T) {

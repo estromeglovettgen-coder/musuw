@@ -86,7 +86,7 @@ ci_on = root_key(ci, "on")
 fail_contract "ci.yml must run on pull requests" unless ci_on.key?("pull_request")
 fail_contract "ci.yml must run on pushes to main" unless ci_on.dig("push", "branches") == ["main"]
 fail_contract "ci.yml must cancel superseded runs" unless ci.dig("concurrency", "cancel-in-progress") == true
-required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md]
+required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh]
 %w[pull_request push].each do |trigger|
   configured = Array(ci_on.dig(trigger, "paths"))
   missing = required_ci_paths.reject { |path| configured.include?(path) }
@@ -127,6 +127,15 @@ fail_contract "repository contracts do not run the tracked publish-boundary scan
 fail_contract "repository contracts reference excluded legacy architecture tests" if ci_text.include?("tests/architecture/")
 fail_contract "canonical CI omits the direct deployment seam contract" unless ci_text.include?("bash scripts/weknora-production/deploy-ci-seams-contract.test.sh")
 fail_contract "canonical CI omits the restricted gate simulation" unless ci_text.include?("bash scripts/weknora-production/musuw-deploy-gate-simulation.test.sh")
+%w[
+  contract.test.sh
+  verify-static.sh
+  capacity-preflight.test.sh
+  gate-simulation.test.sh
+].each do |staging_contract|
+  expected_command = "bash scripts/weknora-staging/#{staging_contract}"
+  fail_contract "canonical CI omits staging contract: #{staging_contract}" unless ci_text.include?(expected_command)
+end
 tracked_scan_text = File.read(tracked_scan_path)
 %w[server desktop dist node_modules .runtime keys].each do |sentinel|
   fail_contract "tracked publish-boundary scanner does not cover #{sentinel}" unless tracked_scan_text.include?(sentinel)
@@ -182,17 +191,22 @@ fail_contract "production deploy must not cancel an active release" unless produ
 production_authorize = production.dig("jobs", "authorize")
 production_build = production.dig("jobs", "build")
 production_deploy = production.dig("jobs", "deploy")
+production_staging = production.dig("jobs", "deploy-staging")
 assert_hash(production_authorize, "deploy-production.yml.jobs.authorize")
 assert_hash(production_build, "deploy-production.yml.jobs.build")
 assert_hash(production_deploy, "deploy-production.yml.jobs.deploy")
+assert_hash(production_staging, "deploy-production.yml.jobs.deploy-staging")
 fail_contract "production authorization must run on the pinned standard GitHub-hosted runner" unless production_authorize["runs-on"] == expected_runner
 fail_contract "production image build must run on the pinned standard GitHub-hosted runner" unless production_build["runs-on"] == expected_runner
 fail_contract "production build must follow authorization" unless production_build["needs"] == "authorize"
-fail_contract "production deploy must wait for authorization and immutable images" unless Array(production_deploy["needs"]) == %w[authorize build]
+fail_contract "production deploy must wait for authorization, immutable images, and staging verification" unless Array(production_deploy["needs"]) == %w[authorize build deploy-staging]
+fail_contract "staging deploy must wait for authorization and immutable images" unless Array(production_staging["needs"]) == %w[authorize build]
 fail_contract "production deploy must run on the pinned standard GitHub-hosted runner" unless production_deploy["runs-on"] == expected_runner
+fail_contract "staging deploy must run on the pinned standard GitHub-hosted runner" unless production_staging["runs-on"] == expected_runner
 fail_contract "production deploy must use its isolated server environment" unless production.dig("jobs", "deploy", "environment") == "server-production"
+fail_contract "staging deploy must use its independent staging environment" unless production.dig("jobs", "deploy-staging", "environment") == "staging"
 fail_contract "production build runner must not receive the production environment" if production_build.key?("environment")
-fail_contract "production package write must be scoped to the image-build job" unless production_build["permissions"] == { "contents" => "read", "packages" => "write" }
+fail_contract "production package write and artifact read must be scoped to the image-build job" unless production_build["permissions"] == { "contents" => "read", "actions" => "read", "packages" => "write" }
 fail_contract "production deploy must receive only read access to GHCR" unless production_deploy["permissions"] == { "contents" => "read", "packages" => "read" }
 fail_contract "production authorization must not receive package write" if production.dig("jobs", "authorize", "permissions", "packages") == "write"
 production_dispatch = production_on.fetch("workflow_dispatch")
@@ -249,9 +263,9 @@ fail_contract "production BuildKit must not retain self-hosted disk floors or re
 daemon_config_path = File.join(ROOT, ".github", "docker-daemon.production-builder.json")
 fail_contract "production must not retain a self-hosted Docker daemon mirror configuration" if File.exist?(daemon_config_path)
 expected_image_outputs = {
-  "app_digest" => "${{ steps.app_image.outputs.digest }}",
+  "app_digest" => "${{ steps.images.outputs.app_digest }}",
   "app_ref" => "${{ steps.images.outputs.app_ref }}",
-  "frontend_digest" => "${{ steps.frontend_image.outputs.digest }}",
+  "frontend_digest" => "${{ steps.images.outputs.frontend_digest }}",
   "frontend_ref" => "${{ steps.images.outputs.frontend_ref }}"
 }
 fail_contract "production build must expose validated immutable image digests and refs" unless production_build["outputs"] == expected_image_outputs
@@ -279,6 +293,7 @@ fail_contract "production dispatch must be restricted to main" unless (productio
 fail_contract "production deploy must resolve an immutable checkout input" unless production_text.include?("inputs.immutable_ref") && production_text.include?("git rev-parse HEAD")
 fail_contract "production deploy must prove the revision belongs to origin/main" unless production_text.include?("origin/main") && production_text.include?("merge-base")
 fail_contract "production release input must be a full 40-character SHA only" unless production_text.include?("^[0-9a-fA-F]{40}$") && !production_text.include?("refs/tags/") && !production_text.include?("git cat-file -t")
+fail_contract "production dispatch must fail closed for unsupported release modes" unless production_text.include?("release_mode must be staging-only or promote") && production_text.include?("staging-only|promote")
 fail_contract "production deploy must require a successful CI run for the revision" unless production_text.include?("actions/runs") && production_text.include?("CI") && production_text.include?("conclusion")
 fail_contract "production deploy must pin checkout to the resolved SHA" unless production_text.include?("ref: ${{ needs.authorize.outputs.release_sha }}")
 fail_contract "production deploy must execute the direct SHA-only runner" unless production_text.include?("bash scripts/weknora-deploy.sh \"$WEKNORA_DEPLOY_REVISION\"") && production_text.include?("remote_gate prepare") && production_text.include?("remote_gate deploy")
@@ -292,5 +307,62 @@ fail_contract "production deploy must retain release manifest/checksum evidence"
 end
 fail_contract "production success manifest must fail closed without server identity/checksum" unless production_text.include?("RELEASE_OUTCOME") && production_text.include?("test \"$server_release_id\" = \"$expected_release_id\"") && production_text.include?("=~ ^[0-9a-fA-F]{64}$")
 fail_contract "production workflow must not use write permissions" if production_text.include?("contents: write") || production_text.include?("actions: write")
+
+# Production is an explicit promotion action only.  A completed CI workflow or
+# a staging-only dispatch may build and verify staging, but neither path may
+# touch the production environment.
+production_deploy_if = production_deploy.fetch("if", "").to_s
+fail_contract "production deploy must be manual promote-only" unless production_deploy_if.include?("github.event_name == 'workflow_dispatch'") && production_deploy_if.include?("inputs.release_mode == 'promote'") && !production_deploy_if.include?("github.event_name == 'workflow_run'")
+fail_contract "workflow_run must never promote production" if production_deploy_if.include?("workflow_run")
+
+# Isolated staging is deliberately part of this release workflow rather than a
+# second build/pipeline.  Keep these assertions close to the production seam so
+# a future edit cannot silently let production bypass the staging gate.
+staging_text = JSON.generate(production_staging)
+staging_steps = Array(production_staging["steps"])
+staging_prepare = staging_steps.find { |step| step.is_a?(Hash) && step["id"] == "staging_prepare" }
+staging_pin = staging_steps.find { |step| step.is_a?(Hash) && step["name"] == "Pin approved GHCR image refs in the staging input" }
+staging_deploy = staging_steps.find { |step| step.is_a?(Hash) && step["name"] == "Execute the staging SHA-only release seam" }
+staging_verify = staging_steps.find { |step| step.is_a?(Hash) && step["name"] == "Verify the deployed staging digest pair" }
+staging_record = staging_steps.find { |step| step.is_a?(Hash) && step["name"] == "Write the verified staging release record" }
+staging_upload = staging_steps.find { |step| step.is_a?(Hash) && step.fetch("uses", "").start_with?("actions/upload-artifact@") }
+staging_cleanup = staging_steps.find { |step| step.is_a?(Hash) && step["name"] == "Remove temporary staging deployment inputs" }
+fail_contract "staging deploy must not build or push images" if staging_text.match?(/build-push-action|setup-buildx-action|Build production browser bundles/)
+fail_contract "staging deploy must consume the authorized SHA and build image refs" unless staging_pin&.dig("env", "RELEASE_SHA") == "${{ needs.authorize.outputs.release_sha }}" && staging_pin&.dig("env", "APP_IMAGE") == "${{ needs.build.outputs.app_ref }}" && staging_pin&.dig("env", "FRONTEND_IMAGE") == "${{ needs.build.outputs.frontend_ref }}"
+fail_contract "staging deploy must use the independent SHA-only runner seam" unless staging_deploy&.fetch("run", "").to_s.include?('bash scripts/weknora-staging-deploy.sh "$WEKNORA_STAGING_REVISION"') && staging_text.include?("WEKNORA_STAGING_GHCR_TOKEN")
+fail_contract "staging deploy must verify the exact digest pair through the fixed remote gate" unless staging_verify&.fetch("run", "").to_s.include?('musuw-staging-gate verify $RELEASE_SHA $APP_IMAGE $FRONTEND_IMAGE') && staging_verify.dig("env", "APP_IMAGE") == "${{ needs.build.outputs.app_ref }}" && staging_verify.dig("env", "FRONTEND_IMAGE") == "${{ needs.build.outputs.frontend_ref }}" && !staging_verify.fetch("run", "").to_s.include?("bash scripts/weknora-staging/verify-deployed.sh")
+fail_contract "staging deploy must use staging-only runtime inputs" unless staging_text.include?("MUSUW_STAGING_PUBLIC_ENV") && staging_text.include?("MUSUW_STAGING_AUTH_PUBLIC_ENV") && staging_text.include?("WEKNORA_STAGING_RUNTIME_DIR") && staging_text.include?("WEKNORA_STAGING_KNOWN_HOSTS_FILE") && staging_text.include?("WEKNORA_STAGING_SSH_KEY") && staging_text.include?("WEKNORA_STAGING_REMOTE")
+fail_contract "staging deploy must retain a deployment release record without claiming full E2E acceptance" unless staging_record&.fetch("run", "").to_s.include?("staging_deployment") && !staging_record.fetch("run", "").to_s.include?("staging_acceptance") && staging_record.fetch("run", "").to_s.include?("app_image") && staging_record.fetch("run", "").to_s.include?("frontend_image") && staging_record.fetch("run", "").to_s.include?("app_digest") && staging_record.fetch("run", "").to_s.include?("frontend_digest") && staging_upload
+fail_contract "staging deploy must remove its temporary key and runtime inputs" unless staging_cleanup&.dig("if") == "always()" && staging_cleanup.fetch("run", "").to_s.include?("rm -f")
+fail_contract "staging prepare must validate restricted staging SSH inputs" unless staging_prepare&.fetch("run", "").to_s.include?("musuw-staging-deploy@") && staging_prepare.fetch("env", {}).values.any? { |value| value.to_s.include?("MUSUW_STAGING_PUBLIC_ENV") }
+fail_contract "production deploy must compare its SHA and refs with the accepted staging pair" unless production_pin_images&.dig("env", "STAGING_APP_IMAGE") == "${{ needs.deploy-staging.outputs.app_ref }}" && production_pin_images&.dig("env", "STAGING_FRONTEND_IMAGE") == "${{ needs.deploy-staging.outputs.frontend_ref }}" && production_pin_images&.dig("env", "STAGING_RELEASE_SHA") == "${{ needs.deploy-staging.outputs.release_sha }}" && production_pin_images.fetch("run", "").to_s.include?("STAGING_APP_IMAGE") && production_pin_images.fetch("run", "").to_s.include?("STAGING_FRONTEND_IMAGE") && production_pin_images.fetch("run", "").to_s.include?("STAGING_RELEASE_SHA")
+fail_contract "production deploy must be conditional on a successful staging gate" unless production_deploy.fetch("if", "").to_s.include?("needs.deploy-staging.result == 'success'")
+
+release_dispatch = production_on.fetch("workflow_dispatch")
+release_mode_input = release_dispatch.dig("inputs", "release_mode")
+staging_run_input = release_dispatch.dig("inputs", "staging_run_id")
+staging_e2e_input = release_dispatch.dig("inputs", "staging_e2e_result")
+assert_hash(release_mode_input, "deploy-production.yml.workflow_dispatch.inputs.release_mode")
+assert_hash(staging_run_input, "deploy-production.yml.workflow_dispatch.inputs.staging_run_id")
+assert_hash(staging_e2e_input, "deploy-production.yml.workflow_dispatch.inputs.staging_e2e_result")
+fail_contract "release_mode must support only staging-only and exact promotion paths" unless release_mode_input["required"] == true && release_mode_input["type"] == "choice" && release_mode_input["default"] == "staging-only" && Array(release_mode_input["options"]) == %w[staging-only promote]
+fail_contract "staging_run_id must be an optional exact prior-run input" unless staging_run_input["required"] == false && staging_run_input["type"] == "string"
+fail_contract "staging E2E input must default closed and expose only the explicit full-Sandbox result" unless staging_e2e_input["required"] == true && staging_e2e_input["type"] == "choice" && staging_e2e_input["default"] == "not-confirmed" && Array(staging_e2e_input["options"]) == %w[not-confirmed full-sandbox-e2e-green]
+fail_contract "promotion must restore a prior staging artifact instead of rebuilding" unless production_build.fetch("steps").any? { |step| step.is_a?(Hash) && step["name"] == "Restore and validate the verified staging release record" && step.fetch("uses", "").start_with?("actions/download-artifact@") } && JSON.generate(production_build).include?("staging_run_id") && JSON.generate(production_build).include?("staging_deployment") && JSON.generate(production_build).include?("release_mode")
+fail_contract "promotion must verify SHA and digest fields from the prior staging record" unless JSON.generate(production_build).include?("commit_sha") && JSON.generate(production_build).include?("app_ref") && JSON.generate(production_build).include?("frontend_ref") && JSON.generate(production_build).include?("app_digest") && JSON.generate(production_build).include?("frontend_digest") && JSON.generate(production_build).include?("staging_run_id")
+fail_contract "staging acceptance must be able to run without promoting production" unless staging_text.include?("staging-only") && production_deploy_if.include?("workflow_dispatch") && production_deploy_if.include?("promote") && !production_deploy_if.include?("staging-only")
+fail_contract "production promotion must require explicit full Sandbox E2E attestation" unless production_deploy_if.include?("inputs.staging_e2e_result == 'full-sandbox-e2e-green'") && production_text.include?("required_reviewers")
+staging_restore = production_build.fetch("steps").find { |step| step.is_a?(Hash) && step["name"] == "Check the prior staging release record and immutable refs" }
+staging_restore_run = staging_restore&.fetch("run", "").to_s
+fail_contract "promotion must accept only a staging-only release record tied to the source run" unless staging_restore_run.include?('.release_mode == "staging-only"') && staging_restore_run.include?("(.workflow_run | tostring) == $run")
+
+build_promote_guard = "${{ github.event_name != 'workflow_dispatch' || inputs.release_mode != 'promote' }}"
+%w[production_static_build production_app_image production_frontend_image].each do |step_id|
+  step = { "production_static_build" => production_static_build, "production_app_image" => production_app_image, "production_frontend_image" => production_frontend_image }.fetch(step_id)
+  fail_contract "promotion must not #{step_id.tr("_", " ")} or rebuild images" unless step&.dig("if") == build_promote_guard
+end
+fail_contract "promotion must verify currently deployed staging digests through the fixed remote gate" unless staging_verify&.dig("if").nil? && staging_verify.fetch("run", "").to_s.include?("musuw-staging-gate verify")
+
+fail_contract "staging release evidence must expose exact refs to production" unless production_staging.fetch("outputs", {}).dig("app_ref") == "${{ steps.staging_record.outputs.app_ref }}" && production_staging.fetch("outputs", {}).dig("frontend_ref") == "${{ steps.staging_record.outputs.frontend_ref }}"
 
 puts "workflow contract green: #{EXPECTED.join(", ")}"

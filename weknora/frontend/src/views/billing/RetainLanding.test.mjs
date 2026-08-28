@@ -25,7 +25,8 @@ test('the Paddle Retain landing page is anonymous, stable, and non-checkout', ()
   assert.doesNotMatch(retainRoute, /redirect:/)
   assert.doesNotMatch(page, /useRoute|URLSearchParams|router\.(?:push|replace)|Checkout|price|payment/i)
   assert.match(page, /https:\/\/musuw\.com\//)
-  assert.match(page, /https:\/\/app\.musuw\.com\/auth\/start/)
+  assert.match(page, /href="\/auth\/start"/)
+  assert.doesNotMatch(page, /https:\/\/app\.musuw\.com\/auth\/start/)
 })
 
 test('Retain reuses the application Paddle.js singleton', () => {
