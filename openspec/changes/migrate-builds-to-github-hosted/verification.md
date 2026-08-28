@@ -19,4 +19,19 @@
 
 ## Warm-cache acceptance
 
-Pending: a documentation-only follow-up revision must pass CI, Storefront, image digest validation, the restricted Tokyo deployment, and public health while demonstrating that the source compilation layer is reused instead of repeating the cold Go build.
+- Documentation-only revision `1710569fcd6e990eb9f5e24cdf0bd6f40bfcdb48`
+  passed [CI run 33141237062](https://github.com/estromeglovettgen-coder/musuw/actions/runs/33141237062),
+  [Storefront run 33141368238](https://github.com/estromeglovettgen-coder/musuw/actions/runs/33141368238),
+  and [Production run 33141368215](https://github.com/estromeglovettgen-coder/musuw/actions/runs/33141368215).
+- The GitHub-hosted native AMD64 image job completed in 1 minute 44 seconds,
+  down from the 8-minute-2-second cold baseline. The application image step
+  completed in 7 seconds, including registry push, and the build log explicitly
+  reported the `make build-prod` source-compilation layer as `CACHED`.
+- Digest validation passed before the restricted release. The Tokyo deployment
+  then completed in 35 seconds; the complete production workflow took about
+  2 minutes 33 seconds from creation through completion.
+- Post-deploy checks confirmed healthy app and frontend containers, exact
+  application/frontend revision labels, and the same validated runtime revision.
+  The TikHub and Paddle protected mounts were present and non-empty without
+  reading their contents. Public `/health` returned success, while Paddle public
+  configuration remained `configured=true` in `live` mode with a client token.
