@@ -15,3 +15,18 @@ test('localized Paddle preview prices are rendered without reformatting', () => 
   assert.match(planPrice, /return localizedPrices\.value\[priceId\]/)
   assert.doesNotMatch(planPrice, /\.replace\(|Intl\.NumberFormat|parseFloat|parseInt|Number\s*\(/)
 })
+
+test('billing actions are visible only to workspace owners and admins', () => {
+  assert.match(plans, /import \{ useAuthStore \} from ['"]@\/stores\/auth['"]\s*;?/)
+  assert.match(plans, /const authStore = useAuthStore\(\)/)
+  assert.match(plans, /const canManageBilling = computed\(\(\) => authStore\.hasRole\('admin'\)\)/)
+
+  const mutationGate = plans.slice(plans.indexOf('const canManageBilling'))
+  assert.match(mutationGate, /subscriptionUpgradeAvailable = computed\(\(\) =>\s*canManageBilling\.value/)
+  assert.match(mutationGate, /const hasCheckout = \(plan: PaidConsumerPlan\) => \{[\s\S]*canManageBilling\.value/)
+  assert.match(mutationGate, /const choosePlan = \(plan: ConsumerPlan\) => \{\s*if \(!canManageBilling\.value/)
+  assert.match(mutationGate, /const handlePortal = async \(\) => \{\s*if \(!canManageBilling\.value/)
+
+  assert.match(plans, /v-if="!canManageBilling"[^>]*>\{\{ \$t\('entitlement\.billingAdminOnly'\) \}\}/)
+  assert.match(plans, /v-if="canManageBilling && entitlement\.plan !== 'free' && portalAvailable"/)
+})

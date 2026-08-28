@@ -15,11 +15,7 @@ let activeEventCallback: ((event: PaddleEventData) => void) | undefined
 interface PaddleCheckoutInput {
   environment: 'sandbox' | 'live'
   clientToken: string
-  priceId: string
-  customData: {
-    tenant_id: string
-    musuw_checkout_binding: string
-  }
+  transactionId: string
   pwCustomerId?: string
   email?: string
   locale?: string
@@ -138,8 +134,7 @@ export async function openPaddleInlineCheckout(input: OpenPaddleInlineCheckoutIn
   const paddle = await initialize(input)
   if (!paddle) throw new Error('Paddle.js failed to initialize')
   paddle.Checkout.open({
-    items: [{ priceId: input.priceId, quantity: 1 }],
-    customData: input.customData,
+    transactionId: input.transactionId,
     customer: input.email ? { email: input.email } : undefined,
     settings: {
       displayMode: 'inline',

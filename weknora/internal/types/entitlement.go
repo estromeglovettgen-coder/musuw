@@ -100,7 +100,10 @@ func EffectiveConsumerPlan(tenant *Tenant) ConsumerPlan {
 		return ConsumerPlanFree
 	}
 	plan := NormalizeConsumerPlan(tenant.Plan)
-	if plan == ConsumerPlanFree || tenant.PlanStatus == "" || tenant.PlanStatus == "active" || tenant.PlanStatus == "trialing" || tenant.PlanStatus == "past_due" {
+	if plan == ConsumerPlanFree {
+		return plan
+	}
+	if tenant.PlanStatus == "active" || tenant.PlanStatus == "trialing" || tenant.PlanStatus == "past_due" {
 		return plan
 	}
 	return ConsumerPlanFree

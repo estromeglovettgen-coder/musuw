@@ -53,7 +53,7 @@ func (s *entitlementRepoStub) ResolvePaddleSubscription(_ context.Context, custo
 	}, nil
 }
 
-func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context, _ uint64, credentials *types.OpenRouterCredentials, creditPeriodEnd time.Time) (bool, error) {
+func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context, _ uint64, credentials *types.OpenRouterCredentials, creditPeriodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.tenant.Credentials != nil && s.tenant.Credentials.OpenRouter != nil {
@@ -66,12 +66,42 @@ func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context
 	s.tenant.Credentials.OpenRouter = &copy
 	value := creditPeriodEnd.UTC()
 	s.tenant.OpenRouterCreditPeriodEnd = &value
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
 	return true, nil
 }
 
-func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time) (bool, error) {
+func (s *entitlementRepoStub) SetOpenRouterDesiredLimit(_ context.Context, _ uint64, desiredLimitMicrousd int64) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if desiredLimitMicrousd <= 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit must be positive")
+	}
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	return true, nil
+}
+
+func (s *entitlementRepoStub) SetOpenRouterDesiredLimitIfUnset(_ context.Context, _ uint64, desiredLimitMicrousd int64) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if desiredLimitMicrousd <= 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit must be positive")
+	}
+	if s.tenant.OpenRouterDesiredLimitMicrousd > 0 {
+		return false, nil
+	}
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	return true, nil
+}
+
+func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time, desiredLimitMicrousd int64) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if eventID != "" {
+		if s.tenant.PaddleLastEventID == eventID || (s.tenant.PaddleLastEventAt != nil && !occurredAt.After(s.tenant.PaddleLastEventAt.UTC())) ||
+			(s.tenant.PaddleLastRenewalAt != nil && !occurredAt.After(s.tenant.PaddleLastRenewalAt.UTC())) {
+			return false, nil
+		}
+	}
 	s.tenant.Plan = plan
 	if status == "" {
 		status = "active"
@@ -80,13 +110,14 @@ func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, pla
 	s.tenant.PaddleBillingPeriod = billingPeriod
 	s.tenant.PaddleCustomerID = customerID
 	s.tenant.PaddleSubscriptionID = subscriptionID
-	if types.EffectiveConsumerPlan(s.tenant) == types.ConsumerPlanFree && status != "paused" {
+	if types.EffectiveConsumerPlan(s.tenant) == types.ConsumerPlanFree && status != "paused" && status != "refunded" && status != "chargeback" {
 		s.tenant.PaddleCurrentPeriodEnd = nil
 	} else if paddlePeriodEnd != nil && (s.tenant.PaddleCurrentPeriodEnd == nil || paddlePeriodEnd.After(s.tenant.PaddleCurrentPeriodEnd.UTC())) {
 		value := paddlePeriodEnd.UTC()
 		s.tenant.PaddleCurrentPeriodEnd = &value
 	}
 	s.tenant.OpenRouterCreditPeriodEnd = creditPeriodEnd
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
 	if eventID != "" {
 		s.tenant.PaddleLastEventID = eventID
 		value := occurredAt.UTC()
@@ -95,15 +126,15 @@ func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, pla
 	return true, nil
 }
 
-func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
+func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if eventID != "" {
-		if s.tenant.PaddleLastEventID == eventID || (s.tenant.PaddleLastEventAt != nil && !occurredAt.After(*s.tenant.PaddleLastEventAt)) {
-			return false, nil
-		}
 		if types.EffectiveConsumerPlan(s.tenant) != plan || billingPeriod != "monthly" || s.tenant.PaddleBillingPeriod != billingPeriod ||
 			s.tenant.PaddleCustomerID != customerID || s.tenant.PaddleSubscriptionID != subscriptionID {
+			return false, nil
+		}
+		if s.tenant.PaddleLastRenewalAt != nil && !occurredAt.After(s.tenant.PaddleLastRenewalAt.UTC()) {
 			return false, nil
 		}
 	}
@@ -112,10 +143,10 @@ func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _
 	}
 	value := periodEnd.UTC()
 	s.tenant.OpenRouterCreditPeriodEnd = &value
-	if eventID != "" {
-		s.tenant.PaddleLastEventID = eventID
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	if eventID != "" && (s.tenant.PaddleLastRenewalAt == nil || occurredAt.After(s.tenant.PaddleLastRenewalAt.UTC())) {
 		value := occurredAt.UTC()
-		s.tenant.PaddleLastEventAt = &value
+		s.tenant.PaddleLastRenewalAt = &value
 	}
 	return true, nil
 }
@@ -123,11 +154,11 @@ func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _
 func (s *entitlementRepoStub) AdvancePaddleCurrentPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, customerID, subscriptionID, billingPeriod, eventID string, occurredAt, periodEnd time.Time) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if eventID != "" && (s.tenant.PaddleLastEventID == eventID || (s.tenant.PaddleLastEventAt != nil && !occurredAt.After(*s.tenant.PaddleLastEventAt))) {
-		return false, nil
-	}
 	if types.EffectiveConsumerPlan(s.tenant) != plan || s.tenant.PaddleCustomerID != customerID ||
 		s.tenant.PaddleSubscriptionID != subscriptionID || s.tenant.PaddleBillingPeriod != billingPeriod {
+		return false, nil
+	}
+	if eventID != "" && s.tenant.PaddleLastRenewalAt != nil && !occurredAt.After(s.tenant.PaddleLastRenewalAt.UTC()) {
 		return false, nil
 	}
 	if s.tenant.PaddleCurrentPeriodEnd != nil && !periodEnd.After(s.tenant.PaddleCurrentPeriodEnd.UTC()) {
@@ -135,10 +166,9 @@ func (s *entitlementRepoStub) AdvancePaddleCurrentPeriod(_ context.Context, _ ui
 	}
 	value := periodEnd.UTC()
 	s.tenant.PaddleCurrentPeriodEnd = &value
-	if eventID != "" {
-		s.tenant.PaddleLastEventID = eventID
+	if eventID != "" && (s.tenant.PaddleLastRenewalAt == nil || occurredAt.After(s.tenant.PaddleLastRenewalAt.UTC())) {
 		value := occurredAt.UTC()
-		s.tenant.PaddleLastEventAt = &value
+		s.tenant.PaddleLastRenewalAt = &value
 	}
 	return true, nil
 }
@@ -251,6 +281,29 @@ func TestMonthlyPaidAllowanceWaitsForConfirmedRenewal(t *testing.T) {
 	_, err := svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
 	require.ErrorIs(t, err, errAllowanceRenewalPending)
 	assert.Zero(t, manager.updateCalls)
+}
+
+func TestOpenRouterKeyUseCapsCrashDriftToDurablePlan(t *testing.T) {
+	periodEnd := time.Now().UTC().Add(time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd:      &periodEnd,
+		OpenRouterDesiredLimitMicrousd: 2_150_000,
+		Credentials:                    &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-7", UsageMicrousd: 900_000,
+		LimitMicrousd: 3_400_000, LimitRemainingMicrousd: 1_600_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	key, err := svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
+
+	require.NoError(t, err)
+	assert.Equal(t, "sk-child", key)
+	assert.Equal(t, 1, manager.updateCalls)
+	assert.Equal(t, int64(2_150_000), manager.updateLimit)
+	assert.Equal(t, int64(1_250_000), manager.info.LimitRemainingMicrousd)
 }
 
 func TestCurrentMarksAllowanceRenewalAsPending(t *testing.T) {
@@ -634,6 +687,76 @@ func TestCancelAfterPauseStartsFullFreeAllowance(t *testing.T) {
 	assert.Nil(t, repo.tenant.PaddleCurrentPeriodEnd)
 }
 
+func TestRecurringAllowanceIgnoresNewerLifecycleCursor(t *testing.T) {
+	oldPeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	renewedAt := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
+	lifecycleAt := renewedAt.Add(time.Hour)
+	newPeriodEnd := oldPeriodEnd.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_1",
+		PaddleLastEventID: "evt-lifecycle", PaddleLastEventAt: &lifecycleAt,
+		OpenRouterCreditPeriodEnd: &oldPeriodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		LimitMicrousd: 2_500_000, LimitRemainingMicrousd: 100_000, UsageMicrousd: 900_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "monthly", "evt-renew", renewedAt, "ctm_1", "sub_1", newPeriodEnd)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Equal(t, int64(3_400_000), manager.updateLimit)
+	assert.Equal(t, 1, manager.updateCalls)
+	assert.Equal(t, "evt-lifecycle", repo.tenant.PaddleLastEventID)
+	require.NotNil(t, repo.tenant.PaddleLastRenewalAt)
+	assert.Equal(t, renewedAt, repo.tenant.PaddleLastRenewalAt.UTC())
+}
+
+func TestRecurringAllowanceConvergesPlanWhenUpgradeWebhookArrivesLate(t *testing.T) {
+	oldPeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	upgradeAt := time.Date(2026, 9, 28, 9, 45, 0, 0, time.UTC)
+	renewedAt := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
+	newPeriodEnd := oldPeriodEnd.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_1",
+		PaddleLastEventID: "evt-before-upgrade", PaddleLastEventAt: &upgradeAt,
+		OpenRouterCreditPeriodEnd: &oldPeriodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		LimitMicrousd: 1_250_000, LimitRemainingMicrousd: 100_000, UsageMicrousd: 900_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	applied, err := svc.RefreshPaidAllowance(
+		context.Background(), 7, types.ConsumerPlanPro, "monthly", "evt-renew-pro", renewedAt,
+		"ctm_1", "sub_1", newPeriodEnd,
+	)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan)
+	assert.Equal(t, "active", repo.tenant.PlanStatus)
+	assert.Equal(t, "monthly", repo.tenant.PaddleBillingPeriod)
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, newPeriodEnd, repo.tenant.OpenRouterCreditPeriodEnd.UTC())
+	require.NotNil(t, repo.tenant.PaddleLastRenewalAt)
+	assert.Equal(t, renewedAt, repo.tenant.PaddleLastRenewalAt.UTC())
+	assert.Equal(t, int64(3_400_000), manager.updateLimit)
+
+	// The delayed T2 lifecycle event is now safely stale: T3 already supplied
+	// the same provider plan and paid period.
+	applied, err = svc.ApplyConsumerPlan(
+		context.Background(), 7, types.ConsumerPlanPro, "active", "monthly", "evt-upgrade-late", upgradeAt,
+		"ctm_1", "sub_1", &oldPeriodEnd,
+	)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan)
+}
+
 func TestPaidAllowanceWithUnknownBillingPeriodFailsClosed(t *testing.T) {
 	periodEnd := time.Now().UTC().Add(-time.Minute)
 	repo := &entitlementRepoStub{tenant: &types.Tenant{
@@ -642,6 +765,21 @@ func TestPaidAllowanceWithUnknownBillingPeriodFailsClosed(t *testing.T) {
 		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
 	}}
 	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{LimitMicrousd: 5_000_000, LimitRemainingMicrousd: 500_000}}
+	svc := newEntitlementService(repo, manager)
+
+	_, err := svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
+	require.ErrorIs(t, err, errAllowanceRenewalPending)
+	assert.Zero(t, manager.updateCalls)
+}
+
+func TestPaidAllowanceWithEmptyPlanStatusFailsClosed(t *testing.T) {
+	periodEnd := time.Now().UTC().Add(time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{LimitMicrousd: 2_500_000, LimitRemainingMicrousd: 500_000}}
 	svc := newEntitlementService(repo, manager)
 
 	_, err := svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
@@ -836,9 +974,10 @@ func TestEntitlementServiceAdjustsProviderRemainingWithoutLocalLedger(t *testing
 	assert.False(t, manager.monthlyReset)
 	assert.Equal(t, int64(700_000), current.OpenRouterRemainingMicrousd)
 	assert.Equal(t, int64(550_000), current.OpenRouterUsedMicrousd)
+	assert.Equal(t, int64(1_050_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
 }
 
-func TestEntitlementServiceAllowsBoundedMaxCompensationForLowerPlan(t *testing.T) {
+func TestEntitlementServiceRejectsRemainingAboveCurrentPlanAllowance(t *testing.T) {
 	periodEnd := time.Now().UTC().AddDate(0, 1, 0)
 	repo := &entitlementRepoStub{tenant: &types.Tenant{
 		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
@@ -849,12 +988,12 @@ func TestEntitlementServiceAllowsBoundedMaxCompensationForLowerPlan(t *testing.T
 	svc := newEntitlementService(repo, manager)
 
 	_, err := svc.SetOpenRouterRemainingForTenant(context.Background(), 7, 5_000_000)
-	require.NoError(t, err)
-	assert.Equal(t, int64(5_000_000), manager.updateLimit)
-	assert.Equal(t, 1, manager.updateCalls)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "current plus plan allowance")
+	assert.Zero(t, manager.updateCalls)
 }
 
-func TestEntitlementServiceRejectsRemainingAboveMaxAllowance(t *testing.T) {
+func TestEntitlementServiceRejectsRemainingAboveCurrentPlanAllowanceWithSmallOverflow(t *testing.T) {
 	periodEnd := time.Now().UTC().AddDate(0, 1, 0)
 	repo := &entitlementRepoStub{tenant: &types.Tenant{
 		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
@@ -866,7 +1005,7 @@ func TestEntitlementServiceRejectsRemainingAboveMaxAllowance(t *testing.T) {
 
 	_, err := svc.SetOpenRouterRemainingForTenant(context.Background(), 7, 5_000_001)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot exceed the Max plan allowance")
+	assert.Contains(t, err.Error(), "cannot exceed the current plus plan allowance")
 	assert.Zero(t, manager.updateCalls)
 }
 
@@ -956,6 +1095,38 @@ func TestEntitlementServiceUsesProviderUsageAndSynchronizesPlanLimit(t *testing.
 	assert.Equal(t, int64(2_250_000), manager.updateLimit)
 }
 
+func TestKeyLimitForPlanChangeKeepsPaidUsageOnDowngrade(t *testing.T) {
+	info := &modelopenrouter.KeyInfo{
+		UsageMicrousd:          900_000,
+		LimitMicrousd:          2_500_000,
+		LimitRemainingMicrousd: 1_600_000,
+		UsageMonthlyMicrousd:   900_000,
+		MonthlyReset:           false,
+	}
+	tenant := &types.Tenant{Plan: types.ConsumerPlanPro, PlanStatus: "active", PaddleBillingPeriod: "monthly"}
+
+	limit, monthlyReset := keyLimitForPlanChange(tenant, types.ConsumerPlanPlus, "monthly", info)
+	assert.Equal(t, int64(1_250_000), limit, "900k already consumed leaves 350k of the Plus allowance")
+	assert.False(t, monthlyReset)
+}
+
+func TestKeyLimitForPlanChangeStartsFullAllowanceOnlyForFreeToPaid(t *testing.T) {
+	info := &modelopenrouter.KeyInfo{
+		UsageMicrousd:          300_000,
+		LimitMicrousd:          400_000,
+		LimitRemainingMicrousd: 100_000,
+	}
+	freeTenant := &types.Tenant{Plan: types.ConsumerPlanFree, PlanStatus: "active"}
+
+	limit, monthlyReset := keyLimitForPlanChange(freeTenant, types.ConsumerPlanPro, "monthly", info)
+	assert.Equal(t, int64(2_800_000), limit)
+	assert.False(t, monthlyReset)
+
+	paidLimit, paidReset := keyLimitForPlanChange(&types.Tenant{Plan: types.ConsumerPlanPro, PlanStatus: "active"}, types.ConsumerPlanFree, "", info)
+	assert.Equal(t, int64(300_000), paidLimit, "paid-to-free must not mint a fresh allowance")
+	assert.False(t, paidReset)
+}
+
 func TestApplyConsumerPlanDoesNotGrantPlanWhenProviderLimitUpdateFails(t *testing.T) {
 	repo := &entitlementRepoStub{tenant: &types.Tenant{
 		ID:         7,
@@ -975,8 +1146,14 @@ func TestApplyConsumerPlanDoesNotGrantPlanWhenProviderLimitUpdateFails(t *testin
 	applied, err := svc.ApplyConsumerPlan(context.Background(), 7, types.ConsumerPlanPro, "active", "monthly", "evt-1", time.Now(), "customer", "sub", &periodEnd)
 	require.Error(t, err)
 	assert.False(t, applied)
-	assert.Equal(t, types.ConsumerPlanFree, repo.tenant.Plan)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan, "DB-first persistence keeps a replayable desired target")
+	assert.Equal(t, int64(2_500_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
 	assert.Equal(t, types.LimitsForConsumerPlan(types.ConsumerPlanPro).MonthlyOpenRouterMicrousd, manager.updateLimit)
+	manager.updateErr = nil
+	applied, err = svc.ApplyConsumerPlan(context.Background(), 7, types.ConsumerPlanPro, "active", "monthly", "evt-1", repo.tenant.PaddleLastEventAt.UTC(), "customer", "sub", &periodEnd)
+	require.NoError(t, err, "the queue retry must replay the durable provider target")
+	assert.True(t, applied)
+	assert.Equal(t, int64(2_500_000), manager.info.LimitMicrousd)
 }
 
 func TestEntitlementServiceOpenRouterUserIDIsStableAcrossTenants(t *testing.T) {
@@ -991,4 +1168,139 @@ func TestEntitlementServiceOpenRouterUserIDIsStableAcrossTenants(t *testing.T) {
 	assert.NotContains(t, a, userID)
 	assert.Contains(t, a, "musuw_")
 	assert.Empty(t, svc.OpenRouterUserID(entitlementContext(7, "")))
+}
+
+func TestOpenRouterDesiredLimitHealsBothProviderDriftDirections(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	const desired = int64(2_150_000)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd: &periodEnd, OpenRouterDesiredLimitMicrousd: desired,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-7", UsageMicrousd: 900_000, LimitMicrousd: 3_400_000, LimitRemainingMicrousd: 2_500_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	_, err := svc.Current(entitlementContext(7, "user-123"), now)
+	require.NoError(t, err)
+	assert.Equal(t, desired, manager.info.LimitMicrousd, "provider-above-desired must be reduced")
+	assert.Equal(t, 1, manager.updateCalls)
+
+	manager.info.LimitMicrousd = 1_000_000
+	manager.info.LimitRemainingMicrousd = 100_000
+	_, err = svc.Current(entitlementContext(7, "user-123"), now)
+	require.NoError(t, err)
+	assert.Equal(t, desired, manager.info.LimitMicrousd, "provider-below-desired must be restored")
+	assert.Equal(t, 2, manager.updateCalls)
+	assert.Equal(t, desired, repo.tenant.OpenRouterDesiredLimitMicrousd)
+}
+
+func TestOpenRouterDesiredLimitBootstrapsLegacyRowFromProviderOnce(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		OpenRouterCreditPeriodEnd: &periodEnd,
+		Credentials:               &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-7", UsageMicrousd: 300_000, LimitMicrousd: 1_750_000, LimitRemainingMicrousd: 1_450_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	_, err := svc.Current(entitlementContext(7, "user-123"), now)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1_750_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Zero(t, manager.updateCalls, "bootstrap must not invent a new provider limit")
+
+	manager.info.LimitMicrousd = 900_000
+	_, err = svc.Current(entitlementContext(7, "user-123"), now)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1_750_000), manager.info.LimitMicrousd)
+	assert.Equal(t, 1, manager.updateCalls)
+}
+
+func TestRefundFreezesDesiredLimitAndFailsClosed(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	const desired = int64(2_500_000)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm-1", PaddleSubscriptionID: "sub-1", PaddleCurrentPeriodEnd: &periodEnd, OpenRouterCreditPeriodEnd: &periodEnd,
+		OpenRouterDesiredLimitMicrousd: desired,
+		Credentials:                    &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{Hash: "hash-7", LimitMicrousd: desired, LimitRemainingMicrousd: desired}}
+	svc := newEntitlementService(repo, manager)
+
+	applied, err := svc.ApplyConsumerPlan(context.Background(), 7, types.ConsumerPlanFree, "refunded", "", "evt-refund", now, "ctm-1", "sub-1", nil)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan, "refund must preserve the paid plan for reversal")
+	assert.Equal(t, "refunded", repo.tenant.PlanStatus)
+	assert.Equal(t, "monthly", repo.tenant.PaddleBillingPeriod)
+	require.NotNil(t, repo.tenant.PaddleCurrentPeriodEnd)
+	assert.Equal(t, periodEnd, repo.tenant.PaddleCurrentPeriodEnd.UTC())
+	assert.Equal(t, desired, repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Zero(t, manager.updateCalls, "refund does not rewrite the provider target")
+
+	_, err = svc.OpenRouterAPIKey(entitlementContext(7, "user-123"))
+	assert.ErrorIs(t, err, errAllowanceRenewalPending)
+}
+
+func TestRefundReversalReusesFrozenDesiredLimit(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	const desired = int64(2_500_000)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "refunded", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm-1", PaddleSubscriptionID: "sub-1", PaddleCurrentPeriodEnd: &periodEnd, OpenRouterCreditPeriodEnd: &periodEnd,
+		OpenRouterDesiredLimitMicrousd: desired,
+		Credentials:                    &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{Hash: "hash-7", UsageMicrousd: 900_000, LimitMicrousd: 900_000, LimitRemainingMicrousd: 0}}
+	svc := newEntitlementService(repo, manager)
+	activeEnd := now.AddDate(0, 1, 0)
+
+	applied, err := svc.ApplyConsumerPlan(context.Background(), 7, types.ConsumerPlanPro, "active", "monthly", "evt-reversal", now, "ctm-1", "sub-1", &activeEnd)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan)
+	assert.Equal(t, "active", repo.tenant.PlanStatus)
+	assert.Equal(t, desired, repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Equal(t, desired, manager.updateLimit, "reversal must restore the frozen absolute target")
+	assert.Equal(t, 1, manager.updateCalls)
+}
+
+func TestPaidRenewalAfterRefundStartsExactlyOneNewAllowance(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	oldPeriodEnd := now.AddDate(0, 1, 0)
+	newPeriodEnd := oldPeriodEnd.AddDate(0, 1, 0)
+	const frozenDesired = int64(2_500_000)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPro, PlanStatus: "refunded", PaddleBillingPeriod: "monthly",
+		PaddleCustomerID: "ctm-1", PaddleSubscriptionID: "sub-1", PaddleCurrentPeriodEnd: &oldPeriodEnd, OpenRouterCreditPeriodEnd: &oldPeriodEnd,
+		OpenRouterDesiredLimitMicrousd: frozenDesired,
+		Credentials:                    &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-child", KeyHash: "hash-7"}},
+	}}
+	manager := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-7", UsageMicrousd: 900_000, LimitMicrousd: frozenDesired, LimitRemainingMicrousd: 1_600_000,
+	}}
+	svc := newEntitlementService(repo, manager)
+
+	applied, err := svc.RefreshPaidAllowance(
+		context.Background(), 7, types.ConsumerPlanPro, "monthly", "evt-new-paid-period",
+		oldPeriodEnd.Add(time.Minute), "ctm-1", "sub-1", newPeriodEnd,
+	)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Equal(t, int64(3_400_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Equal(t, int64(3_400_000), manager.updateLimit)
+	require.NotNil(t, repo.tenant.PaddleCurrentPeriodEnd)
+	assert.Equal(t, newPeriodEnd, repo.tenant.PaddleCurrentPeriodEnd.UTC())
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, newPeriodEnd, repo.tenant.OpenRouterCreditPeriodEnd.UTC())
 }

@@ -2292,6 +2292,7 @@ export default {
     upgradeFailed: '요금제를 업그레이드할 수 없습니다. 다시 시도해 주세요.',
     managePlan: '요금제 관리',
     manageDescription: '현재 구독을 변경하거나 취소하세요.',
+    billingAdminOnly: '워크스페이스 소유자와 관리자만 결제 및 구독을 시작하거나 관리할 수 있습니다.',
     billingNotConfigured: '현재 요금제를 변경할 수 없습니다.',
     billingRenewalPending: '결제 확인이 아직 완료되지 않았거나 복구가 필요합니다. 결제 동기화 후 AI 액세스가 복구됩니다.',
     billingPendingShort: '결제 확인 대기 중',

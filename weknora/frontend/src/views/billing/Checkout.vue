@@ -134,6 +134,7 @@ const previewPrice = ref('')
 const upgradePreview = ref<PaddleSubscriptionUpgradePreview | null>(null)
 const upgradeSubmitting = ref(false)
 const upgradeOperationKey = ref<string | null>(null)
+const checkoutOperationKey = ref<string | null>(null)
 const checkoutIntent = ref<PaddleCheckoutIntent | null>(null)
 let checkoutIntentRequest: Promise<PaddleCheckoutIntent> | null = null
 const period = computed<BillingPeriod>(() => route.query.period === 'yearly' ? 'yearly' : 'monthly')
@@ -143,6 +144,10 @@ const targetPlan = computed<PaidConsumerPlan | null>(() => {
 })
 const planName = computed(() => targetPlan.value ? t(`entitlement.plans.${targetPlan.value}`) : '')
 const planRank: Record<string, number> = { free: 0, plus: 1, pro: 2, max: 3 }
+// The backend protects every billing mutation. Keep direct `/checkout`
+// navigation equally clear for ordinary members and avoid starting any
+// provider operation that the server will reject.
+const canManageBilling = computed(() => authStore.hasRole('admin'))
 
 const formatMinorCurrency = (amount: number | string, currencyCode: string) => {
   try {
@@ -214,20 +219,35 @@ const getUpgradeOperationKey = (): string => {
   return upgradeOperationKey.value
 }
 
+const getCheckoutOperationKey = (): string => {
+  if (checkoutOperationKey.value) return checkoutOperationKey.value
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    checkoutOperationKey.value = crypto.randomUUID()
+  } else {
+    checkoutOperationKey.value = `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+  return checkoutOperationKey.value
+}
+
 const getPaddleCheckoutIntent = async (plan: PaidConsumerPlan, billingPeriod: BillingPeriod): Promise<PaddleCheckoutIntent> => {
   if (checkoutIntent.value) return checkoutIntent.value
   if (!checkoutIntentRequest) {
     checkoutIntentRequest = createPaddleCheckoutIntent({
       plan,
       billingPeriod,
+      operationKey: getCheckoutOperationKey(),
     })
   }
-  const response = await checkoutIntentRequest
-  if (!response?.price_id || !response.custom_data?.tenant_id || !response.custom_data?.musuw_checkout_binding) {
-    throw new Error('Paddle checkout input unavailable')
+  try {
+    const response = await checkoutIntentRequest
+    if (!response?.transaction_id) throw new Error('Paddle checkout input unavailable')
+    checkoutIntent.value = response
+    return response
+  } catch (error) {
+    checkoutIntentRequest = null
+    checkoutOperationKey.value = null
+    throw error
   }
-  checkoutIntent.value = response
-  return response
 }
 
 const handlePaddleEvent = (event: PaddleEventData) => {
@@ -299,8 +319,7 @@ const mountCheckout = async () => {
     environment: config.environment,
     clientToken: config.client_token,
     pwCustomerId: config.pw_customer_id,
-    priceId: intent.price_id,
-    customData: intent.custom_data,
+    transactionId: intent.transaction_id,
     email: authStore.user?.email,
     locale: locale.value,
     frameTarget: 'paddle-inline-target',
@@ -313,6 +332,11 @@ const initializeCheckout = async () => {
   const plan = targetPlan.value
   if (!plan) {
     await router.replace('/plans')
+    return
+  }
+  if (!canManageBilling.value) {
+    errorMessage.value = t('entitlement.billingAdminOnly')
+    loading.value = false
     return
   }
   loading.value = true
@@ -342,6 +366,7 @@ const confirmUpgrade = async () => {
     await upgradePaddleSubscription(plan, getUpgradeOperationKey())
     void refreshAfterPayment()
   } catch {
+    upgradeOperationKey.value = null
     errorMessage.value = t('entitlement.upgradeFailed')
   } finally {
     upgradeSubmitting.value = false

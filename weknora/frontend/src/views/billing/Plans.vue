@@ -60,10 +60,11 @@
         </section>
 
         <footer class="plans-page__footer">
-          <p v-if="billingPending">{{ $t('entitlement.billingRenewalPending') }}</p>
+          <p v-if="!canManageBilling">{{ $t('entitlement.billingAdminOnly') }}</p>
+          <p v-else-if="billingPending">{{ $t('entitlement.billingRenewalPending') }}</p>
           <p v-else-if="!billingConfigured">{{ $t('entitlement.billingNotConfigured') }}</p>
           <p v-else>{{ $t('entitlement.checkoutSecureNote') }}</p>
-          <button v-if="entitlement.plan !== 'free' && portalAvailable" type="button" :disabled="portalOpening" @click="handlePortal">
+          <button v-if="canManageBilling && entitlement.plan !== 'free' && portalAvailable" type="button" :disabled="portalOpening" @click="handlePortal">
             {{ $t('entitlement.manageBilling') }}
           </button>
         </footer>
@@ -79,6 +80,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
 import {
   createPaddlePortalSession,
   getCurrentEntitlement,
@@ -92,6 +94,7 @@ import { previewPaddlePrices } from '@/utils/paddleCheckout'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const { locale, t } = useI18n()
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
@@ -123,9 +126,13 @@ const requestedPlan = computed<ConsumerPlan | null>(() => {
 })
 const billingConfigured = computed(() => billing.value?.configured === true)
 const portalAvailable = computed(() => billing.value?.portal_available === true)
+// Billing mutations are an Owner/Admin capability. The server remains the
+// authority; this gate only keeps ordinary workspace members from seeing
+// actions that the guarded endpoints would reject.
+const canManageBilling = computed(() => authStore.hasRole('admin'))
 const billingPending = computed(() => entitlement.value?.openrouter_credits_status === 'pending')
 const subscriptionUpgradeAvailable = computed(() =>
-  billingConfigured.value && portalAvailable.value && entitlement.value?.plan_status === 'active',
+  canManageBilling.value && billingConfigured.value && portalAvailable.value && entitlement.value?.plan_status === 'active',
 )
 
 const loadPrices = async () => {
@@ -193,7 +200,7 @@ const planFeatures = (plan: ConsumerPlan) => {
 
 const hasCheckout = (plan: PaidConsumerPlan) => {
   const priceId = billing.value?.catalog?.[plan]?.[period.value]?.price_id
-  return Boolean(billingConfigured.value && priceId)
+  return Boolean(canManageBilling.value && billingConfigured.value && priceId)
 }
 
 const planActionKind = (plan: ConsumerPlan): 'current' | 'included' | 'choose' | 'unavailable' => {
@@ -215,12 +222,12 @@ const planActionLabel = (plan: ConsumerPlan) => {
 }
 
 const choosePlan = (plan: ConsumerPlan) => {
-  if (planActionKind(plan) !== 'choose' || plan === 'free') return
+  if (!canManageBilling.value || planActionKind(plan) !== 'choose' || plan === 'free') return
   void router.push({ path: '/checkout', query: { plan, period: period.value } })
 }
 
 const handlePortal = async () => {
-  if (!portalAvailable.value || portalOpening.value) return
+  if (!canManageBilling.value || !portalAvailable.value || portalOpening.value) return
   portalOpening.value = true
   try {
     const response = await createPaddlePortalSession()

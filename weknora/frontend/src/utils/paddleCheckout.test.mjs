@@ -35,22 +35,22 @@ test('the app initializes official Paddle.js on public and authenticated pages f
   assert.match(app, /pwCustomerId:\s*undefined/)
 })
 
-test('self-service checkout lets official Paddle.js create the transaction from server-signed items', () => {
+test('self-service checkout opens exactly one server-created official Paddle transaction', () => {
   assert.match(entitlementApi, /createPaddleCheckoutIntent/)
   assert.match(entitlementApi, /\/api\/v1\/billing\/paddle\/checkout-intent/)
   assert.match(entitlementApi, /billing_period: input\.billingPeriod/)
-  assert.doesNotMatch(entitlementApi, /createPaddleCheckoutIntent[\s\S]*operation_key: input\.operationKey/)
+  assert.match(entitlementApi, /operation_key: input\.operationKey/)
   assert.match(entitlementApi, /subscription-upgrade[\s\S]*operation_key: operationKey/)
   assert.match(checkout, /createPaddleCheckoutIntent\(/)
+  assert.match(checkout, /checkoutOperationKey/)
   assert.match(checkout, /upgradeOperationKey/)
   assert.match(checkout, /upgradePaddleSubscription\(plan, getUpgradeOperationKey\(\)\)/)
-  assert.match(checkout, /priceId: intent\.price_id/)
-  assert.match(checkout, /customData: intent\.custom_data/)
+  assert.match(checkout, /transactionId: intent\.transaction_id/)
   assert.match(checkout, /config\.catalog\?\./)
   assert.doesNotMatch(checkout, /checkoutBinding:|tenantId:|config\.tenant_id/)
-  assert.match(paddle, /items:\s*\[\{\s*priceId:\s*input\.priceId,\s*quantity:\s*1\s*\}\]/)
-  assert.match(paddle, /customData:\s*input\.customData/)
-  assert.doesNotMatch(paddle, /transactionId:\s*input\.transactionId/)
+  assert.match(paddle, /transactionId:\s*input\.transactionId/)
+  assert.doesNotMatch(paddle, /Checkout\.open\(\{[\s\S]*items:/)
+  assert.doesNotMatch(paddle, /Checkout\.open\(\{[\s\S]*customData:/)
 })
 
 test('localized price preview uses Paddle final totals, not pre-tax subtotals', () => {

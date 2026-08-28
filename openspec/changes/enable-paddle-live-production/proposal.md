@@ -5,7 +5,7 @@ Musuw's production billing integration is deliberately pinned to Paddle Sandbox 
 ## What Changes
 
 - Require production to use one internally consistent Paddle Live unit: Live SDK mode, one existing active client token, the existing six active recurring prices, one existing server-only API key with the verified required scopes, and the signing secret for the one production destination.
-- Reuse and verify the approved app domain, set the default payment link to the public Paddle.js `/pay` route, and use Paddle.js standard self-service transaction creation, official subscription update and customer portal APIs, signed webhooks, retry, ordering, and idempotency paths.
+- Reuse and verify the approved app domain, set the default payment link to the public Paddle.js `/pay` route, and use Paddle's automatic transaction API plus Paddle.js `transactionId` checkout, official subscription update and customer portal APIs, signed webhooks, retry, ordering, and idempotency paths. Musuw keeps only one tenant-scoped durable active-operation fence to prevent duplicate tabs; Paddle remains the payment and subscription authority.
 - Define an explicit fail-closed refund and dispute entitlement policy using Paddle adjustment notifications and authoritative provider reads, without adding a parallel billing ledger or creating a financial transaction for testing.
 - Move the local production operations view and deployment contracts from Sandbox to Live while keeping Sandbox development/test resources isolated and available.
 - Record provider, protected-runtime, CI, production smoke, rollback, and secret-leak evidence. No payout account, real payment method, charge, refund, transfer, or fabricated production event is in scope.

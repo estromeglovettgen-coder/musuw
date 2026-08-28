@@ -25,6 +25,19 @@ func TestPaddleWebhookTaskPayloadValidate(t *testing.T) {
 	if err := base.Validate(); err != nil {
 		t.Fatalf("valid apply payload rejected: %v", err)
 	}
+	checkout := base
+	checkout.BillingOperationType = PaddleBillingOperationCheckout
+	checkout.BillingOperationKey = "checkout-operation-key"
+	checkout.PriceID = "pri_pro_monthly"
+	checkout.EventType = "subscription.created"
+	checkout.TransactionID = "txn_provider_owned"
+	if err := checkout.Validate(); err != nil {
+		t.Fatalf("valid checkout completion rejected: %v", err)
+	}
+	checkout.TransactionID = ""
+	if err := checkout.Validate(); err == nil {
+		t.Fatal("checkout completion without exact provider transaction must be rejected")
+	}
 
 	refresh := base
 	refresh.Operation = PaddleWebhookTaskOperationRefreshPaidAllowance

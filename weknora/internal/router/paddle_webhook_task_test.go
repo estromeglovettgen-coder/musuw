@@ -18,8 +18,63 @@ type paddleWebhookEntitlementStub struct {
 	refreshCalls   int
 	applyPayload   types.PaddleWebhookTaskPayload
 	refreshPayload types.PaddleWebhookTaskPayload
+	applyResult    *bool
 	applyErr       error
 	refreshErr     error
+}
+
+type paddleWebhookBillingOperationStub struct {
+	finishCalls        int
+	finishTenantID     uint64
+	finishOperationKey string
+	finishPriceID      string
+	finishTransaction  string
+	finishSubscription string
+	finishStatus       types.PaddleBillingOperationStatus
+	finishMismatch     bool
+}
+
+func (*paddleWebhookBillingOperationStub) Claim(context.Context, types.PaddleBillingOperationIntent) (*types.PaddleBillingOperation, types.PaddleBillingOperationClaimDisposition, error) {
+	return nil, "", errors.New("Claim is not used by the webhook worker test")
+}
+
+func (*paddleWebhookBillingOperationStub) FindByKey(context.Context, uint64, string) (*types.PaddleBillingOperation, bool, error) {
+	return nil, false, errors.New("FindByKey is not used by the webhook worker test")
+}
+
+func (*paddleWebhookBillingOperationStub) MarkInFlight(context.Context, uint64) (bool, error) {
+	return false, errors.New("MarkInFlight is not used by the webhook worker test")
+}
+
+func (*paddleWebhookBillingOperationStub) FailPendingWithoutProviderWrite(context.Context, uint64, string) (bool, error) {
+	return false, errors.New("FailPendingWithoutProviderWrite is not used by the webhook worker test")
+}
+
+func (*paddleWebhookBillingOperationStub) RecordPaddleTransaction(context.Context, uint64, string) error {
+	return errors.New("RecordPaddleTransaction is not used by the webhook worker test")
+}
+
+func (*paddleWebhookBillingOperationStub) Finish(context.Context, uint64, types.PaddleBillingOperationStatus, string, string) error {
+	return errors.New("Finish is not used by the webhook worker test")
+}
+
+func (s *paddleWebhookBillingOperationStub) FinishMatchingActive(
+	_ context.Context,
+	tenantID uint64,
+	_ types.PaddleBillingOperationType,
+	operationKey, priceID, transactionID, subscriptionID string,
+	status types.PaddleBillingOperationStatus,
+	_ string,
+	_ string,
+) (bool, error) {
+	s.finishCalls++
+	s.finishTenantID = tenantID
+	s.finishOperationKey = operationKey
+	s.finishPriceID = priceID
+	s.finishTransaction = transactionID
+	s.finishSubscription = subscriptionID
+	s.finishStatus = status
+	return !s.finishMismatch, nil
 }
 
 func (s *paddleWebhookEntitlementStub) ApplyConsumerPlan(
@@ -37,7 +92,13 @@ func (s *paddleWebhookEntitlementStub) ApplyConsumerPlan(
 		EventID: eventID, OccurredAt: occurredAt, CustomerID: customerID,
 		SubscriptionID: subscriptionID, EventPeriodEnd: eventPeriodEnd,
 	}
-	return s.applyErr == nil, s.applyErr
+	if s.applyErr != nil {
+		return false, s.applyErr
+	}
+	if s.applyResult != nil {
+		return *s.applyResult, nil
+	}
+	return true, nil
 }
 
 func (s *paddleWebhookEntitlementStub) RefreshPaidAllowance(
@@ -92,6 +153,79 @@ func TestPaddleWebhookTaskHandlerAppliesConsumerPlan(t *testing.T) {
 	}
 	if stub.applyPayload.EventID != payload.EventID || stub.applyPayload.Plan != payload.Plan {
 		t.Fatalf("unexpected apply payload: %+v", stub.applyPayload)
+	}
+}
+
+func TestPaddleWebhookTaskHandlerDoesNotFinishOperationWhenEntitlementWasNotApplied(t *testing.T) {
+	notApplied := false
+	entitlements := &paddleWebhookEntitlementStub{applyResult: &notApplied}
+	operations := &paddleWebhookBillingOperationStub{}
+	handler := NewPaddleWebhookTaskHandler(entitlements, operations)
+	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
+	payload.BillingOperationType = types.PaddleBillingOperationUpgrade
+	payload.BillingOperationKey = "upgrade-operation-key"
+	payload.PriceID = "pri_pro_monthly"
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := handler.Handle(context.Background(), asynq.NewTask(types.TypePaddleWebhook, body)); err == nil {
+		t.Fatal("an unapplied entitlement must be retried instead of settling the billing operation")
+	}
+	if operations.finishCalls != 0 {
+		t.Fatalf("FinishMatchingActive calls = %d, want 0", operations.finishCalls)
+	}
+}
+
+func TestPaddleWebhookTaskHandlerFinishesMatchingOperationAfterEntitlementApplied(t *testing.T) {
+	entitlements := &paddleWebhookEntitlementStub{}
+	operations := &paddleWebhookBillingOperationStub{}
+	handler := NewPaddleWebhookTaskHandler(entitlements, operations)
+	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
+	payload.BillingOperationType = types.PaddleBillingOperationUpgrade
+	payload.BillingOperationKey = "upgrade-operation-key"
+	payload.PriceID = "pri_pro_monthly"
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := handler.Handle(context.Background(), asynq.NewTask(types.TypePaddleWebhook, body)); err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+	if operations.finishCalls != 1 {
+		t.Fatalf("FinishMatchingActive calls = %d, want 1", operations.finishCalls)
+	}
+	if operations.finishTenantID != payload.TenantID ||
+		operations.finishOperationKey != payload.BillingOperationKey ||
+		operations.finishPriceID != payload.PriceID ||
+		operations.finishSubscription != payload.SubscriptionID ||
+		operations.finishStatus != types.PaddleBillingOperationSucceeded {
+		t.Fatalf("unexpected operation completion: %+v", operations)
+	}
+}
+
+func TestPaddleWebhookTaskHandlerRetriesMismatchedActiveOperation(t *testing.T) {
+	entitlements := &paddleWebhookEntitlementStub{}
+	operations := &paddleWebhookBillingOperationStub{finishMismatch: true}
+	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
+	payload.BillingOperationType = types.PaddleBillingOperationUpgrade
+	payload.BillingOperationKey = "old-upgrade-operation"
+	payload.PriceID = "pri_pro_monthly"
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = NewPaddleWebhookTaskHandler(entitlements, operations).Handle(
+		context.Background(), asynq.NewTask(types.TypePaddleWebhook, body),
+	)
+	if err == nil {
+		t.Fatal("mismatched active operation must be retried instead of silently acknowledged")
+	}
+	if operations.finishCalls != 1 {
+		t.Fatalf("FinishMatchingActive calls = %d, want 1", operations.finishCalls)
 	}
 }
 

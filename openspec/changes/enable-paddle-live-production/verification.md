@@ -70,13 +70,19 @@ stored here.
 
 ## Explicit boundaries
 
-- The consolidated adversarial review found no Musuw card field, server-created
-  first-purchase transaction, checkout operation state, billing ledger, refund
-  executor, dunning state machine, or duplicate catalog/destination. Initial
-  checkout is Paddle.js `items`/`customData`; the only durable billing operation
-  is the narrow paid-subscription upgrade guard required because Paddle's
-  subscription update API has no general idempotency key and the available
-  Customer Portal has no Product Collections configuration.
+- The consolidated adversarial review found no Musuw card field, payment-detail
+  storage, local billing ledger, refund executor, dunning state machine, or
+  duplicate catalog/destination. Initial checkout uses one Paddle automatic
+  transaction created from the server's allow-listed item and signed custom
+  data, then Paddle.js opens that provider transaction by `transactionId`. The
+  only durable row is the existing tenant-scoped active-operation fence: it
+  stores the provider transaction ID and immutable request coordinates solely to
+  prevent duplicate tabs and safely reuse/release one unresolved attempt. Paddle
+  remains authoritative for transaction/subscription lifecycle, payment data,
+  tax, currency, payment methods, receipts, and portal behavior; the same fence
+  also protects the paid-subscription update because Paddle's subscription
+  update API has no general client idempotency key and the available Customer
+  Portal has no Product Collections configuration.
 - No real card, charge, refund, transfer, payout, or payout-account operation
   occurred. Paddle owns checkout, tax, currency conversion, payment methods,
   dunning, receipts, refunds, and recovery. Musuw only mints a signed checkout

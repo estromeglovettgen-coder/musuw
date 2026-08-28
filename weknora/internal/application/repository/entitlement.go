@@ -61,9 +61,12 @@ func (r *entitlementRepository) ResolvePaddleSubscription(ctx context.Context, c
 // SetOpenRouterCredentialsIfAbsent installs the first provider-managed key for
 // a tenant without replacing any other provider credentials. The row lock makes
 // first-use provisioning safe when multiple requests or replicas race.
-func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Context, tenantID uint64, credentials *types.OpenRouterCredentials, creditPeriodEnd time.Time) (bool, error) {
+func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Context, tenantID uint64, credentials *types.OpenRouterCredentials, creditPeriodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
 	if credentials == nil || credentials.APIKey == "" || credentials.KeyHash == "" {
 		return false, fmt.Errorf("OpenRouter tenant credentials are incomplete")
+	}
+	if desiredLimitMicrousd <= 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit must be positive")
 	}
 	inserted := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -81,8 +84,9 @@ func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Con
 		copy := *credentials
 		merged.OpenRouter = &copy
 		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(map[string]any{
-			"credentials":                   &merged,
-			"open_router_credit_period_end": creditPeriodEnd.UTC(),
+			"credentials":                        &merged,
+			"open_router_credit_period_end":      creditPeriodEnd.UTC(),
+			"open_router_desired_limit_microusd": desiredLimitMicrousd,
 		}).Error; err != nil {
 			return err
 		}
@@ -92,7 +96,53 @@ func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Con
 	return inserted, err
 }
 
-func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time) (bool, error) {
+// SetOpenRouterDesiredLimit changes the one durable absolute target for an
+// existing managed key. The provider mutation is intentionally performed by
+// the service after this write commits, so a failed provider call can be
+// replayed by any later entitlement read.
+func (r *entitlementRepository) SetOpenRouterDesiredLimit(ctx context.Context, tenantID uint64, desiredLimitMicrousd int64) (bool, error) {
+	if desiredLimitMicrousd <= 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit must be positive")
+	}
+	result := r.db.WithContext(ctx).Model(&types.Tenant{}).Where("id = ?", tenantID).
+		Update("open_router_desired_limit_microusd", desiredLimitMicrousd)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
+}
+
+// SetOpenRouterDesiredLimitIfUnset bootstraps a legacy row exactly once. The
+// row lock means concurrent readers cannot overwrite the first observed
+// provider limit with a different value.
+func (r *entitlementRepository) SetOpenRouterDesiredLimitIfUnset(ctx context.Context, tenantID uint64, desiredLimitMicrousd int64) (bool, error) {
+	if desiredLimitMicrousd <= 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit must be positive")
+	}
+	inserted := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant types.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+			return err
+		}
+		if tenant.OpenRouterDesiredLimitMicrousd > 0 {
+			return nil
+		}
+		result := tx.Model(&types.Tenant{}).Where("id = ? AND open_router_desired_limit_microusd = 0", tenantID).
+			Update("open_router_desired_limit_microusd", desiredLimitMicrousd)
+		if result.Error != nil {
+			return result.Error
+		}
+		inserted = result.RowsAffected == 1
+		return nil
+	})
+	return inserted, err
+}
+
+func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time, desiredLimitMicrousd int64) (bool, error) {
+	if desiredLimitMicrousd < 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit cannot be negative")
+	}
 	applied := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
@@ -101,6 +151,12 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 		}
 		if eventID != "" {
 			if tenant.PaddleLastEventID == eventID || (tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt)) {
+				return nil
+			}
+			// Renewal events have their own monotonic cursor. Lifecycle and
+			// adjustment webhooks may advance PaddleLastEventAt, but must not
+			// suppress a valid recurring payment that belongs to this period.
+			if tenant.PaddleLastRenewalAt != nil && !occurredAt.After(tenant.PaddleLastRenewalAt.UTC()) {
 				return nil
 			}
 		}
@@ -125,16 +181,24 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 			return nil
 		}
 		limits := types.LimitsForConsumerPlan(effectivePlan)
-		updates := map[string]any{
-			"plan":                          plan,
-			"plan_status":                   status,
-			"storage_quota":                 limits.StorageBytes,
-			"paddle_customer_id":            customerID,
-			"paddle_subscription_id":        subscriptionID,
-			"paddle_billing_period":         billingPeriod,
-			"open_router_credit_period_end": creditPeriodEnd,
+		// Revocation is an access-state change, not a new allowance grant. Keep
+		// the last paid absolute target durable even if an older caller still
+		// sends plan=free/desired=0; the provider remains untouched and an
+		// authoritative reversal can replay this exact target later.
+		if (status == "refunded" || status == "chargeback") && tenant.OpenRouterDesiredLimitMicrousd > 0 {
+			desiredLimitMicrousd = tenant.OpenRouterDesiredLimitMicrousd
 		}
-		if effectivePlan == types.ConsumerPlanFree && status != "paused" {
+		updates := map[string]any{
+			"plan":                               plan,
+			"plan_status":                        status,
+			"storage_quota":                      limits.StorageBytes,
+			"paddle_customer_id":                 customerID,
+			"paddle_subscription_id":             subscriptionID,
+			"paddle_billing_period":              billingPeriod,
+			"open_router_credit_period_end":      creditPeriodEnd,
+			"open_router_desired_limit_microusd": desiredLimitMicrousd,
+		}
+		if effectivePlan == types.ConsumerPlanFree && status != "paused" && status != "refunded" && status != "chargeback" {
 			updates["paddle_current_period_end"] = nil
 		} else if paddlePeriodEnd != nil && !paddlePeriodEnd.IsZero() &&
 			(tenant.PaddleCurrentPeriodEnd == nil || paddlePeriodEnd.After(tenant.PaddleCurrentPeriodEnd.UTC())) {
@@ -155,9 +219,12 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 }
 
 // AdvanceOpenRouterCreditPeriod is the only local allowance-period marker.
-// When eventID is present, the Paddle event cursor and period advance in the
-// same row transaction so an older adjustment cannot roll back a paid renewal.
-func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
+// Recurring payment events use PaddleLastRenewalAt rather than the lifecycle
+// cursor, so unrelated webhooks cannot suppress a valid renewal.
+func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
+	if desiredLimitMicrousd < 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit cannot be negative")
+	}
 	applied := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
@@ -165,9 +232,6 @@ func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Contex
 			return err
 		}
 		if eventID != "" {
-			if tenant.PaddleLastEventID == eventID || (tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt)) {
-				return nil
-			}
 			plan = types.NormalizeConsumerPlan(plan)
 			if plan == types.ConsumerPlanFree || types.EffectiveConsumerPlan(&tenant) != plan ||
 				billingPeriod != "monthly" || tenant.PaddleBillingPeriod != billingPeriod ||
@@ -175,15 +239,20 @@ func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Contex
 				strings.TrimSpace(tenant.PaddleSubscriptionID) != strings.TrimSpace(subscriptionID) {
 				return nil
 			}
+			if tenant.PaddleLastRenewalAt != nil && !occurredAt.After(tenant.PaddleLastRenewalAt.UTC()) {
+				return nil
+			}
 		}
 		periodEnd = periodEnd.UTC()
 		if tenant.OpenRouterCreditPeriodEnd != nil && !periodEnd.After(tenant.OpenRouterCreditPeriodEnd.UTC()) {
 			return nil
 		}
-		updates := map[string]any{"open_router_credit_period_end": periodEnd}
-		if eventID != "" {
-			updates["paddle_last_event_id"] = eventID
-			updates["paddle_last_event_at"] = occurredAt.UTC()
+		updates := map[string]any{
+			"open_router_credit_period_end":      periodEnd,
+			"open_router_desired_limit_microusd": desiredLimitMicrousd,
+		}
+		if eventID != "" && (tenant.PaddleLastRenewalAt == nil || occurredAt.After(tenant.PaddleLastRenewalAt.UTC())) {
+			updates["paddle_last_renewal_at"] = occurredAt.UTC()
 		}
 		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(updates).Error; err != nil {
 			return err
@@ -195,17 +264,14 @@ func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Contex
 }
 
 // AdvancePaddleCurrentPeriod records only a newer provider-confirmed service
-// period and advances the Paddle event cursor in the same row transaction. No
-// local billing ledger is needed.
+// period and advances the independent renewal cursor in the same row
+// transaction. No local billing ledger is needed.
 func (r *entitlementRepository) AdvancePaddleCurrentPeriod(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, customerID, subscriptionID, billingPeriod, eventID string, occurredAt, periodEnd time.Time) (bool, error) {
 	applied := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
 			return err
-		}
-		if eventID != "" && (tenant.PaddleLastEventID == eventID || (tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt))) {
-			return nil
 		}
 		plan = types.NormalizeConsumerPlan(plan)
 		if plan == types.ConsumerPlanFree || types.EffectiveConsumerPlan(&tenant) != plan ||
@@ -214,14 +280,16 @@ func (r *entitlementRepository) AdvancePaddleCurrentPeriod(ctx context.Context, 
 			strings.TrimSpace(tenant.PaddleSubscriptionID) != strings.TrimSpace(subscriptionID) {
 			return nil
 		}
+		if eventID != "" && tenant.PaddleLastRenewalAt != nil && !occurredAt.After(tenant.PaddleLastRenewalAt.UTC()) {
+			return nil
+		}
 		periodEnd = periodEnd.UTC()
 		if tenant.PaddleCurrentPeriodEnd != nil && !periodEnd.After(tenant.PaddleCurrentPeriodEnd.UTC()) {
 			return nil
 		}
 		updates := map[string]any{"paddle_current_period_end": periodEnd}
-		if eventID != "" {
-			updates["paddle_last_event_id"] = eventID
-			updates["paddle_last_event_at"] = occurredAt.UTC()
+		if eventID != "" && (tenant.PaddleLastRenewalAt == nil || occurredAt.After(tenant.PaddleLastRenewalAt.UTC())) {
+			updates["paddle_last_renewal_at"] = occurredAt.UTC()
 		}
 		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(updates).Error; err != nil {
 			return err

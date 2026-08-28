@@ -2294,6 +2294,7 @@ export default {
     upgradeFailed: '暂时无法升级套餐，请重试。',
     managePlan: '管理套餐',
     manageDescription: '更新或取消当前订阅。',
+    billingAdminOnly: '只有工作区所有者和管理员可以发起或管理账单。',
     billingNotConfigured: '当前暂时无法更改套餐。',
     billingRenewalPending: '账单确认尚未完成或需要修复，账单同步后将恢复 AI 访问。',
     billingPendingShort: '账单待确认',

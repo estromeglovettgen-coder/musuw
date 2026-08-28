@@ -17,7 +17,7 @@
 ## 3. Consumer UI
 
 - [x] 3.1 Show plan/storage/credit state in Usage & billing settings and align storefront's four plans with enforced limits
-- [x] 3.2 Preserve storefront plan intent through authentication, route settings/account upgrade actions through standalone `/plans`, and mount the official Paddle.js inline Checkout on `/checkout` without a custom payment form
+- [x] 3.2 Preserve storefront plan intent through authentication, route settings/account upgrade actions through standalone `/plans`, mount the official Paddle.js inline Checkout on `/checkout` without a custom payment form, and show billing/portal mutations only to tenant Owners/Admins
 - [x] 3.3 Add an authenticated, tenant-owned Paddle Customer Portal button using the official Go SDK and expose only a fresh one-time overview URL
 - [x] 3.4 Add official Paddle preview/update for paid upgrades while preserving the current term and keeping the signed webhook authoritative
 - [x] 3.5 Replace the compact upgrade controls with a standalone GPT-style four-plan comparison and Paddle.js localized `PricePreview()` values
@@ -40,10 +40,11 @@
 - [x] 4.14 Render Paddle's localized formatted final total without rewriting it and pass only the authenticated tenant-derived Paddle customer to `pwCustomer`/`Paddle.Update`; the sibling Live change initializes official Retain globally without granting browser authority
 - [x] 4.15 Implement the verified Paddle webhook handoff as durable, retryable Asynq work that acknowledges within five seconds, keeps the tenant event markers as final idempotency, and preserves dead-letter visibility after retries are exhausted
 - [ ] 4.16 Verify webhook enqueue timing, worker restart/retry behavior, duplicate and reordered deliveries, and final tenant-marker idempotency in the Paddle Sandbox
-- [x] 4.17 Replace server-created checkout transaction state with Paddle.js standard `items`/`customData`; keep only serialized/reused tenant upgrade operations, keep uncertain upgrade responses fail-closed for explicit reconciliation, never retry them blindly, and accept exactly one known subscription base item
-- [ ] 4.18 Verify stateless repeated checkout input, repeated upgrades across replicas, uncertain subscription-update responses, upgrade-operation reuse, unsafe multi-item/unknown-item subscriptions, and signed-webhook authority in the Paddle Sandbox
+- [x] 4.17 Reuse the existing tenant billing-operation fence for one official initial Paddle transaction ID and paid upgrades; open Paddle.js by `transactionId`, reconcile uncertain upgrades with provider reads only, never retry a mutation blindly, and accept exactly one known subscription base item
+- [ ] 4.18 Verify repeated checkout transaction reuse/replacement, repeated upgrades across replicas, uncertain subscription-update responses, operation reuse, unsafe multi-item/unknown-item subscriptions, and signed-webhook authority in the Paddle Sandbox
 - [x] 4.19 Implement the separately reviewed Live full-refund/chargeback entitlement policy through signed adjustment events and the minimum official provider-state read for reversal; add no financial ledger or payment write
 - [x] 4.20 Verify refund, chargeback, reversal, and official Retain behavior through local signed policy fixtures plus provider-supported no-charge Live evidence; never create a real financial action
+- [x] 4.21 Fix the audit-confirmed billing write authorization, duplicate-checkout, cross-stream webhook ordering, stuck-upgrade reconciliation, paid-downgrade allowance, and empty-status fail-closed defects with focused and race tests and no new queue, ledger, or payment UI
 
 ## 5. Consumer account erasure
 

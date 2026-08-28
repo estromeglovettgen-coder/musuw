@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/types"
@@ -15,9 +15,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var paddleBillingOperationTestDBSequence atomic.Uint64
+
 func setupPaddleBillingOperationDB(t *testing.T) (*gorm.DB, interfaces.PaddleBillingOperationRepository) {
 	t.Helper()
-	dsn := fmt.Sprintf("file:paddle_billing_operation_%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	dsn := fmt.Sprintf("file:paddle_billing_operation_%d?mode=memory&cache=shared", paddleBillingOperationTestDBSequence.Add(1))
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
@@ -26,6 +28,7 @@ func setupPaddleBillingOperationDB(t *testing.T) (*gorm.DB, interfaces.PaddleBil
 	// claim tests exercise the repository's transaction/unique-index contract
 	// without turning SQLITE_BUSY into a test of the driver pool.
 	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
 	require.NoError(t, db.AutoMigrate(&types.PaddleBillingOperation{}))
 	require.NoError(t, db.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS ux_paddle_billing_operations_active_tenant
@@ -45,6 +48,18 @@ func paddleBillingIntent(tenantID uint64, key string) types.PaddleBillingOperati
 		BillingPeriod:      "monthly",
 		PriceID:            "pri_pro_monthly",
 		SubscriptionID:     "sub_owned",
+	}
+}
+
+func paddleCheckoutIntent(tenantID uint64, key string) types.PaddleBillingOperationIntent {
+	return types.PaddleBillingOperationIntent{
+		TenantID:           tenantID,
+		OperationKey:       key,
+		OperationType:      types.PaddleBillingOperationCheckout,
+		RequestFingerprint: "fingerprint-" + key,
+		Plan:               types.ConsumerPlanPlus,
+		BillingPeriod:      "monthly",
+		PriceID:            "pri_plus_monthly",
 	}
 }
 
@@ -76,7 +91,9 @@ func TestPaddleBillingOperationDuplicateKeyReusesProviderIntentAndResult(t *test
 	created, disposition, err := repo.Claim(ctx, intent)
 	require.NoError(t, err)
 	assert.Equal(t, types.PaddleBillingOperationClaimCreated, disposition)
-	require.NoError(t, repo.MarkInFlight(ctx, created.ID))
+	started, err := repo.MarkInFlight(ctx, created.ID)
+	require.NoError(t, err)
+	require.True(t, started)
 	providerAccepted, disposition, err := repo.Claim(ctx, intent)
 	require.NoError(t, err)
 	assert.Equal(t, types.PaddleBillingOperationClaimExisting, disposition)
@@ -129,6 +146,112 @@ func TestPaddleBillingOperationTerminalStatesReleaseTenantSlot(t *testing.T) {
 	_, disposition, err = repo.Claim(ctx, paddleBillingIntent(9, "checkout-after-uncertain"))
 	require.NoError(t, err)
 	assert.Equal(t, types.PaddleBillingOperationClaimActive, disposition)
+}
+
+func TestPaddleBillingOperationRecordsOneCheckoutTransaction(t *testing.T) {
+	db, repo := setupPaddleBillingOperationDB(t)
+	ctx := context.Background()
+	checkout, disposition, err := repo.Claim(ctx, paddleCheckoutIntent(7, "checkout-transaction"))
+	require.NoError(t, err)
+	require.Equal(t, types.PaddleBillingOperationClaimCreated, disposition)
+	started, err := repo.MarkInFlight(ctx, checkout.ID)
+	require.NoError(t, err)
+	require.True(t, started)
+	require.NoError(t, repo.RecordPaddleTransaction(ctx, checkout.ID, "txn_provider_owned"))
+	require.NoError(t, repo.RecordPaddleTransaction(ctx, checkout.ID, "txn_provider_owned"), "same transaction replay is idempotent")
+
+	var stored types.PaddleBillingOperation
+	require.NoError(t, db.First(&stored, checkout.ID).Error)
+	assert.Equal(t, "txn_provider_owned", stored.PaddleTransactionID)
+	assert.ErrorIs(t, repo.RecordPaddleTransaction(ctx, checkout.ID, "txn_other"), ErrPaddleBillingOperationInvalidTransition)
+
+	matched, err := repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, checkout.OperationKey, checkout.PriceID, "txn_other", "sub_created", types.PaddleBillingOperationSucceeded, `{}`, "")
+	require.NoError(t, err)
+	assert.False(t, matched)
+	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, checkout.OperationKey, checkout.PriceID, "txn_provider_owned", "sub_created", types.PaddleBillingOperationSucceeded, `{}`, "")
+	require.NoError(t, err)
+	assert.True(t, matched)
+	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, checkout.OperationKey, checkout.PriceID, "txn_provider_owned", "sub_created", types.PaddleBillingOperationSucceeded, `{}`, "")
+	require.NoError(t, err)
+	assert.True(t, matched, "terminal webhook replay is idempotently settled")
+	require.NoError(t, db.First(&stored, checkout.ID).Error)
+	assert.Equal(t, types.PaddleBillingOperationSucceeded, stored.Status)
+	assert.NoError(t, repo.RecordPaddleTransaction(ctx, checkout.ID, "txn_provider_owned"), "HTTP persistence replay after webhook success is idempotent")
+
+	webhookFirst, _, err := repo.Claim(ctx, paddleCheckoutIntent(7, "checkout-webhook-first"))
+	require.NoError(t, err)
+	started, err = repo.MarkInFlight(ctx, webhookFirst.ID)
+	require.NoError(t, err)
+	assert.True(t, started)
+	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, webhookFirst.OperationKey, webhookFirst.PriceID, "txn_webhook_first", "sub_webhook_first", types.PaddleBillingOperationSucceeded, `{}`, "")
+	require.NoError(t, err)
+	assert.True(t, matched)
+	require.NoError(t, repo.RecordPaddleTransaction(ctx, webhookFirst.ID, "txn_webhook_first"), "late HTTP persistence must accept the transaction already bound by the signed webhook")
+}
+
+func TestPaddleBillingOperationFailPendingWithoutProviderWriteIsAtomic(t *testing.T) {
+	db, repo := setupPaddleBillingOperationDB(t)
+	ctx := context.Background()
+
+	pending, _, err := repo.Claim(ctx, paddleCheckoutIntent(7, "checkout-pending-release"))
+	require.NoError(t, err)
+	released, err := repo.FailPendingWithoutProviderWrite(ctx, pending.ID, "selection changed")
+	require.NoError(t, err)
+	assert.True(t, released)
+	var stored types.PaddleBillingOperation
+	require.NoError(t, db.First(&stored, pending.ID).Error)
+	assert.Equal(t, types.PaddleBillingOperationFailed, stored.Status)
+	assert.Equal(t, "selection changed", stored.LastError)
+
+	bound, _, err := repo.Claim(ctx, paddleCheckoutIntent(8, "checkout-bound-release"))
+	require.NoError(t, err)
+	started, err := repo.MarkInFlight(ctx, bound.ID)
+	require.NoError(t, err)
+	assert.True(t, started)
+	require.NoError(t, repo.RecordPaddleTransaction(ctx, bound.ID, "txn_bound"))
+	released, err = repo.FailPendingWithoutProviderWrite(ctx, bound.ID, "selection changed")
+	require.NoError(t, err)
+	assert.False(t, released, "a provider-bound operation must never be released by the pending CAS")
+	stored = types.PaddleBillingOperation{}
+	require.NoError(t, db.First(&stored, bound.ID).Error)
+	assert.Equal(t, types.PaddleBillingOperationInFlight, stored.Status)
+}
+
+func TestPaddleBillingOperationBindsSignedTransactionWhenPersistenceWasUncertain(t *testing.T) {
+	db, repo := setupPaddleBillingOperationDB(t)
+	ctx := context.Background()
+	checkout, _, err := repo.Claim(ctx, paddleCheckoutIntent(17, "checkout-signed-recovery"))
+	require.NoError(t, err)
+	_, err = repo.MarkInFlight(ctx, checkout.ID)
+	require.NoError(t, err)
+	require.NoError(t, repo.Finish(ctx, checkout.ID, types.PaddleBillingOperationUncertain, `{}`, "transaction response was not persisted"))
+
+	matched, err := repo.FinishMatchingActive(ctx, 17, types.PaddleBillingOperationCheckout, checkout.OperationKey, checkout.PriceID, "txn_signed_created", "sub_signed_created", types.PaddleBillingOperationSucceeded, `{}`, "")
+	require.NoError(t, err)
+	assert.True(t, matched)
+
+	var stored types.PaddleBillingOperation
+	require.NoError(t, db.First(&stored, checkout.ID).Error)
+	assert.Equal(t, "txn_signed_created", stored.PaddleTransactionID)
+	assert.Equal(t, types.PaddleBillingOperationSucceeded, stored.Status)
+}
+
+func TestPaddleBillingOperationDoesNotBindCheckoutBeforeProviderWriteStarts(t *testing.T) {
+	db, repo := setupPaddleBillingOperationDB(t)
+	ctx := context.Background()
+	checkout, _, err := repo.Claim(ctx, paddleCheckoutIntent(18, "checkout-still-pending"))
+	require.NoError(t, err)
+
+	matched, err := repo.FinishMatchingActive(
+		ctx, 18, types.PaddleBillingOperationCheckout, checkout.OperationKey, checkout.PriceID,
+		"txn_unrelated", "sub_unrelated", types.PaddleBillingOperationSucceeded, `{}`, "",
+	)
+	require.NoError(t, err)
+	assert.False(t, matched)
+	var stored types.PaddleBillingOperation
+	require.NoError(t, db.First(&stored, checkout.ID).Error)
+	assert.Equal(t, types.PaddleBillingOperationPending, stored.Status)
+	assert.Empty(t, stored.PaddleTransactionID)
 }
 
 func TestPaddleBillingOperationConcurrentSameKeyConverges(t *testing.T) {
@@ -187,13 +310,13 @@ func TestPaddleBillingOperationFinishMatchingUpgradeRequiresSubscription(t *test
 	upgrade, _, err := repo.Claim(ctx, intent)
 	require.NoError(t, err)
 
-	matched, err := repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationUpgrade, "upgrade-webhook", intent.PriceID, "", types.PaddleBillingOperationSucceeded, `{}`, "")
+	matched, err := repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationUpgrade, "upgrade-webhook", intent.PriceID, "", "", types.PaddleBillingOperationSucceeded, `{}`, "")
 	require.NoError(t, err)
 	assert.False(t, matched)
-	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationUpgrade, "upgrade-webhook", intent.PriceID, "sub_other", types.PaddleBillingOperationSucceeded, `{}`, "")
+	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationUpgrade, "upgrade-webhook", intent.PriceID, "", "sub_other", types.PaddleBillingOperationSucceeded, `{}`, "")
 	require.NoError(t, err)
 	assert.False(t, matched)
-	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationUpgrade, "upgrade-webhook", intent.PriceID, intent.SubscriptionID, types.PaddleBillingOperationSucceeded, `{}`, "")
+	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationUpgrade, "upgrade-webhook", intent.PriceID, "", intent.SubscriptionID, types.PaddleBillingOperationSucceeded, `{}`, "")
 	require.NoError(t, err)
 	assert.True(t, matched)
 

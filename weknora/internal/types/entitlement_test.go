@@ -67,3 +67,8 @@ func TestEffectiveConsumerPlanAtBoundsPastDueGraceByConfirmedTerm(t *testing.T) 
 		PaddleCurrentPeriodEnd: &future, OpenRouterCreditPeriodEnd: &past,
 	}, now))
 }
+
+func TestEffectiveConsumerPlanRejectsPaidPlanWithoutProviderStatus(t *testing.T) {
+	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlan(&Tenant{Plan: ConsumerPlanPro}))
+	assert.Equal(t, ConsumerPlanPro, EffectiveConsumerPlan(&Tenant{Plan: ConsumerPlanPro, PlanStatus: "active"}))
+}

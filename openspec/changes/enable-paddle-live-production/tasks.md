@@ -12,7 +12,7 @@
 - [x] 2.2 Change only the fixed production wrapper, checked-in example, static release preflight, registry validator, and metadata entries from Sandbox-only to Live-only.
 - [x] 2.3 Switch the production operations Paddle read from the Sandbox API/test Keychain item to the Live API/production Keychain item and update focused tests and runbooks.
 - [x] 2.4 Run the focused shell, operations, registry, and source-secret tests and record the original red plus final green evidence.
-- [x] 2.5 Replace the redundant server-created initial transaction and checkout-operation state with Paddle.js standard `items`/`customData`; retain signed-webhook authority and only the narrow paid-upgrade serialization that the official subscription API still requires.
+- [x] 2.5 Use Paddle's automatic transaction API once per unresolved tenant checkout operation, pass its `transactionId` to Paddle.js, and retain only the existing durable active-operation fence needed to prevent duplicate tabs; signed webhooks remain authoritative and the same minimal fence covers the official paid-upgrade API.
 - [x] 2.6 Initialize official Paddle.js on the stable public app shell and pass only the authenticated entitlement-derived Paddle customer to Retain; keep dunning and recovery UI provider-owned with no local recovery state.
 
 ## 3. Refund and dispute policy
@@ -35,5 +35,5 @@
 - [x] 5.2 Open the real Live checkout for a supported plan, confirm the displayed plan/price/origin, and stop before entering a payment method or confirming purchase.
 - [x] 5.3 Prove official non-charge notification delivery, signature acceptance, safe retry/duplicate behavior, and tenant customer/subscription/entitlement consistency without fabricating a production event.
 - [x] 5.4 Scan tracked changes, CI/runtime logs, browser responses, and server file metadata for secret leakage; do not capture sensitive Dashboard fields in screenshots.
-- [x] 5.5 Run one consolidated adversarial review covering no money movement, untouched payout settings, no duplicate catalog, no Sandbox/Live mixing, no secret exposure, rollback consistency, and every unverified claim.
+- [x] 5.5 Run one consolidated adversarial review covering no money movement, untouched payout settings, no duplicate catalog, no Sandbox/Live mixing, no secret exposure, rollback consistency, the single checkout fence versus Paddle authority, and every unverified claim.
 - [x] 5.6 Update the deferred consumer-entitlement tasks and this change's verification record with fresh evidence, remaining owner-only steps, and exact residual risk.

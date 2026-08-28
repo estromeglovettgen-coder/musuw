@@ -56,13 +56,10 @@ export interface PaddleSubscriptionUpgradePreview {
   next_billed_at: string
 }
 
-/** Paddle.js self-service input signed by the authenticated Musuw server. */
+/** One server-created Paddle transaction. Paddle.js owns the payment UI. */
 export interface PaddleCheckoutIntent {
-  price_id: string
-  custom_data: {
-    tenant_id: string
-    musuw_checkout_binding: string
-  }
+  transaction_id: string
+  pending: true
 }
 
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
@@ -91,9 +88,11 @@ export async function upgradePaddleSubscription(plan: PaidConsumerPlan, operatio
 export async function createPaddleCheckoutIntent(input: {
   plan: PaidConsumerPlan
   billingPeriod: BillingPeriod
+  operationKey: string
 }): Promise<PaddleCheckoutIntent> {
   return post('/api/v1/billing/paddle/checkout-intent', {
     plan: input.plan,
     billing_period: input.billingPeriod,
+    operation_key: input.operationKey,
   }) as Promise<PaddleCheckoutIntent>
 }

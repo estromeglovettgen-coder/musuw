@@ -3,7 +3,7 @@ package types
 import "time"
 
 // PaddleBillingOperationStatus is the durable state of a server-owned Paddle
-// subscription-update intent. Pending/in_flight/uncertain occupy
+// checkout or subscription-update intent. Pending/in_flight/uncertain occupy
 // the tenant's single active billing-operation slot; terminal states release
 // it. The provider call must happen after the claim transaction commits.
 type PaddleBillingOperationStatus string
@@ -21,7 +21,8 @@ const (
 type PaddleBillingOperationType string
 
 const (
-	PaddleBillingOperationUpgrade PaddleBillingOperationType = "upgrade"
+	PaddleBillingOperationCheckout PaddleBillingOperationType = "checkout"
+	PaddleBillingOperationUpgrade  PaddleBillingOperationType = "upgrade"
 )
 
 // PaddleBillingOperationClaimDisposition tells the caller why Claim returned
@@ -52,25 +53,26 @@ type PaddleBillingOperationIntent struct {
 	SubscriptionID     string
 }
 
-// PaddleBillingOperation is the durable record that bridges a local
-// subscription-update request and Paddle's API. Result is opaque JSON owned by
-// the caller. Standard self-service checkout transactions remain Paddle.js-owned.
+// PaddleBillingOperation is the durable record that bridges a local request
+// and Paddle's API. PaddleTransactionID is populated only for checkout; Paddle
+// still owns payment collection and the signed webhook remains authoritative.
 type PaddleBillingOperation struct {
-	ID                 uint64                       `json:"id" gorm:"primaryKey;autoIncrement"`
-	TenantID           uint64                       `json:"tenant_id" gorm:"not null;index;uniqueIndex:ux_paddle_billing_operations_key"`
-	OperationKey       string                       `json:"operation_key" gorm:"type:varchar(128);not null;uniqueIndex:ux_paddle_billing_operations_key"`
-	OperationType      PaddleBillingOperationType   `json:"operation_type" gorm:"column:operation_type;type:varchar(32);not null"`
-	RequestFingerprint string                       `json:"-" gorm:"column:request_fingerprint;type:varchar(128);not null;default:''"`
-	Plan               ConsumerPlan                 `json:"plan" gorm:"type:varchar(16);not null;default:''"`
-	BillingPeriod      string                       `json:"billing_period" gorm:"type:varchar(16);not null;default:''"`
-	PriceID            string                       `json:"price_id" gorm:"type:varchar(64);not null;default:''"`
-	SubscriptionID     string                       `json:"subscription_id" gorm:"type:varchar(64);not null;default:''"`
-	Status             PaddleBillingOperationStatus `json:"status" gorm:"type:varchar(16);not null;default:'pending';index"`
-	Result             string                       `json:"result" gorm:"column:result_json;type:jsonb;not null;default:'{}'"`
-	LastError          string                       `json:"last_error" gorm:"column:last_error;type:text;not null;default:''"`
-	CreatedAt          time.Time                    `json:"created_at"`
-	UpdatedAt          time.Time                    `json:"updated_at"`
-	CompletedAt        *time.Time                   `json:"completed_at,omitempty"`
+	ID                  uint64                       `json:"id" gorm:"primaryKey;autoIncrement"`
+	TenantID            uint64                       `json:"tenant_id" gorm:"not null;index;uniqueIndex:ux_paddle_billing_operations_key"`
+	OperationKey        string                       `json:"operation_key" gorm:"type:varchar(128);not null;uniqueIndex:ux_paddle_billing_operations_key"`
+	OperationType       PaddleBillingOperationType   `json:"operation_type" gorm:"column:operation_type;type:varchar(32);not null"`
+	RequestFingerprint  string                       `json:"-" gorm:"column:request_fingerprint;type:varchar(128);not null;default:''"`
+	Plan                ConsumerPlan                 `json:"plan" gorm:"type:varchar(16);not null;default:''"`
+	BillingPeriod       string                       `json:"billing_period" gorm:"type:varchar(16);not null;default:''"`
+	PriceID             string                       `json:"price_id" gorm:"type:varchar(64);not null;default:''"`
+	SubscriptionID      string                       `json:"subscription_id" gorm:"type:varchar(64);not null;default:''"`
+	PaddleTransactionID string                       `json:"paddle_transaction_id" gorm:"column:paddle_transaction_id;type:varchar(64);not null;default:''"`
+	Status              PaddleBillingOperationStatus `json:"status" gorm:"type:varchar(16);not null;default:'pending';index"`
+	Result              string                       `json:"result" gorm:"column:result_json;type:jsonb;not null;default:'{}'"`
+	LastError           string                       `json:"last_error" gorm:"column:last_error;type:text;not null;default:''"`
+	CreatedAt           time.Time                    `json:"created_at"`
+	UpdatedAt           time.Time                    `json:"updated_at"`
+	CompletedAt         *time.Time                   `json:"completed_at,omitempty"`
 }
 
 // TableName pins the table to the Paddle billing-operation migration.

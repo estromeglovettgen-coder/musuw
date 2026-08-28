@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,18 +8,6 @@ import (
 
 	"github.com/google/uuid"
 )
-
-// PaddleWebhookTaskID returns a stable, opaque Asynq task ID for one provider
-// event. It is intentionally only a short-term Redis enqueue dedupe; durable
-// event_id / occurred_at idempotency remains in EntitlementService/repository.
-func PaddleWebhookTaskID(eventID string) string {
-	eventID = strings.TrimSpace(eventID)
-	if eventID == "" {
-		return ""
-	}
-	sum := sha256.Sum256([]byte(eventID))
-	return "paddle-webhook-" + hex.EncodeToString(sum[:16])
-}
 
 // GenerateTaskID generates a unique task ID with multiple collision-resistant elements.
 // The format is: <taskType>_<tenantID>_<timestamp>_<uuid>_<businessID>

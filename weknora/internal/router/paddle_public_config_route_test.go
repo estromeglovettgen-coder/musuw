@@ -22,3 +22,25 @@ func TestPaddlePublicConfigRouteIsPreciselyAnonymousAndReadOnly(t *testing.T) {
 	require.Equal(t, 1, strings.Count(text, "/api/v1/billing/paddle/public-config"))
 	require.NotContains(t, text, `r.POST("/api/v1/billing/paddle/public-config"`)
 }
+
+func TestPaddleBillingMutationRoutesRequireTenantAdmin(t *testing.T) {
+	source, err := os.ReadFile("router.go")
+	require.NoError(t, err)
+	text := string(source)
+
+	// These endpoints either create a hosted billing-management session,
+	// return a checkout intent, or mutate/preview a subscription. Keep the
+	// existing entitlement read available to every authenticated member, but
+	// require the shared Owner-or-Admin guard for each billing action.
+	routes := []string{
+		`v1.POST("/billing/paddle/portal-session", rbacGuards.Admin(), params.EntitlementHandler.PaddlePortalSession)`,
+		`v1.POST("/billing/paddle/checkout-intent", rbacGuards.Admin(), params.EntitlementHandler.PaddleCheckoutIntent)`,
+		`v1.POST("/billing/paddle/subscription-upgrade/preview", rbacGuards.Admin(), params.EntitlementHandler.PaddleSubscriptionUpgradePreview)`,
+		`v1.POST("/billing/paddle/subscription-upgrade", rbacGuards.Admin(), params.EntitlementHandler.PaddleSubscriptionUpgrade)`,
+	}
+	for _, route := range routes {
+		require.Equal(t, 1, strings.Count(text, route), "billing route must have exactly one Admin guard: %s", route)
+	}
+	require.Contains(t, text, `v1.GET("/entitlements/current", params.EntitlementHandler.Current)`,
+		"entitlement reads should remain authenticated-member readable")
+}

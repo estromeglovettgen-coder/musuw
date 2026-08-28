@@ -122,24 +122,94 @@ func (r *paddleBillingOperationRepository) FindByKey(
 	return &operation, true, nil
 }
 
-func (r *paddleBillingOperationRepository) MarkInFlight(ctx context.Context, id uint64) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+func (r *paddleBillingOperationRepository) MarkInFlight(ctx context.Context, id uint64) (bool, error) {
+	started := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var operation types.PaddleBillingOperation
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&operation, id).Error; err != nil {
 			return err
 		}
 		switch operation.Status {
-		case types.PaddleBillingOperationPending, types.PaddleBillingOperationUncertain:
-			return tx.Model(&types.PaddleBillingOperation{}).Where("id = ?", id).
+		case types.PaddleBillingOperationPending:
+			if err := tx.Model(&types.PaddleBillingOperation{}).Where("id = ?", id).
 				Updates(map[string]any{
 					"status":     types.PaddleBillingOperationInFlight,
 					"updated_at": time.Now().UTC(),
-				}).Error
-		case types.PaddleBillingOperationInFlight:
+				}).Error; err != nil {
+				return err
+			}
+			started = true
+			return nil
+		case types.PaddleBillingOperationInFlight, types.PaddleBillingOperationUncertain:
 			return nil
 		default:
 			return fmt.Errorf("%w: %s cannot become in_flight", ErrPaddleBillingOperationInvalidTransition, operation.Status)
 		}
+	})
+	return started, err
+}
+
+func (r *paddleBillingOperationRepository) FailPendingWithoutProviderWrite(ctx context.Context, id uint64, reason string) (bool, error) {
+	released := false
+	reason = strings.TrimSpace(reason)
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var operation types.PaddleBillingOperation
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&operation, id).Error; err != nil {
+			return err
+		}
+		if operation.Status != types.PaddleBillingOperationPending || strings.TrimSpace(operation.PaddleTransactionID) != "" {
+			return nil
+		}
+		now := time.Now().UTC()
+		result := tx.Model(&types.PaddleBillingOperation{}).
+			Where("id = ? AND status = ? AND paddle_transaction_id = ''", id, types.PaddleBillingOperationPending).
+			Updates(map[string]any{
+				"status":       types.PaddleBillingOperationFailed,
+				"result_json":  "{}",
+				"last_error":   reason,
+				"completed_at": now,
+				"updated_at":   now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		released = result.RowsAffected == 1
+		return nil
+	})
+	return released, err
+}
+
+func (r *paddleBillingOperationRepository) RecordPaddleTransaction(ctx context.Context, id uint64, transactionID string) error {
+	transactionID = strings.TrimSpace(transactionID)
+	if transactionID == "" {
+		return errors.New("Paddle transaction ID is required")
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var operation types.PaddleBillingOperation
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&operation, id).Error; err != nil {
+			return err
+		}
+		if existing := strings.TrimSpace(operation.PaddleTransactionID); existing != "" {
+			if existing == transactionID && operation.Status == types.PaddleBillingOperationSucceeded {
+				// The signed subscription event may arrive before the HTTP create
+				// response persists its transaction ID. Replaying that response is
+				// safe once the exact operation already succeeded.
+				return nil
+			}
+			if existing == transactionID {
+				return nil
+			}
+			return fmt.Errorf("%w: checkout already owns another transaction", ErrPaddleBillingOperationInvalidTransition)
+		}
+		if operation.OperationType != types.PaddleBillingOperationCheckout ||
+			(operation.Status != types.PaddleBillingOperationPending && operation.Status != types.PaddleBillingOperationInFlight &&
+				operation.Status != types.PaddleBillingOperationUncertain) {
+			return fmt.Errorf("%w: transaction cannot be attached to %s/%s", ErrPaddleBillingOperationInvalidTransition, operation.OperationType, operation.Status)
+		}
+		return tx.Model(&types.PaddleBillingOperation{}).Where("id = ?", id).Updates(map[string]any{
+			"paddle_transaction_id": transactionID,
+			"updated_at":            time.Now().UTC(),
+		}).Error
 	})
 }
 
@@ -167,14 +237,14 @@ func (r *paddleBillingOperationRepository) FinishMatchingActive(
 	ctx context.Context,
 	tenantID uint64,
 	operationType types.PaddleBillingOperationType,
-	operationKey, priceID, subscriptionID string,
+	operationKey, priceID, transactionID, subscriptionID string,
 	status types.PaddleBillingOperationStatus,
 	resultJSON, lastError string,
 ) (bool, error) {
 	if tenantID == 0 {
 		return false, errors.New("paddle billing operation tenant ID is required")
 	}
-	if operationType != types.PaddleBillingOperationUpgrade {
+	if operationType != types.PaddleBillingOperationCheckout && operationType != types.PaddleBillingOperationUpgrade {
 		return false, fmt.Errorf("unsupported Paddle billing operation type %q", operationType)
 	}
 	operationKey = strings.TrimSpace(operationKey)
@@ -189,6 +259,10 @@ func (r *paddleBillingOperationRepository) FinishMatchingActive(
 	if subscriptionID == "" {
 		return false, nil
 	}
+	transactionID = strings.TrimSpace(transactionID)
+	if operationType == types.PaddleBillingOperationCheckout && transactionID == "" {
+		return false, nil
+	}
 	resultJSON, lastError, err := preparePaddleBillingOperationFinish(status, resultJSON, lastError)
 	if err != nil {
 		return false, err
@@ -200,13 +274,42 @@ func (r *paddleBillingOperationRepository) FinishMatchingActive(
 			Where("tenant_id = ? AND operation_type = ? AND operation_key = ? AND price_id = ? AND status IN ?",
 				tenantID, operationType, operationKey, priceID, activePaddleBillingOperationStatuses()).
 			Order("id ASC")
-		query = query.Where("subscription_id = ?", subscriptionID)
+		if operationType == types.PaddleBillingOperationUpgrade {
+			query = query.Where("subscription_id = ?", subscriptionID)
+		} else {
+			// The signed subscription.created event is the only safe recovery if
+			// Paddle accepted checkout but the server lost the create response or
+			// failed to persist its transaction ID. A non-empty different ID never
+			// matches; an empty ID is atomically bound to this exact signed event.
+			query = query.Where(
+				"paddle_transaction_id = ? OR (paddle_transaction_id = '' AND status IN ?)",
+				transactionID,
+				[]types.PaddleBillingOperationStatus{types.PaddleBillingOperationInFlight, types.PaddleBillingOperationUncertain},
+			)
+		}
 		var operation types.PaddleBillingOperation
 		if err := query.First(&operation).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// Idempotent replay after the matching operation already reached a
+				// terminal state is complete. A different active operation is a real
+				// coordinate mismatch and must be surfaced to the worker for retry.
+				var activeCount int64
+				if countErr := tx.Model(&types.PaddleBillingOperation{}).
+					Where("tenant_id = ? AND status IN ?", tenantID, activePaddleBillingOperationStatuses()).
+					Count(&activeCount).Error; countErr != nil {
+					return countErr
+				}
+				matched = activeCount == 0
 				return nil
 			}
 			return err
+		}
+		if operationType == types.PaddleBillingOperationCheckout && strings.TrimSpace(operation.PaddleTransactionID) == "" {
+			if err := tx.Model(&types.PaddleBillingOperation{}).Where("id = ?", operation.ID).
+				Update("paddle_transaction_id", transactionID).Error; err != nil {
+				return err
+			}
+			operation.PaddleTransactionID = transactionID
 		}
 		if err := finishPaddleBillingOperation(tx, &operation, status, resultJSON, lastError); err != nil {
 			return err
@@ -271,7 +374,7 @@ func validatePaddleBillingOperationIntent(intent types.PaddleBillingOperationInt
 	if strings.TrimSpace(intent.OperationKey) == "" {
 		return errors.New("paddle billing operation key is required")
 	}
-	if intent.OperationType != types.PaddleBillingOperationUpgrade {
+	if intent.OperationType != types.PaddleBillingOperationCheckout && intent.OperationType != types.PaddleBillingOperationUpgrade {
 		return fmt.Errorf("unsupported Paddle billing operation type %q", intent.OperationType)
 	}
 	return nil

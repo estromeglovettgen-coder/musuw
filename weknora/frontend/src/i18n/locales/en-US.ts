@@ -3833,6 +3833,7 @@ export default {
     upgradeFailed: 'Your plan could not be upgraded. Please try again.',
     managePlan: 'Manage plan',
     manageDescription: 'Update or cancel your current subscription.',
+    billingAdminOnly: 'Only workspace owners and admins can start or manage billing.',
     billingNotConfigured: 'Plan changes are currently unavailable.',
     billingRenewalPending: 'Billing confirmation is pending or needs repair. AI access resumes after billing sync.',
     billingPendingShort: 'Billing pending',

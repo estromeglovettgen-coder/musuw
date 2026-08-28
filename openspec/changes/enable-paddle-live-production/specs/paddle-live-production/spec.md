@@ -23,11 +23,15 @@ The release SHALL reuse the existing active three-product, six-price catalog, ap
 - **THEN** the release remains blocked until the existing provider object is safely corrected or an explicit product decision is recorded
 
 ### Requirement: Live checkout is verified without a financial transaction
-The public payment-link page SHALL load Paddle.js on the approved app origin, the authenticated plan flow SHALL show server-mapped Live pricing and open the official Live payment form, and acceptance SHALL stop before any payment method is entered or a purchase is confirmed. A redirect, query parameter, browser callback, or checkout return MUST NOT grant entitlement.
+The public payment-link page SHALL load Paddle.js on the approved app origin, an authenticated tenant Admin (including Owner) SHALL be able to request one server-mapped Live transaction and open the official Live payment form by its `transactionId`, and acceptance SHALL stop before any payment method is entered or a purchase is confirmed. A redirect, query parameter, browser callback, or checkout return MUST NOT grant entitlement. Paddle SHALL remain authoritative for transaction lifecycle, payment data, tax, currency, eligible payment methods, receipts, and subscription creation; Musuw's single durable active-operation row is only a duplicate-initiation fence, not a local payment state machine.
 
 #### Scenario: Checkout reaches payment boundary
 - **WHEN** a reviewer chooses an available paid plan through the production app
-- **THEN** the server returns exactly one mapped Live price and tenant-bound signed custom data, Paddle.js creates and displays the official Checkout for that plan and price, Musuw stores no initial transaction state, and the reviewer closes checkout before entering payment details
+- **THEN** the server creates or reuses exactly one automatic Paddle transaction with one mapped Live price and tenant-bound signed custom data, stores only its provider ID and immutable operation coordinates in the existing active-operation fence, Paddle.js displays the official Checkout by `transactionId`, and the reviewer closes checkout before entering payment details
+
+#### Scenario: Ordinary member cannot initiate billing
+- **WHEN** an authenticated workspace member without Owner/Admin role opens `/plans` or `/checkout`
+- **THEN** plan prices remain readable (including Paddle's read-only localized `PricePreview()`), billing and portal actions are hidden or disabled with a clear role message, and no checkout-intent, subscription-upgrade preview/update, portal-session, or other billing mutation request is started
 
 #### Scenario: Browser-only completion claim
 - **WHEN** a browser supplies a checkout return or completion callback without a valid signed provider lifecycle event

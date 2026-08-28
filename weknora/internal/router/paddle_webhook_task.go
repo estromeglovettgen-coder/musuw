@@ -8,7 +8,6 @@ import (
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	"github.com/Tencent/WeKnora/internal/utils"
 	"github.com/hibiken/asynq"
 )
 
@@ -32,18 +31,16 @@ func NewPaddleWebhookTask(payload types.PaddleWebhookTaskPayload) (*asynq.Task, 
 	return asynq.NewTask(types.TypePaddleWebhook, body), nil
 }
 
-// PaddleWebhookTaskOptions keeps queue, bounded retry/timeout, and short-term
-// deterministic dedupe in one place for every producer (Redis and Lite).
+// PaddleWebhookTaskOptions keeps queue and bounded retry/timeout in one place
+// for every producer (Redis and Lite). Deliveries intentionally receive unique
+// queue IDs: an archived failed task must never make a later Paddle redelivery
+// look like success. Durable event-id/occurred-at guards provide idempotency.
 func PaddleWebhookTaskOptions(payload types.PaddleWebhookTaskPayload) []asynq.Option {
-	options := []asynq.Option{
+	return []asynq.Option{
 		asynq.Queue(types.QueueBilling),
 		asynq.MaxRetry(PaddleWebhookTaskMaxRetry),
 		asynq.Timeout(PaddleWebhookTaskTimeout),
 	}
-	if taskID := utils.PaddleWebhookTaskID(payload.EventID); taskID != "" {
-		options = append(options, asynq.TaskID(taskID))
-	}
-	return options
 }
 
 type paddleWebhookTaskHandler struct {
@@ -115,7 +112,17 @@ func (h *paddleWebhookTaskHandler) Handle(ctx context.Context, task *asynq.Task)
 	if err != nil {
 		return fmt.Errorf("execute paddle webhook task operation=%s: %w", payload.Operation, err)
 	}
-	if applied && h.operations != nil && payload.BillingOperationType != "" {
+	// A signed Paddle event proves the provider-side change, but a checkout or
+	// upgrade operation is complete only after the corresponding entitlement is
+	// durably applied. ApplyConsumerPlan returns true for both a fresh write and
+	// an exact durable event replay. A false result means the event was stale or
+	// did not own the tenant binding, so settling the operation here would hide a
+	// paid-but-unprovisioned account. Let the existing bounded queue retry and
+	// dead-letter path preserve that failure for recovery instead.
+	if h.operations != nil && payload.BillingOperationType != "" {
+		if !applied {
+			return fmt.Errorf("complete Paddle billing operation: entitlement was not durably applied")
+		}
 		result, marshalErr := json.Marshal(map[string]string{
 			"event_id":        payload.EventID,
 			"event_type":      payload.EventType,
@@ -124,11 +131,15 @@ func (h *paddleWebhookTaskHandler) Handle(ctx context.Context, task *asynq.Task)
 		if marshalErr != nil {
 			return fmt.Errorf("encode Paddle billing operation result: %w", marshalErr)
 		}
-		if _, finishErr := h.operations.FinishMatchingActive(
+		settled, finishErr := h.operations.FinishMatchingActive(
 			ctx, payload.TenantID, payload.BillingOperationType, payload.BillingOperationKey, payload.PriceID,
-			payload.SubscriptionID, types.PaddleBillingOperationSucceeded, string(result), "",
-		); finishErr != nil {
+			payload.TransactionID, payload.SubscriptionID, types.PaddleBillingOperationSucceeded, string(result), "",
+		)
+		if finishErr != nil {
 			return fmt.Errorf("complete Paddle billing operation: %w", finishErr)
+		}
+		if !settled {
+			return fmt.Errorf("complete Paddle billing operation: signed event does not match the active operation")
 		}
 	}
 	logger.Infof(ctx,

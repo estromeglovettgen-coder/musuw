@@ -110,8 +110,20 @@ type Tenant struct {
 	PaddleBillingPeriod       string       `yaml:"paddle_billing_period" json:"-" gorm:"type:varchar(16);default:''"`
 	PaddleCurrentPeriodEnd    *time.Time   `yaml:"paddle_current_period_end" json:"-"`
 	OpenRouterCreditPeriodEnd *time.Time   `yaml:"open_router_credit_period_end" json:"-"`
-	PaddleLastEventID         string       `yaml:"paddle_last_event_id" json:"-" gorm:"type:varchar(64);default:''"`
-	PaddleLastEventAt         *time.Time   `yaml:"paddle_last_event_at" json:"-"`
+	// OpenRouterDesiredLimitMicrousd is the one durable absolute provider
+	// limit for this tenant's managed key. OpenRouter remains the usage
+	// authority; this scalar only records the exact limit that the provider
+	// must converge to after a plan/period change or an operator adjustment.
+	// A zero value means that an existing legacy key has not been bootstrapped
+	// yet (or that the tenant has no key).
+	OpenRouterDesiredLimitMicrousd int64      `yaml:"open_router_desired_limit_microusd" json:"-" gorm:"column:open_router_desired_limit_microusd;not null;default:0"`
+	PaddleLastEventID              string     `yaml:"paddle_last_event_id" json:"-" gorm:"type:varchar(64);default:''"`
+	PaddleLastEventAt              *time.Time `yaml:"paddle_last_event_at" json:"-"`
+	// PaddleLastRenewalAt is the independent monotonic watermark for provider
+	// confirmed recurring payment events. Lifecycle and adjustment webhooks use
+	// PaddleLastEventAt; keeping this cursor separate prevents an unrelated
+	// newer event from dropping a valid renewal.
+	PaddleLastRenewalAt *time.Time `yaml:"paddle_last_renewal_at" json:"-"`
 	// Global Context configuration for this workspace (default for all sessions)
 	ContextConfig *ContextConfig `yaml:"context_config"      json:"context_config"      gorm:"type:jsonb"`
 	// Global WebSearch configuration for this workspace
