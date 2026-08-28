@@ -1,5 +1,25 @@
 # Verification Report: consumer-plan-entitlements
 
+## 2026-08-27 Paddle Live entitlement and Retain evidence
+
+- The separately reviewed Live cutover deployed the same signed-event
+  entitlement implementation with one complete Live configuration unit. The
+  production destination has the exact eleven-event set, including both
+  adjustment events, and two fresh official no-charge adjustment simulations
+  returned HTTP 200.
+- Local signed policy fixtures and fresh race-enabled handler/router/service/
+  repository tests prove full approved refund and chargeback withdrawal,
+  partial/pending/rejected no-op, provider-read reversal, bounded queue handoff,
+  duplicate and out-of-order rejection, and final tenant-marker idempotency.
+- Paddle confirmed Retain Live after validating the public recovery page. The
+  marketing recovery page reports Paddle.js installed. Authenticated in-app
+  customer context remains derived only from signed tenant provider state and
+  grants no entitlement authority.
+- One real Live Checkout was opened to Paddle's customer/payment form and then
+  stopped without entering customer or payment data. Its draft transaction was
+  canceled with zero payments. No real charge, refund, transfer, payout, or
+  entitlement fabrication was used as evidence.
+
 > Historical evidence below records the matrix verified at those dates. The unreleased `adjust-consumer-plan-limits` change supersedes those numeric limits for the next release; this report is intentionally not rewritten as new evidence.
 
 ## 2026-08-24 production disposable E2E (current entitlement evidence)

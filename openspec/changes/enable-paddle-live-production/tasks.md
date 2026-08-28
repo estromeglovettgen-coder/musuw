@@ -19,21 +19,21 @@
 
 - [x] 3.1 Add failing signed-event and worker/service tests for full approved refund, full chargeback, partial/pending/rejected/warning no-op, duplicate/stale delivery, and authoritative reversal.
 - [x] 3.2 Extend the existing canonical webhook task and tenant mirror with the minimum current-subscription adjustment lookup and provider-state read; do not add a billing ledger or financial write.
-- [ ] 3.3 Add `adjustment.created` and `adjustment.updated` to the one Live destination only after the code path is green; retain the existing lifecycle and recurring event set.
-- [ ] 3.4 Verify signature, bounded acknowledgement/retry, idempotency, ordering, entitlement mapping, raw-body suppression, and adjustment behavior with local signed fixtures and official no-charge simulation where supported.
+- [x] 3.3 Add `adjustment.created` and `adjustment.updated` to the one Live destination only after the code path is green; retain the existing lifecycle and recurring event set.
+- [x] 3.4 Verify signature, bounded acknowledgement/retry, idempotency, ordering, entitlement mapping, raw-body suppression, and adjustment behavior with local signed fixtures and official no-charge simulation where supported.
 
 ## 4. Protected cutover and release
 
 - [x] 4.1 Set the existing approved app's Live default payment link to `https://app.musuw.com/pay` and re-read the saved provider state.
-- [ ] 4.2 Build the Live public input from provider-verified IDs/token and atomically install it in the existing GitHub production environment and root-owned server public file without printing it.
-- [ ] 4.3 Atomically install the existing Live API key and exact destination signing secret in the root-owned `0600` server secret files and prove only shape, ownership, mode, and destination match.
-- [ ] 4.4 Run server preflight before recreation, commit and push the reviewed SHA, require CI and exact-SHA deployment, and verify running revision plus application/worker health.
+- [x] 4.2 Build the Live public input from provider-verified IDs/token and atomically install it in the existing GitHub production environment and root-owned server public file without printing it.
+- [x] 4.3 Atomically install the existing Live API key and exact destination signing secret in the root-owned `0600` server secret files and prove only shape, ownership, mode, and destination match.
+- [x] 4.4 Run server preflight before recreation, commit and push the reviewed SHA, require CI and exact-SHA deployment, and verify running revision plus application/worker health.
 
 ## 5. End-to-end acceptance and review
 
-- [ ] 5.1 Verify public storefront/legal/contact surfaces, production Live public config, and server-side price preview for all six mappings.
-- [ ] 5.2 Open the real Live checkout for a supported plan, confirm the displayed plan/price/origin, and stop before entering a payment method or confirming purchase.
-- [ ] 5.3 Prove official non-charge notification delivery, signature acceptance, safe retry/duplicate behavior, and tenant customer/subscription/entitlement consistency without fabricating a production event.
-- [ ] 5.4 Scan tracked changes, CI/runtime logs, browser responses, and server file metadata for secret leakage; do not capture sensitive Dashboard fields in screenshots.
-- [ ] 5.5 Run one consolidated adversarial review covering no money movement, untouched payout settings, no duplicate catalog, no Sandbox/Live mixing, no secret exposure, rollback consistency, and every unverified claim.
-- [ ] 5.6 Update the deferred consumer-entitlement tasks and this change's verification record with fresh evidence, remaining owner-only steps, and exact residual risk.
+- [x] 5.1 Verify public storefront/legal/contact surfaces, production Live public config, and server-side price preview for all six mappings.
+- [x] 5.2 Open the real Live checkout for a supported plan, confirm the displayed plan/price/origin, and stop before entering a payment method or confirming purchase.
+- [x] 5.3 Prove official non-charge notification delivery, signature acceptance, safe retry/duplicate behavior, and tenant customer/subscription/entitlement consistency without fabricating a production event.
+- [x] 5.4 Scan tracked changes, CI/runtime logs, browser responses, and server file metadata for secret leakage; do not capture sensitive Dashboard fields in screenshots.
+- [x] 5.5 Run one consolidated adversarial review covering no money movement, untouched payout settings, no duplicate catalog, no Sandbox/Live mixing, no secret exposure, rollback consistency, and every unverified claim.
+- [x] 5.6 Update the deferred consumer-entitlement tasks and this change's verification record with fresh evidence, remaining owner-only steps, and exact residual risk.

@@ -10,18 +10,18 @@ Paddle 资源 ID、credential 值、网络地址或供应商响应原文。
 | --- | --- | --- |
 | 网站域名送审 | **`app.musuw.com` 已通过** | 所有公开产品、价格、法律与联系页面已上线；主域若未显示 approved，仍须单独确认。Paddle Seller Handbook 要求同时公开 buyer-support email 和 phone，当前没有经 owner 核验并授权公开的真实 support phone；Domain Review 页面没有把 phone 列为独立表单硬门槛，但缺失仍是审核风险。 |
 | Paddle account verification | **Verification passed** | 2026-08-27 已在 owner 登录的 Live onboarding 页面重新核验；无需重复提交，也不得从代码推断、读取或代填企业/个人资料。 |
-| Live 配置与正式收款 | **切换实施中，尚未完成** | Live catalog、client、approved app domain 和唯一 destination 已由官方 Live API 重新核对；source contract 已改为 Live-only，default payment link 已保存为 `/pay`，但 11-event destination、保护文件、部署、simulation、Retain 和 checkout 验收完成前不得称为 operational。 |
+| Live 配置与正式收款 | **Live 已部署并通过无扣款验收** | 3 products/6 prices、Live client/API key、唯一 11-event destination、exact signing secret、`/pay`、Retain 和东京运行时已作为一个 Live-only 单元上线；真实 Checkout 已打开到 Paddle 付款表单后停止，官方 simulation 连续成功。Payout/bank 仍是未触碰的 owner-only 范围。 |
 
 本次独立 review 已把 checked source contract 改为完整 **Paddle Live** 单元；
-preflight 和 app entrypoint 现在拒绝 Sandbox、缺项和混合环境。Tokyo 当前运行
-容器仍是旧 Sandbox release，只有完整公开/保护输入、CI、exact-SHA 部署和无扣款
-验收全部完成后才算切换，不允许只改环境变量。
+preflight 和 app entrypoint 现在拒绝 Sandbox、缺项和混合环境。完整公开/保护输入、
+CI、exact-SHA 东京部署、Live Checkout 边界和官方无扣款 webhook simulation 已完成，
+没有通过单改环境变量或跳过发布门完成切换。
 
 ## 现有资源优先与禁止乱建
 
 - 每次操作先盘点现有 Live 资源，再复用符合环境、权限和用途的 active 资源。
-- 当前已有可选的 active Live API keys、active client-side tokens、完整六价格
-  catalog，以及一个 active notification destination；默认路径不是再创建一套。
+- 当前复用一个 active Live API key、一个 active client-side token、完整六价格
+  catalog，以及唯一一个 active production notification destination；没有再创建一套。
 - 只读权限表已确认其中一个较小权限的 active API key 覆盖当前应用所需的
   `price.read`、`product.read`、`subscription.write` 和
   `customer_portal_session.write`；`subscription.write` 按 Paddle 权限规则同时
@@ -33,8 +33,9 @@ preflight 和 app entrypoint 现在拒绝 Sandbox、缺项和混合环境。Toky
 - 2026-08-27 使用现有 production Keychain API key 通过 Paddle 官方 Live API
   重新完成 inventory：3 个 active SaaS products、6 个 active recurring prices、
   2 个 active client-side tokens、1 个 approved app checkout domain 和 1 个 active
-  production destination。输出只保留 count/名称/金额/周期/事件集合；未打印 token、
-  API key、destination secret 或资源 ID，也没有创建、撤销或重建资源。
+  production destination。发布选择复用了其中一组既有 active credential；输出只保留
+  count/名称/金额/周期/事件集合，未打印 token、API key、destination secret 或资源 ID，
+  也没有创建、撤销或重建 credential/catalog/destination。
 - revoked credential 只保留为历史记录，不复活、不删除，也不作为运行时候选。
 - 只有现有资源经官方能力和实际调用范围核验后确实不适用，才可以提出新增或
   替换；在执行前必须给 owner 展示资源用途、权限、消费者、secret 落点、切换、
@@ -143,14 +144,14 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
    read/update、customer portal session 与验证能力。优先复用现有 active 候选；
    credential 值只进入既有 secret store/受保护运行文件，绝不进入仓库、公开
    env、日志或审核材料。
-8. **复用现有唯一 active Live notification destination。** 当前九事件覆盖
+8. **复用现有唯一 active Live notification destination。** 现已精确覆盖
    `subscription.created`、`subscription.activated`、`subscription.trialing`、
    `subscription.updated`、`subscription.past_due`、`subscription.paused`、
    `subscription.resumed`、`subscription.canceled` 和 `transaction.completed`。
-   并在本次 reviewed refund/chargeback policy 代码上线前一次性追加
-   `adjustment.created` 与 `adjustment.updated`，形成精确 11-event 集合。
-   destination-specific signing secret 只进 server secret store。当前 Live log
-   尚无投递证据，必须先完成签名交付验证；保留 Sandbox destination，不混用、
+   reviewed refund/chargeback policy 上线时已一次性追加 `adjustment.created` 与
+   `adjustment.updated`，形成精确 11-event 集合，`traffic_source=all`。
+   destination-specific signing secret 只进入 server secret store。Paddle 官方
+   adjustment simulation 已连续成功投递并返回 HTTP 200；保留 Sandbox destination，不混用、
    不覆盖，也不为相同用途新建第二个 destination。full approved refund/chargeback
    通过现有 plan service 撤权；partial/pending/rejected/credit/warning 不变更；
    chargeback reversal 受限读取当前 subscription 后恢复。后续真实 recurring
@@ -175,56 +176,56 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
     `Paddle.Initialize()`，并在 SPA 后识别客户时用 `Paddle.Update()` 更新；它不
     接受浏览器提交的 internal tenant/customer claim，也不授予 entitlement。
     2026-08-27 已用公开企业支持邮箱提交发件身份，owner 随后完成 Postmark
-    验证，Dashboard 已进入 Paddle.js 检测步骤。全局 Paddle.js/`pwCustomer` source
-    已补齐但尚未部署，因此必须等 matching SHA 上线后用公开且不要求登录的
-    `https://app.musuw.com/login` 完成检测，再启用 Retain Live。若当前账号已开通官方
+    验证。matching SHA 上线后，Dashboard 已验证公开且不要求登录的
+    `https://app.musuw.com/retain`，显示该页 Paddle.js Installed，并明确确认
+    `Retain is now live`。当前浏览器账号是没有 Paddle customer binding 的手工 Plus，
+    因此不能用它证明可选的 authenticated in-app detector；代码仍只对真实签名
+    provider customer 注入 `pwCustomer`。若当前账号已开通官方
     Customer Portal Product Collections 且能完整表达现有只升档规则，优先以它
     替换 Musuw 的付费升级入口；否则保留官方 subscription preview/update 加一条
     最小本地升级串行边界，因为该写 API 没有通用幂等键。
-13. **先做无真实收费的 Live 健康验证。** 验证 API authentication、六个价格
-    全部解析且 recurring/active、默认链接页面加载、exact destination 的签名
-    simulation 在五秒内得到成功响应、重复投递无重复副作用、未知价格/错误签名
-    fail closed。完成这些之前不能把 Live 描述为 operational。
+13. **完成无真实收费的 Live 健康验证。** API authentication、六个 recurring/active
+    价格、默认链接页面、真实 Paddle 付款表单边界、exact destination 签名 simulation、
+    重复/乱序/未知价格/错误签名契约均已验证。付款表单未输入任何客户或支付资料；
+    唯一 smoke draft 随后取消且 payments=0。
 14. **真实付款不属于本次验收。** 只允许 checkout 打开到付款表单前、官方
-    notification simulator、签名 fixture 和现有 provider-state read；不得输入
-    真实支付方式、确认购买、退款、转账或制造真实交易。
+    notification simulator、签名 fixture、现有 provider-state read，以及为 default
+    payment link 边界创建后立即取消的零付款 draft；不得输入客户/支付资料、确认购买、
+    退款、转账或形成已付/应付财务记录。
 
 ## 阻断级别速查
 
 | 项目 | 阻断级别 | 当前状态 |
 | --- | --- | --- |
-| 公开产品、价格、功能、Terms/Refund/Privacy、HTTPS | 域名审核硬要求 | 已有公开页面；本地新增视频边界需正常发布后才算线上证据。 |
+| 公开产品、价格、功能、Terms/Refund/Privacy、HTTPS | 域名审核硬要求 | 公开首页、Contact、Terms、Refund、Privacy 及应用套餐页均已上线并完成公网复核。 |
 | 真实 support phone | Seller Handbook 合规要求/审批风险；不是 Domain Review 页面列出的独立提交字段 | 缺失，等待 owner 提供并授权；不可伪造。 |
 | reviewer account | Paddle 对登录产品可能要求 | 现有专用英文 fixture；仅可由主交付线程通过安全渠道传凭据。 |
 | business/identity information | account verification 硬阻断 | Dashboard 已显示 verification passed；资料仍属 owner-only，不能读取或从仓库推断。 |
-| 六个 Live recurring prices | Live 结账和 webhook 映射硬阻断 | 已有 3 products/6 active recurring prices；仍须与运行时六映射逐项核验，禁止重复创建。 |
-| Live client-side token 与 API key | Paddle.js/API 技术硬阻断 | 已有 active 候选；必须选择并复用最小充分权限组合，尚未接入固定生产。 |
-| Live webhook destination 与 signing secret | 可靠履约/entitlement 硬阻断 | 已有唯一 active destination；当前 9 事件，代码部署前须原地追加 2 个 adjustment 事件并完成 exact-destination simulation。 |
+| 六个 Live recurring prices | Live 结账和 webhook 映射硬阻断 | 3 products/6 active recurring prices 已与运行时六映射和浏览器月/年价格逐项核验；未重复创建。 |
+| Live client-side token 与 API key | Paddle.js/API 技术硬阻断 | 复用既有 active Live credential，已通过保护文件接入固定生产；未轮换或复制。 |
+| Live webhook destination 与 signing secret | 可靠履约/entitlement 硬阻断 | 唯一 active destination 已是精确 11 事件，exact secret 已保护挂载，官方 no-charge simulation 连续 HTTP 200。 |
 | Live default payment link | Paddle transaction 技术硬阻断 | Dashboard 已新鲜复核为 `https://app.musuw.com/pay` 且显示有效。 |
 | tax mode、balance currency、payment methods | Live 商业配置硬阻断 | Dashboard 已复核：税为 automatic-by-location、余额 USD、CNY 自动转换；Checkout 使用 Paddle 官方方法开关，应用不推断买家税/币种/eligible methods。 |
 | payout settings | 获得 payout 的 owner-only 阻断；不是接受付款的代码证明 | 本次禁止修改；最终单独报告。 |
-| `pwCustomer` / Retain | 完整 Live Retain 准备阻断；Sandbox 不加载 Retain | Postmark 发件身份已由 owner 验证；代码已本地补齐但尚未发布，部署后须让 Dashboard 检测公开 `/login` 上的 Paddle.js，再完成 Live 步骤。 |
+| `pwCustomer` / Retain | 完整 Live Retain 准备阻断；Sandbox 不加载 Retain | Postmark 发件身份已验证；公开 `/retain` 被 Dashboard 标记 Paddle.js Installed，Retain 已确认 Live。可选 web-app detector 需真实 Paddle customer 会话，当前手工 Plus smoke 账号不具备该绑定。 |
 | webhook source allowlist | 官方推荐的纵深防御，不是申请表硬门槛 | 待 Live edge 配置；signature verification 已有且仍是必须保留的主校验。 |
-| 固定生产 Live-only lock | 当前安全硬边界 | source 已完成 TDD 修改；Tokyo 部署前仍须完整 Live input 和 provider health。 |
+| 固定生产 Live-only lock | 当前安全硬边界 | 完整 Live input、provider health、exact-SHA 东京部署和 runtime preflight 均已通过。 |
 
 ## 当前非敏感证据
 
-- 公网主域的首页、Terms、Privacy、Refund、Contact，以及 app 的首页、`/pay`
-  和 `/checkout` 历史上均返回成功；当前 running public Paddle config 仍是旧
-  Sandbox release，不能把 source 的 Live-only 变更提前写成已部署。
-- 2026-08-24 通过 Paddle.js `PricePreview()` 对当前六个 Sandbox 映射做了
-  只读核验：六项全部返回、互不重复、exact mapping、active、recurring、
-  `saas` tax category，且都有 Paddle 格式化价格与 currency code；没有创建
-  transaction 或 charge。
-- 现有生产证据保留同一 Sandbox destination 的签名 lifecycle 与
-  `transaction.completed` 成功投递、重复事件幂等和浏览器回调不授予套餐。
+- 公网主域首页、Terms、Privacy、Refund、Contact，以及 app 的 `/pay`、`/retain`
+  和 Live public config 均返回 HTTP 200。生产响应报告 configured Live，且没有暴露
+  server secret、内部租户绑定或完整 catalog。
+- 2026-08-27 通过 Paddle.js `PricePreview()` 对六个 Live 映射做了只读核验：
+  月付 `$5.00/$10.00/$20.00`、年付 `$49.00/$99.00/$199.00` 全部返回，六项互不
+  重复并使用 Paddle 格式化金额；Paddle 仍决定税、币种转换和可用付款方式。
 - 当前首购由 Paddle.js 标准 `items`/`customData` 创建 transaction；Musuw 不维护
   checkout operation。raw-body Paddle SDK verifier、server-owned price allowlist、
   tenant binding 和 signed webhook 共同决定 entitlement。
 - 2026-08-27 Live API 只读盘点确认：3 products/6 active recurring prices（USD
   与既有中国 CNY override、monthly/yearly、`saas`）、2 个 active client-side
-  tokens、approved app domain 和 1 个 active/九事件 production destination；
-  Live notifications 仍无交付记录。随后已在登录后的 onboarding 页面逐字读完
+  tokens、approved app domain 和 1 个 active/11-event production destination。
+  随后已在登录后的 onboarding 页面逐字读完
   两个详细提示并确认 account verification 为 passed。
 - 同日 Paddle 官方 Live MCP 的只读 inventory 与上述 catalog、client-side token、
   notification destination 和 checkout domain 结论一致；调用只返回脱敏后的
@@ -232,10 +233,19 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
 - 同日登录 Dashboard 新鲜核验：default payment link 已是公开 `/pay` 页面，税由
   Paddle 按 location 自动决定，余额币种 USD、CNY 自动转换，PayPal/Google Pay/
   Apple Pay/Bancontact/WeChat Pay 已启用，app 域名与 Apple Pay 均 approved；
-  Customer Portal 可用，但没有 Product Collections 配置入口；Retain 发件身份已
-  验证并进入 Paddle.js 检测步骤，尚未启用 Live。
-- 本轮只读盘点和 source 实现没有创建、撤销、删除或重建 Paddle resource，
-  没有触碰 payout，也没有真实收费、退款或资金移动。
+  Customer Portal 可用，但没有 Product Collections 配置入口；Retain 发件身份、
+  公开 recovery page 检测和 Live activation 均已完成。
+- exact destination 现为 `traffic_source=all` 的精确 11-event 集合。官方无扣款
+  adjustment simulation 两次 fresh run 均 completed/success/HTTP 200，事件 replay
+  请求被 Paddle 接受；同期 production Paddle/webhook 日志为 12 行、0 focused error、
+  0 panic/fatal。
+- Live `/pay` smoke 使用 Paddle 官方 API 创建一个 automatically-collected draft，
+  页面自动打开真实 Paddle frame 并显示 Plus 月付、本地税、客户字段和 Paddle
+  merchant-of-record 说明。未填写客户或支付资料，未点击确认；draft 随后 canceled，
+  payments=0。
+- 本轮没有创建、撤销、删除或重建 credential、catalog 或 destination，没有触碰
+  payout，也没有真实收费、退款或资金移动。为 checkout 边界创建的单个 draft 已
+  立即取消且没有 payment。
 - 续费执行现在把已确认周期和 Paddle 事件游标在同一租户行事务中推进；恢复
   `refunded`/`chargeback` 状态的判断延后到 worker 持有 allowance lock 后完成。
   因而较新 recurring completion 可以恢复后续真实付费周期，而较旧退款/争议
@@ -249,9 +259,11 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
 - [Paddle setup checklist](https://developer.paddle.com/build/set-up-checklist/)
 - [Paddle go-live checklist](https://developer.paddle.com/build/go-live-checklist/)
 - [Set your default payment link](https://developer.paddle.com/build/transactions/default-payment-link/)
+- [Create a transaction](https://developer.paddle.com/api-reference/transactions/create-transaction/)
 - [Build a localized pricing page](https://developer.paddle.com/build/checkout/build-pricing-page/)
 - [Open a checkout with Paddle.js](https://developer.paddle.com/paddle-js/methods/paddle-checkout-open/)
 - [Pass custom data to transactions](https://developer.paddle.com/build/transactions/custom-data/)
 - [Paddle.Initialize and Retain](https://developer.paddle.com/paddle-js/methods/paddle-initialize/)
 - [Paddle.Update](https://developer.paddle.com/paddle-js/methods/paddle-update/)
 - [Handle webhook delivery](https://developer.paddle.com/webhooks/about/respond-to-webhooks/)
+- [Create and replay webhook simulations](https://developer.paddle.com/api-reference/simulation-runs/)
