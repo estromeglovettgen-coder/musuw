@@ -61,3 +61,40 @@ func TestCheckKnowledgeExists_FileHashIsScopedByFileType(t *testing.T) {
 		assert.Equal(t, "md", knowledge.FileType)
 	})
 }
+
+func TestAminusB_IgnoresFailedAndInFlightTargetRows(t *testing.T) {
+	db := setupKnowledgeTestDB(t)
+	repo := NewKnowledgeRepository(db)
+	ctx := context.Background()
+	const tenantID = uint64(1)
+	sourceKB := uuid.NewString()
+	targetKB := uuid.NewString()
+	const fileHash = "retryable-source-hash"
+
+	for _, row := range []struct {
+		id     string
+		kbID   string
+		status string
+	}{
+		{id: uuid.NewString(), kbID: sourceKB, status: types.ParseStatusCompleted},
+		{id: uuid.NewString(), kbID: targetKB, status: types.ParseStatusFailed},
+		{id: uuid.NewString(), kbID: targetKB, status: types.ParseStatusProcessing},
+	} {
+		require.NoError(t, db.Exec(`
+			INSERT INTO knowledges (id, tenant_id, knowledge_base_id, type, title, file_hash, parse_status)
+			VALUES (?, ?, ?, 'file', 'retry-test', ?, ?)
+		`, row.id, tenantID, row.kbID, fileHash, row.status).Error)
+	}
+
+	add, err := repo.AminusB(ctx, tenantID, sourceKB, tenantID, targetKB)
+	require.NoError(t, err)
+	if assert.Len(t, add, 1) {
+		var sourceCount int64
+		require.NoError(t, db.Model(&types.Knowledge{}).Where("id = ?", add[0]).Count(&sourceCount).Error)
+		assert.Equal(t, int64(1), sourceCount)
+	}
+
+	del, err := repo.AminusB(ctx, tenantID, targetKB, tenantID, sourceKB)
+	require.NoError(t, err)
+	assert.Len(t, del, 2, "failed and processing target rows must both be removed on retry")
+}

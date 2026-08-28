@@ -1093,12 +1093,42 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 		taskID = utils.GenerateTaskID("kb_clone", tenantID.(uint64), req.SourceID)
 	}
 
+	// Create the destination before enqueueing so the task carries one stable
+	// target ID across every retry. Creating it in the worker would allocate a
+	// fresh KB on each failed attempt and leave the caller without a target to
+	// poll. Existing-target copies keep their caller-supplied target unchanged.
+	targetID := req.TargetID
+	createdTargetID := ""
+	if targetID == "" {
+		_, targetKB, createErr := h.service.CopyKnowledgeBase(ctx, req.SourceID, "")
+		if createErr != nil {
+			if appErr, ok := apperrors.IsAppError(createErr); ok {
+				c.Error(appErr)
+				return
+			}
+			if stderrors.Is(createErr, repository.ErrKnowledgeBaseNotFound) {
+				c.Error(errors.NewNotFoundError("Source knowledge base not found"))
+				return
+			}
+			logger.ErrorWithFields(ctx, createErr, nil)
+			c.Error(apperrors.NewInternalServerError(createErr.Error()))
+			return
+		}
+		if targetKB == nil || targetKB.ID == "" {
+			logger.Error(ctx, "Knowledge base copy returned an empty target")
+			c.Error(apperrors.NewInternalServerError("Failed to create copy target"))
+			return
+		}
+		targetID = targetKB.ID
+		createdTargetID = targetID
+	}
+
 	// Create KB clone payload
 	payload := types.KBClonePayload{
 		TenantID:  tenantID.(uint64),
 		TaskID:    taskID,
 		SourceID:  req.SourceID,
-		TargetID:  req.TargetID,
+		TargetID:  targetID,
 		Initiator: types.TaskInitiatorFromContext(ctx),
 	}
 	langfuse.InjectTracing(ctx, &payload)
@@ -1117,6 +1147,13 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 	info, err := h.asynqClient.Enqueue(task)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to enqueue KB clone task: %v", err)
+		if createdTargetID != "" {
+			// The target has no cloned content yet; best-effort soft deletion keeps
+			// an enqueue failure from leaving an orphaned destination KB.
+			if cleanupErr := h.service.DeleteKnowledgeBase(ctx, createdTargetID); cleanupErr != nil {
+				logger.Warnf(ctx, "Failed to clean up copy target after enqueue failure: %v", cleanupErr)
+			}
+		}
 		c.Error(apperrors.NewInternalServerError("Failed to enqueue task"))
 		return
 	}
@@ -1128,7 +1165,7 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 	initialProgress := &types.KBCloneProgress{
 		TaskID:    taskID,
 		SourceID:  req.SourceID,
-		TargetID:  req.TargetID,
+		TargetID:  targetID,
 		Status:    types.KBCloneStatusPending,
 		Progress:  0,
 		Message:   "Task queued, waiting to start...",
@@ -1145,7 +1182,7 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 		"data": CopyKnowledgeBaseResponse{
 			TaskID:   taskID,
 			SourceID: req.SourceID,
-			TargetID: req.TargetID,
+			TargetID: targetID,
 			Message:  "Knowledge base copy task started",
 		},
 	})

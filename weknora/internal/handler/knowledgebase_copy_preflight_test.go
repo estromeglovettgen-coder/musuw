@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,14 +16,16 @@ import (
 	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/hibiken/asynq"
 )
 
-// stubKBCopyService provides only the methods the duplicate handler reaches.
+// stubKBCopyService provides only the methods the copy/duplicate handlers reach.
 // Other interface methods stay embedded so accidental new calls panic in tests.
 type stubKBCopyService struct {
 	interfaces.KnowledgeBaseService
 	byID      func(ctx context.Context, id string) (*types.KnowledgeBase, error)
 	duplicate func(ctx context.Context, sourceID string) (*types.KnowledgeBase, error)
+	copy      func(ctx context.Context, sourceID, targetID string) (*types.KnowledgeBase, *types.KnowledgeBase, error)
 }
 
 func (s *stubKBCopyService) GetKnowledgeBaseByID(ctx context.Context, id string) (*types.KnowledgeBase, error) {
@@ -34,6 +37,35 @@ func (s *stubKBCopyService) DuplicateKnowledgeBase(
 	sourceID string,
 ) (*types.KnowledgeBase, error) {
 	return s.duplicate(ctx, sourceID)
+}
+
+func (s *stubKBCopyService) CopyKnowledgeBase(
+	ctx context.Context,
+	sourceID, targetID string,
+) (*types.KnowledgeBase, *types.KnowledgeBase, error) {
+	if s.copy == nil {
+		return nil, nil, errors.New("copy callback not configured")
+	}
+	return s.copy(ctx, sourceID, targetID)
+}
+
+type stubKBCloneProgressService struct {
+	interfaces.KnowledgeService
+	saved []*types.KBCloneProgress
+}
+
+func (s *stubKBCloneProgressService) SaveKBCloneProgress(_ context.Context, progress *types.KBCloneProgress) error {
+	s.saved = append(s.saved, progress)
+	return nil
+}
+
+type recordingKBCloneEnqueuer struct {
+	task *asynq.Task
+}
+
+func (e *recordingKBCloneEnqueuer) Enqueue(task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+	e.task = task
+	return &asynq.TaskInfo{ID: "task-1"}, nil
 }
 
 func newDuplicateRouter(svc interfaces.KnowledgeBaseService) *gin.Engine {
@@ -86,6 +118,61 @@ func TestDuplicateHandler_ReturnsCreatedKnowledgeBase(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %s: %s", want, body)
 		}
+	}
+}
+
+func TestCopyHandler_PrecreatesAndReturnsStableTargetID(t *testing.T) {
+	var copyCalls []string
+	service := &stubKBCopyService{
+		byID: func(_ context.Context, id string) (*types.KnowledgeBase, error) {
+			return &types.KnowledgeBase{ID: id, TenantID: 1, Name: "Source"}, nil
+		},
+		copy: func(_ context.Context, sourceID, targetID string) (*types.KnowledgeBase, *types.KnowledgeBase, error) {
+			copyCalls = append(copyCalls, targetID)
+			if targetID != "" {
+				return &types.KnowledgeBase{ID: sourceID, TenantID: 1}, &types.KnowledgeBase{ID: targetID, TenantID: 1}, nil
+			}
+			return &types.KnowledgeBase{ID: sourceID, TenantID: 1}, &types.KnowledgeBase{ID: "target-fixed", TenantID: 1}, nil
+		},
+	}
+	progress := &stubKBCloneProgressService{}
+	enqueuer := &recordingKBCloneEnqueuer{}
+	r := gin.New()
+	r.Use(middleware.ErrorHandler())
+	r.Use(func(c *gin.Context) {
+		c.Set(types.TenantIDContextKey.String(), uint64(1))
+		c.Set(types.UserIDContextKey.String(), "u-test")
+		c.Next()
+	})
+	h := &KnowledgeBaseHandler{service: service, knowledgeService: progress, asynqClient: enqueuer}
+	r.POST("/knowledge-bases/copy", h.CopyKnowledgeBase)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/knowledge-bases/copy", strings.NewReader(`{"source_id":"src"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"target_id":"target-fixed"`) {
+		t.Fatalf("response must expose the precreated target id: %s", w.Body.String())
+	}
+	if len(copyCalls) != 1 || copyCalls[0] != "" {
+		t.Fatalf("expected one precreate call with empty target, got %#v", copyCalls)
+	}
+	if enqueuer.task == nil {
+		t.Fatal("copy task was not enqueued")
+	}
+	var payload types.KBClonePayload
+	if err := json.Unmarshal(enqueuer.task.Payload(), &payload); err != nil {
+		t.Fatalf("invalid clone payload: %v", err)
+	}
+	if payload.TargetID != "target-fixed" {
+		t.Fatalf("clone payload must carry fixed target id, got %q", payload.TargetID)
+	}
+	if len(progress.saved) != 1 || progress.saved[0].TargetID != "target-fixed" {
+		t.Fatalf("initial progress must carry fixed target id, got %#v", progress.saved)
 	}
 }
 

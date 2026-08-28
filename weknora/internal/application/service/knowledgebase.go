@@ -1712,38 +1712,10 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 			}
 		}
 	} else {
-		var faqConfig *types.FAQConfig
-		if sourceKB.FAQConfig != nil {
-			cfg := *sourceKB.FAQConfig
-			faqConfig = &cfg
+		targetKB, err = s.buildKnowledgeBaseCopyTarget(ctx, sourceKB, tenantID)
+		if err != nil {
+			return nil, nil, err
 		}
-		// Preserve VectorStoreID so the cloned KB lands on the same
-		// physical index. GORM `<-:create` permits the value at INSERT.
-		targetKB = &types.KnowledgeBase{
-			ID:                    uuid.New().String(),
-			Name:                  sourceKB.Name,
-			Type:                  sourceKB.Type,
-			Description:           sourceKB.Description,
-			TenantID:              tenantID,
-			ChunkingConfig:        sourceKB.ChunkingConfig,
-			ImageProcessingConfig: sourceKB.ImageProcessingConfig,
-			EmbeddingModelID:      sourceKB.EmbeddingModelID,
-			SummaryModelID:        sourceKB.SummaryModelID,
-			VLMConfig:             sourceKB.VLMConfig,
-			StorageProviderConfig: sourceKB.StorageProviderConfig,
-			StorageBackendID:      sourceKB.StorageBackendID,
-			StorageConfig:         sourceKB.StorageConfig,
-			FAQConfig:             faqConfig,
-			VectorStoreID:         sourceKB.VectorStoreID,
-		}
-		// The clone is owned by the caller, not the original creator —
-		// otherwise a Contributor copying someone else's KB would still
-		// not be able to edit the result. Skip synthetic API-key users
-		// (see CreateKnowledgeBase for the same reasoning).
-		if uid, ok := types.UserIDFromContext(ctx); ok && !types.IsSyntheticUserID(uid) {
-			targetKB.CreatorID = uid
-		}
-		targetKB.EnsureDefaults()
 		if err := s.repo.CreateKnowledgeBase(ctx, targetKB); err != nil {
 			return nil, nil, err
 		}
@@ -1771,6 +1743,39 @@ func (s *knowledgeBaseService) DuplicateKnowledgeBase(
 	}
 	sourceKB.EnsureDefaults()
 
+	targetKB, err := s.buildKnowledgeBaseCopyTarget(ctx, sourceKB, tenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	if targetKB.HasVectorStore() {
+		if err := s.validateVectorStoreBinding(ctx, tenantID, *targetKB.VectorStoreID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := s.checkCreateKnowledgeBaseEntitlement(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.repo.CreateKnowledgeBase(ctx, targetKB); err != nil {
+		return nil, err
+	}
+	recordKBActivity(ctx, s.audit, tenantID, targetKB.ID, types.AuditActionKBDuplicated,
+		"knowledge_base", targetKB.ID, types.AuditOutcomeSuccess, map[string]any{
+			"source_kb_id": sourceKB.ID, "name": targetKB.Name,
+		})
+	return targetKB, nil
+}
+
+// buildKnowledgeBaseCopyTarget deep-copies every user-facing KB setting while
+// assigning a fresh identity and clearing runtime/projection state. Both the
+// settings-only duplicate and the full content-copy path use this constructor
+// so their target KBs cannot drift as new configuration fields are added.
+func (s *knowledgeBaseService) buildKnowledgeBaseCopyTarget(
+	ctx context.Context,
+	sourceKB *types.KnowledgeBase,
+	tenantID uint64,
+) (*types.KnowledgeBase, error) {
 	targetKB, err := cloneKnowledgeBaseConfiguration(sourceKB)
 	if err != nil {
 		return nil, err
@@ -1798,23 +1803,6 @@ func (s *knowledgeBaseService) DuplicateKnowledgeBase(
 	targetKB.CreatorName = ""
 	targetKB.EnsureDefaults()
 	targetKB.Normalize()
-
-	if targetKB.HasVectorStore() {
-		if err := s.validateVectorStoreBinding(ctx, tenantID, *targetKB.VectorStoreID); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := s.checkCreateKnowledgeBaseEntitlement(ctx); err != nil {
-		return nil, err
-	}
-	if err := s.repo.CreateKnowledgeBase(ctx, targetKB); err != nil {
-		return nil, err
-	}
-	recordKBActivity(ctx, s.audit, tenantID, targetKB.ID, types.AuditActionKBDuplicated,
-		"knowledge_base", targetKB.ID, types.AuditOutcomeSuccess, map[string]any{
-			"source_kb_id": sourceKB.ID, "name": targetKB.Name,
-		})
 	return targetKB, nil
 }
 

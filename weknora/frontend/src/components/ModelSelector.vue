@@ -611,7 +611,6 @@ const chatAgentOptions = computed<ChatAgentOption[]>(() => {
     return { key: `own-${agent.id}`, agent }
   })
   const shared = props.sharedAgents
-    .filter(sharedAgent => !sharedAgent.disabled_by_me)
     .map((sharedAgent) => {
       const sourceTenantId = String(sharedAgent.source_tenant_id)
       const agent: CustomAgent = { is_builtin: false, config: {}, ...sharedAgent.agent }

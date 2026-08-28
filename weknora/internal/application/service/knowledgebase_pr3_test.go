@@ -395,6 +395,50 @@ func TestCopyKnowledgeBase_Defenses(t *testing.T) {
 	})
 }
 
+func TestCopyKnowledgeBase_NewTargetPreservesProductConfigurationAndUsesCopyName(t *testing.T) {
+	repo := newFakeKBRepo()
+	source := &types.KnowledgeBase{
+		ID:               "src",
+		Name:             "Source KB",
+		Type:             types.KnowledgeBaseTypeDocument,
+		Description:      "source description",
+		TenantID:         1,
+		EmbeddingModelID: "embed-1",
+		ASRConfig:        types.ASRConfig{Enabled: true, ModelID: "asr-1", Language: "zh"},
+		ExtractConfig: &types.ExtractConfig{
+			Enabled: true,
+			Text:    "extract entities",
+			Tags:    []string{"product"},
+		},
+		QuestionGenerationConfig: &types.QuestionGenerationConfig{Enabled: true, QuestionCount: 5},
+		WikiConfig:               &types.WikiConfig{SynthesisModelID: "wiki-llm", MaxPagesPerIngest: 12},
+		IndexingStrategy: types.IndexingStrategy{
+			VectorEnabled:  true,
+			KeywordEnabled: true,
+			WikiEnabled:    true,
+			GraphEnabled:   true,
+		},
+	}
+	repo.rows[source.ID] = source
+	svc := newPR3KBService(repo, &fakeRegistry{}, &fakeOwnership{})
+	ctx := context.WithValue(ctxWithTenant(1), types.UserIDContextKey, "copy-user")
+
+	_, target, err := svc.CopyKnowledgeBase(ctx, source.ID, "")
+	require.NoError(t, err)
+	require.NotNil(t, target)
+
+	assert.Equal(t, "Source KB 副本", target.Name)
+	assert.Equal(t, "copy-user", target.CreatorID)
+	assert.Equal(t, source.ASRConfig, target.ASRConfig)
+	require.NotNil(t, target.ExtractConfig)
+	assert.Equal(t, source.ExtractConfig.Text, target.ExtractConfig.Text)
+	require.NotNil(t, target.QuestionGenerationConfig)
+	assert.Equal(t, source.QuestionGenerationConfig.QuestionCount, target.QuestionGenerationConfig.QuestionCount)
+	require.NotNil(t, target.WikiConfig)
+	assert.Equal(t, source.WikiConfig.SynthesisModelID, target.WikiConfig.SynthesisModelID)
+	assert.Equal(t, source.IndexingStrategy, target.IndexingStrategy)
+}
+
 func TestDuplicateKnowledgeBase_CreatesSettingsOnlyDuplicate(t *testing.T) {
 	repo := newFakeKBRepo()
 	source := &types.KnowledgeBase{

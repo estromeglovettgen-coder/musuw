@@ -154,13 +154,12 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
         disabled_own_agent_ids?: string[]
       }
       const data = response.data || []
-      const disabled = response.disabled_own_agent_ids || []
       if (creator === 'all') {
         agents.value = data
-        disabledOwnAgentIds.value = disabled
+        disabledOwnAgentIds.value = []
         loadedAt.value.agents = Date.now()
       }
-      return { data, disabled_own_agent_ids: disabled }
+      return { data, disabled_own_agent_ids: [] }
     }
 
     const orgStore = useOrganizationStore()
@@ -172,11 +171,11 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
         orgStore.fetchSharedAgents({ force }),
       ])
       const res = agentsRes as { data?: CustomAgent[]; disabled_own_agent_ids?: string[] }
-      return { data: res.data || [], disabled_own_agent_ids: res.disabled_own_agent_ids || [] }
+      return { data: res.data || [], disabled_own_agent_ids: [] }
     }
 
     if (!force && isFresh('agents')) {
-      return { data: agents.value, disabled_own_agent_ids: disabledOwnAgentIds.value }
+      return { data: agents.value, disabled_own_agent_ids: [] }
     }
     if (!force && agentsAllInflight) return agentsAllInflight
 
@@ -190,9 +189,9 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
         const res = agentsRes as { data?: CustomAgent[]; disabled_own_agent_ids?: string[] }
         const data = res.data || []
         agents.value = data
-        disabledOwnAgentIds.value = res.disabled_own_agent_ids || []
+        disabledOwnAgentIds.value = []
         loadedAt.value.agents = Date.now()
-        return { data, disabled_own_agent_ids: res.disabled_own_agent_ids || [] }
+        return { data, disabled_own_agent_ids: [] }
       } finally {
         if (agentsAllGen === gen) agentsAllInflight = null
       }

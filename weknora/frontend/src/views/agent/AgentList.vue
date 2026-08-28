@@ -222,34 +222,9 @@
                       <div v-if="authStore.hasRole('contributor')" class="popup-menu-item" @click="handleCopy(agent)">
                         <t-icon class="menu-icon" name="file-copy" /><span>{{ $t('common.copy') }}</span>
                       </div>
-                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
-                        @click="handleToggleDisabled(agent)">
-                        <t-icon class="menu-icon" name="poweroff" />
-                        <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
-                      </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)"><t-icon class="menu-icon" name="delete" /><span>{{
                           $t('common.delete') }}</span></div>
-                    </div>
-                  </template>
-                </t-popup>
-                <t-popup v-else-if="!agent.isMine && authStore.hasRole('admin')"
-                  :visible="openMoreAgentId === 'shared-' + agent.share_id" trigger="hover"
-                  overlayClassName="card-more-popup" destroy-on-close placement="bottom-right"
-                  @update:visible="(v: boolean) => { if (!v) openMoreAgentId = null }">
-                  <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === 'shared-' + agent.share_id }"
-                    role="button" tabindex="0" :aria-label="$t('common.more')"
-                    @click.stop="toggleMore($event, 'shared-' + agent.share_id)"
-                    @keydown.enter.stop.prevent="toggleMore($event, 'shared-' + agent.share_id)"
-                    @keydown.space.stop.prevent="toggleMore($event, 'shared-' + agent.share_id)">
-                    <t-icon class="more-icon" name="ellipsis" aria-hidden="true" />
-                  </div>
-                  <template #content>
-                    <div class="popup-menu">
-                      <div class="popup-menu-item" @click="handleToggleSharedDisabled(agent)">
-                        <t-icon class="menu-icon" name="poweroff" />
-                        <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
-                      </div>
                     </div>
                   </template>
                 </t-popup>
@@ -264,12 +239,6 @@
                 </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
-                    <t-tag v-if="agent.isMine && agent.disabled_by_me" theme="default" size="small"
-                      class="disabled-badge">{{
-                        $t('agent.disabled') }}</t-tag>
-                    <t-tag v-if="!agent.isMine && agent.disabled_by_me" theme="default" size="small"
-                      class="disabled-badge">{{
-                        $t('agent.disabled') }}</t-tag>
                     <t-tooltip
                       :content="agent.config?.agent_mode === 'smart-reasoning' ? $t('agent.mode.agent') : $t('agent.mode.normal')"
                       placement="top">
@@ -436,11 +405,6 @@
                         <t-icon class="menu-icon" name="file-copy" />
                         <span>{{ $t('common.copy') }}</span>
                       </div>
-                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
-                        @click="handleToggleDisabled(agent)">
-                        <t-icon class="menu-icon" name="poweroff" />
-                        <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
-                      </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)">
                         <t-icon class="menu-icon" name="delete" />
@@ -466,8 +430,6 @@
                 </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
-                    <t-tag v-if="agent.disabled_by_me" theme="default" size="small" class="disabled-badge">{{
-                      $t('agent.disabled') }}</t-tag>
                     <t-tooltip
                       :content="agent.config?.agent_mode === 'smart-reasoning' ? $t('agent.mode.agent') : $t('agent.mode.normal')"
                       placement="top">
@@ -597,26 +559,6 @@
                   <AgentAvatar v-else :name="shared.agent?.name" size="small" />
                   <span class="card-title" :title="shared.agent?.name">{{ shared.agent?.name }}</span>
                 </div>
-                <t-popup v-if="!shared.is_mine && authStore.hasRole('admin')"
-                  :visible="openMoreAgentId === 'shared-tab-' + shared.share_id" trigger="hover"
-                  overlayClassName="card-more-popup" destroy-on-close placement="bottom-right"
-                  @update:visible="(v: boolean) => { if (!v) openMoreAgentId = null }">
-                  <div class="more-wrap" :class="{ 'active-more': openMoreAgentId === 'shared-tab-' + shared.share_id }"
-                    role="button" tabindex="0" :aria-label="$t('common.more')"
-                    @click.stop="toggleMore($event, 'shared-tab-' + shared.share_id)"
-                    @keydown.enter.stop.prevent="toggleMore($event, 'shared-tab-' + shared.share_id)"
-                    @keydown.space.stop.prevent="toggleMore($event, 'shared-tab-' + shared.share_id)">
-                    <t-icon class="more-icon" name="ellipsis" aria-hidden="true" />
-                  </div>
-                  <template #content>
-                    <div class="popup-menu">
-                      <div class="popup-menu-item" @click="handleToggleSharedDisabledFromShared(shared)">
-                        <t-icon class="menu-icon" name="poweroff" />
-                        <span>{{ shared.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
-                      </div>
-                    </div>
-                  </template>
-                </t-popup>
               </div>
               <div class="card-content">
                 <div class="card-description">{{ shared.agent?.description || $t('agent.noDescription') }}</div>
@@ -628,8 +570,6 @@
                 </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
-                    <t-tag v-if="shared.disabled_by_me" theme="default" size="small" class="disabled-badge">{{
-                      $t('agent.disabled') }}</t-tag>
                     <t-tooltip
                       :content="shared.agent?.config?.agent_mode === 'smart-reasoning' ? $t('agent.mode.agent') : $t('agent.mode.normal')"
                       placement="top">
@@ -855,7 +795,7 @@ import { formatStringDate } from '@/utils/index'
 import { useI18n } from 'vue-i18n'
 import { createSessions } from '@/api/chat/index'
 import { useOrganizationStore } from '@/stores/organization'
-import { setSharedAgentDisabledByMe, listOrganizationSharedAgents } from '@/api/organization'
+import { listOrganizationSharedAgents } from '@/api/organization'
 import { useSettingsStore } from '@/stores/settings'
 import { useMenuStore } from '@/stores/menu'
 import type { SharedAgentInfo, OrganizationSharedAgentItem } from '@/api/organization'
@@ -883,14 +823,12 @@ const { loaded: modelsReadyLoaded, isReadyForAgent } = useTenantModelReadiness()
 
 interface AgentWithUI extends CustomAgent {
   showMore?: boolean
-  /** 当前空间在对话下拉中停用（仅影响本空间） */
-  disabled_by_me?: boolean
 }
 
 /** Merged agent for "all" tab: my agents (isMine: true) or shared
- *  (isMine: false, org_name, source_tenant_id, share_id, permission, disabled_by_me?).
+ *  (isMine: false, org_name, source_tenant_id, share_id, permission).
  *  `permission` drives the「可编辑 / 仅查看」分组，仅在 shared 分支携带。 */
-type DisplayAgent = (AgentWithUI & { isMine: true }) | (CustomAgent & { isMine: false; org_name: string; source_tenant_id: number; share_id: string; permission?: string; showMore?: boolean; disabled_by_me?: boolean })
+type DisplayAgent = (AgentWithUI & { isMine: true }) | (CustomAgent & { isMine: false; org_name: string; source_tenant_id: number; share_id: string; permission?: string; showMore?: boolean })
 
 // 左侧空间选择：默认根据当前角色决定。
 // 与 KnowledgeBaseList 同款逻辑：Viewer 在当前空间里通常没有自建智能体，
@@ -984,7 +922,6 @@ const favoritesAgentList = computed<DisplayAgent[]>(() => {
         org_name: s.org_name,
         source_tenant_id: s.source_tenant_id,
         share_id: s.share_id,
-        disabled_by_me: s.disabled_by_me,
         showMore: false,
       } as DisplayAgent
     })
@@ -1005,7 +942,6 @@ const recentsAgentList = computed<DisplayAgent[]>(() => {
         org_name: s.org_name,
         source_tenant_id: s.source_tenant_id,
         share_id: s.share_id,
-        disabled_by_me: s.disabled_by_me,
         showMore: false,
       } as DisplayAgent
     })
@@ -1062,7 +998,6 @@ const filteredAgents = computed<DisplayAgent[]>(() => {
       source_tenant_id: shared.source_tenant_id,
       share_id: shared.share_id,
       permission: shared.permission,
-      disabled_by_me: shared.disabled_by_me,
       showMore: false
     } as DisplayAgent)
   })
@@ -1154,11 +1089,9 @@ const showAgentTenantModelsGuide = computed(
 )
 
 const applyAgentListData = (res: { data: CustomAgent[]; disabled_own_agent_ids: string[] }) => {
-  const disabledOwnIds = res.disabled_own_agent_ids || []
   agents.value = (res.data || []).map((agent: CustomAgent) => ({
     ...agent,
-    showMore: false,
-    disabled_by_me: disabledOwnIds.includes(agent.id)
+    showMore: false
   }))
   checkAndOpenEditModal()
 }
@@ -1311,7 +1244,7 @@ function openSharedAgentDetail(shared: SharedAgentInfo) {
 /** 空间视角下点击卡片：我共享的进编辑，他人共享的打开详情抽屉 */
 function handleSpaceAgentCardClick(shared: OrganizationSharedAgentItem) {
   if (shared.is_mine && shared.agent) {
-    handleEdit({ ...shared.agent, showMore: false, disabled_by_me: shared.disabled_by_me } as AgentWithUI)
+    handleEdit({ ...shared.agent, showMore: false } as AgentWithUI)
   } else {
     openSharedAgentDetail(shared)
   }
@@ -1528,55 +1461,6 @@ const handleCopy = (agent: AgentWithUI) => {
     }
   }).catch((e: any) => {
     MessagePlugin.error(e?.message || t('agent.messages.copyFailed'))
-  })
-}
-
-/** 切换「我的」智能体停用状态（仅影响当前空间对话下拉显示） */
-const handleToggleDisabled = (agent: AgentWithUI) => {
-  openMoreAgentId.value = null
-  const nextDisabled = !agent.disabled_by_me
-  setSharedAgentDisabledByMe(agent.id, nextDisabled).then((res: any) => {
-    if (res.success) {
-      MessagePlugin.success(nextDisabled ? t('agent.messages.disabled') : t('agent.messages.enabled'))
-      fetchList(true)
-    } else {
-      MessagePlugin.error(res.message || t('agent.messages.saveFailed'))
-    }
-  }).catch((e: any) => {
-    MessagePlugin.error(e?.message || t('agent.messages.saveFailed'))
-  })
-}
-
-/** 切换共享智能体“停用”状态（仅影响当前用户对话下拉显示） */
-const handleToggleSharedDisabled = (agent: DisplayAgent) => {
-  if (agent.isMine) return
-  openMoreAgentId.value = null
-  const nextDisabled = !agent.disabled_by_me
-  setSharedAgentDisabledByMe(agent.id, nextDisabled).then((res: any) => {
-    if (res.success) {
-      MessagePlugin.success(nextDisabled ? t('agent.messages.disabled') : t('agent.messages.enabled'))
-      orgStore.fetchSharedAgents({ force: true })
-    } else {
-      MessagePlugin.error(res.message || t('agent.messages.saveFailed'))
-    }
-  }).catch((e: any) => {
-    MessagePlugin.error(e?.message || t('agent.messages.saveFailed'))
-  })
-}
-
-const handleToggleSharedDisabledFromShared = (shared: SharedAgentInfo) => {
-  if (!shared.agent) return
-  openMoreAgentId.value = null
-  const nextDisabled = !shared.disabled_by_me
-  setSharedAgentDisabledByMe(shared.agent.id, nextDisabled).then((res: any) => {
-    if (res.success) {
-      MessagePlugin.success(nextDisabled ? t('agent.messages.disabled') : t('agent.messages.enabled'))
-      orgStore.fetchSharedAgents({ force: true })
-    } else {
-      MessagePlugin.error(res.message || t('agent.messages.saveFailed'))
-    }
-  }).catch((e: any) => {
-    MessagePlugin.error(e?.message || t('agent.messages.saveFailed'))
   })
 }
 

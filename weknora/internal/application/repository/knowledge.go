@@ -448,21 +448,25 @@ func (r *knowledgeRepository) CheckKnowledgeExists(
 // Rows with a NULL/empty file_hash carry no reliable identity (unparsed /
 // passage knowledge), so they are always treated as present-only-in-A to
 // avoid collapsing distinct rows into one.
+// Only completed rows in B count as matched copies. Clone retries leave a
+// failed/processing destination row with the same hash; counting it would
+// make the retry skip the source item permanently.
 func (r *knowledgeRepository) AminusB(
 	ctx context.Context,
 	Atenant uint64, A string,
 	Btenant uint64, B string,
 ) ([]string, error) {
 	type hashRow struct {
-		ID       string
-		FileHash string
+		ID          string
+		FileHash    string
+		ParseStatus string
 	}
 	// Order so the retained (matched) copies are the earliest ones and the
 	// surplus we return is deterministic across runs.
 	var aRows []hashRow
 	if err := r.db.WithContext(ctx).
 		Model(&types.Knowledge{}).
-		Select("id, file_hash").
+		Select("id, file_hash, parse_status").
 		Where("tenant_id = ? AND knowledge_base_id = ?", Atenant, A).
 		Order("file_hash, created_at, id").
 		Find(&aRows).Error; err != nil {
@@ -477,7 +481,7 @@ func (r *knowledgeRepository) AminusB(
 	if err := r.db.WithContext(ctx).
 		Model(&types.Knowledge{}).
 		Select("file_hash, COUNT(*) AS cnt").
-		Where("tenant_id = ? AND knowledge_base_id = ?", Btenant, B).
+		Where("tenant_id = ? AND knowledge_base_id = ? AND parse_status = ?", Btenant, B, types.ParseStatusCompleted).
 		Group("file_hash").
 		Find(&bCounts).Error; err != nil {
 		return nil, err
@@ -493,6 +497,13 @@ func (r *knowledgeRepository) AminusB(
 
 	knowledgeIDs := make([]string, 0)
 	for _, row := range aRows {
+		// A failed/processing row is never a valid copy. Return it as surplus
+		// without consuming a completed counterpart from B; this lets clone
+		// retries replace stale partial rows instead of retaining them forever.
+		if row.ParseStatus != types.ParseStatusCompleted {
+			knowledgeIDs = append(knowledgeIDs, row.ID)
+			continue
+		}
 		// NULL scans into "" here, so this also covers NULL hashes.
 		if row.FileHash == "" {
 			knowledgeIDs = append(knowledgeIDs, row.ID)

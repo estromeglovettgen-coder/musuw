@@ -14,7 +14,6 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
     'handleEdit(agent)',
     'handleCopy(agent)',
     'handleDelete(agent)',
-    'handleToggleDisabled(agent)',
     'handleCardClick(agent)',
     'class="agents-panel__search"',
     'class="agents-panel__title-icon"',
@@ -27,6 +26,8 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
     'background: var(--mvc-page, #151619) !important',
     'box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important',
   ]) assert.ok(list.includes(token), `Agent list contract lost ${token}`)
+  assert.doesNotMatch(list, /handleToggle(?:Shared)?Disabled/)
+  assert.doesNotMatch(list, /setSharedAgentDisabledByMe/)
   assert.match(list, /\.agent-card-meta\s*\{[\s\S]*?span\s*\{[\s\S]*?line-height:\s*16px;/)
   assert.match(nativeDirectoryStyles, /\.agent-card \.card-bottom,[\s\S]*?min-height:\s*20px !important;/)
   assert.match(nativeDirectoryStyles, /\.agent-card \.more-wrap,[\s\S]*?width:\s*24px !important;[\s\S]*?height:\s*24px !important;[\s\S]*?padding:\s*4px !important;[\s\S]*?box-sizing:\s*border-box !important;/)

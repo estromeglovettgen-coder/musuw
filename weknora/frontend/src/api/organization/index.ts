@@ -711,22 +711,6 @@ export async function listOrganizationSharedAgents(orgId: string): Promise<ApiRe
   }
 }
 
-/** 设置当前用户对某共享智能体的停用状态（仅影响本人对话下拉显示） */
-export async function setSharedAgentDisabledByMe(
-  agentId: string,
-  disabled: boolean
-): Promise<ApiResponse<void>> {
-  try {
-    const response = await post('/api/v1/shared-agents/disabled', {
-      agent_id: agentId,
-      disabled
-    })
-    return response as unknown as ApiResponse<void>
-  } catch (error: any) {
-    return { success: false, message: error.message || 'Failed to update preference' }
-  }
-}
-
 export async function listOrgAgentShares(orgId: string): Promise<ApiResponse<ListAgentSharesResponse>> {
   try {
     const response = await get(`/api/v1/organizations/${orgId}/agent-shares`)

@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Native agent lifecycle and cards
-The system SHALL expose the existing WeKnora custom-agent list, creation, editing, deletion, enablement, and selection workflows using the supplied workspace's card and empty-state presentation.
+The system SHALL expose the existing WeKnora custom-agent list, creation, editing, deletion, and selection workflows using the supplied workspace's card and empty-state presentation. Musuw SHALL NOT add a separate agent enablement or disablement lifecycle.
 
 #### Scenario: Manage agents
 - **WHEN** an authorized user opens the agent surface
-- **THEN** the user can view agent cards and use the existing create, edit, enable, duplicate where supported, and delete actions
+- **THEN** the user can view agent cards and use the existing create, edit, duplicate where supported, and delete actions
 
 ### Requirement: Reduced native agent editor
 The system SHALL expose agent name, description, quick-answer or smart-reasoning mode, conversation model, one system prompt, and knowledge-base scope while using the existing `CustomAgentConfig` contract.
@@ -33,7 +33,7 @@ The agent editor SHALL preserve the native all, selected, and none knowledge-bas
 The chat composer SHALL expose the native agent, model, and supported reasoning controls inside one grey capsule that visually follows the supplied workspace reference.
 
 #### Scenario: Select and use an agent
-- **WHEN** a user selects an enabled accessible agent in chat
+- **WHEN** a user selects an accessible agent in chat
 - **THEN** subsequent requests use that agent through the existing quick-answer or smart-reasoning execution path
 
 #### Scenario: Open the combined capsule
