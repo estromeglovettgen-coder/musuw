@@ -129,6 +129,7 @@ const errorMessage = ref('')
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
 const totals = ref<CheckoutTotals | null>(null)
+const previewSubtotal = ref('')
 const previewPrice = ref('')
 const upgradePreview = ref<PaddleSubscriptionUpgradePreview | null>(null)
 const upgradeSubmitting = ref(false)
@@ -166,7 +167,7 @@ const formatCheckoutCurrency = (amount: number, currencyCode: string) => {
 const displaySubtotal = computed(() => {
   if (totals.value) return formatCheckoutCurrency(totals.value.subtotal, totals.value.currency)
   if (upgradePreview.value) return formatMinorCurrency(upgradePreview.value.prorated_subtotal, upgradePreview.value.currency_code)
-  return previewPrice.value || '…'
+  return previewSubtotal.value || '…'
 })
 const displayTax = computed(() => {
   if (totals.value) return formatCheckoutCurrency(totals.value.tax, totals.value.currency)
@@ -287,7 +288,8 @@ const mountCheckout = async () => {
       pwCustomerId: config.pw_customer_id,
       priceIds: [option.price_id],
     })
-    previewPrice.value = preview?.formattedUnitSubtotal || ''
+    previewSubtotal.value = preview?.formattedSubtotal || ''
+    previewPrice.value = preview?.formattedTotal || ''
   } catch {
     // Paddle checkout itself remains authoritative and can still load.
   }

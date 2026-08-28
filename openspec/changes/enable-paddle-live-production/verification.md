@@ -102,3 +102,32 @@ stored here.
   resolution is an explicitly authorized cleanup of disposable pre-Live test
   account state, or a fresh Free account for the initial Live checkout. No
   tenant state was deleted or rewritten during this diagnosis.
+
+## 2026-08-28 Japan localization correction
+
+- Paddle Live's official JPY automatic currency conversion was enabled in
+  place; the six existing recurring prices, destination, credentials, tax
+  mode, payout settings, and China CNY overrides were not replaced.
+- A fresh read-only Paddle preview for Japan returned JPY for all six prices.
+  Monthly Plus/Pro/Max totals were JPY 798/1,595/3,190, and yearly totals were
+  JPY 7,816/15,791/31,741. Paddle supplied both the tax decomposition and final
+  formatted amounts; Musuw calculated neither exchange rates nor tax.
+- A corresponding United States preview remained in USD, proving that enabling
+  JPY did not replace the six prices' USD base currency. The plan comparison
+  now renders Paddle's final formatted line-item total instead of exposing the
+  pre-tax subtotal in tax-inclusive markets; Checkout still shows Paddle's
+  subtotal, tax, and total separately.
+- No payment details were entered and no charge, refund, transfer, payout, or
+  payout-account operation occurred.
+
+## 2026-08-28 WeChat Pay eligibility diagnosis
+
+- The Live Dashboard payment-method switch is enabled, but Paddle currently
+  supports WeChat Pay only for eligible one-time items and does not support it
+  for subscriptions. Musuw's six active prices are all recurring, so Paddle
+  correctly omits WeChat Pay from their China/CNY Checkout.
+- Musuw passes only the server-mapped recurring price, signed tenant data,
+  customer email, and locale to Paddle.js. It has no payment-method whitelist,
+  country override, or currency override that could suppress WeChat Pay.
+- No one-time catalog, manual-renewal entitlement path, or duplicate payment
+  flow was added merely to expose WeChat Pay.

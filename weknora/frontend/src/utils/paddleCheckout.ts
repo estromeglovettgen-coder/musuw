@@ -40,7 +40,17 @@ export interface OpenPaddleInlineCheckoutInput extends PaddleCheckoutInput {
 
 export interface PaddleLocalizedPrice {
   priceId: string
-  formattedUnitSubtotal: string
+  /**
+   * Paddle's formatted pre-tax line-item subtotal. Keep this string untouched
+   * for the checkout summary while the embedded Checkout is loading.
+   */
+  formattedSubtotal: string
+  /**
+   * Paddle's final formatted line-item total, including any tax that applies
+   * to the buyer's location. Keep this string untouched so the pricing page
+   * matches the amount Paddle shows at checkout.
+   */
+  formattedTotal: string
   currencyCode: string
 }
 
@@ -113,7 +123,11 @@ export async function previewPaddlePrices(input: PreviewPaddlePricesInput): Prom
   })
   return preview.data.details.lineItems.map((item) => ({
     priceId: item.price.id,
-    formattedUnitSubtotal: item.formattedUnitTotals.subtotal,
+    formattedSubtotal: item.formattedUnitTotals.subtotal,
+    // `subtotal` is pre-tax. With Paddle's `location` tax mode it is lower
+    // than the advertised/charged amount in tax-inclusive countries (for
+    // example, Japan), so use Paddle's final formatted total instead.
+    formattedTotal: item.formattedTotals.total,
     currencyCode: preview.data.currencyCode,
   }))
 }

@@ -52,3 +52,12 @@ test('self-service checkout lets official Paddle.js create the transaction from 
   assert.match(paddle, /customData:\s*input\.customData/)
   assert.doesNotMatch(paddle, /transactionId:\s*input\.transactionId/)
 })
+
+test('localized price preview uses Paddle final totals, not pre-tax subtotals', () => {
+  assert.match(paddle, /formattedSubtotal:\s*item\.formattedUnitTotals\.subtotal/)
+  assert.match(paddle, /formattedTotal:\s*item\.formattedTotals\.total/)
+  assert.doesNotMatch(paddle, /formattedUnitSubtotal/)
+  assert.match(plans, /preview\.formattedTotal/)
+  assert.match(checkout, /previewSubtotal\.value = preview\?\.formattedSubtotal/)
+  assert.match(checkout, /preview\?\.formattedTotal/)
+})

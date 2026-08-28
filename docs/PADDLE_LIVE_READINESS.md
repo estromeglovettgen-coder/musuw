@@ -206,7 +206,7 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
 | Live client-side token 与 API key | Paddle.js/API 技术硬阻断 | 复用既有 active Live credential，已通过保护文件接入固定生产；未轮换或复制。 |
 | Live webhook destination 与 signing secret | 可靠履约/entitlement 硬阻断 | 唯一 active destination 已是精确 11 事件，exact secret 已保护挂载，官方 no-charge simulation 连续 HTTP 200。 |
 | Live default payment link | Paddle transaction 技术硬阻断 | Dashboard 已新鲜复核为 `https://app.musuw.com/pay` 且显示有效。 |
-| tax mode、balance currency、payment methods | Live 商业配置硬阻断 | Dashboard 已复核：税为 automatic-by-location、余额 USD、CNY 自动转换；Checkout 使用 Paddle 官方方法开关，应用不推断买家税/币种/eligible methods。 |
+| tax mode、balance currency、payment methods | Live 商业配置硬阻断 | Dashboard 已复核：税为 automatic-by-location、余额 USD、CNY 与 JPY 自动转换；Checkout 使用 Paddle 官方方法开关，应用不推断买家税/币种/eligible methods。 |
 | payout settings | 获得 payout 的 owner-only 阻断；不是接受付款的代码证明 | 本次禁止修改；最终单独报告。 |
 | `pwCustomer` / Retain | 完整 Live Retain 准备阻断；Sandbox 不加载 Retain | Postmark 发件身份已验证；公开 `/retain` 被 Dashboard 标记 Paddle.js Installed，Retain 已确认 Live。可选 web-app detector 需真实 Paddle customer 会话，当前手工 Plus smoke 账号不具备该绑定。 |
 | webhook source allowlist | 官方推荐的纵深防御，不是申请表硬门槛 | 待 Live edge 配置；signature verification 已有且仍是必须保留的主校验。 |
@@ -232,8 +232,10 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
   notification destination 和 checkout domain 结论一致；调用只返回脱敏后的
   计数、状态和事件集合，没有返回 credential、destination URL 或资源 ID。
 - 同日登录 Dashboard 新鲜核验：default payment link 已是公开 `/pay` 页面，税由
-  Paddle 按 location 自动决定，余额币种 USD、CNY 自动转换，PayPal/Google Pay/
-  Apple Pay/Bancontact/WeChat Pay 已启用，app 域名与 Apple Pay 均 approved；
+  Paddle 按 location 自动决定，余额币种 USD、CNY 与 JPY 自动转换，PayPal/Google Pay/
+  Apple Pay/Bancontact/WeChat Pay 已启用，app 域名与 Apple Pay 均 approved；其中
+  WeChat Pay 仍受 Paddle 官方 eligibility 限制，只适用于一次性商品，不适用于当前
+  六个 recurring subscription price；
   Customer Portal 可用，但没有 Product Collections 配置入口；Retain 发件身份、
   公开 recovery page 检测和 Live activation 均已完成。
 - exact destination 现为 `traffic_source=all` 的精确 11-event 集合。官方无扣款
