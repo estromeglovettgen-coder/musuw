@@ -39,11 +39,12 @@ func paddleBillingIntent(tenantID uint64, key string) types.PaddleBillingOperati
 	return types.PaddleBillingOperationIntent{
 		TenantID:           tenantID,
 		OperationKey:       key,
-		OperationType:      types.PaddleBillingOperationCheckout,
+		OperationType:      types.PaddleBillingOperationUpgrade,
 		RequestFingerprint: "fingerprint-" + key,
-		Plan:               types.ConsumerPlanPlus,
+		Plan:               types.ConsumerPlanPro,
 		BillingPeriod:      "monthly",
-		PriceID:            "pri_plus_monthly",
+		PriceID:            "pri_pro_monthly",
+		SubscriptionID:     "sub_owned",
 	}
 }
 
@@ -76,9 +77,9 @@ func TestPaddleBillingOperationDuplicateKeyReusesProviderIntentAndResult(t *test
 	require.NoError(t, err)
 	assert.Equal(t, types.PaddleBillingOperationClaimCreated, disposition)
 	require.NoError(t, repo.MarkInFlight(ctx, created.ID))
-	require.NoError(t, repo.RecordPaddleTransaction(ctx, created.ID, "txn_123"))
-	providerAccepted, err := repo.GetByID(ctx, created.ID)
+	providerAccepted, disposition, err := repo.Claim(ctx, intent)
 	require.NoError(t, err)
+	assert.Equal(t, types.PaddleBillingOperationClaimExisting, disposition)
 	assert.Equal(t, types.PaddleBillingOperationInFlight, providerAccepted.Status, "provider acceptance is not entitlement success")
 	require.NoError(t, repo.Finish(ctx, created.ID, types.PaddleBillingOperationSucceeded, `{"redirect":"/pay"}`, ""))
 
@@ -88,7 +89,6 @@ func TestPaddleBillingOperationDuplicateKeyReusesProviderIntentAndResult(t *test
 	require.NotNil(t, replayed)
 	assert.Equal(t, created.ID, replayed.ID)
 	assert.Equal(t, types.PaddleBillingOperationSucceeded, replayed.Status)
-	assert.Equal(t, "txn_123", replayed.PaddleTransactionID)
 	assert.JSONEq(t, `{"redirect":"/pay"}`, replayed.Result)
 
 	found, ok, err := repo.FindByKey(ctx, intent.TenantID, intent.OperationKey)
@@ -180,46 +180,10 @@ func TestPaddleBillingOperationConcurrentSameKeyConverges(t *testing.T) {
 	assert.Equal(t, callers-1, existing)
 }
 
-func TestPaddleBillingOperationFinishMatchingActiveRequiresProviderIdentity(t *testing.T) {
-	_, repo := setupPaddleBillingOperationDB(t)
-	ctx := context.Background()
-
-	checkout, _, err := repo.Claim(ctx, paddleBillingIntent(7, "checkout-webhook"))
-	require.NoError(t, err)
-
-	matched, err := repo.FinishMatchingActive(ctx, 8, types.PaddleBillingOperationCheckout, "checkout-webhook", "pri_plus_monthly", "sub_wrong_tenant", types.PaddleBillingOperationSucceeded, `{"transaction":"txn_1"}`, "")
-	require.NoError(t, err)
-	assert.False(t, matched)
-	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, "checkout-webhook", "pri_other", "sub_wrong_price", types.PaddleBillingOperationSucceeded, `{}`, "")
-	require.NoError(t, err)
-	assert.False(t, matched)
-	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, "old-checkout", checkout.PriceID, "sub_from_activation", types.PaddleBillingOperationSucceeded, `{}`, "")
-	require.NoError(t, err)
-	assert.False(t, matched, "a delayed webhook for another operation must not close the active checkout")
-
-	// Checkout activation carries the subscription ID, but the local checkout
-	// intent is keyed by tenant+price until that webhook establishes it.
-	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, "checkout-webhook", checkout.PriceID, "sub_from_activation", types.PaddleBillingOperationSucceeded, `{"transaction":"txn_1"}`, "")
-	require.NoError(t, err)
-	assert.True(t, matched)
-
-	finished, err := repo.GetByID(ctx, checkout.ID)
-	require.NoError(t, err)
-	assert.Equal(t, types.PaddleBillingOperationSucceeded, finished.Status)
-	assert.JSONEq(t, `{"transaction":"txn_1"}`, finished.Result)
-
-	matched, err = repo.FinishMatchingActive(ctx, 7, types.PaddleBillingOperationCheckout, "checkout-webhook", checkout.PriceID, "sub_from_activation", types.PaddleBillingOperationSucceeded, `{}`, "")
-	require.NoError(t, err)
-	assert.False(t, matched, "a duplicate webhook must not terminalize a second row")
-}
-
 func TestPaddleBillingOperationFinishMatchingUpgradeRequiresSubscription(t *testing.T) {
-	_, repo := setupPaddleBillingOperationDB(t)
+	db, repo := setupPaddleBillingOperationDB(t)
 	ctx := context.Background()
 	intent := paddleBillingIntent(7, "upgrade-webhook")
-	intent.OperationType = types.PaddleBillingOperationUpgrade
-	intent.SubscriptionID = "sub_owned"
-	intent.PriceID = "pri_pro_monthly"
 	upgrade, _, err := repo.Claim(ctx, intent)
 	require.NoError(t, err)
 
@@ -233,7 +197,7 @@ func TestPaddleBillingOperationFinishMatchingUpgradeRequiresSubscription(t *test
 	require.NoError(t, err)
 	assert.True(t, matched)
 
-	finished, err := repo.GetByID(ctx, upgrade.ID)
-	require.NoError(t, err)
+	var finished types.PaddleBillingOperation
+	require.NoError(t, db.First(&finished, upgrade.ID).Error)
 	assert.Equal(t, types.PaddleBillingOperationSucceeded, finished.Status)
 }

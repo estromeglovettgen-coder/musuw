@@ -132,7 +132,6 @@ const totals = ref<CheckoutTotals | null>(null)
 const previewPrice = ref('')
 const upgradePreview = ref<PaddleSubscriptionUpgradePreview | null>(null)
 const upgradeSubmitting = ref(false)
-const checkoutOperationKey = ref<string | null>(null)
 const upgradeOperationKey = ref<string | null>(null)
 const checkoutIntent = ref<PaddleCheckoutIntent | null>(null)
 let checkoutIntentRequest: Promise<PaddleCheckoutIntent> | null = null
@@ -204,18 +203,6 @@ const planFeatures = computed(() => {
   ]
 })
 
-const getCheckoutOperationKey = (): string => {
-  if (checkoutOperationKey.value) return checkoutOperationKey.value
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    checkoutOperationKey.value = crypto.randomUUID()
-  } else {
-    // All supported browsers expose randomUUID; keep a deterministic shape for
-    // older embedded WebViews without making the key user-controlled.
-    checkoutOperationKey.value = `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  }
-  return checkoutOperationKey.value
-}
-
 const getUpgradeOperationKey = (): string => {
   if (upgradeOperationKey.value) return upgradeOperationKey.value
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -232,11 +219,12 @@ const getPaddleCheckoutIntent = async (plan: PaidConsumerPlan, billingPeriod: Bi
     checkoutIntentRequest = createPaddleCheckoutIntent({
       plan,
       billingPeriod,
-      operationKey: getCheckoutOperationKey(),
     })
   }
   const response = await checkoutIntentRequest
-  if (!response?.transaction_id) throw new Error('Paddle checkout transaction unavailable')
+  if (!response?.price_id || !response.custom_data?.tenant_id || !response.custom_data?.musuw_checkout_binding) {
+    throw new Error('Paddle checkout input unavailable')
+  }
   checkoutIntent.value = response
   return response
 }
@@ -309,7 +297,8 @@ const mountCheckout = async () => {
     environment: config.environment,
     clientToken: config.client_token,
     pwCustomerId: config.pw_customer_id,
-    transactionId: intent.transaction_id,
+    priceId: intent.price_id,
+    customData: intent.custom_data,
     email: authStore.user?.email,
     locale: locale.value,
     frameTarget: 'paddle-inline-target',

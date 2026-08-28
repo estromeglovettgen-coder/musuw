@@ -33,6 +33,67 @@ func TestApplyConsumerPlanUpdatesQuotaAndIgnoresOlderBillingEvent(t *testing.T) 
 	assert.Equal(t, periodEnd, stored.PaddleCurrentPeriodEnd.UTC())
 }
 
+func TestApplyConsumerPlanCannotReplaceConcurrentInitialSubscription(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewEntitlementRepository(db)
+	tenant := &types.Tenant{Name: "subscriber", Status: "active"}
+	require.NoError(t, db.Create(tenant).Error)
+
+	firstAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	firstEnd := firstAt.AddDate(0, 1, 0)
+	applied, err := repo.ApplyConsumerPlan(
+		context.Background(), tenant.ID, types.ConsumerPlanPlus, "active", "monthly",
+		"evt-first", firstAt, "ctm_1", "sub_first", &firstEnd, &firstEnd,
+	)
+	require.NoError(t, err)
+	require.True(t, applied)
+
+	secondAt := firstAt.Add(time.Second)
+	secondEnd := secondAt.AddDate(0, 1, 0)
+	applied, err = repo.ApplyConsumerPlan(
+		context.Background(), tenant.ID, types.ConsumerPlanPro, "active", "monthly",
+		"evt-second", secondAt, "ctm_1", "sub_second", &secondEnd, &secondEnd,
+	)
+	require.NoError(t, err)
+	assert.False(t, applied)
+
+	var stored types.Tenant
+	require.NoError(t, db.First(&stored, tenant.ID).Error)
+	assert.Equal(t, types.ConsumerPlanPlus, stored.Plan)
+	assert.Equal(t, "sub_first", stored.PaddleSubscriptionID)
+	assert.Equal(t, "evt-first", stored.PaddleLastEventID)
+}
+
+func TestResolvePaddleSubscriptionRequiresExactUnambiguousBinding(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewEntitlementRepository(db)
+	bound := &types.Tenant{
+		Name: "bound", Status: "active", Plan: types.ConsumerPlanPro, PlanStatus: "active",
+		PaddleBillingPeriod: "yearly", PaddleCustomerID: "ctm_bound", PaddleSubscriptionID: "sub_bound",
+	}
+	require.NoError(t, db.Create(bound).Error)
+
+	binding, err := repo.ResolvePaddleSubscription(context.Background(), "ctm_bound", "sub_bound")
+	require.NoError(t, err)
+	require.NotNil(t, binding)
+	assert.Equal(t, bound.ID, binding.TenantID)
+	assert.Equal(t, types.ConsumerPlanPro, binding.Plan)
+	assert.Equal(t, "yearly", binding.BillingPeriod)
+
+	binding, err = repo.ResolvePaddleSubscription(context.Background(), "ctm_other", "sub_bound")
+	require.NoError(t, err)
+	assert.Nil(t, binding)
+
+	duplicate := &types.Tenant{
+		Name: "duplicate", Status: "active", Plan: types.ConsumerPlanPlus, PlanStatus: "active",
+		PaddleBillingPeriod: "monthly", PaddleCustomerID: "ctm_bound", PaddleSubscriptionID: "sub_bound",
+	}
+	require.NoError(t, db.Create(duplicate).Error)
+	binding, err = repo.ResolvePaddleSubscription(context.Background(), "ctm_bound", "sub_bound")
+	assert.Error(t, err)
+	assert.Nil(t, binding)
+}
+
 func TestApplyCanceledConsumerPlanRestoresFreeStorageQuota(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewEntitlementRepository(db)
@@ -91,15 +152,15 @@ func TestAdvancePaddleCurrentPeriodOnlyMovesForward(t *testing.T) {
 	tenant.PaddleSubscriptionID = "sub_1"
 	tenant.PaddleBillingPeriod = "yearly"
 	require.NoError(t, db.Save(tenant).Error)
-	applied, err := repo.AdvancePaddleCurrentPeriod(context.Background(), tenant.ID, types.ConsumerPlanPro, "ctm_1", "sub_1", "yearly", newer)
+	applied, err := repo.AdvancePaddleCurrentPeriod(context.Background(), tenant.ID, types.ConsumerPlanPro, "ctm_1", "sub_1", "yearly", "", time.Time{}, newer)
 	require.NoError(t, err)
 	assert.True(t, applied)
 
-	applied, err = repo.AdvancePaddleCurrentPeriod(context.Background(), tenant.ID, types.ConsumerPlanPro, "ctm_1", "sub_1", "yearly", initial)
+	applied, err = repo.AdvancePaddleCurrentPeriod(context.Background(), tenant.ID, types.ConsumerPlanPro, "ctm_1", "sub_1", "yearly", "", time.Time{}, initial)
 	require.NoError(t, err)
 	assert.False(t, applied)
 
-	applied, err = repo.AdvancePaddleCurrentPeriod(context.Background(), tenant.ID, types.ConsumerPlanPro, "ctm_1", "sub_replaced", "yearly", newer.AddDate(1, 0, 0))
+	applied, err = repo.AdvancePaddleCurrentPeriod(context.Background(), tenant.ID, types.ConsumerPlanPro, "ctm_1", "sub_replaced", "yearly", "", time.Time{}, newer.AddDate(1, 0, 0))
 	require.NoError(t, err)
 	assert.False(t, applied)
 
@@ -107,6 +168,43 @@ func TestAdvancePaddleCurrentPeriodOnlyMovesForward(t *testing.T) {
 	require.NoError(t, db.First(&stored, tenant.ID).Error)
 	require.NotNil(t, stored.PaddleCurrentPeriodEnd)
 	assert.Equal(t, newer, stored.PaddleCurrentPeriodEnd.UTC())
+}
+
+func TestNewerRecurringPeriodPreventsOlderRefundRollback(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewEntitlementRepository(db)
+	oldPeriodEnd := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	renewedAt := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
+	newPeriodEnd := oldPeriodEnd.AddDate(0, 1, 0)
+	tenant := &types.Tenant{
+		Name: "subscriber", Status: "active", Plan: types.ConsumerPlanPro, PlanStatus: "active",
+		PaddleBillingPeriod: "monthly", PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_1",
+		OpenRouterCreditPeriodEnd: &oldPeriodEnd,
+	}
+	require.NoError(t, db.Create(tenant).Error)
+
+	applied, err := repo.AdvanceOpenRouterCreditPeriod(
+		context.Background(), tenant.ID, types.ConsumerPlanPro, "monthly", "evt-renewed", renewedAt,
+		"ctm_1", "sub_1", newPeriodEnd,
+	)
+	require.NoError(t, err)
+	assert.True(t, applied)
+
+	olderRefundAt := renewedAt.Add(-time.Minute)
+	applied, err = repo.ApplyConsumerPlan(
+		context.Background(), tenant.ID, types.ConsumerPlanFree, "refunded", "", "evt-old-refund", olderRefundAt,
+		"ctm_1", "sub_1", nil, nil,
+	)
+	require.NoError(t, err)
+	assert.False(t, applied)
+
+	var stored types.Tenant
+	require.NoError(t, db.First(&stored, tenant.ID).Error)
+	assert.Equal(t, types.ConsumerPlanPro, stored.Plan)
+	assert.Equal(t, "active", stored.PlanStatus)
+	assert.Equal(t, "evt-renewed", stored.PaddleLastEventID)
+	require.NotNil(t, stored.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, newPeriodEnd, stored.OpenRouterCreditPeriodEnd.UTC())
 }
 
 func TestApplyConsumerPlanCannotRollBackConfirmedPaidTerm(t *testing.T) {

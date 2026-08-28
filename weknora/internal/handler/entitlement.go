@@ -28,6 +28,8 @@ import (
 
 const paddleSignatureTolerance = 5 * time.Second
 
+const paddleAdjustmentReconcileTimeout = 3 * time.Second
+
 type PaddleConfig struct {
 	Environment   string
 	APIKey        string
@@ -121,19 +123,49 @@ func (c PaddleConfig) planAndPeriodForPrice(priceID string) (types.ConsumerPlan,
 	return "", "", false
 }
 
-func (c PaddleConfig) checkoutBinding(tenantID uint64, priceID string) string {
-	mac := hmac.New(sha256.New, []byte(c.WebhookSecret))
+func paddleCheckoutBindingWithKey(key []byte, tenantID uint64, priceID string) string {
+	if len(key) == 0 {
+		return ""
+	}
+	mac := hmac.New(sha256.New, key)
 	_, _ = mac.Write([]byte(fmt.Sprintf("musuw-paddle-checkout-v1\x00%d\x00%s", tenantID, priceID)))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func (c PaddleConfig) validCheckoutBinding(tenantID uint64, priceID, binding string) bool {
-	want, err := hex.DecodeString(c.checkoutBinding(tenantID, priceID))
-	if err != nil {
+func (c PaddleConfig) checkoutBinding(tenantID uint64, priceID string) string {
+	key := utils.SystemHMACKey()
+	if len(key) == 0 {
+		// Generic deployments historically used the destination secret. Fixed
+		// production always supplies SYSTEM_AES_KEY, so a destination rotation
+		// cannot invalidate the long-lived tenant/price binding copied by Paddle.
+		key = []byte(c.WebhookSecret)
+	}
+	return paddleCheckoutBindingWithKey(key, tenantID, priceID)
+}
+
+func validEncodedPaddleCheckoutBinding(wantEncoded, gotEncoded string) bool {
+	want, err := hex.DecodeString(wantEncoded)
+	if err != nil || len(want) == 0 {
 		return false
 	}
-	got, err := hex.DecodeString(strings.TrimSpace(binding))
+	got, err := hex.DecodeString(strings.TrimSpace(gotEncoded))
 	return err == nil && hmac.Equal(want, got)
+}
+
+func (c PaddleConfig) validCheckoutBinding(tenantID uint64, priceID, binding string) bool {
+	if validEncodedPaddleCheckoutBinding(c.checkoutBinding(tenantID, priceID), binding) {
+		return true
+	}
+	// Accept bindings minted by the prior generic adapter while its original
+	// destination secret remains installed. New production bindings use the
+	// stable system key and therefore survive destination-secret rotation.
+	if len(utils.SystemHMACKey()) > 0 {
+		return validEncodedPaddleCheckoutBinding(
+			paddleCheckoutBindingWithKey([]byte(c.WebhookSecret), tenantID, priceID),
+			binding,
+		)
+	}
+	return false
 }
 
 func (c PaddleConfig) billingResponse(tenantID uint64, plan types.ConsumerPlan, portalAvailable bool) gin.H {
@@ -181,16 +213,11 @@ type paddleSubscriptionUpdater interface {
 	UpdateSubscription(context.Context, *paddle.UpdateSubscriptionRequest) (*paddle.Subscription, error)
 }
 
-type paddleTransactionCreator interface {
-	CreateTransaction(context.Context, *paddle.CreateTransactionRequest) (*paddle.Transaction, error)
-}
-
 type EntitlementHandler struct {
 	service       interfaces.EntitlementService
 	paddle        PaddleConfig
 	portal        paddlePortalSessionCreator
 	subscriptions paddleSubscriptionUpdater
-	transactions  paddleTransactionCreator
 	tasks         interfaces.TaskEnqueuer
 	operations    interfaces.PaddleBillingOperationRepository
 }
@@ -216,7 +243,6 @@ func NewEntitlementHandler(service interfaces.EntitlementService, tasks interfac
 	}
 	handler.portal = sdk
 	handler.subscriptions = sdk
-	handler.transactions = sdk
 	return handler
 }
 
@@ -314,7 +340,6 @@ type paddleSubscriptionUpgradeRequest struct {
 type paddleCheckoutIntentRequest struct {
 	Plan          types.ConsumerPlan `json:"plan" binding:"required"`
 	BillingPeriod string             `json:"billing_period" binding:"required"`
-	OperationKey  string             `json:"operation_key" binding:"required"`
 }
 
 func validPaddleOperationKey(value string) bool {
@@ -352,13 +377,13 @@ func (h *EntitlementHandler) PaddleCheckoutIntent(c *gin.Context) {
 		_ = c.Error(apperrors.NewUnauthorizedError("authentication required"))
 		return
 	}
-	if h.transactions == nil || h.operations == nil || !h.paddle.Configured() || !h.paddle.PortalConfigured() {
+	if !h.paddle.Configured() || !h.paddle.PortalConfigured() {
 		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is not configured"))
 		return
 	}
 	var request paddleCheckoutIntentRequest
-	if err := c.ShouldBindJSON(&request); err != nil || !validPaddleOperationKey(request.OperationKey) {
-		_ = c.Error(apperrors.NewBadRequestError("a valid checkout operation key is required"))
+	if err := c.ShouldBindJSON(&request); err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("a paid plan and billing period are required"))
 		return
 	}
 	request.Plan = types.NormalizeConsumerPlan(request.Plan)
@@ -382,66 +407,16 @@ func (h *EntitlementHandler) PaddleCheckoutIntent(c *gin.Context) {
 		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle price is not configured"))
 		return
 	}
-	intent := types.PaddleBillingOperationIntent{
-		TenantID: tenantID, OperationKey: strings.TrimSpace(request.OperationKey),
-		OperationType: types.PaddleBillingOperationCheckout, Plan: request.Plan,
-		BillingPeriod: request.BillingPeriod, PriceID: priceID,
-	}
-	intent.RequestFingerprint = paddleBillingOperationFingerprint(intent.OperationType, intent.Plan, intent.BillingPeriod, intent.PriceID, "")
-	operation, disposition, err := h.operations.Claim(c.Request.Context(), intent)
-	if errors.Is(err, interfaces.ErrPaddleBillingOperationKeyConflict) {
-		_ = c.Error(apperrors.NewConflictError("checkout operation key was already used for another request"))
-		return
-	}
-	if err != nil {
-		logger.Errorf(c.Request.Context(), "Paddle checkout operation claim failed tenant_id=%d: %v", tenantID, err)
-		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable"))
-		return
-	}
-	if !samePaddleBillingOperation(operation, intent) {
-		_ = c.Error(apperrors.NewConflictError("another billing operation is already in progress"))
-		return
-	}
-	if transactionID := strings.TrimSpace(operation.PaddleTransactionID); transactionID != "" {
-		c.JSON(http.StatusOK, gin.H{"transaction_id": transactionID, "pending": true})
-		return
-	}
-	if disposition != types.PaddleBillingOperationClaimCreated {
-		_ = c.Error(apperrors.NewConflictError("checkout creation is already in progress or requires reconciliation"))
-		return
-	}
-	if err := h.operations.MarkInFlight(c.Request.Context(), operation.ID); err != nil {
-		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable"))
-		return
-	}
-	transaction, providerErr := h.transactions.CreateTransaction(c.Request.Context(), &paddle.CreateTransactionRequest{
-		Items: []paddle.CreateTransactionItems{*paddle.NewCreateTransactionItemsTransactionItemFromCatalog(&paddle.TransactionItemFromCatalog{
-			PriceID: priceID, Quantity: 1,
-		})},
-		CustomData: paddle.CustomData{
-			"tenant_id":                   strconv.FormatUint(tenantID, 10),
-			"musuw_checkout_binding":      h.paddle.checkoutBinding(tenantID, priceID),
-			"musuw_billing_operation_key": intent.OperationKey,
+	// Paddle.js owns the standard self-service transaction. Musuw returns only
+	// the allow-listed item and a tenant/price MAC; the signed Paddle webhook
+	// remains the sole authority that can grant the resulting subscription.
+	c.JSON(http.StatusOK, gin.H{
+		"price_id": priceID,
+		"custom_data": gin.H{
+			"tenant_id":              strconv.FormatUint(tenantID, 10),
+			"musuw_checkout_binding": h.paddle.checkoutBinding(tenantID, priceID),
 		},
 	})
-	if providerErr != nil || transaction == nil || !strings.HasPrefix(strings.TrimSpace(transaction.ID), "txn_") {
-		message := "Paddle transaction response is uncertain"
-		if providerErr != nil {
-			message = providerErr.Error()
-		}
-		_ = h.operations.Finish(c.Request.Context(), operation.ID, types.PaddleBillingOperationUncertain, `{}`, message)
-		logger.Errorf(c.Request.Context(), "Paddle checkout transaction result uncertain tenant_id=%d", tenantID)
-		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable; retrying will not create another transaction"))
-		return
-	}
-	transactionID := strings.TrimSpace(transaction.ID)
-	if err := h.operations.RecordPaddleTransaction(c.Request.Context(), operation.ID, transactionID); err != nil {
-		_ = h.operations.Finish(c.Request.Context(), operation.ID, types.PaddleBillingOperationUncertain, `{}`, err.Error())
-		logger.Errorf(c.Request.Context(), "Paddle checkout transaction persistence uncertain tenant_id=%d", tenantID)
-		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle checkout is temporarily unavailable; retrying will not create another transaction"))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"transaction_id": transactionID, "pending": true})
 }
 
 type paddleSubscriptionUpgradeTarget struct {
@@ -689,6 +664,8 @@ type paddleEvent struct {
 type paddleEventData struct {
 	ID                   string               `json:"id"`
 	Status               string               `json:"status"`
+	Action               string               `json:"action"`
+	Type                 string               `json:"type"`
 	Origin               string               `json:"origin"`
 	CustomerID           string               `json:"customer_id"`
 	SubscriptionID       string               `json:"subscription_id"`
@@ -700,6 +677,32 @@ type paddleEventData struct {
 			ID string `json:"id"`
 		} `json:"price"`
 	} `json:"items"`
+}
+
+type paddleAdjustmentDecision uint8
+
+const (
+	paddleAdjustmentIgnore paddleAdjustmentDecision = iota
+	paddleAdjustmentRevoke
+	paddleAdjustmentReconcile
+)
+
+func decidePaddleAdjustment(action, adjustmentType, status string) paddleAdjustmentDecision {
+	if strings.TrimSpace(adjustmentType) != "full" || strings.TrimSpace(status) != "approved" {
+		return paddleAdjustmentIgnore
+	}
+	switch strings.TrimSpace(action) {
+	case "refund", "chargeback":
+		return paddleAdjustmentRevoke
+	case "chargeback_reverse":
+		return paddleAdjustmentReconcile
+	default:
+		return paddleAdjustmentIgnore
+	}
+}
+
+func isAdjustmentPaddleEvent(eventType string) bool {
+	return eventType == "adjustment.created" || eventType == "adjustment.updated"
 }
 
 func (h *EntitlementHandler) enqueuePaddleWebhook(c *gin.Context, payload types.PaddleWebhookTaskPayload) bool {
@@ -758,6 +761,10 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 		_ = c.Error(apperrors.NewBadRequestError("invalid Paddle event"))
 		return
 	}
+	if isAdjustmentPaddleEvent(event.EventType) {
+		h.handlePaddleAdjustment(c, event)
+		return
+	}
 	isSubscriptionEvent := isEntitlementPaddleEvent(event.EventType)
 	isRecurringCompletion := event.EventType == "transaction.completed" && event.Data.Status == "completed" && event.Data.Origin == "subscription_recurring"
 	if !isSubscriptionEvent && !isRecurringCompletion {
@@ -793,17 +800,16 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 			return
 		}
 		periodEnd := event.Data.BillingPeriod.EndsAt.UTC()
-		payload.Operation = types.PaddleWebhookTaskOperationRefreshPaidAllowance
 		payload.EventPeriodEnd = &periodEnd
+		// The worker decides whether this is a normal period advance or a
+		// post-adjustment restoration while holding the tenant allowance lock.
+		payload.Operation = types.PaddleWebhookTaskOperationRefreshPaidAllowance
 	} else {
 		payload.Operation = types.PaddleWebhookTaskOperationApplyConsumerPlan
 		payload.EventPeriodEnd = entitledPaddlePeriodEnd(event.EventType, status, event.Data.CurrentBillingPeriod)
 		if operationKey := paddleBillingOperationKey(event.Data.CustomData); validPaddleOperationKey(operationKey) {
-			payload.BillingOperationKey = operationKey
-			switch event.EventType {
-			case "subscription.created", "subscription.activated":
-				payload.BillingOperationType = types.PaddleBillingOperationCheckout
-			case "subscription.updated":
+			if event.EventType == "subscription.updated" {
+				payload.BillingOperationKey = operationKey
 				payload.BillingOperationType = types.PaddleBillingOperationUpgrade
 			}
 		}
@@ -812,6 +818,163 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "queued": true})
+}
+
+func (h *EntitlementHandler) handlePaddleAdjustment(c *gin.Context, event paddleEvent) {
+	decision := decidePaddleAdjustment(event.Data.Action, event.Data.Type, event.Data.Status)
+	if decision == paddleAdjustmentIgnore {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+		return
+	}
+	if h.service == nil {
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle entitlement service is unavailable"))
+		return
+	}
+	customerID := strings.TrimSpace(event.Data.CustomerID)
+	subscriptionID := strings.TrimSpace(event.Data.SubscriptionID)
+	if customerID == "" || subscriptionID == "" {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+		return
+	}
+	binding, err := h.service.ResolvePaddleSubscription(c.Request.Context(), customerID, subscriptionID)
+	if err != nil {
+		logger.Errorf(c.Request.Context(), "Paddle adjustment binding lookup failed event_id=%s: %v", event.EventID, err)
+		_ = c.Error(apperrors.NewServiceUnavailableError("Paddle adjustment binding is temporarily unavailable"))
+		return
+	}
+	var providerSubscription *paddle.Subscription
+	if binding == nil {
+		binding, providerSubscription, err = h.recoverPaddleAdjustmentBinding(c.Request.Context(), customerID, subscriptionID)
+		if err != nil {
+			logger.Errorf(c.Request.Context(), "Paddle adjustment binding recovery failed event_id=%s: %v", event.EventID, err)
+			_ = c.Error(apperrors.NewServiceUnavailableError("Paddle adjustment binding is temporarily unavailable"))
+			return
+		}
+	}
+	if binding == nil || binding.TenantID == 0 ||
+		strings.TrimSpace(binding.CustomerID) != customerID ||
+		strings.TrimSpace(binding.SubscriptionID) != subscriptionID {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+		return
+	}
+
+	payload := types.PaddleWebhookTaskPayload{
+		TenantID:       binding.TenantID,
+		Operation:      types.PaddleWebhookTaskOperationApplyConsumerPlan,
+		Plan:           types.ConsumerPlanFree,
+		EventID:        event.EventID,
+		EventType:      event.EventType,
+		OccurredAt:     event.OccurredAt,
+		CustomerID:     binding.CustomerID,
+		SubscriptionID: binding.SubscriptionID,
+	}
+	if decision == paddleAdjustmentRevoke {
+		if strings.TrimSpace(event.Data.Action) == "chargeback" {
+			payload.Status = "chargeback"
+		} else {
+			payload.Status = "refunded"
+		}
+	} else {
+		if h.subscriptions == nil {
+			_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription reconciliation is unavailable"))
+			return
+		}
+		subscription := providerSubscription
+		if subscription == nil {
+			ctx, cancel := context.WithTimeout(c.Request.Context(), paddleAdjustmentReconcileTimeout)
+			defer cancel()
+			var lookupErr error
+			subscription, lookupErr = h.subscriptions.GetSubscription(ctx, &paddle.GetSubscriptionRequest{SubscriptionID: binding.SubscriptionID})
+			if lookupErr != nil {
+				logger.Errorf(c.Request.Context(), "Paddle adjustment reconciliation lookup failed event_id=%s: %v", event.EventID, lookupErr)
+				_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription reconciliation is temporarily unavailable"))
+				return
+			}
+		}
+		if subscription == nil || strings.TrimSpace(subscription.ID) != binding.SubscriptionID ||
+			strings.TrimSpace(subscription.CustomerID) != binding.CustomerID || len(subscription.Items) != 1 {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+			return
+		}
+		plan, billingPeriod, ok := h.paddle.planAndPeriodForPrice(subscription.Items[0].Price.ID)
+		if !ok {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+			return
+		}
+		payload.PriceID = subscription.Items[0].Price.ID
+		payload.Status = string(subscription.Status)
+		switch subscription.Status {
+		case paddle.SubscriptionStatusActive, paddle.SubscriptionStatusTrialing:
+			if subscription.CurrentBillingPeriod == nil {
+				_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription has no current billing period"))
+				return
+			}
+			periodEnd, parseErr := time.Parse(time.RFC3339Nano, subscription.CurrentBillingPeriod.EndsAt)
+			if parseErr != nil || !periodEnd.After(event.OccurredAt) {
+				_ = c.Error(apperrors.NewServiceUnavailableError("Paddle subscription billing period is invalid"))
+				return
+			}
+			periodEnd = periodEnd.UTC()
+			payload.Plan = plan
+			payload.BillingPeriod = billingPeriod
+			payload.EventPeriodEnd = &periodEnd
+		case paddle.SubscriptionStatusPastDue, paddle.SubscriptionStatusPaused:
+			payload.Plan = plan
+			payload.BillingPeriod = billingPeriod
+		case paddle.SubscriptionStatusCanceled:
+			payload.Plan = types.ConsumerPlanFree
+			payload.BillingPeriod = ""
+		default:
+			c.JSON(http.StatusOK, gin.H{"ok": true, "applied": false})
+			return
+		}
+	}
+	if !h.enqueuePaddleWebhook(c, payload) {
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "queued": true})
+}
+
+// recoverPaddleAdjustmentBinding handles the one safe out-of-order case where
+// Paddle delivers a final adjustment before the subscription webhook worker
+// has persisted its local customer/subscription binding. Paddle copies checkout
+// custom_data to the subscription, so the existing tenant/price HMAC remains
+// the ownership authority; unknown or unbound subscriptions are ignored.
+func (h *EntitlementHandler) recoverPaddleAdjustmentBinding(ctx context.Context, customerID, subscriptionID string) (*types.PaddleSubscriptionBinding, *paddle.Subscription, error) {
+	if h.subscriptions == nil {
+		return nil, nil, fmt.Errorf("Paddle subscription reconciliation is unavailable")
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, paddleAdjustmentReconcileTimeout)
+	defer cancel()
+	subscription, err := h.subscriptions.GetSubscription(lookupCtx, &paddle.GetSubscriptionRequest{SubscriptionID: subscriptionID})
+	if err != nil {
+		return nil, nil, err
+	}
+	if subscription == nil || strings.TrimSpace(subscription.ID) != subscriptionID ||
+		strings.TrimSpace(subscription.CustomerID) != customerID || len(subscription.Items) != 1 {
+		return nil, nil, nil
+	}
+	priceID := strings.TrimSpace(subscription.Items[0].Price.ID)
+	plan, billingPeriod, ok := h.paddle.planAndPeriodForPrice(priceID)
+	if !ok {
+		return nil, nil, nil
+	}
+	customData, err := json.Marshal(subscription.CustomData)
+	if err != nil {
+		return nil, nil, nil
+	}
+	tenantID, err := paddleTenantID(customData)
+	if err != nil || !h.paddle.validCheckoutBinding(tenantID, priceID, paddleCheckoutBinding(customData)) {
+		return nil, nil, nil
+	}
+	return &types.PaddleSubscriptionBinding{
+		TenantID:       tenantID,
+		Plan:           plan,
+		Status:         string(subscription.Status),
+		BillingPeriod:  billingPeriod,
+		CustomerID:     customerID,
+		SubscriptionID: subscriptionID,
+	}, subscription, nil
 }
 
 // Paddle sends subscription.updated at the start of renewal, before payment is

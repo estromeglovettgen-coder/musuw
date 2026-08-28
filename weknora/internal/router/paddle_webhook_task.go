@@ -101,6 +101,7 @@ func (h *paddleWebhookTaskHandler) Handle(ctx context.Context, task *asynq.Task)
 			ctx,
 			payload.TenantID,
 			payload.Plan,
+			payload.BillingPeriod,
 			payload.EventID,
 			payload.OccurredAt,
 			payload.CustomerID,

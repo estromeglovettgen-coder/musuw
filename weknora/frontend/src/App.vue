@@ -7,11 +7,13 @@ import ManualKnowledgeEditor from "@/components/manual-knowledge-editor.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useSettingsStore } from "@/stores/settings";
 import { getCurrentUser, userInfoFromApi } from "@/api/auth";
+import { getCurrentEntitlement, getPaddlePublicConfig } from "@/api/entitlement";
 import { consumePendingTenantSwitchToast } from "@/utils/tenantSwitch";
 import { useRoleLabel } from "@/composables/useRoleLabel";
 import { notifyLoginSuccess } from "@/utils/loginNotify";
 import { renderWorkspaceNotifyContent } from "@/utils/workspaceNotifyContent";
 import { handoffToExternalAuth } from "@/utils/nativeAuthHandoff";
+import { initializePaddlePaymentLink } from "@/utils/paddleCheckout";
 
 // TDesign locale configs
 import enUSConfig from "tdesign-vue-next/esm/locale/en_US";
@@ -173,6 +175,45 @@ const stopInvitationPolling = () => {
   }
 };
 
+// Retain is part of Paddle.js itself. Initialize it once across the SPA so the
+// public login surface can receive recovery links and authenticated product
+// pages can show provider-owned recovery UI. The only customer identity comes
+// from the authenticated entitlement response; logout clears it with
+// Paddle.Update through the existing singleton.
+let paddleRetainSyncSequence = 0;
+const syncPaddleRetain = async () => {
+  const sequence = ++paddleRetainSyncSequence;
+  try {
+    const config = await getPaddlePublicConfig();
+    if (sequence !== paddleRetainSyncSequence) return;
+    if (
+      !config.configured ||
+      (config.environment !== "sandbox" && config.environment !== "live") ||
+      !config.client_token
+    ) return;
+
+    if (authStore.isLoggedIn && authStore.effectiveTenantId) {
+      const entitlement = await getCurrentEntitlement();
+      if (sequence !== paddleRetainSyncSequence) return;
+      await initializePaddlePaymentLink({
+        environment: config.environment,
+        clientToken: config.client_token,
+        pwCustomerId: entitlement.billing.pw_customer_id,
+      });
+      return;
+    }
+
+    await initializePaddlePaymentLink({
+      environment: config.environment,
+      clientToken: config.client_token,
+      pwCustomerId: undefined,
+    });
+  } catch {
+    // Paddle is optional outside Musuw's fixed production overlay. Checkout
+    // pages retry through the same singleton and expose their own error state.
+  }
+};
+
 // React to login/logout and product-edition changes. When the server reports
 // Lite, stop an existing Standard invitation poll immediately.
 watch(
@@ -181,6 +222,12 @@ watch(
     if (logged && !lite) startInvitationPolling();
     else stopInvitationPolling();
   },
+  { immediate: true },
+);
+
+watch(
+  () => [authStore.isLoggedIn, authStore.effectiveTenantId] as const,
+  () => { void syncPaddleRetain(); },
   { immediate: true },
 );
 

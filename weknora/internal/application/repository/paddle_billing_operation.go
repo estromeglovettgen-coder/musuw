@@ -28,8 +28,8 @@ type paddleBillingOperationRepository struct {
 	db *gorm.DB
 }
 
-// NewPaddleBillingOperationRepository creates the durable adapter for
-// server-owned Paddle checkout and subscription-update intents.
+// NewPaddleBillingOperationRepository creates the durable adapter for the one
+// Paddle mutation that lacks a provider idempotency key: subscription update.
 func NewPaddleBillingOperationRepository(db *gorm.DB) interfaces.PaddleBillingOperationRepository {
 	return &paddleBillingOperationRepository{db: db}
 }
@@ -101,14 +101,6 @@ func (r *paddleBillingOperationRepository) Claim(
 	return operation, disposition, err
 }
 
-func (r *paddleBillingOperationRepository) GetByID(ctx context.Context, id uint64) (*types.PaddleBillingOperation, error) {
-	var operation types.PaddleBillingOperation
-	if err := r.db.WithContext(ctx).First(&operation, id).Error; err != nil {
-		return nil, err
-	}
-	return &operation, nil
-}
-
 func (r *paddleBillingOperationRepository) FindByKey(
 	ctx context.Context,
 	tenantID uint64,
@@ -151,34 +143,6 @@ func (r *paddleBillingOperationRepository) MarkInFlight(ctx context.Context, id 
 	})
 }
 
-func (r *paddleBillingOperationRepository) RecordPaddleTransaction(ctx context.Context, id uint64, transactionID string) error {
-	transactionID = strings.TrimSpace(transactionID)
-	if transactionID == "" {
-		return errors.New("paddle transaction ID is required")
-	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var operation types.PaddleBillingOperation
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&operation, id).Error; err != nil {
-			return err
-		}
-		if operation.PaddleTransactionID != "" && operation.PaddleTransactionID != transactionID {
-			return fmt.Errorf("%w: Paddle transaction ID already recorded", ErrPaddleBillingOperationInvalidTransition)
-		}
-		if operation.Status == types.PaddleBillingOperationSucceeded || operation.Status == types.PaddleBillingOperationFailed {
-			if operation.PaddleTransactionID == transactionID {
-				return nil
-			}
-			return fmt.Errorf("%w: terminal operation cannot record a new Paddle transaction", ErrPaddleBillingOperationInvalidTransition)
-		}
-		return tx.Model(&types.PaddleBillingOperation{}).Where("id = ?", id).
-			Updates(map[string]any{
-				"paddle_transaction_id": transactionID,
-				"status":                types.PaddleBillingOperationInFlight,
-				"updated_at":            time.Now().UTC(),
-			}).Error
-	})
-}
-
 func (r *paddleBillingOperationRepository) Finish(
 	ctx context.Context,
 	id uint64,
@@ -210,7 +174,7 @@ func (r *paddleBillingOperationRepository) FinishMatchingActive(
 	if tenantID == 0 {
 		return false, errors.New("paddle billing operation tenant ID is required")
 	}
-	if operationType != types.PaddleBillingOperationCheckout && operationType != types.PaddleBillingOperationUpgrade {
+	if operationType != types.PaddleBillingOperationUpgrade {
 		return false, fmt.Errorf("unsupported Paddle billing operation type %q", operationType)
 	}
 	operationKey = strings.TrimSpace(operationKey)
@@ -222,10 +186,7 @@ func (r *paddleBillingOperationRepository) FinishMatchingActive(
 		return false, errors.New("paddle billing operation price ID is required")
 	}
 	subscriptionID = strings.TrimSpace(subscriptionID)
-	// An upgrade must prove the durable subscription identity. Checkout
-	// activation is intentionally matched by tenant+price: the webhook is the
-	// first authoritative source of the subscription ID for that intent.
-	if operationType == types.PaddleBillingOperationUpgrade && subscriptionID == "" {
+	if subscriptionID == "" {
 		return false, nil
 	}
 	resultJSON, lastError, err := preparePaddleBillingOperationFinish(status, resultJSON, lastError)
@@ -239,9 +200,7 @@ func (r *paddleBillingOperationRepository) FinishMatchingActive(
 			Where("tenant_id = ? AND operation_type = ? AND operation_key = ? AND price_id = ? AND status IN ?",
 				tenantID, operationType, operationKey, priceID, activePaddleBillingOperationStatuses()).
 			Order("id ASC")
-		if operationType == types.PaddleBillingOperationUpgrade {
-			query = query.Where("subscription_id = ?", subscriptionID)
-		}
+		query = query.Where("subscription_id = ?", subscriptionID)
 		var operation types.PaddleBillingOperation
 		if err := query.First(&operation).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -312,7 +271,7 @@ func validatePaddleBillingOperationIntent(intent types.PaddleBillingOperationInt
 	if strings.TrimSpace(intent.OperationKey) == "" {
 		return errors.New("paddle billing operation key is required")
 	}
-	if intent.OperationType != types.PaddleBillingOperationCheckout && intent.OperationType != types.PaddleBillingOperationUpgrade {
+	if intent.OperationType != types.PaddleBillingOperationUpgrade {
 		return fmt.Errorf("unsupported Paddle billing operation type %q", intent.OperationType)
 	}
 	return nil

@@ -190,9 +190,9 @@ function loadRuntime(target) {
       database: { connectionString: productionDatabaseConnectionString(runtime), application_name: 'musuw-operations-production' },
       backendBaseUrl: runtime.MUSUW_ADMIN_BACKEND_URL.replace(/\/$/, ''),
       platformKeyAccount,
-      paddleEnvironment: 'sandbox',
-      paddleApiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.paddle, 'musuw-admin-test'),
-      paddleApiBase: 'https://sandbox-api.paddle.com',
+      paddleEnvironment: 'live',
+      paddleApiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
+      paddleApiBase: 'https://api.paddle.com',
       supabaseAdmin: {
         targetEnvironment: 'PRODUCTION',
         projects: [

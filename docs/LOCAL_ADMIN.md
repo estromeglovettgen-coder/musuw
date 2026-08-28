@@ -56,11 +56,10 @@ scripts/musuw-admin stop all
 
 - Musuw scoped management API：TEST 与 PRODUCTION 均 available。平台密钥
   只从 macOS Keychain 对应环境账号读取，不进入页面 JavaScript、日志或仓库。
-- Paddle：当前固定产品运行时和可接受的支付证据是 Sandbox。历史上某个
-  Live-shaped 运营台配置能够读取 provider API，只证明该读取调用当时可达，
-  不证明 account/domain approval、Live 授权或可售状态。浏览器只接收字段
-  白名单投影；套餐仍只由签名 webhook 更新，退款、支付和供应商级配置继续
-  交给 Paddle 官方后台。
+- Paddle：TEST 固定读取 Sandbox；PRODUCTION 使用 production Keychain 项读取
+  Live API。API 可达只证明对应能力调用成功，不能替代 account/domain、default
+  payment link、destination 或 checkout 健康。浏览器只接收字段白名单投影；
+  套餐仍只由签名 webhook 更新，退款、支付和供应商级配置继续交给 Paddle 官方后台。
 - Supabase Auth Admin：Musuw Staging `achfnnicetupvtoqiwqd` 与 Musuw
   Production `phtveqtlswzokwsztsvu` 已分别在 TEST/PRODUCTION 进程通过官方
   Admin API。单个进程只读取所选环境凭据；另一项目仅显示 ref 与未选择状态。
@@ -76,12 +75,13 @@ scripts/musuw-admin stop all
 [`docs/SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md)。该文档不含
 任何密钥值。
 
-## 2026-08-22 真实浏览器验收（Paddle 状态已被当前边界取代）
+## 2026-08-22 真实浏览器验收（历史证据）
 
 - PRODUCTION 七页当时以真实数据渲染；所选 Paddle provider 配置的订阅与交易
   读取返回可用但为空，不把真实空页伪装成失败。该历史读取不能再标注为
-  “Paddle Live 已连接/授权”；当前固定产品支付环境是完整 Sandbox，Live 为
-  `not-authorized`。其他 Supabase、R2 与 Langfuse 验收结论不受此更正影响。
+  “Paddle Live 已连接/授权”。当前 PRODUCTION 运营进程已改为 Live API 只读，
+  必须以本次切换后的新验收替代这条历史空结果；其他 Supabase、R2 与 Langfuse
+  验收结论不受影响。
 - TEST 七页全部通过：7 位用户；Paddle Sandbox 返回 2 个订阅、27 个交易；
   Supabase 与 Langfuse 可用；R2 以“TEST 本地存储”显示为不适用。
 - Chrome 实际打开用户完整详情、严格脱敏调查、文档详情和 `UPDATE:<tenant>`
@@ -107,7 +107,8 @@ scripts/musuw-admin start
 ```
 
 执行 `start` 或 `production` 即表示本机操作者明确选择启动只读生产运营台；
-它只读取生产业务数据，不代表 Paddle Live provider 已获批或允许用于结账。
+它只读取生产业务数据；只有本次 Live cutover 的 Dashboard、部署、checkout 和
+signed-notification 证据可以证明实际可售状态。
 
 PRODUCTION 还要求本机 ignored 文件
 `.runtime/musuw-admin/production.env` 提供独立数据库、后端和供应商配置。

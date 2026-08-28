@@ -20,7 +20,7 @@ fail() {
 grep -Fq 'provider: paddle' "$registry" || fail 'registry has no Paddle entries'
 grep -Fq 'environment: sandbox' "$registry" || fail 'registry has no Paddle Sandbox boundary'
 grep -Fq 'environment: live' "$registry" || fail 'registry has no explicit Paddle Live status'
-grep -Fq 'status: not-authorized' "$registry" || fail 'registry does not record the current Live authorization boundary'
+grep -Fq 'status: active' "$registry" || fail 'registry does not record active credential metadata'
 grep -Fq 'MUSUW_PADDLE_CLIENT_TOKEN' "$registry" || fail 'registry omits Paddle client token consumer'
 grep -Fq 'MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID' "$registry" || fail 'registry omits Paddle price catalog'
 grep -Fq 'paddle_webhook_secret' "$registry" || fail 'registry omits Paddle webhook secret consumer'

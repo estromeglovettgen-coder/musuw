@@ -15,16 +15,15 @@ hash 或供应商响应内容**。
 
 ## 1. 当前硬边界
 
-- 当前产品阶段只使用 **Paddle Sandbox**。Paddle Live 尚未申请、尚未授权，
-  不能因为本地存在一个 production Keychain 项或某个旧运行文件而视为可用。
-- Sandbox 的环境选择、client token、六个价格 ID、API key、webhook secret、
-  notification destination 和默认套餐链接必须属于同一个 Sandbox 账户。
+- 正式生产使用一个完整的 **Paddle Live** 单元；Sandbox 仅供开发和测试。
+- Live 的环境选择、client token、六个价格 ID、API key、webhook secret、
+  notification destination 和默认付款链接必须属于同一个 Live 账户。
   Live 与 Sandbox 不可混用。
-- 生产公开环境中的 `MUSUW_PADDLE_ENVIRONMENT` 必须是 `sandbox`；
+- 生产公开环境中的 `MUSUW_PADDLE_ENVIRONMENT` 必须是 `live`；
   `scripts/ci/verify-external-credentials-registry.sh` 和生产静态校验会挡住
-  Live-shaped 的 client token/API key、缺失价格目录或混合环境。即使一整套
-  Live 前缀彼此匹配，固定生产 preflight 与 app entrypoint 也会拒绝；未来启用
-  Live 必须先获授权并经过代码审查，不能只改环境变量。
+  Sandbox-shaped 的 client token/API key、缺失价格目录或混合环境。Live 仍须
+  通过 Dashboard/API 的 catalog、domain、destination 与无扣款健康证明；不能只
+  凭前缀或 Keychain 项存在性宣称可收款。
 - 浏览器只能接收 publishable/client/catalog 值；server secret、management/admin、
   webhook signing、SSH/deploy 和 OAuth secret 只能从 Keychain、GitHub Environment
   或服务器 `0600` 文件进入受控进程。
@@ -40,8 +39,8 @@ hash 或供应商响应内容**。
 | Service | TEST 账号 | PRODUCTION 账号 | 边界与用途 |
 | --- | --- | --- | --- |
 | `com.musuw.local-admin.platform-key` | `musuw-admin-test` | `musuw-admin-production` | capability-scoped WeKnora 管理 API；不开放 settings/API-key management。 |
-| `com.musuw.local-admin.paddle-api-key` | `musuw-admin-test` present | `musuw-admin-production` present-but-unauthorized | TEST 只对应 Paddle Sandbox；PRODUCTION 项存在性不是 Live 授权，当前不得用于 Tokyo。 |
-| `com.musuw.local-admin.paddle-webhook-secret` | `musuw-admin-test` present | —（本机未登记） | TEST Sandbox notification destination；当前没有获授权的 Live destination。 |
+| `com.musuw.local-admin.paddle-api-key` | `musuw-admin-test` present | `musuw-admin-production` present | TEST 对应 Sandbox；PRODUCTION 对应 Live，只供官方 API/运营只读能力与现有订阅操作。 |
+| `com.musuw.local-admin.paddle-webhook-secret` | `musuw-admin-test` present | —（不要求本机副本） | TEST Sandbox destination；Live exact-destination secret 直接进入服务器保护文件，不复制进文档或浏览器。 |
 | `com.musuw.local-admin.supabase-secret-key` | `musuw-admin-test` | `musuw-admin-production` | Supabase secret-key 类型，只供 Auth Admin/运营台。 |
 | `com.musuw.local-admin.r2-access-key-id` | — | `musuw-admin-production` | R2 S3 访问标识；TEST 使用本地存储。 |
 | `com.musuw.local-admin.r2-secret-access-key` | — | `musuw-admin-production` | R2 S3 server secret；只供服务端。 |
@@ -72,8 +71,8 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 | `.runtime/weknora/paddle-sandbox.env` | Paddle Sandbox environment、client token、六个价格 ID；API key/webhook secret 由 Keychain 注入。 |
 | `.runtime/weknora/secrets/*` | OIDC、数据库、Redis、AES、JWT 等服务运行 secret；仅本机受控进程读取。 |
 
-旧的 `candidate`/迁移目录若出现 Live-shaped Paddle 公开值，只能归类为历史审计
-材料，不能覆盖 Sandbox 权威源。部署前必须重新生成公开环境并运行静态校验。
+旧的 `candidate`/迁移目录不是生产权威。部署前必须从当前 Live provider 状态
+重新生成生产公开环境并运行静态校验；Sandbox 本地输入不能覆盖 Live。
 
 仓库顶层 `.env.example` 中的 `DEEPSEEK_*`、`MUSNOW_*` 和旧 Paddle fallback
 变量只是空模板/兼容名，不是当前生产 authority；任何仍引用它们的测试或旧快照
@@ -93,15 +92,15 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 | `neo4j_auth` / `searxng_secret` | Neo4j、SearXNG | 内部运行 secret。 |
 | `oidc_client_id` / `oidc_client_secret` | Supabase OIDC | server-only OAuth client。 |
 | `openrouter_management_api_key` | child-key provisioning、usage/limit 权威 | server-only management key。 |
-| `paddle_api_key` | Paddle 官方 API | **当前必须是 Sandbox API key**；Live 未授权。 |
-| `paddle_webhook_secret` | 签名 webhook | **当前必须对应 Sandbox notification destination**。 |
+| `paddle_api_key` | Paddle 官方 API | **必须是 Live API key**，并匹配生产运行时实际权限。 |
+| `paddle_webhook_secret` | 签名 webhook | **必须对应唯一 active Live production destination**。 |
 | `r2_access_key_id` / `r2_secret_access_key` | Cloudflare R2 S3 存储 | server-only；不进浏览器/Worker。 |
 | `langfuse_public_key` / `langfuse_secret_key` | Langfuse trace 写入 | server-only；observability 投影排除内容。 |
 
 `integration/weknora-production/app-entrypoint.sh` 只在容器启动时读取这些挂载；
 `scripts/weknora-production/prepare-runtime.sh` 生成不含 server secret 值的
-`production.env`。任何生产公开 env 都必须从受控的 Sandbox public contract
-生成，不能手工把 candidate/Tokyo 文件复制过去。
+`production.env`。任何生产公开 env 都必须从受控的 Live public contract
+生成，不能手工把 candidate 或历史迁移文件复制过去。
 
 安全地只检查文件与权限：
 
@@ -117,7 +116,7 @@ ssh musuw-tokyo \
 
 | 提供商/类别 | TEST/Sandbox | PROD/Live | 权威、消费者和健康证明 |
 | --- | --- | --- | --- |
-| Paddle | Sandbox public client/catalog、server API key、webhook destination 可用 | Live 全部 `not-authorized`；不得部署 | Paddle 控制台是唯一权威；frontend Paddle.js、billing config/checkout、portal/upgrade API 和 webhook 路由必须使用同一 Sandbox；健康证明只保留状态/count/price metadata。 |
+| Paddle | Sandbox public client/catalog、server API key、webhook destination 可用 | 一套 Live public client/catalog、server API key 与 exact destination | Paddle 控制台是唯一权威；production frontend、checkout、portal/upgrade API 和 webhook 必须使用同一 Live；健康证明只保留状态/count/price metadata 与无扣款结果。 |
 | Supabase Auth | TEST public auth + Auth Admin | Production public auth + Auth Admin | Supabase dashboard/project 是权威；auth shell、OIDC discovery/callback、运营台 Auth Admin；不记录 session/token。 |
 | OpenRouter | 候选运行时只读 metadata | production management key + encrypted tenant child key | 官方 usage/limit 是额度权威；entrypoint、entitlement service 和 model transport；tenant key 不进浏览器。 |
 | Cloudflare Worker | 不适用 | GitHub `storefront-production` 只含 Worker-scoped account/token | GitHub Environment + Cloudflare dashboard；仅 Wrangler 部署，Worker 不拿 server/model/billing secret。 |
@@ -128,12 +127,12 @@ ssh musuw-tokyo \
 | Tencent VectorDB / Alibaba Cloud | optional/independent inventory | Tokyo 当前无此 active consumer | 各自 provider dashboard；仅在明确启用的独立项目中使用，不能从示例变量推断已配置。 |
 | Google OAuth / SMTP | Supabase/OAuth 与邮件设置待按项目确认 | 当前 Musuw 没有 direct Google secret consumer；SMTP 由 Supabase Auth 配置边界管理 | Supabase/Google/provider dashboard；只验证 discovery、callback、OTP delivery，不记录 token 或邮件内容。 |
 
-Paddle 的 destination、domain 和默认链接含义也固定在中央注册表：Sandbox
-notification destination → app webhook；storefront plan CTA → app 的认证
+Paddle 的 destination、domain 和默认链接含义也固定在中央注册表：Live
+production destination → app webhook；storefront plan CTA → app 的认证
 `/plans` → `/checkout`；Paddle transaction/default-payment link → app 的公开
 `/pay`。`/pay` 页面已经存在不等于 Paddle Dashboard 已完成对应环境的绑定；
-provider 状态必须另行核验。没有获授权的 Live destination/domain/default
-link，不得出现在部署输入或客服说明中。
+provider 状态必须另行核验。未批准或未保存的 destination/domain/default link
+不得被部署记录当作已完成。
 
 ## 6. 其他本地项目：只登记，不复制
 
@@ -157,8 +156,8 @@ Musuw 的 production env。AiToEarn 发现有 tracked env 文件，需由其 own
 
 ## 7. 轮换、撤销、交接与验证
 
-1. 先在对应 provider 创建替代 credential，确认最小真实能力；Sandbox/Live
-   分开验证，Live 当前不执行。
+1. 先在对应 provider 选择或创建确有需要的替代 credential，确认最小真实能力；
+   Sandbox/Live 分开验证，现有 Live 可用项优先复用。
 2. 只通过 Keychain、GitHub Environment 或远端 `0600` 文件原子替换，不经过聊天、
    剪贴板、普通 env、日志或截图。
 3. 重启对应服务，验证真实消费者和错误态：Paddle checkout/portal/webhook、
@@ -175,6 +174,6 @@ bash scripts/ci/external-credentials-registry.test.sh
 bash scripts/ci/verify-external-credentials-registry.sh
 ```
 
-这两个脚本只检查注册表元数据、Sandbox-only 生产边界、文档链接和禁止值模式；
+这两个脚本只检查注册表元数据、Live-only 生产边界、文档链接和禁止值模式；
 不会读取 Keychain secret、连接 provider、扫描 shell history/session 或解析 git
 objects/blobs。

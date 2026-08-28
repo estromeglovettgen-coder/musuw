@@ -28,9 +28,9 @@ for the same production hostname during a cutover.
 
 The single credential inventory is [`external-credentials-registry.yaml`](external-credentials-registry.yaml),
 with the operator playbook in [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md).
-The current launch boundary is Paddle Sandbox only: Live onboarding is under
-review and has not been authorized, so a Live-shaped runtime input is a
-configuration mismatch.
+The reviewed production boundary is one complete Paddle Live unit. Sandbox is
+development/test-only, and either a Sandbox production input or a mixed
+Live/Sandbox unit is a configuration error.
 
 ## Normal path
 
@@ -201,34 +201,29 @@ Private runtime credentials remain on the server; they are not copied into the
 repository, Cloudflare Worker, or browser bundles.
 
 The protected production secret directory must include the file-backed
-OpenRouter Management key plus the Sandbox Paddle API key and secret for the
-exact Sandbox notification destination. The non-secret production public
-environment carries only `sandbox`, its matching `test_` client token, and six
-approved Sandbox Plus/Pro/Max monthly/yearly price IDs. The preflight and app
-entrypoint both require `test_` with `pdl_sdbx_apikey_` and reject Live even
-when its prefixes are internally consistent. They also reject mixed pairs, an
-invalid destination-secret shape, missing or duplicate prices, and any server
-secret placed in the generated environment.
+OpenRouter Management key plus the Live Paddle API key and destination-specific
+secret for the one production notification destination. The non-secret public
+environment carries only `live`, its matching `live_` client token, and six
+provider-verified Live Plus/Pro/Max monthly/yearly price IDs. The preflight and
+app entrypoint require `live_` with `pdl_live_apikey_`; they reject Sandbox,
+mixed pairs, an invalid destination-secret shape, missing or duplicate prices,
+and any server secret placed in the generated environment.
 
-The current checked launch stage is **Paddle Sandbox** because Live has not
-been authorized. Keep `production.env.example`, the protected API key, all six
-prices, and the exact notification destination on Sandbox as one unit. Price
-IDs and destination secrets do not encode their environment, so prefix checks
-are necessary but not sufficient: before enabling checkout, resolve all six
-recurring prices through the Sandbox Paddle API and accept one correctly
-signed event from that exact destination. Live cannot be enabled with an env
-edit. After authorization, a future cutover requires a reviewed code change
-that replaces the entire unit together; never rotate one field in isolation.
+Keep `production.env.example`, the protected key, all six prices, and the exact
+destination on Live as one unit. Price IDs and destination secrets do not
+encode their environment, so prefix checks are necessary but not sufficient:
+resolve all six recurring prices through the Live API, verify the existing
+approved app domain/default payment link, and accept official signed no-charge
+simulation from that exact destination before calling billing healthy. Never
+rotate one field in isolation.
 
-Sandbox launch data is disposable and is not migrated across Paddle
-environments. Remove stale test accounts through the existing product account
-deletion lifecycle and validate a fresh checkout; do not add a parallel
-subscription-recovery path or repair billing state with SQL. Only a correctly
-signed active `subscription.created` or `subscription.activated` event with the
-tenant binding and a confirmed current period grants an initial paid period.
-Later allowance renewals still require a correctly signed
-`transaction.completed` event with `subscription_recurring` origin. Browser
-callbacks never grant either state.
+Sandbox data is disposable and is never migrated into Live. Do not add a
+parallel subscription-recovery path or repair billing state with SQL. Only a
+correctly signed active `subscription.created` or `subscription.activated`
+event with the tenant binding and a confirmed period grants an initial paid
+period; later allowance renewals require a signed `transaction.completed` with
+`subscription_recurring` origin. Approved full refunds and chargebacks follow
+the reviewed adjustment policy. Browser callbacks never grant state.
 
 The checked-in lockfiles are used by CI (`npm ci`). When a dependency changes,
 regenerate its lockfile in the same change.

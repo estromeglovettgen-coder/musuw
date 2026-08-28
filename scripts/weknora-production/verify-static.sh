@@ -27,14 +27,14 @@ for required in \
     fi
 done
 
-grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=sandbox' "$production_env_example" || {
-    printf '%s\n' 'checked production example must select Paddle Sandbox until Live is authorized' >&2
+grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=live' "$production_env_example" || {
+    printf '%s\n' 'checked production example must select Paddle Live' >&2
     exit 1
 }
 case "$(awk -F= '$1 == "MUSUW_PADDLE_CLIENT_TOKEN" { print substr($0, index($0, "=") + 1); exit }' "$production_env_example")" in
-    test_*) ;;
+    live_*) ;;
     *)
-        printf '%s\n' 'checked production example must use a Paddle Sandbox client token' >&2
+        printf '%s\n' 'checked production example must use a Paddle Live client token' >&2
         exit 1
         ;;
 esac
@@ -57,12 +57,12 @@ musuw_paddle_validate_configuration \
     live live_static-client-token pdl_live_apikey_static-verification \
     pdl_ntfset_static-verification "${paddle_prices[@]}"
 musuw_paddle_validate_production_launch \
-    sandbox test_static-client-token pdl_sdbx_apikey_static-verification \
+    live live_static-client-token pdl_live_apikey_static-verification \
     pdl_ntfset_static-verification "${paddle_prices[@]}"
 if musuw_paddle_validate_production_launch \
-    live live_static-client-token pdl_live_apikey_static-verification \
+    sandbox test_static-client-token pdl_sdbx_apikey_static-verification \
     pdl_ntfset_static-verification "${paddle_prices[@]}" >/dev/null 2>&1; then
-    printf '%s\n' 'fixed production launch accepted Paddle Live before authorization' >&2
+    printf '%s\n' 'fixed production launch accepted Paddle Sandbox after Live authorization' >&2
     exit 1
 fi
 
@@ -160,7 +160,7 @@ done
 printf '%s\n' '0123456789abcdef0123456789abcdef' > "$secret_dir/system_aes_key"
 printf '%s\n' 'neo4j/static-verification-password' > "$secret_dir/neo4j_auth"
 printf '%s\n' 'static-native-oidc-client' > "$secret_dir/oidc_client_id"
-printf '%s\n' 'pdl_sdbx_apikey_static-verification' > "$secret_dir/paddle_api_key"
+printf '%s\n' 'pdl_live_apikey_static-verification' > "$secret_dir/paddle_api_key"
 printf '%s\n' 'pdl_ntfset_static-verification' > "$secret_dir/paddle_webhook_secret"
 printf '%s\n' 'pk-lf-static-verification' > "$secret_dir/langfuse_public_key"
 printf '%s\n' 'sk-lf-static-verification' > "$secret_dir/langfuse_secret_key"
@@ -209,8 +209,8 @@ printf '%s\n' \
         'OIDC_AUTH_SCOPES=openid profile email' \
         'OIDC_USER_INFO_MAPPING_USER_NAME=name' \
         'OIDC_USER_INFO_MAPPING_EMAIL=email' \
-        'MUSUW_PADDLE_ENVIRONMENT=sandbox' \
-        'MUSUW_PADDLE_CLIENT_TOKEN=test_static-client-token' \
+        'MUSUW_PADDLE_ENVIRONMENT=live' \
+        'MUSUW_PADDLE_CLIENT_TOKEN=live_static-client-token' \
         'MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID=pri_static_plus_monthly' \
         'MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID=pri_static_plus_yearly' \
         'MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID=pri_static_pro_monthly' \
@@ -233,32 +233,32 @@ if grep -Eq '^(DB_PASSWORD|REDIS_PASSWORD|SYSTEM_AES_KEY|JWT_SECRET|NEO4J_AUTH|O
     exit 1
 fi
 
-# The current fixed launch accepts only a complete Sandbox environment. Live
-# shape remains tested above for a future reviewed cutover, but production
-# preflight rejects it even when every prefix matches.
-printf '%s\n' 'pdl_live_apikey_static-verification' > "$secret_dir/paddle_api_key"
-if WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-   "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null 2>&1; then
-    printf '%s\n' 'production runtime accepted a Live API key with Sandbox public settings' >&2
-    exit 1
-fi
-live_public_env="$runtime_dir/live-production.public.env"
-awk '
-    /^MUSUW_PADDLE_ENVIRONMENT=/ { print "MUSUW_PADDLE_ENVIRONMENT=live"; next }
-    /^MUSUW_PADDLE_CLIENT_TOKEN=/ { print "MUSUW_PADDLE_CLIENT_TOKEN=live_static-client-token"; next }
-    { print }
-' "$runtime_dir/production.public.env" > "$live_public_env"
-WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-WEKNORA_PRODUCTION_PUBLIC_ENV="$live_public_env" \
-    "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null 2>&1 && {
-    printf '%s\n' 'fixed production preflight accepted a complete Live environment before authorization' >&2
-    exit 1
-}
+# The fixed launch accepts only a complete Live environment. Mixing the Live
+# public unit with a Sandbox server key must fail before runtime generation.
 printf '%s\n' 'pdl_sdbx_apikey_static-verification' > "$secret_dir/paddle_api_key"
 if WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
-   WEKNORA_PRODUCTION_PUBLIC_ENV="$live_public_env" \
    "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null 2>&1; then
     printf '%s\n' 'production runtime accepted a Sandbox API key with Live public settings' >&2
+    exit 1
+fi
+sandbox_public_env="$runtime_dir/sandbox-production.public.env"
+awk '
+    /^MUSUW_PADDLE_ENVIRONMENT=/ { print "MUSUW_PADDLE_ENVIRONMENT=sandbox"; next }
+    /^MUSUW_PADDLE_CLIENT_TOKEN=/ { print "MUSUW_PADDLE_CLIENT_TOKEN=test_static-client-token"; next }
+    { print }
+' "$runtime_dir/production.public.env" > "$sandbox_public_env"
+printf '%s\n' 'pdl_sdbx_apikey_static-verification' > "$secret_dir/paddle_api_key"
+WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+WEKNORA_PRODUCTION_PUBLIC_ENV="$sandbox_public_env" \
+    "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null 2>&1 && {
+    printf '%s\n' 'fixed production preflight accepted a complete Sandbox environment after Live authorization' >&2
+    exit 1
+}
+printf '%s\n' 'pdl_live_apikey_static-verification' > "$secret_dir/paddle_api_key"
+if WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+   WEKNORA_PRODUCTION_PUBLIC_ENV="$sandbox_public_env" \
+   "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null 2>&1; then
+    printf '%s\n' 'production runtime accepted a Live API key with Sandbox public settings' >&2
     exit 1
 fi
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$repo_root/scripts/weknora-production/prepare-runtime.sh" >/dev/null
@@ -314,8 +314,8 @@ jq -e '
   (.services.app.environment.RETRIEVE_DRIVER == "postgres") and
   (.services.app.environment.STREAM_MANAGER_TYPE == "redis") and
   (.services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-production") and
-  (.services.app.environment.MUSUW_PADDLE_ENVIRONMENT == "sandbox") and
-  (.services.app.environment.MUSUW_PADDLE_CLIENT_TOKEN == "test_static-client-token") and
+  (.services.app.environment.MUSUW_PADDLE_ENVIRONMENT == "live") and
+  (.services.app.environment.MUSUW_PADDLE_CLIENT_TOKEN == "live_static-client-token") and
   (.services.app.environment.MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID == "pri_static_plus_monthly") and
   (.services.app.environment.MUSUW_PADDLE_MAX_YEARLY_PRICE_ID == "pri_static_max_yearly") and
   ([.services.app.volumes[] | select(

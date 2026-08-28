@@ -60,6 +60,19 @@ type ConsumerEntitlement struct {
 	OpenRouterCreditPeriodEnd           *time.Time              `json:"-"`
 }
 
+// PaddleSubscriptionBinding is the minimum durable provider identity needed
+// to route adjustment events back to the existing tenant entitlement mirror.
+// It is not a billing ledger and deliberately carries no payment or secret
+// data.
+type PaddleSubscriptionBinding struct {
+	TenantID       uint64
+	Plan           ConsumerPlan
+	Status         string
+	BillingPeriod  string
+	CustomerID     string
+	SubscriptionID string
+}
+
 func NormalizeConsumerPlan(plan ConsumerPlan) ConsumerPlan {
 	switch plan {
 	case ConsumerPlanPlus, ConsumerPlanPro, ConsumerPlanMax:

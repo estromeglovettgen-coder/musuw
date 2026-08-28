@@ -44,6 +44,7 @@ func (s *paddleWebhookEntitlementStub) RefreshPaidAllowance(
 	_ context.Context,
 	tenantID uint64,
 	plan types.ConsumerPlan,
+	billingPeriod string,
 	eventID string,
 	occurredAt time.Time,
 	customerID, subscriptionID string,
@@ -51,7 +52,7 @@ func (s *paddleWebhookEntitlementStub) RefreshPaidAllowance(
 ) (bool, error) {
 	s.refreshCalls++
 	s.refreshPayload = types.PaddleWebhookTaskPayload{
-		TenantID: tenantID, Plan: plan, EventID: eventID, OccurredAt: occurredAt,
+		TenantID: tenantID, Plan: plan, BillingPeriod: billingPeriod, EventID: eventID, OccurredAt: occurredAt,
 		CustomerID: customerID, SubscriptionID: subscriptionID,
 		EventPeriodEnd: &periodEnd,
 	}

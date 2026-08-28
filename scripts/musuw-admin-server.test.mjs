@@ -342,14 +342,14 @@ test('admin launcher starts each target with a clean environment', () => {
   assert.doesNotMatch(source, /MUSUW_PADDLE_API_KEY=.*env/)
 })
 
-test('production operations keeps Paddle on the authorized Sandbox unit', () => {
+test('production operations reads the authorized Paddle Live unit', () => {
   const source = readFileSync(new URL('./musuw-admin-server.mjs', import.meta.url), 'utf8')
   const productionBranch = source.slice(source.indexOf("if (target === 'production')"), source.indexOf('const candidate ='))
-  assert.match(productionBranch, /paddleEnvironment:\s*'sandbox'/)
-  assert.match(productionBranch, /paddleApiBase:\s*'https:\/\/sandbox-api\.paddle\.com'/)
-  assert.match(productionBranch, /paddleApiKey:\s*readKeychainSecret\(PROVIDER_KEY_SERVICES\.paddle,\s*'musuw-admin-test'\)/)
-  assert.doesNotMatch(productionBranch, /paddleEnvironment:\s*'live'/)
-  assert.doesNotMatch(productionBranch, /https:\/\/api\.paddle\.com/)
+  assert.match(productionBranch, /paddleEnvironment:\s*'live'/)
+  assert.match(productionBranch, /paddleApiBase:\s*'https:\/\/api\.paddle\.com'/)
+  assert.match(productionBranch, /paddleApiKey:\s*readKeychainSecret\(PROVIDER_KEY_SERVICES\.paddle,\s*providerKeyAccount\)/)
+  assert.doesNotMatch(productionBranch, /paddleEnvironment:\s*'sandbox'/)
+  assert.doesNotMatch(productionBranch, /https:\/\/sandbox-api\.paddle\.com/)
 })
 
 test('Supabase Auth Admin reads only the selected process environment with the official apikey header', async () => {

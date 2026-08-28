@@ -116,6 +116,10 @@ func (s *entitlementService) CurrentForTenant(ctx context.Context, tenantID uint
 	return s.Current(context.WithValue(ctx, types.TenantIDContextKey, tenantID), at)
 }
 
+func (s *entitlementService) ResolvePaddleSubscription(ctx context.Context, customerID, subscriptionID string) (*types.PaddleSubscriptionBinding, error) {
+	return s.repo.ResolvePaddleSubscription(ctx, customerID, subscriptionID)
+}
+
 // SetOpenRouterRemainingForTenant adjusts the existing OpenRouter-managed
 // child key's remaining allowance without adding a local usage counter. The
 // absolute provider limit is lifetime usage plus the requested remainder,
@@ -336,7 +340,7 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 	}
 
 	if targetPeriodEnd != nil && (periodEnd == nil || targetPeriodEnd.After(periodEnd.UTC())) {
-		applied, persistErr := s.repo.AdvanceOpenRouterCreditPeriod(ctx, tenant.ID, targetPeriodEnd.UTC())
+		applied, persistErr := s.repo.AdvanceOpenRouterCreditPeriod(ctx, tenant.ID, "", "", "", time.Time{}, "", "", targetPeriodEnd.UTC())
 		if persistErr != nil {
 			if providerChanged {
 				if restoreErr := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, prior.LimitMicrousd, prior.MonthlyReset); restoreErr != nil {
@@ -375,6 +379,10 @@ func (s *entitlementService) OpenRouterUserID(ctx context.Context) string {
 func (s *entitlementService) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, eventPeriodEnd *time.Time) (bool, error) {
 	unlock := s.lockAllowance(tenantID)
 	defer unlock()
+	return s.applyConsumerPlanLocked(ctx, tenantID, plan, status, billingPeriod, eventID, occurredAt, customerID, subscriptionID, eventPeriodEnd)
+}
+
+func (s *entitlementService) applyConsumerPlanLocked(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, eventPeriodEnd *time.Time) (bool, error) {
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
 	if err != nil {
 		return false, err
@@ -499,7 +507,7 @@ func (s *entitlementService) syncOpenRouterLimitFromTenant(ctx context.Context, 
 	return nil
 }
 
-func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
+func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
 	unlock := s.lockAllowance(tenantID)
 	defer unlock()
 	tenant, err := s.repo.GetTenantEntitlement(ctx, tenantID)
@@ -507,20 +515,40 @@ func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID 
 		return false, err
 	}
 	plan = types.NormalizeConsumerPlan(plan)
-	if eventID == "" || periodEnd.IsZero() || !periodEnd.After(occurredAt) {
+	if eventID == "" || periodEnd.IsZero() || !periodEnd.After(occurredAt) || (billingPeriod != "monthly" && billingPeriod != "yearly") {
 		return false, fmt.Errorf("Paddle recurring transaction has an invalid billing period")
 	}
-	if types.EffectiveConsumerPlan(tenant) != plan || plan == types.ConsumerPlanFree ||
-		(tenant.PaddleBillingPeriod != "monthly" && tenant.PaddleBillingPeriod != "yearly") ||
-		strings.TrimSpace(tenant.PaddleCustomerID) != strings.TrimSpace(customerID) ||
+	if tenant.PaddleLastEventID == eventID {
+		return true, nil
+	}
+	if tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt) {
+		logger.Infof(ctx, "Paid allowance event ignored as stale tenant_id=%d event_id=%s", tenantID, eventID)
+		return false, nil
+	}
+	if strings.TrimSpace(tenant.PaddleCustomerID) != strings.TrimSpace(customerID) ||
 		strings.TrimSpace(tenant.PaddleSubscriptionID) != strings.TrimSpace(subscriptionID) {
 		return false, fmt.Errorf("Paddle recurring transaction does not match the active tenant subscription")
 	}
 	periodEnd = periodEnd.UTC()
-	if tenant.PaddleBillingPeriod == "yearly" {
-		applied, err := s.repo.AdvancePaddleCurrentPeriod(ctx, tenantID, plan, customerID, subscriptionID, "yearly", periodEnd)
+	if tenant.PlanStatus == "refunded" || tenant.PlanStatus == "chargeback" {
+		return s.applyConsumerPlanLocked(ctx, tenantID, plan, "active", billingPeriod, eventID, occurredAt, customerID, subscriptionID, &periodEnd)
+	}
+	if types.EffectiveConsumerPlan(tenant) != plan || plan == types.ConsumerPlanFree || tenant.PaddleBillingPeriod != billingPeriod {
+		return false, fmt.Errorf("Paddle recurring transaction does not match the active tenant subscription")
+	}
+	if billingPeriod == "yearly" {
+		applied, err := s.repo.AdvancePaddleCurrentPeriod(ctx, tenantID, plan, customerID, subscriptionID, "yearly", eventID, occurredAt, periodEnd)
 		if err != nil {
 			return false, err
+		}
+		if !applied {
+			latest, reloadErr := s.repo.GetTenantEntitlement(ctx, tenantID)
+			if reloadErr != nil {
+				return false, reloadErr
+			}
+			if latest.PlanStatus == "refunded" || latest.PlanStatus == "chargeback" {
+				return s.applyConsumerPlanLocked(ctx, tenantID, plan, "active", billingPeriod, eventID, occurredAt, customerID, subscriptionID, &periodEnd)
+			}
 		}
 		logger.Infof(ctx, "Annual paid term confirmed tenant_id=%d event_id=%s period_end=%s applied=%t", tenantID, eventID, periodEnd.Format(time.RFC3339), applied)
 		return applied, nil
@@ -554,7 +582,7 @@ func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID 
 		}
 	}
 
-	applied, err := s.repo.AdvanceOpenRouterCreditPeriod(ctx, tenantID, periodEnd)
+	applied, err := s.repo.AdvanceOpenRouterCreditPeriod(ctx, tenantID, plan, "monthly", eventID, occurredAt, customerID, subscriptionID, periodEnd)
 	if err != nil && providerChanged && priorInfo != nil {
 		if restoreErr := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, priorInfo.LimitMicrousd, priorInfo.MonthlyReset); restoreErr != nil {
 			return false, errors.Join(err, fmt.Errorf("restore OpenRouter tenant key after allowance persistence failure: %w", restoreErr))
@@ -562,6 +590,23 @@ func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID 
 	}
 	if err != nil {
 		return false, err
+	}
+	if !applied {
+		latest, reloadErr := s.repo.GetTenantEntitlement(ctx, tenantID)
+		if reloadErr != nil {
+			return false, reloadErr
+		}
+		if latest.PlanStatus == "refunded" || latest.PlanStatus == "chargeback" {
+			restored, restoreErr := s.applyConsumerPlanLocked(ctx, tenantID, plan, "active", billingPeriod, eventID, occurredAt, customerID, subscriptionID, &periodEnd)
+			if restoreErr != nil || restored {
+				return restored, restoreErr
+			}
+		}
+		if providerChanged && stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
+			if syncErr := s.syncOpenRouterLimitFromTenant(ctx, tenantID, stored.KeyHash); syncErr != nil {
+				return false, syncErr
+			}
+		}
 	}
 	logger.Infof(ctx, "Paid allowance event processed tenant_id=%d event_id=%s period_end=%s applied=%t", tenantID, eventID, periodEnd.Format(time.RFC3339), applied)
 	return applied, nil

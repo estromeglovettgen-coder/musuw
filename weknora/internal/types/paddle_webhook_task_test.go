@@ -56,6 +56,25 @@ func TestPaddleWebhookTaskPayloadValidate(t *testing.T) {
 	if err := refresh.Validate(); err == nil {
 		t.Fatal("refresh payload without period end should be rejected")
 	}
+
+	for _, tc := range []struct {
+		name string
+		edit func(*PaddleWebhookTaskPayload)
+	}{
+		{"missing billing period", func(p *PaddleWebhookTaskPayload) { p.BillingPeriod = "" }},
+		{"unknown billing period", func(p *PaddleWebhookTaskPayload) { p.BillingPeriod = "weekly" }},
+		{"missing customer", func(p *PaddleWebhookTaskPayload) { p.CustomerID = "" }},
+		{"missing subscription", func(p *PaddleWebhookTaskPayload) { p.SubscriptionID = "" }},
+	} {
+		t.Run("refresh "+tc.name, func(t *testing.T) {
+			payload := base
+			payload.Operation = PaddleWebhookTaskOperationRefreshPaidAllowance
+			tc.edit(&payload)
+			if err := payload.Validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
 }
 
 func TestPaddleWebhookTaskPayloadDoesNotCarrySecrets(t *testing.T) {

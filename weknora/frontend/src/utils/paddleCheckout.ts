@@ -6,6 +6,8 @@ import {
 } from '@paddle/paddle-js'
 
 let paddlePromise: Promise<Paddle | undefined> | null = null
+let activeEnvironment: PaddleCheckoutInput['environment'] | undefined
+let activeClientToken: string | undefined
 let activePwCustomerId: string | undefined
 let completed: (() => void) | undefined
 let activeEventCallback: ((event: PaddleEventData) => void) | undefined
@@ -13,7 +15,11 @@ let activeEventCallback: ((event: PaddleEventData) => void) | undefined
 interface PaddleCheckoutInput {
   environment: 'sandbox' | 'live'
   clientToken: string
-  transactionId: string
+  priceId: string
+  customData: {
+    tenant_id: string
+    musuw_checkout_binding: string
+  }
   pwCustomerId?: string
   email?: string
   locale?: string
@@ -54,6 +60,9 @@ function retainCustomerID(value?: string): string | undefined {
 
 async function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clientToken' | 'pwCustomerId'>) {
   const pwCustomerId = retainCustomerID(input.pwCustomerId)
+  if (paddlePromise && (input.environment !== activeEnvironment || input.clientToken !== activeClientToken)) {
+    throw new Error('Paddle.js configuration changed; reload required')
+  }
   if (!paddlePromise) {
     const eventCallback = (event: PaddleEventData) => {
       activeEventCallback?.(event)
@@ -63,6 +72,8 @@ async function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clie
         callback?.()
       }
     }
+    activeEnvironment = input.environment
+    activeClientToken = input.clientToken
     activePwCustomerId = pwCustomerId
     paddlePromise = initializePaddle({
       ...(input.environment === 'sandbox' ? { environment: 'sandbox' as const } : {}),
@@ -71,6 +82,8 @@ async function initialize(input: Pick<PaddleCheckoutInput, 'environment' | 'clie
       eventCallback,
     }).catch((error) => {
       paddlePromise = null
+      activeEnvironment = undefined
+      activeClientToken = undefined
       activePwCustomerId = undefined
       throw error
     })
@@ -111,7 +124,8 @@ export async function openPaddleInlineCheckout(input: OpenPaddleInlineCheckoutIn
   const paddle = await initialize(input)
   if (!paddle) throw new Error('Paddle.js failed to initialize')
   paddle.Checkout.open({
-    transactionId: input.transactionId,
+    items: [{ priceId: input.priceId, quantity: 1 }],
+    customData: input.customData,
     customer: input.email ? { email: input.email } : undefined,
     settings: {
       displayMode: 'inline',

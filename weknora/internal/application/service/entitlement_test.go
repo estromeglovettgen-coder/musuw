@@ -37,6 +37,22 @@ func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*ty
 	return &copy, nil
 }
 
+func (s *entitlementRepoStub) ResolvePaddleSubscription(_ context.Context, customerID, subscriptionID string) (*types.PaddleSubscriptionBinding, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tenant.PaddleCustomerID != customerID || s.tenant.PaddleSubscriptionID != subscriptionID {
+		return nil, nil
+	}
+	return &types.PaddleSubscriptionBinding{
+		TenantID:       s.tenant.ID,
+		Plan:           types.NormalizeConsumerPlan(s.tenant.Plan),
+		Status:         s.tenant.PlanStatus,
+		BillingPeriod:  s.tenant.PaddleBillingPeriod,
+		CustomerID:     s.tenant.PaddleCustomerID,
+		SubscriptionID: s.tenant.PaddleSubscriptionID,
+	}, nil
+}
+
 func (s *entitlementRepoStub) SetOpenRouterCredentialsIfAbsent(_ context.Context, _ uint64, credentials *types.OpenRouterCredentials, creditPeriodEnd time.Time) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -79,20 +95,37 @@ func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, pla
 	return true, nil
 }
 
-func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _ uint64, periodEnd time.Time) (bool, error) {
+func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if eventID != "" {
+		if s.tenant.PaddleLastEventID == eventID || (s.tenant.PaddleLastEventAt != nil && !occurredAt.After(*s.tenant.PaddleLastEventAt)) {
+			return false, nil
+		}
+		if types.EffectiveConsumerPlan(s.tenant) != plan || billingPeriod != "monthly" || s.tenant.PaddleBillingPeriod != billingPeriod ||
+			s.tenant.PaddleCustomerID != customerID || s.tenant.PaddleSubscriptionID != subscriptionID {
+			return false, nil
+		}
+	}
 	if s.tenant.OpenRouterCreditPeriodEnd != nil && !periodEnd.After(*s.tenant.OpenRouterCreditPeriodEnd) {
 		return false, nil
 	}
 	value := periodEnd.UTC()
 	s.tenant.OpenRouterCreditPeriodEnd = &value
+	if eventID != "" {
+		s.tenant.PaddleLastEventID = eventID
+		value := occurredAt.UTC()
+		s.tenant.PaddleLastEventAt = &value
+	}
 	return true, nil
 }
 
-func (s *entitlementRepoStub) AdvancePaddleCurrentPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, customerID, subscriptionID, billingPeriod string, periodEnd time.Time) (bool, error) {
+func (s *entitlementRepoStub) AdvancePaddleCurrentPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, customerID, subscriptionID, billingPeriod, eventID string, occurredAt, periodEnd time.Time) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if eventID != "" && (s.tenant.PaddleLastEventID == eventID || (s.tenant.PaddleLastEventAt != nil && !occurredAt.After(*s.tenant.PaddleLastEventAt))) {
+		return false, nil
+	}
 	if types.EffectiveConsumerPlan(s.tenant) != plan || s.tenant.PaddleCustomerID != customerID ||
 		s.tenant.PaddleSubscriptionID != subscriptionID || s.tenant.PaddleBillingPeriod != billingPeriod {
 		return false, nil
@@ -102,6 +135,11 @@ func (s *entitlementRepoStub) AdvancePaddleCurrentPeriod(_ context.Context, _ ui
 	}
 	value := periodEnd.UTC()
 	s.tenant.PaddleCurrentPeriodEnd = &value
+	if eventID != "" {
+		s.tenant.PaddleLastEventID = eventID
+		value := occurredAt.UTC()
+		s.tenant.PaddleLastEventAt = &value
+	}
 	return true, nil
 }
 
@@ -624,13 +662,13 @@ func TestRecurringPaidAllowanceRefreshesOncePerPeriod(t *testing.T) {
 	}}
 	svc := newEntitlementService(repo, manager)
 
-	applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "evt-renew", oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
+	applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "monthly", "evt-renew", oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
 	require.NoError(t, err)
 	assert.True(t, applied)
 	assert.Equal(t, int64(3_400_000), manager.updateLimit)
 	assert.Equal(t, 1, manager.updateCalls)
 
-	applied, err = svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "evt-renew-duplicate", oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
+	applied, err = svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "monthly", "evt-renew-duplicate", oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
 	require.NoError(t, err)
 	assert.False(t, applied)
 	assert.Equal(t, 1, manager.updateCalls)
@@ -645,13 +683,13 @@ func TestAnnualRecurringCompletionAdvancesPaidTermWithoutGrantingAllowance(t *te
 	}}
 	svc := newEntitlementService(repo, nil)
 
-	applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "evt-renew", oldPaidTermEnd, "ctm_1", "sub_1", newPaidTermEnd)
+	applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "yearly", "evt-renew", oldPaidTermEnd, "ctm_1", "sub_1", newPaidTermEnd)
 	require.NoError(t, err)
 	assert.True(t, applied)
 	require.NotNil(t, repo.tenant.PaddleCurrentPeriodEnd)
 	assert.Equal(t, newPaidTermEnd, repo.tenant.PaddleCurrentPeriodEnd.UTC())
 
-	applied, err = svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "evt-renew-duplicate", oldPaidTermEnd, "ctm_1", "sub_1", newPaidTermEnd)
+	applied, err = svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "yearly", "evt-renew-duplicate", oldPaidTermEnd, "ctm_1", "sub_1", newPaidTermEnd)
 	require.NoError(t, err)
 	assert.False(t, applied)
 }
@@ -680,7 +718,7 @@ func TestConcurrentRecurringDeliveriesMutateProviderOnlyOnce(t *testing.T) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, fmt.Sprintf("evt-renew-%d", index), oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
+			applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "monthly", fmt.Sprintf("evt-renew-%d", index), oldPeriodEnd, "ctm_1", "sub_1", newPeriodEnd)
 			results <- applied
 			errs <- err
 		}(i)
@@ -700,6 +738,28 @@ func TestConcurrentRecurringDeliveriesMutateProviderOnlyOnce(t *testing.T) {
 	}
 	assert.Equal(t, 1, appliedCount)
 	assert.Equal(t, 1, manager.updateCalls)
+}
+
+func TestRecurringCompletionRestoresAdjustedCurrentSubscription(t *testing.T) {
+	refundedAt := time.Date(2026, 9, 28, 9, 30, 0, 0, time.UTC)
+	paidAt := refundedAt.Add(time.Hour)
+	periodEnd := paidAt.AddDate(0, 1, 0)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "refunded",
+		PaddleCustomerID: "ctm_1", PaddleSubscriptionID: "sub_1",
+		PaddleLastEventID: "evt-refund", PaddleLastEventAt: &refundedAt,
+	}}
+	svc := newEntitlementService(repo, nil)
+
+	applied, err := svc.RefreshPaidAllowance(context.Background(), 7, types.ConsumerPlanPro, "monthly", "evt-paid", paidAt, "ctm_1", "sub_1", periodEnd)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Equal(t, types.ConsumerPlanPro, repo.tenant.Plan)
+	assert.Equal(t, "active", repo.tenant.PlanStatus)
+	assert.Equal(t, "monthly", repo.tenant.PaddleBillingPeriod)
+	assert.Equal(t, "evt-paid", repo.tenant.PaddleLastEventID)
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, periodEnd, repo.tenant.OpenRouterCreditPeriodEnd.UTC())
 }
 
 func (s *keyManagerStub) GetKey(context.Context, string) (*modelopenrouter.KeyInfo, error) {

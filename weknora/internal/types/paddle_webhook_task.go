@@ -76,7 +76,7 @@ func (p PaddleWebhookTaskPayload) Validate() error {
 			return fmt.Errorf("paddle webhook task billing_period is invalid")
 		}
 		if p.BillingOperationType != "" {
-			if p.BillingOperationType != PaddleBillingOperationCheckout && p.BillingOperationType != PaddleBillingOperationUpgrade {
+			if p.BillingOperationType != PaddleBillingOperationUpgrade {
 				return fmt.Errorf("paddle webhook task billing operation type is invalid")
 			}
 			if strings.TrimSpace(p.PriceID) == "" {
@@ -89,6 +89,12 @@ func (p PaddleWebhookTaskPayload) Validate() error {
 	case PaddleWebhookTaskOperationRefreshPaidAllowance:
 		if p.Plan != ConsumerPlanPlus && p.Plan != ConsumerPlanPro && p.Plan != ConsumerPlanMax {
 			return fmt.Errorf("paddle webhook task refresh plan is invalid")
+		}
+		if p.BillingPeriod != "monthly" && p.BillingPeriod != "yearly" {
+			return fmt.Errorf("paddle webhook task refresh billing_period is invalid")
+		}
+		if strings.TrimSpace(p.CustomerID) == "" || strings.TrimSpace(p.SubscriptionID) == "" {
+			return fmt.Errorf("paddle webhook task refresh subscription binding is incomplete")
 		}
 		if p.EventPeriodEnd == nil || p.EventPeriodEnd.IsZero() || !p.EventPeriodEnd.After(p.OccurredAt) {
 			return fmt.Errorf("paddle webhook task event_period_end is invalid")

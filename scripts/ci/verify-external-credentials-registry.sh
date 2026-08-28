@@ -62,13 +62,21 @@ if grep -qE '(^|[[:space:]])[[:alnum:]_.-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}([[:s
     fail 'registry contains an email address'
 fi
 
-# Paddle is the current launch-stage blocker. Keep both environments visible,
-# but require every Live entry to remain explicitly unauthorized.
+# Keep both Paddle environments visible. The separately reviewed production
+# unit requires exact active/available metadata for each Live resource class.
 awk '
     function check() {
-        if (entry != "" && provider == "paddle" && environment == "live" && status != "not-authorized") {
-            printf "Paddle Live entry is not blocked: %s\n", entry > "/dev/stderr"
-            bad = 1
+        if (entry == "paddle.live.public-client" && status != "active") {
+            printf "Paddle Live public client is not active\n" > "/dev/stderr"; bad = 1
+        }
+        if (entry == "paddle.live.price-catalog" && status != "active") {
+            printf "Paddle Live catalog is not active\n" > "/dev/stderr"; bad = 1
+        }
+        if (entry == "paddle.live.api-key" && status != "available") {
+            printf "Paddle Live API key is not available\n" > "/dev/stderr"; bad = 1
+        }
+        if (entry == "paddle.live.webhook-secret" && status != "available") {
+            printf "Paddle Live webhook secret is not available\n" > "/dev/stderr"; bad = 1
         }
     }
     /^  - id:/ {
@@ -86,7 +94,7 @@ awk '
         check()
         exit bad
     }
-' "$registry" || fail 'Paddle Live authorization boundary is invalid'
+' "$registry" || fail 'Paddle Live production metadata is invalid'
 
 grep -Fq 'id: paddle.sandbox.public-client' "$registry" || fail 'Paddle Sandbox public client entry is missing'
 grep -Fq 'id: paddle.sandbox.price-catalog' "$registry" || fail 'Paddle Sandbox catalog entry is missing'
@@ -97,11 +105,11 @@ grep -Fq 'id: paddle.live.price-catalog' "$registry" || fail 'Paddle Live catalo
 grep -Fq 'id: paddle.live.api-key' "$registry" || fail 'Paddle Live API audit entry is missing'
 grep -Fq 'id: paddle.live.webhook-secret' "$registry" || fail 'Paddle Live webhook audit entry is missing'
 
-# The checked-in production contract must agree with the registry's current
-# launch boundary. A future Live launch requires a separate reviewed change.
-grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=sandbox' "$production_public_env" || fail 'production public env is not Sandbox-only'
-grep -Fq 'MUSUW_PADDLE_CLIENT_TOKEN=test_' "$production_public_env" || fail 'production public env is not using a Sandbox client-token class'
-grep -Fq 'current launch stage uses Paddle Sandbox' "$production_public_env" || fail 'production public env does not document the Live authorization boundary'
+# The checked-in production contract must agree with the registry's reviewed
+# Live launch while Sandbox remains a separate test/development unit.
+grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=live' "$production_public_env" || fail 'production public env is not Live-only'
+grep -Fq 'MUSUW_PADDLE_CLIENT_TOKEN=live_' "$production_public_env" || fail 'production public env is not using a Live client-token class'
+grep -Fq 'Production uses one complete Paddle Live unit' "$production_public_env" || fail 'production public env does not document the Live unit'
 
 # Keep the operator-facing entry points linked to one registry instead of
 # copying values or inventing per-project lists.
@@ -112,8 +120,8 @@ grep -Fq 'external-credentials-registry.yaml' "$secrets_doc" || fail 'secrets do
 grep -Fq 'external-credentials-registry.yaml' "$deployment_doc" || fail 'deployment document does not link the central registry'
 grep -Fq 'external-credentials-registry.yaml' "$readme" || fail 'README does not link the central registry'
 grep -Fq 'external-credentials-registry.yaml' "$agents" || fail 'AGENTS does not link the central registry'
-grep -Fq 'Sandbox' "$deployment_doc" || fail 'deployment document has no Paddle Sandbox boundary'
-grep -Fq 'Sandbox' "$readme" || fail 'README has no Paddle Sandbox boundary'
-grep -Fq 'Sandbox' "$agents" || fail 'AGENTS has no Paddle Sandbox boundary'
+grep -Fq 'Paddle Live' "$deployment_doc" || fail 'deployment document has no Paddle Live boundary'
+grep -Fq 'Paddle Live' "$readme" || fail 'README has no Paddle Live boundary'
+grep -Fq 'Paddle Live' "$agents" || fail 'AGENTS has no Paddle Live boundary'
 
 printf '%s\n' 'external credential registry verification green'

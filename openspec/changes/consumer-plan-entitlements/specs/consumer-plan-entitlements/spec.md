@@ -178,8 +178,8 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **THEN** the server resolves the customer from that tenant, creates a fresh Paddle portal session through the official SDK, and returns only its HTTPS overview URL
 
 #### Scenario: Authenticated Paddle customer handoff remains non-authoritative
-- **WHEN** the authenticated tenant has a valid Paddle customer ID derived from signed provider state and the complete Sandbox unit is configured
-- **THEN** the authenticated billing response supplies that provider customer ID only as the Paddle.js `pwCustomer` value, `Paddle.Initialize()` or `Paddle.Update()` receives it, anonymous public config and request input cannot supply it, no Retain feature is activated, and the value grants no entitlement or provider mutation authority
+- **WHEN** the authenticated tenant has a valid Paddle customer ID derived from signed provider state and the complete Live unit is configured
+- **THEN** the authenticated billing response supplies that provider customer ID only as the Paddle.js `pwCustomer` value, `Paddle.Initialize()` or `Paddle.Update()` receives it, anonymous request input cannot supply it, Paddle owns Retain recovery behavior, and the value grants no entitlement or provider mutation authority
 
 #### Scenario: Portal ownership cannot be proven
 - **WHEN** a request is anonymous or the authenticated tenant has no Paddle customer record
@@ -190,16 +190,16 @@ When Paddle environment values are fully configured, an authenticated Free tenan
 - **THEN** the product reports billing as unavailable while all effective entitlement enforcement remains active
 
 #### Scenario: Fixed production runtime is only partially configured
-- **WHEN** the Musuw production overlay is missing a Paddle or OpenRouter server secret, lacks one of six distinct recurring price mappings, pairs Sandbox with anything other than a `test_` client token and `pdl_sdbx_apikey_` API key, selects Live before authorization (even with internally matching Live prefixes), supplies an invalid destination-secret shape, or attempts to place a server secret in the generated environment
+- **WHEN** the Musuw production overlay is missing a Paddle or OpenRouter server secret, lacks one of six distinct recurring price mappings, selects Sandbox, mixes Live with any Sandbox-shaped token/key, supplies an invalid destination-secret shape, or attempts to place a server secret in the generated environment
 - **THEN** the production preflight rejects the release before Compose starts while generic deployments retain the optional unconfigured-billing behavior
 
 #### Scenario: Selected Paddle environment is proven end to end
 - **WHEN** operators prepare to enable billing for the fixed production runtime
 - **THEN** all six recurring prices resolve through the selected Paddle environment and the exact notification destination delivers a correctly signed event before billing is declared operational; local prefix checks alone SHALL NOT claim that price IDs or a destination secret belong to that environment
 
-#### Scenario: Current launch stage remains Sandbox
-- **WHEN** Live has not yet been authorized
-- **THEN** the checked production example, preflight, and app entrypoint require the complete Sandbox unit; changing only one client token, API key, price, or destination secret or supplying a complete Live unit SHALL fail closed, and enabling Live SHALL require a reviewed code change
+#### Scenario: Current launch stage requires Live
+- **WHEN** the fixed production runtime is prepared or rolled back
+- **THEN** the checked production example, preflight, app entrypoint, public token, API key, six prices, and exact destination require one matching Live unit; changing only one component or supplying Sandbox SHALL fail closed
 
 #### Scenario: Paid tenant never receives a parallel checkout
 - **WHEN** a tenant already has a paid plan
@@ -216,23 +216,23 @@ The system SHALL perform raw-body signature, tenant, binding, price, and event-s
 - **WHEN** the same event task is redelivered, a worker restarts, or a provider call fails transiently
 - **THEN** Asynq retries the task and the durable tenant event markers apply the entitlement at most once, while exhausted work remains observable through the existing dead-letter path
 
-### Requirement: Checkout and upgrade operations are server-owned and serialized
-The system SHALL create or reuse a server-owned, tenant-bound checkout transaction intent before opening Paddle Checkout and SHALL create or reuse one serialized upgrade operation for a tenant's target plan. A known Paddle transaction SHALL be reused. Because Paddle does not provide a general idempotency key for arbitrary mutations, an uncertain provider response SHALL remain fail-closed, SHALL keep the tenant mutation slot occupied for explicit reconciliation, and SHALL never cause a blind second provider mutation. The signed webhook remains the only authority that grants or changes the durable plan.
+### Requirement: Self-service checkout is Paddle-owned and paid upgrades are serialized
+For an initial self-service checkout, the system SHALL return exactly one server-mapped price and tenant-bound signed custom data, and Paddle.js SHALL create and own the checkout transaction. Musuw SHALL NOT create, mirror, or serialize that initial provider transaction. The system SHALL create or reuse one serialized upgrade operation for a paid tenant's target plan. Because Paddle does not provide a general idempotency key for the subscription update mutation, an uncertain upgrade response SHALL remain fail-closed, SHALL keep the tenant mutation slot occupied for explicit reconciliation, and SHALL never cause a blind second provider mutation. The signed webhook remains the only authority that grants or changes the durable plan.
 
-#### Scenario: Repeated checkout requests reuse one intent
+#### Scenario: Repeated checkout requests remain stateless
 - **WHEN** a Free tenant submits the same plan and billing-period checkout request more than once before it resolves
-- **THEN** the server returns or reuses one active tenant-bound Paddle transaction intent and does not create a parallel provider transaction
+- **THEN** the server returns the same allow-listed price and deterministic tenant binding without writing local payment-operation state, while Paddle Checkout owns incomplete provider transactions and no request grants entitlement
 
 #### Scenario: Repeated upgrades reuse one serialized operation
 - **WHEN** concurrent authenticated requests ask the same tenant to upgrade to the same or another higher plan
 - **THEN** one tenant-scoped operation is active, later requests reuse or report that operation, and only its provider-confirmed signed webhook can change the plan
 
-#### Scenario: Provider response is uncertain
-- **WHEN** a checkout or upgrade provider call times out after it may have been accepted
-- **THEN** the server records the uncertain result, blocks another mutation for that tenant, and requires explicit provider/operator reconciliation rather than blindly submitting a second mutation
+#### Scenario: Upgrade provider response is uncertain
+- **WHEN** a subscription update call times out after it may have been accepted
+- **THEN** the server records the uncertain upgrade result, blocks another subscription mutation for that tenant, and requires explicit provider/operator reconciliation rather than blindly submitting a second mutation
 
 ### Requirement: Subscription shape and payment-recovery grace are bounded
-The system SHALL accept, activate, or upgrade only a subscription containing exactly one known server-owned recurring base item. Zero items, multiple base items, unknown prices, or unrecognized add-ons SHALL fail closed without granting or changing entitlement. A `past_due` subscription SHALL remain paid grace through its last confirmed paid-term boundary, SHALL NOT advance that boundary or open a new allowance without a matching successful recurring payment, and SHALL become unavailable only after that confirmed term ends. The current release SHALL remain Paddle Sandbox-only; refund/chargeback entitlement policy, adjustment-event handling, Live cutover, and Retain feature activation are deferred to a later reviewed change.
+The system SHALL accept, activate, or upgrade only a subscription containing exactly one known server-owned recurring base item. Zero items, multiple base items, unknown prices, or unrecognized add-ons SHALL fail closed without granting or changing entitlement. A `past_due` subscription SHALL remain paid grace through its last confirmed paid-term boundary, SHALL NOT advance that boundary or open a new allowance without a matching successful recurring payment, and SHALL become unavailable only after that confirmed term ends. Production SHALL use the complete reviewed Live unit; Paddle SHALL own checkout, payment execution, tax, currency, portal, Retain, and dunning while Musuw consumes only signed provider outcomes for entitlement.
 
 #### Scenario: Subscription has exactly one known base item
 - **WHEN** Paddle returns a subscription with exactly one active recurring item mapped to a server-owned price
@@ -246,6 +246,6 @@ The system SHALL accept, activate, or upgrade only a subscription containing exa
 - **WHEN** a current subscription is `past_due` but its last confirmed paid-term boundary has not elapsed
 - **THEN** existing paid access remains available, no new allowance is opened, and the unpaid provider period does not move the paid-term boundary
 
-#### Scenario: Sandbox launch defers Live and Retain
-- **WHEN** Live enablement or Retain feature activation is requested before a reviewed follow-up
-- **THEN** the fixed production contract remains the complete Paddle Sandbox unit and no Live or Retain feature is activated
+#### Scenario: Live launch keeps provider recovery authoritative
+- **WHEN** the reviewed Live unit and Retain are enabled
+- **THEN** Paddle.js and signed provider events remain the payment and recovery authority while Musuw adds no payment form, retry scheduler, recovery state machine, or financial ledger

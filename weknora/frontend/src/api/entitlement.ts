@@ -56,14 +56,13 @@ export interface PaddleSubscriptionUpgradePreview {
   next_billed_at: string
 }
 
-/**
- * A server-owned Paddle checkout transaction. The browser supplies only the
- * desired plan, billing period, and a replay key; price selection and
- * customer binding stay on the authenticated server.
- */
+/** Paddle.js self-service input signed by the authenticated Musuw server. */
 export interface PaddleCheckoutIntent {
-  transaction_id: string
-  pending: true
+  price_id: string
+  custom_data: {
+    tenant_id: string
+    musuw_checkout_binding: string
+  }
 }
 
 export async function getCurrentEntitlement(): Promise<EntitlementResponse> {
@@ -92,11 +91,9 @@ export async function upgradePaddleSubscription(plan: PaidConsumerPlan, operatio
 export async function createPaddleCheckoutIntent(input: {
   plan: PaidConsumerPlan
   billingPeriod: BillingPeriod
-  operationKey: string
 }): Promise<PaddleCheckoutIntent> {
   return post('/api/v1/billing/paddle/checkout-intent', {
     plan: input.plan,
     billing_period: input.billingPeriod,
-    operation_key: input.operationKey,
   }) as Promise<PaddleCheckoutIntent>
 }

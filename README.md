@@ -10,9 +10,10 @@ Credential ownership is recorded once in the metadata-only
 [`docs/external-credentials-registry.yaml`](docs/external-credentials-registry.yaml);
 the operator-facing rules live in
 [`docs/SECRETS_AND_INTEGRATIONS.md`](docs/SECRETS_AND_INTEGRATIONS.md). The
-current billing launch stage is Paddle **Sandbox**. Paddle Live has not been
-authorized, so Live-shaped values are rejected and must not be copied into the
-Tokyo runtime.
+production billing contract is **Paddle Live** as one atomic unit. Sandbox is
+retained for development/test only; Live and Sandbox client, catalog, API and
+destination inputs must never be mixed. Live acceptance is proved without
+entering a payment method or creating a real charge.
 
 ## Active source
 

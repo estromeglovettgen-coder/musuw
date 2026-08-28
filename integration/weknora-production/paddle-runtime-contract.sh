@@ -87,15 +87,15 @@ musuw_paddle_validate_configuration() {
 }
 
 # Musuw's fixed production overlay is intentionally narrower than the generic
-# Paddle adapter. Live has not been authorized for this launch; enabling it
-# requires a reviewed code change, not an environment-only switch.
+# Paddle adapter. Production is one complete Live unit; Sandbox remains valid
+# only through the generic development/test adapter.
 musuw_paddle_validate_production_launch() {
     if [ "$#" -ne 10 ]; then
         musuw_paddle_contract_reject 'Paddle production launch configuration is incomplete'
         return 1
     fi
-    if [ "$1" != 'sandbox' ]; then
-        musuw_paddle_contract_reject 'current Musuw production launch requires Paddle Sandbox'
+    if [ "$1" != 'live' ]; then
+        musuw_paddle_contract_reject 'Musuw production launch requires Paddle Live'
         return 1
     fi
     musuw_paddle_validate_configuration "$@"
