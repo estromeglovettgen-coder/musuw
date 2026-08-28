@@ -23,6 +23,16 @@ test('consumer scene controls are shown only in Lite mode through the existing p
   assert.match(source, /updateConsumerSceneModel/)
 })
 
+test('consumer model settings omit the redundant scene-model heading and explanation', () => {
+  const consumerSurface = source.slice(
+    source.indexOf('<section\n      v-if="authStore.isLiteMode"'),
+    source.indexOf('<template v-if="!authStore.isLiteMode">'),
+  )
+
+  assert.doesNotMatch(consumerSurface, /consumer-scene-settings__header/)
+  assert.doesNotMatch(consumerSurface, /modelSettings\.sceneModels\.(?:title|description)/)
+})
+
 test('consumer settings options come only from the typed scene-options API', () => {
   assert.match(source, /ensureConsumerSceneOptions\(scene\)/)
   assert.doesNotMatch(source, /all-models=/)

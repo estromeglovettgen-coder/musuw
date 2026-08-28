@@ -5,6 +5,7 @@ import test from 'node:test'
 const finalTheme = readFileSync(new URL('./musuw-final-theme-closure.css', import.meta.url), 'utf8')
 const reachableSurface = readFileSync(new URL('./musuw-reachable-surface-final.css', import.meta.url), 'utf8')
 const composer = readFileSync(new URL('../components/Input-field.vue', import.meta.url), 'utf8')
+const chatView = readFileSync(new URL('../views/chat/index.vue', import.meta.url), 'utf8')
 const closureStart = finalTheme.indexOf('/* Chat dark contrast closure.')
 const chatDark = closureStart >= 0 ? finalTheme.slice(closureStart) : ''
 
@@ -63,4 +64,9 @@ test('dark chat header, request metadata and upload cards own every interactive 
 
 test('teleported feedback uses a dark surface in dark mode', () => {
   assert.match(reachableSurface, /:root\[theme-mode="dark"\] body \.t-message\s*\{[\s\S]*?background:\s*#18181b\s*!important;[\s\S]*?color:\s*#f4f4f5\s*!important;/)
+})
+
+test('chat no longer renders the obstructive floating scroll-to-bottom control', () => {
+  assert.doesNotMatch(chatView, /visual-chat-scroll-bottom/)
+  assert.doesNotMatch(chatView, /@click="onClickScrollToBottom"/)
 })

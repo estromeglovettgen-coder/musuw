@@ -91,7 +91,7 @@
               </p>
             </section>
 
-            <section v-if="!isFAQ" class="kb-config-field">
+            <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="kb-config-field">
               <div class="kb-config-field__heading">
                 <label>{{ $t('knowledgeEditor.wiki.extractionGranularityLabel') }}</label>
                 <p>{{ $t('knowledgeEditor.wiki.extractionGranularityTip') }}</p>
@@ -122,7 +122,7 @@
               <p class="kb-config-granularity__hint">{{ granularityHint }}</p>
             </section>
 
-            <section v-if="!isFAQ" class="kb-config-field">
+            <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="kb-config-field">
               <div class="kb-config-field__heading">
                 <label>{{ $t('knowledgeEditor.wiki.contentInstructionsLabel') }}</label>
                 <p>{{ $t('knowledgeEditor.wiki.contentInstructionsTip') }}</p>
@@ -139,7 +139,7 @@
               </span>
             </section>
 
-            <section v-if="!isFAQ" class="kb-config-field">
+            <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="kb-config-field">
               <div class="kb-config-field__heading">
                 <label>{{ $t('knowledgeEditor.wiki.extractionInstructionsLabel') }}</label>
                 <p>{{ $t('knowledgeEditor.wiki.extractionInstructionsTip') }}</p>
@@ -192,6 +192,7 @@
                 model-type="KnowledgeQA"
                 :selected-model-id="formData.modelConfig.llmModelId"
                 :all-models="allModels"
+                :show-add-model="false"
                 :placeholder="$t('knowledgeEditor.models.llmPlaceholder')"
                 @update:selected-model-id="(val: string) => formData.modelConfig.llmModelId = val"
               />

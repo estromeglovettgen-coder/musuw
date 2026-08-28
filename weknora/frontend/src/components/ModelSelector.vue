@@ -454,20 +454,21 @@ const sceneOptionById = computed(() => new Map((props.sceneOptions || []).map(op
 const sceneOptionFor = (modelId?: string) => modelId ? sceneOptionById.value.get(modelId) : undefined
 const isConsumerSceneSelector = computed(() => props.mode === 'catalog' && !props.showAddModel)
 const selectorModels = computed<ModelSelectorModel[]>(() => {
-  if (isConsumerSceneSelector.value) {
-    return props.sceneOptions.map((option) => ({
-      id: option.model_id,
-      name: option.display_name,
-      display_name: option.display_name,
-      type: option.model_type,
-      model_type: option.model_type,
-      source: 'remote' as const,
-      parameters: { provider: 'openrouter' },
-      is_builtin: true,
-      is_default: option.is_scene_default,
-    }))
+  if (props.sceneOptions.length) {
+    if (isConsumerSceneSelector.value) {
+      return props.sceneOptions.map((option) => ({
+        id: option.model_id,
+        name: option.display_name,
+        display_name: option.display_name,
+        type: option.model_type,
+        model_type: option.model_type,
+        source: 'remote' as const,
+        parameters: { provider: 'openrouter' },
+        is_builtin: true,
+        is_default: option.is_scene_default,
+      }))
+    }
   }
-  if (!props.sceneOptions?.length) return catalogModels.value
   return catalogModels.value
 })
 
@@ -487,9 +488,9 @@ const selectedCatalogModel = computed(() => {
 void selectedCatalogModel
 
 const loadModels = async () => {
-  // Consumer scene selectors are display-only projections of the safe
-  // scene-options endpoint. They must never fall back to /models, whose
-  // semantics intentionally filter locked models out.
+  // Compact selectors either receive the safe scene projection used by the
+  // settings page or an explicit allModels catalog supplied by their caller.
+  // Neither variant should issue a second, competing /models request.
   if (props.allModels || isConsumerSceneSelector.value) {
     return
   }

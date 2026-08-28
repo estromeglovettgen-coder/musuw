@@ -65,8 +65,6 @@ export default defineComponent({
       </div>
     </div>
 
-    <Transition name="visual-chat-scroll-button"><button v-show="userHasScrolledUp" type="button" class="visual-chat-scroll-bottom" :aria-label="t('chat.scrollToBottom')" @click="onClickScrollToBottom"><t-icon name="chevron-down" /></button></Transition>
-
     <div class="visual-chat-input" :class="{ 'is-embedded': embeddedMode }">
       <InputField ref="inputFieldRef" :is-replying="isReplying" :session-id="session_id" :assistant-message-id="currentAssistantMessageId" :embedded-mode="embeddedMode" @send-msg="(query: any, modelId: any, mentionedItems: any, imageFiles: any, attachmentFiles: any, thinking: any, reasoningEffort: any) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort)" @stop-generation="handleStopGeneration" />
     </div>
@@ -110,13 +108,8 @@ export default defineComponent({
 .visual-chat-wait > span { width: 12px; height: 12px; box-sizing: border-box; border: 1.5px solid #d1d5db; border-top-color: #6b7280; border-radius: 50%; animation: visual-chat-spin .8s linear infinite; }
 .visual-chat-input { flex: 0 0 auto; width: min(768px,calc(100% - 32px)); min-width: 0; margin: 0 auto; padding: 8px 0 18px; box-sizing: border-box; background: #fff; }
 .visual-chat-input.is-embedded { width: 100%; padding: 10px 16px 16px; }
-.visual-chat-scroll-bottom { position: absolute; left: 50%; bottom: 116px; z-index: 10; width: 32px; height: 32px; padding: 7px; border: 1px solid #e5e7eb; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #6b7280; box-shadow: 0 4px 14px rgb(15 23 42 / 7%); cursor: pointer; transform: translateX(-50%); }
-.visual-chat-scroll-bottom:hover { background: #f9fafb; color: #111827; }
-.visual-chat-scroll-bottom :deep(.t-icon) { font-size: 13px; }
-.visual-chat-scroll-button-enter-active,.visual-chat-scroll-button-leave-active { transition: opacity 140ms ease,transform 140ms ease; }
-.visual-chat-scroll-button-enter-from,.visual-chat-scroll-button-leave-to { opacity: 0; transform: translateX(-50%) translateY(5px); }
 .visual-chat-suggestions-fade-enter-active,.visual-chat-suggestions-fade-leave-active { transition: opacity 140ms ease; }
 .visual-chat-suggestions-fade-enter-from,.visual-chat-suggestions-fade-leave-to { opacity: 0; }
 @keyframes visual-chat-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .visual-chat-view,.visual-chat-scroll-button-enter-active,.visual-chat-scroll-button-leave-active,.visual-chat-suggestions-fade-enter-active,.visual-chat-suggestions-fade-leave-active { transition: none !important; } .visual-chat-wait > span,.visual-chat-suggestions__refresh .is-spinning { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .visual-chat-view,.visual-chat-suggestions-fade-enter-active,.visual-chat-suggestions-fade-leave-active { transition: none !important; } .visual-chat-wait > span,.visual-chat-suggestions__refresh .is-spinning { animation: none; } }
 </style>

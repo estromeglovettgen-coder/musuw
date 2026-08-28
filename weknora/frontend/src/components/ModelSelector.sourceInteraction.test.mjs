@@ -163,6 +163,15 @@ test('consumer scene catalog uses the reference CustomSelect surface', () => {
   assert.doesNotMatch(lockedRule, /opacity:/)
 })
 
+test('compact catalog appearance can reuse caller-supplied catalog models', () => {
+  const modelsProjection = selector.slice(
+    selector.indexOf('const selectorModels = computed'),
+    selector.indexOf('const consumerSelectRef'),
+  )
+  assert.match(modelsProjection, /if \(props\.sceneOptions\.length\)/)
+  assert.match(modelsProjection, /return catalogModels\.value/)
+})
+
 test('consumer scene dropdown raises its open selector above sibling rows in dark and light themes', () => {
   // Every selector receives a dark-theme stacking context.  The active root
   // must therefore opt into a strictly higher layer; otherwise a later row

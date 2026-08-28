@@ -59,7 +59,7 @@ const controllers = [
       'suggestedQuestionsLoading', 'fetchSuggestedQuestions', 'handleSuggestedQuestionClick',
       'shouldRenderAssistantMessage', 'getUserQuery', 'isFirstEnter', 'scrollToBottom',
       'handleAnswerRenderComplete', 'handleFollowUpSelect', 'loadFollowUpSuggestions',
-      'showGlobalTypingIndicator', 'userHasScrolledUp', 'onClickScrollToBottom', 'inputFieldRef',
+      'showGlobalTypingIndicator', 'inputFieldRef',
       'sendMsg', 'handleStopGeneration', 'session_id', 'currentAssistantMessageId',
     ],
   },

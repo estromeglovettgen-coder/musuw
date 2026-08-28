@@ -291,6 +291,19 @@
 .agent-card .more-icon,
 .org-card .more-icon { width: 14px !important; height: 14px !important; opacity: .65 !important; }
 
+/* Knowledge-base cards are the visual contract for the consumer directory.
+ * Keep Agent-only business metadata, but align the shared card controls. */
+.agent-card .card-header-left { padding-right: 42px !important; }
+.agent-card .card-bottom { gap: 6px !important; flex-wrap: wrap !important; }
+.agent-card .agent-favorite-star {
+  position: absolute !important;
+  top: 14px !important;
+  right: 42px !important;
+  border-radius: 6px !important;
+}
+.agent-card .more-wrap { border-radius: 6px !important; }
+.agent-card .more-icon { width: 16px !important; height: 16px !important; }
+
 /* Group headings become the lightweight section labels used by reference KB. */
 .agent-section-header,
 .org-section-header {

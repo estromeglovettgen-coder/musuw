@@ -75,6 +75,37 @@ test('create exposes native RAG, Wiki, Wiki instructions, and summary model whil
   assert.match(settingsRefreshWatcher, /editorMode\.value !== 'create'/)
 })
 
+test('Wiki-only authoring controls stay hidden until Wiki indexing is enabled', () => {
+  const template = source.slice(0, source.indexOf('<script setup'))
+
+  for (const control of [
+    'class="kb-config-granularity"',
+    'v-model="formData.wikiConfig.contentInstructions"',
+    'v-model="formData.wikiConfig.extractionInstructions"',
+  ]) {
+    const controlIndex = template.indexOf(control)
+    assert.ok(controlIndex >= 0, `expected Wiki control ${control}`)
+    const sectionStart = template.lastIndexOf('<section', controlIndex)
+    const sectionTagEnd = template.indexOf('>', sectionStart)
+    const sectionTag = template.slice(sectionStart, sectionTagEnd + 1)
+    assert.match(
+      sectionTag,
+      /v-if="!isFAQ && formData\.indexingStrategy\.wikiEnabled"/,
+      `${control} must follow the native Wiki enablement contract`,
+    )
+  }
+})
+
+test('knowledge-base model selection uses the same compact selector surface as model settings', () => {
+  const template = source.slice(0, source.indexOf('<script setup'))
+  const selectorStart = template.indexOf('<ModelSelector')
+  const selectorEnd = template.indexOf('/>', selectorStart)
+  const selector = template.slice(selectorStart, selectorEnd + 2)
+
+  assert.match(selector, /:all-models="allModels"/)
+  assert.match(selector, /:show-add-model="false"/)
+})
+
 test('create mode reuses native TDesign fields and API payload', () => {
   assert.match(source, /<form v-if="formData" class="kb-config-form" @submit\.prevent="handleSubmit">/)
   assert.match(

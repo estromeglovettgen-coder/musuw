@@ -39,15 +39,8 @@
       v-if="authStore.isLiteMode"
       class="consumer-scene-settings"
       data-persisted-capability="consumer-scene-models"
-      aria-labelledby="consumer-scene-settings-title"
     >
-      <div class="consumer-scene-settings__header">
-        <div>
-          <h3 id="consumer-scene-settings-title">{{ $t('modelSettings.sceneModels.title') }}</h3>
-          <p>{{ $t('modelSettings.sceneModels.description') }}</p>
-        </div>
-        <t-loading v-if="consumerSceneLoading" size="small" />
-      </div>
+      <t-loading v-if="consumerSceneLoading" class="consumer-scene-settings__loading" size="small" />
       <div class="consumer-scene-settings__grid">
         <div v-for="scene in consumerScenes" :key="scene" class="consumer-scene-settings__row">
           <div class="consumer-scene-settings__copy">
@@ -919,45 +912,10 @@ onMounted(() => {
   background: transparent;
 }
 
-.visual-model-settings.is-lite .consumer-scene-settings__header {
-  margin-bottom: 16px;
-}
-
-.visual-model-settings.is-lite .consumer-scene-settings__header h3 {
-  margin: 0 0 4px;
-  color: #111827;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 700;
-}
-
-.visual-model-settings.is-lite .consumer-scene-settings__header p {
-  color: #777;
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.consumer-scene-settings__header {
+.consumer-scene-settings__loading {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
   margin-bottom: 10px;
-}
-
-.consumer-scene-settings__header h3 {
-  margin: 0 0 2px;
-  color: #374151;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 700;
-}
-
-.consumer-scene-settings__header p {
-  margin: 0;
-  color: #9ca3af;
-  font-size: 11px;
-  line-height: 16px;
 }
 
 .consumer-scene-settings__grid {
