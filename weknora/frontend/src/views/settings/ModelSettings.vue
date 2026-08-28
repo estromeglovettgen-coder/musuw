@@ -36,7 +36,7 @@
     </aside>
 
     <section
-      v-if="false"
+      v-if="authStore.isLiteMode"
       class="consumer-scene-settings"
       data-persisted-capability="consumer-scene-models"
       aria-labelledby="consumer-scene-settings-title"

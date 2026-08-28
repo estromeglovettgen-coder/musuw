@@ -30,14 +30,14 @@ test('all five Lite settings pages share the General title-strip DOM contract', 
   }
 })
 
-test('consumer-only presentation hides brand color and scene model rows without deleting persisted capability code', () => {
+test('consumer-only presentation hides brand color and shows the existing scene model rows', () => {
   const general = readPage('GeneralSettings.vue')
   assert.match(general, /<div\s+v-if="false"\s+class="visual-setting-row"\s+data-persisted-setting="theme-color">/)
   assert.match(general, /localThemeColor/)
   assert.match(general, /handleThemeColorChange/)
 
   const models = readPage('ModelSettings.vue')
-  assert.match(models, /<section\s+v-if="false"\s+class="consumer-scene-settings"\s+data-persisted-capability="consumer-scene-models"/)
+  assert.match(models, /<section\s+v-if="authStore\.isLiteMode"\s+class="consumer-scene-settings"\s+data-persisted-capability="consumer-scene-models"/)
   assert.match(models, /getConsumerSceneModel/)
   assert.match(models, /updateConsumerSceneModel/)
 })

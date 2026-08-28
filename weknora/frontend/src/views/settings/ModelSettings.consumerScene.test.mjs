@@ -16,8 +16,8 @@ test('consumer model settings show exactly the five real configurable boundaries
   assert.match(source, /updateConsumerSceneModel/)
 })
 
-test('consumer scene controls are presentation-hidden while their persisted/runtime seam remains intact', () => {
-  assert.match(source, /<section\s+v-if="false"\s+class="consumer-scene-settings"\s+data-persisted-capability="consumer-scene-models"/)
+test('consumer scene controls are shown only in Lite mode through the existing persisted/runtime seam', () => {
+  assert.match(source, /<section\s+v-if="authStore\.isLiteMode"\s+class="consumer-scene-settings"\s+data-persisted-capability="consumer-scene-models"/)
   assert.match(source, /const consumerScenes/)
   assert.match(source, /getConsumerSceneModel/)
   assert.match(source, /updateConsumerSceneModel/)
