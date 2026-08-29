@@ -4274,8 +4274,9 @@ export default {
     messages: {
       deleted: '삭제됨',
       deleteFailed: '삭제 실패',
-      duplicateSuccess: '설정 복제본이 생성되었습니다(문서, FAQ, Wiki 페이지 및 인덱스는 복사되지 않음)',
-      duplicateFailed: '지식베이스 설정 복제 실패'
+      duplicateStarted: '지식베이스 설정, 문서 및 인덱스를 백그라운드에서 복사하고 있습니다',
+      duplicateSuccess: '지식베이스 복사가 완료되었습니다',
+      duplicateFailed: '지식베이스 복사 실패'
     },
     sections: {
       pinned: '고정됨',
@@ -4296,7 +4297,7 @@ export default {
     menu: {
       viewDetails: '세부 사항을 확인하세요',
       editConfig: '구성 편집',
-      duplicate: '설정 복제'
+      duplicate: '지식베이스 복사'
     },
     delete: {
       confirmTitle: '삭제 확인',

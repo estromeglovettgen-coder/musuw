@@ -152,3 +152,45 @@ func TestCreateKnowledgeBaseResolverEmptyResultFailsClosed(t *testing.T) {
 	require.Contains(t, err.Error(), "resolved no model")
 	require.Empty(t, repo.rows)
 }
+
+func TestCreateKnowledgeBaseRejectsGraphOnlyConsumerDocumentBeforePersisting(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	repo := newFakeKBRepo()
+	svc := &knowledgeBaseService{repo: repo}
+
+	_, err := svc.CreateKnowledgeBase(ctxWithTenant(1), &types.KnowledgeBase{
+		Name:             "hidden-graph-only",
+		Type:             types.KnowledgeBaseTypeDocument,
+		IndexingStrategy: types.IndexingStrategy{GraphEnabled: true},
+	})
+
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	require.Equal(t, apperrors.ErrBadRequest, appErr.Code)
+	require.Contains(t, appErr.Message, "RAG or Wiki")
+	require.Empty(t, repo.rows)
+}
+
+func TestCreateKnowledgeBasePreservesStandardGraphOnlyDocumentContract(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
+	repo := newFakeKBRepo()
+	svc := &knowledgeBaseService{
+		repo:         repo,
+		modelService: &platformCatalogStub{models: readyPlatformKnowledgeBaseModels()},
+	}
+
+	kb, err := svc.CreateKnowledgeBase(ctxWithTenant(1), &types.KnowledgeBase{
+		Name:             "standard-graph-only",
+		Type:             types.KnowledgeBaseTypeDocument,
+		IndexingStrategy: types.IndexingStrategy{GraphEnabled: true},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, kb)
+	require.True(t, kb.IndexingStrategy.GraphEnabled)
+	require.False(t, kb.IndexingStrategy.VectorEnabled)
+	require.False(t, kb.IndexingStrategy.KeywordEnabled)
+	require.False(t, kb.IndexingStrategy.WikiEnabled)
+	require.Len(t, repo.rows, 1)
+}

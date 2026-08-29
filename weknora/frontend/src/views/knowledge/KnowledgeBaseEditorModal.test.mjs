@@ -24,8 +24,42 @@ test('a successful configured create closes after using the native create contra
   assert.ok(createBranch, 'expected to find the create branch')
   assert.match(createBranch, /handleClose\(\)/)
   assert.doesNotMatch(createBranch, /savedKbId\.value|loadKBData\(createdKbId\)/)
-  assert.match(createBranch, /indexing_strategy:/)
-  assert.match(createBranch, /wiki_config:/)
+  assert.match(createBranch, /createPayload\.indexing_strategy =/)
+  assert.match(createBranch, /createPayload\.wiki_config =/)
+})
+
+test('FAQ create preserves the native type and FAQ configuration contract', () => {
+  const doSubmit = source.slice(
+    source.indexOf('const doSubmit = async () => {'),
+    source.indexOf('// 重置所有状态'),
+  )
+  assert.match(doSubmit, /type:\s*formData\.value\.type/)
+  assert.match(
+    doSubmit,
+    /if \(formData\.value\.type === 'faq'\) \{[\s\S]*?createPayload\.faq_config = \{[\s\S]*?index_mode:[\s\S]*?question_index_mode:/,
+  )
+  assert.match(doSubmit, /else \{[\s\S]*?createPayload\.indexing_strategy = \{[\s\S]*?createPayload\.wiki_config = \{/)
+})
+
+test('document create requires a visible RAG or Wiki strategy before the zero-config return', () => {
+  const validateForm = source.slice(
+    source.indexOf('const validateForm = (): boolean => {'),
+    source.indexOf('// 构建提交数据'),
+  )
+  const visibleStrategyGuard = validateForm.match(
+    /if \(authStore\.isLiteMode && formData\.value\.type !== 'faq'\) \{([\s\S]*?)^\s{2}\}/m,
+  )?.[0] ?? ''
+
+  assert.match(visibleStrategyGuard, /!s\.vectorEnabled/)
+  assert.match(visibleStrategyGuard, /!s\.keywordEnabled/)
+  assert.match(visibleStrategyGuard, /!s\.wikiEnabled/)
+  assert.doesNotMatch(visibleStrategyGuard, /graphEnabled/)
+  assert.ok(
+    validateForm.indexOf(visibleStrategyGuard) < validateForm.indexOf("if (editorMode.value === 'create') return true"),
+    'visible strategy validation must run before create mode skips edit-only model validation',
+  )
+  assert.match(zh, /atLeastOne: '请至少选择 RAG 检索或 Wiki 知识库'/)
+  assert.match(en, /atLeastOne: 'Select at least RAG retrieval or Wiki'/)
 })
 
 test('save button labels match the reference create and edit actions', () => {
@@ -113,7 +147,7 @@ test('create mode reuses native TDesign fields and API payload', () => {
     /<t-textarea[\s\S]*?v-model="formData\.description"[\s\S]*?:placeholder="\$t\('knowledgeEditor\.basic\.descriptionPlaceholder'\)"[\s\S]*?:maxlength="200"/,
   )
   assert.doesNotMatch(source, /visual-kb-create-textarea|<textarea/)
-  assert.match(source, /const sceneModels = consumerSceneModelsForCreate\(\)[\s\S]*createKnowledgeBase\(\{[\s\S]*name: formData\.value\.name\.trim\(\),[\s\S]*description: formData\.value\.description\.trim\(\),[\s\S]*\.\.\.sceneModels,[\s\S]*indexing_strategy:[\s\S]*wiki_config:/)
+  assert.match(source, /const sceneModels = consumerSceneModelsForCreate\(\)[\s\S]*const createPayload:[\s\S]*name: formData\.value\.name\.trim\(\),[\s\S]*description: formData\.value\.description\.trim\(\),[\s\S]*\.\.\.sceneModels,[\s\S]*createPayload\.indexing_strategy =[\s\S]*createPayload\.wiki_config =[\s\S]*createKnowledgeBase\(createPayload\)/)
 })
 
 test('create dialog is a scrollable consumer settings modal with mobile-safe bounds', () => {

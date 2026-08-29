@@ -4276,8 +4276,9 @@ export default {
     messages: {
       deleted: '已删除',
       deleteFailed: '删除失败',
-      duplicateSuccess: '已创建配置副本（不含文档、FAQ、Wiki 页面和索引）',
-      duplicateFailed: '创建知识库配置副本失败'
+      duplicateStarted: '正在后台复制知识库配置、文档与索引',
+      duplicateSuccess: '知识库复制完成',
+      duplicateFailed: '复制知识库失败'
     },
     sections: {
       pinned: '置顶',
@@ -4298,7 +4299,7 @@ export default {
     menu: {
       viewDetails: '查看详情',
       editConfig: '编辑配置',
-      duplicate: '创建配置副本'
+      duplicate: '复制知识库'
     },
     delete: {
       confirmTitle: '删除确认',

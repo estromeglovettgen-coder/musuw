@@ -7,12 +7,12 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 test('settings shell follows the supplied SettingsModal geometry', () => {
   const source = read('../views/settings/components/VisualSettingsShell.vue')
   assert.match(source, /width: min\(896px, 100%\);/)
-  assert.match(source, /height: 580px;/)
+  assert.match(source, /height: 620px;/)
   assert.match(source, /max-height: 92vh;/)
   assert.match(source, /border-radius: 24px;/)
   assert.match(source, /flex: 0 0 192px;/)
   assert.match(source, /padding: 16px 12px 12px;/)
-  assert.match(source, /background: rgb\(0 0 0 \/ 40%\);/)
+  assert.match(source, /background: rgb\(0 0 0 \/ 50%\);/)
   assert.match(source, /backdrop-filter: blur\(4px\);/)
   assert.match(source, /padding: 12px;/)
   assert.match(source, /@media \(min-width: 640px\)\s*\{[\s\S]*\.visual-settings-overlay \{ padding: 16px; \}/)
@@ -128,15 +128,16 @@ test('consumer scene loading and errors stay on the source CustomSelect branch',
   assert.match(source, /\.visual-model-selector__consumer-option\s*\{[\s\S]*transition: background-color 150ms ease, color 150ms ease;/)
 })
 
-test('user profile keeps the plain source settings group without navigation icons', () => {
+test('user profile keeps the authoritative unboxed rows and mono account metadata', () => {
   const source = read('../views/settings/UserProfile.vue')
-  const cascade = read('./musuw-settings-reference-inner.css')
   assert.match(source, /class="visual-settings-page-header"/)
-  assert.match(source, /class="settings-group"/)
+  assert.match(source, /class="user-profile__rows"/)
   assert.doesNotMatch(source, /t-icon|visual-settings-nav/)
-  assert.match(source, /border-radius: 16px;/)
-  assert.match(cascade, /\.visual-settings-content \.user-profile \.setting-row\s*\{[\s\S]*display: flex !important;/)
-  assert.match(cascade, /\.visual-settings-content \.user-profile \.setting-info label\s*\{[\s\S]*font-size: 14px !important;/)
+  assert.doesNotMatch(source, /class="desc"/)
+  assert.match(source, /class="info-value is-mono">\{\{ userInfo\?\.email/)
+  assert.match(source, /class="info-value is-mono">\{\{ formatDate/)
+  assert.match(source, /\.user-profile__row\s*\{[\s\S]*padding:\s*14px 0;[\s\S]*gap:\s*16px;[\s\S]*border-bottom:\s*1px solid #f3f4f6;/)
+  assert.match(source, /\.info-value\.is-mono\s*\{[\s\S]*font-family:\s*var\(--app-font-family-mono\);/)
 })
 
 test('consumer scene dropdown inherits the source CustomSelect tokens', () => {

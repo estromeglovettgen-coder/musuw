@@ -26,9 +26,10 @@ The system SHALL expose RAG and Wiki as consumer choices while retaining native 
 - **WHEN** a Lite user disables both RAG and Wiki and attempts to create a document knowledge base
 - **THEN** the UI prevents submission and the server independently rejects the request without persisting a knowledge base
 
-#### Scenario: Duplicate settings uses the native contract
+#### Scenario: Content copy uses the native asynchronous contract
 - **WHEN** a user creates a duplicate from a knowledge-base card
-- **THEN** the UI states that only settings are copied and the native duplicate remains empty of documents, FAQ entries, Wiki pages, and indexes
+- **THEN** the UI starts the existing `/knowledge-bases/copy` task, polls its existing progress endpoint to a terminal state, and reports completion only after the configuration, document or FAQ content, and their chunks and indexes have been copied
+- **AND** the UI does not promise to copy Wiki pages, which are outside the existing native copy contract
 
 #### Scenario: Avoid false rebuild promises
 - **WHEN** a user edits settings on a knowledge base that already contains content

@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const source = readFileSync(new URL("./KnowledgeBase.vue", import.meta.url), "utf8");
+const nativeController = readFileSync(
+  new URL("../../assets/business-baselines/KnowledgeBase.pre-view.vue", import.meta.url),
+  "utf8",
+);
 
 test("knowledge detail keeps the compact reference toolbar without the user-hidden date filter", () => {
   assert.match(source, /class="visual-knowledge-toolbar"[\s\S]*?visual-knowledge-toolbar__left/);
@@ -28,10 +32,13 @@ test("graph view keeps the original layout chrome instead of inheriting document
   );
 });
 
-test("knowledge detail derives folder data independently from the collapsed sidebar layout", () => {
-  assert.match(source, /showFolderTree:\s*computed\(\(\) => !Boolean\(unref\(state\.isFAQ\)\)\)/);
-  assert.match(source, /currentChildFolders:\s*computed\([\s\S]*?childFolders\(/);
-  assert.doesNotMatch(source.slice(0, source.indexOf('<template>')), /folderTreeCollapsed/);
+test("knowledge detail delegates empty and collapsed folder behavior to the native controller", () => {
+  const wrapper = source.slice(0, source.indexOf('<template>'));
+  assert.doesNotMatch(wrapper, /showFolderTree:\s*computed/);
+  assert.doesNotMatch(wrapper, /currentChildFolders:\s*computed/);
+  assert.doesNotMatch(wrapper, /childFolders|ROOT_FOLDER_PATH|legacySetup/);
+  assert.match(nativeController, /const showFolderTree = computed\(\(\) => !isFAQ\.value && hasFolders\.value\)/);
+  assert.match(nativeController, /if \(showFolderTree\.value && !folderTreeCollapsed\.value\) return \[\]/);
 });
 
 test("knowledge detail does not duplicate settings in the top-right header", () => {

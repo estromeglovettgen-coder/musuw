@@ -51,19 +51,27 @@ func (s *stubKBCopyService) CopyKnowledgeBase(
 
 type stubKBCloneProgressService struct {
 	interfaces.KnowledgeService
-	saved []*types.KBCloneProgress
+	saved  []*types.KBCloneProgress
+	onSave func()
 }
 
 func (s *stubKBCloneProgressService) SaveKBCloneProgress(_ context.Context, progress *types.KBCloneProgress) error {
+	if s.onSave != nil {
+		s.onSave()
+	}
 	s.saved = append(s.saved, progress)
 	return nil
 }
 
 type recordingKBCloneEnqueuer struct {
-	task *asynq.Task
+	task      *asynq.Task
+	onEnqueue func()
 }
 
 func (e *recordingKBCloneEnqueuer) Enqueue(task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+	if e.onEnqueue != nil {
+		e.onEnqueue()
+	}
 	e.task = task
 	return &asynq.TaskInfo{ID: "task-1"}, nil
 }
@@ -135,8 +143,9 @@ func TestCopyHandler_PrecreatesAndReturnsStableTargetID(t *testing.T) {
 			return &types.KnowledgeBase{ID: sourceID, TenantID: 1}, &types.KnowledgeBase{ID: "target-fixed", TenantID: 1}, nil
 		},
 	}
-	progress := &stubKBCloneProgressService{}
-	enqueuer := &recordingKBCloneEnqueuer{}
+	var events []string
+	progress := &stubKBCloneProgressService{onSave: func() { events = append(events, "progress") }}
+	enqueuer := &recordingKBCloneEnqueuer{onEnqueue: func() { events = append(events, "enqueue") }}
 	r := gin.New()
 	r.Use(middleware.ErrorHandler())
 	r.Use(func(c *gin.Context) {
@@ -173,6 +182,9 @@ func TestCopyHandler_PrecreatesAndReturnsStableTargetID(t *testing.T) {
 	}
 	if len(progress.saved) != 1 || progress.saved[0].TargetID != "target-fixed" {
 		t.Fatalf("initial progress must carry fixed target id, got %#v", progress.saved)
+	}
+	if len(events) != 2 || events[0] != "progress" || events[1] != "enqueue" {
+		t.Fatalf("initial progress must be saved before enqueue to avoid overwriting a fast worker, got %#v", events)
 	}
 }
 

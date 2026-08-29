@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import KbWikiBadge from './KbWikiBadge.vue'
+import { computed } from 'vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -43,6 +43,14 @@ const emit = defineEmits<{
   details: []
 }>()
 
+const hasRagStrategy = computed(() => Boolean(
+  props.kb.indexing_strategy?.vector_enabled || props.kb.indexing_strategy?.keyword_enabled,
+))
+const hasWikiStrategy = computed(() => Boolean(props.kb.indexing_strategy?.wiki_enabled))
+const isVisibleStrategyMissing = computed(() => (
+  authStore.isLiteMode && props.kb.type !== 'faq' && !hasRagStrategy.value && !hasWikiStrategy.value
+))
+
 const requestEdit = () => {
   props.kb.showMore = false
   emit('edit')
@@ -82,19 +90,6 @@ const requestDelete = () => {
           <t-icon name="pin-filled" />
           <span>{{ $t('knowledgeList.pin.pin') }}</span>
         </span>
-        <KbWikiBadge v-if="kb.indexing_strategy?.wiki_enabled" />
-        <span
-          v-else-if="kb.indexing_strategy?.vector_enabled || kb.indexing_strategy?.keyword_enabled"
-          class="visual-reference-kb-card__strategy-icon"
-          data-indexing-strategy="rag"
-          title="RAG"
-        ><t-icon name="layers" /></span>
-        <span
-          v-else-if="authStore.isLiteMode && kb.type !== 'faq'"
-          class="visual-reference-kb-card__strategy-icon is-warning"
-          data-indexing-strategy="unconfigured"
-          :title="$t('knowledgeList.features.unconfigured')"
-        ><t-icon name="error-circle" /></span>
         <strong>{{ kb.name }}</strong>
       </div>
 
@@ -117,6 +112,21 @@ const requestDelete = () => {
         </template>
       </t-popup>
     </header>
+
+    <div class="visual-reference-kb-card__strategies" :aria-label="$t('knowledgeEditor.indexing.title')">
+      <span v-if="hasRagStrategy" data-indexing-strategy="rag" class="visual-reference-kb-card__strategy">
+        <t-icon name="layers" />
+        <span>RAG</span>
+      </span>
+      <span v-if="hasWikiStrategy" data-indexing-strategy="wiki" class="visual-reference-kb-card__strategy">
+        <t-icon name="book-open" />
+        <span>Wiki</span>
+      </span>
+      <span v-if="isVisibleStrategyMissing" data-indexing-strategy="unconfigured" class="visual-reference-kb-card__strategy is-warning">
+        <t-icon name="error-circle" />
+        <span>{{ $t('knowledgeList.features.unconfigured') }}</span>
+      </span>
+    </div>
 
     <p class="visual-reference-kb-card__description">{{ kb.description?.trim() || $t('knowledgeBase.noDescription') }}</p>
 
@@ -163,9 +173,6 @@ const requestDelete = () => {
 .visual-reference-kb-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .visual-reference-kb-card__title { min-width: 0; flex: 1; padding-right: 42px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .visual-reference-kb-card__title strong { min-width: 0; flex: 1; overflow: hidden; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
-.visual-reference-kb-card__strategy-icon { flex: 0 0 auto; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: #6b7280; }
-.visual-reference-kb-card__strategy-icon :deep(.t-icon) { width: 14px; height: 14px; font-size: 14px; }
-.visual-reference-kb-card__strategy-icon.is-warning { color: #d97706; }
 .visual-reference-kb-card__pinned { flex: 0 0 auto; min-height: 18px; padding: 2px 6px; border: 1px solid rgb(253 230 138 / 60%); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: rgb(255 251 235 / 90%); color: #b45309; font-size: 10px; line-height: 12px; font-weight: 500; }
 .visual-reference-kb-card__pinned :deep(.t-icon) { width: 10px; height: 10px; font-size: 10px; color: #d97706; }
 .visual-reference-kb-card__favorite { position: absolute; top: 14px; right: 42px; z-index: 2; width: 24px; height: 24px; padding: 4px; border: 0; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #d1d5db; opacity: 0; cursor: pointer; transition: opacity 150ms ease,color 150ms ease,background-color 150ms ease; }
@@ -180,6 +187,10 @@ const requestDelete = () => {
 .visual-reference-kb-card__state small { font-size: 9px; line-height: 1; }
 .visual-reference-kb-card__more:hover { background: rgb(243 244 246 / 80%); color: #1f2937; }
 .visual-reference-kb-card__more :deep(.t-icon) { width: 16px; height: 16px; font-size: 16px; }
+.visual-reference-kb-card__strategies { min-height: 18px; margin-top: 6px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.visual-reference-kb-card__strategy { min-height: 18px; padding: 2px 6px; border: 1px solid rgb(229 231 235 / 90%); border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; background: #f9fafb; color: #6b7280; font-size: 10px; line-height: 12px; font-weight: 500; }
+.visual-reference-kb-card__strategy :deep(.t-icon) { width: 10px; height: 10px; font-size: 10px; }
+.visual-reference-kb-card__strategy.is-warning { border-color: rgb(253 230 138 / 80%); background: #fffbeb; color: #b45309; }
 .visual-reference-kb-card__description { margin: 6px 0 0; overflow: hidden; color: #6b7280; font-size: 12px; line-height: 1.625; letter-spacing: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .visual-reference-kb-card__footer { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .visual-reference-kb-card__badge { min-height: 20px; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; background: #f5f5f5; color: #4b5563; font-size: 11px; line-height: 16px; font-weight: 400; }
@@ -193,7 +204,8 @@ const requestDelete = () => {
 :root[theme-mode="dark"] .visual-reference-kb-card:hover { border-color: var(--mvc-line-strong, #484c54) !important; background: var(--mvc-hover, #25272c) !important; box-shadow: var(--mvc-shadow) !important; transform: none !important; }
 :root[theme-mode="dark"] .visual-reference-kb-card.is-highlighted { border-color: #71717a; box-shadow: 0 0 0 2px rgb(244 244 245 / 7%); }
 :root[theme-mode="dark"] .visual-reference-kb-card__title strong { color: #f4f4f5; }
-:root[theme-mode="dark"] .visual-reference-kb-card__strategy-icon { color: #d4d4d8; }
+:root[theme-mode="dark"] .visual-reference-kb-card__strategy { border-color: #3f3f46; background: #27272a; color: #d4d4d8; }
+:root[theme-mode="dark"] .visual-reference-kb-card__strategy.is-warning { border-color: rgb(146 64 14 / 70%); background: rgb(120 53 15 / 24%); color: #fbbf24; }
 :root[theme-mode="dark"] .visual-reference-kb-card__description { color: #a1a1aa; }
 :root[theme-mode="dark"] .visual-reference-kb-card__footer { border-color: #27272a; }
 :root[theme-mode="dark"] .visual-reference-kb-card__badge,

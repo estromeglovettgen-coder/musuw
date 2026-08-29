@@ -1,6 +1,9 @@
 <script lang="ts">
-import { defineComponent, type SetupContext } from 'vue'
+import { defineComponent, onUnmounted, type SetupContext } from 'vue'
+import { MessagePlugin } from 'tdesign-vue-next'
+import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseListBusiness from '@/assets/business-baselines/KnowledgeBaseList.pre-view.vue'
+import { duplicateKnowledgeBase, getKnowledgeBaseCopyProgress } from '@/api/knowledge-base'
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import KnowledgeBaseListReferenceCard from './components/KnowledgeBaseListReferenceCard.vue'
@@ -23,7 +26,66 @@ export default defineComponent({
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const { t } = useI18n()
+      let disposed = false
+
+      onUnmounted(() => {
+        disposed = true
+      })
+
+      const pollCopy = async (taskId: string, targetId?: string) => {
+        while (!disposed) {
+          try {
+            const response: any = await getKnowledgeBaseCopyProgress(taskId)
+            if (disposed) return
+            const progress = response?.data
+            if (progress?.status === 'completed') {
+              MessagePlugin.success(t('knowledgeList.messages.duplicateSuccess'))
+              await state.fetchList(true).catch(() => undefined)
+              if (targetId) state.triggerHighlightFlash(targetId)
+              return
+            }
+            if (progress?.status === 'failed') {
+              MessagePlugin.error(progress.error || progress.message || t('knowledgeList.messages.duplicateFailed'))
+              return
+            }
+          } catch {
+            // The copy task remains authoritative; retry transient progress reads.
+          }
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      }
+
+      const copyById = async (id: string) => {
+        try {
+          const response: any = await duplicateKnowledgeBase(id)
+          if (!response?.success) {
+            MessagePlugin.error(response?.message || t('knowledgeList.messages.duplicateFailed'))
+            return
+          }
+          const targetId = response.data?.target_id || response.data?.knowledge_base?.id
+          const taskId = response.data?.task_id
+          if (!taskId) {
+            MessagePlugin.error(t('knowledgeList.messages.duplicateFailed'))
+            return
+          }
+          MessagePlugin.info(t('knowledgeList.messages.duplicateStarted'))
+          await state.fetchList(true).catch(() => undefined)
+          if (targetId) state.triggerHighlightFlash(targetId)
+          void pollCopy(taskId, targetId)
+        } catch (error: any) {
+          MessagePlugin.error(error?.message || t('knowledgeList.messages.duplicateFailed'))
+        }
+      }
+
+      state.handleDuplicate = async (kb: { id: string; showMore?: boolean }) => {
+        kb.showMore = false
+        await copyById(kb.id)
+      }
+      state.handleDuplicateById = copyById
+      return { ...state }
+    }
     return state
   },
 })

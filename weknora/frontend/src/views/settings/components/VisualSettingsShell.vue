@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   box-sizing: border-box;
   padding: 12px;
-  background: rgb(0 0 0 / 40%);
+  background: rgb(0 0 0 / 50%);
   backdrop-filter: blur(4px);
   user-select: none;
 }
@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
 .visual-settings-modal {
   position: relative;
   width: min(896px, 100%);
-  height: 580px;
+  height: 620px;
   max-height: 92vh;
   min-width: 0;
   display: flex;

@@ -1151,9 +1151,33 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 	task := asynq.NewTask(types.TypeKBClone, payloadBytes,
 		asynq.TaskID(taskID), asynq.Queue(types.QueueMaintenance),
 		asynq.MaxRetry(3), asynq.Timeout(2*time.Hour))
+
+	// Publish pending progress before enqueueing. A small/empty clone can finish
+	// immediately; writing pending after enqueue could overwrite the worker's
+	// completed state and leave clients polling forever.
+	initialProgress := &types.KBCloneProgress{
+		TaskID:    taskID,
+		SourceID:  req.SourceID,
+		TargetID:  targetID,
+		Status:    types.KBCloneStatusPending,
+		Progress:  0,
+		Message:   "Task queued, waiting to start...",
+		CreatedAt: time.Now().Unix(),
+		UpdatedAt: time.Now().Unix(),
+	}
+	if err := h.knowledgeService.SaveKBCloneProgress(ctx, initialProgress); err != nil {
+		logger.Warnf(ctx, "Failed to save initial KB clone progress: %v", err)
+		// Don't fail the request; the worker will publish its own progress.
+	}
+
 	info, err := h.asynqClient.Enqueue(task)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to enqueue KB clone task: %v", err)
+		initialProgress.Status = types.KBCloneStatusFailed
+		initialProgress.Error = "Failed to enqueue task"
+		initialProgress.Message = "Failed to enqueue task"
+		initialProgress.UpdatedAt = time.Now().Unix()
+		_ = h.knowledgeService.SaveKBCloneProgress(ctx, initialProgress)
 		if createdTargetID != "" {
 			// The target has no cloned content yet; best-effort soft deletion keeps
 			// an enqueue failure from leaving an orphaned destination KB.
@@ -1167,22 +1191,6 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 
 	logger.Infof(ctx, "KB clone task enqueued: %s, asynq task ID: %s, source: %s, target: %s",
 		taskID, info.ID, secutils.SanitizeForLog(req.SourceID), secutils.SanitizeForLog(req.TargetID))
-
-	// Save initial progress to Redis so frontend can query immediately
-	initialProgress := &types.KBCloneProgress{
-		TaskID:    taskID,
-		SourceID:  req.SourceID,
-		TargetID:  targetID,
-		Status:    types.KBCloneStatusPending,
-		Progress:  0,
-		Message:   "Task queued, waiting to start...",
-		CreatedAt: time.Now().Unix(),
-		UpdatedAt: time.Now().Unix(),
-	}
-	if err := h.knowledgeService.SaveKBCloneProgress(ctx, initialProgress); err != nil {
-		logger.Warnf(ctx, "Failed to save initial KB clone progress: %v", err)
-		// Don't fail the request, task is already enqueued
-	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

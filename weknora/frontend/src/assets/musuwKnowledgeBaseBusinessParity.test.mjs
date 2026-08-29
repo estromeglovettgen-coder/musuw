@@ -11,11 +11,11 @@ test('audited KnowledgeBase controller remains locked after managed video suppor
   assert.equal(blobSha(controller), '75996e898b170fe61e0c32eac39ca71b79bee9a0')
 })
 
-test('rebuilt KnowledgeBase reuses normalized frozen setup and keeps Graph host binding intact', () => {
+test('rebuilt KnowledgeBase delegates setup to the frozen native controller and keeps Graph host binding intact', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   assert.match(source, /import LegacyKnowledgeBaseBusiness from .*KnowledgeBase\.pre-view\.vue/)
-  assert.match(source, /const legacySetup = legacy\.setup/)
-  assert.match(source, /\.\.\.state,[\s\S]*?showFolderTree: computed[\s\S]*?currentChildFolders: computed/)
+  assert.match(source, /const legacy = LegacyKnowledgeBaseBusiness as any/)
+  assert.doesNotMatch(source, /legacySetup|showFolderTree:\s*computed|currentChildFolders:\s*computed/)
   assert.match(source, /class="visual-knowledge-page"/)
   assert.ok(source.includes(`:view="activeKbTab === 'graph' ? 'graph' : 'browser'"`))
   assert.ok(source.includes('@open-source-doc="openSourceDoc"'))

@@ -3,7 +3,6 @@
     <header class="visual-settings-page-header">
       <div class="visual-settings-page-header__copy">
         <h2 class="visual-settings-page-header__title">{{ $t('userProfile.title') }}</h2>
-        <p class="visual-settings-page-header__description">{{ $t('userProfile.description') }}</p>
       </div>
     </header>
 
@@ -23,38 +22,23 @@
     </div>
 
     <!-- Content -->
-    <div v-else class="settings-group">
+    <div v-else class="user-profile__rows">
       <!-- 用户名 -->
-      <div class="setting-row">
-        <div class="setting-info">
-          <label>{{ $t('tenant.api.usernameLabel') }}</label>
-          <p class="desc">{{ $t('tenant.api.usernameDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <span class="info-value">{{ userInfo?.username || '-' }}</span>
-        </div>
+      <div class="user-profile__row">
+        <span class="user-profile__label">{{ $t('tenant.api.usernameLabel') }}</span>
+        <span class="info-value">{{ userInfo?.username || '-' }}</span>
       </div>
 
       <!-- 邮箱 -->
-      <div class="setting-row">
-        <div class="setting-info">
-          <label>{{ $t('tenant.api.emailLabel') }}</label>
-          <p class="desc">{{ $t('tenant.api.emailDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <span class="info-value">{{ userInfo?.email || '-' }}</span>
-        </div>
+      <div class="user-profile__row">
+        <span class="user-profile__label">{{ $t('tenant.api.emailLabel') }}</span>
+        <span class="info-value is-mono">{{ userInfo?.email || '-' }}</span>
       </div>
 
       <!-- 注册时间 -->
-      <div class="setting-row">
-        <div class="setting-info">
-          <label>{{ $t('tenant.api.createdAtLabel') }}</label>
-          <p class="desc">{{ $t('tenant.api.createdAtDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <span class="info-value">{{ formatDate(userInfo?.created_at) }}</span>
-        </div>
+      <div class="user-profile__row">
+        <span class="user-profile__label">{{ $t('tenant.api.createdAtLabel') }}</span>
+        <span class="info-value is-mono">{{ formatDate(userInfo?.created_at) }}</span>
       </div>
     </div>
   </div>
@@ -115,28 +99,6 @@ onMounted(loadInfo)
   color: #202123;
 }
 
-.section-header {
-  margin: 0 0 8px;
-  padding: 0 0 12px;
-  border-bottom: 1px solid #f3f4f6;
-
-  h2 {
-    margin: 0;
-    color: #111827;
-    font-size: 16px;
-    line-height: 24px;
-    font-weight: 700;
-    letter-spacing: normal;
-  }
-
-  .section-description {
-    margin: 2px 0 0;
-    color: #9ca3af;
-    font-size: 12px;
-    line-height: 16px;
-  }
-}
-
 .loading-inline {
   display: flex;
   align-items: center;
@@ -151,68 +113,55 @@ onMounted(loadInfo)
   padding: 20px 0;
 }
 
-.settings-group {
-  overflow: hidden;
-  border: 1px solid #e5e5e5;
-  border-radius: 16px;
-  background: #fff;
+.user-profile__rows {
   display: flex;
   flex-direction: column;
 }
 
-.setting-row {
+.user-profile__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 64px;
-  padding: 14px 16px;
+  padding: 14px 0;
   gap: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f3f4f6;
 
   &:last-child {
     border-bottom: none;
   }
 }
 
-.setting-info {
+.user-profile__label {
   min-width: 0;
   flex: 1;
-
-  label {
-    display: block;
-    color: #111827;
-    font-size: 14px;
-    line-height: 20px;
-    font-weight: 600;
-  }
-
-  .desc {
-    margin: 2px 0 0;
-    color: #777;
-    font-size: 12px;
-    line-height: 18px;
-  }
+  color: #111827;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
 }
 
-.setting-control {
+.info-value {
   flex-shrink: 0;
-  max-width: 52%;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  max-width: 58%;
+  color: #374151;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-word;
+}
 
-  .info-value {
-    color: #374151;
-    font-size: 12px;
-    line-height: 18px;
-    text-align: right;
-    word-break: break-word;
-  }
+.info-value.is-mono {
+  font-family: var(--app-font-family-mono);
 }
 
 @media (max-width: 640px) {
-  .setting-row { align-items: flex-start; flex-direction: column; gap: 6px; }
-  .setting-control { max-width: 100%; justify-content: flex-start; }
-  .setting-control .info-value { text-align: left; }
+  .user-profile__row { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .info-value { max-width: 100%; text-align: left; }
 }
+
+:global(:root[theme-mode="dark"]) .user-profile { color: #e4e4e7; }
+:global(:root[theme-mode="dark"]) .user-profile__row { border-bottom-color: #27272a; }
+:global(:root[theme-mode="dark"]) .user-profile__label { color: #f4f4f5; }
+:global(:root[theme-mode="dark"]) .info-value { color: #e4e4e7; }
 </style>

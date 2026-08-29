@@ -143,6 +143,16 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 	}
 	consumerCandidates := requestedConsumerModels(kb)
 	kb.ApplyPlatformKnowledgeBaseDefaults()
+	// Lite exposes only RAG and Wiki as selectable document-library
+	// strategies. Graph is an intentionally hidden platform default, so a
+	// graph-only request would create a library that accepts and parses files
+	// but cannot serve the visible RAG/Wiki product contract. Keep Standard's
+	// native graph-only capability unchanged.
+	if isLiteProductEdition() && kb.Type == types.KnowledgeBaseTypeDocument &&
+		!kb.IndexingStrategy.VectorEnabled && !kb.IndexingStrategy.KeywordEnabled &&
+		!kb.IndexingStrategy.WikiEnabled {
+		return nil, apperrors.NewBadRequestError("at least one visible indexing strategy (RAG or Wiki) must be enabled")
+	}
 	kb.EnsureDefaults()
 	if err := s.applyConsumerKnowledgeBaseModels(ctx, kb, consumerCandidates); err != nil {
 		return nil, err

@@ -106,7 +106,7 @@ test('KnowledgeBase.tsx list tokens remain mechanically translated while native 
 
 test('SettingsModal.tsx remains the accepted mechanical-reference sample', () => {
   expectTokens('../views/settings/components/VisualSettingsShell.vue', [
-    'width: min(896px, 100%);', 'height: 580px;', 'border-radius: 24px;',
+    'width: min(896px, 100%);', 'height: 620px;', 'border-radius: 24px;',
     'flex: 0 0 192px;', 'padding: 16px 12px 12px;',
   ])
   expectTokens('../views/settings/Settings.vue', [
@@ -123,7 +123,8 @@ test('Lite personal settings share the Codex-style grouped-row geometry', () => 
     'max-width: 640px;', 'usage-billing__section', 'usage-billing__card', 'border-radius: 16px;',
   ])
   expectTokens('../views/settings/UserProfile.vue', [
-    'max-width: 640px;', 'settings-group', 'border-radius: 16px;',
+    'max-width: 640px;', 'user-profile__rows', 'padding: 14px 0;',
+    'font-size: 14px;', 'font-weight: 600;', 'font-family: var(--app-font-family-mono);',
   ])
 })
 

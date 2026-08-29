@@ -95,7 +95,7 @@
                           $t('agent.editor.normalDesc') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-radio-group v-model="agentMode" :disabled="isBuiltinAgent" data-guide="agent-create-mode">
+                        <t-radio-group class="agent-segmented-control" v-model="agentMode" :disabled="isBuiltinAgent" data-guide="agent-create-mode">
                           <t-radio-button value="quick-answer">
                             {{ $t('agent.type.normal') }}
                           </t-radio-button>
@@ -1300,7 +1300,7 @@
                         <p class="desc">{{ $t('agentEditor.desc.kbScope') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-radio-group v-model="kbSelectionMode">
+                        <t-radio-group class="agent-segmented-control agent-segmented-control--scope" v-model="kbSelectionMode">
                           <t-radio-button value="all">{{ $t('agent.editor.allKnowledgeBases') }}</t-radio-button>
                           <t-radio-button value="selected">{{ $t('agent.editor.selectedKnowledgeBases')
                             }}</t-radio-button>
@@ -4578,11 +4578,13 @@ const handleSave = async () => {
 }
 
 .setting-row {
-  display: flex;
-  align-items: flex-start;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 52%) !important;
+  align-items: center !important;
   justify-content: space-between;
-  gap: 24px;
-  padding: 16px 0;
+  gap: 16px !important;
+  padding: 14px 0 !important;
+  margin-bottom: 0 !important;
   border-bottom: 1px solid var(--td-component-stroke);
   min-width: 0;
 
@@ -4591,7 +4593,9 @@ const handleSave = async () => {
   }
 
   &.setting-row-vertical {
+    grid-template-columns: 1fr !important;
     flex-direction: column;
+    align-items: stretch !important;
     gap: 12px;
 
     .setting-info {
@@ -4642,8 +4646,8 @@ const handleSave = async () => {
 }
 
 .setting-info {
-  flex: 0 0 42%;
-  max-width: 42%;
+  flex: 1 1 auto;
+  max-width: none;
   min-width: 0;
   padding-right: 0;
 
@@ -4664,8 +4668,10 @@ const handleSave = async () => {
   }
 
   label {
-    font-size: 15px;
-    font-weight: 500;
+    margin-bottom: 4px !important;
+    font-size: 14px !important;
+    line-height: 20px !important;
+    font-weight: 600 !important;
     color: var(--td-text-color-primary);
     display: block;
     margin-bottom: 4px;
@@ -4677,10 +4683,10 @@ const handleSave = async () => {
   }
 
   .desc {
-    font-size: 13px;
+    font-size: 12px !important;
     color: var(--td-text-color-secondary);
     margin: 0;
-    line-height: 1.5;
+    line-height: 18px !important;
 
     .hint {
       color: var(--td-warning-color, var(--td-text-color-placeholder));
@@ -4689,13 +4695,14 @@ const handleSave = async () => {
 }
 
 .setting-control {
-  flex: 1 1 58%;
+  flex: none;
   min-width: 0;
-  max-width: 58%;
+  width: 100% !important;
+  max-width: none !important;
   display: flex;
   justify-content: flex-end;
-  align-items: flex-start;
-  overflow: hidden;
+  align-items: center;
+  overflow: visible;
 
   &.setting-control-full {
     width: 100%;
@@ -4730,6 +4737,82 @@ const handleSave = async () => {
   :deep(.t-input-number) {
     width: 120px;
   }
+}
+
+.agent-segmented-control {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f3f4f6;
+  box-shadow: none;
+}
+
+.agent-segmented-control.t-radio-group__outline { flex-wrap: nowrap; }
+
+.agent-segmented-control :deep(.t-radio-button) {
+  flex: 0 0 auto;
+  min-width: max-content;
+  height: 28px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #4b5563;
+  font-family: var(--app-font-family);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.agent-segmented-control.t-radio-group.t-size-m :deep(.t-radio-button) {
+  height: 28px;
+  padding: 6px 14px;
+}
+
+.agent-segmented-control.t-radio-group__outline :deep(.t-radio-button:first-child),
+.agent-segmented-control.t-radio-group__outline :deep(.t-radio-button:last-child) {
+  border: 0;
+  border-radius: 8px;
+}
+
+.agent-segmented-control :deep(.t-radio-button.t-is-checked) {
+  border: 0;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.agent-segmented-control :deep(.t-radio-button.t-is-checked + .t-radio-button) { border-left: 0; }
+.agent-segmented-control :deep(.t-radio-button.t-is-disabled) { background: transparent; opacity: .55; }
+
+.agent-segmented-control--scope {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.agent-segmented-control--scope::-webkit-scrollbar { display: none; }
+
+.setting-row[data-guide="agent-create-model"] .setting-control :deep(.visual-model-selector) {
+  width: 100%;
+  min-width: 220px;
+  max-width: 280px;
+}
+
+:global(:root[theme-mode="dark"]) .agent-segmented-control {
+  border-color: #3f3f46;
+  background: #27272a;
+}
+:global(:root[theme-mode="dark"]) .agent-segmented-control :deep(.t-radio-button) { color: #a1a1aa; }
+:global(:root[theme-mode="dark"]) .agent-segmented-control :deep(.t-radio-button.t-is-checked) {
+  background: #3f3f46;
+  color: #f4f4f5;
 }
 
 .integration-inline {
@@ -5903,6 +5986,11 @@ const handleSave = async () => {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .setting-row { grid-template-columns: 1fr !important; }
+  .setting-control { justify-content: flex-start; }
 }
 
 @media (max-width: 560px) {

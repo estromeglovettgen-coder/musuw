@@ -620,16 +620,6 @@ func (s *knowledgeService) ProcessKBClone(ctx context.Context, t *asynq.Task) er
 				return err
 			}
 
-			// Update progress
-			processedCount++
-			if totalOperations > 0 {
-				progress.Progress = processedCount * 100 / totalOperations
-			}
-			progress.Processed = processedCount
-			progress.Message = fmt.Sprintf("Cloned %d/%d knowledge", processedCount-len(delKnowledge), len(addKnowledge))
-			progress.UpdatedAt = time.Now().Unix()
-			_ = s.saveKBCloneProgress(ctx, progress)
-
 			return nil
 		})
 	}
@@ -638,6 +628,14 @@ func (s *knowledgeService) ProcessKBClone(ctx context.Context, t *asynq.Task) er
 		handleError(progress, err, "Failed to clone knowledge")
 		return err
 	}
+	processedCount += len(addKnowledge)
+	if totalOperations > 0 {
+		progress.Progress = processedCount * 100 / totalOperations
+	}
+	progress.Processed = processedCount
+	progress.Message = fmt.Sprintf("Cloned %d/%d knowledge", processedCount-len(delKnowledge), len(addKnowledge))
+	progress.UpdatedAt = time.Now().Unix()
+	_ = s.saveKBCloneProgress(ctx, progress)
 
 	// Mark as completed
 	progress.Status = types.KBCloneStatusCompleted

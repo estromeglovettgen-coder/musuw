@@ -4,6 +4,8 @@ import test from 'node:test'
 
 const source = readFileSync(new URL('./KnowledgeBaseListReferenceCard.vue', import.meta.url), 'utf8')
 const list = readFileSync(new URL('../KnowledgeBaseList.vue', import.meta.url), 'utf8')
+const en = readFileSync(new URL('../../../i18n/locales/en-US.ts', import.meta.url), 'utf8')
+const zh = readFileSync(new URL('../../../i18n/locales/zh-CN.ts', import.meta.url), 'utf8')
 
 test('knowledge-base cards show persisted descriptions and only fall back for blank text', () => {
   assert.match(
@@ -25,6 +27,29 @@ test('card actions close the native kb.showMore popup before emitting', () => {
   assert.match(source, /v-if="canDuplicate"[^>]*@click="requestDuplicate"/)
   assert.match(source, /class="is-danger" @click="requestDelete"/)
   assert.doesNotMatch(source, /menuVisible|import \{ ref \} from 'vue'/)
+})
+
+test('document cards render persisted RAG and Wiki strategy badges and flag legacy invalid rows', () => {
+  assert.match(source, /import \{ useAuthStore \} from '@\/stores\/auth'/)
+  assert.match(source, /authStore\.isLiteMode &&\s*props\.kb\.type !== 'faq'/)
+  assert.match(source, /v-if="hasRagStrategy"[^>]*data-indexing-strategy="rag"/)
+  assert.match(source, /data-indexing-strategy="rag"[\s\S]*?<t-icon name="layers"/)
+  assert.match(source, /v-if="hasWikiStrategy"[^>]*data-indexing-strategy="wiki"/)
+  assert.match(source, /data-indexing-strategy="wiki"[\s\S]*?<t-icon name="book-open"/)
+  assert.match(source, /v-if="isVisibleStrategyMissing"[^>]*data-indexing-strategy="unconfigured"/)
+  assert.match(source, /kb\.type !== 'faq'/)
+  assert.doesNotMatch(source, /<KbWikiBadge/)
+})
+
+test('duplicate copy and invalid-strategy messages state the native asynchronous content-copy contract', () => {
+  assert.match(zh, /duplicate: '复制知识库'/)
+  assert.match(zh, /duplicateStarted: '正在后台复制知识库配置、文档与索引'/)
+  assert.match(zh, /duplicateSuccess: '知识库复制完成'/)
+  assert.match(zh, /unconfigured: '未配置'/)
+  assert.match(en, /duplicate: 'Copy knowledge base'/)
+  assert.match(en, /duplicateStarted: 'Copying knowledge base settings, documents, and indexes in the background'/)
+  assert.match(en, /duplicateSuccess: 'Knowledge base copy completed'/)
+  assert.match(en, /unconfigured: 'Not configured'/)
 })
 
 test('the native three-dot menu opens the existing knowledge-base editor', () => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { computed, defineComponent, unref, type SetupContext } from 'vue'
+import { defineComponent } from 'vue'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
@@ -15,10 +15,8 @@ import TagEditDialog from './components/TagEditDialog.vue'
 import BatchTagDialog from './components/BatchTagDialog.vue'
 import KbTagManageDrawer from './components/KbTagManageDrawer.vue'
 import WikiBrowser from './wiki/WikiBrowser.vue'
-import { childFolders, ROOT_FOLDER_PATH } from './folderTree'
 
 const legacy = LegacyKnowledgeBaseBusiness as any
-const legacySetup = legacy.setup
 
 export default defineComponent({
   ...legacy,
@@ -28,22 +26,6 @@ export default defineComponent({
     DocContent, EmptyKnowledge, KBSwitcherDropdown, KnowledgeBaseEditorModal, FAQEntryManager,
     DocumentListView, DocumentCardView, DocumentBatchBar, KbUploadSourceDropdown, KbFolderTree,
     TagEditDialog, BatchTagDialog, KbTagManageDrawer, WikiBrowser,
-  },
-  setup(props: Record<string, unknown>, context: SetupContext) {
-    const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') {
-      return {
-        ...state,
-        showFolderTree: computed(() => !Boolean(unref(state.isFAQ))),
-        currentChildFolders: computed(() => Boolean(unref(state.isFiltering))
-          ? []
-          : childFolders(
-            unref(state.folderTree) ?? null,
-            unref(state.selectedFolderPath) ?? ROOT_FOLDER_PATH,
-          )),
-      }
-    }
-    return state
   },
 })
 </script>

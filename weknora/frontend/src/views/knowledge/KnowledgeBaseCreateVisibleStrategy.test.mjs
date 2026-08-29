@@ -18,11 +18,13 @@ test('Lite cannot submit a document library without visible RAG or Wiki indexing
   )
 })
 
-test('duplicate wording states the native settings-only contract', () => {
-  assert.match(zh, /duplicate: '创建配置副本'/)
-  assert.match(zh, /duplicateSuccess: '已创建配置副本（不含文档、FAQ、Wiki 页面和索引）'/)
-  assert.match(en, /duplicate: 'Duplicate settings'/)
-  assert.match(en, /duplicateSuccess: 'Settings duplicate created \(documents, FAQs, Wiki pages, and indexes were not copied\)'/)
+test('copy wording states the native asynchronous content-copy contract', () => {
+  assert.match(zh, /duplicate: '复制知识库'/)
+  assert.match(zh, /duplicateStarted: '正在后台复制知识库配置、文档与索引'/)
+  assert.match(zh, /duplicateSuccess: '知识库复制完成'/)
+  assert.match(en, /duplicate: 'Copy knowledge base'/)
+  assert.match(en, /duplicateStarted: 'Copying knowledge base settings, documents, and indexes in the background'/)
+  assert.match(en, /duplicateSuccess: 'Knowledge base copy completed'/)
 })
 
 test('knowledge-base cards identify RAG and legacy unconfigured Lite rows', () => {

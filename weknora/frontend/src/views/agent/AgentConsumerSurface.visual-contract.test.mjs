@@ -83,10 +83,22 @@ test('Settings and Agent editor render the same shared visual shell while Agent 
     'class="visual-settings-content__inner"',
     'class="visual-settings-footer"',
     'width: min(896px, 100%)',
-    'height: 580px',
+    'height: 620px',
     'flex: 0 0 192px',
     'padding: 32px',
     ':root[theme-mode="dark"] .visual-settings-sidebar',
     'background: var(--mvc-page, #151619) !important',
   ]) assert.ok(settingsShell.includes(token), `shared Settings shell contract lost ${token}`)
+})
+
+test('Agent mode and knowledge scope use the authoritative single-line segmented controls', () => {
+  assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control"[^>]*v-model="agentMode"/)
+  assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control agent-segmented-control--scope"[^>]*v-model="kbSelectionMode"/)
+  assert.match(editor, /\.agent-segmented-control\s*\{[\s\S]*?display:\s*inline-flex;[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?padding:\s*4px;[\s\S]*?border-radius:\s*12px;/)
+  assert.match(editor, /\.agent-segmented-control :deep\(\.t-radio-button\)\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*6px 14px;[\s\S]*?border-radius:\s*8px;[\s\S]*?font-size:\s*12px;/)
+  assert.match(editor, /\.agent-segmented-control--scope\s*\{[\s\S]*?overflow-x:\s*auto;/)
+  assert.match(editor, /\.setting-row\s*\{[\s\S]*?display:\s*grid !important;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) minmax\(280px, 52%\) !important;/)
+  assert.match(editor, /label\s*\{[\s\S]*?font-size:\s*14px !important;[\s\S]*?line-height:\s*20px !important;[\s\S]*?font-weight:\s*600 !important;/)
+  assert.match(editor, /\.setting-control\s*\{[\s\S]*?width:\s*100% !important;[\s\S]*?max-width:\s*none !important;/)
+  assert.match(editor, /&\.setting-row-vertical\s*\{[\s\S]*?grid-template-columns:\s*1fr !important;/)
 })

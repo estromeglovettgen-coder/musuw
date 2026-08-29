@@ -1796,7 +1796,7 @@ export default {
     menu: {
       viewDetails: 'View Details',
       editConfig: 'Edit Configuration',
-      duplicate: 'Duplicate settings'
+      duplicate: 'Copy knowledge base'
     },
     pin: {
       pin: 'Pin to Top',
@@ -1817,8 +1817,9 @@ export default {
     messages: {
       deleted: 'Knowledge base deleted',
       deleteFailed: 'Failed to delete knowledge base',
-      duplicateSuccess: 'Settings duplicate created (documents, FAQs, Wiki pages, and indexes were not copied)',
-      duplicateFailed: 'Failed to duplicate knowledge base settings'
+      duplicateStarted: 'Copying knowledge base settings, documents, and indexes in the background',
+      duplicateSuccess: 'Knowledge base copy completed',
+      duplicateFailed: 'Failed to copy the knowledge base'
     },
     detail: {
       title: 'Shared Knowledge Base',

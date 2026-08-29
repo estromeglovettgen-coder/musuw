@@ -176,6 +176,10 @@ export function duplicateKnowledgeBase(id: string) {
   return copyKnowledgeBase({ source_id: id });
 }
 
+export function getKnowledgeBaseCopyProgress(taskId: string) {
+  return get(`/api/v1/knowledge-bases/copy/progress/${taskId}`);
+}
+
 // 获取可移动目标知识库列表（同类型、同Embedding模型）
 export function listMoveTargets(sourceKbId: string) {
   return get(`/api/v1/knowledge-bases/${sourceKbId}/move-targets`);

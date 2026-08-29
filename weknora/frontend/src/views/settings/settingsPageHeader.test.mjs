@@ -20,7 +20,11 @@ test('all five Lite settings pages share the General title-strip DOM contract', 
     assert.match(source, /<(?:header|div) class="[^"]*visual-settings-page-header[^"]*">/)
     assert.match(source, /class="visual-settings-page-header__copy"/)
     assert.match(source, /<h2 class="visual-settings-page-header__title">/)
-    assert.match(source, /<p class="visual-settings-page-header__description[^"]*">/)
+    if (file === 'UserProfile.vue') {
+      assert.doesNotMatch(source, /<p class="visual-settings-page-header__description[^"]*">/)
+    } else {
+      assert.match(source, /<p class="visual-settings-page-header__description[^"]*">/)
+    }
   }
 
   for (const file of ['UserProfile.vue', 'McpSettings.vue']) {

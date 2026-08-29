@@ -1051,25 +1051,40 @@ const doSubmit = async () => {
   try {
     if (editorMode.value === 'create') {
       const sceneModels = consumerSceneModelsForCreate()
-      const result: any = await createKnowledgeBase({
+      const createPayload: any = {
         name: formData.value.name.trim(),
         description: formData.value.description.trim(),
+        type: formData.value.type,
         ...sceneModels,
         summary_model_id: formData.value.modelConfig.llmModelId.trim()
           || String(sceneModels.summary_model_id || ''),
-        indexing_strategy: {
+      }
+      if (formData.value.type === 'faq') {
+        // FAQ is a distinct native knowledge-base type. Do not leak the
+        // document-only Wiki/VLM/ASR scene configuration into its create
+        // request, and preserve the native FAQ indexing choices.
+        delete createPayload.wiki_config
+        delete createPayload.vlm_config
+        delete createPayload.asr_config
+        createPayload.faq_config = {
+          index_mode: formData.value.faqConfig?.indexMode || 'question_only',
+          question_index_mode: formData.value.faqConfig?.questionIndexMode || 'separate',
+        }
+      } else {
+        createPayload.indexing_strategy = {
           vector_enabled: !!formData.value.indexingStrategy.vectorEnabled,
           keyword_enabled: !!formData.value.indexingStrategy.keywordEnabled,
           wiki_enabled: !!formData.value.indexingStrategy.wikiEnabled,
           graph_enabled: true,
-        },
-        wiki_config: {
+        }
+        createPayload.wiki_config = {
           ...((sceneModels.wiki_config as Record<string, unknown>) || {}),
           extraction_granularity: formData.value.wikiConfig.extractionGranularity,
           content_instructions: formData.value.wikiConfig.contentInstructions.trim(),
           extraction_instructions: formData.value.wikiConfig.extractionInstructions.trim(),
-        },
-      })
+        }
+      }
+      const result: any = await createKnowledgeBase(createPayload)
       if (!result.success || !result.data?.id) {
         throw new Error(result.message || t('knowledgeEditor.messages.createFailed'))
       }

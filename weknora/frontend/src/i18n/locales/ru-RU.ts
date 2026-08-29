@@ -4274,8 +4274,9 @@ export default {
     messages: {
       deleted: 'База знаний удалена',
       deleteFailed: 'Не удалось удалить базу знаний',
-      duplicateSuccess: 'Копия настроек создана (документы, FAQ, Wiki-страницы и индексы не копировались)',
-      duplicateFailed: 'Не удалось скопировать настройки базы знаний'
+      duplicateStarted: 'Настройки, документы и индексы базы знаний копируются в фоновом режиме',
+      duplicateSuccess: 'Копирование базы знаний завершено',
+      duplicateFailed: 'Не удалось скопировать базу знаний'
     },
     sections: {
       pinned: 'Закреплённые',
@@ -4296,7 +4297,7 @@ export default {
     menu: {
       viewDetails: 'View Details',
       editConfig: 'Изменить настройки',
-      duplicate: 'Копировать настройки'
+      duplicate: 'Копировать базу знаний'
     },
     delete: {
       confirmTitle: 'Подтверждение удаления',
