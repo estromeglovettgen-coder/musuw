@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, type SetupContext } from 'vue'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
@@ -17,6 +17,7 @@ import KbTagManageDrawer from './components/KbTagManageDrawer.vue'
 import WikiBrowser from './wiki/WikiBrowser.vue'
 
 const legacy = LegacyKnowledgeBaseBusiness as any
+const legacySetup = legacy.setup
 
 export default defineComponent({
   ...legacy,
@@ -26,6 +27,11 @@ export default defineComponent({
     DocContent, EmptyKnowledge, KBSwitcherDropdown, KnowledgeBaseEditorModal, FAQEntryManager,
     DocumentListView, DocumentCardView, DocumentBatchBar, KbUploadSourceDropdown, KbFolderTree,
     TagEditDialog, BatchTagDialog, KbTagManageDrawer, WikiBrowser,
+  },
+  setup(props: Record<string, unknown>, context: SetupContext) {
+    const state = legacySetup?.(props, context)
+    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    return state
   },
 })
 </script>

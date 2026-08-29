@@ -32,11 +32,13 @@ test("graph view keeps the original layout chrome instead of inheriting document
   );
 });
 
-test("knowledge detail delegates empty and collapsed folder behavior to the native controller", () => {
+test("knowledge detail delegates setup plus empty and collapsed folder behavior to the native controller", () => {
   const wrapper = source.slice(0, source.indexOf('<template>'));
   assert.doesNotMatch(wrapper, /showFolderTree:\s*computed/);
   assert.doesNotMatch(wrapper, /currentChildFolders:\s*computed/);
-  assert.doesNotMatch(wrapper, /childFolders|ROOT_FOLDER_PATH|legacySetup/);
+  assert.doesNotMatch(wrapper, /childFolders|ROOT_FOLDER_PATH/);
+  assert.match(wrapper, /const legacySetup = legacy\.setup/);
+  assert.match(wrapper, /setup\(props:[\s\S]*?return \{ \.\.\.state \}/);
   assert.match(nativeController, /const showFolderTree = computed\(\(\) => !isFAQ\.value && hasFolders\.value\)/);
   assert.match(nativeController, /if \(showFolderTree\.value && !folderTreeCollapsed\.value\) return \[\]/);
 });
