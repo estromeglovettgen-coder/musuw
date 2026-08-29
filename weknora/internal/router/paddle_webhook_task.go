@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -46,6 +47,38 @@ func PaddleWebhookTaskOptions(payload types.PaddleWebhookTaskPayload) []asynq.Op
 type paddleWebhookTaskHandler struct {
 	entitlements interfaces.EntitlementService
 	operations   interfaces.PaddleBillingOperationRepository
+}
+
+// checkoutEntitlementMatches verifies the durable provider identity after a
+// checkout event was already applied by an earlier lifecycle event. Paddle can
+// deliver subscription.activated before subscription.created; in that order
+// the created task is intentionally stale, but its operation may still need to
+// be settled. The durable binding is the same tenant/customer/subscription and
+// catalog identity used by the HTTP webhook path, so this does not introduce a
+// second entitlement state machine or allow an old checkout to finish.
+func (h *paddleWebhookTaskHandler) checkoutEntitlementMatches(ctx context.Context, payload types.PaddleWebhookTaskPayload) (bool, error) {
+	if h == nil || h.entitlements == nil || payload.BillingOperationType != types.PaddleBillingOperationCheckout ||
+		payload.EventType != "subscription.created" {
+		return false, nil
+	}
+	customerID := strings.TrimSpace(payload.CustomerID)
+	subscriptionID := strings.TrimSpace(payload.SubscriptionID)
+	if customerID == "" || subscriptionID == "" {
+		return false, nil
+	}
+	binding, err := h.entitlements.ResolvePaddleSubscription(ctx, customerID, subscriptionID)
+	if err != nil {
+		return false, fmt.Errorf("resolve Paddle checkout binding for operation settlement: %w", err)
+	}
+	if binding == nil || binding.TenantID != payload.TenantID ||
+		strings.TrimSpace(binding.CustomerID) != customerID ||
+		strings.TrimSpace(binding.SubscriptionID) != subscriptionID ||
+		types.NormalizeConsumerPlan(binding.Plan) != types.NormalizeConsumerPlan(payload.Plan) ||
+		strings.TrimSpace(binding.Status) != strings.TrimSpace(payload.Status) ||
+		strings.TrimSpace(binding.BillingPeriod) != strings.TrimSpace(payload.BillingPeriod) {
+		return false, nil
+	}
+	return true, nil
 }
 
 // NewPaddleWebhookTaskHandler constructs the worker-side execution adapter.
@@ -115,13 +148,27 @@ func (h *paddleWebhookTaskHandler) Handle(ctx context.Context, task *asynq.Task)
 	// A signed Paddle event proves the provider-side change, but a checkout or
 	// upgrade operation is complete only after the corresponding entitlement is
 	// durably applied. ApplyConsumerPlan returns true for both a fresh write and
-	// an exact durable event replay. A false result means the event was stale or
-	// did not own the tenant binding, so settling the operation here would hide a
-	// paid-but-unprovisioned account. Let the existing bounded queue retry and
-	// dead-letter path preserve that failure for recovery instead.
+	// an exact durable event replay. A false result normally means the event was
+	// stale or did not own the tenant binding. The one ordering exception is a
+	// stale subscription.created after subscription.activated already committed:
+	// checkoutEntitlementMatches below proves that exact current binding before
+	// allowing the existing operation repository to settle it. Every other false
+	// result remains retryable through the bounded queue/dead-letter path.
 	if h.operations != nil && payload.BillingOperationType != "" {
-		if !applied {
-			return fmt.Errorf("complete Paddle billing operation: entitlement was not durably applied")
+		settleAllowed := applied
+		if !settleAllowed {
+			// A later subscription.created can be stale after an earlier
+			// subscription.activated already committed the exact entitlement. Only
+			// that current durable binding may authorize checkout settlement; every
+			// other stale/mismatched event remains retryable.
+			var bindingErr error
+			settleAllowed, bindingErr = h.checkoutEntitlementMatches(ctx, payload)
+			if bindingErr != nil {
+				return bindingErr
+			}
+			if !settleAllowed {
+				return fmt.Errorf("complete Paddle billing operation: entitlement was not durably applied")
+			}
 		}
 		result, marshalErr := json.Marshal(map[string]string{
 			"event_id":        payload.EventID,

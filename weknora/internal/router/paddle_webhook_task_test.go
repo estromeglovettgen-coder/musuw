@@ -10,17 +10,21 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/hibiken/asynq"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type paddleWebhookEntitlementStub struct {
 	interfaces.EntitlementService
-	applyCalls     int
-	refreshCalls   int
-	applyPayload   types.PaddleWebhookTaskPayload
-	refreshPayload types.PaddleWebhookTaskPayload
-	applyResult    *bool
-	applyErr       error
-	refreshErr     error
+	applyCalls         int
+	refreshCalls       int
+	applyPayload       types.PaddleWebhookTaskPayload
+	refreshPayload     types.PaddleWebhookTaskPayload
+	applyResult        *bool
+	applyErr           error
+	refreshErr         error
+	resolvedBinding    *types.PaddleSubscriptionBinding
+	resolvedBindingErr error
 }
 
 type paddleWebhookBillingOperationStub struct {
@@ -101,6 +105,12 @@ func (s *paddleWebhookEntitlementStub) ApplyConsumerPlan(
 	return true, nil
 }
 
+func (s *paddleWebhookEntitlementStub) ResolvePaddleSubscription(
+	_ context.Context, _, _ string,
+) (*types.PaddleSubscriptionBinding, error) {
+	return s.resolvedBinding, s.resolvedBindingErr
+}
+
 func (s *paddleWebhookEntitlementStub) RefreshPaidAllowance(
 	_ context.Context,
 	tenantID uint64,
@@ -176,6 +186,82 @@ func TestPaddleWebhookTaskHandlerDoesNotFinishOperationWhenEntitlementWasNotAppl
 	if operations.finishCalls != 0 {
 		t.Fatalf("FinishMatchingActive calls = %d, want 0", operations.finishCalls)
 	}
+}
+
+func TestPaddleWebhookTaskHandlerSettlesStaleCheckoutAfterActivatedBinding(t *testing.T) {
+	notApplied := false
+	entitlements := &paddleWebhookEntitlementStub{
+		applyResult: &notApplied,
+		resolvedBinding: &types.PaddleSubscriptionBinding{
+			TenantID: 7, Plan: types.ConsumerPlanMax, Status: "active", BillingPeriod: "monthly",
+			CustomerID: "ctm_test", SubscriptionID: "sub_test",
+		},
+	}
+	operations := &paddleWebhookBillingOperationStub{}
+	handler := NewPaddleWebhookTaskHandler(entitlements, operations)
+	periodEnd := time.Date(2026, time.August, 26, 0, 0, 0, 0, time.UTC)
+	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
+	payload.Plan = types.ConsumerPlanMax
+	payload.Status = "active"
+	payload.PriceID = "pri_max_monthly"
+	payload.EventType = "subscription.created"
+	payload.TransactionID = "txn_test"
+	payload.EventPeriodEnd = &periodEnd
+	payload.BillingOperationType = types.PaddleBillingOperationCheckout
+	payload.BillingOperationKey = "checkout-operation-key"
+	payload.CustomerID = "ctm_test"
+	payload.SubscriptionID = "sub_test"
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	// The activated event has already applied the entitlement and advanced its
+	// lifecycle cursor, so the later created event is stale. Its exact durable
+	// tenant/subscription binding still permits settling the matching checkout.
+	err = handler.Handle(context.Background(), asynq.NewTask(types.TypePaddleWebhook, body))
+	require.NoError(t, err)
+	assert.Equal(t, 1, operations.finishCalls)
+	assert.Equal(t, payload.TenantID, operations.finishTenantID)
+	assert.Equal(t, payload.BillingOperationKey, operations.finishOperationKey)
+	assert.Equal(t, payload.PriceID, operations.finishPriceID)
+	assert.Equal(t, payload.TransactionID, operations.finishTransaction)
+	assert.Equal(t, payload.SubscriptionID, operations.finishSubscription)
+	assert.Equal(t, types.PaddleBillingOperationSucceeded, operations.finishStatus)
+}
+
+func TestPaddleWebhookTaskHandlerDoesNotSettleStaleCheckoutForWrongBinding(t *testing.T) {
+	notApplied := false
+	entitlements := &paddleWebhookEntitlementStub{
+		applyResult: &notApplied,
+		resolvedBinding: &types.PaddleSubscriptionBinding{
+			// The event's signed coordinates belong to a previous subscription;
+			// never settle its operation against this tenant's current state.
+			TenantID: 7, Plan: types.ConsumerPlanMax, Status: "active", BillingPeriod: "monthly",
+			CustomerID: "ctm_test", SubscriptionID: "sub_previous",
+		},
+	}
+	operations := &paddleWebhookBillingOperationStub{}
+	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
+	payload.Plan = types.ConsumerPlanMax
+	payload.Status = "active"
+	payload.PriceID = "pri_max_monthly"
+	payload.EventType = "subscription.created"
+	payload.TransactionID = "txn_test"
+	payload.BillingOperationType = types.PaddleBillingOperationCheckout
+	payload.BillingOperationKey = "checkout-operation-key"
+	payload.CustomerID = "ctm_test"
+	payload.SubscriptionID = "sub_current"
+	periodEnd := time.Date(2026, time.August, 26, 0, 0, 0, 0, time.UTC)
+	payload.EventPeriodEnd = &periodEnd
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	err = NewPaddleWebhookTaskHandler(entitlements, operations).Handle(
+		context.Background(), asynq.NewTask(types.TypePaddleWebhook, body),
+	)
+	if err == nil {
+		t.Fatal("a stale checkout with a non-current subscription binding must be retried")
+	}
+	assert.Zero(t, operations.finishCalls)
 }
 
 func TestPaddleWebhookTaskHandlerFinishesMatchingOperationAfterEntitlementApplied(t *testing.T) {
