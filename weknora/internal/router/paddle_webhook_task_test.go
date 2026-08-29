@@ -36,14 +36,15 @@ type paddleWebhookBillingOperationStub struct {
 	finishSubscription string
 	finishStatus       types.PaddleBillingOperationStatus
 	finishMismatch     bool
+	foundOperation     *types.PaddleBillingOperation
 }
 
 func (*paddleWebhookBillingOperationStub) Claim(context.Context, types.PaddleBillingOperationIntent) (*types.PaddleBillingOperation, types.PaddleBillingOperationClaimDisposition, error) {
 	return nil, "", errors.New("Claim is not used by the webhook worker test")
 }
 
-func (*paddleWebhookBillingOperationStub) FindByKey(context.Context, uint64, string) (*types.PaddleBillingOperation, bool, error) {
-	return nil, false, errors.New("FindByKey is not used by the webhook worker test")
+func (s *paddleWebhookBillingOperationStub) FindByKey(context.Context, uint64, string) (*types.PaddleBillingOperation, bool, error) {
+	return s.foundOperation, s.foundOperation != nil, nil
 }
 
 func (*paddleWebhookBillingOperationStub) MarkInFlight(context.Context, uint64) (bool, error) {
@@ -169,7 +170,16 @@ func TestPaddleWebhookTaskHandlerAppliesConsumerPlan(t *testing.T) {
 func TestPaddleWebhookTaskHandlerDoesNotFinishOperationWhenEntitlementWasNotApplied(t *testing.T) {
 	notApplied := false
 	entitlements := &paddleWebhookEntitlementStub{applyResult: &notApplied}
-	operations := &paddleWebhookBillingOperationStub{}
+	operations := &paddleWebhookBillingOperationStub{foundOperation: &types.PaddleBillingOperation{
+		TenantID:       7,
+		OperationKey:   "upgrade-operation-key",
+		OperationType:  types.PaddleBillingOperationUpgrade,
+		Plan:           types.ConsumerPlanPro,
+		BillingPeriod:  "monthly",
+		PriceID:        "pri_pro_monthly",
+		SubscriptionID: "sub_test",
+		Status:         types.PaddleBillingOperationFailed,
+	}}
 	handler := NewPaddleWebhookTaskHandler(entitlements, operations)
 	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
 	payload.BillingOperationType = types.PaddleBillingOperationUpgrade
@@ -186,6 +196,35 @@ func TestPaddleWebhookTaskHandlerDoesNotFinishOperationWhenEntitlementWasNotAppl
 	if operations.finishCalls != 0 {
 		t.Fatalf("FinishMatchingActive calls = %d, want 0", operations.finishCalls)
 	}
+}
+
+func TestPaddleWebhookTaskHandlerAcknowledgesStaleLifecycleEventForSucceededOperation(t *testing.T) {
+	notApplied := false
+	entitlements := &paddleWebhookEntitlementStub{applyResult: &notApplied}
+	operations := &paddleWebhookBillingOperationStub{foundOperation: &types.PaddleBillingOperation{
+		TenantID:      7,
+		OperationKey:  "upgrade-operation-key",
+		OperationType: types.PaddleBillingOperationCheckout,
+		Plan:          types.ConsumerPlanPlus,
+		BillingPeriod: "monthly",
+		PriceID:       "pri_plus_monthly",
+		Status:        types.PaddleBillingOperationSucceeded,
+	}}
+	payload := paddleWebhookTestPayload(types.PaddleWebhookTaskOperationApplyConsumerPlan)
+	payload.EventType = "subscription.updated"
+	payload.BillingOperationType = types.PaddleBillingOperationUpgrade
+	payload.BillingOperationKey = "upgrade-operation-key"
+	payload.PriceID = "pri_pro_monthly"
+	payload.SubscriptionID = "sub_lifecycle"
+	payload.TransactionID = "" // Lifecycle updates commonly omit transaction IDs.
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	err = NewPaddleWebhookTaskHandler(entitlements, operations).Handle(
+		context.Background(), asynq.NewTask(types.TypePaddleWebhook, body),
+	)
+	require.NoError(t, err)
+	assert.Zero(t, operations.finishCalls)
 }
 
 func TestPaddleWebhookTaskHandlerSettlesStaleCheckoutAfterActivatedBinding(t *testing.T) {

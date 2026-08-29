@@ -420,6 +420,12 @@ func liteProductRouteBlocked(method, path string) bool {
 	// created before the capability was hidden.
 	if strings.HasPrefix(path, "/api/v1/knowledge-bases/") {
 		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/knowledge-bases/"), "/")
+		// The legacy duplicate endpoint copies settings only. Lite exposes the
+		// native asynchronous /copy workflow instead, which also clones the
+		// knowledge content; keep the old contract out of this product surface.
+		if method == http.MethodPost && len(parts) == 2 && parts[1] == "duplicate" {
+			return true
+		}
 		if len(parts) >= 2 && parts[1] == "faq" && method != http.MethodGet && method != http.MethodDelete &&
 			!(method == http.MethodPost && len(parts) == 3 && parts[2] == "search") {
 			return true

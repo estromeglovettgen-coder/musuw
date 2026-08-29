@@ -81,6 +81,20 @@ func (h *paddleWebhookTaskHandler) checkoutEntitlementMatches(ctx context.Contex
 	return true, nil
 }
 
+// billingOperationAlreadySucceeded recognizes the tenant-scoped operation key
+// after its existing operation fence has already reached success. Paddle keeps
+// old custom_data on later lifecycle events, so their event-derived type and
+// subscription projection need not equal the original immutable intent.
+func (h *paddleWebhookTaskHandler) billingOperationAlreadySucceeded(ctx context.Context, payload types.PaddleWebhookTaskPayload) (bool, error) {
+	operation, found, err := h.operations.FindByKey(ctx, payload.TenantID, payload.BillingOperationKey)
+	if err != nil {
+		return false, fmt.Errorf("lookup Paddle billing operation: %w", err)
+	}
+	return found && operation != nil && operation.Status == types.PaddleBillingOperationSucceeded &&
+		operation.TenantID == payload.TenantID &&
+		strings.TrimSpace(operation.OperationKey) == strings.TrimSpace(payload.BillingOperationKey), nil
+}
+
 // NewPaddleWebhookTaskHandler constructs the worker-side execution adapter.
 // It deliberately depends on the existing entitlement service interface; no
 // second billing service or repository path is introduced.
@@ -152,21 +166,32 @@ func (h *paddleWebhookTaskHandler) Handle(ctx context.Context, task *asynq.Task)
 	// stale or did not own the tenant binding. The one ordering exception is a
 	// stale subscription.created after subscription.activated already committed:
 	// checkoutEntitlementMatches below proves that exact current binding before
-	// allowing the existing operation repository to settle it. Every other false
-	// result remains retryable through the bounded queue/dead-letter path.
+	// allowing the existing operation repository to settle it. A matching
+	// operation that already succeeded is also complete; every absent, active,
+	// failed, or mismatched operation remains retryable.
 	if h.operations != nil && payload.BillingOperationType != "" {
 		settleAllowed := applied
 		if !settleAllowed {
 			// A later subscription.created can be stale after an earlier
 			// subscription.activated already committed the exact entitlement. Only
-			// that current durable binding may authorize checkout settlement; every
-			// other stale/mismatched event remains retryable.
+			// that current durable binding may authorize checkout settlement.
 			var bindingErr error
 			settleAllowed, bindingErr = h.checkoutEntitlementMatches(ctx, payload)
 			if bindingErr != nil {
 				return bindingErr
 			}
 			if !settleAllowed {
+				alreadySucceeded, lookupErr := h.billingOperationAlreadySucceeded(ctx, payload)
+				if lookupErr != nil {
+					return lookupErr
+				}
+				if alreadySucceeded {
+					logger.Infof(ctx,
+						"Paddle billing task already settled operation=%s tenant_id=%d event_id=%s",
+						payload.Operation, payload.TenantID, payload.EventID,
+					)
+					return nil
+				}
 				return fmt.Errorf("complete Paddle billing operation: entitlement was not durably applied")
 			}
 		}

@@ -26,6 +26,7 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "agent chat", method: "POST", path: "/api/v1/agent-chat/abc", blocked: false},
 		{name: "sessions", method: "GET", path: "/api/v1/sessions", blocked: false},
 		{name: "knowledge base", method: "POST", path: "/api/v1/knowledge-bases", blocked: false},
+		{name: "legacy knowledge base duplicate hidden", method: "POST", path: "/api/v1/knowledge-bases/kb-1/duplicate", blocked: true},
 		{name: "knowledge", method: "PUT", path: "/api/v1/knowledge/abc", blocked: false},
 		{name: "wiki", method: "GET", path: "/api/v1/knowledge-bases/1/wiki/pages", blocked: false},
 		{name: "historical faq list", method: "GET", path: "/api/v1/knowledge-bases/1/faq/entries", blocked: false},
