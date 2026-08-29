@@ -21,6 +21,7 @@ required_files=(
     "$staging_root/app-entrypoint.sh"
     "$staging_root/staging.env.example"
     "$staging_root/auth-public.env.example"
+    "$repo_root/weknora/docker/searxng/settings.yml"
     "$script_dir/lib.sh"
     "$script_dir/capacity-preflight.sh"
     "$script_dir/capacity-preflight.test.sh"
@@ -57,6 +58,8 @@ grep -Fq 'image: busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2c
 grep -Fq 'image: searxng/searxng@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e' "$staging_root/compose.yaml" || fail 'staging SearXNG image is not pinned'
 grep -Fq 'profiles: !reset []' "$staging_root/compose.yaml" || fail 'staging SearXNG profiles are not cleared'
 grep -Fq 'python3' "$staging_root/compose.yaml" || fail 'staging SearXNG health probe is missing'
+grep -A1 -F '  - name: bing' "$repo_root/weknora/docker/searxng/settings.yml" | grep -Fq '    disabled: false' ||
+    fail 'shared SearXNG settings do not enable the native Bing fallback'
 grep -Fq 'MUSUW_STAGING_R2_BUCKET=musuw-staging' "$staging_root/staging.env.example" || fail 'staging R2 bucket is not the commissioned bucket'
 grep -Fq 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' "$staging_root/auth-public.env.example" || fail 'staging Supabase project is not the commissioned test project'
 if grep -Fq '/opt/weknora-production/app-entrypoint.sh' "$staging_root/compose.yaml"; then
