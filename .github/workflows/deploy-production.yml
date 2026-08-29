@@ -419,10 +419,6 @@ jobs:
       packages: read
     runs-on: ubuntu-24.04
     timeout-minutes: 35
-    outputs:
-      app_ref: ${{ steps.staging_record.outputs.app_ref }}
-      frontend_ref: ${{ steps.staging_record.outputs.frontend_ref }}
-      release_sha: ${{ steps.staging_record.outputs.release_sha }}
     steps:
       - name: Check out the exact authorized revision
         uses: actions/checkout@v7
@@ -604,11 +600,6 @@ jobs:
             '{schema_version:$schema_version,repository:$repository,workflow:$workflow,release_mode:$release_mode,commit_sha:$commit_sha,app_image:$app_image,frontend_image:$frontend_image,app_digest:$app_digest,frontend_digest:$frontend_digest,staging_deployment:$staging_deployment,staging_run_id:$staging_run_id,ci_workflow_run:$ci_workflow_run,workflow_run:$workflow_run}' \
             > "$record_dir/staging-release.json"
           test -s "$record_dir/staging-release.json"
-          {
-            printf 'release_sha=%s\n' "$RELEASE_SHA"
-            printf 'app_ref=%s\n' "$APP_IMAGE"
-            printf 'frontend_ref=%s\n' "$FRONTEND_IMAGE"
-          } >> "$GITHUB_OUTPUT"
       - name: Upload accepted staging release record
         if: ${{ (github.event_name != 'workflow_dispatch' || inputs.release_mode != 'promote') && success() }}
         uses: actions/upload-artifact@v7
@@ -717,19 +708,11 @@ jobs:
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
           APP_IMAGE: ${{ needs.build.outputs.app_ref }}
           FRONTEND_IMAGE: ${{ needs.build.outputs.frontend_ref }}
-          STAGING_APP_IMAGE: ${{ needs.deploy-staging.outputs.app_ref }}
-          STAGING_FRONTEND_IMAGE: ${{ needs.deploy-staging.outputs.frontend_ref }}
-          STAGING_RELEASE_SHA: ${{ needs.deploy-staging.outputs.release_sha }}
         run: |
           set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$APP_IMAGE" =~ ^ghcr\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$ ]]
           [[ "$FRONTEND_IMAGE" =~ ^ghcr\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$ ]]
-          [[ "$STAGING_APP_IMAGE" =~ ^ghcr\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$ ]]
-          [[ "$STAGING_FRONTEND_IMAGE" =~ ^ghcr\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$ ]]
-          [[ "$STAGING_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$RELEASE_SHA" = "$STAGING_RELEASE_SHA"
-          test "$APP_IMAGE" = "$STAGING_APP_IMAGE"
-          test "$FRONTEND_IMAGE" = "$STAGING_FRONTEND_IMAGE"
           tmp="$RUNTIME_DIR/production.public.env.$$"
           awk '!/^(WEKNORA_PRODUCTION_REVISION|WEKNORA_PRODUCTION_APP_IMAGE|WEKNORA_PRODUCTION_FRONTEND_IMAGE)=/' \
             "$RUNTIME_DIR/production.public.env" > "$tmp"

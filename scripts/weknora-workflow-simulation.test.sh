@@ -28,6 +28,18 @@ if grep -Fq 'staging_acceptance' "$workflow_path"; then
     fail 'automatic staging smoke verification still claims full acceptance'
 fi
 grep -Fq 'staging_deployment' "$workflow_path" || fail 'staging deployment evidence is missing'
+deploy_staging_block="$(sed -n '/^  deploy-staging:/,/^  deploy:/p' "$workflow_path")"
+deploy_block="$(sed -n '/^  deploy:/,$p' "$workflow_path")"
+if grep -Fq 'app_ref: ${{ steps.staging_record.outputs.app_ref }}' <<< "$deploy_staging_block" ||
+   grep -Fq 'frontend_ref: ${{ steps.staging_record.outputs.frontend_ref }}' <<< "$deploy_staging_block"; then
+    fail 'promotion still transports verified image refs through secret-mask-prone staging job outputs'
+fi
+if grep -Fq 'STAGING_APP_IMAGE: ${{ needs.deploy-staging.outputs.app_ref }}' <<< "$deploy_block" ||
+   grep -Fq 'STAGING_FRONTEND_IMAGE: ${{ needs.deploy-staging.outputs.frontend_ref }}' <<< "$deploy_block"; then
+    fail 'production still depends on secret-mask-prone staging image outputs'
+fi
+grep -Fq 'APP_IMAGE: ${{ needs.build.outputs.app_ref }}' <<< "$deploy_block" || fail 'production does not consume the artifact-validated app ref'
+grep -Fq 'FRONTEND_IMAGE: ${{ needs.build.outputs.frontend_ref }}' <<< "$deploy_block" || fail 'production does not consume the artifact-validated frontend ref'
 if grep -A12 '^  deploy:$' "$workflow_path" | grep -Fq 'github.event_name == '\''workflow_run'\'''; then
     fail 'workflow_run is still allowed to promote production'
 fi
