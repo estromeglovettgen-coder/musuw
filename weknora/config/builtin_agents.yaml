@@ -34,7 +34,7 @@ builtin_agents:
       image_upload_enabled: true
       audio_upload_enabled: true
       attachment_image_understanding: true
-      system_prompt_id: "hybrid_rag_wiki_agent"
+      system_prompt_id: "default_kb"
       context_template_id: "default_context"
       temperature: 0.7
       max_completion_tokens: 2048

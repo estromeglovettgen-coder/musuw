@@ -38,7 +38,7 @@ func TestBuiltinQuickAnswerUsesManagedV4FlashDefaults(t *testing.T) {
 	require.NotNil(t, cfg.Thinking)
 	assert.False(t, *cfg.Thinking)
 
-	assert.Equal(t, "hybrid_rag_wiki_agent", cfg.SystemPromptID)
+	assert.Equal(t, "default_kb", cfg.SystemPromptID)
 	assert.Empty(t, cfg.SystemPrompt, "the existing prompt template must be referenced, not copied into builtin_agents.yaml")
 
 	assert.True(t, cfg.MultiTurnEnabled)
