@@ -10,8 +10,8 @@
 
 - [x] 2.1 Run all Storefront tests, build, Cloudflare dry-run, workflow
   validation, and one bounded adversarial review.
-- [ ] 2.2 Commit the legal policy separately from the homepage visual change,
+- [x] 2.2 Commit the legal policy separately from the homepage visual change,
   push both to main, and verify the production Storefront deployment.
-- [ ] 2.3 Verify the live English and Chinese Terms, Refund Policy, and
+- [x] 2.3 Verify the live English and Chinese Terms, Refund Policy, and
   Subscription Policy expose the new policy and retain Paddle/mandatory-rights
   links.
