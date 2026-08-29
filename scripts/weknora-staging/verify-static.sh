@@ -18,6 +18,7 @@ for required in \
     "$staging_root/staging.env.example" "$staging_root/auth-public.env.example" \
     "$script_dir/lib.sh" "$script_dir/source-manifest.sh" "$script_dir/capacity-preflight.sh" "$script_dir/capacity-preflight.test.sh" "$script_dir/prepare-runtime.sh" \
     "$script_dir/compose.sh" "$script_dir/release-ci.sh" "$script_dir/verify-deployed.sh" \
+    "$repo_root/scripts/weknora/paddle-ip-allowlist.sh" \
     "$repo_root/scripts/weknora-staging-deploy.sh" \
     "$script_dir/server/musuw-staging-deploy-gate" \
     "$script_dir/server/musuw-staging-deploy-ssh-gate" \
@@ -25,6 +26,8 @@ for required in \
     "$script_dir/server/verify-musuw-staging-deploy-gate.sh"; do
     [ -f "$required" ] && [ ! -L "$required" ] || fail 'staging static inputs are incomplete'
 done
+
+bash -n "$repo_root/scripts/weknora/paddle-ip-allowlist.sh"
 
 for script in "$script_dir"/*.sh "$script_dir/server"/*.sh "$repo_root/scripts/weknora-staging-deploy.sh"; do
     bash -n "$script" || fail "staging shell syntax is invalid: $script"

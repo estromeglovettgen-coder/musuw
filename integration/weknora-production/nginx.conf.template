@@ -1,3 +1,12 @@
+# The frontend is reachable through the trusted Cloudflare Tunnel only. Paddle
+# sends its source address in CF-Connecting-IP; the application still verifies
+# Paddle-Signature after this network gate. The mounted file is generated at
+# runtime from Paddle's official /ips endpoint for the selected environment.
+geo $http_cf_connecting_ip $paddle_webhook_source_allowed {
+    default 0;
+    include /etc/nginx/paddle-ips/allowlist.conf;
+}
+
 server {
     listen 8080;
     server_name _;
@@ -89,6 +98,24 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # Keep the webhook path public through the Tunnel while rejecting direct
+    # or non-Paddle requests. Other API paths and /health remain unaffected.
+    location = /api/v1/billing/paddle/webhook {
+        include /etc/nginx/musuw-noindex.conf;
+        if ($paddle_webhook_source_allowed = 0) { return 403; }
+        proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/api/v1/billing/paddle/webhook;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 30s;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
     }
 
     location /api/ {

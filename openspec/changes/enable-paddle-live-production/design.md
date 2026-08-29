@@ -55,6 +55,16 @@ Ignoring adjustments was rejected because an approved full refund or chargeback 
 
 The production destination subscribes only to the existing subscription lifecycle and recurring completion events plus `adjustment.created` and `adjustment.updated` required by the chosen policy. Official Paddle notification simulation is used to prove TLS delivery, destination signing, acknowledgement, retryable queue handoff, duplicate handling, and safe ignoring of non-applicable adjustment shapes. Local signed fixtures cover tenant-bound plan mutation and full-refund/chargeback/reversal policy. No webhook is hand-authored against production and no live transaction is created for verification.
 
+The trusted Cloudflare Tunnel is also the sole public route to the frontend.
+At deployment preflight, the fixed environment selects Paddle's official Live
+or Sandbox `/ips` endpoint, validates a non-empty set of unique IPv4 `/32`
+ranges, and atomically renders a non-secret Nginx `geo` include. Nginx checks
+the Cloudflare-overwritten `CF-Connecting-IP` only for the exact Paddle webhook
+path; direct or unlisted sources fail closed before the application, while the
+raw-body `Paddle-Signature` verifier remains mandatory. The provider URL is
+not caller-configurable, and a failed refresh preserves the prior file or
+blocks first deployment rather than installing an empty allowlist.
+
 ### Use Paddle Retain instead of local dunning
 
 The existing Paddle.js singleton initializes on the public app shell, including the stable public login page used by Paddle's Retain setup check. Once authenticated, it receives only the provider customer ID already derived from the signed tenant entitlement response, and tenant/logout changes update or clear that identity. Paddle owns recovery links, retry communication, payment-method recovery UI, and dunning behavior; Musuw adds no scheduler, retry rules, recovery table, or payment form.

@@ -17,6 +17,7 @@ manifest_path() {
     case "$1" in
         weknora/docker-compose.yml|weknora/config/config.yaml|weknora/docker/searxng/settings.yml|\
         integration/weknora-production/*|scripts/weknora-production/*|\
+        scripts/weknora/paddle-ip-allowlist.sh|\
         deploy/production.public.env|deploy/auth-public.env) ;;
         *) fail 'source manifest contains a path outside the production allowlist' ;;
     esac
@@ -124,6 +125,7 @@ generate_manifest() {
     append_tracked_paths weknora/docker/searxng/settings.yml "$path_list"
     append_tracked_paths integration/weknora-production "$path_list"
     append_tracked_paths scripts/weknora-production "$path_list"
+    printf '%s\n' scripts/weknora/paddle-ip-allowlist.sh >> "$path_list"
 
     printf '%s\n' deploy/production.public.env deploy/auth-public.env >> "$path_list"
 

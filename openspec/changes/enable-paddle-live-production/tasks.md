@@ -37,3 +37,5 @@
 - [x] 5.4 Scan tracked changes, CI/runtime logs, browser responses, and server file metadata for secret leakage; do not capture sensitive Dashboard fields in screenshots.
 - [x] 5.5 Run one consolidated adversarial review covering no money movement, untouched payout settings, no duplicate catalog, no Sandbox/Live mixing, no secret exposure, rollback consistency, the single checkout fence versus Paddle authority, and every unverified claim.
 - [x] 5.6 Update the deferred consumer-entitlement tasks and this change's verification record with fresh evidence, remaining owner-only steps, and exact residual risk.
+- [x] 5.7 Re-audit Paddle's authoritative onboarding progress, distinguish platform notification logs from successful simulations, and add a tested deployment-time Live/Sandbox webhook source allowlist from the fixed official `/ips` endpoints without weakening signature verification.
+- [ ] 5.8 Deploy the source-allowlist correction to staging first, prove official Sandbox delivery and negative ingress behavior, then promote the exact same frontend digest to production and prove the existing Live simulation still returns HTTP 200.

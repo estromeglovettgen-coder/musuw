@@ -20,12 +20,15 @@ for required in \
     "$paddle_runtime_contract" \
     "$repo_root/integration/weknora-production/app-entrypoint.sh" \
     "$repo_root/integration/weknora-production/redis-entrypoint.sh" \
-    "$repo_root/integration/weknora-production/neo4j-entrypoint.sh"; do
+    "$repo_root/integration/weknora-production/neo4j-entrypoint.sh" \
+    "$repo_root/scripts/weknora/paddle-ip-allowlist.sh"; do
     if [ ! -f "$required" ]; then
         printf '%s\n' 'production overlay is incomplete' >&2
         exit 1
     fi
 done
+
+bash -n "$repo_root/scripts/weknora/paddle-ip-allowlist.sh"
 
 grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=live' "$production_env_example" || {
     printf '%s\n' 'checked production example must select Paddle Live' >&2

@@ -28,6 +28,7 @@ manifest_path() {
         integration/weknora-production/redis-entrypoint.sh|\
         integration/weknora-production/searxng-entrypoint.sh|\
         integration/weknora-staging/*|scripts/weknora-staging/*|\
+        scripts/weknora/paddle-ip-allowlist.sh|\
         deploy/staging.public.env|deploy/auth-public.env) ;;
         *) fail "staging manifest contains an unallowlisted path: $1" ;;
     esac
@@ -95,6 +96,7 @@ generate_manifest() {
     append_tracked_paths integration/weknora-production/searxng-entrypoint.sh "$path_list"
     append_tracked_paths integration/weknora-staging "$path_list"
     append_tracked_paths scripts/weknora-staging "$path_list"
+    printf '%s\n' scripts/weknora/paddle-ip-allowlist.sh >> "$path_list"
     printf '%s\n' deploy/staging.public.env deploy/auth-public.env >> "$path_list"
 
     while IFS= read -r relative; do

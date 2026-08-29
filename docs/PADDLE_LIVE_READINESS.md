@@ -242,9 +242,9 @@ reviewer password 和 recovery material 只保留在既有 secret storage 与授
 | Live webhook destination 与 signing secret | 可靠履约/entitlement 硬阻断 | 唯一 active destination 已是精确 11 事件，exact secret 已保护挂载，官方 no-charge simulation 连续 HTTP 200。 |
 | Live default payment link | Paddle transaction 技术硬阻断 | Dashboard 已新鲜复核为 `https://app.musuw.com/pay` 且显示有效。 |
 | tax mode、balance currency、payment methods | Live 商业配置硬阻断 | Dashboard 已复核：税为 automatic-by-location、余额 USD、CNY 与 JPY 自动转换；Checkout 使用 Paddle 官方方法开关，应用不推断买家税/币种/eligible methods。 |
-| payout settings | 获得 payout 的 owner-only 阻断；不是接受付款的代码证明 | 本次禁止修改；最终单独报告。 |
+| payout settings | 获得 payout 的 owner-only 阻断；不是接受付款的代码证明 | Owner 后续已在 Paddle Dashboard 保存；自动化未读取、复制或提交任何银行字段，应用收款链路不依赖这些敏感值。 |
 | `pwCustomer` / Retain | 完整 Live Retain 准备阻断；Sandbox 不加载 Retain | Postmark 发件身份已验证；公开 `/retain` 被 Dashboard 标记 Paddle.js Installed，Retain 已确认 Live。可选 web-app detector 需真实 Paddle customer 会话，当前手工 Plus smoke 账号不具备该绑定。 |
-| webhook source allowlist | 官方推荐的纵深防御，不是申请表硬门槛 | 待 Live edge 配置；signature verification 已有且仍是必须保留的主校验。 |
+| webhook source allowlist | 官方推荐的纵深防御，不是申请表硬门槛 | 已实现部署前从固定 Live/Sandbox `/ips` 动态生成 allowlist；Cloudflare Tunnel 后仅精确 webhook 路径按 `CF-Connecting-IP` 拒绝非 Paddle 来源，signature verification 仍是必须保留的主校验。待同一 digest 先 staging 后 production 激活验证。 |
 | 固定生产 Live-only lock | 当前安全硬边界 | 完整 Live input、provider health、exact-SHA 东京部署和 runtime preflight 均已通过。 |
 
 ## 当前非敏感证据

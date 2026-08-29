@@ -11,6 +11,10 @@ runtime_dir="$(weknora_production_runtime_dir)"
 repo_root="$(weknora_production_repo_root)"
 paddle_runtime_contract="$repo_root/integration/weknora-production/paddle-runtime-contract.sh"
 weknora_production_require_file "$paddle_runtime_contract"
+allowlist_helper="$repo_root/scripts/weknora/paddle-ip-allowlist.sh"
+weknora_production_require_file "$allowlist_helper"
+weknora_production_require_command curl
+weknora_production_require_command jq
 # shellcheck source=../../integration/weknora-production/paddle-runtime-contract.sh
 . "$paddle_runtime_contract"
 public_env="${WEKNORA_PRODUCTION_PUBLIC_ENV:-$runtime_dir/production.public.env}"
@@ -25,6 +29,7 @@ weknora_production_require_unique_env_keys "$auth_public_env"
 
 install -d -m 700 "$runtime_dir"
 [ "$(weknora_production_file_mode "$runtime_dir")" = '700' ] || weknora_production_die 'production runtime directory permissions are unsafe'
+"$allowlist_helper" live "$runtime_dir/paddle-ips"
 [ -d "$secret_dir" ] || weknora_production_die 'production secret directory is unavailable'
 [ "$(weknora_production_file_mode "$secret_dir")" = '700' ] || weknora_production_die 'production secret directory permissions are unsafe'
 

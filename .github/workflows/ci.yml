@@ -236,6 +236,7 @@ jobs:
       - name: Run production static and direct deployment contracts
         run: |
           bash scripts/weknora-production/verify-static.sh
+          bash scripts/weknora/paddle-ip-allowlist.test.sh
           bash scripts/weknora-production/deploy-ci-seams-contract.test.sh
           bash scripts/weknora-production/musuw-deploy-gate-simulation.test.sh
           # verify-static.sh renders both base and edge scripts/weknora-production/compose.sh config.

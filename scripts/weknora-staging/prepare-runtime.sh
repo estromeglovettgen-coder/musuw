@@ -10,6 +10,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 runtime_dir="$(weknora_staging_runtime_dir)"
 repo_root="$(weknora_staging_repo_root)"
+allowlist_helper="$repo_root/scripts/weknora/paddle-ip-allowlist.sh"
+weknora_staging_require_file "$allowlist_helper"
 public_env="${WEKNORA_STAGING_PUBLIC_ENV:-$runtime_dir/staging.public.env}"
 auth_public_env="${WEKNORA_STAGING_AUTH_PUBLIC_ENV:-$runtime_dir/auth-public.env}"
 secret_dir="${MUSUW_STAGING_SECRET_DIR:-$runtime_dir/secrets}"
@@ -18,6 +20,8 @@ output_env="$runtime_dir/staging.env"
 
 weknora_staging_require_command awk
 weknora_staging_require_command sha256sum
+weknora_staging_require_command curl
+weknora_staging_require_command jq
 weknora_staging_require_file "$public_env"
 weknora_staging_require_file "$auth_public_env"
 weknora_staging_require_file "$openrouter_workspace_pin"
@@ -28,6 +32,7 @@ weknora_staging_require_unique_env_keys "$auth_public_env"
 [ -s "$openrouter_workspace_pin" ] || weknora_staging_die 'staging OpenRouter workspace pin is empty'
 install -d -m 700 "$runtime_dir"
 [ "$(weknora_staging_file_mode "$runtime_dir")" = 700 ] || weknora_staging_die 'staging runtime directory permissions are unsafe'
+"$allowlist_helper" sandbox "$runtime_dir/paddle-ips"
 [ -d "$secret_dir" ] && [ ! -L "$secret_dir" ] || weknora_staging_die 'staging secret directory is unavailable or unsafe'
 [ "$(weknora_staging_file_mode "$secret_dir")" = 700 ] || weknora_staging_die 'staging secret directory permissions are unsafe'
 

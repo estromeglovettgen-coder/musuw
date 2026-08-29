@@ -137,3 +137,32 @@ stored here.
   country override, or currency override that could suppress WeChat Pay.
 - No one-time catalog, manual-renewal entitlement path, or duplicate payment
   flow was added merely to expose WeChat Pay.
+
+## 2026-08-29 onboarding progress and source-allowlist correction
+
+- Paddle's authenticated progress response reports `live-setup=in_progress`
+  with the sole missing signal `notificationDeliveryLogs`; verification and
+  all five verification substeps are complete. The Live account still has the
+  verified catalog, credentials, destination, default payment link, payment
+  methods, approved domain, and saved payout settings.
+- The exact Live destination has successful official `adjustment.created`
+  simulation deliveries returning HTTP 200, including runs from the previous
+  UTC date, while the normal Notifications log remains empty. Paddle therefore does
+  not count simulation traffic as the platform-origin delivery signal. There
+  is no manual completion control, and producing that signal would require a
+  real Live platform event outside this change's no-customer/no-transaction/
+  no-charge boundary. The first onboarding card is intentionally not reported
+  as complete.
+- A repository audit found the documented Paddle source-IP defense had not
+  been implemented. The corrective delta now fetches the fixed environment's
+  official `/ips` response during runtime preparation, rejects malformed,
+  empty, duplicate, non-`/32`, or out-of-range IPv4 data, and atomically keeps
+  the previous allowlist on refresh failure. Production and staging mount only
+  that non-secret generated directory into the shared frontend image.
+- The Nginx gate uses the Cloudflare-overwritten `CF-Connecting-IP` because the
+  origin is reachable only through the Tunnel and loopback; using
+  `$remote_addr` would incorrectly see the `cloudflared` container. Only the
+  exact Paddle webhook path is gated, and application-level Paddle signature
+  verification remains authoritative. Helper, production-static, staging-
+  static, shell-syntax, and diff checks are green locally. Deployment and
+  provider delivery after activation remain task 5.8.

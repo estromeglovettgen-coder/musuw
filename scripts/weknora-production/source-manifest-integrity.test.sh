@@ -17,6 +17,7 @@ mkdir -p \
     "$fixture/weknora/frontend" \
     "$fixture/auth" \
     "$fixture/integration/weknora-production" \
+    "$fixture/scripts/weknora" \
     "$fixture/scripts/weknora-production" \
     "$runtime"
 
@@ -29,6 +30,7 @@ printf '%s\n' 'services: {}' > "$fixture/integration/weknora-production/compose.
 printf '%s\n' 'auth/*.dump' 'weknora/frontend/.env.local' > "$fixture/.gitignore"
 cp "$script_dir/lib.sh" "$fixture/scripts/weknora-production/lib.sh"
 cp "$script_dir/source-manifest.sh" "$fixture/scripts/weknora-production/source-manifest.sh"
+cp "$script_dir/../weknora/paddle-ip-allowlist.sh" "$fixture/scripts/weknora/paddle-ip-allowlist.sh"
 printf '%s\n' 'PUBLIC_APP=https://app.musuw.com' > "$runtime/production.public.env"
 printf '%s\n' 'PUBLIC_AUTH=https://auth.musuw.com' > "$runtime/auth-public.env"
 
@@ -106,6 +108,7 @@ WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
 grep -Fq 'weknora/docker-compose.yml' "$output/source-manifest.sha256"
 grep -Fq 'weknora/config/config.yaml' "$output/source-manifest.sha256"
 grep -Fq 'weknora/docker/searxng/settings.yml' "$output/source-manifest.sha256"
+grep -Fq 'scripts/weknora/paddle-ip-allowlist.sh' "$output/source-manifest.sha256"
 if grep -Eq 'weknora/app\.go|auth/app\.ts' "$output/source-manifest.sha256"; then
     printf '%s\n' 'source manifest included application source that is already shipped in immutable images' >&2
     exit 1
@@ -134,6 +137,7 @@ WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" \
 [ ! -e "$materialized_tree/auth/dist" ]
 [ ! -e "$materialized_tree/weknora/frontend/.env.local" ]
 [ ! -e "$materialized_tree/auth/debug.dump" ]
+[ -f "$materialized_tree/scripts/weknora/paddle-ip-allowlist.sh" ]
 WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime" WEKNORA_PRODUCTION_REVISION="$revision" \
     "$fixture/scripts/weknora-production/source-manifest.sh" verify \
     "$materialized_tree" >/dev/null
