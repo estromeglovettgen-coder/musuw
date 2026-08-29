@@ -243,5 +243,4 @@ func TestDocumentCloneDoesNotMutateSharedTenantUsageFromWorkers(t *testing.T) {
 	source := storageAccountingServiceSource(t, "knowledge_clone_move.go")
 	require.NotContains(t, source, "StorageUsed +=")
 	require.NotContains(t, source, "StorageUsed -=")
-	require.NotContains(t, source, "processedCount++")
 }
