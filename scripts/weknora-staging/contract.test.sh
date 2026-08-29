@@ -40,6 +40,10 @@ for required in "${required_files[@]}"; do
     [ ! -L "$required" ] || fail "staging contract file is a symlink: $required"
 done
 
+deploy_usage="$("$repo_root/scripts/weknora-staging-deploy.sh" 2>&1 || true)"
+grep -Fq 'Usage: scripts/weknora-staging-deploy.sh <full-sha>' <<<"$deploy_usage" ||
+    fail 'staging runner cannot resolve repository-local helpers'
+
 grep -Fq 'weknora-v072-staging' "$staging_root/compose.yaml" || fail 'staging project identity is not fixed'
 grep -Fq '127.0.0.1:${WEKNORA_STAGING_FRONTEND_PORT:-4192}:8080' "$staging_root/compose.yaml" || fail 'staging frontend port is not loopback 4192'
 grep -Fq '127.0.0.1:${WEKNORA_STAGING_APP_PORT:-18092}:8080' "$staging_root/compose.yaml" || fail 'staging app port is not loopback 18092'

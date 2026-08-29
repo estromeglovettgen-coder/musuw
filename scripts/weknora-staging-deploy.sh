@@ -4,7 +4,7 @@
 # or path reaches the server.
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 staging_dir="$repo_root/scripts/weknora-staging"
 # shellcheck source=scripts/weknora-staging/lib.sh
 . "$staging_dir/lib.sh"
