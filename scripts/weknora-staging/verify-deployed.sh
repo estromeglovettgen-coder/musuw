@@ -99,7 +99,7 @@ printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_DEPLOYMENT_ENVIRONMENT=staging' || f
 printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=sandbox' || fail 'staging Paddle selector is not Sandbox at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'NEO4J_ENABLE=false' || fail 'staging unexpectedly enables Neo4j at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'WEKNORA_REDIS_NAMESPACE=weknora-v072-staging' || fail 'staging Redis namespace is not isolated at runtime'
-printf '%s\n' "$app_env" | grep -Fqx 'APP_EXTERNAL_URL=https://staging.app.musuw.com' || fail 'staging external origin is not dotted HTTPS'
+printf '%s\n' "$app_env" | grep -Fqx 'APP_EXTERNAL_URL=https://staging.musuw.com' || fail 'staging external origin is not dotted HTTPS'
 workspace_id="$(weknora_staging_require_env_value "$staging_env" OPENROUTER_WORKSPACE_ID)"
 [[ "$workspace_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]] || fail 'staging OpenRouter workspace ID is invalid'
 printf '%s\n' "$app_env" | grep -Fqx "OPENROUTER_WORKSPACE_ID=$workspace_id" || fail 'staging OpenRouter workspace is not isolated at runtime'
@@ -117,8 +117,8 @@ case "$r2_endpoint" in https://*.r2.cloudflarestorage.com) ;; *) fail 'staging R
 printf '%s\n' "$app_env" | grep -Fqx "S3_ENDPOINT=$r2_endpoint" || fail 'staging app R2 endpoint differs from the release environment'
 printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' || fail 'staging app Supabase project has drifted'
 printf '%s\n' "$frontend_env" | grep -Fqx 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' || fail 'staging frontend Supabase project has drifted'
-printf '%s\n' "$frontend_env" | grep -Fqx 'MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.app.musuw.com' || fail 'staging browser auth origin has drifted'
-printf '%s\n' "$app_env" | grep -Fqx 'FRONTEND_BASE_URL=https://staging.app.musuw.com' || fail 'staging backend frontend origin has drifted'
+printf '%s\n' "$frontend_env" | grep -Fqx 'MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.musuw.com' || fail 'staging browser auth origin has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'FRONTEND_BASE_URL=https://staging.musuw.com' || fail 'staging backend frontend origin has drifted'
 printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_ISSUER_URL=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1' || fail 'staging OIDC issuer has drifted'
 printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_DISCOVERY_URL=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/.well-known/openid-configuration' || fail 'staging OIDC discovery URL has drifted'
 

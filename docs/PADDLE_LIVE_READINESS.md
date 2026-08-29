@@ -16,7 +16,7 @@ Paddle 资源 ID、credential 值、网络地址或供应商响应原文。
 Staging 的 Sandbox unit 必须一次性核对并保持成组：SDK mode `sandbox`、Sandbox
 API URL、`test_` client token、`pdl_sdbx_apikey_` server API key、`pdl_ntfset_`
 destination secret、Plus/Pro/Max monthly/yearly 六个 distinct recurring USD
-prices、approved `staging.app.musuw.com` checkout domain、Sandbox `/pay` default
+prices、approved `staging.musuw.com` checkout domain、Sandbox `/pay` default
 payment link，以及 Paddle-owned location tax、currency 和 payment-method 设置。
 这些值只进入 staging protected runtime/GitHub `staging` Environment；不得复制到
 production Live files or browser bundles。

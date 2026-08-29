@@ -11,7 +11,7 @@ export type RuntimeAuthPublicConfig = Readonly<{
 const unavailableMessage = "Authentication configuration is unavailable";
 const supportedOrigins = new Set([
   "https://app.musuw.com",
-  "https://staging.app.musuw.com",
+  "https://staging.musuw.com",
   "http://localhost:4190",
   "http://127.0.0.1:4190",
 ]);

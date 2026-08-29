@@ -32,7 +32,7 @@
 
 - [ ] 5.1 Create the GitHub `staging` Environment and install only the required isolated public/runtime/SSH inputs without printing or persisting secret values in artifacts.
 - [ ] 5.2 Create `/opt/weknora/staging-runtime`, protected secret files, staging volumes/network, and the dedicated R2 test bucket/credentials; prove metadata and storage isolation.
-- [ ] 5.3 Add Cloudflare DNS/TLS/tunnel routing for `staging.app.musuw.com` to `staging-web`; reuse Access if directly applicable and add an exact webhook bypass.
+- [ ] 5.3 Add Cloudflare DNS/TLS/tunnel routing for `staging.musuw.com` to `staging-web`; reuse Access if directly applicable and add an exact webhook bypass.
 - [ ] 5.4 Audit the Sandbox catalog and configure the active client token, approved staging domain, default `/pay` link, portal/history, Retain, location tax, USD base prices, and eligible payment methods.
 - [ ] 5.5 Create or update one active staging notification destination with the exact 11 events, install its opaque secret, and leave the production Live destination unchanged.
 

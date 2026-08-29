@@ -118,7 +118,7 @@ handoff. A Cloudflare command succeeding without these probes is not enough.
 
 ## Staging edge and application
 
-`staging.app.musuw.com` is an exact, separate Cloudflare hostname. Cloudflare
+`staging.musuw.com` is an exact, separate Cloudflare hostname. Cloudflare
 terminates TLS and the existing Tunnel routes it to the staging frontend's
 `staging-web` alias; production's `web` alias and `app.musuw.com` route remain
 unchanged. No staging app, database, Redis or DocReader port is publicly bound.
@@ -180,8 +180,8 @@ curl -fsS https://app.musuw.com/
 curl -fsS https://app.musuw.com/health
 curl -fsS https://app.musuw.com/auth/start
 # Staging probes are read-only and must report Sandbox/noindex.
-curl -fsS https://staging.app.musuw.com/health
-curl -fsSI https://staging.app.musuw.com/ | grep -i '^x-robots-tag:.*noindex'
+curl -fsS https://staging.musuw.com/health
+curl -fsSI https://staging.musuw.com/ | grep -i '^x-robots-tag:.*noindex'
 ```
 
 The public storefront and the server release are independent: a green
@@ -267,7 +267,7 @@ Staging keeps a separate Sandbox unit in `/opt/weknora/staging-runtime`: its
 `staging.public.env` and `auth-public.env` contain only public coordinates, while
 database/Redis/AES/JWT/OIDC/Supabase service, OpenRouter, Paddle Sandbox and R2
 credentials stay in the staging `secrets/` directory. The six Sandbox price IDs,
-Sandbox destination and approved `staging.app.musuw.com` checkout domain are
+Sandbox destination and approved `staging.musuw.com` checkout domain are
 validated together. Staging acceptance must finish before a manual exact-digest
 promotion; it must never alter this production Live unit.
 

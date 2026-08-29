@@ -511,14 +511,14 @@ describe("Supabase to WeKnora authorization continuation", () => {
         approveAuthorization: vi.fn(async () => ({
           data: {
             redirect_url:
-              "https://staging.app.musuw.com/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
+              "https://staging.musuw.com/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
           },
           error: null,
         })),
         getAuthorizationDetails: vi.fn(async () => ({
           data: {
             ...authorizationDetails(),
-            redirect_uri: "https://staging.app.musuw.com/api/v1/auth/oidc/callback",
+            redirect_uri: "https://staging.musuw.com/api/v1/auth/oidc/callback",
           },
           error: null,
         })),
@@ -526,7 +526,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     });
     const runtime = createAuthRuntime({
       config: {
-        publicOrigin: "https://staging.app.musuw.com",
+        publicOrigin: "https://staging.musuw.com",
         publishableKey: "sb_publishable_key",
         supabaseUrl: "https://identity.example",
         weknoraOAuthClientId: "weknora-client",
@@ -542,7 +542,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       state: "authorization_complete",
     });
     expect(assigned).toHaveBeenCalledWith(
-      "https://staging.app.musuw.com/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
+      "https://staging.musuw.com/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
     );
 
     const productionClient = identity({

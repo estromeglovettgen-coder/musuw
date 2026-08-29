@@ -20,7 +20,7 @@ function environment(publicOrigin: string): ImportMetaEnv {
   };
 }
 
-function runtimeAuth(publicOrigin = "https://staging.app.musuw.com"): Record<string, string> {
+function runtimeAuth(publicOrigin = "https://staging.musuw.com"): Record<string, string> {
   return {
     publicOrigin,
     supabaseUrl: "https://identity.example",
@@ -32,7 +32,7 @@ function runtimeAuth(publicOrigin = "https://staging.app.musuw.com"): Record<str
 describe("auth public origin configuration", () => {
   it.each([
     ["https://app.musuw.com", "https://app.musuw.com"],
-    ["https://staging.app.musuw.com", "https://staging.app.musuw.com"],
+    ["https://staging.musuw.com", "https://staging.musuw.com"],
     ["http://localhost:4190", "http://localhost:4190"],
     ["http://127.0.0.1:4190", "http://127.0.0.1:4190"],
   ])("accepts the exact supported origin %s", (input, expectedOrigin) => {
@@ -42,9 +42,10 @@ describe("auth public origin configuration", () => {
   it.each([
     "",
     "https://unknown.example",
-    "https://app.musuw.com https://staging.app.musuw.com",
+    "https://staging.app.musuw.com",
+    "https://app.musuw.com https://staging.musuw.com",
     "http://app.musuw.com",
-    "https://staging.app.musuw.com:4090",
+    "https://staging.musuw.com:4090",
     "https://staging-app.musuw.com",
     "http://localhost:4090",
     "https://app.musuw.com/callback",
@@ -57,7 +58,7 @@ describe("auth public origin configuration", () => {
 
   it("accepts a complete startup runtime auth object", () => {
     expect(authConfigFromRuntime(runtimeAuth())).toEqual({
-      publicOrigin: "https://staging.app.musuw.com",
+      publicOrigin: "https://staging.musuw.com",
       supabaseUrl: "https://identity.example",
       publishableKey: "sb_publishable_key",
       weknoraOAuthClientId: "weknora-client",
@@ -73,7 +74,7 @@ describe("auth public origin configuration", () => {
     { ...runtimeAuth(), weknoraOAuthClientId: undefined },
     { ...runtimeAuth(), serverSecret: "pdl_live_apikey_should_not_be_here" },
     { ...runtimeAuth(), publicOrigin: "https://staging-app.musuw.com" },
-    { ...runtimeAuth(), publicOrigin: "https://staging.app.musuw.com\";alert(1)//" },
+    { ...runtimeAuth(), publicOrigin: "https://staging.musuw.com\";alert(1)//" },
   ])("rejects an incomplete or unsafe startup runtime auth object", (runtime) => {
     expect(() => authConfigFromRuntime(runtime)).toThrow(
       "Authentication configuration is unavailable",
@@ -81,7 +82,7 @@ describe("auth public origin configuration", () => {
   });
 
   it("never falls back field-by-field when a runtime object is present", () => {
-    const partial = { publicOrigin: "https://staging.app.musuw.com" };
+    const partial = { publicOrigin: "https://staging.musuw.com" };
     expect(() => authConfigFromRuntimeOrEnvironment(environment("https://app.musuw.com"), partial, true)).toThrow(
       "Authentication configuration is unavailable",
     );

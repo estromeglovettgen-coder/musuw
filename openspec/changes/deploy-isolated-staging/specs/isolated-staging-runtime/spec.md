@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Staging has an isolated runtime identity
-The system SHALL run `staging.app.musuw.com` and production as distinct Docker Compose projects on the existing Tokyo host. Staging SHALL use distinct container names, internal networks, PostgreSQL data, Redis data and namespace, file storage, temporary data, runtime directory, secrets directory, and current-release pointer. The only shared application infrastructure SHALL be immutable release source, deliberately shared external edge connectivity, and explicitly approved external provider accounts.
+The system SHALL run `staging.musuw.com` and production as distinct Docker Compose projects on the existing Tokyo host. Staging SHALL use distinct container names, internal networks, PostgreSQL data, Redis data and namespace, file storage, temporary data, runtime directory, secrets directory, and current-release pointer. The only shared application infrastructure SHALL be immutable release source, deliberately shared external edge connectivity, and explicitly approved external provider accounts.
 
 #### Scenario: Both projects are running
 - **WHEN** an operator inspects Docker project, container, network, mount, and volume metadata
@@ -39,7 +39,7 @@ The shared frontend image SHALL load a single startup-generated public configura
 
 #### Scenario: Staging starts
 - **WHEN** the same frontend digest starts with the staging public runtime file
-- **THEN** the auth shell trusts only `https://staging.app.musuw.com` and initializes the test Supabase public project coordinates
+- **THEN** the auth shell trusts only `https://staging.musuw.com` and initializes the test Supabase public project coordinates
 
 #### Scenario: Runtime config is partial or unsafe
 - **WHEN** a required field is absent, whitespace-padded, contains unsafe serialization input, or uses an unapproved origin or URL
@@ -53,7 +53,7 @@ Every staging service SHALL have an explicit memory and CPU limit appropriate to
 - **THEN** all required staging services remain within their limits, have no OOM kill or unexpected restart, and production health remains green
 
 ### Requirement: Staging is routed securely and excluded from indexing
-Cloudflare SHALL terminate valid TLS for `staging.app.musuw.com` and route it through the existing tunnel to only the staging frontend alias. Staging responses for workspace, auth, API, and static surfaces SHALL emit `X-Robots-Tag: noindex, nofollow`. No staging application or data-service port SHALL be publicly bound on the host.
+Cloudflare SHALL terminate valid TLS for `staging.musuw.com` and route it through the existing tunnel to only the staging frontend alias. Staging responses for workspace, auth, API, and static surfaces SHALL emit `X-Robots-Tag: noindex, nofollow`. No staging application or data-service port SHALL be publicly bound on the host.
 
 #### Scenario: Public staging routes are probed
 - **WHEN** an external client requests health, workspace, auth, API, and a static asset over HTTPS

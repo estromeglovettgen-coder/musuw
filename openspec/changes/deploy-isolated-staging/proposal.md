@@ -4,7 +4,7 @@ Musuw has a healthy Tokyo production deployment but no production-like staging e
 
 ## What Changes
 
-- Add `staging.app.musuw.com` as a second, resource-bounded Docker Compose project on the existing Tokyo host, with separate PostgreSQL, Redis, file, and R2 test storage.
+- Add `staging.musuw.com` as a second, resource-bounded Docker Compose project on the existing Tokyo host, with separate PostgreSQL, Redis, file, and R2 test storage.
 - Make only public browser configuration environment-selectable at container startup so one frontend image digest can serve production and staging; keep every credential server-side and preserve the production Live-only fence.
 - Add a GitHub `staging` Environment and a one-build release sequence that deploys exact app/frontend digests to staging, runs acceptance checks, then promotes the same digests to production.
 - Reuse the existing Cloudflare Tunnel and edge network for staging TLS and routing, require `noindex`, and leave the Paddle webhook path publicly reachable even when interactive staging pages use Access.

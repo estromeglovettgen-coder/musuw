@@ -474,6 +474,9 @@ jobs:
           test -s "$known_hosts_path"
           test -s "$runtime_dir/staging.public.env"
           test -s "$runtime_dir/auth-public.env"
+          grep -Fqx 'APP_EXTERNAL_URL=https://staging.musuw.com' "$runtime_dir/staging.public.env"
+          grep -Fqx 'FRONTEND_BASE_URL=https://staging.musuw.com' "$runtime_dir/staging.public.env"
+          grep -Fqx 'MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.musuw.com' "$runtime_dir/auth-public.env"
       - name: Pin approved GHCR image refs in the staging input
         env:
           RUNTIME_DIR: ${{ steps.staging_prepare.outputs.runtime_dir }}

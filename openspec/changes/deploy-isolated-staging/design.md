@@ -39,7 +39,7 @@ Alternatives rejected: a second server violates the brief; a repository copy or 
 
 `/config.js` remains the single public runtime seam. It gains a bounded auth object containing only the exact public origin, Supabase URL, Supabase publishable key, and native OAuth client ID. The auth shell reads that object before creating its client. Docker-built auth assets require the runtime object; local Vite development may continue using `import.meta.env`. A present but incomplete runtime object never falls back field-by-field to baked values.
 
-The entrypoint validates and safely serializes these public values, accepts only `https://app.musuw.com`, `https://staging.app.musuw.com`, or the existing fixed local development origin, and never accepts a credential. The auth callback trust checks use the same origin function. Paddle remains on its existing same-origin public-config endpoint and server-only SDK adapter.
+The entrypoint validates and safely serializes these public values, accepts only `https://app.musuw.com`, `https://staging.musuw.com`, or the existing fixed local development origin, and never accepts a credential. The auth callback trust checks use the same origin function. Paddle remains on its existing same-origin public-config endpoint and server-only SDK adapter.
 
 Alternatives rejected: one frontend build per environment violates digest parity; rewriting hashed assets at startup is brittle; moving public configuration into a new service is unnecessary.
 
@@ -51,7 +51,7 @@ Provider-side reads prove the six prices belong to Sandbox and represent Plus, P
 
 ### Reuse the Cloudflare tunnel and keep billing ingress independent of interactive access
 
-Cloudflare maps `staging.app.musuw.com` to `http://staging-web:8080` through the existing tunnel. TLS terminates at Cloudflare; no new host port is public. Nginx emits `X-Robots-Tag: noindex, nofollow` on staging HTML, auth, API, and static responses, and the existing robots metadata remains.
+Cloudflare maps `staging.musuw.com` to `http://staging-web:8080` through the existing tunnel. TLS terminates at Cloudflare; no new host port is public. Nginx emits `X-Robots-Tag: noindex, nofollow` on staging HTML, auth, API, and static responses, and the existing robots metadata remains.
 
 If the existing Access configuration can protect the staging hostname directly, it is reused. The exact `POST /api/v1/billing/paddle/webhook` path is an explicit bypass and remains protected by Paddle's raw-body signature verification; health may be bypassed only as needed for external probes. No new proxy or VPN is introduced merely to add Access.
 

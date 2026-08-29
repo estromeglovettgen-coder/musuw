@@ -33,6 +33,8 @@ if grep -A12 '^  deploy:$' "$workflow_path" | grep -Fq 'github.event_name == '\'
 fi
 grep -Fq 'if [ -z "$mode" ]; then mode=staging-only; fi' "$workflow_path" || fail 'workflow_run does not default to staging-only'
 grep -Fq 'musuw-staging-gate verify' "$workflow_path" || fail 'staging acceptance does not use the fixed remote verify gate'
+grep -Fq 'APP_EXTERNAL_URL=https://staging.musuw.com' "$workflow_path" || fail 'staging workflow does not pin the dotted hostname'
+grep -Fq 'MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.musuw.com' "$workflow_path" || fail 'staging workflow does not pin the browser origin'
 if grep -Fq 'bash scripts/weknora-staging/verify-deployed.sh' "$workflow_path"; then
     fail 'server-local staging verifier is being executed on the GitHub runner'
 fi

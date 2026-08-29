@@ -104,8 +104,8 @@ AUTO_MIGRATE=true
 AUTO_RECOVER_DIRTY=true
 DISABLE_REGISTRATION=false
 WEKNORA_AUTH_DEFAULT_TENANT_MODE=create_personal
-APP_EXTERNAL_URL=https://staging.app.musuw.com
-FRONTEND_BASE_URL=https://staging.app.musuw.com
+APP_EXTERNAL_URL=https://staging.musuw.com
+FRONTEND_BASE_URL=https://staging.musuw.com
 OIDC_AUTH_ENABLE=true
 OIDC_AUTH_ISSUER_URL=https://identity-staging.example/auth/v1
 OIDC_AUTH_DISCOVERY_URL=https://identity-staging.example/auth/v1/.well-known/openid-configuration
@@ -129,7 +129,7 @@ LANGFUSE_RELEASE=musuw-staging
 LANGFUSE_ENVIRONMENT=staging
 EOF
 cat > "$runtime_dir/auth-public.env" <<'EOF'
-MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.app.musuw.com
+MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.musuw.com
 MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co
 MUSUW_SUPABASE_PUBLISHABLE_KEY=static-sandbox-publishable-key
 MUSUW_WEKNORA_OAUTH_CLIENT_ID=static-staging-oidc-client
@@ -196,8 +196,8 @@ jq -e '
     .services.app.environment.S3_BUCKET_NAME == "musuw-staging" and
     .services.app.environment.NEO4J_ENABLE == "false" and
     .services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-staging" and
-    .services.app.environment.APP_EXTERNAL_URL == "https://staging.app.musuw.com" and
-    .services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "https://staging.app.musuw.com" and
+    .services.app.environment.APP_EXTERNAL_URL == "https://staging.musuw.com" and
+    .services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "https://staging.musuw.com" and
     ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 5 and
     ([.services[].cpus | tonumber] | add) <= 1.5 and
     ([.services[].mem_limit | tonumber] | add) <= 1932735283

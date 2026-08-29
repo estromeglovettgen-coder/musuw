@@ -17,7 +17,7 @@ Staging 的独立 Compose、Sandbox 和发布门见
 
 ## 1. 当前硬边界
 
-- 正式生产使用一个完整的 **Paddle Live** 单元；`staging.app.musuw.com` 使用
+- 正式生产使用一个完整的 **Paddle Live** 单元；`staging.musuw.com` 使用
   独立的 Paddle Sandbox 测试单元。Sandbox 证据不能证明 Live 已获批或改变
   production 配置。
 - Live 的环境选择、client token、六个价格 ID、API key、webhook secret、

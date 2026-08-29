@@ -1,6 +1,6 @@
 # Musuw staging 运维与发布
 
-本文是 `staging.app.musuw.com` 的运维边界。Staging 是一次性验收和回归环境，
+本文是 `staging.musuw.com` 的运维边界。Staging 是一次性验收和回归环境，
 不是生产副本，也不是新的产品运行时。生产仍使用 Paddle Live；staging 只使用
 Paddle Sandbox 和测试身份。凭据只记录在
 [`external-credentials-registry.yaml`](external-credentials-registry.yaml) 的元数据
@@ -14,7 +14,7 @@ Tunnel edge 网络和同一组不可变镜像外，不共享运行状态：
 | 边界 | Production | Staging |
 | --- | --- | --- |
 | Compose project | `weknora-v072-production` | `weknora-v072-staging` |
-| HTTPS host | `app.musuw.com` | `staging.app.musuw.com` |
+| HTTPS host | `app.musuw.com` | `staging.musuw.com` |
 | Paddle | 一个完整 Live unit | 一个完整 Sandbox unit |
 | Supabase | production Auth project | 独立 test Auth project |
 | PostgreSQL/Redis/files | production volumes、生产 Redis namespace | 独立 PostgreSQL、Redis namespace、文件 volume、DocReader 临时 volume |
@@ -24,7 +24,7 @@ Tunnel edge 网络和同一组不可变镜像外，不共享运行状态：
 
 Staging 只有 frontend 通过现有 edge 网络的 `staging-web` alias 暴露给 Tunnel；
 app 和数据服务只绑定 loopback，不开放新的主机公网端口。Cloudflare 必须为
-`staging.app.musuw.com` 提供有效 TLS，并把该 exact host 路由到 staging alias，
+`staging.musuw.com` 提供有效 TLS，并把该 exact host 路由到 staging alias，
 不能把 production 的 `web` alias 或 origin 混入。所有 workspace、auth、API 和
 静态响应都应带 `X-Robots-Tag: noindex, nofollow`。
 
@@ -109,7 +109,7 @@ known hosts 上传 manifest-backed source，并让远端 root gate 调用冻结 
 
 上线前逐项确认：
 
-- `staging.app.musuw.com` 的 DNS、Cloudflare TLS、Tunnel exact host/alias 和
+- `staging.musuw.com` 的 DNS、Cloudflare TLS、Tunnel exact host/alias 和
   Nginx route 均指向 staging；Paddle webhook exact POST path 保持公开 bypass，
   其余交互路由可复用现有 Access；
 - Compose 渲染只出现五个验收服务、全部有 CPU/memory/pids limit，app/frontend

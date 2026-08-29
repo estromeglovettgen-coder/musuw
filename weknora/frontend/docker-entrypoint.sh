@@ -41,7 +41,7 @@ require_public_value supabase_publishable_key "$supabase_publishable_key"
 require_public_value weknora_oauth_client_id "$weknora_oauth_client_id"
 
 case "$auth_public_origin" in
-  https://app.musuw.com|https://staging.app.musuw.com|http://localhost:4190|http://127.0.0.1:4190) ;;
+  https://app.musuw.com|https://staging.musuw.com|http://localhost:4190|http://127.0.0.1:4190) ;;
   *) fail "public runtime origin is invalid" ;;
 esac
 

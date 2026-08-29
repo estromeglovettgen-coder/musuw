@@ -89,8 +89,8 @@ done
 for volume_key in WEKNORA_STAGING_POSTGRES_VOLUME WEKNORA_STAGING_FILES_VOLUME WEKNORA_STAGING_DOCREADER_TMP_VOLUME WEKNORA_STAGING_REDIS_VOLUME; do
     weknora_staging_assert_volume "$(weknora_staging_require_env_value "$tmp_env" "$volume_key")"
 done
-[ "$(weknora_staging_require_env_value "$tmp_env" APP_EXTERNAL_URL)" = 'https://staging.app.musuw.com' ] || weknora_staging_die 'staging APP_EXTERNAL_URL is not the dotted HTTPS origin'
-[ "$(weknora_staging_require_env_value "$tmp_env" FRONTEND_BASE_URL)" = 'https://staging.app.musuw.com' ] || weknora_staging_die 'staging FRONTEND_BASE_URL is not the dotted HTTPS origin'
+[ "$(weknora_staging_require_env_value "$tmp_env" APP_EXTERNAL_URL)" = 'https://staging.musuw.com' ] || weknora_staging_die 'staging APP_EXTERNAL_URL is not the dotted HTTPS origin'
+[ "$(weknora_staging_require_env_value "$tmp_env" FRONTEND_BASE_URL)" = 'https://staging.musuw.com' ] || weknora_staging_die 'staging FRONTEND_BASE_URL is not the dotted HTTPS origin'
 [ "$(weknora_staging_require_env_value "$tmp_env" MUSUW_PADDLE_ENVIRONMENT)" = sandbox ] || weknora_staging_die 'staging Paddle environment must be Sandbox'
 [ "$(weknora_staging_require_env_value "$tmp_env" MUSUW_PADDLE_API_URL)" = 'https://sandbox-api.paddle.com' ] || weknora_staging_die 'staging Paddle API URL must be Sandbox'
 [ "$(weknora_staging_require_env_value "$tmp_env" NEO4J_ENABLE)" = false ] || weknora_staging_die 'staging must disable Neo4j'
@@ -118,7 +118,7 @@ workspace_pin="$(awk 'NR == 1 { value = $0 } END { if (NR != 1) exit 1; print va
 unset workspace_id workspace_pin
 
 public_origin="$(weknora_staging_require_env_value "$auth_public_env" MUSUW_AUTH_PUBLIC_ORIGIN)"
-[ "$public_origin" = 'https://staging.app.musuw.com' ] || weknora_staging_die 'staging auth origin must be the dotted HTTPS origin'
+[ "$public_origin" = 'https://staging.musuw.com' ] || weknora_staging_die 'staging auth origin must be the dotted HTTPS origin'
 supabase_url="$(weknora_staging_require_env_value "$auth_public_env" MUSUW_SUPABASE_URL)"
 [ "$supabase_url" = 'https://achfnnicetupvtoqiwqd.supabase.co' ] || weknora_staging_die 'staging Supabase URL is not the commissioned test project'
 supabase_authority="${supabase_url#https://}"
