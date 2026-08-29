@@ -14,13 +14,13 @@ const pageFiles = [
 
 const readPage = (file) => readFileSync(join(root, 'src/views/settings', file), 'utf8')
 
-test('all five Lite settings pages share the General title-strip DOM contract', () => {
+test('all five Lite settings pages share the authoritative title-strip DOM contract', () => {
   for (const file of pageFiles) {
     const source = readPage(file)
     assert.match(source, /<(?:header|div) class="[^"]*visual-settings-page-header[^"]*">/)
     assert.match(source, /class="visual-settings-page-header__copy"/)
     assert.match(source, /<h2 class="visual-settings-page-header__title">/)
-    if (file === 'UserProfile.vue') {
+    if (file === 'UserProfile.vue' || file === 'UsageBillingSettings.vue') {
       assert.doesNotMatch(source, /<p class="visual-settings-page-header__description[^"]*">/)
     } else {
       assert.match(source, /<p class="visual-settings-page-header__description[^"]*">/)
@@ -54,12 +54,12 @@ test('the shared title strip keeps the reference cadence and borders', () => {
   assert.match(titleRule, /border-bottom:\s*1px solid #f3f4f6 !important/)
   assert.match(shell, /\.visual-settings-content \.visual-settings-page-header__title,\s*\.visual-settings-content \.section-header h2\s*\{[\s\S]*font-size:\s*16px !important;[\s\S]*line-height:\s*24px !important;/)
   assert.match(shell, /\.visual-settings-content \.visual-settings-page-header__description,\s*\.visual-settings-content \.section-description\s*\{[\s\S]*font-size:\s*12px !important;[\s\S]*line-height:\s*16px !important;/)
-  assert.match(shell, /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header,\s*:root\[theme-mode="dark"\] \.visual-settings-content \.section-header\s*\{[\s\S]*border-bottom-color:\s*var\(--mvc-line/)
+  assert.match(shell, /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header,\s*:root\[theme-mode="dark"\] \.visual-settings-content \.section-header\s*\{[\s\S]*border-bottom-color:\s*#27272a/)
 })
 
-test('usage title is mounted before plan cards and models title is not Lite-gated', () => {
+test('usage title is mounted before the authoritative plan row and models title is not Lite-gated', () => {
   const usage = readPage('UsageBillingSettings.vue')
-  assert.ok(usage.indexOf('visual-settings-page-header__title') < usage.indexOf('usage-plan-title'))
+  assert.ok(usage.indexOf('visual-settings-page-header__title') < usage.indexOf('usage-billing__quota-title'))
 
   const models = readPage('ModelSettings.vue')
   const headerStart = models.indexOf('<header class="visual-settings-page-header')

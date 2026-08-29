@@ -1,6 +1,6 @@
 ## Context
 
-Musuw Lite already contains the upstream WeKnora knowledge-base editor, custom-agent runtime, agent CRUD, chat agent selection, and remote MCP management. The Lite product gate and consumer UI hide most of those capabilities. The supplied `musnow-ai-workspace (6).zip` and the accompanying screenshots are the visual authority for the agent, MCP, knowledge settings, and combined chat capsule surfaces; the clean WeKnora 0.7.2 tree is the functional authority for types, APIs, permissions, defaults, selectors, persistence, and execution paths.
+Musuw Lite already contains the upstream WeKnora knowledge-base editor, custom-agent runtime, agent CRUD, chat agent selection, and remote MCP management. The supplied `musnow-ai-workspace (7).zip` and the accompanying screenshots are the visual authority for the agent, MCP, knowledge settings, and combined chat capsule surfaces; the clean WeKnora 0.7.2 tree is the functional authority for types, APIs, permissions, defaults, selectors, persistence, and execution paths.
 
 The implementation must remain a thin product layer. It must preserve the user's unrelated TikHub/social-import work and must not add a parallel configuration model, agent engine, MCP client, rebuild endpoint, database migration, or provider protocol.
 

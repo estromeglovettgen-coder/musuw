@@ -8,7 +8,7 @@ Musuw Lite currently hides complete WeKnora knowledge-base, custom-agent, and MC
 - Restore native custom-agent listing, cards, creation, editing, deletion, and chat selection.
 - Reduce the native agent editor to basic information, the selected conversation model, one system prompt, knowledge-base scope, and smart-reasoning MCP selection. Hidden fields retain native defaults.
 - Restore the native MCP settings routes and tenant-admin management workflow, while mechanically porting the supplied `McpSettingsPanel` presentation and exposing the complete native remote-service form.
-- Add the supplied `musnow-ai-workspace (6).zip` agent card, editor, MCP settings, knowledge settings, and combined chat capsule presentation by mechanically translating the reference React structure and style values into the existing Vue and TDesign stack.
+- Add the supplied `musnow-ai-workspace (7).zip` agent card, editor, MCP settings, knowledge settings, and combined chat capsule presentation by mechanically translating the reference React structure and style values into the existing Vue and TDesign stack.
 - Restore WeKnora 0.7.2 native component behavior before visual translation; the reference archive controls presentation only and MUST NOT replace native state, persistence, selectors, or execution logic.
 - Make every affected surface usable and legible in both light and dark modes.
 - Let an authorized user reopen knowledge-base settings from the existing card overflow menu.

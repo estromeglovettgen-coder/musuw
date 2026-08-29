@@ -7,6 +7,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 test('settings shell follows the supplied SettingsModal geometry', () => {
   const source = read('../views/settings/components/VisualSettingsShell.vue')
   assert.match(source, /width: min\(896px, 100%\);/)
+  assert.match(source, /@media \(min-width: 1024px\)\s*\{[\s\S]*?\.visual-settings-modal \{ width: min\(1024px, 100%\); \}/)
   assert.match(source, /height: 620px;/)
   assert.match(source, /max-height: 92vh;/)
   assert.match(source, /border-radius: 24px;/)
@@ -17,6 +18,9 @@ test('settings shell follows the supplied SettingsModal geometry', () => {
   assert.match(source, /padding: 12px;/)
   assert.match(source, /@media \(min-width: 640px\)\s*\{[\s\S]*\.visual-settings-overlay \{ padding: 16px; \}/)
   assert.match(source, /box-shadow: 0 25px 50px -12px rgb\(0 0 0 \/ 25%\);/)
+  assert.match(source, /:root\[theme-mode="dark"\] \.visual-settings-modal,[\s\S]*?background: #18181b;/)
+  assert.match(source, /:root\[theme-mode="dark"\] \.visual-settings-sidebar\s*\{[^}]*background: rgb\(9 9 11 \/ 60%\);/)
+  assert.doesNotMatch(source, /background: #202124|background: #292a2d/)
 })
 
 test('settings shell exposes only source tabs plus a close circle in every mode', () => {
@@ -29,7 +33,7 @@ test('settings shell exposes only source tabs plus a close circle in every mode'
   for (const legacy of ['visual-settings-back', 'visual-settings-search', 'visual-settings-title', 'visual-settings-nav__group']) {
     assert.equal(shell.includes(legacy), false, `${legacy} is not in SettingsModal source`)
   }
-  assert.match(settings, /\{ key: 'general',[\s\S]*\{ key: 'usage',[\s\S]*\{ key: 'models',[\s\S]*\{ key: 'userprofile'/)
+  assert.match(settings, /\{ key: 'general',[\s\S]*\{ key: 'userprofile',[\s\S]*\{ key: 'models',[\s\S]*\{ key: 'mcp',[\s\S]*\{ key: 'usage'/)
   assert.equal((settings.match(/key: 'system-audit-log'/g) || []).length, 1)
 })
 
@@ -80,20 +84,19 @@ test('consumer model scene controls use the reference vertical row stack', () =>
   assert.match(row, /border-bottom: 1px solid/)
 })
 
-test('usage and general settings retain the reference card scale', () => {
+test('usage and general settings retain the authoritative unboxed row scale', () => {
   const usage = read('../views/settings/UsageBillingSettings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
-  assert.doesNotMatch(usage, /usage-billing__header|usage-billing__group/)
-  assert.match(usage, /usage-billing__section/)
-  assert.match(usage, /usage-billing__card/)
+  assert.doesNotMatch(usage, /usage-billing__header|usage-billing__group|usage-billing__section|usage-billing__card/)
+  assert.match(usage, /usage-billing__rows/)
   assert.match(usage, /\.usage-billing__meter\s*\{[\s\S]*width: 100%;[\s\S]*height: 6px;/)
-  assert.doesNotMatch(usage, /width: 96px;|min-width: 206px;/)
+  assert.match(usage, /\.usage-billing__meter-control\s*\{[\s\S]*width:\s*224px;/)
   assert.doesNotMatch(usage, /usage-billing__primary/)
   assert.match(usage, /usage-billing__meter-meta[\s\S]*entitlement\.remaining[\s\S]*usage-billing__meter/)
   assert.match(usage, /usage-billing__row usage-billing__row--meter/)
   assert.match(usage, /entitlement\.storageUsage/)
-  assert.match(usage, /\.usage-billing__row--meter\s*\{[\s\S]*padding: 14px;/)
-  assert.match(usage, /v-if="!authStore\.isLiteMode" class="usage-billing__section"/)
+  assert.match(usage, /\.usage-billing__row\s*\{[\s\S]*padding: 14px 0;[\s\S]*border-bottom: 1px solid #f3f4f6;/)
+  assert.match(usage, /v-if="!authStore\.isLiteMode" class="usage-billing__row is-compact"/)
   assert.match(usage, /createPaddlePortalSession/)
   assert.match(usage, /handlePortal/)
   assert.match(usage, /portalOpening/)
@@ -137,6 +140,7 @@ test('user profile keeps the authoritative unboxed rows and mono account metadat
   assert.match(source, /class="info-value is-mono">\{\{ userInfo\?\.email/)
   assert.match(source, /class="info-value is-mono">\{\{ formatDate/)
   assert.match(source, /\.user-profile__row\s*\{[\s\S]*padding:\s*14px 0;[\s\S]*gap:\s*16px;[\s\S]*border-bottom:\s*1px solid #f3f4f6;/)
+  assert.match(source, /\.user-profile\s*\{[\s\S]*max-width:\s*none;/)
   assert.match(source, /\.info-value\.is-mono\s*\{[\s\S]*font-family:\s*var\(--app-font-family-mono\);/)
 })
 

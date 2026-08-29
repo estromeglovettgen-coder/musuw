@@ -1042,7 +1042,7 @@ export default {
     },
     desc: {
       name: '에이전트를 쉽게 식별할 수 있는 이름을 설정하세요',
-      description: '에이전트의 용도와 특징을 간단히 설명하세요',
+      description: '에이전트의 포지션, 용도 및 핵심 기능을 간단히 설명하세요',
       systemPrompt: '에이전트의 동작과 역할을 정의하는 사용자 정의 시스템 프롬프트',
       leaveEmptyDefault: '(비워두면 시스템 기본값 사용)',
       contextTemplate: '검색된 콘텐츠를 모델에 전달하기 전에 형식을 정의합니다',
@@ -1881,6 +1881,7 @@ export default {
     title: '모델 설정',
     description: '다양한 유형의 AI 모델을 관리합니다. Ollama 로컬 모델과 원격 API를 지원합니다',
     sceneModels: {
+      navTitle: '시나리오 모델 설정',
       title: '시나리오별 모델',
       description: '이 브라우저에서 사용할 에이전트, Rerank, Wiki, 비전 및 음성 모델을 선택합니다. 잠긴 유료 모델은 요금제가 필요합니다.',
       scenes: {
@@ -2274,6 +2275,7 @@ export default {
     monthlyAllowance: '월간 한도',
     storageRemaining: '저장 공간 잔여',
     storageUsage: '{used} / {total} 사용',
+    usedPercent: '{percent}% 사용',
     remaining: '남음',
     unavailable: '사용할 수 없음',
     resetsAt: '{month}에 초기화',
@@ -5064,6 +5066,8 @@ export default {
     title: '에이전트',
     subtitle: '에이전트 구성 및 관리, 대화 동작 및 기능 맞춤화',
     createAgent: '에이전트 만들기',
+    newAgent: '새 에이전트',
+    searchPlaceholder: '에이전트 검색...',
     builtin: '내장',
     disabled: '비활성화됨',
     disable: '비활성화',
@@ -5096,7 +5100,7 @@ export default {
       createTitle: '에이전트 만들기',
       editTitle: '에이전트 편집',
       buttons: {
-        create: '에이전트 만들기',
+        create: '만들기',
         saveAndClose: '저장 후 닫기',
       },
       postCreateHint: {

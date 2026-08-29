@@ -141,6 +141,24 @@ test('chat picker owns complete light and dark surface tokens', () => {
   ]) assert.ok(inputField.includes(token), `composer theme contract lost ${token}`)
 })
 
+test('composer capsule keeps the model label visible and never replaces it with a loading spinner', () => {
+  const modelIndex = inputField.indexOf('class="visual-chat-composer__combined-picker-model"')
+  assert.ok(modelIndex >= 0, 'composer capsule must render the selected model label')
+  assert.equal(
+    inputField.lastIndexOf('v-if="!isBuiltinAgentSelected"', modelIndex),
+    -1,
+    'builtin quick/reasoning modes must keep the model label in the capsule',
+  )
+  assert.doesNotMatch(inputField, /<t-loading[^>]*modelsLoading/, 'capsule must not show a loading spinner')
+  assert.match(
+    inputField,
+    /const selectedModelCapsuleName = computed\([\s\S]*?selectedModel\?\.display_name\?\.trim\(\)[\s\S]*?sceneOptions\.find\(\(option\) => option\.model_id === selectedModelId\)\?\.display_name\?\.trim\(\)[\s\S]*?if \(selectedModelId\) return selectedModelId/,
+    'capsule must resolve a stable model label without changing the frozen controller',
+  )
+  assert.match(inputField, /\{\{ selectedModelCapsuleName \}\}/)
+  assert.match(inputField, /legacyName !== t\('common\.loading'\)/)
+})
+
 test('agent candidates reuse the model flyout shell, rows, checkmark, placement, and open state', () => {
   for (const token of [
     "const hoveredSubmenu = ref<'agents' | 'models' | 'reasoning' | null>",

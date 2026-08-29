@@ -46,7 +46,7 @@
                     <p class="section-description">{{ $t('agent.editor.basicInfoDesc') }}</p>
                   </div>
 
-                  <div class="settings-group">
+                  <div class="settings-group settings-group--basic">
                     <!-- 智能体 ID（用于 API 集成） -->
                     <div v-if="false" data-agent-hidden-field="agent-id" class="setting-row">
                       <div class="setting-info">
@@ -88,7 +88,7 @@
                     </div>
 
                     <!-- 运行模式（首先选择） -->
-                    <div class="setting-row">
+                    <div class="setting-row setting-row--basic-mode">
                       <div class="setting-info">
                         <label>{{ $t('agent.editor.mode') }} <span class="required">*</span></label>
                         <p class="desc">{{ agentMode === 'smart-reasoning' ? $t('agent.editor.agentDesc') :
@@ -107,42 +107,44 @@
                     </div>
 
                     <!-- 名称 -->
-                    <div class="setting-row" data-guide="agent-create-name">
-                      <div class="setting-info">
-                        <label>{{ $t('agent.editor.name') }} <span v-if="!isBuiltinAgent"
-                            class="required">*</span></label>
-                        <p class="desc">{{ $t('agentEditor.desc.name') }}</p>
+                    <div class="setting-row setting-row--basic-name" data-guide="agent-create-name">
+                      <div class="setting-row__heading">
+                        <div class="setting-info">
+                          <label>{{ $t('agent.editor.name') }} <span v-if="!isBuiltinAgent"
+                              class="required">*</span></label>
+                        </div>
+                        <span class="setting-row__counter">{{ formData.name.length }}/50</span>
                       </div>
-                      <div class="setting-control">
+                      <div class="setting-control setting-control-full">
                         <div class="name-input-wrapper">
-                          <!-- 内置智能体使用简洁图标 -->
-                          <div v-if="isBuiltinAgent" class="builtin-avatar" :class="isAgentMode ? 'agent' : 'normal'">
-                            <t-icon :name="isAgentMode ? 'control-platform' : 'chat'" size="24px" />
+                          <div class="agent-name-mark" aria-hidden="true">
+                            <t-icon name="highlight-1" size="16px" />
                           </div>
-                          <!-- 自定义智能体使用 AgentAvatar -->
-                          <AgentAvatar v-else :name="formData.name || '?'" size="medium" />
                           <t-input v-model="formData.name" :placeholder="$t('agent.editor.namePlaceholder')"
-                            class="name-input" :disabled="isBuiltinAgent" />
+                            class="name-input" :disabled="isBuiltinAgent" :maxlength="50" />
                         </div>
                       </div>
                     </div>
 
                     <!-- 描述 -->
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <label>{{ $t('agent.editor.description') }}</label>
-                        <p class="desc">{{ $t('agentEditor.desc.description') }}</p>
+                    <div class="setting-row setting-row--basic-description">
+                      <div class="setting-row__heading">
+                        <div class="setting-info">
+                          <label>{{ $t('agent.editor.description') }}</label>
+                          <p class="desc">{{ $t('agentEditor.desc.description') }}</p>
+                        </div>
+                        <span class="setting-row__counter">{{ formData.description.length }}/200</span>
                       </div>
-                      <div class="setting-control">
+                      <div class="setting-control setting-control-full">
                         <t-textarea v-model="formData.description"
                           :placeholder="$t('agent.editor.descriptionPlaceholder')"
-                          :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isBuiltinAgent" />
+                          :autosize="{ minRows: 3, maxRows: 3 }" :disabled="isBuiltinAgent" :maxlength="200" />
                       </div>
                     </div>
 
                     <!-- 模型（对用户只暴露主对话模型；其余模型参数保留原生默认/旧值） -->
                     <div
-                      class="setting-row"
+                      class="setting-row setting-row--basic-model"
                       data-guide="agent-create-model"
                       data-agent-field="summary_model"
                       :class="{ 'setting-row--field-highlight': highlightedField === 'summary_model' }"
@@ -1187,7 +1189,7 @@
                         <p class="desc">{{ $t('agentEditor.mcp.desc') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-radio-group v-model="mcpSelectionMode">
+                        <t-radio-group v-model="mcpSelectionMode" class="agent-segmented-control agent-segmented-control--scope">
                           <t-radio-button value="all">{{ $t('agentEditor.selection.all') }}</t-radio-button>
                           <t-radio-button value="selected">{{ $t('agentEditor.selection.selected') }}</t-radio-button>
                           <t-radio-button value="none">{{ $t('agentEditor.selection.disabled') }}</t-radio-button>
@@ -1239,7 +1241,7 @@
                         <p class="desc">{{ $t('agent.editor.skillsSelectionDesc') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-radio-group v-model="skillsSelectionMode">
+                        <t-radio-group v-model="skillsSelectionMode" class="agent-segmented-control agent-segmented-control--scope">
                           <t-radio-button value="all">{{ $t('agent.editor.skillsAll') }}</t-radio-button>
                           <t-radio-button value="selected">{{ $t('agent.editor.skillsSelected') }}</t-radio-button>
                           <t-radio-button value="none">{{ $t('agent.editor.skillsNone') }}</t-radio-button>
@@ -1661,7 +1663,6 @@ import { useAuthStore } from '@/stores/auth';
 import { useOrganizationStore } from '@/stores/organization';
 import { useChatResourcesStore } from '@/stores/chatResources';
 import { useEditorResourcesStore } from '@/stores/editorResources';
-import AgentAvatar from '@/components/AgentAvatar.vue';
 import PromptTemplateSelector from '@/components/PromptTemplateSelector.vue';
 import ModelSelector from '@/components/ModelSelector.vue';
 import KBParserSettings, { type ParserEngineRule } from '@/views/knowledge/settings/KBParserSettings.vue';
@@ -1745,7 +1746,11 @@ const copyAgentId = async () => {
   }
 };
 
-const currentSection = ref(props.initialSection || 'basic');
+const EDITOR_VISIBLE_SECTIONS = new Set(['basic', 'knowledge', 'prompts', 'mcp']);
+const normalizeEditorSection = (section?: string): string =>
+  section && EDITOR_VISIBLE_SECTIONS.has(section) ? section : 'basic';
+
+const currentSection = ref(normalizeEditorSection(props.initialSection));
 const suggestionTab = ref<'starters' | 'followUps'>('starters');
 const contentWrapperRef = ref<HTMLElement | null>(null);
 const highlightedField = ref<AgentNotReadyReasonKey | null>(null);
@@ -1753,10 +1758,7 @@ let highlightClearTimer: ReturnType<typeof setTimeout> | null = null;
 
 const VALID_HIGHLIGHT_FIELDS: AgentNotReadyReasonKey[] = ['summary_model', 'rerank_model', 'allowed_tools'];
 
-const sectionForHighlightField = (field: AgentNotReadyReasonKey): string => {
-  if (field === 'allowed_tools') return 'tools';
-  return 'basic';
-};
+const sectionForHighlightField = (_field: AgentNotReadyReasonKey): string => 'basic';
 
 const FIELD_FLASH_DURATION_MS = 2400;
 
@@ -2820,7 +2822,7 @@ const needsRerankModel = computed(() => {
 watch(() => props.visible, async (val) => {
   if (val) {
     savedAgent.value = null;
-    currentSection.value = props.initialSection || 'basic';
+    currentSection.value = normalizeEditorSection(props.initialSection);
     // 先加载依赖数据（包括默认配置）
     await loadDependencies();
 
@@ -4168,7 +4170,7 @@ const handleSave = async () => {
   // 校验 VLM 模型（当图片上传启用时必填）
   if (formData.value.config.image_upload_enabled && !formData.value.config.vlm_model_id) {
     MessagePlugin.error(t('agentEditor.imageUpload.vlmModelRequired'));
-    currentSection.value = 'multimodal';
+    currentSection.value = 'basic';
     return;
   }
 
@@ -4553,6 +4555,20 @@ const handleSave = async () => {
   gap: 0;
 }
 
+.settings-group--basic {
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.visual-settings-content .settings-group--basic > .setting-row {
+  padding: 0 0 16px !important;
+}
+
+.visual-settings-content .settings-group--basic > .setting-row--basic-model {
+  padding: 4px 0 0 !important;
+  border-bottom: 0 !important;
+}
+
 .parser-policy-block {
   padding: 16px 0;
   border-bottom: 1px solid var(--td-component-stroke);
@@ -4578,8 +4594,7 @@ const handleSave = async () => {
 }
 
 .setting-row {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 52%) !important;
+  display: flex !important;
   align-items: center !important;
   justify-content: space-between;
   gap: 16px !important;
@@ -4593,7 +4608,6 @@ const handleSave = async () => {
   }
 
   &.setting-row-vertical {
-    grid-template-columns: 1fr !important;
     flex-direction: column;
     align-items: stretch !important;
     gap: 12px;
@@ -4601,6 +4615,10 @@ const handleSave = async () => {
     .setting-info {
       max-width: 100%;
       padding-right: 0;
+    }
+
+    .setting-control {
+      max-width: none !important;
     }
   }
 
@@ -4695,19 +4713,20 @@ const handleSave = async () => {
 }
 
 .setting-control {
-  flex: none;
+  flex: 0 1 280px;
   min-width: 0;
   width: 100% !important;
-  max-width: none !important;
+  max-width: 280px !important;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   overflow: visible;
 
   &.setting-control-full {
+    flex: 1 1 100%;
     width: 100%;
     min-width: 100%;
-    max-width: 100%;
+    max-width: none !important;
     justify-content: flex-start;
   }
 
@@ -4739,6 +4758,30 @@ const handleSave = async () => {
   }
 }
 
+.setting-row--basic-name,
+.setting-row--basic-description {
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 12px !important;
+}
+
+.setting-row__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.setting-row__counter {
+  flex: 0 0 auto;
+  padding-top: 2px;
+  color: #9ca3af;
+  font-family: var(--app-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .agent-segmented-control {
   display: inline-flex;
   flex-wrap: nowrap;
@@ -4753,6 +4796,10 @@ const handleSave = async () => {
 }
 
 .agent-segmented-control.t-radio-group__outline { flex-wrap: nowrap; }
+
+.agent-segmented-control[data-guide="agent-create-mode"] :deep(.t-radio-button) {
+  padding-inline: 16px;
+}
 
 .agent-segmented-control :deep(.t-radio-button) {
   flex: 0 0 auto;
@@ -4894,12 +4941,44 @@ const handleSave = async () => {
 .name-input-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 
   .name-input {
     flex: 1;
   }
+}
+
+.setting-row--basic-name :deep(.t-input),
+.setting-row--basic-model :deep(.visual-model-selector__consumer-control) {
+  min-height: 40px;
+  border-radius: 12px;
+}
+
+.setting-row--basic-model :deep(.visual-model-selector__consumer-control) {
+  padding: 10px 14px;
+}
+
+.setting-row--basic-description :deep(.t-textarea__inner) {
+  min-height: 96px;
+  padding: 14px;
+  border-radius: 12px;
+  line-height: 1.625;
+  resize: none;
+}
+
+.agent-name-mark {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f3f4f6;
+  color: #4b5563;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
 }
 
 .agent-id-field {
@@ -5988,8 +6067,39 @@ const handleSave = async () => {
   font-weight: 600;
 }
 
+.settings-footer-actions :deep(.t-button--theme-primary) {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%) !important;
+}
+
+.settings-footer-actions :deep(.t-button--variant-outline) {
+  border-color: #e5e7eb !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+
+:global(:root[theme-mode="dark"]) .agent-name-mark {
+  border-color: #3f3f46;
+  background: #27272a;
+  color: #a1a1aa;
+}
+
+:global(:root[theme-mode="dark"]) .settings-footer-actions :deep(.t-button--theme-primary) {
+  border-color: #f4f4f5 !important;
+  background: #f4f4f5 !important;
+  color: #18181b !important;
+}
+
+:global(:root[theme-mode="dark"]) .settings-footer-actions :deep(.t-button--variant-outline) {
+  border-color: #3f3f46 !important;
+  background: #18181b !important;
+  color: #e4e4e7 !important;
+}
+
 @media (max-width: 720px) {
-  .setting-row { grid-template-columns: 1fr !important; }
   .setting-control { justify-content: flex-start; }
 }
 
@@ -6013,9 +6123,9 @@ const handleSave = async () => {
   .t-input-number,
   .t-select-input,
   .t-select-input .t-input {
-    border-color: var(--mvc-line, #31343a) !important;
-    background: var(--mvc-surface, #1a1b1f) !important;
-    color: var(--mvc-text, #f2f2f2) !important;
+    border-color: #3f3f46 !important;
+    background: #27272a !important;
+    color: #e4e4e7 !important;
     box-shadow: none !important;
   }
 
@@ -6023,15 +6133,15 @@ const handleSave = async () => {
   .t-textarea__inner,
   .t-input-number input,
   .t-select-input input {
-    color: var(--mvc-text, #f2f2f2) !important;
-    caret-color: var(--mvc-text, #f2f2f2) !important;
+    color: #e4e4e7 !important;
+    caret-color: #e4e4e7 !important;
   }
 
   .t-input__inner::placeholder,
   .t-textarea__inner::placeholder,
   .t-input-number input::placeholder,
   .t-select-input input::placeholder {
-    color: var(--mvc-faint, #8b8d94) !important;
+    color: #71717a !important;
   }
 }
 

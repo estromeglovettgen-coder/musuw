@@ -95,7 +95,7 @@ onMounted(loadInfo)
 <style lang="less" scoped>
 .user-profile {
   width: 100%;
-  max-width: 640px;
+  max-width: none;
   color: #202123;
 }
 

@@ -113,10 +113,10 @@ test("combined selector mechanically preserves native labels, hover entry, and t
   assert.match(inputField, /BUILTIN_QUICK_ANSWER_ID/);
   assert.match(inputField, /BUILTIN_SMART_REASONING_ID/);
   assert.match(inputField, /selectedAgentDisplayName[\s\S]*?t\('input\.normalMode'\)[\s\S]*?t\('input\.agentMode'\)/);
-  assert.match(inputField, /const isBuiltinAgentSelected = computed[\s\S]*?BUILTIN_QUICK_ANSWER_ID[\s\S]*?BUILTIN_SMART_REASONING_ID/);
   assert.match(capsule, /\{\{ selectedAgentDisplayName \}\}/);
-  assert.match(capsule, /<template v-if="!isBuiltinAgentSelected">[\s\S]*?combined-picker-dot[\s\S]*?combined-picker-model[\s\S]*?combined-picker-effort[\s\S]*?<\/template>/);
-  assert.match(inputField, /:aria-label="isBuiltinAgentSelected\s*\? selectedAgentDisplayName/);
+  assert.match(capsule, /combined-picker-dot[\s\S]*?combined-picker-model[\s\S]*?combined-picker-effort/);
+  assert.doesNotMatch(capsule, /<template v-if="!isBuiltinAgentSelected">/);
+  assert.match(inputField, /:aria-label="`\$\{selectedAgentDisplayName\} \$\{selectedModelCapsuleName\}/);
   assert.match(agentRow, /@mouseenter="hoverOpen\('agents'\)"/);
   assert.match(agentRow, /@click="toggleHover\('agents'\)"/);
   assert.match(agentRow, /@keydown\.enter\.stop\.prevent="toggleHover\('agents'\)"/);
@@ -142,7 +142,7 @@ test("combined selector mechanically preserves native labels, hover entry, and t
   ]) assert.ok(modelSelector.includes(token), `shared picker source token lost ${token}`);
 });
 
-test("model selector distinguishes the initial catalog load from missing configuration", () => {
+test("model selector controller distinguishes the initial catalog load from missing configuration", () => {
   const labelStart = inputBusiness.indexOf("const selectedModelDisplayName = computed");
   const labelEnd = inputBusiness.indexOf("const modelDisplayName", labelStart);
   const selectedModelLabel = inputBusiness.slice(labelStart, labelEnd);

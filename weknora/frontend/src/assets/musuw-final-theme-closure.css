@@ -405,33 +405,59 @@
 
   /* Restored native Agent / Organization directory surfaces. */
   .agent-list-container,
-  .org-list-container,
   .agent-list-content,
+  .agent-list-main {
+    background: #121214 !important;
+    color: #f4f4f5 !important;
+  }
+  .org-list-container,
   .org-list-content,
-  .agent-list-main,
   .org-list-main {
     background: var(--mvc-page) !important;
     color: var(--mvc-text) !important;
   }
-  .agent-list-content > .header,
-  .org-list-content > .header,
+  .agent-list-content > .header {
+    border-color: #27272a !important;
+    background: #121214 !important;
+    color: #a1a1aa !important;
+  }
   .agent-card,
+  .agent-card-skeleton {
+    border-color: #27272a !important;
+    background: #18181b !important;
+    color: #a1a1aa !important;
+  }
+  .agent-list-content .header-action-btn:not(.agent-create-header-btn) {
+    border-color: #3f3f46 !important;
+    background: #27272a !important;
+    color: #d4d4d8 !important;
+  }
+  .agent-list-content .agent-create-header-btn {
+    border-color: #f4f4f5 !important;
+    background: #f4f4f5 !important;
+    color: #18181b !important;
+  }
+  .agent-list-content .agent-create-header-btn:hover,
+  .agent-list-content .agent-create-header-btn:focus-visible {
+    border-color: #fff !important;
+    background: #fff !important;
+    color: #09090b !important;
+  }
+  .org-list-content > .header,
   .org-card,
-  .agent-card-skeleton,
   .org-card-skeleton,
-  .agent-list-content .header-action-btn,
   .org-list-content .header-action-btn,
   .org-list-content .org-join-btn {
     border-color: var(--mvc-line) !important;
     background: var(--mvc-surface) !important;
     color: var(--mvc-muted-strong) !important;
   }
-  .agent-list-content .title-row h2,
   .org-list-content .title-row h2,
-  .agent-card .card-title,
   .org-card .card-title,
-  .agent-list-main .empty-txt,
   .org-list-main .empty-txt { color: var(--mvc-text-strong) !important; }
+  .agent-list-content .title-row h2,
+  .agent-card .card-title,
+  .agent-list-main .empty-txt { color: #f4f4f5 !important; }
   .agent-list-content .header-subtitle,
   .org-list-content .header-subtitle,
   .agent-card .card-description,
@@ -457,8 +483,12 @@
     background: var(--mvc-hover) !important;
     color: var(--mvc-muted-strong) !important;
   }
-  .agent-card:hover,
   .org-card:hover { border-color: var(--mvc-line-strong) !important; box-shadow: var(--mvc-shadow) !important; }
+  .agent-card:hover {
+    border-color: #52525b !important;
+    background: #18181b !important;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
+  }
 
   /* Native list-space and cross-tenant switcher chrome. */
   .list-space-sidebar,
@@ -532,18 +562,18 @@
   .visual-model-settings,
   .usage-billing,
   .user-profile {
-    border-color: var(--mvc-line) !important;
-    background: var(--mvc-page) !important;
-    color: var(--mvc-text) !important;
+    border-color: #27272a !important;
+    background: #18181b !important;
+    color: #e4e4e7 !important;
   }
-  .visual-settings-sidebar { background: var(--mvc-sidebar) !important; }
+  .visual-settings-sidebar { background: rgb(9 9 11 / 60%) !important; }
   .visual-settings-close,
   .visual-general-settings__select-control,
   .visual-model-selector__consumer-control,
   .usage-billing__secondary {
-    border-color: var(--mvc-line) !important;
-    background: var(--mvc-surface) !important;
-    color: var(--mvc-muted-strong) !important;
+    border-color: #3f3f46 !important;
+    background: #27272a !important;
+    color: #d4d4d8 !important;
     box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
   }
   .visual-settings-close:hover,
@@ -552,9 +582,9 @@
   .visual-model-selector__consumer-control:hover,
   .visual-model-selector__consumer-control:focus-visible,
   .usage-billing__secondary:hover {
-    border-color: var(--mvc-line-strong) !important;
-    background: var(--mvc-hover) !important;
-    color: var(--mvc-text-strong) !important;
+    border-color: #52525b !important;
+    background: #3f3f46 !important;
+    color: #f4f4f5 !important;
   }
   .visual-settings-nav__item,
   .visual-settings-nav__item > span,
@@ -562,26 +592,26 @@
   .visual-model-selector__consumer-value,
   .usage-billing__copy,
   .usage-billing__row,
-  .user-profile .setting-control .info-value { color: var(--mvc-muted-strong) !important; }
-  .visual-settings-nav__item.is-active { background: var(--mvc-hover) !important; color: var(--mvc-text-strong) !important; border-color: var(--mvc-line-strong) !important; }
-  .visual-settings-nav__item:hover { background: var(--mvc-hover) !important; color: var(--mvc-text-strong) !important; }
+  .user-profile .setting-control .info-value { color: #d4d4d8 !important; }
+  .visual-settings-nav__item.is-active { background: #27272a !important; color: #f4f4f5 !important; border-color: #3f3f46 !important; }
+  .visual-settings-nav__item:hover { background: #27272a !important; color: #f4f4f5 !important; }
   .visual-settings-close .t-icon,
   .visual-general-settings__select-control > .t-icon,
-  .visual-model-selector__consumer-control > .t-icon { color: var(--mvc-muted) !important; }
+  .visual-model-selector__consumer-control > .t-icon { color: #a1a1aa !important; }
 
   .visual-general-settings__select-dropdown,
   .visual-model-selector__consumer-dropdown,
   .visual-model-selector__chat-panel,
   .visual-model-selector__chat-flyout,
   .visual-chat-composer__model-menu {
-    border-color: var(--mvc-line) !important;
-    background: var(--mvc-surface) !important;
-    color: var(--mvc-text) !important;
-    box-shadow: var(--mvc-shadow) !important;
+    border-color: #3f3f46 !important;
+    background: #27272a !important;
+    color: #e4e4e7 !important;
+    box-shadow: 0 18px 48px rgb(0 0 0 / 32%) !important;
   }
   .visual-general-settings__select-option,
   .visual-model-selector__consumer-option,
-  .visual-model-selector__chat-option { color: var(--mvc-muted-strong) !important; }
+  .visual-model-selector__chat-option { color: #d4d4d8 !important; }
   .visual-general-settings__select-option:hover,
   .visual-general-settings__select-option.is-selected,
   .visual-model-selector__consumer-option:hover,
@@ -590,17 +620,17 @@
   .visual-model-selector__chat-option:hover,
   .visual-model-selector__chat-option.is-active,
   .visual-model-selector__chat-option.is-selected {
-    background: var(--mvc-hover) !important;
-    color: var(--mvc-text-strong) !important;
+    background: #3f3f46 !important;
+    color: #f4f4f5 !important;
   }
   .visual-general-settings__select-check,
   .visual-model-selector__consumer-check,
-  .visual-model-selector__chat-check { color: var(--mvc-text-strong) !important; }
+  .visual-model-selector__chat-check { color: #f4f4f5 !important; }
   .visual-model-selector__consumer-option.is-locked,
   .visual-model-selector__consumer-lock,
   .visual-model-selector__chat-lock,
   .visual-model-selector__consumer-state,
-  .visual-model-selector__chat-empty { color: var(--mvc-muted) !important; }
+  .visual-model-selector__chat-empty { color: #a1a1aa !important; }
   .visual-model-selector__consumer-option.is-locked:hover,
   .visual-model-selector__consumer-option.is-locked:focus-visible,
   .visual-model-selector__chat-option.is-locked:hover,
@@ -611,7 +641,7 @@
   .visual-model-settings .visual-model-tabs,
   .visual-general-settings .visual-setting-row,
   .user-profile .setting-row,
-  .usage-billing__row { border-color: var(--mvc-line) !important; }
+  .usage-billing__row { border-color: #27272a !important; }
   .visual-model-settings .consumer-scene-settings { background: transparent !important; }
   .visual-model-settings .consumer-scene-settings__copy strong,
   .visual-general-settings__header h2,
@@ -619,13 +649,13 @@
   .usage-billing__section > h3,
   .usage-billing__copy strong,
   .usage-billing__meter-meta > strong,
-  .user-profile .setting-info label { color: var(--mvc-text-strong) !important; }
+  .user-profile .setting-info label { color: #f4f4f5 !important; }
   .visual-model-settings .consumer-scene-settings__copy span,
   .visual-general-settings__header p,
   .visual-settings-content :is(.section-description, .setting-info .desc, .visual-setting-row__copy p),
   .usage-billing__copy small,
   .usage-billing__meter-meta > small,
-  .user-profile .setting-info .desc { color: var(--mvc-muted) !important; }
+  .user-profile .setting-info .desc { color: #a1a1aa !important; }
   .usage-billing__card,
   .user-profile .settings-group {
     border-color: var(--mvc-line) !important;
@@ -633,8 +663,8 @@
     color: var(--mvc-text) !important;
   }
   .usage-billing__notice--action { border-color: var(--mvc-line) !important; background: var(--mvc-surface-raised) !important; }
-  .usage-billing__meter { background: var(--mvc-hover) !important; }
-  .usage-billing__meter span { background: var(--mvc-text-strong) !important; }
+  .usage-billing__meter { background: #27272a !important; }
+  .usage-billing__meter span { background: #f4f4f5 !important; }
 
   /* Keep dropdowns and selectors above the scrolling title/row layers. The
    * content viewport remains scrollable; child surfaces never clip a popup. */
@@ -695,13 +725,13 @@
 }
 
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header {
-  border-bottom-color: var(--mvc-line) !important;
+  border-bottom-color: #27272a !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__title {
-  color: var(--mvc-text-strong) !important;
+  color: #f4f4f5 !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__description {
-  color: var(--mvc-muted) !important;
+  color: #a1a1aa !important;
 }
 
 /* Chat dark contrast closure.  The chat/sidebar components keep their

@@ -364,7 +364,7 @@ const handleFontSizeChange = (value: FontSizeKey) => {
 <style scoped lang="less">
 .visual-general-settings {
   width: 100%;
-  max-width: 640px;
+  max-width: none;
   min-width: 0;
   box-sizing: border-box;
   color: #1f2937;

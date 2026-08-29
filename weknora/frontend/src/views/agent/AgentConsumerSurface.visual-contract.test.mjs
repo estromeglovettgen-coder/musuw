@@ -17,15 +17,24 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
     'handleCardClick(agent)',
     'class="agents-panel__search"',
     'class="agents-panel__title-icon"',
+    '<t-icon name="add"',
+    "$t('agent.searchPlaceholder')",
+    "$t('agent.newAgent')",
     '<t-icon class="more-icon" name="ellipsis"',
     'agent-card-skeleton',
     'border-radius: 12px',
     'padding: 18px',
     ':root[theme-mode="dark"] .agent-list-container',
     ':root[theme-mode="dark"] .agent-list-content > .header',
-    'background: var(--mvc-page, #151619) !important',
+    'background: #121214 !important',
     'box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important',
   ]) assert.ok(list.includes(token), `Agent list contract lost ${token}`)
+  assert.doesNotMatch(list, /class="sparkles-icon"/)
+  assert.match(list, /\.agents-panel__header\s*\{[\s\S]*?padding-bottom:\s*20px;[\s\S]*?border-bottom:\s*1px solid #e5e7eb;/)
+  assert.match(list, /\.agents-panel__search\s*\{[\s\S]*?width:\s*224px;[\s\S]*?border-radius:\s*12px;[\s\S]*?background:\s*#fff;/)
+  assert.match(list, /\.agent-create-header-btn\s*\{[\s\S]*?border-radius:\s*12px !important;[\s\S]*?background:\s*#111827 !important;/)
+  assert.match(list, /:root\[theme-mode="dark"\] \.agents-panel__search\s*\{[\s\S]*?border-color:\s*#3f3f46;[\s\S]*?background:\s*#27272a;/)
+  assert.match(list, /:root\[theme-mode="dark"\] \.agent-create-header-btn,[\s\S]*?\{[\s\S]*?border-color:\s*#f4f4f5 !important;[\s\S]*?background:\s*#f4f4f5 !important;[\s\S]*?color:\s*#18181b !important;/)
   assert.doesNotMatch(list, /handleToggle(?:Shared)?Disabled/)
   assert.doesNotMatch(list, /setSharedAgentDisabledByMe/)
   assert.match(list, /\.agent-card-meta\s*\{[\s\S]*?span\s*\{[\s\S]*?line-height:\s*16px;/)
@@ -41,13 +50,13 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
   assert.doesNotMatch(list, /\.agent-card\s*\{[\s\S]{0,900}linear-gradient/, 'consumer cards must not keep the decorative gradient')
   assert.match(
     nativeDirectoryStyles,
-    /:root\[theme-mode="dark"\] \.agent-card:hover,[\s\S]*?box-shadow:\s*var\(--mvc-shadow\) !important;/,
-    'Agent hover must use the same dark shadow token as the Knowledge Base card',
+    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[\s\S]*?border-color:\s*#52525b !important;[\s\S]*?background:\s*#18181b !important;[\s\S]*?box-shadow:\s*0 4px 6px -1px/,
+    'Agent hover must preserve the authoritative zinc card surface and shadow',
   )
   assert.match(
     list,
-    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[^}]*background:\s*var\(--mvc-hover, #25272c\) !important;[^}]*border-color:\s*var\(--mvc-line-strong, #484c54\) !important;[^}]*box-shadow:\s*var\(--mvc-shadow\) !important;/,
-    'the component-level dark rule must not override the shared Knowledge Base hover animation',
+    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[^}]*background:\s*#18181b !important;[^}]*border-color:\s*#52525b !important;[^}]*box-shadow:\s*0 4px 6px -1px/,
+    'the component-level dark rule must keep the authoritative zinc hover treatment',
   )
 })
 
@@ -65,7 +74,7 @@ test('Settings and Agent editor render the same shared visual shell while Agent 
     'data-agent-hidden-field="agent-id"',
     'data-agent-hidden-field="integrations"',
     ':root[theme-mode="dark"] .agent-editor-modal',
-    'background: var(--mvc-surface, #1a1b1f) !important',
+    'background: #27272a !important',
   ]) assert.ok(editor.includes(token), `Agent editor contract lost ${token}`)
   assert.match(settings, /import VisualSettingsShell from '.\/components\/VisualSettingsShell\.vue'/)
   assert.match(settings, /<VisualSettingsShell[\s\S]*?<template #nav>/)
@@ -83,11 +92,14 @@ test('Settings and Agent editor render the same shared visual shell while Agent 
     'class="visual-settings-content__inner"',
     'class="visual-settings-footer"',
     'width: min(896px, 100%)',
+    '@media (min-width: 1024px)',
+    'width: min(1024px, 100%)',
     'height: 620px',
     'flex: 0 0 192px',
     'padding: 32px',
     ':root[theme-mode="dark"] .visual-settings-sidebar',
-    'background: var(--mvc-page, #151619) !important',
+    'background: rgb(9 9 11 / 60%)',
+    'background: #18181b',
   ]) assert.ok(settingsShell.includes(token), `shared Settings shell contract lost ${token}`)
 })
 
@@ -97,8 +109,30 @@ test('Agent mode and knowledge scope use the authoritative single-line segmented
   assert.match(editor, /\.agent-segmented-control\s*\{[\s\S]*?display:\s*inline-flex;[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?padding:\s*4px;[\s\S]*?border-radius:\s*12px;/)
   assert.match(editor, /\.agent-segmented-control :deep\(\.t-radio-button\)\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*6px 14px;[\s\S]*?border-radius:\s*8px;[\s\S]*?font-size:\s*12px;/)
   assert.match(editor, /\.agent-segmented-control--scope\s*\{[\s\S]*?overflow-x:\s*auto;/)
-  assert.match(editor, /\.setting-row\s*\{[\s\S]*?display:\s*grid !important;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) minmax\(280px, 52%\) !important;/)
+  assert.match(editor, /\.setting-row\s*\{[\s\S]*?display:\s*flex !important;[\s\S]*?gap:\s*16px !important;/)
   assert.match(editor, /label\s*\{[\s\S]*?font-size:\s*14px !important;[\s\S]*?line-height:\s*20px !important;[\s\S]*?font-weight:\s*600 !important;/)
-  assert.match(editor, /\.setting-control\s*\{[\s\S]*?width:\s*100% !important;[\s\S]*?max-width:\s*none !important;/)
-  assert.match(editor, /&\.setting-row-vertical\s*\{[\s\S]*?grid-template-columns:\s*1fr !important;/)
+  assert.match(editor, /\.setting-control\s*\{[\s\S]*?width:\s*100% !important;[\s\S]*?max-width:\s*280px !important;/)
+  assert.match(editor, /&\.setting-row-vertical\s*\{[\s\S]*?flex-direction:\s*column;/)
+})
+
+test('authoritative workspace 7 basic tab uses full-width counted name and description fields', () => {
+  assert.match(editor, /class="setting-row setting-row--basic-name"/)
+  assert.match(editor, /class="setting-row__heading"[\s\S]*?class="setting-row__counter"[\s\S]*?\{\{ formData\.name\.length \}\}\/50/)
+  assert.match(editor, /v-model="formData\.name"[\s\S]*?:maxlength="50"/)
+  assert.match(editor, /class="setting-row setting-row--basic-description"/)
+  assert.match(editor, /\{\{ formData\.description\.length \}\}\/200/)
+  assert.match(editor, /v-model="formData\.description"[\s\S]*?:maxlength="200"/)
+  assert.match(editor, /\.setting-row--basic-name,[\s\S]*?\.setting-row--basic-description\s*\{[\s\S]*?flex-direction:\s*column;/)
+  assert.match(editor, /\.settings-footer-actions :deep\(\.t-button--theme-primary\)\s*\{[\s\S]*?background:\s*#111827 !important;/)
+  const footer = editor.match(/<template #footer>[\s\S]*?<\/template>/)?.[0] || ''
+  const primary = footer.match(/<t-button v-if="!props\.readOnly"[\s\S]*?<\/t-button>/)?.[0] || ''
+  assert.ok(primary, 'expected the authoritative primary action')
+  assert.doesNotMatch(primary, /<t-icon|#icon|check/)
+})
+
+test('hidden legacy editor sections cannot leave the authoritative shell on a blank panel', () => {
+  assert.match(editor, /const EDITOR_VISIBLE_SECTIONS = new Set\(\['basic', 'knowledge', 'prompts', 'mcp'\]\)/)
+  assert.match(editor, /const currentSection = ref\(normalizeEditorSection\(props\.initialSection\)\)/)
+  assert.match(editor, /currentSection\.value = normalizeEditorSection\(props\.initialSection\)/)
+  assert.doesNotMatch(editor, /currentSection\.value = 'multimodal'/)
 })

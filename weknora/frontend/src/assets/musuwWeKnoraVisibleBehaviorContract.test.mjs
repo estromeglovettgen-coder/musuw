@@ -91,7 +91,7 @@ test('Lite Settings also exposes native MCP for admins; Standard settings remain
 
   assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/)
   assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'usage'[\s\S]*key: 'models'[\s\S]*key: 'userprofile'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/)
   assert.match(settings, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
   assert.ok(settings.includes('<ModelSettings v-else-if="currentSection === \'models\'"'))
   assert.ok(settings.includes('UsageBillingSettings'))

@@ -227,7 +227,7 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   padding: 12px 32px;
   box-sizing: border-box;
-  border-top: 1px solid #ececea;
+  border-top: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -261,18 +261,18 @@ onBeforeUnmount(() => {
 }
 .visual-settings-content .usage-billing__group,
 .visual-settings-content .settings-group {
-  border: 1px solid #e5e5e3 !important;
-  border-radius: 16px !important;
-  background: #fdfdfd !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
   box-shadow: none !important;
-  overflow: hidden;
+  overflow: visible;
 }
 .visual-settings-content .usage-billing__row,
 .visual-settings-content .setting-row {
-  min-height: 64px !important;
+  min-height: 0 !important;
   margin: 0 !important;
-  padding: 13px 16px !important;
-  border-bottom: 1px solid #ececea !important;
+  padding: 14px 0 !important;
+  border-bottom: 1px solid #f3f4f6 !important;
 }
 .visual-settings-content .setting-row:last-child { border-bottom: 0 !important; }
 
@@ -291,6 +291,9 @@ onBeforeUnmount(() => {
   .visual-settings-content { padding: 32px; }
   .visual-settings-content.has-footer { padding: 0; }
 }
+@media (min-width: 1024px) {
+  .visual-settings-modal { width: min(1024px, 100%); }
+}
 @media (max-width: 560px) {
   .visual-settings-overlay { align-items: stretch; padding: 0; }
   .visual-settings-modal { width: 100%; height: 100%; max-height: none; flex-direction: column; border: 0; border-radius: 0; }
@@ -306,54 +309,54 @@ onBeforeUnmount(() => {
 @media (prefers-color-scheme: dark) {
   :root:not([theme-mode="light"]) .visual-settings-modal,
   :root:not([theme-mode="light"]) .visual-settings-content,
-  :root:not([theme-mode="light"]) .visual-settings-footer { background: #202124; color: #ececec; }
-  :root:not([theme-mode="light"]) .visual-settings-sidebar { border-color: #38393c; background: #292a2d; }
-  :root:not([theme-mode="light"]) .visual-settings-close { border-color: #44464a; background: #292a2d; color: #a9aaad; }
-  :root:not([theme-mode="light"]) .visual-settings-close:hover { background: #343539; color: #f2f2f2; }
-  :root:not([theme-mode="light"]) .visual-settings-nav__empty { color: #a9aaad; }
-  :root:not([theme-mode="light"]) .visual-settings-nav__item:hover { background: #343539; color: #f2f2f2; }
-  :root:not([theme-mode="light"]) .visual-settings-nav__item { color: #d0d1d3; }
-  :root:not([theme-mode="light"]) .visual-settings-nav__item.is-active { border-color: #44464a; background: #3b3c40; color: #f5f5f5; }
+  :root:not([theme-mode="light"]) .visual-settings-footer { border-color: #27272a; background: #18181b; color: #f4f4f5; }
+  :root:not([theme-mode="light"]) .visual-settings-sidebar { border-color: rgb(39 39 42 / 80%); background: rgb(9 9 11 / 60%); }
+  :root:not([theme-mode="light"]) .visual-settings-close { border-color: #3f3f46; background: #27272a; color: #a1a1aa; }
+  :root:not([theme-mode="light"]) .visual-settings-close:hover { background: #3f3f46; color: #fff; }
+  :root:not([theme-mode="light"]) .visual-settings-nav__empty { color: #a1a1aa; }
+  :root:not([theme-mode="light"]) .visual-settings-nav__item:hover { background: rgb(39 39 42 / 50%); color: #fff; }
+  :root:not([theme-mode="light"]) .visual-settings-nav__item { color: #a1a1aa; }
+  :root:not([theme-mode="light"]) .visual-settings-nav__item.is-active { border-color: #3f3f46; background: #27272a; color: #fff; }
 }
 :root[theme-mode="dark"] .visual-settings-modal,
 :root[theme-mode="dark"] .visual-settings-content,
-:root[theme-mode="dark"] .visual-settings-footer { border-color: #38393c; background: #202124; color: #ececec; }
-:root[theme-mode="dark"] .visual-settings-sidebar { border-color: #38393c; background: #292a2d; }
-:root[theme-mode="dark"] .visual-settings-close { border-color: #44464a; background: #292a2d; color: #a9aaad; }
-:root[theme-mode="dark"] .visual-settings-close:hover { background: #343539; color: #f2f2f2; }
-:root[theme-mode="dark"] .visual-settings-nav__empty { color: #a9aaad; }
-:root[theme-mode="dark"] .visual-settings-nav__item:hover { background: #343539; color: #f2f2f2; }
-:root[theme-mode="dark"] .visual-settings-nav__item { color: #d0d1d3; }
-:root[theme-mode="dark"] .visual-settings-nav__item.is-active { border-color: #44464a; background: #3b3c40; color: #f5f5f5; }
+:root[theme-mode="dark"] .visual-settings-footer { border-color: #27272a; background: #18181b; color: #f4f4f5; }
+:root[theme-mode="dark"] .visual-settings-sidebar { border-color: rgb(39 39 42 / 80%); background: rgb(9 9 11 / 60%); }
+:root[theme-mode="dark"] .visual-settings-close { border-color: #3f3f46; background: #27272a; color: #a1a1aa; }
+:root[theme-mode="dark"] .visual-settings-close:hover { background: #3f3f46; color: #fff; }
+:root[theme-mode="dark"] .visual-settings-nav__empty { color: #a1a1aa; }
+:root[theme-mode="dark"] .visual-settings-nav__item:hover { background: rgb(39 39 42 / 50%); color: #fff; }
+:root[theme-mode="dark"] .visual-settings-nav__item { color: #a1a1aa; }
+:root[theme-mode="dark"] .visual-settings-nav__item.is-active { border-color: #3f3f46; background: #27272a; color: #fff; }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header,
 :root[theme-mode="dark"] .visual-settings-content .section-header {
-  border-bottom-color: var(--mvc-line, #31343a) !important;
+  border-bottom-color: #27272a !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__title,
 :root[theme-mode="dark"] .visual-settings-content .section-header h2 {
-  color: var(--mvc-text-strong, #fff) !important;
+  color: #fff !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__description,
 :root[theme-mode="dark"] .visual-settings-content .section-description {
-  color: var(--mvc-muted, #c2c2c2) !important;
+  color: #a1a1aa !important;
 }
 :root[theme-mode="dark"] .visual-settings-footer {
-  border-top-color: var(--mvc-line, #31343a) !important;
-  background: var(--mvc-page, #151619) !important;
-  color: var(--mvc-text, #f2f2f2) !important;
+  border-top-color: #27272a !important;
+  background: #18181b !important;
+  color: #f4f4f5 !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .usage-billing__group,
-:root[theme-mode="dark"] .visual-settings-content .settings-group { border-color: #3c3d40 !important; background: #202124 !important; }
+:root[theme-mode="dark"] .visual-settings-content .settings-group { border-color: transparent !important; background: transparent !important; }
 :root[theme-mode="dark"] .visual-settings-content .usage-billing__row,
 :root[theme-mode="dark"] .visual-settings-content .setting-row,
-:root[theme-mode="dark"] .visual-settings-content .usage-billing__group h3 { border-bottom-color: #343539 !important; }
+:root[theme-mode="dark"] .visual-settings-content .usage-billing__group h3 { border-bottom-color: #27272a !important; }
 :root[theme-mode="dark"] .visual-settings-content h2,
 :root[theme-mode="dark"] .visual-settings-content h3,
 :root[theme-mode="dark"] .visual-settings-content label,
 :root[theme-mode="dark"] .visual-settings-content strong,
-:root[theme-mode="dark"] .visual-settings-content .info-value { color: #f1f1f1 !important; }
+:root[theme-mode="dark"] .visual-settings-content .info-value { color: #e4e4e7 !important; }
 :root[theme-mode="dark"] .visual-settings-content p,
 :root[theme-mode="dark"] .visual-settings-content small,
-:root[theme-mode="dark"] .visual-settings-content .desc { color: #a9aaad !important; }
+:root[theme-mode="dark"] .visual-settings-content .desc { color: #a1a1aa !important; }
 @media (prefers-reduced-motion: reduce) { .visual-settings-nav__item { transition: none !important; } }
 </style>

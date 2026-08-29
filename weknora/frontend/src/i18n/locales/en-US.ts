@@ -819,6 +819,8 @@ export default {
     title: 'Agents',
     subtitle: 'Configure and manage your agents to customize conversation behavior and capabilities',
     createAgent: 'Create Agent',
+    newAgent: 'New Agent',
+    searchPlaceholder: 'Search agents...',
     builtin: 'Built-in',
     disabled: 'Disabled',
     disable: 'Disable',
@@ -914,7 +916,7 @@ export default {
       createTitle: 'Create Agent',
       editTitle: 'Edit Agent',
       buttons: {
-        create: 'Create Agent',
+        create: 'Create',
         saveAndClose: 'Save and Close',
       },
       postCreateHint: {
@@ -3817,6 +3819,7 @@ export default {
     monthlyAllowance: 'Monthly allowance',
     storageRemaining: 'Storage remaining',
     storageUsage: 'Used {used} / {total}',
+    usedPercent: '{percent}% used',
     remaining: 'remaining',
     unavailable: 'Unavailable',
     resetsAt: 'Resets {month}',
@@ -4079,6 +4082,7 @@ export default {
     title: 'Model Settings',
     description: 'Manage different types of AI models, including local Ollama and remote APIs',
     sceneModels: {
+      navTitle: 'Scenario model settings',
       title: 'Your model by scenario',
       description: 'Choose the models used for the agent, Rerank, Wiki, vision, and speech in this browser. Locked paid models remain visible for discovery and require a plan.',
       scenes: {
@@ -5013,7 +5017,7 @@ export default {
     },
     desc: {
       name: 'Set an easily identifiable name for the agent',
-      description: 'Briefly describe the purpose and features of the agent',
+      description: 'Briefly describe the agent positioning, purpose, and core capabilities',
       systemPrompt: 'Custom system prompt to define the agent behavior and role',
       leaveEmptyDefault: '(leave empty to use system default)',
       contextTemplate: 'Define how retrieved content is formatted before passing to the model',

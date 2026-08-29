@@ -1042,7 +1042,7 @@ export default {
     },
     desc: {
       name: 'Задайте легко узнаваемое имя для агента',
-      description: 'Кратко опишите назначение и особенности агента',
+      description: 'Кратко опишите назначение, роль и ключевые возможности агента',
       systemPrompt: 'Пользовательский системный промпт для определения поведения и роли агента',
       leaveEmptyDefault: '(оставьте пустым для системного значения по умолчанию)',
       contextTemplate: 'Определите формат передачи найденного контента модели',
@@ -1881,6 +1881,7 @@ export default {
     title: 'Настройки моделей',
     description: 'Управление типами AI‑моделей: локальные (Ollama) и удалённые API',
     sceneModels: {
+      navTitle: 'Scenario model settings',
       title: 'Модель для сценария',
       description: 'Выберите модели агента, Rerank, Wiki, зрения и речи для этого браузера. Заблокированные платные модели требуют соответствующего плана.',
       scenes: {
@@ -2274,6 +2275,7 @@ export default {
     monthlyAllowance: 'Месячный лимит',
     storageRemaining: 'Остаток хранилища',
     storageUsage: 'Использовано {used} / {total}',
+    usedPercent: 'Использовано {percent}%',
     remaining: 'осталось',
     unavailable: 'Недоступно',
     resetsAt: 'Сброс: {month}',
@@ -5064,6 +5066,8 @@ export default {
     title: 'Agents',
     subtitle: 'Configure and manage your agents to customize conversation behavior and capabilities',
     createAgent: 'Create Agent',
+    newAgent: 'New Agent',
+    searchPlaceholder: 'Search agents...',
     builtin: 'Built-in',
     disabled: 'Disabled',
     disable: 'Disable',
@@ -5096,7 +5100,7 @@ export default {
       createTitle: 'Create Agent',
       editTitle: 'Edit Agent',
       buttons: {
-        create: 'Создать агента',
+        create: 'Создать',
         saveAndClose: 'Сохранить и закрыть',
       },
       postCreateHint: {

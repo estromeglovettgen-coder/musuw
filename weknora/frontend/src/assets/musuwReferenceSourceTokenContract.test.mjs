@@ -115,15 +115,15 @@ test('SettingsModal.tsx remains the accepted mechanical-reference sample', () =>
   ])
 })
 
-test('Lite personal settings share the Codex-style grouped-row geometry', () => {
+test('Lite personal settings share the authoritative full-width unboxed row geometry', () => {
   expectTokens('../views/settings/GeneralSettings.vue', [
-    'max-width: 640px;', 'border-radius: 0;', 'min-height: 64px;',
+    'max-width: none;', 'border-radius: 0;', 'min-height: 64px;',
   ])
   expectTokens('../views/settings/UsageBillingSettings.vue', [
-    'max-width: 640px;', 'usage-billing__section', 'usage-billing__card', 'border-radius: 16px;',
+    'max-width: none;', 'usage-billing__rows', 'usage-billing__row', 'width: 224px;',
   ])
   expectTokens('../views/settings/UserProfile.vue', [
-    'max-width: 640px;', 'user-profile__rows', 'padding: 14px 0;',
+    'max-width: none;', 'user-profile__rows', 'padding: 14px 0;',
     'font-size: 14px;', 'font-weight: 600;', 'font-family: var(--app-font-family-mono);',
   ])
 })

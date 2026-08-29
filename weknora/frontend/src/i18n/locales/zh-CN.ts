@@ -1042,7 +1042,7 @@ export default {
     },
     desc: {
       name: '为智能体设置一个易于识别的名称',
-      description: '简要描述智能体的用途和特点',
+      description: '简要描述智能体的定位、用途和核心能力特点',
       systemPrompt: '自定义系统提示词，定义智能体的行为和角色',
       leaveEmptyDefault: '（留空则使用系统默认）',
       contextTemplate: '定义如何将检索到的内容格式化后传递给模型',
@@ -1881,6 +1881,7 @@ export default {
     title: '模型配置',
     description: '管理不同类型的 AI 模型，支持 Ollama 本地模型和远程 API',
     sceneModels: {
+      navTitle: '场景模型配置',
       title: '按场景选择模型',
       description: '为当前浏览器选择智能体、Rerank、Wiki、视觉和语音场景使用的模型。付费模型会显示但需要对应套餐。',
       scenes: {
@@ -2276,6 +2277,7 @@ export default {
     monthlyAllowance: '当前额度',
     storageRemaining: '存储剩余',
     storageUsage: '已使用 {used} / {total}',
+    usedPercent: '已使用 {percent}%',
     remaining: '剩余',
     unavailable: '暂不可用',
     resetsAt: '{month} 重置',
@@ -5066,6 +5068,8 @@ export default {
     title: '智能体',
     subtitle: '配置和管理您的智能体，自定义对话行为和能力',
     createAgent: '创建智能体',
+    newAgent: '新建智能体',
+    searchPlaceholder: '搜索智能体...',
     builtin: '内置',
     disabled: '已停用',
     disable: '停用',
@@ -5098,7 +5102,7 @@ export default {
       createTitle: '创建智能体',
       editTitle: '编辑智能体',
       buttons: {
-        create: '创建智能体',
+        create: '创建',
         saveAndClose: '保存并关闭',
       },
       postCreateHint: {

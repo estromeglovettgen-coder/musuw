@@ -13,6 +13,21 @@ import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent
 const legacy = LegacyInputFieldBusiness as any
 const legacySetup = legacy.setup
 
+type CapsuleModel = {
+  display_name?: string
+  name?: string
+}
+
+type CapsuleSceneOption = {
+  model_id?: string
+  display_name?: string
+}
+
+const readStateValue = <T,>(value: T | { value: T }): T => {
+  if (value && typeof value === 'object' && 'value' in value) return value.value
+  return value as T
+}
+
 export default defineComponent({
   ...legacy,
   name: 'InputField',
@@ -47,10 +62,21 @@ export default defineComponent({
         if (agentId === BUILTIN_SMART_REASONING_ID) return t('input.agentMode')
         return selectedAgent?.name || t('input.agentMode')
       })
-      const isBuiltinAgentSelected = computed(() =>
-        selectedAgentPresentation.value.id === BUILTIN_QUICK_ANSWER_ID
-        || selectedAgentPresentation.value.id === BUILTIN_SMART_REASONING_ID,
-      )
+      const selectedModelCapsuleName = computed(() => {
+        const selectedModel = readStateValue<CapsuleModel | null>((state as any).selectedModel)
+        const directName = selectedModel?.display_name?.trim() || selectedModel?.name?.trim()
+        if (directName) return directName
+
+        const selectedModelId = String(readStateValue<unknown>((state as any).selectedModelId) || '').trim()
+        const effectiveScene = readStateValue<unknown>((state as any).effectiveConsumerScene)
+        const sceneOptions = ((state as any).sceneOptionsFor?.(effectiveScene) || []) as CapsuleSceneOption[]
+        const sceneName = sceneOptions.find((option) => option.model_id === selectedModelId)?.display_name?.trim()
+        if (sceneName) return sceneName
+        if (selectedModelId) return selectedModelId
+
+        const legacyName = String(readStateValue<unknown>((state as any).selectedModelDisplayName) || '').trim()
+        return legacyName && legacyName !== t('common.loading') ? legacyName : t('input.notConfigured')
+      })
       const visualModelDropdownStyle = computed(() => {
         const source = (state as any).modelDropdownStyle
         const style = source && typeof source === 'object' && 'value' in source ? source.value : source
@@ -127,7 +153,7 @@ export default defineComponent({
         orgStore,
         modelPickerView,
         selectedAgentDisplayName,
-        isBuiltinAgentSelected,
+        selectedModelCapsuleName,
         visualModelDropdownStyle,
         selectAgentFromPicker,
         openModelPicker,
@@ -241,21 +267,19 @@ export default defineComponent({
             class="visual-chat-composer__combined-picker"
             :class="{ 'is-open': showModelSelector }"
             :aria-expanded="showModelSelector"
-            :aria-label="isBuiltinAgentSelected
-              ? selectedAgentDisplayName
-              : `${selectedAgentDisplayName} ${selectedModelDisplayName} ${selectedReasoningLabel}`"
+            :aria-label="`${selectedAgentDisplayName} ${selectedModelCapsuleName} ${selectedReasoningLabel}`"
             @click.stop="openModelPicker"
           >
             <span class="visual-chat-composer__combined-picker-copy">
               <span class="visual-chat-composer__combined-picker-agent" :title="selectedAgentDisplayName">{{ selectedAgentDisplayName }}</span>
-              <template v-if="!isBuiltinAgentSelected">
-                <span class="visual-chat-composer__combined-picker-dot" aria-hidden="true">·</span>
-                <span class="visual-chat-composer__combined-picker-model" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
-                <span v-if="reasoningEffort !== 'none' && selectedReasoningLabel" class="visual-chat-composer__combined-picker-effort">{{ selectedReasoningLabel }}</span>
-              </template>
+              <span class="visual-chat-composer__combined-picker-dot" aria-hidden="true">·</span>
+              <span
+                class="visual-chat-composer__combined-picker-model"
+                :title="selectedModelCapsuleName"
+              >{{ selectedModelCapsuleName }}</span>
+              <span v-if="reasoningEffort !== 'none' && selectedReasoningLabel" class="visual-chat-composer__combined-picker-effort">{{ selectedReasoningLabel }}</span>
             </span>
-            <t-loading v-if="modelsLoading" size="small" />
-            <t-icon v-else name="chevron-down" />
+            <t-icon name="chevron-down" />
           </button>
 
           <div class="visual-chat-composer__submit">

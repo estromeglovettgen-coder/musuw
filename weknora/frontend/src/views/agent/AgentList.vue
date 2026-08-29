@@ -15,32 +15,18 @@
         <div class="agents-panel__toolbar" style="--wails-draggable: no-drag">
           <label class="agents-panel__search">
             <t-icon name="search" size="16px" aria-hidden="true" />
-            <input v-model="agentSearchQuery" type="search" :placeholder="$t('common.search')"
-              :aria-label="$t('common.search')" />
+            <input v-model="agentSearchQuery" type="search" :placeholder="$t('agent.searchPlaceholder')"
+              :aria-label="$t('agent.searchPlaceholder')" />
           </label>
-          <t-tooltip v-if="authStore.hasRole('contributor')" :content="$t('agent.createAgent')" placement="bottom">
+          <t-tooltip v-if="authStore.hasRole('contributor')" :content="$t('agent.newAgent')" placement="bottom">
             <t-button theme="default" size="small" class="header-action-btn agent-create-header-btn"
               data-guide="agent-list-create" style="--wails-draggable: no-drag" @click="handleCreateAgent">
                 <template #icon>
                   <span class="btn-icon-wrapper">
-                    <svg class="sparkles-icon" width="19" height="19" viewBox="0 0 20 20" fill="none"
-                      xmlns="http://www.w3.org/2000/svg">
-                      <path
-                        d="M10 3L10.8 6.2C10.9 6.7 11.3 7.1 11.8 7.2L15 8L11.8 8.8C11.3 8.9 10.9 9.3 10.8 9.8L10 13L9.2 9.8C9.1 9.3 8.7 8.9 8.2 8.8L5 8L8.2 7.2C8.7 7.1 9.1 6.7 9.2 6.2L10 3Z"
-                        fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                      <path
-                        d="M15.5 4L15.8 5.2C15.85 5.45 16.05 5.65 16.3 5.7L17.5 6L16.3 6.3C16.05 6.35 15.85 6.55 15.8 6.8L15.5 8L15.2 6.8C15.15 6.55 14.95 6.35 14.7 6.3L13.5 6L14.7 5.7C14.95 5.65 15.15 5.45 15.2 5.2L15.5 4Z"
-                        fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                      <path
-                        d="M4.5 13L4.8 14.2C4.85 14.45 5.05 14.65 5.3 14.7L6.5 15L5.3 15.3C5.05 15.35 4.85 15.55 4.8 15.8L4.5 17L4.2 15.8C4.15 15.55 3.95 15.35 3.7 15.3L2.5 15L3.7 14.7C3.95 14.65 4.15 14.45 4.2 14.2L4.5 13Z"
-                        fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                    </svg>
+                    <t-icon name="add" size="16px" aria-hidden="true" />
                   </span>
                 </template>
-                <span class="agent-create-header-label">{{ $t('agent.createAgent') }}</span>
+                <span class="agent-create-header-label">{{ $t('agent.newAgent') }}</span>
               </t-button>
             </t-tooltip>
         </div>
@@ -619,25 +605,9 @@
           <t-button v-if="authStore.hasRole('contributor')" class="agent-create-btn empty-state-btn"
             data-guide="agent-list-create" @click="handleCreateAgent">
             <template #icon>
-              <span class="btn-icon-wrapper">
-                <svg class="sparkles-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"
-                  xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M10 3L10.8 6.2C10.9 6.7 11.3 7.1 11.8 7.2L15 8L11.8 8.8C11.3 8.9 10.9 9.3 10.8 9.8L10 13L9.2 9.8C9.1 9.3 8.7 8.9 8.2 8.8L5 8L8.2 7.2C8.7 7.1 9.1 6.7 9.2 6.2L10 3Z"
-                    fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                  <path
-                    d="M15.5 4L15.8 5.2C15.85 5.45 16.05 5.65 16.3 5.7L17.5 6L16.3 6.3C16.05 6.35 15.85 6.55 15.8 6.8L15.5 8L15.2 6.8C15.15 6.55 14.95 6.35 14.7 6.3L13.5 6L14.7 5.7C14.95 5.65 15.15 5.45 15.2 5.2L15.5 4Z"
-                    fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                  <path
-                    d="M4.5 13L4.8 14.2C4.85 14.45 5.05 14.65 5.3 14.7L6.5 15L5.3 15.3C5.05 15.35 4.85 15.55 4.8 15.8L4.5 17L4.2 15.8C4.15 15.55 3.95 15.35 3.7 15.3L2.5 15L3.7 14.7C3.95 14.65 4.15 14.45 4.2 14.2L4.5 13Z"
-                    fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                </svg>
-              </span>
+              <span class="btn-icon-wrapper"><t-icon name="add" size="16px" aria-hidden="true" /></span>
             </template>
-            <span>{{ $t('agent.createAgent') }}</span>
+            <span>{{ $t('agent.newAgent') }}</span>
           </t-button>
         </div>
 
@@ -660,25 +630,9 @@
           <t-button v-if="authStore.hasRole('contributor')" class="agent-create-btn empty-state-btn"
             @click="handleCreateAgent">
             <template #icon>
-              <span class="btn-icon-wrapper">
-                <svg class="sparkles-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"
-                  xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M10 3L10.8 6.2C10.9 6.7 11.3 7.1 11.8 7.2L15 8L11.8 8.8C11.3 8.9 10.9 9.3 10.8 9.8L10 13L9.2 9.8C9.1 9.3 8.7 8.9 8.2 8.8L5 8L8.2 7.2C8.7 7.1 9.1 6.7 9.2 6.2L10 3Z"
-                    fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                  <path
-                    d="M15.5 4L15.8 5.2C15.85 5.45 16.05 5.65 16.3 5.7L17.5 6L16.3 6.3C16.05 6.35 15.85 6.55 15.8 6.8L15.5 8L15.2 6.8C15.15 6.55 14.95 6.35 14.7 6.3L13.5 6L14.7 5.7C14.95 5.65 15.15 5.45 15.2 5.2L15.5 4Z"
-                    fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                  <path
-                    d="M4.5 13L4.8 14.2C4.85 14.45 5.05 14.65 5.3 14.7L6.5 15L5.3 15.3C5.05 15.35 4.85 15.55 4.8 15.8L4.5 17L4.2 15.8C4.15 15.55 3.95 15.35 3.7 15.3L2.5 15L3.7 14.7C3.95 14.65 4.15 14.45 4.2 14.2L4.5 13Z"
-                    fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                </svg>
-              </span>
+              <span class="btn-icon-wrapper"><t-icon name="add" size="16px" aria-hidden="true" /></span>
             </template>
-            <span>{{ $t('agent.createAgent') }}</span>
+            <span>{{ $t('agent.newAgent') }}</span>
           </t-button>
         </div>
         <!-- 空状态：空间下 -->
@@ -1602,9 +1556,15 @@ defineExpose({
     color: var(--td-text-color-primary);
     font-family: var(--app-font-family);
     font-size: 20px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 32px;
   }
+}
+
+.agents-panel__header {
+  margin-bottom: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .agents-panel__toolbar {
@@ -1619,18 +1579,18 @@ defineExpose({
   height: 34px;
   box-sizing: border-box;
   padding: 0 10px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-placeholder);
+  background: #fff;
+  color: #9ca3af;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
   &:focus-within {
-    border-color: var(--td-brand-color);
-    box-shadow: 0 0 0 2px var(--td-brand-color-focus, rgba(0, 82, 217, 0.12));
+    border-color: #111827;
+    box-shadow: 0 0 0 2px rgb(17 24 39 / 8%);
   }
 
   input {
@@ -1639,38 +1599,51 @@ defineExpose({
     border: 0;
     outline: 0;
     background: transparent;
-    color: var(--td-text-color-primary);
+    color: #111827;
     font: inherit;
     font-size: 12px;
 
     &::placeholder {
-      color: var(--td-text-color-placeholder);
+      color: #9ca3af;
     }
   }
 }
 
+@media (max-width: 767px) {
+  .agents-panel__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+    padding-right: 0;
+  }
+
+  .agents-panel__toolbar,
+  .agents-panel__search {
+    width: 100%;
+  }
+}
+
 :deep(.agent-create-btn) {
-  --ripple-color: rgba(118, 75, 162, 0.3) !important;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  border: none !important;
-  color: var(--td-text-color-anti) !important;
-  position: relative;
-  overflow: hidden;
+  --ripple-color: rgb(255 255 255 / 16%) !important;
+  min-height: 34px;
+  padding: 0 14px !important;
+  border: 1px solid #111827 !important;
+  border-radius: 12px !important;
+  background: #111827 !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  font-size: 12px;
+  font-weight: 700;
 
   &:hover,
   &:active,
   &:focus,
   &.t-is-active,
   &[data-state="active"] {
-    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%) !important;
-    border: none !important;
-    color: var(--td-text-color-anti) !important;
+    border-color: #000 !important;
+    background: #000 !important;
+    color: #fff !important;
   }
-
-  --td-button-primary-bg-color: #667eea !important;
-  --td-button-primary-border-color: #667eea !important;
-  --td-button-primary-active-bg-color: #5a6fd6 !important;
-  --td-button-primary-active-border-color: #5a6fd6 !important;
 
   .btn-icon-wrapper {
     display: inline-flex;
@@ -1678,50 +1651,13 @@ defineExpose({
     justify-content: center;
   }
 
-  .sparkles-icon {
-    animation: twinkle 2s ease-in-out infinite;
-  }
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(45deg,
-        transparent 30%,
-        rgba(255, 255, 255, 0.1) 50%,
-        transparent 70%);
-    transform: translateX(-100%);
-    transition: transform 0.6s ease;
-    z-index: 0;
-  }
-
-  &:hover::before {
-    transform: translateX(100%);
-  }
-}
-
-@keyframes twinkle {
-
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.8;
-    transform: scale(0.95);
-  }
 }
 
 .header-subtitle {
   margin: 0;
   color: var(--td-text-color-placeholder);
   font-family: var(--app-font-family);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 400;
   line-height: 20px;
 }
@@ -1772,7 +1708,7 @@ defineExpose({
   padding: 0 14px !important;
   gap: 6px;
   border-color: #111827 !important;
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   background: #111827 !important;
   color: #fff !important;
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
@@ -1787,7 +1723,7 @@ defineExpose({
 
   .agent-create-header-label {
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 16px;
     white-space: nowrap;
   }
@@ -2447,16 +2383,40 @@ defineExpose({
 }
 
 :root[theme-mode="dark"] .agent-list-container { background: #121214; }
-:root[theme-mode="dark"] .agent-list-content > .header { background: var(--mvc-page, #151619) !important; }
+:root[theme-mode="dark"] .agent-list-content > .header { background: #121214 !important; border-bottom-color: #27272a; }
+:root[theme-mode="dark"] .agents-panel__search {
+  border-color: #3f3f46;
+  background: #27272a;
+  color: #71717a;
+}
+:root[theme-mode="dark"] .agents-panel__search input { color: #f4f4f5; }
+:root[theme-mode="dark"] .agents-panel__search input::placeholder { color: #71717a; }
+:root[theme-mode="dark"] .agents-panel__search:focus-within { border-color: #d4d4d8; box-shadow: 0 0 0 2px rgb(244 244 245 / 8%); }
+:root[theme-mode="dark"] .agent-create-header-btn,
+:root[theme-mode="dark"] :deep(.agent-create-btn) {
+  border-color: #f4f4f5 !important;
+  background: #f4f4f5 !important;
+  color: #18181b !important;
+}
+:root[theme-mode="dark"] .agent-create-header-btn:hover,
+:root[theme-mode="dark"] .agent-create-header-btn:focus,
+:root[theme-mode="dark"] .agent-create-header-btn:active,
+:root[theme-mode="dark"] :deep(.agent-create-btn:hover),
+:root[theme-mode="dark"] :deep(.agent-create-btn:focus),
+:root[theme-mode="dark"] :deep(.agent-create-btn:active) {
+  border-color: #fff !important;
+  background: #fff !important;
+  color: #09090b !important;
+}
 :root[theme-mode="dark"] .agent-list-content .agents-panel__title-icon { color: #d4d4d8; }
 :root[theme-mode="dark"] .agent-card,
 :root[theme-mode="dark"] .agent-card.agent-mode-normal,
 :root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: #27272a; background: #18181b; color: #a1a1aa; box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important; }
 :root[theme-mode="dark"] .agent-card .card-bottom { gap: 6px !important; }
 :root[theme-mode="dark"] .agent-card:hover {
-  background: var(--mvc-hover, #25272c) !important;
-  border-color: var(--mvc-line-strong, #484c54) !important;
-  box-shadow: var(--mvc-shadow) !important;
+  background: #18181b !important;
+  border-color: #52525b !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
 }
 :root[theme-mode="dark"] .agent-card-meta span { background: #27272a; color: #d4d4d8; }
 

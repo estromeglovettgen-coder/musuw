@@ -161,12 +161,12 @@ const navItems = computed<NavItem[]>(() => {
   if (authStore.isLiteMode) {
     return [
       { key: 'general', icon: 'setting', label: t('general.title') },
-      { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
-      { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
       { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
+      { key: 'models', icon: 'cpu', label: t('modelSettings.sceneModels.navTitle') },
       ...(authStore.canAccessAllTenants || authStore.hasRole('admin')
         ? [{ key: 'mcp', icon: 'tools', label: t('settings.mcpService') }]
         : []),
+      { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
     ]
   }
 

@@ -539,12 +539,18 @@
 /* Dark native preference compatibility                                       */
 /* -------------------------------------------------------------------------- */
 :root[theme-mode="dark"] .agent-list-container,
+:root[theme-mode="dark"] .agent-list-content { background: #121214 !important; color: #f4f4f5 !important; }
 :root[theme-mode="dark"] .org-list-container,
-:root[theme-mode="dark"] .agent-list-content,
 :root[theme-mode="dark"] .org-list-content { background: var(--mvc-page, #151619) !important; color: var(--mvc-text, #f2f2f2) !important; }
 :root[theme-mode="dark"] .agent-card,
-:root[theme-mode="dark"] .org-card,
 :root[theme-mode="dark"] .agent-card-skeleton,
+:root[theme-mode="dark"] .agent-card.agent-mode-normal,
+:root[theme-mode="dark"] .agent-card.agent-mode-agent {
+  border-color: #27272a !important;
+  background: #18181b !important;
+  color: #a1a1aa !important;
+}
+:root[theme-mode="dark"] .org-card,
 :root[theme-mode="dark"] .org-card-skeleton,
 :root[theme-mode="dark"] .list-space-sidebar,
 :root[theme-mode="dark"] .visual-sidebar .tenant-trigger,
@@ -555,15 +561,14 @@
   background: var(--mvc-surface, #1d1f23) !important;
   color: var(--mvc-text, #f2f2f2) !important;
 }
-:root[theme-mode="dark"] .agent-list-content .title-row h2,
 :root[theme-mode="dark"] .org-list-content .title-row h2,
-:root[theme-mode="dark"] .agent-card .card-title,
 :root[theme-mode="dark"] .org-card .card-title,
 :root[theme-mode="dark"] .visual-sidebar .tenant-name,
 :root[theme-mode="dark"] .tenant-dropdown .dropdown-title,
 :root[theme-mode="dark"] .shared-detail-drawer-title,
 :root[theme-mode="dark"] .invite-preview-title { color: var(--mvc-text-strong, #fff) !important; }
-:root[theme-mode="dark"] .agent-card:hover,
+:root[theme-mode="dark"] .agent-list-content .title-row h2,
+:root[theme-mode="dark"] .agent-card .card-title { color: #f4f4f5 !important; }
 :root[theme-mode="dark"] .org-card:hover,
 :root[theme-mode="dark"] .list-space-sidebar .icon-item-labeled:hover,
 :root[theme-mode="dark"] .list-space-sidebar .sidebar-item:hover,
@@ -576,8 +581,12 @@
   border-color: var(--mvc-line, #31343a) !important;
   color: var(--mvc-text-strong, #fff) !important;
 }
-:root[theme-mode="dark"] .agent-card:hover,
 :root[theme-mode="dark"] .org-card:hover {
   border-color: var(--mvc-line-strong, #484c54) !important;
   box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] .agent-card:hover {
+  border-color: #52525b !important;
+  background: #18181b !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
 }

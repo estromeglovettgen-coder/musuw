@@ -2,8 +2,8 @@
   <section class="visual-model-settings" :class="{ 'is-lite': authStore.isLiteMode }">
     <header class="visual-settings-page-header visual-model-settings__header">
       <div class="visual-settings-page-header__copy">
-        <h2 class="visual-settings-page-header__title">{{ $t('modelSettings.title') }}</h2>
-        <p class="visual-settings-page-header__description">{{ $t('modelSettings.description') }}</p>
+        <h2 class="visual-settings-page-header__title">{{ $t(authStore.isLiteMode ? 'modelSettings.sceneModels.navTitle' : 'modelSettings.title') }}</h2>
+        <p class="visual-settings-page-header__description">{{ $t(authStore.isLiteMode ? 'modelSettings.sceneModels.description' : 'modelSettings.description') }}</p>
       </div>
       <button
         v-if="!authStore.isLiteMode && authStore.hasRole('admin')"

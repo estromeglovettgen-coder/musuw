@@ -43,3 +43,12 @@
 - [x] 7.5 Add and run light/dark visual contracts for all affected surfaces, including loading, empty, error, selected, disabled, hover, and focus states
 - [x] 7.6 Run full frontend tests, type-check, i18n check, production build, relevant backend tests, OpenSpec validation, and diff checks
 - [x] 7.7 Browser-test all flows in light and dark mode at fixed viewports and compare screenshots to the reference before one consolidated corrective review
+
+## 8. Authoritative Source Pixel-Parity Correction
+
+- [x] 8.1 Replace stale visual contracts with failing source contracts derived from `musnow-ai-workspace (7).zip`, including shared modal geometry, semantic light/dark surfaces, segmented controls, agent search/create controls, and primary-button icon rules
+- [x] 8.2 Mechanically align the agent directory header, search field, create action, and shared card-adjacent presentation in both themes without changing native behavior
+- [x] 8.3 Mechanically align the agent editor shell, navigation, headers, basic-information layout, rows, controls, dropdowns, and footer to the authoritative source while preserving native save and permission contracts
+- [x] 8.4 Mechanically align the lower-left account settings shell, user-information page, usage page, and shared primitives to the same authoritative geometry and light/dark tokens
+- [x] 8.5 Run focused contracts, full frontend tests, type-check, i18n audit, production build, and fixed-viewport browser acceptance in both themes
+- [x] 8.6 Perform one bounded adversarial review of the completed correction and fix current blockers only
