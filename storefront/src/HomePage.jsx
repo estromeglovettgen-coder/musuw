@@ -29,7 +29,7 @@ export function HomePage({ copy, locale, onLocaleChange }) {
         onLocaleChange={onLocaleChange}
       />
       <main>
-        <HeroScene copy={homepageCopy} />
+        <HeroScene copy={homepageCopy} locale={locale} />
         <FeaturesSection copy={homepageCopy} />
         <PlatformSection copy={homepageCopy} />
         <MarketingPricingSection copy={homepageCopy} />

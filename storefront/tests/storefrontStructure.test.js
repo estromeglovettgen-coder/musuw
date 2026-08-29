@@ -88,7 +88,9 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /billing-discount-badge/);
   assert.match(home, /Save ~17%/);
   assert.match(home, /100 GiB/);
-  assert.match(home, /<video/);
+  assert.match(home, /class="hero-product-demo"/);
+  assert.match(home, /class="hero-demo-composer/);
+  assert.doesNotMatch(home, /<video/);
   assert.doesNotMatch(home, /hero-float/);
   assert.match(home, />Features</);
   assert.match(home, />Platform</);

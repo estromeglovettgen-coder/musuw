@@ -170,8 +170,8 @@ test("homepage keeps the smooth hero while removing examples and repeated workfl
   const heroSource = readFileSync(join(root, "src/components/HeroScene.jsx"), "utf8");
   assert.match(heroSource, /className="dashboard-scene"/);
   assert.match(heroSource, /sampleHeroVisibility/);
-  assert.match(heroSource, /<video/);
-  assert.match(heroSource, /musuw-overview\.webm/);
+  assert.match(heroSource, /<HeroProductDemo locale=\{locale\}/);
+  assert.doesNotMatch(heroSource, /<video|musuw-overview\.webm/);
   assert.match(heroSource, /id="demo"/);
   assert.doesNotMatch(heroSource, /hero-float/);
 
