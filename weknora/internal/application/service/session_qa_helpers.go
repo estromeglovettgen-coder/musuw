@@ -9,6 +9,12 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
+// effectiveWebSearchEnabled keeps Standard's per-request behavior and makes
+// Lite's platform-managed web search mandatory for every service caller.
+func effectiveWebSearchEnabled(requested bool) bool {
+	return isLiteProductEdition() || requested
+}
+
 // ---------------------------------------------------------------------------
 // Shared QA helpers: KB resolution, model resolution, retrieval tenant
 // ---------------------------------------------------------------------------

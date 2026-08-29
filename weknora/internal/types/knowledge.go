@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -188,6 +189,29 @@ type Knowledge struct {
 	DeletedAt gorm.DeletedAt `json:"deleted_at"         gorm:"index"`
 	// Knowledge base name (not stored in database, populated on query)
 	KnowledgeBaseName string `json:"knowledge_base_name" gorm:"-"`
+}
+
+// AccountedStorageBytes returns the storage contribution of this knowledge
+// row. FileSize is the retained source object and StorageSize is the derived
+// index footprint; both components are kept separate for diagnostics but are
+// charged together for quota and tenant usage. Legacy rows can contain null
+// (which scans as zero) or negative values, so each component is normalized to
+// zero before adding. The result saturates at MaxInt64 instead of wrapping.
+func (k *Knowledge) AccountedStorageBytes() int64 {
+	if k == nil {
+		return 0
+	}
+	total := int64(0)
+	for _, component := range []int64{k.FileSize, k.StorageSize} {
+		if component <= 0 {
+			continue
+		}
+		if total > math.MaxInt64-component {
+			return math.MaxInt64
+		}
+		total += component
+	}
+	return total
 }
 
 // CustomMetadataText returns stable human-readable metadata for summaries and

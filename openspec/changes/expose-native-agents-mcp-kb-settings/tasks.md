@@ -23,6 +23,8 @@
 
 - [x] 5.1 Narrow the Lite backend gate for the required existing agent, MCP, OAuth, approval, attachment, and chat payload paths
 - [x] 5.2 Restore the matching frontend route, menu, settings, and Lite chat-state visibility without bypassing route-level permissions
+- [x] 5.3 Reject FAQ creation/mutation/copy in Lite and hide historical FAQ cards/manager while retaining Standard behavior and cleanup reads/deletes
+- [x] 5.4 Force web search on at the Lite router and runtime seams while hiding its toggle and preserving Standard request behavior
 
 ## 6. Verification
 

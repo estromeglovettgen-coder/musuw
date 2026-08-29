@@ -212,7 +212,7 @@ func (s *sessionService) buildAgentConfig(
 	agentConfig := &types.AgentConfig{
 		MaxIterations:               customAgent.Config.MaxIterations,
 		Temperature:                 customAgent.Config.Temperature,
-		WebSearchEnabled:            customAgent.Config.WebSearchEnabled && req.WebSearchEnabled,
+		WebSearchEnabled:            effectiveWebSearchEnabled(customAgent.Config.WebSearchEnabled && req.WebSearchEnabled),
 		WebSearchMaxResults:         customAgent.Config.WebSearchMaxResults,
 		WebSearchProviderID:         customAgent.Config.WebSearchProviderID,
 		MultiTurnEnabled:            customAgent.Config.MultiTurnEnabled,

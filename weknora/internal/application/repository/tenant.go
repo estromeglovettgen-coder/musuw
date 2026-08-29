@@ -16,6 +16,11 @@ var (
 	ErrTenantHasKnowledgeBase = errors.New("tenant has associated knowledge bases")
 )
 
+const (
+	maxInt64Value = int64(^uint64(0) >> 1)
+	minInt64Value = -maxInt64Value - 1
+)
+
 // tenantRepository implements tenant repository interface
 type tenantRepository struct {
 	db *gorm.DB
@@ -133,21 +138,75 @@ func (r *tenantRepository) DeleteTenant(ctx context.Context, id uint64) error {
 
 func (r *tenantRepository) AdjustStorageUsed(ctx context.Context, tenantID uint64, delta int64) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var tenant types.Tenant
-		// 使用悲观锁确保并发安全
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+		tenant, err := lockTenantForStorage(tx, tenantID)
+		if err != nil {
 			return err
 		}
-
-		tenant.StorageUsed += delta
-		// 保存更新并验证业务规则
-		if tenant.StorageUsed < 0 {
-			logger.Errorf(ctx, "tenant storage used is negative %d: %d", tenant.ID, tenant.StorageUsed)
-			tenant.StorageUsed = 0
-		}
-
-		return tx.Save(&tenant).Error
+		return applyLockedStorageDelta(ctx, tx, tenant, delta)
 	})
+}
+
+// lockTenantForStorage is the single tenant-first serialization point shared
+// by the legacy adjustment method and paired knowledge mutations. PostgreSQL
+// takes a row lock; SQLite ignores FOR UPDATE but still runs the caller in the
+// surrounding transaction.
+func lockTenantForStorage(tx *gorm.DB, tenantID uint64) (*types.Tenant, error) {
+	var tenant types.Tenant
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", tenantID).First(&tenant).Error; err != nil {
+		return nil, err
+	}
+	return &tenant, nil
+}
+
+// applyLockedStorageDelta applies a delta after the caller has locked the
+// tenant row. It deliberately preserves AdjustStorageUsed's legacy behavior:
+// negative results are logged and clamped to zero. Positive overflow is
+// saturated so a malformed legacy delta cannot wrap the aggregate negative.
+func applyLockedStorageDelta(ctx context.Context, tx *gorm.DB, tenant *types.Tenant, delta int64) error {
+	if tenant == nil {
+		return ErrTenantNotFound
+	}
+	next := tenant.StorageUsed
+	switch {
+	case delta > 0:
+		if next > maxInt64Value-delta {
+			next = maxInt64Value
+		} else {
+			next += delta
+		}
+	case delta < 0:
+		// Avoid negating MinInt64. Any non-negative usage plus that delta is
+		// below zero and therefore clamps; for a negative legacy value the
+		// same clamp is also the only safe result.
+		if delta == minInt64Value || next < -delta {
+			next = 0
+		} else {
+			next += delta
+		}
+	}
+	if next < 0 {
+		logger.Errorf(ctx, "tenant storage used is negative %d: %d", tenant.ID, next)
+		next = 0
+	}
+	tenant.StorageUsed = next
+	return tx.Save(tenant).Error
+}
+
+// ensureStorageQuota allows a non-positive effective quota to mean unlimited
+// and otherwise rejects only a positive delta whose next usage exceeds the
+// quota. Using subtraction avoids overflow and makes next == quota valid.
+func ensureStorageQuota(tenant *types.Tenant, delta, effectiveQuota int64) error {
+	if tenant == nil || delta <= 0 || effectiveQuota <= 0 {
+		return nil
+	}
+	used := tenant.StorageUsed
+	if used < 0 {
+		used = 0
+	}
+	if delta > effectiveQuota || used > effectiveQuota-delta {
+		return types.NewStorageQuotaExceededError()
+	}
+	return nil
 }
 
 // BulkSetStorageQuota writes quotaBytes to storage_quota for every

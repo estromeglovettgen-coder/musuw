@@ -229,6 +229,16 @@ type KnowledgeService interface {
 // KnowledgeRepository defines the interface for knowledge repositories.
 type KnowledgeRepository interface {
 	CreateKnowledge(ctx context.Context, knowledge *types.Knowledge) error
+	// CreateKnowledgeWithStorage creates a knowledge row and accounts its full
+	// source-plus-index contribution atomically with the tenant usage counter.
+	// A positive effectiveQuota enforces the exact-boundary rule; zero or less
+	// means unlimited.
+	CreateKnowledgeWithStorage(ctx context.Context, knowledge *types.Knowledge, effectiveQuota int64) error
+	// ClaimKnowledgeSourceWithStorage conditionally materializes the source for
+	// an existing knowledge row. If another worker has already persisted a
+	// source path, it returns that winner without overwriting or charging it;
+	// otherwise it commits the proposed row and full contribution atomically.
+	ClaimKnowledgeSourceWithStorage(ctx context.Context, proposed *types.Knowledge, effectiveQuota int64) (current *types.Knowledge, claimed bool, err error)
 	GetKnowledgeByID(ctx context.Context, tenantID uint64, id string) (*types.Knowledge, error)
 	// GetKnowledgeByIDOnly returns knowledge by ID without tenant filter (for permission resolution).
 	GetKnowledgeByIDOnly(ctx context.Context, id string) (*types.Knowledge, error)
@@ -241,10 +251,24 @@ type KnowledgeRepository interface {
 		tenantID uint64, kbID string, page *types.Pagination, filter types.KnowledgeListFilter,
 	) ([]*types.Knowledge, int64, error)
 	UpdateKnowledge(ctx context.Context, knowledge *types.Knowledge) error
+	// UpdateKnowledgeWithStorage updates a knowledge row and applies the
+	// persisted-to-new contribution delta atomically with tenant usage.
+	UpdateKnowledgeWithStorage(ctx context.Context, knowledge *types.Knowledge, effectiveQuota int64) error
+	// UpdateKnowledgeStorageFailureIfCurrent marks a processing row failed only
+	// when its persisted index contribution still matches the worker's
+	// pre-index checkpoint. A concurrent successful worker therefore remains the
+	// row's authority instead of being overwritten by stale failure state.
+	UpdateKnowledgeStorageFailureIfCurrent(ctx context.Context, tenantID uint64, knowledgeID string, expectedStorageSize int64, errorMessage string) (bool, error)
 	// UpdateKnowledgeBatch updates knowledge items in batch
 	UpdateKnowledgeBatch(ctx context.Context, knowledgeList []*types.Knowledge) error
 	DeleteKnowledge(ctx context.Context, tenantID uint64, id string) error
+	// DeleteKnowledgeWithStorage soft-deletes an active knowledge row and
+	// releases its full source-plus-index contribution atomically.
+	DeleteKnowledgeWithStorage(ctx context.Context, tenantID uint64, id string) error
 	DeleteKnowledgeList(ctx context.Context, tenantID uint64, ids []string) error
+	// DeleteKnowledgeListWithStorage soft-deletes active knowledge rows and
+	// releases the aggregate contribution atomically.
+	DeleteKnowledgeListWithStorage(ctx context.Context, tenantID uint64, ids []string) error
 	GetKnowledgeBatch(ctx context.Context, tenantID uint64, ids []string) ([]*types.Knowledge, error)
 	// CheckKnowledgeExists checks if knowledge already exists.
 	// For file types, check by fileHash or (fileName+fileSize).

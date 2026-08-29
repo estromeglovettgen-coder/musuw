@@ -109,7 +109,15 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 	// Check storage quota
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
 	storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
-	if storageQuota > 0 && tenantInfo.StorageUsed >= storageQuota {
+	storageUsed := tenantInfo.StorageUsed
+	if storageUsed < 0 {
+		storageUsed = 0
+	}
+	fileBytes := file.Size
+	if fileBytes < 0 {
+		fileBytes = 0
+	}
+	if storageQuota > 0 && (storageUsed >= storageQuota || fileBytes > storageQuota-storageUsed) {
 		logger.Error(ctx, "Storage quota exceeded")
 		return nil, types.NewStorageQuotaExceededError()
 	}
@@ -189,7 +197,7 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 
 	// Save knowledge record to database after the file is safely stored.
 	logger.Info(ctx, "Saving knowledge record to database")
-	if err := s.repo.CreateKnowledge(ctx, knowledge); err != nil {
+	if err := s.repo.CreateKnowledgeWithStorage(ctx, knowledge, storageQuota); err != nil {
 		logger.Errorf(ctx, "Failed to create knowledge record, ID: %s, error: %v", knowledge.ID, err)
 		if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
 			logger.Errorf(ctx, "Failed to delete saved file after knowledge creation failed, path: %s, error: %v", filePath, deleteErr)

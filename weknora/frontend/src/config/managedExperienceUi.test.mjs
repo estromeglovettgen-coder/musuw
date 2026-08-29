@@ -67,10 +67,10 @@ test("cached Edition is reapplied after logout resets the auth store", () => {
   assert.match(router, /resolvedLiteMode = isLite/);
 });
 
-test("agent selection keeps web search disabled in Lite", () => {
+test("agent selection keeps platform web search enabled while Lite hides the toggle", () => {
   assert.match(
     settingsStore,
-    /selectAgent\([\s\S]{0,450}this\.settings\.webSearchEnabled = !useAuthStore\(\)\.isLiteMode;/,
+    /selectAgent\([\s\S]{0,450}this\.settings\.webSearchEnabled = true;/,
   );
   assert.match(inputField, /v-if="!authStore\.isLiteMode && showWebSearchButton"/);
 });

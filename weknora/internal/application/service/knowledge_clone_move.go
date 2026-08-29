@@ -183,22 +183,39 @@ func rewriteContentImageURLs(content string, urlCache map[string]string) string 
 	return content
 }
 
-// cleanupCopiedObjects deletes objects that were newly created during a clone
-// that subsequently failed, to avoid orphaning storage. It is best-effort:
-// delete errors are logged but never returned (the original clone error wins).
-func cleanupCopiedObjects(ctx context.Context, svc interfaces.FileService, paths []string) {
+// cleanupCopiedObjectsWithError deletes objects that were newly created during
+// a clone that subsequently failed. Returning the first error is important for
+// document clone compensation: a destination row must remain available for a
+// retry when any owned object could not be removed.
+func cleanupCopiedObjectsWithError(ctx context.Context, svc interfaces.FileService, paths []string) error {
 	if len(paths) == 0 || svc == nil {
-		return
+		if len(paths) > 0 && svc == nil {
+			return errors.New("copied-object cleanup service is unavailable")
+		}
+		return nil
 	}
 	logger.Infof(ctx, "Cleaning up %d copied objects after clone failure", len(paths))
+	var firstErr error
 	for _, p := range paths {
 		if p == "" {
 			continue
 		}
 		if err := svc.DeleteFile(ctx, p); err != nil {
 			logger.Errorf(ctx, "Failed to clean up copied object %s: %v", p, err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
+	return firstErr
+}
+
+// cleanupCopiedObjects preserves the historical best-effort behavior for
+// callers that do not own a persisted destination row. The document clone
+// path uses the error-returning helper above so it can retain a failed row
+// when cleanup is incomplete.
+func cleanupCopiedObjects(ctx context.Context, svc interfaces.FileService, paths []string) {
+	_ = cleanupCopiedObjectsWithError(ctx, svc, paths)
 }
 
 func (s *knowledgeService) CloneKnowledgeBase(ctx context.Context, srcID, dstID string) error {

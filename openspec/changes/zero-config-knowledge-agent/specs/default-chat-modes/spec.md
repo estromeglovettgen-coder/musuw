@@ -21,6 +21,10 @@ reasoning picker SHALL expose only efforts supported by the selected model.
 - **WHEN** a request supplies a model outside the active plan catalog
 - **THEN** the server rejects the model without invoking it
 
-#### Scenario: Client submits a hidden tool override
-- **WHEN** a Lite chat request supplies an Agent, MCP, Skill, or web-search override
+#### Scenario: Client submits a hidden skill or shared-agent override
+- **WHEN** a Lite chat request supplies a Skill or a non-local shared-agent source
 - **THEN** the Lite product gate rejects the request
+
+#### Scenario: Lite web search is platform managed
+- **WHEN** a Lite chat request omits web search or supplies either boolean value
+- **THEN** the server forces web search on and the consumer UI does not expose a toggle

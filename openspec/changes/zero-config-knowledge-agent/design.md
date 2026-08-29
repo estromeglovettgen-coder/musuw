@@ -71,7 +71,9 @@ validates the requested model against the server catalog, then applies that
 model and reasoning effort to a request-scoped copy of the full-capability
 agent and to title generation. Persisted built-in agent configuration is not
 mutated, custom agents in Standard WeKnora keep their own model, and Lite
-cannot use hidden Agent/MCP/Skill overrides.
+cannot use hidden Skill or shared-agent overrides. Later native-agent exposure
+permits tenant-local Agent/MCP selection and makes web search a mandatory
+server-owned Lite capability.
 
 Alternative considered: create a persistent custom agent per tenant.  That
 duplicates the built-in registry and creates lifecycle/migration work, so it

@@ -14,6 +14,7 @@ fail() { printf '%s\n' "$1" >&2; exit 1; }
 
 for required in \
     "$staging_root/compose.yaml" "$staging_root/compose.edge.yaml" "$staging_root/app-entrypoint.sh" \
+    "$repo_root/weknora/docker/searxng/settings.yml" "$repo_root/integration/weknora-production/searxng-entrypoint.sh" \
     "$staging_root/staging.env.example" "$staging_root/auth-public.env.example" \
     "$script_dir/lib.sh" "$script_dir/source-manifest.sh" "$script_dir/capacity-preflight.sh" "$script_dir/capacity-preflight.test.sh" "$script_dir/prepare-runtime.sh" \
     "$script_dir/compose.sh" "$script_dir/release-ci.sh" "$script_dir/verify-deployed.sh" \
@@ -36,6 +37,12 @@ grep -Fq 'NEO4J_ENABLE: "false"' "$staging_root/compose.yaml" || fail 'staging u
 grep -Fq 'MUSUW_STAGING_R2_BUCKET' "$staging_root/compose.yaml" || fail 'staging R2 bucket is not explicit'
 grep -Fq '/opt/weknora/staging-runtime/secrets' "$staging_root/compose.yaml" || fail 'staging fixed secret root is missing'
 grep -Fq '/opt/weknora-staging/app-entrypoint.sh' "$staging_root/compose.yaml" || fail 'staging does not mount its Sandbox-only entrypoint'
+grep -Fq 'weknora-v072-staging-searxng' "$staging_root/compose.yaml" || fail 'staging SearXNG service identity is missing'
+grep -Fq 'sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662' "$staging_root/compose.yaml" || fail 'staging SearXNG init image is not pinned'
+grep -Fq 'sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e' "$staging_root/compose.yaml" || fail 'staging SearXNG image is not pinned'
+grep -Fq 'profiles: !reset []' "$staging_root/compose.yaml" || fail 'staging SearXNG profiles are not cleared'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_CONFIG_VOLUME' "$staging_root/compose.yaml" || fail 'staging SearXNG config volume is not isolated'
+grep -Fq 'searxng_secret' "$staging_root/compose.yaml" || fail 'staging SearXNG secret is not file-backed'
 grep -Fq 'musuw_paddle_validate_configuration' "$staging_root/app-entrypoint.sh" || fail 'staging entrypoint does not call generic Paddle validator'
 grep -Fq 'sandbox' "$staging_root/app-entrypoint.sh" || fail 'staging entrypoint does not select Paddle Sandbox'
 if grep -Fq 'musuw_paddle_validate_production_launch' "$staging_root/app-entrypoint.sh"; then
@@ -47,6 +54,8 @@ fi
 if grep -Fq 'integration/weknora-production/app-entrypoint.sh' "$script_dir/source-manifest.sh"; then
     fail 'staging source manifest carries an unused production app entrypoint'
 fi
+grep -Fq 'weknora/docker/searxng/settings.yml' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the SearXNG settings template'
+grep -Fq 'integration/weknora-production/searxng-entrypoint.sh' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the reused SearXNG entrypoint'
 if grep -Eiq 'tikhub_api_key|TIKHUB_API_KEY' "$staging_root/app-entrypoint.sh" "$staging_root/compose.yaml" "$script_dir/prepare-runtime.sh"; then
     fail 'staging runtime reads or mounts TikHub credentials'
 fi
@@ -54,13 +63,14 @@ grep -Fq 'staging-web' "$staging_root/compose.edge.yaml" || fail 'staging edge a
 grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'staging tunnel network is missing'
 grep -Fq 'HostConfig.Memory' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert memory limits'
 grep -Fq 'capacity-preflight.sh' "$script_dir/release-ci.sh" || fail 'staging release helper has no capacity preflight'
+grep -Fq 'searxng-init searxng app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/musuw-staging-static.XXXXXX")"
 trap 'find "$tmp_root" -depth -delete 2>/dev/null || true' EXIT
 runtime_dir="$tmp_root/runtime"
 secret_dir="$runtime_dir/secrets"
 mkdir -m 700 -p "$secret_dir"
-for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key; do
+for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret; do
     printf '%s\n' 'staging-static-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -80,6 +90,7 @@ WEKNORA_STAGING_POSTGRES_VOLUME=weknora-v072-staging-postgres-data
 WEKNORA_STAGING_FILES_VOLUME=weknora-v072-staging-data-files
 WEKNORA_STAGING_DOCREADER_TMP_VOLUME=weknora-v072-staging-docreader-tmp
 WEKNORA_STAGING_REDIS_VOLUME=weknora-v072-staging-redis-data
+WEKNORA_STAGING_SEARXNG_CONFIG_VOLUME=weknora-v072-staging-searxng-config
 MUSUW_STAGING_SECRET_DIR=$secret_dir
 MUSUW_STAGING_R2_ENDPOINT=https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com
 MUSUW_STAGING_R2_BUCKET=musuw-staging
@@ -183,7 +194,7 @@ WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir
     "$script_dir/compose.sh" --edge config --format json > "$edge_config_json"
 
 jq -e '
-    ([.services | keys[]] | sort) == ["app", "docreader", "frontend", "postgres", "redis"] and
+    ([.services | keys[]] | sort) == ["app", "docreader", "frontend", "postgres", "redis", "searxng", "searxng-init"] and
     ([.services[] | select(has("build"))] | length) == 0 and
     (.services.frontend.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$")) and
     (.services.app.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$")) and
@@ -198,7 +209,11 @@ jq -e '
     .services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-staging" and
     .services.app.environment.APP_EXTERNAL_URL == "https://staging.musuw.com" and
     .services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "https://staging.musuw.com" and
-    ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 5 and
+    (.services.searxng.image == "searxng/searxng@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e") and
+    (.services["searxng-init"].image == "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662") and
+    (.services.searxng.ports | length == 0) and
+    (.services.searxng.profiles | length == 0) and (.services["searxng-init"].profiles | length == 0) and
+    ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 7 and
     ([.services[].cpus | tonumber] | add) <= 1.5 and
     ([.services[].mem_limit | tonumber] | add) <= 1932735283
 ' "$config_json" >/dev/null || fail 'staging Compose topology/resource contract failed'
@@ -220,4 +235,4 @@ if grep -Eq '^VITE_' "$runtime_dir/auth-public.env"; then
     fail 'staging auth public env retains build-time VITE aliases'
 fi
 
-printf '%s\n' 'staging static contract green: five-service native stack, isolated resources, Sandbox selector, immutable images, edge alias, metadata-only secrets'
+printf '%s\n' 'staging static contract green: six-service native stack plus init, SearXNG health/search contract, isolated resources, Sandbox selector, immutable images, edge alias, metadata-only secrets'

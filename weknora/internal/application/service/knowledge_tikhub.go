@@ -13,12 +13,27 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
 	"github.com/Tencent/WeKnora/internal/infrastructure/tikhub"
+	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
 var errTikHubNotConfigured = errors.New("TikHub social import is not configured")
 var errSocialVideoNotAllowed = errors.New("current plan does not support social video import")
+
+func cleanupTikHubResolvedImages(ctx context.Context, fileSvc interfaces.FileService, images []docparser.StoredImage) {
+	if fileSvc == nil {
+		return
+	}
+	for _, image := range images {
+		if imagePath := strings.TrimSpace(image.ServingURL); imagePath != "" {
+			if deleteErr := fileSvc.DeleteFile(ctx, imagePath); deleteErr != nil {
+				logger.Warnf(ctx, "Failed to clean social image after source materialization failure, path: %s, error: %v", imagePath, deleteErr)
+			}
+		}
+	}
+}
 
 func socialImportFailureReason(err error) string {
 	switch {
@@ -107,6 +122,11 @@ func (s *knowledgeService) prepareTikHubArtifact(
 
 	var content []byte
 	var resolvedImages []docparser.StoredImage
+	// ResolveRemoteImages can persist image copies before the source artifact
+	// itself is admitted. Keep one compensation hook in scope for every
+	// post-resolution, pre-claim exit (empty content, size limit, storage
+	// lookup/save failure, and the source claim branches below).
+	cleanupResolvedImages := func() {}
 	switch result.Kind {
 	case tikhub.ResultDocument:
 		markdown := strings.TrimSpace(result.Markdown)
@@ -118,12 +138,16 @@ func (s *knowledgeService) prepareTikHubArtifact(
 			if fileSvc == nil {
 				return true, nil, errors.New("social artifact storage is not configured")
 			}
+			cleanupResolvedImages = func() {
+				cleanupTikHubResolvedImages(ctx, fileSvc, resolvedImages)
+			}
 			updated, images, _ := s.imageResolver.ResolveRemoteImages(ctx, markdown, fileSvc, payload.TenantID)
 			markdown = dropUnresolvedSocialImageLines(updated, result.ImageURLs)
 			resolvedImages = images
 		}
 		content = []byte(markdown)
 		if len(content) == 0 {
+			cleanupResolvedImages()
 			return true, nil, errors.New("TikHub document response contained no content")
 		}
 		result.FileType = "md"
@@ -148,37 +172,81 @@ func (s *knowledgeService) prepareTikHubArtifact(
 
 	maxBytes := secutils.GetMaxFileSize()
 	if int64(len(content)) > maxBytes {
+		cleanupResolvedImages()
 		return true, nil, fmt.Errorf("social artifact exceeds the configured %d MB upload limit", secutils.GetMaxFileSizeMB())
 	}
 	fileName := tikHubArtifactFileName(*route, result)
 	fileSvc := s.resolveFileService(ctx, kb)
 	if fileSvc == nil {
+		cleanupResolvedImages()
 		return true, nil, errors.New("social artifact storage is not configured")
 	}
 	// This file is the knowledge source and retry checkpoint, not scratch data.
 	filePath, err := fileSvc.SaveBytes(ctx, content, payload.TenantID, fileName, false)
 	if err != nil {
+		cleanupResolvedImages()
 		return true, nil, fmt.Errorf("failed to persist social artifact: %w", err)
 	}
 
-	payload.URL = ""
-	payload.FilePath = filePath
-	payload.FileName = fileName
-	payload.FileType = result.FileType
-	knowledge.FilePath = filePath
-	knowledge.FileName = fileName
-	knowledge.FileType = result.FileType
-	knowledge.FileSize = int64(len(content))
+	// Build a copy so a failed paired row/counter mutation cannot publish a
+	// path to an object that we immediately delete. The caller only receives
+	// the materialized payload after the database and tenant usage commit.
+	updatedKnowledge := new(types.Knowledge)
+	*updatedKnowledge = *knowledge
+	updatedKnowledge.FilePath = filePath
+	updatedKnowledge.FileName = fileName
+	updatedKnowledge.FileType = result.FileType
+	updatedKnowledge.FileSize = int64(len(content))
 	if strings.TrimSpace(result.Title) != "" && (strings.TrimSpace(knowledge.Title) == "" || knowledge.Title == knowledge.Source) {
-		knowledge.Title = strings.TrimSpace(result.Title)
+		updatedKnowledge.Title = strings.TrimSpace(result.Title)
 	}
 	if strings.TrimSpace(result.Description) != "" {
-		knowledge.Description = strings.TrimSpace(result.Description)
+		updatedKnowledge.Description = strings.TrimSpace(result.Description)
 	}
-	knowledge.UpdatedAt = time.Now()
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
-		_ = fileSvc.DeleteFile(ctx, filePath)
-		return true, nil, fmt.Errorf("failed to persist social artifact state: %w", err)
+	updatedKnowledge.UpdatedAt = time.Now()
+	tenantInfo, _ := types.TenantInfoFromContext(ctx)
+	storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+	currentKnowledge, claimed, claimErr := s.repo.ClaimKnowledgeSourceWithStorage(ctx, updatedKnowledge, storageQuota)
+	if claimErr != nil {
+		if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+			logger.Warnf(ctx, "Failed to clean social artifact after source claim failure, path: %s, error: %v", filePath, deleteErr)
+		}
+		cleanupResolvedImages()
+		return true, nil, fmt.Errorf("failed to persist social artifact state: %w", claimErr)
+	}
+	if currentKnowledge == nil {
+		if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+			logger.Warnf(ctx, "Failed to clean social artifact after empty source claim, path: %s, error: %v", filePath, deleteErr)
+		}
+		cleanupResolvedImages()
+		return true, nil, errors.New("social artifact source claim returned no knowledge")
+	}
+	if !claimed && filePath != currentKnowledge.FilePath {
+		if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+			logger.Warnf(ctx, "Failed to clean losing social artifact, path: %s, winner: %s, error: %v", filePath, currentKnowledge.FilePath, deleteErr)
+		}
+		cleanupResolvedImages()
+	}
+
+	*knowledge = *currentKnowledge
+	payload.URL = ""
+	payload.FilePath = currentKnowledge.FilePath
+	payload.FileName = currentKnowledge.FileName
+	payload.FileType = currentKnowledge.FileType
+	if currentKnowledge.ParseStatus == types.ParseStatusCancelled || currentKnowledge.ParseStatus == types.ParseStatusDeleting {
+		// The source claim is durable and already accounted. Stop this stale
+		// worker before it can send the winner through conversion/indexing; the
+		// cancellation/deletion lifecycle owns the persisted row from here. The
+		// source artifact is retained for that lifecycle, while image copies have
+		// no chunk ImageInfo yet and must be released now.
+		cleanupResolvedImages()
+		return true, nil, nil
+	}
+	if !claimed {
+		// A losing worker's image copies are not part of the winner's source
+		// artifact. Returning them would enqueue multimodal work against objects
+		// that this worker just discarded (or that belong to another checkpoint).
+		return true, nil, nil
 	}
 	return true, resolvedImages, nil
 }

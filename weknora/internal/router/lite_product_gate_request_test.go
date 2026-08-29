@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +64,7 @@ func TestLiteChatRequestBlocked(t *testing.T) {
 		{name: "smart MCP mention", body: `{"query":"hello","agent_id":"builtin-smart-reasoning","mentioned_items":[{"type":"mcp","id":"mcp-1"}]}`, blocked: false},
 		{name: "MCP mention without agent reaches runtime", body: `{"query":"hello","mentioned_items":[{"type":"mcp","id":"mcp-1"}]}`, blocked: false},
 		{name: "skill mention", body: `{"query":"hello","mentioned_items":[{"type":"skill","id":"skill-1"}]}`, blocked: true},
-		{name: "web search override", body: `{"query":"hello","web_search_enabled":true}`, blocked: true},
+		{name: "enabled web search remains enabled", body: `{"query":"hello","web_search_enabled":true}`, blocked: false},
 		{name: "disabled web search", body: `{"query":"hello","web_search_enabled":false}`, blocked: false},
 		{name: "kb mention stays valid", body: `{"query":"hello","mentioned_items":[{"type":"kb","id":"kb-1"}]}`, blocked: false},
 		{name: "malformed json stays native validation", body: `{"query":`, blocked: false},
@@ -77,8 +78,19 @@ func TestLiteChatRequestBlocked(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read restored body: %v", err)
 			}
-			if string(gotBody) != tt.body {
-				t.Fatalf("request body was not restored: got %q want %q", string(gotBody), tt.body)
+			if tt.blocked || !json.Valid([]byte(tt.body)) {
+				if string(gotBody) != tt.body {
+					t.Fatalf("blocked/malformed request body changed: got %q want %q", string(gotBody), tt.body)
+				}
+				return
+			}
+			var rewritten map[string]json.RawMessage
+			if err := json.Unmarshal(gotBody, &rewritten); err != nil {
+				t.Fatalf("decode rewritten Lite chat body: %v", err)
+			}
+			var webSearchEnabled bool
+			if err := json.Unmarshal(rewritten["web_search_enabled"], &webSearchEnabled); err != nil || !webSearchEnabled {
+				t.Fatalf("Lite chat must force web_search_enabled=true, body=%s err=%v", gotBody, err)
 			}
 		})
 	}

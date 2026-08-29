@@ -15,7 +15,7 @@ test('Lite activation keeps MCP selections but removes hidden skills/tools', () 
 
   const liteSettings = reconcileLiteChatSettings(standardSettings)
 
-  assert.equal(liteSettings.webSearchEnabled, false)
+  assert.equal(liteSettings.webSearchEnabled, true)
   assert.deepEqual(liteSettings.selectedMCPServices, ['mcp-1'])
   assert.deepEqual(liteSettings.selectedSkills, [])
   assert.deepEqual(liteSettings.selectedTools, [])

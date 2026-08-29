@@ -51,12 +51,17 @@ for container in \
     weknora-v072-staging-redis \
     weknora-v072-staging-docreader \
     weknora-v072-staging-app \
-    weknora-v072-staging-frontend; do
+    weknora-v072-staging-frontend \
+    weknora-v072-staging-searxng-init \
+    weknora-v072-staging-searxng; do
     docker inspect "$container" >/dev/null 2>&1 || fail "staging container is missing: $container"
     project="$(docker inspect "$container" --format '{{index .Config.Labels "com.docker.compose.project"}}')"
     [ "$project" = weknora-v072-staging ] || fail "staging container has the wrong Compose project: $container"
 done
 wait_for_healthy weknora-v072-staging-postgres
+init_state="$(docker inspect weknora-v072-staging-searxng-init --format '{{.State.Status}}|{{.State.ExitCode}}' 2>/dev/null || true)"
+[ "$init_state" = 'exited|0' ] || fail 'staging SearXNG init did not complete successfully'
+wait_for_healthy weknora-v072-staging-searxng
 wait_for_healthy weknora-v072-staging-app
 wait_for_healthy weknora-v072-staging-frontend
 
@@ -77,7 +82,9 @@ for container in \
     weknora-v072-staging-redis \
     weknora-v072-staging-docreader \
     weknora-v072-staging-app \
-    weknora-v072-staging-frontend; do
+    weknora-v072-staging-frontend \
+    weknora-v072-staging-searxng-init \
+    weknora-v072-staging-searxng; do
     assert_resource_limits "$container"
 done
 
@@ -91,7 +98,12 @@ for container in weknora-v072-staging-app weknora-v072-staging-frontend; do
 done
 
 service_names="$(docker ps --filter label=com.docker.compose.project=weknora-v072-staging --format '{{.Names}}' | sort | tr '\n' ' ')"
-[ "$service_names" = 'weknora-v072-staging-app weknora-v072-staging-docreader weknora-v072-staging-frontend weknora-v072-staging-postgres weknora-v072-staging-redis ' ] || fail 'staging started services are not the five-service native stack'
+[ "$service_names" = 'weknora-v072-staging-app weknora-v072-staging-docreader weknora-v072-staging-frontend weknora-v072-staging-postgres weknora-v072-staging-redis weknora-v072-staging-searxng ' ] || fail 'staging started services are not the six-service native stack plus init'
+
+searxng_port_bindings="$(docker inspect weknora-v072-staging-searxng --format '{{json .HostConfig.PortBindings}}' 2>/dev/null || true)"
+[ "$searxng_port_bindings" = '{}' ] || [ "$searxng_port_bindings" = 'null' ] || fail 'staging SearXNG exposes a host port'
+docker exec weknora-v072-staging-searxng python3 -c 'import json,urllib.request; response=urllib.request.urlopen("http://127.0.0.1:8080/search?q=musuw-staging-health&format=json", timeout=5); assert response.status == 200; assert isinstance(json.loads(response.read()).get("results"), list)' ||
+    fail 'staging SearXNG search probe failed'
 
 app_env="$(docker inspect weknora-v072-staging-app --format '{{range .Config.Env}}{{println .}}{{end}}')"
 frontend_env="$(docker inspect weknora-v072-staging-frontend --format '{{range .Config.Env}}{{println .}}{{end}}')"
@@ -148,9 +160,10 @@ for volume in \
     weknora-v072-staging-postgres-data \
     weknora-v072-staging-data-files \
     weknora-v072-staging-docreader-tmp \
-    weknora-v072-staging-redis-data; do
+    weknora-v072-staging-redis-data \
+    weknora-v072-staging-searxng-config; do
     docker volume inspect "$volume" >/dev/null 2>&1 || fail "staging volume is missing: $volume"
 done
 docker network inspect weknora-v072-staging-internal >/dev/null 2>&1 || fail 'staging internal network is missing'
 
-printf '%s\n' 'staging deployed green: five-service health, noindex, Sandbox public config, isolated volumes/network, same digest release record'
+printf '%s\n' 'staging deployed green: six-service health plus init, SearXNG search, noindex, Sandbox public config, isolated volumes/network, same digest release record'

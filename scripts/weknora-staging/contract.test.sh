@@ -52,6 +52,11 @@ grep -Fq 'MUSUW_PADDLE_ENVIRONMENT: sandbox' "$staging_root/compose.yaml" || fai
 grep -Fq 'OPENROUTER_WORKSPACE_ID: ${OPENROUTER_WORKSPACE_ID:?set OPENROUTER_WORKSPACE_ID}' "$staging_root/compose.yaml" || fail 'staging OpenRouter workspace is not required'
 grep -Fq 'OPENROUTER_WORKSPACE_ID=00000000-0000-4000-8000-000000000001' "$staging_root/staging.env.example" || fail 'staging OpenRouter workspace fixture is missing'
 grep -Fq 'openrouter-workspace-id' "$script_dir/prepare-runtime.sh" || fail 'staging OpenRouter workspace is not pinned by the server runtime'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_CONFIG_VOLUME=weknora-v072-staging-searxng-config' "$staging_root/staging.env.example" || fail 'staging SearXNG config volume fixture is missing'
+grep -Fq 'image: busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662' "$staging_root/compose.yaml" || fail 'staging SearXNG init image is not pinned'
+grep -Fq 'image: searxng/searxng@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e' "$staging_root/compose.yaml" || fail 'staging SearXNG image is not pinned'
+grep -Fq 'profiles: !reset []' "$staging_root/compose.yaml" || fail 'staging SearXNG profiles are not cleared'
+grep -Fq 'python3' "$staging_root/compose.yaml" || fail 'staging SearXNG health probe is missing'
 grep -Fq 'MUSUW_STAGING_R2_BUCKET=musuw-staging' "$staging_root/staging.env.example" || fail 'staging R2 bucket is not the commissioned bucket'
 grep -Fq 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' "$staging_root/auth-public.env.example" || fail 'staging Supabase project is not the commissioned test project'
 if grep -Fq '/opt/weknora-production/app-entrypoint.sh' "$staging_root/compose.yaml"; then
@@ -60,11 +65,14 @@ fi
 if grep -Fq 'integration/weknora-production/app-entrypoint.sh' "$script_dir/source-manifest.sh"; then
     fail 'staging source manifest carries an unused production app entrypoint'
 fi
+grep -Fq 'weknora/docker/searxng/settings.yml' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the SearXNG settings template'
+grep -Fq 'integration/weknora-production/searxng-entrypoint.sh' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the reused SearXNG entrypoint'
 grep -Fq 'S3_BUCKET_NAME: ${MUSUW_STAGING_R2_BUCKET:?set MUSUW_STAGING_R2_BUCKET}' "$staging_root/compose.yaml" || fail 'staging R2 bucket is not runtime-selected'
 grep -Fq 'WEKNORA_REDIS_NAMESPACE: weknora-v072-staging' "$staging_root/compose.yaml" || fail 'staging Redis namespace is not isolated'
 grep -Fq 'NEO4J_ENABLE: "false"' "$staging_root/compose.yaml" || fail 'staging must disable Neo4j'
 grep -Fq 'MUSUW_STAGING_SECRET_DIR' "$staging_root/compose.yaml" || fail 'staging secret root is not explicit'
 grep -Fq '/opt/weknora/staging-runtime/secrets' "$staging_root/compose.yaml" || fail 'staging secret root is not the fixed server path'
+grep -Fq 'file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/searxng_secret' "$staging_root/compose.yaml" || fail 'staging SearXNG secret is not file-backed'
 grep -Fq 'image: ${WEKNORA_STAGING_APP_IMAGE:?set WEKNORA_STAGING_APP_IMAGE}' "$staging_root/compose.yaml" || fail 'staging app image is not immutable input'
 grep -Fq 'image: ${WEKNORA_STAGING_FRONTEND_IMAGE:?set WEKNORA_STAGING_FRONTEND_IMAGE}' "$staging_root/compose.yaml" || fail 'staging frontend image is not immutable input'
 grep -Fq 'musuw_paddle_validate_configuration' "$staging_root/app-entrypoint.sh" || fail 'staging entrypoint does not call generic Paddle validator'
@@ -80,24 +88,33 @@ if grep -Eq '^\s+build:' "$staging_root/compose.yaml" &&
     fail 'staging overlay still permits a server-side build'
 fi
 
-for service in frontend app postgres redis docreader; do
+for service in frontend app postgres redis docreader searxng-init searxng; do
     grep -A160 -E "^  ${service}:" "$staging_root/compose.yaml" | grep -Eq 'cpus:|mem_limit:|pids_limit:' ||
         fail "staging ${service} does not declare CPU/memory/pids limits"
 done
-grep -Fq 'WEKNORA_STAGING_APP_CPUS:-0.75' "$staging_root/compose.yaml" || fail 'staging app CPU default is too high or missing'
-grep -Fq 'WEKNORA_STAGING_APP_MEMORY:-768m' "$staging_root/compose.yaml" || fail 'staging app memory default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_APP_CPUS:-0.625' "$staging_root/compose.yaml" || fail 'staging app CPU default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_APP_MEMORY:-704m' "$staging_root/compose.yaml" || fail 'staging app memory default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_FRONTEND_CPUS:-0.125' "$staging_root/compose.yaml" || fail 'staging frontend CPU default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_FRONTEND_MEMORY:-128m' "$staging_root/compose.yaml" || fail 'staging frontend memory default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_DOCREADER_CPUS:-0.25' "$staging_root/compose.yaml" || fail 'staging docreader CPU default is too high or missing'
-grep -Fq 'WEKNORA_STAGING_DOCREADER_MEMORY:-384m' "$staging_root/compose.yaml" || fail 'staging docreader memory default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_DOCREADER_MEMORY:-320m' "$staging_root/compose.yaml" || fail 'staging docreader memory default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_POSTGRES_CPUS:-0.25' "$staging_root/compose.yaml" || fail 'staging postgres CPU default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_POSTGRES_MEMORY:-384m' "$staging_root/compose.yaml" || fail 'staging postgres memory default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_REDIS_CPUS:-0.125' "$staging_root/compose.yaml" || fail 'staging Redis CPU default is too high or missing'
 grep -Fq 'WEKNORA_STAGING_REDIS_MEMORY:-128m' "$staging_root/compose.yaml" || fail 'staging Redis memory default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_INIT_CPUS:-0.025' "$staging_root/compose.yaml" || fail 'staging SearXNG init CPU default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_INIT_MEMORY:-32m' "$staging_root/compose.yaml" || fail 'staging SearXNG init memory default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_INIT_PIDS:-32' "$staging_root/compose.yaml" || fail 'staging SearXNG init PID default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_CPUS:-0.1' "$staging_root/compose.yaml" || fail 'staging SearXNG CPU default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_MEMORY:-128m' "$staging_root/compose.yaml" || fail 'staging SearXNG memory default is too high or missing'
+grep -Fq 'WEKNORA_STAGING_SEARXNG_PIDS:-64' "$staging_root/compose.yaml" || fail 'staging SearXNG PID default is too high or missing'
 
 grep -Fq 'staging-web' "$staging_root/compose.edge.yaml" || fail 'staging edge alias is missing'
 grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'staging edge network is not the existing tunnel network'
 grep -Fq 'noindex' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not enforce noindex'
+grep -Fq 'staging-searxng' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert SearXNG topology'
+grep -Fq '/search?q=musuw-staging-health' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not probe SearXNG search'
+grep -Fq 'searxng-init searxng app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
 
 for fixed in \
     '/var/lib/musuw-staging-deploy' \

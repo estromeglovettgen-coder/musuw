@@ -39,3 +39,14 @@ The create and edit dialogs, cards, overflow menu, fields, helper text, and acti
 #### Scenario: Edit a knowledge base in dark mode
 - **WHEN** the application is in dark mode and a user opens knowledge-base settings
 - **THEN** the dialog loads successfully and every visible control has readable text, boundaries, focus, hover, disabled, and selected states
+
+### Requirement: FAQ generation is unavailable in Lite
+The system SHALL hide FAQ knowledge bases from the Lite consumer surface and SHALL reject native FAQ creation, mutation, copy, and duplicate attempts server-side while preserving Standard WeKnora behavior.
+
+#### Scenario: Crafted Lite FAQ request
+- **WHEN** a Lite client calls a native FAQ write route or creates, copies, or duplicates a FAQ knowledge base
+- **THEN** the server rejects it without creating or changing FAQ content
+
+#### Scenario: Historical FAQ cleanup
+- **WHEN** a tenant has FAQ data created before the Lite restriction
+- **THEN** read/search and deletion remain available for inspection and cleanup while it stays absent from the Lite list and manager UI

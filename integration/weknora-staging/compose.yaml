@@ -154,11 +154,13 @@ services:
         condition: service_healthy
       docreader:
         condition: service_healthy
+      searxng:
+        condition: service_healthy
     networks: !override
       WeKnora-network: {}
     restart: unless-stopped
-    cpus: ${WEKNORA_STAGING_APP_CPUS:-0.75}
-    mem_limit: ${WEKNORA_STAGING_APP_MEMORY:-768m}
+    cpus: ${WEKNORA_STAGING_APP_CPUS:-0.625}
+    mem_limit: ${WEKNORA_STAGING_APP_MEMORY:-704m}
     pids_limit: ${WEKNORA_STAGING_APP_PIDS:-256}
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -180,7 +182,7 @@ services:
       WeKnora-network: {}
     restart: unless-stopped
     cpus: ${WEKNORA_STAGING_DOCREADER_CPUS:-0.25}
-    mem_limit: ${WEKNORA_STAGING_DOCREADER_MEMORY:-384m}
+    mem_limit: ${WEKNORA_STAGING_DOCREADER_MEMORY:-320m}
     pids_limit: ${WEKNORA_STAGING_DOCREADER_PIDS:-128}
 
   postgres:
@@ -231,6 +233,62 @@ services:
     mem_limit: ${WEKNORA_STAGING_REDIS_MEMORY:-128m}
     pids_limit: ${WEKNORA_STAGING_REDIS_PIDS:-128}
 
+  searxng-init:
+    platform: linux/amd64
+    image: busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    container_name: weknora-v072-staging-searxng-init
+    command: ["sh", "-c", "cp /template/settings.yml /etc/searxng/settings.yml && chmod 0644 /etc/searxng/settings.yml"]
+    volumes: !override
+      - ../weknora/docker/searxng/settings.yml:/template/settings.yml:ro
+      - searxng_config:/etc/searxng
+    restart: "no"
+    networks: !override
+      WeKnora-network: {}
+    profiles: !reset []
+    cpus: ${WEKNORA_STAGING_SEARXNG_INIT_CPUS:-0.025}
+    mem_limit: ${WEKNORA_STAGING_SEARXNG_INIT_MEMORY:-32m}
+    pids_limit: ${WEKNORA_STAGING_SEARXNG_INIT_PIDS:-32}
+
+  searxng:
+    platform: linux/amd64
+    image: searxng/searxng@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e
+    container_name: weknora-v072-staging-searxng
+    ports: !override []
+    volumes: !override
+      - searxng_config:/etc/searxng
+      - ../integration/weknora-production/searxng-entrypoint.sh:/opt/weknora-staging/searxng-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/opt/weknora-staging/searxng-entrypoint.sh"]
+    command: []
+    environment: !override
+      SEARXNG_BASE_URL: http://searxng:8080/
+      INSTANCE_NAME: weknora-v072-staging-searxng
+    secrets:
+      - source: searxng_secret
+        target: searxng_secret
+        mode: 0400
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+    depends_on: !override
+      searxng-init:
+        condition: service_completed_successfully
+    networks: !override
+      WeKnora-network: {}
+    profiles: !reset []
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3); assert response.status == 200"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    cpus: ${WEKNORA_STAGING_SEARXNG_CPUS:-0.1}
+    mem_limit: ${WEKNORA_STAGING_SEARXNG_MEMORY:-128m}
+    pids_limit: ${WEKNORA_STAGING_SEARXNG_PIDS:-64}
+
 networks:
   WeKnora-network:
     name: weknora-v072-staging-internal
@@ -249,6 +307,8 @@ volumes:
   redis-data:
     external: true
     name: ${WEKNORA_STAGING_REDIS_VOLUME:?set WEKNORA_STAGING_REDIS_VOLUME}
+  searxng_config:
+    name: ${WEKNORA_STAGING_SEARXNG_CONFIG_VOLUME:?set WEKNORA_STAGING_SEARXNG_CONFIG_VOLUME}
 
 secrets:
   # On Tokyo MUSUW_STAGING_SECRET_DIR is fixed to
@@ -277,3 +337,5 @@ secrets:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/r2_access_key_id
   r2_secret_access_key:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/r2_secret_access_key
+  searxng_secret:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/searxng_secret

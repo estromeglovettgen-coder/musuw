@@ -37,6 +37,7 @@ func (s *knowledgeService) cloneKnowledge(
 		return nil
 	}
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
+	storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
 	dst := &types.Knowledge{
 		ID:               uuid.New().String(),
 		TenantID:         targetKB.TenantID,
@@ -64,6 +65,7 @@ func (s *knowledgeService) cloneKnowledge(
 	// deleting the source knowledge would destroy the clone's file too. The new
 	// object is tracked for cleanup if the clone fails downstream.
 	var copiedFilePaths []string
+	created := false
 	if src.FilePath != "" {
 		srcKB, kbErr := s.kbService.GetKnowledgeBaseByID(ctx, src.KnowledgeBaseID)
 		if kbErr != nil {
@@ -80,31 +82,86 @@ func (s *knowledgeService) cloneKnowledge(
 	}
 
 	defer func() {
-		if err != nil {
-			if len(copiedFilePaths) > 0 {
-				cleanupCopiedObjects(ctx, s.resolveFileService(ctx, targetKB), copiedFilePaths)
-			}
-			dst.ParseStatus = "failed"
-			dst.ErrorMessage = err.Error()
-			_ = s.repo.UpdateKnowledge(ctx, dst)
-			logger.GetLogger(ctx).WithField("error", err).Errorf("MoveKnowledge failed to move knowledge")
-		} else {
+		if err == nil {
 			dst.ParseStatus = "completed"
 			dst.EnableStatus = "enabled"
-			_ = s.repo.UpdateKnowledge(ctx, dst)
+			if updateErr := s.repo.UpdateKnowledgeWithStorage(ctx, dst, storageQuota); updateErr != nil {
+				logger.GetLogger(ctx).WithField("error", updateErr).
+					Errorf("MoveKnowledge failed to finalize cloned knowledge")
+				err = updateErr
+			}
+		}
+		if err != nil {
+			if created {
+				// A clone owns a complete source + index contribution. Clean the
+				// external index, chunks, and copied objects before deleting the row;
+				// if any cleanup cannot be completed, retain a failed row with its
+				// full counter contribution so a retry/manual repair is possible.
+				var cleanupErr error
+				if s.retrieveEngine == nil || s.modelService == nil {
+					cleanupErr = errors.New("clone index cleanup dependencies are unavailable")
+				} else {
+					cleanupEngine, engineErr := retriever.CreateRetrieveEngineForKB(
+						ctx, s.retrieveEngine, s.ownership, dst.TenantID, targetKB.VectorStoreID,
+					)
+					if engineErr != nil {
+						cleanupErr = engineErr
+					} else {
+						cleanupModel, modelErr := s.modelService.GetEmbeddingModel(ctx, dst.EmbeddingModelID)
+						if modelErr != nil {
+							cleanupErr = modelErr
+						} else {
+							cleanupErr = cleanupEngine.DeleteByKnowledgeIDList(
+								ctx, []string{dst.ID}, cleanupModel.GetDimensions(), dst.Type,
+							)
+						}
+					}
+				}
+				if cleanupErr == nil {
+					if s.chunkService == nil {
+						cleanupErr = errors.New("clone chunk cleanup service is unavailable")
+					} else {
+						cleanupErr = s.chunkService.DeleteChunksByKnowledgeID(ctx, dst.ID)
+					}
+				}
+				if cleanupErr == nil {
+					cleanupErr = cleanupCopiedObjectsWithError(
+						ctx, s.resolveFileService(ctx, targetKB), copiedFilePaths,
+					)
+				}
+				if cleanupErr == nil {
+					// Only after every owned external artifact is gone may the
+					// paired delete release the tenant contribution.
+					if deleteErr := s.repo.DeleteKnowledgeWithStorage(ctx, dst.TenantID, dst.ID); deleteErr != nil {
+						cleanupErr = deleteErr
+					}
+				}
+				if cleanupErr != nil {
+					dst.ParseStatus = types.ParseStatusFailed
+					dst.ErrorMessage = err.Error()
+					dst.UpdatedAt = time.Now()
+					if markErr := s.repo.UpdateKnowledgeWithStorage(ctx, dst, storageQuota); markErr != nil {
+						logger.GetLogger(ctx).WithField("error", markErr).
+							Errorf("MoveKnowledge failed to retain failed clone row")
+					}
+					logger.GetLogger(ctx).WithField("error", cleanupErr).
+						Warnf("MoveKnowledge cleanup incomplete; retaining failed cloned knowledge")
+				}
+			} else if len(copiedFilePaths) > 0 {
+				// No destination row exists, so best-effort object cleanup is safe.
+				cleanupCopiedObjects(ctx, s.resolveFileService(ctx, targetKB), copiedFilePaths)
+			}
+			logger.GetLogger(ctx).WithField("error", err).Errorf("MoveKnowledge failed to move knowledge")
+		} else {
 			logger.GetLogger(ctx).WithField("knowledge_id", dst.ID).Infof("MoveKnowledge move knowledge successfully")
 		}
 	}()
 
-	if err = s.repo.CreateKnowledge(ctx, dst); err != nil {
+	if err = s.repo.CreateKnowledgeWithStorage(ctx, dst, storageQuota); err != nil {
 		logger.GetLogger(ctx).WithField("error", err).Errorf("MoveKnowledge create knowledge failed")
 		return
 	}
-	tenantInfo.StorageUsed += dst.StorageSize
-	if err = s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, dst.StorageSize); err != nil {
-		logger.GetLogger(ctx).WithField("error", err).Errorf("MoveKnowledge update tenant storage used failed")
-		return
-	}
+	created = true
 	if err = s.CloneChunk(ctx, src, dst); err != nil {
 		logger.GetLogger(ctx).WithField("knowledge_id", dst.ID).
 			WithField("error", err).Errorf("MoveKnowledge move chunks failed")
@@ -288,11 +345,47 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 		ctx, s.retrieveEngine, s.ownership, tenantInfo.ID, kb.VectorStoreID)
 	if err == nil && embeddingModel != nil {
 		if err := retrieveEngine.DeleteByKnowledgeIDList(ctx, []string{knowledge.ID}, embeddingModel.GetDimensions(), knowledge.Type); err != nil {
-			logger.Warnf(ctx, "Failed to delete existing index data (may not exist): %v", err)
-			// 不返回错误，继续处理（可能没有旧数据）
+			knowledge.ParseStatus = types.ParseStatusFailed
+			knowledge.ErrorMessage = err.Error()
+			knowledge.UpdatedAt = time.Now()
+			// The old index may be only partially removed. Keep its persisted
+			// StorageSize/counter contribution until a retry can finish cleanup;
+			// starting a new indexing attempt here would create an unaccounted
+			// external state.
+			_ = s.repo.UpdateKnowledge(ctx, knowledge)
+			logger.Warnf(ctx, "Failed to delete existing index data; deferring processing for retry: %v", err)
+			return
 		} else {
 			logger.Infof(ctx, "Successfully deleted existing index data for knowledge: %s", knowledge.ID)
 		}
+		// Reparse replaces only derived index bytes. Release the persisted
+		// StorageSize immediately after the old external index is gone so a
+		// later quota rejection cannot leave the tenant counter charged for
+		// data that no longer exists. FileSize remains untouched and counted.
+		if knowledge.StorageSize != 0 {
+			oldStorageSize := knowledge.StorageSize
+			knowledge.StorageSize = 0
+			storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+			if resetErr := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, storageQuota); resetErr != nil {
+				knowledge.StorageSize = oldStorageSize
+				knowledge.ParseStatus = types.ParseStatusFailed
+				knowledge.ErrorMessage = resetErr.Error()
+				knowledge.UpdatedAt = time.Now()
+				// The paired helper rolled back the row/counter mutation. Persist
+				// only the terminal status while retaining the old contribution;
+				// the next retry will attempt the reset again.
+				_ = s.repo.UpdateKnowledge(ctx, knowledge)
+				logger.Warnf(ctx, "Failed to release existing index storage; deferring processing for retry: %v", resetErr)
+				return
+			}
+		}
+	} else if embeddingModel != nil {
+		knowledge.ParseStatus = types.ParseStatusFailed
+		knowledge.ErrorMessage = err.Error()
+		knowledge.UpdatedAt = time.Now()
+		_ = s.repo.UpdateKnowledge(ctx, knowledge)
+		logger.Warnf(ctx, "Failed to initialize retrieve engine; deferring processing for retry: %v", err)
+		return
 	}
 
 	// 删除知识图谱数据（如果存在）
@@ -532,26 +625,13 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 			})
 		}
 
-		// Calculate storage size required for embeddings
+		// Calculate storage size required for embeddings. Quota admission is
+		// deliberately deferred to UpdateKnowledgeWithStorage below, where the
+		// repository serializes the tenant row and applies the replacement delta
+		// atomically. This avoids overflow-prone prechecks and TOCTOU races.
 		totalStorageSize = retrieveEngine.EstimateStorageSize(ctx, embeddingModel, indexInfoList)
-		if effectiveStorageQuota(tenantInfo, time.Now().UTC()) > 0 {
-			// Re-fetch tenant storage information
-			tenantInfo, err = s.tenantRepo.GetTenantByID(ctx, tenantInfo.ID)
-			if err != nil {
-				knowledge.ParseStatus = types.ParseStatusFailed
-				knowledge.ErrorMessage = err.Error()
-				knowledge.UpdatedAt = time.Now()
-				s.repo.UpdateKnowledge(ctx, knowledge)
-				return
-			}
-			// Check if there's enough storage quota available
-			if tenantInfo.StorageUsed+totalStorageSize > effectiveStorageQuota(tenantInfo, time.Now().UTC()) {
-				knowledge.ParseStatus = types.ParseStatusFailed
-				knowledge.ErrorMessage = "存储空间不足"
-				knowledge.UpdatedAt = time.Now()
-				s.repo.UpdateKnowledge(ctx, knowledge)
-				return
-			}
+		if totalStorageSize < 0 {
+			totalStorageSize = 0
 		}
 
 		// Check again before batch indexing (heavy operation).
@@ -630,6 +710,7 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 	pendingMultimodal := isImage && options.EnableMultimodel && len(options.StoredImages) > 0
 	pendingPDFMultimodal := !isImage && !isVideo && options.EnableMultimodel && len(options.StoredImages) > 0
 
+	oldStorageSize := knowledge.StorageSize
 	now := time.Now()
 	finalizeIndexedKnowledgeState(
 		knowledge,
@@ -639,10 +720,57 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 		now,
 	)
 
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
-		logger.GetLogger(ctx).WithField("error", err).Errorf("processChunks update knowledge failed")
+	storageQuota := effectiveStorageQuota(tenantInfo, now.UTC())
+	if err := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, storageQuota); err != nil {
+		// The external index/chunks have already been written. If the paired
+		// row/counter mutation is rejected (usually a concurrent quota race),
+		// remove only this attempt's external state. A whole-knowledge delete
+		// could erase a newer concurrent retry's chunks and vectors.
+		chunkIDs := make([]string, 0, len(insertChunks))
+		for _, chunk := range insertChunks {
+			if chunk != nil && chunk.ID != "" {
+				chunkIDs = append(chunkIDs, chunk.ID)
+			}
+		}
+		if len(chunkIDs) > 0 {
+			if cleanupErr := s.chunkService.DeleteChunks(ctx, chunkIDs); cleanupErr != nil {
+				logger.GetLogger(ctx).WithField("error", cleanupErr).
+					Warnf("processChunks failed to cleanup chunks after storage mutation failure")
+			}
+		}
+		if retrieveEngine != nil && embeddingModel != nil && len(textChunks) > 0 {
+			indexedChunkIDs := make([]string, 0, len(textChunks))
+			for _, chunk := range textChunks {
+				if chunk != nil && chunk.ID != "" {
+					indexedChunkIDs = append(indexedChunkIDs, chunk.ID)
+				}
+			}
+			if len(indexedChunkIDs) > 0 {
+				if cleanupErr := retrieveEngine.DeleteByChunkIDList(
+					ctx, indexedChunkIDs, embeddingModel.GetDimensions(), kb.Type,
+				); cleanupErr != nil {
+					logger.GetLogger(ctx).WithField("error", cleanupErr).
+						Warnf("processChunks failed to cleanup index after storage mutation failure")
+				}
+			}
+		}
+		if marked, markErr := s.repo.UpdateKnowledgeStorageFailureIfCurrent(
+			ctx, knowledge.TenantID, knowledge.ID, oldStorageSize, err.Error(),
+		); markErr != nil {
+			logger.GetLogger(ctx).WithField("error", markErr).
+				Errorf("processChunks failed to mark storage mutation failure")
+		} else if marked {
+			// Keep the in-memory object aligned with the conditional row update.
+			// This does not issue another persistence call, so a stale worker can
+			// never overwrite a concurrent successful row.
+			knowledge.StorageSize = oldStorageSize
+			knowledge.ParseStatus = types.ParseStatusFailed
+			knowledge.ErrorMessage = err.Error()
+		} else if !marked {
+			logger.Infof(ctx, "processChunks storage mutation failure superseded for knowledge %s", knowledge.ID)
+		}
+		return
 	}
-
 	// Enqueue multimodal tasks for images (async, non-blocking)
 	if options.EnableMultimodel && len(options.StoredImages) > 0 {
 		s.beginStage(ctx, knowledge.ID, types.StageMultimodal, types.JSONMap{
@@ -677,11 +805,6 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 		}
 	}
 
-	// Update tenant's storage usage
-	tenantInfo.StorageUsed += totalStorageSize
-	if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, totalStorageSize); err != nil {
-		logger.GetLogger(ctx).WithField("error", err).Errorf("processChunks update tenant storage used failed")
-	}
 	logger.GetLogger(ctx).Infof("processChunks successfully")
 }
 
@@ -3291,6 +3414,15 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 			_ = s.repo.UpdateKnowledge(ctx, knowledge)
 			return nil
 		}
+		if handled && (knowledge.ParseStatus == types.ParseStatusCancelled || knowledge.ParseStatus == types.ParseStatusDeleting) {
+			// prepareTikHubArtifact may have won source materialization just as a
+			// cancellation/deletion became visible. Keep that durable source and
+			// its accounting, but do not let this stale worker continue into
+			// conversion or indexing.
+			logger.Infof(ctx, "Knowledge aborted (%s) after TikHub source claim, skipping processing: %s",
+				knowledge.ParseStatus, knowledge.ID)
+			return nil
+		}
 	}
 
 	// 检查多模态配置（仅对文件导入）
@@ -3330,62 +3462,133 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 	var chunks []types.ParsedChunk
 
 	if payload.FileURL != "" {
-		// file_url import: SSRF re-check (防 DNS 重绑定), download, persist, then delegate to convert()
-		if err := secutils.ValidateURLForSSRF(payload.FileURL); err != nil {
-			logger.Errorf(ctx, "File URL rejected for SSRF protection in ProcessDocument: %s, err: %v", payload.FileURL, err)
-			knowledge.ParseStatus = "failed"
-			knowledge.ErrorMessage = "File URL is not allowed for security reasons"
-			knowledge.UpdatedAt = time.Now()
-			s.repo.UpdateKnowledge(ctx, knowledge)
-			return nil
-		}
-
-		resolvedFileName := payload.FileName
-		resolvedFileType := payload.FileType
-		contentBytes, err := downloadFileFromURL(ctx, payload.FileURL, &resolvedFileName, &resolvedFileType)
-		if err != nil {
-			logger.Errorf(ctx, "Failed to download file from URL: %s, error: %v", payload.FileURL, err)
-			if isLastRetry {
+		// file_url import: re-check SSRF, then materialize the remote bytes once
+		// as an owned durable source. Retries and reparses reuse the persisted
+		// path, so a provider download can never charge storage twice.
+		if strings.TrimSpace(knowledge.FilePath) != "" {
+			payload.FileURL = ""
+			payload.FilePath = knowledge.FilePath
+			if knowledge.FileName != "" {
+				payload.FileName = knowledge.FileName
+			}
+			if knowledge.FileType != "" {
+				payload.FileType = knowledge.FileType
+			}
+		} else {
+			if err := secutils.ValidateURLForSSRF(payload.FileURL); err != nil {
+				logger.Errorf(ctx, "File URL rejected for SSRF protection in ProcessDocument: %s, err: %v", payload.FileURL, err)
 				knowledge.ParseStatus = "failed"
-				knowledge.ErrorMessage = err.Error()
+				knowledge.ErrorMessage = "File URL is not allowed for security reasons"
 				knowledge.UpdatedAt = time.Now()
 				s.repo.UpdateKnowledge(ctx, knowledge)
+				return nil
 			}
-			return fmt.Errorf("failed to download file from URL: %w", err)
-		}
 
-		if resolvedFileType != "" && !isSupportedImportExtension(resolvedFileType) {
-			logger.Errorf(ctx, "Unsupported file type resolved from file URL: %s", resolvedFileType)
-			knowledge.ParseStatus = "failed"
-			knowledge.ErrorMessage = fmt.Sprintf("unsupported file type: %s", resolvedFileType)
-			knowledge.UpdatedAt = time.Now()
-			s.repo.UpdateKnowledge(ctx, knowledge)
-			return nil
-		}
+			resolvedFileName := payload.FileName
+			resolvedFileType := payload.FileType
+			contentBytes, err := downloadFileFromURL(ctx, payload.FileURL, &resolvedFileName, &resolvedFileType)
+			if err != nil {
+				logger.Errorf(ctx, "Failed to download file from URL: %s, error: %v", payload.FileURL, err)
+				if isLastRetry {
+					knowledge.ParseStatus = "failed"
+					knowledge.ErrorMessage = err.Error()
+					knowledge.UpdatedAt = time.Now()
+					s.repo.UpdateKnowledge(ctx, knowledge)
+				}
+				return fmt.Errorf("failed to download file from URL: %w", err)
+			}
 
-		if resolvedFileName != "" && knowledge.FileName == "" {
-			knowledge.FileName = resolvedFileName
-		}
-		if resolvedFileType != "" && knowledge.FileType == "" {
-			knowledge.FileType = resolvedFileType
-			s.repo.UpdateKnowledge(ctx, knowledge)
-		}
-
-		fileSvc := s.resolveFileService(ctx, kb)
-		filePath, err := fileSvc.SaveBytes(ctx, contentBytes, payload.TenantID, resolvedFileName, true)
-		if err != nil {
-			if isLastRetry {
+			if resolvedFileType != "" && !isSupportedImportExtension(resolvedFileType) {
+				logger.Errorf(ctx, "Unsupported file type resolved from file URL: %s", resolvedFileType)
 				knowledge.ParseStatus = "failed"
-				knowledge.ErrorMessage = err.Error()
+				knowledge.ErrorMessage = fmt.Sprintf("unsupported file type: %s", resolvedFileType)
 				knowledge.UpdatedAt = time.Now()
 				s.repo.UpdateKnowledge(ctx, knowledge)
+				return nil
 			}
-			return fmt.Errorf("failed to save downloaded file: %w", err)
-		}
 
-		payload.FilePath = filePath
-		payload.FileName = resolvedFileName
-		payload.FileType = resolvedFileType
+			fileSvc := s.resolveFileService(ctx, kb)
+			if fileSvc == nil {
+				err := errors.New("file URL storage is not configured")
+				if isLastRetry {
+					knowledge.ParseStatus = "failed"
+					knowledge.ErrorMessage = err.Error()
+					knowledge.UpdatedAt = time.Now()
+					s.repo.UpdateKnowledge(ctx, knowledge)
+				}
+				return err
+			}
+			filePath, err := fileSvc.SaveBytes(ctx, contentBytes, payload.TenantID, resolvedFileName, false)
+			if err != nil {
+				if isLastRetry {
+					knowledge.ParseStatus = "failed"
+					knowledge.ErrorMessage = err.Error()
+					knowledge.UpdatedAt = time.Now()
+					s.repo.UpdateKnowledge(ctx, knowledge)
+				}
+				return fmt.Errorf("failed to save downloaded file: %w", err)
+			}
+
+			proposedKnowledge := new(types.Knowledge)
+			*proposedKnowledge = *knowledge
+			if resolvedFileName != "" {
+				proposedKnowledge.FileName = resolvedFileName
+			}
+			if resolvedFileType != "" {
+				proposedKnowledge.FileType = resolvedFileType
+			}
+			proposedKnowledge.FilePath = filePath
+			proposedKnowledge.FileSize = int64(len(contentBytes))
+			proposedKnowledge.UpdatedAt = time.Now()
+			storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+			currentKnowledge, claimed, claimErr := s.repo.ClaimKnowledgeSourceWithStorage(ctx, proposedKnowledge, storageQuota)
+			if claimErr != nil {
+				if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+					logger.Warnf(ctx, "Failed to clean downloaded file after storage mutation failed, path: %s, error: %v", filePath, deleteErr)
+				}
+				if isLastRetry {
+					// Do not write the stale full row after another worker may have
+					// claimed the source (or a user may have cancelled/deleted it).
+					// Re-read first, then use the column-level status seam only while
+					// the row is still an unmaterialized active source.
+					if latest, latestErr := s.repo.GetKnowledgeByID(ctx, knowledge.TenantID, knowledge.ID); latestErr == nil && latest != nil &&
+						strings.TrimSpace(latest.FilePath) == "" &&
+						latest.ParseStatus != types.ParseStatusCancelled && latest.ParseStatus != types.ParseStatusDeleting {
+						_ = s.repo.UpdateKnowledgeColumns(ctx, knowledge.ID, map[string]interface{}{
+							"parse_status":  "failed",
+							"error_message": claimErr.Error(),
+							"updated_at":    time.Now(),
+						})
+					}
+				}
+				return fmt.Errorf("failed to persist downloaded file state: %w", claimErr)
+			}
+			if currentKnowledge == nil {
+				if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+					logger.Warnf(ctx, "Failed to clean downloaded file after empty source claim, path: %s, error: %v", filePath, deleteErr)
+				}
+				return errors.New("source claim returned no knowledge")
+			}
+			if !claimed && filePath != currentKnowledge.FilePath {
+				if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+					logger.Warnf(ctx, "Failed to clean losing downloaded file, path: %s, winner: %s, error: %v", filePath, currentKnowledge.FilePath, deleteErr)
+				}
+			}
+			*knowledge = *currentKnowledge
+
+			payload.FileURL = ""
+			payload.FilePath = currentKnowledge.FilePath
+			payload.FileName = currentKnowledge.FileName
+			payload.FileType = currentKnowledge.FileType
+			if currentKnowledge.ParseStatus == types.ParseStatusCancelled || currentKnowledge.ParseStatus == types.ParseStatusDeleting {
+				// Claim commits the source and its usage before returning the winner.
+				// A concurrent cancel/delete now owns the lifecycle; do not parse or
+				// index through this stale worker.
+				logger.Infof(ctx, "Knowledge aborted (%s) after direct source claim, skipping processing: %s",
+					currentKnowledge.ParseStatus, currentKnowledge.ID)
+				return nil
+			}
+		}
 		convertResult, err = s.convert(ctx, payload, kb, knowledge, eff, isLastRetry)
 		if err != nil {
 			return err

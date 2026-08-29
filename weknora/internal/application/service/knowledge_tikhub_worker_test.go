@@ -20,12 +20,61 @@ import (
 
 type tikHubWorkerRepoStub struct {
 	interfaces.KnowledgeRepository
-	updates int
+	updates              int
+	updatesWithStorage   int
+	updateStorageQuota   int64
+	updatedKnowledge     *types.Knowledge
+	updateWithStorageErr error
+	claimCalls           int
+	claimStorageQuota    int64
+	claimCurrent         *types.Knowledge
+	claimResult          bool
+	claimErr             error
 }
 
-func (r *tikHubWorkerRepoStub) UpdateKnowledge(_ context.Context, _ *types.Knowledge) error {
+func (r *tikHubWorkerRepoStub) UpdateKnowledge(_ context.Context, knowledge *types.Knowledge) error {
 	r.updates++
+	if knowledge != nil {
+		copy := *knowledge
+		r.updatedKnowledge = &copy
+	}
 	return nil
+}
+
+func (r *tikHubWorkerRepoStub) UpdateKnowledgeWithStorage(
+	_ context.Context,
+	knowledge *types.Knowledge,
+	effectiveQuota int64,
+) error {
+	r.updatesWithStorage++
+	r.updateStorageQuota = effectiveQuota
+	if knowledge != nil {
+		copy := *knowledge
+		r.updatedKnowledge = &copy
+	}
+	return r.updateWithStorageErr
+}
+
+func (r *tikHubWorkerRepoStub) ClaimKnowledgeSourceWithStorage(
+	_ context.Context,
+	knowledge *types.Knowledge,
+	effectiveQuota int64,
+) (*types.Knowledge, bool, error) {
+	r.claimCalls++
+	r.claimStorageQuota = effectiveQuota
+	if r.claimErr != nil {
+		return nil, false, r.claimErr
+	}
+	if r.claimCurrent != nil {
+		copy := *r.claimCurrent
+		return &copy, r.claimResult, nil
+	}
+	if knowledge == nil {
+		return nil, false, errors.New("knowledge is nil")
+	}
+	copy := *knowledge
+	r.updatedKnowledge = &copy
+	return &copy, true, nil
 }
 
 type tikHubWorkerFileServiceStub struct {
@@ -33,6 +82,10 @@ type tikHubWorkerFileServiceStub struct {
 	savedFileName string
 	savedTemp     bool
 	saveCalls     int
+	deleteCalls   int
+	deletedPath   string
+	deletedPaths  []string
+	deleteErr     error
 }
 
 func (s *tikHubWorkerFileServiceStub) CheckConnectivity(context.Context) error { return nil }
@@ -52,9 +105,24 @@ func (s *tikHubWorkerFileServiceStub) GetFile(context.Context, string) (io.ReadC
 func (s *tikHubWorkerFileServiceStub) GetFileURL(context.Context, string) (string, error) {
 	return "", errors.New("not implemented")
 }
-func (s *tikHubWorkerFileServiceStub) DeleteFile(context.Context, string) error { return nil }
+func (s *tikHubWorkerFileServiceStub) DeleteFile(_ context.Context, path string) error {
+	s.deleteCalls++
+	s.deletedPath = path
+	s.deletedPaths = append(s.deletedPaths, path)
+	return s.deleteErr
+}
 func (s *tikHubWorkerFileServiceStub) CopyFile(context.Context, string, uint64, string) (string, error) {
 	return "", errors.New("not implemented")
+}
+
+func TestCleanupTikHubResolvedImagesDeletesServingURLs(t *testing.T) {
+	files := &tikHubWorkerFileServiceStub{}
+	cleanupTikHubResolvedImages(context.Background(), files, []docparser.StoredImage{
+		{ServingURL: "stored/image-one.png"},
+		{ServingURL: "  stored/image-two.png  "},
+		{ServingURL: ""},
+	})
+	require.ElementsMatch(t, []string{"stored/image-one.png", "stored/image-two.png"}, files.deletedPaths)
 }
 
 type tikHubWorkerRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -106,7 +174,10 @@ func TestPrepareTikHubArtifactPersistsDocumentBeforeExistingParser(t *testing.T)
 	require.Contains(t, string(files.savedData), "https://images.example/one.jpg")
 	require.Equal(t, 1, files.saveCalls)
 	require.False(t, files.savedTemp, "social artifacts must use durable storage")
-	require.Equal(t, 1, repo.updates)
+	require.Equal(t, 0, repo.updates)
+	require.Equal(t, 1, repo.claimCalls)
+	require.Equal(t, int64(0), repo.claimStorageQuota)
+	require.Equal(t, int64(len(files.savedData)), repo.updatedKnowledge.FileSize)
 }
 
 func TestPrepareTikHubArtifactAllowsDouyinPhotoOnFreePlanWithoutVLM(t *testing.T) {
@@ -224,6 +295,103 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	require.Equal(t, []byte("video-bytes"), files.savedData)
 	require.False(t, files.savedTemp, "social videos must survive worker retries and reparses")
 	require.False(t, strings.Contains(files.savedFileName, "/"))
+}
+
+func TestPrepareTikHubArtifactCleansObjectWhenStorageMutationFails(t *testing.T) {
+	t.Parallel()
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/xiaohongshu/app_v2/get_image_note_detail", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"code":200,"data":{"type":"normal","title":"内容","desc":"正文","image_list":[{"url":"https://images.example/one.jpg"}]}}`)
+	}))
+	defer api.Close()
+
+	files := &tikHubWorkerFileServiceStub{}
+	repo := &tikHubWorkerRepoStub{claimErr: errors.New("storage quota exceeded")}
+	svc := &knowledgeService{
+		repo:           repo,
+		fileSvc:        files,
+		tikhubImporter: tikhub.NewTikHubImporterForTest(api.URL, "test-key", api.Client()),
+	}
+	payload := types.DocumentProcessPayload{
+		TenantID: 7,
+		URL:      "https://www.xiaohongshu.com/explore/64f123456789abcdef123456",
+	}
+	knowledge := &types.Knowledge{ID: "knowledge-failure", TenantID: 7, FileType: "html"}
+
+	handled, _, err := svc.prepareTikHubArtifact(
+		context.Background(),
+		&payload,
+		&types.KnowledgeBase{ID: "kb-1"},
+		knowledge,
+		types.EffectiveProcessConfig{},
+	)
+
+	require.True(t, handled)
+	require.EqualError(t, err, "failed to persist social artifact state: storage quota exceeded")
+	require.Equal(t, 1, repo.claimCalls)
+	require.Equal(t, 1, files.deleteCalls)
+	require.Equal(t, "stored/xiaohongshu-64f123456789abcdef123456.md", files.deletedPath)
+	require.Empty(t, knowledge.FilePath, "failed persistence must not publish the deleted object path")
+	require.Equal(t, "https://www.xiaohongshu.com/explore/64f123456789abcdef123456", payload.URL)
+	require.Empty(t, payload.FilePath)
+}
+
+func TestPrepareTikHubArtifactDeletesLosingObjectAndUsesWinnerCheckpoint(t *testing.T) {
+	t.Parallel()
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/xiaohongshu/app_v2/get_image_note_detail", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"code":200,"data":{"type":"normal","title":"stale title","desc":"stale description","image_list":[{"url":"https://images.example/stale.jpg"}]}}`)
+	}))
+	defer api.Close()
+
+	files := &tikHubWorkerFileServiceStub{}
+	winner := &types.Knowledge{
+		ID:             "knowledge-loser",
+		TenantID:       7,
+		FilePath:       "stored/winner.md",
+		FileName:       "winner.md",
+		FileType:       "md",
+		FileSize:       99,
+		ParseStatus:    types.ParseStatusCancelled,
+		Description:    "persisted description",
+		Metadata:       types.JSON(`{"persisted":true}`),
+		CustomMetadata: types.JSON(`{"persisted":true}`),
+	}
+	repo := &tikHubWorkerRepoStub{claimCurrent: winner, claimResult: false}
+	svc := &knowledgeService{
+		repo:           repo,
+		fileSvc:        files,
+		tikhubImporter: tikhub.NewTikHubImporterForTest(api.URL, "test-key", api.Client()),
+	}
+	payload := types.DocumentProcessPayload{
+		TenantID: 7,
+		URL:      "https://www.xiaohongshu.com/explore/64f123456789abcdef123456",
+	}
+	knowledge := &types.Knowledge{ID: "knowledge-loser", TenantID: 7, FileType: "html"}
+
+	handled, _, err := svc.prepareTikHubArtifact(
+		context.Background(),
+		&payload,
+		&types.KnowledgeBase{ID: "kb-1"},
+		knowledge,
+		types.EffectiveProcessConfig{},
+	)
+	require.NoError(t, err)
+	require.True(t, handled)
+	require.Equal(t, 1, repo.claimCalls)
+	require.Equal(t, 1, files.deleteCalls)
+	require.Equal(t, "stored/"+files.savedFileName, files.deletedPath)
+	require.Equal(t, winner.FilePath, knowledge.FilePath)
+	require.Equal(t, winner.FileName, payload.FileName)
+	require.Equal(t, winner.FileType, payload.FileType)
+	require.Equal(t, winner.FilePath, payload.FilePath)
+	require.Equal(t, winner.ParseStatus, knowledge.ParseStatus, "stale worker state must not replace persisted cancellation")
+	require.Equal(t, winner.Description, knowledge.Description)
+	require.JSONEq(t, string(winner.Metadata), string(knowledge.Metadata))
 }
 
 func TestPrepareTikHubArtifactLeavesOrdinaryURLsOnExistingWebPath(t *testing.T) {

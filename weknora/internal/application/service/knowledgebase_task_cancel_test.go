@@ -212,6 +212,10 @@ func (populatedKBKnowledgeRepo) DeleteKnowledgeList(context.Context, uint64, []s
 	return nil
 }
 
+func (populatedKBKnowledgeRepo) DeleteKnowledgeListWithStorage(context.Context, uint64, []string) error {
+	return nil
+}
+
 type kbCleanupChunkRepo struct {
 	interfaces.ChunkRepository
 }
@@ -316,6 +320,11 @@ type kbDeleteTrackingKnowledgeRepo struct {
 }
 
 func (r *kbDeleteTrackingKnowledgeRepo) DeleteKnowledgeList(context.Context, uint64, []string) error {
+	r.deleteCalls++
+	return nil
+}
+
+func (r *kbDeleteTrackingKnowledgeRepo) DeleteKnowledgeListWithStorage(context.Context, uint64, []string) error {
 	r.deleteCalls++
 	return nil
 }

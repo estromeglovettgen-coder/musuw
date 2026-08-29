@@ -213,7 +213,7 @@ export default defineComponent({
     </main>
   </template>
 
-  <section v-else class="visual-faq-manager"><FAQEntryManager v-if="kbId" :kb-id="kbId" /></section>
+  <section v-else-if="!authStore.isLiteMode" class="visual-faq-manager"><FAQEntryManager v-if="kbId" :kb-id="kbId" /></section>
   <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode" :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType" @update:visible="(val: boolean) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
   <TagEditDialog :visible="tagEditDialogVisible" :knowledge-name="tagEditTarget?.display_name || tagEditTarget?.file_name || tagEditTarget?.title || ''" :kb-id="kbId" :tag-list="tagList" :selected-tags="tagEditTarget?.tags || []" :can-manage="canEdit" @update:visible="tagEditDialogVisible = $event" @confirm="onTagEditConfirm" @tag-created="loadTags(kbId, true)" @open-manage="openTagManageFromEditDialog" />
   <BatchTagDialog :visible="batchTagDialogVisible" :count="selectedIds.size" :kb-id="kbId" :tag-list="tagList" :pre-selected-tag-ids="batchTagPreSelectedIds" :can-manage="canEdit" :confirm-loading="batchTagging" @update:visible="batchTagDialogVisible = $event" @confirm="onBatchTagConfirm" @tag-created="loadTags(kbId, true)" @open-manage="openTagManageFromBatchDialog" />

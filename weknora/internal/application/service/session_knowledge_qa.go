@@ -26,6 +26,10 @@ func (s *sessionService) KnowledgeQA(
 	req *types.QARequest,
 	eventBus *event.EventBus,
 ) error {
+	// Lite always includes platform-managed web search. This service-level
+	// invariant also covers non-HTTP/internal callers; the router separately
+	// rewrites browser/API requests so persisted execution context is truthful.
+	req.WebSearchEnabled = effectiveWebSearchEnabled(req.WebSearchEnabled)
 	logger.Infof(
 		ctx,
 		"Knowledge base question answering parameters, session ID: %s, query length: %d, webSearchEnabled: %v",

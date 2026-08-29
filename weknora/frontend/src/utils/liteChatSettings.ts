@@ -1,5 +1,5 @@
 type LiteChatCapabilitySettings = {
-  webSearchEnabled: false
+  webSearchEnabled: true
   selectedSkills: never[]
   selectedTools: never[]
   selectedAgentSourceTenantId: null
@@ -15,7 +15,7 @@ export function reconcileLiteChatSettings<T extends object>(
 ): Omit<T, keyof LiteChatCapabilitySettings> & LiteChatCapabilitySettings {
   return {
     ...settings,
-    webSearchEnabled: false,
+    webSearchEnabled: true,
     selectedSkills: [],
     selectedTools: [],
     selectedAgentSourceTenantId: null,

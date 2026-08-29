@@ -18,9 +18,11 @@ import (
 type createKnowledgeFileRepoStub struct {
 	interfaces.KnowledgeRepository
 
-	createCalls      int
-	createErr        error
-	createdKnowledge *types.Knowledge
+	createCalls            int
+	createWithStorageCalls int
+	createStorageQuota     int64
+	createErr              error
+	createdKnowledge       *types.Knowledge
 }
 
 func (r *createKnowledgeFileRepoStub) CheckKnowledgeExists(
@@ -33,6 +35,19 @@ func (r *createKnowledgeFileRepoStub) CheckKnowledgeExists(
 }
 
 func (r *createKnowledgeFileRepoStub) CreateKnowledge(ctx context.Context, knowledge *types.Knowledge) error {
+	r.createCalls++
+	copied := *knowledge
+	r.createdKnowledge = &copied
+	return r.createErr
+}
+
+func (r *createKnowledgeFileRepoStub) CreateKnowledgeWithStorage(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	effectiveQuota int64,
+) error {
+	r.createWithStorageCalls++
+	r.createStorageQuota = effectiveQuota
 	r.createCalls++
 	copied := *knowledge
 	r.createdKnowledge = &copied
@@ -187,9 +202,83 @@ func TestCreateKnowledgeFromFilePersistsStoredFilePathOnCreate(t *testing.T) {
 	require.NotEmpty(t, fileSvc.savedWithKnowledgeID)
 	require.Equal(t, fileSvc.savedWithKnowledgeID, knowledge.ID)
 	require.Equal(t, 1, repo.createCalls)
+	require.Equal(t, 1, repo.createWithStorageCalls)
 	require.NotNil(t, repo.createdKnowledge)
 	require.Equal(t, "stored/"+knowledge.ID, repo.createdKnowledge.FilePath)
+	require.Equal(t, int64(len("hello")), repo.createdKnowledge.FileSize)
 	require.Equal(t, 1, task.calls)
+}
+
+func TestCreateKnowledgeFromFileRejectsWhenSourceWouldExceedQuota(t *testing.T) {
+	t.Parallel()
+
+	repo := &createKnowledgeFileRepoStub{}
+	fileSvc := &createKnowledgeFileServiceStub{}
+	svc := &knowledgeService{
+		repo:      repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		fileSvc:   fileSvc,
+	}
+	ctx := context.WithValue(newCreateKnowledgeFileContext(), types.TenantInfoContextKey, &types.Tenant{
+		ID:           1,
+		StorageUsed:  8,
+		StorageQuota: 10,
+	})
+
+	knowledge, err := svc.CreateKnowledgeFromFile(
+		ctx,
+		"kb-1",
+		newMultipartFileHeader(t, "doc.txt", "three"),
+		nil,
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	var quotaErr *types.StorageQuotaExceededError
+	require.ErrorAs(t, err, &quotaErr)
+	require.Nil(t, knowledge)
+	require.Zero(t, fileSvc.saveCalls, "quota admission must happen before storing the source")
+	require.Zero(t, repo.createWithStorageCalls)
+}
+
+func TestCreateKnowledgeFromFileAllowsExactQuotaBoundary(t *testing.T) {
+	t.Parallel()
+
+	repo := &createKnowledgeFileRepoStub{}
+	fileSvc := &createKnowledgeFileServiceStub{}
+	task := &createKnowledgeTaskEnqueuerStub{}
+	svc := &knowledgeService{
+		repo:      repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		fileSvc:   fileSvc,
+		task:      task,
+	}
+	ctx := context.WithValue(newCreateKnowledgeFileContext(), types.TenantInfoContextKey, &types.Tenant{
+		ID:           1,
+		StorageUsed:  5,
+		StorageQuota: 10,
+	})
+
+	knowledge, err := svc.CreateKnowledgeFromFile(
+		ctx,
+		"kb-1",
+		newMultipartFileHeader(t, "doc.txt", "hello"),
+		nil,
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, knowledge)
+	require.Equal(t, 1, fileSvc.saveCalls)
+	require.Equal(t, 1, repo.createWithStorageCalls)
+	require.Equal(t, int64(10), repo.createStorageQuota)
 }
 
 func TestCreateKnowledgeFromFileAcceptsSupportedVideo(t *testing.T) {
@@ -297,7 +386,7 @@ func TestCreateKnowledgeFromFileDeletesStoredFileWhenCreateFails(t *testing.T) {
 	require.EqualError(t, err, "database unavailable")
 	require.Nil(t, knowledge)
 	require.Equal(t, 1, fileSvc.saveCalls)
-	require.Equal(t, 1, repo.createCalls)
+	require.Equal(t, 1, repo.createWithStorageCalls)
 	require.Equal(t, 1, fileSvc.deleteCalls)
 	require.Equal(t, "stored/"+fileSvc.savedWithKnowledgeID, fileSvc.deletedPath)
 }

@@ -41,6 +41,10 @@ func (r *strictDeleteKnowledgeRepo) DeleteKnowledgeList(context.Context, uint64,
 	return nil
 }
 
+func (r *strictDeleteKnowledgeRepo) DeleteKnowledgeListWithStorage(ctx context.Context, tenantID uint64, ids []string) error {
+	return r.DeleteKnowledgeList(ctx, tenantID, ids)
+}
+
 type strictDeleteEngine struct {
 	interfaces.RetrieveEngineService
 	err   error
@@ -325,13 +329,42 @@ func TestProcessKBDeleteStrictDeletesRowsAfterAllResourcesSucceed(t *testing.T) 
 	assert.Equal(t, []string{"local://source.txt"}, fileSvc.calls)
 }
 
-func TestProcessKBDeleteNonStrictPreservesBestEffortCompatibility(t *testing.T) {
+func TestProcessKBDeleteNonStrictRetainsRowsWhenVectorCleanupFails(t *testing.T) {
 	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{strictDeleteKnowledge()}}
 	engine := &strictDeleteEngine{err: errors.New("vector backend unavailable")}
 	svc := strictDeleteService(knowledgeRepo, engine)
 
-	require.NoError(t, svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, false)))
-	assert.Equal(t, 1, knowledgeRepo.deleteCall)
+	err := svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, false))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "vector backend unavailable")
+	assert.Zero(t, knowledgeRepo.deleteCall, "ordinary deletion must preserve rows and usage for a retry")
+}
+
+func TestProcessKBDeleteNonStrictRetainsRowsWhenChunkCleanupFails(t *testing.T) {
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{strictDeleteKnowledge()}}
+	chunkRepo := &strictDeleteChunkRepo{chunkErr: errors.New("chunks unavailable")}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.chunkRepo = chunkRepo
+
+	err := svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, false))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "chunks unavailable")
+	assert.Zero(t, knowledgeRepo.deleteCall)
+}
+
+func TestProcessKBDeleteNonStrictRetainsRowsWhenGraphCleanupFails(t *testing.T) {
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{strictDeleteKnowledge()}}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.chunkRepo = &strictDeleteChunkRepo{}
+	svc.graphEngine = strictDeleteGraph{err: errors.New("graph unavailable")}
+
+	err := svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, false))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "graph unavailable")
+	assert.Zero(t, knowledgeRepo.deleteCall)
 }
 
 func TestDeleteFileIdempotentNormalizesAlreadyAbsentObjects(t *testing.T) {

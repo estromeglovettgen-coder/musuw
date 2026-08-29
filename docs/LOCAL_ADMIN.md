@@ -37,6 +37,8 @@ scripts/musuw-admin stop all
   到一个凭据不会冒充连接成功。
 - **存储**：分开显示 `file_size`、`storage_size`、
   `tenant.storage_used`、套餐配额、Musuw 后端和物理对象引用。
+  其中 `tenant.storage_used` 是产品与配额的唯一权威值，等于未删除知识行的
+  非负 `file_size + storage_size`；前两项仅用于原文件/索引诊断，不形成第二套配额。
   “数据库有引用”不会被描述成“R2 HEAD 已成功”。
 - **日志与追踪**：直接复用 Musuw 的运行队列与系统审计组件。
   Langfuse 查询未配置时显示 unavailable；不会绘制虚假空图表。

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Generate and verify the small source bundle required by staging Compose.
 # Application and browser code stay in the immutable GHCR images; this bundle
-# contains only reviewed runtime wiring and the two public environment files.
+# contains only reviewed runtime wiring, the two reused SearXNG files, and the
+# two public environment files.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -22,8 +23,10 @@ line_checksum() { printf '%s' "${1%%  *}"; }
 manifest_path() {
     case "$1" in
         weknora/docker-compose.yml|weknora/config/config.yaml|\
+        weknora/docker/searxng/settings.yml|\
         integration/weknora-production/paddle-runtime-contract.sh|\
         integration/weknora-production/redis-entrypoint.sh|\
+        integration/weknora-production/searxng-entrypoint.sh|\
         integration/weknora-staging/*|scripts/weknora-staging/*|\
         deploy/staging.public.env|deploy/auth-public.env) ;;
         *) fail "staging manifest contains an unallowlisted path: $1" ;;
@@ -86,8 +89,10 @@ generate_manifest() {
 
     append_tracked_paths weknora/docker-compose.yml "$path_list"
     append_tracked_paths weknora/config/config.yaml "$path_list"
+    append_tracked_paths weknora/docker/searxng/settings.yml "$path_list"
     append_tracked_paths integration/weknora-production/paddle-runtime-contract.sh "$path_list"
     append_tracked_paths integration/weknora-production/redis-entrypoint.sh "$path_list"
+    append_tracked_paths integration/weknora-production/searxng-entrypoint.sh "$path_list"
     append_tracked_paths integration/weknora-staging "$path_list"
     append_tracked_paths scripts/weknora-staging "$path_list"
     printf '%s\n' deploy/staging.public.env deploy/auth-public.env >> "$path_list"

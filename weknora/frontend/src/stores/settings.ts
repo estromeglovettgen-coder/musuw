@@ -477,7 +477,7 @@ export const useSettingsStore = defineStore("settings", {
     selectAgent(agentId: string, sourceTenantId?: string | null) {
       this.settings.selectedAgentId = agentId;
       this.settings.selectedAgentSourceTenantId = (sourceTenantId != null && sourceTenantId !== "") ? sourceTenantId : null;
-      this.settings.webSearchEnabled = !useAuthStore().isLiteMode;
+      this.settings.webSearchEnabled = true;
       // 根据智能体类型自动切换 Agent 模式
       if (agentId === BUILTIN_QUICK_ANSWER_ID) {
         this.settings.isAgentEnabled = false;

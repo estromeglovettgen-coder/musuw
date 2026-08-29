@@ -72,11 +72,11 @@ printf '%s\n' "$ghcr_token" |
 DOCKER_CONFIG="$docker_config" WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" \
     "$script_dir/compose.sh" --edge pull app frontend
 
-# Bring up only the five native services consumed by staging acceptance. The
-# app/frontend recreation is digest-pinned and explicitly --no-build.
+# Bring up the native staging services, including the isolated SearXNG sidecar.
+# The app/frontend recreation is digest-pinned and explicitly --no-build.
 staging_mutated=1
 DOCKER_CONFIG="$docker_config" WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" \
-    "$script_dir/compose.sh" --edge up -d --no-build postgres redis docreader app frontend
+    "$script_dir/compose.sh" --edge up -d --no-build postgres redis docreader searxng-init searxng app frontend
 
 wait_for_healthy() {
     local container="$1" deadline status image_revision

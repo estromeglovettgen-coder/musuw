@@ -418,9 +418,11 @@ Chunk 类型（`internal/types/chunk.go`）：`text`、`parent_text`、`image_oc
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
 | `storage_quota` | 1073741824（1 GiB） | 消费者 Free 租户默认总配额 |
-| `storage_used` | 0 | 已用量（涵盖原始文件、文本、向量与索引占用） |
+| `storage_used` | 0 | 权威已用量：所有未删除知识的 `max(file_size, 0) + max(storage_size, 0)` 之和 |
 
-创建 KB 与上传知识前都会执行配额检查（`internal/handler/knowledgebase.go` 创建校验链），超限拒绝写入；每条知识记录自身 `file_size` 与 `storage_size`，删除时回收用量。
+`file_size` 只表示系统持有的原文件，`storage_size` 只表示派生索引估算，两者不会互相包含。手工文本、段落和普通网页 URL 没有持有的原文件时，`file_size` 为 0，只按实际生成的索引计量。上传或物化远程原文件、生成/替换索引、复制和删除都会把知识行与 `storage_used` 在同一数据库事务中更新；达到配额的精确边界允许写入，超过才拒绝。重解析保留原文件时只释放并重计索引，删除则一次性回收原文件与索引的完整贡献。
+
+历史租户在数据库迁移时按仍然有效的知识行重算权威用量。迁移回滚会从回滚时仍有效的知识行恢复旧的“仅索引”口径，无法也无需还原历史上的错误低估值。
 
 ## 8. 混合检索（Hybrid Search）
 

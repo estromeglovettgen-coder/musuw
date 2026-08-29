@@ -117,6 +117,9 @@ func (s *knowledgeBaseService) GetRepository() interfaces.KnowledgeBaseRepositor
 func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 	kb *types.KnowledgeBase,
 ) (*types.KnowledgeBase, error) {
+	if err := rejectLiteFAQKnowledgeBase(kb); err != nil {
+		return nil, err
+	}
 	if err := s.checkCreateKnowledgeBaseEntitlement(ctx); err != nil {
 		return nil, err
 	}
@@ -184,6 +187,13 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 
 	logger.Infof(ctx, "Knowledge base created successfully, ID: %s, name: %s", kb.ID, kb.Name)
 	return kb, nil
+}
+
+func rejectLiteFAQKnowledgeBase(kb *types.KnowledgeBase) error {
+	if isLiteProductEdition() && kb != nil && kb.Type == types.KnowledgeBaseTypeFAQ {
+		return apperrors.NewBadRequestError("FAQ knowledge bases are unavailable in Lite")
+	}
+	return nil
 }
 
 // consumerKnowledgeBaseModels captures only the model candidates supplied by
@@ -1125,11 +1135,12 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 			for key, knowledgeGroup := range embeddingGroups {
 				embeddingModel, err := s.modelService.GetEmbeddingModel(ctx, key.EmbeddingModelID)
 				if err != nil {
-					logger.Warnf(ctx, "Failed to get embedding model %s: %v", key.EmbeddingModelID, err)
-					continue
+					logger.Errorf(ctx, "Failed to get embedding model %s: %v", key.EmbeddingModelID, err)
+					return err
 				}
 				if err := retrieveEngine.DeleteByKnowledgeIDList(ctx, knowledgeGroup, embeddingModel.GetDimensions(), key.Type); err != nil {
-					logger.Warnf(ctx, "Failed to delete embeddings for model %s: %v", key.EmbeddingModelID, err)
+					logger.Errorf(ctx, "Failed to delete embeddings for model %s: %v", key.EmbeddingModelID, err)
+					return err
 				}
 			}
 		}
@@ -1137,7 +1148,8 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 		// Collect image URLs before chunks are deleted
 		chunkImageInfos, imgErr := s.chunkRepo.ListImageInfoByKnowledgeIDs(ctx, tenantID, knowledgeIDs)
 		if imgErr != nil {
-			logger.Warnf(ctx, "Failed to collect image URLs for KB delete: %v", imgErr)
+			logger.Errorf(ctx, "Failed to collect image URLs for KB delete: %v", imgErr)
+			return imgErr
 		}
 		var imageInfoStrs []string
 		for _, ci := range chunkImageInfos {
@@ -1149,25 +1161,8 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 		logger.Infof(ctx, "Deleting all chunks in knowledge base")
 		for _, knowledgeID := range knowledgeIDs {
 			if err := s.chunkRepo.DeleteChunksByKnowledgeID(ctx, tenantID, knowledgeID); err != nil {
-				logger.Warnf(ctx, "Failed to delete chunks for knowledge %s: %v", knowledgeID, err)
-			}
-		}
-
-		// Delete physical files, extracted images, and adjust storage
-		logger.Infof(ctx, "Deleting physical files and extracted images")
-		storageAdjust := int64(0)
-		for _, knowledge := range knowledgeList {
-			if knowledge.FilePath != "" {
-				if err := s.fileSvc.DeleteFile(ctx, knowledge.FilePath); err != nil {
-					logger.Warnf(ctx, "Failed to delete file %s: %v", knowledge.FilePath, err)
-				}
-			}
-			storageAdjust -= knowledge.StorageSize
-		}
-		deleteExtractedImages(ctx, s.fileSvc, imageURLs)
-		if storageAdjust != 0 {
-			if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantID, storageAdjust); err != nil {
-				logger.Warnf(ctx, "Failed to adjust tenant storage: %v", err)
+				logger.Errorf(ctx, "Failed to delete chunks for knowledge %s: %v", knowledgeID, err)
+				return err
 			}
 		}
 
@@ -1182,18 +1177,33 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 		}
 		if s.graphEngine != nil && len(namespaces) > 0 {
 			if err := s.graphEngine.DelGraph(ctx, namespaces); err != nil {
-				logger.Warnf(ctx, "Failed to delete knowledge graph: %v", err)
+				logger.Errorf(ctx, "Failed to delete knowledge graph: %v", err)
+				return err
 			}
 		}
 
 		// Delete all knowledge entries from database
 		logger.Infof(ctx, "Deleting knowledge entries from database")
-		if err := s.kgRepo.DeleteKnowledgeList(ctx, tenantID, knowledgeIDs); err != nil {
+		if err := s.kgRepo.DeleteKnowledgeListWithStorage(ctx, tenantID, knowledgeIDs); err != nil {
 			logger.ErrorWithFields(ctx, err, map[string]interface{}{
 				"knowledge_base_id": kbID,
 			})
 			return err
 		}
+
+		// Physical objects are removed only after the knowledge rows and their
+		// source-plus-index usage have committed together. A failed object delete
+		// can leak bytes, but cannot leave an active row pointing at a missing
+		// source or split the tenant counter from the database row.
+		logger.Infof(ctx, "Deleting physical files and extracted images")
+		for _, knowledge := range knowledgeList {
+			if knowledge.FilePath != "" {
+				if err := s.fileSvc.DeleteFile(ctx, knowledge.FilePath); err != nil {
+					logger.Warnf(ctx, "Failed to delete file %s: %v", knowledge.FilePath, err)
+				}
+			}
+		}
+		deleteExtractedImages(ctx, s.fileSvc, imageURLs)
 	}
 
 	logger.Infof(ctx, "KB delete task completed successfully, knowledge base ID: %s", kbID)
@@ -1666,6 +1676,9 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 		return nil, nil, err
 	}
 	sourceKB.EnsureDefaults()
+	if err := rejectLiteFAQKnowledgeBase(sourceKB); err != nil {
+		return nil, nil, err
+	}
 	if dstKB == "" {
 		if err := s.checkCreateKnowledgeBaseEntitlement(ctx); err != nil {
 			return nil, nil, err
@@ -1676,6 +1689,9 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 		// Load target KB with tenant scope so we only clone into the caller's tenant
 		targetKB, err = s.repo.GetKnowledgeBaseByIDAndTenant(ctx, dstKB, tenantID)
 		if err != nil {
+			return nil, nil, err
+		}
+		if err := rejectLiteFAQKnowledgeBase(targetKB); err != nil {
 			return nil, nil, err
 		}
 
@@ -1742,6 +1758,9 @@ func (s *knowledgeBaseService) DuplicateKnowledgeBase(
 		return nil, err
 	}
 	sourceKB.EnsureDefaults()
+	if err := rejectLiteFAQKnowledgeBase(sourceKB); err != nil {
+		return nil, err
+	}
 
 	targetKB, err := s.buildKnowledgeBaseCopyTarget(ctx, sourceKB, tenantID)
 	if err != nil {

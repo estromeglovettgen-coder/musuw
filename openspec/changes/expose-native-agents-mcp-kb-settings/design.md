@@ -61,6 +61,13 @@ Knowledge-base create/edit SHALL expose name, description, RAG, Wiki, Wiki granu
 
 The backend Lite product gate SHALL permit only the existing agent CRUD/runtime, MCP management/OAuth/approval, and chat payload paths required by this feature. The existing route-level roles, tenant filtering, credential handling, and service validation remain in force. UI visibility is not treated as authorization.
 
+FAQ remains outside the Lite product: native FAQ creation and mutation routes,
+plus FAQ copy/duplicate paths, are rejected server-side while Standard keeps
+the upstream behavior. Historical FAQ reads/searches and deletion remain for
+inspection and cleanup. Web search follows the opposite policy: Lite forces
+the existing native request field on at both router and service seams while
+keeping its UI toggle hidden; Standard retains the caller's native choice.
+
 ## Risks / Trade-offs
 
 - **Hidden legacy agent values can remain persisted** → Hide without rewriting them unless the visible choice requires a native field change; test mode changes and save/reload behavior.

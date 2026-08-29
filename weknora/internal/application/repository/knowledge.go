@@ -9,6 +9,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrKnowledgeNotFound = errors.New("knowledge not found")
@@ -55,6 +56,142 @@ func NewKnowledgeRepository(db *gorm.DB) interfaces.KnowledgeRepository {
 func (r *knowledgeRepository) CreateKnowledge(ctx context.Context, knowledge *types.Knowledge) error {
 	err := r.db.WithContext(ctx).Create(knowledge).Error
 	return err
+}
+
+// CreateKnowledgeWithStorage creates a knowledge row and accounts its full
+// source-plus-index contribution while holding the tenant row lock. The row
+// and counter update share one transaction, so a quota rejection or database
+// failure cannot leave either side partially persisted.
+func (r *knowledgeRepository) CreateKnowledgeWithStorage(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	effectiveQuota int64,
+) error {
+	if knowledge == nil {
+		return errors.New("knowledge is nil")
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenant, err := lockTenantForStorage(tx, knowledge.TenantID)
+		if err != nil {
+			return err
+		}
+		delta := knowledge.AccountedStorageBytes()
+		if err := ensureStorageQuota(tenant, delta, effectiveQuota); err != nil {
+			return err
+		}
+		if err := tx.Create(knowledge).Error; err != nil {
+			return err
+		}
+		return applyLockedStorageDelta(ctx, tx, tenant, delta)
+	})
+}
+
+// ClaimKnowledgeSourceWithStorage conditionally commits a durable source
+// materialization for an existing knowledge row. The tenant lock is acquired
+// before the row lock so competing workers serialize with every other storage
+// mutation. A non-empty persisted FilePath is the winner checkpoint: it is
+// returned unchanged and never recharged or overwritten.
+func (r *knowledgeRepository) ClaimKnowledgeSourceWithStorage(
+	ctx context.Context,
+	proposed *types.Knowledge,
+	effectiveQuota int64,
+) (current *types.Knowledge, claimed bool, err error) {
+	if proposed == nil {
+		return nil, false, errors.New("knowledge is nil")
+	}
+	sourcePath := strings.TrimSpace(proposed.FilePath)
+	if sourcePath == "" {
+		return nil, false, errors.New("knowledge source path is required")
+	}
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenant, lockErr := lockTenantForStorage(tx, proposed.TenantID)
+		if lockErr != nil {
+			return lockErr
+		}
+
+		var persisted types.Knowledge
+		if findErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", proposed.TenantID, proposed.ID).
+			First(&persisted).Error; findErr != nil {
+			if errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return ErrKnowledgeNotFound
+			}
+			return findErr
+		}
+
+		if strings.TrimSpace(persisted.FilePath) != "" {
+			current = &persisted
+			claimed = false
+			return nil
+		}
+
+		// Merge only fields owned by source materialization. Keeping parse state,
+		// metadata, and orchestration counters from the persisted row prevents a
+		// stale direct-file/TikHub worker from undoing a cancellation or another
+		// concurrent update.
+		merged := persisted
+		merged.FilePath = sourcePath
+		merged.FileName = proposed.FileName
+		merged.FileType = proposed.FileType
+		merged.FileSize = proposed.FileSize
+		merged.Title = proposed.Title
+		merged.Description = proposed.Description
+		if proposed.UpdatedAt.IsZero() {
+			merged.UpdatedAt = time.Now()
+		} else {
+			merged.UpdatedAt = proposed.UpdatedAt
+		}
+
+		delta := storageContributionDelta(persisted.AccountedStorageBytes(), merged.AccountedStorageBytes())
+		if quotaErr := ensureStorageQuota(tenant, delta, effectiveQuota); quotaErr != nil {
+			return quotaErr
+		}
+
+		// Keep the row's tenant identity and all non-source fields authoritative.
+		// TRIM makes the conditional write safe even on dialects where a row lock
+		// is unavailable (SQLite); a zero-row result means another worker won.
+		result := tx.Model(&types.Knowledge{}).
+			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND TRIM(COALESCE(file_path, '')) = ''", persisted.TenantID, persisted.ID).
+			Updates(map[string]interface{}{
+				"file_path":   merged.FilePath,
+				"file_name":   merged.FileName,
+				"file_type":   merged.FileType,
+				"file_size":   merged.FileSize,
+				"title":       merged.Title,
+				"description": merged.Description,
+				"updated_at":  merged.UpdatedAt,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			var winner types.Knowledge
+			if findErr := tx.Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", persisted.TenantID, persisted.ID).First(&winner).Error; findErr != nil {
+				if errors.Is(findErr, gorm.ErrRecordNotFound) {
+					return ErrKnowledgeNotFound
+				}
+				return findErr
+			}
+			if strings.TrimSpace(winner.FilePath) != "" {
+				current = &winner
+				claimed = false
+				return nil
+			}
+			return errors.New("knowledge source claim was not applied")
+		}
+		if delta != 0 {
+			if adjustErr := applyLockedStorageDelta(ctx, tx, tenant, delta); adjustErr != nil {
+				return adjustErr
+			}
+		}
+		current = &merged
+		claimed = true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return current, claimed, nil
 }
 
 // GetKnowledgeByID gets knowledge
@@ -316,6 +453,95 @@ func (r *knowledgeRepository) UpdateKnowledge(ctx context.Context, knowledge *ty
 	return err
 }
 
+// UpdateKnowledgeWithStorage updates a knowledge row and applies the delta
+// between its persisted and proposed source-plus-index contributions under the
+// same tenant lock. A positive delta is checked against effectiveQuota with an
+// exact-boundary admission rule.
+func (r *knowledgeRepository) UpdateKnowledgeWithStorage(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	effectiveQuota int64,
+) error {
+	if knowledge == nil {
+		return errors.New("knowledge is nil")
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenant, err := lockTenantForStorage(tx, knowledge.TenantID)
+		if err != nil {
+			return err
+		}
+
+		var persisted types.Knowledge
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", knowledge.TenantID, knowledge.ID).
+			First(&persisted).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrKnowledgeNotFound
+			}
+			return err
+		}
+
+		delta := storageContributionDelta(persisted.AccountedStorageBytes(), knowledge.AccountedStorageBytes())
+		if err := ensureStorageQuota(tenant, delta, effectiveQuota); err != nil {
+			return err
+		}
+
+		// The target tenant is the one selected above; do not allow a stale or
+		// caller-mutated object to move the row across tenant boundaries.
+		knowledge.TenantID = persisted.TenantID
+		omit := omitFieldsOnUpdate
+		if knowledge.CustomMetadata == nil {
+			omit = append(append([]string{}, omitFieldsOnUpdate...), "custom_metadata")
+		}
+		// Keep the active predicate on the final write too. The tenant-first lock
+		// serializes paired deletes, while this conditional update also protects
+		// callers that still use the legacy row-only delete path: a late worker
+		// must not reanimate a soft-deleted row or re-add its released bytes.
+		result := tx.Model(&types.Knowledge{}).
+			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", persisted.TenantID, persisted.ID).
+			Omit(omit...).
+			Select("*").
+			Updates(knowledge)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrKnowledgeNotFound
+		}
+		if delta == 0 {
+			return nil
+		}
+		return applyLockedStorageDelta(ctx, tx, tenant, delta)
+	})
+}
+
+// UpdateKnowledgeStorageFailureIfCurrent marks a processing row failed only
+// while its index contribution is still the checkpoint observed before this
+// worker started indexing. The conditional write is deliberately column-scoped:
+// a stale worker must not overwrite a concurrent successful worker's source,
+// index, or orchestration state after its paired storage update was rejected.
+func (r *knowledgeRepository) UpdateKnowledgeStorageFailureIfCurrent(
+	ctx context.Context,
+	tenantID uint64,
+	knowledgeID string,
+	expectedStorageSize int64,
+	errorMessage string,
+) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Model(&types.Knowledge{}).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND parse_status = ? AND COALESCE(storage_size, 0) = ?",
+			tenantID, knowledgeID, types.ParseStatusProcessing, expectedStorageSize).
+		Updates(map[string]interface{}{
+			"parse_status":  types.ParseStatusFailed,
+			"error_message": errorMessage,
+			"updated_at":    time.Now(),
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
 // UpdateKnowledgeBatch updates knowledge items in batch
 func (r *knowledgeRepository) UpdateKnowledgeBatch(ctx context.Context, knowledgeList []*types.Knowledge) error {
 	if len(knowledgeList) == 0 {
@@ -329,9 +555,101 @@ func (r *knowledgeRepository) DeleteKnowledge(ctx context.Context, tenantID uint
 	return r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.Knowledge{}).Error
 }
 
+// DeleteKnowledgeWithStorage soft-deletes an active knowledge row and releases
+// its complete source-plus-index contribution while holding the tenant lock.
+// Missing or already-deleted rows retain the legacy idempotent no-op behavior.
+func (r *knowledgeRepository) DeleteKnowledgeWithStorage(ctx context.Context, tenantID uint64, id string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenant, err := lockTenantForStorage(tx, tenantID)
+		if err != nil {
+			return err
+		}
+
+		var knowledge types.Knowledge
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+			First(&knowledge).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+
+		if err := tx.Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.Knowledge{}).Error; err != nil {
+			return err
+		}
+		return applyLockedStorageDelta(ctx, tx, tenant, -knowledge.AccountedStorageBytes())
+	})
+}
+
 // DeleteKnowledge deletes knowledge
 func (r *knowledgeRepository) DeleteKnowledgeList(ctx context.Context, tenantID uint64, ids []string) error {
 	return r.db.WithContext(ctx).Where("tenant_id = ? AND id in ?", tenantID, ids).Delete(&types.Knowledge{}).Error
+}
+
+// DeleteKnowledgeListWithStorage soft-deletes active rows and releases their
+// aggregate source-plus-index contribution in one tenant-serialized
+// transaction. The sum is derived from rows loaded in that transaction, not
+// from caller-provided sizes or a second usage authority.
+func (r *knowledgeRepository) DeleteKnowledgeListWithStorage(
+	ctx context.Context,
+	tenantID uint64,
+	ids []string,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenant, err := lockTenantForStorage(tx, tenantID)
+		if err != nil {
+			return err
+		}
+
+		var knowledges []*types.Knowledge
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("tenant_id = ? AND id IN ? AND deleted_at IS NULL", tenantID, ids).
+			Find(&knowledges).Error; err != nil {
+			return err
+		}
+		if len(knowledges) == 0 {
+			return nil
+		}
+
+		var total int64
+		for _, knowledge := range knowledges {
+			total = saturatingStorageSum(total, knowledge.AccountedStorageBytes())
+		}
+		if err := tx.Where("tenant_id = ? AND id IN ? AND deleted_at IS NULL", tenantID, ids).
+			Delete(&types.Knowledge{}).Error; err != nil {
+			return err
+		}
+		return applyLockedStorageDelta(ctx, tx, tenant, -total)
+	})
+}
+
+// storageContributionDelta computes new-old for two normalized, saturated
+// contributions. The branch form keeps subtraction in int64 bounds because
+// both inputs are in [0, MaxInt64].
+func storageContributionDelta(oldContribution, newContribution int64) int64 {
+	if newContribution >= oldContribution {
+		return newContribution - oldContribution
+	}
+	return -(oldContribution - newContribution)
+}
+
+// saturatingStorageSum adds normalized row contributions without allowing a
+// malformed legacy row set to wrap the aggregate.
+func saturatingStorageSum(total, contribution int64) int64 {
+	if total < 0 {
+		total = 0
+	}
+	if contribution <= 0 {
+		return total
+	}
+	if total > maxInt64Value-contribution {
+		return maxInt64Value
+	}
+	return total + contribution
 }
 
 // GetKnowledgeBatch gets knowledge in batch

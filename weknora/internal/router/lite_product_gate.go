@@ -135,7 +135,6 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 	var req struct {
 		AgentID             string   `json:"agent_id"`
 		AgentSourceTenantID uint64   `json:"agent_source_tenant_id"`
-		WebSearchEnabled    bool     `json:"web_search_enabled"`
 		MCPServiceIDs       []string `json:"mcp_service_ids"`
 		SkillNames          []string `json:"skill_names"`
 		MentionedItems      []struct {
@@ -153,9 +152,6 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 	if req.AgentSourceTenantID != 0 {
 		return true
 	}
-	if req.WebSearchEnabled {
-		return true
-	}
 	// MCP fields are passed through to the native runtime. Quick-answer simply
 	// ignores them because it uses the normal RAG path; smart/custom agent
 	// configuration decides whether and which services can actually run.
@@ -167,6 +163,23 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 			return true
 		}
 	}
+
+	// Lite owns this capability as a platform policy, not a client preference.
+	// Preserve every unknown/native request field as raw JSON while forcing the
+	// handler-visible value on even when an old browser omits it or a crafted
+	// request sends false. The Lite UI deliberately keeps the toggle hidden.
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil || fields == nil {
+		return false
+	}
+	fields["web_search_enabled"] = json.RawMessage("true")
+	rewritten, err := json.Marshal(fields)
+	if err != nil {
+		return true
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(rewritten))
+	c.Request.ContentLength = int64(len(rewritten))
+	c.Request.Header.Set("Content-Length", strconv.Itoa(len(rewritten)))
 	return false
 }
 
@@ -401,6 +414,17 @@ func liteOperationsAdminRouteAllowed(method, path string) bool {
 func liteProductRouteBlocked(method, path string) bool {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	path = strings.TrimSpace(path)
+
+	// Lite cannot create or change FAQ content. Historical FAQ reads/searches
+	// and deletion remain available so tenants can inspect or clean up data
+	// created before the capability was hidden.
+	if strings.HasPrefix(path, "/api/v1/knowledge-bases/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/knowledge-bases/"), "/")
+		if len(parts) >= 2 && parts[1] == "faq" && method != http.MethodGet && method != http.MethodDelete &&
+			!(method == http.MethodPost && len(parts) == 3 && parts[2] == "search") {
+			return true
+		}
+	}
 
 	// Musuw uses the external OIDC/Auth shell for human identity. Native
 	// password registration/login/change-password, desktop auto-setup, tenant

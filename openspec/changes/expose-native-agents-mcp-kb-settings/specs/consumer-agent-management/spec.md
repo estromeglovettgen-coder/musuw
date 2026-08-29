@@ -50,3 +50,14 @@ The agent list, cards, editor, selector, capsule, menus, and validation states S
 #### Scenario: Use an agent in dark mode
 - **WHEN** the application is in dark mode
 - **THEN** all agent controls, overlays, inputs, helper text, focus states, and actions remain visible and functional
+
+### Requirement: Lite web search is mandatory and hidden
+The system SHALL force the existing native web-search capability on for every Lite knowledge or agent chat request while keeping the consumer toggle hidden, and SHALL leave Standard request behavior unchanged.
+
+#### Scenario: Client omits or disables web search
+- **WHEN** a Lite knowledge-chat or agent-chat request omits `web_search_enabled` or supplies `false`
+- **THEN** the router and runtime execute it with web search enabled
+
+#### Scenario: Standard chooses web search
+- **WHEN** a Standard request supplies either web-search value
+- **THEN** the runtime preserves that value

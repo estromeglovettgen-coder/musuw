@@ -81,7 +81,13 @@ func (s *knowledgeService) DeleteKnowledge(ctx context.Context, id string) error
 	originalStatus := knowledge.ParseStatus
 	knowledge.ParseStatus = types.ParseStatusDeleting
 	knowledge.UpdatedAt = time.Now()
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	// Use a column-scoped update: the loaded row may be stale while an index
+	// worker is finalizing. Saving the whole object here could roll back its
+	// newly-accounted StorageSize/FileSize before the paired delete releases it.
+	if err := s.repo.UpdateKnowledgeColumns(ctx, knowledge.ID, map[string]interface{}{
+		"parse_status": types.ParseStatusDeleting,
+		"updated_at":   knowledge.UpdatedAt,
+	}); err != nil {
 		logger.GetLogger(ctx).WithField("error", err).Errorf("DeleteKnowledge failed to mark as deleting")
 		// Continue with deletion even if marking fails
 	} else {
@@ -193,7 +199,7 @@ func (s *knowledgeService) DeleteKnowledge(ctx context.Context, id string) error
 	// row could leave a "file missing but row present" zombie that can neither be
 	// reparsed nor cleanly re-deleted (issue #2192). Orphaning a file after the
 	// row is gone is the tolerable failure mode instead.
-	if err := s.repo.DeleteKnowledge(ctx, tenantID, id); err != nil {
+	if err := s.repo.DeleteKnowledgeWithStorage(ctx, tenantID, id); err != nil {
 		return err
 	}
 
@@ -206,9 +212,10 @@ func (s *knowledgeService) DeleteKnowledge(ctx context.Context, id string) error
 	}
 	deleteExtractedImages(ctx, kbFileSvc, imageURLs)
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
-	tenantInfo.StorageUsed -= knowledge.StorageSize
-	if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, -knowledge.StorageSize); err != nil {
-		logger.GetLogger(ctx).WithField("error", err).Errorf("DeleteKnowledge update tenant storage used failed")
+	if released := knowledge.AccountedStorageBytes(); released >= tenantInfo.StorageUsed {
+		tenantInfo.StorageUsed = 0
+	} else {
+		tenantInfo.StorageUsed -= released
 	}
 	recordKBActivity(ctx, s.audit, tenantID, knowledge.KnowledgeBaseID, types.AuditActionKnowledgeDeleted,
 		"knowledge", knowledge.ID, types.AuditOutcomeSuccess,
@@ -520,7 +527,13 @@ func (s *knowledgeService) DeleteKnowledgeList(ctx context.Context, ids []string
 		prev := knowledge.ParseStatus
 		knowledge.ParseStatus = types.ParseStatusDeleting
 		knowledge.UpdatedAt = time.Now()
-		if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+		// Keep this transition column-scoped for the same stale-row reason as
+		// DeleteKnowledge: preserve a concurrent source/index contribution until
+		// DeleteKnowledgeListWithStorage reads and releases the persisted row.
+		if err := s.repo.UpdateKnowledgeColumns(ctx, knowledge.ID, map[string]interface{}{
+			"parse_status": types.ParseStatusDeleting,
+			"updated_at":   knowledge.UpdatedAt,
+		}); err != nil {
 			logger.GetLogger(ctx).WithField("error", err).WithField("knowledge_id", knowledge.ID).
 				Errorf("DeleteKnowledgeList failed to mark as deleting")
 			// Continue with deletion even if marking fails
@@ -654,11 +667,10 @@ func (s *knowledgeService) DeleteKnowledgeList(ctx context.Context, ids []string
 	// gone avoids "file missing but row present" zombies that break reparse /
 	// re-delete when an earlier cleanup step failed (issue #2192). A failure below
 	// only orphans storage.
-	if err := s.repo.DeleteKnowledgeList(ctx, tenantInfo.ID, ids); err != nil {
+	if err := s.repo.DeleteKnowledgeListWithStorage(ctx, tenantInfo.ID, ids); err != nil {
 		return err
 	}
 
-	storageAdjust := int64(0)
 	for _, knowledge := range knowledgeList {
 		if knowledge.FilePath != "" {
 			fSvc := kbFileServices[knowledge.KnowledgeBaseID]
@@ -666,7 +678,12 @@ func (s *knowledgeService) DeleteKnowledgeList(ctx context.Context, ids []string
 				logger.GetLogger(ctx).WithField("error", err).Errorf("DeleteKnowledge delete file failed")
 			}
 		}
-		storageAdjust -= knowledge.StorageSize
+		released := knowledge.AccountedStorageBytes()
+		if released >= tenantInfo.StorageUsed {
+			tenantInfo.StorageUsed = 0
+		} else {
+			tenantInfo.StorageUsed -= released
+		}
 	}
 	// Delete extracted images per KB
 	for kbID, urls := range kbImageURLs {
@@ -676,10 +693,6 @@ func (s *knowledgeService) DeleteKnowledgeList(ctx context.Context, ids []string
 			continue
 		}
 		deleteExtractedImages(ctx, fSvc, urls)
-	}
-	tenantInfo.StorageUsed += storageAdjust
-	if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, storageAdjust); err != nil {
-		logger.GetLogger(ctx).WithField("error", err).Errorf("DeleteKnowledge update tenant storage used failed")
 	}
 	byKB := make(map[string][]*types.Knowledge)
 	for i := range knowledgeList {
@@ -779,17 +792,31 @@ func (s *knowledgeService) cleanupKnowledgeResources(ctx context.Context, knowle
 		logger.GetLogger(ctx).WithField("error", err).Error("Failed to delete manual knowledge graph data")
 		cleanupErr = errors.Join(cleanupErr, err)
 	}
+	// Keep the persisted index contribution until all indexed resources have
+	// been removed. A retry can then repeat idempotent cleanup without losing
+	// the only byte count available to release from the tenant aggregate.
+	if cleanupErr != nil {
+		return cleanupErr
+	}
 
-	if knowledge.StorageSize > 0 {
-		tenantInfo.StorageUsed -= knowledge.StorageSize
-		if tenantInfo.StorageUsed < 0 {
-			tenantInfo.StorageUsed = 0
-		}
-		if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, -knowledge.StorageSize); err != nil {
-			logger.GetLogger(ctx).WithField("error", err).Error("Failed to adjust storage usage during manual cleanup")
-			cleanupErr = errors.Join(cleanupErr, err)
+	if knowledge.StorageSize != 0 {
+		originalStorageSize := knowledge.StorageSize
+		releasedStorageSize := originalStorageSize
+		if releasedStorageSize < 0 {
+			releasedStorageSize = 0
 		}
 		knowledge.StorageSize = 0
+		if err := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, 0); err != nil {
+			knowledge.StorageSize = originalStorageSize
+			logger.GetLogger(ctx).WithField("error", err).Error("Failed to release index storage during manual cleanup")
+			cleanupErr = errors.Join(cleanupErr, err)
+		} else {
+			if releasedStorageSize >= tenantInfo.StorageUsed {
+				tenantInfo.StorageUsed = 0
+			} else {
+				tenantInfo.StorageUsed -= releasedStorageSize
+			}
+		}
 	}
 
 	return cleanupErr
