@@ -206,7 +206,7 @@
                 type="submit"
                 class="kb-config-button is-primary"
                 data-guide="kb-create-submit"
-                :disabled="saving"
+                :disabled="saving || (authStore.isLiteMode && !isFAQ && !formData.indexingStrategy.vectorEnabled && !formData.indexingStrategy.keywordEnabled && !formData.indexingStrategy.wikiEnabled)"
               >
                 <t-icon :name="saving ? 'loading' : 'check'" :class="{ 'is-spinning': saving }" />
                 <span>{{ saveButtonLabel }}</span>
@@ -832,20 +832,22 @@ const validateForm = (): boolean => {
     return false
   }
 
-  // Creation is server-owned zero configuration. The client may forward the
-  // four persisted scene candidates during submit, but does not require any
-  // model/settings endpoint while opening the modal.
-  if (editorMode.value === 'create') return true
-
-  // 验证索引策略 — 文档类型至少需要开启一种
-  if (formData.value.type !== 'faq') {
+  // Consumer document libraries expose RAG and Wiki as their only selectable
+  // indexing strategies. Graph stays platform-owned and hidden, so it must
+  // never make an otherwise unconfigured create request appear valid.
+  if (authStore.isLiteMode && formData.value.type !== 'faq') {
     const s = formData.value.indexingStrategy
-    if (s && !s.vectorEnabled && !s.keywordEnabled && !s.wikiEnabled && !s.graphEnabled) {
+    if (!s || (!s.vectorEnabled && !s.keywordEnabled && !s.wikiEnabled)) {
       MessagePlugin.warning(t('knowledgeEditor.indexing.atLeastOne'))
       currentSection.value = 'basic'
       return false
     }
   }
+
+  // Creation is server-owned zero configuration. The client may forward the
+  // four persisted scene candidates during submit, but does not require any
+  // edit-only model/settings validation while opening the modal.
+  if (editorMode.value === 'create') return true
 
   // 验证模型配置 - embedding 模型仅在检索索引启用时必须
   const needsEmbedding = formData.value.indexingStrategy?.vectorEnabled || formData.value.indexingStrategy?.keywordEnabled

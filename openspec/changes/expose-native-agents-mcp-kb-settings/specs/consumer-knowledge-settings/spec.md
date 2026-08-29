@@ -22,6 +22,14 @@ The system SHALL expose RAG and Wiki as consumer choices while retaining native 
 - **WHEN** a user enables or disables RAG or Wiki in the visible form
 - **THEN** the form maps RAG to the existing vector and keyword settings, maps Wiki to the existing Wiki setting, and leaves graph at the platform-owned default
 
+#### Scenario: Reject a library with no visible indexing strategy
+- **WHEN** a Lite user disables both RAG and Wiki and attempts to create a document knowledge base
+- **THEN** the UI prevents submission and the server independently rejects the request without persisting a knowledge base
+
+#### Scenario: Duplicate settings uses the native contract
+- **WHEN** a user creates a duplicate from a knowledge-base card
+- **THEN** the UI states that only settings are copied and the native duplicate remains empty of documents, FAQ entries, Wiki pages, and indexes
+
 #### Scenario: Avoid false rebuild promises
 - **WHEN** a user edits settings on a knowledge base that already contains content
 - **THEN** the UI saves the native configuration without claiming or calling a non-existent whole-library rebuild operation

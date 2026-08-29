@@ -361,6 +361,13 @@ func (h *KnowledgeBaseHandler) CreateKnowledgeBase(c *gin.Context) {
 		c.Error(apperrors.NewBadRequestError("Invalid request parameters").WithDetails(err.Error()))
 		return
 	}
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") &&
+		req.Type != types.KnowledgeBaseTypeFAQ &&
+		!req.IndexingStrategy.VectorEnabled && !req.IndexingStrategy.KeywordEnabled &&
+		!req.IndexingStrategy.WikiEnabled {
+		c.Error(apperrors.NewBadRequestError("at least one visible indexing strategy (RAG or Wiki) must be enabled"))
+		return
+	}
 	if err := validateExtractConfig(req.ExtractConfig); err != nil {
 		logger.Error(ctx, "Invalid extract configuration", err)
 		c.Error(err)

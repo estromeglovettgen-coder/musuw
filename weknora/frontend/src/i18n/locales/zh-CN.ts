@@ -3909,7 +3909,7 @@ export default {
       wikiDesc: '自动生成互相关联的 Wiki 知识页面，构建结构化知识体系',
       graphTitle: '知识图谱',
       graphDesc: '提取实体和关系，构建知识图谱支持图谱检索',
-      atLeastOne: '至少需要开启一种索引策略',
+      atLeastOne: '请至少选择 RAG 检索或 Wiki 知识库',
       embeddingRequired: 'RAG 检索需要配置 Embedding 模型',
       lockedTip: '知识库已有内容，索引策略暂不支持调整。如需变更，请先清空知识库。',
       rebuildConfirmTitle: '重建索引',
@@ -4255,7 +4255,8 @@ export default {
       knowledgeGraph: '知识图谱',
       multimodal: '多模态',
       questionGeneration: '问题生成',
-      wiki: 'Wiki'
+      wiki: 'Wiki',
+      unconfigured: '未配置'
     },
     detail: {
       title: '共享知识库',
@@ -4275,8 +4276,8 @@ export default {
     messages: {
       deleted: '已删除',
       deleteFailed: '删除失败',
-      duplicateSuccess: '复制已开始，请稍后刷新列表查看',
-      duplicateFailed: '创建知识库副本失败'
+      duplicateSuccess: '已创建配置副本（不含文档、FAQ、Wiki 页面和索引）',
+      duplicateFailed: '创建知识库配置副本失败'
     },
     sections: {
       pinned: '置顶',
@@ -4297,7 +4298,7 @@ export default {
     menu: {
       viewDetails: '查看详情',
       editConfig: '编辑配置',
-      duplicate: '创建副本'
+      duplicate: '创建配置副本'
     },
     delete: {
       confirmTitle: '删除确认',

@@ -7,6 +7,7 @@
 
 - [x] 2.1 Expose the agreed native knowledge-base fields in create and edit using the existing request contracts
 - [x] 2.2 Hide expert controls, keep graph platform-owned, and remove any UI promise or call to the unimplemented whole-library rebuild route
+- [x] 2.3 Reject Lite creation when both visible strategies are disabled and label the native settings-only duplicate honestly
 
 ## 3. Agent Experience
 

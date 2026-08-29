@@ -3907,7 +3907,7 @@ export default {
       wikiDesc: '상호 연결된 Wiki 지식 페이지를 자동 생성하여 구조화된 지식 체계를 구축합니다',
       graphTitle: '지식 그래프',
       graphDesc: '엔티티와 관계를 추출하여 지식 그래프를 구축하고 그래프 검색을 지원합니다',
-      atLeastOne: '최소 하나의 인덱싱 전략을 활성화해야 합니다',
+      atLeastOne: 'RAG 검색 또는 Wiki 중 하나 이상을 선택하세요',
       embeddingRequired: 'RAG 검색에는 Embedding 모델 설정이 필요합니다',
       lockedTip: '지식베이스에 콘텐츠가 있어 인덱싱 전략을 변경할 수 없습니다. 변경하려면 먼저 지식베이스를 비우세요.',
       rebuildConfirmTitle: '인덱스 재구축',
@@ -4253,7 +4253,8 @@ export default {
       knowledgeGraph: '지식 그래프 활성화됨',
       multimodal: '멀티모달 활성화됨',
       questionGeneration: '질문 생성 활성화됨',
-      wiki: 'Wiki'
+      wiki: 'Wiki',
+      unconfigured: '구성되지 않음'
     },
     detail: {
       title: '공유 지식베이스',
@@ -4273,8 +4274,8 @@ export default {
     messages: {
       deleted: '삭제됨',
       deleteFailed: '삭제 실패',
-      duplicateSuccess: '복사를 시작했습니다. 잠시 후 목록을 새로고침하여 확인하세요.',
-      duplicateFailed: '지식베이스 복제본 생성 실패'
+      duplicateSuccess: '설정 복제본이 생성되었습니다(문서, FAQ, Wiki 페이지 및 인덱스는 복사되지 않음)',
+      duplicateFailed: '지식베이스 설정 복제 실패'
     },
     sections: {
       pinned: '고정됨',
@@ -4295,7 +4296,7 @@ export default {
     menu: {
       viewDetails: '세부 사항을 확인하세요',
       editConfig: '구성 편집',
-      duplicate: '복제'
+      duplicate: '설정 복제'
     },
     delete: {
       confirmTitle: '삭제 확인',

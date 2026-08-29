@@ -3907,7 +3907,7 @@ export default {
       wikiDesc: 'Автоматически создаёт взаимосвязанные Wiki-страницы и формирует структурированную систему знаний',
       graphTitle: 'Граф знаний',
       graphDesc: 'Извлекает сущности и связи, строит граф знаний и поддерживает поиск по графу',
-      atLeastOne: 'Должна быть включена хотя бы одна стратегия индексации',
+      atLeastOne: 'Выберите хотя бы RAG-поиск или Wiki',
       embeddingRequired: 'RAG-поиск требует настройки модели Embedding',
       lockedTip: 'В базе знаний уже есть содержимое, изменение стратегии индексации недоступно. Чтобы изменить, сначала очистите базу знаний.',
       rebuildConfirmTitle: 'Перестроить индекс',
@@ -4253,7 +4253,8 @@ export default {
       knowledgeGraph: 'Граф знаний включен',
       multimodal: 'Мультимодальность включена',
       questionGeneration: 'Генерация вопросов включена',
-      wiki: 'Wiki'
+      wiki: 'Wiki',
+      unconfigured: 'Не настроено'
     },
     detail: {
       title: 'Shared Knowledge Base',
@@ -4273,8 +4274,8 @@ export default {
     messages: {
       deleted: 'База знаний удалена',
       deleteFailed: 'Не удалось удалить базу знаний',
-      duplicateSuccess: 'Копирование началось. Обновите список позже, чтобы увидеть копию.',
-      duplicateFailed: 'Не удалось создать дубликат базы знаний'
+      duplicateSuccess: 'Копия настроек создана (документы, FAQ, Wiki-страницы и индексы не копировались)',
+      duplicateFailed: 'Не удалось скопировать настройки базы знаний'
     },
     sections: {
       pinned: 'Закреплённые',
@@ -4295,7 +4296,7 @@ export default {
     menu: {
       viewDetails: 'View Details',
       editConfig: 'Изменить настройки',
-      duplicate: 'Duplicate'
+      duplicate: 'Копировать настройки'
     },
     delete: {
       confirmTitle: 'Подтверждение удаления',

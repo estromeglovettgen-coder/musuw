@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import KbWikiBadge from './KbWikiBadge.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
+import { useAuthStore } from '@/stores/auth'
 
 type OriginVariant = 'mine' | 'tenant' | 'creator' | 'space' | 'shared'
 
@@ -30,6 +31,7 @@ const props = withDefaults(defineProps<{
   highlighted: false,
   showDetailsOnly: false,
 })
+const authStore = useAuthStore()
 
 const emit = defineEmits<{
   open: []
@@ -81,6 +83,18 @@ const requestDelete = () => {
           <span>{{ $t('knowledgeList.pin.pin') }}</span>
         </span>
         <KbWikiBadge v-if="kb.indexing_strategy?.wiki_enabled" />
+        <span
+          v-else-if="kb.indexing_strategy?.vector_enabled || kb.indexing_strategy?.keyword_enabled"
+          class="visual-reference-kb-card__strategy-icon"
+          data-indexing-strategy="rag"
+          title="RAG"
+        ><t-icon name="layers" /></span>
+        <span
+          v-else-if="authStore.isLiteMode && kb.type !== 'faq'"
+          class="visual-reference-kb-card__strategy-icon is-warning"
+          data-indexing-strategy="unconfigured"
+          :title="$t('knowledgeList.features.unconfigured')"
+        ><t-icon name="error-circle" /></span>
         <strong>{{ kb.name }}</strong>
       </div>
 
@@ -149,6 +163,9 @@ const requestDelete = () => {
 .visual-reference-kb-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .visual-reference-kb-card__title { min-width: 0; flex: 1; padding-right: 42px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .visual-reference-kb-card__title strong { min-width: 0; flex: 1; overflow: hidden; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
+.visual-reference-kb-card__strategy-icon { flex: 0 0 auto; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: #6b7280; }
+.visual-reference-kb-card__strategy-icon :deep(.t-icon) { width: 14px; height: 14px; font-size: 14px; }
+.visual-reference-kb-card__strategy-icon.is-warning { color: #d97706; }
 .visual-reference-kb-card__pinned { flex: 0 0 auto; min-height: 18px; padding: 2px 6px; border: 1px solid rgb(253 230 138 / 60%); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: rgb(255 251 235 / 90%); color: #b45309; font-size: 10px; line-height: 12px; font-weight: 500; }
 .visual-reference-kb-card__pinned :deep(.t-icon) { width: 10px; height: 10px; font-size: 10px; color: #d97706; }
 .visual-reference-kb-card__favorite { position: absolute; top: 14px; right: 42px; z-index: 2; width: 24px; height: 24px; padding: 4px; border: 0; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #d1d5db; opacity: 0; cursor: pointer; transition: opacity 150ms ease,color 150ms ease,background-color 150ms ease; }
@@ -176,6 +193,7 @@ const requestDelete = () => {
 :root[theme-mode="dark"] .visual-reference-kb-card:hover { border-color: var(--mvc-line-strong, #484c54) !important; background: var(--mvc-hover, #25272c) !important; box-shadow: var(--mvc-shadow) !important; transform: none !important; }
 :root[theme-mode="dark"] .visual-reference-kb-card.is-highlighted { border-color: #71717a; box-shadow: 0 0 0 2px rgb(244 244 245 / 7%); }
 :root[theme-mode="dark"] .visual-reference-kb-card__title strong { color: #f4f4f5; }
+:root[theme-mode="dark"] .visual-reference-kb-card__strategy-icon { color: #d4d4d8; }
 :root[theme-mode="dark"] .visual-reference-kb-card__description { color: #a1a1aa; }
 :root[theme-mode="dark"] .visual-reference-kb-card__footer { border-color: #27272a; }
 :root[theme-mode="dark"] .visual-reference-kb-card__badge,

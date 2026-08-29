@@ -1796,7 +1796,7 @@ export default {
     menu: {
       viewDetails: 'View Details',
       editConfig: 'Edit Configuration',
-      duplicate: 'Duplicate'
+      duplicate: 'Duplicate settings'
     },
     pin: {
       pin: 'Pin to Top',
@@ -1817,8 +1817,8 @@ export default {
     messages: {
       deleted: 'Knowledge base deleted',
       deleteFailed: 'Failed to delete knowledge base',
-      duplicateSuccess: 'Copy started. Refresh the list later to view it.',
-      duplicateFailed: 'Failed to create knowledge base duplicate'
+      duplicateSuccess: 'Settings duplicate created (documents, FAQs, Wiki pages, and indexes were not copied)',
+      duplicateFailed: 'Failed to duplicate knowledge base settings'
     },
     detail: {
       title: 'Shared Knowledge Base',
@@ -1839,7 +1839,8 @@ export default {
       knowledgeGraph: 'Knowledge Graph',
       multimodal: 'Multimodal',
       questionGeneration: 'Question Generation',
-      wiki: 'Wiki'
+      wiki: 'Wiki',
+      unconfigured: 'Not configured'
     },
     uploadProgress: {
       uploadingTitle: 'Uploading folder documents to "{name}"',
@@ -2179,7 +2180,7 @@ export default {
       wikiDesc: 'Auto-generate interlinked wiki pages to build a structured knowledge system',
       graphTitle: 'Knowledge Graph',
       graphDesc: 'Extract entities and relationships to build a knowledge graph for graph-based retrieval',
-      atLeastOne: 'At least one indexing strategy must be enabled',
+      atLeastOne: 'Select at least RAG retrieval or Wiki',
       embeddingRequired: 'RAG search requires an Embedding model',
       lockedTip: 'The indexing strategy cannot be changed once the knowledge base contains content. Please clear the knowledge base first.',
       rebuildConfirmTitle: 'Rebuild Index',
