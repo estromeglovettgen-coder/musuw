@@ -30,7 +30,12 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(document.path, route);
       assert.ok(document.title.length >= 4);
       assert.ok(document.summary.length >= 30);
-      assert.equal(document.updated, "2026-08-27");
+      assert.equal(
+        document.updated,
+        ["/terms", "/refund-policy", "/subscription-policy"].includes(route)
+          ? "2026-08-29"
+          : "2026-08-27",
+      );
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
 
@@ -60,18 +65,34 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
     assert.doesNotMatch(all, locale === "zh-CN" ? /3\s*个工作日/ : /three business days/i);
 
     const refund = flatten(locale, "/refund-policy");
-    assert.match(refund, locale === "zh-CN" ? /30\s*个日历日|30\s*天/ : /30 calendar days/i);
+    assert.match(
+      refund,
+      locale === "zh-CN"
+        ? /不提供自愿退款.*最终交易且不予退款|最终交易且不予退款.*不提供自愿退款/
+        : /does not offer voluntary refunds.*final and non-refundable/i,
+    );
     assert.match(refund, locale === "zh-CN" ? /Paddle.*退款|退款.*Paddle/ : /Paddle.*Refund|Refund.*Paddle/i);
-    assert.match(refund, locale === "zh-CN" ? /续费/ : /renewal/i);
     assert.match(refund, locale === "zh-CN" ? /强制性.*消费者|法定.*权利/ : /mandatory consumer rights/i);
 
     const subscription = flatten(locale, "/subscription-policy");
     assert.match(subscription, locale === "zh-CN" ? /自动续费/ : /automatically renew/i);
     assert.match(subscription, locale === "zh-CN" ? /取消/ : /cancel/i);
+    assert.match(
+      subscription,
+      locale === "zh-CN"
+        ? /不提供自愿.*最终交易且不予退款/
+        : /does not offer voluntary.*final and non-refundable/i,
+    );
 
     const terms = flatten(locale, "/terms");
     assert.match(terms, /Paddle/);
     assert.match(terms, /Merchant of Record|商户记录方/);
+    assert.doesNotMatch(
+      `${terms}\n${refund}\n${subscription}`,
+      locale === "zh-CN"
+        ? /30\s*个?日历日|30\s*天退款保证|退款保证/
+        : /30[- ](?:calendar[- ]day|day)|30 calendar days/i,
+    );
     assert.match(
       terms,
       locale === "zh-CN"

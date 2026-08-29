@@ -119,7 +119,7 @@ test("auth and consumer application entry points are private to crawlers", (t) =
 
 test("the sitemap keeps every public Musuw route current and canonical", () => {
   const sitemap = read("public/sitemap.xml");
-  for (const pathname of [
+  const routes = [
     "/",
     "/terms",
     "/privacy",
@@ -129,8 +129,12 @@ test("the sitemap keeps every public Musuw route current and canonical", () => {
     "/cookies",
     "/security",
     "/contact",
-  ]) {
-    assert.match(sitemap, new RegExp(`<loc>https://musuw\\.com${pathname === "/" ? "/" : pathname}</loc><lastmod>2026-08-22</lastmod>`));
+  ];
+  for (const pathname of routes) {
+    const lastmod = ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
+      ? "2026-08-29"
+      : "2026-08-22";
+    assert.match(sitemap, new RegExp(`<loc>https://musuw\\.com${pathname === "/" ? "/" : pathname}</loc><lastmod>${lastmod}</lastmod>`));
   }
   assert.doesNotMatch(sitemap, /Musnow|ClientHub|weknora|www\.musuw\.com/i);
 });

@@ -18,6 +18,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
 ]);
 
 const updated = "2026-08-27";
+const billingPolicyUpdated = "2026-08-29";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -43,7 +44,7 @@ const englishDocuments = {
     title: "Terms of Service",
     summary:
       "These terms govern access to musuw, purchases, subscriptions, user content, and use of the product's source-grounded AI features.",
-    updated,
+    updated: billingPolicyUpdated,
     sections: [
       {
         heading: "1. Who operates musuw",
@@ -118,7 +119,7 @@ const englishDocuments = {
         heading: "9. Cancellation and refunds",
         blocks: [
           p("You can cancel a recurring plan through the management link in your receipt, Paddle's buyer portal, an in-product billing link when available, or by contacting us. Paddle's confirmation controls the recorded cancellation time; cancellation stops future renewals and takes effect at the end of the current paid period unless mandatory law provides otherwise."),
-          p("musuw offers the 30-calendar-day money-back guarantee stated in our Refund Policy. Paddle's current Refund Policy and mandatory consumer rights also apply."),
+          p("musuw does not offer voluntary refunds. Transactions are final and non-refundable, subject to Paddle's current Refund Policy and mandatory consumer rights."),
           link("Read Musuw Refund Policy", "/refund-policy"),
           link("Read Paddle Refund Policy", PADDLE_LINKS.refundPolicy)
         ]
@@ -314,8 +315,8 @@ const englishDocuments = {
     eyebrow: "Purchases",
     title: "Refund Policy",
     summary:
-      "musuw offers a 30-calendar-day money-back guarantee for initial paid orders and the most recent subscription renewal, while preserving Paddle and mandatory consumer rights.",
-    updated,
+      "musuw does not offer voluntary refunds. Transactions are final and non-refundable except where required by law or allowed under Paddle's current Refund Policy, including mandatory rights and remedies for faulty, misdescribed, or unfit products.",
+    updated: billingPolicyUpdated,
     sections: [
       {
         heading: "1. Verified paid orders",
@@ -325,11 +326,10 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "2. Our 30-day money-back guarantee",
+        heading: "2. No voluntary refunds",
         blocks: [
-          p("You may request a full refund within 30 calendar days after an initial paid order or within 30 calendar days after the most recent subscription renewal."),
-          p("This additional guarantee applies to monthly and annual renewals. A refund normally ends access associated with the refunded order and does not automatically refund older billing periods outside the request window."),
-          p("We may decline this additional guarantee where there is credible evidence of fraud, refund abuse, duplicate recovery, or an active chargeback. This exception never limits mandatory consumer rights or Paddle's current Refund Policy."),
+          p("We do not offer voluntary or routine refunds. Completed transactions are final and non-refundable except where required by applicable law or allowed under Paddle's current Refund Policy."),
+          p("Paddle may approve refunds at its discretion and may decline requests involving fraud, refund abuse, or other manipulative behavior. Mandatory consumer rights remain unaffected."),
           link("Read Paddle Refund Policy", PADDLE_LINKS.refundPolicy)
         ]
       },
@@ -349,7 +349,7 @@ const englishDocuments = {
         heading: "4. Who processes the refund",
         blocks: [
           p("Paddle processes eligible refunds to the original payment method where possible. Follow the Paddle receipt, Customer Portal, or buyer-support process."),
-          p("We will cooperate with Paddle, the Merchant of Record, to honor this 30-day guarantee. Transaction verification, payment-network timing, currency conversion, and provider buyer terms may affect how the refund appears."),
+          p("We will cooperate with Paddle, the Merchant of Record, to process any refund required or approved under the applicable policy. Transaction verification, payment-network timing, currency conversion, and provider buyer terms may affect how the refund appears."),
           link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport)
         ]
       },
@@ -382,7 +382,7 @@ const englishDocuments = {
     title: "Subscription and Cancellation Policy",
     summary:
       "This policy explains automatic renewal, billing intervals, cancellation methods, plan changes, and the difference between subscriptions and one-time purchases.",
-    updated,
+    updated: billingPolicyUpdated,
     sections: [
       {
         heading: "1. What you buy",
@@ -435,7 +435,7 @@ const englishDocuments = {
       {
         heading: "7. Refunds and mandatory rights",
         blocks: [
-          p("Cancellation and refunds are different. A cancellation prevents future renewals. A refund reverses an eligible completed transaction. Our 30-calendar-day refund request window covers the most recent renewal."),
+          p("Cancellation and refunds are different. A cancellation prevents future renewals. musuw does not offer voluntary or routine refunds; completed transactions are final and non-refundable except where required by law or approved under Paddle's current Refund Policy."),
           link("Read the Refund Policy", "/refund-policy"),
           p("Nothing in this policy limits mandatory consumer rights.")
         ]
@@ -691,7 +691,7 @@ const chineseDocuments = {
     eyebrow: "法律条款",
     title: "服务条款",
     summary: "本条款适用于 musuw 的访问、购买、订阅、用户内容，以及具有来源依据和可核查证据的 AI 功能。",
-    updated,
+    updated: billingPolicyUpdated,
     sections: [
       {
         heading: "1. 运营主体",
@@ -766,7 +766,7 @@ const chineseDocuments = {
         heading: "9. 取消与退款",
         blocks: [
           p("您可通过收据中的管理链接、Paddle 买家门户、可用时的产品内账单入口或联系我们取消循环订阅。Paddle 的确认记录取消时间；取消会停止未来续费，并在当前已付费周期结束时生效，除非强制性法律另有规定。"),
-          p("musuw 提供本退款政策所述的 30 个日历日退款保证；同时适用 Paddle 当前退款政策及强制性消费者权利。"),
+          p("musuw 不提供自愿退款。交易均为最终交易且不予退款，但以 Paddle 当前《退款政策》和强制性消费者权利适用的情形为准。"),
           link("查看 musuw 退款政策", "/refund-policy"),
           link("查看 Paddle 退款政策", PADDLE_LINKS.refundPolicy)
         ]
@@ -960,8 +960,8 @@ const chineseDocuments = {
     path: "/refund-policy",
     eyebrow: "购买",
     title: "退款政策",
-    summary: "musuw 为初次真实付款和最近一次订阅续费提供 30 个日历日退款保证，同时保留 Paddle 政策及强制性消费者权利。",
-    updated,
+    summary: "musuw 不提供自愿退款。除适用法律要求或 Paddle 当前《退款政策》允许（包括强制性权利及产品缺陷、描述不符或不适用时的救济）外，交易均为最终交易且不予退款。",
+    updated: billingPolicyUpdated,
     sections: [
       {
         heading: "1. 已验证的付费订单",
@@ -971,11 +971,10 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "2. 我们的 30 天退款保证",
+        heading: "2. 不提供自愿退款",
         blocks: [
-          p("您可在初次真实付款后 30 个日历日内，或最近一次订阅续费后 30 个日历日内申请全额退款。"),
-          p("这项额外保证适用于月度和年度续费。退款通常会终止该笔订单对应的付费访问权，不会自动退还申请期限以外更早的计费周期。"),
-          p("存在可信欺诈、退款滥用、重复追偿或进行中拒付时，我们可拒绝这项额外保证；该例外绝不限制强制性消费者权利或 Paddle 当前退款政策。"),
+          p("我们不提供自愿或常规退款。除适用法律要求或 Paddle 当前《退款政策》允许外，已完成交易均为最终交易且不予退款。"),
+          p("Paddle 可酌情批准退款，也可拒绝涉及欺诈、退款滥用或其他操纵行为的申请。强制性消费者权利不受影响。"),
           link("查看 Paddle 退款政策", PADDLE_LINKS.refundPolicy)
         ]
       },
@@ -995,7 +994,7 @@ const chineseDocuments = {
         heading: "4. 谁处理退款",
         blocks: [
           p("Paddle 会在可能时将符合条件的退款退回原付款方式。请使用 Paddle 收据、客户门户或买家支持流程。"),
-          p("我们会与商户记录方 Paddle 配合履行这项 30 天保证。交易核验、支付网络处理时间、汇率换算和服务商买家条款可能影响退款到账方式。"),
+          p("我们会与商户记录方 Paddle 配合处理适用政策要求或批准的退款。交易核验、支付网络处理时间、汇率换算和服务商买家条款可能影响退款到账方式。"),
           link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport)
         ]
       },
@@ -1027,7 +1026,7 @@ const chineseDocuments = {
     eyebrow: "账单",
     title: "订阅与取消政策",
     summary: "本政策说明自动续费、计费周期、取消方式、套餐变更，以及循环订阅和单次购买之间的明确区别。",
-    updated,
+    updated: billingPolicyUpdated,
     sections: [
       {
         heading: "1. 您购买的内容",
@@ -1080,7 +1079,7 @@ const chineseDocuments = {
       {
         heading: "7. 退款与强制性权利",
         blocks: [
-          p("取消与退款不同。取消阻止未来续费；退款撤销符合条件的已完成交易。我们的 30 个日历日退款申请期覆盖最近一次续费。"),
+          p("取消与退款不同。取消阻止未来续费。musuw 不提供自愿或常规退款；已完成交易均为最终交易且不予退款，但适用法律要求或 Paddle 当前《退款政策》批准的情形除外。"),
           link("查看退款政策", "/refund-policy"),
           p("本政策不限制任何强制性消费者权利。")
         ]
