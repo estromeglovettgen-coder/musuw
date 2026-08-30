@@ -54,16 +54,17 @@ var (
 
 // InitializationHandler 初始化处理器
 type InitializationHandler struct {
-	config           *config.Config
-	tenantService    interfaces.TenantService
-	modelService     interfaces.ModelService
-	kbService        interfaces.KnowledgeBaseService
-	kbRepository     interfaces.KnowledgeBaseRepository
-	knowledgeService interfaces.KnowledgeService
-	ollamaService    *ollama.OllamaService
-	documentReader   interfaces.DocumentReader
-	pooler           embedding.EmbedderPooler
-	storageResolver  interfaces.StorageBackendResolver
+	config                *config.Config
+	tenantService         interfaces.TenantService
+	modelService          interfaces.ModelService
+	consumerModelResolver interfaces.ConsumerModelResolver
+	kbService             interfaces.KnowledgeBaseService
+	kbRepository          interfaces.KnowledgeBaseRepository
+	knowledgeService      interfaces.KnowledgeService
+	ollamaService         *ollama.OllamaService
+	documentReader        interfaces.DocumentReader
+	pooler                embedding.EmbedderPooler
+	storageResolver       interfaces.StorageBackendResolver
 }
 
 // NewInitializationHandler 创建初始化处理器
@@ -71,6 +72,7 @@ func NewInitializationHandler(
 	config *config.Config,
 	tenantService interfaces.TenantService,
 	modelService interfaces.ModelService,
+	consumerModelResolver interfaces.ConsumerModelResolver,
 	kbService interfaces.KnowledgeBaseService,
 	kbRepository interfaces.KnowledgeBaseRepository,
 	knowledgeService interfaces.KnowledgeService,
@@ -80,16 +82,17 @@ func NewInitializationHandler(
 	storageResolver interfaces.StorageBackendResolver,
 ) *InitializationHandler {
 	return &InitializationHandler{
-		config:           config,
-		tenantService:    tenantService,
-		modelService:     modelService,
-		kbService:        kbService,
-		kbRepository:     kbRepository,
-		knowledgeService: knowledgeService,
-		ollamaService:    ollamaService,
-		documentReader:   documentReader,
-		pooler:           pooler,
-		storageResolver:  storageResolver,
+		config:                config,
+		tenantService:         tenantService,
+		modelService:          modelService,
+		consumerModelResolver: consumerModelResolver,
+		kbService:             kbService,
+		kbRepository:          kbRepository,
+		knowledgeService:      knowledgeService,
+		ollamaService:         ollamaService,
+		documentReader:        documentReader,
+		pooler:                pooler,
+		storageResolver:       storageResolver,
 	}
 }
 
@@ -251,6 +254,10 @@ func (h *InitializationHandler) UpdateKBConfig(c *gin.Context) {
 	if err != nil || kb == nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{"kbId": utils.SanitizeForLog(kbIdStr)})
 		c.Error(errors.NewNotFoundError("知识库不存在"))
+		return
+	}
+	if err := h.resolveConsumerKBConfigModels(ctx, &req); err != nil {
+		c.Error(err)
 		return
 	}
 
@@ -479,6 +486,52 @@ func (h *InitializationHandler) UpdateKBConfig(c *gin.Context) {
 		"success": true,
 		"message": "配置更新成功",
 	})
+}
+
+func (h *InitializationHandler) resolveConsumerKBConfigModels(
+	ctx context.Context,
+	req *KBModelConfigRequest,
+) error {
+	if req == nil || h.consumerModelResolver == nil || !strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		return nil
+	}
+
+	resolve := func(scene types.ConsumerScene, requestedID string, expectedType types.ModelType) (string, error) {
+		model, err := h.consumerModelResolver.ResolveConsumerModel(ctx, scene, requestedID)
+		if err != nil {
+			if appErr, ok := errors.IsAppError(err); ok {
+				return "", appErr
+			}
+			return "", errors.NewBadRequestError("invalid consumer model")
+		}
+		if model == nil || model.Type != expectedType || strings.TrimSpace(model.ID) == "" {
+			return "", errors.NewBadRequestError("invalid consumer model")
+		}
+		return model.ID, nil
+	}
+
+	llmModelID, err := resolve(types.ConsumerSceneRAG, req.LLMModelID, types.ModelTypeKnowledgeQA)
+	if err != nil {
+		return err
+	}
+	req.LLMModelID = llmModelID
+
+	if req.VLMConfig != nil && req.Multimodal.Enabled && req.VLMConfig.ModelID != "" {
+		modelID, resolveErr := resolve(types.ConsumerSceneVision, req.VLMConfig.ModelID, types.ModelTypeVLLM)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		req.VLMConfig.ModelID = modelID
+	}
+	if req.ASRConfig != nil && req.ASRConfig.Enabled && req.ASRConfig.ModelID != "" {
+		modelID, resolveErr := resolve(types.ConsumerSceneASR, req.ASRConfig.ModelID, types.ModelTypeASR)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		req.ASRConfig.ModelID = modelID
+	}
+
+	return nil
 }
 
 // InitializeByKB godoc
