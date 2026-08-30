@@ -55,6 +55,7 @@ test('the shared title strip keeps the reference cadence and borders', () => {
   assert.match(shell, /\.visual-settings-content \.visual-settings-page-header__title,\s*\.visual-settings-content \.section-header h2\s*\{[\s\S]*font-size:\s*16px !important;[\s\S]*line-height:\s*24px !important;/)
   assert.match(shell, /\.visual-settings-content \.visual-settings-page-header__description,\s*\.visual-settings-content \.section-description\s*\{[\s\S]*font-size:\s*12px !important;[\s\S]*line-height:\s*16px !important;/)
   assert.match(shell, /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header,\s*:root\[theme-mode="dark"\] \.visual-settings-content \.section-header\s*\{[\s\S]*border-bottom-color:\s*#27272a/)
+  assert.match(shell, /:root\[theme-mode="dark"\] \.visual-settings-content h2\.visual-settings-page-header__title,\s*:root\[theme-mode="dark"\] \.visual-settings-content \.section-header h2\s*\{[\s\S]*color:\s*#fff !important/)
 })
 
 test('usage title is mounted before the authoritative plan row and models title is not Lite-gated', () => {

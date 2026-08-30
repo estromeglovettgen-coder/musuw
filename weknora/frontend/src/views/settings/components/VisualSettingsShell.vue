@@ -332,7 +332,7 @@ onBeforeUnmount(() => {
 :root[theme-mode="dark"] .visual-settings-content .section-header {
   border-bottom-color: #27272a !important;
 }
-:root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__title,
+:root[theme-mode="dark"] .visual-settings-content h2.visual-settings-page-header__title,
 :root[theme-mode="dark"] .visual-settings-content .section-header h2 {
   color: #fff !important;
 }

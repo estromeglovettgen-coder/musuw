@@ -148,7 +148,7 @@ test('user profile keeps the authoritative unboxed rows and mono account metadat
 test('the final dark theme owns the current user profile classes, not only legacy settings rows', () => {
   assert.match(
     finalTheme,
-    /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header__title\s*\{[^}]*color:\s*#fff\s*!important;/,
+    /:root\[theme-mode="dark"\] \.visual-settings-content h2\.visual-settings-page-header__title\s*\{[^}]*color:\s*#fff\s*!important;/,
   )
   assert.match(
     finalTheme,
