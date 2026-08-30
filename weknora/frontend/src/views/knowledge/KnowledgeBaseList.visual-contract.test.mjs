@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const knowledgeBaseList = read('./KnowledgeBaseList.vue')
 const agentList = read('../agent/AgentList.vue')
+const nativeDirectoryReference = read('../../assets/musuw-native-directory-reference.css')
 
 const compact = (value) => value.replace(/\s+/g, '')
 
@@ -48,6 +49,21 @@ test('knowledge-base create action mirrors the Agent header button geometry and 
     compact(agentList),
     /<t-iconname="add"size="16px"/,
     'Agent header create button icon size is the reference contract',
+  )
+})
+
+test('legacy compact header rules do not override the Agent creation reference', () => {
+  const compactReference = compact(nativeDirectoryReference)
+
+  assert.match(
+    compactReference,
+    /\.agent-list-content\.header-action-btn:not\(\.agent-create-header-btn\),/,
+    'the legacy header action selector must exclude the Agent creation button',
+  )
+  assert.doesNotMatch(
+    compactReference,
+    /\.agent-list-content\.header-action-btn,\.org-list-content\.header-action-btn\{/,
+    'the legacy selector must not regain control of Agent creation geometry or shadow',
   )
 })
 
