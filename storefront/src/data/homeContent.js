@@ -148,7 +148,21 @@ export const priceBooks = Object.freeze({
     Object.freeze({ monthly: 29, yearlyTotal: 289 }),
     Object.freeze({ monthly: 59, yearlyTotal: 589 }),
     Object.freeze({ monthly: 129, yearlyTotal: 1289 })
+  ]),
+  // Paddle Live PricePreview snapshot for country=JP on 2026-08-28:
+  // monthly 798/1595/3190 and yearly 7816/15791/31741 JPY.
+  JPY: Object.freeze([
+    Object.freeze({ monthly: 0, yearlyTotal: 0 }),
+    Object.freeze({ monthly: 798, yearlyTotal: 7816 }),
+    Object.freeze({ monthly: 1595, yearlyTotal: 15791 }),
+    Object.freeze({ monthly: 3190, yearlyTotal: 31741 })
   ])
+});
+
+export const currencySymbols = Object.freeze({
+  USD: "$",
+  CNY: "¥",
+  JPY: "¥"
 });
 
 export const plans = [

@@ -5,6 +5,7 @@ import { LegalPage, NotFoundPage } from "./LegalPage";
 import { getPublicDocument, getPublicDocumentMeta } from "./legalContent";
 import { applyHomepagePlanPresentation } from "./planPresentation";
 import { applyHomepageMarketingRefresh } from "./homepageMarketingRefresh";
+import { getInitialPricingCountry, selectPricingCurrency } from "./pricingLocalization.js";
 import {
   SITE_LOGO_ALT,
   SITE_LOGO_URL,
@@ -27,6 +28,7 @@ function setMeta(attribute, key, content) {
 export default function App() {
   const [locale, setLocale] = useState(() => getInitialLocale());
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
+  const pricingCurrency = selectPricingCurrency(getInitialPricingCountry(), copy.pricing.currencyCode);
   const homeMeta = useMemo(
     () => applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy)).meta,
     [copy],
@@ -120,7 +122,12 @@ export default function App() {
 
   return (
     <div className="relative">
-      <HomePage copy={copy} locale={locale} onLocaleChange={handleLocaleChange} />
+      <HomePage
+        copy={copy}
+        locale={locale}
+        onLocaleChange={handleLocaleChange}
+        pricingCurrency={pricingCurrency}
+      />
     </div>
   );
 }

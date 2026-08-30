@@ -1,4 +1,9 @@
+import { normalizeCountry } from "../src/pricingLocalization.js";
 import { localizeDocumentResponse, selectLocale } from "./localization.js";
+
+function requestCountry(request) {
+  return normalizeCountry(request.cf?.country || request.headers.get("CF-IPCountry"));
+}
 
 function notFound() {
   return Response.json(
@@ -16,15 +21,17 @@ export async function handleRequest(request, env) {
   const assetResponse = await env.ASSETS.fetch(request);
   const contentType = assetResponse.headers.get("content-type") ?? "";
   if (request.method === "GET" && contentType.toLowerCase().includes("text/html")) {
+    const country = requestCountry(request);
     return localizeDocumentResponse(
       assetResponse,
       selectLocale(
-        request.cf?.country,
+        country,
         request.headers.get("cookie") ?? "",
         url.searchParams.get("lang") ?? "",
       ),
       url.pathname,
       url.hostname,
+      country,
     );
   }
   if (request.method === "GET" && url.pathname.startsWith("/assets/")) {

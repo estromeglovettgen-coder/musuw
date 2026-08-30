@@ -17,7 +17,7 @@ import {
   MARKETING_NAVIGATION,
 } from "./homepageMarketingRefresh";
 
-export function HomePage({ copy, locale, onLocaleChange }) {
+export function HomePage({ copy, locale, onLocaleChange, pricingCurrency }) {
   const homepageCopy = applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy));
 
   return (
@@ -32,7 +32,7 @@ export function HomePage({ copy, locale, onLocaleChange }) {
         <HeroScene copy={homepageCopy} locale={locale} />
         <FeaturesSection copy={homepageCopy} />
         <PlatformSection copy={homepageCopy} />
-        <MarketingPricingSection copy={homepageCopy} />
+        <MarketingPricingSection copy={homepageCopy} pricingCurrency={pricingCurrency} />
         <MarketingComparisonSection copy={homepageCopy} />
         <FAQSection copy={homepageCopy} />
         <FinalCTA copy={homepageCopy} />

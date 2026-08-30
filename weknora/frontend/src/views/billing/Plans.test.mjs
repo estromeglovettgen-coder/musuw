@@ -16,6 +16,19 @@ test('localized Paddle preview prices are rendered without reformatting', () => 
   assert.doesNotMatch(planPrice, /\.replace\(|Intl\.NumberFormat|parseFloat|parseInt|Number\s*\(/)
 })
 
+test('Paddle owns visitor localization and preview uses the checkout catalog IDs', () => {
+  const priceLoad = plans.slice(plans.indexOf('const loadPrices = async () =>'))
+  assert.match(priceLoad, /config\.catalog\?\./)
+  assert.match(priceLoad, /priceIds:\s*options\.map\(\(option\) => option\.price_id\)/)
+  assert.doesNotMatch(priceLoad, /address\s*:/)
+  assert.doesNotMatch(priceLoad, /country\s*:/)
+  assert.doesNotMatch(priceLoad, /currency(?:Code)?\s*:/)
+
+  const checkoutCatalog = readFileSync(new URL('./Checkout.vue', import.meta.url), 'utf8')
+  assert.match(checkoutCatalog, /config\.catalog\?\.\[plan\]\?\.\[period\.value\]/)
+  assert.match(checkoutCatalog, /price_id/)
+})
+
 test('billing actions are visible only to workspace owners and admins', () => {
   assert.match(plans, /import \{ useAuthStore \} from ['"]@\/stores\/auth['"]\s*;?/)
   assert.match(plans, /const authStore = useAuthStore\(\)/)

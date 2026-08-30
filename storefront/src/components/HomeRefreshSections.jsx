@@ -7,7 +7,7 @@ import { Minus } from "@phosphor-icons/react/Minus";
 import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
 import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
 import { Stack } from "@phosphor-icons/react/Stack";
-import { comparisonGroups, priceBooks, plans } from "../data/homeContent";
+import { comparisonGroups, currencySymbols, priceBooks, plans } from "../data/homeContent";
 import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
 import { Reveal, StaggerGroup, StaggerItem } from "./MotionPrimitives";
 import { ButtonLink, SectionIntro } from "./SiteChrome";
@@ -89,9 +89,11 @@ export function PlatformSection({ copy }) {
   );
 }
 
-export function MarketingPricingSection({ copy }) {
+export function MarketingPricingSection({ copy, pricingCurrency }) {
   const [yearly, setYearly] = useState(false);
-  const priceBook = priceBooks[copy.pricing.currencyCode] ?? priceBooks.USD;
+  const effectiveCurrency = pricingCurrency ?? copy.pricing.currencyCode;
+  const priceBook = priceBooks[effectiveCurrency] ?? priceBooks[copy.pricing.currencyCode] ?? priceBooks.USD;
+  const currencySymbol = currencySymbols[effectiveCurrency] ?? copy.pricing.currencySymbol;
   const localizedPlans = plans.map((plan, index) => ({
     ...plan,
     ...copy.pricing.plans[index],
@@ -142,7 +144,7 @@ export function MarketingPricingSection({ copy }) {
                   <div className="plan-price">
                     <strong>
                       {formatPlanAmount(
-                        copy.pricing.currencySymbol,
+                        currencySymbol,
                         yearly ? plan.yearlyTotal : plan.monthly,
                       )}
                     </strong>

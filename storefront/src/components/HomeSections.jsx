@@ -16,6 +16,7 @@ import {
   customerMarks,
   faqs,
   features,
+  currencySymbols,
   priceBooks,
   plans,
   testimonials,
@@ -258,9 +259,11 @@ export function BenefitsSection({ copy }) {
   );
 }
 
-export function PricingSection({ copy }) {
+export function PricingSection({ copy, pricingCurrency }) {
   const [yearly, setYearly] = useState(false);
-  const priceBook = priceBooks[copy.pricing.currencyCode] ?? priceBooks.USD;
+  const effectiveCurrency = pricingCurrency ?? copy.pricing.currencyCode;
+  const priceBook = priceBooks[effectiveCurrency] ?? priceBooks[copy.pricing.currencyCode] ?? priceBooks.USD;
+  const currencySymbol = currencySymbols[effectiveCurrency] ?? copy.pricing.currencySymbol;
   const localizedPlans = plans.map((plan, index) => ({
     ...plan,
     ...copy.pricing.plans[index],
@@ -311,7 +314,7 @@ export function PricingSection({ copy }) {
                     <p className="plan-description">{plan.description}</p>
                   </div>
                   <div className="plan-price">
-                    <strong>{formatPlanAmount(copy.pricing.currencySymbol, yearly ? plan.yearlyTotal : plan.monthly)}</strong>
+                    <strong>{formatPlanAmount(currencySymbol, yearly ? plan.yearlyTotal : plan.monthly)}</strong>
                     <span>{yearly ? copy.pricing.perYear : copy.pricing.perUserMonth}</span>
                   </div>
                 </div>

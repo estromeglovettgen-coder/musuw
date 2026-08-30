@@ -32,7 +32,8 @@ test("localized HTML hands the country signal to the product subdomain", async (
     '<html lang="en"><head></head><body></body></html>',
     { headers: { "content-type": "text/html" } },
   );
-  const response = await localizeDocumentResponse(source, "zh-CN", "/", "musuw.com");
+  const response = await localizeDocumentResponse(source, "zh-CN", "/", "musuw.com", "JP");
+  const html = await response.text();
 
   assert.match(
     response.headers.get("set-cookie") ?? "",
@@ -43,6 +44,9 @@ test("localized HTML hands the country signal to the product subdomain", async (
     /Domain=\.musuw\.com/,
   );
   assert.match(response.headers.get("set-cookie") ?? "", /SameSite=Lax/);
+  assert.match(html, /__MUSUW_COUNTRY__="JP"/);
+  assert.match(response.headers.get("vary") ?? "", /CF-IPCountry/);
+  assert.match(response.headers.get("vary") ?? "", /Cookie/);
 });
 
 test("localized documents receive bounded metadata and private caching", async () => {
@@ -56,10 +60,13 @@ test("localized documents receive bounded metadata and private caching", async (
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-language"), "zh-CN");
   assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.match(response.headers.get("vary") ?? "", /CF-IPCountry/);
+  assert.match(response.headers.get("vary") ?? "", /Cookie/);
   assert.equal(response.headers.get("etag"), null);
   assert.match(html, /<title>隐私政策 \| musuw<\/title>/);
   assert.match(html, /href="https:\/\/musuw\.com\/privacy"/);
   assert.match(html, /__MUSUW_LOCALE__="zh-CN"/);
+  assert.match(html, /__MUSUW_COUNTRY__=""/);
 });
 
 test("HTML is localized while hashed assets stay immutable", async () => {
@@ -79,6 +86,7 @@ test("HTML is localized while hashed assets stay immutable", async () => {
     env,
   );
   assert.equal(documentResponse.headers.get("content-language"), "zh-CN");
+  assert.match(await documentResponse.text(), /__MUSUW_COUNTRY__="CN"/);
 
   const explicitLocaleResponse = await handleRequest(
     requestWithCountry("https://musuw.com/privacy?lang=en", "CN"),
@@ -92,4 +100,21 @@ test("HTML is localized while hashed assets stay immutable", async () => {
   );
   assert.equal(assetResponse.headers.get("cache-control"), "public, max-age=31536000, immutable");
   assert.equal(assetResponse.headers.get("content-language"), null);
+});
+
+test("the Worker accepts Cloudflare's country header when request.cf is unavailable", async () => {
+  const env = {
+    ASSETS: {
+      async fetch() {
+        return new Response('<html lang="en"><head></head><body></body></html>', {
+          headers: { "content-type": "text/html" },
+        });
+      },
+    },
+  };
+  const response = await handleRequest(
+    new Request("https://musuw.com/", { headers: { "CF-IPCountry": "jp" } }),
+    env,
+  );
+  assert.match(await response.text(), /__MUSUW_COUNTRY__="JP"/);
 });

@@ -61,3 +61,18 @@ test('localized price preview uses Paddle final totals, not pre-tax subtotals', 
   assert.match(checkout, /previewSubtotal\.value = preview\?\.formattedSubtotal/)
   assert.match(checkout, /preview\?\.formattedTotal/)
 })
+
+test('PricePreview leaves country and currency selection to Paddle', () => {
+  const start = paddle.indexOf('export async function previewPaddlePrices')
+  const end = paddle.indexOf('\nexport async function openPaddleInlineCheckout', start)
+  assert.notEqual(start, -1, 'preview helper must exist')
+  assert.notEqual(end, -1, 'preview helper must be bounded')
+
+  const preview = paddle.slice(start, end)
+  assert.match(preview, /paddle\.PricePreview\(\{\s*items:/)
+  const request = preview.slice(preview.indexOf('paddle.PricePreview'), preview.indexOf('})\n  return'))
+  assert.doesNotMatch(request, /address\s*:/)
+  assert.doesNotMatch(request, /country\s*:/)
+  assert.doesNotMatch(request, /currency(?:Code)?\s*:/)
+  assert.match(preview, /formattedTotals\.total/)
+})

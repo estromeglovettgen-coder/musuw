@@ -143,6 +143,12 @@ test("regional price books expose exact monthly and annual totals for all four p
     { monthly: 59, yearlyTotal: 589 },
     { monthly: 129, yearlyTotal: 1289 },
   ]);
+  assert.deepEqual(priceBooks.JPY, [
+    { monthly: 0, yearlyTotal: 0 },
+    { monthly: 798, yearlyTotal: 7816 },
+    { monthly: 1595, yearlyTotal: 15791 },
+    { monthly: 3190, yearlyTotal: 31741 },
+  ]);
   assert.equal(plans[0].key, "free");
   assert.equal(plans[3].key, "max");
   assert.notEqual(plans[3].available, false);

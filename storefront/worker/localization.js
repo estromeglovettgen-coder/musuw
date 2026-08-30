@@ -1,6 +1,7 @@
 import { getStorefrontCopy } from "../src/i18n.js";
 import { getPublicDocumentMeta } from "../src/legalContent.js";
 import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
+import { normalizeCountry } from "../src/pricingLocalization.js";
 import {
   SITE_LOGO_ALT,
   SITE_LOGO_URL,
@@ -31,10 +32,11 @@ function savedLocale(cookieHeader) {
 }
 
 export function selectLocale(country, cookieHeader = "", requestedLocale = "") {
+  const normalizedCountry = normalizeCountry(country);
   return (
     supportedLocale(requestedLocale) ??
     savedLocale(cookieHeader) ??
-    (country === "CN" ? "zh-CN" : "en")
+    (normalizedCountry === "CN" ? "zh-CN" : "en")
   );
 }
 
@@ -49,7 +51,7 @@ function normalizeDocumentPath(pathname) {
   return normalizePathname(pathname);
 }
 
-function withDocumentLocale(html, locale, pathname = "/") {
+function withDocumentLocale(html, locale, pathname = "/", country = "") {
   const copy = getStorefrontCopy(locale);
   const normalizedPath = normalizeDocumentPath(pathname);
   const legalMeta = getPublicDocumentMeta(locale, normalizedPath);
@@ -131,7 +133,7 @@ function withDocumentLocale(html, locale, pathname = "/") {
     /<script\s+id=["']musuw-structured-data["'][^>]*>[\s\S]*?<\/script>/i,
     structuredMarkup,
   );
-  const bootstrap = `<script>window.__MUSUW_LOCALE__=${JSON.stringify(locale)}</script>`;
+  const bootstrap = `<script>window.__MUSUW_LOCALE__=${JSON.stringify(locale)};window.__MUSUW_COUNTRY__=${JSON.stringify(normalizeCountry(country))}</script>`;
   return localizedHtml.includes("</head>")
     ? localizedHtml.replace("</head>", `${bootstrap}</head>`)
     : `${bootstrap}${localizedHtml}`;
@@ -142,6 +144,7 @@ export async function localizeDocumentResponse(
   locale,
   pathname = "/",
   hostname = "musuw.com",
+  country = "",
 ) {
   const normalizedLocale = locale === "zh-CN" ? "zh-CN" : "en";
   const normalizedPath = normalizeDocumentPath(pathname);
@@ -150,11 +153,25 @@ export async function localizeDocumentResponse(
   const headers = new Headers(assetResponse.headers);
   headers.set("content-language", normalizedLocale);
   headers.set("cache-control", "private, no-store");
+  const vary = new Set(
+    (headers.get("vary") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+  vary.add("CF-IPCountry");
+  vary.add("Cookie");
+  headers.set("vary", [...vary].join(", "));
   headers.delete("content-length");
   headers.delete("etag");
   headers.delete("last-modified");
   headers.set("set-cookie", localeCookie(normalizedLocale, hostname));
-  const html = withDocumentLocale(await assetResponse.text(), normalizedLocale, normalizedPath);
+  const html = withDocumentLocale(
+    await assetResponse.text(),
+    normalizedLocale,
+    normalizedPath,
+    country,
+  );
   const status = knownDocument ? assetResponse.status : 404;
   return new Response(html, {
     status,

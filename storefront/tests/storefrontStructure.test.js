@@ -35,6 +35,9 @@ test("commercial home keeps the smooth template and presents the approved produc
   ]);
   const copy = getStorefrontCopy("en");
   const home = renderToStaticMarkup(React.createElement(HomePage, { copy }));
+  const japanHome = renderToStaticMarkup(
+    React.createElement(HomePage, { copy, pricingCurrency: "JPY" }),
+  );
   const footer = renderToStaticMarkup(
     React.createElement(SiteFooter, { copy: homepageCopy("en") }),
   );
@@ -87,6 +90,8 @@ test("commercial home keeps the smooth template and presents the approved produc
   }
   assert.match(home, /billing-discount-badge/);
   assert.match(home, /Save ~17%/);
+  assert.match(japanHome, />¥798</);
+  assert.match(japanHome, />¥1,595</);
   assert.match(home, /100 GiB/);
   assert.match(home, /class="hero-product-demo"/);
   assert.match(home, /class="hero-demo-composer/);
