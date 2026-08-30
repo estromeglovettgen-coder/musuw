@@ -1,6 +1,6 @@
 # Musuw 密钥与官方集成清单
 
-最后核对：2026-08-26（America/Phoenix）。本文件只记录变量名、服务/账号标签、
+最后核对：2026-08-30（America/Phoenix）。本文件只记录变量名、服务/账号标签、
 文件名、权限、消费者和健康证明，**绝不记录密钥值、邮件地址、完整主机/IP、
 hash 或供应商响应内容**。
 
@@ -31,9 +31,12 @@ Staging 的独立 Compose、Sandbox 和发布门见
 - 浏览器只能接收 publishable/client/catalog 值；server secret、management/admin、
   webhook signing、SSH/deploy 和 OAuth secret 只能从 Keychain、GitHub Environment
   或服务器 `0600` 文件进入受控进程。
-- TikHub 社交链接入库只读取后端进程的 `TIKHUB_API_KEY`。供应商地址由代码固定，
-  密钥不得进入前端 runtime config、用户请求、任务 payload、日志或数据库字段；
-  未配置密钥时应明确拒绝社交平台解析，同时继续保留普通网页 URL 入库。
+- TikHub 社交链接入库只读取后端进程的 `TIKHUB_API_KEY`。Musuw production 与
+  staging overlay 都要求 root-owned `0600` 文件 `tikhub_api_key`：预检只验证文件
+  元数据，Compose 以 `0400` 只读挂载，app entrypoint 才在进程内读取并导出。
+  供应商地址由代码固定，密钥不得进入前端 runtime config、用户请求、任务 payload、
+  日志、数据库字段或生成的 env；本地/社区部署未配置时应明确拒绝受支持的社交平台
+  解析，同时继续保留普通网页 URL 入库。
 
 ## 2. 本机 macOS Keychain（只检查存在性）
 
@@ -76,7 +79,7 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 | `.runtime/weknora/secrets/*` | OIDC、数据库、Redis、AES、JWT 等服务运行 secret；仅本机受控进程读取。 |
 | `/opt/weknora/staging-runtime/staging.public.env` | Tokyo staging 的非密钥 Compose/Paddle/Supabase/OpenRouter/R2 选择；由 `staging` Environment 受控输入生成。 |
 | `/opt/weknora/staging-runtime/auth-public.env` | staging browser public origin、Supabase public coordinates 和 OAuth client ID；不含 service/API key。 |
-| `/opt/weknora/staging-runtime/secrets/*` | staging 独立数据库、Redis、OIDC、Supabase service、OpenRouter、Paddle Sandbox、R2 等 server-only secret，regular non-symlink、非空、`0600`。 |
+| `/opt/weknora/staging-runtime/secrets/*` | staging 独立数据库、Redis、OIDC、Supabase service、OpenRouter、TikHub、Paddle Sandbox、R2 等 server-only secret，regular non-symlink、非空、`0600`。 |
 
 旧的 `candidate`/迁移目录不是生产权威。部署前必须从对应 provider 环境
 重新生成公开环境并运行静态校验；staging Sandbox 输入不能覆盖 production Live，
@@ -100,6 +103,7 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 | `neo4j_auth` / `searxng_secret` | Neo4j、SearXNG | 内部运行 secret。 |
 | `oidc_client_id` / `oidc_client_secret` | Supabase OIDC | server-only OAuth client。 |
 | `openrouter_management_api_key` | child-key provisioning、usage/limit 权威 | server-only management key。 |
+| `tikhub_api_key` | TikHub 社交分享链接入库 | server-only；只由 app entrypoint 读取，不进 public/generated env、任务 payload 或日志。 |
 | `paddle_api_key` | Paddle 官方 API | **必须是 Live API key**，并匹配生产运行时实际权限。 |
 | `paddle_webhook_secret` | 签名 webhook | **必须对应唯一 active Live production destination**。 |
 | `r2_access_key_id` / `r2_secret_access_key` | Cloudflare R2 S3 存储 | server-only；不进浏览器/Worker。 |
@@ -117,8 +121,16 @@ Staging uses `/opt/weknora/staging-runtime/secrets` and its own
 volumes/namespace, file and DocReader temporary volumes, R2 test bucket,
 Supabase test project, Paddle Sandbox account/destination and OpenRouter test
 workspace. The file names mirror the production contract where needed, but the
-values and provider resources are never shared. The staging Compose project is
-`weknora-v072-staging`; production remains `weknora-v072-production`.
+environment-specific values and provider resources are never shared. TikHub has
+no Musuw Sandbox/Live split, but each overlay still receives its own protected
+file mount. The staging Compose project is `weknora-v072-staging`; production
+remains `weknora-v072-production`.
+
+Both overlays require a file named `tikhub_api_key` in their own protected
+secret directory. Preflight verifies only regular-file shape, non-emptiness,
+root ownership and mode `0600`; Compose mounts it read-only and the app
+entrypoint exports `TIKHUB_API_KEY` only inside the backend process. Never copy
+or transport the value through a public env, release artifact or log.
 
 The GitHub `staging` Environment contains only the staging SSH key/known-hosts,
 restricted remote/port, and public runtime files. The release workflow accepts
@@ -147,7 +159,7 @@ ssh musuw-tokyo \
 | Cloudflare Worker | 不适用 | GitHub `storefront-production` 只含 Worker-scoped account/token | GitHub Environment + Cloudflare dashboard；仅 Wrangler 部署，Worker 不拿 server/model/billing secret。 |
 | Cloudflare R2 | staging 专用 test bucket 与 protected files | production protected files/bucket | R2 S3 API；应用只返回对象/计量 metadata，staging 对象绝不迁移到 Live。 |
 | Langfuse | test Keychain pair | production protected pair | Langfuse 项目；trace health 只返回 count/status，排除 input/output/prompt/content/attachments。 |
-| TikHub | operator-managed server key | protected backend runtime when deployed | TikHub dashboard 是权威；只供 WeKnora 社交分享入库 importer，浏览器和任务队列均不得得到密钥；健康证明只保留脱敏状态与 request ID。 |
+| TikHub | staging 独立保护文件 `tikhub_api_key` | production 独立保护文件 `tikhub_api_key` | TikHub dashboard credential 不区分 Musuw Sandbox/Live；两个 overlay 都 fail closed 地要求各自的文件型 mount，只供 WeKnora 社交分享入库 importer，浏览器和任务队列均不得得到密钥；健康证明只保留文件元数据、脱敏状态、完成/分块计数与 request ID。 |
 | GitHub/GHCR/SSH | `staging` Environment、restricted staging SSH + pinned known hosts；GHCR token 为 job-only | `server-production` restricted SSH + pinned known hosts；GHCR token 为 job-only | GitHub Environment 和 workflow 是权威；staging-only→人工 Sandbox E2E→exact-digest promote，固定 release gate、health check。 |
 | Tencent VectorDB / Alibaba Cloud | optional/independent inventory | Tokyo 当前无此 active consumer | 各自 provider dashboard；仅在明确启用的独立项目中使用，不能从示例变量推断已配置。 |
 | Google OAuth / SMTP | Supabase/OAuth 与邮件设置待按项目确认 | 当前 Musuw 没有 direct Google secret consumer；SMTP 由 Supabase Auth 配置边界管理 | Supabase/Google/provider dashboard；只验证 discovery、callback、OTP delivery，不记录 token 或邮件内容。 |
@@ -194,9 +206,10 @@ Musuw 的 production env。AiToEarn 发现有 tracked env 文件，需由其 own
 5. 若值曾出现在终端输出、DOM snapshot、截图、日志或 git diff，立即按已泄露处理
    并轮换，不能只删除视觉证据。
 
-Staging 轮换遵循同样的边界，但只在 Sandbox/test provider 和 GitHub `staging`
-Environment 内操作：先验证完整 Sandbox unit（SDK mode/API URL、client token、
-API key、destination secret、六个 recurring prices、approved domain/default link、
+Staging 轮换遵循同样的边界：Sandbox/test provider 的 server secret 只原子替换到
+staging protected runtime；GitHub `staging` Environment 只承载 SSH 和非密钥 public
+输入。先验证完整 Sandbox unit（SDK mode/API URL、client token、API key、
+destination secret、六个 recurring prices、approved domain/default link、
 tax/currency/payment methods），再用全新测试身份完成完整 Paddle E2E。只有支付、
 升级、取消/到期、恢复、签名 webhook 的重试/幂等/乱序、会员身份、OpenRouter 个人
 额度及 portal/history 全部通过，才可用同 SHA/同 digest promote；staging 任何

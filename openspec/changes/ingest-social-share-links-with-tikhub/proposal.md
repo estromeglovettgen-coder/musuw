@@ -26,5 +26,7 @@ None.
 
 - `weknora/frontend`: the existing URL dialog adopts the supplied link-import styling and stops rejecting share text before submission.
 - `weknora/internal/handler` and `weknora/internal/application/service`: input extraction moves ahead of URL/file classification; known social URLs branch inside the existing document worker.
-- Server/container wiring: one server-only TikHub credential (optional outside the Musuw production overlay) and a fixed provider base URL.
+- Server/container wiring: one server-only TikHub credential, required as a
+  file-backed secret by the Musuw production and staging overlays but optional
+  for local/community deployments, plus a fixed provider base URL.
 - Existing URL import API remains compatible; no new public endpoint or request field is introduced.

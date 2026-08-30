@@ -1,3 +1,9 @@
+> **Historical baseline.** The server-release portion of this change is
+> superseded by `deploy-isolated-staging`: automatic delivery now stops at
+> staging, and production requires full Sandbox E2E plus manual same-digest
+> promotion. Use `README.md`, `docs/DEPLOYMENT.md`, and that later change for
+> current operations.
+
 ## Why
 
 Musuw needs one obvious delivery path. GitHub should contain the complete

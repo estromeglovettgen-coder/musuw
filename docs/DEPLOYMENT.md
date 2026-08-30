@@ -3,14 +3,16 @@
 GitHub is the only source of production code. The repository is
 `estromeglovettgen-coder/musuw` and `main` is the release branch.
 
-The two delivery targets are deliberately small:
+The delivery surfaces are deliberately small:
 
 - `storefront/` is the public marketing site and is deployed to the existing
   Cloudflare Worker `musuw-site` (`musuw.com` and `www.musuw.com`).
 - GitHub Actions builds the `weknora/frontend/` and `auth/` browser bundles,
   builds the Go application and frontend runtime images, pushes those two
-  images to GHCR, and records their immutable digests. The production server
-  only pulls those digests and runs the checked-in Compose file.
+  images to GHCR, and records their immutable digests. The workflow deploys
+  those digests to staging automatically; production only pulls the same
+  staging-approved pair after the manual promotion gate. Both targets use
+  their checked-in Compose wrappers with `--no-build`.
 
 ## Runtime topology
 
@@ -93,10 +95,10 @@ stop-and-retain-disk procedure.
 ## Source and upload boundary
 
 The release bundle is materialized from tracked files at the selected SHA. It
-contains application source, lockfiles, the production Compose files, scripts,
-safe examples and documentation only. It must not contain `.env` values,
-private keys, dependency directories, generated output, logs, databases,
-volumes or server runtime files.
+contains application source, lockfiles, the production and staging Compose
+definitions, scripts, safe examples and documentation only. It must not contain
+`.env` values, private keys, dependency directories, generated output, logs,
+databases, volumes or server runtime files.
 
 The restricted SSH key and pinned `known_hosts` entry are supplied only to the
 deploy job, never to the native image-build job. The gate must reject a mutable ref, an unsafe path, an
@@ -150,10 +152,14 @@ the normal path.
 
 The fixed production Compose files remain the production runtime definition. The
 update sequence is GitHub build/push → upload/verify SHA and manifest → GHCR
-login → pull exact digests → `docker compose up -d --no-build --force-recreate
-app frontend` → health checks. Keep named volumes and server-owned runtime files
-in place; the server never builds images or prunes its build cache. Staging uses
-its own overlay, project name and runtime root as documented in
+login → pull exact digests →
+`scripts/weknora-production/compose.sh --edge up -d --no-build --no-deps
+--force-recreate app frontend` → health checks. Do not replace the checked-in
+wrapper with raw `docker compose`: the wrapper fixes the production project,
+Compose files, profiles, OIDC boundary and target architecture. Keep named
+volumes and server-owned runtime files in place; the server never builds images
+or prunes its build cache. Staging uses its own overlay, project name and runtime
+root as documented in
 [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md); it never changes this
 production sequence.
 
@@ -247,8 +253,10 @@ Private runtime credentials remain on the server; they are not copied into the
 repository, Cloudflare Worker, or browser bundles.
 
 The protected production secret directory must include the file-backed
-OpenRouter Management key plus the Live Paddle API key and destination-specific
-secret for the one production notification destination. The non-secret public
+OpenRouter Management key, TikHub `tikhub_api_key`, Live Paddle API key and
+destination-specific secret for the one production notification destination.
+TikHub is mounted read-only and exported only inside the backend process; it
+must never appear in a public or generated environment. The non-secret public
 environment carries only `live`, its matching `live_` client token, and six
 provider-verified Live Plus/Pro/Max monthly/yearly price IDs. The preflight and
 app entrypoint require `live_` with `pdl_live_apikey_`; they reject Sandbox,
@@ -265,8 +273,11 @@ rotate one field in isolation.
 
 Staging keeps a separate Sandbox unit in `/opt/weknora/staging-runtime`: its
 `staging.public.env` and `auth-public.env` contain only public coordinates, while
-database/Redis/AES/JWT/OIDC/Supabase service, OpenRouter, Paddle Sandbox and R2
-credentials stay in the staging `secrets/` directory. The six Sandbox price IDs,
+database/Redis/AES/JWT/OIDC/Supabase service, OpenRouter, TikHub, Paddle Sandbox
+and R2 credentials stay in the staging `secrets/` directory. Production and
+staging keep separate protected TikHub file mounts even when the provider
+credential is environment-agnostic; it never travels through a public env or
+release artifact. The six Sandbox price IDs,
 Sandbox destination and approved `staging.musuw.com` checkout domain are
 validated together. Staging acceptance must finish before a manual exact-digest
 promotion; it must never alter this production Live unit.

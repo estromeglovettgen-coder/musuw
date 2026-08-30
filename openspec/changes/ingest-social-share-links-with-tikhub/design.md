@@ -72,13 +72,16 @@ The URL handler and creation service log only knowledge IDs and sanitized host/p
 - **TikHub response bodies are not typed by OpenAPI** -> Lock each normalizer with provider-shaped fixtures and fail closed when required fields are absent.
 - **A social video exceeds `MAX_FILE_SIZE_MB` or no VLM is configured** -> Mark the knowledge failed with an actionable message; do not fall back to a web page or fetch another format automatically.
 - **A short and long link for one work can still bypass deduplication when the short link hides the object ID** -> Use stable-ID hashes wherever the ID is locally extractable and accept the unresolved-short-link trade-off without a schema migration.
-- **Shared TikHub balance can be consumed by authenticated users** -> Limit each job to its fixed request count, use existing URL-import authorization, and expose provider errors; production rollout must also set an operator balance alert before enabling `TIKHUB_API_KEY`.
+- **Shared TikHub balance can be consumed by authenticated users** -> Limit each job to its fixed request count, use existing URL-import authorization, and expose provider errors; each Musuw overlay must also set an operator balance alert before enabling `TIKHUB_API_KEY`.
 - **Provider success followed by worker crash is not exactly once** -> Disable normal retries and make the residual uncertainty visible rather than adding a transaction/lease subsystem.
 
 ## Migration Plan
 
 1. Local/community deployments may leave `TIKHUB_API_KEY` unset; ordinary URL behavior remains active and recognized social inputs fail with a configuration message.
-2. The Musuw production overlay requires the file-backed `tikhub_api_key` secret and an operator balance alert before rollout.
+2. The Musuw production and staging overlays each require their own file-backed
+   `tikhub_api_key` secret and an operator balance alert before rollout. Their
+   preflights inspect only safe file metadata; the app entrypoint reads the
+   mounted value solely inside the backend process.
 3. Run one authorized fixture per supported content kind and verify downstream video/Markdown ingestion.
 4. Roll back by disabling social input or reverting the change; no schema rollback is required.
 

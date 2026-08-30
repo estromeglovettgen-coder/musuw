@@ -44,22 +44,28 @@ The Go API, authentication shell, and workspace UI run directly from this
 checkout. `npm run dev:down` stops both host processes and those dependency
 containers while preserving their data volumes.
 
-Use `npm run preview` only for a production-like full Docker rebuild. Normal
-production delivery is automatic after successful `main` CI; reserve
+Use `npm run preview` only for a production-like full Docker rebuild. Successful
+`main` CI automatically starts the immutable build and staging-only delivery;
+production still requires the documented manual promotion. Reserve
 `npm run release -- <full-sha>` for an explicit exact-SHA rerun.
 
 ## Production delivery
 
 GitHub is the only production code entry point. Pull requests run CI; after a
-successful CI run on `main`, GitHub Actions automatically performs both
-deliveries:
+successful CI run on `main`, GitHub Actions automatically deploys the public
+storefront and builds the immutable app/frontend pair for staging acceptance:
 
 - `storefront/` is built in GitHub and deployed to the Cloudflare Worker
   `musuw-site`, serving `musuw.com` and `www.musuw.com`.
 - The authenticated frontend and auth shell bundles, plus the Go application
   and frontend runtime images, are built in GitHub. The two runtime images are
-  pushed to GHCR and deployed by immutable digest; the server only pulls them
-  and runs the checked-in Compose file with `--no-build`.
+  pushed to GHCR and deployed by immutable digest to `staging.musuw.com`; the
+  server only pulls them and runs the checked-in Compose wrapper with
+  `--no-build`.
+- Production is never promoted by the automatic `workflow_run`. Operators must
+  complete the full Paddle Sandbox E2E, then manually promote the same Git SHA
+  and recorded image digests through the protected `server-production`
+  Environment and its account-owner approval.
 
 `app.musuw.com` stays on the simple Cloudflare Tunnel → server Nginx path for
 the API, login, uploads, and streaming responses. It is not a second Worker
@@ -81,5 +87,7 @@ and verification only and is not a production deployment path.
 - [WeKnora license and upstream notices](weknora/LICENSE)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-Historical migration notes, legacy runtime specifications, acceptance captures,
-and prior project handoffs intentionally do not live in this working tree.
+Historical OpenSpec, verification, and handoff records document past decisions;
+they are not current runtime instructions. This README, the operator documents
+under [`docs/`](docs/), the checked-in release scripts, and the active source are
+the current authority.

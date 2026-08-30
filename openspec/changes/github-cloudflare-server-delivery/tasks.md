@@ -1,3 +1,8 @@
+> **Historical completion record.** The direct production-delivery steps below
+> were completed for the recorded release and are now superseded by
+> `deploy-isolated-staging`. Current production promotion is manual and consumes
+> the staging-approved SHA/digests.
+
 ## 1. GitHub source
 
 - [x] 1.1 Use `estromeglovettgen-coder/musuw` as the private canonical

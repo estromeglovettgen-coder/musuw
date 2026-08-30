@@ -1,3 +1,8 @@
+> **Historical baseline.** Steps below record the previously verified direct
+> production path. `deploy-isolated-staging` supersedes it with automatic
+> staging-only delivery and manual same-digest production promotion. Do not use
+> this file as the current runbook; use `docs/DEPLOYMENT.md`.
+
 ## Delivery boundaries
 
 The repository is the only source of code used for a release. The active

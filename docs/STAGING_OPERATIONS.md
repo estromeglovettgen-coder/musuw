@@ -73,11 +73,15 @@ GitHub `staging` Environment 只提供 staging 部署所需的受限输入。仓
   不写入 artifact 或 server permanent config。
 
 Tokyo 的 staging runtime 目录是 `/opt/weknora/staging-runtime`，secret 子目录
-是 `/opt/weknora/staging-runtime/secrets`。数据库、Redis、AES/JWT、Supabase
-service key、OpenRouter management key、Paddle Sandbox API key/webhook secret、
-R2 access key 等都必须是 regular、non-symlink、非空、root-owned `0600` 文件，
-再由 Compose 只读挂载。`TIKHUB_API_KEY` 只能由安全的后端检查存在性、类型、非空、
-owner 和 mode；不得读取内容或把它带入镜像、前端、日志、任务 payload 或 artifact。
+是 `/opt/weknora/staging-runtime/secrets`。数据库、Redis、AES/JWT、OIDC、Supabase
+service key、OpenRouter management key、TikHub、Paddle Sandbox API key/webhook
+secret、R2 access key 与 SearXNG secret 都必须是 regular、non-symlink、非空、
+root-owned `0600` 文件，再由 Compose 只读挂载。TikHub 必须使用该目录中的
+`tikhub_api_key`：
+`prepare-runtime.sh` 和部署验证只检查存在性、类型、非空、owner 与 mode，Compose
+以 `0400` 挂载，app entrypoint 才在后端进程内读取为 `TIKHUB_API_KEY`。缺失或空值
+会在启动前 fail closed；密钥不得进入镜像、public/generated env、前端、日志、任务
+payload 或 artifact。
 
 Staging provider identity 也必须 fail closed：Supabase public URL 固定为已配置的
 test project，R2 bucket 固定为 `musuw-staging`；OpenRouter workspace UUID 同时存在
@@ -107,6 +111,13 @@ ruby scripts/ci/validate-workflows.rb
 known hosts 上传 manifest-backed source，并让远端 root gate 调用冻结 release
 中的 verifier。不要手工绕过 gate、传入 caller-selected command/path，或在服务器
 直接运行 Compose build。
+
+TikHub 首次安装或轮换后，还要用一个受支持的公开社交作品 URL 做真实 staging
+验收。任务必须从 `processing`/`finalizing` 到 `completed`，持久化为现有 Markdown
+或视频文件并产生可检索分块；页面和数据库均不能继续显示
+`Social link import is not configured`。供应商调用不自动重试，只有操作者明确点击
+重新解析才可再次调用。证据只记录平台类别、终态、文件类型、分块计数、耗时和
+脱敏 request ID，不记录原始分享文本、完整 URL、响应体、签名媒体地址或密钥。
 
 上线前逐项确认：
 

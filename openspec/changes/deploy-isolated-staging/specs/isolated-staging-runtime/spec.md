@@ -64,7 +64,7 @@ Cloudflare SHALL terminate valid TLS for `staging.musuw.com` and route it throug
 - **THEN** interactive routes require Access while the exact Paddle webhook path bypasses Access and remains guarded by Paddle signature verification
 
 ### Requirement: Secret and environment boundaries fail closed
-Production and staging SHALL use separate protected runtime directories and file-backed secrets. Secret files SHALL be regular, non-symlink, non-empty, root-owned mode-0600 files; values MUST NOT be logged, returned, committed, copied into images, or stored in GitHub artifacts. TikHub verification SHALL inspect only existence, type, non-emptiness, ownership, and mode.
+Production and staging SHALL use separate protected runtime directories and file-backed secrets. Secret files SHALL be regular, non-symlink, non-empty, root-owned mode-0600 files; values MUST NOT be logged, returned, committed, copied into images, or stored in GitHub artifacts. Production and staging SHALL each require `tikhub_api_key` in their own protected secret directory. TikHub preflight and deployment verification SHALL inspect only existence, type, non-emptiness, ownership, and mode; only the app entrypoint may read the mounted value to export `TIKHUB_API_KEY` inside the backend process.
 
 #### Scenario: Runtime preflight inspects secrets
 - **WHEN** deployment validates staging or production secret inputs

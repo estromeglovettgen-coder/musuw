@@ -20,5 +20,7 @@
 
 ## 5. Configuration and Verification
 
-- [x] 5.1 Document `TIKHUB_API_KEY` in server-only environment/credential metadata and ensure it cannot enter frontend runtime config or logs.
+- [x] 5.1 Document `TIKHUB_API_KEY` in server-only credential metadata, require
+  file-backed secrets in both Musuw production and staging overlays, and ensure
+  it cannot enter frontend/public/generated runtime config or logs.
 - [x] 5.2 Run targeted Go tests, frontend tests/typecheck/build, OpenSpec validation, and a bounded adversarial review; fix all current blockers.

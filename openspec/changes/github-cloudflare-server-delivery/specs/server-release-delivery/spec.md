@@ -1,3 +1,7 @@
+> **Historical delta.** `deploy-isolated-staging` supersedes automatic server
+> publication: CI now builds once and deploys staging; production promotion is
+> manual after full Sandbox E2E and reuses the same SHA/digests.
+
 ## ADDED Requirements
 
 ### Requirement: Server releases use one exact Git SHA

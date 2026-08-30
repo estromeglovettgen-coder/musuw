@@ -1,6 +1,6 @@
 # Paddle Live 正式切换清单
 
-最后核验：2026-08-27（America/Phoenix）。本文件只记录公开页面、资源类别、
+最后核验：2026-08-30（America/Phoenix）。本文件只记录公开页面、资源类别、
 操作顺序和非敏感验证结论；不得加入审核账号凭据、个人/企业核验资料、
 Paddle 资源 ID、credential 值、网络地址或供应商响应原文。
 
@@ -18,8 +18,10 @@ API URL、`test_` client token、`pdl_sdbx_apikey_` server API key、`pdl_ntfset
 destination secret、Plus/Pro/Max monthly/yearly 六个 distinct recurring USD
 prices、approved `staging.musuw.com` checkout domain、Sandbox `/pay` default
 payment link，以及 Paddle-owned location tax、currency 和 payment-method 设置。
-这些值只进入 staging protected runtime/GitHub `staging` Environment；不得复制到
-production Live files or browser bundles。
+其中 API key 与 destination secret 只进入 staging protected runtime；client
+token、模式、价格和其他浏览器公开坐标通过 GitHub `staging` Environment 的 public
+输入交付。GitHub `staging` 不保存 provider server secret；任何 Sandbox 值都不得
+复制到 production Live files，server secret 也不得进入 browser bundle。
 
 The staging destination exposes the exact public
 `POST /api/v1/billing/paddle/webhook` path (Cloudflare Access bypass only for this
