@@ -34,6 +34,11 @@ fi
 compose_args+=( --profile neo4j --profile searxng )
 
 exec env \
+    -u OIDC_AUTH_ISSUER_URL \
+    -u OIDC_AUTH_DISCOVERY_URL \
+    -u OIDC_AUTH_AUTHORIZATION_ENDPOINT \
+    -u OIDC_AUTH_TOKEN_ENDPOINT \
+    -u OIDC_AUTH_USER_INFO_ENDPOINT \
     DOCKER_DEFAULT_PLATFORM=linux/amd64 \
     WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
     WEKNORA_PRODUCTION_REVISION="$revision" \

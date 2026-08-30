@@ -133,6 +133,9 @@ printf '%s\n' "$frontend_env" | grep -Fqx 'MUSUW_AUTH_PUBLIC_ORIGIN=https://stag
 printf '%s\n' "$app_env" | grep -Fqx 'FRONTEND_BASE_URL=https://staging.musuw.com' || fail 'staging backend frontend origin has drifted'
 printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_ISSUER_URL=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1' || fail 'staging OIDC issuer has drifted'
 printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_DISCOVERY_URL=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/.well-known/openid-configuration' || fail 'staging OIDC discovery URL has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_AUTHORIZATION_ENDPOINT=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/authorize' || fail 'staging OIDC authorization endpoint has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_TOKEN_ENDPOINT=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/token' || fail 'staging OIDC token endpoint has drifted'
+printf '%s\n' "$app_env" | grep -Fqx 'OIDC_AUTH_USER_INFO_ENDPOINT=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/userinfo' || fail 'staging OIDC user-info endpoint has drifted'
 
 app_port="$(weknora_staging_require_env_value "$staging_env" WEKNORA_STAGING_APP_PORT)"
 frontend_port="$(weknora_staging_require_env_value "$staging_env" WEKNORA_STAGING_FRONTEND_PORT)"

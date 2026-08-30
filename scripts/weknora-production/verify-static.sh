@@ -305,6 +305,26 @@ DB_PASSWORD=static-verification-placeholder REDIS_PASSWORD=static-verification-p
 DB_PASSWORD=static-verification-placeholder REDIS_PASSWORD=static-verification-placeholder WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$compose_helper" --edge config --quiet
 DB_PASSWORD=static-verification-placeholder REDIS_PASSWORD=static-verification-placeholder WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" "$compose_helper" --edge config --format json > "$edge_config_json"
 
+conflicting_config_json="$runtime_dir/compose-conflicting-shell.json"
+OIDC_AUTH_ISSUER_URL=https://staging-identity.example/auth/v1 \
+OIDC_AUTH_DISCOVERY_URL=https://staging-identity.example/auth/v1/.well-known/openid-configuration \
+OIDC_AUTH_AUTHORIZATION_ENDPOINT=https://staging-identity.example/auth/v1/oauth/authorize \
+OIDC_AUTH_TOKEN_ENDPOINT=https://staging-identity.example/auth/v1/oauth/token \
+OIDC_AUTH_USER_INFO_ENDPOINT=https://staging-identity.example/auth/v1/oauth/userinfo \
+DB_PASSWORD=static-verification-placeholder REDIS_PASSWORD=static-verification-placeholder \
+WEKNORA_PRODUCTION_RUNTIME_DIR="$runtime_dir" \
+    "$compose_helper" config --format json > "$conflicting_config_json"
+jq -e '
+  .services.app.environment.OIDC_AUTH_ISSUER_URL == "https://identity.example/auth/v1" and
+  .services.app.environment.OIDC_AUTH_DISCOVERY_URL == "https://identity.example/auth/v1/.well-known/openid-configuration" and
+  .services.app.environment.OIDC_AUTH_AUTHORIZATION_ENDPOINT == "https://identity.example/auth/v1/oauth/authorize" and
+  .services.app.environment.OIDC_AUTH_TOKEN_ENDPOINT == "https://identity.example/auth/v1/oauth/token" and
+  .services.app.environment.OIDC_AUTH_USER_INFO_ENDPOINT == "https://identity.example/auth/v1/oauth/userinfo"
+' "$conflicting_config_json" >/dev/null || {
+    printf '%s\n' 'production Compose accepted inherited OIDC endpoint drift' >&2
+    exit 1
+}
+
 for service in frontend app docreader postgres redis neo4j searxng-init searxng; do
     jq -e --arg service "$service" '.services[$service].platform == "linux/amd64"' "$config_json" >/dev/null || {
         printf '%s\n' 'production service is not pinned to linux/amd64' >&2
@@ -330,6 +350,9 @@ jq -e '
   ((.services.frontend.networks | has("edge")) | not) and
   (.services.app.environment.APP_EXTERNAL_URL == "https://app.musuw.com") and
   (.services.app.environment.FRONTEND_BASE_URL == "https://app.musuw.com") and
+  (.services.app.environment.OIDC_AUTH_AUTHORIZATION_ENDPOINT == "https://identity.example/auth/v1/oauth/authorize") and
+  (.services.app.environment.OIDC_AUTH_TOKEN_ENDPOINT == "https://identity.example/auth/v1/oauth/token") and
+  (.services.app.environment.OIDC_AUTH_USER_INFO_ENDPOINT == "https://identity.example/auth/v1/oauth/userinfo") and
   (.services.app.environment.RETRIEVE_DRIVER == "postgres") and
   (.services.app.environment.STREAM_MANAGER_TYPE == "redis") and
   (.services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-production") and

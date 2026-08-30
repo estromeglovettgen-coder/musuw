@@ -31,6 +31,11 @@ if [ "$use_edge" = true ]; then
 fi
 
 exec env \
+    -u OIDC_AUTH_ISSUER_URL \
+    -u OIDC_AUTH_DISCOVERY_URL \
+    -u OIDC_AUTH_AUTHORIZATION_ENDPOINT \
+    -u OIDC_AUTH_TOKEN_ENDPOINT \
+    -u OIDC_AUTH_USER_INFO_ENDPOINT \
     DOCKER_DEFAULT_PLATFORM=linux/amd64 \
     DB_PASSWORD="${DB_PASSWORD:-__staging_file_backed__}" \
     REDIS_PASSWORD="${REDIS_PASSWORD:-__staging_file_backed__}" \

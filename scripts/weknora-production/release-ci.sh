@@ -4,6 +4,16 @@
 # derived locally from this release tree and the fixed production adapters.
 set -euo pipefail
 
+# Compose gives inherited shell variables precedence over --env-file values.
+# Clear the public OIDC coordinates once at the release boundary so both the
+# current wrapper and a rollback through an older wrapper use production.env.
+unset \
+    OIDC_AUTH_ISSUER_URL \
+    OIDC_AUTH_DISCOVERY_URL \
+    OIDC_AUTH_AUTHORIZATION_ENDPOINT \
+    OIDC_AUTH_TOKEN_ENDPOINT \
+    OIDC_AUTH_USER_INFO_ENDPOINT
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
 . "$script_dir/lib.sh"
@@ -216,6 +226,18 @@ wait_for_healthy() {
 
 wait_for_healthy weknora-v072-production-app
 wait_for_healthy weknora-v072-production-frontend
+
+# Verify the running container, not only the rendered release input. These
+# public endpoints are intentionally inspected without printing the remaining
+# environment so file-backed credentials stay undisclosed.
+app_env="$(docker inspect weknora-v072-production-app --format '{{range .Config.Env}}{{println .}}{{end}}')"
+oidc_issuer="$(weknora_production_require_env_value "$runtime_dir/production.env" OIDC_AUTH_ISSUER_URL)"
+printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_ISSUER_URL=$oidc_issuer" || die 'production OIDC issuer has drifted at runtime'
+printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_DISCOVERY_URL=$oidc_issuer/.well-known/openid-configuration" || die 'production OIDC discovery URL has drifted at runtime'
+printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_AUTHORIZATION_ENDPOINT=$oidc_issuer/oauth/authorize" || die 'production OIDC authorization endpoint has drifted at runtime'
+printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_TOKEN_ENDPOINT=$oidc_issuer/oauth/token" || die 'production OIDC token endpoint has drifted at runtime'
+printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_USER_INFO_ENDPOINT=$oidc_issuer/oauth/userinfo" || die 'production OIDC user-info endpoint has drifted at runtime'
+unset app_env oidc_issuer
 
 app_port="$(weknora_production_require_env_value "$runtime_dir/production.env" WEKNORA_PRODUCTION_APP_PORT)"
 frontend_port="$(weknora_production_require_env_value "$runtime_dir/production.env" WEKNORA_PRODUCTION_FRONTEND_PORT)"

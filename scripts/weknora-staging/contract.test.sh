@@ -140,6 +140,10 @@ grep -Fq 'S3_BUCKET_NAME=musuw-staging' "$script_dir/verify-deployed.sh" || fail
 grep -Fq 'MUSUW_SUPABASE_URL=https://achfnnicetupvtoqiwqd.supabase.co' "$script_dir/verify-deployed.sh" || fail 'staging promotion verifier does not pin the Supabase test project'
 grep -Fq 'MUSUW_AUTH_PUBLIC_ORIGIN=https://staging.musuw.com' "$script_dir/verify-deployed.sh" || fail 'staging promotion verifier does not pin the browser auth origin'
 grep -Fq 'FRONTEND_BASE_URL=https://staging.musuw.com' "$script_dir/verify-deployed.sh" || fail 'staging promotion verifier does not pin the backend frontend origin'
+for endpoint_key in OIDC_AUTH_AUTHORIZATION_ENDPOINT OIDC_AUTH_TOKEN_ENDPOINT OIDC_AUTH_USER_INFO_ENDPOINT; do
+    grep -Fq "$endpoint_key=https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/" "$script_dir/verify-deployed.sh" ||
+        fail "staging promotion verifier does not pin $endpoint_key"
+done
 grep -Fq 'openrouter-workspace-id' "$script_dir/verify-deployed.sh" || fail 'staging promotion verifier does not recheck the OpenRouter server pin'
 grep -Fq 'source-manifest.sh' "$script_dir/release-ci.sh" || fail 'staging release helper does not verify source manifest'
 grep -Fq 'capacity-preflight.sh' "$script_dir/release-ci.sh" || fail 'staging release helper has no production capacity preflight'

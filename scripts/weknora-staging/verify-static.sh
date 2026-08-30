@@ -196,6 +196,22 @@ WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir
 WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir" \
     "$script_dir/compose.sh" --edge config --format json > "$edge_config_json"
 
+conflicting_config_json="$runtime_dir/compose-conflicting-shell.json"
+OIDC_AUTH_ISSUER_URL=https://production-identity.example/auth/v1 \
+OIDC_AUTH_DISCOVERY_URL=https://production-identity.example/auth/v1/.well-known/openid-configuration \
+OIDC_AUTH_AUTHORIZATION_ENDPOINT=https://production-identity.example/auth/v1/oauth/authorize \
+OIDC_AUTH_TOKEN_ENDPOINT=https://production-identity.example/auth/v1/oauth/token \
+OIDC_AUTH_USER_INFO_ENDPOINT=https://production-identity.example/auth/v1/oauth/userinfo \
+WEKNORA_STAGING_RUNTIME_DIR="$runtime_dir" MUSUW_STAGING_SECRET_DIR="$secret_dir" \
+    "$script_dir/compose.sh" config --format json > "$conflicting_config_json"
+jq -e '
+    .services.app.environment.OIDC_AUTH_ISSUER_URL == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1" and
+    .services.app.environment.OIDC_AUTH_DISCOVERY_URL == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/.well-known/openid-configuration" and
+    .services.app.environment.OIDC_AUTH_AUTHORIZATION_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/authorize" and
+    .services.app.environment.OIDC_AUTH_TOKEN_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/token" and
+    .services.app.environment.OIDC_AUTH_USER_INFO_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/userinfo"
+' "$conflicting_config_json" >/dev/null || fail 'staging Compose accepted inherited OIDC endpoint drift'
+
 jq -e '
     ([.services | keys[]] | sort) == ["app", "docreader", "frontend", "postgres", "redis", "searxng", "searxng-init"] and
     ([.services[] | select(has("build"))] | length) == 0 and
@@ -211,6 +227,9 @@ jq -e '
     .services.app.environment.NEO4J_ENABLE == "false" and
     .services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-staging" and
     .services.app.environment.APP_EXTERNAL_URL == "https://staging.musuw.com" and
+    .services.app.environment.OIDC_AUTH_AUTHORIZATION_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/authorize" and
+    .services.app.environment.OIDC_AUTH_TOKEN_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/token" and
+    .services.app.environment.OIDC_AUTH_USER_INFO_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/userinfo" and
     .services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "https://staging.musuw.com" and
     (.services.searxng.image == "searxng/searxng@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e") and
     (.services["searxng-init"].image == "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662") and

@@ -48,13 +48,10 @@ const clearOIDCCallbackState = (path = "/") => {
   window.history.replaceState({}, document.title, path);
 };
 
-const syncOIDCUserContext = async () => {
-  const currentUserResponse = await getCurrentUser();
-  if (!currentUserResponse.success || !currentUserResponse.data?.user) {
-    throw new Error(currentUserResponse.message || "Failed to get user information");
-  }
-
-  const { user, tenant, memberships, capabilities } = currentUserResponse.data;
+const applyOIDCUserContext = (
+  { user, tenant, memberships, capabilities }: any,
+  applyCapabilities = true,
+) => {
   authStore.setUser(userInfoFromApi(user, tenant?.id));
   if (tenant) {
     authStore.setTenant({
@@ -79,7 +76,7 @@ const syncOIDCUserContext = async () => {
   if (Array.isArray(memberships)) {
     authStore.setMemberships(memberships);
   }
-  if (typeof capabilities?.can_create_tenant === "boolean") {
+  if (applyCapabilities && typeof capabilities?.can_create_tenant === "boolean") {
     authStore.setCanCreateTenant(capabilities.can_create_tenant);
   }
   // Same active-vs-home reconciliation as Login.vue: if the OIDC login
@@ -95,6 +92,31 @@ const syncOIDCUserContext = async () => {
   }
 };
 
+type OIDCReconciliationGuard = {
+  token: string;
+  selectedTenantId: number | null;
+};
+
+const captureOIDCReconciliationGuard = (): OIDCReconciliationGuard => ({
+  token: authStore.token,
+  selectedTenantId: authStore.selectedTenantId,
+});
+
+const isCurrentOIDCReconciliationGuard = (guard: OIDCReconciliationGuard) =>
+  authStore.token === guard.token && authStore.selectedTenantId === guard.selectedTenantId;
+
+const syncOIDCUserContext = async (guard?: OIDCReconciliationGuard) => {
+  const currentUserResponse = await getCurrentUser();
+  // A slow response from a previous login or tenant selection must never
+  // repopulate state after logout, re-login, or a workspace switch.
+  if (guard && !isCurrentOIDCReconciliationGuard(guard)) return;
+  if (!currentUserResponse.success || !currentUserResponse.data?.user) {
+    throw new Error(currentUserResponse.message || "Failed to get user information");
+  }
+
+  applyOIDCUserContext(currentUserResponse.data);
+};
+
 const persistOIDCLoginResponse = async (response: any) => {
   if (!response.token) {
     throw new Error(response.message || "OIDC login failed");
@@ -105,7 +127,26 @@ const persistOIDCLoginResponse = async (response: any) => {
     authStore.setRefreshToken(response.refresh_token);
   }
 
-  await syncOIDCUserContext();
+  const hasCompleteOIDCCallbackSnapshot =
+    typeof response.user?.id === "string" &&
+    response.user.id.trim() !== "" &&
+    Array.isArray(response.memberships);
+  if (hasCompleteOIDCCallbackSnapshot) {
+    // The callback snapshot was assembled by the backend after it issued the
+    // local session. Use it immediately so slow clients do not pay for a
+    // redundant serial /auth/me round trip. Workspace creation stays
+    // fail-closed until the authoritative capability refresh succeeds.
+    authStore.setCanCreateTenant(false);
+    applyOIDCUserContext(response, false);
+    const reconciliationGuard = captureOIDCReconciliationGuard();
+    void syncOIDCUserContext(reconciliationGuard).catch((error) => {
+      console.warn("OIDC user context reconciliation failed:", error);
+    });
+  } else {
+    // Older or incomplete callback payloads retain the authoritative blocking
+    // path rather than entering the application with partial identity state.
+    await syncOIDCUserContext();
+  }
 
   await nextTick();
   // Re-enter through `/` so a validated checkout intent captured by the auth

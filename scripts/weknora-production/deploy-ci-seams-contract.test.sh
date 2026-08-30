@@ -42,6 +42,12 @@ grep -Fq 'find "$docker_config" -depth -delete' "$release_ci" || fail 'GHCR Dock
 grep -Fq 'rollback_production' "$release_ci" || fail 'release helper has no automatic app/frontend rollback'
 grep -Fq 'previous_source=' "$release_ci" || fail 'release helper does not bind rollback to the prior current release'
 grep -Fq 'compose_mutated=1' "$release_ci" || fail 'release helper does not track the production mutation boundary'
+release_prologue="$(sed -n '1,25p' "$release_ci")"
+grep -Fq 'unset \' <<< "$release_prologue" || fail 'release boundary does not clear inherited identity coordinates'
+for endpoint_key in OIDC_AUTH_ISSUER_URL OIDC_AUTH_DISCOVERY_URL OIDC_AUTH_AUTHORIZATION_ENDPOINT OIDC_AUTH_TOKEN_ENDPOINT OIDC_AUTH_USER_INFO_ENDPOINT; do
+    grep -Fq "$endpoint_key" <<< "$release_prologue" ||
+        fail "release rollback may inherit stale $endpoint_key from an older Compose wrapper"
+done
 for runtime_file in production.public.env auth-public.env production.env; do
     grep -Fq "$runtime_file" "$release_ci" || fail "release rollback does not preserve $runtime_file"
 done
@@ -52,6 +58,9 @@ if grep -Fq 'build-images.sh' "$release_ci"; then
 fi
 grep -Fq 'compose.sh" --edge' "$release_ci" || fail 'release helper does not invoke fixed Compose'
 grep -Fq 'atomic current' "$release_ci" || fail 'release helper does not document atomic current activation'
+for endpoint_key in OIDC_AUTH_AUTHORIZATION_ENDPOINT OIDC_AUTH_TOKEN_ENDPOINT OIDC_AUTH_USER_INFO_ENDPOINT; do
+    grep -Fq "$endpoint_key=" "$release_ci" || fail "release helper does not verify running $endpoint_key"
+done
 
 for forbidden in 'musuw-gate preflight' 'musuw-gate promote' 'musuw-gate run' \
     release-transaction rollback.sh cutover.sh start-staged.sh update-current.sh; do
