@@ -476,7 +476,7 @@
                           <p class="desc">{{ $t('agentEditor.desc.fallbackStrategy') }}</p>
                         </div>
                         <div class="setting-control">
-                          <t-radio-group v-model="formData.config.fallback_strategy">
+                          <t-radio-group class="agent-segmented-control" v-model="formData.config.fallback_strategy">
                             <t-radio-button value="fixed">{{ $t('agentEditor.fallback.fixed') }}</t-radio-button>
                             <t-radio-button value="model">{{ $t('agentEditor.fallback.model') }}</t-radio-button>
                           </t-radio-group>

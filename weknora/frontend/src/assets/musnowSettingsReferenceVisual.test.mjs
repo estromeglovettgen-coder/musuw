@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const finalTheme = read('./musuw-final-theme-closure.css')
 
 test('settings shell follows the supplied SettingsModal geometry', () => {
   const source = read('../views/settings/components/VisualSettingsShell.vue')
@@ -142,6 +143,25 @@ test('user profile keeps the authoritative unboxed rows and mono account metadat
   assert.match(source, /\.user-profile__row\s*\{[\s\S]*padding:\s*14px 0;[\s\S]*gap:\s*16px;[\s\S]*border-bottom:\s*1px solid #f3f4f6;/)
   assert.match(source, /\.user-profile\s*\{[\s\S]*max-width:\s*none;/)
   assert.match(source, /\.info-value\.is-mono\s*\{[\s\S]*font-family:\s*var\(--app-font-family-mono\);/)
+})
+
+test('the final dark theme owns the current user profile classes, not only legacy settings rows', () => {
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.visual-settings-content \.visual-settings-page-header__title\s*\{[^}]*color:\s*#fff\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.visual-settings-content \.user-profile__row\s*\{[^}]*border-bottom-color:\s*#27272a\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.visual-settings-content \.user-profile__label\s*\{[^}]*color:\s*#f4f4f5\s*!important;[^}]*font-size:\s*14px\s*!important;[^}]*line-height:\s*20px\s*!important;[^}]*font-weight:\s*600\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.visual-settings-content \.user-profile \.info-value\s*\{[^}]*color:\s*#e4e4e7\s*!important;[^}]*font-size:\s*14px\s*!important;[^}]*line-height:\s*20px\s*!important;[^}]*font-weight:\s*500\s*!important;/,
+  )
 })
 
 test('consumer scene dropdown inherits the source CustomSelect tokens', () => {

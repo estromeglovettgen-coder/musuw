@@ -728,7 +728,7 @@
   border-bottom-color: #27272a !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__title {
-  color: #f4f4f5 !important;
+  color: #fff !important;
 }
 :root[theme-mode="dark"] .visual-settings-content .visual-settings-page-header__description {
   color: #a1a1aa !important;
@@ -1698,4 +1698,339 @@ body .t-drawer.t-drawer--right.wiki-graph-drawer > .t-drawer__content-wrapper {
 :root[theme-mode="dark"] .visual-session-filter__trigger[aria-expanded="true"] {
   background: var(--mvc-hover) !important;
   color: var(--mvc-text-strong) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Authority convergence: menus, Settings profile and Agent controls          */
+/* -------------------------------------------------------------------------- */
+
+/* DocumentActionMenu is shared by the knowledge list and card views.  Its
+ * component geometry is native, but its scoped colors are light-only, so the
+ * teleported dark popup needs one late semantic owner for every nested mode. */
+:root[theme-mode="dark"] body .visual-list-menu,
+:root[theme-mode="dark"] body .visual-card-menu,
+:root[theme-mode="dark"] body .visual-document-actions {
+  background: transparent !important;
+  color: var(--mvc-muted-strong) !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item {
+  background: transparent !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item .t-icon {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item:hover,
+:root[theme-mode="dark"] body .visual-list-menu__back:hover,
+:root[theme-mode="dark"] body .visual-list-menu__target:hover,
+:root[theme-mode="dark"] body .visual-card-menu__back:hover,
+:root[theme-mode="dark"] body .visual-card-menu__target:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item:hover .t-icon {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item.is-danger,
+:root[theme-mode="dark"] body .visual-document-actions__item.is-danger .t-icon {
+  color: #ff7b72 !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item.is-danger::before {
+  background: var(--mvc-line) !important;
+}
+:root[theme-mode="dark"] body .visual-document-actions__item.is-danger:hover {
+  background: rgb(248 81 73 / 14%) !important;
+  color: #ff938a !important;
+}
+:root[theme-mode="dark"] body .visual-list-menu__back,
+:root[theme-mode="dark"] body .visual-list-menu__target,
+:root[theme-mode="dark"] body .visual-list-menu__mode,
+:root[theme-mode="dark"] body .visual-card-menu__back,
+:root[theme-mode="dark"] body .visual-card-menu__target,
+:root[theme-mode="dark"] body .visual-card-menu__mode {
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-list-menu__target small,
+:root[theme-mode="dark"] body .visual-list-menu__state,
+:root[theme-mode="dark"] body .visual-list-menu__mode small {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .visual-card-menu__state,
+:root[theme-mode="dark"] body .visual-card-menu__target-count,
+:root[theme-mode="dark"] body .visual-card-menu__mode small {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .visual-list-menu__destination,
+:root[theme-mode="dark"] body .visual-list-menu__mode,
+:root[theme-mode="dark"] body .visual-card-menu__destination,
+:root[theme-mode="dark"] body .visual-card-menu__mode {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-list-menu__mode strong,
+:root[theme-mode="dark"] body .visual-card-menu__mode strong {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-list-menu__mode:hover,
+:root[theme-mode="dark"] body .visual-list-menu__mode.is-active,
+:root[theme-mode="dark"] body .visual-card-menu__mode:hover,
+:root[theme-mode="dark"] body .visual-card-menu__mode.is-active {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-list-menu, .visual-card-menu) .t-loading {
+  color: var(--mvc-muted) !important;
+}
+
+:root[theme-mode="dark"] body :is(.visual-list-menu__actions, .visual-card-menu__actions) .t-button--variant-outline {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-list-menu__actions, .visual-card-menu__actions) .t-button--variant-outline:hover {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-list-menu__actions, .visual-card-menu__actions) .t-button--theme-primary {
+  border-color: var(--mvc-text-strong) !important;
+  background: var(--mvc-text-strong) !important;
+  color: var(--mvc-page) !important;
+}
+
+/* FolderPickerMenu is shared by both list and card move flows. */
+:root[theme-mode="dark"] body .visual-folder-picker,
+:root[theme-mode="dark"] body .visual-folder-picker__back,
+:root[theme-mode="dark"] body .visual-folder-picker__select,
+:root[theme-mode="dark"] body .visual-folder-picker__create-button,
+:root[theme-mode="dark"] body .visual-folder-picker__cancel-create {
+  background: transparent !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__row:hover {
+  background: var(--mvc-hover) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__back:hover,
+:root[theme-mode="dark"] body .visual-folder-picker__row.is-current .visual-folder-picker__select {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__folder-icon {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__check {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__create-button:hover,
+:root[theme-mode="dark"] body .visual-folder-picker__cancel-create:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__input {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+  caret-color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__input::placeholder {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .visual-folder-picker__input:focus {
+  border-color: var(--mvc-line-strong) !important;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 8%) !important;
+}
+
+/* TDesign puts checked state on the label, not the nested input span. */
+:root:not([theme-mode="dark"]) body :is(.visual-list-menu, .visual-card-menu) .t-radio:hover .t-radio__input,
+:root:not([theme-mode="dark"]) body :is(.visual-list-menu, .visual-card-menu) .t-radio.t-is-checked .t-radio__input {
+  border-color: #111827 !important;
+  background-color: #fff !important;
+}
+:root:not([theme-mode="dark"]) body :is(.visual-list-menu, .visual-card-menu) .t-radio.t-is-checked .t-radio__input::after {
+  background-color: #111827 !important;
+}
+:root:not([theme-mode="dark"]) body :is(.visual-document-list, .visual-document-card, .visual-document-batch) .t-checkbox.t-is-checked .t-checkbox__input {
+  border-color: #111827 !important;
+  background-color: #111827 !important;
+}
+:root:not([theme-mode="dark"]) body :is(.visual-document-list, .visual-document-card, .visual-document-batch) .t-checkbox.t-is-checked .t-checkbox__input::after {
+  border-color: #fff !important;
+}
+:root[theme-mode="dark"] body :is(.visual-list-menu, .visual-card-menu) .t-radio:hover .t-radio__input,
+:root[theme-mode="dark"] body :is(.visual-list-menu, .visual-card-menu) .t-radio.t-is-checked .t-radio__input {
+  border-color: var(--mvc-text-strong) !important;
+  background-color: var(--mvc-surface-raised) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-list-menu, .visual-card-menu) .t-radio.t-is-checked .t-radio__input::after {
+  background-color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-document-list, .visual-document-card, .visual-document-batch) .t-checkbox.t-is-checked .t-checkbox__input {
+  border-color: var(--mvc-text-strong) !important;
+  background-color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-document-list, .visual-document-card, .visual-document-batch) .t-checkbox.t-is-checked .t-checkbox__input::after {
+  border-color: var(--mvc-page) !important;
+}
+
+/* The source profile uses the current BEM rows.  Older closure selectors still
+ * mention the pre-migration setting-row markup and therefore miss these nodes. */
+:root[theme-mode="dark"] .visual-settings-content .user-profile__row {
+  border-bottom-color: #27272a !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .user-profile__label {
+  color: #f4f4f5 !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600 !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .user-profile .info-value {
+  color: #e4e4e7 !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 500 !important;
+}
+
+/* AgentEditor uses TDesign primitives for behavior only.  Paint their final
+ * states here so the older broad radio/switch bridge cannot replace the
+ * authority's neutral white/zinc segmented, toggle and footer palette. */
+.agent-editor-modal .agent-segmented-control {
+  border-color: rgb(229 231 235 / 60%) !important;
+  background: #f3f4f6 !important;
+}
+.agent-editor-modal .agent-segmented-control .t-radio-button {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #4b5563 !important;
+  padding: 6px 14px !important;
+  font-family: var(--app-font-family) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600 !important;
+  transition: all 200ms ease-in-out !important;
+}
+.agent-editor-modal .agent-segmented-control[data-guide="agent-create-mode"] .t-radio-button {
+  padding-inline: 16px !important;
+}
+.agent-editor-modal .agent-segmented-control .t-radio-button.t-is-checked {
+  background: #fff !important;
+  color: #111827 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+.agent-editor-modal .agent-segmented-control .t-radio-button:not(.t-is-checked):hover {
+  color: #111827 !important;
+}
+.agent-editor-modal .settings-footer-actions .t-button {
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 8px 16px !important;
+  border-radius: 12px !important;
+  font-family: var(--app-font-family) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600 !important;
+}
+.agent-editor-modal .settings-footer-actions .t-button--theme-primary {
+  padding-inline: 20px !important;
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+.agent-editor-modal .settings-footer-actions .t-button--variant-outline {
+  border-color: #e5e7eb !important;
+  background: #fff !important;
+  color: #374151 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+.agent-editor-modal .settings-footer-actions .t-button--theme-primary:hover {
+  border-color: #000 !important;
+  background: #000 !important;
+}
+.agent-editor-modal .settings-footer-actions .t-button--variant-outline:hover {
+  background: #f3f4f6 !important;
+}
+.agent-editor-modal .t-switch {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 24px !important;
+  border: 2px solid transparent !important;
+  border-radius: 9999px !important;
+  background: #e5e7eb !important;
+  box-sizing: border-box !important;
+  transition: background-color 200ms ease-in-out, border-color 200ms ease-in-out !important;
+}
+.agent-editor-modal .t-switch.t-is-checked {
+  background: #111827 !important;
+}
+.agent-editor-modal .t-switch .t-switch__handle,
+.agent-editor-modal .t-switch.t-is-checked .t-switch__handle {
+  top: 0 !important;
+  left: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  transform: translateX(0) !important;
+}
+.agent-editor-modal .t-switch .t-switch__handle {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 6%) !important;
+  transition: transform 200ms ease-in-out !important;
+}
+.agent-editor-modal .t-switch.t-is-checked .t-switch__handle {
+  transform: translateX(20px) !important;
+}
+.agent-editor-modal .t-switch .t-switch__handle::before {
+  background: #fff !important;
+  transition: background-color 200ms ease-in-out !important;
+}
+.agent-editor-modal .t-switch:active:not(.t-is-disabled):not(.t-is-loading) .t-switch__handle::before {
+  right: 0 !important;
+  left: 0 !important;
+}
+
+:root[theme-mode="dark"] .agent-editor-modal .agent-segmented-control {
+  border-color: rgb(63 63 70 / 60%) !important;
+  background: #27272a !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .agent-segmented-control .t-radio-button {
+  background: transparent !important;
+  color: #a1a1aa !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .agent-segmented-control .t-radio-button:hover {
+  color: #fff !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .agent-segmented-control .t-radio-button.t-is-checked {
+  background: #3f3f46 !important;
+  color: #fff !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .t-switch {
+  background: #3f3f46 !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .t-switch .t-switch__handle::before {
+  background: #a1a1aa !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .t-switch.t-is-checked {
+  background: #f4f4f5 !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .t-switch.t-is-checked .t-switch__handle::before {
+  background: #18181b !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .settings-footer-actions .t-button--theme-primary {
+  border-color: #f4f4f5 !important;
+  background: #f4f4f5 !important;
+  color: #18181b !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .settings-footer-actions .t-button--theme-primary:hover {
+  border-color: #fff !important;
+  background: #fff !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .settings-footer-actions .t-button--variant-outline {
+  border-color: #3f3f46 !important;
+  background: #18181b !important;
+  color: #d4d4d8 !important;
+}
+:root[theme-mode="dark"] .agent-editor-modal .settings-footer-actions .t-button--variant-outline:hover {
+  background: #27272a !important;
 }

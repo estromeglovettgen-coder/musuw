@@ -7,6 +7,7 @@ const editor = readFileSync(new URL('./AgentEditorModal.vue', import.meta.url), 
 const settings = readFileSync(new URL('../settings/Settings.vue', import.meta.url), 'utf8')
 const settingsShell = readFileSync(new URL('../settings/components/VisualSettingsShell.vue', import.meta.url), 'utf8')
 const nativeDirectoryStyles = readFileSync(new URL('../../assets/musuw-native-directory-reference.css', import.meta.url), 'utf8')
+const finalTheme = readFileSync(new URL('../../assets/musuw-final-theme-closure.css', import.meta.url), 'utf8')
 
 test('consumer Agent list preserves native CRUD while matching the compact reference surface', () => {
   for (const token of [
@@ -105,7 +106,9 @@ test('Settings and Agent editor render the same shared visual shell while Agent 
 
 test('Agent mode and knowledge scope use the authoritative single-line segmented controls', () => {
   assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control"[^>]*v-model="agentMode"/)
+  assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control"[^>]*v-model="formData\.config\.fallback_strategy"/)
   assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control agent-segmented-control--scope"[^>]*v-model="kbSelectionMode"/)
+  assert.equal((editor.match(/class="agent-segmented-control agent-segmented-control--scope"/g) || []).length, 3)
   assert.match(editor, /\.agent-segmented-control\s*\{[\s\S]*?display:\s*inline-flex;[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?padding:\s*4px;[\s\S]*?border-radius:\s*12px;/)
   assert.match(editor, /\.agent-segmented-control :deep\(\.t-radio-button\)\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*6px 14px;[\s\S]*?border-radius:\s*8px;[\s\S]*?font-size:\s*12px;/)
   assert.match(editor, /\.agent-segmented-control--scope\s*\{[\s\S]*?overflow-x:\s*auto;/)
@@ -113,6 +116,59 @@ test('Agent mode and knowledge scope use the authoritative single-line segmented
   assert.match(editor, /label\s*\{[\s\S]*?font-size:\s*14px !important;[\s\S]*?line-height:\s*20px !important;[\s\S]*?font-weight:\s*600 !important;/)
   assert.match(editor, /\.setting-control\s*\{[\s\S]*?width:\s*100% !important;[\s\S]*?max-width:\s*280px !important;/)
   assert.match(editor, /&\.setting-row-vertical\s*\{[\s\S]*?flex-direction:\s*column;/)
+})
+
+test('the final visual owner preserves authoritative Agent segmented, switch and footer colors', () => {
+  assert.match(
+    finalTheme,
+    /\.agent-editor-modal \.agent-segmented-control\s*\{[^}]*border-color:\s*rgb\(229 231 235 \/ 60%\)\s*!important;[^}]*background:\s*#f3f4f6\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /\.agent-editor-modal \.agent-segmented-control \.t-radio-button\.t-is-checked\s*\{[^}]*background:\s*#fff\s*!important;[^}]*color:\s*#111827\s*!important;[^}]*box-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 5%\)\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.agent-editor-modal \.agent-segmented-control\s*\{[^}]*border-color:\s*rgb\(63 63 70 \/ 60%\)\s*!important;[^}]*background:\s*#27272a\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.agent-editor-modal \.agent-segmented-control \.t-radio-button\.t-is-checked\s*\{[^}]*background:\s*#3f3f46\s*!important;[^}]*color:\s*#fff\s*!important;/,
+  )
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] \.agent-editor-modal \.t-switch\.t-is-checked\s*\{[^}]*background:\s*#f4f4f5\s*!important;/)
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] \.agent-editor-modal \.t-switch\s*\{[^}]*background:\s*#3f3f46\s*!important;/)
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] \.agent-editor-modal \.t-switch \.t-switch__handle::before\s*\{[^}]*background:\s*#a1a1aa\s*!important;/)
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] \.agent-editor-modal \.t-switch\.t-is-checked \.t-switch__handle::before\s*\{[^}]*background:\s*#18181b\s*!important;/)
+  assert.match(finalTheme, /\.agent-editor-modal \.t-switch\s*\{[^}]*width:\s*44px\s*!important;[^}]*min-width:\s*44px\s*!important;[^}]*height:\s*24px\s*!important;[^}]*transition:\s*background-color 200ms ease-in-out, border-color 200ms ease-in-out\s*!important;/)
+  assert.match(
+    finalTheme,
+    /\.agent-editor-modal \.t-switch \.t-switch__handle,\s*\.agent-editor-modal \.t-switch\.t-is-checked \.t-switch__handle\s*\{[^}]*width:\s*20px\s*!important;[^}]*height:\s*20px\s*!important;/,
+  )
+  assert.match(finalTheme, /\.agent-editor-modal \.t-switch \.t-switch__handle\s*\{[^}]*box-shadow:\s*0 1px 3px rgb\(0 0 0 \/ 10%\),\s*0 1px 2px rgb\(0 0 0 \/ 6%\)\s*!important;[^}]*transition:\s*transform 200ms ease-in-out\s*!important;/)
+  assert.match(finalTheme, /\.agent-editor-modal \.t-switch\.t-is-checked \.t-switch__handle\s*\{[^}]*transform:\s*translateX\(20px\)\s*!important;/)
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.agent-editor-modal \.settings-footer-actions \.t-button--theme-primary\s*\{[^}]*border-color:\s*#f4f4f5\s*!important;[^}]*background:\s*#f4f4f5\s*!important;[^}]*color:\s*#18181b\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /\.agent-editor-modal \.settings-footer-actions \.t-button\s*\{[^}]*height:\s*34px\s*!important;[^}]*min-height:\s*34px\s*!important;[^}]*border-radius:\s*12px\s*!important;[^}]*font-size:\s*12px\s*!important;/,
+  )
+  assert.match(finalTheme, /\.agent-editor-modal \.settings-footer-actions \.t-button--theme-primary\s*\{[^}]*padding-inline:\s*20px\s*!important;[^}]*box-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 5%\)\s*!important;/)
+  assert.match(finalTheme, /\.agent-editor-modal \.settings-footer-actions \.t-button--variant-outline\s*\{[^}]*font-weight:\s*500\s*!important;[^}]*box-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 5%\)\s*!important;/)
+  assert.match(finalTheme, /\.agent-editor-modal \.settings-footer-actions \.t-button--theme-primary:hover\s*\{[^}]*background:\s*#000\s*!important;/)
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] \.agent-editor-modal \.settings-footer-actions \.t-button--variant-outline\s*\{[^}]*color:\s*#d4d4d8\s*!important;/)
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] \.agent-editor-modal \.settings-footer-actions \.t-button--variant-outline:hover\s*\{[^}]*background:\s*#27272a\s*!important;/)
+  assert.match(
+    finalTheme,
+    /\.agent-editor-modal \.agent-segmented-control \.t-radio-button\s*\{[^}]*padding:\s*6px 14px\s*!important;/,
+  )
+  assert.match(
+    finalTheme,
+    /\.agent-editor-modal \.agent-segmented-control\[data-guide="agent-create-mode"\] \.t-radio-button\s*\{[^}]*padding-inline:\s*16px\s*!important;/,
+  )
+  assert.match(editor, /\.agent-segmented-control\[data-guide="agent-create-mode"\] :deep\(\.t-radio-button\)\s*\{[^}]*padding-inline:\s*16px;/)
+  assert.match(editor, /\.agent-segmented-control :deep\(\.t-radio-button\)\s*\{[^}]*padding:\s*6px 14px;/)
 })
 
 test('authoritative workspace 7 basic tab uses full-width counted name and description fields', () => {
