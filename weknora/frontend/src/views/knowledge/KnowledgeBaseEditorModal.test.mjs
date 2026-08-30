@@ -84,7 +84,7 @@ test('create exposes native RAG, Wiki, Wiki instructions, and summary model whil
     /if \(props\.mode === 'create'\) \{([\s\S]*?)^\s{4}\}/m,
   )?.[1]
   assert.ok(createOpenBranch, 'expected the zero-config create open branch')
-  assert.match(createOpenBranch, /loadAllModels/)
+  assert.match(createOpenBranch, /loadSummaryModelOptions/)
   assert.doesNotMatch(createOpenBranch, /loadTenantDefaultStorageProvider|kbEditorInitialSection/)
 
   assert.ok(source.includes('const consumerSceneModelsForCreate = () => {'))
@@ -130,14 +130,17 @@ test('Wiki-only authoring controls stay hidden until Wiki indexing is enabled', 
   }
 })
 
-test('knowledge-base model selection uses the same compact selector surface as model settings', () => {
+test('Lite knowledge-base model selection uses only the same safe RAG scene catalog as model settings', () => {
   const template = source.slice(0, source.indexOf('<script setup'))
   const selectorStart = template.indexOf('<ModelSelector')
   const selectorEnd = template.indexOf('/>', selectorStart)
   const selector = template.slice(selectorStart, selectorEnd + 2)
 
-  assert.match(selector, /:all-models="allModels"/)
+  assert.match(selector, /:all-models="authStore\.isLiteMode \? \[\] : allModels"/)
+  assert.match(selector, /:scene-options="authStore\.isLiteMode \? summaryModelSceneOptions : \[\]"/)
   assert.match(selector, /:show-add-model="false"/)
+  assert.match(source, /const summaryModelSceneOptions = computed\(\(\) => chatResources\.consumerSceneOptions\.rag\?\.options \|\| \[\]\)/)
+  assert.match(source, /chatResources\.ensureConsumerSceneOptions\('rag', force\)/)
 })
 
 test('create mode reuses native TDesign fields and API payload', () => {

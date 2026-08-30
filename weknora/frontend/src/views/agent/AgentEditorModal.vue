@@ -155,7 +155,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="KnowledgeQA" :selected-model-id="formData.config.model_id"
-                          :all-models="allModels"
+                          :all-models="authStore.isLiteMode ? [] : allModels"
                           :scene-options="authStore.isLiteMode ? agentModelSceneOptions : []"
                           :show-add-model="!authStore.isLiteMode"
                           @update:selected-model-id="(val: string) => formData.config.model_id = val"
@@ -3253,14 +3253,16 @@ const applyPromptTemplateDefaults = (cfg: PromptTemplatesConfig | null) => {
 const loadDependencies = async () => {
   try {
     await Promise.all([
-      chatResources.ensureModels(),
+      authStore.isLiteMode ? Promise.resolve() : chatResources.ensureModels(),
       authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('rag') : Promise.resolve(),
       chatResources.ensureKnowledgeBases(),
       chatResources.ensureWebSearchProviders(),
       editorResources.prefetchAgentEditorDeps(),
     ]);
 
-    if (chatResources.allModels.length > 0) {
+    if (authStore.isLiteMode) {
+      allModels.value = [];
+    } else if (chatResources.allModels.length > 0) {
       allModels.value = chatResources.allModels;
     }
 

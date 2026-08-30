@@ -6,7 +6,8 @@ const editor = readFileSync(new URL('./KnowledgeBaseEditorModal.vue', import.met
 test('compact consumer editor leaves the hidden Wiki model platform-owned and preserves native payloads', () => {
   const template = editor.slice(0, editor.indexOf('<script setup'))
   assert.doesNotMatch(template, /wiki-scene-options|wikiSynthesisModelId|KBModelConfig/)
-  assert.doesNotMatch(editor, /syncWikiSceneCandidate|resolveConsumerSceneCandidate/)
+  assert.doesNotMatch(editor, /syncWikiSceneCandidate/)
+  assert.match(editor, /resolveConsumerSceneCandidate/)
   assert.match(editor, /wikiSynthesisModelId: kb\.wiki_config\?\.synthesis_model_id \|\| ''/)
   assert.match(editor, /synthesis_model_id: formData\.value\.modelConfig\?\.wikiSynthesisModelId/)
   assert.match(editor, /embeddingModelId: data\.embedding_model_id/)

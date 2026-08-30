@@ -35,7 +35,7 @@ test('shows a post-create hint after the first successful save', () => {
   assert.match(source, /agent\.editor\.postCreateHint\.title/)
 })
 
-test('new agents keep the upstream default and use the existing Lite model catalog as fallback', () => {
+test('new agents keep the upstream default and use the effective Lite scene model as fallback', () => {
   const defaultBlock = source.match(
     /const applyDefaultChatModelIfEmpty = \(\) => \{([\s\S]*?)^\}/m
   )?.[1]
@@ -62,7 +62,7 @@ test('agent dependencies retain the upstream fail-together Promise.all contract'
 
   assert.match(
     dependencies,
-    /await Promise\.all\(\[\s*chatResources\.ensureModels\(\),\s*authStore\.isLiteMode \? chatResources\.ensureConsumerSceneOptions\('rag'\) : Promise\.resolve\(\),\s*chatResources\.ensureKnowledgeBases\(\),\s*chatResources\.ensureWebSearchProviders\(\),\s*editorResources\.prefetchAgentEditorDeps\(\),\s*\]\);/,
+    /await Promise\.all\(\[\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureModels\(\),\s*authStore\.isLiteMode \? chatResources\.ensureConsumerSceneOptions\('rag'\) : Promise\.resolve\(\),\s*chatResources\.ensureKnowledgeBases\(\),\s*chatResources\.ensureWebSearchProviders\(\),\s*editorResources\.prefetchAgentEditorDeps\(\),\s*\]\);/,
   )
   assert.doesNotMatch(dependencies, /Promise\.allSettled/)
 })
@@ -86,7 +86,7 @@ test('consumer agent editor keeps the model in Basic and hides the agent type', 
   }
   assert.match(basicSection, /data-agent-field="summary_model"/)
   assert.match(basicSection, /<ModelSelector model-type="KnowledgeQA"/)
-  assert.match(basicSection, /:all-models="allModels"/)
+  assert.match(basicSection, /:all-models="authStore\.isLiteMode \? \[\] : allModels"/)
   assert.match(basicSection, /:show-add-model="!authStore\.isLiteMode"/)
   assert.match(basicSection, /:scene-options="authStore\.isLiteMode \? agentModelSceneOptions : \[\]"/)
   assert.doesNotMatch(source, /data-guide="agent-create-agent-type"/)

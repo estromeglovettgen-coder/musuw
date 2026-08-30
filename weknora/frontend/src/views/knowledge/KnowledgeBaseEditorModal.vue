@@ -191,7 +191,8 @@
               <ModelSelector
                 model-type="KnowledgeQA"
                 :selected-model-id="formData.modelConfig.llmModelId"
-                :all-models="allModels"
+                :all-models="authStore.isLiteMode ? [] : allModels"
+                :scene-options="authStore.isLiteMode ? summaryModelSceneOptions : []"
                 :show-add-model="false"
                 :placeholder="$t('knowledgeEditor.models.llmPlaceholder')"
                 @update:selected-model-id="(val: string) => formData.modelConfig.llmModelId = val"
@@ -248,6 +249,7 @@ import KBShareSettings from './settings/KBShareSettings.vue'
 import DataSourceSettings from './settings/DataSourceSettings.vue'
 import KnowledgeBaseActivitySettings from './settings/KnowledgeBaseActivitySettings.vue'
 import { useI18n } from 'vue-i18n'
+import { resolveConsumerSceneCandidate } from '@/utils/consumerSceneModels'
 
 const uiStore = useUIStore()
 const authStore = useAuthStore()
@@ -321,6 +323,7 @@ onBeforeUnmount(() => {
 const saving = ref(false)
 const loading = ref(false)
 const allModels = ref<any[]>([])
+const summaryModelSceneOptions = computed(() => chatResources.consumerSceneOptions.rag?.options || [])
 const hasFiles = ref(false)
 const initialStorageProvider = ref<string>('')
 /** Tenant-wide default from Settings → Storage engine (used when creating a KB). */
@@ -523,6 +526,29 @@ const loadAllModels = async (force = false) => {
     console.error('Failed to load model list:', error)
     MessagePlugin.error(t('knowledgeEditor.messages.loadModelsFailed'))
     allModels.value = []
+  }
+}
+
+const loadSummaryModelOptions = async (force = false) => {
+  if (!authStore.isLiteMode) {
+    await loadAllModels(force)
+    return
+  }
+
+  allModels.value = []
+  try {
+    await chatResources.ensureConsumerSceneOptions('rag', force)
+    if (editorMode.value === 'create' && formData.value) {
+      const response = chatResources.consumerSceneOptions.rag
+      formData.value.modelConfig.llmModelId = resolveConsumerSceneCandidate(
+        response?.options || [],
+        formData.value.modelConfig.llmModelId,
+        response?.effective_model_id,
+      )
+    }
+  } catch (error) {
+    console.error('Failed to load summary model options:', error)
+    MessagePlugin.error(t('knowledgeEditor.messages.loadModelsFailed'))
   }
 }
 
@@ -1241,7 +1267,7 @@ watch(() => props.visible, async (newVal) => {
       currentSection.value = 'basic'
       formData.value = initFormData(props.initialType || 'document')
       hasFiles.value = false
-      await loadAllModels()
+      await loadSummaryModelOptions()
       return
     }
 
@@ -1251,7 +1277,7 @@ watch(() => props.visible, async (newVal) => {
     }
 
     await Promise.all([
-      loadAllModels(),
+      loadSummaryModelOptions(),
       loadTenantDefaultStorageProvider(),
     ])
     if (props.kbId) {
@@ -1271,7 +1297,7 @@ watch(
   () => uiStore.showSettingsModal,
   async (visible, previous) => {
     if (!visible && previous && props.visible && editorMode.value !== 'create') {
-      await loadAllModels(true)
+      await loadSummaryModelOptions(true)
     }
   }
 )
