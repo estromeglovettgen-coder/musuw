@@ -1,8 +1,7 @@
 #!/bin/sh
 # Staging-only secret bridge. It reuses the shared Paddle shape validator but
 # deliberately calls the generic Sandbox path; production's Live-only wrapper
-# is never mounted into this project. TikHub is intentionally neither mounted
-# nor read for staging.
+# is never mounted into this project.
 set -eu
 
 paddle_runtime_contract=/opt/weknora-staging/paddle-runtime-contract.sh
@@ -36,6 +35,7 @@ export OIDC_AUTH_CLIENT_ID="$(read_required_secret /run/secrets/oidc_client_id o
 export OIDC_AUTH_CLIENT_SECRET="$(read_required_secret /run/secrets/oidc_client_secret oidc-client-secret)"
 export MUSUW_SUPABASE_SERVICE_ROLE_KEY="$(read_required_secret /run/secrets/supabase_service_role_key supabase-service-role-key)"
 export OPENROUTER_MANAGEMENT_API_KEY="$(read_required_secret /run/secrets/openrouter_management_api_key openrouter-management-api-key)"
+export TIKHUB_API_KEY="$(read_required_secret /run/secrets/tikhub_api_key tikhub-api-key)"
 export MUSUW_PADDLE_API_KEY="$(read_required_secret /run/secrets/paddle_api_key paddle-api-key)"
 export MUSUW_PADDLE_WEBHOOK_SECRET="$(read_required_secret /run/secrets/paddle_webhook_secret paddle-webhook-secret)"
 musuw_paddle_validate_configuration \

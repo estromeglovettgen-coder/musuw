@@ -59,9 +59,12 @@ if grep -Fq 'integration/weknora-production/app-entrypoint.sh' "$script_dir/sour
 fi
 grep -Fq 'weknora/docker/searxng/settings.yml' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the SearXNG settings template'
 grep -Fq 'integration/weknora-production/searxng-entrypoint.sh' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the reused SearXNG entrypoint'
-if grep -Eiq 'tikhub_api_key|TIKHUB_API_KEY' "$staging_root/app-entrypoint.sh" "$staging_root/compose.yaml" "$script_dir/prepare-runtime.sh"; then
-    fail 'staging runtime reads or mounts TikHub credentials'
-fi
+grep -Fq 'export TIKHUB_API_KEY="$(read_required_secret /run/secrets/tikhub_api_key tikhub-api-key)"' "$staging_root/app-entrypoint.sh" ||
+    fail 'staging entrypoint does not read the TikHub API key from a secret'
+grep -Fq 'source: tikhub_api_key' "$staging_root/compose.yaml" || fail 'staging app does not mount the TikHub secret'
+grep -Fq 'file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/tikhub_api_key' "$staging_root/compose.yaml" ||
+    fail 'staging TikHub secret is not file-backed'
+grep -Fq 'tikhub_api_key' "$script_dir/prepare-runtime.sh" || fail 'staging runtime does not require the TikHub secret'
 grep -Fq 'staging-web' "$staging_root/compose.edge.yaml" || fail 'staging edge alias is missing'
 grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'staging tunnel network is missing'
 grep -Fq 'HostConfig.Memory' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert memory limits'
@@ -73,7 +76,7 @@ trap 'find "$tmp_root" -depth -delete 2>/dev/null || true' EXIT
 runtime_dir="$tmp_root/runtime"
 secret_dir="$runtime_dir/secrets"
 mkdir -m 700 -p "$secret_dir"
-for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret; do
+for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret tikhub_api_key; do
     printf '%s\n' 'staging-static-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done

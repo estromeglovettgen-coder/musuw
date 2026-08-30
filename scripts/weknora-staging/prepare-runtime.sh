@@ -152,9 +152,9 @@ input_redis_namespace="$(weknora_staging_env_value "$tmp_env" WEKNORA_REDIS_NAME
     weknora_staging_die 'staging Redis namespace is not the fixed staging identity'
 unset input_secret_dir input_redis_namespace
 
-# Only non-secret metadata is checked. TikHub is neither mounted nor read in
-# staging; the production runtime performs its separate metadata-only audit.
-required_secrets=(db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret)
+# Only non-secret metadata is checked. Values are read exclusively by the
+# container entrypoints from their mounted secret files.
+required_secrets=(db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret)
 for secret in "${required_secrets[@]}"; do
     weknora_staging_require_secret_file "$secret_dir/$secret"
 done

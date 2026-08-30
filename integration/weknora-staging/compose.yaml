@@ -140,6 +140,9 @@ services:
       - source: openrouter_management_api_key
         target: openrouter_management_api_key
         mode: 0400
+      - source: tikhub_api_key
+        target: tikhub_api_key
+        mode: 0400
       - source: paddle_api_key
         target: paddle_api_key
         mode: 0400
@@ -334,6 +337,8 @@ secrets:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/supabase_service_role_key
   openrouter_management_api_key:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/openrouter_management_api_key
+  tikhub_api_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/tikhub_api_key
   paddle_api_key:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/paddle_api_key
   paddle_webhook_secret:

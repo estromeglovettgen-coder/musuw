@@ -83,9 +83,12 @@ grep -Fq 'sandbox' "$staging_root/app-entrypoint.sh" || fail 'staging entrypoint
 if grep -Fq 'musuw_paddle_validate_production_launch' "$staging_root/app-entrypoint.sh"; then
     fail 'staging entrypoint calls production Live-only wrapper'
 fi
-if grep -Eq 'tikhub_api_key|TIKHUB_API_KEY' "$staging_root/app-entrypoint.sh" "$staging_root/compose.yaml" "$script_dir/prepare-runtime.sh"; then
-    fail 'staging runtime reads or mounts TikHub credentials'
-fi
+grep -Fq 'export TIKHUB_API_KEY="$(read_required_secret /run/secrets/tikhub_api_key tikhub-api-key)"' "$staging_root/app-entrypoint.sh" ||
+    fail 'staging entrypoint does not read the TikHub API key from a secret'
+grep -Fq 'source: tikhub_api_key' "$staging_root/compose.yaml" || fail 'staging app does not mount the TikHub secret'
+grep -Fq 'file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/tikhub_api_key' "$staging_root/compose.yaml" ||
+    fail 'staging TikHub secret is not file-backed'
+grep -Fq 'tikhub_api_key' "$script_dir/prepare-runtime.sh" || fail 'staging runtime does not require the TikHub secret'
 if grep -Eq '^\s+build:' "$staging_root/compose.yaml" &&
    ! grep -Eq '^\s+build: !reset null$' "$staging_root/compose.yaml"; then
     fail 'staging overlay still permits a server-side build'
