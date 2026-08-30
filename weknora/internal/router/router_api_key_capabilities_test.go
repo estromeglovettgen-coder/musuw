@@ -68,6 +68,8 @@ func TestPlatformControlPlaneRoutesDeclarePlatformCapabilities(t *testing.T) {
 		{http.MethodGet, "/api/v1/system/admin/tenants/:id/entitlement", types.APIKeyCapabilitySystemTenantsRead},
 		{http.MethodPatch, "/api/v1/system/admin/tenants/:id", types.APIKeyCapabilitySystemTenantsManage},
 		{http.MethodPut, "/api/v1/system/admin/tenants/:id/openrouter-credits", types.APIKeyCapabilitySystemTenantsManage},
+		{http.MethodPut, "/api/v1/system/admin/tenants/:id/complimentary-entitlement", types.APIKeyCapabilitySystemTenantsManage},
+		{http.MethodDelete, "/api/v1/system/admin/tenants/:id/complimentary-entitlement", types.APIKeyCapabilitySystemTenantsManage},
 		{http.MethodGet, "/api/v1/system/admin/users/:user_id/investigation", types.APIKeyCapabilitySystemTenantsRead},
 		{http.MethodDelete, "/api/v1/system/admin/users/:user_id", types.APIKeyCapabilitySystemTenantsManage},
 	}

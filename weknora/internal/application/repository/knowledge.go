@@ -75,6 +75,10 @@ func (r *knowledgeRepository) CreateKnowledgeWithStorage(
 		if err != nil {
 			return err
 		}
+		// The caller's quota is only an early UX check. Admission is based on
+		// the row locked above so a grant revoked while this request was waiting
+		// cannot authorize bytes under its old paid allowance.
+		effectiveQuota = types.EffectiveStorageQuotaAt(tenant, time.Now().UTC())
 		delta := knowledge.AccountedStorageBytes()
 		if err := ensureStorageQuota(tenant, delta, effectiveQuota); err != nil {
 			return err
@@ -108,6 +112,7 @@ func (r *knowledgeRepository) ClaimKnowledgeSourceWithStorage(
 		if lockErr != nil {
 			return lockErr
 		}
+		effectiveQuota = types.EffectiveStorageQuotaAt(tenant, time.Now().UTC())
 
 		var persisted types.Knowledge
 		if findErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -470,6 +475,7 @@ func (r *knowledgeRepository) UpdateKnowledgeWithStorage(
 		if err != nil {
 			return err
 		}
+		effectiveQuota = types.EffectiveStorageQuotaAt(tenant, time.Now().UTC())
 
 		var persisted types.Knowledge
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).

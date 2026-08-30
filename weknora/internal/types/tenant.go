@@ -103,8 +103,15 @@ type Tenant struct {
 	// Consumer entitlement. Billing identifiers and provider spend are never
 	// serialized through the generic tenant API; the dedicated entitlement DTO
 	// exposes only effective limits and aggregate usage.
-	Plan                      ConsumerPlan `yaml:"plan" json:"-" gorm:"type:varchar(16);default:'free'"`
-	PlanStatus                string       `yaml:"plan_status" json:"-" gorm:"type:varchar(16);default:'active'"`
+	Plan       ConsumerPlan `yaml:"plan" json:"-" gorm:"type:varchar(16);default:'free'"`
+	PlanStatus string       `yaml:"plan_status" json:"-" gorm:"type:varchar(16);default:'active'"`
+	// Complimentary entitlement is an operations-owned overlay. It never
+	// replaces Paddle's durable plan/status or provider identity. The opaque
+	// grant ID is retained after revoke so a delayed request cannot revoke or
+	// recreate a later grant.
+	ComplimentaryPlan         ConsumerPlan `yaml:"complimentary_plan" json:"-" gorm:"type:varchar(16);default:''"`
+	ComplimentaryExpiresAt    *time.Time   `yaml:"complimentary_expires_at" json:"-"`
+	ComplimentaryGrantID      string       `yaml:"complimentary_grant_id" json:"-" gorm:"type:varchar(64);default:''"`
 	PaddleCustomerID          string       `yaml:"paddle_customer_id" json:"-" gorm:"type:varchar(64);default:''"`
 	PaddleSubscriptionID      string       `yaml:"paddle_subscription_id" json:"-" gorm:"type:varchar(64);default:''"`
 	PaddleBillingPeriod       string       `yaml:"paddle_billing_period" json:"-" gorm:"type:varchar(16);default:''"`

@@ -26,6 +26,7 @@ func TestApplyConsumerPlanUpdatesQuotaAndIgnoresOlderBillingEvent(t *testing.T) 
 	assert.False(t, applied)
 
 	var stored types.Tenant
+	stored = types.Tenant{}
 	require.NoError(t, db.First(&stored, tenant.ID).Error)
 	assert.Equal(t, types.ConsumerPlanPro, stored.Plan)
 	assert.Equal(t, types.LimitsForConsumerPlan(types.ConsumerPlanPro).StorageBytes, stored.StorageQuota)
@@ -63,6 +64,100 @@ func TestApplyConsumerPlanCannotReplaceConcurrentInitialSubscription(t *testing.
 	assert.Equal(t, types.ConsumerPlanPlus, stored.Plan)
 	assert.Equal(t, "sub_first", stored.PaddleSubscriptionID)
 	assert.Equal(t, "evt-first", stored.PaddleLastEventID)
+}
+
+func TestComplimentaryPlanGrantReplayConflictAndRevokeCAS(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewEntitlementRepository(db)
+	tenant := &types.Tenant{Name: "gift", Status: "active", Plan: types.ConsumerPlanFree, PlanStatus: "active"}
+	require.NoError(t, db.Create(tenant).Error)
+
+	at := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	expires := at.AddDate(0, 2, 0)
+	periodEnd := at.AddDate(0, 1, 0)
+	applied, err := repo.GrantComplimentaryPlan(context.Background(), tenant.ID, types.ConsumerPlanPro, "grant-1234567890", at, expires, periodEnd, 2_750_000)
+	require.NoError(t, err)
+	require.True(t, applied)
+
+	// Exact replay is a no-op even if a stale caller computed another provider target.
+	applied, err = repo.GrantComplimentaryPlan(context.Background(), tenant.ID, types.ConsumerPlanPro, "grant-1234567890", at, expires, periodEnd, 9_999_999)
+	require.NoError(t, err)
+	assert.False(t, applied)
+
+	_, err = repo.GrantComplimentaryPlan(context.Background(), tenant.ID, types.ConsumerPlanMax, "grant-1234567890", at, expires, periodEnd, 5_000_000)
+	require.ErrorIs(t, err, ErrComplimentaryPlanConflict)
+	_, err = repo.GrantComplimentaryPlan(context.Background(), tenant.ID, types.ConsumerPlanMax, "grant-another-1234", at, expires, periodEnd, 5_000_000)
+	require.ErrorIs(t, err, ErrComplimentaryPlanConflict)
+
+	var stored types.Tenant
+	require.NoError(t, db.First(&stored, tenant.ID).Error)
+	assert.Equal(t, types.ConsumerPlanPro, stored.ComplimentaryPlan)
+	assert.Equal(t, "grant-1234567890", stored.ComplimentaryGrantID)
+	require.NotNil(t, stored.ComplimentaryExpiresAt)
+	assert.Equal(t, expires, stored.ComplimentaryExpiresAt.UTC())
+	assert.Equal(t, int64(2_750_000), stored.OpenRouterDesiredLimitMicrousd)
+
+	_, err = repo.RevokeComplimentaryPlan(context.Background(), tenant.ID, "grant-wrong-123456", at, at, 0)
+	require.ErrorIs(t, err, ErrComplimentaryPlanConflict)
+	applied, err = repo.RevokeComplimentaryPlan(context.Background(), tenant.ID, "grant-1234567890", at, at, 0)
+	require.NoError(t, err)
+	require.True(t, applied)
+	applied, err = repo.RevokeComplimentaryPlan(context.Background(), tenant.ID, "grant-1234567890", at, at, 0)
+	require.NoError(t, err)
+	assert.False(t, applied)
+
+	stored = types.Tenant{}
+	require.NoError(t, db.First(&stored, tenant.ID).Error)
+	assert.Empty(t, stored.ComplimentaryPlan)
+	assert.Nil(t, stored.ComplimentaryExpiresAt)
+	assert.Equal(t, "grant-1234567890", stored.ComplimentaryGrantID)
+	assert.Zero(t, stored.OpenRouterDesiredLimitMicrousd)
+
+	// A revoked operation ID can never reactivate access.
+	_, err = repo.GrantComplimentaryPlan(context.Background(), tenant.ID, types.ConsumerPlanPro, "grant-1234567890", at, expires, periodEnd, 2_500_000)
+	assert.Error(t, err)
+}
+
+func TestComplimentaryGrantRejectsPaddleStateAndPaddleActivationSupersedesGrant(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewEntitlementRepository(db)
+	at := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	expires := at.AddDate(0, 2, 0)
+	periodEnd := at.AddDate(0, 1, 0)
+
+	bound := &types.Tenant{Name: "bound", Status: "active", Plan: types.ConsumerPlanFree, PlanStatus: "active", PaddleCustomerID: "ctm_old"}
+	require.NoError(t, db.Create(bound).Error)
+	_, err := repo.GrantComplimentaryPlan(context.Background(), bound.ID, types.ConsumerPlanPlus, "grant-bound-123456", at, expires, periodEnd, 1_250_000)
+	require.ErrorIs(t, err, ErrComplimentaryPlanConflict)
+
+	free := &types.Tenant{Name: "free", Status: "active", Plan: types.ConsumerPlanFree, PlanStatus: "active"}
+	require.NoError(t, db.Create(free).Error)
+	applied, err := repo.GrantComplimentaryPlan(context.Background(), free.ID, types.ConsumerPlanMax, "grant-paddle-1234", at, expires, periodEnd, 5_000_000)
+	require.NoError(t, err)
+	require.True(t, applied)
+
+	paidEnd := at.AddDate(0, 1, 0)
+	applied, err = repo.ApplyConsumerPlan(context.Background(), free.ID, types.ConsumerPlanPro, "active", "monthly", "evt-paid", at.Add(time.Second), "ctm_new", "sub_new", &paidEnd, &paidEnd, 2_500_000)
+	require.NoError(t, err)
+	require.True(t, applied)
+
+	var stored types.Tenant
+	stored = types.Tenant{}
+	require.NoError(t, db.First(&stored, free.ID).Error)
+	assert.Equal(t, types.ConsumerPlanPro, stored.Plan)
+	assert.Empty(t, stored.ComplimentaryPlan)
+	assert.Nil(t, stored.ComplimentaryExpiresAt)
+	assert.Equal(t, "grant-paddle-1234", stored.ComplimentaryGrantID)
+	assert.Equal(t, "sub_new", stored.PaddleSubscriptionID)
+
+	// A delayed revoke for the superseded grant cannot change Paddle state.
+	applied, err = repo.RevokeComplimentaryPlan(context.Background(), free.ID, "grant-paddle-1234", at.Add(2*time.Second), at.Add(2*time.Second), 0)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	stored = types.Tenant{}
+	require.NoError(t, db.First(&stored, free.ID).Error)
+	assert.Equal(t, types.ConsumerPlanPro, stored.Plan)
+	assert.Equal(t, "sub_new", stored.PaddleSubscriptionID)
 }
 
 func TestResolvePaddleSubscriptionRequiresExactUnambiguousBinding(t *testing.T) {

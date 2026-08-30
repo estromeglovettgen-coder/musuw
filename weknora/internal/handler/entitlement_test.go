@@ -302,6 +302,14 @@ func (s entitlementHandlerServiceStub) SetOpenRouterRemainingForTenant(context.C
 	return s.current, nil
 }
 
+func (s entitlementHandlerServiceStub) GrantComplimentaryPlan(context.Context, uint64, types.ConsumerPlan, time.Time, string) (*types.ConsumerEntitlement, bool, error) {
+	return s.current, false, nil
+}
+
+func (s entitlementHandlerServiceStub) RevokeComplimentaryPlan(context.Context, uint64, string) (*types.ConsumerEntitlement, bool, error) {
+	return s.current, false, nil
+}
+
 func (s entitlementHandlerServiceStub) ResolvePaddleSubscription(context.Context, string, string) (*types.PaddleSubscriptionBinding, error) {
 	return s.paddleBinding, s.paddleBindingErr
 }
@@ -897,6 +905,38 @@ func TestPaddleCheckoutIntentCreatesOneOfficialTransactionAcrossTabs(t *testing.
 	assert.Equal(t, config.checkoutBinding(42, "pri_plus_monthly"), transactions.createReq.CustomData["musuw_checkout_binding"])
 	assert.Equal(t, "00000000-0000-4000-8000-000000000001", transactions.createReq.CustomData["musuw_billing_operation_key"])
 	assert.Equal(t, "txn_server_owned", operations.recordedTransaction)
+}
+
+func TestPaddleCheckoutIntentAllowsPaddleUnboundComplimentaryTenantToPurchase(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config := PaddleConfig{
+		Environment: "sandbox", APIKey: "pdl_sdbx_apikey_test", ClientToken: "test_client_token", WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	transactions := &paddleTransactionClientStub{transaction: &paddle.Transaction{ID: "txn_gift_purchase", Status: paddle.TransactionStatusDraft}}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
+			ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanPro),
+			PlanStatus:         "complimentary",
+			PlanSource:         "complimentary",
+		}},
+		paddle: config, transactions: transactions, operations: &paddleBillingOperationRepoStub{},
+	}
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/checkout-intent", strings.NewReader(`{"plan":"max","billing_period":"monthly","operation_key":"00000000-0000-4000-8000-000000000003"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+
+	h.PaddleCheckoutIntent(c)
+
+	require.Empty(t, c.Errors)
+	assert.Equal(t, 1, transactions.createCalls)
+	assert.JSONEq(t, `{"transaction_id":"txn_gift_purchase","pending":true}`, recorder.Body.String())
 }
 
 func TestPaddleCheckoutIntentDoesNotCancelProviderTransactionWhenLocalPersistenceFails(t *testing.T) {

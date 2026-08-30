@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -18,13 +19,19 @@ import (
 )
 
 type entitlementRepoStub struct {
-	mu     sync.Mutex
-	tenant *types.Tenant
+	mu            sync.Mutex
+	tenant        *types.Tenant
+	getTenantErr  error
+	grantPlanErr  error
+	revokePlanErr error
 }
 
 func (s *entitlementRepoStub) GetTenantEntitlement(context.Context, uint64) (*types.Tenant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.getTenantErr != nil {
+		return nil, s.getTenantErr
+	}
 	copy := *s.tenant
 	if s.tenant.Credentials != nil {
 		credentials := *s.tenant.Credentials
@@ -93,6 +100,75 @@ func (s *entitlementRepoStub) SetOpenRouterDesiredLimitIfUnset(_ context.Context
 	return true, nil
 }
 
+func (s *entitlementRepoStub) GrantComplimentaryPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, grantID string, at, expiresAt, creditPeriodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.grantPlanErr != nil {
+		return false, s.grantPlanErr
+	}
+	if s.tenant.ComplimentaryGrantID == grantID {
+		if s.tenant.ComplimentaryPlan == plan && s.tenant.ComplimentaryExpiresAt != nil && s.tenant.ComplimentaryExpiresAt.Equal(expiresAt) {
+			return false, nil
+		}
+		return false, fmt.Errorf("complimentary grant ID was already used")
+	}
+	if _, active := types.ActiveComplimentaryPlanAt(s.tenant, at); active {
+		return false, fmt.Errorf("an active complimentary grant must be revoked before replacement")
+	}
+	if types.NormalizeConsumerPlan(s.tenant.Plan) != types.ConsumerPlanFree || s.tenant.PaddleCustomerID != "" || s.tenant.PaddleSubscriptionID != "" {
+		return false, fmt.Errorf("complimentary grants require a Paddle-unbound Free tenant")
+	}
+	s.tenant.ComplimentaryPlan = plan
+	s.tenant.ComplimentaryGrantID = grantID
+	expires := expiresAt.UTC()
+	s.tenant.ComplimentaryExpiresAt = &expires
+	period := creditPeriodEnd.UTC()
+	s.tenant.OpenRouterCreditPeriodEnd = &period
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	return true, nil
+}
+
+func (s *entitlementRepoStub) RevokeComplimentaryPlan(_ context.Context, _ uint64, grantID string, at, creditPeriodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.revokePlanErr != nil {
+		return false, s.revokePlanErr
+	}
+	if s.tenant.ComplimentaryGrantID != grantID {
+		return false, fmt.Errorf("complimentary grant ID does not match")
+	}
+	if s.tenant.ComplimentaryPlan == "" || s.tenant.ComplimentaryExpiresAt == nil {
+		return false, nil
+	}
+	s.tenant.ComplimentaryPlan = ""
+	s.tenant.ComplimentaryExpiresAt = nil
+	period := creditPeriodEnd.UTC()
+	s.tenant.OpenRouterCreditPeriodEnd = &period
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	return true, nil
+}
+
+func (s *entitlementRepoStub) AdvanceComplimentaryCreditPeriod(_ context.Context, _ uint64, grantID string, at time.Time, expectedPlan types.ConsumerPlan, periodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tenant.ComplimentaryGrantID != grantID || types.EffectiveConsumerPlanAt(s.tenant, at) != expectedPlan {
+		return false, nil
+	}
+	if expectedPlan == types.ConsumerPlanFree && (s.tenant.ComplimentaryExpiresAt == nil || s.tenant.ComplimentaryExpiresAt.After(at)) {
+		return false, nil
+	}
+	if expectedPlan != types.ConsumerPlanFree && s.tenant.ComplimentaryExpiresAt != nil && periodEnd.After(*s.tenant.ComplimentaryExpiresAt) {
+		return false, nil
+	}
+	if s.tenant.OpenRouterCreditPeriodEnd != nil && !periodEnd.After(*s.tenant.OpenRouterCreditPeriodEnd) {
+		return false, nil
+	}
+	period := periodEnd.UTC()
+	s.tenant.OpenRouterCreditPeriodEnd = &period
+	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	return true, nil
+}
+
 func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time, desiredLimitMicrousd int64) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -118,12 +194,318 @@ func (s *entitlementRepoStub) ApplyConsumerPlan(_ context.Context, _ uint64, pla
 	}
 	s.tenant.OpenRouterCreditPeriodEnd = creditPeriodEnd
 	s.tenant.OpenRouterDesiredLimitMicrousd = desiredLimitMicrousd
+	if types.EffectiveConsumerPlan(s.tenant) != types.ConsumerPlanFree && (status == "active" || status == "trialing" || status == "past_due") {
+		s.tenant.ComplimentaryPlan = ""
+		s.tenant.ComplimentaryExpiresAt = nil
+	}
 	if eventID != "" {
 		s.tenant.PaddleLastEventID = eventID
 		value := occurredAt.UTC()
 		s.tenant.PaddleLastEventAt = &value
 	}
 	return true, nil
+}
+
+func TestGrantComplimentaryPlanSynchronizesExistingKeyAndIsReplaySafe(t *testing.T) {
+	now := time.Now().UTC()
+	freePeriodEnd := now.Add(12 * time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -2, 0),
+		OpenRouterCreditPeriodEnd: &freePeriodEnd, OpenRouterDesiredLimitMicrousd: 400_000,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-or-v1", KeyHash: "hash-1"}},
+	}}
+	keys := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-1", UsageMicrousd: 250_000, LimitMicrousd: 400_000, LimitRemainingMicrousd: 150_000,
+	}}
+	svc := newEntitlementService(repo, keys)
+	expires := now.AddDate(0, 2, 0)
+
+	current, applied, err := svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPro, expires, "grant-1234567890")
+	require.NoError(t, err)
+	require.True(t, applied)
+	require.NotNil(t, current)
+	assert.Equal(t, types.ConsumerPlanPro, current.Plan)
+	assert.Equal(t, "complimentary", current.PlanStatus)
+	assert.Equal(t, "complimentary", current.PlanSource)
+	assert.Equal(t, int64(2_750_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Equal(t, int64(2_750_000), keys.updateLimit)
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.True(t, repo.tenant.OpenRouterCreditPeriodEnd.After(now))
+	assert.False(t, repo.tenant.OpenRouterCreditPeriodEnd.After(expires))
+
+	updates := keys.updateCalls
+	current, applied, err = svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPro, expires, "grant-1234567890")
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, updates, keys.updateCalls, "exact replay must not mint or resynchronize another allowance")
+	assert.Equal(t, types.ConsumerPlanPro, current.Plan)
+}
+
+func TestProviderSynchronizationConvergesWhenPaddleSupersedesGrantDuringWrite(t *testing.T) {
+	now := time.Now().UTC()
+	expires := now.Add(24 * time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active",
+		ComplimentaryPlan: types.ConsumerPlanPro, ComplimentaryGrantID: "grant-race-123456", ComplimentaryExpiresAt: &expires,
+		OpenRouterDesiredLimitMicrousd: 2_500_000,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{
+			APIKey: "sk-or-v1", KeyHash: "hash-1",
+		}},
+	}}
+	keys := &blockingLimitKeyManager{
+		info:    &modelopenrouter.KeyInfo{Hash: "hash-1", LimitMicrousd: 400_000, LimitRemainingMicrousd: 400_000},
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	svc := newEntitlementService(repo, keys).(*entitlementService)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.syncTenantOpenRouterDesiredLimit(context.Background(), repo.tenant)
+	}()
+	<-keys.started
+
+	// Simulate a signed Paddle activation committing while the older grant
+	// provider write is blocked. The old writer must notice the new durable
+	// target and repair its own stale write before returning.
+	repo.mu.Lock()
+	repo.tenant.Plan = types.ConsumerPlanPro
+	repo.tenant.PlanStatus = "active"
+	repo.tenant.PaddleCustomerID = "ctm_paid"
+	repo.tenant.PaddleSubscriptionID = "sub_paid"
+	repo.tenant.ComplimentaryPlan = ""
+	repo.tenant.ComplimentaryExpiresAt = nil
+	repo.tenant.OpenRouterDesiredLimitMicrousd = 4_000_000
+	repo.mu.Unlock()
+	close(keys.release)
+
+	require.NoError(t, <-done)
+	assert.Equal(t, []int64{2_500_000, 4_000_000}, keys.updateLimits())
+	assert.Equal(t, int64(4_000_000), keys.info.LimitMicrousd)
+}
+
+func TestGrantComplimentaryPlanSupportsEveryPaidTierWithoutEagerKeyCreation(t *testing.T) {
+	for _, plan := range []types.ConsumerPlan{types.ConsumerPlanPlus, types.ConsumerPlanPro, types.ConsumerPlanMax} {
+		t.Run(string(plan), func(t *testing.T) {
+			now := time.Now().UTC()
+			repo := &entitlementRepoStub{tenant: &types.Tenant{
+				ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -1, 0),
+			}}
+			keys := &keyManagerStub{}
+			svc := newEntitlementService(repo, keys)
+
+			current, applied, err := svc.GrantComplimentaryPlan(
+				context.Background(), 7, plan, now.Add(48*time.Hour), "grant-"+string(plan)+"-1234567890",
+			)
+
+			require.NoError(t, err)
+			require.True(t, applied)
+			assert.Equal(t, plan, current.Plan)
+			assert.Equal(t, "complimentary", current.PlanSource)
+			assert.Zero(t, keys.createCalls, "granting must not create a second or eager provider key")
+			assert.Zero(t, keys.updateCalls)
+		})
+	}
+}
+
+func TestGrantComplimentaryPlanPreservesTransientRepositoryErrors(t *testing.T) {
+	now := time.Now().UTC()
+	dbErr := errors.New("database temporarily unavailable")
+
+	t.Run("lookup", func(t *testing.T) {
+		repo := &entitlementRepoStub{getTenantErr: dbErr}
+		svc := newEntitlementService(repo, &keyManagerStub{})
+
+		current, applied, err := svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPro, now.Add(time.Hour), "grant-transient-123")
+
+		require.ErrorIs(t, err, dbErr)
+		assert.Nil(t, current)
+		assert.False(t, applied)
+		_, isAppError := err.(*apperrors.AppError)
+		assert.False(t, isAppError, "transient repository errors must not be classified as conflicts")
+	})
+
+	t.Run("mutation", func(t *testing.T) {
+		repo := &entitlementRepoStub{
+			tenant:       &types.Tenant{ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active"},
+			grantPlanErr: dbErr,
+		}
+		svc := newEntitlementService(repo, &keyManagerStub{})
+
+		current, applied, err := svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPro, now.Add(time.Hour), "grant-transient-123")
+
+		require.ErrorIs(t, err, dbErr)
+		assert.Nil(t, current)
+		assert.False(t, applied)
+		_, isAppError := err.(*apperrors.AppError)
+		assert.False(t, isAppError, "transient repository errors must not be classified as conflicts")
+	})
+}
+
+func TestComplimentaryPlanRefreshesOneMonthlyAllowanceAndCapsNextBoundaryAtExpiry(t *testing.T) {
+	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	previousBoundary := now.Add(-24 * time.Hour)
+	expires := now.Add(10 * 24 * time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -4, 0),
+		ComplimentaryPlan: types.ConsumerPlanMax, ComplimentaryGrantID: "grant-refresh-123", ComplimentaryExpiresAt: &expires,
+		OpenRouterCreditPeriodEnd: &previousBoundary, OpenRouterDesiredLimitMicrousd: 5_100_000,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-or-v1", KeyHash: "hash-1"}},
+	}}
+	keys := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-1", UsageMicrousd: 1_200_000, LimitMicrousd: 5_100_000, LimitRemainingMicrousd: 3_900_000,
+	}}
+	svc := newEntitlementService(repo, keys)
+
+	current, err := svc.CurrentForTenant(context.Background(), 7, now)
+
+	require.NoError(t, err)
+	assert.Equal(t, types.ConsumerPlanMax, current.Plan)
+	assert.Equal(t, int64(6_200_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Equal(t, int64(6_200_000), keys.updateLimit)
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, expires, repo.tenant.OpenRouterCreditPeriodEnd.UTC(), "the final grant period must never cross custom expiration")
+}
+
+func TestGrantComplimentaryPlanKeepsDurableTargetWhenProviderSyncFails(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -1, 0),
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-or-v1", KeyHash: "hash-1"}},
+	}}
+	keys := &keyManagerStub{
+		info:      &modelopenrouter.KeyInfo{Hash: "hash-1", UsageMicrousd: 300_000, LimitMicrousd: 400_000, LimitRemainingMicrousd: 100_000},
+		updateErr: errors.New("provider unavailable"),
+	}
+	svc := newEntitlementService(repo, keys)
+
+	current, applied, err := svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPlus, now.Add(24*time.Hour), "grant-provider-123")
+
+	require.Error(t, err)
+	assert.Nil(t, current)
+	assert.True(t, applied, "the caller must know the durable transition committed before provider failure")
+	assert.Equal(t, types.ConsumerPlanPlus, repo.tenant.ComplimentaryPlan)
+	assert.Equal(t, int64(1_550_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+
+	current, applied, err = svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPlus, now.Add(24*time.Hour), "grant-provider-123")
+	require.Error(t, err, "an exact retry must keep reporting unavailable until the durable target converges")
+	assert.Nil(t, current)
+	assert.False(t, applied)
+
+	keys.updateErr = nil
+	current, applied, err = svc.GrantComplimentaryPlan(context.Background(), 7, types.ConsumerPlanPlus, now.Add(24*time.Hour), "grant-provider-123")
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, types.ConsumerPlanPlus, current.Plan)
+}
+
+func TestComplimentaryPlanExpiresAndConvergesProviderToFree(t *testing.T) {
+	now := time.Now().UTC()
+	expires := now.Add(-time.Second)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -2, 0),
+		ComplimentaryPlan: types.ConsumerPlanMax, ComplimentaryGrantID: "grant-expired-123", ComplimentaryExpiresAt: &expires,
+		OpenRouterCreditPeriodEnd: &expires, OpenRouterDesiredLimitMicrousd: 5_100_000,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-or-v1", KeyHash: "hash-1"}},
+	}}
+	keys := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-1", UsageMicrousd: 100_000, LimitMicrousd: 5_100_000, LimitRemainingMicrousd: 5_000_000,
+	}}
+	svc := newEntitlementService(repo, keys)
+
+	current, err := svc.CurrentForTenant(context.Background(), 7, now)
+	require.NoError(t, err)
+	assert.Equal(t, types.ConsumerPlanFree, current.Plan)
+	assert.Equal(t, int64(500_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Equal(t, int64(500_000), keys.updateLimit)
+	assert.Equal(t, int64(400_000), current.OpenRouterRemainingMicrousd)
+}
+
+func TestRevokeComplimentaryPlanRestoresFreeWithoutTouchingPaddle(t *testing.T) {
+	now := time.Now().UTC()
+	expires := now.Add(time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -2, 0),
+		ComplimentaryPlan: types.ConsumerPlanPlus, ComplimentaryGrantID: "grant-revoke-123", ComplimentaryExpiresAt: &expires,
+		OpenRouterCreditPeriodEnd: &expires, OpenRouterDesiredLimitMicrousd: 1_350_000,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-or-v1", KeyHash: "hash-1"}},
+	}}
+	keys := &keyManagerStub{info: &modelopenrouter.KeyInfo{
+		Hash: "hash-1", UsageMicrousd: 100_000, LimitMicrousd: 1_350_000, LimitRemainingMicrousd: 1_250_000,
+	}}
+	svc := newEntitlementService(repo, keys)
+
+	current, applied, err := svc.RevokeComplimentaryPlan(context.Background(), 7, "grant-revoke-123")
+	require.NoError(t, err)
+	require.True(t, applied)
+	assert.Equal(t, types.ConsumerPlanFree, current.Plan)
+	assert.Empty(t, repo.tenant.ComplimentaryPlan)
+	assert.Nil(t, repo.tenant.ComplimentaryExpiresAt)
+	assert.Equal(t, int64(500_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
+	assert.Equal(t, int64(500_000), keys.updateLimit)
+}
+
+func TestRevokeComplimentaryPlanPreservesTransientRepositoryErrors(t *testing.T) {
+	now := time.Now().UTC()
+	expires := now.Add(time.Hour)
+	dbErr := errors.New("database temporarily unavailable")
+
+	t.Run("lookup", func(t *testing.T) {
+		repo := &entitlementRepoStub{getTenantErr: dbErr}
+		svc := newEntitlementService(repo, &keyManagerStub{})
+
+		current, applied, err := svc.RevokeComplimentaryPlan(context.Background(), 7, "grant-transient-123")
+
+		require.ErrorIs(t, err, dbErr)
+		assert.Nil(t, current)
+		assert.False(t, applied)
+		_, isAppError := err.(*apperrors.AppError)
+		assert.False(t, isAppError, "transient repository errors must not be classified as conflicts")
+	})
+
+	t.Run("mutation", func(t *testing.T) {
+		repo := &entitlementRepoStub{
+			tenant: &types.Tenant{
+				ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active",
+				ComplimentaryPlan: types.ConsumerPlanPro, ComplimentaryGrantID: "grant-transient-123", ComplimentaryExpiresAt: &expires,
+			},
+			revokePlanErr: dbErr,
+		}
+		svc := newEntitlementService(repo, &keyManagerStub{})
+
+		current, applied, err := svc.RevokeComplimentaryPlan(context.Background(), 7, "grant-transient-123")
+
+		require.ErrorIs(t, err, dbErr)
+		assert.Nil(t, current)
+		assert.False(t, applied)
+		_, isAppError := err.(*apperrors.AppError)
+		assert.False(t, isAppError, "transient repository errors must not be classified as conflicts")
+	})
+}
+
+func TestRevokeComplimentaryPlanReportsCommittedProviderSyncFailure(t *testing.T) {
+	now := time.Now().UTC()
+	expires := now.Add(time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanFree, PlanStatus: "active", CreatedAt: now.AddDate(0, -2, 0),
+		ComplimentaryPlan: types.ConsumerPlanMax, ComplimentaryGrantID: "grant-revoke-fail", ComplimentaryExpiresAt: &expires,
+		OpenRouterCreditPeriodEnd: &expires, OpenRouterDesiredLimitMicrousd: 5_100_000,
+		Credentials: &types.CredentialsConfig{OpenRouter: &types.OpenRouterCredentials{APIKey: "sk-or-v1", KeyHash: "hash-1"}},
+	}}
+	keys := &keyManagerStub{
+		info:      &modelopenrouter.KeyInfo{Hash: "hash-1", UsageMicrousd: 100_000, LimitMicrousd: 5_100_000, LimitRemainingMicrousd: 5_000_000},
+		updateErr: errors.New("provider unavailable"),
+	}
+	svc := newEntitlementService(repo, keys)
+
+	current, applied, err := svc.RevokeComplimentaryPlan(context.Background(), 7, "grant-revoke-fail")
+
+	require.Error(t, err)
+	assert.Nil(t, current)
+	assert.True(t, applied)
+	assert.Empty(t, repo.tenant.ComplimentaryPlan)
+	assert.Nil(t, repo.tenant.ComplimentaryExpiresAt)
+	assert.Equal(t, int64(500_000), repo.tenant.OpenRouterDesiredLimitMicrousd)
 }
 
 func (s *entitlementRepoStub) AdvanceOpenRouterCreditPeriod(_ context.Context, _ uint64, plan types.ConsumerPlan, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, periodEnd time.Time, desiredLimitMicrousd int64) (bool, error) {
@@ -204,6 +586,9 @@ func (s *keyManagerStub) UpdateKeyLimit(_ context.Context, _ string, limit int64
 	s.updateCalls++
 	s.updateLimit = limit
 	s.monthlyReset = monthlyReset
+	if s.updateErr != nil {
+		return s.updateErr
+	}
 	if s.info != nil {
 		s.info.LimitMicrousd = limit
 		remaining := limit - s.info.UsageMicrousd
@@ -213,7 +598,53 @@ func (s *keyManagerStub) UpdateKeyLimit(_ context.Context, _ string, limit int64
 		s.info.LimitRemainingMicrousd = remaining
 		s.info.MonthlyReset = monthlyReset
 	}
-	return s.updateErr
+	return nil
+}
+
+type blockingLimitKeyManager struct {
+	mu      sync.Mutex
+	info    *modelopenrouter.KeyInfo
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+	updates []int64
+}
+
+func (m *blockingLimitKeyManager) CreateKey(context.Context, string, int64, bool) (*modelopenrouter.ManagedKey, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *blockingLimitKeyManager) GetKey(context.Context, string) (*modelopenrouter.KeyInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	copy := *m.info
+	return &copy, nil
+}
+
+func (m *blockingLimitKeyManager) UpdateKeyLimit(_ context.Context, _ string, limit int64, monthlyReset bool) error {
+	block := false
+	m.once.Do(func() {
+		block = true
+		close(m.started)
+	})
+	if block {
+		<-m.release
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.updates = append(m.updates, limit)
+	m.info.LimitMicrousd = limit
+	m.info.LimitRemainingMicrousd = nonNegativeMicrousd(limit - m.info.UsageMicrousd)
+	m.info.MonthlyReset = monthlyReset
+	return nil
+}
+
+func (m *blockingLimitKeyManager) DeleteKey(context.Context, string) error { return nil }
+
+func (m *blockingLimitKeyManager) updateLimits() []int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]int64(nil), m.updates...)
 }
 
 func TestFreeAllowanceRefreshesOnRegistrationAnniversaryWithoutStacking(t *testing.T) {

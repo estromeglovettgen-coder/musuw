@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +16,12 @@ import (
 type entitlementRepository struct {
 	db *gorm.DB
 }
+
+// ErrComplimentaryPlanConflict marks a durable complimentary-entitlement
+// state conflict.  Callers may safely map this sentinel to HTTP 409; database
+// and infrastructure errors intentionally remain unclassified so they can be
+// retried instead of being reported as caller conflicts.
+var ErrComplimentaryPlanConflict = errors.New("complimentary plan state conflict")
 
 func NewEntitlementRepository(db *gorm.DB) interfaces.EntitlementRepository {
 	return &entitlementRepository{db: db}
@@ -139,6 +146,169 @@ func (r *entitlementRepository) SetOpenRouterDesiredLimitIfUnset(ctx context.Con
 	return inserted, err
 }
 
+func (r *entitlementRepository) GrantComplimentaryPlan(
+	ctx context.Context,
+	tenantID uint64,
+	plan types.ConsumerPlan,
+	grantID string,
+	at, expiresAt, creditPeriodEnd time.Time,
+	desiredLimitMicrousd int64,
+) (bool, error) {
+	plan = types.NormalizeConsumerPlan(plan)
+	grantID = strings.TrimSpace(grantID)
+	at, expiresAt, creditPeriodEnd = at.UTC(), expiresAt.UTC(), creditPeriodEnd.UTC()
+	if plan == types.ConsumerPlanFree {
+		return false, fmt.Errorf("complimentary plan must be plus, pro, or max")
+	}
+	if grantID == "" {
+		return false, fmt.Errorf("complimentary grant ID is required")
+	}
+	if !expiresAt.After(at) {
+		return false, fmt.Errorf("complimentary expiration must be in the future")
+	}
+	if !creditPeriodEnd.After(at) || creditPeriodEnd.After(expiresAt) {
+		return false, fmt.Errorf("complimentary credit period must end after now and no later than expiration")
+	}
+	if desiredLimitMicrousd < 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit cannot be negative")
+	}
+
+	applied := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant types.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+			return err
+		}
+		if tenant.ComplimentaryGrantID == grantID {
+			if tenant.ComplimentaryPlan == plan && tenant.ComplimentaryExpiresAt != nil && tenant.ComplimentaryExpiresAt.UTC().Equal(expiresAt) {
+				return nil
+			}
+			return fmt.Errorf("%w: complimentary grant ID was already used", ErrComplimentaryPlanConflict)
+		}
+		if _, active := types.ActiveComplimentaryPlanAt(&tenant, at); active {
+			return fmt.Errorf("%w: an active complimentary grant must be revoked before replacement", ErrComplimentaryPlanConflict)
+		}
+		if types.NormalizeConsumerPlan(tenant.Plan) != types.ConsumerPlanFree ||
+			strings.TrimSpace(tenant.PaddleCustomerID) != "" || strings.TrimSpace(tenant.PaddleSubscriptionID) != "" {
+			return fmt.Errorf("%w: complimentary grants require a Paddle-unbound Free tenant", ErrComplimentaryPlanConflict)
+		}
+		updates := map[string]any{
+			"complimentary_plan":                 plan,
+			"complimentary_expires_at":           expiresAt,
+			"complimentary_grant_id":             grantID,
+			"open_router_credit_period_end":      creditPeriodEnd,
+			"open_router_desired_limit_microusd": desiredLimitMicrousd,
+		}
+		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(updates).Error; err != nil {
+			return err
+		}
+		applied = true
+		return nil
+	})
+	return applied, err
+}
+
+func (r *entitlementRepository) RevokeComplimentaryPlan(
+	ctx context.Context,
+	tenantID uint64,
+	grantID string,
+	at, creditPeriodEnd time.Time,
+	desiredLimitMicrousd int64,
+) (bool, error) {
+	grantID = strings.TrimSpace(grantID)
+	at, creditPeriodEnd = at.UTC(), creditPeriodEnd.UTC()
+	if grantID == "" {
+		return false, fmt.Errorf("complimentary grant ID is required")
+	}
+	if creditPeriodEnd.Before(at) {
+		return false, fmt.Errorf("revoked credit period cannot end before revoke time")
+	}
+	if desiredLimitMicrousd < 0 {
+		return false, fmt.Errorf("OpenRouter tenant desired limit cannot be negative")
+	}
+
+	applied := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant types.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+			return err
+		}
+		if tenant.ComplimentaryGrantID != grantID {
+			return fmt.Errorf("%w: complimentary grant ID does not match", ErrComplimentaryPlanConflict)
+		}
+		// A signed Paddle activation clears the overlay but retains this ID.
+		// Delayed revoke is therefore an idempotent no-op, never a paid-plan write.
+		if tenant.ComplimentaryPlan == "" || tenant.ComplimentaryExpiresAt == nil {
+			return nil
+		}
+		updates := map[string]any{
+			"complimentary_plan":                 nil,
+			"complimentary_expires_at":           nil,
+			"open_router_credit_period_end":      creditPeriodEnd,
+			"open_router_desired_limit_microusd": desiredLimitMicrousd,
+		}
+		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(updates).Error; err != nil {
+			return err
+		}
+		applied = true
+		return nil
+	})
+	return applied, err
+}
+
+func (r *entitlementRepository) AdvanceComplimentaryCreditPeriod(
+	ctx context.Context,
+	tenantID uint64,
+	grantID string,
+	at time.Time,
+	expectedPlan types.ConsumerPlan,
+	periodEnd time.Time,
+	desiredLimitMicrousd int64,
+) (bool, error) {
+	grantID = strings.TrimSpace(grantID)
+	at, periodEnd = at.UTC(), periodEnd.UTC()
+	expectedPlan = types.NormalizeConsumerPlan(expectedPlan)
+	if grantID == "" || !periodEnd.After(at) || desiredLimitMicrousd <= 0 {
+		return false, fmt.Errorf("invalid complimentary credit-period transition")
+	}
+	applied := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant types.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
+			return err
+		}
+		if tenant.ComplimentaryGrantID != grantID || types.NormalizeConsumerPlan(tenant.Plan) != types.ConsumerPlanFree ||
+			strings.TrimSpace(tenant.PaddleCustomerID) != "" || strings.TrimSpace(tenant.PaddleSubscriptionID) != "" {
+			return nil
+		}
+		actualPlan := types.EffectiveConsumerPlanAt(&tenant, at)
+		if actualPlan != expectedPlan {
+			return nil
+		}
+		if expectedPlan != types.ConsumerPlanFree {
+			if grantPlan, active := types.ActiveComplimentaryPlanAt(&tenant, at); !active || grantPlan != expectedPlan ||
+				(tenant.ComplimentaryExpiresAt != nil && periodEnd.After(tenant.ComplimentaryExpiresAt.UTC())) {
+				return nil
+			}
+		} else if tenant.ComplimentaryExpiresAt == nil || tenant.ComplimentaryExpiresAt.After(at) {
+			return nil
+		}
+		if tenant.OpenRouterCreditPeriodEnd != nil && !periodEnd.After(tenant.OpenRouterCreditPeriodEnd.UTC()) {
+			return nil
+		}
+		updates := map[string]any{
+			"open_router_credit_period_end":      periodEnd,
+			"open_router_desired_limit_microusd": desiredLimitMicrousd,
+		}
+		if err := tx.Model(&types.Tenant{}).Where("id = ?", tenantID).Updates(updates).Error; err != nil {
+			return err
+		}
+		applied = true
+		return nil
+	})
+	return applied, err
+}
+
 func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, status, billingPeriod, eventID string, occurredAt time.Time, customerID, subscriptionID string, creditPeriodEnd, paddlePeriodEnd *time.Time, desiredLimitMicrousd int64) (bool, error) {
 	if desiredLimitMicrousd < 0 {
 		return false, fmt.Errorf("OpenRouter tenant desired limit cannot be negative")
@@ -197,6 +367,10 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 			"paddle_billing_period":              billingPeriod,
 			"open_router_credit_period_end":      creditPeriodEnd,
 			"open_router_desired_limit_microusd": desiredLimitMicrousd,
+		}
+		if effectivePlan != types.ConsumerPlanFree && (status == "active" || status == "trialing" || status == "past_due") {
+			updates["complimentary_plan"] = nil
+			updates["complimentary_expires_at"] = nil
 		}
 		if effectivePlan == types.ConsumerPlanFree && status != "paused" && status != "refunded" && status != "chargeback" {
 			updates["paddle_current_period_end"] = nil

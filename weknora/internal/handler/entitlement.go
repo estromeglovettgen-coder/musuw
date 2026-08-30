@@ -699,7 +699,11 @@ func (h *EntitlementHandler) PaddleCheckoutIntent(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-	if current.Plan != types.ConsumerPlanFree ||
+	// A complimentary overlay is not a Paddle subscription. Keep checkout open
+	// so a gifted user can purchase normally; the signed activation will clear
+	// the overlay atomically. Any real/current Paddle entitlement still blocks a
+	// second checkout exactly as before.
+	if (current.Plan != types.ConsumerPlanFree && current.PlanSource != "complimentary") ||
 		(strings.TrimSpace(current.PaddleSubscriptionID) != "" && current.PlanStatus != "canceled") {
 		_ = c.Error(apperrors.NewConflictError("an existing paid subscription must be managed instead of opening another checkout"))
 		return

@@ -368,6 +368,10 @@ func liteOperationsAdminRouteAllowed(method, path string) bool {
 			return true
 		case method == http.MethodPut && len(parts) == 2 && parts[1] == "openrouter-credits":
 			return true
+		case method == http.MethodPut && len(parts) == 2 && parts[1] == "complimentary-entitlement":
+			return true
+		case method == http.MethodDelete && len(parts) == 2 && parts[1] == "complimentary-entitlement":
+			return true
 		default:
 			return false
 		}

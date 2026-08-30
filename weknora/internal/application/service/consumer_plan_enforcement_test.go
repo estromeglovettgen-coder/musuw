@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/models/provider"
@@ -14,6 +15,16 @@ import (
 
 func contextWithConsumerPlan(tenantID uint64, plan types.ConsumerPlan) context.Context {
 	tenant := &types.Tenant{ID: tenantID, Plan: plan, PlanStatus: "active"}
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, tenantID)
+	return context.WithValue(ctx, types.TenantInfoContextKey, tenant)
+}
+
+func contextWithComplimentaryPlan(tenantID uint64, plan types.ConsumerPlan, expiresAt time.Time) context.Context {
+	tenant := &types.Tenant{
+		ID: tenantID, Plan: types.ConsumerPlanFree, PlanStatus: "active",
+		StorageQuota:      types.LimitsForConsumerPlan(types.ConsumerPlanFree).StorageBytes,
+		ComplimentaryPlan: plan, ComplimentaryExpiresAt: &expiresAt, ComplimentaryGrantID: "grant-1234567890",
+	}
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, tenantID)
 	return context.WithValue(ctx, types.TenantInfoContextKey, tenant)
 }
@@ -139,6 +150,37 @@ func TestFreePlanRejectsEleventhDocumentAndVideo(t *testing.T) {
 	err = svc.checkCreateKnowledgeEntitlement(ctx, "kb-1", "mp4", 1024)
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, apperrors.ErrForbidden, appErr.Code)
+}
+
+func TestComplimentaryPlanUsesPaidContentAndBoundedStorageLimits(t *testing.T) {
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	ctx := contextWithComplimentaryPlan(1, types.ConsumerPlanPro, expiresAt)
+
+	repo := newFakeKBRepo()
+	repo.rows["existing"] = &types.KnowledgeBase{ID: "existing", TenantID: 1}
+	err := (&knowledgeBaseService{repo: repo}).checkCreateKnowledgeBaseEntitlement(ctx)
+	require.NoError(t, err)
+
+	knowledge := &knowledgeService{repo: &planKnowledgeRepo{count: 10}}
+	require.NoError(t, knowledge.checkCreateKnowledgeEntitlement(ctx, "kb-1", "mp4", 1024))
+
+	tenant, ok := types.TenantInfoFromContext(ctx)
+	require.True(t, ok)
+	assert.Equal(t, types.LimitsForConsumerPlan(types.ConsumerPlanPro).StorageBytes, effectiveStorageQuota(tenant, time.Now().UTC()))
+	assert.Equal(t, types.LimitsForConsumerPlan(types.ConsumerPlanFree).StorageBytes, effectiveStorageQuota(tenant, expiresAt))
+}
+
+func TestComplimentaryStorageNeverLowersAnOperatorQuota(t *testing.T) {
+	now := time.Now().UTC()
+	expiresAt := now.Add(time.Hour)
+	tenant := &types.Tenant{
+		Plan: types.ConsumerPlanFree, PlanStatus: "active",
+		StorageQuota:           80 * 1024 * 1024 * 1024,
+		ComplimentaryPlan:      types.ConsumerPlanPlus,
+		ComplimentaryExpiresAt: &expiresAt,
+		ComplimentaryGrantID:   "grant-1234567890",
+	}
+	assert.Equal(t, tenant.StorageQuota, effectiveStorageQuota(tenant, now))
 }
 
 type planModelRepo struct {

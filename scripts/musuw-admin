@@ -477,7 +477,7 @@ validate_target() {
   target=$1
   case "$target" in
     test)
-      [ -r "$repo_root/.runtime/weknora/candidate.env" ] || die 'TEST runtime is missing .runtime/weknora/candidate.env'
+      [ -r "$repo_root/.runtime/weknora/local.source.env" ] || die 'TEST runtime is missing .runtime/weknora/local.source.env'
       [ -r "$repo_root/.runtime/weknora/paddle-sandbox.env" ] || die 'TEST Paddle runtime is missing .runtime/weknora/paddle-sandbox.env'
       ;;
     production)

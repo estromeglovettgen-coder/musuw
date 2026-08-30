@@ -67,6 +67,30 @@
             <div><dt>额度周期结束</dt><dd>{{ formatDate(entitlement?.openrouter_credit_period_end || selected.open_router_credit_period_end) }}</dd></div><div><dt>Paddle 周期结束</dt><dd>{{ formatDate(entitlement?.paddle_current_period_end || selected.paddle_current_period_end) }}</dd></div>
           </dl>
         </section>
+        <section class="ops-drawer-section"><h3>赠送套餐</h3>
+          <div v-if="detailLoading && !entitlement" class="detail-loading"><t-loading size="small" text="读取赠送资格" /></div>
+          <div v-else-if="detailError && !entitlement" class="ops-callout is-warning"><InfoCircleIcon class="ops-callout__icon"/><div><strong>暂不能判断赠送资格</strong><span>{{ detailError }}</span></div></div>
+          <template v-else-if="entitlement">
+            <div class="complimentary-summary">
+              <div><span class="ops-muted">当前来源</span><strong>{{ planSourceLabel }}</strong></div>
+              <div><span class="ops-muted">赠送套餐</span><strong>{{ entitlement.complimentary_plan?.toUpperCase() || '—' }}</strong></div>
+              <div><span class="ops-muted">赠送状态</span><t-tag size="small" :theme="complimentaryActive ? 'success' : (hasComplimentaryGrant ? 'warning' : 'default')" variant="light">{{ complimentaryStatusLabel }}</t-tag></div>
+              <div><span class="ops-muted">到期时间</span><strong>{{ formatDate(entitlement.complimentary_expires_at) }}</strong></div>
+            </div>
+            <div v-if="complimentaryEligible" class="complimentary-form">
+              <div class="complimentary-form__fields">
+                <label><span>套餐</span><t-select v-model="gift.plan" :disabled="giftSubmitting"><t-option value="plus" label="Plus" /><t-option value="pro" label="Pro" /><t-option value="max" label="Max" /></t-select></label>
+                <label><span>到期时间（本地时间）</span><input v-model="gift.expiresAtLocal" class="complimentary-datetime" type="datetime-local" :disabled="giftSubmitting" /></label>
+              </div>
+              <div class="complimentary-form__actions"><span v-if="gift.grantId" class="ops-muted ops-mono">操作 ID 将在重试时复用</span><t-button theme="primary" :loading="giftSubmitting" :disabled="!canSubmitGift" @click="submitComplimentaryGrant">赠送套餐</t-button></div>
+            </div>
+            <div v-else-if="!complimentaryActive" class="ops-callout is-warning"><InfoCircleIcon class="ops-callout__icon"/><div><strong>当前不可赠送</strong><span>仅 configured_plan 为 Free、且没有 Paddle Customer/Subscription 绑定的空间可接受赠送。</span></div></div>
+            <div v-if="hasComplimentaryGrant" class="complimentary-revoke">
+              <div class="ops-callout is-danger"><ErrorCircleIcon class="ops-callout__icon"/><div><strong>撤销当前赠送</strong><span>撤销后立即按底层套餐收敛权限；过期赠送也可用当前 grant ID 清理元数据。</span></div></div>
+              <div class="complimentary-form__actions"><span class="ops-muted ops-mono">{{ entitlement.complimentary_grant_id }}</span><t-button theme="danger" variant="outline" :loading="revokeSubmitting" :disabled="!canSubmitRevoke" @click="submitComplimentaryRevoke">撤销赠送</t-button></div>
+            </div>
+          </template>
+        </section>
         <section class="ops-drawer-section"><h3>内容</h3><dl class="ops-definition">
           <div><dt>知识库</dt><dd>{{ selected.knowledge_base_count }}</dd></div><div><dt>文档</dt><dd>{{ selected.document_count }}</dd></div>
           <div><dt>原文件总量</dt><dd>{{ formatBytes(selected.source_bytes) }}</dd></div><div><dt>索引计量</dt><dd>{{ formatBytes(selected.index_bytes) }}</dd></div>
@@ -127,7 +151,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { ChevronRightIcon, ErrorCircleIcon, FilterIcon, InfoCircleIcon, SearchIcon, UserSearchIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
 import { formatBytes, formatDate, formatMicrousd, percent, statusTone } from '../format'
-import type { InvestigationData, OperationsConfig, TenantEntitlement, UserRow } from '../types'
+import type { ComplimentaryPlan, InvestigationData, OperationsConfig, TenantEntitlement, UserRow } from '../types'
 
 const props = defineProps<{ config: OperationsConfig | null; refreshKey: number }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
@@ -139,6 +163,8 @@ const detailError = ref(''), investigationError = ref('')
 const manageVisible = ref(false), managing = ref(false)
 const eraseVisible = ref(false), erasing = ref(false)
 const manage = reactive({ status: 'active', quotaGiB: 5, creditMode: 'keep', creditUsd: 0, confirmation: '' })
+const gift = reactive<{ plan: ComplimentaryPlan; expiresAtLocal: string; grantId: string }>({ plan: 'pro', expiresAtLocal: '', grantId: '' })
+const giftSubmitting = ref(false), revokeSubmitting = ref(false)
 
 const columns = [
   { colKey: 'identity', title: '用户', minWidth: 240 }, { colKey: 'workspace', title: '工作空间', minWidth: 170 },
@@ -149,6 +175,49 @@ const columns = [
 
 function initials(value: string) { return String(value || '?').trim().slice(0, 1).toUpperCase() }
 function handleRowClick(context: { row: UserRow }) { openUser(context.row) }
+function localDateTimeInput(date = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+function newGrantId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const random = Math.random() * 16 | 0
+    const value = character === 'x' ? random : (random & 0x3 | 0x8)
+    return value.toString(16)
+  })
+}
+function resetGiftForm() {
+  gift.plan = 'pro'; gift.expiresAtLocal = localDateTimeInput(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); gift.grantId = ''
+}
+const configuredPlan = computed(() => String(entitlement.value?.configured_plan || 'free').toLowerCase())
+const paddleBound = computed(() => Boolean(entitlement.value?.paddle_customer_id || entitlement.value?.paddle_subscription_id))
+const complimentaryPlan = computed(() => String(entitlement.value?.complimentary_plan || '').toLowerCase())
+const hasComplimentaryGrant = computed(() => ['plus', 'pro', 'max'].includes(complimentaryPlan.value) && Boolean(entitlement.value?.complimentary_grant_id))
+const complimentaryActive = computed(() => {
+  if (!hasComplimentaryGrant.value || !entitlement.value?.complimentary_expires_at) return false
+  const expiresAt = Date.parse(entitlement.value.complimentary_expires_at)
+  return Number.isFinite(expiresAt) && expiresAt > Date.now()
+})
+const complimentaryEligible = computed(() => configuredPlan.value === 'free' && !paddleBound.value && !complimentaryActive.value)
+const planSourceLabel = computed(() => {
+  const source = String(entitlement.value?.plan_source || '').toLowerCase()
+  if (source === 'complimentary') return '运营赠送'
+  if (source === 'paddle') return 'Paddle'
+  if (source === 'free') return 'Free'
+  return source || 'Free'
+})
+const complimentaryStatusLabel = computed(() => {
+  if (!hasComplimentaryGrant.value) return '未设置'
+  return complimentaryActive.value ? '生效中' : '已过期'
+})
+const giftExpiresAtIso = computed(() => {
+  if (!gift.expiresAtLocal) return ''
+  const date = new Date(gift.expiresAtLocal)
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString()
+})
+const canSubmitGift = computed(() => Boolean(selected.value && complimentaryEligible.value && ['plus', 'pro', 'max'].includes(gift.plan) && giftExpiresAtIso.value && Date.parse(giftExpiresAtIso.value) > Date.now()))
+const canSubmitRevoke = computed(() => Boolean(selected.value && hasComplimentaryGrant.value && entitlement.value?.complimentary_grant_id))
 async function load() {
   loading.value = true; error.value = ''; emit('busy', true)
   try { const result = await operationsApi.users({ page: page.value, page_size: pageSize, q: search.value, plan: plan.value, state: state.value }); rows.value = result.rows; total.value = result.total }
@@ -157,6 +226,7 @@ async function load() {
 }
 function applyFilters() { page.value = 1; load() }
 async function openUser(row: UserRow) {
+  if (selected.value?.tenant_id !== row.tenant_id) resetGiftForm()
   selected.value = row; drawerVisible.value = true; detailLoading.value = true
   entitlement.value = null; investigation.value = null; detailError.value = ''; investigationError.value = ''
   const [entitlementResult, investigationResult] = await Promise.allSettled([operationsApi.entitlement(row.tenant_id), operationsApi.investigation(row.id)])
@@ -165,6 +235,59 @@ async function openUser(row: UserRow) {
   if (investigationResult.status === 'fulfilled') investigation.value = investigationResult.value
   else investigationError.value = investigationResult.reason instanceof Error ? investigationResult.reason.message : '调查服务不可用'
   detailLoading.value = false
+}
+async function refreshSelectedUser() {
+  if (!selected.value) return
+  const selectedId = selected.value.id
+  await load()
+  const refreshed = rows.value.find((row) => row.id === selectedId)
+  if (refreshed) await openUser(refreshed)
+}
+async function submitComplimentaryGrant() {
+  if (!selected.value || !canSubmitGift.value || giftSubmitting.value) return
+  if (!gift.grantId) gift.grantId = newGrantId()
+  giftSubmitting.value = true
+  try {
+    await operationsApi.grantComplimentaryPlan(selected.value.tenant_id, {
+      plan: gift.plan,
+      expires_at: giftExpiresAtIso.value,
+      grant_id: gift.grantId,
+    })
+  } catch (grantError) {
+    MessagePlugin.error(grantError instanceof Error ? grantError.message : '赠送失败，可使用相同操作 ID 重试')
+    giftSubmitting.value = false
+    return
+  }
+  MessagePlugin.success('赠送套餐已提交')
+  resetGiftForm()
+  try {
+    await refreshSelectedUser()
+  } catch (refreshError) {
+    MessagePlugin.warning(refreshError instanceof Error ? `赠送已完成，但详情刷新失败：${refreshError.message}` : '赠送已完成，但详情刷新失败')
+  } finally {
+    giftSubmitting.value = false
+  }
+}
+async function submitComplimentaryRevoke() {
+  if (!selected.value || !canSubmitRevoke.value || revokeSubmitting.value) return
+  revokeSubmitting.value = true
+  try {
+    await operationsApi.revokeComplimentaryPlan(selected.value.tenant_id, {
+      grant_id: entitlement.value?.complimentary_grant_id || '',
+    })
+  } catch (revokeError) {
+    MessagePlugin.error(revokeError instanceof Error ? revokeError.message : '撤销失败')
+    revokeSubmitting.value = false
+    return
+  }
+  MessagePlugin.success('赠送套餐已撤销')
+  try {
+    await refreshSelectedUser()
+  } catch (refreshError) {
+    MessagePlugin.warning(refreshError instanceof Error ? `撤销已完成，但详情刷新失败：${refreshError.message}` : '撤销已完成，但详情刷新失败')
+  } finally {
+    revokeSubmitting.value = false
+  }
 }
 function openManage() {
   if (!selected.value) return
@@ -220,4 +343,18 @@ watch(() => props.refreshKey, load)
 .user-detail-heading span { overflow: hidden; margin-top: 4px; color: #596579; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-loading { min-height: 80px; display: grid; place-items: center; }
 .manage-form { display: grid; gap: 18px; }
+.complimentary-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; margin-bottom: 16px; }
+.complimentary-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #edf0f3; font-size: 11px; }
+.complimentary-summary strong { color: #344054; font-size: 12px; font-weight: 620; }
+.complimentary-form, .complimentary-revoke { display: grid; gap: 13px; }
+.complimentary-form + .complimentary-revoke { margin-top: 18px; padding-top: 18px; border-top: 1px solid #edf0f3; }
+.complimentary-form label, .complimentary-revoke label { display: grid; gap: 6px; color: #596579; font-size: 11px; }
+.complimentary-form__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.complimentary-datetime { width: 100%; height: 32px; padding: 0 10px; border: 1px solid #dfe3e8; border-radius: 7px; color: #344054; background: #fff; font-size: 12px; }
+.complimentary-datetime:focus { border-color: #506de2; outline: 2px solid rgba(80,109,226,.12); }
+.complimentary-form__actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.complimentary-form__actions .ops-muted { margin-right: auto; }
+@media (max-width: 620px) {
+  .complimentary-summary, .complimentary-form__fields { grid-template-columns: 1fr; }
+}
 </style>

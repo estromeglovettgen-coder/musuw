@@ -72,3 +72,44 @@ func TestEffectiveConsumerPlanRejectsPaidPlanWithoutProviderStatus(t *testing.T)
 	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlan(&Tenant{Plan: ConsumerPlanPro}))
 	assert.Equal(t, ConsumerPlanPro, EffectiveConsumerPlan(&Tenant{Plan: ConsumerPlanPro, PlanStatus: "active"}))
 }
+
+func TestEffectiveConsumerPlanAtUsesBoundedComplimentaryPlan(t *testing.T) {
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	expires := now.Add(time.Hour)
+	tenant := &Tenant{
+		Plan:                   ConsumerPlanFree,
+		PlanStatus:             "active",
+		ComplimentaryPlan:      ConsumerPlanPro,
+		ComplimentaryExpiresAt: &expires,
+		ComplimentaryGrantID:   "grant-1234567890",
+	}
+
+	plan, ok := ActiveComplimentaryPlanAt(tenant, now)
+	assert.True(t, ok)
+	assert.Equal(t, ConsumerPlanPro, plan)
+	assert.Equal(t, ConsumerPlanPro, EffectiveConsumerPlanAt(tenant, now))
+	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlanAt(tenant, expires))
+	assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlanAt(tenant, expires.Add(time.Nanosecond)))
+}
+
+func TestEffectiveConsumerPlanAtPrefersVerifiedPaddleAndRejectsMalformedGift(t *testing.T) {
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	expires := now.Add(time.Hour)
+	paid := &Tenant{
+		Plan: ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		ComplimentaryPlan: ConsumerPlanMax, ComplimentaryExpiresAt: &expires, ComplimentaryGrantID: "grant-1234567890",
+	}
+	assert.Equal(t, ConsumerPlanPlus, EffectiveConsumerPlanAt(paid, now))
+
+	for _, tenant := range []*Tenant{
+		{Plan: ConsumerPlanFree, PlanStatus: "active", ComplimentaryPlan: ConsumerPlanFree, ComplimentaryExpiresAt: &expires, ComplimentaryGrantID: "grant-1234567890"},
+		{Plan: ConsumerPlanFree, PlanStatus: "active", ComplimentaryPlan: ConsumerPlan("unknown"), ComplimentaryExpiresAt: &expires, ComplimentaryGrantID: "grant-1234567890"},
+		{Plan: ConsumerPlanFree, PlanStatus: "active", ComplimentaryPlan: ConsumerPlanPro, ComplimentaryGrantID: "grant-1234567890"},
+		{Plan: ConsumerPlanFree, PlanStatus: "active", ComplimentaryPlan: ConsumerPlanPro, ComplimentaryExpiresAt: &expires},
+		{Plan: ConsumerPlanPro, PlanStatus: "refunded", ComplimentaryPlan: ConsumerPlanMax, ComplimentaryExpiresAt: &expires, ComplimentaryGrantID: "grant-1234567890"},
+	} {
+		_, ok := ActiveComplimentaryPlanAt(tenant, now)
+		assert.False(t, ok)
+		assert.Equal(t, ConsumerPlanFree, EffectiveConsumerPlanAt(tenant, now))
+	}
+}

@@ -223,6 +223,8 @@ test('allowlist admits only scoped operations routes and methods', () => {
     ['DELETE', '/api/v1/system/admin/users/7c67173c-7113-4766-98b9-61f47ed182c9'],
     ['PATCH', '/api/v1/system/admin/tenants/10005'],
     ['PUT', '/api/v1/system/admin/tenants/10005/openrouter-credits'],
+    ['PUT', '/api/v1/system/admin/tenants/10005/complimentary-entitlement'],
+    ['DELETE', '/api/v1/system/admin/tenants/10005/complimentary-entitlement'],
     ['POST', '/api/v1/system/admin/runtime/queues/knowledge/tasks/abc:123/actions/retry'],
     ['DELETE', '/api/v1/system/admin/runtime/queues/knowledge/archived'],
   ]
@@ -233,12 +235,28 @@ test('allowlist admits only scoped operations routes and methods', () => {
     ['GET', '/api/v1/system/settings'],
     ['GET', '/api/v1/system/admin/api-keys'],
     ['POST', '/api/v1/system/admin/tenants/10005'],
+    ['POST', '/api/v1/system/admin/tenants/10005/complimentary-entitlement'],
+    ['PATCH', '/api/v1/system/admin/tenants/10005/complimentary-entitlement'],
     ['DELETE', '/api/v1/system/admin/runtime/queues/knowledge/tasks/abc'],
     ['GET', '/api/v1/system/admin/users/not-an-id/investigation'],
     ['DELETE', '/api/v1/system/admin/users/not-an-id'],
     ['PATCH', '/api/v1/system/admin/tenants/10005/../../settings'],
   ]
   for (const [method, path] of denied) assert.equal(isSafeOperationsPath(method, path), false, `${method} ${path}`)
+})
+
+test('allowlist matches the user-drawer complimentary mutation path exactly', () => {
+  assert.equal(isSafeOperationsPath('PUT', '/api/v1/system/admin/tenants/10018/complimentary-entitlement'), true)
+  assert.equal(isSafeOperationsPath('DELETE', '/api/v1/system/admin/tenants/10018/complimentary-entitlement'), true)
+  assert.equal(isSafeOperationsPath('PUT', '/api/v1/system/admin/tenants/10018/complimentary-entitlement/'), false)
+})
+
+test('operations user list projects and filters the effective complimentary plan without rewriting Paddle state', () => {
+  const source = readFileSync(new URL('./musuw-admin-server.mjs', import.meta.url), 'utf8')
+  assert.match(source, /complimentary_expires_at > NOW\(\)/)
+  assert.match(source, /effectivePlanSQL} = \$\$\{params\.length\}/)
+  assert.match(source, /effectivePlanSQL} AS plan, t\.plan AS configured_plan/)
+  assert.match(source, /GREATEST\(t\.storage_quota, CASE t\.complimentary_plan/)
 })
 
 test('console shell assets can bootstrap after a server restart while APIs stay session-bound', () => {
@@ -313,6 +331,12 @@ test('production operations runtime is authoritative and cannot be overridden by
   const productionBranch = source.slice(source.indexOf("if (target === 'production')"), source.indexOf('const candidate ='))
   assert.match(productionBranch, /const runtime = parseEnvFile\(runtimePath\)/)
   assert.doesNotMatch(productionBranch, /\.\.\.process\.env/)
+})
+
+test('TEST operations reads database identity from the durable local source, not the generated candidate artifact', () => {
+  const source = readFileSync(new URL('./musuw-admin-server.mjs', import.meta.url), 'utf8')
+  assert.match(source, /\.runtime\/weknora\/local\.source\.env/)
+  assert.doesNotMatch(source, /parseEnvFile\(resolve\(repoRoot, '\.runtime\/weknora\/candidate\.env'\)\)/)
 })
 
 test('host development loads Paddle and Langfuse server secrets from Keychain instead of ignored env files', () => {

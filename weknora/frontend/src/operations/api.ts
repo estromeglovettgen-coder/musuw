@@ -1,5 +1,7 @@
 import type {
   BillingData,
+  ComplimentaryPlanGrantRequest,
+  ComplimentaryPlanRevokeRequest,
   DocumentRow,
   IdentityData,
   InvestigationData,
@@ -84,4 +86,8 @@ export const operationsApi = {
     request(`/api/v1/system/admin/tenants/${tenantId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   updateCredits: (tenantId: number, body: { reset?: boolean; remaining_microusd?: number }) =>
     request<TenantEntitlement>(`/api/v1/system/admin/tenants/${tenantId}/openrouter-credits`, { method: 'PUT', body: JSON.stringify(body) }),
+  grantComplimentaryPlan: (tenantId: number, body: ComplimentaryPlanGrantRequest) =>
+    request<TenantEntitlement>(`/api/v1/system/admin/tenants/${tenantId}/complimentary-entitlement`, { method: 'PUT', body: JSON.stringify(body) }),
+  revokeComplimentaryPlan: (tenantId: number, body: ComplimentaryPlanRevokeRequest) =>
+    request<TenantEntitlement>(`/api/v1/system/admin/tenants/${tenantId}/complimentary-entitlement`, { method: 'DELETE', body: JSON.stringify(body) }),
 }

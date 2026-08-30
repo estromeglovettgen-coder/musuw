@@ -22,17 +22,7 @@ func effectivePlanFromContext(ctx context.Context) (types.ConsumerPlan, bool) {
 }
 
 func effectiveStorageQuota(tenant *types.Tenant, at time.Time) int64 {
-	if tenant == nil {
-		return 0
-	}
-	quota := tenant.StorageQuota
-	if types.EffectiveConsumerPlan(tenant) != types.ConsumerPlanFree && types.EffectiveConsumerPlanAt(tenant, at) == types.ConsumerPlanFree {
-		freeQuota := types.LimitsForConsumerPlan(types.ConsumerPlanFree).StorageBytes
-		if quota <= 0 || quota > freeQuota {
-			return freeQuota
-		}
-	}
-	return quota
+	return types.EffectiveStorageQuotaAt(tenant, at)
 }
 
 func (s *knowledgeBaseService) checkCreateKnowledgeBaseEntitlement(ctx context.Context) error {

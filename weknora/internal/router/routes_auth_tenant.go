@@ -302,9 +302,10 @@ func RegisterSystemAdminRoutes(
 			handler.ApplyDefaultStorageQuotaToAllTenants)
 
 		// Cross-tenant operations console seam. Reads use the provider-backed
-		// entitlement service; mutations are limited to account status,
-		// storage quota, and an OpenRouter child-key remaining allowance.
-		// Paddle plan/billing state remains webhook/API owned.
+		// entitlement service; ordinary mutations are limited to account status,
+		// storage quota, and an OpenRouter child-key remaining allowance. The
+		// separate complimentary-entitlement routes are the only operator plan
+		// transition and never mutate Paddle-owned billing state.
 		g.apiKeyRoute(adminRoutes, http.MethodGet, "/tenants/:id/entitlement",
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsRead, types.APIKeyCapabilitySystemTenantsManage),
 			handler.GetManagedTenantEntitlement)
@@ -314,6 +315,12 @@ func RegisterSystemAdminRoutes(
 		g.apiKeyRoute(adminRoutes, http.MethodPut, "/tenants/:id/openrouter-credits",
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
 			handler.UpdateManagedTenantOpenRouterCredits)
+		g.apiKeyRoute(adminRoutes, http.MethodPut, "/tenants/:id/complimentary-entitlement",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
+			handler.GrantManagedTenantComplimentaryPlan)
+		g.apiKeyRoute(adminRoutes, http.MethodDelete, "/tenants/:id/complimentary-entitlement",
+			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage),
+			handler.RevokeManagedTenantComplimentaryPlan)
 		g.apiKeyRoute(adminRoutes, http.MethodGet, "/users/:user_id/investigation",
 			apiKeyPlatform(types.APIKeyCapabilitySystemTenantsRead, types.APIKeyCapabilitySystemTenantsManage),
 			handler.InvestigateManagedUser)

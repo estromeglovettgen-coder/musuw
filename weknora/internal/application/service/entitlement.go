@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/application/repository"
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -55,9 +57,20 @@ func (s *entitlementService) Current(ctx context.Context, at time.Time) (*types.
 	}
 	plan := types.EffectiveConsumerPlanAt(tenant, at)
 	limits := types.LimitsForConsumerPlan(plan)
+	planStatus := tenant.PlanStatus
+	planSource := "free"
+	if types.PaddleEffectiveConsumerPlanAt(tenant, at) != types.ConsumerPlanFree {
+		planSource = "paddle"
+	} else if complimentary, active := types.ActiveComplimentaryPlanAt(tenant, at); active && complimentary == plan {
+		planStatus = "complimentary"
+		planSource = "complimentary"
+	}
 	current := &types.ConsumerEntitlement{
 		ConsumerPlanLimits:        limits,
-		PlanStatus:                tenant.PlanStatus,
+		PlanStatus:                planStatus,
+		PlanSource:                planSource,
+		ComplimentaryPlan:         tenant.ComplimentaryPlan,
+		ComplimentaryExpiresAt:    tenant.ComplimentaryExpiresAt,
 		StorageUsed:               tenant.StorageUsed,
 		OpenRouterCreditsStatus:   types.OpenRouterCreditsUnprovisioned,
 		PaddleCustomerID:          tenant.PaddleCustomerID,
@@ -177,13 +190,150 @@ func (s *entitlementService) SetOpenRouterRemainingForTenant(ctx context.Context
 		unlock()
 		return nil, fmt.Errorf("persist OpenRouter tenant credit limit: %w", err)
 	}
-	if err := s.keys.UpdateKeyLimit(requestCtx, stored.KeyHash, targetLimit, false); err != nil {
+	if err := s.syncTenantOpenRouterDesiredLimit(requestCtx, tenant); err != nil {
 		unlock()
 		return nil, fmt.Errorf("update OpenRouter tenant credit limit: %w", err)
 	}
 	unlock()
 
 	return s.CurrentForTenant(requestCtx, tenantID, time.Now().UTC())
+}
+
+func (s *entitlementService) GrantComplimentaryPlan(ctx context.Context, tenantID uint64, plan types.ConsumerPlan, expiresAt time.Time, grantID string) (*types.ConsumerEntitlement, bool, error) {
+	if tenantID == 0 {
+		return nil, false, apperrors.NewValidationError("tenant ID must be positive")
+	}
+	if plan != types.ConsumerPlanPlus && plan != types.ConsumerPlanPro && plan != types.ConsumerPlanMax {
+		return nil, false, apperrors.NewValidationError("complimentary plan must be plus, pro, or max")
+	}
+	grantID = strings.TrimSpace(grantID)
+	if !validComplimentaryGrantID(grantID) {
+		return nil, false, apperrors.NewValidationError("complimentary grant ID must be 16-64 letters, digits, hyphens, or underscores")
+	}
+	now := time.Now().UTC()
+	expiresAt = expiresAt.UTC()
+	if !expiresAt.After(now) {
+		return nil, false, apperrors.NewValidationError("complimentary expiration must be in the future")
+	}
+
+	requestCtx := context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+	unlock := s.lockAllowance(tenantID)
+	tenant, err := s.repo.GetTenantEntitlement(requestCtx, tenantID)
+	if err != nil {
+		unlock()
+		return nil, false, err
+	}
+	if tenant.ComplimentaryGrantID == grantID {
+		if tenant.ComplimentaryPlan == plan && tenant.ComplimentaryExpiresAt != nil && tenant.ComplimentaryExpiresAt.UTC().Equal(expiresAt) {
+			if err := s.syncTenantOpenRouterDesiredLimit(requestCtx, tenant); err != nil {
+				unlock()
+				return nil, false, apperrors.NewServiceUnavailableError(err.Error())
+			}
+			unlock()
+			current, currentErr := s.CurrentForTenant(requestCtx, tenantID, now)
+			return current, false, currentErr
+		}
+		unlock()
+		return nil, false, apperrors.NewConflictError("complimentary grant ID was already used")
+	}
+	if _, active := types.ActiveComplimentaryPlanAt(tenant, now); active {
+		unlock()
+		return nil, false, apperrors.NewConflictError("revoke the active complimentary grant before creating another")
+	}
+	if types.NormalizeConsumerPlan(tenant.Plan) != types.ConsumerPlanFree ||
+		strings.TrimSpace(tenant.PaddleCustomerID) != "" || strings.TrimSpace(tenant.PaddleSubscriptionID) != "" {
+		unlock()
+		return nil, false, apperrors.NewConflictError("complimentary grants require a Paddle-unbound Free tenant")
+	}
+
+	periodEnd := complimentaryPeriodEnd(now, expiresAt)
+	desiredLimit := int64(0)
+	stored := openRouterCredentialsFromTenant(tenant)
+	if stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
+		if s.keys == nil {
+			unlock()
+			return nil, false, apperrors.NewServiceUnavailableError("OpenRouter management is unavailable")
+		}
+		priorInfo, infoErr := s.keys.GetKey(requestCtx, stored.KeyHash)
+		if infoErr != nil || priorInfo == nil {
+			unlock()
+			return nil, false, apperrors.NewServiceUnavailableError("OpenRouter tenant allowance is unavailable")
+		}
+		desiredLimit = priorInfo.UsageMicrousd + types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
+	}
+	applied, err := s.repo.GrantComplimentaryPlan(requestCtx, tenantID, plan, grantID, now, expiresAt, periodEnd, desiredLimit)
+	if err != nil {
+		unlock()
+		if errors.Is(err, repository.ErrComplimentaryPlanConflict) {
+			return nil, false, apperrors.NewConflictError(err.Error())
+		}
+		return nil, false, err
+	}
+	latest, reloadErr := s.repo.GetTenantEntitlement(requestCtx, tenantID)
+	if reloadErr != nil {
+		unlock()
+		return nil, applied, reloadErr
+	}
+	if !applied {
+		if latest.ComplimentaryGrantID != grantID || latest.ComplimentaryPlan != plan || latest.ComplimentaryExpiresAt == nil || !latest.ComplimentaryExpiresAt.UTC().Equal(expiresAt) {
+			unlock()
+			return nil, false, apperrors.NewConflictError("complimentary grant changed concurrently")
+		}
+	}
+	// Synchronize from the row reloaded after commit, never from the pre-lock
+	// provider snapshot. If a signed Paddle activation won immediately after the
+	// grant transaction, its durable desired limit is the only target used here.
+	if err := s.syncTenantOpenRouterDesiredLimit(requestCtx, latest); err != nil {
+		unlock()
+		return nil, applied, apperrors.NewServiceUnavailableError(err.Error())
+	}
+	unlock()
+	current, err := s.CurrentForTenant(requestCtx, tenantID, now)
+	return current, applied, err
+}
+
+func (s *entitlementService) RevokeComplimentaryPlan(ctx context.Context, tenantID uint64, grantID string) (*types.ConsumerEntitlement, bool, error) {
+	if tenantID == 0 {
+		return nil, false, apperrors.NewValidationError("tenant ID must be positive")
+	}
+	grantID = strings.TrimSpace(grantID)
+	if !validComplimentaryGrantID(grantID) {
+		return nil, false, apperrors.NewValidationError("complimentary grant ID must be 16-64 letters, digits, hyphens, or underscores")
+	}
+	now := time.Now().UTC()
+	requestCtx := context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+	unlock := s.lockAllowance(tenantID)
+	tenant, err := s.repo.GetTenantEntitlement(requestCtx, tenantID)
+	if err != nil {
+		unlock()
+		return nil, false, err
+	}
+	if tenant.ComplimentaryGrantID != grantID {
+		unlock()
+		return nil, false, apperrors.NewConflictError("complimentary grant ID does not match")
+	}
+	applied, err := s.repo.RevokeComplimentaryPlan(requestCtx, tenantID, grantID, now, now, 0)
+	if err != nil {
+		unlock()
+		if errors.Is(err, repository.ErrComplimentaryPlanConflict) {
+			return nil, false, apperrors.NewConflictError(err.Error())
+		}
+		return nil, false, err
+	}
+	latest, reloadErr := s.repo.GetTenantEntitlement(requestCtx, tenantID)
+	if reloadErr != nil {
+		unlock()
+		return nil, applied, reloadErr
+	}
+	if stored := openRouterCredentialsFromTenant(latest); stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
+		if _, syncErr := s.ensureAllowanceCurrent(requestCtx, latest, now); syncErr != nil {
+			unlock()
+			return nil, applied, apperrors.NewServiceUnavailableError(syncErr.Error())
+		}
+	}
+	unlock()
+	current, currentErr := s.CurrentForTenant(requestCtx, tenantID, now)
+	return current, applied, currentErr
 }
 
 func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, error) {
@@ -194,7 +344,8 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 	if err != nil {
 		return "", err
 	}
-	if tenant.PlanStatus == "paused" {
+	_, complimentaryActive := types.ActiveComplimentaryPlanAt(tenant, time.Now().UTC())
+	if tenant.PlanStatus == "paused" && !complimentaryActive {
 		return "", errSubscriptionPaused
 	}
 	now := time.Now().UTC()
@@ -230,6 +381,9 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 
 	limit := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
 	creditPeriodEnd := initialCreditPeriodEnd(tenant, plan, tenant.PaddleBillingPeriod, time.Now().UTC(), nil)
+	if _, active := types.ActiveComplimentaryPlanAt(tenant, time.Now().UTC()); active && tenant.ComplimentaryExpiresAt != nil {
+		creditPeriodEnd = complimentaryPeriodEnd(time.Now().UTC(), tenant.ComplimentaryExpiresAt.UTC())
+	}
 	logger.Infof(ctx, "OpenRouter tenant key provisioning started tenant_id=%d monthly_limit_microusd=%d", tenantID, limit)
 	created, err := s.keys.CreateKey(ctx, fmt.Sprintf("musuw-tenant-%d", tenantID), limit, false)
 	if err != nil {
@@ -278,7 +432,8 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 // term. Monthly subscriptions wait for Paddle's paid recurring transaction
 // webhook, so unused credit cannot leak into an unpaid period.
 func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant *types.Tenant, at time.Time) (*modelopenrouter.KeyInfo, error) {
-	if tenant != nil && tenant.PlanStatus == "paused" {
+	complimentaryPlan, complimentaryActive := types.ActiveComplimentaryPlanAt(tenant, at)
+	if tenant != nil && tenant.PlanStatus == "paused" && !complimentaryActive {
 		return nil, errSubscriptionPaused
 	}
 	at = at.UTC()
@@ -300,10 +455,12 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 
 	allowance := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
 	periodEnd := tenant.OpenRouterCreditPeriodEnd
+	expiredComplimentary := tenant.ComplimentaryPlan != "" && tenant.ComplimentaryGrantID != "" &&
+		tenant.ComplimentaryExpiresAt != nil && !tenant.ComplimentaryExpiresAt.After(at)
 	// A paid tenant may predate the billing-period column. Treat an unknown
 	// period like monthly (webhook-gated), not yearly (self-refreshing), so a
 	// missing migration value can never grant an unpaid allowance.
-	if periodEnd != nil && !periodEnd.After(at) && plan != types.ConsumerPlanFree && tenant.PaddleBillingPeriod != "yearly" {
+	if periodEnd != nil && !periodEnd.After(at) && plan != types.ConsumerPlanFree && tenant.PaddleBillingPeriod != "yearly" && !complimentaryActive {
 		return info, errAllowanceRenewalPending
 	}
 
@@ -313,8 +470,15 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 	// from a stale plan or a local usage counter.
 	desiredLimit := tenant.OpenRouterDesiredLimitMicrousd
 	var targetPeriodEnd *time.Time
-	if periodEnd == nil {
+	if expiredComplimentary {
+		value := monthlyBoundaryAfter(tenant.CreatedAt, at)
+		targetPeriodEnd = &value
+		desiredLimit = info.UsageMicrousd + allowance
+	} else if periodEnd == nil {
 		value := initialCreditPeriodEnd(tenant, plan, tenant.PaddleBillingPeriod, at, nil)
+		if complimentaryActive && tenant.ComplimentaryExpiresAt != nil {
+			value = complimentaryPeriodEnd(at, tenant.ComplimentaryExpiresAt.UTC())
+		}
 		targetPeriodEnd = &value
 		if desiredLimit <= 0 {
 			// Legacy keys have no durable target yet. Preserve the provider's
@@ -324,7 +488,9 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 		}
 	} else if !periodEnd.After(at) {
 		value := nextPersonalCreditPeriodEnd(*periodEnd, at)
-		if plan == types.ConsumerPlanFree && !tenant.CreatedAt.IsZero() {
+		if complimentaryActive && tenant.ComplimentaryExpiresAt != nil && value.After(tenant.ComplimentaryExpiresAt.UTC()) {
+			value = tenant.ComplimentaryExpiresAt.UTC()
+		} else if plan == types.ConsumerPlanFree && !tenant.CreatedAt.IsZero() {
 			value = monthlyBoundaryAfter(tenant.CreatedAt, at)
 		}
 		targetPeriodEnd = &value
@@ -362,9 +528,17 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 	// durable target instead of minting a second allowance from our snapshot.
 	if targetPeriodEnd != nil {
 		periodValue := targetPeriodEnd.UTC()
-		applied, persistErr := s.repo.AdvanceOpenRouterCreditPeriod(
-			ctx, tenant.ID, "", "", "", time.Time{}, "", "", periodValue, desiredLimit,
-		)
+		var applied bool
+		var persistErr error
+		if (complimentaryActive && complimentaryPlan == plan) || expiredComplimentary {
+			applied, persistErr = s.repo.AdvanceComplimentaryCreditPeriod(
+				ctx, tenant.ID, tenant.ComplimentaryGrantID, at, plan, periodValue, desiredLimit,
+			)
+		} else {
+			applied, persistErr = s.repo.AdvanceOpenRouterCreditPeriod(
+				ctx, tenant.ID, "", "", "", time.Time{}, "", "", periodValue, desiredLimit,
+			)
+		}
 		if persistErr != nil {
 			return nil, fmt.Errorf("persist OpenRouter personal credit period: %w", persistErr)
 		}
@@ -399,12 +573,36 @@ func (s *entitlementService) ensureAllowanceCurrent(ctx context.Context, tenant 
 		return nil, fmt.Errorf("OpenRouter tenant desired limit is unavailable")
 	}
 	if info.LimitMicrousd != desiredLimit || info.MonthlyReset {
-		if err := s.keys.UpdateKeyLimit(ctx, stored.KeyHash, desiredLimit, false); err != nil {
+		if err := s.syncTenantOpenRouterDesiredLimit(ctx, tenant); err != nil {
 			return nil, fmt.Errorf("synchronize OpenRouter tenant credit limit: %w", err)
 		}
-		info.LimitMicrousd = desiredLimit
-		info.LimitRemainingMicrousd = nonNegativeMicrousd(desiredLimit - info.UsageMicrousd)
-		info.MonthlyReset = false
+		// The convergence helper may have observed a newer Paddle/grant target
+		// than this request. Return the provider's final state rather than
+		// projecting counters from the stale target above.
+		latest, reloadErr := s.repo.GetTenantEntitlement(ctx, tenant.ID)
+		if reloadErr != nil {
+			return nil, reloadErr
+		}
+		latestPlan := types.EffectiveConsumerPlanAt(latest, at)
+		if latest.PlanStatus == "paused" {
+			if _, active := types.ActiveComplimentaryPlanAt(latest, at); !active {
+				return nil, errSubscriptionPaused
+			}
+		}
+		if paidPlanAccessUnavailable(latest, latestPlan, at) {
+			return nil, errAllowanceRenewalPending
+		}
+		latestStored := openRouterCredentialsFromTenant(latest)
+		if latestStored == nil || strings.TrimSpace(latestStored.KeyHash) == "" {
+			return nil, fmt.Errorf("OpenRouter tenant credentials are unavailable")
+		}
+		info, reloadErr = s.keys.GetKey(ctx, latestStored.KeyHash)
+		if reloadErr != nil {
+			return nil, reloadErr
+		}
+		if info == nil {
+			return nil, fmt.Errorf("OpenRouter tenant key lookup returned no state")
+		}
 	}
 	return info, nil
 }
@@ -576,7 +774,7 @@ func (s *entitlementService) applyConsumerPlanLocked(ctx context.Context, tenant
 	}
 	if applied {
 		if providerSyncRequired && stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
-			if syncErr := s.syncOpenRouterLimitToDesired(ctx, stored.KeyHash, desiredLimit, priorInfo); syncErr != nil {
+			if syncErr := s.syncTenantOpenRouterDesiredLimit(ctx, tenant); syncErr != nil {
 				return false, syncErr
 			}
 		}
@@ -591,7 +789,7 @@ func (s *entitlementService) applyConsumerPlanLocked(ctx context.Context, tenant
 		return false, reloadErr
 	}
 	if storedLatest := openRouterCredentialsFromTenant(latest); storedLatest != nil && strings.TrimSpace(storedLatest.KeyHash) != "" && latest.PlanStatus != "refunded" && latest.PlanStatus != "chargeback" {
-		if syncErr := s.syncOpenRouterLimitToDesired(ctx, storedLatest.KeyHash, latest.OpenRouterDesiredLimitMicrousd, nil); syncErr != nil {
+		if syncErr := s.syncTenantOpenRouterDesiredLimit(ctx, latest); syncErr != nil {
 			return false, syncErr
 		}
 	}
@@ -604,12 +802,48 @@ func (s *entitlementService) applyConsumerPlanLocked(ctx context.Context, tenant
 }
 
 func (s *entitlementService) syncTenantOpenRouterDesiredLimit(ctx context.Context, tenant *types.Tenant) error {
+	if tenant == nil || tenant.ID == 0 {
+		return nil
+	}
+
+	// Database state is the source of truth, while OpenRouter cannot join the
+	// tenant transaction. Re-read before each provider write and verify after
+	// it. If a newer Paddle event or operations grant commits while the write is
+	// in flight, the same request immediately converges to that newer target
+	// instead of returning after restoring its stale one.
+	const maxAttempts = 3
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		before, err := s.repo.GetTenantEntitlement(ctx, tenant.ID)
+		if err != nil {
+			return err
+		}
+		keyHash, desiredLimit, ok := openRouterDesiredTarget(before)
+		if !ok {
+			return nil
+		}
+		if err := s.syncOpenRouterLimitToDesired(ctx, keyHash, desiredLimit, nil); err != nil {
+			return err
+		}
+
+		after, err := s.repo.GetTenantEntitlement(ctx, tenant.ID)
+		if err != nil {
+			return err
+		}
+		afterKeyHash, afterDesiredLimit, afterOK := openRouterDesiredTarget(after)
+		if !afterOK || (afterKeyHash == keyHash && afterDesiredLimit == desiredLimit) {
+			return nil
+		}
+	}
+	return fmt.Errorf("OpenRouter tenant desired limit changed repeatedly during provider synchronization")
+}
+
+func openRouterDesiredTarget(tenant *types.Tenant) (keyHash string, desiredLimitMicrousd int64, ok bool) {
 	stored := openRouterCredentialsFromTenant(tenant)
 	if tenant == nil || stored == nil || strings.TrimSpace(stored.KeyHash) == "" ||
 		tenant.PlanStatus == "refunded" || tenant.PlanStatus == "chargeback" || tenant.OpenRouterDesiredLimitMicrousd <= 0 {
-		return nil
+		return "", 0, false
 	}
-	return s.syncOpenRouterLimitToDesired(ctx, stored.KeyHash, tenant.OpenRouterDesiredLimitMicrousd, nil)
+	return strings.TrimSpace(stored.KeyHash), tenant.OpenRouterDesiredLimitMicrousd, true
 }
 
 func (s *entitlementService) syncOpenRouterLimitToDesired(ctx context.Context, keyHash string, desiredLimitMicrousd int64, info *modelopenrouter.KeyInfo) error {
@@ -736,7 +970,7 @@ func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID 
 		return false, err
 	}
 	if applied && stored != nil && strings.TrimSpace(stored.KeyHash) != "" {
-		if syncErr := s.syncOpenRouterLimitToDesired(ctx, stored.KeyHash, desiredLimit, priorInfo); syncErr != nil {
+		if syncErr := s.syncTenantOpenRouterDesiredLimit(ctx, tenant); syncErr != nil {
 			return false, syncErr
 		}
 	}
@@ -752,7 +986,7 @@ func (s *entitlementService) RefreshPaidAllowance(ctx context.Context, tenantID 
 			}
 		}
 		if storedLatest := openRouterCredentialsFromTenant(latest); storedLatest != nil && strings.TrimSpace(storedLatest.KeyHash) != "" && latest.PlanStatus != "refunded" && latest.PlanStatus != "chargeback" {
-			if syncErr := s.syncOpenRouterLimitToDesired(ctx, storedLatest.KeyHash, latest.OpenRouterDesiredLimitMicrousd, nil); syncErr != nil {
+			if syncErr := s.syncTenantOpenRouterDesiredLimit(ctx, latest); syncErr != nil {
 				return false, syncErr
 			}
 		}
@@ -772,6 +1006,10 @@ func entitlementResetAt(tenant *types.Tenant, plan types.ConsumerPlan, at time.T
 
 func paidPlanAccessUnavailable(tenant *types.Tenant, plan types.ConsumerPlan, at time.Time) bool {
 	if tenant == nil {
+		return false
+	}
+	if complimentary, active := types.ActiveComplimentaryPlanAt(tenant, at); active && complimentary == plan &&
+		types.PaddleEffectiveConsumerPlanAt(tenant, at) == types.ConsumerPlanFree {
 		return false
 	}
 	// A persisted paid plan without a provider status is incomplete state. Do
@@ -861,6 +1099,27 @@ func addMonthsClamped(anchor time.Time, months int) time.Time {
 		day = lastDay
 	}
 	return time.Date(first.Year(), first.Month(), day, anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), time.UTC)
+}
+
+func complimentaryPeriodEnd(at, expiresAt time.Time) time.Time {
+	end := addMonthsClamped(at.UTC(), 1)
+	if expiresAt.UTC().Before(end) {
+		return expiresAt.UTC()
+	}
+	return end
+}
+
+func validComplimentaryGrantID(value string) bool {
+	if len(value) < 16 || len(value) > 64 {
+		return false
+	}
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func keyLimitForPlanChange(tenant *types.Tenant, targetPlan types.ConsumerPlan, billingPeriod string, info *modelopenrouter.KeyInfo) (int64, bool) {

@@ -166,6 +166,8 @@ export function isSafeOperationsPath(method, pathname) {
   if (method === 'DELETE' && /^\/api\/v1\/system\/admin\/users\/[0-9a-f-]+$/.test(pathname)) return true
   if (method === 'PATCH' && /^\/api\/v1\/system\/admin\/tenants\/\d+$/.test(pathname)) return true
   if (method === 'PUT' && /^\/api\/v1\/system\/admin\/tenants\/\d+\/openrouter-credits$/.test(pathname)) return true
+  if (method === 'PUT' && /^\/api\/v1\/system\/admin\/tenants\/\d+\/complimentary-entitlement$/.test(pathname)) return true
+  if (method === 'DELETE' && /^\/api\/v1\/system\/admin\/tenants\/\d+\/complimentary-entitlement$/.test(pathname)) return true
   if (method === 'POST' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/tasks\/[0-9a-z:_-]+\/actions\/(retry|run-now|run_now)$/.test(pathname)) return true
   if (method === 'DELETE' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/archived$/.test(pathname)) return true
   return false
@@ -225,7 +227,10 @@ function loadRuntime(target) {
     }
   }
 
-  const candidate = parseEnvFile(resolve(repoRoot, '.runtime/weknora/candidate.env'))
+  // The operations console only needs the database identity from the stable
+  // local source. candidate.env is a generated Compose artifact and may be
+  // evicted by macOS storage optimization while the source remains local.
+  const candidate = parseEnvFile(resolve(repoRoot, '.runtime/weknora/local.source.env'))
   const providerKeyAccount = 'musuw-admin-test'
   return {
     target: 'test',
@@ -721,6 +726,28 @@ function createQueries(pool) {
     const search = (url.searchParams.get('q') || '').trim()
     const plan = (url.searchParams.get('plan') || '').trim().toLowerCase()
     const state = (url.searchParams.get('state') || '').trim().toLowerCase()
+    const effectivePlanSQL = `CASE
+      WHEN t.plan IN ('plus', 'pro', 'max') AND t.plan_status IN ('active', 'trialing') THEN t.plan
+      WHEN t.plan IN ('plus', 'pro', 'max') AND t.plan_status = 'past_due' AND (
+        (t.paddle_billing_period = 'monthly' AND t.open_router_credit_period_end > NOW()) OR
+        (t.paddle_billing_period = 'yearly' AND t.paddle_current_period_end > NOW())
+      ) THEN t.plan
+      WHEN t.plan = 'free' AND t.complimentary_plan IN ('plus', 'pro', 'max')
+        AND t.complimentary_grant_id IS NOT NULL AND t.complimentary_grant_id <> ''
+        AND t.complimentary_expires_at > NOW() THEN t.complimentary_plan
+      ELSE 'free'
+    END`
+    const effectiveStorageQuotaSQL = `CASE
+      WHEN t.plan = 'free' AND t.complimentary_plan IN ('plus', 'pro', 'max')
+        AND t.complimentary_grant_id IS NOT NULL AND t.complimentary_grant_id <> ''
+        AND t.complimentary_expires_at > NOW()
+      THEN GREATEST(t.storage_quota, CASE t.complimentary_plan
+        WHEN 'plus' THEN 10737418240
+        WHEN 'pro' THEN 32212254720
+        WHEN 'max' THEN 107374182400
+        ELSE t.storage_quota END)
+      ELSE t.storage_quota
+    END`
     const params = []
     const where = ['u.deleted_at IS NULL']
     if (search) {
@@ -729,7 +756,7 @@ function createQueries(pool) {
     }
     if (['free', 'plus', 'pro', 'max'].includes(plan)) {
       params.push(plan)
-      where.push(`t.plan = $${params.length}`)
+      where.push(`${effectivePlanSQL} = $${params.length}`)
     }
     if (state === 'active' || state === 'inactive') {
       params.push(state === 'active')
@@ -740,8 +767,10 @@ function createQueries(pool) {
     const rows = await pool.query(`
       SELECT u.id, u.username, u.email, u.avatar, u.is_active, u.is_system_admin,
              u.tenant_id, u.created_at, u.updated_at,
-             t.name AS tenant_name, t.status AS tenant_status, t.plan, t.plan_status,
-             t.storage_quota AS storage_quota_bytes, t.storage_used AS storage_used_bytes,
+             t.name AS tenant_name, t.status AS tenant_status,
+             ${effectivePlanSQL} AS plan, t.plan AS configured_plan, t.plan_status,
+             t.complimentary_plan, t.complimentary_expires_at, t.complimentary_grant_id,
+             ${effectiveStorageQuotaSQL} AS storage_quota_bytes, t.storage_used AS storage_used_bytes,
              t.paddle_customer_id, t.paddle_subscription_id, t.paddle_billing_period,
              t.paddle_current_period_end, t.open_router_credit_period_end,
              COALESCE(kb.knowledge_base_count, 0)::int AS knowledge_base_count,

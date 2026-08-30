@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
@@ -86,6 +87,31 @@ func TestKnowledgePairedCreateEnforcesExactBoundaryAndRollback(t *testing.T) {
 	var count int64
 	require.NoError(t, db.Model(&types.Knowledge{}).Where("id = ?", rejected.ID).Count(&count).Error)
 	assert.Zero(t, count, "quota rejection must not leave a row")
+}
+
+func TestKnowledgePairedCreateRecomputesExpiredComplimentaryQuotaFromLockedTenant(t *testing.T) {
+	db, tenant := newStorageAccountingDB(t)
+	repo := NewKnowledgeRepository(db)
+	now := time.Now().UTC()
+	expiredAt := now.Add(-time.Second)
+	require.NoError(t, db.Model(&types.Tenant{}).Where("id = ?", tenant.ID).Updates(map[string]interface{}{
+		"storage_used":             int64(5),
+		"complimentary_plan":       types.ConsumerPlanPro,
+		"complimentary_expires_at": expiredAt,
+		"complimentary_grant_id":   "grant-expired-storage",
+	}).Error)
+
+	// Simulate the request having cached Pro's quota before it waited for the
+	// tenant lock. The transaction must ignore that stale value and reject
+	// against the latest persisted Free quota of five bytes.
+	err := repo.CreateKnowledgeWithStorage(
+		context.Background(),
+		storageKnowledge(tenant.ID, "stale-complimentary-quota", 1, 0),
+		types.LimitsForConsumerPlan(types.ConsumerPlanPro).StorageBytes,
+	)
+	var quotaErr *types.StorageQuotaExceededError
+	require.ErrorAs(t, err, &quotaErr)
+	assert.Equal(t, int64(5), tenantStorageUsed(t, db, tenant.ID))
 }
 
 func TestKnowledgePairedCreateRollsBackRowWhenCounterWriteFails(t *testing.T) {

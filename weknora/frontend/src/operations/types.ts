@@ -16,6 +16,18 @@ export interface OperationsConfig {
 
 export type EnvironmentTarget = OperationsConfig['target']
 
+export type ComplimentaryPlan = 'plus' | 'pro' | 'max'
+
+export interface ComplimentaryPlanGrantRequest {
+  plan: ComplimentaryPlan
+  expires_at: string
+  grant_id: string
+}
+
+export interface ComplimentaryPlanRevokeRequest {
+  grant_id: string
+}
+
 /**
  * Safe model metadata returned to the local operations console.  The policy
  * route intentionally carries display/type data only; provider parameters and
@@ -88,7 +100,12 @@ export interface UserRow {
   tenant_name?: string
   tenant_status?: string
   plan?: string
+  configured_plan?: string
   plan_status?: string
+  plan_source?: string
+  complimentary_plan?: ComplimentaryPlan | ''
+  complimentary_expires_at?: string | null
+  complimentary_grant_id?: string
   storage_quota_bytes?: string | number
   storage_used_bytes?: string | number
   paddle_customer_id?: string
@@ -161,6 +178,10 @@ export interface TenantBillingRow {
   tenant_status: string
   plan: string
   plan_status: string
+  plan_source?: string
+  complimentary_plan?: ComplimentaryPlan | ''
+  complimentary_expires_at?: string | null
+  complimentary_grant_id?: string
   paddle_customer_id?: string
   paddle_subscription_id?: string
   paddle_billing_period?: string
@@ -289,6 +310,10 @@ export interface TenantEntitlement {
   configured_plan: string
   plan: string
   plan_status: string
+  plan_source?: string
+  complimentary_plan?: ComplimentaryPlan | ''
+  complimentary_expires_at?: string | null
+  complimentary_grant_id?: string
   storage_quota_bytes: number
   storage_used_bytes: number
   storage_usage_percent: number

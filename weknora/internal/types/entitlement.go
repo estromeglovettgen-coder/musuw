@@ -39,10 +39,13 @@ type ConsumerPlanLimits struct {
 
 type ConsumerEntitlement struct {
 	ConsumerPlanLimits
-	PlanStatus                  string `json:"plan_status"`
-	StorageUsed                 int64  `json:"storage_used"`
-	OpenRouterUsedMicrousd      int64  `json:"openrouter_used_microusd"`
-	OpenRouterRemainingMicrousd int64  `json:"openrouter_remaining_microusd"`
+	PlanStatus                  string       `json:"plan_status"`
+	PlanSource                  string       `json:"plan_source"`
+	ComplimentaryPlan           ConsumerPlan `json:"complimentary_plan,omitempty"`
+	ComplimentaryExpiresAt      *time.Time   `json:"complimentary_expires_at,omitempty"`
+	StorageUsed                 int64        `json:"storage_used"`
+	OpenRouterUsedMicrousd      int64        `json:"openrouter_used_microusd"`
+	OpenRouterRemainingMicrousd int64        `json:"openrouter_remaining_microusd"`
 	// Provider-backed usage is kept separate from the consumer-facing
 	// allowance projection. OpenRouter reports lifetime key usage/remaining;
 	// the consumer fields above are the current plan period after our plan
@@ -113,21 +116,79 @@ func EffectiveConsumerPlan(tenant *Tenant) ConsumerPlan {
 // grace policy. A failed renewal keeps paid access only through the last
 // provider-confirmed paid term; it can never extend that boundary by itself.
 func EffectiveConsumerPlanAt(tenant *Tenant, at time.Time) ConsumerPlan {
-	plan := EffectiveConsumerPlan(tenant)
-	if plan == ConsumerPlanFree || tenant == nil || tenant.PlanStatus != "past_due" {
+	plan := PaddleEffectiveConsumerPlanAt(tenant, at)
+	// A verified Paddle entitlement always wins. Complimentary state is a
+	// bounded overlay for otherwise-Free, Paddle-unbound workspaces.
+	if plan != ConsumerPlanFree {
 		return plan
 	}
-	var paidTermEnd *time.Time
-	switch tenant.PaddleBillingPeriod {
-	case "monthly":
-		paidTermEnd = tenant.OpenRouterCreditPeriodEnd
-	case "yearly":
-		paidTermEnd = tenant.PaddleCurrentPeriodEnd
+	if complimentary, ok := ActiveComplimentaryPlanAt(tenant, at); ok {
+		return complimentary
 	}
-	if paidTermEnd == nil || !paidTermEnd.After(at.UTC()) {
-		return ConsumerPlanFree
+	return ConsumerPlanFree
+}
+
+// PaddleEffectiveConsumerPlanAt resolves only the billing-owned base state.
+// Billing and grant code use this helper to avoid treating an operations
+// overlay as a real subscription.
+func PaddleEffectiveConsumerPlanAt(tenant *Tenant, at time.Time) ConsumerPlan {
+	plan := EffectiveConsumerPlan(tenant)
+	if plan != ConsumerPlanFree && tenant != nil && tenant.PlanStatus == "past_due" {
+		var paidTermEnd *time.Time
+		switch tenant.PaddleBillingPeriod {
+		case "monthly":
+			paidTermEnd = tenant.OpenRouterCreditPeriodEnd
+		case "yearly":
+			paidTermEnd = tenant.PaddleCurrentPeriodEnd
+		}
+		if paidTermEnd == nil || !paidTermEnd.After(at.UTC()) {
+			plan = ConsumerPlanFree
+		}
 	}
 	return plan
+}
+
+// ActiveComplimentaryPlanAt returns only a complete, unexpired paid-plan
+// overlay. Exact expiry is exclusive, so the tenant is Free at expires_at.
+func ActiveComplimentaryPlanAt(tenant *Tenant, at time.Time) (ConsumerPlan, bool) {
+	if tenant == nil || NormalizeConsumerPlan(tenant.Plan) != ConsumerPlanFree ||
+		tenant.ComplimentaryExpiresAt == nil || tenant.ComplimentaryGrantID == "" ||
+		!tenant.ComplimentaryExpiresAt.After(at.UTC()) {
+		return ConsumerPlanFree, false
+	}
+	switch tenant.ComplimentaryPlan {
+	case ConsumerPlanPlus, ConsumerPlanPro, ConsumerPlanMax:
+		return tenant.ComplimentaryPlan, true
+	default:
+		return ConsumerPlanFree, false
+	}
+}
+
+// EffectiveStorageQuotaAt derives the admission limit from the same tenant
+// snapshot that owns storage_used. Callers that enforce quota inside a
+// transaction should pass the row they locked in that transaction, so a
+// concurrent complimentary revoke or expiry cannot leave a stale paid quota
+// on an in-flight upload.
+func EffectiveStorageQuotaAt(tenant *Tenant, at time.Time) int64 {
+	if tenant == nil {
+		return 0
+	}
+	quota := tenant.StorageQuota
+	if complimentary, active := ActiveComplimentaryPlanAt(tenant, at); active &&
+		PaddleEffectiveConsumerPlanAt(tenant, at) == ConsumerPlanFree {
+		giftQuota := LimitsForConsumerPlan(complimentary).StorageBytes
+		if quota < giftQuota {
+			return giftQuota
+		}
+		return quota
+	}
+	if EffectiveConsumerPlan(tenant) != ConsumerPlanFree && EffectiveConsumerPlanAt(tenant, at) == ConsumerPlanFree {
+		freeQuota := LimitsForConsumerPlan(ConsumerPlanFree).StorageBytes
+		if quota <= 0 || quota > freeQuota {
+			return freeQuota
+		}
+	}
+	return quota
 }
 
 func ConsumerPlanAllowsModel(plan ConsumerPlan, model *Model) bool {

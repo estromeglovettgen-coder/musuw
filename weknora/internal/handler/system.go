@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -140,6 +141,10 @@ type systemTenantEntitlementResponse struct {
 	ConfiguredPlan            types.ConsumerPlan `json:"configured_plan"`
 	Plan                      types.ConsumerPlan `json:"plan"`
 	PlanStatus                string             `json:"plan_status"`
+	PlanSource                string             `json:"plan_source"`
+	ComplimentaryPlan         types.ConsumerPlan `json:"complimentary_plan"`
+	ComplimentaryExpiresAt    *time.Time         `json:"complimentary_expires_at,omitempty"`
+	ComplimentaryGrantID      string             `json:"complimentary_grant_id,omitempty"`
 	StorageQuotaBytes         int64              `json:"storage_quota_bytes"`
 	StorageUsedBytes          int64              `json:"storage_used_bytes"`
 	StorageUsagePercent       float64            `json:"storage_usage_percent"`
@@ -173,6 +178,25 @@ type systemTenantOpenRouterCreditsRequest struct {
 	Reset             bool   `json:"reset"`
 }
 
+// systemTenantComplimentaryGrantRequest is intentionally a narrow DTO. Plan
+// state owned by Paddle is never accepted through the generic tenant update
+// route; operators must use this explicit, audited grant action instead.
+type systemTenantComplimentaryGrantRequest struct {
+	Plan      string `json:"plan"`
+	ExpiresAt string `json:"expires_at"`
+	GrantID   string `json:"grant_id"`
+}
+
+type systemTenantComplimentaryRevokeRequest struct {
+	GrantID string `json:"grant_id"`
+}
+
+// Grant IDs are opaque operation identifiers, not arbitrary user text. The
+// bounded alphabet keeps them safe to place in audit details and idempotency
+// comparisons without introducing another escaping or normalization rule. The
+// 16-character minimum matches the entitlement service's operation-ID contract.
+var complimentaryGrantIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{15,63}$`)
+
 func systemTenantID(c *gin.Context) (uint64, error) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -185,9 +209,30 @@ func newSystemTenantEntitlementResponse(tenant *types.Tenant, current *types.Con
 	if tenant == nil || current == nil {
 		return nil
 	}
+	planSource := strings.TrimSpace(current.PlanSource)
+	if planSource == "" {
+		// Keep the operator projection useful for legacy/partial service
+		// implementations that predate PlanSource; the entitlement service is
+		// still authoritative whenever it supplies the explicit value.
+		if types.PaddleEffectiveConsumerPlanAt(tenant, time.Now().UTC()) != types.ConsumerPlanFree {
+			planSource = "paddle"
+		} else if _, active := types.ActiveComplimentaryPlanAt(tenant, time.Now().UTC()); active {
+			planSource = "complimentary"
+		} else {
+			planSource = "free"
+		}
+	}
+	storageQuota := tenant.StorageQuota
+	// Complimentary storage is an effective write limit, not a persisted
+	// tenant quota mutation. Reflect that same limit in the operator projection
+	// while the overlay is active so the console never reports a false 1 GiB
+	// ceiling for a gifted Plus/Pro/Max workspace.
+	if planSource == "complimentary" && current.StorageBytes > storageQuota {
+		storageQuota = current.StorageBytes
+	}
 	usagePercent := float64(0)
-	if tenant.StorageQuota > 0 {
-		usagePercent = float64(tenant.StorageUsed) * 100 / float64(tenant.StorageQuota)
+	if storageQuota > 0 {
+		usagePercent = float64(tenant.StorageUsed) * 100 / float64(storageQuota)
 	}
 	return &systemTenantEntitlementResponse{
 		TenantID:                    tenant.ID,
@@ -196,7 +241,11 @@ func newSystemTenantEntitlementResponse(tenant *types.Tenant, current *types.Con
 		ConfiguredPlan:              types.NormalizeConsumerPlan(tenant.Plan),
 		Plan:                        current.Plan,
 		PlanStatus:                  current.PlanStatus,
-		StorageQuotaBytes:           tenant.StorageQuota,
+		PlanSource:                  planSource,
+		ComplimentaryPlan:           tenant.ComplimentaryPlan,
+		ComplimentaryExpiresAt:      tenant.ComplimentaryExpiresAt,
+		ComplimentaryGrantID:        tenant.ComplimentaryGrantID,
+		StorageQuotaBytes:           storageQuota,
 		StorageUsedBytes:            tenant.StorageUsed,
 		StorageUsagePercent:         usagePercent,
 		BillingPeriod:               tenant.PaddleBillingPeriod,
@@ -2585,7 +2634,7 @@ func (h *SystemHandler) UpdateManagedTenantOpenRouterCredits(c *gin.Context) {
 	}
 	remaining := int64(0)
 	if req.Reset {
-		remaining = types.LimitsForConsumerPlan(types.EffectiveConsumerPlan(tenant)).MonthlyOpenRouterMicrousd
+		remaining = types.LimitsForConsumerPlan(types.EffectiveConsumerPlanAt(tenant, time.Now().UTC())).MonthlyOpenRouterMicrousd
 	} else {
 		remaining = *req.RemainingMicrousd
 	}
@@ -2599,6 +2648,254 @@ func (h *SystemHandler) UpdateManagedTenantOpenRouterCredits(c *gin.Context) {
 		"reset": req.Reset, "remaining_microusd": remaining,
 	})
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": newSystemTenantEntitlementResponse(tenant, current)})
+}
+
+// GrantManagedTenantComplimentaryPlan grants a bounded Plus/Pro/Max overlay
+// through the entitlement service. The service owns the row lock, Paddle
+// eligibility check, provider-key convergence, and replay semantics; this
+// handler is deliberately limited to request validation, projection, and
+// audit metadata.
+func (h *SystemHandler) GrantManagedTenantComplimentaryPlan(c *gin.Context) {
+	ctx := logger.CloneContext(c.Request.Context())
+	id, err := systemTenantID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var req systemTenantComplimentaryGrantRequest
+	if err := decodeStrictJSONBody(c, &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+	plan, expiresAt, err := validateComplimentaryGrantRequest(req, time.Now().UTC())
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if h.tenantSvc == nil || h.entitlementSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement service unavailable"})
+		return
+	}
+
+	// Read the underlying row before the transition so the audit event can
+	// describe the old effective plan. The entitlement service repeats all
+	// eligibility checks under its transaction; this read is never trusted for
+	// authorization or state mutation.
+	tenantBefore, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrTenantNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+			return
+		}
+		logger.Errorf(ctx, "managed complimentary grant lookup failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	oldPlan := types.EffectiveConsumerPlanAt(tenantBefore, time.Now().UTC())
+
+	current, applied, err := h.entitlementSvc.GrantComplimentaryPlan(ctx, id, plan, expiresAt, req.GrantID)
+	if err != nil {
+		// The service may commit the durable row before a provider sync fails;
+		// preserve the audit trail whenever it explicitly reports applied=true,
+		// even though the caller receives a retryable 503.
+		if applied {
+			h.emitManagedTenantAudit(ctx, types.AuditActionSystemEntitlementGranted, id, map[string]any{
+				"grant_id":           req.GrantID,
+				"old_effective_plan": string(oldPlan),
+				"new_effective_plan": string(plan),
+				"complimentary_plan": string(plan),
+				"expires_at":         expiresAt.UTC().Format(time.RFC3339),
+			})
+		}
+		writeComplimentaryEntitlementError(c, err)
+		return
+	}
+	if current == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	if applied {
+		h.emitManagedTenantAudit(ctx, types.AuditActionSystemEntitlementGranted, id, map[string]any{
+			"grant_id":           req.GrantID,
+			"old_effective_plan": string(oldPlan),
+			"new_effective_plan": string(current.Plan),
+			"complimentary_plan": string(plan),
+			"expires_at":         expiresAt.UTC().Format(time.RFC3339),
+		})
+	}
+
+	// Re-read the tenant after the service commit so the projection includes
+	// the durable grant metadata and never synthesizes it from request input.
+	tenant, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		logger.Errorf(ctx, "managed complimentary grant projection read failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "applied": applied, "data": newSystemTenantEntitlementResponse(tenant, current)})
+}
+
+// RevokeManagedTenantComplimentaryPlan removes only the currently matching
+// complimentary grant. Compare-and-set on grant_id happens in the service so
+// an old operator request cannot revoke a later replacement or Paddle-owned
+// entitlement.
+func (h *SystemHandler) RevokeManagedTenantComplimentaryPlan(c *gin.Context) {
+	ctx := logger.CloneContext(c.Request.Context())
+	id, err := systemTenantID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var req systemTenantComplimentaryRevokeRequest
+	if err := decodeStrictJSONBody(c, &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+	if err := validateComplimentaryRevokeRequest(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if h.tenantSvc == nil || h.entitlementSvc == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement service unavailable"})
+		return
+	}
+
+	tenantBefore, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrTenantNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+			return
+		}
+		logger.Errorf(ctx, "managed complimentary revoke lookup failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	oldPlan := types.EffectiveConsumerPlanAt(tenantBefore, time.Now().UTC())
+	oldExpiresAt := tenantBefore.ComplimentaryExpiresAt
+
+	current, applied, err := h.entitlementSvc.RevokeComplimentaryPlan(ctx, id, req.GrantID)
+	if err != nil {
+		if applied {
+			h.emitManagedTenantAudit(ctx, types.AuditActionSystemEntitlementRevoked, id, map[string]any{
+				"grant_id":           req.GrantID,
+				"old_effective_plan": string(oldPlan),
+				"new_effective_plan": string(types.ConsumerPlanFree),
+				"expires_at":         formatOptionalAuditTime(oldExpiresAt),
+			})
+		}
+		writeComplimentaryEntitlementError(c, err)
+		return
+	}
+	if current == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	if applied {
+		details := map[string]any{
+			"grant_id":           req.GrantID,
+			"old_effective_plan": string(oldPlan),
+			"new_effective_plan": string(current.Plan),
+		}
+		if value := formatOptionalAuditTime(oldExpiresAt); value != "" {
+			details["expires_at"] = value
+		}
+		h.emitManagedTenantAudit(ctx, types.AuditActionSystemEntitlementRevoked, id, details)
+	}
+
+	tenant, err := h.tenantSvc.GetTenantByID(ctx, id)
+	if err != nil {
+		logger.Errorf(ctx, "managed complimentary revoke projection read failed tenant_id=%d: %v", id, err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tenant entitlement unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "applied": applied, "data": newSystemTenantEntitlementResponse(tenant, current)})
+}
+
+func formatOptionalAuditTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
+}
+
+func decodeStrictJSONBody(c *gin.Context, dst any) error {
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("request body must contain one JSON object")
+		}
+		return err
+	}
+	return nil
+}
+
+func validateComplimentaryGrantRequest(req systemTenantComplimentaryGrantRequest, now time.Time) (types.ConsumerPlan, time.Time, error) {
+	plan := types.ConsumerPlan(strings.ToLower(strings.TrimSpace(req.Plan)))
+	switch plan {
+	case types.ConsumerPlanPlus, types.ConsumerPlanPro, types.ConsumerPlanMax:
+	default:
+		return types.ConsumerPlanFree, time.Time{}, fmt.Errorf("plan must be plus, pro, or max")
+	}
+	grantID := strings.TrimSpace(req.GrantID)
+	if grantID == "" || !complimentaryGrantIDPattern.MatchString(grantID) {
+		return types.ConsumerPlanFree, time.Time{}, fmt.Errorf("grant_id must match %s", complimentaryGrantIDPattern.String())
+	}
+	if req.GrantID != grantID {
+		return types.ConsumerPlanFree, time.Time{}, fmt.Errorf("grant_id must not contain leading or trailing whitespace")
+	}
+	expiresAt, err := time.Parse(time.RFC3339, strings.TrimSpace(req.ExpiresAt))
+	if err != nil {
+		return types.ConsumerPlanFree, time.Time{}, fmt.Errorf("expires_at must be RFC3339 with an explicit timezone offset")
+	}
+	if !expiresAt.After(now.UTC()) {
+		return types.ConsumerPlanFree, time.Time{}, fmt.Errorf("expires_at must be in the future")
+	}
+	return plan, expiresAt.UTC(), nil
+}
+
+func validateComplimentaryRevokeRequest(req systemTenantComplimentaryRevokeRequest) error {
+	grantID := strings.TrimSpace(req.GrantID)
+	if grantID == "" || !complimentaryGrantIDPattern.MatchString(grantID) {
+		return fmt.Errorf("grant_id must match %s", complimentaryGrantIDPattern.String())
+	}
+	if req.GrantID != grantID {
+		return fmt.Errorf("grant_id must not contain leading or trailing whitespace")
+	}
+	return nil
+}
+
+func writeComplimentaryEntitlementError(c *gin.Context, err error) {
+	status := http.StatusServiceUnavailable
+	message := "tenant entitlement unavailable"
+	if err != nil {
+		message = err.Error()
+	}
+	var appErr *apperrors.AppError
+	if errors.As(err, &appErr) && appErr != nil {
+		message = appErr.Message
+		switch appErr.Code {
+		case apperrors.ErrConflict:
+			status = http.StatusConflict
+		case apperrors.ErrBadRequest, apperrors.ErrValidation:
+			status = http.StatusBadRequest
+		case apperrors.ErrNotFound:
+			status = http.StatusNotFound
+		case apperrors.ErrServiceUnavailable, apperrors.ErrTimeout:
+			status = http.StatusServiceUnavailable
+		default:
+			if appErr.HTTPCode >= 400 && appErr.HTTPCode <= 599 {
+				status = appErr.HTTPCode
+			}
+		}
+	}
+	c.JSON(status, gin.H{"success": false, "error": message})
 }
 
 func (h *SystemHandler) emitManagedTenantAudit(ctx context.Context, action types.AuditAction, tenantID uint64, details map[string]any) {
