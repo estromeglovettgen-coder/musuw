@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestBuiltinQuickAnswerUsesManagedV4FlashDefaults(t *testing.T) {
+func TestBuiltinQuickAnswerUsesUpstreamModeNameWithManagedModelDefaults(t *testing.T) {
 	configPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
@@ -27,8 +27,14 @@ func TestBuiltinQuickAnswerUsesManagedV4FlashDefaults(t *testing.T) {
 	}
 	require.NotNil(t, quick)
 
-	for locale, localized := range quick.I18n {
-		assert.Equalf(t, "V4 Flash", localized.Name, "locale %s must expose the managed quick mode name", locale)
+	for locale, expectedName := range map[string]string{
+		"default": "Quick Answer",
+		"zh-CN":   "快速问答",
+		"zh-TW":   "快速問答",
+		"ja-JP":   "クイック回答",
+		"ko-KR":   "빠른 답변",
+	} {
+		assert.Equalf(t, expectedName, quick.I18n[locale].Name, "locale %s must expose the upstream quick-answer mode name", locale)
 	}
 
 	cfg := quick.Config
@@ -92,7 +98,7 @@ func TestBuiltinQuickAnswerPromptReferenceExists(t *testing.T) {
 	t.Fatal("hybrid_rag_wiki_agent prompt template not found")
 }
 
-func TestBuiltinSmartReasoningEnablesV4ProFullToolAccess(t *testing.T) {
+func TestBuiltinSmartReasoningUsesUpstreamModeNameWithManagedModelDefaults(t *testing.T) {
 	configPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
@@ -108,8 +114,14 @@ func TestBuiltinSmartReasoningEnablesV4ProFullToolAccess(t *testing.T) {
 		}
 	}
 	require.NotNil(t, smart)
-	for locale, localized := range smart.I18n {
-		assert.Equalf(t, "V4 Pro", localized.Name, "locale %s must expose the managed pro mode name", locale)
+	for locale, expectedName := range map[string]string{
+		"default": "Smart Reasoning",
+		"zh-CN":   "智能推理",
+		"zh-TW":   "智能推理",
+		"ja-JP":   "スマート推論",
+		"ko-KR":   "스마트 추론",
+	} {
+		assert.Equalf(t, expectedName, smart.I18n[locale].Name, "locale %s must expose the upstream smart-reasoning mode name", locale)
 	}
 
 	cfg := smart.Config

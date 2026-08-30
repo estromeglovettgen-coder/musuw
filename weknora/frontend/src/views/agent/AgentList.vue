@@ -219,10 +219,6 @@
                 <div class="card-description">{{ agent.description || $t('agent.noDescription') }}</div>
               </div>
               <div class="card-bottom">
-                <div class="agent-card-meta" aria-label="">
-                  <span><t-icon name="control-platform" aria-hidden="true" />{{ agentModelLabel(agent) }}</span>
-                  <span><t-icon name="folder" aria-hidden="true" />{{ agentKbScopeLabel(agent) }}</span>
-                </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
                     <t-tooltip
@@ -410,10 +406,6 @@
 
               <!-- 卡片底部 -->
               <div class="card-bottom">
-                <div class="agent-card-meta" aria-label="">
-                  <span><t-icon name="control-platform" aria-hidden="true" />{{ agentModelLabel(agent) }}</span>
-                  <span><t-icon name="folder" aria-hidden="true" />{{ agentKbScopeLabel(agent) }}</span>
-                </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
                     <t-tooltip
@@ -550,10 +542,6 @@
                 <div class="card-description">{{ shared.agent?.description || $t('agent.noDescription') }}</div>
               </div>
               <div class="card-bottom">
-                <div class="agent-card-meta" aria-label="">
-                  <span><t-icon name="control-platform" aria-hidden="true" />{{ agentModelLabel(shared.agent) }}</span>
-                  <span><t-icon name="folder" aria-hidden="true" />{{ agentKbScopeLabel(shared.agent) }}</span>
-                </div>
                 <div class="bottom-left">
                   <div class="feature-badges">
                     <t-tooltip
@@ -1009,19 +997,6 @@ const sharedAgentMcpScopeText = computed(() => {
   return t('agent.shareScope.mcpNone')
 })
 
-const agentConfigForCard = (agent: unknown): CustomAgent['config'] | undefined =>
-  (agent as Partial<CustomAgent> | null | undefined)?.config
-
-const agentModelLabel = (agent: unknown) =>
-  agentConfigForCard(agent)?.model_id || t('input.notConfigured')
-
-const agentKbScopeLabel = (agent: unknown) => {
-  const config = agentConfigForCard(agent)
-  if (!config || config.kb_selection_mode === 'none') return t('agent.shareScope.kbNone')
-  if (config.kb_selection_mode === 'all') return t('agent.shareScope.kbAll')
-  if (config.knowledge_bases?.length) return t('agent.shareScope.kbSelected', { count: config.knowledge_bases.length })
-  return t('agent.shareScope.kbNone')
-}
 const editorVisible = ref(false)
 const editorMode = ref<'create' | 'edit'>('create')
 const editingAgent = ref<CustomAgent | null>(null)
@@ -2192,36 +2167,6 @@ defineExpose({
   border-top: .5px solid var(--td-component-stroke);
 }
 
-.agent-card-meta {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-
-  span {
-    min-width: 0;
-    max-width: 48%;
-    padding: 2px 8px;
-    border-radius: 6px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    overflow: hidden;
-    background: #f5f5f5;
-    color: #4b5563;
-    font-size: 11px;
-    line-height: 16px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  :deep(.t-icon) { flex: 0 0 12px; font-size: 12px; }
-}
-
-.agent-card-meta + .bottom-left { display: none; }
-
 .bottom-left {
   display: flex;
   align-items: center;
@@ -2418,8 +2363,6 @@ defineExpose({
   border-color: #52525b !important;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
 }
-:root[theme-mode="dark"] .agent-card-meta span { background: #27272a; color: #d4d4d8; }
-
 // 删除确认对话框样式
 :deep(.del-agent-dialog) {
   padding: 0px !important;

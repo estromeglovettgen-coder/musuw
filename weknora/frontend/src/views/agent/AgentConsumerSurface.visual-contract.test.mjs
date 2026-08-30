@@ -37,7 +37,7 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
   assert.match(list, /:root\[theme-mode="dark"\] \.agent-create-header-btn,[\s\S]*?\{[\s\S]*?border-color:\s*#f4f4f5 !important;[\s\S]*?background:\s*#f4f4f5 !important;[\s\S]*?color:\s*#18181b !important;/)
   assert.doesNotMatch(list, /handleToggle(?:Shared)?Disabled/)
   assert.doesNotMatch(list, /setSharedAgentDisabledByMe/)
-  assert.match(list, /\.agent-card-meta\s*\{[\s\S]*?span\s*\{[\s\S]*?line-height:\s*16px;/)
+  assert.doesNotMatch(list, /agent-card-meta|agentModelLabel/, 'Agent cards must not expose their internal model ID')
   assert.match(nativeDirectoryStyles, /\.agent-card \.card-bottom,[\s\S]*?min-height:\s*20px !important;/)
   assert.match(nativeDirectoryStyles, /\.agent-card \.more-wrap,[\s\S]*?width:\s*24px !important;[\s\S]*?height:\s*24px !important;[\s\S]*?padding:\s*4px !important;[\s\S]*?box-sizing:\s*border-box !important;/)
   assert.match(nativeDirectoryStyles, /\.agent-card \.card-header,[\s\S]*?min-height:\s*24px !important;/)

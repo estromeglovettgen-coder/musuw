@@ -8,19 +8,19 @@ builtin_agents:
     is_builtin: true
     i18n:
       default:
-        name: "V4 Flash"
+        name: "Quick Answer"
         description: "Knowledge base RAG Q&A for fast and accurate answers"
       zh-CN:
-        name: "V4 Flash"
+        name: "快速问答"
         description: "基于知识库的 RAG 问答，快速准确地回答问题"
       zh-TW:
-        name: "V4 Flash"
+        name: "快速問答"
         description: "基於知識庫的 RAG 問答，快速準確地回答問題"
       ja-JP:
-        name: "V4 Flash"
+        name: "クイック回答"
         description: "ナレッジベース RAG Q&A による迅速で正確な回答"
       ko-KR:
-        name: "V4 Flash"
+        name: "빠른 답변"
         description: "지식 베이스 RAG Q&A를 통한 빠르고 정확한 답변"
     config:
       agent_mode: "quick-answer"
@@ -63,19 +63,19 @@ builtin_agents:
     is_builtin: true
     i18n:
       default:
-        name: "V4 Pro"
+        name: "Smart Reasoning"
         description: "ReAct reasoning framework with multi-step thinking and tool calling"
       zh-CN:
-        name: "V4 Pro"
+        name: "智能推理"
         description: "ReAct 推理框架，支持多步思考与工具调用"
       zh-TW:
-        name: "V4 Pro"
+        name: "智能推理"
         description: "ReAct 推理框架，支援多步思考與工具呼叫"
       ja-JP:
-        name: "V4 Pro"
+        name: "スマート推論"
         description: "ReAct 推論フレームワーク、マルチステップ思考とツール呼び出し対応"
       ko-KR:
-        name: "V4 Pro"
+        name: "스마트 추론"
         description: "ReAct 추론 프레임워크, 다단계 사고 및 도구 호출 지원"
     config:
       agent_mode: "smart-reasoning"
