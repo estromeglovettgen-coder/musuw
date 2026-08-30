@@ -295,6 +295,9 @@
  * Keep Agent-only business metadata, but align the shared card controls. */
 .agent-card .card-header-left { padding-right: 42px !important; }
 .agent-card .card-bottom { gap: 6px !important; flex-wrap: wrap !important; }
+:root[theme-mode="dark"] .agent-card .card-bottom {
+  border-top-color: var(--mvc-line, #31343a) !important;
+}
 .agent-card .agent-favorite-star {
   position: absolute !important;
   top: 14px !important;

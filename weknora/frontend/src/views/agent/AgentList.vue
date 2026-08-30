@@ -230,17 +230,6 @@
                           size="14px" />
                       </div>
                     </t-tooltip>
-                    <t-tooltip v-if="agent.config?.web_search_enabled" :content="$t('agent.features.webSearch')"
-                      placement="top">
-                      <div class="feature-badge web-search">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <ellipse cx="8" cy="8" rx="2.5" ry="6" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <line x1="2" y1="6" x2="14" y2="6" stroke="currentColor" stroke-width="1.2" />
-                          <line x1="2" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.2" />
-                        </svg>
-                      </div>
-                    </t-tooltip>
                     <t-tooltip v-if="agent.config?.knowledge_bases?.length || agent.config?.kb_selection_mode === 'all'"
                       :content="$t('agent.features.knowledgeBase')" placement="top">
                       <div class="feature-badge knowledge">
@@ -417,17 +406,6 @@
                           size="14px" />
                       </div>
                     </t-tooltip>
-                    <t-tooltip v-if="agent.config?.web_search_enabled" :content="$t('agent.features.webSearch')"
-                      placement="top">
-                      <div class="feature-badge web-search">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <ellipse cx="8" cy="8" rx="2.5" ry="6" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <line x1="2" y1="6" x2="14" y2="6" stroke="currentColor" stroke-width="1.2" />
-                          <line x1="2" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.2" />
-                        </svg>
-                      </div>
-                    </t-tooltip>
                     <t-tooltip v-if="agent.config?.knowledge_bases?.length || agent.config?.kb_selection_mode === 'all'"
                       :content="$t('agent.features.knowledgeBase')" placement="top">
                       <div class="feature-badge knowledge">
@@ -553,16 +531,6 @@
                           :name="shared.agent?.config?.agent_mode === 'smart-reasoning' ? 'control-platform' : 'chat'"
                           size="14px" />
                       </div>
-                    </t-tooltip>
-                    <t-tooltip v-if="shared.agent?.config?.web_search_enabled" :content="$t('agent.features.webSearch')"
-                      placement="top">
-                      <div class="feature-badge web-search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-                          xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <ellipse cx="8" cy="8" rx="2.5" ry="6" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <line x1="2" y1="6" x2="14" y2="6" stroke="currentColor" stroke-width="1.2" />
-                          <line x1="2" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.2" />
-                        </svg></div>
                     </t-tooltip>
                     <t-tooltip
                       v-if="shared.agent?.config?.knowledge_bases?.length || shared.agent?.config?.kb_selection_mode === 'all'"
@@ -2162,9 +2130,9 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
-  padding-top: 8px;
-  border-top: .5px solid var(--td-component-stroke);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
 }
 
 .bottom-left {
@@ -2204,15 +2172,6 @@ defineExpose({
 
     &:hover {
       background: rgba(124, 77, 255, 0.12);
-    }
-  }
-
-  &.web-search {
-    background: rgba(255, 152, 0, 0.08);
-    color: var(--td-warning-color);
-
-    &:hover {
-      background: rgba(255, 152, 0, 0.12);
     }
   }
 
@@ -2357,7 +2316,10 @@ defineExpose({
 :root[theme-mode="dark"] .agent-card,
 :root[theme-mode="dark"] .agent-card.agent-mode-normal,
 :root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: #27272a; background: #18181b; color: #a1a1aa; box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important; }
-:root[theme-mode="dark"] .agent-card .card-bottom { gap: 6px !important; }
+:root[theme-mode="dark"] .agent-card .card-bottom {
+  gap: 6px !important;
+  border-top-color: var(--mvc-line, #31343a) !important;
+}
 :root[theme-mode="dark"] .agent-card:hover {
   background: #18181b !important;
   border-color: #52525b !important;
