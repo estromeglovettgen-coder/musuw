@@ -32,10 +32,10 @@ test('native KB editor reuses SettingsModal visual shell without changing behavi
   for (const token of [
     '.settings-modal:not(.settings-modal--compact)',
     'width: min(896px, 100%) !important',
-    'height: 520px !important',
+    'height: 620px !important',
     'border-radius: 24px !important',
-    'flex: 0 0 224px !important',
-    'padding: 32px !important',
+    'flex: 0 0 192px !important',
+    'padding: 24px !important',
     '.nav-item.active',
   ]) assert.ok(css.includes(token), `KB editor shell token missing: ${token}`)
 })

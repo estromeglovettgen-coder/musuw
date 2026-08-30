@@ -151,7 +151,7 @@
 .settings-modal:not(.settings-modal--compact) {
   width: min(896px, 100%) !important;
   max-width: 896px !important;
-  height: 520px !important;
+  height: 620px !important;
   max-height: calc(100dvh - 32px) !important;
   border: 1px solid rgb(229 231 235 / 90%) !important;
   border-radius: 24px !important;
@@ -160,10 +160,10 @@
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%) !important;
 }
 .settings-modal:not(.settings-modal--compact) .settings-sidebar {
-  flex: 0 0 224px !important;
-  width: 224px !important;
+  flex: 0 0 192px !important;
+  width: 192px !important;
   border-right: 1px solid #f3f4f6 !important;
-  background: #fff !important;
+  background: #fafafa !important;
 }
 .settings-modal:not(.settings-modal--compact) .sidebar-header {
   padding: 24px 24px 12px !important;
@@ -216,7 +216,7 @@
   font-size: 9px !important;
 }
 .settings-modal:not(.settings-modal--compact) .settings-content { background: #fff !important; }
-.settings-modal:not(.settings-modal--compact) .content-wrapper { padding: 32px !important; }
+.settings-modal:not(.settings-modal--compact) .content-wrapper { padding: 24px !important; }
 .settings-modal:not(.settings-modal--compact) .section { margin-bottom: 24px !important; }
 .settings-modal:not(.settings-modal--compact) .section-header { margin-bottom: 20px !important; }
 .settings-modal:not(.settings-modal--compact) .section-title {
@@ -480,5 +480,11 @@ body .t-message {
     border: 0 !important;
     border-radius: 0 !important;
   }
-  .settings-modal:not(.settings-modal--compact) .settings-sidebar { flex-basis: 184px !important; width: 184px !important; }
+  .settings-modal:not(.settings-modal--compact) .settings-sidebar { flex-basis: 192px !important; width: 192px !important; }
+}
+@media (min-width: 1024px) {
+  .settings-modal:not(.settings-modal--compact) {
+    width: min(1024px, 100%) !important;
+    max-width: 1024px !important;
+  }
 }
