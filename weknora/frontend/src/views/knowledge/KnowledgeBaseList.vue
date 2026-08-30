@@ -110,7 +110,7 @@ export default defineComponent({
           <div class="visual-kb-list__title-row"><t-icon name="folder" /><h1>{{ $t('knowledgeBase.title') }}</h1></div>
           <p>{{ $t('knowledgeList.subtitle') }}</p>
         </div>
-        <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button>
+        <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" size="16px" aria-hidden="true" /><span>{{ $t('knowledgeList.create') }}</span></button>
       </header>
 
       <section v-if="uploadSummaries.length" class="visual-kb-upload-status" aria-live="polite">
@@ -273,9 +273,11 @@ export default defineComponent({
 .visual-kb-list__title-row :deep(.t-icon) { width: 20px; height: 20px; font-size: 20px; color: #374151; }
 .visual-kb-list__header h1 { margin: 0; color: #111827; font-size: 20px; line-height: 28px; font-weight: 700; }
 .visual-kb-list__header p { margin: 4px 0 0; color: #6b7280; font-size: 12px; line-height: 18px; }
-.visual-kb-list__create { min-height: 32px; padding: 8px 14px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; background: #111827; color: #fff; font: inherit; font-size: 12px; line-height: 16px; font-weight: 700; white-space: nowrap; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); transition: background-color 150ms ease; }
-.visual-kb-list__create:hover { background: #000; }
-.visual-kb-list__create :deep(.t-icon) { font-size: 14px; }
+.visual-kb-list__create { height: 34px !important; min-height: 34px; padding: 0 14px !important; border-width: 1px; border-style: solid; border-color: #111827 !important; border-radius: 12px !important; display: inline-flex; align-items: center; gap: 6px; background: #111827 !important; color: #fff !important; font: inherit; font-size: 12px; line-height: 16px; font-weight: 700; white-space: nowrap; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 8%); transition: background-color 150ms ease, border-color 150ms ease; }
+.visual-kb-list__create:hover,
+.visual-kb-list__create:focus-visible,
+.visual-kb-list__create:active { border-color: #000 !important; background: #000 !important; color: #fff !important; }
+.visual-kb-list__create :deep(.t-icon) { display: inline-flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; }
 .visual-kb-warning { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: #fff; color: #6b7280; font-size: 11px; line-height: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
 .visual-kb-warning :deep(.t-icon) { flex: 0 0 16px; font-size: 16px; color: #9ca3af; }
 .visual-kb-upload-status { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; }
@@ -334,6 +336,10 @@ export default defineComponent({
 :root[theme-mode="dark"] .visual-kb-workspace,
 :root[theme-mode="dark"] .visual-kb-list { background: var(--mvc-page, #151619) !important; }
 :root[theme-mode="dark"] .visual-kb-list__header { background: var(--mvc-page, #151619) !important; }
+:root[theme-mode="dark"] .visual-kb-list__create { border-color: #f4f4f5 !important; background: #f4f4f5 !important; color: #18181b !important; }
+:root[theme-mode="dark"] .visual-kb-list__create:hover,
+:root[theme-mode="dark"] .visual-kb-list__create:focus-visible,
+:root[theme-mode="dark"] .visual-kb-list__create:active { border-color: #fff !important; background: #fff !important; color: #09090b !important; }
 </style>
 
 <style>

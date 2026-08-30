@@ -4571,6 +4571,16 @@ const handleSave = async () => {
   border-bottom: 0 !important;
 }
 
+/*
+ * The shared horizontal setting-control rule uses a 280px flex basis. In a
+ * vertical row that basis becomes height, so full-width controls must size
+ * from their contents instead.
+ */
+.setting-row--basic-name > .setting-control-full,
+.setting-row--basic-description > .setting-control-full {
+  flex: 0 0 auto !important;
+}
+
 .parser-policy-block {
   padding: 16px 0;
   border-bottom: 1px solid var(--td-component-stroke);

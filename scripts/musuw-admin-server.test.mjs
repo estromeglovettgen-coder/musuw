@@ -248,7 +248,9 @@ test('allowlist admits only scoped operations routes and methods', () => {
 test('allowlist matches the user-drawer complimentary mutation path exactly', () => {
   assert.equal(isSafeOperationsPath('PUT', '/api/v1/system/admin/tenants/10018/complimentary-entitlement'), true)
   assert.equal(isSafeOperationsPath('DELETE', '/api/v1/system/admin/tenants/10018/complimentary-entitlement'), true)
-  assert.equal(isSafeOperationsPath('PUT', '/api/v1/system/admin/tenants/10018/complimentary-entitlement/'), false)
+  assert.equal(isSafeOperationsPath('PUT', '/api/v1/system/admin/tenants/10018/complimentary-entitlement/'), true)
+  assert.equal(isSafeOperationsPath('DELETE', '/api/v1/system/admin/tenants/10018/complimentary-entitlement/'), true)
+  assert.equal(isSafeOperationsPath('PUT', '/api/v1/system/admin/tenants/10018/complimentary-entitlement//'), false)
 })
 
 test('operations user list projects and filters the effective complimentary plan without rewriting Paddle state', () => {

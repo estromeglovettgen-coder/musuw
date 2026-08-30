@@ -154,11 +154,21 @@ export function unavailableProviderState(configured, missingReason, adapterReaso
   return { available: false, reason: configured ? adapterReason : missingReason }
 }
 
+// Browser/router layers may append one harmless trailing slash. Normalize only
+// that equivalent spelling before checking and forwarding an already-scoped
+// operations route; repeated slashes remain outside the allowlist.
+export function normalizeOperationsPath(pathname) {
+  const value = String(pathname || '')
+  return value.length > 1 && value.endsWith('/') ? value.slice(0, -1) : value
+}
+
 export function isSafeOperationsPath(method, pathname) {
   const exactReads = new Set([
     '/api/v1/system/admin/runtime/queues',
     '/api/v1/system/admin/audit-log',
   ])
+  method = String(method || '').toUpperCase()
+  pathname = normalizeOperationsPath(pathname)
   if (method === 'GET' && exactReads.has(pathname)) return true
   if (method === 'GET' && /^\/api\/v1\/system\/admin\/runtime\/queues\/[a-z0-9_-]+\/tasks$/.test(pathname)) return true
   if (method === 'GET' && /^\/api\/v1\/system\/admin\/tenants\/\d+\/entitlement$/.test(pathname)) return true
@@ -1055,6 +1065,7 @@ async function start() {
 
   async function proxyOperationsRequest(request, response, url, session) {
     if (!platformKey) return writeJSON(response, 503, { error: 'Musuw operations credential unavailable' })
+    const operationsPath = normalizeOperationsPath(url.pathname)
     if (!isSafeOperationsPath(request.method, url.pathname)) {
       return writeJSON(response, 404, { error: 'operation is outside the console allowlist' })
     }
@@ -1066,7 +1077,7 @@ async function start() {
       const parsed = await parseJSONBody(request)
       body = parsed == null ? undefined : JSON.stringify(parsed)
     }
-    const upstream = new URL(url.pathname + url.search, runtime.backendBaseUrl)
+    const upstream = new URL(operationsPath + url.search, runtime.backendBaseUrl)
     const { response: upstreamResponse, payload } = await fetchJSON(upstream, {
       method: request.method,
       headers: {

@@ -179,6 +179,11 @@ test('authoritative workspace 7 basic tab uses full-width counted name and descr
   assert.match(editor, /\{\{ formData\.description\.length \}\}\/200/)
   assert.match(editor, /v-model="formData\.description"[\s\S]*?:maxlength="200"/)
   assert.match(editor, /\.setting-row--basic-name,[\s\S]*?\.setting-row--basic-description\s*\{[\s\S]*?flex-direction:\s*column;/)
+  assert.match(
+    editor,
+    /\.setting-row--basic-name\s*>\s*\.setting-control-full,[\s\S]*?\.setting-row--basic-description\s*>\s*\.setting-control-full\s*\{[\s\S]*?flex:\s*0 0 auto !important;/,
+    'vertical full-width controls must not interpret the shared 280px horizontal basis as height',
+  )
   assert.match(editor, /\.settings-footer-actions :deep\(\.t-button--theme-primary\)\s*\{[\s\S]*?background:\s*#111827 !important;/)
   const footer = editor.match(/<template #footer>[\s\S]*?<\/template>/)?.[0] || ''
   const primary = footer.match(/<t-button v-if="!props\.readOnly"[\s\S]*?<\/t-button>/)?.[0] || ''
