@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { AuthApp, getAuthCopy } from "./AuthApp";
 import { authConfigFromRuntimeOrEnvironment } from "./config";
 import { getInitialAuthLocale } from "./locale";
-import { createAuthRuntime } from "./runtime";
+import { createAuthRuntime, isLocalMusuwAuthEnabled } from "./runtime";
 import { createSupabaseIdentityClient } from "./supabase";
 import "./styles.css";
 
@@ -28,6 +28,11 @@ try {
     config,
     createIdentityClient: (identityConfig) =>
       createSupabaseIdentityClient(identityConfig, window.sessionStorage, window.localStorage),
+    localMusuwPasswordAuth: isLocalMusuwAuthEnabled(
+      import.meta.env.DEV,
+      import.meta.env["VITE_MUSUW_DEV_LOCAL_AUTH"],
+      window.location.hostname,
+    ),
     nativeStorage: window.localStorage,
     sharedStorage: window.localStorage,
     storage: window.sessionStorage,

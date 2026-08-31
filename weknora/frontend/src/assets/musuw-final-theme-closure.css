@@ -2034,3 +2034,119 @@ body .t-drawer.t-drawer--right.wiki-graph-drawer > .t-drawer__content-wrapper {
 :root[theme-mode="dark"] .agent-editor-modal .settings-footer-actions .t-button--variant-outline:hover {
   background: #27272a !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Dark-mode color closure for the two document/citation surfaces             */
+/* -------------------------------------------------------------------------- */
+
+/* ChatReferencesDrawer owns a custom aside rather than a TDesign drawer. Its
+ * header has a light-only reference fill, so the panel body switches to dark
+ * while the top strip remains white. Paint that strip with the same semantic
+ * dark surface as the rest of the drawer. */
+:root[theme-mode="dark"] .visual-references-panel__header {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .visual-references-panel__dot,
+:root[theme-mode="dark"] .visual-references-panel__count,
+:root[theme-mode="dark"] .visual-references-panel__close {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] .visual-references-panel__count {
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] .visual-references-panel__close:hover,
+:root[theme-mode="dark"] .visual-references-panel__close:focus-visible {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+/* DocumentPreview's light reference layer uses explicit !important colors.
+ * That light-only preview chrome otherwise wins over the dark drawer
+ * tokens (especially the TXT/Markdown code surface shown in the document
+ * detail screenshot), leaving pale text on a white card. Keep all preview
+ * states on the existing dark semantic palette without changing light mode. */
+:root[theme-mode="dark"] .document-preview {
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-toolbar {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-muted-strong) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-toolbar .t-button {
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-toolbar .t-button:hover,
+:root[theme-mode="dark"] .document-preview .preview-toolbar .t-button:focus-visible {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-loading,
+:root[theme-mode="dark"] .document-preview .preview-error,
+:root[theme-mode="dark"] .document-preview .preview-unsupported {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-loading .loading-text,
+:root[theme-mode="dark"] .document-preview .preview-error p,
+:root[theme-mode="dark"] .document-preview .preview-unsupported p,
+:root[theme-mode="dark"] .document-preview .preview-unsupported .unsupported-hint {
+  color: var(--mvc-muted) !important;
+}
+
+/* Text/Markdown/Excel are rendered into the preview component itself (unlike
+ * a PDF iframe or a native document page), so both the container and its
+ * generated content need an explicit dark surface/ink pair. */
+:root[theme-mode="dark"] .document-preview .preview-text .code-preview,
+:root[theme-mode="dark"] .document-preview .preview-markdown,
+:root[theme-mode="dark"] .document-preview .preview-excel .excel-container {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-text .code-preview code.hljs {
+  background: transparent !important;
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-text .code-preview code.hljs .hljs-subst {
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-markdown .markdown-body {
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-markdown .markdown-body :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-markdown .markdown-body :is(p, li, td) {
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-markdown .markdown-body :is(pre, blockquote) {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-markdown .markdown-body code:not(pre code) {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-excel .excel-container table,
+:root[theme-mode="dark"] .document-preview .preview-excel .excel-container td,
+:root[theme-mode="dark"] .document-preview .preview-excel .excel-container th {
+  border-color: var(--mvc-line) !important;
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] .document-preview .preview-excel .excel-container th,
+:root[theme-mode="dark"] .document-preview .excel-sheet-name {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+:root[theme-mode="dark"] .document-preview.is-fullscreen {
+  background: var(--mvc-page) !important;
+  color: var(--mvc-text) !important;
+}

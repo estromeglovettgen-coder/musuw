@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AUTH_FLOW_TTL_MS,
   createAuthRuntime,
+  isLocalMusuwAuthEnabled,
   type AuthorizationDetails,
   type IdentityClient,
   type SessionStorageLike,
@@ -107,6 +108,7 @@ function runtimeFor(
   nativeStore = storage(),
   publicOrigin = "https://app.musuw.com",
   sharedStore?: SessionStorageLike,
+  localMusuwPasswordAuth = false,
 ) {
   const runtimeOptions = {
     config: {
@@ -118,6 +120,7 @@ function runtimeFor(
     createIdentityClient: () => client,
     fetch,
     location: { assign: assigned, origin: "https://app.musuw.com" },
+    localMusuwPasswordAuth,
     nativeStorage: nativeStore,
     nextFlowId: () => "flow_1",
     now: () => 1,
@@ -751,6 +754,71 @@ describe("Supabase to WeKnora authorization continuation", () => {
 });
 
 describe("password identity continuation", () => {
+  it("keeps local Musuw auth restricted to an explicit loopback development switch", () => {
+    expect(isLocalMusuwAuthEnabled(true, "true", "localhost")).toBe(true);
+    expect(isLocalMusuwAuthEnabled(true, "true", "127.0.0.1")).toBe(true);
+    expect(isLocalMusuwAuthEnabled(false, "true", "localhost")).toBe(false);
+    expect(isLocalMusuwAuthEnabled(true, "false", "localhost")).toBe(false);
+    expect(isLocalMusuwAuthEnabled(true, "true", "app.musuw.com")).toBe(false);
+  });
+
+  it("signs into the local Musuw app without redirecting through hosted identity", async () => {
+    const client = identity() as IdentityClient & {
+      signInWithPassword: ReturnType<typeof vi.fn>;
+    };
+    const assigned = vi.fn();
+    const nativeStore = storage();
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+      expect(String(input)).toBe("http://localhost:4190/api/v1/auth/login");
+      return response({
+        refresh_token: "local-refresh-token",
+        success: true,
+        token: "local-access-token",
+      });
+    });
+    const runtime = createAuthRuntime({
+      config: {
+        publicOrigin: "http://localhost:4190",
+        publishableKey: "sb_publishable_key",
+        supabaseUrl: "https://identity.example",
+        weknoraOAuthClientId: "weknora-client",
+      },
+      createIdentityClient: () => client,
+      fetch,
+      localMusuwPasswordAuth: true,
+      location: { assign: assigned, origin: "http://localhost:4190" },
+      nativeStorage: nativeStore,
+      storage: storage(),
+    });
+
+    await expect(runtime.signInWithPassword(" USER@example.com ", "local-password"))
+      .resolves.toEqual({ state: "identity_complete" });
+
+    expect(client.signInWithPassword).not.toHaveBeenCalled();
+    expect(nativeStore.getItem("weknora_token")).toBe("local-access-token");
+    expect(nativeStore.getItem("weknora_refresh_token")).toBe("local-refresh-token");
+    expect(assigned).toHaveBeenCalledWith("http://localhost:4190/");
+  });
+
+  it("shows the Musuw login page locally even when a hosted identity session exists", async () => {
+    const client = identity();
+    const { assigned, fetch, runtime } = runtimeFor(
+      client,
+      storage(),
+      vi.fn(),
+      vi.fn<typeof globalThis.fetch>(async () => response({}, 401)),
+      storage(),
+      "http://localhost:4190",
+      undefined,
+      true,
+    );
+
+    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_login_required" });
+    expect(client.getSession).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(assigned).not.toHaveBeenCalled();
+  });
+
   it("signs in with a normalized email and resumes the native OIDC handoff", async () => {
     const client = identity() as IdentityClient & {
       signInWithPassword: ReturnType<typeof vi.fn>;

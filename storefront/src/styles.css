@@ -30,6 +30,14 @@
   font-weight: 700;
 }
 
+@font-face {
+  font-family: "Geist";
+  src: url("../../auth/public/fonts/geist-variable.woff") format("woff");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
 :root {
   color-scheme: light;
   --page: #ffffff;
@@ -274,7 +282,7 @@ textarea {
 
 .button-primary {
   background: var(--ink);
-  color: #f7f8fa;
+  color: var(--page);
   box-shadow: 0 8px 22px rgba(17, 19, 24, 0.14);
 }
 
@@ -312,9 +320,10 @@ textarea {
   width: 46px;
   height: 46px;
   place-items: center;
-  border: 1px solid var(--line);
+  border: 1px solid var(--ink);
   border-radius: 50%;
-  background: rgba(253, 253, 253, 0.82);
+  background: var(--page);
+  color: var(--ink);
   cursor: pointer;
 }
 
@@ -363,20 +372,49 @@ textarea {
 
 .hero {
   position: relative;
+  isolation: isolate;
   min-height: 1260px;
   overflow: hidden;
   padding-top: 154px;
+  background: var(--page);
 }
 
 .hero-dots {
   position: absolute;
   inset: 60px 0 auto;
   height: 780px;
-  background:
-    linear-gradient(to bottom, rgba(248, 249, 251, 0.1), var(--page)),
-    url("/images/dot-background.png") center top / 1744px 692px no-repeat;
-  opacity: 0.94;
+  background: none;
+  opacity: 1;
   pointer-events: none;
+  -webkit-mask-image: url("/images/hero-dot-mask.png");
+  mask-image: url("/images/hero-dot-mask.png");
+  -webkit-mask-mode: luminance;
+  mask-mode: luminance;
+  -webkit-mask-position: 50% 50%;
+  mask-position: 50% 50%;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: 15px 15px;
+  mask-size: 15px 15px;
+}
+
+.hero-dots::before,
+.hero-dots::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.hero-dots::before {
+  background: linear-gradient(143deg, rgba(237, 241, 255, 0.69) 7%, #f4b5ff 64%);
+  -webkit-mask-image: linear-gradient(#000 0%, transparent 102%);
+  mask-image: linear-gradient(#000 0%, transparent 102%);
+}
+
+.hero-dots::after {
+  background: #adc6ff;
+  -webkit-mask-image: radial-gradient(50% 31% at 50% 30.9%, #000 0%, transparent 86.13%);
+  mask-image: radial-gradient(50% 31% at 50% 30.9%, #000 0%, transparent 86.13%);
 }
 
 .hero-copy {
@@ -392,26 +430,15 @@ textarea {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
-  gap: 8px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  padding: 4px 13px 4px 5px;
+  padding: 6px 16px;
   background: rgba(253, 253, 253, 0.72);
   color: #414750;
   font-size: 14px;
   font-weight: 540;
   box-shadow: 0 4px 15px rgba(30, 44, 72, 0.05);
   backdrop-filter: blur(12px);
-}
-
-.hero-eyebrow > span {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #f7f8fa;
 }
 
 .hero h1 {
@@ -2166,7 +2193,8 @@ textarea {
   font-size: 12px;
 }
 
-@media (min-width: 1081px) {
+/* Match TikHub's lg breakpoint: desktop layout starts at 1024px. */
+@media (min-width: 1024px) {
   .site-header {
     position: fixed;
     top: 0;
@@ -2221,10 +2249,9 @@ textarea {
   }
 
   .hero {
-    isolation: isolate;
     min-height: 1444px;
     padding-top: 160px;
-    background: #fff;
+    background: var(--page);
   }
 
   .hero::before,
@@ -2262,37 +2289,6 @@ textarea {
     inset: 0 0 auto;
     z-index: 0;
     height: 1504px;
-    background: none;
-    opacity: 1;
-    -webkit-mask-image: url("/images/hero-dot-mask.png");
-    mask-image: url("/images/hero-dot-mask.png");
-    -webkit-mask-mode: luminance;
-    mask-mode: luminance;
-    -webkit-mask-position: 50% 50%;
-    mask-position: 50% 50%;
-    -webkit-mask-repeat: repeat;
-    mask-repeat: repeat;
-    -webkit-mask-size: 15px 15px;
-    mask-size: 15px 15px;
-  }
-
-  .hero-dots::before,
-  .hero-dots::after {
-    position: absolute;
-    inset: 0;
-    content: "";
-  }
-
-  .hero-dots::before {
-    background: linear-gradient(143deg, rgba(237, 241, 255, 0.69) 7%, #f4b5ff 64%);
-    -webkit-mask-image: linear-gradient(#000 0%, transparent 102%);
-    mask-image: linear-gradient(#000 0%, transparent 102%);
-  }
-
-  .hero-dots::after {
-    background: #adc6ff;
-    -webkit-mask-image: radial-gradient(50% 31% at 50% 30.9%, #000 0%, transparent 86.13%);
-    mask-image: radial-gradient(50% 31% at 50% 30.9%, #000 0%, transparent 86.13%);
   }
 
   .hero h1 {
@@ -2323,18 +2319,10 @@ textarea {
 
   .hero-eyebrow {
     min-height: 36px;
-    gap: 9px;
-    padding: 4px 12px 4px 4px;
+    padding: 6px 16px;
     background: rgba(255, 255, 255, 0.8);
     color: #2b2b2b;
     font-weight: 400;
-  }
-
-  .hero-eyebrow > span {
-    width: 30px;
-    height: 26px;
-    border-radius: 13px;
-    background: #2e6dff;
   }
 
   .hero-description-break {
@@ -3284,7 +3272,7 @@ textarea {
   }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1023px) {
   .nav-shell {
     grid-template-columns: 1fr auto;
   }
@@ -4264,7 +4252,7 @@ textarea {
   width: max-content;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1023px) {
   .feature-story {
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   }
@@ -4438,5 +4426,396 @@ textarea {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* TikHub homepage effect contract, adapted only to Musuw's existing shell. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0c0c10;
+  --surface: #151519;
+  --surface-soft: #19191f;
+  --surface-tint: #171923;
+  --ink: #f5f5f7;
+  --ink-soft: #b2b2bc;
+  --ink-faint: #81818d;
+  --line: #2a2a32;
+  --line-strong: #3a3a44;
+  --accent: #818cf8;
+  --accent-dark: #a78bfa;
+  --accent-soft: rgba(99, 102, 241, 0.18);
+  --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.28);
+  --shadow-float: 0 30px 80px rgba(0, 0, 0, 0.42);
+}
+
+.theme-toggle {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
+  border-radius: 50%;
+  padding: 0;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.theme-toggle:hover {
+  border-color: color-mix(in srgb, var(--ink) 24%, var(--line));
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.hero-liquid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.hero-liquid .auth-liquid-ether {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.hero-dots {
+  z-index: 1;
+}
+
+.hero-typewriter {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.hero-typewriter-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: currentColor;
+  vertical-align: middle;
+  animation: hero-typewriter-cursor 1s steps(2, jump-none) infinite;
+}
+
+@keyframes hero-typewriter-cursor {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.hero-focus-line {
+  display: inline-flex;
+  min-height: 1.08em;
+  color: color-mix(in oklab, #6366f1 70%, transparent);
+}
+
+.hero-true-focus {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  user-select: none;
+}
+
+.hero-true-focus-segment {
+  display: inline-flex;
+}
+
+.hero-true-focus-word {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.hero-true-focus-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.hero-true-focus-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.hero-true-focus-corner-top-left {
+  top: -8px;
+  left: -8px;
+  border-top: 2.5px solid;
+  border-left: 2.5px solid;
+}
+
+.hero-true-focus-corner-top-right {
+  top: -8px;
+  right: -8px;
+  border-top: 2.5px solid;
+  border-right: 2.5px solid;
+}
+
+.hero-true-focus-corner-bottom-left {
+  bottom: -8px;
+  left: -8px;
+  border-bottom: 2.5px solid;
+  border-left: 2.5px solid;
+}
+
+.hero-true-focus-corner-bottom-right {
+  right: -8px;
+  bottom: -8px;
+  border-right: 2.5px solid;
+  border-bottom: 2.5px solid;
+}
+
+html[data-theme="dark"] .site-header {
+  background: linear-gradient(180deg, rgba(12, 12, 16, 0.88) 0%, rgba(12, 12, 16, 0) 100%);
+}
+
+html[data-theme="dark"] .brand-mark img {
+  filter: invert(1);
+}
+
+html[data-theme="dark"] .button-primary:hover {
+  background: #dedee5;
+}
+
+html[data-theme="dark"] .desktop-nav,
+html[data-theme="dark"] .hero-description {
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .lang-select,
+html[data-theme="dark"] .hero-eyebrow {
+  border-color: var(--line-strong);
+  background: rgba(21, 21, 25, 0.76);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .lang-select:hover {
+  background: var(--surface-soft);
+  border-color: #555560;
+}
+
+html[data-theme="dark"] .hero {
+  background: var(--page);
+}
+
+.hero-copy {
+  font-family: "Geist", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+.hero h1 {
+  max-width: 56rem;
+  color: #1a1a1a;
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.hero-description {
+  color: #6b7280;
+}
+
+@media (min-width: 48rem) {
+  .hero h1 {
+    font-size: 48px;
+  }
+}
+
+@media (min-width: 64rem) {
+  .hero h1 {
+    font-size: 64px;
+  }
+}
+
+html[data-theme="dark"] .hero h1 {
+  color: #f2f2f0;
+}
+
+html[data-theme="dark"] .hero-description {
+  color: #9ca3af;
+}
+
+html[data-theme="dark"] .hero-focus-line {
+  color: color-mix(in oklab, #818cf8 70%, transparent);
+}
+
+html[data-theme="dark"] .hero::before,
+html[data-theme="dark"] .hero::after {
+  opacity: 0;
+}
+
+html[data-theme="dark"] .hero-dots::before {
+  background: linear-gradient(143deg, rgba(59, 67, 108, 0.5) 7%, rgba(99, 102, 241, 0.5) 64%);
+}
+
+html[data-theme="dark"] .hero-dots {
+  opacity: 0.24;
+}
+
+html[data-theme="dark"] .hero-dots::after {
+  background: #4759a8;
+  opacity: 0.62;
+}
+
+html[data-theme="dark"] .site-footer {
+  border-color: var(--line);
+  background: var(--page);
+}
+
+@media (max-width: 767px) {
+  .hero h1 br {
+    display: block;
+  }
+
+  .hero-true-focus {
+    gap: 0.18em;
+  }
+
+}
+
+/* Preserve the source liquid colors and opacity above Musuw's local dot field. */
+.hero-liquid {
+  z-index: 1;
+  opacity: 0.45;
+}
+
+.hero-dots {
+  z-index: 0;
+}
+
+.hero-eyebrow {
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 16px;
+  border-color: color-mix(in srgb, var(--line) 40%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: #6366f1;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.hero-eyebrow::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 6px;
+  background: currentColor;
+  animation: hero-eyebrow-pulse 2s ease-in-out infinite;
+  content: "";
+}
+
+.hero-typewriter-cursor {
+  animation-duration: 2s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes hero-eyebrow-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+html[data-theme="dark"] .hero-liquid {
+  opacity: 0.45;
+}
+
+html[data-theme="dark"] .hero-dots {
+  opacity: 0.5;
+}
+
+html[data-theme="dark"] .hero-dots::before {
+  background: linear-gradient(143deg, rgba(72, 84, 148, 0.68) 7%, rgba(113, 107, 255, 0.72) 64%);
+}
+
+html[data-theme="dark"] .hero-dots::after {
+  background: #6574d8;
+  opacity: 0.72;
+}
+
+html[data-theme="dark"] .hero-eyebrow {
+  border-color: rgba(38, 38, 46, 0.4);
+  background: rgba(23, 23, 29, 0.7);
+  color: #818cf8;
+  box-shadow: none;
+}
+
+/* Keep the mobile navigation on the same dark surface as the page.  These
+   controls are only rendered below the 1024px desktop breakpoint. */
+html[data-theme="dark"] .menu-button {
+  border-color: var(--ink);
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .mobile-nav {
+  border-color: var(--line-strong);
+  background: var(--page);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .menu-button:hover,
+html[data-theme="dark"] .menu-button:focus-visible {
+  border-color: #fff;
+  background: var(--page);
+}
+
+html[data-theme="dark"] .mobile-nav > a:not(.button):hover {
+  background: var(--surface-soft);
+}
+
+/* Keep the reference card's colored pinpoints in both themes so the product
+   preview remains separated from its surrounding surface. */
+.final-cta-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse 46% 70% at 13% 18%, rgba(109, 124, 255, 0.16), transparent 68%),
+    radial-gradient(ellipse 38% 64% at 76% 4%, rgba(225, 112, 212, 0.12), transparent 72%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  content: "";
+}
+
+.final-cta-copy,
+.final-cta-visual {
+  z-index: 2;
+}
+
+html[data-theme="dark"] .final-cta-card::before {
+  background:
+    radial-gradient(ellipse 48% 76% at 12% 16%, rgba(101, 116, 216, 0.25), transparent 68%),
+    radial-gradient(ellipse 40% 70% at 78% 2%, rgba(156, 91, 194, 0.16), transparent 72%);
+  mix-blend-mode: screen;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-eyebrow::before,
+  .hero-typewriter-cursor {
+    animation: none;
   }
 }

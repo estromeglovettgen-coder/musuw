@@ -6,17 +6,24 @@ import {
   useSpring,
   useTransform
 } from "motion/react";
-import { useRef } from "react";
-import { Sparkle } from "@phosphor-icons/react/Sparkle";
+import { lazy, Suspense, useRef } from "react";
 import { ButtonLink } from "./SiteChrome";
 import { HeroProductDemo } from "./HeroProductDemo";
+import { TrueFocus, Typewriter } from "./TikHubHeroEffects";
 import { APP_LOGIN_URL } from "../productHandoff";
 import {
   sampleHeroVisibility
 } from "./heroMotion";
 
+// Reuse the already-vendored source implementation shared with the auth shell.
+// It is loaded only on the client so the homepage keeps TikHub's lazy WebGL path.
+const LiquidEther = lazy(() => import("../../../auth/src/LiquidEther.tsx"));
+const HERO_LIQUID_COLORS = ["#6366F1", "#818CF8", "#A78BFA"];
+
 export function HeroScene({ copy, locale }) {
   const reduceMotion = useReducedMotion();
+  const typewriterPhrases = copy.hero.typewriterPhrases || [copy.hero.eyebrow];
+  const focusSegments = copy.hero.titleFocusSegments || [copy.hero.titleLine2];
   const sceneRef = useRef(null);
   const { scrollYProgress: sceneVisibilityProgress } = useScroll({
     target: sceneRef,
@@ -73,6 +80,30 @@ export function HeroScene({ copy, locale }) {
 
   return (
     <section className="hero" id="hero">
+      {!reduceMotion ? (
+        <div className="hero-liquid" aria-hidden="true">
+          <Suspense fallback={null}>
+            <LiquidEther
+              colors={HERO_LIQUID_COLORS}
+              mouseForce={8}
+              cursorSize={80}
+              isViscous
+              viscous={60}
+              iterationsViscous={32}
+              iterationsPoisson={32}
+              resolution={0.5}
+              isBounce={false}
+              autoDemo
+              autoSpeed={0.3}
+              autoIntensity={0.6}
+              takeoverDuration={0.25}
+              autoResumeDelay={5000}
+              autoRampDuration={0.6}
+              style={{ width: "100%", height: "100%" }}
+            />
+          </Suspense>
+        </div>
+      ) : null}
       <div className="hero-dots" aria-hidden="true" />
       <div className="container hero-copy">
         <motion.div
@@ -81,20 +112,40 @@ export function HeroScene({ copy, locale }) {
           animate={{ opacity: 1, y: 0 }}
           transition={bkpwddTransition}
         >
-          <span>
-            <Sparkle size={15} weight="fill" />
-          </span>
-          {copy.hero.eyebrow}
+          {reduceMotion ? (
+            typewriterPhrases[0]
+          ) : (
+            <Typewriter
+              phrases={typewriterPhrases}
+              typingSpeed={50}
+              deletingSpeed={35}
+              pauseDuration={2000}
+            />
+          )}
         </motion.div>
         <motion.h1
+          aria-label={`${copy.hero.titleLine1} ${copy.hero.titleLine2}`}
           initial={reduceMotion ? false : { opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={bkpwddTransition}
         >
           {copy.hero.titleLine1}
           <br />
-          {" "}
-          {copy.hero.titleLine2}
+          <span className="hero-focus-line" aria-hidden="true">
+            {reduceMotion ? (
+              copy.hero.titleLine2
+            ) : (
+              <TrueFocus
+                sentence={focusSegments.join(" ")}
+                manualMode={false}
+                blurAmount={4}
+                borderColor="#6366F1"
+                glowColor="rgba(99, 102, 241, 0.4)"
+                animationDuration={0.5}
+                pauseBetweenAnimations={1.2}
+              />
+            )}
+          </span>
         </motion.h1>
         <motion.p
           className="hero-description"

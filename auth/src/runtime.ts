@@ -120,6 +120,7 @@ type RuntimeOptions = Readonly<{
   config: AuthConfig;
   createIdentityClient: (config: AuthConfig) => IdentityClient;
   fetch?: typeof globalThis.fetch;
+  localMusuwPasswordAuth?: boolean;
   location?: LocationLike;
   nativeStorage: SessionStorageLike;
   nextFlowId?: () => string;
@@ -208,6 +209,7 @@ export type AuthStartView =
 
 const callbackPath = "/api/v1/auth/oidc/callback";
 const oidcURLPath = "/api/v1/auth/oidc/url";
+const localMusuwLoginPath = "/api/v1/auth/login";
 const nativeSessionPath = "/api/v1/auth/me";
 const flowKey = "musnow.auth.flow";
 const recoveryMarkerKey = "musnow.auth.password-recovery";
@@ -218,6 +220,22 @@ const nativeTokenKey = "weknora_token";
 const nativeRefreshTokenKey = "weknora_refresh_token";
 const maximumFlowAgeMs = AUTH_FLOW_TTL_MS;
 const defaultRequestTimeoutMs = 30_000;
+
+export function isLocalMusuwAuthEnabled(
+  isDevelopment: boolean,
+  flag: unknown,
+  hostname: string,
+): boolean {
+  const normalizedHost = hostname.trim().toLowerCase();
+  return (
+    isDevelopment &&
+    flag === "true" &&
+    (normalizedHost === "localhost" ||
+      normalizedHost === "127.0.0.1" ||
+      normalizedHost === "::1" ||
+      normalizedHost === "[::1]")
+  );
+}
 
 function localWorkspaceURL(path: string, origin: string): string {
   const root = new URL("/", origin);
@@ -643,6 +661,53 @@ export function createAuthRuntime(options: RuntimeOptions) {
     options.nativeStorage.removeItem(nativeRefreshTokenKey);
   };
 
+  const signInToLocalMusuw = async (
+    email: string,
+    password: string,
+  ): Promise<IdentityCompletionView> => {
+    try {
+      const endpoint = new URL(localMusuwLoginPath, location.origin);
+      const response = await withinRequestDeadline(
+        fetchImpl(endpoint.toString(), {
+          body: JSON.stringify({ email, password }),
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      if (response.status === 401 || response.status === 403) {
+        return identityError("invalid_credentials");
+      }
+      if (response.status === 429) return identityError("rate_limited");
+      if (!response.ok) return identityError("unavailable");
+
+      const payload: unknown = await withinRequestDeadline(response.json());
+      const token = isObject(payload) ? exactString(payload["token"], 16_384) : null;
+      const refreshToken = isObject(payload)
+        ? exactString(payload["refresh_token"], 16_384)
+        : null;
+      if (!isObject(payload) || payload["success"] !== true || token === null || refreshToken === null) {
+        return identityError("unavailable");
+      }
+
+      try {
+        options.nativeStorage.setItem(nativeRefreshTokenKey, refreshToken);
+        options.nativeStorage.setItem(nativeTokenKey, token);
+      } catch {
+        clearNativeSession();
+        return identityError("unavailable");
+      }
+      clearContinuation();
+      location.assign(localWorkspaceURL("/", location.origin));
+      return { state: "identity_complete" };
+    } catch {
+      return identityError("unavailable");
+    }
+  };
+
   const nativeSessionState = async (): Promise<"active" | "absent" | "invalid" | "unavailable"> => {
     const rawToken = options.nativeStorage.getItem(nativeTokenKey);
     const token = exactString(rawToken, 16_384);
@@ -740,6 +805,10 @@ export function createAuthRuntime(options: RuntimeOptions) {
         }
         if (nativeSession === "unavailable") {
           return { code: "native_session_unavailable", state: "start_error" };
+        }
+
+        if (options.localMusuwPasswordAuth === true) {
+          return { state: "start_login_required" };
         }
 
         if (await currentIdentitySession() === null) {
@@ -904,6 +973,9 @@ export function createAuthRuntime(options: RuntimeOptions) {
       const email = normalizeEmailAddress(emailInput);
       if (email === null) return identityError("email_invalid");
       if (password === "") return identityError("password_invalid");
+      if (options.localMusuwPasswordAuth === true) {
+        return signInToLocalMusuw(email, password);
+      }
       try {
         const result = await withinRequestDeadline(
           identity().signInWithPassword({ email, password }),

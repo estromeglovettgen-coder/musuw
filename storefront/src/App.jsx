@@ -14,6 +14,7 @@ import {
   openGraphLocale,
   structuredDataText,
 } from "./seoMetadata.js";
+import { applyTheme, getInitialTheme } from "./theme.js";
 
 function setMeta(attribute, key, content) {
   let element = document.querySelector(`meta[${attribute}="${key}"]`);
@@ -27,6 +28,7 @@ function setMeta(attribute, key, content) {
 
 export default function App() {
   const [locale, setLocale] = useState(() => getInitialLocale());
+  const [theme, setTheme] = useState(() => getInitialTheme());
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
   const pricingCurrency = selectPricingCurrency(getInitialPricingCountry(), copy.pricing.currencyCode);
   const homeMeta = useMemo(
@@ -42,6 +44,14 @@ export default function App() {
     setLocale(normalized);
     persistLocalePreference(normalized);
   }, []);
+
+  const handleThemeToggle = useCallback(() => {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }, []);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     const meta = publicDocument
@@ -126,6 +136,8 @@ export default function App() {
         copy={copy}
         locale={locale}
         onLocaleChange={handleLocaleChange}
+        theme={theme}
+        onThemeToggle={handleThemeToggle}
         pricingCurrency={pricingCurrency}
       />
     </div>

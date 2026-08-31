@@ -670,23 +670,12 @@ export default function LiquidEther({
       }
       update(...args: any[]) {
         const props = args[0] || {};
-        const forceX = (Mouse.diff.x / 2) * (props.mouse_force || 0);
-        const forceY = (Mouse.diff.y / 2) * (props.mouse_force || 0);
-        const cellScale = props.cellScale || { x: 1, y: 1 };
+        const forceX = Mouse.diff.x * (props.mouse_force || 0);
+        const forceY = Mouse.diff.y * (props.mouse_force || 0);
         const cursorSize = props.cursor_size || 0;
-        const cursorSizeX = cursorSize * cellScale.x;
-        const cursorSizeY = cursorSize * cellScale.y;
-        const centerX = Math.min(
-          Math.max(Mouse.coords.x, -1 + cursorSizeX + cellScale.x * 2),
-          1 - cursorSizeX - cellScale.x * 2
-        );
-        const centerY = Math.min(
-          Math.max(Mouse.coords.y, -1 + cursorSizeY + cellScale.y * 2),
-          1 - cursorSizeY - cellScale.y * 2
-        );
         const uniforms = (this.mouse.material as THREE.RawShaderMaterial).uniforms;
         uniforms.force.value.set(forceX, forceY);
-        uniforms.center.value.set(centerX, centerY);
+        uniforms.center.value.set(Mouse.coords.x, Mouse.coords.y);
         uniforms.scale.value.set(cursorSize, cursorSize);
         super.update();
       }
@@ -1014,7 +1003,7 @@ export default function LiquidEther({
       props: any;
       output!: Output;
       autoDriver?: AutoDriver;
-      lastUserInteraction = performance.now();
+      lastUserInteraction = 0;
       running = false;
       private _loop = this.loop.bind(this);
       private _resize = this.resize.bind(this);
@@ -1060,6 +1049,7 @@ export default function LiquidEther({
         if (this.autoDriver) this.autoDriver.update();
         Mouse.update();
         Common.update();
+        Common.renderer?.clear();
         this.output.update();
       }
       loop() {

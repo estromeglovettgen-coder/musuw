@@ -28,3 +28,24 @@ command.
 
 See [`SOURCE_PROVENANCE.md`](SOURCE_PROVENANCE.md) for the retained source
 record.
+
+## Responsive visual contract
+
+The Storefront uses one Hero background contract at every viewport width:
+
+- desktop layout begins at `1024px`; widths at or below `1023px` use the compact
+  navigation and responsive Hero layout;
+- `.hero` owns the theme background (`--page`), so dark mode remains `#0c0c10`
+  and light mode remains white;
+- `.hero-dots` uses the transparent `hero-dot-mask.png` pattern at every
+  breakpoint. The legacy light `dot-background.png` raster must never be
+  composited over the dark Hero;
+- `.hero-liquid` is the only full-surface animated color layer. Its renderer
+  stays transparent (`alpha`, transparent material, and no depth write), while
+  its source colors, pointer force, and motion amplitude remain unchanged;
+- content stays above both decorative layers and must remain readable in both
+  themes.
+
+This separation is intentional. Do not reintroduce breakpoint-specific Hero
+background images or append another override block to repair a single width;
+change the shared contract instead.

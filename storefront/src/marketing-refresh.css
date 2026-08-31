@@ -475,3 +475,329 @@
     padding: 12px;
   }
 }
+
+/* Home-page dark palette. Structure and spacing stay unchanged. */
+html[data-theme="dark"] .platform-section,
+html[data-theme="dark"] .comparison-section {
+  border-color: var(--line);
+  background: #101014;
+}
+
+html[data-theme="dark"] :is(
+  .platform-card,
+  .feature-story,
+  .feature-visual,
+  .pricing-card,
+  .comparison-panel,
+  .comparison-feature-row,
+  .final-cta-card
+) {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 14px 40px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="dark"] :is(
+  .platform-card > span,
+  .feature-icon,
+  .billing-toggle,
+  .comparison-plan-header,
+  .comparison-feature-cell
+) {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+
+html[data-theme="dark"] :is(
+  .platform-card h3,
+  .feature-copy h3,
+  .pricing-heading h2,
+  .pricing-card h3,
+  .plan-price,
+  .plan-includes,
+  .comparison-intro h2,
+  .comparison-feature-name,
+  .comparison-value,
+  .faq-intro h2,
+  .faq-item > button,
+  .final-cta h2
+) {
+  color: var(--ink);
+}
+
+html[data-theme="dark"] :is(
+  .platform-card p,
+  .feature-copy > p:not(.feature-label),
+  .pricing-heading p,
+  .plan-description,
+  .comparison-intro p,
+  .comparison-feature-cell,
+  .comparison-mobile-plan,
+  .faq-intro > p:last-child,
+  .faq-answer p,
+  .final-cta p
+) {
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .billing-toggle button.active {
+  background: #292931;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .plan-recommended {
+  background: #2b2b33;
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .pricing-card li,
+html[data-theme="dark"] .pricing-card li svg {
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .comparison-eyebrow {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .comparison-plan-header,
+html[data-theme="dark"] .comparison-feature-row,
+html[data-theme="dark"] .comparison-feature-name {
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .comparison-feature-row:hover {
+  background: #1b1b21;
+}
+
+html[data-theme="dark"] .comparison-plan-chip,
+html[data-theme="dark"] .comparison-value-text {
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .comparison-plan-chip[data-featured="true"] {
+  background: var(--ink);
+  color: var(--page);
+}
+
+html[data-theme="dark"] .button-secondary,
+html[data-theme="dark"] .pricing-button.button-secondary {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+@media (max-width: 767px) {
+  html[data-theme="dark"] .comparison-feature-row:hover {
+    background: var(--surface);
+  }
+
+  html[data-theme="dark"] .comparison-feature-cell[data-featured="true"] {
+    border-color: rgba(129, 140, 248, 0.3);
+    background: rgba(99, 102, 241, 0.13);
+  }
+}
+
+/* One theme contract for the complete homepage: white/black, then black/white. */
+html,
+body,
+#root,
+main,
+.relative {
+  background: var(--page);
+  color: var(--ink);
+}
+
+html[data-theme] :is(
+  .features-section,
+  .platform-section,
+  .pricing-section,
+  .comparison-section,
+  .faq-section,
+  .final-cta,
+  .site-footer
+) {
+  background: var(--page);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .dashboard-scene {
+  background: rgba(21, 21, 25, 0.78);
+  mix-blend-mode: normal;
+}
+
+html[data-theme="dark"] .dashboard-scene::after {
+  border-color: var(--ink);
+}
+
+html[data-theme="dark"] .dashboard-frame::after {
+  border-color: var(--line);
+}
+
+/* The embedded product preview is monochrome, so a direct inverse is the
+   smallest faithful dark-mode equivalent of the original light preview. */
+html[data-theme="dark"] .hero-product-demo {
+  filter: grayscale(1) invert(1);
+}
+
+html[data-theme="dark"] :is(
+  .feature-visual img,
+  .final-cta-bg,
+  .final-cta-dashboard-frame img
+) {
+  filter: grayscale(1) invert(1);
+}
+
+/* Header controls keep the same outlined construction in both themes. */
+.site-header :is(
+  .theme-toggle,
+  .lang-select,
+  .nav-actions > .button
+) {
+  border-color: var(--ink);
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.site-header :is(
+  .theme-toggle,
+  .lang-select,
+  .nav-actions > .button
+):hover {
+  border-color: var(--ink);
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .button-primary {
+  border-color: var(--ink);
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .button-primary:hover {
+  border-color: var(--ink);
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .feature-bullets {
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .feature-bullets li {
+  border-color: var(--line-strong);
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] :is(
+  .faq-list,
+  .faq-item
+) {
+  border-color: var(--line-strong);
+}
+
+html[data-theme="dark"] .final-cta-dashboard-frame {
+  border-color: var(--ink);
+}
+
+/* Decorative section pills were removed from the active homepage. Reclaim
+   their space without changing the information hierarchy or real controls. */
+.section-intro h2,
+.faq-intro h2,
+.feature-copy h3 {
+  margin-top: 0;
+}
+
+.section-intro .section-body {
+  margin-top: 14px;
+}
+
+.feature-stack {
+  margin-top: clamp(36px, 4vw, 56px);
+}
+
+.platform-grid {
+  margin-top: clamp(36px, 4vw, 52px);
+}
+
+.faq-list {
+  margin-top: clamp(42px, 5vw, 56px);
+}
+
+html[data-theme="dark"] :is(
+  .section-body,
+  .footer-group a
+) {
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .footer-bottom {
+  color: var(--ink-faint);
+}
+
+@media (max-width: 767px) {
+  .feature-stack,
+  .platform-grid,
+  .faq-list {
+    margin-top: 36px;
+  }
+}
+
+/* Functional marks stay monochrome in both themes. The animated hero keeps
+   its own visual palette; checks, FAQ controls, and platform glyphs do not. */
+.feature-bullets svg,
+.platform-card > span,
+.pricing-card li svg,
+.comparison-included,
+.faq-item > button svg,
+.faq-item.open > button,
+.faq-item.open > button svg {
+  color: var(--ink);
+}
+
+.comparison-not-included {
+  color: var(--ink-faint);
+}
+
+/* Give the screenshot-led stories more room without changing their type
+   scale. Copy remains readable while the product capture becomes dominant. */
+@media (min-width: 1081px) {
+  .features-section > .container {
+    width: min(calc(100% - 48px), 1460px);
+  }
+
+  .feature-stack {
+    width: min(100%, 1400px);
+    max-width: 1400px;
+    gap: clamp(36px, 4vw, 64px);
+  }
+
+  .feature-story {
+    max-width: 1400px;
+    min-height: clamp(560px, 42vw, 660px);
+    grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.28fr);
+    gap: clamp(36px, 3vw, 52px);
+    padding: clamp(44px, 4vw, 64px);
+  }
+
+  .feature-story-reverse {
+    grid-template-columns: minmax(0, 1.28fr) minmax(360px, 0.72fr);
+  }
+
+  .feature-visual {
+    max-height: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .comparison-feature-cell[data-featured="true"],
+  html[data-theme="dark"] .comparison-feature-cell[data-featured="true"] {
+    border-color: var(--line-strong);
+    background: var(--surface-soft);
+  }
+}

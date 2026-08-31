@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight } from "@phosphor-icons/react/ArrowUpRight";
 import { List } from "@phosphor-icons/react/List";
+import { Moon } from "@phosphor-icons/react/Moon";
+import { Sun } from "@phosphor-icons/react/Sun";
 import { X } from "@phosphor-icons/react/X";
 import { getStorefrontCopy } from "../i18n";
 import {
@@ -125,6 +127,8 @@ export function SiteHeader({
   navigation = MARKETING_NAVIGATION,
   locale,
   onLocaleChange,
+  theme = "light",
+  onThemeToggle,
 }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
@@ -133,6 +137,15 @@ export function SiteHeader({
   const reduceMotion = useReducedMotion();
   const labels = publicNavigationLabels(copy);
   const currentLocale = locale || (copy?.pricing?.currencyCode === "CNY" ? "zh-CN" : "en");
+  const isZh = currentLocale === "zh-CN" || currentLocale === "zh";
+  const isDark = theme === "dark";
+  const themeLabel = isDark
+    ? isZh
+      ? "切换到浅色模式"
+      : "Switch to light mode"
+    : isZh
+      ? "切换到深色模式"
+      : "Switch to dark mode";
 
   useEffect(() => {
     let mounted = true;
@@ -152,7 +165,7 @@ export function SiteHeader({
 
   useEffect(() => {
     if (!open) return undefined;
-    const desktopQuery = window.matchMedia("(min-width: 1081px)");
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
     const closeAtDesktop = (event) => {
       if (event.matches) setOpen(false);
     };
@@ -188,6 +201,15 @@ export function SiteHeader({
           ))}
         </nav>
         <div className="nav-actions">
+          <button
+            type="button"
+            className="theme-toggle"
+            aria-label={themeLabel}
+            title={themeLabel}
+            onClick={onThemeToggle}
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <LanguageSwitcher locale={currentLocale} onLocaleChange={onLocaleChange} />
           <ProductEntryLinks authenticated={authenticated} copy={copy} />
           <button

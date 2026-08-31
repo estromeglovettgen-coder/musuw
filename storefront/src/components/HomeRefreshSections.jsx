@@ -59,8 +59,6 @@ export function PlatformSection({ copy }) {
       <div className="container">
         <Reveal>
           <SectionIntro
-            label={copy.platform.intro.label}
-            icon={Stack}
             title={copy.platform.intro.title}
             body={copy.platform.intro.body}
           />

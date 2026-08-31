@@ -177,6 +177,8 @@ load_host_environment() {
   export LOCAL_STORAGE_BASE_DIR="$runtime_dir/host-files"
   export VITE_DEV_PROXY_TARGET="http://127.0.0.1:${MUSUW_DEV_BACKEND_PORT}"
   export VITE_AUTH_DEV_TARGET="http://127.0.0.1:${MUSUW_DEV_AUTH_PORT}"
+  export MUSUW_DEV_LOCAL_AUTH=true
+  export VITE_MUSUW_DEV_LOCAL_AUTH=true
   # The container candidate pins openrouter.ai to a freshly resolved public IP.
   # Host development cannot use Compose extra_hosts, so trust only that same
   # fixed platform endpoint through WeKnora's native SSRF whitelist. This also

@@ -5,8 +5,6 @@ import { CheckCircle } from "@phosphor-icons/react/CheckCircle";
 import { ClipboardText } from "@phosphor-icons/react/ClipboardText";
 import { Minus } from "@phosphor-icons/react/Minus";
 import { Plus } from "@phosphor-icons/react/Plus";
-import { Question } from "@phosphor-icons/react/Question";
-import { SealCheck } from "@phosphor-icons/react/SealCheck";
 import { SquaresFour } from "@phosphor-icons/react/SquaresFour";
 import { Star } from "@phosphor-icons/react/Star";
 import {
@@ -82,18 +80,11 @@ export function CustomerStrip({ copy }) {
 }
 
 function FeatureStory({ feature, index }) {
-  const Icon = feature.icon;
   const reverse = index % 2 === 1;
 
   return (
     <Reveal className={`feature-story ${reverse ? "feature-story-reverse" : ""}`} amount={0.16}>
       <div className="feature-copy">
-        <p className="feature-label">
-          <span className="feature-icon">
-            <Icon size={15} weight="bold" />
-          </span>
-          {feature.label}
-        </p>
         <h3>{feature.title}</h3>
         <p>{feature.description}</p>
         <ul className="feature-bullets">
@@ -130,8 +121,6 @@ export function FeaturesSection({ copy }) {
       <div className="container">
         <Reveal>
           <SectionIntro
-            label={copy.features.intro.label}
-            icon={SealCheck}
             title={copy.features.intro.title}
             body={copy.features.intro.body}
           />
@@ -597,12 +586,6 @@ export function FAQSection({ copy }) {
     <section className="section faq-section" id="faq">
       <div className="container faq-layout">
         <Reveal className="faq-intro">
-          <p className="section-label">
-            <span className="section-label-icon" aria-hidden="true">
-              <Question size={20} weight="regular" />
-            </span>
-            {copy.faq.label}
-          </p>
           <h2>{copy.faq.title}</h2>
           <p>{copy.faq.body}</p>
         </Reveal>

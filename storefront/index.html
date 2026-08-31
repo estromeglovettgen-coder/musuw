@@ -7,7 +7,7 @@
       name="description"
       content="Capture documents, webpages, and video, reason with agents, and organize what matters into a connected Wiki and knowledge graph."
     />
-    <meta name="theme-color" content="#f8f9fb" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="robots" content="index,follow" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="musuw" />
@@ -38,6 +38,21 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=20260822" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260822" />
     <link rel="manifest" href="/site.webmanifest?v=20260822" />
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("musuw-theme");
+          const isDark = savedTheme
+            ? savedTheme === "dark"
+            : matchMedia("(prefers-color-scheme: dark)").matches;
+          const theme = isDark ? "dark" : "light";
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
     <script id="musuw-structured-data" type="application/ld+json">
       {
         "@context": "https://schema.org",

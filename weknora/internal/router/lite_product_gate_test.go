@@ -162,6 +162,46 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 	}
 }
 
+func TestLiteProductGateLocalMusuwLoginBoundary(t *testing.T) {
+	originalEdition := handler.Edition
+	handler.Edition = "lite"
+	t.Cleanup(func() { handler.Edition = originalEdition })
+
+	router := gin.New()
+	router.Use(liteProductGate())
+	router.POST("/api/v1/auth/login", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	tests := []struct {
+		name       string
+		enabled    string
+		host       string
+		remoteAddr string
+		serverHost string
+		want       int
+	}{
+		{name: "switch disabled", enabled: "false", host: "localhost:4190", remoteAddr: "127.0.0.1:41000", serverHost: "127.0.0.1", want: http.StatusNotFound},
+		{name: "local Musuw request", enabled: "true", host: "localhost:4190", remoteAddr: "127.0.0.1:41000", serverHost: "127.0.0.1", want: http.StatusNoContent},
+		{name: "remote address remains blocked", enabled: "true", host: "localhost:4190", remoteAddr: "203.0.113.8:41000", serverHost: "127.0.0.1", want: http.StatusNotFound},
+		{name: "hosted origin remains blocked", enabled: "true", host: "app.musuw.com", remoteAddr: "127.0.0.1:41000", serverHost: "127.0.0.1", want: http.StatusNotFound},
+		{name: "hosted server binding remains blocked", enabled: "true", host: "localhost:4190", remoteAddr: "127.0.0.1:41000", serverHost: "0.0.0.0", want: http.StatusNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MUSUW_DEV_LOCAL_AUTH", tt.enabled)
+			t.Setenv("SERVER_HOST", tt.serverHost)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+			req.Host = tt.host
+			req.RemoteAddr = tt.remoteAddr
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+			if recorder.Code != tt.want {
+				t.Fatalf("status = %d, want %d (body=%s)", recorder.Code, tt.want, recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestLiteTemporaryAttachmentRequestBlocked(t *testing.T) {
 	t.Parallel()
 

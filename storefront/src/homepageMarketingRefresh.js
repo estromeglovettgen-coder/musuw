@@ -37,14 +37,23 @@ const MARKETING_COPY = Object.freeze({
   en: Object.freeze({
     navLabels: Object.freeze(["Features", "Platform", "Pricing", "Security", "Contact"]),
     meta: Object.freeze({
-      title: "musuw | Turn scattered documents into intelligent knowledge assets",
+      title: "musuw | Turn source material into intelligent knowledge assets",
       description:
         "Capture documents webpages and video reason with agents and organize what matters into a connected Wiki and knowledge graph",
     }),
     hero: Object.freeze({
       eyebrow: "RAG · Agents · Wiki",
-      titleLine1: "Turn scattered documents",
-      titleLine2: "into intelligent knowledge assets",
+      typewriterPhrases: Object.freeze([
+        "RAG · Agent · Wiki",
+        "Turn documents into a living Wiki",
+        "Retrieve precise cited answers",
+        "Let agents reason with evidence",
+        "Reveal hidden links in the graph",
+        "Keep knowledge evolving",
+      ]),
+      titleLine1: "Turn source material into",
+      titleLine2: "intelligent knowledge assets",
+      titleFocusSegments: Object.freeze(["intelligent", "knowledge", "assets"]),
       descriptionLine1: "RAG answers agent reasoning and a connected Wiki in one system",
       descriptionLine2:
         "Capture documents webpages and video work through complex tasks and keep every useful result as knowledge",
@@ -238,13 +247,22 @@ const MARKETING_COPY = Object.freeze({
   zh: Object.freeze({
     navLabels: Object.freeze(["功能", "平台", "定价", "安全", "联系"]),
     meta: Object.freeze({
-      title: "musuw｜把散落文档变成会思考的知识资产",
+      title: "musuw｜把资料转化为会思考的知识资产",
       description: "采集文档 网页与视频 通过 RAG 问答 Agent 推理和 Wiki 图谱 让知识真正参与工作",
     }),
     hero: Object.freeze({
       eyebrow: "RAG · Agent · Wiki",
-      titleLine1: "把散落文档",
-      titleLine2: "变成会思考的知识资产",
+      typewriterPhrases: Object.freeze([
+        "RAG · Agent · Wiki",
+        "文档自动长成 Wiki",
+        "检索每一个精确答案",
+        "Agent 带着证据推理",
+        "图谱连接隐藏关系",
+        "知识随使用持续进化",
+      ]),
+      titleLine1: "把资料转化为",
+      titleLine2: "会思考的知识资产",
+      titleFocusSegments: Object.freeze(["会", "思考的", "知识资产"]),
       descriptionLine1: "RAG 问答 Agent 推理与 Wiki 图谱一体化",
       descriptionLine2: "采集文档 网页与视频 完成复杂任务 并让每个有用结果继续沉淀为知识",
       getStarted: "免费开始",

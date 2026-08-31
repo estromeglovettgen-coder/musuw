@@ -89,5 +89,5 @@ and verification only and is not a production deployment path.
 
 Historical OpenSpec, verification, and handoff records document past decisions;
 they are not current runtime instructions. This README, the operator documents
-under [`docs/`](docs/), the checked-in release scripts, and the active source are
-the current authority.
+listed in [`docs/README.md`](docs/README.md), the checked-in release scripts,
+and the active source are the current authority.

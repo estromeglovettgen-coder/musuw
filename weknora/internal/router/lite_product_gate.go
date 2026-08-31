@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 
 const (
 	musuwProductEditionEnv    = "MUSUW_PRODUCT_EDITION"
+	musuwDevLocalAuthEnv      = "MUSUW_DEV_LOCAL_AUTH"
 	liteQuickAnswerAgentID    = "builtin-quick-answer"
 	liteSmartReasoningAgentID = "builtin-smart-reasoning"
 )
@@ -59,6 +61,38 @@ func serveLiteSystemInfo(c *gin.Context) {
 			"edition": handler.Edition,
 		},
 	})
+}
+
+func isLoopbackHost(raw string) bool {
+	host := strings.TrimSpace(raw)
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+		host = parsedHost
+	}
+	host = strings.Trim(strings.ToLower(host), "[]")
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func liteLocalMusuwLoginAllowed(c *gin.Context) bool {
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv(musuwDevLocalAuthEnv)), "true") ||
+		!isLoopbackHost(os.Getenv("SERVER_HOST")) ||
+		c.Request.Method != http.MethodPost || c.Request.URL.Path != "/api/v1/auth/login" {
+		return false
+	}
+
+	remoteHost, _, err := net.SplitHostPort(strings.TrimSpace(c.Request.RemoteAddr))
+	if err != nil {
+		remoteHost = strings.Trim(strings.TrimSpace(c.Request.RemoteAddr), "[]")
+	}
+	remoteIP := net.ParseIP(remoteHost)
+	if remoteIP == nil || !remoteIP.IsLoopback() {
+		return false
+	}
+
+	return isLoopbackHost(c.Request.Host)
 }
 
 func readAndRestoreRequestBody(c *gin.Context) ([]byte, error) {
@@ -232,6 +266,10 @@ func liteProductGate() gin.HandlerFunc {
 			return
 		}
 		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
+		}
+		if liteLocalMusuwLoginAllowed(c) {
 			c.Next()
 			return
 		}
