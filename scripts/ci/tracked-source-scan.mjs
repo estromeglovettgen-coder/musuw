@@ -109,6 +109,10 @@ function isWoff2(buffer) {
   return buffer.subarray(0, 4).toString("ascii") === "wOF2";
 }
 
+function isZip(buffer) {
+  return startsWithHex(buffer, "504b0304");
+}
+
 function isParquet(buffer) {
   return buffer.length >= 8 && buffer.subarray(0, 4).toString("ascii") === "PAR1" && buffer.subarray(-4).toString("ascii") === "PAR1";
 }
@@ -137,6 +141,7 @@ const allowedBinaryExtensions = new Map([
 // Keeping the exception path-specific prevents a newly misnamed binary from
 // silently widening the release boundary.
 const approvedSignatureExceptions = new Map([
+  ["auth/public/fonts/geist-variable.woff", isWoff2],
   ["storefront/public/images/musuw-data-control.png", isJpeg],
   ["storefront/public/images/musuw-dialogue.png", isJpeg],
   ["storefront/public/images/musuw-grounded-answer.png", isJpeg],
@@ -149,6 +154,7 @@ const approvedSignatureExceptions = new Map([
   ["weknora/docs/images/rbac-member-management.png", isJpeg],
   ["weknora/docs/images/rbac-pending-invitation.png", isJpeg],
   ["weknora/docs/images/rbac-workspace-switcher.png", isJpeg],
+  ["weknora/docreader/tests/fixtures/issue_2634_vertical_merge.docx", isZip],
   ["weknora/frontend/src/assets/img/datasource-yuque.ico", isPng],
 ]);
 

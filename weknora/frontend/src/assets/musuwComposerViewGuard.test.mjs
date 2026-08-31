@@ -30,10 +30,10 @@ test('model selector keeps the native filterable selection and emit contract und
     '@change="handleModelChange"',
     "value=\"__add_model__\"",
     "emit('add-model')",
-    "emit('update:selectedModelId', value)",
     'defineExpose({',
     'refresh: loadModels',
   ]) assert.ok(source.includes(token), `ModelSelector lost native selection contract: ${token}`)
+  assert.match(source, /emit\('update:selectedModelId', value(?: \|\| '')?\)/)
 })
 
 test('composer presents every native resource and generation control in the new View', () => {

@@ -174,10 +174,150 @@ jobs:
           go-version-file: weknora/go.mod
           cache: true
           cache-dependency-path: weknora/go.sum
+      - name: Vet Go packages
+        run: go vet ./...
       - name: Run Go tests
         run: go test ./...
       - name: Build the native server
         run: go build ./cmd/server
+      - name: Build, audit, and exercise the AnyDoc parser engine
+        run: |
+          rustc --version
+          ./scripts/build-anydoc-lib.sh
+          cargo install cargo-audit --version 0.22.2 --locked
+          (cd third_party/anydoc-go && cargo audit)
+          go vet -tags anydoc ./internal/infrastructure/docparser/...
+          go test -tags anydoc -count=1 ./internal/infrastructure/docparser/...
+          go build -tags anydoc ./cmd/server
+
+  go-modules:
+    name: WeKnora ${{ matrix.name }} tests, vet and build
+    needs: workflow-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: CLI
+            directory: weknora/cli
+            go_sum: weknora/cli/go.sum
+          - name: Go SDK
+            directory: weknora/client
+            go_sum: weknora/client/go.sum
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.directory }}/go.mod
+          cache: true
+          cache-dependency-path: ${{ matrix.go_sum }}
+      - name: Test
+        working-directory: ${{ matrix.directory }}
+        run: go test ./...
+      - name: Vet
+        working-directory: ${{ matrix.directory }}
+        run: go vet ./...
+      - name: Build
+        working-directory: ${{ matrix.directory }}
+        run: go build ./...
+
+  go-lint:
+    name: golangci-lint (${{ matrix.name }})
+    needs: workflow-contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: root
+            directory: weknora
+            go_sum: weknora/go.sum
+          - name: cli
+            directory: weknora/cli
+            go_sum: weknora/cli/go.sum
+          - name: client
+            directory: weknora/client
+            go_sum: weknora/client/go.sum
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.directory }}/go.mod
+          cache: true
+          cache-dependency-path: ${{ matrix.go_sum }}
+      - name: Lint only new findings
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: ${{ matrix.directory }}
+          only-new-issues: true
+
+  dsh-plugin:
+    name: DeepSeek Harness plugin contract and E2E
+    needs: workflow-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: weknora/packages/dsh-weknora/package-lock.json
+      - name: Set up pnpm for the harness profile
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+      - name: Set up Go for the server-side contract
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: weknora/go.mod
+          cache: true
+          cache-dependency-path: weknora/go.sum
+      - name: Install plugin dependencies
+        run: npm ci --prefix weknora/packages/dsh-weknora --ignore-scripts
+      - name: Type-check, build and test the plugin
+        run: |
+          npm --prefix weknora/packages/dsh-weknora run typecheck
+          npm --prefix weknora/packages/dsh-weknora test
+      - name: Test the WeKnora side of the plugin contract
+        working-directory: weknora
+        run: go test ./packages/dsh-weknora/contract/...
+      - name: Cache the pinned harness install
+        uses: actions/cache@v4
+        with:
+          path: .cache/dsh-e2e-install
+          key: dsh-e2e-${{ runner.os }}-0.1.0-rc.8
+      - name: Run the plugin inside the pinned harness
+        working-directory: weknora/packages/dsh-weknora
+        env:
+          DSH_PACKAGE_SPEC: "@deepseek-ai/dsh@0.1.0-rc.8"
+          DSH_INSTALL_DIR: ${{ github.workspace }}/.cache/dsh-e2e-install
+          DSH_E2E_LOG: ${{ runner.temp }}/dsh-weknora-e2e.log
+        run: node test/e2e/run-in-dsh.mjs
+      - name: Upload the harness transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-weknora-e2e-transcript
+          path: ${{ runner.temp }}/dsh-weknora-e2e.log
+          if-no-files-found: ignore
 
   docreader:
     name: Active DocReader tests
@@ -225,6 +365,14 @@ jobs:
         run: node scripts/ci/tracked-source-scan.mjs
       - name: Validate source manifest
         run: node scripts/ci/source-manifest.mjs
+      - name: Validate the fixed-main upgrade contract
+        run: npm run upgrade:contract
+      - name: Validate the complete Musuw and fixed-main resolution ledger
+        run: |
+          npm run upgrade:ledger
+          git diff --exit-code -- \
+            third_party/weknora/upgrades/81142df/resolution-ledger.tsv \
+            third_party/weknora/upgrades/81142df/resolution-summary.json
       - name: Scan checked-in source for credentials
         run: bash scripts/ci/secret-scan.sh
       - name: Validate metadata-only external credential registry

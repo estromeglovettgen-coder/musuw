@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/hibiken/asynq"
@@ -228,12 +229,13 @@ func (s *accountErasureFileStub) DeleteFile(_ context.Context, path string) erro
 type accountErasureTenantStub struct {
 	interfaces.TenantService
 	tenant  *types.Tenant
+	getErr  error
 	deleted []uint64
 	order   *[]string
 }
 
 func (s *accountErasureTenantStub) GetTenantByID(context.Context, uint64) (*types.Tenant, error) {
-	return s.tenant, nil
+	return s.tenant, s.getErr
 }
 
 func (s *accountErasureTenantStub) DeleteTenant(_ context.Context, id uint64) error {
@@ -422,6 +424,23 @@ func TestAccountErasureWorkerWaitsForTerminalPaddleState(t *testing.T) {
 	require.False(t, repo.purged)
 }
 
+func TestAccountErasureWorkerPropagatesTenantLookupFailure(t *testing.T) {
+	target := eligibleErasureTarget()
+	repo := &accountErasureRepoStub{target: target}
+	lookupErr := errors.New("tenant database unavailable")
+	tenants := &accountErasureTenantStub{getErr: lookupErr}
+	svc := newAccountErasureService(
+		repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenants,
+		nil, nil, &accountErasureBillingStub{}, &accountErasureIdentityStub{},
+	)
+	task, err := NewAccountErasureTask("user-1")
+	require.NoError(t, err)
+
+	err = svc.Process(context.Background(), task)
+	require.ErrorIs(t, err, lookupErr)
+	require.False(t, repo.purged)
+}
+
 func TestAccountErasureWorkerDeletesProviderIdentityBeforeFinalLocalPurge(t *testing.T) {
 	order := []string{}
 	target := eligibleErasureTarget()
@@ -568,5 +587,20 @@ func TestAccountErasureWorkerRetriesAfterTenantWasSoftDeleted(t *testing.T) {
 	require.NoError(t, svc.Process(context.Background(), task))
 	require.Empty(t, tenants.deleted)
 	require.Equal(t, 1, identity.calls)
+	require.True(t, repo.purged)
+}
+
+func TestAccountErasureWorkerAllowsKnownMissingTenantOnRetry(t *testing.T) {
+	target := eligibleErasureTarget()
+	target.OwnerTenantCount = 0
+	target.IsTenantDeleted = true
+	repo := &accountErasureRepoStub{target: target}
+	tenants := &accountErasureTenantStub{getErr: apprepo.ErrTenantNotFound}
+	identity := &accountErasureIdentityStub{}
+	svc := newAccountErasureService(repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenants, nil, nil, &accountErasureBillingStub{}, identity)
+	task, err := NewAccountErasureTask("user-1")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.Process(context.Background(), task))
 	require.True(t, repo.purged)
 }

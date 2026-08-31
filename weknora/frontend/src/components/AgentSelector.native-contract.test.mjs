@@ -6,7 +6,7 @@ const modelSelector = readFileSync(new URL('./ModelSelector.vue', import.meta.ur
 const inputField = readFileSync(new URL('./Input-field.vue', import.meta.url), 'utf8')
 const inputBusiness = readFileSync(new URL('../assets/business-baselines/Input-field.pre-view.vue', import.meta.url), 'utf8')
 
-test('agent selection retains the WeKnora 0.7.2 readiness, source-tenant, and store chain', () => {
+test('agent selection retains the WeKnora main readiness, source-tenant, and store chain', () => {
   for (const token of [
     'const handleSelectAgent = async',
     'collectAgentNotReadyReasons(',

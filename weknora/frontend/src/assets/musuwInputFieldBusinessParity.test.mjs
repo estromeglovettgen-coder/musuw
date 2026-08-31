@@ -6,9 +6,9 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('audited Input-field controller remains locked after consumer picker integration', () => {
+test('audited Input-field controller remains locked after main-kernel skills integration', () => {
   const controller = read('./business-baselines/Input-field.pre-view.vue')
-  assert.equal(blobSha(controller), 'bfa653c206ebb7d579e294e18f8220ffb83f5682')
+  assert.equal(blobSha(controller), '11bc2cb650979eb55e367d370980051fa6caa429')
 })
 
 test('rebuilt Input-field reuses the frozen component options and replaces only its active View', () => {

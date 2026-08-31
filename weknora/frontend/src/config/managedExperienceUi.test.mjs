@@ -123,7 +123,7 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
 
 test("Lite Settings exposes consumer sections and MCP for tenant admins while General keeps theme controls", () => {
   assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/);
-  assert.match(settingsView, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/);
+  assert.match(settingsView, /if \(\s*authStore\.isLiteMode\s*&&\s*section !== 'usage'\s*&&\s*section !== 'userprofile'\s*&&\s*section !== 'models'\s*&&\s*section !== 'mcp'\s*\)\s*\{\s*return 'general'/);
   assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/);
   assert.match(settingsView, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/);
   assert.match(settingsView, /<ModelSettings v-else-if="currentSection === 'models'"/);

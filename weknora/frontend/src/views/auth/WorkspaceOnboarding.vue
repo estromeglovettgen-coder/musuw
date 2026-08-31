@@ -4,23 +4,13 @@
       <div class="workspace-mark" aria-hidden="true">
         <t-icon name="system-sum" size="30px" />
       </div>
-      <h1>
-        {{
-          $t(
-            authStore.canCreateTenant
-              ? 'auth.workspaceOnboarding.title'
-              : 'auth.workspaceOnboarding.inviteOnlyTitle',
-          )
-        }}
-      </h1>
-      <p class="workspace-description">
-        {{
-          $t(
-            authStore.canCreateTenant
-              ? 'auth.workspaceOnboarding.description'
-              : 'auth.workspaceOnboarding.inviteOnlyDescription',
-          )
-        }}
+      <h1 v-if="authStore.canCreateTenant">{{ $t('auth.workspaceOnboarding.title') }}</h1>
+      <h1 v-else>{{ $t('auth.workspaceOnboarding.inviteOnlyTitle') }}</h1>
+      <p v-if="authStore.canCreateTenant" class="workspace-description">
+        {{ $t('auth.workspaceOnboarding.description') }}
+      </p>
+      <p v-else class="workspace-description">
+        {{ $t('auth.workspaceOnboarding.inviteOnlyDescription') }}
       </p>
 
       <div v-if="policyLoading" class="policy-loading">

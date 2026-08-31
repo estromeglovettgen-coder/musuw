@@ -39,6 +39,56 @@
           </div>
 
           <form v-if="formData" class="kb-config-form" @submit.prevent="handleSubmit">
+            <nav
+              v-if="!authStore.isLiteMode"
+              class="kb-config-nav"
+              aria-label="Knowledge base settings sections"
+              data-guide="kb-editor-sidebar"
+            >
+              <button
+                v-for="item in navItems"
+                :key="item.key"
+                type="button"
+                class="kb-config-nav__item"
+                :class="{ 'is-active': currentSection === item.key }"
+                :data-guide="`kb-editor-nav-${item.key}`"
+                @click="currentSection = item.key"
+              >
+                <t-icon :name="item.icon" aria-hidden="true" />
+                <span>{{ item.label }}</span>
+                <span v-if="item.badge" class="kb-config-nav__badge">{{ item.badge }}</span>
+              </button>
+            </nav>
+
+            <div v-show="currentSection === 'basic'" class="kb-config-section">
+            <section v-if="editorMode === 'edit' && activeKbId" class="kb-config-field kb-config-id-field">
+              <div class="kb-config-field__heading">
+                <label>{{ $t('knowledgeEditor.basic.kbId') }}</label>
+                <p>{{ $t('knowledgeEditor.basic.kbIdDesc') }}</p>
+              </div>
+              <div class="kb-config-id-control">
+                <code class="kb-config-id-value" :title="activeKbId">{{ activeKbId }}</code>
+                <button type="button" class="kb-config-id-copy" :title="$t('common.copy')" @click="copyKbId">
+                  <t-icon name="file-copy" aria-hidden="true" />
+                </button>
+              </div>
+            </section>
+
+            <section class="kb-config-field">
+              <div class="kb-config-field__heading">
+                <label class="is-required">{{ $t('knowledgeEditor.basic.typeLabel') }}</label>
+                <p>{{ $t('knowledgeEditor.basic.typeDescription') }}</p>
+              </div>
+              <t-radio-group
+                v-model="formData.type"
+                :disabled="editorMode === 'edit'"
+                data-guide="kb-create-type"
+              >
+                <t-radio-button value="document">{{ $t('knowledgeEditor.basic.typeDocument') }}</t-radio-button>
+                <t-radio-button value="faq">{{ $t('knowledgeEditor.basic.typeFAQ') }}</t-radio-button>
+              </t-radio-group>
+            </section>
+
             <section v-if="!isFAQ" class="kb-config-field">
               <div class="kb-config-field__heading">
                 <label class="is-required">{{ $t('knowledgeEditor.indexing.title') }}</label>
@@ -183,7 +233,7 @@
               <span class="kb-config-count">{{ formData.description.length }}/200</span>
             </section>
 
-            <section class="kb-config-field kb-config-summary-model" data-guide="kb-create-llm">
+            <section v-if="authStore.isLiteMode" class="kb-config-field kb-config-summary-model" data-guide="kb-create-llm">
               <div class="kb-config-field__heading">
                 <label>{{ $t('knowledgeEditor.models.llmLabel') }}</label>
                 <p>{{ $t('knowledgeEditor.models.llmDesc') }}</p>
@@ -198,6 +248,201 @@
                 @update:selected-model-id="(val: string) => formData.modelConfig.llmModelId = val"
               />
             </section>
+
+            </div>
+
+            <!-- Standard-tier settings remain available through the compact section navigator. -->
+            <div v-if="!authStore.isLiteMode && currentSection === 'models'" class="kb-config-section">
+              <KBModelConfig
+                ref="modelConfigRef"
+                v-if="formData"
+                :config="formData.modelConfig"
+                :has-files="hasFiles"
+                :wiki-enabled="formData.indexingStrategy?.wikiEnabled"
+                :rag-enabled="formData.indexingStrategy?.vectorEnabled || formData.indexingStrategy?.keywordEnabled"
+                :all-models="allModels"
+                @update:config="handleModelConfigUpdate"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && currentSection === 'vectorStore'" class="kb-config-section">
+              <KBVectorStoreSettings
+                v-if="formData"
+                :mode="editorMode"
+                :vector-store-id="formData.vectorStoreId"
+                :bound-source="formData.vectorStoreInfo?.source"
+                :bound-name="formData.vectorStoreInfo?.name"
+                :bound-engine-type="formData.vectorStoreInfo?.engineType"
+                :bound-status="formData.vectorStoreInfo?.status"
+                @update:vector-store-id="handleVectorStoreIdUpdate"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && isFAQ && currentSection === 'faq'" class="kb-config-section">
+              <div class="kb-config-field__heading">
+                <label>{{ $t('knowledgeEditor.faq.title') }}</label>
+                <p>{{ $t('knowledgeEditor.faq.description') }}</p>
+              </div>
+              <div class="kb-config-field">
+                <label>{{ $t('knowledgeEditor.faq.indexModeLabel') }}</label>
+                <t-radio-group v-model="formData.faqConfig.indexMode">
+                  <t-radio-button value="question_only">{{ $t('knowledgeEditor.faq.modes.questionOnly') }}</t-radio-button>
+                  <t-radio-button value="question_answer">{{ $t('knowledgeEditor.faq.modes.questionAnswer') }}</t-radio-button>
+                </t-radio-group>
+                <p class="kb-config-field__hint">{{ $t('knowledgeEditor.faq.indexModeDescription') }}</p>
+              </div>
+              <div class="kb-config-field">
+                <label>{{ $t('knowledgeEditor.faq.questionIndexModeLabel') }}</label>
+                <t-radio-group v-model="formData.faqConfig.questionIndexMode">
+                  <t-radio-button value="combined">{{ $t('knowledgeEditor.faq.modes.combined') }}</t-radio-button>
+                  <t-radio-button value="separate">{{ $t('knowledgeEditor.faq.modes.separate') }}</t-radio-button>
+                </t-radio-group>
+                <p class="kb-config-field__hint">{{ $t('knowledgeEditor.faq.questionIndexModeDescription') }}</p>
+              </div>
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'parser'" class="kb-config-section">
+              <KBParserSettings
+                v-if="formData"
+                :parser-engine-rules="formData.chunkingConfig.parserEngineRules"
+                @update:parser-engine-rules="handleParserEngineRulesUpdate"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'storage'" class="kb-config-section">
+              <KBStorageSettings
+                v-if="formData"
+                :storage-backend-id="formData.storageBackendId"
+                :storage-provider="formData.storageProvider"
+                :has-files="editorMode === 'edit' && hasFiles"
+                @update:storage-backend-id="handleStorageBackendUpdate"
+                @update:storage-provider="handleStorageProviderUpdate"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'chunking'" class="kb-config-section">
+              <KBChunkingSettings
+                v-if="formData"
+                :config="formData.chunkingConfig"
+                @update:config="handleChunkingConfigUpdate"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'multimodal'" class="kb-config-section">
+              <div class="kb-config-field__heading">
+                <label>{{ $t('knowledgeEditor.multimodal.title') }}</label>
+                <p>{{ $t('knowledgeEditor.multimodal.description') }}</p>
+              </div>
+              <div class="kb-config-settings-group">
+                <div class="kb-config-setting-row">
+                  <div class="kb-config-setting-info">
+                    <label>{{ $t('knowledgeEditor.advanced.multimodal.label') }}</label>
+                    <p>{{ $t('knowledgeEditor.advanced.multimodal.description') }}</p>
+                  </div>
+                  <t-switch v-model="formData.multimodalConfig.enabled" @change="handleMultimodalToggle" />
+                </div>
+                <div v-if="formData.multimodalConfig.enabled" class="kb-config-setting-row">
+                  <div class="kb-config-setting-info">
+                    <label>{{ $t('knowledgeEditor.advanced.multimodal.vllmLabel') }} <span class="is-required">*</span></label>
+                    <p>{{ $t('knowledgeEditor.advanced.multimodal.vllmDescription') }}</p>
+                  </div>
+                  <ModelSelector
+                    model-type="VLLM"
+                    :selected-model-id="formData.multimodalConfig.vllmModelId"
+                    :all-models="allModels"
+                    @update:selected-model-id="handleMultimodalVLLMChange"
+                    @add-model="handleAddVLLMModel"
+                    :placeholder="$t('knowledgeEditor.advanced.multimodal.vllmPlaceholder')"
+                  />
+                </div>
+                <div v-if="formData.multimodalConfig.enabled" class="kb-config-setting-row">
+                  <div class="kb-config-setting-info">
+                    <label>{{ $t('knowledgeEditor.advanced.multimodal.descriptionLanguageLabel') }}</label>
+                    <p>{{ $t('knowledgeEditor.advanced.multimodal.descriptionLanguageDescription') }}</p>
+                  </div>
+                  <t-select v-model="formData.multimodalConfig.descriptionLanguage" clearable :placeholder="$t('knowledgeEditor.advanced.multimodal.descriptionLanguageAuto')">
+                    <t-option value="Chinese" :label="$t('language.zhCN')" />
+                    <t-option value="English" :label="$t('language.enUS')" />
+                    <t-option value="Korean" :label="$t('language.koKR')" />
+                    <t-option value="Russian" :label="$t('language.ruRU')" />
+                  </t-select>
+                </div>
+                <div v-if="formData.multimodalConfig.enabled" class="kb-config-setting-row kb-config-setting-row--vertical">
+                  <div class="kb-config-setting-info">
+                    <label>{{ $t('knowledgeEditor.advanced.multimodal.customInstructionsLabel') }}</label>
+                    <p>{{ $t('knowledgeEditor.advanced.multimodal.customInstructionsDescription') }}</p>
+                  </div>
+                  <t-textarea v-model="formData.multimodalConfig.customInstructions" :placeholder="$t('knowledgeEditor.advanced.multimodal.customInstructionsPlaceholder')" :maxlength="4000" :autosize="{ minRows: 3, maxRows: 8 }" />
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'asr'" class="kb-config-section">
+              <div class="kb-config-field__heading">
+                <label>{{ $t('knowledgeEditor.asr.title') }}</label>
+                <p>{{ $t('knowledgeEditor.asr.description') }}</p>
+              </div>
+              <div class="kb-config-settings-group">
+                <div class="kb-config-setting-row">
+                  <div class="kb-config-setting-info">
+                    <label>{{ $t('knowledgeEditor.asr.label') }}</label>
+                    <p>{{ $t('knowledgeEditor.asr.desc') }}</p>
+                  </div>
+                  <t-switch v-model="formData.asrConfig.enabled" />
+                </div>
+                <div v-if="formData.asrConfig.enabled" class="kb-config-setting-row">
+                  <div class="kb-config-setting-info">
+                    <label>{{ $t('knowledgeEditor.asr.modelLabel') }} <span class="is-required">*</span></label>
+                    <p>{{ $t('knowledgeEditor.asr.modelDescription') }}</p>
+                  </div>
+                  <ModelSelector
+                    model-type="ASR"
+                    :selected-model-id="formData.asrConfig.modelId"
+                    :all-models="allModels"
+                    @update:selected-model-id="(val: string) => { if (formData) formData.asrConfig.modelId = val }"
+                    @add-model="handleAddASRModel"
+                    :placeholder="$t('knowledgeEditor.asr.modelPlaceholder')"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'graph'" class="kb-config-section">
+              <GraphSettings
+                v-if="formData"
+                :graph-extract="formData.nodeExtractConfig"
+                :model-id="formData.modelConfig.llmModelId"
+                :all-models="allModels"
+                @update:graph-extract="handleNodeExtractUpdate"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'advanced'" class="kb-config-section">
+              <KBAdvancedSettings
+                ref="advancedSettingsRef"
+                v-if="formData"
+                :question-generation="formData.questionGenerationConfig"
+                :auto-tag="formData.autoTagConfig"
+                :rag-enabled="formData.indexingStrategy?.vectorEnabled || formData.indexingStrategy?.keywordEnabled"
+                :all-models="allModels"
+                :table-metadata-instructions="formData.chunkingConfig.tableMetadataInstructions"
+                @update:question-generation="handleQuestionGenerationUpdate"
+                @update:auto-tag="(value) => { if (formData) formData.autoTagConfig = value }"
+                @update:table-metadata-instructions="(value: string) => { if (formData) formData.chunkingConfig.tableMetadataInstructions = value }"
+              />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && editorMode === 'edit' && activeKbId && currentSection === 'datasource'" class="kb-config-section">
+              <DataSourceSettings v-if="activeKbId" :kb-id="activeKbId" @count="dsCount = $event" />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && editorMode === 'edit' && activeKbId && currentSection === 'share'" class="kb-config-section">
+              <KBShareSettings v-if="activeKbId" :kb-id="activeKbId" :can-share="canShareKB" />
+            </div>
+
+            <div v-if="!authStore.isLiteMode && editorMode === 'edit' && activeKbId && canViewActivity && currentSection === 'activity'" class="kb-config-section">
+              <KnowledgeBaseActivitySettings v-if="activeKbId" :kb-id="activeKbId" :active="currentSection === 'activity'" />
+            </div>
 
             <footer class="kb-config-actions">
               <button type="button" class="kb-config-button is-secondary" @click="handleClose">
@@ -233,6 +478,8 @@ import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKnowledgeBase } from '@/api/knowledge-base'
 import { updateKBConfig, type KBModelConfigRequest } from '@/api/initialization'
 import { useChatResourcesStore } from '@/stores/chatResources'
+import { selectInitialModelId } from '@/utils/modelDefaults'
+import { copyWithToast } from '@/utils/clipboard'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useSettingsStore } from '@/stores/settings'
 import { useUIStore } from '@/stores/ui'
@@ -281,34 +528,14 @@ const saveButtonLabel = computed(() =>
 )
 
 const copyKbId = async () => {
-  const id = activeKbId.value
-  if (!id) return
-
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(id)
-    } else {
-      const textarea = document.createElement('textarea')
-      textarea.value = id
-      textarea.setAttribute('readonly', '')
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-    }
-    MessagePlugin.success(t('common.copied'))
-  } catch {
-    MessagePlugin.error(t('common.copyFailed'))
-  }
+  await copyWithToast(activeKbId.value, 'common.copied')
 }
 
 const currentSection = ref<string>('basic')
 
 const onKbEditorFocusSection = (event: Event) => {
   const section = (event as CustomEvent<{ section?: string }>).detail?.section
-  if (section) {
+  if (section && navItems.value.some((item) => item.key === section)) {
     currentSection.value = section
   }
 }
@@ -465,6 +692,18 @@ const kbCreateNeedsEmbedding = computed(() => {
   return Boolean(s?.vectorEnabled || s?.keywordEnabled)
 })
 
+const applyDefaultModelsIfEmpty = () => {
+  if (!formData.value || editorMode.value !== 'create') return
+  const chatModelId = selectInitialModelId(allModels.value, 'KnowledgeQA')
+  const embeddingModelId = selectInitialModelId(allModels.value, 'Embedding')
+  if (!formData.value.modelConfig.llmModelId && chatModelId) {
+    formData.value.modelConfig.llmModelId = chatModelId
+  }
+  if (!formData.value.modelConfig.embeddingModelId && embeddingModelId) {
+    formData.value.modelConfig.embeddingModelId = embeddingModelId
+  }
+}
+
 watch(
   () => formData.value?.type,
   (newType, oldType) => {
@@ -486,6 +725,9 @@ const initFormData = (type: 'document' | 'faq' = 'document') => ({
   type,
   name: '',
   description: '',
+  chunkingConfig: {
+    tableMetadataInstructions: '',
+  },
   modelConfig: {
     llmModelId: settingsStore.getConsumerSceneModel('rag').trim(),
   },
@@ -499,6 +741,17 @@ const initFormData = (type: 'document' | 'faq' = 'document') => ({
     extractionGranularity: 'standard' as 'focused' | 'standard' | 'exhaustive',
     contentInstructions: '',
     extractionInstructions: '',
+  },
+  questionGenerationConfig: {
+    enabled: true,
+    questionCount: 3,
+    customInstructions: ''
+  },
+  autoTagConfig: {
+    enabled: false,
+    modelId: '',
+    maxTags: 3,
+    skipIfTagged: true
   },
 })
 
@@ -522,6 +775,7 @@ const loadAllModels = async (force = false) => {
   try {
     await chatResources.ensureModels(force)
     allModels.value = chatResources.allModels || []
+    applyDefaultModelsIfEmpty()
   } catch (error) {
     console.error('Failed to load model list:', error)
     MessagePlugin.error(t('knowledgeEditor.messages.loadModelsFailed'))
@@ -633,6 +887,12 @@ const loadKBData = async (kbIdOverride?: string) => {
         enabled: kb.question_generation_config?.enabled || false,
         questionCount: kb.question_generation_config?.question_count || 3,
         customInstructions: kb.question_generation_config?.custom_instructions || ''
+      },
+      autoTagConfig: {
+        enabled: kb.auto_tag_config?.enabled || false,
+        modelId: kb.auto_tag_config?.model_id || '',
+        maxTags: kb.auto_tag_config?.max_tags || 3,
+        skipIfTagged: kb.auto_tag_config?.skip_if_tagged ?? true
       },
       wikiConfig: {
         synthesisModelId: kb.wiki_config?.synthesis_model_id || '',
@@ -994,6 +1254,13 @@ const buildSubmitData = () => {
     }
   }
 
+  data.auto_tag_config = {
+    enabled: formData.value.autoTagConfig?.enabled || false,
+    model_id: formData.value.autoTagConfig?.modelId || '',
+    max_tags: formData.value.autoTagConfig?.maxTags || 3,
+    skip_if_tagged: formData.value.autoTagConfig?.skipIfTagged ?? true,
+  }
+
   if (formData.value.type === 'faq') {
     data.faq_config = {
       index_mode: formData.value.faqConfig?.indexMode || 'question_only',
@@ -1109,6 +1376,12 @@ const doSubmit = async () => {
           content_instructions: formData.value.wikiConfig.contentInstructions.trim(),
           extraction_instructions: formData.value.wikiConfig.extractionInstructions.trim(),
         }
+        createPayload.auto_tag_config = {
+          enabled: formData.value.autoTagConfig?.enabled || false,
+          model_id: formData.value.autoTagConfig?.modelId || '',
+          max_tags: formData.value.autoTagConfig?.maxTags || 3,
+          skip_if_tagged: formData.value.autoTagConfig?.skipIfTagged ?? true,
+        }
       }
       const result: any = await createKnowledgeBase(createPayload)
       if (!result.success || !result.data?.id) {
@@ -1151,6 +1424,7 @@ const doSubmit = async () => {
         }
       }
       if (formData.value.type !== 'faq') {
+        updateConfig.auto_tag_config = data.auto_tag_config
         updateConfig.indexing_strategy = {
           vector_enabled: formData.value.indexingStrategy?.vectorEnabled ?? true,
           keyword_enabled: formData.value.indexingStrategy?.keywordEnabled ?? true,
@@ -1271,8 +1545,11 @@ watch(() => props.visible, async (newVal) => {
       return
     }
 
-    // Editing remains an internal/admin capability and may target a section.
-    if (uiStore.kbEditorInitialSection) {
+    // Lite remains a single consumer form; never leave it on a hidden
+    // Standard-only section when a stale deep-link is present.
+    if (authStore.isLiteMode) {
+      currentSection.value = 'basic'
+    } else if (uiStore.kbEditorInitialSection) {
       currentSection.value = uiStore.kbEditorInitialSection
     }
 
@@ -1282,6 +1559,13 @@ watch(() => props.visible, async (newVal) => {
     ])
     if (props.kbId) {
       await loadKBData()
+    }
+    // Keep stale deep-links from selecting a section that this KB/type does
+    // not expose (for example a document-only section on an FAQ). This also
+    // gives Lite a deterministic basic form when an old launcher hint leaks
+    // through.
+    if (!navItems.value.some((item) => item.key === currentSection.value)) {
+      currentSection.value = 'basic'
     }
   } else {
     // 关闭弹窗时，延迟重置状态（等待动画结束）
@@ -1429,6 +1713,188 @@ watch(
   line-height: 20px;
   scrollbar-width: thin;
   scrollbar-color: #d1d5db transparent;
+}
+
+.kb-config-nav {
+  flex: 0 0 auto;
+  margin: -4px -8px 4px;
+  padding: 4px;
+  border: 1px solid #f3f4f6;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  background: #f9fafb;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.kb-config-nav__item {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: #6b7280;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+
+  :deep(.t-icon) {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
+
+  &:hover {
+    border-color: #e5e7eb;
+    color: #111827;
+  }
+
+  &.is-active {
+    border-color: #e5e7eb;
+    background: #fff;
+    color: #111827;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  }
+}
+
+.kb-config-nav__badge {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.kb-config-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.kb-config-field__hint {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.kb-config-id-control {
+  min-height: 40px;
+  padding: 0 8px 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #f9fafb;
+}
+
+.kb-config-id-value {
+  min-width: 0;
+  overflow: hidden;
+  color: #4b5563;
+  font-family: var(--app-font-family-mono);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-config-id-copy {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #111827;
+  }
+
+  :deep(.t-icon) {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
+}
+
+.kb-config-settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.kb-config-setting-row {
+  min-width: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  > :deep(.visual-model-selector),
+  > :deep(.t-select),
+  > :deep(.t-textarea) {
+    flex: 0 1 280px;
+    min-width: 220px;
+  }
+}
+
+.kb-config-setting-row--vertical {
+  flex-direction: column;
+}
+
+.kb-config-setting-info {
+  min-width: 0;
+  flex: 1 1 auto;
+
+  label {
+    display: block;
+    color: #111827;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .is-required {
+    color: #ef4444;
+  }
 }
 
 .kb-config-field {
@@ -1792,6 +2258,22 @@ watch(
   .kb-config-strategies {
     grid-template-columns: 1fr;
   }
+
+  .kb-config-nav {
+    margin-inline: -4px;
+  }
+
+  .kb-config-setting-row {
+    flex-direction: column;
+
+    > :deep(.visual-model-selector),
+    > :deep(.t-select),
+    > :deep(.t-textarea) {
+      width: 100%;
+      min-width: 0;
+      flex-basis: auto;
+    }
+  }
 }
 
 @media (max-width: 420px) {
@@ -1989,6 +2471,60 @@ watch(
 
 :root[theme-mode="dark"] body .kb-config-actions {
   border-top-color: #27272a;
+}
+
+:root[theme-mode="dark"] body .kb-config-nav {
+  border-color: #27272a;
+  background: #18181b;
+}
+
+:root[theme-mode="dark"] body .kb-config-nav__item {
+  color: #a1a1aa;
+}
+
+:root[theme-mode="dark"] body .kb-config-nav__item:hover,
+:root[theme-mode="dark"] body .kb-config-nav__item.is-active {
+  border-color: #3f3f46;
+  background: #27272a;
+  color: #fff;
+}
+
+:root[theme-mode="dark"] body .kb-config-nav__badge {
+  background: #3f3f46;
+  color: #e4e4e7;
+}
+
+:root[theme-mode="dark"] body .kb-config-setting-row {
+  border-bottom-color: #27272a;
+}
+
+:root[theme-mode="dark"] body .kb-config-setting-info label {
+  color: #f4f4f5;
+}
+
+:root[theme-mode="dark"] body .kb-config-setting-info p,
+:root[theme-mode="dark"] body .kb-config-field__hint {
+  color: #a1a1aa;
+}
+
+:root[theme-mode="dark"] body .kb-config-id-control {
+  border-color: #3f3f46;
+  background: #27272a;
+}
+
+:root[theme-mode="dark"] body .kb-config-id-value {
+  color: #d4d4d8;
+}
+
+:root[theme-mode="dark"] body .kb-config-id-copy {
+  border-color: #3f3f46;
+  background: #18181b;
+  color: #a1a1aa;
+}
+
+:root[theme-mode="dark"] body .kb-config-id-copy:hover {
+  background: #3f3f46;
+  color: #fff;
 }
 
 :root[theme-mode="dark"] body .kb-config-button.is-secondary {

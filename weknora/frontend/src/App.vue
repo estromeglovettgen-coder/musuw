@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { NotifyPlugin } from "tdesign-vue-next";
+import { MessagePlugin, NotifyPlugin } from "tdesign-vue-next";
 import ManualKnowledgeEditor from "@/components/manual-knowledge-editor.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useSettingsStore } from "@/stores/settings";
@@ -146,6 +146,21 @@ const persistOIDCLoginResponse = async (response: any) => {
     // Older or incomplete callback payloads retain the authoritative blocking
     // path rather than entering the application with partial identity state.
     await syncOIDCUserContext();
+  }
+
+  // OIDC may have been initiated from an invitation link. Redeem the
+  // short-lived token only after the native session is durable, then enter the
+  // normal workspace surface. A failed/expired token must not strand a valid
+  // session on the callback page.
+  const pendingInviteToken = sessionStorage.getItem("weknora_pending_invite_token");
+  if (pendingInviteToken) {
+    sessionStorage.removeItem("weknora_pending_invite_token");
+    const result = await authStore.acceptInvitationByTokenAndRefresh(pendingInviteToken);
+    await nextTick();
+    if (result.ok) MessagePlugin.success(t("inviteRegister.joined"));
+    else MessagePlugin.warning(t("inviteRegister.invalidBody"));
+    router.replace("/platform/knowledge-bases");
+    return;
   }
 
   await nextTick();

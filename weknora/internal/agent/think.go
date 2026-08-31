@@ -170,16 +170,19 @@ func (e *AgentEngine) streamThinkingToEventBus(
 	iteration int,
 	sessionID string,
 ) (*types.ChatResponse, error) {
-	logger.Debugf(ctx, "[Agent][Thinking] Iteration-%d: temp=%.2f, tools=%d, thinking=%v, reasoning_effort=%s",
-		iteration+1, e.config.Temperature, len(tools), e.config.Thinking, e.config.ReasoningEffort)
+	budget := e.getCompletionTokenBudget()
+	logger.Debugf(ctx, "[Agent][Thinking] Iteration-%d: temp=%.2f, tools=%d, thinking=%v, reasoning_effort=%s, max_tokens=%d",
+		iteration+1, e.config.Temperature, len(tools), e.config.Thinking, e.config.ReasoningEffort, budget)
 
 	parallelToolCalls := true
 	opts := &chat.ChatOptions{
-		Temperature:       e.config.Temperature,
-		Tools:             tools,
-		Thinking:          e.config.Thinking,
-		ReasoningEffort:   e.config.ReasoningEffort,
-		ParallelToolCalls: &parallelToolCalls,
+		Temperature:         e.config.Temperature,
+		MaxTokens:           budget,
+		MaxCompletionTokens: budget,
+		Tools:               tools,
+		Thinking:            e.config.Thinking,
+		ReasoningEffort:     e.config.ReasoningEffort,
+		ParallelToolCalls:   &parallelToolCalls,
 	}
 
 	pendingToolCalls := make(map[string]bool)

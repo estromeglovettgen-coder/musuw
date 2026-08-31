@@ -152,6 +152,8 @@ type SyncTaskParams struct {
 	KnowledgePostProcess    interfaces.TaskHandler `name:"knowledgePostProcess"`
 	WikiIngest              interfaces.TaskHandler `name:"wikiIngest"`
 	TemporaryDocument       interfaces.TemporaryDocumentService
+	KnowledgeAutoTag        interfaces.TaskHandler `name:"knowledgeAutoTag"`
+	MemoryService           interfaces.MemoryService
 }
 
 // RegisterSyncHandlers registers all task handlers on the SyncTaskExecutor.
@@ -174,9 +176,11 @@ func RegisterSyncHandlers(params SyncTaskParams) {
 	params.Executor.RegisterHandler(types.TypeAccountErasure, params.AccountErasure.Process)
 	params.Executor.RegisterHandler(types.TypeImageMultimodal, params.ImageMultimodal.Handle)
 	params.Executor.RegisterHandler(types.TypeKnowledgePostProcess, params.KnowledgePostProcess.Handle)
+	params.Executor.RegisterHandler(types.TypeKnowledgeAutoTag, params.KnowledgeAutoTag.Handle)
 	params.Executor.RegisterHandler(types.TypeDataSourceSync, params.DataSourceService.ProcessSync)
 	params.Executor.RegisterHandler(types.TypeWikiIngest, params.WikiIngest.Handle)
 	params.Executor.RegisterHandler(types.TypeWikiFinalize, params.WikiIngest.Handle)
 	params.Executor.RegisterHandler(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
+	params.Executor.RegisterHandler(types.TypeMemoryExtract, params.MemoryService.Handle)
 	logger.Infof(context.Background(), "[SyncTask] All task handlers registered (Lite mode, no Redis)")
 }

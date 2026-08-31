@@ -16,7 +16,7 @@ import (
 //   - GET   /:id          Viewer+ (read tenant settings)
 //   - PUT   /:id          Owner+ (mutate tenant config)
 //   - DELETE /:id         Owner+ (also normally a CanAccessAllTenants op)
-//   - GET/POST/DELETE /:id/api-keys   Owner+ (scoped API key management)
+//   - GET/POST/PUT/DELETE /:id/api-keys   Owner+ (scoped API key management)
 //   - GET    /:id/members            Viewer+ (any member can see who else is in)
 //   - POST   /:id/members            Owner+ (only Owner can add new members)
 //   - PUT    /:id/members/:user_id   Owner+ (only Owner can change roles)
@@ -93,6 +93,7 @@ func RegisterTenantRoutes(
 				apiKeyPlatform(types.APIKeyCapabilitySystemTenantsManage), g.Owner(), handler.DeleteTenant)
 			tenantByID.GET("/api-keys", g.Owner(), handler.ListAPIKeys)
 			tenantByID.POST("/api-keys", g.Owner(), handler.CreateAPIKey)
+			tenantByID.PUT("/api-keys/:key_id", g.Owner(), handler.UpdateAPIKey)
 			tenantByID.DELETE("/api-keys/:key_id", g.Owner(), handler.DeleteAPIKey)
 			tenantByID.GET("/api-principal-config", g.Owner(), handler.GetAPIPrincipalConfig)
 			tenantByID.PUT("/api-principal-config", g.Owner(), handler.UpdateAPIPrincipalConfig)
@@ -167,6 +168,34 @@ func RegisterMyInvitationRoutes(r *gin.RouterGroup, invitationHandler *handler.T
 		me.GET("/invitations/pending-count", invitationHandler.CountMyPendingInvitations)
 		me.POST("/invitations/:inv_id/accept", invitationHandler.AcceptMyInvitation)
 		me.POST("/invitations/:inv_id/decline", invitationHandler.DeclineMyInvitation)
+		// 已登录用户用共享链接 token 加入空间（对应 register-by-invite，但不建新账号）。
+		me.POST("/invitations/accept-by-token", invitationHandler.AcceptMyInvitationByToken)
+	}
+}
+
+// RegisterMyEnvVarRoutes wires the caller's own environment variables under
+// /me/env-vars. The v1 group already applies middleware.Auth, and no role gate
+// is added on purpose: these are the caller's own values, and the service
+// derives whose they are from the context rather than the request.
+//
+// This deliberately does not reuse /sandbox-configs/:id/skills*, which is
+// Admin+ even for reads (see routes_infra.go): an upload there drives a root
+// shell whose output is baked into the image, and the listing names what that
+// image carries. This endpoint returns declarations and set/unset status only.
+//
+// h may be nil in environments built without the dependency wired; a no-op
+// registration is preferable to a startup crash, as with the invitation inbox.
+func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler) {
+	if h == nil {
+		return
+	}
+	me := r.Group("/me/env-vars")
+	{
+		me.GET("", h.List)
+		me.PUT("/skill", h.SetSkill)
+		me.DELETE("/skill", h.DeleteSkill)
+		me.PUT("/sandbox", h.SetSandbox)
+		me.DELETE("/sandbox", h.DeleteSandbox)
 	}
 }
 
@@ -187,6 +216,9 @@ func RegisterAuthRoutes(r *gin.RouterGroup, authHandler *handler.AuthHandler, g 
 	r.POST("/auth/switch-tenant", authHandler.SwitchTenant)
 	r.GET("/auth/oidc/config", authHandler.GetOIDCConfig)
 	r.GET("/auth/oidc/url", authHandler.GetOIDCAuthorizationURL)
+	// Direct-link OIDC flow for integrations that cannot fetch an authorization
+	// URL through JavaScript first.
+	r.GET("/auth/oidc/start", authHandler.OIDCStart)
 	// First-time OIDC identities must obey the same registration_mode policy as
 	// password registration; existing local OIDC users still log in normally.
 	r.GET("/auth/oidc/callback", authHandler.OIDCRedirectCallback)
@@ -208,15 +240,21 @@ func RegisterAuthRoutes(r *gin.RouterGroup, authHandler *handler.AuthHandler, g 
 // reachable". The /*-check / /reconnect endpoints actively probe
 // remote services with tenant credentials and could trigger network
 // fanout, so they're Admin+.
-func RegisterSystemRoutes(r *gin.RouterGroup, handler *handler.SystemHandler, g *rbacGuards) {
+func RegisterSystemRoutes(
+	r *gin.RouterGroup,
+	handler *handler.SystemHandler,
+	g *rbacGuards,
+) {
 	systemRoutes := g.apiKeyGroup(r.Group("/system"), apiKeyManageVectorStores(apiKeyFullAccess()))
 	{
+		systemRoutes.With(apiKeyAny()).GET("/capabilities", g.Viewer(), handler.GetDeploymentCapabilities)
 		systemRoutes.GET("/info", g.Viewer(), handler.GetSystemInfo)
 		systemRoutes.GET("/parser-engines", g.Viewer(), handler.ListParserEngines)
 		systemRoutes.POST("/parser-engines/check", g.Admin(), handler.CheckParserEngines)
 		systemRoutes.POST("/docreader/reconnect", g.Admin(), handler.ReconnectDocReader)
 		systemRoutes.GET("/storage-engine-status", g.Viewer(), handler.GetStorageEngineStatus)
 		systemRoutes.POST("/storage-engine-check", g.Admin(), handler.CheckStorageEngine)
+		systemRoutes.POST("/sandbox-check", g.Admin(), handler.CheckSandboxConfig)
 	}
 }
 
@@ -252,6 +290,7 @@ func RegisterSystemAdminRoutes(
 		adminRoutes.POST("/revoke", handler.RevokeSystemAdmin)
 		adminRoutes.GET("/list", handler.ListSystemAdmins)
 		adminRoutes.POST("/users/reset-password", handler.ResetUserPassword)
+		adminRoutes.POST("/users/create", handler.CreateSystemUser)
 		adminRoutes.GET("/api-keys", handler.ListPlatformAPIKeys)
 		adminRoutes.POST("/api-keys", handler.CreatePlatformAPIKey)
 		adminRoutes.DELETE("/api-keys/:key_id", handler.DeletePlatformAPIKey)

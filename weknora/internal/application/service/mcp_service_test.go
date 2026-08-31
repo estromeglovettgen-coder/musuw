@@ -7,6 +7,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/mcp"
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -117,6 +118,102 @@ func newTestService() (*mcpServiceService, *fakeMCPRepo) {
 	return svc, repo
 }
 
+func TestUpdateMCPService_RespectsScalarFieldPresence(t *testing.T) {
+	tests := []struct {
+		name            string
+		update          *types.MCPService
+		updateFields    map[string]bool
+		wantName        string
+		wantDescription string
+		wantEnabled     bool
+	}{
+		{
+			name:            "description only",
+			update:          &types.MCPService{Description: "after"},
+			updateFields:    map[string]bool{"description": true},
+			wantName:        "test",
+			wantDescription: "after",
+			wantEnabled:     true,
+		},
+		{
+			name:            "name only",
+			update:          &types.MCPService{Name: "renamed"},
+			updateFields:    map[string]bool{"name": true},
+			wantName:        "renamed",
+			wantDescription: "before",
+			wantEnabled:     true,
+		},
+		{
+			name:            "explicit empty description",
+			update:          &types.MCPService{Description: ""},
+			updateFields:    map[string]bool{"description": true},
+			wantName:        "test",
+			wantDescription: "",
+			wantEnabled:     true,
+		},
+		{
+			name:            "explicit disable",
+			update:          &types.MCPService{Enabled: false},
+			updateFields:    map[string]bool{"enabled": true},
+			wantName:        "test",
+			wantDescription: "before",
+			wantEnabled:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			svc, repo := newTestService()
+			id := seedService(t, repo, "stored-api", "stored-token")
+			repo.store[id].Description = "before"
+
+			tt.update.ID = id
+			tt.update.TenantID = 1
+			require.NoError(t, svc.UpdateMCPService(ctx, tt.update, tt.updateFields))
+
+			got := repo.store[id]
+			assert.Equal(t, tt.wantName, got.Name)
+			assert.Equal(t, tt.wantDescription, got.Description)
+			assert.Equal(t, tt.wantEnabled, got.Enabled)
+		})
+	}
+}
+
+func TestUpdateMCPService_AppliesNonScalarUpdateWithoutName(t *testing.T) {
+	// The test is about field-update semantics, not live DNS. Some local and
+	// CI resolvers intentionally map public names into RFC 2544 synthetic
+	// addresses, which the production SSRF guard correctly rejects. Whitelist
+	// the fixed documentation host explicitly so this test stays deterministic
+	// without weakening the independent SSRF coverage.
+	utils.SetSSRFWhitelistFromRaw("example.com")
+	t.Cleanup(func() { utils.SetSSRFWhitelistFromRaw("") })
+
+	ctx := context.Background()
+	svc, repo := newTestService()
+	id := seedService(t, repo, "stored-api", "stored-token")
+	// Use resolvable example.com paths: subdomains like before.example.com fail
+	// SSRF DNS checks because they do not resolve to a public IP.
+	beforeURL := "https://example.com/before"
+	repo.store[id].Description = "before"
+	repo.store[id].URL = &beforeURL
+
+	afterURL := "https://example.com/after"
+	update := &types.MCPService{
+		ID:       id,
+		TenantID: 1,
+		URL:      &afterURL,
+	}
+	require.NoError(t, svc.UpdateMCPService(ctx, update, nil))
+
+	got := repo.store[id]
+	require.NotNil(t, got.URL)
+	assert.Equal(t, afterURL, *got.URL)
+	assert.Equal(t, "test", got.Name)
+	assert.Equal(t, "before", got.Description)
+	assert.True(t, got.Enabled)
+}
+
 // ---- UpdateMCPService: must not touch APIKey/Token even when caller sends them ----
 
 // The handler now strips api_key/token from the main PUT body, but defense
@@ -140,7 +237,10 @@ func TestUpdateMCPService_DoesNotTouchSecretsEvenIfPassed(t *testing.T) {
 			Token:  "should-not-overwrite-either",
 		},
 	}
-	require.NoError(t, svc.UpdateMCPService(ctx, upd))
+	require.NoError(t, svc.UpdateMCPService(ctx, upd, map[string]bool{
+		"name":    true,
+		"enabled": true,
+	}))
 
 	got := repo.store[id]
 	assert.Equal(t, "stored-api", got.AuthConfig.APIKey,
@@ -165,7 +265,7 @@ func TestUpdateMCPService_CustomHeadersPreserveOnNil(t *testing.T) {
 		// AuthConfig present but CustomHeaders nil → preserve.
 		AuthConfig: &types.MCPAuthConfig{},
 	}
-	require.NoError(t, svc.UpdateMCPService(ctx, upd))
+	require.NoError(t, svc.UpdateMCPService(ctx, upd, nil))
 
 	got := repo.store[id]
 	assert.Equal(t, "acme", got.AuthConfig.CustomHeaders["X-Tenant"],
@@ -188,7 +288,7 @@ func TestUpdateMCPService_CustomHeadersReplaceOnNonNil(t *testing.T) {
 			CustomHeaders: map[string]string{"X-Replaced": "yes"},
 		},
 	}
-	require.NoError(t, svc.UpdateMCPService(ctx, upd))
+	require.NoError(t, svc.UpdateMCPService(ctx, upd, nil))
 
 	got := repo.store[id]
 	assert.Equal(t, map[string]string{"X-Replaced": "yes"}, got.AuthConfig.CustomHeaders,

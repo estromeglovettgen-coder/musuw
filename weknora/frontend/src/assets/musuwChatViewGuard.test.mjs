@@ -36,7 +36,7 @@ test('user message visual surface keeps image and attachment preview affordances
 test('chat image viewers only mount when a real preview is open', () => {
   for (const path of ['../views/chat/components/usermsg.vue', '../views/chat/components/botmsg.vue']) {
     const source = read(path)
-    assert.ok(source.includes('<picturePreview v-if="reviewImg && reviewUrl"'), `${path} mounts an empty image viewer`)
+    assert.match(source, /<picturePreview\s+v-if="reviewImg && reviewUrl"/, `${path} mounts an empty image viewer`)
   }
   const agentStream = read('../views/chat/components/AgentStreamDisplay.vue')
   assert.ok(agentStream.includes('<picturePreview v-if="imagePreviewVisible && imagePreviewUrl"'), 'AgentStreamDisplay mounts an empty image viewer')

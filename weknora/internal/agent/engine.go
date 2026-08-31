@@ -22,10 +22,6 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
-// langfuseQueryPreview caps the query length we ship as the agent.execute
-// span input — long quoted-context queries can be many KB of prose.
-const langfuseQueryPreview = 2000
-
 // AgentEngine is the core engine for running ReAct agents.
 //
 // History persistence note: the engine is stateless across turns. Conversation
@@ -44,6 +40,7 @@ type AgentEngine struct {
 	pinnedSkills         []*PinnedSkillInfo        // User @mentioned skills for this turn
 	sessionID            string                    // Session ID for logging and event emission
 	systemPromptTemplate string                    // System prompt template (optional, uses default if empty)
+	memoryPrompt         string                    // Long-term memory envelope appended to the system prompt
 	skillsManager        *skills.Manager           // Skills manager for Progressive Disclosure (optional)
 	appConfig            *appconfig.Config         // Application config for prompt template resolution (optional)
 	imageDescriber       ImageDescriberFunc        // VLM function for describing images in tool results (optional)
@@ -113,6 +110,10 @@ func (e *AgentEngine) systemPromptOptions(ctx context.Context) *BuildSystemPromp
 	if e.skillsManager != nil && e.skillsManager.IsEnabled() {
 		opts.SkillsMetadata = e.skillsManager.GetAllMetadata()
 	}
+	if e.toolRegistry != nil {
+		_, err := e.toolRegistry.GetTool(agenttools.ToolShellExec)
+		opts.ShellExecEnabled = err == nil
+	}
 	return opts
 }
 
@@ -123,7 +124,16 @@ func (e *AgentEngine) buildSystemPrompt(ctx context.Context) string {
 		e.systemPromptOptions(ctx),
 		e.systemPromptTemplate,
 	)
-	return strings.TrimRight(prompt, " \t\r\n") + e.modelContext.ProtocolPrompt()
+	// Memory has to ride in the system prompt: buildMessagesWithLLMContext
+	// drops system messages coming from history, so a separate memory message
+	// would be silently discarded from the second turn onward.
+	return strings.TrimRight(prompt, " \t\r\n") + e.memoryPrompt + e.modelContext.ProtocolPrompt()
+}
+
+// SetMemoryPrompt supplies the long-term memory envelope for this run. Empty
+// input leaves the system prompt untouched.
+func (e *AgentEngine) SetMemoryPrompt(prompt string) {
+	e.memoryPrompt = prompt
 }
 
 // NewAgentEngineWithSkills creates a new agent engine with skills support
@@ -225,7 +235,6 @@ func (e *AgentEngine) Execute(
 	spanCtx, agentSpan := langfuse.GetManager().StartSpan(ctx, langfuse.SpanOptions{
 		Name: "agent.execute",
 		Input: map[string]interface{}{
-			"query":        truncateRunes(query, langfuseQueryPreview),
 			"query_len":    len(query),
 			"context_msgs": len(llmContext),
 			"image_count":  imgCount,
@@ -321,7 +330,6 @@ func finishAgentSpan(span *langfuse.Span, state *types.AgentState, err error) {
 		"tool_calls":       totalToolCalls,
 		"complete":         state.IsComplete,
 		"final_answer_len": len(state.FinalAnswer),
-		"final_answer":     truncateRunes(state.FinalAnswer, langfuseQueryPreview),
 	}
 	span.Finish(output, map[string]interface{}{
 		"rounds":     state.CurrentRound,
@@ -547,6 +555,7 @@ func (e *AgentEngine) runReActIteration(
 	response = resp
 	if response.Usage.TotalTokens > 0 {
 		e.lastUsage = response.Usage
+		state.TurnUsage.Accumulate(response.Usage)
 		logger.Debugf(ctx, "[Agent][Round-%d] Usage: prompt=%d, completion=%d, total=%d",
 			round, response.Usage.PromptTokens,
 			response.Usage.CompletionTokens, response.Usage.TotalTokens)

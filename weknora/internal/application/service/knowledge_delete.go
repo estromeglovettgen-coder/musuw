@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -40,19 +41,124 @@ func collectImageURLs(ctx context.Context, imageInfos []string) []string {
 	return urls
 }
 
+// knowledgeResourceOwners builds the releaser for a set of knowledge entries
+// being deleted. A nil catalog (no resource registry) yields nil, which
+// deleteExtractedImages treats as "delete unconditionally", i.e. the behaviour
+// from before bindings were tracked.
+func knowledgeResourceOwners(catalog interfaces.ResourceCatalog, knowledgeIDs ...string) *resourceReleaser {
+	if catalog == nil || len(knowledgeIDs) == 0 {
+		return nil
+	}
+	return &resourceReleaser{catalog: catalog, ownerType: types.ResourceOwnerKnowledge, ownerIDs: knowledgeIDs}
+}
+
+// resourceReleaser decides whether a stored file's bytes may be deleted along
+// with the domain object that referenced them.
+//
+// A file can be claimed by more than one owner — an answer saved into the
+// knowledge base shares the very blob the chat message still shows, and two
+// knowledge entries can share an image. Deleting one owner must drop only that
+// owner's claim; the bytes go away when the last claim does.
+type resourceReleaser struct {
+	catalog   interfaces.ResourceCatalog
+	ownerType string
+	ownerIDs  []string
+}
+
+// deletable drops this releaser's claims on ref and reports whether the bytes
+// are now unreferenced.
+//
+// An unreadable binding count keeps the file. The cost of keeping it is an
+// orphaned blob that a later delete can still reclaim; the cost of guessing
+// wrong the other way is an image vanishing from a conversation or document
+// that nobody deleted.
+func (r *resourceReleaser) deletable(ctx context.Context, ref string) bool {
+	deletable, err := r.deletableStrict(ctx, ref)
+	if err != nil {
+		logger.Warnf(ctx, "Failed to release resource %s from %s: %v", ref, r.ownerType, err)
+		return false
+	}
+	return deletable
+}
+
+// deletableStrict is the fail-closed counterpart used by durable KB cleanup.
+// A release failure is returned to the caller instead of being treated as an
+// unreferenced object; retaining the row and retrying is safer than deleting a
+// blob still referenced by another owner.
+func (r *resourceReleaser) deletableStrict(ctx context.Context, ref string) (bool, error) {
+	if r == nil || r.catalog == nil {
+		return true, nil
+	}
+	remaining := int64(-1)
+	for _, ownerID := range r.ownerIDs {
+		count, err := r.catalog.Release(ctx, ref, r.ownerType, ownerID)
+		if err != nil {
+			return false, err
+		}
+		if count >= 0 {
+			remaining = count
+		}
+	}
+	// -1 means the reference is not a catalog handle: no claims to account
+	// for, so fall back to deleting it as before.
+	return remaining <= 0, nil
+}
+
 // deleteExtractedImages deletes all extracted image files from storage.
 // Standalone function — callable from both knowledgeService and knowledgeBaseService.
 // Errors are logged but do not fail the overall deletion.
-func deleteExtractedImages(ctx context.Context, fileSvc interfaces.FileService, imageURLs []string) {
+//
+// releaser may be nil, in which case every file is deleted unconditionally.
+func deleteExtractedImages(
+	ctx context.Context,
+	fileSvc interfaces.FileService,
+	releaser *resourceReleaser,
+	imageURLs []string,
+) {
 	if len(imageURLs) == 0 {
 		return
 	}
 	logger.Infof(ctx, "Deleting %d extracted images", len(imageURLs))
 	for _, url := range imageURLs {
+		if !releaser.deletable(ctx, url) {
+			logger.Infof(ctx, "Keeping extracted image %s: another owner may still reference it", url)
+			continue
+		}
 		if err := fileSvc.DeleteFile(ctx, url); err != nil {
 			logger.Errorf(ctx, "Failed to delete extracted image %s: %v", url, err)
 		}
 	}
+}
+
+// deleteExtractedImagesStrict removes extracted objects only when every
+// resource-catalog release succeeds. It is used by the durable KB delete
+// worker before deleting knowledge rows, so provider/R2 failures remain
+// retryable and cannot silently orphan references.
+func deleteExtractedImagesStrict(
+	ctx context.Context,
+	fileSvc interfaces.FileService,
+	releaser *resourceReleaser,
+	imageURLs []string,
+) error {
+	if len(imageURLs) == 0 {
+		return nil
+	}
+	if fileSvc == nil {
+		return errors.New("file service is unavailable")
+	}
+	for _, imageURL := range imageURLs {
+		deletable, err := releaser.deletableStrict(ctx, imageURL)
+		if err != nil {
+			return fmt.Errorf("release extracted image %s: %w", imageURL, err)
+		}
+		if !deletable {
+			continue
+		}
+		if err := deleteFileIdempotent(ctx, fileSvc, imageURL); err != nil {
+			return fmt.Errorf("delete extracted image %s: %w", imageURL, err)
+		}
+	}
+	return nil
 }
 
 // shouldPreserveExtractedImagesForReparse identifies social Markdown that was
@@ -210,7 +316,7 @@ func (s *knowledgeService) DeleteKnowledge(ctx context.Context, id string) error
 			logger.GetLogger(ctx).WithField("error", err).Errorf("DeleteKnowledge delete file failed")
 		}
 	}
-	deleteExtractedImages(ctx, kbFileSvc, imageURLs)
+	deleteExtractedImages(ctx, kbFileSvc, knowledgeResourceOwners(s.resourceCatalog, knowledge.ID), imageURLs)
 	tenantInfo := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
 	if released := knowledge.AccountedStorageBytes(); released >= tenantInfo.StorageUsed {
 		tenantInfo.StorageUsed = 0
@@ -580,6 +686,10 @@ func (s *knowledgeService) DeleteKnowledgeList(ctx context.Context, ids []string
 	for kbID, infos := range kbImageInfos {
 		kbImageURLs[kbID] = collectImageURLs(ctx, infos)
 	}
+	kbKnowledgeIDs := make(map[string][]string) // kbID → knowledge IDs releasing their claims
+	for _, k := range knowledgeList {
+		kbKnowledgeIDs[k.KnowledgeBaseID] = append(kbKnowledgeIDs[k.KnowledgeBaseID], k.ID)
+	}
 
 	wg := errgroup.Group{}
 	// 2. Delete knowledge embeddings from vector store
@@ -692,7 +802,7 @@ func (s *knowledgeService) DeleteKnowledgeList(ctx context.Context, ids []string
 			logger.Warnf(ctx, "No file service for KB %s, skipping %d image deletions", kbID, len(urls))
 			continue
 		}
-		deleteExtractedImages(ctx, fSvc, urls)
+		deleteExtractedImages(ctx, fSvc, knowledgeResourceOwners(s.resourceCatalog, kbKnowledgeIDs[kbID]...), urls)
 	}
 	byKB := make(map[string][]*types.Knowledge)
 	for i := range knowledgeList {
@@ -784,7 +894,7 @@ func (s *knowledgeService) cleanupKnowledgeResources(ctx context.Context, knowle
 	// images; keep those objects so the queued file reparse can reuse them.
 	// DeleteKnowledge has its own cleanup path and remains destructive.
 	if !shouldPreserveExtractedImagesForReparse(knowledge) {
-		deleteExtractedImages(ctx, fileSvc, imageURLs)
+		deleteExtractedImages(ctx, fileSvc, knowledgeResourceOwners(s.resourceCatalog, knowledge.ID), imageURLs)
 	}
 
 	namespace := types.NameSpace{KnowledgeBase: knowledge.KnowledgeBaseID, Knowledge: knowledge.ID}

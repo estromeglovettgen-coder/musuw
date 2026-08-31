@@ -35,6 +35,7 @@ const expectedSqliteMigrations = [
   "000020_knowledge_multi_tags",
   "000021_principal_model",
   "000022_message_usage",
+  "000023_sandbox_artifacts_compat",
 ];
 
 async function assertMigrationPairs(directory, expectedStems) {
@@ -67,6 +68,16 @@ async function assertMigrationPairs(directory, expectedStems) {
   }
 }
 
+async function assertFileContains(relativePath, expectedFragments) {
+  const content = await readFile(path.join(weknoraRoot, relativePath), "utf8");
+  for (const fragment of expectedFragments) {
+    assert.ok(
+      content.includes(fragment),
+      `${relativePath} lost required Musuw/target contract fragment: ${fragment}`,
+    );
+  }
+}
+
 test("the vendored kernel provenance pins the requested official commit", async () => {
   const provenance = JSON.parse(
     await readFile(
@@ -84,6 +95,7 @@ test("the vendored kernel provenance pins the requested official commit", async 
   );
   assert.equal(provenance.sourceDirectory, "weknora");
   assert.equal(provenance.import.latestMigration, 104);
+  assert.equal(provenance.import.latestSQLiteMigration, 23);
 });
 
 test("Musuw migration meanings remain fixed and upstream migrations append", async () => {
@@ -109,6 +121,28 @@ test("Musuw migration meanings remain fixed and upstream migrations append", asy
   assert.ok(sqliteNames.has("000003_consumer_plan_entitlements.up.sql"));
   assert.ok(sqliteNames.has("000012_complimentary_entitlements.up.sql"));
   assert.ok(!sqliteNames.has("000003_knowledge_base_auto_tag_config.up.sql"));
+
+  const [sqliteInit, sqliteCompat] = await Promise.all([
+    readFile(path.join(weknoraRoot, "migrations/sqlite/000000_init.up.sql"), "utf8"),
+    readFile(
+      path.join(weknoraRoot, "migrations/sqlite/000023_sandbox_artifacts_compat.up.sql"),
+      "utf8",
+    ),
+  ]);
+  for (const schemaObject of [
+    "sandbox_config_id",
+    "artifacts",
+    "tenant_sandbox_configs",
+  ]) {
+    assert.ok(
+      !sqliteInit.includes(schemaObject),
+      `${schemaObject} must not be init-only because an existing v12 DB would miss it`,
+    );
+    assert.ok(
+      sqliteCompat.includes(schemaObject),
+      `SQLite compatibility migration must add ${schemaObject}`,
+    );
+  }
 });
 
 test("representative fixed-target capabilities are present at their owning modules", async () => {
@@ -124,4 +158,76 @@ test("representative fixed-target capabilities are present at their owning modul
       "packages/dsh-weknora/package.json",
     ].map((relativePath) => access(path.join(weknoraRoot, relativePath))),
   );
+});
+
+test("high-risk Musuw product semantics remain composed with the target", async () => {
+  await Promise.all([
+    assertFileContains("internal/application/service/user.go", [
+      "authenticationFenceError",
+      "code_verifier",
+      "bindOIDCIdentity",
+      "ErrAuthenticationUnavailable",
+    ]),
+    assertFileContains("internal/router/router.go", [
+      "liteProductGate()",
+      "PaddleWebhook",
+      "PaddlePublicConfig",
+      "RegisterSandboxConfigRoutes",
+      "RegisterMemoryRoutes",
+    ]),
+    assertFileContains("internal/container/container.go", [
+      "NewEntitlementRepository",
+      "NewPaddleBillingOperationRepository",
+      "NewAccountErasureService",
+      "NewModelServiceWithConsumerResolver",
+      "configureAccountErasureRecovery",
+    ]),
+    assertFileContains("internal/application/repository/knowledge.go", [
+      "CreateKnowledgeWithStorage",
+      "ClaimKnowledgeSourceWithStorage",
+      "DeleteKnowledgeWithStorage",
+      "DeleteKnowledgeListWithStorage",
+    ]),
+    assertFileContains("internal/application/service/knowledge_process.go", [
+      "prepareTikHubArtifact",
+      "ClaimKnowledgeSourceWithStorage",
+      "resolveDocReader(",
+      "WeKnoraCloudCredentials: s.tenantService.GetWeKnoraCloudCredentials",
+    ]),
+    assertFileContains("internal/application/service/session_qa_helpers.go", [
+      "effectiveWebSearchEnabled",
+      "resolveConsumerChatModel",
+      "resolveConsumerRerankModelID",
+      "resolveRequestThinking",
+    ]),
+    assertFileContains("internal/types/tenant.go", [
+      "ComplimentaryPlan",
+      "PaddleSubscriptionID",
+      "OpenRouterDesiredLimitMicrousd",
+      "GetOpenRouter",
+      "default:1073741824",
+    ]),
+    assertFileContains("internal/types/chat.go", [
+      'json:"error_code,omitempty"',
+      'json:"reasoning_details,omitempty"',
+    ]),
+    assertFileContains("internal/types/task.go", [
+      'QueueBilling        = "billing"',
+      'TypeAccountErasure           = "account:erase"',
+      'json:"strict,omitempty"',
+    ]),
+    assertFileContains("internal/application/service/custom_agent.go", [
+      "isPlatformManagedBuiltinAgentID",
+      "ErrCannotModifyBuiltin",
+    ]),
+    assertFileContains("internal/types/knowledgebase.go", [
+      "ApplyPlatformKnowledgeBaseDefaults",
+      "PlatformKnowledgeBaseEmbeddingModelID",
+    ]),
+    assertFileContains("internal/agent/engine.go", [
+      '"query_len"',
+      "ErrorCode: openrouter.ErrorCode(err)",
+      "ReasoningDetails: response.ReasoningDetails",
+    ]),
+  ]);
 });

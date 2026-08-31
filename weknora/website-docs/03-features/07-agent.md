@@ -35,7 +35,7 @@ WeKnora 提供两种模式，在对话框顶部切换：
 | Token 估算与压缩 | `internal/agent/token/` | `Estimator`（BPE 估算）与 `CompressContext`（滑动裁剪） |
 | 记忆整合 | `internal/agent/memory/consolidator.go` | LLM 驱动的历史摘要（Memory Consolidation） |
 | 技能系统 | `internal/agent/skills/` | SKILL.md 的发现、加载与脚本执行（Progressive Disclosure） |
-| 执行沙箱 | `internal/sandbox/` | 技能脚本的 Docker / Local 隔离执行与安全校验 |
+| 执行沙箱 | `internal/sandbox/` | 技能脚本的 Docker / Cube / E2B 隔离执行与安全校验 |
 | 工具审批 | `internal/agent/approval/gate.go` | MCP 危险工具的人工审批（HITL）与会话内 OAuth 授权 |
 | Agent 服务层 | `internal/application/service/agent_service.go` | 组装引擎：注册工具、解析 KB 元信息、初始化技能/沙箱/VLM |
 | 会话问答入口 | `internal/application/service/session_agent_qa.go` | 从 `CustomAgent` 构建运行时 `AgentConfig` 并执行 |
@@ -101,7 +101,7 @@ flowchart TB
         MCP["MCP 工具 mcp_{service}_{tool}"]
     end
     GATE["approval.Gate<br/>（HITL 审批 / OAuth）"]
-    SBX["sandbox.Manager<br/>（Docker / Local）"]
+    SBX["sandbox.Manager<br/>（Docker / Cube / E2B）"]
     EB["event.EventBus"]
 
     H1 --> SQA --> AS --> ENG
@@ -402,19 +402,14 @@ description: Extract text and tables from PDF files, fill forms, merge documents
 
 Agent 侧的启停在 `configureSkillsFromAgent`（`internal/application/service/session_agent_qa.go`）：
 
-- **沙箱关闭（`WEKNORA_SANDBOX_MODE` 为空或 `disabled`）时技能整体不可用**；
-- `SkillsSelectionMode`：`all` = 全部预置技能、`selected` = `SelectedSkills` 白名单、`none`/空 = 禁用；
+- 智能体选择具名沙箱配置后，以该空间已安装到沙箱镜像的 `tenant_skills` 快照为唯一技能来源，不会把宿主机 `skills/preloaded/` 中同名但未安装的脚本混入执行环境；
+- 未选择具名配置时，升级前的 env-only 部署可由 `WEKNORA_SANDBOX_MODE=docker` 提供 deployment-wide 会话沙箱；设为 `disabled`、旧 `local` 或未知值时脚本执行工具不可用；
+- `SkillsSelectionMode`：`all` = 当前沙箱配置的全部已安装技能、`selected` = `SelectedSkills` 白名单、`none`/空 = 禁用；
 - 用户 `@技能` 提及会经 `applyPerRequestSkillScope` 把本轮白名单收窄到提及集合，并作为 `PinnedSkillInfo` 注入 `<must_use>` 块（"Must call read_skill(...) before answering"）。
 
 ### 5.3 与沙箱（internal/sandbox）的关系
 
-`execute_skill_script` → `skills.Manager.ExecuteScript` → `sandbox.Manager.Execute`。沙箱由环境变量配置：
-
-| 环境变量 | 含义 | 默认 |
-| --- | --- | --- |
-| `WEKNORA_SANDBOX_MODE` | `docker` / `local` / `disabled` | `disabled` |
-| `WEKNORA_SANDBOX_DOCKER_IMAGE` | Docker 沙箱镜像 | `wechatopenai/weknora-sandbox:latest` |
-| `WEKNORA_SANDBOX_TIMEOUT` | 执行超时（秒） | 60 |
+`execute_skill_script` → `skills.Manager.ExecuteScript` → `sandbox.Manager.Execute`。Docker、CubeSandbox、E2B 均通过「设置 → 沙箱后端」的同一套空间配置与检查接口维护；远端模板从目标集群实时拉取，缺少 WeKnora 标准模板时自动创建。三者都是会话级持久沙箱，提供 shell_exec、附件暂存与产物收集。本机开发用 Docker 后端连本机 daemon；生产环境使用 E2B 协议后端：E2B Cloud、CubeSandbox，或任意 E2B 兼容控制面，接入方式见 `docs/sandbox-protocol.md`。
 
 **Manager 与校验器**（`internal/sandbox/manager.go`、`validator.go`）：每次执行前，除非 `SkipValidation`，`ScriptValidator` 会做四类静态校验，任一命中即拒绝执行并返回 `ErrSecurityViolation`：
 
@@ -423,17 +418,15 @@ Agent 侧的启停在 `configureSkillsFromAgent`（`internal/application/service
 3. **stdin**：内嵌 shell 命令检测；
 4. 合并入口 `ValidateAll`。
 
-**Docker 沙箱**（`docker.go`，`docker run --rm` 隔离）：
+**Docker 沙箱**（`docker_remote_client.go`、`session_manager.go`）：
 
-- `--user 1000:1000` 非 root、`--cap-drop ALL`、`--security-opt no-new-privileges`、`--pids-limit 100`；
-- 默认 `--network none`（除非 `AllowNetwork`）；
-- 资源限额：内存默认 `DefaultMemoryLimit = 256MB`（`--memory` + `--memory-swap` 同值禁 swap）、CPU 默认 `DefaultCPULimit = 1.0` 核；
-- 技能目录以只读挂载到 `/workspace`；可选 `--read-only` 根文件系统 + 64MB noexec tmpfs；
-- 按扩展名选择解释器（`.py`→`python3` 等）。
+- 每个租户会话按需创建一个带 Musuw 管理标签的持久容器，session→sandbox 绑定存 Redis（单实例无 Redis 时退回进程内存）；服务重启或容器停止后可重新连接，空闲默认 30 分钟由 sweeper 删除；
+- 普通工具执行显式使用镜像内非 root `user`；容器先 `--cap-drop ALL`，只给安装流程保留最小文件/身份切换能力，并启用 `no-new-privileges` 与 init 进程；
+- 默认资源限额为 2GiB / 2 CPU / 512 pids，内存与 memory+swap 同值以禁用 swap；空间配置可下调或覆盖；
+- 网络只允许 `bridge` 或 `none`，具名配置的互联网/私网策略在配置完整性检查和连接守卫中执行；Docker daemon 的 TCP 连接要求 TLS，unix socket 可用于本机开发；
+- `/workspace/input` 保存会话附件、`/workspace/output` 收集生成产物，其余 `/workspace` 供 shell 与技能共享；安装后的技能通过镜像快照供后续会话使用。
 
-**Local 沙箱**（`local.go` / `local_unix.go`，Docker 不可用时的回退）：解释器白名单（默认 `python`/`python3`/`node`/`bash` 及 `cat`/`grep` 等安全命令）、脚本必须为绝对路径且可选限制在 `AllowedPaths` 内、最小化环境变量、`Setpgid` 建进程组以便超时后 `SIGKILL` 整组杀掉。
-
-Manager 初始化时：`docker` 模式先探测 `docker version`，可用则异步预拉镜像，不可用且允许回退则降级 local；`disabled` 模式的 `disabledSandbox` 拒绝一切执行。
+Manager 初始化时：`disabled` 模式的 `disabledSandbox` 拒绝一切执行。
 
 ### 5.4 技能执行时序图
 
@@ -443,7 +436,7 @@ sequenceDiagram
     participant ENG as AgentEngine
     participant SK as skills.Manager
     participant VAL as ScriptValidator
-    participant SBX as "Sandbox（Docker / Local）"
+    participant SBX as "Sandbox（Docker / Cube / E2B）"
 
     Note over LLM: system prompt 含全部技能<br/>Level 1 元数据（name + description）
     LLM->>ENG: "tool_call: read_skill(skill_name)"
@@ -457,7 +450,7 @@ sequenceDiagram
     alt 校验失败
         VAL-->>LLM: "ExitCode=-1, ErrSecurityViolation"
     else 校验通过
-        SBX->>SBX: "docker run --rm --network none --cap-drop ALL ...<br/>或本地白名单解释器 + 进程组"
+        SBX->>SBX: "会话级容器 / MicroVM 内执行"
         SBX-->>LLM: "stdout / stderr / exit_code / duration / killed"
     end
 ```
@@ -662,5 +655,5 @@ const (
 | `DefaultConsolidationThreshold` | 0.5 | `internal/agent/memory/consolidator.go` |
 | `DefaultContextThresholdRatio` | 0.8 | `internal/agent/token/compress.go` |
 | 审批默认超时 | 10 分钟 | `internal/agent/approval/gate.go` |
-| 沙箱默认限额 | 60s / 256MB / 1 CPU / 100 pids | `internal/sandbox/sandbox.go`、`docker.go` |
+| Docker 沙箱默认限额 | 单次执行 60s / 空闲 30m / 2GiB / 2 CPU / 512 pids | `internal/sandbox/sandbox.go`、`docker_engine.go`、`docker_remote_client.go` |
 | 技能命名限制 | name ≤ 64、description ≤ 1024 | `internal/agent/skills/skill.go` |

@@ -192,8 +192,23 @@ test('authoritative workspace 7 basic tab uses full-width counted name and descr
 })
 
 test('hidden legacy editor sections cannot leave the authoritative shell on a blank panel', () => {
-  assert.match(editor, /const EDITOR_VISIBLE_SECTIONS = new Set\(\['basic', 'knowledge', 'prompts', 'mcp'\]\)/)
-  assert.match(editor, /const currentSection = ref\(normalizeEditorSection\(props\.initialSection\)\)/)
-  assert.match(editor, /currentSection\.value = normalizeEditorSection\(props\.initialSection\)/)
+  assert.match(
+    editor,
+    /const EDITOR_VISIBLE_SECTIONS = new Set\(\[[\s\S]*?'basic'[\s\S]*?'knowledge'[\s\S]*?'prompts'[\s\S]*?'conversation'[\s\S]*?'retrieval'[\s\S]*?'websearch'[\s\S]*?'multimodal'[\s\S]*?'skills'[\s\S]*?'share'[\s\S]*?'suggestions'[\s\S]*?'tools'[\s\S]*?'mcp'/,
+  )
+  assert.match(
+    editor,
+    /const LITE_EDITOR_VISIBLE_SECTIONS = new Set\(\['basic', 'knowledge', 'prompts', 'mcp'\]\)/,
+  )
+  assert.match(
+    editor,
+    /if \(authStore\.isLiteMode\) \{[\s\S]*?if \(isAgentMode\.value\) \{[\s\S]*?key: 'mcp'[\s\S]*?return items;/,
+  )
+  assert.match(
+    editor,
+    /const visibleSections = authStore\.isLiteMode\s*\?\s*LITE_EDITOR_VISIBLE_SECTIONS\s*:\s*EDITOR_VISIBLE_SECTIONS/,
+  )
+  assert.match(editor, /const currentSection = ref\((?:normalizeEditorSection|resolveEditorSection)\(props\.initialSection\)\)/)
+  assert.match(editor, /currentSection\.value = (?:normalizeEditorSection|resolveEditorSection)\(props\.initialSection\)/)
   assert.doesNotMatch(editor, /currentSection\.value = 'multimodal'/)
 })

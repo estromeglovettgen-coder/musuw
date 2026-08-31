@@ -31,10 +31,12 @@ import {
   cancelKnowledgeParse,
   batchDeleteKnowledge,
   batchReparseKnowledge,
+  getKnowledgeDetails,
   getKnowledgeSpans,
   listKnowledgeFolders,
   moveKnowledgeToFolder,
   renameKnowledgeFolder,
+  downKnowledgeDetails,
   type KnowledgeFolderTree,
 } from "@/api/knowledge-base/index";
 import { knowledgeSpansPayloadHasTrace } from '@/utils/knowledgeTrace';
@@ -55,6 +57,7 @@ import {
   shouldRefreshWikiStatusAfterKnowledgePoll,
 } from './wikiStatusRefresh';
 import { listMoveTargets, moveKnowledge, getKnowledgeMoveProgress } from '@/api/knowledge-base';
+import { resolveKnowledgeDownloadFileName } from './knowledgeDownloadFileName';
 import {
   buildUploadFileName,
   canMoveFolderTo,
@@ -574,6 +577,8 @@ const sourceOptions = computed(() => [
   { label: t('knowledgeBase.channelFeishuDrive'), value: 'feishu_drive' },
   { label: t('knowledgeBase.channelNotion'), value: 'notion' },
   { label: t('knowledgeBase.channelYuque'), value: 'yuque' },
+  { label: t('knowledgeBase.channelGitLab'), value: 'gitlab' },
+  { label: t('knowledgeBase.channelIma'), value: 'ima' },
   { label: t('knowledgeBase.channelWechat'), value: 'wechat' },
   { label: t('knowledgeBase.channelWecom'), value: 'wecom' },
   { label: t('knowledgeBase.channelDingtalk'), value: 'dingtalk' },
@@ -1197,18 +1202,35 @@ const pendingKnowledgeId = ref<string | null>(
   (route.query.knowledge_id as string) || null
 );
 
-const tryAutoOpenDocument = () => {
-  if (!pendingKnowledgeId.value || !cardList.value?.length) return;
+let autoOpenRequest = 0;
+
+const tryAutoOpenDocument = async () => {
+  if (!pendingKnowledgeId.value) return;
   const targetId = pendingKnowledgeId.value;
   pendingKnowledgeId.value = null;
+  const request = ++autoOpenRequest;
   const card = cardList.value.find((c: KnowledgeCard) => c.id === targetId);
-  if (card) {
-    nextTick(() => openCardDetails(card));
-  } else {
-    nextTick(() => {
-      openCardDetails({ id: targetId } as KnowledgeCard);
-    });
+
+  // A card list is scoped to the currently selected folder. Resolve a
+  // referenced document before opening its drawer so links from chat also
+  // navigate to the document's nested folder.
+  let target = card || ({ id: targetId } as KnowledgeCard);
+  try {
+    const response: any = await getKnowledgeDetails(targetId);
+    if (request !== autoOpenRequest) return;
+    const detail = response?.data || response;
+    if (detail && typeof detail === 'object') {
+      target = { ...target, ...detail, id: targetId } as KnowledgeCard;
+      selectedFolderPath.value = detail.folder_path || ROOT_FOLDER_PATH;
+    }
+  } catch (error) {
+    // Keep the ID-only fallback; the drawer's normal loader reports failures.
+    console.error('Failed to resolve referenced document folder', error);
   }
+
+  if (request !== autoOpenRequest) return;
+  await nextTick();
+  openCardDetails(target);
 };
 
 // React to later ?knowledge_id= changes on the same KB route (no remount).
@@ -1217,8 +1239,6 @@ watch(
   (newId) => {
     if (typeof newId !== 'string' || !newId) return;
     pendingKnowledgeId.value = newId;
-    // cardList is almost always already loaded at this point; if not, the
-    // cardList watcher below will pick it up.
     tryAutoOpenDocument();
   },
 );
@@ -1260,7 +1280,7 @@ watch(() => cardList.value, (newValue) => {
   docListLoading.value = false;
 
   // Auto-open document if navigated with ?knowledge_id=xxx
-  if (pendingKnowledgeId.value && newValue?.length) {
+  if (pendingKnowledgeId.value) {
     tryAutoOpenDocument();
   }
 
@@ -2050,12 +2070,33 @@ const confirmCancelParseKnowledge = async (item: KnowledgeCard) => {
   }
 };
 
+const downloadKnowledge = async (item: KnowledgeCard) => {
+  if (!item?.id) return;
+  try {
+    const file = await downKnowledgeDetails(item.id);
+    const objectUrl = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = objectUrl;
+    link.download = resolveKnowledgeDownloadFileName(item);
+    document.body.appendChild(link);
+    link.click();
+    nextTick(() => {
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    });
+  } catch {
+    MessagePlugin.error(t('file.downloadFailed'));
+  }
+};
+
 // Bridge card-view actions back to existing per-card handlers.
 const handleCardAction = (
-  action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
+  action: 'download' | 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
   item: KnowledgeCard,
 ) => {
   const idx = (cardList.value || []).findIndex((i: KnowledgeCard) => i.id === item.id);
+  if (action === 'download') return downloadKnowledge(item);
   if (action === 'edit') return handleManualEdit(idx, item);
   if (action === 'reparse') {
     if (isParseInFlight(item.parse_status)) return onReparseMenuClick(idx, item);
@@ -2070,10 +2111,11 @@ const handleCardAction = (
 
 // Bridge list-view actions back to existing per-card handlers.
 const handleListAction = (
-  action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
+  action: 'download' | 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'delete' | 'view-trace' | 'batch-manage',
   item: KnowledgeCard,
 ) => {
   const idx = (cardList.value || []).findIndex((i: KnowledgeCard) => i.id === item.id);
+  if (action === 'download') return downloadKnowledge(item);
   if (action === 'edit') return handleManualEdit(idx, item);
   if (action === 'reparse') return confirmRebuildKnowledge(idx, item);
   if (action === 'cancel-parse') return confirmCancelParseKnowledge(item);
@@ -2467,6 +2509,7 @@ async function createNewSession(value: string): Promise<void> {
                     :selected-ids="selectedIds"
                     :batch-mode="batchMode"
                     :can-edit="canEdit"
+                    :can-download="canDownloadKnowledge"
                     :can-mutate-knowledge="canMutateKnowledge"
                     :trace-available-by-id="traceAvailableById"
                     :tag-list="tagList"
@@ -2495,6 +2538,7 @@ async function createNewSession(value: string): Promise<void> {
                     :selected-ids="selectedIds" :tag-list="tagList"
                     :can-edit="canEdit" :can-mutate-knowledge="canMutateKnowledge"
                     :trace-visible-ids="traceAvailableById"
+                    :can-download="canDownloadKnowledge"
                     :move-menu-mode="moveMenuMode"
                     :move-target-kbs="moveTargetKbs"
                     :move-targets-loading="moveTargetsLoading"

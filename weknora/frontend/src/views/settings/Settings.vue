@@ -37,9 +37,17 @@
       <ModelSettings v-else-if="currentSection === 'models'" :initial-type="currentModelType" />
       <WebSearchSettings v-else-if="currentSection === 'websearch'" />
       <ChatHistorySettings v-else-if="currentSection === 'chathistory'" />
+      <MemoryWorkspaceSettings v-else-if="currentSection === 'memory'" />
+      <MemorySettings v-else-if="currentSection === 'mymemory'" />
+      <EnvVarSettings v-else-if="currentSection === 'envvars'" />
       <VectorStoreSettings v-else-if="currentSection === 'vectorstore'" />
       <ParserEngineSettings v-else-if="currentSection === 'parser'" />
       <StorageEngineSettings v-else-if="currentSection === 'storage'" />
+      <SandboxSettings v-else-if="currentSection === 'sandbox'" />
+      <SkillSettings
+        v-else-if="currentSection === 'skills'"
+        :initial-sandbox-id="currentSubSection"
+      />
       <SystemInfo v-else-if="currentSection === 'system'" />
       <SystemSettings v-else-if="currentSection === 'system-global'" />
       <RuntimeQueues v-else-if="currentSection === 'runtime-queues'" />
@@ -60,9 +68,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { LocationQueryRaw } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
 import { useI18n } from 'vue-i18n'
+import { MessagePlugin } from 'tdesign-vue-next'
 import SystemInfo from './SystemInfo.vue'
 import TenantInfo from './TenantInfo.vue'
 import UserProfile from './UserProfile.vue'
@@ -73,9 +84,14 @@ import OllamaSettings from './OllamaSettings.vue'
 import McpSettings from './McpSettings.vue'
 import WebSearchSettings from './WebSearchSettings.vue'
 import ChatHistorySettings from './ChatHistorySettings.vue'
+import MemorySettings from './MemorySettings.vue'
+import EnvVarSettings from './EnvVarSettings.vue'
+import MemoryWorkspaceSettings from './MemoryWorkspaceSettings.vue'
 import VectorStoreSettings from './VectorStoreSettings.vue'
 import ParserEngineSettings from './ParserEngineSettings.vue'
 import StorageEngineSettings from './StorageBackendSettings.vue'
+import SandboxSettings from './SandboxSettings.vue'
+import SkillSettings from './SkillSettings.vue'
 import WeKnoraCloudSettings from './WeKnoraCloudSettings.vue'
 import TenantMembers from './TenantMembers.vue'
 import SystemSettings from '@/views/system/SystemSettings.vue'
@@ -85,9 +101,8 @@ import SystemAuditLog from '@/views/system/SystemAuditLog.vue'
 import IntegrationSettingsSection from '@/views/integrations/IntegrationSettingsSection.vue'
 import {
   INTEGRATION_PREVIEW_ITEMS,
+  INTEGRATION_TAB_CAPABILITY,
   INTEGRATION_TAB_MIN_ROLE,
-  INTEGRATION_TABS,
-  type IntegrationTab,
 } from '@/config/integrations'
 import {
   SETTINGS_SECTION_MIN_ROLE,
@@ -95,11 +110,22 @@ import {
 } from '@/config/settingsAccess'
 import { filterSettingsNavigation } from './settingsNavigation'
 import VisualSettingsShell from './components/VisualSettingsShell.vue'
+import { SETTINGS_SECTION_CAPABILITY } from '@/config/deploymentCapabilities'
+import { SKILL_ICON } from '@/types/mention'
+import {
+  buildSettingsRouteQuery,
+  integrationSectionKey,
+  integrationTabFromSection,
+  isIntegrationSection,
+  normalizeSettingsSection as normalizeSettingsSectionFromQuery,
+  settingsQueryUnchanged,
+} from '@/config/settingsRoute'
 
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
+const deploymentCapabilities = useDeploymentCapabilitiesStore()
 const { t } = useI18n()
 
 const currentSection = ref<string>('general')
@@ -114,30 +140,39 @@ type NavItem = {
 }
 
 const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS
-const INTEGRATION_SECTION_PREFIX = 'integration-'
-const integrationSectionKey = (tab: IntegrationTab) => `${INTEGRATION_SECTION_PREFIX}${tab}`
-
-const integrationTabFromSection = (section: string): IntegrationTab => {
-  const raw = section.startsWith(INTEGRATION_SECTION_PREFIX)
-    ? section.slice(INTEGRATION_SECTION_PREFIX.length)
-    : section
-  return INTEGRATION_TABS.includes(raw as IntegrationTab) ? raw as IntegrationTab : 'im'
-}
-
-const isIntegrationSection = (section: string) =>
-  section.startsWith(INTEGRATION_SECTION_PREFIX) &&
-  INTEGRATION_TABS.includes(integrationTabFromSection(section))
 
 const normalizeSettingsSection = (section: string) => {
-  // Consumer Lite exposes personal settings, usage, consumer model choices,
-  // and the native MCP settings surface for tenant admins.
-  // Internal events/deep-links cannot reopen hidden management sections.
-  if (authStore.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp') return 'general'
-  if (section === 'api') return integrationSectionKey('api')
-  if (section === 'integrations') {
-    return integrationSectionKey(integrationTabFromSection((route.query.tab as string) || 'im'))
+  // Preserve Musuw Lite's intentionally narrow settings surface while using
+  // the fixed upstream route aliases for regular deployments.
+  if (
+    authStore.isLiteMode
+    && section !== 'usage'
+    && section !== 'userprofile'
+    && section !== 'models'
+    && section !== 'mcp'
+  ) {
+    return 'general'
   }
-  return section
+  return normalizeSettingsSectionFromQuery(section, route.query.tab as string | undefined)
+}
+
+const syncSettingsRoute = (sectionKey: string) => {
+  if (route.path !== '/platform/settings') return
+  const query = buildSettingsRouteQuery(sectionKey, route.query)
+  if (settingsQueryUnchanged(route.query, query)) return
+  void router.replace({
+    path: '/platform/settings',
+    query: query as LocationQueryRaw,
+  })
+}
+
+const isSectionSupported = (key: string): boolean => {
+  if (isIntegrationSection(key)) {
+    return deploymentCapabilities.isSupported(
+      INTEGRATION_TAB_CAPABILITY[integrationTabFromSection(key)],
+    )
+  }
+  return deploymentCapabilities.isSupported(SETTINGS_SECTION_CAPABILITY[key])
 }
 
 const canSeeSection = (key: string): boolean => {
@@ -177,9 +212,8 @@ const navItems = computed<NavItem[]>(() => {
     label: t(`integrations.tabs.${item.key}`),
   }))
 
-  // Behavior authority: keep the complete WeKnora v0.7.2 settings capability
-  // set. Visual authority: render it as one clean SettingsModal.tsx nav stack,
-  // without inventing extra group headings that do not exist in @视觉文件.
+  // Behavior authority is the fixed main commit 81142df. Keep every compatible
+  // settings capability while rendering it through Musuw's visual shell.
   const all: NavItem[] = [
     { key: 'general', icon: 'setting', label: t('general.title') },
     { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
@@ -190,10 +224,14 @@ const navItems = computed<NavItem[]>(() => {
     { key: 'models', icon: 'cpu', label: t('settings.modelManagement') },
     { key: 'ollama', icon: 'server', label: 'Ollama' },
     { key: 'weknoracloud', icon: 'cloud', label: 'Musuw Cloud' },
-    ...integrationItems,
+    { key: 'memory', icon: 'bulletpoint', label: t('memoryWorkspaceSettings.title') },
+    { key: 'mymemory', icon: 'bookmark', label: t('memorySettings.title') },
+    { key: 'envvars', icon: 'key', label: t('envVarSettings.title') },
     { key: 'vectorstore', icon: 'data-base', label: t('settings.vectorStoreEngine') },
     { key: 'parser', icon: 'file-search', label: t('settings.parserEngine') },
     { key: 'storage', icon: 'cloud', label: t('settings.storageEngine') },
+    { key: 'sandbox', icon: 'code', label: t('settings.sandbox.title') },
+    { key: 'skills', icon: SKILL_ICON, label: t('settings.skills.title') },
     { key: 'websearch', icon: 'search', label: t('settings.webSearchConfig') },
     { key: 'mcp', icon: 'tools', label: t('settings.mcpService') },
     { key: 'system-global', icon: 'server', label: t('settings.system') },
@@ -201,17 +239,18 @@ const navItems = computed<NavItem[]>(() => {
     { key: 'platform-api-keys', icon: 'secured', label: t('platformApiKeys.title') },
     { key: 'system-audit-log', icon: 'history', label: t('system.globalSettings.audit.tabLabel') },
     { key: 'system', icon: 'info-circle', label: t('settings.versionInfo') },
+    ...integrationItems,
   ]
 
   if (!authStore.currentTenantRole && !authStore.canAccessAllTenants) return []
-  return all.filter((item) => canSeeSection(item.key))
+  return all.filter((item) => canSeeSection(item.key) && isSectionSupported(item.key))
 })
 
 const filteredNavItems = computed(() => filterSettingsNavigation(navItems.value, settingsSearchQuery.value))
 const activeNavLabel = computed(() => navItems.value.find((item) => item.key === currentSection.value)?.label || t('general.settings'))
-
 const isSettingsRoute = computed(() => route.path === '/platform/settings')
 const visible = computed(() => route.path === '/platform/settings' || uiStore.showSettingsModal)
+
 const currentModelType = computed(() => {
   if (currentSection.value !== 'models') return null
   if (currentSubSection.value) return currentSubSection.value
@@ -222,19 +261,7 @@ const currentModelType = computed(() => {
 const handleNavClick = (item: NavItem) => {
   currentSection.value = item.key
   currentSubSection.value = ''
-
-  // Preserve WeKnora's route contract: only integration/system compatibility
-  // URLs own a stable query encoding. Ordinary Settings tabs remain internal.
-  if (route.path === '/platform/settings' && isIntegrationSection(item.key)) {
-    void router.replace({
-      path: '/platform/settings',
-      query: { ...route.query, section: 'integrations', tab: integrationTabFromSection(item.key) },
-    })
-  } else if (route.path === '/platform/settings' && SYSTEM_ADMIN_SECTIONS.has(item.key)) {
-    const query = { ...route.query }
-    delete query.tab
-    void router.replace({ path: '/platform/settings', query: { ...query, section: item.key } })
-  }
+  syncSettingsRoute(item.key)
 }
 
 const handleClose = () => {
@@ -242,7 +269,12 @@ const handleClose = () => {
   uiStore.closeSettings()
   if (route.path === '/platform/settings') {
     const section = route.query.section
-    if (section === 'system-global' || section === 'runtime-queues' || section === 'platform-api-keys' || section === 'system-audit-log') {
+    if (
+      section === 'system-global'
+      || section === 'runtime-queues'
+      || section === 'platform-api-keys'
+      || section === 'system-audit-log'
+    ) {
       void router.replace('/platform/knowledge-bases')
     } else {
       const previousPath = router.options.history.state.back
@@ -258,36 +290,80 @@ const handleClose = () => {
 
 watch(() => uiStore.settingsInitialSection, (section) => {
   if (!section || !visible.value) return
-  currentSection.value = normalizeSettingsSection(section)
+  const normalizedSection = normalizeSettingsSection(section)
+  if (deploymentCapabilities.loaded && !isSectionSupported(normalizedSection)) {
+    MessagePlugin.warning(t('settings.capabilityUnavailable'))
+    const fallback = navItems.value[0]?.key || 'general'
+    currentSection.value = fallback
+    currentSubSection.value = ''
+    syncSettingsRoute(fallback)
+    return
+  }
+  currentSection.value = normalizedSection
   currentSubSection.value = authStore.isLiteMode ? '' : (uiStore.settingsInitialSubSection || '')
+  syncSettingsRoute(normalizedSection)
 }, { immediate: true })
 
+watch(() => uiStore.settingsInitialSubSection, (sub) => {
+  if (uiStore.settingsInitialSection === 'skills' && visible.value) {
+    currentSubSection.value = sub || ''
+  }
+})
+
 watch(
-  () => [visible.value, route.query.section, route.query.tab],
-  ([isVisible, section, tab]) => {
-    if (!isVisible || typeof section !== 'string') return
-    currentSection.value = normalizeSettingsSection(section)
-    currentSubSection.value = authStore.isLiteMode ? '' : (typeof tab === 'string' ? tab : '')
+  () => [visible.value, route.path, route.query.section, route.query.tab, deploymentCapabilities.loaded] as const,
+  ([isVisible, path, section, tab, capabilitiesLoaded]) => {
+    if (!isVisible || path !== '/platform/settings') return
+    if (typeof section !== 'string') {
+      syncSettingsRoute(currentSection.value || 'general')
+      return
+    }
+    const normalizedSection = normalizeSettingsSectionFromQuery(
+      section,
+      typeof tab === 'string' ? tab : undefined,
+    )
+    if (capabilitiesLoaded && !isSectionSupported(normalizedSection)) {
+      MessagePlugin.warning(t('settings.capabilityUnavailable'))
+      const fallback = navItems.value[0]?.key || 'general'
+      currentSection.value = fallback
+      currentSubSection.value = ''
+      syncSettingsRoute(fallback)
+      return
+    }
+    currentSection.value = normalizedSection
+    currentSubSection.value = authStore.isLiteMode ? '' : (
+      normalizedSection === 'models' && typeof tab === 'string' ? tab : ''
+    )
   },
   { immediate: true },
 )
 
 watch(navItems, (items) => {
   if (!items.some((item) => item.key === currentSection.value)) {
-    currentSection.value = items[0]?.key || 'general'
+    const fallback = items[0]?.key || 'general'
+    currentSection.value = fallback
     currentSubSection.value = ''
+    syncSettingsRoute(fallback)
   }
 })
 
 const handleSettingsNav = (event: Event) => {
   const detail = event instanceof CustomEvent ? event.detail : null
   if (!detail?.section) return
-  currentSection.value = normalizeSettingsSection(String(detail.section))
+  const normalizedSection = normalizeSettingsSection(String(detail.section))
+  if (deploymentCapabilities.loaded && !isSectionSupported(normalizedSection)) {
+    MessagePlugin.warning(t('settings.capabilityUnavailable'))
+    currentSection.value = navItems.value[0]?.key || 'general'
+    currentSubSection.value = ''
+    return
+  }
+  currentSection.value = normalizedSection
   currentSubSection.value = authStore.isLiteMode ? '' : (detail.subsection ? String(detail.subsection) : '')
+  syncSettingsRoute(normalizedSection)
 }
 
 onMounted(() => {
-  window.addEventListener('settings-nav', handleSettingsNav)
+  window.addEventListener('settings-nav', handleSettingsNav as EventListener)
 })
 
 watch(currentSection, () => {
@@ -295,6 +371,6 @@ watch(currentSection, () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('settings-nav', handleSettingsNav)
+  window.removeEventListener('settings-nav', handleSettingsNav as EventListener)
 })
 </script>

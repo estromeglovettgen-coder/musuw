@@ -85,6 +85,16 @@ func sanitizeQuery(raw string) string {
 // data that field-level JSON redaction cannot safely inspect. Keep request
 // metadata, but never persist those request or response bodies.
 func shouldLogBodies(path string) bool {
+	pathLower := strings.ToLower(path)
+	// Sharing and invitation endpoints carry tenant/user identifiers and
+	// sometimes operator-supplied messages or signed links. The generic
+	// logger cannot reliably classify those payloads field-by-field, so keep
+	// their bodies out of access logs just like authentication and payment
+	// payloads. This applies to reads as well as mutations so a failed share
+	// response cannot echo a private invitation or share token.
+	if strings.Contains(pathLower, "/share") || strings.Contains(pathLower, "/invite") {
+		return false
+	}
 	// URL imports accept arbitrary pasted share text. Even field-level
 	// redaction cannot safely sanitize provider URLs, signed query strings, or
 	// Chinese copy text, so keep this request/response body out of access logs
@@ -273,6 +283,16 @@ func Logger() gin.HandlerFunc {
 		if responseBodyStr != "" {
 			logMsg = logMsg.WithField("response_body", secutils.SanitizeForLog(responseBodyStr))
 		}
-		logMsg.Info()
+		if last := c.Errors.Last(); last != nil && last.Err != nil {
+			logMsg = logMsg.WithField("error", secutils.SanitizeForLog(last.Err.Error()))
+		}
+		switch {
+		case statusCode >= 500:
+			logMsg.Error()
+		case statusCode >= 400:
+			logMsg.Warn()
+		default:
+			logMsg.Info()
+		}
 	}
 }

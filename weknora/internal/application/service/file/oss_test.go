@@ -5,7 +5,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Tencent/WeKnora/internal/utils"
 )
+
+func allowOSSFixtureHosts(t *testing.T) {
+	t.Helper()
+	// These tests exercise OSS construction/error handling, not live DNS.
+	// VPN/proxy resolvers may map public names to RFC 2544 synthetic IPs,
+	// which production SSRF validation correctly blocks.
+	utils.SetSSRFWhitelistFromRaw("oss-cn-hangzhou.aliyuncs.com,example.com")
+	t.Cleanup(func() { utils.SetSSRFWhitelistFromRaw("") })
+}
 
 func TestParseOssFilePath(t *testing.T) {
 	tests := []struct {
@@ -99,6 +110,8 @@ func TestParseOssFilePath(t *testing.T) {
 }
 
 func TestNewOSSClient(t *testing.T) {
+	allowOSSFixtureHosts(t)
+
 	tests := []struct {
 		name      string
 		endpoint  string
@@ -117,7 +130,7 @@ func TestNewOSSClient(t *testing.T) {
 		},
 		{
 			name:      "custom endpoint",
-			endpoint:  "https://custom-oss-endpoint.com",
+			endpoint:  "https://example.com",
 			region:    "cn-shanghai",
 			accessKey: "ak",
 			secretKey: "sk",
@@ -145,6 +158,12 @@ func TestNewOSSClient(t *testing.T) {
 	}
 }
 
+func TestNewOSSClientRejectsUnsafeEndpoint(t *testing.T) {
+	if _, err := newOSSClient("http://127.0.0.1:9000", "cn-hangzhou", "ak", "sk"); err == nil {
+		t.Fatal("expected loopback OSS endpoint to be rejected")
+	}
+}
+
 func TestCheckOssConnectivity_InvalidEndpoint(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -164,6 +183,8 @@ func TestCheckOssConnectivity_InvalidEndpoint(t *testing.T) {
 }
 
 func TestOssEnsureBucket_NonExistent(t *testing.T) {
+	allowOSSFixtureHosts(t)
+
 	client, err := newOSSClient(
 		"https://oss-cn-hangzhou.aliyuncs.com",
 		"cn-hangzhou",
@@ -182,6 +203,8 @@ func TestOssEnsureBucket_NonExistent(t *testing.T) {
 }
 
 func TestOssEnsureBucket_CreateFails(t *testing.T) {
+	allowOSSFixtureHosts(t)
+
 	client, err := newOSSClient(
 		"https://oss-cn-hangzhou.aliyuncs.com",
 		"cn-hangzhou",

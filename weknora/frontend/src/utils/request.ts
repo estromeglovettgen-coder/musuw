@@ -27,8 +27,8 @@ const instance = axios.create({
 });
 
 // 获取当前用户语言（用于 Accept-Language header）
-function getCurrentLanguage(): string {
-  return i18n.global.locale?.value || localStorage.getItem('locale') || 'en-US'
+export function getCurrentLanguage(): string {
+  return i18n.global.locale?.value || localStorage.getItem('locale') || 'zh-CN'
 }
 
 
@@ -314,6 +314,10 @@ export function post<T = any>(url: string, data = {}, config?: any): Promise<T> 
 
 export function put<T = any>(url: string, data = {}, config?: any): Promise<T> {
   return instance.put<T>(url, data, config) as unknown as Promise<T>;
+}
+
+export function patch<T = any>(url: string, data = {}, config?: any): Promise<T> {
+  return instance.patch<T>(url, data, config) as unknown as Promise<T>;
 }
 
 export function del<T = any>(url: string, data?: any): Promise<T> {

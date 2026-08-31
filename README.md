@@ -1,7 +1,8 @@
 # Musuw
 
 Musuw is a consumer knowledge workspace built from the complete upstream
-[WeKnora v0.7.2](https://github.com/Tencent/WeKnora/tree/v0.7.2) source tree.
+[WeKnora main source at fixed commit `81142df`](https://github.com/Tencent/WeKnora/tree/81142dfd17b2778087e95d3a317483a2fd909b91)
+(the upstream `VERSION` remains `0.7.2`).
 Users enter through Musuw's Google or email-OTP sign-in, then use a single,
 preconfigured knowledge workspace. Model credentials and infrastructure remain
 server-side.
@@ -24,7 +25,7 @@ entering a payment method or creating a real charge.
 | [`storefront/`](storefront/) | Source for the public homepage at `musuw.com`; its product actions enter the app at `app.musuw.com/auth/start`. |
 | [`integration/`](integration/) | Runtime composition for local host-mode work and the production release. |
 | [`scripts/`](scripts/) | The small local, preview, and release entry points. |
-| [`third_party/weknora/`](third_party/weknora/) | The v0.7.2 source provenance record. |
+| [`third_party/weknora/`](third_party/weknora/) | The fixed-main source provenance record and historical v0.7.2 baseline. |
 
 The vendored application is the authority. Keep changes small and local to the
 existing WeKnora modules; do not introduce a second product runtime, API, or

@@ -26,7 +26,7 @@ test('settings search never synthesizes a hidden section', () => {
 test('Lite settings expose consumer models and admin MCP without exposing system administration', () => {
   assert.match(
     settingsSource,
-    /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/,
+    /if \(\s*authStore\.isLiteMode\s*&&\s*section !== 'usage'\s*&&\s*section !== 'userprofile'\s*&&\s*section !== 'models'\s*&&\s*section !== 'mcp'\s*\)\s*\{\s*return 'general'/,
   )
   assert.match(
     settingsSource,

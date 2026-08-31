@@ -236,3 +236,56 @@ func TestResolveChatModelIDRejectsUnavailableRuntimeModelForPlatformMode(t *test
 	assert.Empty(t, modelID)
 	assert.Contains(t, err.Error(), "unavailable")
 }
+func TestResolveChatModelIDWikiFixerFallsBackToKnowledgeBaseModel(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			modelsByID: map[string]*types.Model{
+				"wiki-chat": {
+					ID:   "wiki-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+		knowledgeBaseService: &fakeAgentKnowledgeBaseService{
+			kb: &types.KnowledgeBase{
+				ID:             "wiki-kb",
+				SummaryModelID: "wiki-chat",
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: types.BuiltinWikiFixerID,
+		},
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, []string{"wiki-kb"}, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "wiki-chat", modelID)
+}
+
+func TestResolveChatModelIDWikiFixerFallsBackToAvailableModel(t *testing.T) {
+	svc := &sessionService{
+		modelService: &stubModelService{
+			availableModels: []*types.Model{
+				{
+					ID:   "system-chat",
+					Type: types.ModelTypeKnowledgeQA,
+				},
+			},
+		},
+	}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: types.BuiltinWikiFixerID,
+		},
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "system-chat", modelID)
+}

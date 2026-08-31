@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, type SetupContext } from 'vue'
+import { defineComponent, onBeforeUnmount, ref, type SetupContext } from 'vue'
 import LegacyChatBusiness from '@/assets/business-baselines/ChatIndex.pre-view.vue'
 import InputField from '../../components/Input-field.vue'
 import botmsg from './components/botmsg.vue'
@@ -8,6 +8,9 @@ import KnowledgeBaseEditorModal from '@/views/knowledge/KnowledgeBaseEditorModal
 import ChatReferencesDrawer from '@/components/ChatReferencesDrawer.vue'
 import ChatAttachmentPreviewDrawer from '@/components/ChatAttachmentPreviewDrawer.vue'
 import FollowUpSuggestions from '@/components/chat/FollowUpSuggestions.vue'
+import ChatQuestionMinimap from '@/components/chat/ChatQuestionMinimap.vue'
+import MessageTimestamp from '@/components/chat/MessageTimestamp.vue'
+import { shouldShowConversationTimestamp } from '@/utils/messageTimestamp'
 import ChatHeader from '@/components/ChatHeader.vue'
 
 const legacy = LegacyChatBusiness as any
@@ -22,7 +25,41 @@ export default defineComponent({
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const minimapTargetId = ref('')
+      let minimapFlashTimer: ReturnType<typeof setTimeout> | null = null
+      const clearMinimapFlash = () => {
+        if (minimapFlashTimer !== null) {
+          clearTimeout(minimapFlashTimer)
+          minimapFlashTimer = null
+        }
+        minimapTargetId.value = ''
+      }
+      const jumpToQuestion = (id: string) => {
+        const root = (state as any).scrollContainer?.value as HTMLElement | null
+        if (!root || !id) return
+        const escapedId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+          ? CSS.escape(id)
+          : id.replace(/"/g, '\\"')
+        const element = root.querySelector<HTMLElement>(`[data-message-id="${escapedId}"]`)
+        if (!element) return
+        const offset = element.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop
+        const nearEnd = root.scrollHeight - offset < root.clientHeight + 80
+        const scrolledUp = (state as any).userHasScrolledUp
+        if (scrolledUp && typeof scrolledUp === 'object' && 'value' in scrolledUp) scrolledUp.value = !nearEnd
+        element.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        minimapTargetId.value = id
+        if (minimapFlashTimer !== null) clearTimeout(minimapFlashTimer)
+        minimapFlashTimer = setTimeout(clearMinimapFlash, 1200)
+      }
+      onBeforeUnmount(clearMinimapFlash)
+      return {
+        ...state,
+        minimapTargetId,
+        jumpToQuestion,
+        shouldShowConversationTimestamp,
+      }
+    }
     return state
   },
 })
@@ -53,17 +90,27 @@ export default defineComponent({
           </Transition>
         </section>
 
-        <article v-for="(session, index) in messagesList" :key="session.id || `${session.role}-${session.created_at}-${index}`" class="visual-chat-message-row" :class="`is-${session.role}`">
+        <template v-for="(session, index) in messagesList" :key="session.id || `${session.role}-${session.created_at}-${index}`">
+          <MessageTimestamp v-if="shouldShowConversationTimestamp(messagesList, index)" :value="session.created_at" />
+          <article class="visual-chat-message-row" :class="[`is-${session.role}`, { 'is-minimap-target': session.role === 'user' && session.id && session.id === minimapTargetId }]" :data-message-id="session.role === 'user' ? (session.id || undefined) : undefined">
           <usermsg v-if="session.role === 'user'" :content="session.content" :mentioned_items="session.mentioned_items" :images="session.images" :attachments="session.attachments" :embedded-mode="embeddedMode" :session-id="session_id" />
           <template v-if="session.role === 'assistant' && shouldRenderAssistantMessage(session)">
             <botmsg :content="session.content" :session="session" :session-id="session_id" :user-query="getUserQuery(index)" :is-first-enter="isFirstEnter" :embedded-mode="embeddedMode" :follow-up-loading="Boolean(session.suggestionLoading && !session.suggestionSet?.questions?.length)" @scroll-bottom="scrollToBottom" @render-complete-change="(ready: boolean) => handleAnswerRenderComplete(session, ready)" />
             <FollowUpSuggestions v-if="session.answerFullyRendered && !session.suggestionsDismissed" :suggestion-set="session.suggestionSet" :loading="session.suggestionLoading" :allow-regenerate="session.suggestionSet?.allow_regenerate" @select="(item: any) => handleFollowUpSelect(session, item)" @regenerate="loadFollowUpSuggestions(session, true, true)" @impression="(set: any) => recordSuggestionEvent(session, set, 'impression')" @dismiss="(set: any) => dismissSuggestions(session, set)" />
           </template>
-        </article>
+          </article>
+        </template>
 
         <div v-if="showGlobalTypingIndicator" class="visual-chat-wait" role="status" :aria-label="t('chat.thinkingAlt')"><span aria-hidden="true" /></div>
       </div>
     </div>
+
+    <ChatQuestionMinimap
+      v-if="!embeddedMode"
+      :scroll-container="scrollContainer"
+      :messages="messagesList"
+      @jump="jumpToQuestion"
+    />
 
     <div class="visual-chat-input" :class="{ 'is-embedded': embeddedMode }">
       <InputField ref="inputFieldRef" :is-replying="isReplying" :session-id="session_id" :assistant-message-id="currentAssistantMessageId" :embedded-mode="embeddedMode" @send-msg="(query: any, modelId: any, mentionedItems: any, imageFiles: any, attachmentFiles: any, thinking: any, reasoningEffort: any) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort)" @stop-generation="handleStopGeneration" />
@@ -88,6 +135,7 @@ export default defineComponent({
 .visual-chat-message-row { min-width: 0; contain: layout style; display: flex; width: 100%; }
 .visual-chat-message-row.is-user { justify-content: flex-end; }
 .visual-chat-message-row.is-assistant { justify-content: flex-start; }
+.visual-chat-message-row.is-minimap-target { animation: visual-chat-minimap-target-flash 1.2s ease; }
 .visual-chat-skeletons { display: flex; flex-direction: column; gap: 32px; padding: 12px 0; }
 .visual-chat-skeleton.is-user { display: flex; justify-content: flex-end; }
 .visual-chat-skeleton.is-assistant { padding-right: 12%; }
@@ -111,5 +159,6 @@ export default defineComponent({
 .visual-chat-suggestions-fade-enter-active,.visual-chat-suggestions-fade-leave-active { transition: opacity 140ms ease; }
 .visual-chat-suggestions-fade-enter-from,.visual-chat-suggestions-fade-leave-to { opacity: 0; }
 @keyframes visual-chat-spin { to { transform: rotate(360deg); } }
+@keyframes visual-chat-minimap-target-flash { 0%, 100% { outline-color: transparent; } 20%, 60% { outline: 2px solid rgb(59 130 246 / 32%); outline-offset: 4px; } }
 @media (prefers-reduced-motion: reduce) { .visual-chat-view,.visual-chat-suggestions-fade-enter-active,.visual-chat-suggestions-fade-leave-active { transition: none !important; } .visual-chat-wait > span,.visual-chat-suggestions__refresh .is-spinning { animation: none; } }
 </style>

@@ -12,6 +12,9 @@
     <Settings v-if="route.path !== '/platform/settings'" />
     <!-- 全局命令面板 (⌘K)，随 platform 路由存活 -->
     <GlobalCommandPalette />
+    <!-- NewUserGuide owns the contextual guide and the invitation bell. Keep
+         one mounted instance so the bell is not rendered twice. -->
+    <NewUserGuide />
   </div>
 </template>
 <script setup lang="ts">
@@ -26,6 +29,8 @@ import { useChatResourcesStore } from "@/stores/chatResources";
 import { getKnowledgeBaseById } from "@/api/knowledge-base/index";
 import { MessagePlugin } from "tdesign-vue-next";
 import { useI18n } from "vue-i18n";
+import NewUserGuide from '@/components/NewUserGuide.vue'
+import { collectDroppedFiles } from './collectDroppedFiles'
 
 const route = useRoute();
 const router = useRouter();
@@ -69,37 +74,6 @@ const CHAT_DROP_ROUTE_NAMES = new Set(["chat", "globalCreatChat", "kbCreatChat"]
 
 const isChatDropRoute = () => {
   return CHAT_DROP_ROUTE_NAMES.has(String(route.name || ""));
-};
-
-const collectDroppedFiles = async (event: DragEvent): Promise<File[]> => {
-  const dataTransferFiles = event.dataTransfer?.files ? Array.from(event.dataTransfer.files) : [];
-  if (dataTransferFiles.length > 0) {
-    return dataTransferFiles;
-  }
-
-  const dataTransferItems = event.dataTransfer?.items ? Array.from(event.dataTransfer.items) : [];
-  if (dataTransferItems.length === 0) {
-    return [];
-  }
-
-  const files = await Promise.all(
-    dataTransferItems.map(
-      (item) =>
-        new Promise<File | null>((resolve) => {
-          const fileEntry = (item as any).webkitGetAsEntry?.();
-          if (fileEntry?.isFile && typeof fileEntry.file === "function") {
-            fileEntry.file(
-              (file: File) => resolve(file),
-              () => resolve(null),
-            );
-            return;
-          }
-          resolve(null);
-        }),
-    ),
-  );
-
-  return files.filter((file): file is File => file instanceof File);
 };
 
 // 检查知识库初始化状态

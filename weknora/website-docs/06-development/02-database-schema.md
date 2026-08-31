@@ -20,14 +20,14 @@
 
 ```text
 migrations/
-├── versioned/     # PostgreSQL/ParadeDB 版本化迁移：000000-000079 共 80 版（160 个 .up/.down.sql 文件）
+├── versioned/     # PostgreSQL/ParadeDB 版本化迁移：000000-000104 共 105 版（210 个 .up/.down.sql 文件）
 ├── sqlite/        # SQLite 迁移：000000_init（压平的全量 schema）+ 其后的增量版本
 ├── paradedb/      # ParadeDB 附加脚本：00-init-db.sql（扩展初始化）、01-migrate-to-paradedb.sql（存量库切换）
 └── mysql/         # 00-init-db.sql，遗留的一次性 MySQL 建表脚本（未接入代码）
 ```
 
-- `versioned/` 是唯一的"增量历史"，从 `000000_init` 到 `000079_knowledge_folder_path`；
-- `sqlite/` 以 `000000_init` 作为压平后的全量初始化（JSONB→TEXT、SERIAL→AUTOINCREMENT 等方言差异已适配），其后按需追加增量版本（当前有 `000001_remove_wiki_log`、`000002_knowledge_folder_path`），同样由 golang-migrate 顺序执行；
+- `versioned/` 是唯一的"增量历史"，从 `000000_init` 到 `000104_skill_catalog`；其中 `000080`–`000093` 是 Musuw 产品迁移，官方 main 的 `000080`–`000090` 变更按原依赖顺序追加为 `000094`–`000104`；
+- `sqlite/` 以 `000000_init` 作为压平后的全量初始化（JSONB→TEXT、SERIAL→AUTOINCREMENT 等方言差异已适配），其后按需追加增量版本（Musuw 的 `000001`–`000012`，官方 main 追加的 `000013`–`000022`，以及为已存在 v12 Lite 库补齐沙箱/消息产物列与表的兼容迁移 `000023`），同样由 golang-migrate 顺序执行；
 - `paradedb/00-init-db.sql` 创建 `pg_search` 等扩展；BM25 索引使用中文 Lindera 分词器建在 `embeddings.content` 上。
 
 ### 2.1 versioned/ 迁移史概览（按主题）
@@ -49,6 +49,8 @@ migrations/
 | 000077 | 移除 Wiki 操作日志 | DROP `wiki_log_entries`，并删除历史遗留的 `page_type = 'log'` 页面；Wiki 变更统一记入知识库活动流 |
 | 000078 | 分块编辑与自定义元数据 | `chunks` 增加 `source_content`/`content_revision`/`index_status`/`last_editor_id`/`context_header`，新增 `chunk_revisions` 表，`knowledges` 增加 `custom_metadata` |
 | 000079 | 知识库文件夹树 | `knowledges` 增加 `folder_path` 列并回填历史目录上传（原先路径塞在 `file_name` 里），新增 `(tenant_id, knowledge_base_id, folder_path)` 索引 |
+| 000080-000093 | Musuw 产品迁移 | 默认搜索与模型、套餐/额度/账期、账号擦除、续费事件、存储来源用量与赠送额度；这些版本号及其含义保持不变 |
+| 000094-000104 | 官方 main 追加迁移 | 知识库自动标签、消息产物、租户/会话沙箱、跨会话记忆、消息用量、技能安装/快照/环境变量与技能目录 |
 
 ## 3. 最终表结构
 
@@ -261,14 +263,14 @@ if strings.HasPrefix(dsn, "sqlite3://") {
 make migrate-up                    # 应用全部待执行迁移
 make migrate-down                  # 回滚
 make migrate-version               # 查看当前版本与 dirty 标志
-make migrate-create name=add_xxx   # 创建 000080_add_xxx.up.sql / .down.sql
+make migrate-create name=add_xxx   # 创建 000105_add_xxx.up.sql / .down.sql
 make migrate-force version=74      # 强制标记版本（恢复 dirty）
 make migrate-goto version=60       # 迁移/回滚到指定版本
 ```
 
 ## 6. 如何新增一个迁移
 
-1. **创建文件**：`make migrate-create name=add_my_feature`，在 `migrations/versioned/` 下生成下一个版本号（当前最大为 `000079`，新迁移将是 `000080_add_my_feature.up.sql` / `.down.sql`）；
+1. **创建文件**：`make migrate-create name=add_my_feature`，在 `migrations/versioned/` 下生成下一个版本号（当前最大为 `000104`，新迁移将是 `000105_add_my_feature.up.sql` / `.down.sql`）；
 2. **编写 up SQL**：注意 PostgreSQL 方言（JSONB、部分索引、`TIMESTAMP WITH TIME ZONE`）；若涉及 `embeddings` 表，参考既有迁移用 `app.skip_embedding` GUC 做条件门控（`SELECT current_setting('app.skip_embedding', true)`），保证非 postgres 检索引擎部署也能通过迁移；
 3. **编写 down SQL**：必须可逆（drop column/table/index），否则回滚链会断；
 4. **同步 SQLite**：`migrations/sqlite/000000_init.up.sql` 是压平的全量 schema，**新增列/表必须合并进去**（注意方言转换：JSONB→TEXT、SERIAL→INTEGER AUTOINCREMENT、无部分索引语法差异等）。若变更需要在已有 Lite 库上生效（例如删表、删数据），还要在 `migrations/sqlite/` 追加一个增量版本；
@@ -310,4 +312,4 @@ BM25 索引（`USING bm25`、Lindera 中文分词）只在 ParadeDB 可用；原
 
 ### 7.5 版本文件冲突
 
-多个分支同时新增同一个版本号（如两个 `000080_*`）会冲突：golang-migrate 按数字排序且版本号唯一。合并时后合入者需要把自己的迁移改成下一个空闲版本号（up/down 两个文件都要改名）。
+多个分支同时新增同一个版本号（如两个 `000105_*`）会冲突：golang-migrate 按数字排序且版本号唯一。合并时后合入者需要把自己的迁移改成下一个空闲版本号（up/down 两个文件都要改名）。

@@ -354,6 +354,45 @@ func TestProcessKBDeleteNonStrictRetainsRowsWhenChunkCleanupFails(t *testing.T) 
 	assert.Zero(t, knowledgeRepo.deleteCall)
 }
 
+func TestProcessKBDeleteNonStrictRetainsRowsWhenFileCleanupFails(t *testing.T) {
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{strictDeleteKnowledge()}}
+	fileSvc := &strictDeleteFileService{err: errors.New("object store unavailable")}
+	chunkRepo := &strictDeleteChunkRepo{}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.fileSvc = fileSvc
+	svc.chunkRepo = chunkRepo
+
+	err := svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, false))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "object store unavailable")
+	assert.Zero(t, knowledgeRepo.deleteCall, "ordinary cleanup must retain rows for a retry")
+	assert.Zero(t, chunkRepo.chunkCalls, "chunk/image metadata must remain for a retry")
+}
+
+func TestProcessKBDeleteNonStrictRetainsImageMetadataWhenImageCleanupFails(t *testing.T) {
+	knowledge := strictDeleteKnowledge()
+	knowledge.FilePath = ""
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{knowledge}}
+	chunkRepo := &strictDeleteChunkRepo{
+		imageInfo: []interfaces.ChunkImageInfo{{
+			KnowledgeID: knowledge.ID,
+			ImageInfo:  `[{"url":"r2://bucket/image.png"}]`,
+		}},
+	}
+	fileSvc := &strictDeleteFileService{err: errors.New("R2 unavailable")}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.chunkRepo = chunkRepo
+	svc.fileSvc = fileSvc
+
+	err := svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, false))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "R2 unavailable")
+	assert.Zero(t, knowledgeRepo.deleteCall)
+	assert.Zero(t, chunkRepo.chunkCalls, "image metadata must remain available for a retry")
+}
+
 func TestProcessKBDeleteNonStrictRetainsRowsWhenGraphCleanupFails(t *testing.T) {
 	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{strictDeleteKnowledge()}}
 	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})

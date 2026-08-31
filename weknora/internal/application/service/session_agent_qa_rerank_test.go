@@ -76,6 +76,8 @@ func (agentQARerankEngine) Execute(context.Context, string, string, string, []ch
 	return &types.AgentState{}, nil
 }
 
+func (agentQARerankEngine) SetMemoryPrompt(string) {}
+
 func TestAgentQAPlatformBuiltinUsesConsumerTenantRerankResolver(t *testing.T) {
 	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
 

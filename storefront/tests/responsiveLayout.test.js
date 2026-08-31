@@ -29,7 +29,7 @@ test("storefront responsive media and final CTA rules stay bounded", () => {
   const baseArticleImageImage = styles.match(/\.article-image img\s*\{[^}]*\}/s)?.[0] ?? "";
   const reviewReady = styles.slice(styles.lastIndexOf("/* Review-ready storefront compositions"));
   const mobile = mediaBlock(reviewReady, "max-width: 767px");
-  const tablet = mediaBlock(reviewReady, "max-width: 1080px");
+  const tablet = mediaBlock(reviewReady, "max-width: 1023px");
 
   assert.match(baseArticleImage, /aspect-ratio:\s*1\.25\s*;/s);
   assert.match(baseArticleImageImage, /height:\s*100%\s*;/s);

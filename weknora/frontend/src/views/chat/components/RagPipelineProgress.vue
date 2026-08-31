@@ -16,62 +16,74 @@
     </button>
 
     <div v-if="showExpandedTimeline" class="visual-rag-timeline">
-      <div v-if="showPrePipelineWait" class="visual-rag-step is-running">
-        <span class="visual-rag-step__rail" aria-hidden="true"><span class="visual-rag-step__spinner" /></span>
-        <div class="visual-rag-step__body"><strong>{{ t('chat.preparingAnswer') }}</strong></div>
-      </div>
+      <ChatMemoryStep
+        v-if="hasMemory"
+        :memories="memoryItems"
+        :expanded="memoryExpanded"
+        :is-last="memoryIsLast"
+        :forgetting-id="forgettingId"
+        @toggle="toggleMemory"
+        @forget="forgetMemory"
+      />
 
-      <button
-        v-for="step in steps"
-        :key="step.id"
-        type="button"
-        class="visual-rag-step"
-        :class="{ 'is-running': step.pending, 'is-clickable': step.canOpenReferences }"
-        :disabled="!step.canOpenReferences"
-        @click="handleStepClick(step)"
-      >
-        <span class="visual-rag-step__rail" aria-hidden="true">
-          <span v-if="step.pending" class="visual-rag-step__spinner" />
-          <t-icon v-else :name="step.iconName" />
-        </span>
-        <span class="visual-rag-step__body">
-          <strong>{{ step.title }}</strong>
-          <span v-if="step.summaryHtml" class="visual-rag-step__summary" v-html="step.summaryHtml" />
-        </span>
-        <t-icon v-if="step.canOpenReferences" name="chevron-right" class="visual-rag-step__open" />
-      </button>
-
-      <div v-if="showWaitStep" class="visual-rag-step" :class="{ 'is-running': !waitStepStalled, 'is-stalled': waitStepStalled }">
-        <span class="visual-rag-step__rail" aria-hidden="true">
-          <span v-if="!waitStepStalled" class="visual-rag-step__spinner" />
-          <t-icon v-else name="time" />
-        </span>
-        <div class="visual-rag-step__body"><strong>{{ waitStepText }}</strong></div>
-      </div>
-
-      <div v-if="showThinkingStep" class="visual-rag-step visual-rag-thinking" :class="{ 'is-running': thinkingPending }">
-        <span class="visual-rag-step__rail" aria-hidden="true">
-          <span v-if="thinkingPending" class="visual-rag-step__spinner" />
-          <t-icon v-else name="lightbulb" />
-        </span>
-        <div class="visual-rag-step__body">
-          <button
-            type="button"
-            class="visual-rag-thinking__toggle"
-            :disabled="!thinkingContent"
-            @click="toggleThinking"
-          >
-            <strong>{{ t('agent.think') }}</strong>
-            <t-icon v-if="thinkingContent" name="chevron-down" :class="{ 'is-folded': !thinkingExpanded }" />
-          </button>
-          <div v-if="thinkingContent && thinkingExpanded" class="visual-rag-thinking__content">{{ thinkingContent }}</div>
+      <template v-if="!memoryOnly">
+        <div v-if="showPrePipelineWait" class="visual-rag-step is-running">
+          <span class="visual-rag-step__rail" aria-hidden="true"><span class="visual-rag-step__spinner" /></span>
+          <div class="visual-rag-step__body"><strong>{{ t('chat.preparingAnswer') }}</strong></div>
         </div>
-      </div>
 
-      <div v-if="showDoneRow" class="visual-rag-step is-done">
-        <span class="visual-rag-step__rail" aria-hidden="true"><t-icon name="check-circle" /></span>
-        <div class="visual-rag-step__body"><strong>{{ t('common.finish') }}</strong></div>
-      </div>
+        <button
+          v-for="step in steps"
+          :key="step.id"
+          type="button"
+          class="visual-rag-step"
+          :class="{ 'is-running': step.pending, 'is-clickable': step.canOpenReferences }"
+          :disabled="!step.canOpenReferences"
+          @click="handleStepClick(step)"
+        >
+          <span class="visual-rag-step__rail" aria-hidden="true">
+            <span v-if="step.pending" class="visual-rag-step__spinner" />
+            <t-icon v-else :name="step.iconName" />
+          </span>
+          <span class="visual-rag-step__body">
+            <strong>{{ step.title }}</strong>
+            <span v-if="step.summaryHtml" class="visual-rag-step__summary" v-html="step.summaryHtml" />
+          </span>
+          <t-icon v-if="step.canOpenReferences" name="chevron-right" class="visual-rag-step__open" />
+        </button>
+
+        <div v-if="showWaitStep" class="visual-rag-step" :class="{ 'is-running': !waitStepStalled, 'is-stalled': waitStepStalled }">
+          <span class="visual-rag-step__rail" aria-hidden="true">
+            <span v-if="!waitStepStalled" class="visual-rag-step__spinner" />
+            <t-icon v-else name="time" />
+          </span>
+          <div class="visual-rag-step__body"><strong>{{ waitStepText }}</strong></div>
+        </div>
+
+        <div v-if="showThinkingStep" class="visual-rag-step visual-rag-thinking" :class="{ 'is-running': thinkingPending }">
+          <span class="visual-rag-step__rail" aria-hidden="true">
+            <span v-if="thinkingPending" class="visual-rag-step__spinner" />
+            <t-icon v-else name="lightbulb" />
+          </span>
+          <div class="visual-rag-step__body">
+            <button
+              type="button"
+              class="visual-rag-thinking__toggle"
+              :disabled="!thinkingContent"
+              @click="toggleThinking"
+            >
+              <strong>{{ t('agent.think') }}</strong>
+              <t-icon v-if="thinkingContent" name="chevron-down" :class="{ 'is-folded': !thinkingExpanded }" />
+            </button>
+            <div v-if="thinkingContent && thinkingExpanded" class="visual-rag-thinking__content">{{ thinkingContent }}</div>
+          </div>
+        </div>
+
+        <div v-if="showDoneRow" class="visual-rag-step is-done">
+          <span class="visual-rag-step__rail" aria-hidden="true"><t-icon name="check-circle" /></span>
+          <div class="visual-rag-step__body"><strong>{{ t('common.finish') }}</strong></div>
+        </div>
+      </template>
     </div>
   </section>
 </template>
@@ -79,6 +91,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import ChatMemoryStep from './ChatMemoryStep.vue'
+import { useChatMemoryRow } from '@/composables/useChatMemoryRow'
 import { getAgentToolIconName } from '@/utils/agent-tool-icons'
 import { getKnowledgeSearchSummaryHtml, getRagPipelineStepTitle, getRetrievalSearchSource } from '@/utils/agent-tool-display'
 import { getAttachmentParsingSummaryHtml } from '@/utils/attachmentParsingDisplay'
@@ -93,9 +107,13 @@ const props = defineProps<{
     agentEventStream?: Array<Record<string, unknown>>
     content?: string
     knowledge_references?: Array<{ chunk_type?: string; knowledge_id?: string; knowledge_title?: string }>
+    used_memories?: Array<{ id: string; kind: string; content: string }>
     is_completed?: boolean
   }
   embeddedMode?: boolean
+  // Set by hosts that already render their own timeline (the agent stream) and
+  // only need the memory row from here.
+  memoryOnly?: boolean
 }>()
 
 const { t } = useI18n()
@@ -105,6 +123,18 @@ const thinkingExpanded = ref(true)
 const rootElement = ref<HTMLElement | null>(null)
 const waitView = ref<RagWaitView>({ kind: 'none', stalled: false })
 const waitController = createRagWaitController((view) => { waitView.value = view })
+
+// Long-term memory is shown as a timeline row rather than as a card of its
+// own: it is one more thing the turn did before answering, and giving it a
+// separate visual language would make it read as unrelated to the pipeline.
+const {
+  memoryItems,
+  hasMemory,
+  expanded: memoryExpanded,
+  forgettingId,
+  toggle: toggleMemory,
+  forget: forgetMemory,
+} = useChatMemoryRow(() => props.session?.used_memories)
 
 const thinkingContent = computed(() => {
   const stream = props.session?.agentEventStream
@@ -186,14 +216,56 @@ const showExpandedTimeline = computed(() => !showCollapsedRoot.value || userExpa
 const showDoneRow = computed(() => {
   const turnDone = hasAnswer.value || Boolean(props.session?.is_completed)
   if (!turnDone) return false
+  // A timeline rendered only because memory was used has nothing to report as
+  // finished; adding a "done" row there would put a step into plain chat that
+  // never had one.
+  if (steps.value.length === 0 && !hasThinking.value) return false
   if (steps.value.length > 0 && !allStepsDone.value) return false
   return true
 })
-const showPrePipelineWait = computed(() => !(hasAnswer.value || props.session?.is_completed || steps.value.length > 0 || hasThinking.value))
+const showPrePipelineWait = computed(() => {
+  if (hasAnswer.value || props.session?.is_completed || steps.value.length > 0 || hasThinking.value) {
+    return false
+  }
+  // Memory is recalled before the first token, so once it is on screen the
+  // turn is visibly under way and the placeholder would be redundant.
+  return !hasMemory.value
+})
+
+// Only show the thinking row once the backend actually streams thinking events.
+// Do not pre-empt during the model phase — that flashes "思考" even when thinking is disabled.
 const showThinkingStep = computed(() => hasThinkingEvent.value)
-const thinkingPending = computed(() => showThinkingStep.value && !hasThinking.value && !hasAnswer.value && !props.session?.is_completed)
-const isThinkingStreaming = computed(() => showThinkingStep.value && thinkingExpanded.value && !hasAnswer.value && !props.session?.is_completed)
-const visible = computed(() => steps.value.length > 0 || showPrePipelineWait.value || showThinkingStep.value)
+
+const thinkingPending = computed(
+  () =>
+    showThinkingStep.value &&
+    !hasThinking.value &&
+    !hasAnswer.value &&
+    !props.session?.is_completed,
+)
+
+const isThinkingStreaming = computed(
+  () =>
+    showThinkingStep.value &&
+    thinkingExpanded.value &&
+    !hasAnswer.value &&
+    !props.session?.is_completed,
+)
+
+// Memory alone is enough to render: a plain-chat answer that used memory still
+// needs somewhere to say so.
+const visible = computed(() => {
+  if (props.memoryOnly) return hasMemory.value
+  return (
+    steps.value.length > 0 || showPrePipelineWait.value || showThinkingStep.value || hasMemory.value
+  )
+})
+
+// The memory row leads the timeline, so it is only the last node when nothing
+// else rendered.
+const memoryIsLast = computed(
+  () => steps.value.length === 0 && !showWaitStep.value && !showThinkingStep.value && !showDoneRow.value,
+)
 const liveStatusText = computed(() => {
   if (showPrePipelineWait.value) return t('chat.preparingAnswer')
   if (showWaitStep.value) return waitStepText.value

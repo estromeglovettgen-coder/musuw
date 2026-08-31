@@ -49,6 +49,8 @@ type AsynqTaskParams struct {
 	TemporaryDocument       interfaces.TemporaryDocumentService
 	DeadLetterRepo          interfaces.TaskDeadLetterRepository
 	SpanTracker             service.SpanTracker
+	KnowledgeAutoTag        interfaces.TaskHandler `name:"knowledgeAutoTag"`
+	MemoryService           interfaces.MemoryService
 }
 
 // defaultRedisOpTimeout is the previous hard-coded read timeout. The 100ms
@@ -316,6 +318,7 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 
 	// Register knowledge post process handler
 	mux.HandleFunc(types.TypeKnowledgePostProcess, params.KnowledgePostProcess.Handle)
+	mux.HandleFunc(types.TypeKnowledgeAutoTag, params.KnowledgeAutoTag.Handle)
 
 	// Register data source sync handler
 	mux.HandleFunc(types.TypeDataSourceSync, params.DataSourceService.ProcessSync)
@@ -329,6 +332,8 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 	// Paddle HTTP handlers enqueue only the canonical secret-free projection;
 	// this worker performs the existing idempotent entitlement mutation.
 	mux.HandleFunc(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
+	// Register long-term memory distillation handler
+	mux.HandleFunc(types.TypeMemoryExtract, params.MemoryService.Handle)
 
 	// Run the same mux on every pool. Shared and dedicated servers intentionally
 	// overlap, but Redis dequeue is atomic, so each task still executes once.

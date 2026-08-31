@@ -109,6 +109,7 @@ func (s *sessionService) resolveChatModelID(
 	summaryModelID := req.SummaryModelID
 	customAgent := req.CustomAgent
 	session := req.Session
+	configuredAgentModelID := ""
 
 	if customAgent != nil {
 		if isPlatformManagedBuiltinAgentID(customAgent.ID) {
@@ -128,17 +129,25 @@ func (s *sessionService) resolveChatModelID(
 			}
 		}
 
-		configuredModelID := strings.TrimSpace(customAgent.Config.ModelID)
-		if configuredModelID == "" {
+		configuredAgentModelID = strings.TrimSpace(customAgent.Config.ModelID)
+		if configuredAgentModelID == "" && customAgent.ID != types.BuiltinWikiFixerID {
 			return "", fmt.Errorf("chat model is not configured: please set model_id on agent %s", customAgent.ID)
 		}
-		model, err := s.modelService.GetModelByID(ctx, configuredModelID)
-		if err != nil || model == nil || model.Type != types.ModelTypeKnowledgeQA {
-			return "", fmt.Errorf("configured chat model %s is unavailable for agent %s", configuredModelID, customAgent.ID)
+		if configuredAgentModelID != "" {
+			model, err := s.modelService.GetModelByID(ctx, configuredAgentModelID)
+			if err != nil || model == nil || model.Type != types.ModelTypeKnowledgeQA {
+				return "", fmt.Errorf("configured chat model %s is unavailable for agent %s", configuredAgentModelID, customAgent.ID)
+			}
+		} else {
+			// The wiki fixer is an internal agent and is intentionally omitted
+			// from the agent-management list. It therefore cannot receive a
+			// user-configured model_id; resolve it from the current Wiki KB or
+			// the normal system KnowledgeQA fallback below instead.
+			logger.Infof(ctx, "No model_id configured for internal wiki fixer %s, using KB/system fallback", customAgent.ID)
 		}
 		if isPlatformManagedBuiltinAgentID(customAgent.ID) {
-			logger.Infof(ctx, "Using platform answer mode model_id: %s", configuredModelID)
-			return configuredModelID, nil
+			logger.Infof(ctx, "Using platform answer mode model_id: %s", configuredAgentModelID)
+			return configuredAgentModelID, nil
 		}
 	}
 
@@ -151,9 +160,9 @@ func (s *sessionService) resolveChatModelID(
 		}
 		logger.Warnf(ctx, "Request provided invalid summary model ID %s, falling back", summaryModelID)
 	}
-	if customAgent != nil && strings.TrimSpace(customAgent.Config.ModelID) != "" {
-		logger.Infof(ctx, "Using custom agent's model_id: %s", strings.TrimSpace(customAgent.Config.ModelID))
-		return strings.TrimSpace(customAgent.Config.ModelID), nil
+	if configuredAgentModelID != "" {
+		logger.Infof(ctx, "Using custom agent's model_id: %s", configuredAgentModelID)
+		return configuredAgentModelID, nil
 	}
 	return s.selectChatModelID(ctx, session, knowledgeBaseIDs, knowledgeIDs)
 }

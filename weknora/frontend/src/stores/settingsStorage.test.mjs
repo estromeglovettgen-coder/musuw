@@ -121,7 +121,7 @@ test("cloneSettings deep-clones nested structures", () => {
   assert.deepEqual(defaults.nested.items, ["a"]);
 });
 
-test("fresh settings use WeKnora v0.7.2 WebSearch default while keeping Musuw thinking", () => {
+test("fresh settings use WeKnora main 81142df WebSearch default while keeping Musuw thinking", () => {
   const store = installMockLocalStorage();
   const defaults = makeDefaults();
   const loaded = loadAndReconcileSettings(defaults);

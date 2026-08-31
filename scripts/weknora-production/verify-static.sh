@@ -447,6 +447,14 @@ if ! grep -Fq 'COPY --from=builder /app/WeKnora ./WeKnora' "$repo_root/integrati
     exit 1
 fi
 
+if ! grep -Fq 'COPY third_party/anydoc-go/go.mod third_party/anydoc-go/go.mod' "$repo_root/integration/weknora-production/Dockerfile.app.runtime" ||
+   ! grep -Fq 'ARG WITH_ANYDOC=1' "$repo_root/integration/weknora-production/Dockerfile.app.runtime" ||
+   ! grep -Fq './scripts/build-anydoc-lib.sh' "$repo_root/integration/weknora-production/Dockerfile.app.runtime" ||
+   ! grep -Fq 'make build-prod GO_BUILD_TAGS=anydoc' "$repo_root/integration/weknora-production/Dockerfile.app.runtime"; then
+    printf '%s\n' 'production app Dockerfile does not link the default AnyDoc engine' >&2
+    exit 1
+fi
+
 if ! grep -Fq 'go mod download || go mod download || go mod download' "$repo_root/integration/weknora-production/Dockerfile.app.runtime"; then
     printf '%s\n' 'production app Dockerfile lacks bounded official Go module download retries' >&2
     exit 1
@@ -498,7 +506,7 @@ runtime_revision_arg_line="$(grep -n '^ARG IMAGE_REVISION_ARG=' "$runtime_docker
 runtime_packages_line="$(grep -n 'build-essential postgresql-client' "$runtime_dockerfile" | cut -d: -f1)"
 runtime_label_line="$(grep -n '^LABEL org.opencontainers.image.version=' "$runtime_dockerfile" | cut -d: -f1)"
 if grep -Fq 'ARG COMMIT_ID_ARG=' "$runtime_dockerfile" ||
-   ! grep -Fq 'COMMIT_ID=runtime' "$runtime_dockerfile" ||
+   ! grep -Fq 'COMMIT_ID=81142dfd17b2778087e95d3a317483a2fd909b91' "$runtime_dockerfile" ||
    [ -z "$runtime_revision_arg_line" ] ||
    [ "$runtime_revision_arg_line" -le "$runtime_packages_line" ] ||
    [ "$runtime_revision_arg_line" -ge "$runtime_label_line" ]; then

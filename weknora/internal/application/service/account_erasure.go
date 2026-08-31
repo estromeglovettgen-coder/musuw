@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -345,9 +346,13 @@ func (s *accountErasureService) Process(ctx context.Context, task *asynq.Task) e
 	}
 	tenant, err := s.tenants.GetTenantByID(ctx, target.TenantID)
 	if err != nil {
-		// DeleteTenant is idempotent and Preflight reads the soft-deleted row;
-		// a nil tenant here can therefore mean a prior retry already completed
-		// the tenant lifecycle. Continue without TenantInfo in that case.
+		// A missing tenant is expected after a retry that already completed the
+		// tenant lifecycle. Every other lookup failure is transient or
+		// otherwise actionable and must stop the purge rather than silently
+		// proceeding without the tenant context.
+		if !errors.Is(err, apprepo.ErrTenantNotFound) {
+			return fmt.Errorf("load personal workspace: %w", err)
+		}
 		tenant = nil
 	}
 	lifecycleCtx := accountErasureContext(ctx, target, tenant)

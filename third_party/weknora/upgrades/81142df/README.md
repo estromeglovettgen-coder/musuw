@@ -25,6 +25,23 @@ target commit was also verified as the advertised official `main` head during
 the audit. The branch name is not used as a build input after the fixed commit
 is recorded.
 
+The applied v0.7.2-to-target patch is pinned by SHA-256
+`bb6b28cef7804885271284c33339c9b27ad96888c21755074a72198a034b18c6`.
+The four modified upstream workflow paths remain intentionally excluded from
+the vendored product tree because Musuw's root workflows are the only CI and
+delivery authority:
+
+- `.github/workflows/app.yml`
+- `.github/workflows/cli.yml`
+- `.github/workflows/docker-image.yml`
+- `.github/workflows/docreader.yml`
+
+The target-only `anydoc.yml`, `dsh-plugin.yml`, `go-lint.yml`, and
+`go-lint-cache.yml` paths are likewise absent from the final vendored tree.
+Their build, test, pinned-harness E2E, and new-findings lint checks are composed
+into Musuw's root CI; the upstream npm publisher and cache-only workflow do not
+become parallel release authorities.
+
 ## Pre-upgrade inventory
 
 The alternate-index audit starts from the complete official v0.7.2 tree under
@@ -100,6 +117,15 @@ b848de10dc098f9bd7816feea460e000f09de6c7915c1e30c19bf25bb04c607b  overlap-paths.
 4. Existing Musuw product and migration semantics win conflicts. Compatible
    upstream behavior is added at the existing owning module and interface.
 5. No prompt omission is evidence for deleting a Musuw behavior.
+
+The migration resolution keeps Musuw PostgreSQL `000080`–`000093` and SQLite
+`000003`–`000012` meanings unchanged. Upstream PostgreSQL changes are appended
+as `000094`–`000104`, upstream SQLite changes as `000013`–`000022`, and
+`000023_sandbox_artifacts_compat` applies the sandbox/artifact schema to
+existing SQLite databases that already reached Musuw version 12. The active
+and fixed-target records are linked from
+[`active-upstream-source.json`](../../active-upstream-source.json) and
+[`target-81142df-provenance.json`](../../target-81142df-provenance.json).
 
 The authoritative acceptance contract is
 `openspec/changes/upgrade-weknora-main-81142df/`.

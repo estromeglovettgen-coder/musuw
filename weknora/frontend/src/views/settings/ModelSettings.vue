@@ -201,11 +201,13 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useSettingsStore } from '@/stores/settings'
 import { resolveConsumerSceneCandidate } from '@/utils/consumerSceneModels'
+import { useUIStore } from '@/stores/ui'
 
 const { t, te } = useI18n()
 const authStore = useAuthStore()
 const chatResources = useChatResourcesStore()
 const settingsStore = useSettingsStore()
+const uiStore = useUIStore()
 const props = defineProps<{ initialType?: string | null }>()
 type ModelType = 'chat' | 'embedding' | 'rerank' | 'vllm' | 'asr'
 type FilterType = 'all' | ModelType
@@ -322,6 +324,17 @@ const normalizeInitialType = (value?: string | null): FilterType => {
 watch(() => props.initialType, value => {
   activeTypeFilter.value = normalizeInitialType(value)
 }, { immediate: true })
+
+const MODEL_TAB_TYPES: FilterType[] = ['chat', 'embedding', 'rerank', 'vllm', 'asr']
+watch(
+  () => uiStore.settingsInitialSubSection,
+  (sub) => {
+    if (sub && MODEL_TAB_TYPES.includes(sub as FilterType)) {
+      activeTypeFilter.value = sub as FilterType
+    }
+  },
+  { immediate: true },
+)
 
 // 模型列表数据
 const allModels = ref<ModelConfig[]>([])

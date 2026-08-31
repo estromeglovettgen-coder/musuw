@@ -160,6 +160,15 @@ func TestParseSocialShareInputUnknownHostFallsBackToGenericURL(t *testing.T) {
 	require.Equal(t, "https://example.com/article?id=42", cleanedURL)
 }
 
+func TestURLForLogOmitsCredentialQueryAndFragment(t *testing.T) {
+	t.Parallel()
+
+	redacted := urlForLog("https://Example.com/path/to/file.pdf?signature=secret-token&expires=123#fragment")
+	require.Equal(t, "example.com/path/to/file.pdf", redacted)
+	require.NotContains(t, redacted, "secret-token")
+	require.NotContains(t, redacted, "expires")
+}
+
 func TestExtractSingleHTTPURLDoesNotClassifyHost(t *testing.T) {
 	t.Parallel()
 

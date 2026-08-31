@@ -16,16 +16,16 @@ const scriptSetupHash = (source) => {
   return createHash('sha256').update(script).digest('hex')
 }
 
-test('MCP business scripts stay byte-identical to the clean WeKnora v0.7.2 authority', () => {
+test('MCP business scripts stay byte-identical to the clean WeKnora main 81142df authority', () => {
   assert.equal(
     scriptSetupHash(listSource),
     'df2c88f2fd8af43e17438bcd9a9d5cd58e3dfd9398995bfaa4f0515af6ae4781',
-    'McpSettings.vue business logic diverged from WeKnora v0.7.2',
+    'McpSettings.vue business logic diverged from WeKnora main 81142df',
   )
   assert.equal(
     scriptSetupHash(drawerSource),
     'a01a5491e71024de5b98f9787abf558bc9391fbfacbda58cffa718a37b7fcf44',
-    'McpServiceDialog.vue business logic diverged from WeKnora v0.7.2',
+    'McpServiceDialog.vue business logic diverged from WeKnora main 81142df',
   )
 })
 

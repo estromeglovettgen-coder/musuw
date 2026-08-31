@@ -6,7 +6,7 @@
 <p align="center">
   <picture>
     <a href="https://trendshift.io/repositories/15289" target="_blank">
-      <img src="https://trendshift.io/api/badge/repositories/15289" alt="Tencent%2FWeKnora | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
+      <img src="https://trendshift.io/api/badge/repositories/15289" alt="Tencent/WeKnora | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
     </a>
   </picture>
 </p>
@@ -23,6 +23,9 @@
     </a>
     <a href="https://clawhub.ai/lyingbug/weknora" target="_blank">
         <img alt="ClawHub Skill" src="https://img.shields.io/badge/ClawHub Skill-WeKnora-ff6b35">
+    </a>
+    <a href="https://www.npmjs.com/package/@wxg-prc-cpg/dsh-weknora" target="_blank">
+        <img alt="npm @wxg-prc-cpg/dsh-weknora" src="https://img.shields.io/npm/v/@wxg-prc-cpg/dsh-weknora?label=dsh-weknora">
     </a>
     <a href="https://github.com/Tencent/WeKnora/blob/main/LICENSE">
         <img src="https://img.shields.io/badge/License-MIT-ffffff?labelColor=d4eaf7&color=2e6cc4" alt="License">
@@ -172,6 +175,15 @@ Feishu、Notion、Yuqueなどの外部プラットフォームからのナレッ
 - **ドキュメントインポート** — エージェント経由でファイルアップロード、Webページインポート、Markdownナレッジの作成
 - **ハイブリッド検索** — 単一または複数のナレッジベースをベクトル + キーワードで横断検索
 - **ナレッジ管理** — プログラムによるナレッジエントリの閲覧、編集、削除
+
+## 🐋 DeepSeek Harness プラグイン
+
+[**`@wxg-prc-cpg/dsh-weknora`**](https://www.npmjs.com/package/@wxg-prc-cpg/dsh-weknora) は公式の [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）プラグインです（[ドキュメント](./packages/dsh-weknora/README.md)）。harness 自体は検索・埋め込み・ナレッジベースの機能を持たないため、このプラグインがコーディングエージェントに自社ドキュメントを与えます。`dsh plugin --profile web add @wxg-prc-cpg/dsh-weknora` でインストールしてデプロイ先を指定すると、4 つの読み取り専用ツールがエージェントのツールセットに現れます。
+
+- **`weknora_search`** — ハイブリッド検索。原文のパッセージをそのまま返し、各件に再利用可能な `knowledge_id` が付く
+- **`weknora_read_document`** — 1 つのドキュメントのチャンクを順番に再構成、ページング対応
+- **`weknora_ask`** — WeKnora 自身が引用付きで作成した回答（RAG または ReAct パイプライン）
+- **`weknora_list_knowledge_bases`** — ナレッジベースの名前と id。エージェントが自分で検索範囲を絞れる
 
 
 ## 🚀 クイックスタート

@@ -3,9 +3,11 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const editor = readFileSync(new URL('./KnowledgeBaseEditorModal.vue', import.meta.url), 'utf8')
-test('compact consumer editor leaves the hidden Wiki model platform-owned and preserves native payloads', () => {
+test('consumer editor keeps Lite scene ownership while exposing full main settings to Standard', () => {
   const template = editor.slice(0, editor.indexOf('<script setup'))
-  assert.doesNotMatch(template, /wiki-scene-options|wikiSynthesisModelId|KBModelConfig/)
+  assert.match(template, /KBModelConfig/)
+  assert.match(template, /v-if="!authStore\.isLiteMode && currentSection === 'models'"/)
+  assert.doesNotMatch(template, /wiki-scene-options|wikiSynthesisModelId/)
   assert.doesNotMatch(editor, /syncWikiSceneCandidate/)
   assert.match(editor, /resolveConsumerSceneCandidate/)
   assert.match(editor, /wikiSynthesisModelId: kb\.wiki_config\?\.synthesis_model_id \|\| ''/)

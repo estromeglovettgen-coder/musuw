@@ -17,7 +17,7 @@ test('rebuilt chat parent reuses normalized frozen setup without legacy shell cl
   const source = read('../views/chat/index.vue')
   assert.match(source, /import LegacyChatBusiness from .*ChatIndex\.pre-view\.vue/)
   assert.match(source, /const legacySetup = legacy\.setup/)
-  assert.match(source, /return \{ \.\.\.state \}/)
+  assert.match(source, /return \{\s*\.\.\.state,/)
   assert.match(source, /class="visual-chat-view"/)
   for (const token of [
     'class="chat"',

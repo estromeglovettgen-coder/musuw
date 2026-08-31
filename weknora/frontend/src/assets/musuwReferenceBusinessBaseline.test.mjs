@@ -8,14 +8,14 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 const scriptOf = (path) => read(path).match(/<script setup(?: lang="ts")?>([\s\S]*?)<\/script>/)?.[1] || ''
 
 const frozen = new Map([
-  ['./business-baselines/Input-field.pre-view.vue', 'bfa653c206ebb7d579e294e18f8220ffb83f5682'],
-  ['./business-baselines/KnowledgeBase.pre-view.vue', '75996e898b170fe61e0c32eac39ca71b79bee9a0'],
+  ['./business-baselines/Input-field.pre-view.vue', '11bc2cb650979eb55e367d370980051fa6caa429'],
+  ['./business-baselines/KnowledgeBase.pre-view.vue', '981716cb4ccf83a7dca23ff588602a0bbd32bbb8'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
   ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],
-  ['../components/settings/SettingDrawer.vue', 'f4469a321c483fd2d7f8db179e79549f01b2296e'],
+  ['../components/settings/SettingDrawer.vue', '9ce6d22d9a2420f734f6d20c5029d882c1218b82'],
 ])
 
 test('protected controllers, compatibility bridges and excluded Graph/Wiki implementations stay byte-for-byte frozen', () => {

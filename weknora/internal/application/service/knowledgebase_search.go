@@ -11,6 +11,12 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
+// maxRetrievalPoolSize bounds every retrieval depth derived from MatchCount:
+// the over-retrieval pool below and the doubling TopK of the FAQ iterative
+// path. Without it a caller-supplied MatchCount scales the vector-store query
+// depth without limit.
+const maxRetrievalPoolSize = 500
+
 // GetQueryEmbedding computes the query embedding using the embedding model
 // associated with the given knowledge base. Callers can pre-compute and reuse
 // the result across multiple KBs that share the same embedding model to avoid
@@ -87,6 +93,10 @@ func (s *knowledgeBaseService) HybridSearch(ctx context.Context,
 	id string,
 	params types.SearchParams,
 ) ([]*types.SearchResult, error) {
+	// Normalize once, before anything reads MatchCount. params is a value
+	// copy, so this stays local to the call.
+	params.MatchCount = normalizedMatchCount(params.MatchCount)
+
 	// Determine the set of KB IDs to search.
 	searchKBIDs := params.KnowledgeBaseIDs
 	if len(searchKBIDs) == 0 {
@@ -143,10 +153,11 @@ func (s *knowledgeBaseService) HybridSearch(ctx context.Context,
 	}
 
 	// Over-retrieval (existing rule, preserved): 5x per-KB matchCount,
-	// floor of 50, capped at 500 across the whole search.
-	matchCount := max(params.MatchCount*5, 50) * len(searchKBIDs)
-	if matchCount > 500 {
-		matchCount = 500
+	// floored at DefaultRetrievalTopK, capped at maxRetrievalPoolSize across
+	// the whole search.
+	matchCount := max(params.MatchCount*5, types.DefaultRetrievalTopK) * len(searchKBIDs)
+	if matchCount > maxRetrievalPoolSize {
+		matchCount = maxRetrievalPoolSize
 	}
 
 	// Compute the query embedding once before fan-out and propagate via
@@ -187,7 +198,7 @@ func (s *knowledgeBaseService) HybridSearch(ctx context.Context,
 	retrieveCtx, retrieveSpan := langfuse.GetManager().StartSpan(ctx, langfuse.SpanOptions{
 		Name: "retrieve",
 		Input: map[string]interface{}{
-			"query_text":             params.QueryText,
+			"query_len":              len(params.QueryText),
 			"kb_ids":                 searchKBIDs,
 			"knowledge_ids":          params.KnowledgeIDs,
 			"tag_ids":                params.TagIDs,
@@ -211,7 +222,7 @@ func (s *knowledgeBaseService) HybridSearch(ctx context.Context,
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"knowledge_base_ids": searchKBIDs,
-			"query_text":         params.QueryText,
+			"query_len":          len(params.QueryText),
 		})
 		return nil, err
 	}
@@ -244,11 +255,35 @@ func (s *knowledgeBaseService) HybridSearch(ctx context.Context,
 		return nil, err
 	}
 
+	// Truncate to the primary-match cap. MatchCount is guaranteed positive by
+	// the normalization at the top of this function; the slice bound below
+	// depends on that.
 	if len(deduplicatedChunks) > params.MatchCount {
 		deduplicatedChunks = deduplicatedChunks[:params.MatchCount]
 	}
 
 	return s.processSearchResults(ctx, deduplicatedChunks, params.SkipContextEnrichment)
+}
+
+// normalizedMatchCount resolves the effective primary-match cap for a search.
+//
+// MatchCount arrives as Go's zero value whenever a caller omits it — JSON
+// cannot tell an absent match_count from an explicit 0 — and three consumers
+// inside HybridSearch read it: the over-retrieval floor, the FAQ
+// iterative-retrieval trigger, and the final truncation. They must agree, so
+// the value is resolved here rather than at each use site. A raw 0 truncates
+// the deduplicated chunk list to [:0] and empties an otherwise successful
+// search; a negative value panics on that same slice bound.
+//
+// The fallback is shared with RetrievalConfig.GetEffectiveEmbeddingTopK:
+// internal callers (chat pipeline, agent tools) feed these results into
+// reranking, which trims to RerankTopK afterwards, so a wide candidate pool is
+// the right failure mode for them.
+func normalizedMatchCount(requested int) int {
+	if requested <= 0 {
+		return types.DefaultRetrievalTopK
+	}
+	return requested
 }
 
 // pickPrimary returns the KB whose ID matches id, or nil if id is not in

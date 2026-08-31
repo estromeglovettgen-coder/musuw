@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 /**
  * Three authorities coexist:
  * 1. @视觉文件 owns presentation of exposed surfaces.
- * 2. WeKnora v0.7.2 owns behavior inside those exposed capabilities.
+ * 2. WeKnora main 81142df owns behavior inside those exposed capabilities.
  * 3. Musuw Lite owns which capabilities are exposed at all.
  *
  * Standard keeps the complete upstream source surface for reversible restore;
@@ -89,7 +89,7 @@ test('Lite Settings also exposes native MCP for admins; Standard settings remain
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(authStore\.isLiteMode && section !== 'usage' && section !== 'userprofile' && section !== 'models' && section !== 'mcp'\) return 'general'/)
+  assert.match(settings, /if \(\s*authStore\.isLiteMode\s*&& section !== 'usage'\s*&& section !== 'userprofile'\s*&& section !== 'models'\s*&& section !== 'mcp'\s*\) \{\s*return 'general'/)
   assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)/)
   assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/)
   assert.match(settings, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)

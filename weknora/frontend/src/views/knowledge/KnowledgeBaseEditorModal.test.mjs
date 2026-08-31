@@ -70,7 +70,10 @@ test('save button labels match the reference create and edit actions', () => {
 })
 
 test('create exposes native RAG, Wiki, Wiki instructions, and summary model while leaving embedding platform-owned', () => {
-  assert.doesNotMatch(source, /applyDefaultModelsIfEmpty|type ModelConfig/)
+  // Main keeps the model-default helper for the full editor surface; Lite
+  // create still forwards only the consumer scene choices below.
+  assert.match(source, /applyDefaultModelsIfEmpty/)
+  assert.doesNotMatch(source, /type ModelConfig/)
   assert.match(
     source,
     /const initFormData = \(type: 'document' \| 'faq' = 'document'\) => \(\{[\s\S]*indexingStrategy:[\s\S]*wikiConfig:[\s\S]*modelConfig:/,
@@ -169,7 +172,8 @@ test('create and edit mechanically share the reference knowledge-base configurat
   assert.match(template, /id="kb-config-title"[\s\S]*?editorMode === 'create'[\s\S]*?knowledgeEditor\.titleCreate[\s\S]*?knowledgeEditor\.titleEdit/)
   assert.match(template, /knowledgeEditor\.modalDescription/)
   assert.match(template, /<form v-if="formData" class="kb-config-form" @submit\.prevent="handleSubmit">/)
-  assert.doesNotMatch(template, /settings-container|settings-sidebar|settings-nav|currentSection ===/)
+  assert.match(template, /class="kb-config-nav"[\s\S]*currentSection === item\.key/)
+  assert.doesNotMatch(template, /settings-container|settings-sidebar|settings-nav/)
   assert.doesNotMatch(template, /:autofocus="editorMode === 'create'"/)
 
   const orderedFields = [

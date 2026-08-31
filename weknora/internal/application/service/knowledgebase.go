@@ -50,6 +50,7 @@ type knowledgeBaseService struct {
 	dsScheduler           *datasource.Scheduler
 	audit                 interfaces.AuditLogService
 	consumerModelResolver interfaces.ConsumerModelResolver
+	resourceCatalog       interfaces.ResourceCatalog
 }
 
 // NewKnowledgeBaseService creates a new knowledge base service
@@ -73,6 +74,7 @@ func NewKnowledgeBaseService(repo interfaces.KnowledgeBaseRepository,
 	dsScheduler *datasource.Scheduler,
 	audit interfaces.AuditLogService,
 	consumerModelResolver interfaces.ConsumerModelResolver,
+	resourceCatalog interfaces.ResourceCatalog,
 ) interfaces.KnowledgeBaseService {
 	return &knowledgeBaseService{
 		repo:                  repo,
@@ -95,6 +97,7 @@ func NewKnowledgeBaseService(repo interfaces.KnowledgeBaseRepository,
 		dsScheduler:           dsScheduler,
 		audit:                 audit,
 		consumerModelResolver: consumerModelResolver,
+		resourceCatalog:       resourceCatalog,
 	}
 }
 
@@ -719,6 +722,10 @@ func (s *knowledgeBaseService) UpdateKnowledgeBase(ctx context.Context,
 		if config.WikiConfig != nil {
 			kb.WikiConfig = config.WikiConfig
 		}
+		if config.AutoTagConfig != nil {
+			config.AutoTagConfig.Normalize()
+			kb.AutoTagConfig = config.AutoTagConfig
+		}
 		// Update indexing strategy — syncs to ExtractConfig for backward compat
 		if config.IndexingStrategy != nil {
 			if !config.IndexingStrategy.HasAnyIndexing() {
@@ -1165,9 +1172,36 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 		for _, ci := range chunkImageInfos {
 			imageInfoStrs = append(imageInfoStrs, ci.ImageInfo)
 		}
-		imageURLs := collectImageURLs(ctx, imageInfoStrs)
+		imageURLs, imageParseErr := collectImageURLsStrict(imageInfoStrs)
+		if imageParseErr != nil {
+			logger.Errorf(ctx, "Failed to parse image URLs for KB delete: %v", imageParseErr)
+			return imageParseErr
+		}
 
-		// Delete all chunks
+		// Physical objects are removed before the knowledge rows. Any provider/R2
+		// failure remains retryable while the rows still retain the references
+		// needed to finish cleanup; image metadata must also remain available if
+		// its provider delete fails, so this block intentionally precedes chunk
+		// deletion. Successful row deletion must never hide an object-delete
+		// failure.
+		logger.Infof(ctx, "Deleting physical files and extracted images")
+		for _, knowledge := range knowledgeList {
+			if knowledge.FilePath != "" {
+				if err := deleteFileIdempotent(ctx, s.fileSvc, knowledge.FilePath); err != nil {
+					logger.Errorf(ctx, "Failed to delete file %s: %v", knowledge.FilePath, err)
+					return err
+				}
+			}
+		}
+		if err := deleteExtractedImagesStrict(ctx, s.fileSvc,
+			knowledgeResourceOwners(s.resourceCatalog, knowledgeIDs...), imageURLs); err != nil {
+			logger.Errorf(ctx, "Failed to delete extracted images for KB %s: %v", kbID, err)
+			return err
+		}
+
+		// Delete all chunks after physical object cleanup succeeds. Retaining
+		// chunk/image metadata until then makes ordinary-task retries complete
+		// rather than silently orphaning an extracted object.
 		logger.Infof(ctx, "Deleting all chunks in knowledge base")
 		for _, knowledgeID := range knowledgeIDs {
 			if err := s.chunkRepo.DeleteChunksByKnowledgeID(ctx, tenantID, knowledgeID); err != nil {
@@ -1192,7 +1226,9 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 			}
 		}
 
-		// Delete all knowledge entries from database
+		// Delete all knowledge entries from database only after every external
+		// cleanup step has succeeded. The paired repository mutation releases
+		// source/index storage accounting atomically with row deletion.
 		logger.Infof(ctx, "Deleting knowledge entries from database")
 		if err := s.kgRepo.DeleteKnowledgeListWithStorage(ctx, tenantID, knowledgeIDs); err != nil {
 			logger.ErrorWithFields(ctx, err, map[string]interface{}{
@@ -1200,20 +1236,6 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 			})
 			return err
 		}
-
-		// Physical objects are removed only after the knowledge rows and their
-		// source-plus-index usage have committed together. A failed object delete
-		// can leak bytes, but cannot leave an active row pointing at a missing
-		// source or split the tenant counter from the database row.
-		logger.Infof(ctx, "Deleting physical files and extracted images")
-		for _, knowledge := range knowledgeList {
-			if knowledge.FilePath != "" {
-				if err := s.fileSvc.DeleteFile(ctx, knowledge.FilePath); err != nil {
-					logger.Warnf(ctx, "Failed to delete file %s: %v", knowledge.FilePath, err)
-				}
-			}
-		}
-		deleteExtractedImages(ctx, s.fileSvc, imageURLs)
 	}
 
 	logger.Infof(ctx, "KB delete task completed successfully, knowledge base ID: %s", kbID)

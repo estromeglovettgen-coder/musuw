@@ -12,6 +12,7 @@ interface KnowledgeItem {
 
 const props = defineProps<{
   item: KnowledgeItem;
+  canDownload?: boolean;
   canMutateKnowledge: boolean;
   traceVisible: boolean;
   /** Whether the knowledge base has a folder structure to file documents into. */
@@ -19,6 +20,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (e: 'download'): void;
   (e: 'edit'): void;
   (e: 'view-trace'): void;
   (e: 'reparse'): void;
@@ -42,6 +44,11 @@ const fileName = computed(() => props.item.file_name || props.item.title || prop
 
 <template>
   <div class="visual-document-actions">
+    <button v-if="canDownload && (item.type === 'file' || item.type === 'manual')" type="button" class="visual-document-actions__item" @click.stop="emit('download')">
+      <t-icon name="download" />
+      <span>{{ $t('common.download') }}</span>
+    </button>
+
     <button v-if="item.type === 'manual'" type="button" class="visual-document-actions__item" @click.stop="emit('edit')">
       <t-icon name="edit" />
       <span>{{ $t('knowledgeBase.editDocument') }}</span>

@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createServer } from "vite";
 import test from "node:test";
 import { comparisonGroups } from "../src/data/homeContent.js";
 import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
@@ -19,40 +17,16 @@ function homepageCopy(locale) {
   );
 }
 
-test("commercial home keeps the smooth template and presents the approved product hierarchy", async (t) => {
-  const server = await createServer({
-    root,
-    appType: "custom",
-    logLevel: "silent",
-    server: { middlewareMode: true },
-  });
-  t.after(() => server.close());
-
-  const [{ HomePage }, { SiteFooter }, { LegalPage }] = await Promise.all([
-    server.ssrLoadModule("/src/HomePage.jsx"),
-    server.ssrLoadModule("/src/components/SiteChrome.jsx"),
-    server.ssrLoadModule("/src/LegalPage.jsx"),
-  ]);
-  const copy = getStorefrontCopy("en");
-  const home = renderToStaticMarkup(React.createElement(HomePage, { copy }));
-  const japanHome = renderToStaticMarkup(
-    React.createElement(HomePage, { copy, pricingCurrency: "JPY" }),
-  );
-  const footer = renderToStaticMarkup(
-    React.createElement(SiteFooter, { copy: homepageCopy("en") }),
-  );
-  const contact = renderToStaticMarkup(
-    React.createElement(LegalPage, {
-      copy,
-      locale: "en",
-      document: getPublicDocument("en", "/contact"),
-    }),
-  );
-  const contactZh = renderToStaticMarkup(
-    React.createElement(LegalPage, {
-      copy: getStorefrontCopy("zh-CN"),
-      locale: "zh-CN",
-      document: getPublicDocument("zh-CN", "/contact"),
+test("commercial home keeps the smooth template and presents the approved product hierarchy", () => {
+  // Vite 8's middleware-mode SSR runner leaves the Node test-file isolation
+  // promise pending after every assertion has completed. Render in a bounded
+  // child process so the real JSX still goes through Vite while this suite has
+  // deterministic cleanup and can report its final result.
+  const { home, japanHome, footer, contact, contactZh } = JSON.parse(
+    execFileSync(process.execPath, [join(root, "tests/renderStorefrontFixture.mjs")], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 4 * 1024 * 1024,
     }),
   );
   const comparison = home.match(/<section class="comparison-section"[\s\S]*?<\/section>/)?.[0] ?? "";

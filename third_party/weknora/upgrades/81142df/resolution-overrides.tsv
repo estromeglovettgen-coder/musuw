@@ -1,0 +1,9 @@
+path	resolution	evidence
+.github/workflows/app.yml	preserve-musuw-deletion	Musuw root CI is the sole application build authority; vendored nested workflow remains intentionally absent
+.github/workflows/cli.yml	preserve-musuw-deletion	Musuw root CI validates the vendored CLI; vendored nested workflow remains intentionally absent
+.github/workflows/docker-image.yml	preserve-musuw-deletion	Musuw root delivery builds the product runtime images; vendored nested publisher remains intentionally absent
+.github/workflows/docreader.yml	preserve-musuw-deletion	Musuw root CI validates active DocReader directly; vendored nested workflow remains intentionally absent
+.github/workflows/anydoc.yml	preserve-musuw-deletion	Musuw root CI builds audits vets and tests AnyDoc; the vendored nested workflow remains intentionally absent
+.github/workflows/dsh-plugin.yml	preserve-musuw-deletion	Musuw root CI validates the DSH package and pinned harness E2E; upstream npm publishing is not a Musuw release authority
+.github/workflows/go-lint-cache.yml	preserve-musuw-deletion	Musuw root CI owns Go caches and release gates; the vendored cache-only workflow remains intentionally absent
+.github/workflows/go-lint.yml	preserve-musuw-deletion	Musuw root CI runs root CLI and client vet build tests plus new-findings golangci-lint; the vendored nested workflow remains intentionally absent

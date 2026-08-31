@@ -125,6 +125,10 @@
               <span class="legend-dot" style="background: #d54941"></span>
               {{ $t("knowledgeEditor.wikiBrowser.filterComparison") }}
             </div>
+            <div v-if="graphFamiliarCount > 0" class="legend-item">
+              <span class="legend-familiar-ring"></span>
+              {{ $t('knowledgeEditor.wikiBrowser.legendFamiliar') }}
+            </div>
           </div>
           <div class="legend-divider"></div>
           <div class="legend-actions">
@@ -1904,6 +1908,8 @@ const graphFrontierCount = computed(() => {
   }
   return count;
 });
+
+const graphFamiliarCount = computed(() => graphData.value?.meta?.familiar_count || 0)
 
 // graphStatusCard drives the little summary panel below the legend.
 //
@@ -3911,9 +3917,12 @@ function mergeGraphData(base: WikiGraphData, incoming: WikiGraphData, gen: numbe
   const nodeBySlug = new Map<string, WikiGraphData["nodes"][number]>();
   for (const n of base.nodes) nodeBySlug.set(n.slug, n);
   for (const n of incoming.nodes) {
-    if (!nodeBySlug.has(n.slug)) {
-      nodeBySlug.set(n.slug, n);
-      bloomGenerations.set(n.slug, gen);
+    const existing = nodeBySlug.get(n.slug)
+    if (!existing) {
+      nodeBySlug.set(n.slug, n)
+      bloomGenerations.set(n.slug, gen)
+    } else if (n.familiar) {
+      existing.familiar = true
     }
   }
   const edgeKey = (e: { source: string; target: string }) => `${e.source}→${e.target}`;
@@ -3933,15 +3942,18 @@ function mergeGraphData(base: WikiGraphData, incoming: WikiGraphData, gen: numbe
       edges.push(e);
     }
   }
+  const nodes = Array.from(nodeBySlug.values())
+  const familiarCount = nodes.filter((n) => n.familiar).length
   return {
-    nodes: Array.from(nodeBySlug.values()),
+    nodes,
     edges,
     meta: {
       // Meta from the latest ego response describes the most recent
       // bloom, but we keep the overview denominator so the truncation
       // hint still reflects the KB-wide total.
       ...incoming.meta,
-      returned: nodeBySlug.size,
+      returned: nodes.length,
+      familiar_count: familiarCount || undefined,
     },
   };
 }
@@ -6051,6 +6063,17 @@ onUnmounted(() => {
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+}
+
+.legend-familiar-ring {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 2px solid #0052d9;
+  background: transparent;
 }
 
 .legend-divider {

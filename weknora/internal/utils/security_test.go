@@ -194,6 +194,12 @@ func TestValidateURLForSSRF_IPv6Whitelist(t *testing.T) {
 			rawURL:    "https://8.8.8.8/dns-query",
 			wantErr:   true,
 		},
+		{
+			name:      "whitelist does not allow non-http scheme",
+			whitelist: "example.com",
+			rawURL:    "gopher://example.com/_stats",
+			wantErr:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -331,6 +337,22 @@ func TestIsRestrictedIP_IPv6(t *testing.T) {
 				t.Fatalf("isRestrictedIP(%s) reason = %q, want contains %q", tt.ip, reason, tt.wantReason)
 			}
 		})
+	}
+}
+
+func TestIsRestrictedIP_BenchmarkingRange(t *testing.T) {
+	for _, raw := range []string{"198.18.0.1", "198.19.255.254"} {
+		ip := net.ParseIP(raw)
+		if ip == nil {
+			t.Fatalf("net.ParseIP(%q) returned nil", raw)
+		}
+		blocked, reason := isRestrictedIP(ip)
+		if !blocked {
+			t.Fatalf("isRestrictedIP(%s) = false, want benchmarking range blocked", raw)
+		}
+		if !strings.Contains(reason, "198.18.0.0/15") {
+			t.Fatalf("isRestrictedIP(%s) reason = %q, want benchmarking range", raw, reason)
+		}
 	}
 }
 

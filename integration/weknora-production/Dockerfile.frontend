@@ -2,11 +2,11 @@
 # presentation/proxy only; it neither implements a business API nor imports
 # any legacy service.
 
-ARG VERSION_ARG=0.7.2
+ARG VERSION_ARG=main-81142df
 ARG REVISION_ARG=local
 FROM nginx:1.30.3-alpine@sha256:0d3b80406a13a767339fbe2f41406d6c7da727ab89cf8fae399e81f780f814d1
 
-ARG VERSION_ARG=0.7.2
+ARG VERSION_ARG=main-81142df
 ARG REVISION_ARG=local
 
 COPY weknora/frontend/dist /usr/share/nginx/html
@@ -19,7 +19,7 @@ RUN chmod +x /docker-entrypoint.sh
 
 ENV MAX_FILE_SIZE_MB=50
 
-LABEL org.opencontainers.image.version="v${VERSION_ARG}" \
+LABEL org.opencontainers.image.version="${VERSION_ARG}" \
       org.opencontainers.image.revision="${REVISION_ARG}"
 
 EXPOSE 8080

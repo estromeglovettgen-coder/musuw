@@ -61,7 +61,7 @@ const nativeListEmpty = computed(() => {
   return false
 })
 
-// Mechanical restoration of WeKnora v0.7.2:
+// Mechanical restoration of WeKnora main 81142df:
 // showAgentListEmpty && isReadyForAgent && !editorVisible.
 const shouldShowGuide = computed(() =>
   listLoaded.value &&

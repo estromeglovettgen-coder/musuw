@@ -52,6 +52,7 @@ func graphTestRouter(wikiService interfaces.WikiPageService) *gin.Engine {
 		&graphTestKnowledgeBaseService{},
 		nil,
 		nil,
+		nil,
 	)
 	router.GET("/knowledgebase/:kb_id/wiki/graph", handler.GetGraph)
 	return router

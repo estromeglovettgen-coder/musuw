@@ -58,6 +58,12 @@ case "$max_file_size_mb" in
   ''|*[!0-9]*) fail "maximum file size is invalid" ;;
 esac
 
+# Only emit whitelisted locale tags to avoid config.js injection from env values.
+runtime_default_locale=""
+case "${DEFAULT_LOCALE:-}" in
+  zh-CN|en-US|ru-RU|ko-KR) runtime_default_locale="${DEFAULT_LOCALE}" ;;
+esac
+
 # This file is intentionally the sole public runtime seam shared by the
 # native frontend and auth shell. Values have passed the strict serializer
 # guard above and contain no server-side provider material.
@@ -69,7 +75,8 @@ window.__RUNTIME_CONFIG__ = {
     supabaseUrl: "${supabase_url}",
     publishableKey: "${supabase_publishable_key}",
     weknoraOAuthClientId: "${weknora_oauth_client_id}"
-  }
+  },
+  DEFAULT_LOCALE: "${runtime_default_locale}"
 };
 EOF
 

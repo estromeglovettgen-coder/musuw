@@ -45,6 +45,21 @@ for required_service in frontend app docreader postgres redis neo4j searxng-init
     fi
 done
 
+if ! jq -e '.services.app.environment.LANGFUSE_ENABLED == "false"' "$config_json" >/dev/null; then
+    printf '%s\n' 'candidate app must not require production Langfuse credentials' >&2
+    exit 1
+fi
+if ! jq -e '
+  .services.frontend.environment.MUSUW_DEPLOYMENT_ENVIRONMENT == "staging" and
+  .services.frontend.environment.MUSUW_AUTH_PUBLIC_ORIGIN == "http://localhost:4190" and
+  (.services.frontend.environment.MUSUW_SUPABASE_URL | length > 0) and
+  (.services.frontend.environment.MUSUW_SUPABASE_PUBLISHABLE_KEY | length > 0) and
+  (.services.frontend.environment.MUSUW_WEKNORA_OAUTH_CLIENT_ID | length > 0)
+' "$config_json" >/dev/null; then
+    printf '%s\n' 'candidate frontend public identity runtime is incomplete' >&2
+    exit 1
+fi
+
 active_volume_sources=()
 while IFS= read -r volume_source; do
     [ -n "$volume_source" ] && active_volume_sources+=("$volume_source")
@@ -81,14 +96,21 @@ if ! grep -Fq 'COPY weknora/frontend/dist' "$repo_root/integration/weknora-candi
     printf '%s\n' 'candidate frontend build inputs are not native-only' >&2
     exit 1
 fi
+if ! grep -Fq 'location = /health' "$repo_root/integration/weknora-candidate/nginx.conf.template" ||
+   ! grep -Fq 'proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/health;' "$repo_root/integration/weknora-candidate/nginx.conf.template"; then
+    printf '%s\n' 'candidate frontend does not proxy the native application health endpoint' >&2
+    exit 1
+fi
 
-# The candidate app must compile v0.7.2 locally and only inherit the official
+# The candidate app must compile fixed main commit 81142df locally and only inherit the official
 # v0.7.1 runtime OS layer by immutable digest. This prevents the old business
 # binary from being selected by accident while avoiding a second large runtime
 # package installation.
 runtime_dockerfile="$repo_root/integration/weknora-candidate/Dockerfile.app.runtime"
 if ! grep -Fq 'FROM wechatopenai/weknora-app@sha256:d88bef9912f6abb8bc7c22144ee7f314016055b8075bda4ea8fbb28af41c3bcf' "$runtime_dockerfile" ||
-   ! grep -Fq 'ARG COMMIT_ID_ARG=3d5d8bfcdfeeea266b292b71cea616847af28d0f' "$runtime_dockerfile" ||
+   ! grep -Fq 'ARG COMMIT_ID_ARG=81142dfd17b2778087e95d3a317483a2fd909b91' "$runtime_dockerfile" ||
+   ! grep -Fq 'ARG WITH_ANYDOC=1' "$runtime_dockerfile" ||
+   ! grep -Fq 'make build-prod GO_BUILD_TAGS=anydoc' "$runtime_dockerfile" ||
    ! grep -Fq 'COPY --from=builder /src/WeKnora ./WeKnora' "$runtime_dockerfile" ||
    ! grep -Fq 'COPY --from=builder /src/migrations/ ./migrations/' "$runtime_dockerfile" ||
    ! grep -Fq 'COPY --from=builder /src/scripts/ ./scripts/' "$runtime_dockerfile" ||

@@ -315,7 +315,8 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
           build-args: |
-            VERSION_ARG=0.7.2
+            VERSION_ARG=main-81142df
+            WITH_ANYDOC=1
             IMAGE_REVISION_ARG=${{ needs.authorize.outputs.release_sha }}
             BUILD_TIME_ARG=production-github-hosted-amd64
             GO_VERSION_ARG=go1.26
@@ -336,7 +337,7 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.authorize.outputs.release_sha }}
           build-args: |
-            VERSION_ARG=0.7.2
+            VERSION_ARG=main-81142df
             REVISION_ARG=${{ needs.authorize.outputs.release_sha }}
           provenance: mode=min
           cache-from: type=gha,scope=musuw-frontend-amd64

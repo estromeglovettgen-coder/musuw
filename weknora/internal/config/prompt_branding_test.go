@@ -29,7 +29,11 @@ func TestPromptTemplatesUseMusuwBranding(t *testing.T) {
 	foundMusuw, foundDidiRen := false, false
 	for _, group := range groups {
 		for _, template := range group {
-			if strings.Contains(strings.ToLower(template.Content), "weknora") || strings.Contains(strings.ToLower(template.Content), "tencent") || strings.Contains(template.Content, "腾讯") {
+			// `.weknora/requirements.json` is a stable sandbox wire path, not
+			// user-facing product branding. Preserve that compatibility token
+			// while rejecting legacy names everywhere else in prompt prose.
+			brandingText := strings.ReplaceAll(strings.ToLower(template.Content), ".weknora", "")
+			if strings.Contains(brandingText, "weknora") || strings.Contains(brandingText, "tencent") || strings.Contains(template.Content, "腾讯") {
 				t.Fatalf("template %q still contains legacy branding", template.ID)
 			}
 			foundMusuw = foundMusuw || strings.Contains(template.Content, "Musuw")

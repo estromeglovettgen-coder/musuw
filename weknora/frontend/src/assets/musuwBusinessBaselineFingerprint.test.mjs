@@ -10,13 +10,15 @@ const gitBlobSha = (text) => {
 }
 
 // Authority order:
-// 1) Tencent/WeKnora v0.7.2 is the behavior contract.
-// 2) 76bc44... records Musuw's first published source baseline and is useful
-//    evidence only where it does not narrow/remove upstream v0.7.2 behavior.
+// 1) Tencent/WeKnora main at the fixed 81142df commit is the current kernel
+//    behavior contract.
+// 2) v0.7.2 records the imported base source and is useful historical evidence
+//    only where it does not narrow/remove current main behavior.
 // 3) 367a0c... is the pre-UI product snapshot used to detect accidental
 //    visual-session mutations, not permission to preserve later product
 //    simplifications that conflict with the upstream behavior contract.
-const EXPECTED_UPSTREAM_COMMIT = '3d5d8bfcdfeeea266b292b71cea616847af28d0f'
+const EXPECTED_UPSTREAM_COMMIT = '81142dfd17b2778087e95d3a317483a2fd909b91'
+const EXPECTED_UPSTREAM_TREE = '37eaafdd6c276d2d1ddffffe1f39f8b38fd7cc03'
 const INITIAL_MUSUW_BASELINE_COMMIT = '76bc44e15433e598c2c131e6873754e5ec5f4f5e'
 const PRE_UI_BUSINESS_BASELINE_COMMIT = '367a0c76e48fcf8a3762c33b672cfa2e16b679f4'
 const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b909'
@@ -25,8 +27,8 @@ const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': 'bfe05d85e3a516bd64afa6d69bfa6f9dddf3e5c5',
-  './business-baselines/Input-field.pre-view.vue': 'bfa653c206ebb7d579e294e18f8220ffb83f5682',
-  './business-baselines/KnowledgeBase.pre-view.vue': '75996e898b170fe61e0c32eac39ca71b79bee9a0',
+  './business-baselines/Input-field.pre-view.vue': '11bc2cb650979eb55e367d370980051fa6caa429',
+  './business-baselines/KnowledgeBase.pre-view.vue': '981716cb4ccf83a7dca23ff588602a0bbd32bbb8',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',
@@ -35,7 +37,7 @@ const LOCKED_BUSINESS_BLOBS = {
 // These controllers remain byte-identical to Musuw's first source baseline.
 // KnowledgeBaseList is deliberately absent: the first Musuw snapshot had
 // narrowed WeKnora's All/Favorites/Recents/Organization scopes to `mine`; the
-// current controller restores the upstream v0.7.2 behavior instead.
+// current controller restores the upstream main behavior instead.
 const INITIAL_MUSUW_BYTE_IDENTICAL = {
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
 }
@@ -45,34 +47,34 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
     change: NATIVE_AGENT_MCP_EXPOSURE_CHANGE,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy',
+    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy',
   },
   chatParent: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort',
+    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort',
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native document import flow extended only with the managed video file types',
+    authority: 'WeKnora main 81142df native document import flow extended only with the managed video file types',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 native knowledge scopes with Musuw platform-default model provisioning',
+    authority: 'WeKnora main 81142df native knowledge scopes with Musuw platform-default model provisioning',
   },
   sidebar: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/menu.pre-view.vue'],
-    authority: 'WeKnora v0.7.2 session behavior without requests to product-hidden channel APIs in Musuw Lite',
+    authority: 'WeKnora main 81142df session behavior without requests to product-hidden channel APIs in Musuw Lite',
   },
 }
 
 const AUDITED_UPSTREAM_VIEW_BLOBS = {
-  'frontend/src/views/chat/index.vue': '8544e69f1d153164af88bb9a3f2748a9ece735b8',
-  'frontend/src/components/Input-field.vue': 'e1cfef13cef9f2d61e53be8c6e4d33268867b2b7',
-  'frontend/src/views/knowledge/KnowledgeBase.vue': '1b1963bfcea822a4aaec34d7df7352dc9de1ba3f',
+  'frontend/src/views/chat/index.vue': '0dbd60aae62aeac5a90bab59abefccff6562f61e',
+  'frontend/src/components/Input-field.vue': 'c74fc5a22464b8582e070e32b294d698e1e2fcf5',
+  'frontend/src/views/knowledge/KnowledgeBase.vue': 'dfa0e41198093599de6c984bfa954a2c42563a87',
   'frontend/src/views/knowledge/KnowledgeBaseList.vue': '0da588be9c707bac596b6cfe90491c40a2667d92',
   'frontend/src/components/manual-knowledge-editor.vue': '5eecf5a2cf1d723cbfa1f68649924acd99811f93',
-  'frontend/src/components/menu.vue': '2e3082b131b4f6e6d37ad1c1eae000efe3a769f7',
+  'frontend/src/components/menu.vue': 'c57ad8de9fa75c3e157f8c2449381b81ffb99cbf',
 }
 
 test('visual rebuild cannot mutate the locked business-controller snapshots', () => {
@@ -112,10 +114,10 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.sidebar.resultingBlob,
     gitBlobSha(read('./business-baselines/menu.pre-view.vue')),
   )
-  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.authority, /WeKnora v0\.7\.2/)
-  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.authority, /WeKnora v0\.7\.2/)
-  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.authority, /WeKnora v0\.7\.2/)
-  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.sidebar.authority, /WeKnora v0\.7\.2/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.authority, /WeKnora main 81142df/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.authority, /WeKnora main 81142df/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.authority, /WeKnora main 81142df/)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.sidebar.authority, /WeKnora main 81142df/)
 })
 
 test('knowledge list controller retains upstream scope behavior rather than Musuw single-scope narrowing', () => {
@@ -128,11 +130,12 @@ test('knowledge list controller retains upstream scope behavior rather than Musu
   assert.equal(source.includes('spaceSelection.value !== "mine"'), false)
 })
 
-test('repository still declares the audited WeKnora v0.7.2 upstream authority', () => {
-  const provenance = JSON.parse(read('../../../../third_party/weknora/v0.7.2-provenance.json'))
-  assert.equal(provenance.upstream.tag, 'v0.7.2')
-  assert.equal(provenance.upstream.commit, EXPECTED_UPSTREAM_COMMIT)
-  assert.equal(provenance.upstream.tree, '7251449b3d71ef5d7d157874c2c705c58a210202')
+test('repository declares the audited WeKnora main 81142df upstream authority', () => {
+  const provenance = JSON.parse(read('../../../../third_party/weknora/active-upstream-source.json'))
+  assert.equal(provenance.tag, 'main')
+  assert.equal(provenance.commit, EXPECTED_UPSTREAM_COMMIT)
+  assert.equal(provenance.import.tree, EXPECTED_UPSTREAM_TREE)
+  assert.equal(provenance.import.version, 'main-81142df')
 })
 
 test('audit record retains the official upstream blobs used for behavior review', () => {

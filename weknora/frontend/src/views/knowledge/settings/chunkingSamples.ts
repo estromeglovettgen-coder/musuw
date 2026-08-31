@@ -147,8 +147,8 @@ docker pull docker.m.daocloud.io/wechatopenai/weknora-ui:v0.5.0
 ### Q8: 如何启用多模态？
 在知识库的"多模态配置"中开启，并选择一个 VLM 模型（如 GPT-4o、Qwen2.5-VL）。开启后，文档中的图片会被 VLM 描述并参与检索。
 
-### Q9: 怎么把日志改成 JSON 格式？
-设置 \`LOG_FORMAT=json LOG_LEVEL=info\`，便于接入 ELK / Loki 等日志栈。
+### Q9: 怎么自定义日志格式？
+设置 \`LOG_FORMAT='[%d] %level %traceId | %msg' LOG_LEVEL=info\`，使用支持的占位符定制输出格式。
 
 ## 检索与召回
 

@@ -1,38 +1,159 @@
 <template>
   <article class="visual-assistant-message" :class="{ 'is-embedded': embeddedMode }">
     <div class="visual-assistant-message__context">
-      <div v-if="!session.isAgentMode && mentionedItems && mentionedItems.length > 0" class="visual-assistant-resources">
-        <span v-for="item in mentionedItems" :key="item.id" class="visual-assistant-resource" :data-resource-type="item.type || 'file'">
-          <span class="visual-assistant-resource__icon" aria-hidden="true"><t-icon v-if="item.type === 'kb'" :name="item.kb_type === 'faq' ? 'chat-bubble-help' : 'folder'" /><t-icon v-else :name="mentionTagIcon(item)" /></span>
+      <div
+        v-if="!session.isAgentMode && mentionedItems && mentionedItems.length > 0"
+        class="visual-assistant-resources"
+      >
+        <span
+          v-for="item in mentionedItems"
+          :key="item.id"
+          class="visual-assistant-resource"
+          :class="mentionTagClass(item)"
+          :data-resource-type="item.type || 'file'"
+        >
+          <span class="visual-assistant-resource__icon" aria-hidden="true">
+            <t-icon
+              v-if="item.type === 'kb'"
+              :name="item.kb_type === 'faq' ? 'chat-bubble-help' : 'folder'"
+            />
+            <t-icon v-else :name="mentionTagIcon(item)" />
+          </span>
           <span class="visual-assistant-resource__name" :title="item.name">{{ item.name }}</span>
         </span>
       </div>
 
       <div v-if="session.isRagMode" class="visual-assistant-pipeline">
         <RagPipelineProgress :session="session" :embedded-mode="embeddedMode" />
-        <AgentStreamDisplay v-if="session.isAgentMode" :session="session" :session-id="sessionId" :user-query="userQuery" :rag-mode="true" :follow-up-loading="followUpLoading" @render-complete-change="emit('render-complete-change', $event)" />
+        <AgentStreamDisplay
+          v-if="session.isAgentMode"
+          :session="session"
+          :session-id="sessionId"
+          :user-query="userQuery"
+          :rag-mode="true"
+          :follow-up-loading="followUpLoading"
+          @render-complete-change="emit('render-complete-change', $event)"
+        />
       </div>
       <template v-else>
+        <!-- A plain answer has no timeline to put the memory row on, so it gets
+             the standalone row. Agent turns render theirs inside their timeline. -->
+        <RagPipelineProgress
+          v-if="!session.isAgentMode && session.used_memories?.length"
+          :session="session"
+          :embedded-mode="embeddedMode"
+          memory-only
+        />
         <docInfo v-if="session.knowledge_references?.length" :session="session" />
-        <AgentStreamDisplay v-if="session.isAgentMode" :session="session" :session-id="sessionId" :user-query="userQuery" :follow-up-loading="followUpLoading" @render-complete-change="emit('render-complete-change', $event)" />
+        <AgentStreamDisplay
+          v-if="session.isAgentMode"
+          :session="session"
+          :session-id="sessionId"
+          :user-query="userQuery"
+          :follow-up-loading="followUpLoading"
+          @render-complete-change="emit('render-complete-change', $event)"
+        />
       </template>
       <deepThink v-if="session.showThink && !session.isAgentMode" :deepSession="session" />
     </div>
 
-    <section ref="parentMd" v-if="!session.hideContent && !session.isAgentMode" class="visual-assistant-answer">
-      <div v-if="hasActualContent" class="visual-assistant-answer__content"><div class="visual-assistant-markdown" v-stable-html="renderedHTML" /></div>
-      <div v-if="answerFullyRendered && (content || session.content)" class="visual-assistant-toolbar">
-        <button type="button" class="visual-assistant-toolbar__button" :title="$t('agent.copy')" @click.stop="handleCopyAnswer"><t-icon name="copy" /></button>
-        <button type="button" class="visual-assistant-toolbar__button" :title="$t('agent.addToKnowledgeBase')" @click.stop="handleAddToKnowledge"><t-icon name="bookmark-add" /></button>
-        <t-tooltip v-if="session.is_fallback" :content="$t('chat.fallbackHint')" placement="top"><button type="button" class="visual-assistant-toolbar__button is-muted" :title="$t('chat.fallbackHint')"><t-icon name="info-circle" /></button></t-tooltip>
-        <ChatRequestInfoButton v-if="showRequestInfo" :session="session" :session-id="sessionId" />
-        <Transition name="visual-follow-up-loading"><span v-if="followUpLoading" class="visual-assistant-toolbar__loading" role="status" aria-live="polite"><t-icon name="lightbulb" /><span>{{ t('chat.followUpQuestionsLoading') }}</span></span></Transition>
+    <section
+      ref="parentMd"
+      v-if="!session.hideContent && !session.isAgentMode"
+      class="visual-assistant-answer"
+    >
+      <div v-if="hasActualContent" class="visual-assistant-answer__content">
+        <div class="visual-assistant-markdown" v-stable-html="renderedHTML" />
       </div>
-      <div v-if="isImgLoading" class="visual-assistant-image-loading"><t-loading size="small" /><span>{{ $t('common.loading') }}</span></div>
+      <div v-if="answerFullyRendered && (content || session.content)" class="visual-assistant-toolbar">
+        <button
+          type="button"
+          class="visual-assistant-toolbar__button"
+          :title="$t('agent.copy')"
+          @click.stop="handleCopyAnswer"
+        >
+          <t-icon name="copy" />
+        </button>
+        <button
+          type="button"
+          class="visual-assistant-toolbar__button"
+          :title="$t('agent.addToKnowledgeBase')"
+          @click.stop="handleAddToKnowledge"
+        >
+          <t-icon name="bookmark-add" />
+        </button>
+        <span
+          v-if="hasArtifacts || artifactsCollecting"
+          class="visual-assistant-toolbar__artifact answer-toolbar__artifact"
+          :class="{ 'is-collecting': artifactButtonCollecting }"
+        >
+          <button
+            type="button"
+            class="visual-assistant-toolbar__button"
+            :disabled="artifactButtonCollecting"
+            :title="hasArtifacts ? $t('agent.artifactDrawer.buttonTitle') : $t('agent.artifactDrawer.collecting')"
+            @click.stop="openArtifactDrawer()"
+          >
+            <t-icon v-if="artifactButtonCollecting" name="loading" class="visual-assistant-toolbar__artifact-spinner answer-toolbar__artifact-spinner" />
+            <t-icon v-else name="folder" />
+          </button>
+          <span v-if="hasArtifacts" class="visual-assistant-toolbar__artifact-count answer-toolbar__artifact-count" aria-hidden="true">{{ artifactCount }}</span>
+        </span>
+        <t-tooltip
+          v-if="session.is_fallback"
+          :content="$t('chat.fallbackHint')"
+          placement="top"
+        >
+          <button
+            type="button"
+            class="visual-assistant-toolbar__button is-muted"
+            :title="$t('chat.fallbackHint')"
+          >
+            <t-icon name="info-circle" />
+          </button>
+        </t-tooltip>
+        <ChatRequestInfoButton
+          v-if="showRequestInfo"
+          :session="session"
+          :session-id="sessionId"
+        />
+        <Transition name="visual-follow-up-loading">
+          <span
+            v-if="followUpLoading"
+            class="visual-assistant-toolbar__loading"
+            role="status"
+            aria-live="polite"
+          >
+            <t-icon name="lightbulb" />
+            <span>{{ t('chat.followUpQuestionsLoading') }}</span>
+          </span>
+        </Transition>
+      </div>
+      <div v-if="isImgLoading" class="visual-assistant-image-loading">
+        <t-loading size="small" />
+        <span>{{ $t('common.loading') }}</span>
+      </div>
     </section>
 
-    <picturePreview v-if="reviewImg && reviewUrl" :reviewImg="reviewImg" :reviewUrl="reviewUrl" @closePreImg="closePreImg" />
-    <ChatCitationFloat :float="citationFloat" :on-enter="cancelCitationClose" :on-leave="scheduleCitationClose" />
+    <picturePreview
+      v-if="reviewImg && reviewUrl"
+      :reviewImg="reviewImg"
+      :reviewUrl="reviewUrl"
+      @closePreImg="closePreImg"
+    />
+    <ChatCitationFloat
+      :float="citationFloat"
+      :on-enter="cancelCitationClose"
+      :on-leave="scheduleCitationClose"
+    />
+    <ChatArtifactsDrawer
+      v-if="hasArtifacts"
+      v-model:visible="showArtifactDrawer"
+      :session-id="sessionId"
+      :message-id="messageIdForArtifacts"
+      :artifacts="artifactList"
+      :preview-index="artifactPreviewIndex"
+    />
   </article>
 </template>
 
@@ -46,48 +167,328 @@ import RagPipelineProgress from './RagPipelineProgress.vue';
 import ChatRequestInfoButton from '@/components/ChatRequestInfoButton.vue';
 import ChatCitationFloat from '@/components/ChatCitationFloat.vue';
 import picturePreview from '@/components/picture-preview.vue';
+import ChatArtifactsDrawer from './ChatArtifactsDrawer.vue';
+import { isCollectingSkillArtifacts } from '@/utils/skillArtifacts';
 import { sanitizeMarkdownHTML, safeMarkdownToHTML, createSafeImage, isValidImageURL, hydrateProtectedFileImages } from '@/utils/security';
+import {
+    artifactIndexFromEventTarget,
+    hydrateArtifactImages,
+    isArtifactRefHref,
+    renderArtifactReference,
+} from '@/utils/sandboxArtifactRefs';
 import { useI18n } from 'vue-i18n';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useUIStore } from '@/stores/ui';
-import { buildManualMarkdown, copyTextToClipboard, formatManualTitle } from '@/utils/chatMessageShared';
-import { createChatMarkdownRenderer, renderChatMarkdown } from '@/utils/chatMarkdownRenderer';
-import { createMermaidCodeRenderer, ensureMermaidInitialized, renderMermaidInContainer, enhanceMarkdownContainer } from '@/utils/mermaidShared';
+import {
+    buildManualMarkdown,
+    formatManualTitle,
+} from '@/utils/chatMessageShared';
+import { copyWithToast } from '@/utils/clipboard';
+import {
+    createChatMarkdownRenderer,
+    renderChatMarkdown,
+} from '@/utils/chatMarkdownRenderer';
+import {
+    createMermaidCodeRenderer,
+    ensureMermaidInitialized,
+    renderMermaidInContainer,
+    enhanceMarkdownContainer,
+} from '@/utils/mermaidShared';
 import { refreshMarkdownEnhancements } from '@/utils/markdownEnhancements';
 import { useChatCitationPopover } from '@/composables/useChatCitationPopover';
 import { useTypewriter } from '@/composables/useTypewriter';
 import { vStableHtml } from '@/directives/stableHtml';
+import { SKILL_ICON } from '@/types/mention';
 
 ensureMermaidInitialized();
-const mentionTagIcon = (item) => { if (item.type === 'tag') return 'tag'; if (item.type === 'mcp') return 'tools'; if (item.type === 'skill') return 'bookmark'; return 'file'; };
+
+const mentionTagClass = (item) => {
+    if (item.type === 'kb') return item.kb_type === 'faq' ? 'faq-tag' : 'kb-tag';
+    return `${item.type || 'file'}-tag`;
+};
+
+const mentionTagIcon = (item) => {
+    if (item.type === 'tag') return 'tag';
+    if (item.type === 'mcp') return 'tools';
+    if (item.type === 'skill') return SKILL_ICON;
+    return 'file';
+};
+
 const emit = defineEmits(['scroll-bottom', 'render-complete-change'])
 const { t } = useI18n()
 const uiStore = useUIStore();
 let parentMd = ref()
-const { float: citationFloat, rebind: rebindCitations, cancelClose: cancelCitationClose, scheduleClose: scheduleCitationClose } = useChatCitationPopover(parentMd, { getKnowledgeReferences: () => props.session?.knowledge_references, sessionId: () => props.sessionId });
+const { float: citationFloat, rebind: rebindCitations, cancelClose: cancelCitationClose, scheduleClose: scheduleCitationClose } = useChatCitationPopover(parentMd, {
+    getKnowledgeReferences: () => props.session?.knowledge_references,
+    sessionId: () => props.sessionId,
+});
 let reviewUrl = ref('')
 let reviewImg = ref(false)
 let isImgLoading = ref(false);
-const props = defineProps({ content: { type: String, required: false }, session: { type: Object, required: false }, userQuery: { type: String, required: false, default: '' }, isFirstEnter: { type: Boolean, required: false }, embeddedMode: { type: Boolean, default: false }, sessionId: { type: String, default: '' }, followUpLoading: { type: Boolean, default: false } });
+const props = defineProps({
+    // 必填项
+    content: {
+        type: String,
+        required: false
+    },
+    session: {
+        type: Object,
+        required: false
+    },
+    userQuery: {
+        type: String,
+        required: false,
+        default: ''
+    },
+    isFirstEnter: {
+        type: Boolean,
+        required: false
+    },
+    embeddedMode: {
+        type: Boolean,
+        default: false
+    },
+    sessionId: {
+        type: String,
+        default: ''
+    },
+    followUpLoading: {
+        type: Boolean,
+        default: false
+    }
+});
+
 const showRequestInfo = computed(() => !!(props.session?.request_id || props.session?.id));
-const preview = (url) => { nextTick(() => { reviewUrl.value = url; reviewImg.value = true }) }
-const closePreImg = () => { reviewImg.value = false; reviewUrl.value = ''; }
-const markdownRenderer = createChatMarkdownRenderer({ codeRenderer: createMermaidCodeRenderer('mermaid-botmsg'), imageRenderer: ({ href, title, text }) => createSafeImage(href, text || '', title || ''), invalidImageHtml: () => `<p>${t('error.invalidImageLink')}</p>`, isValidImageUrl: isValidImageURL });
-const mentionedItems = computed(() => props.session?.mentioned_items || []);
-const answerText = computed(() => { const text = props.content || props.session?.content || ''; return typeof text === 'string' ? text : ''; });
-const { displayed: typedAnswer } = useTypewriter(() => answerText.value, () => Boolean(props.session?.is_completed));
-const answerFullyRendered = computed(() => Boolean(props.session?.is_completed) && typedAnswer.value.length >= answerText.value.length);
-watch(answerFullyRendered, (ready) => { if (!props.session?.isAgentMode) emit('render-complete-change', ready); }, { immediate: true });
-const renderedHTML = computed(() => { const text = typedAnswer.value; if (!text || typeof text !== 'string') return ''; return renderChatMarkdown(text, { renderer: markdownRenderer, escapeMarkdown: safeMarkdownToHTML, sanitizeHtml: sanitizeMarkdownHTML, streaming: !props.session?.is_completed, knowledgeReferences: props.session?.knowledge_references }); });
-const hasActualContent = computed(() => { const text = props.content || props.session?.content || ''; return text && text.trim().length > 0; });
-const getActualContent = () => (props.content || props.session?.content || '').trim();
-const handleCopyAnswer = async () => { const content = getActualContent(); if (!content) { MessagePlugin.warning(t('chat.emptyContentWarning')); return; } try { await copyTextToClipboard(content); MessagePlugin.success(t('chat.copySuccess')); } catch (err) { console.error('复制失败:', err); MessagePlugin.error(t('chat.copyFailed')); } };
-const handleAddToKnowledge = () => { const content = getActualContent(); if (!content) { MessagePlugin.warning(t('chat.emptyContentWarning')); return; } const question = (props.userQuery || '').trim(); const manualContent = buildManualMarkdown(question, content); const manualTitle = formatManualTitle(question); uiStore.openManualEditor({ mode: 'create', title: manualTitle, content: manualContent, status: 'draft' }); MessagePlugin.info(t('chat.editorOpened')); };
-const handleMarkdownImageClick = (e) => { const target = e.target; if (target && target.tagName === 'IMG') { const src = target.getAttribute('src'); if (src) { e.preventDefault(); e.stopPropagation(); preview(src); } } };
-watch(renderedHTML, () => { nextTick(() => { rebindCitations(); }); });
-onUpdated(() => { nextTick(async () => { await hydrateProtectedFileImages(parentMd.value); refreshMarkdownEnhancements(parentMd.value); if (props.session?.is_completed) await renderMermaidInContainer(parentMd.value); }); });
-onMounted(async () => { nextTick(async () => { if (parentMd.value) parentMd.value.addEventListener('click', handleMarkdownImageClick, true); rebindCitations(); await hydrateProtectedFileImages(parentMd.value); await enhanceMarkdownContainer(parentMd.value); }); });
-onBeforeUnmount(() => { if (parentMd.value) parentMd.value.removeEventListener('click', handleMarkdownImageClick, true); });
+
+// -----------------------------------------------------------------------------
+// Skill artifact download (drawer)
+// -----------------------------------------------------------------------------
+// The download button and drawer are opt-in per message: the toolbar checks
+// `hasArtifacts` and only renders when the assistant message actually
+// recorded a file. `messageIdForArtifacts` resolves to whichever field the
+// caller uses to identify the row on the server (session.id from the SSE
+// hydration path, request_id when the caller pre-populated it).
+//
+// NOTE: this file's <script setup> block is plain JS (no lang="ts"), so we
+// stay away from TypeScript-only syntax like `as any[]` — the vite Vue
+// plugin routes non-TS blocks through babel which rejects those tokens.
+const showArtifactDrawer = ref(false);
+const artifactList = computed(() => {
+    const raw = props.session && props.session.artifacts;
+    const list = Array.isArray(raw) ? raw : [];
+    // Enrich each entry with its position so the download endpoint can
+    // resolve it. Server responses already include `index` when they come
+    // via listMessageArtifacts; SSE payloads that land through Message.Artifacts
+    // omit it. Normalising here keeps ChatArtifactsDrawer index-agnostic.
+    return list.map((a, i) => ({ index: i, ...a }));
+});
+const hasArtifacts = computed(() => artifactList.value.length > 0);
+const artifactCount = computed(() => artifactList.value.length);
+const artifactsCollecting = computed(() => isCollectingSkillArtifacts(props.session));
+const artifactButtonCollecting = computed(() => artifactsCollecting.value && !hasArtifacts.value);
+const messageIdForArtifacts = computed(() => {
+    // Prefer the persistent message ID; fall back to request_id for the
+    // in-flight path where the SSE stream still identifies rows by request.
+    return String((props.session && (props.session.id || props.session.request_id)) || '');
+});
+// Set when the drawer is opened by clicking an inline artifact card, so it
+// lands directly on that file's preview instead of the list.
+const artifactPreviewIndex = ref(null);
+function openArtifactDrawer(previewIndex = null) {
+    if (!hasArtifacts.value) return;
+    artifactPreviewIndex.value = previewIndex;
+    showArtifactDrawer.value = true;
+}
+
+const artifactRefContext = computed(() => {
+    const messageId = messageIdForArtifacts.value;
+    if (!props.sessionId || !messageId) return null;
+    return { sessionId: props.sessionId, messageId };
+});
+
+const artifactRefLabels = computed(() => ({
+    previewHint: t('agent.artifactDrawer.inlinePreviewHint'),
+    missingHint: t('agent.artifactDrawer.inlineMissing'),
+}));
+
+const preview = (url) => {
+    nextTick(() => {
+        reviewUrl.value = url;
+        reviewImg.value = true
+    })
+}
+
+const closePreImg = () => {
+    reviewImg.value = false
+    reviewUrl.value = '';
+}
+
+const markdownRenderer = createChatMarkdownRenderer({
+    codeRenderer: createMermaidCodeRenderer('mermaid-botmsg'),
+    imageRenderer: ({ href, title, text }) => {
+        // A sandbox-generated file shares the resource:// form with every other
+        // protected image, so it is matched against this message's artifacts
+        // first. Anything that does not belong to this reply falls through to
+        // the ordinary protected-image path.
+        const artifactHtml = renderArtifactReference({
+            href,
+            alt: text || '',
+            artifacts: artifactList.value,
+            labels: artifactRefLabels.value,
+            context: artifactRefContext.value,
+            streaming: !props.session?.is_completed,
+        });
+        if (artifactHtml !== null) return artifactHtml;
+        return createSafeImage(href, text || '', title || '');
+    },
+    invalidImageHtml: () => `<p>${t('error.invalidImageLink')}</p>`,
+    isValidImageUrl: (href) => isArtifactRefHref(href) || isValidImageURL(href),
+});
+
+// 计算属性：将 Markdown 文本转换为 tokens
+const mentionedItems = computed(() => {
+    return props.session?.mentioned_items || [];
+});
+
+// Smooth the streamed answer into a steady typewriter cadence (shared with the
+// Agent path). Copy/toolbar still read the full content; only display is paced.
+const answerText = computed(() => {
+    const text = props.content || props.session?.content || '';
+    return typeof text === 'string' ? text : '';
+});
+const { displayed: typedAnswer } = useTypewriter(
+    () => answerText.value,
+    () => Boolean(props.session?.is_completed),
+);
+
+// The backend completion event can arrive while the local typewriter still has
+// buffered text to reveal. Treat the answer as visually complete only after the
+// displayed text has caught up, so actions never appear beside a moving answer.
+const answerFullyRendered = computed(() =>
+    Boolean(props.session?.is_completed) && typedAnswer.value.length >= answerText.value.length
+);
+
+watch(
+    answerFullyRendered,
+    (ready) => {
+        if (!props.session?.isAgentMode) emit('render-complete-change', ready);
+    },
+    { immediate: true },
+);
+
+// 单次渲染整个 Markdown 内容（替代 token-by-token，修复 KaTeX 公式在 streaming 时闪烁消失的问题）
+const renderedHTML = computed(() => {
+    const text = typedAnswer.value;
+    if (!text || typeof text !== 'string') return '';
+    return renderChatMarkdown(text, {
+        renderer: markdownRenderer,
+        escapeMarkdown: safeMarkdownToHTML,
+        sanitizeHtml: sanitizeMarkdownHTML,
+        streaming: !props.session?.is_completed,
+        knowledgeReferences: props.session?.knowledge_references,
+    });
+});
+
+// 计算属性：判断是否有实际内容（非空且不只是空白）
+const hasActualContent = computed(() => {
+    const text = props.content || props.session?.content || '';
+    return text && text.trim().length > 0;
+});
+
+// 获取实际内容
+const getActualContent = () => {
+    return (props.content || props.session?.content || '').trim();
+};
+
+// 复制回答内容
+const handleCopyAnswer = async () => {
+    const content = getActualContent();
+    if (!content) {
+        MessagePlugin.warning(t('chat.emptyContentWarning'));
+        return;
+    }
+
+    await copyWithToast(content, 'chat.copySuccess', 'chat.copyFailed');
+};
+
+// 添加到知识库
+const handleAddToKnowledge = () => {
+    const content = getActualContent();
+    if (!content) {
+        MessagePlugin.warning(t('chat.emptyContentWarning'));
+        return;
+    }
+
+    const question = (props.userQuery || '').trim();
+    const manualContent = buildManualMarkdown(question, content);
+    const manualTitle = formatManualTitle(question);
+
+    uiStore.openManualEditor({
+        mode: 'create',
+        title: manualTitle,
+        content: manualContent,
+        status: 'draft',
+    });
+
+    MessagePlugin.info(t('chat.editorOpened'));
+};
+
+// 处理 markdown-content 中图片的点击事件
+const handleMarkdownImageClick = (e) => {
+    const target = e.target;
+    const artifactIndex = artifactIndexFromEventTarget(target);
+    if (artifactIndex !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+        openArtifactDrawer(artifactIndex);
+        return;
+    }
+    if (target && target.tagName === 'IMG') {
+        const src = target.getAttribute('src');
+        if (src) {
+            e.preventDefault();
+            e.stopPropagation();
+            preview(src);
+        }
+    }
+};
+
+watch(renderedHTML, () => {
+    nextTick(() => {
+        rebindCitations();
+    });
+});
+
+// 渲染 Mermaid 图表的函数
+onUpdated(() => {
+    nextTick(async () => {
+        await hydrateProtectedFileImages(parentMd.value);
+        await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
+        refreshMarkdownEnhancements(parentMd.value);
+        if (props.session?.is_completed) {
+            await renderMermaidInContainer(parentMd.value);
+        }
+    });
+});
+
+onMounted(async () => {
+    // 为 markdown-content 中的图片添加点击事件
+    nextTick(async () => {
+        if (parentMd.value) {
+            parentMd.value.addEventListener('click', handleMarkdownImageClick, true);
+        }
+        rebindCitations();
+        await hydrateProtectedFileImages(parentMd.value);
+        await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
+        await enhanceMarkdownContainer(parentMd.value);
+    });
+});
+
+onBeforeUnmount(() => {
+    if (parentMd.value) {
+        parentMd.value.removeEventListener('click', handleMarkdownImageClick, true);
+    }
+});
 </script>
 
 <style scoped lang="less">

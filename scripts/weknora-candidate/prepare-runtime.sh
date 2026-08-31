@@ -90,6 +90,11 @@ awk '
         key == "WEKNORA_REDIS_NAMESPACE" || key == "COMPOSE_PROJECT_NAME" ||
         key == "AUTO_MIGRATE" || key == "DISABLE_REGISTRATION" ||
         key == "WEKNORA_AUTH_DEFAULT_TENANT_MODE" ||
+        key == "MUSUW_DEPLOYMENT_ENVIRONMENT" ||
+        key == "MUSUW_AUTH_PUBLIC_ORIGIN" ||
+        key == "MUSUW_SUPABASE_URL" ||
+        key == "MUSUW_SUPABASE_PUBLISHABLE_KEY" ||
+        key == "MUSUW_WEKNORA_OAUTH_CLIENT_ID" ||
         key == "NEO4J_ENABLE" || key == "NEO4J_URI") next
     print
   }
@@ -150,6 +155,11 @@ printf '%s\n' \
     'APP_SCHEME=http' \
     'FRONTEND_BASE_URL=http://localhost:4190' \
     'APP_EXTERNAL_URL=http://localhost:4190' \
+    'MUSUW_DEPLOYMENT_ENVIRONMENT=staging' \
+    "MUSUW_AUTH_PUBLIC_ORIGIN=${public_origin}" \
+    "MUSUW_SUPABASE_URL=${supabase_url}" \
+    "MUSUW_SUPABASE_PUBLISHABLE_KEY=${supabase_publishable_key}" \
+    "MUSUW_WEKNORA_OAUTH_CLIENT_ID=${public_oidc_client_id}" \
     'SEARXNG_BIND=127.0.0.1' \
     'WEKNORA_REDIS_NAMESPACE=weknora-v072-candidate' \
     'AUTO_MIGRATE=true' \

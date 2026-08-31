@@ -31,12 +31,13 @@ import picturePreview from '@/components/picture-preview.vue';
 import { useI18n } from 'vue-i18n';
 import { useChatAttachmentPreviewDrawer } from '@/composables/useChatAttachmentPreviewDrawer';
 import { isPreviewableAttachment, resolveAttachmentFileType } from '@/utils/attachmentPreview';
+import { SKILL_ICON } from '@/types/mention';
 
 const { t } = useI18n();
 const mentionTagIcon = (item) => {
     if (item.type === 'tag') return 'tag';
     if (item.type === 'mcp') return 'tools';
-    if (item.type === 'skill') return 'bookmark';
+    if (item.type === 'skill') return SKILL_ICON;
     return 'file';
 };
 const props = defineProps({

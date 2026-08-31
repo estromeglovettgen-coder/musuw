@@ -529,6 +529,22 @@ func TestAdjustStorageUsedKeepsLegacyClampBehavior(t *testing.T) {
 	require.NoError(t, repo.AdjustStorageUsed(ctx, tenant.ID, 3))
 	require.NoError(t, repo.AdjustStorageUsed(ctx, tenant.ID, -99))
 	assert.Zero(t, tenantStorageUsed(t, db, tenant.ID))
+
+	// Saturate rather than wrapping when a legacy caller reports a positive
+	// delta that would overflow the signed storage aggregate.
+	require.NoError(t, db.Model(&types.Tenant{}).
+		Where("id = ?", tenant.ID).
+		Update("storage_used", int64(math.MaxInt64-1)).Error)
+	require.NoError(t, repo.AdjustStorageUsed(ctx, tenant.ID, 2))
+	assert.Equal(t, int64(math.MaxInt64), tenantStorageUsed(t, db, tenant.ID))
+
+	// MinInt64 cannot be negated safely; it is still a negative legacy delta
+	// and must clamp usage to zero instead of wrapping positive.
+	require.NoError(t, db.Model(&types.Tenant{}).
+		Where("id = ?", tenant.ID).
+		Update("storage_used", int64(123)).Error)
+	require.NoError(t, repo.AdjustStorageUsed(ctx, tenant.ID, math.MinInt64))
+	assert.Zero(t, tenantStorageUsed(t, db, tenant.ID))
 }
 
 func TestPairedMethodsReturnNotFoundOnlyForUpdate(t *testing.T) {

@@ -136,8 +136,11 @@ test('user profile keeps the authoritative unboxed rows and mono account metadat
   const source = read('../views/settings/UserProfile.vue')
   assert.match(source, /class="visual-settings-page-header"/)
   assert.match(source, /class="user-profile__rows"/)
-  assert.doesNotMatch(source, /t-icon|visual-settings-nav/)
-  assert.doesNotMatch(source, /class="desc"/)
+  // Main adds an inline password-edit affordance; keep the Musuw row
+  // geometry while allowing that native control and its explanatory copy.
+  assert.doesNotMatch(source, /visual-settings-nav/)
+  assert.match(source, /class="edit-btn"/)
+  assert.match(source, /class="desc"/)
   assert.match(source, /class="info-value is-mono">\{\{ userInfo\?\.email/)
   assert.match(source, /class="info-value is-mono">\{\{ formatDate/)
   assert.match(source, /\.user-profile__row\s*\{[\s\S]*padding:\s*14px 0;[\s\S]*gap:\s*16px;[\s\S]*border-bottom:\s*1px solid #f3f4f6;/)

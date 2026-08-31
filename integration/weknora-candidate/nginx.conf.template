@@ -22,6 +22,15 @@ server {
     # It never proxies or transforms WeKnora business routes.
     include /etc/nginx/weknora-auth-shell.conf;
 
+    # Keep candidate health semantics identical to the production edge. A SPA
+    # fallback here would return 200 even when the application is unavailable.
+    location = /health {
+        proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT}/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # 启用 gzip 压缩静态资源 (前端 index.js 单文件 ~1MB, 不压实测 20s+,
     # 压缩后约 200-300KB, 大陆同地域低带宽机器加载从 25s 降到 3-5s)
     gzip on;

@@ -65,7 +65,6 @@ test('chat picker preserves the native business state and keeps catalog mode int
     "'select-model'",
     "'select-reasoning'",
     "'update:view'",
-    "emit('update:selectedModelId', value)",
     '@change="handleModelChange"',
     'value="__add_model__"',
     ':models="availableModels"',
@@ -76,6 +75,7 @@ test('chat picker preserves the native business state and keeps catalog mode int
     const haystack = `${source}\n${inputField}`
     assert.ok(haystack.includes(token), `business contract lost ${token}`)
   }
+  assert.match(source, /emit\('update:selectedModelId', value(?: \|\| '')?\)/)
   assert.equal(inputField.includes('<AgentSelector'), false, 'agent candidates must not own a second popup component')
   assert.ok(source.includes('class="visual-model-selector__chat-row is-agent"'))
   assert.ok(source.includes("hoverOpen('agents')"))

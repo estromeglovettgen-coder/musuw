@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { formatFileSize, getFileIcon } from '@/utils/files';
 import { useTagChipsOverflow } from '@/composables/useTagChipsOverflow';
@@ -17,7 +17,7 @@ interface KnowledgeCard {
 }
 
 const props = defineProps<{
-  items: KnowledgeCard[]; selectedIds: Set<string>; batchMode: boolean; canEdit: boolean; canMutateKnowledge: boolean;
+  items: KnowledgeCard[]; selectedIds: Set<string>; batchMode: boolean; canEdit: boolean; canDownload: boolean; canMutateKnowledge: boolean;
   traceAvailableById: Record<string, boolean>; tagList: Tag[]; folders?: Array<{ path: string; name: string; total_count: number }>;
   folderOptions?: FolderOption[]; showFolderPath?: boolean; moveMenuMode: 'normal' | 'targets' | 'confirm';
   moveTargetKbs: any[]; moveTargetsLoading: boolean; moveSelectedTargetName: string; moveMode: 'reuse_vectors' | 'reparse';
@@ -28,7 +28,7 @@ const emit = defineEmits<{
   (e: 'open', item: KnowledgeCard): void;
   (e: 'toggle-checkbox', id: string, checked: boolean, ctx?: { e?: Event }): void;
   (e: 'menu-visible-change', visible: boolean, item: KnowledgeCard): void;
-  (e: 'action', action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void;
+  (e: 'action', action: 'download' | 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void;
   (e: 'tag-edit', item: KnowledgeCard): void;
   (e: 'open-folder', path: string): void;
   (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void;
@@ -81,6 +81,7 @@ const getKnowledgeType = (item: KnowledgeCard) => {
 const channelLabelMap: Record<string, string> = {
   web: 'knowledgeBase.channelWeb', api: 'knowledgeBase.channelApi', browser_extension: 'knowledgeBase.channelBrowserExtension',
   wechat: 'knowledgeBase.channelWechat', wecom: 'knowledgeBase.channelWecom', feishu: 'knowledgeBase.channelFeishu',
+  gitlab: 'knowledgeBase.channelGitLab', ima: 'knowledgeBase.channelIma',
   dingtalk: 'knowledgeBase.channelDingtalk', slack: 'knowledgeBase.channelSlack', im: 'knowledgeBase.channelIm',
 };
 const getChannelLabel = (channel: string) => { const key = channelLabelMap[channel]; return key ? t(key) : t('knowledgeBase.channelUnknown'); };
@@ -97,6 +98,11 @@ const CARD_POPOVER_ESTIMATED_HEIGHT = 300;
 const cardHoverShowDelay = 300;
 let cardHoverTimer: ReturnType<typeof setTimeout> | null = null;
 let cardPopoverElement: HTMLElement | null = null;
+const dismissCardPopover = () => {
+  if (cardHoverTimer) { clearTimeout(cardHoverTimer); cardHoverTimer = null; }
+  hoveredCardItem.value = null;
+  cardPopoverElement = null;
+};
 const calculatePopoverPositionFromCard = (cardElement: HTMLElement): { x: number; y: number } => {
   const cardRect = cardElement.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
@@ -128,18 +134,30 @@ const onCardMouseEnter = (ev: MouseEvent, item: KnowledgeCard) => {
   if (cardHoverTimer) { clearTimeout(cardHoverTimer); cardHoverTimer = null; }
   const cardElement = ev.currentTarget as HTMLElement;
   cardHoverTimer = setTimeout(() => {
-    cardHoverTimer = null; hoveredCardItem.value = item; cardPopoverPos.value = calculatePopoverPositionFromCard(cardElement);
-    nextTick(() => { cardPopoverElement = document.querySelector('.visual-document-popover') as HTMLElement; if (cardPopoverElement) cardPopoverPos.value = calculatePopoverPositionFromCard(cardElement); });
+    cardHoverTimer = null;
+    if (!cardElement.isConnected || !props.items.some(candidate => candidate.id === item.id)) return;
+    hoveredCardItem.value = item;
+    cardPopoverPos.value = calculatePopoverPositionFromCard(cardElement);
+    nextTick(() => {
+      if (!cardElement.isConnected || hoveredCardItem.value?.id !== item.id) return;
+      cardPopoverElement = document.querySelector('.visual-document-popover') as HTMLElement;
+      if (cardPopoverElement) cardPopoverPos.value = calculatePopoverPositionFromCard(cardElement);
+    });
   }, cardHoverShowDelay);
 };
 const onCardMouseLeave = () => {
-  if (cardHoverTimer) { clearTimeout(cardHoverTimer); cardHoverTimer = null; }
-  hoveredCardItem.value = null; cardPopoverElement = null;
+  dismissCardPopover();
+};
+watch(() => props.items, dismissCardPopover);
+onBeforeUnmount(dismissCardPopover);
+const onOpenFolder = (path: string) => {
+  dismissCardPopover();
+  emit('open-folder', path);
 };
 const onFolderPicked = (item: KnowledgeCard, path: string) => {
   folderPickerItemId.value = null; if (item.isMore !== undefined) item.isMore = false; activeMenuIndex.value = -1; emit('move-to-folder', item, path);
 };
-const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
+const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard) => {
   if (action === 'move-folder') { folderPickerItemId.value = item.id; return; }
   if (action !== 'move') { if (item.isMore !== undefined) item.isMore = false; activeMenuIndex.value = -1; }
   emit('action', action, item);
@@ -148,7 +166,7 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
 
 <template>
   <div class="visual-document-grid" role="list">
-    <button v-for="folder in folders" :key="'folder-' + folder.path" type="button" class="visual-folder-card" :title="folder.path" @click="emit('open-folder', folder.path)">
+    <button v-for="folder in folders" :key="'folder-' + folder.path" type="button" class="visual-folder-card" :title="folder.path" @click="onOpenFolder(folder.path)">
       <div class="visual-folder-card__main"><t-icon name="folder" class="visual-folder-card__icon" /><span class="visual-folder-card__title">{{ folder.name }}</span></div>
       <div class="visual-folder-card__footer">{{ t('knowledgeBase.folderTree.folderCardCount', { count: folder.total_count }) }}</div>
     </button>
@@ -164,7 +182,7 @@ const handleAction = (action: 'edit' | 'view-trace' | 'reparse' | 'cancel-parse'
               <button type="button" class="visual-document-card__more" :class="{ 'is-active': activeMenuIndex === index }" :aria-label="$t('common.more')" @click.stop="openMenu(index)"><t-icon name="ellipsis" /></button>
               <template #content>
                 <div v-if="folderPickerItemId === item.id" class="visual-card-menu visual-card-menu--move"><FolderPickerMenu :options="folderOptions || []" :current-path="item.folder_path || ''" show-back @back="folderPickerItemId = null" @confirm="(path: string) => onFolderPicked(item, path)" /></div>
-                <div v-else-if="moveMenuMode === 'normal'" class="visual-card-menu"><DocumentActionMenu :item="item" :can-mutate-knowledge="canMutateKnowledge" :trace-visible="isTraceMenuVisible(item)" @edit="handleAction('edit', item)" @view-trace="handleAction('view-trace', item)" @reparse="handleAction('reparse', item)" @cancel-parse="handleAction('cancel-parse', item)" @move="handleAction('move', item)" @move-folder="handleAction('move-folder', item)" @batch-manage="handleAction('batch-manage', item)" @delete="handleAction('delete', item)" /></div>
+                <div v-else-if="moveMenuMode === 'normal'" class="visual-card-menu"><DocumentActionMenu :item="item" :can-download="canDownload" :can-mutate-knowledge="canMutateKnowledge" :trace-visible="isTraceMenuVisible(item)" @download="handleAction('download', item)" @edit="handleAction('edit', item)" @view-trace="handleAction('view-trace', item)" @reparse="handleAction('reparse', item)" @cancel-parse="handleAction('cancel-parse', item)" @move="handleAction('move', item)" @move-folder="handleAction('move-folder', item)" @batch-manage="handleAction('batch-manage', item)" @delete="handleAction('delete', item)" /></div>
                 <div v-else-if="moveMenuMode === 'targets'" class="visual-card-menu visual-card-menu--move">
                   <button type="button" class="visual-card-menu__back" @click.stop="emit('move-back')"><t-icon name="chevron-left" size="16px" /><span>{{ $t('knowledgeBase.moveToKnowledgeBase') }}</span></button>
                   <div v-if="moveTargetsLoading" class="visual-card-menu__state"><t-loading size="small" /></div>

@@ -189,6 +189,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
+import { copyWithToast } from '@/utils/clipboard'
 import { debugModel, type ModelConfig, type ModelDebugResult } from '@/api/model'
 import { fileSizeVerification } from '@/utils'
 import { modelSupportsThinking } from '@/utils/thinkingControl'
@@ -455,12 +456,7 @@ const runDebug = async () => {
 
 const copyResult = async () => {
   if (!result.value) return
-  try {
-    await navigator.clipboard.writeText(JSON.stringify(result.value, null, 2))
-    MessagePlugin.success(t('common.copied'))
-  } catch {
-    MessagePlugin.error(t('common.copyFailed'))
-  }
+  await copyWithToast(JSON.stringify(result.value, null, 2), 'common.copied')
 }
 
 onMounted(() => {

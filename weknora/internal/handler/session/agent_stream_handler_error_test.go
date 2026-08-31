@@ -26,7 +26,7 @@ func (s *errorCaptureStreamManager) GetEvents(context.Context, string, string, i
 
 func TestAgentStreamErrorCarriesStableBillingCode(t *testing.T) {
 	manager := &errorCaptureStreamManager{}
-	h := NewAgentStreamHandler(context.Background(), "session", "assistant", "request", time.Now(), nil, manager, event.NewEventBus())
+	h := NewAgentStreamHandler(context.Background(), "session", "assistant", "request", 1, time.Now(), nil, manager, event.NewEventBus(), nil)
 
 	err := h.handleError(context.Background(), event.Event{
 		ID:        "error-event",

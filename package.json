@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Musuw consumer knowledge workspace built on WeKnora v0.7.2.",
+  "description": "Musuw consumer knowledge workspace built on WeKnora main at 81142df.",
   "engines": {
     "node": "24.18.0",
     "npm": "11.16.0"
@@ -28,6 +28,7 @@
     "homepage:build": "npm --prefix storefront run build",
     "homepage:test": "npm --prefix storefront test",
     "upgrade:contract": "node --test scripts/weknora-upgrade-contract.test.mjs",
+    "upgrade:ledger": "node scripts/ci/generate-weknora-resolution-ledger.mjs",
     "build": "npm run app:build && npm run auth:build && npm run homepage:build"
   },
   "dependencies": {

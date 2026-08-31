@@ -79,6 +79,8 @@ export function useCmdkSearch(options: {
   chunkLimit?: number
   /** Debounce delay in ms. */
   debounceMs?: number
+  /** 当前部署是否提供智能体路由；不提供时不发起预加载请求。 */
+  agentsEnabled?: () => boolean
 }) {
   const debounceMs = options.debounceMs ?? 350
   const query = ref('')
@@ -154,7 +156,7 @@ export function useCmdkSearch(options: {
 
   // Agents (own + shared) are loaded only in Standard mode.
   const ensureAgents = async (): Promise<void> => {
-    if (isLiteProductMode()) {
+    if (isLiteProductMode() || options.agentsEnabled?.() === false) {
       agents.value = []
       agentsLoaded.value = true
       return
@@ -198,7 +200,7 @@ export function useCmdkSearch(options: {
   }
 
   const agentMatches = computed<CmdkAgent[]>(() => {
-    if (isLiteProductMode()) return []
+    if (isLiteProductMode() || options.agentsEnabled?.() === false) return []
     const q = query.value.trim().toLowerCase()
     if (!q) return []
     return agents.value
@@ -350,7 +352,9 @@ export function useCmdkSearch(options: {
   onMounted(() => {
     // KB search stays available in Lite; Agent discovery is Standard-only.
     ensureKbs()
-    if (!isLiteProductMode()) ensureAgents()
+    if (!isLiteProductMode() && options.agentsEnabled?.() !== false) {
+      ensureAgents()
+    }
   })
 
   return {

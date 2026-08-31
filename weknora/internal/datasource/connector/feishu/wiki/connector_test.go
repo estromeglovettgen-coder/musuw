@@ -749,6 +749,18 @@ func TestFetchAll_MixedTypes(t *testing.T) {
 }
 
 func TestFetchAll_LogsSummaryWithSkipBreakdown(t *testing.T) {
+	previousLogFormat, hadLogFormat := os.LookupEnv("LOG_FORMAT")
+	t.Setenv("LOG_FORMAT", "%msg")
+	logger.ConfigureFromEnv()
+	t.Cleanup(func() {
+		if hadLogFormat {
+			_ = os.Setenv("LOG_FORMAT", previousLogFormat)
+		} else {
+			_ = os.Unsetenv("LOG_FORMAT")
+		}
+		logger.ConfigureFromEnv()
+	})
+
 	nodes := []core.WikiNode{
 		{NodeToken: "nt1", ObjToken: "obj1", ObjType: "docx", Title: "Doc", NodeEditTime: "1711468800"},
 		{NodeToken: "nt4", ObjToken: "obj4", ObjType: "mindnote", Title: "Mind", NodeEditTime: "1711468800"},

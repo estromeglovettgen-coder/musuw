@@ -128,6 +128,14 @@ const (
 	AuditActionSystemEntitlementGranted AuditAction = "system.entitlement_granted"
 	AuditActionSystemEntitlementRevoked AuditAction = "system.entitlement_revoked"
 
+	// AuditActionSystemUserCreated fires when a SystemAdmin provisions a
+	// new local user via POST /api/v1/system/admin/users/create. Details
+	// carry {target_email, target_username, password_generated, idempotent}
+	// password_generated=true only on the create path, idempotent=true
+	// marks a no-op hit on an already-existing identity.
+	// TenantID=0 (system-scope).
+	AuditActionSystemUserCreated AuditAction = "system.user_created"
+
 	// Runtime queue mutations are privileged SystemAdmin actions. Retrying an
 	// archived task can repeat its original side effects; deleting one removes
 	// the Redis failure record. Both must leave a platform audit trail.
