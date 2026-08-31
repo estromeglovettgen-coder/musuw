@@ -77,3 +77,15 @@ release gate; diagnostic failures are recorded instead of being hidden.
   keys from protected files. Candidate browser identity values remain public,
   are generated from the existing root-only auth input, and pass through the
   same strict frontend serializer used by staging and production.
+
+## First-version handoff
+
+- Branch: `codex/upgrade-weknora-main-81142df`.
+- Implementation commit: `0746755d5300bf5c38df0dba6ddbb435a49646a7`;
+  recoverable pre-import checkpoint: `4749954d26b1b113252b7be2183fdca396279076`.
+- Fixed upstream: `81142dfd17b2778087e95d3a317483a2fd909b91`, tree
+  `37eaafdd6c276d2d1ddffffe1f39f8b38fd7cc03`.
+- Completion: 59/59 OpenSpec tasks (100%), every mandatory gate passed,
+  consolidated current blockers 0. The implementation commit was verified
+  from a clean working tree and `git fsck --full --no-dangling --no-reflogs`
+  passed before this handoff record was added.

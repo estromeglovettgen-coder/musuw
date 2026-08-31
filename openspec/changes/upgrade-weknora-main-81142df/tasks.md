@@ -77,6 +77,6 @@
 ## 8. Complete and commit the first version
 
 - [x] 8.1 Validate the OpenSpec change and map every requirement/scenario to implementation and fresh evidence.
-- [ ] 8.2 Calculate first-version completion from tasks and mandatory gates, confirming at least 99% with no masked blocker.
-- [ ] 8.3 Review the final staged diff, status, provenance, and secret scan, then commit all upgrade results on `codex/upgrade-weknora-main-81142df`.
-- [ ] 8.4 Verify the branch commit, clean working tree, fixed upstream identity, and concise handoff record.
+- [x] 8.2 Calculate first-version completion from tasks and mandatory gates, confirming at least 99% with no masked blocker.
+- [x] 8.3 Review the final staged diff, status, provenance, and secret scan, then commit all upgrade results on `codex/upgrade-weknora-main-81142df`.
+- [x] 8.4 Verify the branch commit, clean working tree, fixed upstream identity, and concise handoff record.
