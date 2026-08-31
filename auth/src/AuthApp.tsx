@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
+import AuthShowcase, { type AuthShowcaseState } from "./AuthShowcase";
 import {
   type AuthRuntime,
   type AuthStartView,
@@ -80,6 +81,12 @@ export function checkoutWorkspacePathFromSearch(search: string): string {
 }
 
 export type AuthCopy = Readonly<{
+  heroEyebrow: string;
+  heroLines: readonly [string, string, string, string];
+  heroDescription: string;
+  recoveryHeroEyebrow: string;
+  recoveryHeroLines: readonly [string, string];
+  recoveryHeroDescription: string;
   title: string;
   intro: string;
   registerTitle: string;
@@ -104,6 +111,8 @@ export type AuthCopy = Readonly<{
   forgotPassword: string;
   forgotPasswordTitle: string;
   forgotPasswordIntro: string;
+  successTitle: string;
+  tryAgain: string;
   sendResetLink: string;
   resetLinkSent: (email: string) => string;
   registrationConfirmation: (email: string) => string;
@@ -152,12 +161,18 @@ export type AuthCopy = Readonly<{
 
 const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
   "zh-CN": {
+    heroEyebrow: "创建你的AI第二大脑",
+    heroLines: ["把资料转化为", "会", "思考的", "知识资产"],
+    heroDescription: "让零散的文档、网页与数据彼此连接，沉淀成可检索、可追溯、持续进化的个人知识系统。",
+    recoveryHeroEyebrow: "账户安全",
+    recoveryHeroLines: ["重置密码，", "恢复安全访问"],
+    recoveryHeroDescription: "输入您的邮箱和新密码，我们将发送验证链接到您的邮箱以确认更改。",
     title: "登录 Musuw",
     intro: "使用 Google、邮箱密码或验证码继续。",
     registerTitle: "创建 Musuw 账号",
     registerIntro: "使用邮箱和密码创建你的账号。",
-    google: "使用 Google 登录",
-    divider: "或",
+    google: "Google 登录",
+    divider: "或继续使用",
     status: "正在继续登录…",
     email: "邮箱",
     emailPlaceholder: "name@example.com",
@@ -176,13 +191,15 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     forgotPassword: "忘记密码？",
     forgotPasswordTitle: "重置密码",
     forgotPasswordIntro: "输入邮箱，我们会发送重置密码的链接。",
+    successTitle: "成功",
+    tryAgain: "重试",
     sendResetLink: "发送重置链接",
     resetLinkSent: (email) => `如果 ${email} 已注册，你会收到重置密码的邮件。`,
     registrationConfirmation: (email) => `请检查 ${email} 的收件箱，输入六位验证码或打开确认链接后即可登录。`,
     passwordRecoveryTitle: "设置新密码",
     passwordRecoveryIntro: "设置一个新的密码以完成恢复。",
     passwordUpdated: "密码已更新，请继续登录。",
-    useEmailCode: "使用邮箱验证码",
+    useEmailCode: "邮箱验证码登录",
     needAccount: "还没有账号？",
     alreadyHaveAccount: "已有账号？",
     backToSignIn: "返回登录",
@@ -222,12 +239,18 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     },
   },
   "en-US": {
+    heroEyebrow: "Create your AI second brain",
+    heroLines: ["Turn information", "into", "knowledge", "that thinks"],
+    heroDescription: "Connect documents, webpages, and data in a searchable, traceable knowledge system that keeps growing with you.",
+    recoveryHeroEyebrow: "Account security",
+    recoveryHeroLines: ["Reset your password,", "restore secure access"],
+    recoveryHeroDescription: "Update your password through a protected email flow and return safely to your knowledge workspace.",
     title: "Log in to Musuw",
     intro: "Continue with Google, an email and password, or a code.",
     registerTitle: "Create your Musuw account",
     registerIntro: "Use your email and a password to get started.",
-    google: "Continue with Google",
-    divider: "or",
+    google: "Google",
+    divider: "or continue with",
     status: "Continuing sign-in…",
     email: "Email",
     emailPlaceholder: "name@example.com",
@@ -246,13 +269,15 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     forgotPassword: "Forgot password?",
     forgotPasswordTitle: "Reset your password",
     forgotPasswordIntro: "Enter your email and we’ll send a password reset link.",
+    successTitle: "Success",
+    tryAgain: "Try again",
     sendResetLink: "Send reset link",
     resetLinkSent: (email) => `If ${email} is registered, you’ll receive a password reset email.`,
     registrationConfirmation: (email) => `Check ${email} for a six-digit code or confirmation link before signing in.`,
     passwordRecoveryTitle: "Set a new password",
     passwordRecoveryIntro: "Choose a new password to finish recovering your account.",
     passwordUpdated: "Your password was updated. You can sign in now.",
-    useEmailCode: "Use an email code",
+    useEmailCode: "Email verification code",
     needAccount: "Need an account?",
     alreadyHaveAccount: "Already have an account?",
     backToSignIn: "Back to sign in",
@@ -399,6 +424,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+  const [isShowcaseFocused, setIsShowcaseFocused] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
@@ -794,32 +820,36 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     [applyIdentityCompletion, copy, email, isSubmitting, runtime, verificationCode],
   );
 
-  if (
+  const isPendingScreen =
     screen === "callback_pending" ||
     screen === "consent_pending" ||
     screen === "identity_pending" ||
     screen === "logout_pending" ||
     screen === "recovery_pending" ||
-    screen === "start_pending"
-  ) {
-    return (
-      <main className="auth-page" aria-busy="true">
-        <section aria-labelledby="auth-status-title" className="auth-card auth-card--status">
-          <img alt="Musuw" className="auth-logo" height="48" src="/musuw-logo.png" width="48" />
-          <p aria-live="polite" className="auth-status" id="auth-status-title">{copy.status}</p>
-        </section>
-      </main>
-    );
-  }
+    screen === "start_pending";
 
   const isPasswordMode = screen === "login" || screen === "register";
+  const isRecoveryExperience =
+    screen === "password_reset_request" ||
+    screen === "password_reset_requested" ||
+    screen === "password_recovery" ||
+    screen === "recovery_pending";
   const passwordInputType = showPassword ? "text" : "password";
   const confirmationInputType = showPasswordConfirmation ? "text" : "password";
-  const title = screen === "register" ? copy.registerTitle :
-    screen === "password_reset_request" || screen === "password_reset_requested"
+  const title = isPendingScreen ? copy.status :
+    screen === "register" ? copy.registerTitle :
+    screen === "password_reset_requested"
+      ? copy.successTitle
+      : screen === "password_reset_request"
       ? copy.forgotPasswordTitle
       : screen === "password_recovery"
         ? copy.passwordRecoveryTitle
+        : screen === "email_entry"
+          ? copy.useEmailCode
+          : screen === "email_code"
+            ? copy.verifyCode
+            : screen === "registration_confirmation"
+              ? copy.confirmEmail
         : copy.title;
   const intro = screen === "register" ? copy.registerIntro :
     screen === "password_reset_request"
@@ -827,32 +857,62 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       : screen === "password_recovery"
         ? copy.passwordRecoveryIntro
         : null;
+  const heroEyebrow = isRecoveryExperience ? copy.recoveryHeroEyebrow : copy.heroEyebrow;
+  const heroLines = isRecoveryExperience ? copy.recoveryHeroLines : copy.heroLines;
+  const heroDescription = isRecoveryExperience
+    ? copy.recoveryHeroDescription
+    : copy.heroDescription;
+  const headlinePre = /[,，]$/.test(heroLines[0])
+    ? heroLines[0]
+    : `${heroLines[0]}${locale === "zh-CN" ? "，" : ","}`;
+  const headlineFocus = heroLines.slice(1).join(" ");
+  const showcaseState: AuthShowcaseState = error !== null
+    ? "error"
+    : showPassword || showPasswordConfirmation
+      ? "privacy"
+      : isShowcaseFocused || isPendingScreen || isSubmitting
+        ? "curious"
+        : "idle";
 
   return (
-    <main className="auth-page">
-      <section aria-labelledby="auth-title" className="auth-card" aria-busy={isSubmitting}>
-        <header className="auth-header">
-          <img alt="Musuw" className="auth-logo" height="48" src="/musuw-logo.png" width="48" />
-        </header>
-        <h1 id="auth-title">{title}</h1>
-        {intro !== null ? <p className="auth-intro">{intro}</p> : null}
+    <main className="auth-page" aria-busy={isPendingScreen || isSubmitting}>
+      <div className="auth-layout">
+        <AuthShowcase
+          eyebrowPhrases={[heroEyebrow]}
+          headlineFocus={headlineFocus}
+          headlinePre={headlinePre}
+          interactionState={showcaseState}
+          subhead={heroDescription}
+        />
 
-        {isPasswordMode ? (
-          <>
-            <button
-              className="auth-google"
-              disabled={isSubmitting}
-              onClick={startGoogle}
-              type="button"
+        <section
+          className="auth-panel"
+          onBlurCapture={(event) => {
+            const next = event.relatedTarget;
+            if (!(next instanceof Node) || !event.currentTarget.contains(next)) setIsShowcaseFocused(false);
+          }}
+          onFocusCapture={() => setIsShowcaseFocused(true)}
+        >
+          <div className="auth-panel-inner">
+            <header className="auth-header">
+              <img alt="Musuw" className="auth-logo" height="28" src="/auth/musuw-logo.png" width="28" />
+              <span>Musuw</span>
+            </header>
+            <section
+              aria-labelledby="auth-title"
+              className="auth-card"
+              aria-busy={isPendingScreen || isSubmitting}
             >
-              {copy.google}
-            </button>
-
-            <div className="auth-divider" role="separator">
-              <span>{copy.divider}</span>
-            </div>
-          </>
-        ) : null}
+              {isPendingScreen ? (
+                <div className="auth-status-view" role="status">
+                  <span aria-hidden="true" className="auth-spinner" />
+                  <h1 id="auth-title">{title}</h1>
+                </div>
+              ) : (
+                <>
+                  <h1 id="auth-title">{title}</h1>
+                  {intro !== null ? <p className="auth-intro">{intro}</p> : null}
+                  {error !== null ? <p className="auth-error" id="auth-error" role="alert">{error}</p> : null}
 
         {screen === "email_code" ? (
           <form
@@ -902,56 +962,59 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           </form>
         ) : screen === "login" ? (
           <form className="auth-form" key="password-login" noValidate onSubmit={(event) => void signInWithPassword(event)}>
-            <label htmlFor="email">{copy.email}</label>
-            <input
-              aria-describedby={error === copy.errors.invalidEmail ? "auth-error" : undefined}
-              aria-invalid={error === copy.errors.invalidEmail}
-              autoComplete="username"
-              id="email"
-              name="email"
-              onChange={(event) => {
-                setEmail(event.target.value);
-                if (error !== null) setError(null);
-              }}
-              placeholder={copy.emailPlaceholder}
-              required
-              type="email"
-              value={email}
-            />
-            <label htmlFor="password">{copy.password}</label>
-            <div className="auth-password-field">
+            <div className="auth-field-group">
+              <label htmlFor="email">{copy.email}</label>
               <input
-                aria-describedby={error !== null ? "auth-error" : undefined}
-                aria-invalid={error !== null}
-                autoComplete="current-password"
-                id="password"
-                name="password"
+                aria-describedby={error === copy.errors.invalidEmail ? "auth-error" : undefined}
+                aria-invalid={error === copy.errors.invalidEmail}
+                autoComplete="username"
+                id="email"
+                name="email"
                 onChange={(event) => {
-                  setPassword(event.target.value);
+                  setEmail(event.target.value);
                   if (error !== null) setError(null);
                 }}
-                placeholder={copy.passwordPlaceholder}
+                placeholder={copy.emailPlaceholder}
                 required
-                type={passwordInputType}
-                value={password}
+                type="email"
+                value={email}
               />
-              <button
-                aria-label={showPassword ? copy.hidePassword : copy.showPassword}
-                className="auth-password-toggle"
-                onClick={() => setShowPassword((visible) => !visible)}
-                type="button"
-              >
-                {showPassword ? copy.hidePassword : copy.showPassword}
-              </button>
             </div>
-            <button className="auth-link auth-forgot" disabled={isSubmitting} onClick={showPasswordReset} type="button">
-              {copy.forgotPassword}
-            </button>
+            <div className="auth-field-group">
+              <div className="auth-field-label-row">
+                <label htmlFor="password">{copy.password}</label>
+                <button className="auth-link auth-forgot" disabled={isSubmitting} onClick={showPasswordReset} type="button">
+                  {copy.forgotPassword}
+                </button>
+              </div>
+              <div className="auth-password-field">
+                <input
+                  aria-describedby={error !== null ? "auth-error" : undefined}
+                  aria-invalid={error !== null}
+                  autoComplete="current-password"
+                  id="password"
+                  name="password"
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (error !== null) setError(null);
+                  }}
+                  placeholder={copy.passwordPlaceholder}
+                  required
+                  type={passwordInputType}
+                  value={password}
+                />
+                <button
+                  aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+                  className="auth-password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  type="button"
+                >
+                  {showPassword ? copy.hidePassword : copy.showPassword}
+                </button>
+              </div>
+            </div>
             <button disabled={isSubmitting} type="submit">
               {isSubmitting ? copy.signingIn : copy.signIn}
-            </button>
-            <button className="auth-link" disabled={isSubmitting} onClick={useEmailCode} type="button">
-              {copy.useEmailCode}
             </button>
             <div className="auth-form-actions auth-mode-switch">
               <span>{copy.needAccount}</span>
@@ -1035,9 +1098,6 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             <button disabled={isSubmitting} type="submit">
               {isSubmitting ? copy.creatingAccount : copy.createAccount}
             </button>
-            <button className="auth-link" disabled={isSubmitting} onClick={useEmailCode} type="button">
-              {copy.useEmailCode}
-            </button>
             <div className="auth-form-actions auth-mode-switch">
               <span>{copy.alreadyHaveAccount}</span>
               <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
@@ -1064,8 +1124,8 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             <button disabled={isSubmitting} type="submit">
               {isSubmitting ? copy.sendingCode : copy.sendResetLink}
             </button>
-            <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
-              {copy.backToSignIn}
+            <button className="auth-link auth-back-link" disabled={isSubmitting} onClick={showLogin} type="button">
+              ← {copy.backToSignIn}
             </button>
           </form>
         ) : screen === "password_recovery" ? (
@@ -1129,6 +1189,9 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             <button disabled={isSubmitting} type="submit">
               {isSubmitting ? copy.updatingPassword : copy.updatePassword}
             </button>
+            <button className="auth-link auth-back-link" disabled={isSubmitting} onClick={showLogin} type="button">
+              ← {copy.backToSignIn}
+            </button>
           </form>
         ) : screen === "registration_confirmation" ? (
           <form
@@ -1166,9 +1229,15 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
             </button>
           </form>
         ) : screen === "password_reset_requested" ? (
-          <div className="auth-message" role="status">
+          <div className="auth-message auth-message--success" role="status">
+            <span aria-hidden="true" className="auth-result-icon">✓</span>
             <p>{copy.resetLinkSent(maskAuthEmail(email))}</p>
-            <button className="auth-link" onClick={showLogin} type="button">{copy.backToSignIn}</button>
+            <button className="auth-result-primary" onClick={showPasswordReset} type="button">
+              {copy.tryAgain}
+            </button>
+            <button className="auth-link auth-back-link" onClick={showLogin} type="button">
+              ← {copy.backToSignIn}
+            </button>
           </div>
         ) : (
           <form className="auth-form" key="email-address" noValidate onSubmit={(event) => void requestEmailCode(event)}>
@@ -1197,19 +1266,52 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           </form>
         )}
 
-        <p className="auth-legal-note">
-          {copy.legal.acknowledgement}{" "}
-          <a href={authLegalHref("terms", locale)} rel="noopener noreferrer" target="_blank">
-            {copy.legal.terms}
-          </a>{" "}
-          {copy.legal.connector}{" "}
-          <a href={authLegalHref("privacy", locale)} rel="noopener noreferrer" target="_blank">
-            {copy.legal.privacy}
-          </a>
-        </p>
+        {isPasswordMode ? (
+          <>
+            <div className="auth-divider" role="separator">
+              <span>{copy.divider}</span>
+            </div>
+            <div className="auth-provider-options">
+              <button
+                className="auth-provider auth-google"
+                disabled={isSubmitting}
+                onClick={startGoogle}
+                type="button"
+              >
+                <img alt="" aria-hidden="true" src="/auth/auth-reference/google.svg" />
+                <span>{copy.google}</span>
+              </button>
+              <button
+                className="auth-provider auth-email-code"
+                disabled={isSubmitting}
+                onClick={useEmailCode}
+                type="button"
+              >
+                <img alt="" aria-hidden="true" src="/auth/auth-reference/mail.svg" />
+                <span>{copy.useEmailCode}</span>
+              </button>
+            </div>
+          </>
+        ) : null}
 
-        {error !== null ? <p className="auth-error" id="auth-error" role="alert">{error}</p> : null}
-      </section>
+        {!isRecoveryExperience ? (
+          <p className="auth-legal-note">
+            {copy.legal.acknowledgement}{" "}
+            <a href={authLegalHref("terms", locale)} rel="noopener noreferrer" target="_blank">
+              {copy.legal.terms}
+            </a>{" "}
+            {copy.legal.connector}{" "}
+            <a href={authLegalHref("privacy", locale)} rel="noopener noreferrer" target="_blank">
+              {copy.legal.privacy}
+            </a>
+          </p>
+        ) : null}
+                </>
+              )}
+            </section>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

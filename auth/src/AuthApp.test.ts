@@ -122,6 +122,85 @@ describe("auth shell legal acknowledgement", () => {
   });
 });
 
+describe("auth shell TikHub reference experience", () => {
+  it("renders the Musuw split narrative as three independent headline segments", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthApp, { runtime: {} as AuthRuntime }),
+    );
+    const source = readFileSync(new URL("./AuthApp.tsx", import.meta.url), "utf8");
+
+    expect(html).toContain('class="auth-layout"');
+    expect(html).toContain('class="auth-showcase"');
+    expect(html).toContain('class="auth-showcase-pre"');
+    expect(html).toContain('class="auth-true-focus-word"');
+    expect(getAuthCopy("zh-CN").heroLines).toEqual([
+      "把资料转化为",
+      "会",
+      "思考的",
+      "知识资产",
+    ]);
+    expect(source).toContain("创建你的AI第二大脑");
+    expect(source).toContain("把资料转化为");
+    expect(source).toContain('"会", "思考的", "知识资产"');
+    expect(source).toContain("知识资产");
+  });
+
+  it("keeps password primary and places Google plus email code after the divider", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthApp, { runtime: {} as AuthRuntime }),
+    );
+    const submitIndex = html.indexOf('type="submit"');
+    const dividerIndex = html.indexOf('class="auth-divider"');
+    const googleIndex = html.indexOf('class="auth-provider auth-google"');
+    const emailCodeIndex = html.indexOf('class="auth-provider auth-email-code"');
+
+    expect(submitIndex).toBeGreaterThan(-1);
+    expect(dividerIndex).toBeGreaterThan(submitIndex);
+    expect(googleIndex).toBeGreaterThan(dividerIndex);
+    expect(emailCodeIndex).toBeGreaterThan(dividerIndex);
+    expect(html.match(/auth-google/g)).toHaveLength(1);
+  });
+
+  it("uses one shared shell without importing another identity runtime or support widget", () => {
+    const source = readFileSync(new URL("./AuthApp.tsx", import.meta.url), "utf8");
+    const index = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+
+    expect(source.match(/<main className="auth-page"/g)).toHaveLength(1);
+    expect(source).not.toContain("@supabase");
+    expect(source).not.toContain("tikhub");
+    expect(source).not.toMatch(/intercom|customer.?service|support.?widget/i);
+    expect(index).not.toMatch(/chaport|intercom|customer.?service|support.?widget/i);
+  });
+
+  it("keeps recovery success inside the same shell with retry and back actions", () => {
+    const source = readFileSync(new URL("./AuthApp.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('className="auth-message auth-message--success"');
+    expect(source).toContain('className="auth-result-primary"');
+    expect(source).toContain('className="auth-link auth-back-link"');
+    expect(source).toContain('{!isRecoveryExperience ? (');
+    expect(source).toContain('src="/auth/auth-reference/google.svg"');
+    expect(source).toContain('src="/auth/musuw-logo.png"');
+  });
+
+  it("uses the reference font, equal split, high-contrast liquid motion, and responsive collapse", () => {
+    const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+    const showcase = readFileSync(new URL("./AuthShowcase.tsx", import.meta.url), "utf8");
+
+    expect(css).toContain('@font-face');
+    expect(css).toContain('font-family: "Geist"');
+    expect(css).toMatch(/\.auth-layout\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    expect(css).toMatch(/\.auth-showcase\s*\{[\s\S]*background:\s*#080808/);
+    expect(css).not.toContain("filter: grayscale(1)");
+    expect(showcase).toContain('colors={["#E5E5E5", "#737373", "#262626"]}');
+    expect(showcase).toContain("cursorSize={120}");
+    expect(showcase).toContain("mouseForce={32}");
+    expect(css).toMatch(/@media\s*\(max-width:\s*1023px\)[\s\S]*\.auth-showcase\s*\{[\s\S]*display:\s*none/);
+    expect(css).toMatch(/@media\s*\(prefers-color-scheme:\s*dark\)[\s\S]*\.auth-logo\s*\{[\s\S]*filter:\s*invert\(1\)/);
+    expect(css).not.toContain("#1a73e8");
+  });
+});
+
 describe("auth shell email privacy", () => {
   it("masks the destination shown while entering a code", () => {
     expect(maskAuthEmail("person@example.com")).toBe("pe••••@example.com");
