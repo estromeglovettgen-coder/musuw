@@ -31,7 +31,7 @@ func (h *AccountErasureHandler) DeleteManagedAccount(c *gin.Context) {
 	case err == nil:
 		c.JSON(http.StatusAccepted, gin.H{"accepted": true})
 	case errors.Is(err, service.ErrAccountBillingActionRequired):
-		_ = c.Error(apperrors.NewConflictError("manage the active subscription in Paddle before deleting this account").
+		_ = c.Error(apperrors.NewConflictError("the Paddle subscription cannot yet be canceled; resolve its billing state and retry account deletion").
 			WithDetails(gin.H{"code": "billing_action_required"}))
 	case errors.Is(err, service.ErrAccountBillingUnavailable):
 		_ = c.Error(apperrors.NewServiceUnavailableError("billing state could not be verified"))

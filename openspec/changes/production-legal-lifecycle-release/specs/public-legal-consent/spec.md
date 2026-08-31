@@ -1,3 +1,5 @@
+> The voluntary 30-day refund scenario in this historical spec was superseded by the `MODIFIED Requirements` in `remove-voluntary-refund-guarantee/specs/public-legal-consent/spec.md`.
+
 ## ADDED Requirements
 
 ### Requirement: Auth entry exposes an adjacent legal continuation notice

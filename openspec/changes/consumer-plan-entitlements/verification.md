@@ -1,3 +1,5 @@
+> The account-erasure billing evidence in this historical verification reflects the former read-only blocker. The implementation and current contract were superseded on 2026-08-30 by `allow-paid-account-deletion`; no real production account is deleted by that change's release verification.
+
 # Verification Report: consumer-plan-entitlements
 
 ## 2026-08-28 operations-only account erasure (pre-release)

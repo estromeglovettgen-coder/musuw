@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/hibiken/asynq"
@@ -386,6 +387,39 @@ func TestPaddleWebhookTaskHandlerPropagatesServiceError(t *testing.T) {
 	err = NewPaddleWebhookTaskHandler(stub).Handle(context.Background(), asynq.NewTask(types.TypePaddleWebhook, body))
 	if !errors.Is(err, want) {
 		t.Fatalf("error = %v, want %v", err, want)
+	}
+}
+
+func TestPaddleWebhookTaskHandlerAcknowledgesLateEventAfterTenantErasure(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation types.PaddleWebhookTaskOperation
+		eventType string
+	}{
+		{name: "lifecycle", operation: types.PaddleWebhookTaskOperationApplyConsumerPlan, eventType: "subscription.updated"},
+		{name: "renewal", operation: types.PaddleWebhookTaskOperationRefreshPaidAllowance, eventType: "transaction.completed"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			entitlements := &paddleWebhookEntitlementStub{
+				applyErr:   apprepo.ErrTenantNotFound,
+				refreshErr: apprepo.ErrTenantNotFound,
+			}
+			operations := &paddleWebhookBillingOperationStub{}
+			payload := paddleWebhookTestPayload(test.operation)
+			payload.EventType = test.eventType
+			payload.BillingOperationType = types.PaddleBillingOperationUpgrade
+			payload.BillingOperationKey = "erased-account-operation"
+			payload.PriceID = "pri_erased_account"
+			body, err := json.Marshal(payload)
+			require.NoError(t, err)
+
+			err = NewPaddleWebhookTaskHandler(entitlements, operations).Handle(
+				context.Background(), asynq.NewTask(types.TypePaddleWebhook, body),
+			)
+			require.NoError(t, err)
+			assert.Zero(t, operations.finishCalls)
+		})
 	}
 }
 

@@ -1,3 +1,5 @@
+> Historical evidence. References to a voluntary 30-day refund guarantee were superseded by `remove-voluntary-refund-guarantee` and are not the current Musuw policy.
+
 # Verification evidence
 
 ## 2026-08-24 production disposable E2E (current browser evidence)

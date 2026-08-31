@@ -1,3 +1,5 @@
+> The billing requirement below records the original pre-release behavior and is superseded by the `MODIFIED Requirements` in `allow-paid-account-deletion/specs/account-erasure/spec.md` as of 2026-08-30.
+
 ## ADDED Requirements
 
 ### Requirement: Account erasure is an operations-only action

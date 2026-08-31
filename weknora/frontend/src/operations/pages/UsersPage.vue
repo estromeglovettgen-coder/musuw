@@ -139,7 +139,7 @@
             <span>将立即停用 {{ selected.email || selected.id }}，并异步清理账号、个人空间和可删除的产品数据。</span>
           </div>
         </div>
-        <p class="ops-muted">Paddle 仍可计费的订阅会直接阻止注销；本操作不会代为取消订阅、退款或产生任何资金动作。</p>
+        <p class="ops-muted">如存在 Paddle 订阅，系统会先安排停止后续自动续费，再立即停用账号并进入清理；不会自动退款，最终清理可能等待 Paddle 确认订阅已取消。</p>
       </div>
     </t-dialog>
   </div>

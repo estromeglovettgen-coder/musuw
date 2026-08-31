@@ -32,9 +32,11 @@ test("every merchant-review document is public and complete in English and Chine
       assert.ok(document.summary.length >= 30);
       assert.equal(
         document.updated,
-        ["/terms", "/refund-policy", "/subscription-policy"].includes(route)
-          ? "2026-08-29"
-          : "2026-08-27",
+        ["/privacy", "/subscription-policy"].includes(route)
+          ? "2026-08-30"
+          : ["/terms", "/refund-policy"].includes(route)
+            ? "2026-08-29"
+            : "2026-08-27",
       );
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
       assert.ok(document.sections.every((section) => section.heading && section.blocks?.length));
@@ -77,6 +79,16 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
     const subscription = flatten(locale, "/subscription-policy");
     assert.match(subscription, locale === "zh-CN" ? /自动续费/ : /automatically renew/i);
     assert.match(subscription, locale === "zh-CN" ? /取消/ : /cancel/i);
+    assert.match(
+      subscription,
+      locale === "zh-CN"
+        ? /账户注销.*停止后续自动续费|停止后续自动续费.*账户注销/
+        : /account closure.*stops future automatic renewals|stops future automatic renewals.*account closure/i,
+    );
+    assert.match(
+      subscription,
+      locale === "zh-CN" ? /账户注销.*不会自动退款|不会自动退款.*账户注销/ : /account closure.*does not automatically refund|does not automatically refund.*account closure/i,
+    );
     assert.match(
       subscription,
       locale === "zh-CN"

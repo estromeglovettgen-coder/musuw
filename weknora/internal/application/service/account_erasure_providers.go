@@ -23,17 +23,20 @@ var (
 )
 
 type accountBillingGuard interface {
+	PrepareAccountDeletion(ctx context.Context, customerID, subscriptionID string) error
 	EnsureAccountTerminal(ctx context.Context, customerID, subscriptionID string) error
 }
 
 type paddleSubscriptionReader interface {
 	GetSubscription(context.Context, *paddle.GetSubscriptionRequest) (*paddle.Subscription, error)
 	ListSubscriptions(context.Context, *paddle.ListSubscriptionsRequest) (*paddle.Collection[*paddle.Subscription], error)
+	CancelSubscription(context.Context, *paddle.CancelSubscriptionRequest) (*paddle.Subscription, error)
 }
 
 type paddleSubscriptionInventory interface {
 	Get(ctx context.Context, subscriptionID string) (*paddle.Subscription, error)
 	ListByCustomer(ctx context.Context, customerID string) ([]*paddle.Subscription, error)
+	Cancel(ctx context.Context, subscriptionID string, effectiveFrom paddle.EffectiveFrom) (*paddle.Subscription, error)
 }
 
 type paddleSDKSubscriptionInventory struct {
@@ -66,6 +69,17 @@ func (i *paddleSDKSubscriptionInventory) ListByCustomer(ctx context.Context, cus
 	return subscriptions, nil
 }
 
+func (i *paddleSDKSubscriptionInventory) Cancel(
+	ctx context.Context,
+	subscriptionID string,
+	effectiveFrom paddle.EffectiveFrom,
+) (*paddle.Subscription, error) {
+	return i.reader.CancelSubscription(ctx, &paddle.CancelSubscriptionRequest{
+		SubscriptionID: subscriptionID,
+		EffectiveFrom:  &effectiveFrom,
+	})
+}
+
 type paddleAccountErasureGuard struct {
 	subscriptions paddleSubscriptionInventory
 	initErr       error
@@ -76,8 +90,9 @@ func newPaddleAccountErasureGuard(subscriptions paddleSubscriptionInventory) *pa
 }
 
 // NewPaddleAccountErasureGuard uses the same selected Paddle environment and
-// file-backed API key as checkout/portal. It performs reads only: account
-// deletion never cancels, refunds, or otherwise mutates a subscription.
+// file-backed API key as checkout/portal. Account deletion schedules normal
+// paid subscriptions to cancel at period end; it never refunds or adjusts a
+// transaction.
 func NewPaddleAccountErasureGuard() accountBillingGuard {
 	environment := strings.ToLower(strings.TrimSpace(os.Getenv("MUSUW_PADDLE_ENVIRONMENT")))
 	apiKey := strings.TrimSpace(os.Getenv("MUSUW_PADDLE_API_KEY"))
@@ -106,6 +121,150 @@ func NewPaddleAccountErasureGuard() accountBillingGuard {
 	return guard
 }
 
+func (g *paddleAccountErasureGuard) PrepareAccountDeletion(ctx context.Context, customerID, subscriptionID string) error {
+	subscriptions, err := g.loadSubscriptions(ctx, customerID, subscriptionID)
+	if err != nil {
+		return err
+	}
+	type cancellation struct {
+		subscriptionID string
+		effectiveFrom  paddle.EffectiveFrom
+	}
+	cancellations := make([]cancellation, 0, len(subscriptions))
+	expectedSubscriptionID := subscriptionID
+	if strings.TrimSpace(customerID) != "" {
+		// Customer inventory is authoritative and may legitimately contain more
+		// than the one locally cached subscription coordinate.
+		expectedSubscriptionID = ""
+	}
+	for _, subscription := range subscriptions {
+		effectiveFrom, required, err := planPaddleSubscriptionCancellation(subscription, customerID, expectedSubscriptionID)
+		if err != nil {
+			return err
+		}
+		if required {
+			cancellations = append(cancellations, cancellation{
+				subscriptionID: strings.TrimSpace(subscription.ID),
+				effectiveFrom:  effectiveFrom,
+			})
+		}
+	}
+	// Validate the complete provider inventory before issuing the first write.
+	// A retry remains safe if Paddle itself fails after an earlier cancellation:
+	// already-scheduled cancellation is an idempotent success on the next read.
+	for _, cancellation := range cancellations {
+		prepared, err := g.subscriptions.Cancel(ctx, cancellation.subscriptionID, cancellation.effectiveFrom)
+		if err != nil {
+			return fmt.Errorf("%w: provider subscription cancellation failed", ErrAccountBillingUnavailable)
+		}
+		if err := validatePaddleCancellationResponse(prepared, cancellation.subscriptionID, cancellation.effectiveFrom); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (g *paddleAccountErasureGuard) loadSubscriptions(
+	ctx context.Context,
+	customerID,
+	subscriptionID string,
+) ([]*paddle.Subscription, error) {
+	customerID = strings.TrimSpace(customerID)
+	subscriptionID = strings.TrimSpace(subscriptionID)
+	if customerID == "" && subscriptionID == "" {
+		return nil, nil
+	}
+	if g == nil || g.subscriptions == nil {
+		return nil, fmt.Errorf("%w: Paddle subscription client is not configured", ErrAccountBillingUnavailable)
+	}
+	if g.initErr != nil {
+		return nil, fmt.Errorf("%w: %v", ErrAccountBillingUnavailable, g.initErr)
+	}
+	if customerID != "" {
+		subscriptions, err := g.subscriptions.ListByCustomer(ctx, customerID)
+		if errors.Is(err, paddle.ErrNotFound) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%w: provider customer subscription read failed", ErrAccountBillingUnavailable)
+		}
+		return subscriptions, nil
+	}
+	subscription, err := g.subscriptions.Get(ctx, subscriptionID)
+	if errors.Is(err, paddle.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: provider subscription read failed", ErrAccountBillingUnavailable)
+	}
+	return []*paddle.Subscription{subscription}, nil
+}
+
+func planPaddleSubscriptionCancellation(
+	subscription *paddle.Subscription,
+	expectedCustomerID,
+	expectedSubscriptionID string,
+) (paddle.EffectiveFrom, bool, error) {
+	if subscription == nil {
+		return "", false, fmt.Errorf("%w: provider returned no subscription", ErrAccountBillingUnavailable)
+	}
+	subscriptionID := strings.TrimSpace(subscription.ID)
+	if subscriptionID == "" || (strings.TrimSpace(expectedSubscriptionID) != "" && subscriptionID != strings.TrimSpace(expectedSubscriptionID)) {
+		return "", false, fmt.Errorf("%w: provider returned mismatched subscription coordinates", ErrAccountBillingUnavailable)
+	}
+	if expectedCustomerID = strings.TrimSpace(expectedCustomerID); expectedCustomerID != "" &&
+		strings.TrimSpace(subscription.CustomerID) != expectedCustomerID {
+		return "", false, fmt.Errorf("%w: provider returned mismatched customer coordinates", ErrAccountBillingUnavailable)
+	}
+	if subscription.Status == paddle.SubscriptionStatusCanceled {
+		return "", false, nil
+	}
+	if subscription.ScheduledChange != nil && subscription.ScheduledChange.Action == paddle.ScheduledChangeActionCancel {
+		if !validPaddleScheduledCancellation(subscription.ScheduledChange) {
+			return "", false, fmt.Errorf("%w: provider returned an invalid scheduled cancellation", ErrAccountBillingUnavailable)
+		}
+		return "", false, nil
+	}
+
+	var effectiveFrom paddle.EffectiveFrom
+	switch subscription.Status {
+	case paddle.SubscriptionStatusActive, paddle.SubscriptionStatusTrialing:
+		effectiveFrom = paddle.EffectiveFromNextBillingPeriod
+	case paddle.SubscriptionStatusPaused:
+		effectiveFrom = paddle.EffectiveFromImmediately
+	case paddle.SubscriptionStatusPastDue:
+		return "", false, ErrAccountBillingActionRequired
+	default:
+		return "", false, fmt.Errorf("%w: unrecognized subscription status", ErrAccountBillingUnavailable)
+	}
+	return effectiveFrom, true, nil
+}
+
+func validatePaddleCancellationResponse(
+	prepared *paddle.Subscription,
+	expectedSubscriptionID string,
+	effectiveFrom paddle.EffectiveFrom,
+) error {
+	if prepared == nil || strings.TrimSpace(prepared.ID) != strings.TrimSpace(expectedSubscriptionID) {
+		return fmt.Errorf("%w: provider returned mismatched cancellation coordinates", ErrAccountBillingUnavailable)
+	}
+	if prepared.Status == paddle.SubscriptionStatusCanceled {
+		return nil
+	}
+	if effectiveFrom != paddle.EffectiveFromNextBillingPeriod || !validPaddleScheduledCancellation(prepared.ScheduledChange) {
+		return fmt.Errorf("%w: provider did not confirm subscription cancellation", ErrAccountBillingUnavailable)
+	}
+	return nil
+}
+
+func validPaddleScheduledCancellation(change *paddle.SubscriptionScheduledChange) bool {
+	if change == nil || change.Action != paddle.ScheduledChangeActionCancel || strings.TrimSpace(change.EffectiveAt) == "" {
+		return false
+	}
+	_, err := time.Parse(time.RFC3339, change.EffectiveAt)
+	return err == nil
+}
+
 func (g *paddleAccountErasureGuard) EnsureAccountTerminal(ctx context.Context, customerID, subscriptionID string) error {
 	customerID = strings.TrimSpace(customerID)
 	subscriptionID = strings.TrimSpace(subscriptionID)
@@ -120,6 +279,9 @@ func (g *paddleAccountErasureGuard) EnsureAccountTerminal(ctx context.Context, c
 	}
 	if customerID != "" {
 		subscriptions, err := g.subscriptions.ListByCustomer(ctx, customerID)
+		if errors.Is(err, paddle.ErrNotFound) {
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("%w: provider customer subscription read failed", ErrAccountBillingUnavailable)
 		}

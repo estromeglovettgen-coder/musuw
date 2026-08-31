@@ -3,9 +3,11 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -157,6 +159,17 @@ func (h *paddleWebhookTaskHandler) Handle(ctx context.Context, task *asynq.Task)
 		return fmt.Errorf("paddle webhook task operation %q is invalid", payload.Operation)
 	}
 	if err != nil {
+		// Account erasure may purge the tenant after Paddle reached its
+		// authoritative terminal state but before an already-queued signed event
+		// runs. A missing tenant is therefore an idempotent terminal no-op; every
+		// provider, database, validation, and binding error remains retryable.
+		if errors.Is(err, apprepo.ErrTenantNotFound) {
+			logger.Infof(ctx,
+				"Paddle billing task ignored for erased tenant operation=%s tenant_id=%d event_id=%s",
+				payload.Operation, payload.TenantID, payload.EventID,
+			)
+			return nil
+		}
 		return fmt.Errorf("execute paddle webhook task operation=%s: %w", payload.Operation, err)
 	}
 	// A signed Paddle event proves the provider-side change, but a checkout or

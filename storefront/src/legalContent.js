@@ -19,6 +19,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
 
 const updated = "2026-08-27";
 const billingPolicyUpdated = "2026-08-29";
+const accountLifecycleUpdated = "2026-08-30";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -175,7 +176,7 @@ const englishDocuments = {
     title: "Privacy Policy",
     summary:
       "This policy explains what personal data musuw collects, why it is used, how long it is kept, who may process it, and the choices available to you.",
-    updated,
+    updated: accountLifecycleUpdated,
     sections: [
       {
         heading: "1. Operator and scope",
@@ -265,7 +266,7 @@ const englishDocuments = {
         heading: "8. Retention",
         blocks: [
           p("We retain account and knowledge content while your account is active or as needed to provide the service. After a verified deletion request or account closure, we delete or de-identify content from active systems without undue delay, subject to lawful retention, security investigations, disputes, and normal backup rotation."),
-          p("Account deletion does not cancel or refund an active Paddle subscription. Paddle is the Merchant of Record and may retain invoices, transaction records, and tax, accounting, fraud-prevention, chargeback, and dispute records for the periods required or permitted by applicable law and its provider terms. Musuw retains only the minimum corresponding records needed for legal, accounting, fraud-prevention, security, or dispute obligations, detaches or minimizes them where possible, and does not present them as active account data. These Paddle and Musuw records follow their own retention periods; we do not promise immediate physical disappearance from Paddle or bounded backups."),
+          p("When managed account closure is accepted, musuw schedules each cancellable Paddle subscription to stop future automatic renewals at the end of its current billing period and ends product access immediately. Account closure does not automatically refund a completed payment; a past-due or otherwise non-cancelable provider state may need to be resolved before closure can be accepted. Paddle is the Merchant of Record and may retain invoices, transaction records, and tax, accounting, fraud-prevention, chargeback, and dispute records for the periods required or permitted by applicable law and its provider terms. musuw retains only the minimum corresponding records needed for legal, accounting, fraud-prevention, security, or dispute obligations, detaches or minimizes them where possible, and does not present them as active account data. These Paddle and musuw records follow their own retention periods; we do not promise immediate physical disappearance from Paddle or bounded backups."),
           p("Security logs and support records are retained only as long as reasonably needed for their purpose."),
           p("When data is no longer needed, we delete, de-identify, or securely isolate it. De-identified information may be retained where it cannot reasonably be linked back to you.")
         ]
@@ -382,7 +383,7 @@ const englishDocuments = {
     title: "Subscription and Cancellation Policy",
     summary:
       "This policy explains automatic renewal, billing intervals, cancellation methods, plan changes, and the difference between subscriptions and one-time purchases.",
-    updated: billingPolicyUpdated,
+    updated: accountLifecycleUpdated,
     sections: [
       {
         heading: "1. What you buy",
@@ -416,7 +417,7 @@ const englishDocuments = {
         heading: "4. Effect of cancellation",
         blocks: [
           p("Cancellation stops future automatic renewals. Unless a refund or mandatory law provides otherwise, paid access continues until the end of the current billing period and no further subscription charge is made."),
-          p("Deleting the application, not using the service, or removing a payment app does not necessarily cancel a subscription. Use one of the cancellation methods above.")
+          p("Deleting the application, not using the service, or removing a payment app does not cancel a subscription. An accepted managed account closure schedules cancellable subscriptions to stop future automatic renewals at period end, ends musuw access immediately, and does not automatically refund a completed payment.")
         ]
       },
       {
@@ -821,7 +822,7 @@ const chineseDocuments = {
     eyebrow: "隐私",
     title: "隐私政策",
     summary: "本政策说明 musuw 收集哪些个人信息、使用目的、保留期限、可能的处理方、跨境处理以及您可行使的权利。",
-    updated,
+    updated: accountLifecycleUpdated,
     sections: [
       {
         heading: "1. 运营主体与适用范围",
@@ -911,7 +912,7 @@ const chineseDocuments = {
         heading: "8. 保留与删除",
         blocks: [
           p("账户处于活动状态或提供服务所需期间，我们会保留账户和知识内容。收到经核验的删除请求或账户关闭后，我们会在不无故拖延的情况下从活动系统删除或去标识化，但可能受法定留存、安全调查、争议和正常备份轮换限制。"),
-          p("账户注销不会取消或退款仍可计费的 Paddle 订阅。Paddle 是订单的商户记录方，可能依据适用法律及其服务条款在法定或允许期限内保留发票、交易记录、税务、会计、反欺诈、拒付和争议记录。musuw 仅为履行法律、会计、反欺诈、安全或争议义务保留相应最小记录，并在可行时脱离账户、最小化，不会作为活跃账户数据展示。这些 Paddle 和 musuw 记录按各自留存期限处理；我们不承诺立即从 Paddle 或受限备份中物理消失。"),
+          p("账户注销获接受后，musuw 会安排每个可取消的 Paddle 订阅在当前计费周期结束时停止后续自动续费，并立即终止产品访问。账户注销不会自动退款已完成的付款；欠费或其他暂不可取消的服务商状态可能需要先处理，注销请求才能获接受。Paddle 是订单的商户记录方，可能依据适用法律及其服务条款在法定或允许期限内保留发票、交易记录、税务、会计、反欺诈、拒付和争议记录。musuw 仅为履行法律、会计、反欺诈、安全或争议义务保留相应最小记录，并在可行时脱离账户、最小化，不会作为活跃账户数据展示。这些 Paddle 和 musuw 记录按各自留存期限处理；我们不承诺立即从 Paddle 或受限备份中物理消失。"),
           p("安全日志和支持记录仅在实现其目的所合理需要的期限内保留。"),
           p("信息不再需要时，我们会删除、去标识化或安全隔离。无法合理重新关联到您的去标识化信息可继续保留。")
         ]
@@ -1026,7 +1027,7 @@ const chineseDocuments = {
     eyebrow: "账单",
     title: "订阅与取消政策",
     summary: "本政策说明自动续费、计费周期、取消方式、套餐变更，以及循环订阅和单次购买之间的明确区别。",
-    updated: billingPolicyUpdated,
+    updated: accountLifecycleUpdated,
     sections: [
       {
         heading: "1. 您购买的内容",
@@ -1060,7 +1061,7 @@ const chineseDocuments = {
         heading: "4. 取消后的效果",
         blocks: [
           p("取消会停止未来自动续费。除退款或强制性法律另有规定外，付费访问权持续至当前计费周期结束，之后不再产生订阅扣款。"),
-          p("删除应用、不使用服务或移除支付应用不一定会取消订阅，请使用上述任一正式取消方式。")
+          p("删除应用、不使用服务或移除支付应用不会取消订阅。获接受的账户注销会安排可取消订阅在周期结束时停止后续自动续费、立即终止 musuw 访问，且不会自动退款已完成的付款。")
         ]
       },
       {

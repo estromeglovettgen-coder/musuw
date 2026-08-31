@@ -120,13 +120,14 @@ func (s *accountErasureService) Request(ctx context.Context, userID string) erro
 		return err
 	}
 	// Validation above checks deterministic provider coordinates and
-	// server-side configuration before the irreversible local access fence. It
-	// never calls the destructive provider endpoint.
+	// server-side configuration before the irreversible local access fence.
+	// Billing preparation may schedule Paddle cancellation, but it never refunds
+	// or changes local entitlement state synchronously.
 	if strings.TrimSpace(target.PaddleCustomerID) != "" || strings.TrimSpace(target.PaddleSubscriptionID) != "" {
 		if s.billing == nil {
 			return ErrAccountBillingUnavailable
 		}
-		if err := s.billing.EnsureAccountTerminal(ctx, target.PaddleCustomerID, target.PaddleSubscriptionID); err != nil {
+		if err := s.billing.PrepareAccountDeletion(ctx, target.PaddleCustomerID, target.PaddleSubscriptionID); err != nil {
 			return err
 		}
 	}

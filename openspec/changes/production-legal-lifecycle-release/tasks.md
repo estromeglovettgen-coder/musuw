@@ -1,3 +1,5 @@
+> Historical task record. Its voluntary 30-day refund requirement was superseded by `remove-voluntary-refund-guarantee`; completed checkboxes below record the earlier release, not current policy.
+
 ## 1. Legal and auth entry
 
 - [x] 1.1 Add failing auth and storefront contract tests for the adjacent

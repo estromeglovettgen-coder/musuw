@@ -83,15 +83,23 @@ func (r *accountErasureRepoStub) Purge(context.Context, *types.AccountErasureTar
 }
 
 type accountErasureBillingStub struct {
-	err    error
-	calls  int
-	lastID string
+	prepareErr    error
+	terminalErr   error
+	prepareCalls  int
+	terminalCalls int
+	lastID        string
 }
 
 func (b *accountErasureBillingStub) EnsureAccountTerminal(_ context.Context, customerID, id string) error {
-	b.calls++
+	b.terminalCalls++
 	b.lastID = customerID + "/" + id
-	return b.err
+	return b.terminalErr
+}
+
+func (b *accountErasureBillingStub) PrepareAccountDeletion(_ context.Context, customerID, id string) error {
+	b.prepareCalls++
+	b.lastID = customerID + "/" + id
+	return b.prepareErr
 }
 
 type accountErasureIdentityStub struct {
@@ -266,20 +274,34 @@ func TestAccountErasureRequestRejectsMissingTargetBeforeSideEffects(t *testing.T
 	err := svc.Request(context.Background(), "user-1")
 	require.ErrorIs(t, err, ErrAccountErasureIneligible)
 	require.False(t, repo.fenced)
-	require.Zero(t, billing.calls)
+	require.Zero(t, billing.prepareCalls)
+	require.Zero(t, billing.terminalCalls)
 	require.Empty(t, queue.tasks)
 }
 
-func TestAccountErasureRequestLeavesAccountActiveWhenPaddleStillBills(t *testing.T) {
+func TestAccountErasureRequestLeavesAccountActiveWhenPaddleCancellationCannotBePrepared(t *testing.T) {
 	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
-	billing := &accountErasureBillingStub{err: ErrAccountBillingActionRequired}
+	billing := &accountErasureBillingStub{prepareErr: ErrAccountBillingUnavailable}
 	queue := &accountErasureTaskStub{}
 	svc := newAccountErasureService(repo, nil, nil, nil, queue, nil, billing, &accountErasureIdentityStub{})
 
 	err := svc.Request(context.Background(), "user-1")
-	require.ErrorIs(t, err, ErrAccountBillingActionRequired)
+	require.ErrorIs(t, err, ErrAccountBillingUnavailable)
 	require.False(t, repo.fenced)
 	require.Empty(t, queue.tasks)
+}
+
+func TestAccountErasureRequestPreparesPaidCancellationBeforeFencing(t *testing.T) {
+	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
+	billing := &accountErasureBillingStub{}
+	queue := &accountErasureTaskStub{}
+	svc := newAccountErasureService(repo, nil, nil, nil, queue, nil, billing, &accountErasureIdentityStub{})
+
+	require.NoError(t, svc.Request(context.Background(), "user-1"))
+	require.Equal(t, 1, billing.prepareCalls)
+	require.Zero(t, billing.terminalCalls)
+	require.True(t, repo.fenced)
+	require.Len(t, queue.tasks, 1)
 }
 
 func TestAccountErasureRequestAutomaticallyLeavesOrdinaryOrganizationMembership(t *testing.T) {
@@ -291,7 +313,8 @@ func TestAccountErasureRequestAutomaticallyLeavesOrdinaryOrganizationMembership(
 
 	require.NoError(t, svc.Request(context.Background(), "user-1"))
 	require.True(t, repo.fenced)
-	require.Equal(t, 1, billing.calls)
+	require.Equal(t, 1, billing.prepareCalls)
+	require.Zero(t, billing.terminalCalls)
 	require.Len(t, queue.tasks, 1)
 }
 
@@ -380,6 +403,25 @@ func TestAccountErasureWorkerUsesExistingKnowledgeLifecycleBeforeTenantDeletion(
 	require.False(t, repo.purged)
 }
 
+func TestAccountErasureWorkerWaitsForTerminalPaddleState(t *testing.T) {
+	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
+	billing := &accountErasureBillingStub{terminalErr: ErrAccountBillingActionRequired}
+	tenant := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}}
+	svc := newAccountErasureService(
+		repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenant,
+		nil, nil, billing, &accountErasureIdentityStub{},
+	)
+	task, err := NewAccountErasureTask("user-1")
+	require.NoError(t, err)
+
+	err = svc.Process(context.Background(), task)
+
+	require.ErrorIs(t, err, ErrAccountBillingActionRequired)
+	require.Equal(t, 1, billing.terminalCalls)
+	require.Empty(t, tenant.deleted)
+	require.False(t, repo.purged)
+}
+
 func TestAccountErasureWorkerDeletesProviderIdentityBeforeFinalLocalPurge(t *testing.T) {
 	order := []string{}
 	target := eligibleErasureTarget()
@@ -458,7 +500,7 @@ func TestAccountErasureRequestResolvesIdentityAdapterBeforeFence(t *testing.T) {
 	require.Zero(t, identity.calls)
 }
 
-func TestAccountErasureRequestFailsClosedOnIncompletePaddleBinding(t *testing.T) {
+func TestAccountErasureRequestUsesCustomerInventoryWithCustomerOnlyBinding(t *testing.T) {
 	target := eligibleErasureTarget()
 	target.PaddleCustomerID = "ctm_bound"
 	target.PaddleSubscriptionID = ""

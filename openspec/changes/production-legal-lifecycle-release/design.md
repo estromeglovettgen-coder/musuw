@@ -1,3 +1,5 @@
+> The voluntary 30-day refund policy described in this historical design was superseded by `remove-voluntary-refund-guarantee`. Current policy permits only refunds required by law or Paddle's governing buyer policy.
+
 ## Context
 
 Musuw already has bilingual public Terms, Privacy, Refund, Subscription,

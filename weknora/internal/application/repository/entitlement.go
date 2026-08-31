@@ -17,6 +17,13 @@ type entitlementRepository struct {
 	db *gorm.DB
 }
 
+func entitlementTenantError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrTenantNotFound
+	}
+	return err
+}
+
 // ErrComplimentaryPlanConflict marks a durable complimentary-entitlement
 // state conflict.  Callers may safely map this sentinel to HTTP 409; database
 // and infrastructure errors intentionally remain unclassified so they can be
@@ -30,7 +37,7 @@ func NewEntitlementRepository(db *gorm.DB) interfaces.EntitlementRepository {
 func (r *entitlementRepository) GetTenantEntitlement(ctx context.Context, tenantID uint64) (*types.Tenant, error) {
 	var tenant types.Tenant
 	if err := r.db.WithContext(ctx).First(&tenant, tenantID).Error; err != nil {
-		return nil, err
+		return nil, entitlementTenantError(err)
 	}
 	return &tenant, nil
 }
@@ -79,7 +86,7 @@ func (r *entitlementRepository) SetOpenRouterCredentialsIfAbsent(ctx context.Con
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if tenant.Credentials != nil && tenant.Credentials.OpenRouter != nil {
 			return nil
@@ -130,7 +137,7 @@ func (r *entitlementRepository) SetOpenRouterDesiredLimitIfUnset(ctx context.Con
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if tenant.OpenRouterDesiredLimitMicrousd > 0 {
 			return nil
@@ -177,7 +184,7 @@ func (r *entitlementRepository) GrantComplimentaryPlan(
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if tenant.ComplimentaryGrantID == grantID {
 			if tenant.ComplimentaryPlan == plan && tenant.ComplimentaryExpiresAt != nil && tenant.ComplimentaryExpiresAt.UTC().Equal(expiresAt) {
@@ -231,7 +238,7 @@ func (r *entitlementRepository) RevokeComplimentaryPlan(
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if tenant.ComplimentaryGrantID != grantID {
 			return fmt.Errorf("%w: complimentary grant ID does not match", ErrComplimentaryPlanConflict)
@@ -275,7 +282,7 @@ func (r *entitlementRepository) AdvanceComplimentaryCreditPeriod(
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if tenant.ComplimentaryGrantID != grantID || types.NormalizeConsumerPlan(tenant.Plan) != types.ConsumerPlanFree ||
 			strings.TrimSpace(tenant.PaddleCustomerID) != "" || strings.TrimSpace(tenant.PaddleSubscriptionID) != "" {
@@ -317,7 +324,7 @@ func (r *entitlementRepository) ApplyConsumerPlan(ctx context.Context, tenantID 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if eventID != "" {
 			if tenant.PaddleLastEventID == eventID || (tenant.PaddleLastEventAt != nil && !occurredAt.After(*tenant.PaddleLastEventAt)) {
@@ -403,7 +410,7 @@ func (r *entitlementRepository) AdvanceOpenRouterCreditPeriod(ctx context.Contex
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		if eventID != "" {
 			plan = types.NormalizeConsumerPlan(plan)
@@ -445,7 +452,7 @@ func (r *entitlementRepository) AdvancePaddleCurrentPeriod(ctx context.Context, 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var tenant types.Tenant
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&tenant, tenantID).Error; err != nil {
-			return err
+			return entitlementTenantError(err)
 		}
 		plan = types.NormalizeConsumerPlan(plan)
 		if plan == types.ConsumerPlanFree || types.EffectiveConsumerPlan(&tenant) != plan ||

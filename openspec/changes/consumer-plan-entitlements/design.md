@@ -1,3 +1,5 @@
+> Account-erasure billing decisions in this historical design were superseded on 2026-08-30 by `allow-paid-account-deletion`. In particular, the erasure path may now call Paddle's official cancellation endpoint before fencing; it still never refunds or grants entitlement from the synchronous response.
+
 ## Context
 
 Musuw already has tenant storage quotas, tenant-scoped repositories, native model factories, one OpenRouter-backed provider path, and an Asynq/Redis worker topology. It lacks a consumer plan source of truth, per-tenant model/spend enforcement, and a real relationship between the storefront's four price cards and product behavior. The sibling `enable-paddle-live-production` change has since authorized and deployed the fixed production Live unit, while Sandbox remains development/test-only. This delta adds the smallest reliable handoff for signed webhooks, one Paddle transaction identity behind a single duplicate-initiation fence, a durable paid-upgrade operation identity, and the exact one-item subscription invariant without introducing a financial reconciliation subsystem or general billing ledger.

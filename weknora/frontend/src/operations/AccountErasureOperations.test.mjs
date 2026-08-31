@@ -14,6 +14,10 @@ test('account erasure exists only as an operations-console action', async () => 
   assert.match(usersPage, /确认彻底注销/)
   assert.match(usersPage, /operationsApi\.eraseUser\(selected\.value\.id\)/)
   assert.doesNotMatch(usersPage, /normalizeEmail|emailConfirmation|确认邮箱|账户邮箱.*确认/)
+  assert.match(usersPage, /停止后续自动续费/)
+  assert.match(usersPage, /不会自动退款/)
+  assert.match(usersPage, /立即停用/)
+  assert.doesNotMatch(usersPage, /仍可计费的订阅会直接阻止注销/)
   assert.match(operationsApi, /method:\s*['"]DELETE['"]/)
   assert.match(operationsApi, /system\/admin\/users\/\$\{encodeURIComponent\(userId\)\}/)
 

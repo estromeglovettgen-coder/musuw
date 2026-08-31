@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,41 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetTenantEntitlementMapsMissingTenant(t *testing.T) {
+	repo := NewEntitlementRepository(setupTestDB(t))
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	periodEnd := now.AddDate(0, 1, 0)
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{name: "read", call: func() error {
+			_, err := repo.GetTenantEntitlement(context.Background(), 999999)
+			return err
+		}},
+		{name: "plan lifecycle write", call: func() error {
+			_, err := repo.ApplyConsumerPlan(context.Background(), 999999, types.ConsumerPlanPro, "active", "monthly", "evt_missing", now, "ctm_missing", "sub_missing", &periodEnd, &periodEnd, 2_500_000)
+			return err
+		}},
+		{name: "monthly allowance write", call: func() error {
+			_, err := repo.AdvanceOpenRouterCreditPeriod(context.Background(), 999999, types.ConsumerPlanPro, "monthly", "evt_missing", now, "ctm_missing", "sub_missing", periodEnd, 2_500_000)
+			return err
+		}},
+		{name: "yearly period write", call: func() error {
+			_, err := repo.AdvancePaddleCurrentPeriod(context.Background(), 999999, types.ConsumerPlanPro, "ctm_missing", "sub_missing", "yearly", "evt_missing", now, periodEnd)
+			return err
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.call()
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, ErrTenantNotFound), "error = %v", err)
+		})
+	}
+}
 
 func TestApplyConsumerPlanUpdatesQuotaAndIgnoresOlderBillingEvent(t *testing.T) {
 	db := setupTestDB(t)

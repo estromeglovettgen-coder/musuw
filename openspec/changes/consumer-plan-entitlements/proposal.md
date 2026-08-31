@@ -1,3 +1,5 @@
+> Account-erasure billing behavior in this historical proposal was superseded on 2026-08-30 by `allow-paid-account-deletion`: cancellable subscriptions are now prepared for cancellation before the account is fenced. The remaining consumer-entitlement proposal is unchanged.
+
 ## Why
 
 Musuw currently advertises four consumer plans but every signed-in tenant receives the same storage, document, and model access, and OpenRouter spend is not bounded per user. The first paid release needs one enforceable source of truth so the advertised limits match real upload and model behavior.
