@@ -64,6 +64,18 @@ test("desktop-floor footer keeps every legal link inside the 1024px viewport", (
   assert.match(footerGrid, /gap:\s*clamp\(24px,\s*4vw,\s*48px\)\s*;/s);
 });
 
+test("mobile navigation locks scrolling and restores focus after outside dismissal", () => {
+  const chrome = readFileSync(join(root, "src/components/SiteChrome.jsx"), "utf8");
+
+  assert.match(chrome, /const headerRef = useRef\(null\)/);
+  assert.match(chrome, /const previousBodyOverflow = document\.body\.style\.overflow/);
+  assert.match(chrome, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(chrome, /document\.addEventListener\("pointerdown", closeOnOutsidePointer\)/);
+  assert.match(chrome, /headerRef\.current\?\.contains\(event\.target\)/);
+  assert.match(chrome, /document\.body\.style\.overflow = previousBodyOverflow/);
+  assert.match(chrome, /<header[\s\S]*ref=\{headerRef\}/);
+});
+
 test("marketing comparison and pricing stay aligned across desktop and mobile", () => {
   const styles = readFileSync(join(root, "src/marketing-refresh.css"), "utf8");
   const mobile = mediaBlock(styles, "max-width: 767px");
