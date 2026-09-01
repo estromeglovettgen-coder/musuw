@@ -791,7 +791,7 @@ internal/application/service/knowledge_update_test.go	-	A	100644	b5662a354ece148
 internal/application/service/knowledge_util.go	M	-	100644	044f9ec44715f3a42178e8c51526812149a3e364	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/knowledge_util_filetype_test.go	M	-	100644	31b22afb75a6c4287f3554f5106981412266c4dc	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/knowledge_util_ssrf_test.go	-	M	100644	6a2a4df118ed4a7642029d47ecaeab348b44128d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/knowledgebase.go	M	M	100644	ce802f9e6c043d4487531863380beccc14747e6d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/application/service/knowledgebase.go	M	M	100644	73bd8a1d5b51a0983c6e6a40906a128c7787900f	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/application/service/knowledgebase_consumer_models_test.go	A	-	100644	f235f4a8ec4aca84f8ab7b2801501e98a139ed16	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/knowledgebase_lite_policy_test.go	A	-	100644	876f3e3930f866bbc75ac137a7fed49f3a3c5336	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/knowledgebase_platform_catalog_test.go	A	-	100644	2037c22c42e3da85c674b699f6ed990b1102dab4	preserve-musuw-exact		audited local-only content is byte-identical
@@ -799,7 +799,7 @@ internal/application/service/knowledgebase_pr3_test.go	M	-	100644	0e204b405a64f2
 internal/application/service/knowledgebase_search.go	M	M	100644	98d59089214a127c68725f9f66afcae5ad1c79ea	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/application/service/knowledgebase_search_faq.go	-	M	100644	e6f28a6fee196af7e334a045d4dd3040fb36d775	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/knowledgebase_search_matchcount_test.go	-	A	100644	da8df5f7b4f8c4733918927280b613962f768c81	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/knowledgebase_strict_delete_test.go	A	-	100644	f8495be3d43c83792f54c3a8a04cc619dc260150	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/application/service/knowledgebase_strict_delete_test.go	A	-	100644	8042741120c7f274b5c59965cb6407d7b93858db	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/knowledgebase_task_cancel_test.go	M	-	100644	f61e86f3dbe662c9e12c8d02f1243c0b28ba8744	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/mcp_service.go	-	M	100644	f273b3353196c6b4e56321279742eb9a90b3cb93	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/mcp_service_test.go	-	M	100644	7cb65cf517f8c2925c204157a9cc63f17f804db5	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
