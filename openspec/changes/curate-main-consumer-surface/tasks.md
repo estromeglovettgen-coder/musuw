@@ -41,4 +41,4 @@
 - [x] 6.5 Align exposed Agent and upload-time settings with the same row/control/responsive grammar and remove reachable clipping or one-off upstream layout patterns.
 - [x] 6.6 Run focused visual contracts and feature tests, then the full frontend suite, i18n checks, type-check, and production build.
 - [x] 6.7 Perform one adversarial visual review, then browser-test ordinary-user and administrator paths in desktop/narrow and light/dark modes; record only reproduced blockers.
-- [ ] 6.8 Update handoff and verification evidence, deploy only the reviewed staging build, re-run browser acceptance, and keep production unchanged.
+- [x] 6.8 Update handoff and verification evidence, deploy only the reviewed staging build, re-run browser acceptance, and keep production unchanged.

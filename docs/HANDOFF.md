@@ -2,16 +2,19 @@
 
 **Audience:** a fresh, no-context reviewer or acceptance operator.
 
-**Snapshot:** 2026-09-01 (America/Phoenix). The source upgrade, local
-verification, automatic staging release, read-only remote staging audit and
-ordinary Lite-user browser acceptance for the `a965a85...` release are
-complete. Paddle Sandbox acceptance is **PARTIAL**. The Memory draft-race
-correction is in source commit `cd52965f`; `72716632` is the deployed source
-and resolution-ledger commit. CI run `33498204284` and automatic staging-only
-run `33498781725` completed successfully. The corrective Memory path, existing
-AnyDoc knowledge base and a real model chat were rechecked in the browser.
-Production application traffic remains on the old release. Do not run a
-`promote` dispatch from this document.
+**Snapshot:** 2026-09-01 (America/Phoenix). The fixed WeKnora-main source,
+Musuw product curation, structural settings-UI correction, full local/CI gate,
+automatic staging-only release, remote infrastructure gate and ordinary
+Lite-user browser acceptance are complete. The current deployed staging source
+and resolution-ledger commit is `09b1bc0b`; the structural UI behavior is in
+ancestor `f092dfee`, and the Memory draft-race correction remains in ancestor
+`cd52965f`. CI run `33509979358` and automatic staging-only run `33510660189`
+completed successfully. The earlier independent review at `553f7bac` found one
+visual mismatch; `f092dfee` corrected it by reusing the Musuw settings shell,
+left navigation, row grammar and footer, and the deployed corrective browser
+pass found no functional, infrastructure or visual blocker. Paddle Sandbox
+acceptance remains **PARTIAL**. Production application traffic remains on the
+old release. Do not run a `promote` dispatch from this document.
 
 This is the current project handoff. It is intentionally a single, stable
 document rather than a dated second source of truth. Code, checked-in release
@@ -50,10 +53,11 @@ Sandbox partial acceptance.
 | --- | --- |
 | Repository | `estromeglovettgen-coder/musuw` |
 | Working branch | `codex/upgrade-weknora-main-81142df` |
-| Current deployed source commit | `72716632e4ab35b0b18e5db2bf1f0db5df945723` (resolution-ledger refresh; Memory behavior is `cd52965f76d5d30f4849b89f73371230069dfe1e`) |
+| Historical independent-review HEAD | `553f7bac6e467d02051e37fa03f5cad483d47b2b`; it reproduced the pre-correction visual mismatch and is retained as historical evidence |
+| Current deployed source commit | `09b1bc0b544fd0a6c59a4c75166526c8b6554410` (resolution-ledger refresh; structural UI behavior is `f092dfee721bc6062c3fbcb573dcb68b2b19b7e4`; Memory behavior is `cd52965f76d5d30f4849b89f73371230069dfe1e`) |
 | `origin/main` | Same SHA as current source at this snapshot |
-| Deployed staging release | SHA `72716632e4ab35b0b18e5db2bf1f0db5df945723`; app/frontend digests are recorded in §6.3 and run artifact `musuw-staging-release-72716632e4ab35b0b18e5db2bf1f0db5df945723` |
-| Corrective release status | **PASS**: `cd52965f` is locally/CI verified and the resulting `72716632` immutable staging release passed the Memory browser regression |
+| Deployed staging release | SHA `09b1bc0b544fd0a6c59a4c75166526c8b6554410`; app/frontend digests are recorded in §6.3 and run artifact `musuw-staging-release-09b1bc0b544fd0a6c59a4c75166526c8b6554410` |
+| Corrective release status | **PASS**: `f092dfee` is locally/CI/adversarially verified; the resulting `09b1bc0b` immutable staging release passed visual, Memory, chat, AnyDoc/retrieval and hidden-route browser acceptance |
 | Fixed upstream | WeKnora `main` commit `81142dfd17b2778087e95d3a317483a2fd909b91` |
 | Upstream tree | `37eaafdd6c276d2d1ddffffe1f39f8b38fd7cc03` |
 | Upstream version label | `main-81142df`; application `VERSION` remains `0.7.2` compatibility metadata |
@@ -257,15 +261,23 @@ Staging responses must carry `X-Robots-Tag: noindex, nofollow`.
 | Memory draft-race correction | **PASS local/CI/browser**, source `cd52965f`; the first-click/no-feedback and late-response-overwrites-new-draft paths are covered by concurrent-create tests. On deployed `72716632`, one click created exactly one `ORCHID CLOCK 5942` item (count 1 -> 2); a second unsaved `SILVER LANTERN 8461` draft remained intact for 3.5 seconds with no stale toast, tab switch or clear. |
 | Browser acceptance of `a965a85...` | **PASS for Lite S4-S10**: fresh ordinary Viewer login, document KB/AnyDoc upload and query, auto-tag policy, full Memory settings and cross-session recall, chat/model/agent defaults, web retrieval, image OCR, audio ASR, hidden Sandbox/Skills/Env surfaces, and Musuw UI states were exercised. `72716632` received the corrective smoke described next. |
 | Browser corrective smoke on `72716632` | **PASS**: authenticated owner Memory create/race path passed; existing accepted KB still exposed two parsed DOCX/Markdown documents; a real DeepSeek V4 Flash chat completed and reported one recalled memory. This is a corrective-delta rerun, not a claim that every a965 upload fixture was recreated. |
+| Historical independent acceptance at `553f7bac` | **PASS for source/function/runtime; historical FAIL for visual convergence**: exact detached-source ledger regenerated 1,601 paths with 0 blockers and no diff; frontend 994/994, type/i18n/build, full Go/vet/build, AnyDoc native archive + tagged vet/test/build, Auth 100/100, Storefront 63/63, DocReader 192 tests, CLI/SDK/DSH contracts, static release/isolation gates, five OpenSpec strict validations, and PostgreSQL 93 -> 104/fresh/retry scenarios passed. It reproduced the pre-`f092dfee` KB-editor mismatch. |
+| Structural visual correction | **PASS local/browser/adversarial**, source `f092dfee`: KB Basic/Advanced, personal/workspace Memory and Lite/Standard Agent settings reuse `VisualSettingsShell`, its 192px left navigation, unboxed `setting-row` grammar, shared header/dividers/footer/scroll behavior and neutral switches. Focused visual contracts plus the full 1017/1017 frontend suite, 11/11 i18n checks, type-check and build pass. Consolidated review reported P0/P1=0. |
+| CI for `09b1bc0b` | **PASS**, run `33509979358`; full Go/AnyDoc, frontend, DocReader, Auth, Storefront, CLI/SDK, plugin E2E, provenance, secret and release-contract jobs are green |
+| Automatic `09b1bc0b` app release | **PASS**, run `33510660189`; immutable staging-only deployment and digest verification passed; restricted production deploy job was skipped |
+| Automatic `09b1bc0b` storefront release | **PASS/independent**, run `33510660226` |
+| Staging after `09b1bc0b` | **PASS remote gate**: app `ghcr.io/estromeglovettgen-coder/musuw-app@sha256:6682abc73f912cd7629f7980ad446fca029d4b32da17414bdeb289a0bcfd6f12`; frontend `ghcr.io/estromeglovettgen-coder/musuw-frontend@sha256:3a021ce6729673c50658f85cec58a148fde24743344a2413e08a8baf065c5864`; six-service health plus init, SearXNG search, noindex, Sandbox public config, isolated volumes/network and exact digest record passed |
+| Browser acceptance on `09b1bc0b` | **PASS corrective/full-path smoke**: an authenticated Lite user inspected KB Basic/Advanced and neutral auto-tag, complete Memory basic/Advanced, reduced Agent navigation, light/dark settings and hidden Sandbox/Skills/Env deep links; a fresh DeepSeek V4 Flash answer completed; a fresh AnyDoc-backed document query returned `ORBITAL SAGE 4826` with the source citation and web results; a single-click manual Memory create produced exactly one item and the disposable item was deleted. No visual or functional blocker reproduced. |
 | Paddle Sandbox acceptance | **PARTIAL**: Sandbox public config/test token, three products/six recurring prices, exact 11-event destination, official transaction/cancellation simulations, portal-session/history API and related tests are green. Real checkout success/decline, upgrade, period-end/resume/recovery/dunning, entitlement/allowance and full hosted-portal browser actions remain untested; tenant `10002` has a stale in-flight checkout operation as a follow-up. |
 | Production app | **UNCHANGED/OLD** release `ea614b077dc0b9fb7fbe742c8defee2e24bc8461`, PostgreSQL `93|f`; this is the required screen-share state |
 | Production promotion | **NOT RUN** and must remain not run for this task |
 | Backups | Read-only verified staging/production database dumps were created before deployment; they are recovery evidence, not a runtime mutation |
 
-The `a965a85...` identity above is the checkout used for the earlier full
-browser matrix. The current `72716632` checkout adds the Memory fix and a
-ledger refresh and is now the deployed staging release. Always use the explicit
-deployed SHA/digests when comparing remote staging. The exact
+The `a965a85...` identity above is the checkout used for the earlier exhaustive
+browser matrix; `72716632` added the Memory correction. The current
+`09b1bc0b` release adds the structural UI correction in `f092dfee` and a fresh
+resolution-ledger refresh. Always use the explicit deployed SHA/digests when
+comparing remote staging. The exact
 production SHA/DB values above are an audit snapshot, not a substitute for a
 fresh probe. A read-only remote audit already confirmed the old production
 release and database after staging deployment; the reviewer must still re-probe
@@ -295,20 +307,60 @@ production R2 bucket.
 
 ## 8. Verification evidence already available
 
-The following are fresh local or CI evidence for the source release (not a
-claim that the new remote staging browser gate is complete):
+The following are fresh local, CI, remote-gate and browser evidence for the
+current source release:
+
+- Independent acceptance on 2026-09-01 used `docs/HANDOFF.md` only as an index,
+  then re-read the source, migrations, tests, workflows and deploy scripts. To
+  avoid mixing in the parent task's concurrent frontend rebuild, exact-commit
+  verification ran from a detached `553f7bac` checkout. The generated
+  1,601-path resolution ledger was byte-identical and reported 0 blockers.
+- The independent browser pass reused a disposable authenticated staging
+  owner. It directly observed Lite navigation and reduced settings, Agents/MCP,
+  both Memory pages, the existing two-document KB, DeepSeek V4 Flash, memory
+  recall (`EMBER COMPASS 7319`), image OCR, audio ASR, web/document citations,
+  and the DOCX vertical-merge answer for Q0104. Opening the citation exposed
+  the correct `issue_2634_vertical_merge.docx` source and summary.
+- The manual-Memory race was independently re-read at source and rerun through
+  the exact 994-test frontend suite: one request guard and draft-version
+  ownership tests pass, and staging still contains the single persisted
+  `ORCHID CLOCK 5942` result from the deployed live regression. This pass did
+  not create another remote Memory item, so the previously recorded live
+  timing remains the write-side browser evidence rather than being silently
+  presented as a new write.
+- A disposable local ParadeDB/PostgreSQL instance independently exercised
+  `93|false -> 104|false` with tenant/session/message sentinels, asserted 11
+  new columns and 11 new tables, initialized an empty database to `104|false`,
+  and verified repeated `up` is idempotent. The first harness attempt exposed
+  only a Docker published-port readiness race; waiting for a host SQL handshake
+  made the original scenario green. No application migration was changed.
+- Read-only probes at 2026-09-01 04:29 MST reconfirmed staging `72716632`, app
+  digest `sha256:9c851f...`, frontend digest `sha256:56fc7f...`, DB `104|f`,
+  healthy/running services, restart 0, no OOM, noindex and Paddle Sandbox.
+  Production remained `ea614b...`, DB `93|f`, restart 0/no OOM and Paddle Live.
+- Historical visual blocker and correction: `553f7bac` reproduced a blue
+  auto-tag switch and a separate boxed/top-tab KB layout. `f092dfee` replaced
+  that structure with the shared Musuw settings shell, left navigation,
+  unboxed rows, neutral switch and common footer; local light/dark browser
+  inspection and the deployed `09b1bc0b` Lite-user pass both match Memory and
+  General Settings. The consolidated corrective review reported P0/P1=0.
+- Follow-up, not a deployed-app blocker: a fresh root `npm audit --omit=dev`
+  reports current advisories in the unused root Next/tooling dependency graph.
+  There is no root Next application source and those packages are not part of
+  the app/frontend release images, but the stale unused dependencies should be
+  removed or upgraded in a separate dependency-maintenance change.
 
 - `npm run upgrade:contract` and `npm run upgrade:ledger`: pass; fixed source,
   provenance, representative target capabilities, high-risk Musuw contracts,
   and the complete 1,601-path ledger are accounted for. The ledger-only
-  refresh is commit `72716632`.
+  refresh is commit `09b1bc0b`.
 - `ruby scripts/ci/validate-workflows.rb`, source-manifest checks, production/
   staging static contracts, release simulations, OpenSpec strict validation
   and secret scans: pass.
-- Frontend: latest current-tree `npm test` is 994/994, with 11/11 i18n checks,
-  type-check and production build passing; the corrective Lite/Standard Agent
-  editor suite is 98/98 focused tests. The two additional tests cover
-  concurrent Memory draft creation.
+- Frontend: latest current-tree `npm test` is 1017/1017, with 11/11 i18n
+  checks, type-check and production build passing. The corrective structural
+  visual contracts cover shared shell/navigation/rows/footer, Lite/Standard
+  Agent editor behavior and Memory ownership/concurrent creation.
 - Auth shell: 100/100 tests, type-check and production build pass.
 - Storefront: 63/63 tests and production build pass.
 - Go: full `go test ./...`, `go vet ./...`, native build, CLI/SDK tests/vet/build,
@@ -324,7 +376,8 @@ claim that the new remote staging browser gate is complete):
   the draft controls while it is pending, and applies completion/error UI only
   to the still-owned draft version/content/kind. Focused concurrent-create
   tests, type-check and build pass; independent adversarial review found no
-  blocker. The `72716632` browser regression described in §6.3 passed.
+  blocker. The `72716632` race regression and `09b1bc0b` one-click
+  create/cleanup regression described in §6.3 passed.
 - Remote staging browser evidence for `a965a85...`: a fresh ordinary Viewer
   logged in and exercised a document-only KB with AnyDoc parsing, DOCX/Markdown
   query/citations and automatic tags; Memory full basic/Advanced visibility,
@@ -333,6 +386,20 @@ claim that the new remote staging browser gate is complete):
   surfaces. The Musuw compact UI remained intact. `72716632` received a
   corrective Memory, existing-KB and real-chat smoke rerun rather than
   recreating every accepted fixture.
+- Remote staging browser evidence for `09b1bc0b`: the deployed Basic/Advanced
+  KB editor, workspace/personal Memory, Lite Agent editor and General Settings
+  share the Musuw layout grammar in light and dark modes; Sandbox, Skills and
+  env deep links redirect to General Settings. A fresh DeepSeek V4 Flash answer
+  completed, and a fresh query against the previously accepted AnyDoc corpus
+  returned the expected `ORBITAL SAGE 4826` value with document citation and
+  web results. The earlier image OCR/audio ASR fixtures remain visible and were
+  not re-uploaded for this presentation-focused delta.
+- Local-candidate chat diagnosis: its provider request fails before inference
+  because the isolated local candidate intentionally has no dedicated TEST
+  `OPENROUTER_MANAGEMENT_API_KEY`. This is the strict Musuw tenant-spend guard,
+  not a model-binding or upstream-source regression. Staging uses its own test
+  secret and completed fresh inference; no production/Default Workspace key
+  was copied and the guard was not bypassed.
 - Paddle Sandbox: public config, test token, three products/six recurring
   prices, exact 11-event destination, signed transaction/cancellation
   simulations, portal-session/history API and related tests pass. S11 remains
@@ -357,9 +424,10 @@ claim that the new remote staging browser gate is complete):
 
 ## 9. Acceptance matrix for the fresh reviewer
 
-The remote infrastructure items below retain the exhaustive `a965a85...`
-browser evidence and add the current `72716632` corrective-delta release and
-browser evidence. Paddle Sandbox is only **PARTIAL**. A
+The remote infrastructure items below retain the exhaustive `a965a85...` and
+`72716632` evidence and add the current `09b1bc0b` structural-corrective
+release and browser pass. Functional, infrastructure and visual blockers are
+0; Paddle Sandbox is only **PARTIAL**. A
 reviewer may create disposable staging data and Sandbox entities, but must not
 change production or source code as part of the first pass.
 
@@ -368,17 +436,19 @@ change production or source code as part of the first pass.
 | S1 | Main CI and automatic staging deployment complete for `a965a85...` | `gh run view 33482477646`; `gh run view 33483876914`; final job conclusion and release artifact | **PASS (remote run)** |
 | S2 | Staging exact digest/revision/current pointer, app image newest migration `000104`, DB `104|f`, all services healthy, limits/restarts/OOM okay | Release artifact `musuw-staging-release-a965a85cb6f5e6b5cf212ee7e4f5c10a34570e5c` (app digest `sha256:d5d918c23477658b493fb47206b962c1fe656071e45a613e40865f087b2adbff`, frontend digest `sha256:c61eac6fce5214a5d59ba64e603a930b44f94f18cfb5dc9401ff4b1c3897725e`), remote staging gate output, Compose inspect, DB query, no secrets | **PASS (remote infrastructure audit)** |
 | S3 | Staging HTTPS/TLS/Tunnel/noindex and public Sandbox config | `curl` probes for `/`, `/auth/start`, `/health`, `/api/v1/billing/paddle/public-config`, asset headers; config reports Sandbox only | **PASS (remote infrastructure audit)** |
-| S1-current | Deploy and accept the corrective Memory source (`cd52965f`, deployed ledger `72716632`) on staging | CI `33498204284`; release `33498781725`; immutable digests above; Memory browser rerun | **PASS** |
-| S4 | Lite ordinary-user login and page load | Fresh browser session at `https://staging.musuw.com/auth/start`; no token/cookie/password capture | **PASS (`a965a85...` full Viewer acceptance; `72716632` authenticated corrective smoke)** |
-| S5 | Document KB create/edit/upload/query; no FAQ type; Basic/Advanced Musuw UI; AnyDoc default; auto-tag Advanced | Disposable KB `94dc2ff0-c54b-4a1b-ad9d-bf4f580872ad`; DOCX/Markdown/image/audio fixtures; terminal processing, chunks/citations/tags | **PASS (`a965a85...` full browser; `72716632` existing-KB/two-document smoke)** |
-| S6 | Memory full visibility and role behavior | Personal memory operations and cross-session recall; workspace common controls plus every Advanced field; non-admin read-only; save/reload as Admin; concurrent draft-create regression | **PASS (`a965a85...` full role/browser + `72716632` live race regression + tests)** |
-| S7 | Chat/model/agent behavior | Real question returns an answer; plan-filtered model and reasoning picker; model readiness/usage/quota; new-agent defaults for image/audio/web/tools; persisted agents unchanged | **PASS (`a965a85...` full browser/runtime; `72716632` real model chat smoke)** |
-| S8 | Web retrieval and ordinary attachments | Search query produces expected web result/citation; image OCR and audio ASR show completion or honest provider error; no hidden provider controls | **PASS (`a965a85...` browser; unchanged corrective scope + full CI)** |
-| S9 | Hidden/deferred routes cannot be reached | Lite deep links and direct API attempts for Sandbox, Skills, env vars, shell, artifacts, FAQ, XMind, datasource/provider/password routes return the supported fallback/404; Standard-only code is not exposed | **PASS (`a965a85...` browser/role audit; unchanged corrective scope + full CI)** |
-| S10 | Agent/MCP surfaces and UI quality | Agent cards/reduced editor/chat capsule; smart-agent MCP only if a test service is configured; light/dark desktop/narrow states; no upstream visual style drift | **PASS (`a965a85...` browser + 98 focused UI tests; `72716632` Memory UI visually inspected)** |
+| S1-current | Deploy and accept the structural-corrective source (`f092dfee`, deployed ledger `09b1bc0b`) on staging | CI `33509979358`; release `33510660189`; immutable digests above; restricted production job skipped | **PASS** |
+| S2-current | Current staging exact revision/digests and isolated runtime | Artifact `musuw-staging-release-09b1bc0b544fd0a6c59a4c75166526c8b6554410`; app `sha256:6682abc...`; frontend `sha256:3a021ce...`; run `33510660189` remote gate | **PASS** |
+| S3-current | Current staging public health/noindex/Sandbox boundary | Fresh `/health`, `/`, `/auth/start`, and public billing-config probes; no secret output | **PASS**: health OK, noindex present and Paddle environment is Sandbox; production public config remains Live |
+| S4 | Lite ordinary-user login and page load | Fresh browser session at `https://staging.musuw.com/auth/start`; no token/cookie/password capture | **PASS (`a965a85...` full Viewer acceptance; `72716632` Memory smoke; `09b1bc0b` authenticated corrective pass)** |
+| S5 | Document KB create/edit/upload/query; no FAQ type; Basic/Advanced Musuw UI; AnyDoc default; auto-tag Advanced | Disposable KB `94dc2ff0-c54b-4a1b-ad9d-bf4f580872ad`; DOCX/Markdown/image/audio fixtures; terminal processing, chunks/citations/tags | **PASS**: existing upload/parsing evidence remains valid; on `09b1bc0b` Basic/Advanced uses the shared shell/rows/footer and neutral auto-tag, and a fresh AnyDoc-backed query returned the expected answer with document citation |
+| S6 | Memory full visibility and role behavior | Personal memory operations and cross-session recall; workspace common controls plus every Advanced field; non-admin read-only; save/reload as Admin; concurrent draft-create regression | **PASS**: full role/browser evidence plus `72716632` live race regression, 1017 tests and `09b1bc0b` one-click create/exactly-one/cleanup pass |
+| S7 | Chat/model/agent behavior | Real question returns an answer; plan-filtered model and reasoning picker; model readiness/usage/quota; new-agent defaults for image/audio/web/tools; persisted agents unchanged | **PASS**: persisted test agent still binds DeepSeek V4 Flash; Lite editor is reduced; fresh `09b1bc0b` model inference completed |
+| S8 | Web retrieval and ordinary attachments | Search query produces expected web result/citation; image OCR and audio ASR show completion or honest provider error; no hidden provider controls | **PASS**: a fresh `09b1bc0b` query returned web/document results; prior accepted image OCR/audio ASR results remain present; hidden provider controls stay absent |
+| S9 | Hidden/deferred routes cannot be reached | Lite deep links and direct API attempts for Sandbox, Skills, env vars, shell, artifacts, FAQ, XMind, datasource/provider/password routes return the supported fallback/404; Standard-only code is not exposed | **PASS**: `09b1bc0b` Sandbox/Skills/env settings deep links each redirected to General Settings; full route/API contracts remain green |
+| S10 | Agent/MCP surfaces and UI quality | Agent cards/reduced editor/chat capsule; smart-agent MCP only if a test service is configured; light/dark desktop/narrow states; no upstream visual style drift | **PASS**: `f092dfee` corrective review P0/P1=0; deployed KB, Memory, Agent and General settings reuse the same shell/navigation/row/footer grammar; light/dark browser inspection passed |
 | S11 | Paddle Sandbox lifecycle | Fresh Sandbox identity: success/decline, upgrade, cancel/period end, resume/recovery, signed duplicate/retry/out-of-order/tamper/unknown-price cases, tenant membership, allowance, portal/history; no Live mutation | **PARTIAL**: Sandbox config/catalog/webhook simulations/portal API green; real checkout, upgrade, period-end/recovery, entitlement/allowance and full hosted-portal browser actions remain pending; tenant `10002` stale checkout is a follow-up |
 | S12 | Production preservation after staging | Reprobe production app health/SHA/digests/DB 93|f, Live public config, volumes/R2/tunnel; confirm no production container restart or mutation | **PASS (read-only post-deploy audit; old revision/container start times unchanged, restart 0, Paddle Live)** |
-| S13 | One consolidated post-deploy adversarial review | Independent source/corrective review found no blocker; review S1-S12 and classify reproducible blockers vs observations | **PASS; source/corrective and final remote audits report blockers=0** |
+| S13 | One consolidated post-deploy adversarial review | Independently review S1-S12 and classify reproducible blockers vs observations | **COMPLETE source/corrective review: functional/infrastructure/visual blockers=0; Paddle remains PARTIAL; production unchanged. A fresh no-context handoff reviewer must independently confirm the final staging delta before project close.** |
 
 S11 is intentionally the full gate from `deploy-isolated-staging` tasks 6.2-6.8.
 Dashboard-owned Retain, payment-method eligibility, portal/history settings and
@@ -396,7 +466,7 @@ command is explicitly marked as a staging deployment action.
 git status --short
 git rev-parse HEAD
 git show -s --format='%H %s' HEAD
-git show -s --format='%H %s' cd52965f 72716632
+git show -s --format='%H %s' cd52965f 72716632 f092dfee 09b1bc0b
 ruby scripts/ci/validate-workflows.rb
 npm run upgrade:contract
 npm run upgrade:ledger
@@ -432,16 +502,20 @@ gh run view 33483876914 --json status,conclusion,jobs
 gh run view 33483876892 --json status,conclusion,jobs
 gh run view 33498204284 --json status,conclusion,jobs
 gh run view 33498781725 --json status,conclusion,jobs
+gh run view 33509979358 --json status,conclusion,jobs
+gh run view 33510660189 --json status,conclusion,jobs
 gh run download 33483876914 \
   --name musuw-staging-release-a965a85cb6f5e6b5cf212ee7e4f5c10a34570e5c
 gh run download 33498781725 \
   --name musuw-staging-release-72716632e4ab35b0b18e5db2bf1f0db5df945723
+gh run download 33510660189 \
+  --name musuw-staging-release-09b1bc0b544fd0a6c59a4c75166526c8b6554410
 ```
 
-The `a965a85...` commands preserve the earlier exhaustive browser matrix;
-`72716632` is the current completed corrective release. Use the workflow's
-recorded release artifact and the staging remote gate. Do not run
-`release_mode=promote`.
+The `a965a85...` commands preserve the earlier exhaustive browser matrix and
+`72716632` preserves the Memory corrective evidence. `09b1bc0b` is the current
+completed structural-corrective release. Use the workflow's recorded release
+artifact and staging remote gate. Do not run `release_mode=promote`.
 
 ### Public staging probes
 
@@ -473,9 +547,10 @@ it before making any further change.
 ## 11. Safe reviewer protocol
 
 1. Read this document and the linked runbooks completely.
-2. Independently verify the completed `72716632` staging identity, digest,
-   migration and isolation. The `a965a85...` release preserves the full browser
-   matrix; `72716632` adds the corrective-delta evidence.
+2. Independently verify the completed `09b1bc0b` staging identity, digest,
+   migration and isolation. The `a965a85...` release preserves the exhaustive
+   browser matrix, `72716632` adds the Memory correction and `09b1bc0b` adds the
+   structural settings-UI correction.
 3. Re-exercise S4-S10 as an ordinary Lite user in a browser when a full fresh
    release sign-off is required.
    Do not reveal or record credentials, tokens, cookies, full webhook bodies,
