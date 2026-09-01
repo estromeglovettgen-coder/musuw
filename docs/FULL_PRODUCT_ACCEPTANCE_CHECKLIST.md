@@ -52,7 +52,7 @@
 | Web provider 增量与 web retrieval | `CHAT-018`、`CHAT-021`、`SEARCH-*` | Lite 强制检索但隐藏开关；provider 管理仅管理员/按策略 |
 | 邀请自动接受与 OIDC start | `AUTH-003`、`AUTH-010`、`TEN-005`、`TEN-008` | Standard/外部 Auth 链路 |
 | Sandbox、Skills、Env、Artifacts | `DEFER-*` | consumer 暂缓并三层隐藏 |
-| GitLab、Tencent IMA、XMind | `DS-001`、`DS-002`、`HIDE-002`–`HIDE-004` | 不接入、不暴露 |
+| GitLab、Tencent IMA、XMind | `DS-001`、`DS-002`、`HIDE-002`–`HIDE-004` | Lite 不暴露 XMind/GitLab/IMA；Standard 保留上游 GitLab/IMA connector catalog |
 | MCP/OAuth/approval 增强 | `MCP-*` | 仅兼容的授权角色；普通 Lite 不管理 |
 | turn usage、consumer model/plan policy | `MODEL-005`、`BILL-010`–`BILL-013`、`OPS-005` | 保留 Musuw 套餐、额度和付费语义 |
 
@@ -111,7 +111,7 @@
 - [ ] `SHELL-008` 会话打开、重命名、pin/unpin、复制 ID/link/Markdown、清空、删除。
 - [ ] `SHELL-009` 批量模式、全选/反选/部分选择、批量删除、取消和失败恢复。
 - [ ] `SHELL-010` 自动标题拒绝长答案/Markdown/URL，刷新后安全持久化。
-- [ ] `SHELL-011` 并发手动重命名不被迟到自动标题覆盖；现有 P1 follow-up 必须复现并修复。
+- [ ] `SHELL-011` 并发手动重命名不被迟到自动标题覆盖。`PASS-CONTRACT`：2026-09-01 deferred-model 红灯稳定复现迟到自动标题覆盖；repository 原子 `UpdateTitleIfEmpty` CAS 修复后 service/repository 定向套件通过。候选 staging 真实浏览器竞态待跑后升级为 `PASS-CURRENT`。
 - [ ] `SHELL-012` 文件拖到 chat→附件，拖到 KB→文档，其他页不误接收；遮罩不残留。
 - [ ] `SHELL-013` New User Guide/Spotlight 开始、下一步、跳过、完成、重开。
 - [ ] `SHELL-014` Standard 邀请 bell badge、打开、刷新、空、错、关闭。
@@ -225,7 +225,7 @@
 - [ ] `WIKI-009` Graph node search/help/type chips/fit/arrows/frontier/overview。
 - [ ] `WIKI-010` Obsidian settings reset/animate/physics/theme；node detail/neighbors/bloom。
 - [ ] `WIKI-011` 大图性能、empty/error、亮暗、窄屏、键盘和 tooltip。
-- [ ] `WIKI-012` Viewer 只读；page/folder/revision/fix/delete 服务端权限正确。
+- [ ] `WIKI-012` Viewer 只读；page/folder/revision/fix/delete 服务端权限正确。`PARTIAL`：2026-09-01 隔离 Standard 已证明 Viewer 可读 shared Wiki page、page create 返回 403、禁止页保持 404，且 shared Agent runtime 不注册 Wiki mutation tools；folder/revision/fix/delete 矩阵待跑。
 - [ ] `WIKI-013` Standard KB Graph 设置的 enable/instructions/tags/random-tag/random-text/entities/relations/extract；graph DB disabled、模型未就绪、成功/失败、保存/取消和 Admin 权限。
 
 ### FAQ product gate
@@ -290,10 +290,10 @@
 - [ ] `AGENT-013` starters/followups add/delete/source/count/model/Advanced/result。
 - [ ] `AGENT-014` Tools groups/select-all/read-write/danger/default/real tool calls。
 - [ ] `AGENT-015` 新 Agent 图片/音频/Web Search+Fetch/基础 Tools 默认开；旧 Agent 不被覆盖。
-- [ ] `AGENT-016` share tenant/org/role/unshare/shared detail/disable shared Agent。
+- [ ] `AGENT-016` share tenant/org/role/unshare/shared detail/disable shared Agent。`PARTIAL`：2026-09-01 隔离 Standard 已通过跨租户 organization Viewer share、shared list、真实 Wiki tool call 与 unshare cleanup；shared detail/disable 和其余角色待跑。
 - [ ] `AGENT-017` suggestions get/ensure/event；failure/late/multi-user。
 - [ ] `AGENT-018` timeout/max iterations/tool/model/quota failure 有明确 UI。
-- [ ] `AGENT-019` Lite 新建 Agent 不因无权读取 storage config 而丢默认 system prompt；`7f56f7fa` 已做 conditional prefetch 修复并在当前部署祖先中，仍需 staging 真实 create→reload→chat 回归。
+- [x] `AGENT-019` Lite 新建 Agent 不因无权读取 storage config 而丢默认 system prompt。`PASS-CURRENT`：2026-09-01 staging 新建 `ACC-20260901T1710Z-Agent-Prefetch`，刷新后 11,649 字符 prompt 保持，真实 chat 以 3 次 tool call 返回知识库 marker `ORBITAL SAGE 4826` 与引用，再刷新后 Agent/回答/引用仍保持。
 - [ ] `AGENT-020` Agent card/editor/guide/chat capsule 亮暗/窄屏符合 Musuw。
 
 ## 9. Memory：个人与工作区全部能力
@@ -444,8 +444,8 @@
 - [ ] `MCP-002` Admin+ 可 create/edit/delete/test、写 credentials 和 tool-approval policy；所有 secret 脱敏。
 - [ ] `MCP-003` OAuth start/callback/status/revoke/expiry/cancel/cross-tenant；approval allow/deny/timeout/retry 不能绕权。
 - [ ] `MCP-004` Lite Viewer/Contributor 无管理入口；Lite Admin/SystemAdmin 仅保留 HANDOFF 明确的兼容例外，服务端仍按角色分读写。
-- [ ] `DS-001` XMind、GitLab、Tencent IMA 不对 consumer 显示。`DEFERRED-HIDDEN`
-- [ ] `DS-002` Standard 消费者也必须按 Musuw 决策隐藏 GitLab/IMA；当前 `DataSourceEditorDialog` 仍可能展示，若 staging 可见即为 P1 release blocker，做最小过滤修正后重验。
+- [x] `DS-001` Lite consumer 不显示 XMind、GitLab、Tencent IMA。`PASS-CURRENT`：2026-09-01 staging Lite 的 KB 设置无 Data Source 入口，GitLab/IMA 可见计数均为 0；XMind 不在 consumer 上传/设置表面。深链/API 三层总门禁另见 `HIDE-002`–`HIDE-004`。
+- [x] `DS-002` Standard 保留上游 GitLab/Tencent IMA connector catalog，同时不得回流 Lite。`PASS-CURRENT`：2026-09-01 隔离 Standard 真实 KB 设置展示 Data Source、GitLab 与腾讯 IMA；Lite 对照为 0，consumer-surface 回归测试 2/2 通过。
 - [ ] `DS-003` 其他 datasource connector/credential/resource tree/create/edit/delete。
 - [ ] `DS-004` schedule/incremental/full/overwrite/skip/deletions/sync/pause/resume/logs/retry。
 
@@ -541,9 +541,9 @@
 这些属于 Musuw 产品决策，不是漏合并：
 
 - [ ] `HIDE-001` FAQ 类型及全部消费者入口。
-- [ ] `HIDE-002` XMind outline parsing。
-- [ ] `HIDE-003` GitLab project sync。
-- [ ] `HIDE-004` Tencent IMA KB/note/file sync。
+- [ ] `HIDE-002` XMind outline parsing。`PARTIAL`：Lite 可见表面已复核为隐藏；深链/API 负向待跑。
+- [ ] `HIDE-003` Lite GitLab project sync。`PARTIAL`：Lite KB 设置无 Data Source 入口且 catalog 可见计数为 0；深链/API 负向待跑。Standard catalog 按 OpenSpec 契约保留。
+- [ ] `HIDE-004` Lite Tencent IMA KB/note/file sync。`PARTIAL`：Lite KB 设置无 Data Source 入口且 catalog 可见计数为 0；深链/API 负向待跑。Standard catalog 按 OpenSpec 契约保留。
 - [ ] `HIDE-005` consumer web-search provider/credential 管理；基础 Web Search 仍可用。
 - [ ] `HIDE-006` consumer model provider/embedding/vector/parser/storage 基础设施管理。
 - [ ] `HIDE-007` consumer Sandbox/Skills/Env/shell/files/generated artifacts。
@@ -598,4 +598,7 @@
 
 | 时间 | 执行者/任务 | 环境/SHA | 角色 | 条目 | 状态 | 证据 | 缺陷/处理 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 待填写 | 待填写 | staging / `8e1c69c1` | 待填写 | 待填写 | NOT-RUN | 待填写 | 待填写 |
+| 2026-09-01 17:10–17:15 UTC | full-product acceptance | staging / `8e1c69c1` | Lite ordinary user | `AGENT-019` | PASS-CURRENT | create→reload→chat→reload；11,649 字符 prompt、3 tool calls、`ORBITAL SAGE 4826` 与引用保持 | 无 blocker；ACC Agent 待全局清理阶段统一处理 |
+| 2026-09-01 17:15–17:35 UTC | full-product acceptance | isolated Standard / `81142df` candidate | Owner + cross-tenant Viewer | `AGENT-016`、`WIKI-012` | PARTIAL | org Viewer share、Viewer page read 200/write 403/absent 404、shared Agent 真实只读 tool call、全资源 cleanup 200 | 缺失 OpenRouter Secret 权限导致首次失败；按 Docker Secret 0444 契约临时注入后通过，随后删除并恢复健康；剩余角色/动作待跑 |
+| 2026-09-01 17:35–17:45 UTC | full-product acceptance | staging Lite `8e1c69c1` + isolated Standard `81142df` candidate | Lite ordinary user + Standard Owner | `DS-001`、`DS-002`、`HIDE-002`–`HIDE-004` | PASS-CURRENT / PARTIAL | Standard Data Source/GitLab/IMA 可见；Lite 三项计数 0；consumer-surface test 2/2；截图 evidence | 修正文档中的陈旧 Standard-hide 契约；临时 KB/tenant 删除 200，账号匿名化，token=0 |
+| 2026-09-01 17:45–17:50 UTC | full-product acceptance | local candidate / branch worktree | service/repository | `SHELL-011` | PASS-CONTRACT | deferred model race 红灯；atomic empty-title CAS；targeted Go service/repository green | 根因是旧空标题快照的无条件 update；候选 staging 浏览器竞态待跑 |

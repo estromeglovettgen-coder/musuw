@@ -892,14 +892,38 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 	if title == "" {
 		return "", stderrors.New("generated session title is empty")
 	}
-	session.Title = title
-
-	// Update session with new title
-	_, err = s.sessionRepo.Update(ctx, session, session.UserID)
+	// Commit the generated candidate only if the persisted title is still empty.
+	// A manual rename (or another generator) may have completed while Chat was
+	// in flight, so an unconditional Update here would overwrite the winner.
+	updated, err := s.sessionRepo.UpdateTitleIfEmpty(
+		ctx,
+		session.TenantID,
+		session.UserID,
+		session.ID,
+		title,
+	)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, nil)
 		return "", err
 	}
+	if updated == 0 {
+		persisted, getErr := s.sessionRepo.Get(
+			ctx,
+			session.TenantID,
+			session.UserID,
+			session.ID,
+		)
+		if getErr != nil {
+			logger.ErrorWithFields(ctx, getErr, nil)
+			return "", getErr
+		}
+		if persisted.Title == "" {
+			return "", stderrors.New("session title was not updated")
+		}
+		session.Title = persisted.Title
+		return session.Title, nil
+	}
+	session.Title = title
 
 	return session.Title, nil
 }

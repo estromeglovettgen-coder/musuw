@@ -89,6 +89,10 @@ type SessionRepository interface {
 	QueryPaged(ctx context.Context, q *types.SessionListQuery) ([]*types.SessionListItem, int64, error)
 	// Update updates a session visible to the tenant/user scope.
 	Update(ctx context.Context, session *types.Session, userID string) (int64, error)
+	// UpdateTitleIfEmpty atomically writes an automatically generated title only
+	// while the persisted title is still empty. A zero row count means another
+	// writer (for example a manual rename) won the race or the row is out of scope.
+	UpdateTitleIfEmpty(ctx context.Context, tenantID uint64, userID string, sessionID string, title string) (int64, error)
 	// SetOwnerID assigns sessions.user_id for a tenant-scoped row.
 	SetOwnerID(ctx context.Context, tenantID uint64, id, ownerID string) (int64, error)
 	// UpdateLastRequestState persists the most recent input-bar state for a

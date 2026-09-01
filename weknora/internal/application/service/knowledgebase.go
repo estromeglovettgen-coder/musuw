@@ -16,6 +16,7 @@ import (
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/storageallowlist"
+	"github.com/Tencent/WeKnora/internal/storageurl"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -1481,26 +1482,24 @@ func (s *knowledgeBaseService) processKBDeleteStrict(
 	// Delete physical files and extracted images before chunks. Keeping chunk
 	// metadata until these calls succeed makes retries safe even for local file
 	// drivers that do not expose an object-exists probe.
-	if s.fileSvc == nil {
-		for _, knowledge := range knowledgeList {
-			if knowledge != nil && strings.TrimSpace(knowledge.FilePath) != "" {
-				return errors.New("strict KB delete file service is unavailable")
-			}
-		}
-		if len(imageURLs) > 0 {
-			return errors.New("strict KB delete file service is unavailable")
-		}
-	}
 	for _, knowledge := range knowledgeList {
 		if knowledge == nil || strings.TrimSpace(knowledge.FilePath) == "" {
 			continue
 		}
-		if err := deleteFileIdempotent(ctx, s.fileSvc, knowledge.FilePath); err != nil {
+		fileSvc, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, knowledge.FilePath)
+		if err != nil {
+			return fmt.Errorf("resolve source file for strict KB delete: %w", err)
+		}
+		if err := deleteFileIdempotent(ctx, fileSvc, knowledge.FilePath); err != nil {
 			return fmt.Errorf("delete source file for strict KB delete: %w", err)
 		}
 	}
 	for _, imageURL := range imageURLs {
-		if err := deleteFileIdempotent(ctx, s.fileSvc, imageURL); err != nil {
+		fileSvc, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, imageURL)
+		if err != nil {
+			return fmt.Errorf("resolve extracted image for strict KB delete: %w", err)
+		}
+		if err := deleteFileIdempotent(ctx, fileSvc, imageURL); err != nil {
 			return fmt.Errorf("delete extracted image for strict KB delete: %w", err)
 		}
 	}
@@ -1569,6 +1568,53 @@ func collectImageURLsStrict(imageInfos []string) ([]string, error) {
 		}
 	}
 	return urls, nil
+}
+
+// resolveFileServiceForPersistedPath routes a backend-scoped path through the
+// concrete storage instance encoded in that path. The process-wide file
+// service only understands provider:// paths; passing
+// storage://<backend-id>/provider://... directly to it either fails (as S3
+// does) or risks selecting a different instance of the same provider.
+func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
+	ctx context.Context,
+	tenantID uint64,
+	path string,
+) (interfaces.FileService, error) {
+	backendID, inner, scoped := types.ParseStorageBackendPath(path)
+	if !scoped {
+		if s.fileSvc == nil {
+			return nil, errors.New("file service is unavailable")
+		}
+		return s.fileSvc, nil
+	}
+	if s.storageResolver == nil {
+		return nil, errors.New("storage backend resolver is unavailable")
+	}
+	tenant, _ := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
+	if tenant == nil || tenant.ID != tenantID {
+		if s.tenantRepo == nil {
+			return nil, errors.New("tenant repository is unavailable for storage cleanup")
+		}
+		var err error
+		tenant, err = s.tenantRepo.GetTenantByID(ctx, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("load storage cleanup tenant: %w", err)
+		}
+	}
+	fileSvc, _, err := s.storageResolver.ResolveFileService(
+		ctx,
+		tenant,
+		backendID,
+		types.ParseProviderScheme(inner),
+		storageurl.LocalStorageBaseDir(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("resolve storage backend %s: %w", backendID, err)
+	}
+	if fileSvc == nil {
+		return nil, fmt.Errorf("resolve storage backend %s: file service is unavailable", backendID)
+	}
+	return fileSvc, nil
 }
 
 // deleteFileIdempotent treats an object that is already gone as success. This

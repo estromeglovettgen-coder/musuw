@@ -12,7 +12,8 @@ import (
 )
 
 type generatedTitleChatModel struct {
-	response string
+	response     string
+	beforeReturn func()
 }
 
 func (m *generatedTitleChatModel) Chat(
@@ -20,6 +21,9 @@ func (m *generatedTitleChatModel) Chat(
 	[]chat.Message,
 	*chat.ChatOptions,
 ) (*types.ChatResponse, error) {
+	if m.beforeReturn != nil {
+		m.beforeReturn()
+	}
 	return &types.ChatResponse{Content: m.response}, nil
 }
 
@@ -45,7 +49,8 @@ func (s *generatedTitleModelService) GetChatModel(context.Context, string) (chat
 
 type generatedTitleSessionRepository struct {
 	interfaces.SessionRepository
-	updated *types.Session
+	updated      *types.Session
+	currentTitle string
 }
 
 func (r *generatedTitleSessionRepository) Update(
@@ -55,7 +60,32 @@ func (r *generatedTitleSessionRepository) Update(
 ) (int64, error) {
 	copy := *session
 	r.updated = &copy
+	r.currentTitle = session.Title
 	return 1, nil
+}
+
+func (r *generatedTitleSessionRepository) UpdateTitleIfEmpty(
+	_ context.Context,
+	_ uint64,
+	_ string,
+	_ string,
+	title string,
+) (int64, error) {
+	if r.currentTitle != "" {
+		return 0, nil
+	}
+	r.currentTitle = title
+	r.updated = &types.Session{Title: title}
+	return 1, nil
+}
+
+func (r *generatedTitleSessionRepository) Get(
+	_ context.Context,
+	_ uint64,
+	_ string,
+	_ string,
+) (*types.Session, error) {
+	return &types.Session{Title: r.currentTitle}, nil
 }
 
 func TestGenerateTitleFallsBackWhenModelAnswersWithCitation(t *testing.T) {
@@ -89,6 +119,42 @@ func TestGenerateTitleFallsBackWhenModelAnswersWithCitation(t *testing.T) {
 	}
 	if repo.updated == nil || repo.updated.Title != want {
 		t.Fatalf("persisted title = %#v, want %q", repo.updated, want)
+	}
+}
+
+func TestGenerateTitleDoesNotOverwriteManualRenameThatWinsDuringModelCall(t *testing.T) {
+	t.Parallel()
+
+	const manualTitle = "Manual title wins"
+	repo := &generatedTitleSessionRepository{}
+	svc := &sessionService{
+		cfg: &config.Config{Conversation: &config.ConversationConfig{
+			GenerateSessionTitlePrompt: "Return only a short title.",
+		}},
+		sessionRepo: repo,
+		modelService: &generatedTitleModelService{model: &generatedTitleChatModel{
+			response: "Late generated title",
+			beforeReturn: func() {
+				// Deterministically model the manual rename that completes while the
+				// title model request is still in flight.
+				repo.currentTitle = manualTitle
+			},
+		}},
+	}
+	session := &types.Session{ID: "session-race", TenantID: 7, UserID: "user-1"}
+
+	title, err := svc.GenerateTitle(context.Background(), session, []types.Message{{
+		Role:    "user",
+		Content: "Give this chat an automatic title",
+	}}, "model-1")
+	if err != nil {
+		t.Fatalf("GenerateTitle() error = %v", err)
+	}
+	if title != manualTitle {
+		t.Fatalf("GenerateTitle() = %q, want concurrent manual title %q", title, manualTitle)
+	}
+	if repo.currentTitle != manualTitle {
+		t.Fatalf("persisted title = %q, want concurrent manual title %q", repo.currentTitle, manualTitle)
 	}
 }
 
