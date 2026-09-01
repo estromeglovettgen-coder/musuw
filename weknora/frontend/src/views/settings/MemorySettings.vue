@@ -76,7 +76,7 @@
             destroy-on-close
             overlay-class-name="memory-add-popup-overlay"
           >
-            <t-button size="small" variant="text" :disabled="!canWrite">
+            <t-button size="small" variant="text" :disabled="!canWrite || creating">
               <template #icon><t-icon name="add" /></template>
               {{ t('memorySettings.add') }}
             </t-button>
@@ -88,6 +88,7 @@
                   <t-select
                     v-model="draftKind"
                     size="small"
+                    :disabled="creating"
                     :popup-props="{ overlayClassName: 'memory-add-kind-popup' }"
                   >
                     <t-option v-for="kind in kinds" :key="kind" :value="kind" :label="kindLabel(kind)" />
@@ -98,16 +99,23 @@
                   <span class="add-label">{{ t('memorySettings.addContentLabel') }}</span>
                   <t-textarea
                     v-model="draftContent"
+                    :disabled="creating"
                     :placeholder="t('memorySettings.addPlaceholder')"
                     :maxlength="300"
                     :autosize="{ minRows: 3, maxRows: 6 }"
                   />
                 </label>
                 <div class="add-popup-footer">
-                  <t-button size="small" variant="outline" @click="addVisible = false">
+                  <t-button size="small" variant="outline" :disabled="creating" @click="addVisible = false">
                     {{ t('common.cancel') }}
                   </t-button>
-                  <t-button size="small" theme="primary" :disabled="!draftContent.trim()" @click="handleCreate">
+                  <t-button
+                    size="small"
+                    theme="primary"
+                    :loading="creating"
+                    :disabled="creating || !draftContent.trim()"
+                    @click="handleCreate"
+                  >
                     {{ t('memorySettings.add') }}
                   </t-button>
                 </div>
@@ -411,6 +419,8 @@ const pageSize = 20
 const draftKind = ref<MemoryKind>('fact')
 const draftContent = ref('')
 const addVisible = ref(false)
+const creating = ref(false)
+const addDraftVersion = ref(0)
 const editingId = ref('')
 const editingContent = ref('')
 const editingImportance = ref(3)
@@ -738,22 +748,39 @@ const handleEnabledChange = async (value: boolean) => {
 }
 
 watch(addVisible, (visible) => {
-  if (visible) draftContent.value = ''
+  if (visible) {
+    addDraftVersion.value += 1
+    draftContent.value = ''
+  }
 })
 
 const handleCreate = async () => {
+  if (creating.value) return
   const content = draftContent.value.trim()
   if (!content) return
+  const draftVersion = addDraftVersion.value
+  const kind = draftKind.value
+  creating.value = true
   try {
-    await createMemoryItem({ kind: draftKind.value, content })
-    draftContent.value = ''
-    addVisible.value = false
-    tab.value = 'active'
-    await reload()
-    await loadSettings()
-    MessagePlugin.success(t('memorySettings.toasts.added'))
+    await createMemoryItem({ kind, content })
+    const ownsSubmittedDraft =
+      draftVersion === addDraftVersion.value &&
+      draftContent.value.trim() === content &&
+      draftKind.value === kind
+    if (ownsSubmittedDraft) {
+      draftContent.value = ''
+      addVisible.value = false
+      tab.value = 'active'
+      await reload()
+      await loadSettings()
+      MessagePlugin.success(t('memorySettings.toasts.added'))
+    }
   } catch (error: any) {
-    MessagePlugin.error(t('memorySettings.toasts.saveFailed', { message: error?.message || '' }))
+    if (draftVersion === addDraftVersion.value && draftContent.value.trim() === content && draftKind.value === kind) {
+      MessagePlugin.error(t('memorySettings.toasts.saveFailed', { message: error?.message || '' }))
+    }
+  } finally {
+    creating.value = false
   }
 }
 
