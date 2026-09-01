@@ -92,7 +92,9 @@ type SessionRepository interface {
 	// UpdateTitleIfEmpty atomically writes an automatically generated title only
 	// while the persisted title is still empty. A zero row count means another
 	// writer (for example a manual rename) won the race or the row is out of scope.
-	UpdateTitleIfEmpty(ctx context.Context, tenantID uint64, userID string, sessionID string, title string) (int64, error)
+	UpdateTitleIfEmpty(
+		ctx context.Context, tenantID uint64, userID string, sessionID string, title string,
+	) (int64, error)
 	// SetOwnerID assigns sessions.user_id for a tenant-scoped row.
 	SetOwnerID(ctx context.Context, tenantID uint64, id, ownerID string) (int64, error)
 	// UpdateLastRequestState persists the most recent input-bar state for a
