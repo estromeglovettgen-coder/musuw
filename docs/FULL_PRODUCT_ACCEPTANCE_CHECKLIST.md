@@ -479,13 +479,13 @@
 - [ ] `OPS-005` consumer free/paid model policies 保存后 runtime 生效。
 - [ ] `OPS-006` Platform API key capability groups/token copy/list/delete/hidden chips。
 - [ ] `OPS-007` Audit refresh/infinite scroll/detail/empty/error/redaction。
-- [ ] `OPS-008` Queues auto-refresh/pool/model stats、active/pending/scheduled/retry/archived/completed。
-- [ ] `OPS-009` task detail/load-more/purge/cancel/run-now/delete、confirm/concurrency/unavailable queue。
+- [ ] `OPS-008` Queues auto-refresh/pool/model stats、active/pending/scheduled/retry/archived/completed。`PARTIAL`：isolated Standard 的 12 个真实队列、worker pools、model empty state、auto-refresh toggle 和 retry 计数已通过；其余状态待补。
+- [ ] `OPS-009` task detail/load-more/purge/cancel/run-now/delete、confirm/concurrency/unavailable queue。`PARTIAL`：真实 retry task 的 detail/run-now confirm 与 CSRF 请求已通过；其余动作待补。
 - [ ] `OPS-010` Lite inline executor 无 dead queue UI；document/Memory/billing 下游仍完成。
 - [ ] `OPS-011` managed entitlement/complimentary/default quota/OpenRouter provision+refresh/wrong tenant。
 - [ ] `OPS-012` user investigation/account erasure/status/retry/paid/shared/audit。
 - [ ] `OPS-013` System info/version/capabilities/parser/storage/sandbox checks 与部署一致。
-- [ ] `OPS-014` operations console overview/users/KB/billing/identity/storage/logs/queue/audit、CSP/X-frame/Axe。
+- [x] `OPS-014` operations console overview/users/KB/billing/identity/storage/logs/queue/audit、CSP/X-frame/Axe。`PASS-CURRENT`：isolated Standard real-data Playwright 3/3；七页 Axe serious/critical=0；CSP、X-Frame、redaction 和跨边界拒绝均通过。
 - [ ] `EVAL-001` Evaluation API：API-key `run_evaluations` capability、Admin POST 异步任务、Viewer GET 结果、tenant isolation/not-found/cost/quota/failure，Lite 负向拒绝；无独立页面时不得伪造 UI PASS。
 
 ## 17. Migration、queue、R2、恢复和数据完整性
@@ -602,3 +602,4 @@
 | 2026-09-01 17:15–17:35 UTC | full-product acceptance | isolated Standard / `81142df` candidate | Owner + cross-tenant Viewer | `AGENT-016`、`WIKI-012` | PARTIAL | org Viewer share、Viewer page read 200/write 403/absent 404、shared Agent 真实只读 tool call、全资源 cleanup 200 | 缺失 OpenRouter Secret 权限导致首次失败；按 Docker Secret 0444 契约临时注入后通过，随后删除并恢复健康；剩余角色/动作待跑 |
 | 2026-09-01 17:35–17:45 UTC | full-product acceptance | staging Lite `8e1c69c1` + isolated Standard `81142df` candidate | Lite ordinary user + Standard Owner | `DS-001`、`DS-002`、`HIDE-002`–`HIDE-004` | PASS-CURRENT / PARTIAL | Standard Data Source/GitLab/IMA 可见；Lite 三项计数 0；consumer-surface test 2/2；截图 evidence | 修正文档中的陈旧 Standard-hide 契约；临时 KB/tenant 删除 200，账号匿名化，token=0 |
 | 2026-09-01 17:45–17:50 UTC | full-product acceptance | local candidate / branch worktree | service/repository | `SHELL-011` | PASS-CONTRACT | deferred model race 红灯；atomic empty-title CAS；targeted Go service/repository green | 根因是旧空标题快照的无条件 update；候选 staging 浏览器竞态待跑 |
+| 2026-09-01 18:20–18:26 UTC | full-product acceptance | isolated Standard / current branch | operations console | `OPS-008`、`OPS-009`、`OPS-014` | PARTIAL / PASS-CURRENT | real-data workflow、guarded run-now/CSRF、security/redaction、七页 Axe；Playwright 3/3；frontend 1017/1017 | 修复 Storage 横向滚动键盘可达性及 Runtime Queues 低对比文字/状态；测试改为从真实 runtime 选择可 run-now task，移除 archived fixture 假设 |

@@ -127,8 +127,34 @@ test('operator workflow uses real data and guarded actions', async ({ page }) =>
   await expect(autoRefresh).toHaveAttribute('aria-checked', 'false')
   await autoRefresh.press('Space')
   await expect(autoRefresh).toHaveAttribute('aria-checked', 'true')
-  await expect(page.getByRole('status')).toContainText(/\d+ 个任务待处理/)
-  await page.getByRole('button', { name: /查看.+中 \d+ 个最终失败任务/ }).first().click()
+
+  const runtimeResponse = await page.request.get('/api/v1/system/admin/runtime/queues')
+  expect(runtimeResponse.status()).toBe(200)
+  const runtime = await runtimeResponse.json() as {
+    queues: Array<Record<'name' | 'retry' | 'archived' | 'scheduled', string | number>>
+  }
+  const actionableStates = ['retry', 'archived', 'scheduled'] as const
+  let actionable: { queueIndex: number; state: typeof actionableStates[number] } | null = null
+  for (const [queueIndex, queue] of runtime.queues.entries()) {
+    for (const state of actionableStates) {
+      if (Number(queue[state]) < 1) continue
+      const tasksResponse = await page.request.get(
+        `/api/v1/system/admin/runtime/queues/${encodeURIComponent(String(queue.name))}/tasks?state=${state}&page_size=20`,
+      )
+      expect(tasksResponse.status()).toBe(200)
+      const taskPage = await tasksResponse.json() as { tasks: Array<{ allowed_actions: string[] }> }
+      if (taskPage.tasks.some((task) => task.allowed_actions.includes('run_now'))) {
+        actionable = { queueIndex, state }
+        break
+      }
+    }
+    if (actionable) break
+  }
+  expect(actionable, 'isolated TEST runtime must expose a real task that supports run_now').not.toBeNull()
+  if (!actionable) throw new Error('no actionable TEST runtime task')
+  const taskStateColumn = { retry: 3, archived: 4, scheduled: 2 } as const
+  const runtimeRow = page.locator('.rq-table-shell').first().locator('tbody tr').nth(actionable.queueIndex)
+  await runtimeRow.locator('td').nth(taskStateColumn[actionable.state]).getByRole('button').click()
   await page.getByRole('button', { name: '立即执行', exact: true }).first().click()
   await expect(page.getByText('该任务将立即进入待执行队列，重试次数不会重置。确认继续？')).toBeVisible()
   await page.getByRole('button', { name: '确定', exact: true }).click()

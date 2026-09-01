@@ -30,7 +30,7 @@
             <div><dt>官方对象数</dt><dd>{{ data.provider.total }}</dd></div><div><dt>当前清单大小</dt><dd>{{ formatBytes(data.provider.total_bytes) }}</dd></div>
             <div><dt>Bucket</dt><dd class="ops-mono">{{ data.provider.bucket }}</dd></div><div><dt>Prefix</dt><dd class="ops-mono">{{ data.provider.prefix || '—' }}</dd></div>
           </dl>
-          <t-table v-if="data.provider.objects.length" class="r2-objects" row-key="key" :data="data.provider.objects" :columns="r2Columns" size="small" hover>
+          <t-table v-if="data.provider.objects.length" v-accessible-scroll="'Cloudflare R2 对象清单'" class="r2-objects" row-key="key" :data="data.provider.objects" :columns="r2Columns" size="small" hover>
             <template #key="{ row }"><span class="ops-mono r2-object-key" :title="row.key">{{ row.key }}</span></template>
             <template #size="{ row }"><strong>{{ formatBytes(row.size) }}</strong></template>
             <template #last_modified="{ row }"><span class="ops-muted">{{ formatDate(row.last_modified) }}</span></template>
@@ -58,7 +58,7 @@
         <div class="ops-toolbar__right"><span class="ops-muted">{{ data.total }} 个对象引用</span></div>
       </div>
       <div class="ops-table-panel">
-        <t-table v-if="data.rows.length" row-key="id" :data="data.rows" :columns="columns" :loading="loading" hover @row-click="handleObjectClick">
+        <t-table v-if="data.rows.length" v-accessible-scroll="'Musuw 存储对象引用'" row-key="id" :data="data.rows" :columns="columns" :loading="loading" hover @row-click="handleObjectClick">
           <template #file="{ row }"><div class="ops-cell-primary"><strong>{{ row.file_name || row.title || '未命名' }}</strong><span class="ops-mono">{{ row.id }}</span></div></template>
           <template #workspace="{ row }"><div class="ops-cell-primary"><strong>{{ row.tenant_name }}</strong><span>#{{ row.tenant_id }} · {{ row.knowledge_base_name }}</span></div></template>
           <template #source_size="{ row }"><strong>{{ formatBytes(row.source_bytes) }}</strong></template>
@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import type { Directive } from 'vue'
 import { ChartBubbleIcon, CheckCircleIcon, CloudIcon, DataBaseIcon, FileIcon, FileSearchIcon, InfoCircleIcon, LinkIcon, SearchIcon, ServerIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
 import { formatBytes, formatDate, statusTone } from '../format'
@@ -96,6 +97,17 @@ const props = defineProps<{ config: OperationsConfig | null; refreshKey: number 
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const data = ref<StorageData | null>(null), loading = ref(false), error = ref(''), search = ref(''), page = ref(1), pageSize = 25
 const selected = ref<StorageObjectRow | null>(null), drawerVisible = ref(false)
+function exposeScrollableTable(element: HTMLElement, label: string) {
+  const content = element.querySelector<HTMLElement>('.t-table__content')
+  if (!content) return
+  content.tabIndex = 0
+  content.setAttribute('role', 'region')
+  content.setAttribute('aria-label', label)
+}
+const vAccessibleScroll: Directive<HTMLElement, string> = {
+  mounted: (element, binding) => exposeScrollableTable(element, binding.value),
+  updated: (element, binding) => exposeScrollableTable(element, binding.value),
+}
 const columns = [
   { colKey: 'file', title: '文件', minWidth: 230 }, { colKey: 'workspace', title: '空间 / 知识库', minWidth: 190 },
   { colKey: 'source_size', title: '原文件', width: 100 }, { colKey: 'index_size', title: '索引计量', width: 100 }, { colKey: 'quota', title: '空间计量 / 配额', width: 140 },
@@ -126,5 +138,6 @@ onMounted(load); watch(() => props.refreshKey, load)
 .r2-summary { margin-bottom: 14px; }
 .r2-objects { border-top: 1px solid #e4e8ee; }
 .r2-object-key { display: block; max-width: 620px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r2-objects :deep(.t-table__content:focus-visible), .ops-table-panel :deep(.t-table__content:focus-visible) { outline: 2px solid #4d64d9; outline-offset: -2px; }
 .ops-definition .wide { grid-column: 1 / -1; }
 </style>

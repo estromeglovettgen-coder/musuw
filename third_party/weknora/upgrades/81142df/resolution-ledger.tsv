@@ -352,7 +352,7 @@ frontend/src/operations/pages/KnowledgePage.vue	A	-	100644	ab6d02fbd1b113e28a0b5
 frontend/src/operations/pages/LogsPage.vue	A	-	100644	0c6c3a93bd4bfc2d25d870d0356d9a6d90d565df	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/operations/pages/ModelsPolicyPage.vue	A	-	100644	8c1faf5b8879a56e1bde3282b2a783567f535fdb	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/operations/pages/OverviewPage.vue	A	-	100644	2502e54fd9e3568ab9d364a8b96eb4d2404af904	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/operations/pages/StoragePage.vue	A	-	100644	642c98c34d1925e96d41e1f842ebe426150d7129	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/operations/pages/StoragePage.vue	A	-	100644	dbc4de32dce724c40abd16ee51bf57a892d6c866	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/operations/pages/UsersPage.vue	A	-	100644	3b6e46ccbd76c505889aab6469680c038a652ac0	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/operations/types.ts	A	-	100644	67b38e29475fa987fd612d8e6398585fc0beeeaa	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/router/index.test.mjs	A	-	100644	01d5637d015e25ef742dfa4ccb8613a2d205ea20	preserve-musuw-exact		audited local-only content is byte-identical
@@ -583,7 +583,7 @@ frontend/src/views/settings/settingsNavigation.test.ts	A	-	100644	f3c7ce941b0ee7
 frontend/src/views/settings/settingsNavigation.ts	A	-	100644	0c71b7bdfb12658fc518a39b765f89bb35f1eed9	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/settingsPageHeader.test.mjs	A	-	100644	694ab118c7d72a0011283927e8060e6e358bf769	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/system/PlatformAPIKeys.vue	-	M	100644	0100e59d558fe996df239ee51dfa0cf6b2770522	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/views/system/RuntimeQueues.vue	M	-	100644	c758b7111efc739c96f41a0ff34395ab76e32661	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/views/system/RuntimeQueues.vue	M	-	100644	74819e864d5e5f2cc9a4b1c0e2c67be16bdba5e0	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/system/SystemSettings.consumerScene.test.mjs	A	-	100644	9d7e2bea5a258e3bbc342a5f169c8f326d1d8725	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/system/SystemSettings.vue	M	-	100644	9d1813997454812b09c0fe41846000a09e2537d9	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/tsconfig.app.json	M	-	100644	ed77fdee8aefcf6e5ee29cb7945eb3f291b20d18	preserve-musuw-exact		audited local-only content is byte-identical
