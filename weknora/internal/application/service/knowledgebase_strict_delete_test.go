@@ -173,6 +173,18 @@ func (r *strictDeleteStorageResolver) ResolveFileService(
 	return r.svc, provider, nil
 }
 
+type strictDeleteResourceCatalog struct {
+	interfaces.ResourceCatalog
+	resource *types.StoredResource
+	err      error
+	calls    []string
+}
+
+func (c *strictDeleteResourceCatalog) Resolve(_ context.Context, reference string) (*types.StoredResource, error) {
+	c.calls = append(c.calls, reference)
+	return c.resource, c.err
+}
+
 type strictDeleteTaskPendingRepo struct {
 	interfaces.TaskPendingOpsRepository
 	err error
@@ -397,6 +409,92 @@ func TestProcessKBDeleteStrictResolvesPersistedBackendScopedSourcePath(t *testin
 	assert.Empty(t, defaultSvc.calls)
 	assert.Equal(t, []string{innerPath}, resolvedInner.calls)
 	assert.Equal(t, 1, knowledgeRepo.deleteCall)
+}
+
+func TestProcessKBDeleteStrictResolvesCatalogBackedSourcePath(t *testing.T) {
+	const (
+		resourceRef = "resource://y16XEhoTvy07RNTh7QUIfw"
+		backendID   = "e4596357-c110-4ce9-8481-e1221cfde92d"
+		innerPath   = "s3://musuw-staging/weknora/10002/knowledge/document.md"
+	)
+	knowledge := strictDeleteKnowledge()
+	knowledge.FilePath = resourceRef
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{knowledge}}
+	defaultSvc := &strictDeleteFileService{err: errors.New("default storage must not receive a catalog reference")}
+	resolvedInner := &strictDeleteFileService{}
+	resolver := &strictDeleteStorageResolver{svc: resolvedInner}
+	catalog := &strictDeleteResourceCatalog{resource: &types.StoredResource{
+		Handle:           "y16XEhoTvy07RNTh7QUIfw",
+		TenantID:         1,
+		StorageBackendID: backendID,
+		Provider:         "s3",
+		PhysicalPath:     "storage://" + backendID + "/" + innerPath,
+	}}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.fileSvc = defaultSvc
+	svc.tenantRepo = strictDeleteTenantRepo{tenant: &types.Tenant{ID: 1}}
+	svc.storageResolver = resolver
+	svc.resourceCatalog = catalog
+
+	require.NoError(t, svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, true)))
+	assert.Equal(t, []string{resourceRef}, catalog.calls)
+	assert.Equal(t, 1, resolver.resolveCallCount)
+	assert.Equal(t, backendID, resolver.backendID)
+	assert.Equal(t, "s3", resolver.provider)
+	assert.Empty(t, defaultSvc.calls)
+	assert.Equal(t, []string{innerPath}, resolvedInner.calls)
+	assert.Equal(t, 1, knowledgeRepo.deleteCall)
+}
+
+func TestResolveFileServiceForPersistedPathRejectsCatalogScopeMismatch(t *testing.T) {
+	const (
+		resourceRef = "resource://y16XEhoTvy07RNTh7QUIfw"
+		backendID   = "e4596357-c110-4ce9-8481-e1221cfde92d"
+		innerPath   = "s3://musuw-staging/weknora/1/knowledge/document.md"
+	)
+	tests := []struct {
+		name     string
+		resource *types.StoredResource
+		want     string
+	}{
+		{
+			name: "tenant mismatch",
+			resource: &types.StoredResource{
+				TenantID: 2, PhysicalPath: "storage://" + backendID + "/" + innerPath,
+			},
+			want: "tenant mismatch",
+		},
+		{
+			name: "backend mismatch",
+			resource: &types.StoredResource{
+				TenantID: 1, StorageBackendID: "another-backend",
+				Provider: "s3", PhysicalPath: "storage://" + backendID + "/" + innerPath,
+			},
+			want: "storage backend mismatch",
+		},
+		{
+			name: "provider mismatch",
+			resource: &types.StoredResource{
+				TenantID: 1, StorageBackendID: backendID,
+				Provider: "local", PhysicalPath: "storage://" + backendID + "/" + innerPath,
+			},
+			want: "storage provider mismatch",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resolver := &strictDeleteStorageResolver{svc: &strictDeleteFileService{}}
+			svc := strictDeleteService(&strictDeleteKnowledgeRepo{}, &strictDeleteEngine{})
+			svc.resourceCatalog = &strictDeleteResourceCatalog{resource: test.resource}
+			svc.storageResolver = resolver
+
+			_, _, err := svc.resolveFileServiceForPersistedPath(context.Background(), 1, resourceRef)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), test.want)
+			assert.Zero(t, resolver.resolveCallCount)
+		})
+	}
 }
 
 func TestProcessKBDeleteNonStrictRetainsRowsWhenVectorCleanupFails(t *testing.T) {

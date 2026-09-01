@@ -1572,19 +1572,66 @@ func collectImageURLsStrict(imageInfos []string) ([]string, error) {
 
 // resolveFileServiceForPersistedPath returns both the concrete storage
 // instance encoded in a persisted path and the provider path that instance
-// must receive. Callers cannot assume every resolver decorates the returned
-// service with backend-scoped-path unwrapping.
+// must receive. Catalog handles need resolving before backend selection:
+// resource:// records deliberately hide their physical storage:// path.
+// Strict account erasure leaves the catalog row intact until the final tenant
+// purge so a retry can still resolve an object deleted by an earlier attempt.
 func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
 	ctx context.Context,
 	tenantID uint64,
 	path string,
 ) (interfaces.FileService, string, error) {
-	backendID, inner, scoped := types.ParseStorageBackendPath(path)
-	if !scoped {
+	persistedPath := strings.TrimSpace(path)
+	physicalPath := persistedPath
+	resourceBackendID := ""
+	resourceProvider := ""
+	isResource := false
+	if _, ok := types.ParseResourcePath(persistedPath); ok {
+		isResource = true
+		if s.resourceCatalog == nil {
+			return nil, "", errors.New("resource catalog is unavailable for storage cleanup")
+		}
+		resource, err := s.resourceCatalog.Resolve(ctx, persistedPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("resolve catalog resource: %w", err)
+		}
+		if resource == nil {
+			return nil, "", errors.New("resolve catalog resource: resource is unavailable")
+		}
+		if resource.TenantID != tenantID {
+			return nil, "", fmt.Errorf("catalog resource tenant mismatch: got %d, want %d", resource.TenantID, tenantID)
+		}
+		physicalPath = strings.TrimSpace(resource.PhysicalPath)
+		if physicalPath == "" {
+			return nil, "", errors.New("catalog resource physical path is empty")
+		}
+		resourceBackendID = strings.TrimSpace(resource.StorageBackendID)
+		resourceProvider = strings.ToLower(strings.TrimSpace(resource.Provider))
+	}
+
+	backendID, inner, scoped := types.ParseStorageBackendPath(physicalPath)
+	providerPath := physicalPath
+	if scoped {
+		providerPath = inner
+		if resourceBackendID != "" && resourceBackendID != backendID {
+			return nil, "", errors.New("catalog resource storage backend mismatch")
+		}
+	} else if resourceBackendID != "" {
+		backendID = resourceBackendID
+	}
+	provider := types.ParseProviderScheme(providerPath)
+	if resourceProvider != "" && provider != "" && resourceProvider != provider {
+		return nil, "", errors.New("catalog resource storage provider mismatch")
+	}
+	if provider == "" {
+		provider = resourceProvider
+	}
+
+	if !isResource && !scoped {
 		if s.fileSvc == nil {
 			return nil, "", errors.New("file service is unavailable")
 		}
-		return s.fileSvc, path, nil
+		return s.fileSvc, persistedPath, nil
 	}
 	if s.storageResolver == nil {
 		return nil, "", errors.New("storage backend resolver is unavailable")
@@ -1600,11 +1647,14 @@ func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
 			return nil, "", fmt.Errorf("load storage cleanup tenant: %w", err)
 		}
 	}
+	if tenant == nil {
+		return nil, "", errors.New("storage cleanup tenant is unavailable")
+	}
 	fileSvc, _, err := s.storageResolver.ResolveFileService(
 		ctx,
 		tenant,
 		backendID,
-		types.ParseProviderScheme(inner),
+		provider,
 		storageurl.LocalStorageBaseDir(),
 	)
 	if err != nil {
@@ -1613,7 +1663,7 @@ func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
 	if fileSvc == nil {
 		return nil, "", fmt.Errorf("resolve storage backend %s: file service is unavailable", backendID)
 	}
-	return fileSvc, inner, nil
+	return fileSvc, providerPath, nil
 }
 
 // deleteFileIdempotent treats an object that is already gone as success. This
