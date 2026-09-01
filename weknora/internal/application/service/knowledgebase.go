@@ -1666,6 +1666,18 @@ func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
 	return fileSvc, providerPath, nil
 }
 
+func (s *knowledgeBaseService) deleteFileForAccountErasure(
+	ctx context.Context,
+	tenantID uint64,
+	reference string,
+) error {
+	fileSvc, deletePath, err := s.resolveFileServiceForPersistedPath(ctx, tenantID, reference)
+	if err != nil {
+		return err
+	}
+	return deleteFileIdempotent(ctx, fileSvc, deletePath)
+}
+
 // deleteFileIdempotent treats an object that is already gone as success. This
 // is required for strict retries after a worker crashed between deleting a
 // physical object and deleting the corresponding knowledge row. Provider

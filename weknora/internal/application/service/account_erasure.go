@@ -39,6 +39,16 @@ type accountErasureService struct {
 	now       func() time.Time
 }
 
+// accountErasureFileDeleter is implemented by the concrete knowledge service,
+// which owns the tenant-aware catalog and storage-backend resolution seam.
+// Keeping it private prevents alternate coordinators from bypassing that
+// routing contract with the process-wide default FileService.
+type accountErasureFileDeleter interface {
+	deleteFileForAccountErasure(ctx context.Context, tenantID uint64, reference string) error
+}
+
+var _ accountErasureFileDeleter = (*knowledgeBaseService)(nil)
+
 func NewAccountErasureService(
 	repo interfaces.AccountErasureRepository,
 	knowledge interfaces.KnowledgeBaseService,
@@ -382,15 +392,16 @@ func (s *accountErasureService) Process(ctx context.Context, task *asynq.Task) e
 	if remaining > 0 {
 		return ErrAccountErasureCleanupPending
 	}
-	if s.files == nil {
-		return errors.New("account erasure file service is unavailable")
-	}
 	resourceRefs, err := s.repo.ListActiveResourceReferences(lifecycleCtx, target.TenantID)
 	if err != nil {
 		return fmt.Errorf("list remaining account resources: %w", err)
 	}
+	fileDeleter, routed := s.knowledge.(accountErasureFileDeleter)
+	if len(resourceRefs) > 0 && !routed {
+		return errors.New("account erasure tenant-aware file deletion is unavailable")
+	}
 	for _, resourceRef := range resourceRefs {
-		if err := deleteFileIdempotent(lifecycleCtx, s.files, resourceRef); err != nil {
+		if err := fileDeleter.deleteFileForAccountErasure(lifecycleCtx, target.TenantID, resourceRef); err != nil {
 			return fmt.Errorf("delete remaining account resource: %w", err)
 		}
 	}
