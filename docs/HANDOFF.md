@@ -40,15 +40,17 @@ Read these files in order:
 
 1. [`AGENTS.md`](../AGENTS.md) - repository rules and source ownership.
 2. [`README.md`](../README.md) - product/source map and release overview.
-3. [`DEPLOYMENT.md`](DEPLOYMENT.md) - immutable build and production boundary.
-4. [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) - staging runbook and
+3. [`FULL_PRODUCT_ACCEPTANCE_CHECKLIST.md`](FULL_PRODUCT_ACCEPTANCE_CHECKLIST.md)
+   - complete clickable, role, failure-path, data and UI acceptance inventory.
+4. [`DEPLOYMENT.md`](DEPLOYMENT.md) - immutable build and production boundary.
+5. [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) - staging runbook and
    Sandbox acceptance gate.
-5. [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md) - secret and
+6. [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md) - secret and
    provider boundaries; never print or copy values.
-6. [`third_party/weknora/upgrades/81142df/README.md`](../third_party/weknora/upgrades/81142df/README.md)
+7. [`third_party/weknora/upgrades/81142df/README.md`](../third_party/weknora/upgrades/81142df/README.md)
    and [`verification.md`](../third_party/weknora/upgrades/81142df/verification.md)
    - source audit, per-path ledger, and historical verification evidence.
-7. The active OpenSpec changes under
+8. The active OpenSpec changes under
    [`openspec/changes/`](../openspec/changes/), especially
    `upgrade-weknora-main-81142df`, `curate-main-consumer-surface`,
    `enable-agent-capabilities-by-default`,
