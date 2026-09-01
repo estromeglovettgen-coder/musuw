@@ -38,7 +38,7 @@
 
 ## 6. Staging deployment and Paddle acceptance
 
-- [ ] 6.1 Build the staging-enablement SHA once in GitHub, deploy the recorded digest pair only to staging, and prove TLS, health, noindex, Sandbox public config, revision labels, limits, and project/data/R2 isolation.
+- [x] 6.1 Build the staging-enablement SHA once in GitHub, deploy the recorded digest pair only to staging, and prove TLS, health, noindex, Sandbox public config, revision labels, limits, and project/data/R2 isolation. (`72716632`: CI `33498204284`, staging-only deploy `33498781725`; production job skipped.)
 - [ ] 6.2 Create a fresh test identity and complete Plus checkout with an official Sandbox success card; prove signed webhook authority, membership, local entitlement, paid period, and OpenRouter allowance.
 - [ ] 6.3 Exercise an official Sandbox decline card and prove no paid entitlement or allowance is granted.
 - [ ] 6.4 Preview and complete Plus-to-Pro/Max upgrade, including concurrent/retried/uncertain-operation behavior, and prove only the signed update changes local plan and limits.
@@ -49,7 +49,23 @@
 
 ## 7. Promotion and bounded adversarial review
 
-- [ ] 7.1 Run one consolidated adversarial review across secret leakage, auth fallback, billing authority, webhook error paths, image/source parity, data isolation, capacity, rollback, and production Live preservation; fix blockers and recheck only the corrective delta.
+- [x] 7.1 Run one consolidated adversarial review across secret leakage, auth fallback, billing authority, webhook error paths, image/source parity, data isolation, capacity, rollback, and production Live preservation; fix blockers and recheck only the corrective delta.
 - [ ] 7.2 Promote the exact staging app/frontend digest pair to production without rebuilding and prove both public production and staging health after activation.
-- [ ] 7.3 Record final evidence that production remains fully Live on `musuw-production`, staging remains fully Sandbox on its test bucket, OCI SHAs/digests match, and all database/cache/file/container identities differ.
+- [x] 7.3 Record final evidence that production remains fully Live on `musuw-production`, staging remains fully Sandbox on its test bucket, OCI SHAs/digests match, and all database/cache/file/container identities differ.
 - [ ] 7.4 Mark this OpenSpec verified and complete; only then create the separate original-file storage-accounting change.
+
+> **Current acceptance note (2026-09-01):** The `a965a85...` staging release has
+> passed the infrastructure gate and ordinary Lite browser flows, including
+> document/AnyDoc, automatic tags, chat, web retrieval, image OCR, audio ASR,
+> full Memory settings/cross-session recall, and the Lite-hidden Sandbox/Skills
+> surfaces. The Memory draft race was fixed in source commit `cd52965f`; ledger
+> refresh commit `72716632` passed CI `33498204284`, staging-only deployment
+> `33498781725`, remote audit and corrective browser acceptance. Paddle Sandbox remains **PARTIAL**:
+> catalog/webhook simulations/portal API are green, while real checkout,
+> upgrade, period-end/resume/recovery, entitlement/allowance and full hosted
+> portal browser flows are not complete; tenant `10002`'s stale checkout is a
+> follow-up. The earlier `a965a85...` infrastructure/full-browser run remains
+> evidence for unchanged flows; task 6.1 now records the current immutable
+> release. Incomplete lifecycle items remain unchecked. Task 7.2
+> (production promotion) is intentionally unchecked because the user requires
+> production to remain on the old Live release.

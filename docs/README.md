@@ -10,6 +10,7 @@ snapshots are not retained as operating instructions.
 | --- | --- |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Immutable build, staging, promotion, rollback, and production delivery contract. |
 | [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) | Staging environment operation and acceptance workflow. |
+| [`HANDOFF.md`](HANDOFF.md) | Current no-context project handoff: source identity, Musuw product boundary, merged capabilities, deployment status, and remaining acceptance matrix. |
 | [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md) | Secret ownership, provider boundaries, and safe operator handling. |
 | [`PADDLE_LIVE_READINESS.md`](PADDLE_LIVE_READINESS.md) | Paddle Live readiness and evidence requirements. |
 | [`LOCAL_ADMIN.md`](LOCAL_ADMIN.md) | Loopback-only operations console. |
@@ -28,6 +29,10 @@ snapshots are not retained as operating instructions.
 - Active OpenSpec changes retain feature decisions and acceptance criteria.
   Completed changes should be archived with OpenSpec rather than treated as a
   current runbook.
+
+[`HANDOFF.md`](HANDOFF.md) is the current continuity document for a fresh
+reviewer. It does not replace the deployment or staging runbooks and must not be
+used to infer that an unrecorded or partial check passed.
 
 When a document conflicts with current source or configuration, correct or
 remove it in the same change. Do not add another dated handoff file as a second

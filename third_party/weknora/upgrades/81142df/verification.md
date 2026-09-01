@@ -3,6 +3,16 @@
 This record separates inherited-worktree evidence from post-upgrade evidence so
 pre-existing failures are not misclassified as vendor-update regressions.
 
+> **Current handoff:** [`docs/HANDOFF.md`](../../../../docs/HANDOFF.md) supersedes
+> the historical first-version snapshot at the end of this file. It records the
+> current deployed branch/ledger commit (`72716632`), the Memory corrective
+> source commit (`cd52965f`), the earlier exhaustive browser release
+> (`a965a85...`), the current corrective staging-only release, the explicit
+> production hold, and the remaining Paddle matrix. Keep the evidence below as
+> source-upgrade history; do not use its old implementation SHA or completion
+> line as current deployment
+> status.
+
 ## Pre-upgrade baseline
 
 Source state: prefixed current-worktree audit tree
@@ -28,8 +38,8 @@ release gate; diagnostic failures are recorded instead of being hidden.
 | Check | Result | Evidence / notes |
 | --- | --- | --- |
 | Fixed-source and migration contract | Pass | `npm run upgrade:contract` passes 4/4, including fixed commit/tree provenance, unique appended migration meanings, representative target capabilities, and high-risk Musuw auth/SaaS/storage/model-policy contracts. |
-| Active source manifest | Pass | Final `node scripts/ci/source-manifest.mjs` reports 3,608 active source files and satisfies the fixed target floor of 3,284 files. `tracked-source-scan.mjs` reviews 4,056 tracked files and 96 approved binary assets. |
-| Resolution ledger (final run) | Pass, zero blockers | Final `npm run upgrade:ledger` classifies the complete 1,601-path union (708 Musuw, 1,051 target, 158 overlap) with no missing, invalid, or unexplained exact-target replacement. |
+| Active source manifest | Pass | Fresh `node scripts/ci/source-manifest.mjs` reports 3,626 active source files and satisfies the fixed target floor of 3,284 files. `tracked-source-scan.mjs` reviews 4,087 tracked files and 96 approved binary assets. |
+| Resolution ledger (final run) | Pass, zero blockers | `npm run upgrade:ledger` at ledger refresh commit `72716632` classifies the complete 1,601-path union (708 Musuw, 1,051 target, 158 overlap) with no missing, invalid, or unexplained exact-target replacement. |
 | PostgreSQL existing database | Pass | Disposable `paradedb/paradedb:v0.22.2-pg17`: Musuw v93 migrated to v104 cleanly; tenant/session/message sentinel values survived and new artifacts/sandbox/memory/skills/env schema was present. |
 | PostgreSQL fresh/retry path | Pass | Empty database reached clean v104; representative target and Musuw schema objects existed; v104 down then up returned to clean v104. |
 | SQLite existing/fresh path | Pass | `go test ./internal/database` exercises a Musuw-v12 fixture and fresh history through v23, including `tenant_sandbox_configs`, `messages.artifacts`, and `sessions.sandbox_config_id`. |
@@ -40,7 +50,8 @@ release gate; diagnostic failures are recorded instead of being hidden.
 | Auth shell | Pass | `npm test` passes 100/100; production Vite build passes with explicit CI placeholder public/OAuth variables. Missing production variables still fail closed. |
 | Storefront | Pass | `npm test` passes 63/63 and production Vite build passes. The inherited responsive assertion was aligned to the intentional 1023px breakpoint; the SSR fixture runs in a child process so Vite cannot retain the Node test runner. |
 | Musuw WeKnora frontend | Pass | Final frontend baseline passes 955/955 tests, 11/11 i18n checks, type checking, and production build. The corrective Lite/Standard editor audit passes 98 focused tests: Lite deep links and validation redirects cannot expose hidden tabs, while Standard exposes the fixed-target settings. |
-| Musuw product-policy defaults | Pass | Fresh current-tree run passes 992/992 frontend tests, 11/11 i18n checks, type checking and production build. New editor-created agents default image/audio attachment handling, web search/fetch and the existing Tool Configuration catalog on; existing agents retain saved values, while Sandbox, Skills, MCP and governed Memory are not implicitly enabled. |
+| Musuw product-policy defaults | Pass | Fresh current-tree run passes 994/994 frontend tests, 11/11 i18n checks, type checking and production build. New editor-created agents default image/audio attachment handling, web search/fetch and the existing Tool Configuration catalog on; existing agents retain saved values, while Sandbox, Skills, MCP and governed Memory are not implicitly enabled. |
+| Memory draft creation race | Pass locally, in CI and on staging | The original UI had no pending/re-entry guard: a slow first create looked inert, permitted a second submit, and its late response could clear a newer draft and show a stale success toast. Commit `cd52965f` serializes creation, disables draft controls while pending, and gates completion/error UI on the submitted draft's version/content/kind. The concurrent-create tests are included in the 994/994 run. On deployed `72716632`, one click created exactly one `ORCHID CLOCK 5942` item (database count 1), while a second unsaved `SILVER LANTERN 8461` draft remained unchanged for 3.5 seconds without a stale toast, tab switch, or clear. |
 | Wiki tool authorization corrective | Pass | Wiki reads retain the authorized search scope, while six mutation tools receive only request-local writable Wiki KB IDs. The caller identity comes from the authenticated session even when shared-agent execution overlays the context with the source tenant. Own-tenant Agent writes use a conservative role/creator rule; viewer, non-owner Contributor, unknown, and error scopes fail closed. Focused tests, `internal/application/service`, `internal/agent/tools`, `internal/handler/session`, `internal/sandbox`, and fresh `go test ./...`, `go vet ./...`, `go build ./...` pass. |
 | Real-browser Agent failure path | Pass with local credential prerequisite | A fresh Chrome send against the isolated candidate reproduced the provider failure and now leaves a persistent Musuw `role=alert` card after the toast lifetime; timestamps and the question minimap also render after registering their wrapper components. The underlying request is rejected before provider inference because candidate lacks a dedicated TEST `OPENROUTER_MANAGEMENT_API_KEY`. Production/staging already mount that secret; no production/Default Workspace key was copied and entitlement was not bypassed. A successful local model answer still requires an isolated TEST OpenRouter workspace/key and corresponding disposable tenant child key. |
 | DSH integration package | Pass | `npm ci`, typecheck, build, and 58/58 tests pass. A cold install of pinned `@deepseek-ai/dsh@0.1.0-rc.8` then passed all three real-harness scenarios: shipped env defaults, renamed profile override, and automatic visible-KB scope; each exercised search/read tool calls through mock WeKnora and produced a grounded answer. |
@@ -48,7 +59,11 @@ release gate; diagnostic failures are recorded instead of being hidden.
 | CI and production wiring | Pass | Workflow validator, root CI simulation, secret/credential scans, production and staging static verifiers, source manifest, and Dockerfile BuildKit checks pass. No nested WeKnora delivery workflow or parallel publisher is tracked. |
 | Candidate image and existing-data runtime | Pass | BuildKit produced `weknora-v072-candidate-app:81142df` from the composed source with AnyDoc and the exact upstream revision label, plus the Musuw frontend/auth image. The isolated native stack started against the existing v0.7.2 PostgreSQL volume; direct and frontend-proxied health, UI/auth shell, OIDC PKCE binding cookie, clean migration 104, and absence of legacy services all passed `verify-runtime.sh`. A first module download ended on a transient proxy EOF and the cached retry completed. Real startup also found and fixed two candidate-only wiring defects: inherited production Langfuse enablement without local production keys, and missing public browser identity coordinates. Candidate tracing now stays disabled and its public identity uses the same fail-closed runtime seam as staging/production. |
 | Artifact resource safety | Pass | Artifact collection now requires `SessionBoundedFileReader`; `SessionBoundManager` executes provider-side `head -c max+1` as the sandbox user and never falls back to an unbounded read. Tests cover a falsely advertised small file, provider argv/cap, oversize rejection, and sources without bounded capability. |
-| Consolidated adversarial review | Pass, zero blockers | Corrective review verified Lite editor allow-list/deep-link behavior, mixed global/named sandbox leases, account-erasure transient-error handling, and provider-side artifact bounds. The only observation is inherited quick-answer `EventError` terminal behavior, unchanged from the checkpoint. |
+| Source corrective adversarial review | Pass, zero blockers | Review of the `cd52965f` Memory draft serialization fix and the prior corrective delta verified the Lite editor allow-list/deep-link behavior, mixed global/named sandbox leases, account-erasure transient-error handling, provider-side artifact bounds, and concurrent Memory create ownership. Post-deploy read-only review verified the exact staging revision/digests, resource/data isolation and production preservation. The only observation is inherited quick-answer `EventError` terminal behavior, unchanged from the checkpoint. |
+| Remote staging/browser acceptance (`a965a85...`) | Pass for ordinary Lite flows | Fresh staging Viewer/owner sessions exercised document-only KB creation, AnyDoc DOCX/Markdown parsing/query/citations, automatic tags, full Memory settings and cross-session recall, chat/model/agent defaults, web retrieval, image OCR, audio ASR, and Lite-hidden Sandbox/Skills/Env surfaces; Musuw compact UI states remained intact. |
+| Current corrective staging (`72716632`) | Pass, zero blockers | CI `33498204284` and staging-only deploy `33498781725` succeeded; production promote job `99827895863` was skipped. App digest is `sha256:9c851f4e84368b5f2bee1468a1a1cb4ef68e49ca565b288bde082c1aeb5bf40f`, frontend digest is `sha256:56fc7fe2c4fba097816a73ebc1626fee058a80311e7d5635d181ad8bcb8afe42`; staging init exited 0 and all services are healthy/running with restart 0 and no OOM, DB is `104|f`, and noindex, Paddle Sandbox, SearXNG, AnyDoc/R2 and isolation checks pass. Browser corrective smoke passed Memory creation/ownership, the existing two-document KB, real DeepSeek V4 Flash chat and memory recall. |
+| Paddle Sandbox acceptance | Partial | Sandbox public config/test token, three products/six recurring prices, exact 11-event destination, official transaction/cancellation simulations, portal-session/history API and related tests pass. Real checkout success/decline, upgrade, period-end/resume/recovery/dunning, entitlement/allowance and full hosted-portal browser actions remain untested. Tenant `10002` has a stale in-flight checkout operation as a follow-up; production Paddle Live was not touched. |
+| Production preservation | Pass (read-only audit) | Production remains on old revision `ea614b077dc0b9fb7fbe742c8defee2e24bc8461` with PostgreSQL `93|f`, Paddle Live and its isolated resources; all nine container identities/start times remain old, restart 0 and no OOM. The `72716632` production job was skipped and no promotion or mutation occurred. |
 
 ## Preservation decisions recorded during reconciliation
 
@@ -81,7 +96,7 @@ release gate; diagnostic failures are recorded instead of being hidden.
   are generated from the existing root-only auth input, and pass through the
   same strict frontend serializer used by staging and production.
 
-## First-version handoff
+## Historical first-version handoff (source-upgrade checkpoint)
 
 - Branch: `codex/upgrade-weknora-main-81142df`.
 - Implementation commit: `0746755d5300bf5c38df0dba6ddbb435a49646a7`;
