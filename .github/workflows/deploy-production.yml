@@ -80,6 +80,7 @@ jobs:
           REQUESTED_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.immutable_ref }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
           EVENT_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           EVENT_WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           EVENT_WORKFLOW_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
@@ -103,11 +104,17 @@ jobs:
             [[ "$EVENT_WORKFLOW_RUN_ID" =~ ^[0-9]+$ ]]
             ci_workflow_run="$EVENT_WORKFLOW_RUN_ID"
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
-            test "$EVENT_REF" = refs/heads/main
             case "$REQUESTED_RELEASE_MODE:$REQUESTED_STAGING_E2E_RESULT" in
               staging-only:not-confirmed|promote:full-sandbox-e2e-green) ;;
               *) printf '%s\n' 'release_mode must be staging-only or promote, and promote requires full Sandbox E2E' >&2; exit 1 ;;
             esac
+            if [ "$REQUESTED_RELEASE_MODE" = promote ]; then
+              test "$EVENT_REF" = refs/heads/main
+            else
+              case "$EVENT_REF" in refs/heads/*) ;; *) printf '%s\n' 'staging-only dispatch must originate from a repository branch' >&2; exit 1 ;; esac
+              [[ "$EVENT_SHA" =~ ^[0-9a-fA-F]{40}$ ]]
+              test "$requested" = "$EVENT_SHA"
+            fi
           else
             printf '%s\n' 'production release accepts only successful canonical CI or workflow_dispatch on main' >&2
             exit 1
@@ -119,8 +126,12 @@ jobs:
           selected_sha="$(git rev-parse "$requested^{commit}")"
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$selected_sha"
-          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-          git merge-base --is-ancestor "$actual" refs/remotes/origin/main
+          if [ "$EVENT_NAME" = workflow_run ] || [ "$REQUESTED_RELEASE_MODE" = promote ]; then
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            git merge-base --is-ancestor "$actual" refs/remotes/origin/main
+          else
+            test "$actual" = "$EVENT_SHA"
+          fi
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             runs="$(curl --fail --silent --show-error --retry 3 --retry-delay 2 \
               -H "Authorization: Bearer $GH_TOKEN" \

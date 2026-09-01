@@ -24,6 +24,11 @@ grep -Fq "github.event_name == 'workflow_dispatch'" "$workflow_path" || fail 'pr
 grep -Fq "inputs.release_mode == 'promote'" "$workflow_path" || fail 'production promotion lacks an explicit promote gate'
 grep -Fq "inputs.staging_e2e_result == 'full-sandbox-e2e-green'" "$workflow_path" || fail 'production promotion is not gated by full Sandbox E2E attestation'
 grep -Fq 'required_reviewers' "$workflow_path" || fail 'production promotion does not verify a protected reviewer gate'
+grep -Fq 'EVENT_SHA: ${{ github.sha }}' "$workflow_path" || fail 'manual staging does not bind the requested SHA to the dispatched branch head'
+grep -Fq 'test "$requested" = "$EVENT_SHA"' "$workflow_path" || fail 'manual staging accepts a SHA other than the dispatched branch head'
+grep -Fq 'if [ "$REQUESTED_RELEASE_MODE" = promote ]; then' "$workflow_path" || fail 'main-only authorization is not scoped to production promotion'
+grep -Fq 'test "$EVENT_REF" = refs/heads/main' "$workflow_path" || fail 'production promotion is not pinned to main'
+grep -Fq 'git merge-base --is-ancestor "$actual" refs/remotes/origin/main' "$workflow_path" || fail 'production promotion lacks main ancestry proof'
 if grep -Fq 'staging_acceptance' "$workflow_path"; then
     fail 'automatic staging smoke verification still claims full acceptance'
 fi
