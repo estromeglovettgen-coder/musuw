@@ -847,7 +847,7 @@ internal/application/service/retriever/keywords_vector_hybrid_indexer.go	M	-	100
 internal/application/service/retriever/keywords_vector_hybrid_indexer_test.go	M	-	100644	cf24052379634e0498fc4c83046e9622b04aaf13	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/retriever/normalizer.go	-	M	100644	00363eb649efc1e6c2d98a48d60ea17b97c78bb0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/session.go	M	M	100644	2567c9dbcb99b74f90a2a11c7b03f5cd47ca2196	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-internal/application/service/session_agent_qa.go	M	M	100644	ee91b87bccffd74ccc08b11edc1902095eb444ce	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/application/service/session_agent_qa.go	M	M	100644	59b5e79a57b7e3b65c7de176ec4c4497f71835a4	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/application/service/session_agent_qa_rerank_test.go	A	-	100644	b0031c37c3ac47403d612f8bb5be850b39d48f31	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/session_agent_qa_scope_test.go	-	M	100644	b348d3a0ec130f30d52e6451bdb000669f9c4cc5	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/application/service/session_attachment_staging.go	-	A	100644	2fb1e21c6e64771c89dc4743c6c264d036fa73d6	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
