@@ -118,6 +118,14 @@ load_paddle_public_env() {
   done < "$file"
 }
 
+apply_host_product_edition_override() {
+  case "${MUSUW_DEV_PRODUCT_EDITION:-}" in
+    '') return 0 ;;
+    lite|standard) export MUSUW_PRODUCT_EDITION="$MUSUW_DEV_PRODUCT_EDITION" ;;
+    *) die 'development product edition must be lite or standard' ;;
+  esac
+}
+
 read_secret() {
   local path="$1"
   [ -r "$path" ] && [ ! -L "$path" ] || die 'required host-development secret is unavailable'
@@ -147,6 +155,7 @@ load_host_environment() {
   load_env_file "$candidate_env"
   load_env_file "$auth_public_env"
   load_paddle_public_env "$paddle_sandbox_env"
+  apply_host_product_edition_override
   if ! grep -q '^LOG_FORMAT=' "$candidate_env"; then
     unset LOG_FORMAT
   fi

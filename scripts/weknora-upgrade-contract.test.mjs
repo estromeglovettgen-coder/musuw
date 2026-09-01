@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -177,6 +178,28 @@ test("Musuw host development links the official AnyDoc engine when its archive e
   assert.ok(
     musuwDev.includes('go run -tags "${GO_BUILD_TAGS:-}" -ldflags="$ldflags" ./cmd/server'),
     "the host Go command must consume the resolved AnyDoc build tag",
+  );
+});
+
+test("Musuw host development can opt into an isolated Standard acceptance runtime", () => {
+  const musuwDev = path.join(repositoryRoot, "scripts/musuw-dev");
+  const evaluate = (body) => execFileSync(
+    "bash",
+    ["-c", `source "${musuwDev}" help >/dev/null; ${body}`],
+    { encoding: "utf8" },
+  );
+
+  assert.equal(
+    evaluate("MUSUW_PRODUCT_EDITION=lite; MUSUW_DEV_PRODUCT_EDITION=standard; apply_host_product_edition_override; printf '%s' \"$MUSUW_PRODUCT_EDITION\""),
+    "standard",
+  );
+  assert.equal(
+    evaluate("MUSUW_PRODUCT_EDITION=lite; unset MUSUW_DEV_PRODUCT_EDITION; apply_host_product_edition_override; printf '%s' \"$MUSUW_PRODUCT_EDITION\""),
+    "lite",
+  );
+  assert.throws(
+    () => evaluate("MUSUW_DEV_PRODUCT_EDITION=enterprise; apply_host_product_edition_override"),
+    /development product edition must be lite or standard/,
   );
 });
 
