@@ -78,8 +78,9 @@ service key、OpenRouter management key、TikHub、Paddle Sandbox API key/webhoo
 secret、R2 access key 与 SearXNG secret 都必须是 regular、non-symlink、非空、
 root-owned `0600` 文件，再由 Compose 只读挂载。TikHub 必须使用该目录中的
 `tikhub_api_key`：
-`prepare-runtime.sh` 和部署验证只检查存在性、类型、非空、owner 与 mode，Compose
-以 `0400` 挂载，app entrypoint 才在后端进程内读取为 `TIKHUB_API_KEY`。缺失或空值
+`prepare-runtime.sh` 和部署验证只检查存在性、类型、非空、owner 与 mode。Compose
+把它只读挂载；本地文件型 secret 会保留宿主机 root-owned `0600` 源 mode（Compose
+声明的 `0400` 不作为 bind mount 的安全证明）。app entrypoint 才在后端进程内读取为 `TIKHUB_API_KEY`。缺失或空值
 会在启动前 fail closed；密钥不得进入镜像、public/generated env、前端、日志、任务
 payload 或 artifact。
 

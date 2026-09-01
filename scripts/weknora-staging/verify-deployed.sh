@@ -65,6 +65,18 @@ wait_for_healthy weknora-v072-staging-searxng
 wait_for_healthy weknora-v072-staging-app
 wait_for_healthy weknora-v072-staging-frontend
 
+# Promotion re-runs this verifier later, so recheck the database instead of
+# trusting the earlier deployment record or the application's liveness probe.
+latest_migration_version="$(docker exec weknora-v072-staging-app bash -o pipefail -ec 'find /app/migrations/versioned -maxdepth 1 -type f -name '\''[0-9][0-9][0-9][0-9][0-9][0-9]_*.up.sql'\'' -exec basename {} \; | sed '\''s/_.*//'\'' | sort -n | tail -1')" ||
+    fail 'staging app migration inventory is unavailable'
+[ -n "$latest_migration_version" ] || fail 'staging app migration inventory is empty'
+latest_migration_version="$(printf '%s' "$latest_migration_version" | sed 's/^0*//; s/^$/0/')"
+migration_state="$(docker exec weknora-v072-staging-postgres sh -ec 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT version, dirty FROM schema_migrations"')" ||
+    fail 'staging database migration state is unavailable'
+if [ -z "$latest_migration_version" ] || [ "$migration_state" != "${latest_migration_version}|f" ]; then
+    fail "staging database is not cleanly migrated to latest version ${latest_migration_version:-unknown}"
+fi
+
 assert_resource_limits() {
     local container="$1" inspection memory nano_cpus pids_limit
     inspection="$(docker inspect "$container" --format '{{.HostConfig.Memory}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.PidsLimit}}' 2>/dev/null || true)"

@@ -33,7 +33,8 @@ Staging 的独立 Compose、Sandbox 和发布门见
   或服务器 `0600` 文件进入受控进程。
 - TikHub 社交链接入库只读取后端进程的 `TIKHUB_API_KEY`。Musuw production 与
   staging overlay 都要求 root-owned `0600` 文件 `tikhub_api_key`：预检只验证文件
-  元数据，Compose 以 `0400` 只读挂载，app entrypoint 才在进程内读取并导出。
+  元数据，Compose 只读挂载并保留本地源文件的 root-owned `0600` mode；声明的
+  `0400` 不作为 bind mount 的运行时证明。app entrypoint 才在进程内读取并导出。
   供应商地址由代码固定，密钥不得进入前端 runtime config、用户请求、任务 payload、
   日志、数据库字段或生成的 env；本地/社区部署未配置时应明确拒绝受支持的社交平台
   解析，同时继续保留普通网页 URL 入库。

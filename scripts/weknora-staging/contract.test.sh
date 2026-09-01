@@ -121,6 +121,15 @@ grep -Fq 'noindex' "$script_dir/verify-deployed.sh" || fail 'staging deployed ve
 grep -Fq 'staging-searxng' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert SearXNG topology'
 grep -Fq '/search?q=musuw-staging-health' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not probe SearXNG search'
 grep -Fq 'searxng-init searxng app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
+grep -Fq 'latest_migration_version' "$script_dir/release-ci.sh" || fail 'staging release helper does not resolve the latest schema migration'
+grep -Fq 'docker exec weknora-v072-staging-app bash -o pipefail -ec' "$script_dir/release-ci.sh" || fail 'staging release helper does not fail closed when the app migration inventory command fails'
+grep -Fq '[ -n "$latest_migration_version" ]' "$script_dir/release-ci.sh" "$script_dir/verify-deployed.sh" || fail 'staging migration gate does not fail closed on an empty app migration inventory'
+grep -Fq '/app/migrations/versioned' "$script_dir/release-ci.sh" || fail 'staging release helper does not inspect migrations shipped in the app image'
+if grep -Fq '$repo_root/weknora/migrations' "$script_dir/release-ci.sh" "$script_dir/verify-deployed.sh"; then
+    fail 'staging migration gate depends on files absent from the materialized server tree'
+fi
+grep -Fq 'SELECT version, dirty FROM schema_migrations' "$script_dir/release-ci.sh" || fail 'staging release helper does not reject an incomplete database migration'
+grep -Fq 'SELECT version, dirty FROM schema_migrations' "$script_dir/verify-deployed.sh" || fail 'staging promotion verifier does not recheck database migration state'
 
 for fixed in \
     '/var/lib/musuw-staging-deploy' \

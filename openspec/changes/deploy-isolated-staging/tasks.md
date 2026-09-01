@@ -30,11 +30,11 @@
 
 ## 5. External staging configuration
 
-- [ ] 5.1 Create the GitHub `staging` Environment with only the required isolated public and SSH inputs; keep provider/runtime secrets in the protected server directory and never print or persist their values in artifacts.
-- [ ] 5.2 Create `/opt/weknora/staging-runtime`, including its own root-owned mode-0600 `secrets/tikhub_api_key` mounted read-only as mode 0400, the remaining protected secret files, staging volumes/network, and the dedicated R2 test bucket/credentials; prove metadata and storage isolation without printing secret values.
-- [ ] 5.3 Add Cloudflare DNS/TLS/tunnel routing for `staging.musuw.com` to `staging-web`; reuse Access if directly applicable and add an exact webhook bypass.
+- [x] 5.1 Create the GitHub `staging` Environment with only the required isolated public and SSH inputs; keep provider/runtime secrets in the protected server directory and never print or persist their values in artifacts.
+- [x] 5.2 Create `/opt/weknora/staging-runtime`, including its own root-owned mode-0600 `secrets/tikhub_api_key` mounted read-only (local-file secrets retain the source mode), the remaining protected secret files, staging volumes/network, and the dedicated R2 test bucket/credentials; prove metadata and storage isolation without printing secret values.
+- [x] 5.3 Add Cloudflare DNS/TLS/tunnel routing for `staging.musuw.com` to `staging-web`; reuse Access if directly applicable and add an exact webhook bypass.
 - [ ] 5.4 Audit the Sandbox catalog and configure the active client token, approved staging domain, default `/pay` link, portal/history, Retain, location tax, USD base prices, and eligible payment methods.
-- [ ] 5.5 Create or update one active staging notification destination with the exact 11 events, install its opaque secret, and leave the production Live destination unchanged.
+- [x] 5.5 Create or update one active staging notification destination with the exact 11 events, install its opaque secret, and leave the production Live destination unchanged.
 
 ## 6. Staging deployment and Paddle acceptance
 

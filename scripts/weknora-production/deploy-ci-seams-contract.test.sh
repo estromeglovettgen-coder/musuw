@@ -42,6 +42,14 @@ grep -Fq 'find "$docker_config" -depth -delete' "$release_ci" || fail 'GHCR Dock
 grep -Fq 'rollback_production' "$release_ci" || fail 'release helper has no automatic app/frontend rollback'
 grep -Fq 'previous_source=' "$release_ci" || fail 'release helper does not bind rollback to the prior current release'
 grep -Fq 'compose_mutated=1' "$release_ci" || fail 'release helper does not track the production mutation boundary'
+grep -Fq 'latest_migration_version' "$release_ci" || fail 'release helper does not resolve the latest schema migration'
+grep -Fq 'docker exec weknora-v072-production-app bash -o pipefail -ec' "$release_ci" || fail 'release helper does not fail closed when the app migration inventory command fails'
+grep -Fq '[ -n "$latest_migration_version" ]' "$release_ci" || fail 'release helper does not fail closed on an empty app migration inventory'
+grep -Fq '/app/migrations/versioned' "$release_ci" || fail 'release helper does not inspect the migrations shipped in the app image'
+if grep -Fq '$repo_root/weknora/migrations' "$release_ci"; then
+    fail 'release helper depends on migrations absent from the materialized server tree'
+fi
+grep -Fq 'SELECT version, dirty FROM schema_migrations' "$release_ci" || fail 'release helper does not reject an incomplete database migration'
 release_prologue="$(sed -n '1,25p' "$release_ci")"
 grep -Fq 'unset \' <<< "$release_prologue" || fail 'release boundary does not clear inherited identity coordinates'
 for endpoint_key in OIDC_AUTH_ISSUER_URL OIDC_AUTH_DISCOVERY_URL OIDC_AUTH_AUTHORIZATION_ENDPOINT OIDC_AUTH_TOKEN_ENDPOINT OIDC_AUTH_USER_INFO_ENDPOINT; do

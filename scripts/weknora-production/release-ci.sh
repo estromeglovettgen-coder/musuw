@@ -227,6 +227,19 @@ wait_for_healthy() {
 wait_for_healthy weknora-v072-production-app
 wait_for_healthy weknora-v072-production-frontend
 
+# The application health endpoint is intentionally a liveness probe and the
+# migrator logs-and-continues on error.  Refuse to activate a release unless
+# the authoritative database reached the newest migration in this exact tree.
+latest_migration_version="$(docker exec weknora-v072-production-app bash -o pipefail -ec 'find /app/migrations/versioned -maxdepth 1 -type f -name '\''[0-9][0-9][0-9][0-9][0-9][0-9]_*.up.sql'\'' -exec basename {} \; | sed '\''s/_.*//'\'' | sort -n | tail -1')" ||
+    die 'production app migration inventory is unavailable'
+[ -n "$latest_migration_version" ] || die 'production app migration inventory is empty'
+latest_migration_version="$(printf '%s' "$latest_migration_version" | sed 's/^0*//; s/^$/0/')"
+migration_state="$(docker exec weknora-v072-production-postgres sh -ec 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT version, dirty FROM schema_migrations"')" ||
+    die 'production database migration state is unavailable'
+if [ -z "$latest_migration_version" ] || [ "$migration_state" != "${latest_migration_version}|f" ]; then
+    die "production database is not cleanly migrated to latest version ${latest_migration_version:-unknown}"
+fi
+
 # Verify the running container, not only the rendered release input. These
 # public endpoints are intentionally inspected without printing the remaining
 # environment so file-backed credentials stay undisclosed.
