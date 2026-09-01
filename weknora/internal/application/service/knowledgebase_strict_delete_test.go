@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"testing"
 
-	filesvc "github.com/Tencent/WeKnora/internal/application/service/file"
 	"github.com/Tencent/WeKnora/internal/models/embedding"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -380,7 +379,11 @@ func TestProcessKBDeleteStrictResolvesPersistedBackendScopedSourcePath(t *testin
 	defaultSvc := &strictDeleteFileService{err: errors.New("default storage must not receive a backend-scoped path")}
 	resolvedInner := &strictDeleteFileService{}
 	resolver := &strictDeleteStorageResolver{
-		svc: filesvc.NewBackendScopedFileService(backendID, resolvedInner),
+		// Resolver implementations are allowed to return the concrete provider
+		// service directly. Strict cleanup must therefore pass the parsed inner
+		// provider path rather than relying on a backend-scoping decorator to
+		// unwrap it a second time.
+		svc: resolvedInner,
 	}
 	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
 	svc.fileSvc = defaultSvc

@@ -1486,20 +1486,20 @@ func (s *knowledgeBaseService) processKBDeleteStrict(
 		if knowledge == nil || strings.TrimSpace(knowledge.FilePath) == "" {
 			continue
 		}
-		fileSvc, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, knowledge.FilePath)
+		fileSvc, deletePath, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, knowledge.FilePath)
 		if err != nil {
 			return fmt.Errorf("resolve source file for strict KB delete: %w", err)
 		}
-		if err := deleteFileIdempotent(ctx, fileSvc, knowledge.FilePath); err != nil {
+		if err := deleteFileIdempotent(ctx, fileSvc, deletePath); err != nil {
 			return fmt.Errorf("delete source file for strict KB delete: %w", err)
 		}
 	}
 	for _, imageURL := range imageURLs {
-		fileSvc, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, imageURL)
+		fileSvc, deletePath, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, imageURL)
 		if err != nil {
 			return fmt.Errorf("resolve extracted image for strict KB delete: %w", err)
 		}
-		if err := deleteFileIdempotent(ctx, fileSvc, imageURL); err != nil {
+		if err := deleteFileIdempotent(ctx, fileSvc, deletePath); err != nil {
 			return fmt.Errorf("delete extracted image for strict KB delete: %w", err)
 		}
 	}
@@ -1570,35 +1570,34 @@ func collectImageURLsStrict(imageInfos []string) ([]string, error) {
 	return urls, nil
 }
 
-// resolveFileServiceForPersistedPath routes a backend-scoped path through the
-// concrete storage instance encoded in that path. The process-wide file
-// service only understands provider:// paths; passing
-// storage://<backend-id>/provider://... directly to it either fails (as S3
-// does) or risks selecting a different instance of the same provider.
+// resolveFileServiceForPersistedPath returns both the concrete storage
+// instance encoded in a persisted path and the provider path that instance
+// must receive. Callers cannot assume every resolver decorates the returned
+// service with backend-scoped-path unwrapping.
 func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
 	ctx context.Context,
 	tenantID uint64,
 	path string,
-) (interfaces.FileService, error) {
+) (interfaces.FileService, string, error) {
 	backendID, inner, scoped := types.ParseStorageBackendPath(path)
 	if !scoped {
 		if s.fileSvc == nil {
-			return nil, errors.New("file service is unavailable")
+			return nil, "", errors.New("file service is unavailable")
 		}
-		return s.fileSvc, nil
+		return s.fileSvc, path, nil
 	}
 	if s.storageResolver == nil {
-		return nil, errors.New("storage backend resolver is unavailable")
+		return nil, "", errors.New("storage backend resolver is unavailable")
 	}
 	tenant, _ := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
 	if tenant == nil || tenant.ID != tenantID {
 		if s.tenantRepo == nil {
-			return nil, errors.New("tenant repository is unavailable for storage cleanup")
+			return nil, "", errors.New("tenant repository is unavailable for storage cleanup")
 		}
 		var err error
 		tenant, err = s.tenantRepo.GetTenantByID(ctx, tenantID)
 		if err != nil {
-			return nil, fmt.Errorf("load storage cleanup tenant: %w", err)
+			return nil, "", fmt.Errorf("load storage cleanup tenant: %w", err)
 		}
 	}
 	fileSvc, _, err := s.storageResolver.ResolveFileService(
@@ -1609,12 +1608,12 @@ func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
 		storageurl.LocalStorageBaseDir(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("resolve storage backend %s: %w", backendID, err)
+		return nil, "", fmt.Errorf("resolve storage backend %s: %w", backendID, err)
 	}
 	if fileSvc == nil {
-		return nil, fmt.Errorf("resolve storage backend %s: file service is unavailable", backendID)
+		return nil, "", fmt.Errorf("resolve storage backend %s: file service is unavailable", backendID)
 	}
-	return fileSvc, nil
+	return fileSvc, inner, nil
 }
 
 // deleteFileIdempotent treats an object that is already gone as success. This
