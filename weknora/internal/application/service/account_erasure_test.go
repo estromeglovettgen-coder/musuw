@@ -208,7 +208,11 @@ func (k *accountErasureKBStub) DeleteKnowledgeBaseForAccountErasure(_ context.Co
 	return nil
 }
 
-func (k *accountErasureKBStub) deleteFileForAccountErasure(ctx context.Context, tenantID uint64, reference string) error {
+func (k *accountErasureKBStub) deleteFileForAccountErasure(
+	ctx context.Context,
+	tenantID uint64,
+	reference string,
+) error {
 	k.erasureFileTenantIDs = append(k.erasureFileTenantIDs, tenantID)
 	k.erasureFileReferences = append(k.erasureFileReferences, reference)
 	return deleteFileIdempotent(ctx, k.erasureFiles, reference)
@@ -552,7 +556,9 @@ func TestAccountErasureWorkerDeletesRemainingResourcesBeforeTenant(t *testing.T)
 	tenants := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}, order: &order}
 	identity := &accountErasureIdentityStub{order: &order}
 	knowledge := &accountErasureKBStub{erasureFiles: routedFiles}
-	svc := newAccountErasureService(wrapped, knowledge, globalFiles, tenants, nil, nil, &accountErasureBillingStub{}, identity)
+	svc := newAccountErasureService(
+		wrapped, knowledge, globalFiles, tenants, nil, nil, &accountErasureBillingStub{}, identity,
+	)
 	task, err := NewAccountErasureTask("user-1")
 	require.NoError(t, err)
 
@@ -573,7 +579,10 @@ func TestAccountErasureWorkerTreatsAlreadyDeletedRemainingResourceAsRetrySuccess
 	globalFiles := &accountErasureFileStub{err: errors.New("global storage must not receive a catalog reference")}
 	tenants := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}}
 	knowledge := &accountErasureKBStub{erasureFiles: routedFiles}
-	svc := newAccountErasureService(wrapped, knowledge, globalFiles, tenants, nil, nil, &accountErasureBillingStub{}, &accountErasureIdentityStub{})
+	svc := newAccountErasureService(
+		wrapped, knowledge, globalFiles, tenants, nil, nil,
+		&accountErasureBillingStub{}, &accountErasureIdentityStub{},
+	)
 	task, err := NewAccountErasureTask("user-1")
 	require.NoError(t, err)
 
