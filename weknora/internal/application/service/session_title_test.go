@@ -1,18 +1,105 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	"github.com/Tencent/WeKnora/internal/config"
+	"github.com/Tencent/WeKnora/internal/models/chat"
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
 )
+
+type generatedTitleChatModel struct {
+	response string
+}
+
+func (m *generatedTitleChatModel) Chat(
+	context.Context,
+	[]chat.Message,
+	*chat.ChatOptions,
+) (*types.ChatResponse, error) {
+	return &types.ChatResponse{Content: m.response}, nil
+}
+
+func (*generatedTitleChatModel) ChatStream(
+	context.Context,
+	[]chat.Message,
+	*chat.ChatOptions,
+) (<-chan types.StreamResponse, error) {
+	return nil, nil
+}
+
+func (*generatedTitleChatModel) GetModelName() string { return "generated-title-test" }
+func (*generatedTitleChatModel) GetModelID() string   { return "generated-title-test" }
+
+type generatedTitleModelService struct {
+	interfaces.ModelService
+	model chat.Chat
+}
+
+func (s *generatedTitleModelService) GetChatModel(context.Context, string) (chat.Chat, error) {
+	return s.model, nil
+}
+
+type generatedTitleSessionRepository struct {
+	interfaces.SessionRepository
+	updated *types.Session
+}
+
+func (r *generatedTitleSessionRepository) Update(
+	_ context.Context,
+	session *types.Session,
+	_ string,
+) (int64, error) {
+	copy := *session
+	r.updated = &copy
+	return 1, nil
+}
+
+func TestGenerateTitleFallsBackWhenModelAnswersWithCitation(t *testing.T) {
+	t.Parallel()
+
+	const query = "只根据选中的知识库回答：1）校准短语是什么？2）Q0104 对应的疾病、基因和检测方法是什么？答案必须分别附上可打开的来源引用。"
+	repo := &generatedTitleSessionRepository{}
+	svc := &sessionService{
+		cfg: &config.Config{Conversation: &config.ConversationConfig{
+			GenerateSessionTitlePrompt: "Return only a short title.",
+		}},
+		sessionRepo: repo,
+		modelService: &generatedTitleModelService{model: &generatedTitleChatModel{response: strings.Join([]string{
+			"1）**校准短语**是指在特定上下文中用于调整模型输出的一组标准表达。",
+			"来源引用：[知识库文档A，第3页](https://example.com)",
+		}, "\n")}},
+	}
+	session := &types.Session{ID: "session-1", UserID: "user-1"}
+
+	title, err := svc.GenerateTitle(context.Background(), session, []types.Message{{
+		Role:    "user",
+		Content: query,
+	}}, "model-1")
+	if err != nil {
+		t.Fatalf("GenerateTitle() error = %v", err)
+	}
+
+	const want = "只根据选中的知识库回答：1）校准短语是什么"
+	if title != want {
+		t.Fatalf("GenerateTitle() = %q, want safe query fallback %q", title, want)
+	}
+	if repo.updated == nil || repo.updated.Title != want {
+		t.Fatalf("persisted title = %#v, want %q", repo.updated, want)
+	}
+}
 
 func TestSanitizeGeneratedTitle(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		raw           string
-		want          string
-		wantTruncated bool
+		name         string
+		raw          string
+		want         string
+		wantRejected bool
 	}{
 		{
 			name: "plain title is kept as is",
@@ -25,16 +112,14 @@ func TestSanitizeGeneratedTitle(t *testing.T) {
 			want: "Claim filing steps",
 		},
 		{
-			name:          "over-long ascii title is truncated",
-			raw:           strings.Repeat("a", 300),
-			want:          strings.Repeat("a", maxSessionTitleRunes),
-			wantTruncated: true,
+			name:         "over-long ascii completion is rejected",
+			raw:          strings.Repeat("a", 300),
+			wantRejected: true,
 		},
 		{
-			name:          "over-long cjk title is truncated by rune, not byte",
-			raw:           strings.Repeat("保", 300),
-			want:          strings.Repeat("保", maxSessionTitleRunes),
-			wantTruncated: true,
+			name:         "over-long cjk completion is rejected by rune count",
+			raw:          strings.Repeat("保", 300),
+			wantRejected: true,
 		},
 		{
 			name: "title exactly at the limit is not truncated",
@@ -42,9 +127,29 @@ func TestSanitizeGeneratedTitle(t *testing.T) {
 			want: strings.Repeat("保", maxSessionTitleRunes),
 		},
 		{
-			name: "empty completion stays empty",
-			raw:  "   ",
-			want: "",
+			name:         "empty completion is rejected",
+			raw:          "   ",
+			wantRejected: true,
+		},
+		{
+			name:         "multiline answer is rejected",
+			raw:          "校准短语说明\n来源：知识库文档",
+			wantRejected: true,
+		},
+		{
+			name:         "markdown link is rejected",
+			raw:          "[校准短语](https://example.com)",
+			wantRejected: true,
+		},
+		{
+			name:         "bare URL is rejected",
+			raw:          "校准短语 https://example.com",
+			wantRejected: true,
+		},
+		{
+			name: "outer quotes are removed",
+			raw:  "“校准短语与基因检测”",
+			want: "校准短语与基因检测",
 		},
 	}
 
@@ -52,17 +157,28 @@ func TestSanitizeGeneratedTitle(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, truncated := sanitizeGeneratedTitle(tt.raw)
+			got, rejected := sanitizeGeneratedTitle(tt.raw)
 			if got != tt.want {
 				t.Fatalf("title = %q, want %q", got, tt.want)
 			}
-			if truncated != tt.wantTruncated {
-				t.Fatalf("truncated = %v, want %v", truncated, tt.wantTruncated)
+			if rejected != tt.wantRejected {
+				t.Fatalf("rejected = %v, want %v", rejected, tt.wantRejected)
 			}
 			if len([]rune(got)) > maxSessionTitleRunes {
 				t.Fatalf("title still exceeds %d runes: %d", maxSessionTitleRunes, len([]rune(got)))
 			}
 		})
+	}
+}
+
+func TestFallbackSessionTitleUsesFirstQuestionAndBoundsRunes(t *testing.T) {
+	t.Parallel()
+
+	if got, want := fallbackSessionTitle("  How   do I file a claim? Include every source. "), "How do I file a claim"; got != want {
+		t.Fatalf("fallbackSessionTitle() = %q, want %q", got, want)
+	}
+	if got := fallbackSessionTitle(strings.Repeat("保", maxSessionTitleRunes+20)); len([]rune(got)) != maxSessionTitleRunes {
+		t.Fatalf("fallbackSessionTitle() rune length = %d, want %d", len([]rune(got)), maxSessionTitleRunes)
 	}
 }
 

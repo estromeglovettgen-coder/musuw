@@ -728,24 +728,59 @@ func (s *sessionService) destroyBoundSandbox(ctx context.Context, sessionID stri
 	}
 }
 
-// maxSessionTitleRunes bounds the auto-generated session title. sessions.title
-// is VARCHAR(255) in every shipped migration, so an over-long model response
-// would be rejected by the database; 100 runes stays well clear of that limit
-// while still being a reasonable title length in the UI.
-const maxSessionTitleRunes = 100
+// maxSessionTitleRunes matches the manual-title limit in the frontend while
+// staying well inside the sessions.title VARCHAR(255) column.
+const maxSessionTitleRunes = 80
 
-// sanitizeGeneratedTitle turns a raw title completion into something safe to
-// persist: the reasoning prefix some models emit is dropped, surrounding
-// whitespace is trimmed, and the result is truncated by rune (not byte) so a
-// multi-byte character is never cut in half. It reports whether truncation
-// happened so the caller can log it.
+// sanitizeGeneratedTitle accepts only the single-line plain-text contract used
+// by session titles. Models occasionally answer the user's question despite
+// the title prompt; rejecting multiline, Markdown, URL-bearing, or over-long
+// output lets the caller use the user's own question as a deterministic title
+// instead of persisting fabricated answer text or links.
 func sanitizeGeneratedTitle(raw string) (string, bool) {
-	title := strings.TrimSpace(strings.TrimPrefix(raw, "<think>\n\n</think>"))
-	runes := []rune(title)
-	if len(runes) <= maxSessionTitleRunes {
-		return title, false
+	title := strings.TrimSpace(raw)
+	if strings.HasPrefix(title, "<think>") {
+		if end := strings.Index(title, "</think>"); end >= 0 {
+			title = strings.TrimSpace(title[end+len("</think>"):])
+		}
 	}
-	return strings.TrimSpace(string(runes[:maxSessionTitleRunes])), true
+	if strings.ContainsAny(title, "\r\n") {
+		return "", true
+	}
+	lower := strings.ToLower(title)
+	if strings.Contains(lower, "http://") ||
+		strings.Contains(lower, "https://") ||
+		strings.Contains(lower, "www.") ||
+		strings.Contains(title, "](") ||
+		strings.Contains(title, "**") ||
+		strings.Contains(title, "`") {
+		return "", true
+	}
+	title = strings.TrimSpace(strings.Trim(title, "\"'#*`“”‘’"))
+	runes := []rune(title)
+	if len(runes) == 0 || len(runes) > maxSessionTitleRunes {
+		return "", true
+	}
+	return title, false
+}
+
+// fallbackSessionTitle derives a bounded title from the text the user actually
+// supplied. It prefers the first complete question so instruction-heavy first
+// turns remain readable in the sidebar without another model call.
+func fallbackSessionTitle(query string) string {
+	title := strings.Join(strings.Fields(query), " ")
+	title = strings.TrimSpace(strings.Trim(title, "\"'#*`“”‘’"))
+	runes := []rune(title)
+	for i, r := range runes {
+		if i >= 3 && (r == '?' || r == '？' || r == '!' || r == '！') {
+			runes = runes[:i]
+			break
+		}
+	}
+	if len(runes) > maxSessionTitleRunes {
+		runes = runes[:maxSessionTitleRunes]
+	}
+	return strings.TrimSpace(string(runes))
 }
 
 // GenerateTitle generates a title for the current conversation content
@@ -844,13 +879,18 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 		return "", err
 	}
 
-	// Process and store the generated title
-	title, truncated := sanitizeGeneratedTitle(response.Content)
-	if truncated {
+	// Process and store the generated title. A model completion that does not
+	// honor the title-only contract falls back to the user's own first question.
+	title, rejected := sanitizeGeneratedTitle(response.Content)
+	if rejected {
+		title = fallbackSessionTitle(message.Content)
 		logger.Warnf(ctx,
-			"Generated session title exceeded %d runes and was truncated, session=%s, model=%s",
-			maxSessionTitleRunes, session.ID, modelID,
+			"Generated session title violated the plain-text contract; used user-query fallback, session=%s, model=%s",
+			session.ID, modelID,
 		)
+	}
+	if title == "" {
+		return "", stderrors.New("generated session title is empty")
 	}
 	session.Title = title
 

@@ -44,3 +44,23 @@ func TestPromptTemplatesUseMusuwBranding(t *testing.T) {
 		t.Fatalf("prompt templates must identify the product as Musuw by 地底人; foundMusuw=%v foundDidiRen=%v", foundMusuw, foundDidiRen)
 	}
 }
+
+func TestSessionTitlePromptRequiresPlainTextWithoutLinks(t *testing.T) {
+	templates, err := loadPromptTemplates(filepath.Join("..", "..", "config"))
+	if err != nil {
+		t.Fatalf("load prompt templates: %v", err)
+	}
+
+	template := FindTemplateByID(templates, "default_session_title")
+	if template == nil {
+		t.Fatal("default_session_title prompt is missing")
+	}
+	for _, requirement := range []string{
+		"one line of plain text",
+		"Do not include Markdown, URLs, citations",
+	} {
+		if !strings.Contains(template.Content, requirement) {
+			t.Fatalf("default_session_title prompt must contain %q", requirement)
+		}
+	}
+}

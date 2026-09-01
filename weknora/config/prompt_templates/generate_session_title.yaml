@@ -10,5 +10,6 @@ templates:
       Requirements:
       - 4-10 words
       - Only extract the intent of the user's question, don't answer about it
-      - Output only the title, no explanation needed
+      - Output exactly one line of plain text
+      - Do not include Markdown, URLs, citations, quotes, labels, or explanations
       - IMPORTANT: Use {{language}} for the title
