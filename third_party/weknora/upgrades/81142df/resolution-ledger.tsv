@@ -556,7 +556,7 @@ frontend/src/views/platform/index.vue	M	M	100644	4a9dcba361e831dae8c6872f5088b6b
 frontend/src/views/settings/EnvVarSettings.vue	-	A	100644	c5ae02808469ef725306b22de3bc9af10e756f67	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/settings/GeneralSettings.vue	M	-	100644	f38fcba97943521f7a604f6f499d407fd58c3aa7	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/McpSettings.vue	M	-	100644	a72ce2dd0eade8b3b7ea50e04fc704563e809a72	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/views/settings/MemorySettings.vue	-	A	100644	72627810ba07d46815fec7e55991f88f359fac1b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
+frontend/src/views/settings/MemorySettings.vue	-	A	100644	5a8ee2f817807e3022bf86bdadc173aafa54a388	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/views/settings/MemoryWorkspaceSettings.vue	-	A	100644	a8295cde7931841e1cf29d89528eb7b52bdfbe87	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/views/settings/ModelSettings.consumerScene.test.mjs	A	-	100644	e45a8e7595cb87e35b919e011efd601fe89653b3	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/ModelSettings.vue	M	M	100644	ba50b3cfac06190ac953808cefae3920b161364a	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
