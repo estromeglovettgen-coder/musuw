@@ -52,6 +52,18 @@ test("storefront responsive media and final CTA rules stay bounded", () => {
   assert.match(mobile, /\.final-cta-dashboard-frame\s*\{[^}]*aspect-ratio:\s*16\s*\/\s*10\s*;/s);
 });
 
+test("desktop-floor footer keeps every legal link inside the 1024px viewport", () => {
+  const styles = readFileSync(join(root, "src/styles.css"), "utf8");
+  const narrowDesktop = mediaBlock(styles, "min-width: 1024px) and (max-width: 1239px");
+  const footerGrid = cssRule(narrowDesktop, "\\.footer-grid");
+
+  assert.match(
+    footerGrid,
+    /grid-template-columns:\s*minmax\(240px,\s*1\.75fr\)\s+repeat\(3,\s*minmax\(0,\s*1fr\)\)\s*;/s,
+  );
+  assert.match(footerGrid, /gap:\s*clamp\(24px,\s*4vw,\s*48px\)\s*;/s);
+});
+
 test("marketing comparison and pricing stay aligned across desktop and mobile", () => {
   const styles = readFileSync(join(root, "src/marketing-refresh.css"), "utf8");
   const mobile = mediaBlock(styles, "max-width: 767px");
