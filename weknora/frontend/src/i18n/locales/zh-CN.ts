@@ -5103,6 +5103,7 @@ export default {
   memoryWorkspaceSettings: {
     title: '长期记忆',
     description: '让助手跨会话记住成员说过的个人信息、偏好、事实与在办事项。',
+    loadError: '长期记忆设置加载失败，请重试。',
     introTitle: '默认关闭，需要你显式开启',
     introDescription: '长期记忆会保留成员在对话中说过的内容，因此默认不开启。开启后每位成员的记忆彼此隔离，成员可以在「我的记忆」里随时查看、修改、删除或整体关闭。生效中的个人信息与偏好会进入之后的每一轮对话；事实和在办事项只在相关问题时召回。',
     enableLabel: '在本空间启用长期记忆',

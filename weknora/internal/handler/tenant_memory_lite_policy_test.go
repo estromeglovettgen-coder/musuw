@@ -7,11 +7,93 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func newTenantMemoryRoleTestEngine(t *testing.T, role types.TenantRole, tenant *types.Tenant) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	h := &TenantHandler{service: &stubTenantService{tenant: tenant}}
+	enforced := true
+	cfg := &config.Config{Tenant: &config.TenantConfig{EnableRBAC: &enforced}}
+
+	r := gin.New()
+	r.Use(middleware.ErrorHandler())
+	r.Use(func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), types.TenantIDContextKey, tenant.ID)
+		ctx = context.WithValue(ctx, types.TenantRoleContextKey, role)
+		ctx = context.WithValue(ctx, types.TenantInfoContextKey, tenant)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
+	r.GET("/tenants/kv/:key", middleware.RequireRole(types.TenantRoleViewer, cfg), h.GetTenantKV)
+	r.PUT("/tenants/kv/:key", middleware.RequireRole(types.TenantRoleAdmin, cfg), h.UpdateTenantKV)
+	return r
+}
+
+func TestTenantMemoryConfigViewerReadAndAdminWriteBoundary(t *testing.T) {
+	t.Parallel()
+
+	t.Run("viewer can read", func(t *testing.T) {
+		t.Parallel()
+		tenant := &types.Tenant{ID: 1, MemoryConfig: &types.MemoryConfig{
+			Enabled:             true,
+			WriteMode:           types.MemoryWriteExplicitOnly,
+			MaxItems:            321,
+			ExtractDelaySeconds: 7,
+		}}
+		engine := newTenantMemoryRoleTestEngine(t, types.TenantRoleViewer, tenant)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/tenants/kv/memory-config", nil)
+		engine.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"max_items":321`)
+	})
+
+	t.Run("viewer cannot write", func(t *testing.T) {
+		t.Parallel()
+		tenant := &types.Tenant{ID: 1, MemoryConfig: &types.MemoryConfig{
+			Enabled:   false,
+			WriteMode: types.MemoryWriteExplicitOnly,
+			MaxItems:  321,
+		}}
+		engine := newTenantMemoryRoleTestEngine(t, types.TenantRoleViewer, tenant)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/tenants/kv/memory-config", strings.NewReader(`{"enabled":true,"max_items":17}`))
+		req.Header.Set("Content-Type", "application/json")
+		engine.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusForbidden, rec.Code)
+		require.False(t, tenant.MemoryConfig.Enabled)
+		require.Equal(t, 321, tenant.MemoryConfig.MaxItems)
+	})
+
+	t.Run("admin can write", func(t *testing.T) {
+		t.Parallel()
+		tenant := &types.Tenant{ID: 1, MemoryConfig: &types.MemoryConfig{
+			Enabled:   false,
+			WriteMode: types.MemoryWriteExplicitOnly,
+			MaxItems:  321,
+		}}
+		engine := newTenantMemoryRoleTestEngine(t, types.TenantRoleAdmin, tenant)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/tenants/kv/memory-config", strings.NewReader(`{"enabled":true,"max_items":17}`))
+		req.Header.Set("Content-Type", "application/json")
+		engine.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.True(t, tenant.MemoryConfig.Enabled)
+		require.Equal(t, 17, tenant.MemoryConfig.MaxItems)
+	})
+}
 
 func TestUpdateTenantMemoryConfigLitePersistsCompleteVisibleConfig(t *testing.T) {
 	originalEdition := Edition

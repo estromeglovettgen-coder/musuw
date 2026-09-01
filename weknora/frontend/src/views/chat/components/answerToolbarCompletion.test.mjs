@@ -45,6 +45,33 @@ test('artifact toolbar uses a folder icon and replaces it while collecting', () 
   assert.doesNotMatch(agentStream, /answer-toolbar__artifact[\s\S]{0,800}:loading=/)
 })
 
+test('Lite agent streams keep sandbox artifacts completely hidden', () => {
+  assert.match(
+    agentStream,
+    /const artifactList = computed\(\(\) => \{\s*if \(authStore\.isLiteMode\) return \[\]/,
+  )
+  assert.match(
+    agentStream,
+    /const artifactsCollecting = computed\(\(\) => !authStore\.isLiteMode && isCollectingSkillArtifacts\(/,
+  )
+  assert.match(
+    agentStream,
+    /<span v-if="!authStore\.isLiteMode && \(hasArtifacts \|\| artifactsCollecting\)"[^>]*class="answer-toolbar__artifact"/,
+  )
+  assert.match(
+    agentStream,
+    /<ChatArtifactsDrawer\s+v-if="!authStore\.isLiteMode && hasArtifacts && sessionIdForArtifacts && messageIdForArtifacts"/,
+  )
+  assert.match(
+    agentStream,
+    /function openArtifactDrawer\(previewIndex: number \| null = null\) \{\s*if \(authStore\.isLiteMode \|\| !hasArtifacts\.value\) return;/,
+  )
+  assert.match(
+    agentStream,
+    /agentRenderer\.image = function agentImageRenderer\(token\) \{\s*if \(authStore\.isLiteMode\) return defaultImageRenderer\.call\(this, token\);/,
+  )
+})
+
 test('follow-up loading is shown compactly inside both answer toolbars', () => {
   assert.match(chatView, /:follow-up-loading="Boolean\(session\.suggestionLoading/)
   assert.match(botMessage, /class="visual-assistant-toolbar__loading"/)

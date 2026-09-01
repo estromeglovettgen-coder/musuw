@@ -17,6 +17,11 @@ Lite SHALL expose personal memory management and the complete workspace memory p
 - **WHEN** a Lite non-admin navigates directly to workspace memory policy
 - **THEN** the complete policy remains visible in read-only form while update authority stays Admin-only
 
+#### Scenario: Memory visual structure
+- **WHEN** a member views personal or workspace Memory in desktop, narrow, light, or dark mode
+- **THEN** headers, notices, direct controls, Advanced disclosure, list toolbar, rows, actions, empty/loading/error states, and control widths follow the existing Musuw settings component rhythm
+- **AND** upstream cards, oversized tab chrome, or independent form spacing do not create a second settings design language
+
 ### Requirement: Memory use remains understandable in chat and agents
 Lite SHALL present memory as a user-controlled product behavior in chat and agents while keeping detailed model, vector, and scheduling choices in the workspace Memory settings page.
 
@@ -27,6 +32,10 @@ Lite SHALL present memory as a user-controlled product behavior in chat and agen
 #### Scenario: Agent memory control
 - **WHEN** a Lite user edits an eligible agent
 - **THEN** memory is expressed as a plain product control that respects workspace and personal policy
+
+#### Scenario: Agent and upload settings remain in the same visual family
+- **WHEN** an exposed Agent or upload-time setting uses a selector, segmented choice, disclosure, or attachment option
+- **THEN** it is placed in the shared Musuw setting-row structure, remains fully readable without horizontal clipping, and collapses to the existing narrow layout
 
 ### Requirement: Low-cost main chat improvements remain available
 Lite SHALL retain stable main chat improvements that do not require Sandbox or Skills, including question navigation, message dates, Mermaid streaming improvements, memory rows, and ordinary attachment/document preview.

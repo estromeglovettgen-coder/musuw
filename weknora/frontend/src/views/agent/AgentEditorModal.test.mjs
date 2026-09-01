@@ -247,7 +247,7 @@ test('quick agents retain hidden context validation and model errors return to B
   )
 })
 
-test('knowledge scope keeps native selection controls but hides file type restrictions', () => {
+test('knowledge scope keeps bounded selection controls but hides file type restrictions', () => {
   const knowledgeSection = source.slice(
     source.indexOf('<!-- 知识库配置 -->'),
     source.indexOf('<!-- 网络搜索设置 -->'),
@@ -256,6 +256,29 @@ test('knowledge scope keeps native selection controls but hides file type restri
   assert.match(knowledgeSection, /kbSelectionMode === 'selected'/)
   assert.match(knowledgeSection, /retrieve_kb_only_when_mentioned/)
   assert.match(knowledgeSection, /v-if="false"\s+data-agent-hidden-field="supported-file-types"/)
+})
+
+test('scope selectors use a bounded Musuw setting control instead of a clipped radio strip', () => {
+  const scopeLabels = [
+    'agent.editor.knowledgeBases',
+    'agentEditor.mcp.label',
+    'agent.editor.skillsSelection',
+  ]
+  for (const label of scopeLabels) {
+    assert.ok(source.includes(label), `expected scope label ${label}`)
+  }
+  assert.match(source, /class="setting-control agent-scope-select-control"[\s\S]*?<t-select[\s\S]*?kbSelectionMode/)
+  assert.match(source, /class="setting-control agent-scope-select-control"[\s\S]*?<t-select[\s\S]*?mcpSelectionMode/)
+  assert.match(source, /class="setting-control agent-scope-select-control"[\s\S]*?<t-select[\s\S]*?skillsSelectionMode/)
+  assert.doesNotMatch(source, /agent-segmented-control agent-segmented-control--scope/)
+  assert.doesNotMatch(source, /agent-segmented-control--scope\s*\{[\s\S]*?overflow-x\s*:/)
+})
+
+test('agent tool choices keep the settings-row language and compact neutral cards', () => {
+  const toolSection = source.slice(source.lastIndexOf('class="setting-row setting-row-vertical"', source.indexOf('data-agent-field="allowed_tools"')), source.indexOf('<!-- 有效工具预览'))
+  assert.match(toolSection, /setting-row setting-row-vertical/)
+  assert.match(toolSection, /tool-card--compact/)
+  assert.doesNotMatch(toolSection, /background:\s*(?:#(?:0*eaf|fff7|fef)|var\(--td-(?:brand|warning)-color-[^)]+\))/)
 })
 
 test('conversation settings stay reachable in smart-reasoning mode', () => {

@@ -22,6 +22,15 @@ The Lite knowledge editor SHALL render only Basic and Advanced product sections 
 - **WHEN** a Lite user views either supported section in light, dark, desktop, or narrow layout
 - **THEN** it uses the existing Musuw modal, setting-row, control-width, spacing, focus, and responsive conventions
 
+#### Scenario: Shared layout structure
+- **WHEN** Basic or Advanced knowledge settings are rendered
+- **THEN** the editor uses the shared Musuw settings shell with left-side section navigation, page header, unboxed setting rows, bounded controls, and shared footer
+- **AND** it does not render an upstream-style top tab strip, card-grid form, or independent modal geometry
+
+#### Scenario: Standard exposes additional sections
+- **WHEN** an internal Standard administrator opens the full knowledge editor
+- **THEN** the additional upstream sections use the same Musuw shell and row grammar without changing their capabilities
+
 ### Requirement: Automatic tags are a managed product switch
 Lite users SHALL be able to enable automatic association of existing tags without selecting a model. Lite SHALL use `builtin-deepseek-v4-flash`, at most three matches, and SHALL preserve manual tags.
 

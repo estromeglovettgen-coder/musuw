@@ -1,19 +1,37 @@
 <template>
   <div class="memory-workspace-settings">
-    <div class="section-header">
-      <h2>{{ t('memoryWorkspaceSettings.title') }}</h2>
-      <p class="section-description">{{ t('memoryWorkspaceSettings.description') }}</p>
-    </div>
+    <header class="visual-settings-page-header">
+      <div class="visual-settings-page-header__copy">
+        <h2 class="visual-settings-page-header__title">{{ t('memoryWorkspaceSettings.title') }}</h2>
+        <p class="visual-settings-page-header__description">{{ t('memoryWorkspaceSettings.description') }}</p>
+      </div>
+    </header>
 
     <!-- The switch defaults to off because memory retains what users say
          across sessions. That makes the feature easy to miss, so the intro
          states plainly what turning it on does. -->
-    <div class="intro">
-      <t-icon name="info-circle" class="intro-icon" />
-      <div>
-        <p class="intro-title">{{ t('memoryWorkspaceSettings.introTitle') }}</p>
-        <p class="intro-desc">{{ t('memoryWorkspaceSettings.introDescription') }}</p>
-      </div>
+    <p class="settings-note">
+      <t-icon name="info-circle" aria-hidden="true" />
+      <span>
+        <strong>{{ t('memoryWorkspaceSettings.introTitle') }}</strong>
+        {{ t('memoryWorkspaceSettings.introDescription') }}
+      </span>
+    </p>
+
+    <div v-if="loadError" class="settings-load-error" role="alert">
+      <span class="settings-load-error__message">
+        <t-icon name="error-circle-filled" aria-hidden="true" />
+        {{ t('memoryWorkspaceSettings.loadError') }}
+      </span>
+      <t-button
+        size="small"
+        variant="text"
+        :loading="isInitializing"
+        :disabled="isInitializing"
+        @click="loadConfig"
+      >
+        {{ t('common.retry') }}
+      </t-button>
     </div>
 
     <div class="settings-group">
@@ -23,7 +41,11 @@
           <p class="desc">{{ t('memoryWorkspaceSettings.enableDescription') }}</p>
         </div>
         <div class="setting-control">
-          <t-switch v-model="config.enabled" :disabled="!canEdit" @change="debouncedSave" />
+          <t-switch
+            v-model="config.enabled"
+            :disabled="!canEdit || !configLoaded"
+            @change="debouncedSave"
+          />
         </div>
       </div>
 
@@ -42,7 +64,7 @@
         <div class="setting-control">
           <t-radio-group
             v-model="config.write_mode"
-            :disabled="!canEdit || !config.enabled"
+            :disabled="!canEdit || !configLoaded || !config.enabled"
             @change="debouncedSave"
           >
             <t-radio-button value="explicit_only">
@@ -63,7 +85,7 @@
         <div class="setting-control">
           <t-switch
             v-model="config.retrieval_conditioning"
-            :disabled="!canEdit || !config.enabled"
+            :disabled="!canEdit || !configLoaded || !config.enabled"
             @change="debouncedSave"
           />
         </div>
@@ -80,7 +102,7 @@
             :min="10"
             :max="2000"
             :step="10"
-            :disabled="!canEdit || !config.enabled"
+            :disabled="!canEdit || !configLoaded || !config.enabled"
             @change="debouncedSave"
           />
         </div>
@@ -88,7 +110,7 @@
 
       <button
         type="button"
-        class="advanced-toggle"
+        class="setting-row setting-row--disclosure advanced-toggle"
         :aria-expanded="advancedOpen"
         aria-controls="memory-advanced-settings"
         @click="advancedOpen = !advancedOpen"
@@ -226,14 +248,14 @@
         </div>
 
         <div
-          class="setting-row instructions-row"
+          class="setting-row setting-row-vertical instructions-row"
           :class="{ 'is-disabled': advancedDisabled || config.write_mode !== 'auto' }"
         >
           <div class="setting-info">
             <label>{{ t('memoryWorkspaceSettings.instructionsLabel') }}</label>
             <p class="desc">{{ t('memoryWorkspaceSettings.instructionsDescription') }}</p>
           </div>
-          <div class="setting-control instructions-control">
+          <div class="setting-control setting-control-full instructions-control">
             <t-textarea
               v-model="config.extract_instructions"
               :autosize="{ minRows: 3, maxRows: 8 }"
@@ -276,29 +298,36 @@ const config = reactive<MemoryConfig>({
   vector_recall: true,
 })
 const isInitializing = ref(true)
+const configLoaded = ref(false)
+const loadError = ref(false)
 const advancedOpen = ref(false)
 
 const canEdit = computed(() => authStore.hasRole('admin'))
-const advancedDisabled = computed(() => !canEdit.value || !config.enabled)
+const advancedDisabled = computed(() => !canEdit.value || !configLoaded.value || !config.enabled)
 
 const loadConfig = async () => {
+  isInitializing.value = true
+  configLoaded.value = false
+  loadError.value = false
   try {
     const response = await getTenantMemoryConfig()
-    if (response.data) {
-      config.enabled = response.data.enabled ?? false
-      config.write_mode = response.data.write_mode === 'auto' ? 'auto' : 'explicit_only'
-      config.extract_model_id = response.data.extract_model_id || ''
-      config.max_items = response.data.max_items || 200
-      config.extract_delay_seconds = response.data.extract_delay_seconds || 90
-      config.extract_min_interval_seconds = response.data.extract_min_interval_seconds || 300
-      config.extract_instructions = response.data.extract_instructions || ''
-      config.interest_threshold = response.data.interest_threshold || 3
-      config.retrieval_conditioning = response.data.retrieval_conditioning !== false
-      config.embedding_model_id = response.data.embedding_model_id || ''
-      config.vector_recall = response.data.vector_recall !== false
-    }
+    if (!response.data) throw new Error('Memory workspace configuration was empty')
+
+    config.enabled = response.data.enabled ?? false
+    config.write_mode = response.data.write_mode === 'auto' ? 'auto' : 'explicit_only'
+    config.extract_model_id = response.data.extract_model_id ?? ''
+    config.max_items = response.data.max_items ?? 200
+    config.extract_delay_seconds = response.data.extract_delay_seconds ?? 90
+    config.extract_min_interval_seconds = response.data.extract_min_interval_seconds ?? 300
+    config.extract_instructions = response.data.extract_instructions ?? ''
+    config.interest_threshold = response.data.interest_threshold ?? 3
+    config.retrieval_conditioning = response.data.retrieval_conditioning !== false
+    config.embedding_model_id = response.data.embedding_model_id ?? ''
+    config.vector_recall = response.data.vector_recall !== false
+    configLoaded.value = true
   } catch (error: any) {
     console.error('Failed to load memory config:', error)
+    loadError.value = true
   } finally {
     // Give the switches a tick to settle so binding the loaded values does not
     // immediately fire a save.
@@ -309,6 +338,8 @@ const loadConfig = async () => {
 }
 
 const saveConfig = async () => {
+  if (!configLoaded.value || loadError.value || isInitializing.value || !canEdit.value) return
+
   try {
     await updateTenantMemoryConfig({ ...config })
     MessagePlugin.success(t('memoryWorkspaceSettings.toasts.saveSuccess'))
@@ -321,7 +352,7 @@ const saveConfig = async () => {
 
 let saveTimer: number | null = null
 const debouncedSave = () => {
-  if (isInitializing.value || !canEdit.value) return
+  if (isInitializing.value || !configLoaded.value || loadError.value || !canEdit.value) return
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = window.setTimeout(() => {
     saveConfig().catch(() => {})
@@ -353,52 +384,48 @@ onMounted(loadConfig)
   width: 100%;
 }
 
-.section-header {
-  margin-bottom: 24px;
-
-  h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0 0 8px 0;
-  }
-
-  .section-description {
-    font-size: 14px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
-  }
-}
-
-.intro {
+.settings-note {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  background: var(--td-bg-color-secondarycontainer);
-}
-
-.intro-icon {
-  color: var(--td-brand-color);
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.intro-title {
-  margin: 0 0 4px 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--td-text-color-primary);
-}
-
-.intro-desc {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
+  padding: 8px 0;
   color: var(--td-text-color-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-note :deep(.t-icon) {
+  flex-shrink: 0;
+  color: var(--td-text-color-placeholder);
+}
+
+.settings-note strong {
+  margin-right: 4px;
+  color: var(--td-text-color-primary);
+  font-weight: 600;
+}
+
+.settings-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--td-error-color-3, #f3b8b8);
+  border-radius: 10px;
+  background: var(--td-error-color-1, #fff1f0);
+  color: var(--td-error-color-7, #c93e3e);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-load-error__message {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .settings-group {
@@ -407,16 +434,6 @@ onMounted(loadConfig)
 }
 
 .setting-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--td-component-stroke);
-
-  &:last-child {
-    border-bottom: none;
-  }
-
   &.is-disabled {
     .setting-info label,
     .setting-info .desc {
@@ -425,57 +442,16 @@ onMounted(loadConfig)
   }
 }
 
-.setting-info {
-  flex: 1;
-  max-width: 65%;
-  padding-right: 24px;
-
-  label {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--td-text-color-primary);
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  .desc {
-    font-size: 13px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
-  }
-
-  .hint {
-    margin-top: 4px !important;
-    color: var(--td-text-color-placeholder);
-  }
-}
-
-.setting-control {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-}
-
 .model-control {
-  width: 280px;
+  width: 100%;
+  max-width: 280px;
 }
 
 .advanced-toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  padding: 16px 0;
-  margin: 0;
-  color: var(--td-text-color-secondary);
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--td-component-stroke);
-  font: inherit;
-  text-align: left;
+  align-items: center;
+  gap: 10px;
   cursor: pointer;
+  color: var(--td-text-color-secondary);
 
   &:hover {
     color: var(--td-text-color-primary);
@@ -513,30 +489,22 @@ onMounted(loadConfig)
 
 .advanced-toggle-description {
   color: var(--td-text-color-secondary);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.advanced-section {
-  display: flex;
-  flex-direction: column;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 // The custom prompt needs room to read, so this row stacks instead of putting a
 // paragraph of rules into a narrow right-hand column.
 .instructions-row {
-  flex-direction: column;
-  align-items: stretch;
-
   .setting-info {
     max-width: 100%;
     padding-right: 0;
-    margin-bottom: 10px;
   }
 }
 
 .instructions-control {
   width: 100%;
+  max-width: none;
   justify-content: stretch;
 }
 

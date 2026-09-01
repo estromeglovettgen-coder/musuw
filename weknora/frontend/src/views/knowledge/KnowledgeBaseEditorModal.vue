@@ -1,84 +1,62 @@
 <template>
-  <Teleport to="body">
-    <Transition name="kb-config">
-      <div v-if="visible" class="kb-config-overlay" @click.self="handleClose">
-        <section
-          class="kb-config-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="kb-config-title"
-          :aria-busy="loading"
-        >
-          <header class="kb-config-header">
-            <div class="kb-config-header__copy">
-              <h2 id="kb-config-title">
-                <t-icon name="folder-add" aria-hidden="true" />
-                <span>
-                  {{
-                    editorMode === 'create'
-                      ? $t('knowledgeEditor.titleCreate')
-                      : $t('knowledgeEditor.titleEdit')
-                  }}
-                </span>
-              </h2>
-              <p>{{ $t('knowledgeEditor.modalDescription') }}</p>
+  <VisualSettingsShell
+    :visible="visible"
+    :dialog-label="editorTitle"
+    :content-label="currentSectionLabel"
+    content-wide
+    modal-class="kb-settings-shell"
+    content-class="kb-settings-content"
+    @close="handleClose"
+  >
+    <template #nav>
+      <button
+        v-for="item in navItems"
+        :key="item.key"
+        type="button"
+        class="visual-settings-nav__item"
+        :class="{ 'is-active': currentSection === item.key }"
+        :aria-current="currentSection === item.key ? 'page' : undefined"
+        :data-guide="`kb-editor-nav-${item.key}`"
+        @click="currentSection = item.key"
+      >
+        <span class="nav-label">{{ item.label }}</span>
+        <span v-if="item.badge" class="kb-settings-nav-badge">{{ item.badge }}</span>
+      </button>
+    </template>
+
+    <div v-if="loading && !formData" class="kb-settings-loading">
+      <t-loading size="medium" />
+    </div>
+
+    <form v-if="formData" class="kb-settings-scroll" @submit.prevent="handleSubmit">
+      <div v-show="currentSection === 'basic'" class="kb-config-section section">
+        <div class="section-header">
+          <h2>{{ $t('knowledgeEditor.sidebar.basic') }}</h2>
+          <p class="section-description">{{ $t('knowledgeEditor.modalDescription') }}</p>
+        </div>
+
+        <div class="settings-group">
+          <section v-if="editorMode === 'edit' && activeKbId" class="setting-row">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.basic.kbId') }}</label>
+              <p class="desc">{{ $t('knowledgeEditor.basic.kbIdDesc') }}</p>
             </div>
-            <button
-              type="button"
-              class="kb-config-close"
-              :aria-label="$t('general.close')"
-              :title="$t('general.close')"
-              @click="handleClose"
-            >
-              <t-icon name="close" aria-hidden="true" />
-            </button>
-          </header>
-
-          <div v-if="loading && !formData" class="kb-config-loading">
-            <t-loading size="medium" />
-          </div>
-
-          <form v-if="formData" class="kb-config-form" @submit.prevent="handleSubmit">
-            <nav
-              v-if="navItems.length > 1"
-              class="kb-config-nav"
-              aria-label="Knowledge base settings sections"
-              data-guide="kb-editor-sidebar"
-            >
-              <button
-                v-for="item in navItems"
-                :key="item.key"
-                type="button"
-                class="kb-config-nav__item"
-                :class="{ 'is-active': currentSection === item.key }"
-                :data-guide="`kb-editor-nav-${item.key}`"
-                @click="currentSection = item.key"
-              >
-                <t-icon :name="item.icon" aria-hidden="true" />
-                <span>{{ item.label }}</span>
-                <span v-if="item.badge" class="kb-config-nav__badge">{{ item.badge }}</span>
-              </button>
-            </nav>
-
-            <div v-show="currentSection === 'basic'" class="kb-config-section">
-            <section v-if="editorMode === 'edit' && activeKbId" class="kb-config-field kb-config-id-field">
-              <div class="kb-config-field__heading">
-                <label>{{ $t('knowledgeEditor.basic.kbId') }}</label>
-                <p>{{ $t('knowledgeEditor.basic.kbIdDesc') }}</p>
-              </div>
+            <div class="setting-control">
               <div class="kb-config-id-control">
                 <code class="kb-config-id-value" :title="activeKbId">{{ activeKbId }}</code>
-                <button type="button" class="kb-config-id-copy" :title="$t('common.copy')" @click="copyKbId">
+                <t-button variant="text" shape="square" size="small" :title="$t('common.copy')" @click="copyKbId">
                   <t-icon name="file-copy" aria-hidden="true" />
-                </button>
+                </t-button>
               </div>
-            </section>
+            </div>
+          </section>
 
-            <section v-if="!authStore.isLiteMode" class="kb-config-field">
-              <div class="kb-config-field__heading">
-                <label class="is-required">{{ $t('knowledgeEditor.basic.typeLabel') }}</label>
-                <p>{{ $t('knowledgeEditor.basic.typeDescription') }}</p>
-              </div>
+          <section v-if="!authStore.isLiteMode" class="setting-row">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.basic.typeLabel') }} <span class="is-required">*</span></label>
+              <p class="desc">{{ $t('knowledgeEditor.basic.typeDescription') }}</p>
+            </div>
+            <div class="setting-control">
               <t-radio-group
                 v-model="formData.type"
                 :disabled="editorMode === 'edit'"
@@ -87,129 +65,89 @@
                 <t-radio-button value="document">{{ $t('knowledgeEditor.basic.typeDocument') }}</t-radio-button>
                 <t-radio-button value="faq">{{ $t('knowledgeEditor.basic.typeFAQ') }}</t-radio-button>
               </t-radio-group>
-            </section>
+            </div>
+          </section>
 
-            <section v-if="!isFAQ" class="kb-config-field">
-              <div class="kb-config-field__heading">
-                <label class="is-required">{{ $t('knowledgeEditor.indexing.title') }}</label>
-                <p>{{ $t('knowledgeEditor.indexing.description') }}</p>
-              </div>
-              <div class="kb-config-strategies" data-guide="kb-create-indexing">
-                <button
-                  type="button"
-                  class="kb-config-strategy"
-                  :class="{
-                    'is-selected': formData.indexingStrategy.vectorEnabled,
-                    'is-disabled': isIndexingLocked,
-                  }"
-                  :disabled="isIndexingLocked"
-                  @click="toggleVectorIndexing"
-                >
-                  <span class="kb-config-strategy__check" aria-hidden="true">
-                    <t-icon v-if="formData.indexingStrategy.vectorEnabled" name="check" />
-                  </span>
-                  <span class="kb-config-strategy__copy">
-                    <strong>{{ $t('knowledgeEditor.indexing.searchTitle') }}</strong>
-                    <small>{{ $t('knowledgeEditor.indexing.searchDesc') }}</small>
-                  </span>
-                </button>
+          <section v-if="!isFAQ" class="setting-row" data-guide="kb-create-indexing">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.indexing.searchTitle') }}</label>
+              <p class="desc">{{ $t('knowledgeEditor.indexing.searchDesc') }}</p>
+            </div>
+            <div class="setting-control">
+              <t-switch
+                v-model="formData.indexingStrategy.vectorEnabled"
+                :disabled="isIndexingLocked"
+                @change="handleVectorIndexingChange"
+              />
+            </div>
+          </section>
 
-                <button
-                  type="button"
-                  class="kb-config-strategy"
-                  :class="{
-                    'is-selected': formData.indexingStrategy.wikiEnabled,
-                    'is-disabled': isIndexingLocked,
-                  }"
-                  :disabled="isIndexingLocked"
-                  @click="toggleWikiIndexing"
-                >
-                  <span class="kb-config-strategy__check" aria-hidden="true">
-                    <t-icon v-if="formData.indexingStrategy.wikiEnabled" name="check" />
-                  </span>
-                  <span class="kb-config-strategy__copy">
-                    <strong>
-                      <span>{{ $t('knowledgeEditor.indexing.wikiTitle') }}</span>
-                      <span class="kb-config-new-badge">NEW</span>
-                    </strong>
-                    <small>{{ $t('knowledgeEditor.indexing.wikiDesc') }}</small>
-                  </span>
-                </button>
-              </div>
+          <section v-if="!isFAQ" class="setting-row">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.indexing.wikiTitle') }}</label>
+              <p class="desc">{{ $t('knowledgeEditor.indexing.wikiDesc') }}</p>
               <p v-if="isIndexingLocked" class="kb-config-locked-tip">
                 {{ $t('knowledgeEditor.indexing.lockedTip') }}
               </p>
-            </section>
+            </div>
+            <div class="setting-control">
+              <t-switch
+                v-model="formData.indexingStrategy.wikiEnabled"
+                :disabled="isIndexingLocked"
+              />
+            </div>
+          </section>
 
-            <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="kb-config-field">
-              <div class="kb-config-field__heading">
-                <label>{{ $t('knowledgeEditor.wiki.extractionGranularityLabel') }}</label>
-                <p>{{ $t('knowledgeEditor.wiki.extractionGranularityTip') }}</p>
-              </div>
-              <div class="kb-config-granularity">
-                <button
-                  type="button"
-                  :class="{ 'is-selected': resolvedGranularity === 'focused' }"
-                  @click="handleGranularityChange('focused')"
-                >
-                  {{ $t('knowledgeEditor.wiki.granularityFocused') }}
-                </button>
-                <button
-                  type="button"
-                  :class="{ 'is-selected': resolvedGranularity === 'standard' }"
-                  @click="handleGranularityChange('standard')"
-                >
-                  {{ $t('knowledgeEditor.wiki.granularityStandard') }}
-                </button>
-                <button
-                  type="button"
-                  :class="{ 'is-selected': resolvedGranularity === 'exhaustive' }"
-                  @click="handleGranularityChange('exhaustive')"
-                >
-                  {{ $t('knowledgeEditor.wiki.granularityExhaustive') }}
-                </button>
-              </div>
-              <p class="kb-config-granularity__hint">{{ granularityHint }}</p>
-            </section>
+          <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="setting-row">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.wiki.extractionGranularityLabel') }}</label>
+              <p class="desc">{{ $t('knowledgeEditor.wiki.extractionGranularityTip') }}</p>
+              <p class="desc kb-settings-hint">{{ granularityHint }}</p>
+            </div>
+            <div class="setting-control">
+              <t-select v-model="formData.wikiConfig.extractionGranularity">
+                <t-option value="focused" :label="$t('knowledgeEditor.wiki.granularityFocused')" />
+                <t-option value="standard" :label="$t('knowledgeEditor.wiki.granularityStandard')" />
+                <t-option value="exhaustive" :label="$t('knowledgeEditor.wiki.granularityExhaustive')" />
+              </t-select>
+            </div>
+          </section>
 
-            <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="kb-config-field">
-              <div class="kb-config-field__heading">
-                <label>{{ $t('knowledgeEditor.wiki.contentInstructionsLabel') }}</label>
-                <p>{{ $t('knowledgeEditor.wiki.contentInstructionsTip') }}</p>
-              </div>
+          <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="setting-row setting-row-vertical">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.wiki.contentInstructionsLabel') }}</label>
+              <p class="desc">{{ $t('knowledgeEditor.wiki.contentInstructionsTip') }}</p>
+            </div>
+            <div class="setting-control setting-control-full kb-settings-textarea">
               <t-textarea
                 v-model="formData.wikiConfig.contentInstructions"
-                class="kb-config-textarea"
                 :placeholder="$t('knowledgeEditor.wiki.contentInstructionsPlaceholder')"
                 :maxlength="4000"
                 :autosize="{ minRows: 3, maxRows: 7 }"
               />
-              <span class="kb-config-count">
-                {{ formData.wikiConfig.contentInstructions.length }}/4000
-              </span>
-            </section>
+            </div>
+          </section>
 
-            <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="kb-config-field">
-              <div class="kb-config-field__heading">
-                <label>{{ $t('knowledgeEditor.wiki.extractionInstructionsLabel') }}</label>
-                <p>{{ $t('knowledgeEditor.wiki.extractionInstructionsTip') }}</p>
-              </div>
+          <section v-if="!isFAQ && formData.indexingStrategy.wikiEnabled" class="setting-row setting-row-vertical">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.wiki.extractionInstructionsLabel') }}</label>
+              <p class="desc">{{ $t('knowledgeEditor.wiki.extractionInstructionsTip') }}</p>
+            </div>
+            <div class="setting-control setting-control-full kb-settings-textarea">
               <t-textarea
                 v-model="formData.wikiConfig.extractionInstructions"
-                class="kb-config-textarea"
                 :placeholder="$t('knowledgeEditor.wiki.extractionInstructionsPlaceholder')"
                 :maxlength="4000"
                 :autosize="{ minRows: 3, maxRows: 7 }"
               />
-              <span class="kb-config-count">
-                {{ formData.wikiConfig.extractionInstructions.length }}/4000
-              </span>
-            </section>
+            </div>
+          </section>
 
-            <section class="kb-config-field" data-guide="kb-create-name">
-              <div class="kb-config-field__heading">
-                <label class="is-required">{{ $t('knowledgeEditor.basic.nameLabel') }}</label>
-              </div>
+          <section class="setting-row" data-guide="kb-create-name">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.basic.nameLabel') }} <span class="is-required">*</span></label>
+            </div>
+            <div class="setting-control">
               <t-input
                 v-model="formData.name"
                 name="name"
@@ -217,23 +155,24 @@
                 :maxlength="50"
                 @enter="handleSubmit"
               />
-            </section>
+            </div>
+          </section>
 
-            <section class="kb-config-field">
-              <div class="kb-config-field__heading">
-                <label>{{ $t('knowledgeEditor.basic.descriptionLabel') }}</label>
-              </div>
+          <section class="setting-row setting-row-vertical">
+            <div class="setting-info">
+              <label>{{ $t('knowledgeEditor.basic.descriptionLabel') }}</label>
+            </div>
+            <div class="setting-control setting-control-full kb-settings-textarea">
               <t-textarea
                 v-model="formData.description"
-                class="kb-config-textarea"
                 :placeholder="$t('knowledgeEditor.basic.descriptionPlaceholder')"
                 :maxlength="200"
                 :autosize="{ minRows: 3, maxRows: 5 }"
               />
-              <span class="kb-config-count">{{ formData.description.length }}/200</span>
-            </section>
-
             </div>
+          </section>
+        </div>
+      </div>
 
             <!-- Standard-tier settings remain available through the compact section navigator. -->
             <div v-if="!authStore.isLiteMode && currentSection === 'models'" class="kb-config-section">
@@ -429,25 +368,24 @@
               <KnowledgeBaseActivitySettings v-if="activeKbId" :kb-id="activeKbId" :active="currentSection === 'activity'" />
             </div>
 
-            <footer class="kb-config-actions">
-              <button type="button" class="kb-config-button is-secondary" @click="handleClose">
-                {{ $t('common.cancel') }}
-              </button>
-              <button
-                type="submit"
-                class="kb-config-button is-primary"
-                data-guide="kb-create-submit"
-                :disabled="saving || (authStore.isLiteMode && !isFAQ && !formData.indexingStrategy.vectorEnabled && !formData.indexingStrategy.keywordEnabled && !formData.indexingStrategy.wikiEnabled)"
-              >
-                <t-icon :name="saving ? 'loading' : 'check'" :class="{ 'is-spinning': saving }" />
-                <span>{{ saveButtonLabel }}</span>
-              </button>
-            </footer>
-          </form>
-        </section>
-      </div>
-    </Transition>
-  </Teleport>
+    </form>
+
+    <template #footer>
+      <t-button variant="outline" @click="handleClose">
+        {{ $t('common.cancel') }}
+      </t-button>
+      <t-button
+        v-if="formData"
+        theme="primary"
+        data-guide="kb-create-submit"
+        :loading="saving"
+        :disabled="saving || (authStore.isLiteMode && !isFAQ && !formData.indexingStrategy.vectorEnabled && !formData.indexingStrategy.keywordEnabled && !formData.indexingStrategy.wikiEnabled)"
+        @click="handleSubmit"
+      >
+        {{ saveButtonLabel }}
+      </t-button>
+    </template>
+  </VisualSettingsShell>
 
   <KbCreateContextualGuide
     :when="false"
@@ -458,6 +396,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import KbCreateContextualGuide from '@/components/KbCreateContextualGuide.vue'
+import VisualSettingsShell from '@/views/settings/components/VisualSettingsShell.vue'
 import { KB_EDITOR_FOCUS_SECTION_EVENT, markContextualGuideDone } from '@/config/contextualGuides'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKnowledgeBase } from '@/api/knowledge-base'
@@ -515,6 +454,11 @@ const emit = defineEmits<{
 
 const editorMode = computed(() => props.mode)
 const activeKbId = computed(() => props.kbId)
+const editorTitle = computed(() =>
+  editorMode.value === 'create'
+    ? t('knowledgeEditor.titleCreate')
+    : t('knowledgeEditor.titleEdit')
+)
 const saveButtonLabel = computed(() =>
   editorMode.value === 'create'
     ? t('knowledgeEditor.buttons.confirmCreate')
@@ -659,6 +603,10 @@ const navItems = computed(() => {
   }
   return items
 })
+
+const currentSectionLabel = computed(() =>
+  navItems.value.find((item) => item.key === currentSection.value)?.label || editorTitle.value
+)
 
 // 左侧导航分组（与 AgentEditorModal 对齐）
 const navGroups = computed(() => {
@@ -1005,18 +953,11 @@ const handleGranularityChange = (value: string | number | boolean) => {
 
 const isIndexingLocked = computed(() => editorMode.value === 'edit' && hasFiles.value)
 
-const toggleVectorIndexing = () => {
+const handleVectorIndexingChange = (value: string | number | boolean) => {
   if (!formData.value) return
-  if (isIndexingLocked.value) return
-  const next = !formData.value.indexingStrategy.vectorEnabled
-  formData.value.indexingStrategy.vectorEnabled = next
-  formData.value.indexingStrategy.keywordEnabled = next
-}
-
-const toggleWikiIndexing = () => {
-  if (!formData.value) return
-  if (isIndexingLocked.value) return
-  formData.value.indexingStrategy.wikiEnabled = !formData.value.indexingStrategy.wikiEnabled
+  const enabled = value === true
+  formData.value.indexingStrategy.vectorEnabled = enabled
+  formData.value.indexingStrategy.keywordEnabled = enabled
 }
 
 const handleChunkingConfigUpdate = (config: any) => {
@@ -2602,5 +2543,90 @@ watch(
 :root[theme-mode="dark"] body .kb-config-button.is-primary:hover:not(:disabled) {
   border-color: #fff;
   background: #fff;
+}
+</style>
+
+<style lang="less">
+/*
+ * The knowledge editor intentionally delegates modal geometry, navigation,
+ * focus management, responsive behavior and footer layout to the same Musuw
+ * shell as Settings and AgentEditor. Only domain-specific scrolling remains.
+ */
+.kb-settings-content > .visual-settings-content__inner {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kb-settings-scroll {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 32px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.kb-settings-loading {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kb-settings-scroll .kb-config-section {
+  width: 100%;
+  min-width: 0;
+}
+
+.kb-settings-scroll .setting-row-vertical {
+  align-items: stretch !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.kb-settings-scroll .kb-settings-textarea {
+  max-width: none !important;
+  align-items: stretch !important;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kb-settings-scroll .kb-settings-textarea .t-textarea,
+.kb-settings-scroll .kb-settings-textarea .t-textarea__inner,
+.kb-settings-scroll .kb-config-id-control {
+  width: 100%;
+}
+
+.kb-settings-scroll .kb-settings-hint {
+  margin-top: 4px !important;
+}
+
+.kb-settings-nav-badge {
+  min-width: 16px;
+  height: 16px;
+  margin-left: auto;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-size: 10px;
+  line-height: 1;
+}
+
+@media (max-width: 560px) {
+  .kb-settings-scroll {
+    padding: 24px;
+  }
+}
+
+:root[theme-mode="dark"] .kb-settings-nav-badge {
+  background: #3f3f46;
+  color: #d4d4d8;
 }
 </style>

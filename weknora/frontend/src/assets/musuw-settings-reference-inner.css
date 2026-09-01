@@ -227,6 +227,13 @@
   align-items: stretch !important;
   gap: 12px !important;
 }
+.visual-settings-content .setting-row.setting-row-vertical > .setting-control,
+.settings-overlay > .settings-modal .setting-row.setting-row-vertical > .setting-control {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  max-width: none !important;
+  justify-content: flex-start !important;
+}
 .visual-settings-content .setting-info,
 .settings-overlay > .settings-modal .setting-info {
   min-width: 0 !important;
@@ -253,6 +260,23 @@
   font-size: 12px !important;
   line-height: 18px !important;
 }
+.visual-settings-content .memory-workspace-settings .setting-row.is-disabled .setting-info :is(label,.desc) {
+  color: var(--td-text-color-disabled, #c0c4cc) !important;
+}
+.visual-settings-content .memory-workspace-settings .advanced-toggle {
+  appearance: none !important;
+  justify-content: flex-start !important;
+  border: 0 !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  background: transparent !important;
+  color: inherit !important;
+  font: inherit !important;
+  text-align: left !important;
+}
+.visual-settings-content .memory-workspace-settings .advanced-toggle-copy {
+  flex: 1 1 auto !important;
+  align-items: flex-start !important;
+}
 .visual-settings-content .setting-control,
 .settings-overlay > .settings-modal .setting-control {
   min-width: 0 !important;
@@ -267,6 +291,46 @@
 .settings-overlay > .settings-modal .setting-control.full-width,
 .visual-settings-content .setting-control-full,
 .settings-overlay > .settings-modal .setting-control-full { width: 100% !important; max-width: none !important; }
+
+/* Compact secondary navigation shared by Model, Memory and Agent settings. */
+.visual-settings-content .visual-model-tabs {
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  display: flex !important;
+  gap: 2px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  scrollbar-width: none !important;
+}
+.visual-settings-content .visual-model-tabs::-webkit-scrollbar { display: none !important; }
+.visual-settings-content .visual-model-tabs__item {
+  position: relative !important;
+  min-height: 36px !important;
+  flex: 0 0 auto !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: transparent !important;
+  color: #9ca3af !important;
+  font: inherit !important;
+  font-size: 11px !important;
+  line-height: 18px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+.visual-settings-content .visual-model-tabs__item:hover { color: #4b5563 !important; }
+.visual-settings-content .visual-model-tabs__item.is-active { color: #111827 !important; }
+.visual-settings-content .visual-model-tabs__item.is-active::after {
+  content: '' !important;
+  position: absolute !important;
+  right: 8px !important;
+  bottom: -1px !important;
+  left: 8px !important;
+  height: 1px !important;
+  background: #111827 !important;
+}
 
 /* TDesign fields */
 .visual-settings-content .t-input,
@@ -337,26 +401,85 @@
 .settings-overlay > .settings-modal .t-button--theme-default:hover { border-color: #d1d5db !important; background: #f9fafb !important; color: #111827 !important; }
 
 /* Cards/panels created by the native settings pages. */
-.visual-settings-content :is(.setting-card,.config-card,.provider-card,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card),
-.settings-overlay > .settings-modal :is(.setting-card,.config-card,.provider-card,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card) {
+.visual-settings-content :is(.setting-card,.config-card,.provider-card,.ds-card,.node-item,.relation-item,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card,.sandbox-card,.skill-card,.backend-card,.store-card,.env-skill-card,.env-sandbox-card),
+.settings-overlay > .settings-modal :is(.setting-card,.config-card,.provider-card,.ds-card,.node-item,.relation-item,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card,.sandbox-card,.skill-card,.backend-card,.store-card,.env-skill-card,.env-sandbox-card) {
   border: 1px solid #e5e7eb !important;
   border-radius: 12px !important;
   background: #fff !important;
   color: #374151 !important;
   box-shadow: 0 1px 2px rgb(0 0 0 / 4%) !important;
 }
-.visual-settings-content :is(.setting-card,.config-card,.provider-card,.engine-card,.model-card,.settings-card,.mcp-card):hover,
-.settings-overlay > .settings-modal :is(.setting-card,.config-card,.provider-card,.engine-card,.model-card,.settings-card,.mcp-card):hover {
+.visual-settings-content :is(.setting-card,.config-card,.provider-card,.ds-card,.node-item,.relation-item,.engine-card,.model-card,.settings-card,.mcp-card,.sandbox-card,.skill-card,.backend-card,.store-card,.env-skill-card,.env-sandbox-card):hover,
+.settings-overlay > .settings-modal :is(.setting-card,.config-card,.provider-card,.ds-card,.node-item,.relation-item,.engine-card,.model-card,.settings-card,.mcp-card,.sandbox-card,.skill-card,.backend-card,.store-card,.env-skill-card,.env-sandbox-card):hover {
   border-color: #d1d5db !important;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 7%) !important;
   transform: none !important;
 }
 
+/* Resource creation remains an action, not an already-configured card. */
+.visual-settings-content :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add),
+.settings-overlay > .settings-modal :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add) {
+  border-color: #d1d5db !important;
+  border-style: dashed !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.visual-settings-content :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add):hover,
+.settings-overlay > .settings-modal :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add):hover {
+  border-color: #9ca3af !important;
+  border-style: dashed !important;
+  background: #f9fafb !important;
+  box-shadow: none !important;
+}
+
+/* Main's resource cards keep their domain content but use ModelSettings scale. */
+.visual-settings-content :is(.provider-card__badge,.ds-card__badge,.skill-card__badge,.backend-card__badge,.store-card__badge) {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+}
+.visual-settings-content :is(.provider-card__title,.ds-card__title,.skill-card__title,.backend-card__title,.store-card__title) {
+  font-size: 12px !important;
+  line-height: 18px !important;
+  font-weight: 600 !important;
+}
+.visual-settings-content :is(.provider-card__subtitle,.ds-card__subtitle,.skill-card__desc,.backend-card__subtitle,.store-card__subtitle) {
+  color: #9ca3af !important;
+  font-size: 10px !important;
+  line-height: 15px !important;
+}
+.visual-settings-content :is(.provider-grid,.ds-grid,.backend-grid,.store-grid,.sandbox-grid,.skill-list) {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+  gap: 12px !important;
+}
+.visual-settings-content :is(.provider-card,.ds-card,.node-item,.relation-item) {
+  padding: 12px !important;
+  gap: 10px !important;
+}
+.visual-settings-content :is(.node-list,.relation-list) { gap: 10px !important; }
+.visual-settings-content .strategy-info-panel {
+  margin: 0 0 12px !important;
+  padding: 10px 12px !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-radius: 10px !important;
+  background: #f9fafb !important;
+  color: #6b7280 !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+
 /* Agent editor prompt and preset primitives. */
+.visual-settings-content .prompts-outline,
 .settings-overlay > .settings-modal .prompts-outline { gap: 6px !important; }
+.visual-settings-content .prompts-outline__pill,
 .settings-overlay > .settings-modal .prompts-outline__pill,
+.visual-settings-content .placeholder-tag,
 .settings-overlay > .settings-modal .placeholder-tag,
+.visual-settings-content .detail-tag,
 .settings-overlay > .settings-modal .detail-tag,
+.visual-settings-content .scope-chip,
 .settings-overlay > .settings-modal .scope-chip {
   border: 1px solid #e5e7eb !important;
   border-radius: 7px !important;
@@ -365,8 +488,11 @@
   box-shadow: none !important;
   font-size: 10px !important;
 }
+.visual-settings-content .prompts-outline__pill:hover,
+.visual-settings-content .prompts-outline__pill--active,
 .settings-overlay > .settings-modal .prompts-outline__pill:hover,
 .settings-overlay > .settings-modal .prompts-outline__pill--active,
+.visual-settings-content .placeholder-tag:hover,
 .settings-overlay > .settings-modal .placeholder-tag:hover {
   border-color: #d1d5db !important;
   background: #f3f4f6 !important;
@@ -501,6 +627,8 @@
 }
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .nav-item:hover,
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .nav-item.active,
+:root[theme-mode="dark"] .visual-settings-content .prompts-outline__pill:hover,
+:root[theme-mode="dark"] .visual-settings-content .prompts-outline__pill--active,
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .prompts-outline__pill:hover,
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .prompts-outline__pill--active,
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .invite-code-box,
@@ -509,6 +637,52 @@
   border-color: var(--mvc-line, #31343a) !important;
   background: var(--mvc-hover, #25272c) !important;
   color: var(--mvc-text-strong, #fff) !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .visual-model-tabs { border-color: #27272a !important; }
+:root[theme-mode="dark"] .visual-settings-content .visual-model-tabs__item { color: #71717a !important; }
+:root[theme-mode="dark"] .visual-settings-content .visual-model-tabs__item:hover { color: #d4d4d8 !important; }
+:root[theme-mode="dark"] .visual-settings-content .visual-model-tabs__item.is-active { color: #fff !important; }
+:root[theme-mode="dark"] .visual-settings-content .visual-model-tabs__item.is-active::after { background: #f4f4f5 !important; }
+:root[theme-mode="dark"] .visual-settings-content .strategy-info-panel {
+  background: #27272a !important;
+  color: #a1a1aa !important;
+}
+:root[theme-mode="dark"] .visual-settings-content :is(.prompts-outline__pill,.placeholder-tag,.detail-tag,.scope-chip),
+:root[theme-mode="dark"] .settings-overlay > .settings-modal :is(.prompts-outline__pill,.placeholder-tag,.detail-tag,.scope-chip) {
+  border-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface-raised, #202227) !important;
+  color: var(--mvc-text-muted, #a1a1aa) !important;
+}
+:root[theme-mode="dark"] .visual-settings-content :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add),
+:root[theme-mode="dark"] .settings-overlay > .settings-modal :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add) {
+  border-color: var(--mvc-line, #31343a) !important;
+  border-style: dashed !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] .visual-settings-content :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add):hover,
+:root[theme-mode="dark"] .settings-overlay > .settings-modal :is(.provider-card--add,.ds-card--add,.backend-card--add,.store-card--add):hover {
+  border-color: #52525b !important;
+  background: var(--mvc-hover, #25272c) !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .memory-workspace-settings .setting-row.is-disabled .setting-info :is(label,.desc) {
+  color: var(--mvc-text-muted, #71717a) !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .memory-workspace-settings .advanced-toggle {
+  border-bottom-color: #27272a !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .t-switch {
+  background: #3f3f46 !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .t-switch .t-switch__handle::before {
+  background: #a1a1aa !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .t-switch.t-is-checked {
+  background: #f4f4f5 !important;
+}
+:root[theme-mode="dark"] .visual-settings-content .t-switch.t-is-checked .t-switch__handle::before {
+  background: #18181b !important;
 }
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .nav-item,
 :root[theme-mode="dark"] .visual-settings-content .nav-item {
@@ -530,8 +704,8 @@
 :root[theme-mode="dark"] .visual-settings-content :is(.t-input,.t-select-input,.t-input-number,.t-textarea__inner):hover {
   border-color: #52525b !important;
 }
-:root[theme-mode="dark"] .settings-overlay > .settings-modal :is(.setting-card,.config-card,.provider-card,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card),
-:root[theme-mode="dark"] .visual-settings-content :is(.setting-card,.config-card,.provider-card,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card),
+:root[theme-mode="dark"] .settings-overlay > .settings-modal :is(.setting-card,.config-card,.provider-card,.ds-card,.node-item,.relation-item,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card,.sandbox-card,.skill-card,.backend-card,.store-card,.env-skill-card,.env-sandbox-card),
+:root[theme-mode="dark"] .visual-settings-content :is(.setting-card,.config-card,.provider-card,.ds-card,.node-item,.relation-item,.engine-card,.model-card,.invite-card,.settings-card,.status-card,.info-card,.mcp-card,.member-card,.sandbox-card,.skill-card,.backend-card,.store-card,.env-skill-card,.env-sandbox-card),
 :root[theme-mode="dark"] .settings-overlay > .settings-modal .t-table,
 :root[theme-mode="dark"] .visual-settings-content .t-table {
   border-color: var(--mvc-line, #31343a) !important;

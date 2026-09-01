@@ -340,7 +340,7 @@
                      assistant message recorded any generated files. Agent
                      mode is the primary path for skills, so this is where
                      the button is most likely to appear. -->
-                <span v-if="hasArtifacts || artifactsCollecting" class="answer-toolbar__artifact"
+                <span v-if="!authStore.isLiteMode && (hasArtifacts || artifactsCollecting)" class="answer-toolbar__artifact"
                   :class="{ 'is-collecting': artifactButtonCollecting }">
                   <t-button size="small" variant="outline" shape="round"
                     :disabled="artifactButtonCollecting"
@@ -516,7 +516,7 @@
     </template>
   </t-drawer>
   <ChatArtifactsDrawer
-    v-if="hasArtifacts && sessionIdForArtifacts && messageIdForArtifacts"
+    v-if="!authStore.isLiteMode && hasArtifacts && sessionIdForArtifacts && messageIdForArtifacts"
     v-model:visible="showArtifactDrawer"
     :session-id="sessionIdForArtifacts"
     :message-id="messageIdForArtifacts"
@@ -943,12 +943,13 @@ watch(
 // appear more often here than in the RAG path.
 const showArtifactDrawer = ref(false);
 const artifactList = computed(() => {
+  if (authStore.isLiteMode) return [];
   const list = ((props.session?.artifacts as any[]) || []);
   return list.map((a, i) => ({ index: i, ...a }));
 });
 const hasArtifacts = computed(() => artifactList.value.length > 0);
 const artifactCount = computed(() => artifactList.value.length);
-const artifactsCollecting = computed(() => isCollectingSkillArtifacts(props.session as any));
+const artifactsCollecting = computed(() => !authStore.isLiteMode && isCollectingSkillArtifacts(props.session as any));
 const artifactButtonCollecting = computed(() => artifactsCollecting.value && !hasArtifacts.value);
 const sessionIdForArtifacts = computed(() => props.sessionId ?? '');
 const messageIdForArtifacts = computed(() =>
@@ -958,12 +959,13 @@ const messageIdForArtifacts = computed(() =>
 // it lands on that file's preview instead of the list.
 const artifactPreviewIndex = ref<number | null>(null);
 function openArtifactDrawer(previewIndex: number | null = null) {
-  if (!hasArtifacts.value) return;
+  if (authStore.isLiteMode || !hasArtifacts.value) return;
   artifactPreviewIndex.value = previewIndex;
   showArtifactDrawer.value = true;
 }
 
 const artifactRefContext = computed(() => {
+  if (authStore.isLiteMode) return null;
   const sessionId = sessionIdForArtifacts.value;
   const messageId = messageIdForArtifacts.value;
   if (!sessionId || !messageId) return null;
@@ -2230,12 +2232,14 @@ const onRootClick = (e: Event) => {
   if (!target) return;
 
   // Inline artifact card -> open the drawer straight on that file's preview.
-  const artifactIndex = artifactIndexFromEventTarget(target);
-  if (artifactIndex !== null) {
-    e.preventDefault();
-    e.stopPropagation();
-    openArtifactDrawer(artifactIndex);
-    return;
+  if (!authStore.isLiteMode) {
+    const artifactIndex = artifactIndexFromEventTarget(target);
+    if (artifactIndex !== null) {
+      e.preventDefault();
+      e.stopPropagation();
+      openArtifactDrawer(artifactIndex);
+      return;
+    }
   }
 
   // Handle image clicks -> open preview (only for images inside markdown/answer content, not icons)
@@ -2326,13 +2330,15 @@ const onRootKeydown = (e: KeyboardEvent) => {
   const target = e.target as HTMLElement;
   if (!target) return;
 
-  const artifactIndex = artifactIndexFromEventTarget(target);
-  if (artifactIndex !== null) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      openArtifactDrawer(artifactIndex);
+  if (!authStore.isLiteMode) {
+    const artifactIndex = artifactIndexFromEventTarget(target);
+    if (artifactIndex !== null) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openArtifactDrawer(artifactIndex);
+      }
+      return;
     }
-    return;
   }
 
   // Handle web citation keyboard
@@ -2406,7 +2412,7 @@ onMounted(() => {
     root.addEventListener('keydown', keydownListener, true);
     rebindCitations();
     await hydrateProtectedFileImages(rootElement.value, protectedFileAccess.value);
-    await hydrateArtifactImages(rootElement.value, artifactRefContext.value);
+    if (!authStore.isLiteMode) await hydrateArtifactImages(rootElement.value, artifactRefContext.value);
   });
 });
 
@@ -2431,7 +2437,7 @@ onUpdated(() => {
     // de-duped, and failures back off for a cooldown — so a not-yet-ready file
     // simply retries later (and the answerFullyRendered pass is the backstop).
     await hydrateProtectedFileImages(rootElement.value, protectedFileAccess.value);
-    await hydrateArtifactImages(rootElement.value, artifactRefContext.value);
+    if (!authStore.isLiteMode) await hydrateArtifactImages(rootElement.value, artifactRefContext.value);
   });
 });
 
@@ -2446,6 +2452,7 @@ agentRenderer.code = createMermaidCodeRenderer('mermaid-agent');
 // default output, which protectProviderImageSrcInHTML still rewrites.
 const defaultImageRenderer = new marked.Renderer().image;
 agentRenderer.image = function agentImageRenderer(token) {
+  if (authStore.isLiteMode) return defaultImageRenderer.call(this, token);
   const artifactHtml = renderArtifactReference({
     href: token.href || '',
     alt: token.text || '',

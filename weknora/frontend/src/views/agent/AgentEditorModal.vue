@@ -133,7 +133,6 @@
                           <label>{{ $t('agent.editor.description') }}</label>
                           <p class="desc">{{ $t('agentEditor.desc.description') }}</p>
                         </div>
-                        <span class="setting-row__counter">{{ formData.description.length }}/200</span>
                       </div>
                       <div class="setting-control setting-control-full">
                         <t-textarea v-model="formData.description"
@@ -935,12 +934,28 @@
                     <p class="section-description">{{ $t('agentEditor.questionSuggestions.description') }}</p>
                   </div>
 
-                  <t-tabs v-model="suggestionTab" class="suggestion-tabs">
-                    <t-tab-panel value="starters"
-                      :label="$t('agentEditor.questionSuggestions.startersTitle')" />
-                    <t-tab-panel value="followUps"
-                      :label="$t('agentEditor.questionSuggestions.followUpsTitle')" />
-                  </t-tabs>
+                  <div class="visual-model-tabs suggestion-tabs" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      class="visual-model-tabs__item"
+                      :class="{ 'is-active': suggestionTab === 'starters' }"
+                      :aria-selected="suggestionTab === 'starters'"
+                      @click="suggestionTab = 'starters'"
+                    >
+                      {{ $t('agentEditor.questionSuggestions.startersTitle') }}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      class="visual-model-tabs__item"
+                      :class="{ 'is-active': suggestionTab === 'followUps' }"
+                      :aria-selected="suggestionTab === 'followUps'"
+                      @click="suggestionTab = 'followUps'"
+                    >
+                      {{ $t('agentEditor.questionSuggestions.followUpsTitle') }}
+                    </button>
+                  </div>
 
                   <div v-show="suggestionTab === 'starters'" class="settings-group">
                     <div class="setting-row">
@@ -1170,7 +1185,7 @@
                             <div class="tool-grid">
                               <t-checkbox v-for="tool in group.tools" :key="tool.value" :value="tool.value"
                                 :disabled="tool.disabled"
-                                :class="['tool-card', { 'tool-card--disabled': tool.disabled, 'tool-card--danger': tool.danger }]">
+                                :class="['tool-card', 'tool-card--compact', { 'tool-card--disabled': tool.disabled, 'tool-card--danger': tool.danger }]">
                                 <div class="tool-card-body">
                                   <div class="tool-card-head">
                                     <span class="tool-card-name">{{ tool.label }}</span>
@@ -1231,12 +1246,12 @@
                         <label>{{ $t('agentEditor.mcp.label') }}</label>
                         <p class="desc">{{ $t('agentEditor.mcp.desc') }}</p>
                       </div>
-                      <div class="setting-control">
-                        <t-radio-group v-model="mcpSelectionMode" class="agent-segmented-control agent-segmented-control--scope">
-                          <t-radio-button value="all">{{ $t('agentEditor.selection.all') }}</t-radio-button>
-                          <t-radio-button value="selected">{{ $t('agentEditor.selection.selected') }}</t-radio-button>
-                          <t-radio-button value="none">{{ $t('agentEditor.selection.disabled') }}</t-radio-button>
-                        </t-radio-group>
+                      <div class="setting-control agent-scope-select-control">
+                        <t-select v-model="mcpSelectionMode" class="agent-scope-select" :placeholder="$t('agentEditor.mcp.label')">
+                          <t-option value="all" :label="$t('agentEditor.selection.all')" />
+                          <t-option value="selected" :label="$t('agentEditor.selection.selected')" />
+                          <t-option value="none" :label="$t('agentEditor.selection.disabled')" />
+                        </t-select>
                       </div>
                     </div>
 
@@ -1334,12 +1349,12 @@
                         <label>{{ $t('agent.editor.skillsSelection') }}</label>
                         <p class="desc">{{ skillsSelectionHint }}</p>
                       </div>
-                      <div class="setting-control agent-segmented-control agent-segmented-control--scope sandbox-select-control">
-                        <t-radio-group v-model="skillsSelectionMode" class="agent-segmented-control agent-segmented-control--scope">
-                          <t-radio-button value="all" :disabled="!canEnableSkills">{{ $t('agent.editor.skillsAll') }}</t-radio-button>
-                          <t-radio-button value="selected" :disabled="!canEnableSkills">{{ $t('agent.editor.skillsSelected') }}</t-radio-button>
-                          <t-radio-button value="none">{{ $t('agent.editor.skillsNone') }}</t-radio-button>
-                        </t-radio-group>
+                      <div class="setting-control agent-scope-select-control sandbox-select-control">
+                        <t-select v-model="skillsSelectionMode" class="agent-scope-select" :placeholder="$t('agent.editor.skillsSelection')">
+                          <t-option value="all" :label="$t('agent.editor.skillsAll')" :disabled="!canEnableSkills" />
+                          <t-option value="selected" :label="$t('agent.editor.skillsSelected')" :disabled="!canEnableSkills" />
+                          <t-option value="none" :label="$t('agent.editor.skillsNone')" />
+                        </t-select>
                         <p v-if="showCatalogSkillList" class="skill-ready-stat">{{ skillListSummary }}</p>
                         <p v-if="!hasSandboxSelected && sandboxConfigOptions.length > 1" class="desc empty-hint">
                           {{ $t('agent.editor.skillsNeedSandbox') }}
@@ -1425,13 +1440,12 @@
                         <label>{{ $t('agent.editor.knowledgeBases') }}</label>
                         <p class="desc">{{ $t('agentEditor.desc.kbScope') }}</p>
                       </div>
-                      <div class="setting-control">
-                        <t-radio-group class="agent-segmented-control agent-segmented-control--scope" v-model="kbSelectionMode">
-                          <t-radio-button value="all">{{ $t('agent.editor.allKnowledgeBases') }}</t-radio-button>
-                          <t-radio-button value="selected">{{ $t('agent.editor.selectedKnowledgeBases')
-                            }}</t-radio-button>
-                          <t-radio-button value="none">{{ $t('agent.editor.noKnowledgeBase') }}</t-radio-button>
-                        </t-radio-group>
+                      <div class="setting-control agent-scope-select-control">
+                        <t-select v-model="kbSelectionMode" class="agent-scope-select" :placeholder="$t('agent.editor.knowledgeBases')">
+                          <t-option value="all" :label="$t('agent.editor.allKnowledgeBases')" />
+                          <t-option value="selected" :label="$t('agent.editor.selectedKnowledgeBases')" />
+                          <t-option value="none" :label="$t('agent.editor.noKnowledgeBase')" />
+                        </t-select>
                       </div>
                     </div>
 
@@ -5349,12 +5363,17 @@ const handleSave = async () => {
 .agent-segmented-control :deep(.t-radio-button.t-is-checked + .t-radio-button) { border-left: 0; }
 .agent-segmented-control :deep(.t-radio-button.t-is-disabled) { background: transparent; opacity: .55; }
 
-.agent-segmented-control--scope {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+// Scope choices are deliberately a normal bounded select. Three labels do not
+// fit reliably in the compact settings control at narrow widths, and a
+// scrollable radio strip hides the current value from keyboard and touch users.
+.agent-scope-select-control {
+  flex: 0 1 280px;
 }
-.agent-segmented-control--scope::-webkit-scrollbar { display: none; }
+
+.agent-scope-select {
+  width: 100%;
+  min-width: 0;
+}
 
 .setting-row[data-guide="agent-create-model"] .setting-control :deep(.visual-model-selector) {
   width: 100%;
@@ -5757,19 +5776,6 @@ const handleSave = async () => {
 // 开场 / 回答后推荐用顶部 tab 区分（参照模型管理），避免整块包围框
 .suggestion-tabs {
   margin-bottom: 4px;
-
-  :deep(.t-tabs__nav-item) {
-    font-size: 14px;
-  }
-
-  :deep(.t-tabs__operations) {
-    display: none;
-  }
-
-  // 只用 tab 作导航，内容自行渲染在下方
-  :deep(.t-tabs__content) {
-    display: none;
-  }
 }
 
 .suggestion-advanced-divider {
@@ -5827,12 +5833,13 @@ const handleSave = async () => {
 .tools-overview {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  background: var(--td-bg-color-secondarycontainer);
-  border-radius: 10px;
-  border: 1px solid var(--td-component-stroke);
+  gap: 8px;
+  margin: 0;
+  padding: 8px 0 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--td-component-stroke);
+  border-radius: 0;
 }
 
 .tools-overview-row {
@@ -5852,12 +5859,12 @@ const handleSave = async () => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  font-size: 13px;
+  padding: 0;
+  font-size: 12px;
   color: var(--td-text-color-secondary);
-  background: var(--td-bg-color-container);
-  border-radius: 999px;
-  border: 1px solid var(--td-component-stroke);
+  background: transparent;
+  border-radius: 0;
+  border: 0;
 
   .t-icon {
     color: var(--td-text-color-secondary);
@@ -5882,8 +5889,7 @@ const handleSave = async () => {
 
   &--warn {
     color: var(--td-warning-color);
-    background: var(--td-warning-color-1, rgba(237, 118, 20, 0.08));
-    border-color: var(--td-warning-color-light, #fcd7b6);
+    background: transparent;
 
     .t-icon {
       color: var(--td-warning-color);
@@ -5955,17 +5961,18 @@ const handleSave = async () => {
   }
 }
 
-// 不同分组的左侧色条
+// Group markers stay neutral like the rest of Musuw settings. Only the
+// write-capable group keeps warning semantics because it changes Wiki data.
 .tool-group--base .tool-group-bar {
-  background: var(--td-gray-color-6, #a0a7ab);
+  background: var(--td-component-stroke);
 }
 
 .tool-group--rag .tool-group-bar {
-  background: var(--td-brand-color);
+  background: var(--td-component-stroke);
 }
 
 .tool-group--wiki_read .tool-group-bar {
-  background: var(--td-success-color, #2ba471);
+  background: var(--td-component-stroke);
 }
 
 .tool-group--wiki_edit .tool-group-bar {
@@ -5973,39 +5980,41 @@ const handleSave = async () => {
 }
 
 .tool-group--wiki_issue .tool-group-bar {
-  background: var(--td-purple-5, #8e56dd);
+  background: var(--td-component-stroke);
 }
 
 .tool-group--data .tool-group-bar {
-  background: var(--td-cyan-6, #09a3b7);
+  background: var(--td-component-stroke);
 }
 
 // 统一两列网格；小屏退化单列
 .tool-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
   width: 100%;
-
-  @media (max-width: 720px) {
-    grid-template-columns: 1fr;
-  }
 }
 
-// ===== 工具卡片（基于 t-checkbox 的 label 结构） =====
+// ===== 工具选择行（基于 t-checkbox 的 label 结构） =====
 .tool-card {
   margin: 0; // 清掉 TDesign checkbox 默认外边距
-  padding: 12px 14px;
-  background: var(--td-bg-color-container);
-  border-radius: 8px;
-  border: 1px solid var(--td-component-stroke);
-  transition: border-color .2s, background .2s;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--td-component-stroke);
+  border-radius: 0;
+  transition: color .15s ease, background .15s ease;
   cursor: pointer;
   overflow: hidden;
 
+  &:last-child {
+    border-bottom: 0;
+  }
+
   &:hover:not(.tool-card--disabled) {
-    border-color: var(--td-brand-color);
-    background: var(--td-brand-color-1, rgba(7, 192, 95, 0.06));
+    background: var(--td-bg-color-secondarycontainer);
   }
 
   // checkbox 的勾选框 + label 改造
@@ -6021,8 +6030,7 @@ const handleSave = async () => {
   }
 
   &.t-is-checked {
-    border-color: var(--td-brand-color);
-    background: var(--td-brand-color-1, rgba(7, 192, 95, 0.08));
+    background: transparent;
   }
 
   &--disabled {
@@ -6031,17 +6039,9 @@ const handleSave = async () => {
   }
 
   &--danger {
-    border-color: var(--td-warning-color-light, #fcd7b6);
-
-    &:hover:not(.tool-card--disabled) {
-      border-color: var(--td-warning-color);
-      background: var(--td-warning-color-1, rgba(237, 118, 20, 0.06));
-    }
-
-    &.t-is-checked {
-      border-color: var(--td-warning-color);
-      background: var(--td-warning-color-1, rgba(237, 118, 20, 0.08));
-    }
+    // Keep destructive semantics in the small badge; the row itself stays in
+    // the same neutral visual family as the rest of Musuw settings.
+    border-color: var(--td-component-stroke);
   }
 }
 
@@ -6060,8 +6060,8 @@ const handleSave = async () => {
 }
 
 .tool-card-name {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--td-text-color-primary);
   line-height: 1.4;
   overflow: hidden;

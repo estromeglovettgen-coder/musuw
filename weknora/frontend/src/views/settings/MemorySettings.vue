@@ -1,37 +1,39 @@
 <template>
   <div class="memory-settings">
-    <div class="section-header">
-      <div class="section-header-titlewrap">
-        <h2>{{ t('memorySettings.title') }}</h2>
-        <t-popup
-          placement="bottom-start"
-          trigger="hover"
-          overlay-class-name="memory-usage-popup-overlay"
-        >
-          <button
-            type="button"
-            class="usage-trigger-btn"
-            :aria-label="t('memorySettings.usage.iconHint')"
-            :title="t('memorySettings.usage.iconHint')"
+    <header class="visual-settings-page-header">
+      <div class="visual-settings-page-header__copy">
+        <div class="section-header-titlewrap">
+          <h2 class="visual-settings-page-header__title">{{ t('memorySettings.title') }}</h2>
+          <t-popup
+            placement="bottom-start"
+            trigger="hover"
+            overlay-class-name="memory-usage-popup-overlay"
           >
-            <t-icon name="info-circle" size="16px" />
-          </button>
-          <template #content>
-            <div class="usage-popup">
-              <div class="usage-popup-title">{{ t('memorySettings.usage.title') }}</div>
-              <p class="usage-popup-intro">{{ t('memorySettings.usage.intro') }}</p>
-              <div class="usage-popup-rows">
-                <div v-for="key in usageRowKeys" :key="key" class="usage-popup-row">
-                  <span class="usage-popup-label">{{ t(`memorySettings.usage.rows.${key}.label`) }}</span>
-                  <span class="usage-popup-text">{{ t(`memorySettings.usage.rows.${key}.text`) }}</span>
+            <button
+              type="button"
+              class="usage-trigger-btn"
+              :aria-label="t('memorySettings.usage.iconHint')"
+              :title="t('memorySettings.usage.iconHint')"
+            >
+              <t-icon name="info-circle" size="16px" />
+            </button>
+            <template #content>
+              <div class="usage-popup">
+                <div class="usage-popup-title">{{ t('memorySettings.usage.title') }}</div>
+                <p class="usage-popup-intro">{{ t('memorySettings.usage.intro') }}</p>
+                <div class="usage-popup-rows">
+                  <div v-for="key in usageRowKeys" :key="key" class="usage-popup-row">
+                    <span class="usage-popup-label">{{ t(`memorySettings.usage.rows.${key}.label`) }}</span>
+                    <span class="usage-popup-text">{{ t(`memorySettings.usage.rows.${key}.text`) }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
-        </t-popup>
+            </template>
+          </t-popup>
+        </div>
+        <p class="visual-settings-page-header__description">{{ t('memorySettings.description') }}</p>
       </div>
-      <p class="section-description">{{ t('memorySettings.description') }}</p>
-    </div>
+    </header>
 
     <!-- Workspace switch is off: say so plainly instead of showing a personal
          toggle that would appear to work and change nothing. -->
@@ -159,16 +161,21 @@
         </div>
       </div>
 
-      <t-tabs :value="tab" class="status-tabs" @change="handleTabChange">
-        <t-tab-panel v-for="value in tabs" :key="value" :value="value">
-          <template #label>
-            <span class="status-tab-label">
-              <t-icon :name="tabIcon(value)" size="14px" />
-              <span>{{ tabLabel(value) }}</span>
-            </span>
-          </template>
-        </t-tab-panel>
-      </t-tabs>
+      <div class="visual-model-tabs memory-status-tabs" role="tablist">
+        <button
+          v-for="value in tabs"
+          :key="value"
+          type="button"
+          role="tab"
+          class="visual-model-tabs__item"
+          :class="{ 'is-active': tab === value }"
+          :aria-selected="tab === value"
+          @click="handleTabChange(value)"
+        >
+          <t-icon :name="tabIcon(value)" size="14px" />
+          <span>{{ tabLabel(value) }}</span>
+        </button>
+      </div>
 
       <t-loading :loading="loading">
         <div v-if="listIsEmpty" class="empty">
@@ -891,24 +898,6 @@ onMounted(async () => {
   width: 100%;
 }
 
-.section-header {
-  margin-bottom: 24px;
-
-  h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--td-text-color-primary);
-    margin: 0;
-  }
-
-  .section-description {
-    font-size: 14px;
-    color: var(--td-text-color-secondary);
-    margin: 8px 0 0;
-    line-height: 1.5;
-  }
-}
-
 .section-header-titlewrap {
   display: inline-flex;
   align-items: center;
@@ -951,12 +940,16 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  border-radius: 8px;
-  background: var(--td-warning-color-1);
-  color: var(--td-text-color-primary);
+  padding: 8px 0;
+  margin-bottom: 4px;
+  color: var(--td-text-color-secondary);
   font-size: 13px;
+  line-height: 18px;
+}
+
+.notice :deep(.t-icon) {
+  flex-shrink: 0;
+  color: var(--td-text-color-placeholder);
 }
 
 .status-hint {
@@ -969,42 +962,6 @@ onMounted(async () => {
 .settings-group {
   display: flex;
   flex-direction: column;
-}
-
-.setting-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--td-component-stroke);
-}
-
-.setting-info {
-  flex: 1;
-  max-width: 65%;
-  padding-right: 24px;
-
-  label {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--td-text-color-primary);
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  .desc {
-    font-size: 13px;
-    color: var(--td-text-color-secondary);
-    margin: 0;
-    line-height: 1.5;
-  }
-}
-
-.setting-control {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
 }
 
 .list-section {
@@ -1045,50 +1002,8 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-.status-tabs {
+.memory-status-tabs {
   margin-top: 0;
-
-  :deep(.t-tabs__header) {
-    margin: 0;
-    background: transparent;
-  }
-
-  :deep(.t-tabs__nav-item) {
-    font-size: 13px;
-  }
-
-  .status-tab-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  /* Spacing must live in padding, not margin: TDesign sums item widths
-     (excluding margin) to place the active underline. */
-  :deep(.t-tabs__nav-item-wrapper) {
-    padding: 0 12px;
-    margin: 0;
-  }
-
-  :deep(.t-tabs__bar + .t-tabs__nav-item .t-tabs__nav-item-wrapper) {
-    padding-left: 0;
-  }
-
-  :deep(.t-tabs__bar) {
-    height: 2px;
-  }
-
-  :deep(.t-tabs__operations) {
-    display: none;
-  }
-
-  :deep(.t-tabs__content) {
-    display: none;
-  }
-
-  :deep(.t-tabs__nav-container) {
-    padding: 0;
-  }
 }
 
 .memory-list {

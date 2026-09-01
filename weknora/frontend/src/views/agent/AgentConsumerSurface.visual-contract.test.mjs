@@ -104,14 +104,16 @@ test('Settings and Agent editor render the same shared visual shell while Agent 
   ]) assert.ok(settingsShell.includes(token), `shared Settings shell contract lost ${token}`)
 })
 
-test('Agent mode and knowledge scope use the authoritative single-line segmented controls', () => {
+test('Agent mode keeps its compact toggle while scope choices use bounded settings selects', () => {
   assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control"[^>]*v-model="agentMode"/)
   assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control"[^>]*v-model="formData\.config\.fallback_strategy"/)
-  assert.match(editor, /<t-radio-group[^>]*class="agent-segmented-control agent-segmented-control--scope"[^>]*v-model="kbSelectionMode"/)
-  assert.equal((editor.match(/class="agent-segmented-control agent-segmented-control--scope"/g) || []).length, 3)
+  assert.match(editor, /<div class="setting-control agent-scope-select-control">[\s\S]*?<t-select[^>]*v-model="kbSelectionMode"/)
+  assert.match(editor, /<div class="setting-control agent-scope-select-control">[\s\S]*?<t-select[^>]*v-model="mcpSelectionMode"/)
+  assert.match(editor, /<div class="setting-control agent-scope-select-control sandbox-select-control">[\s\S]*?<t-select[^>]*v-model="skillsSelectionMode"/)
+  assert.equal((editor.match(/agent-segmented-control--scope/g) || []).length, 0)
   assert.match(editor, /\.agent-segmented-control\s*\{[\s\S]*?display:\s*inline-flex;[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?padding:\s*4px;[\s\S]*?border-radius:\s*12px;/)
   assert.match(editor, /\.agent-segmented-control :deep\(\.t-radio-button\)\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*6px 14px;[\s\S]*?border-radius:\s*8px;[\s\S]*?font-size:\s*12px;/)
-  assert.match(editor, /\.agent-segmented-control--scope\s*\{[\s\S]*?overflow-x:\s*auto;/)
+  assert.match(editor, /\.agent-scope-select-control\s*\{[\s\S]*?flex:\s*0 1 280px;/)
   assert.match(editor, /\.setting-row\s*\{[\s\S]*?display:\s*flex !important;[\s\S]*?gap:\s*16px !important;/)
   assert.match(editor, /label\s*\{[\s\S]*?font-size:\s*14px !important;[\s\S]*?line-height:\s*20px !important;[\s\S]*?font-weight:\s*600 !important;/)
   assert.match(editor, /\.setting-control\s*\{[\s\S]*?width:\s*100% !important;[\s\S]*?max-width:\s*280px !important;/)
@@ -176,8 +178,12 @@ test('authoritative workspace 7 basic tab uses full-width counted name and descr
   assert.match(editor, /class="setting-row__heading"[\s\S]*?class="setting-row__counter"[\s\S]*?\{\{ formData\.name\.length \}\}\/50/)
   assert.match(editor, /v-model="formData\.name"[\s\S]*?:maxlength="50"/)
   assert.match(editor, /class="setting-row setting-row--basic-description"/)
-  assert.match(editor, /\{\{ formData\.description\.length \}\}\/200/)
   assert.match(editor, /v-model="formData\.description"[\s\S]*?:maxlength="200"/)
+  assert.doesNotMatch(
+    editor,
+    /setting-row--basic-description[\s\S]{0,500}formData\.description\.length/,
+    'the textarea already renders its maxlength counter and must not duplicate it in the row heading',
+  )
   assert.match(editor, /\.setting-row--basic-name,[\s\S]*?\.setting-row--basic-description\s*\{[\s\S]*?flex-direction:\s*column;/)
   assert.match(
     editor,

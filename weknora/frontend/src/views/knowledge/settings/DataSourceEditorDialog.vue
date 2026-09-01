@@ -19,6 +19,7 @@ import {
 import SettingDrawer from '@/components/settings/SettingDrawer.vue'
 import DataSourceTypeIcon from './DataSourceTypeIcon.vue'
 import { getDatasourceIconUrl } from './datasourceIcons'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   kbId: string
@@ -28,6 +29,7 @@ const props = defineProps<{
 const visible = defineModel<boolean>('visible', { default: false })
 const emit = defineEmits<{ saved: [] }>()
 const { t } = useI18n()
+const authStore = useAuthStore()
 
 const isEdit = computed(() => !!props.dataSource)
 const step = ref(0)
@@ -634,6 +636,19 @@ const connectorDefs = computed<ConnectorDef[]>(() => [
     ],
   },
 ])
+
+// Musuw Lite keeps the backend connector implementations intact for existing
+// data and for Standard workspaces, but does not advertise the deferred
+// integrations in the create flow. The existing row's connector is retained
+// while editing so old databases remain readable and editable.
+const LITE_DEFERRED_CONNECTOR_TYPES = new Set(['gitlab', 'ima'])
+const visibleConnectorDefs = computed(() => {
+  if (!authStore.isLiteMode) return connectorDefs.value
+  const existingType = isEdit.value ? props.dataSource?.type : undefined
+  return connectorDefs.value.filter(
+    def => !LITE_DEFERRED_CONNECTOR_TYPES.has(def.type) || def.type === existingType,
+  )
+})
 
 
 const currentDef = computed(() => connectorDefs.value.find(d => d.type === form.value.type))
@@ -1298,7 +1313,7 @@ const drawerConfirmText = computed(() => {
       <h4 class="setting-drawer__section-title">{{ t('datasource.step.selectType') }}</h4>
       <div class="ds-type-grid">
         <button
-          v-for="def in connectorDefs"
+          v-for="def in visibleConnectorDefs"
           :key="def.type"
           type="button"
           :class="['ds-type-card', { disabled: !def.available }]"

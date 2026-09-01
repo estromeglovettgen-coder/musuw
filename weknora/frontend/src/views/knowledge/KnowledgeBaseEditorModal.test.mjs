@@ -116,7 +116,7 @@ test('Wiki-only authoring controls stay hidden until Wiki indexing is enabled', 
   const template = source.slice(0, source.indexOf('<script setup'))
 
   for (const control of [
-    'class="kb-config-granularity"',
+    'v-model="formData.wikiConfig.extractionGranularity"',
     'v-model="formData.wikiConfig.contentInstructions"',
     'v-model="formData.wikiConfig.extractionInstructions"',
   ]) {
@@ -143,7 +143,7 @@ test('Lite knowledge-base creation keeps model choices managed and does not rend
 })
 
 test('create mode reuses native TDesign fields and API payload', () => {
-  assert.match(source, /<form v-if="formData" class="kb-config-form" @submit\.prevent="handleSubmit">/)
+  assert.match(source, /<form v-if="formData" class="kb-settings-scroll" @submit\.prevent="handleSubmit">/)
   assert.match(
     source,
     /<t-textarea[\s\S]*?v-model="formData\.description"[\s\S]*?:placeholder="\$t\('knowledgeEditor\.basic\.descriptionPlaceholder'\)"[\s\S]*?:maxlength="200"/,
@@ -153,28 +153,29 @@ test('create mode reuses native TDesign fields and API payload', () => {
 })
 
 test('create dialog is a scrollable consumer settings modal with mobile-safe bounds', () => {
-  assert.match(source, /role="dialog"/)
-  assert.match(source, /aria-modal="true"/)
-  assert.match(source, /aria-labelledby="kb-config-title"/)
-  assert.match(source, /<h2 id="kb-config-title">/)
-  assert.match(source, /\.kb-config-form\s*\{[^}]*min-height:\s*0;[^}]*flex:\s*1 1 auto;[^}]*overflow-y:\s*auto;/s)
+  assert.match(source, /<VisualSettingsShell[\s\S]*?:dialog-label="editorTitle"/)
+  assert.match(source, /content-class="kb-settings-content"/)
+  assert.match(source, /\.kb-settings-content > \.visual-settings-content__inner\s*\{[\s\S]*?overflow:\s*hidden;/)
+  assert.match(source, /\.kb-settings-scroll\s*\{[\s\S]*?height:\s*100%;[\s\S]*?overflow-y:\s*auto;/)
+  assert.match(source, /@media \(max-width: 560px\)[\s\S]*?\.kb-settings-scroll\s*\{[\s\S]*?padding:\s*24px;/)
 })
 
 test('create and edit mechanically share the reference knowledge-base configuration surface', () => {
   const template = source.slice(0, source.indexOf('<script setup'))
 
-  assert.match(template, /class="kb-config-overlay"/)
-  assert.match(template, /class="kb-config-modal"/)
-  assert.match(template, /id="kb-config-title"[\s\S]*?editorMode === 'create'[\s\S]*?knowledgeEditor\.titleCreate[\s\S]*?knowledgeEditor\.titleEdit/)
+  assert.match(template, /<VisualSettingsShell/)
+  assert.match(template, /modal-class="kb-settings-shell"/)
+  assert.match(template, /:dialog-label="editorTitle"/)
   assert.match(template, /knowledgeEditor\.modalDescription/)
-  assert.match(template, /<form v-if="formData" class="kb-config-form" @submit\.prevent="handleSubmit">/)
-  assert.match(template, /class="kb-config-nav"[\s\S]*currentSection === item\.key/)
-  assert.doesNotMatch(template, /settings-container|settings-sidebar|settings-nav/)
+  assert.match(template, /<form v-if="formData" class="kb-settings-scroll" @submit\.prevent="handleSubmit">/)
+  assert.match(template, /class="visual-settings-nav__item"[\s\S]*currentSection === item\.key/)
+  assert.match(template, /class="section-header"[\s\S]*class="settings-group"[\s\S]*class="setting-row"/)
+  assert.doesNotMatch(template, /kb-config-overlay|kb-config-modal|kb-config-nav/)
   assert.doesNotMatch(template, /:autofocus="editorMode === 'create'"/)
 
   const orderedFields = [
     'data-guide="kb-create-indexing"',
-    'class="kb-config-granularity"',
+    'v-model="formData.wikiConfig.extractionGranularity"',
     'v-model="formData.wikiConfig.contentInstructions"',
     'v-model="formData.wikiConfig.extractionInstructions"',
     'data-guide="kb-create-name"',
@@ -187,13 +188,10 @@ test('create and edit mechanically share the reference knowledge-base configurat
     previousIndex = index
   }
 
-  assert.match(source, /\.kb-config-modal\s*\{[\s\S]*?width:\s*min\(672px, calc\(100vw - 24px\)\);[\s\S]*?max-height:\s*90dvh;[\s\S]*?border-radius:\s*24px;/)
-  assert.match(source, /\.kb-config-header\s*\{[\s\S]*?padding:\s*24px 32px 16px;/)
-  assert.match(source, /\.kb-config-form\s*\{[\s\S]*?padding:\s*20px 32px;[\s\S]*?gap:\s*24px;/)
-  assert.match(source, /\.kb-config-textarea :deep\(\.t-textarea__info_wrapper\)\s*\{\s*display:\s*none;/)
-  assert.match(source, /:root\[theme-mode="dark"\] body \.kb-config-modal/)
-  assert.match(source, /:root\[theme-mode="dark"\] body \.kb-config-field/)
-  assert.match(source, /:root\[theme-mode="dark"\] body \.kb-config-summary-model \.visual-model-selector__control \.t-input/)
+  assert.match(source, /import VisualSettingsShell from '@\/views\/settings\/components\/VisualSettingsShell\.vue'/)
+  assert.match(source, /\.kb-settings-scroll\s*\{[\s\S]*?padding:\s*32px;[\s\S]*?overflow-y:\s*auto;/)
+  assert.match(template, /<template #footer>[\s\S]*?<t-button[^>]*variant="outline"[\s\S]*?<t-button[^>]*theme="primary"/)
+  assert.match(template, /class="setting-control setting-control-full kb-settings-textarea"/)
 })
 
 test('consumer editor does not call the unimplemented whole-library rebuild endpoint', () => {

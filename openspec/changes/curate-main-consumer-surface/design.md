@@ -45,6 +45,25 @@ Sandbox configs, Skills, environment variables, shell execution, sandbox files, 
 
 Lite exposes personal memory and the complete workspace memory configuration through the existing Settings shell. Personal content remains scoped to its owner. Every member can inspect the workspace policy; only admins can update it. Common controls (enabled, write mode, retrieval conditioning, and retention limit) stay directly visible; model selection, semantic recall, extraction cadence, interest threshold, and custom extraction instructions remain fully visible inside one compact Advanced disclosure. Controls that do not apply to the selected mode stay visible but disabled with an explanation. Lite and Standard persist the same validated memory contract rather than silently discarding fields.
 
+### Treat Musuw layout structure as a product contract
+
+Matching colors is not sufficient. Every newly exposed settings surface must
+reuse the existing Musuw structure at the component boundary: the shared
+`VisualSettingsShell` modal, left-side section navigation, page header,
+unboxed `settings-group` / `setting-row` rhythm, `setting-info` copy column,
+bounded `setting-control` column, shared footer, and the existing narrow and
+dark-mode behavior. A new surface must not substitute an upstream top-tab
+dialog, card grid, isolated alert-card language, or a one-off form geometry
+when an existing Musuw component or class contract can express the same
+interaction.
+
+Knowledge Basic/Advanced, personal and workspace Memory, Agent settings, and
+upload-time settings are one visual family. Domain-specific controls may remain
+specialized, but their placement, spacing, grouping, labels, descriptions,
+focus states, loading/error/empty states, and responsive collapse follow the
+shared Musuw shell. Standard may expose more sections than Lite, but it uses
+the same shell and row grammar rather than a parallel upstream visual system.
+
 ### Separate review from correction
 
 After implementation and automated verification, one consolidated adversarial review records findings without corrective edits. The exact reviewed tree is then exercised as an ordinary Lite user in a real browser. Findings are classified as reproducible, non-reproducible, or not browser-reachable before any later corrective pass.
@@ -56,6 +75,7 @@ After implementation and automated verification, one consolidated adversarial re
 - [Hidden executable API remains callable] → Deny route families and crafted chat fields in the Lite server gate, not only in templates.
 - [Consumer defaults overwrite existing Musuw semantics] → Apply forced defaults only in Lite and only to newly submitted consumer configuration; Standard and stored non-consumer data remain intact.
 - [Advanced UI becomes another technical settings dump] → Reuse Musuw rows, keep one disclosure, explain dependencies in product language, and avoid exposing provider credentials or a second model-management surface.
+- [Colors match while structure drifts] → Contract-test shared shell/row reuse, prohibit top-tab and card-grid substitutes on exposed settings pages, and browser-check desktop/narrow plus light/dark layouts for clipping and hierarchy drift.
 - [Review findings mutate before reproduction] → Record the reviewed commit/diff and prohibit corrective edits until browser reproduction is complete.
 
 ## Migration Plan

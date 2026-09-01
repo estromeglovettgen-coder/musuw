@@ -6,6 +6,18 @@ const source = readFileSync(new URL('./MemorySettings.vue', import.meta.url), 'u
 const template = source.slice(0, source.indexOf('<script setup'))
 const script = source.slice(source.indexOf('<script setup'), source.indexOf('<style'))
 
+test('personal memory follows the shared Musuw settings rhythm', () => {
+  assert.match(template, /class="visual-settings-page-header"/)
+  assert.match(template, /class="visual-settings-page-header__copy"/)
+  assert.match(template, /class="visual-settings-page-header__title"/)
+  assert.match(template, /class="visual-settings-page-header__description"/)
+  assert.match(template, /class="setting-row"/)
+  const style = source.slice(source.indexOf('<style'))
+  assert.doesNotMatch(style, /padding:\s*20px\s+0/)
+  assert.doesNotMatch(style, /font-size:\s*20px/)
+  assert.doesNotMatch(style, /font-size:\s*15px/)
+})
+
 test('one click starts one visible memory create request', () => {
   assert.match(
     template,

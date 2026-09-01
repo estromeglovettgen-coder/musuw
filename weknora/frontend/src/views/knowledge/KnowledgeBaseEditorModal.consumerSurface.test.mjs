@@ -10,7 +10,7 @@ test('Lite knowledge editor renders only the Basic and Advanced product sections
   assert.match(editor, /key:\s*'basic'/)
   assert.match(editor, /key:\s*'advanced'/)
   assert.match(editor, /if \(authStore\.isLiteMode\) \{[\s\S]*?LITE_KB_EDITOR_SECTIONS\.map/)
-  assert.match(template, /v-if="navItems\.length > 1"[\s\S]*?class="kb-config-nav"/)
+  assert.match(template, /<VisualSettingsShell[\s\S]*?<template #nav>[\s\S]*?class="visual-settings-nav__item"/)
   assert.match(template, /currentSection === 'advanced'[\s\S]*?KBAdvancedSettings/)
   assert.doesNotMatch(template, /v-if="!authStore\.isLiteMode && currentSection === 'advanced'"/)
 })

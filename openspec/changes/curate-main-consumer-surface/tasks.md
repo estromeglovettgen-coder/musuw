@@ -31,3 +31,14 @@
 - [x] 5.2 Start the exact reviewed build with a real Lite ordinary-user fixture and audit database state/configuration.
 - [x] 5.3 Exercise all included capabilities and excluded deep links in the browser, inspect desktop/narrow and light/dark UI, and classify each review finding by actual reproducibility.
 - [x] 5.4 Record the original findings, corrective decisions, remaining observations, and browser evidence; commit the implementation on the upgrade branch.
+
+## 6. Structural Visual Corrective Delta
+
+- [x] 6.1 Inventory every newly exposed settings surface against the authoritative Musuw shell, row, control, footer, responsive, and dark-mode contracts.
+- [x] 6.2 Add failing structural visual-contract tests that require shared component/layout reuse and catch clipped or top-tab/card-grid substitutes without pixel snapshots.
+- [x] 6.3 Rebuild the Knowledge Basic/Advanced and full Standard editor on the shared Musuw settings shell and row grammar without changing payloads or capability boundaries.
+- [x] 6.4 Align personal and workspace Memory headers, notices, disclosures, toolbars, lists, forms, and states with the existing Musuw settings rhythm while preserving complete Memory behavior.
+- [x] 6.5 Align exposed Agent and upload-time settings with the same row/control/responsive grammar and remove reachable clipping or one-off upstream layout patterns.
+- [x] 6.6 Run focused visual contracts and feature tests, then the full frontend suite, i18n checks, type-check, and production build.
+- [x] 6.7 Perform one adversarial visual review, then browser-test ordinary-user and administrator paths in desktop/narrow and light/dark modes; record only reproduced blockers.
+- [ ] 6.8 Update handoff and verification evidence, deploy only the reviewed staging build, re-run browser acceptance, and keep production unchanged.

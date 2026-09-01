@@ -46,6 +46,20 @@ test('workspace memory keeps every setting visible and groups low-frequency cont
   )
 })
 
+test('workspace memory follows the shared Musuw settings rhythm', () => {
+  assert.match(template, /class="visual-settings-page-header"/)
+  assert.match(template, /class="visual-settings-page-header__copy"/)
+  assert.match(template, /class="visual-settings-page-header__title"/)
+  assert.match(template, /class="visual-settings-page-header__description"/)
+  assert.match(template, /class="setting-row setting-row--disclosure(?:\s|\")/)
+  assert.doesNotMatch(template, /class="intro"/)
+
+  const style = source.slice(source.indexOf('<style'))
+  assert.doesNotMatch(style, /padding:\s*20px\s+0/)
+  assert.doesNotMatch(style, /font-size:\s*20px/)
+  assert.doesNotMatch(style, /font-size:\s*15px/)
+})
+
 test('one user action persists the workspace memory policy exactly once', () => {
   const saveBody = script.match(/const saveConfig = async \(\) => \{([\s\S]*?)\n\}/)?.[1] || ''
   assert.equal(
@@ -61,4 +75,13 @@ test('clearing the extractor model persists the empty session-model fallback', (
     /const handleModelChange = \(modelId: string\) => \{\s*config\.extract_model_id = modelId \|\| ''[\s\S]*?debouncedSave\(\)/,
     'a cleared selector value must normalize to the empty backend value',
   )
+})
+
+test('workspace memory fails closed when the tenant policy cannot be loaded', () => {
+  assert.match(script, /const configLoaded = ref\(false\)/)
+  assert.match(script, /const loadError = ref\(false\)/)
+  assert.match(script, /if \(!configLoaded\.value \|\| loadError\.value(?: \|\| [^)]*)?\) return/)
+  assert.match(template, /v-if="loadError"[^>]*class="settings-load-error"/)
+  assert.match(template, /:disabled="!canEdit \|\| !configLoaded"/)
+  assert.match(template, /@click="loadConfig"/)
 })
