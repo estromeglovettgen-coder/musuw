@@ -1294,7 +1294,7 @@ func (h *TenantHandler) SearchTenants(c *gin.Context) {
 
 // GetTenantKV godoc
 // @Summary      获取空间KV配置
-// @Description  获取空间级别的KV配置（支持web-search-config、prompt-templates、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config）
+// @Description  获取空间级别的KV配置（支持web-search-config、prompt-templates、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config、memory-config）
 // @Tags         空间管理
 // @Accept       json
 // @Produce      json
@@ -1347,7 +1347,7 @@ func (h *TenantHandler) GetTenantKV(c *gin.Context) {
 
 // UpdateTenantKV godoc
 // @Summary      更新空间KV配置
-// @Description  更新空间级别的KV配置（支持web-search-config、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config）
+// @Description  更新空间级别的KV配置（支持web-search-config、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config、memory-config）
 // @Tags         空间管理
 // @Accept       json
 // @Produce      json
@@ -1862,6 +1862,12 @@ func (h *TenantHandler) updateTenantMemoryConfigInternal(c *gin.Context) {
 		c.Error(errors.NewValidationError("Invalid request data").WithDetails(err.Error()))
 		return
 	}
+	tenant, _ := types.TenantInfoFromContext(ctx)
+	if tenant == nil {
+		logger.Error(ctx, "Workspace is empty")
+		c.Error(errors.NewBadRequestError("Workspace is empty"))
+		return
+	}
 	if cfg.WriteMode != "" &&
 		cfg.WriteMode != types.MemoryWriteExplicitOnly &&
 		cfg.WriteMode != types.MemoryWriteAuto {
@@ -1900,13 +1906,6 @@ func (h *TenantHandler) updateTenantMemoryConfigInternal(c *gin.Context) {
 		return
 	}
 	cfg.Normalize()
-
-	tenant, _ := types.TenantInfoFromContext(ctx)
-	if tenant == nil {
-		logger.Error(ctx, "Workspace is empty")
-		c.Error(errors.NewBadRequestError("Workspace is empty"))
-		return
-	}
 
 	tenant.MemoryConfig = &cfg
 	updatedTenant, err := h.service.UpdateTenant(ctx, tenant)

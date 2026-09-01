@@ -40,6 +40,78 @@ func isPlatformManagedBuiltinAgentID(id string) bool {
 	return id == types.BuiltinQuickAnswerID || id == types.BuiltinSmartReasoningID
 }
 
+func isLiteHiddenBuiltinAgentID(id string) bool {
+	return isLiteProductEdition() && id == types.BuiltinSkillInstallerID
+}
+
+var liteExecutableAgentToolNames = map[string]struct{}{
+	"shell_exec":           {},
+	"read_skill":           {},
+	"execute_skill_script": {},
+	"list_sandbox_files":   {},
+	"read_sandbox_file":    {},
+	"write_sandbox_file":   {},
+	"edit_sandbox_file":    {},
+}
+
+func cloneAgentStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	return append([]string(nil), values...)
+}
+
+func liteAgentExecutionConfigRedacted(config types.CustomAgentConfig) types.CustomAgentConfig {
+	config.SandboxConfigID = ""
+	config.SkillsSelectionMode = "none"
+	config.SelectedSkills = nil
+	if len(config.AllowedTools) > 0 {
+		allowed := make([]string, 0, len(config.AllowedTools))
+		for _, toolName := range config.AllowedTools {
+			if _, blocked := liteExecutableAgentToolNames[toolName]; blocked {
+				continue
+			}
+			allowed = append(allowed, toolName)
+		}
+		config.AllowedTools = allowed
+	}
+	return config
+}
+
+// redactLiteAgent returns a detached view. Legacy Standard rows keep their
+// sandbox/skill settings in storage for a later edition switch, while Lite
+// reads and runtime requests can never activate or expose those capabilities.
+func redactLiteAgent(agent *types.CustomAgent) *types.CustomAgent {
+	if agent == nil || !isLiteProductEdition() {
+		return agent
+	}
+	clone := *agent
+	clone.Config = liteAgentExecutionConfigRedacted(agent.Config)
+	clone.Config.KnowledgeBases = cloneAgentStrings(agent.Config.KnowledgeBases)
+	clone.Config.AllowedTools = cloneAgentStrings(clone.Config.AllowedTools)
+	clone.Config.SelectedSkills = nil
+	return &clone
+}
+
+func clearLiteAgentExecutionConfig(config *types.CustomAgentConfig) {
+	if !isLiteProductEdition() || config == nil {
+		return
+	}
+	config.SandboxConfigID = ""
+	config.SkillsSelectionMode = "none"
+	config.SelectedSkills = nil
+	if len(config.AllowedTools) > 0 {
+		filtered := make([]string, 0, len(config.AllowedTools))
+		for _, toolName := range config.AllowedTools {
+			if _, blocked := liteExecutableAgentToolNames[toolName]; blocked {
+				continue
+			}
+			filtered = append(filtered, toolName)
+		}
+		config.AllowedTools = filtered
+	}
+}
+
 // customAgentService implements the CustomAgentService interface
 type customAgentService struct {
 	repo           interfaces.CustomAgentRepository
@@ -113,6 +185,7 @@ func (s *customAgentService) CreateAgent(ctx context.Context, agent *types.Custo
 	agent.IsBuiltin = false
 
 	// Set defaults
+	clearLiteAgentExecutionConfig(&agent.Config)
 	agent.EnsureDefaults()
 	if err := agent.Config.QuestionSuggestions.Validate(); err != nil {
 		return nil, err
@@ -130,7 +203,7 @@ func (s *customAgentService) CreateAgent(ctx context.Context, agent *types.Custo
 	}
 
 	logger.Infof(ctx, "Custom agent created successfully, ID: %s, name: %s", agent.ID, agent.Name)
-	return agent, nil
+	return redactLiteAgent(agent), nil
 }
 
 // GetAgentByID retrieves an agent by its ID (including built-in agents)
@@ -138,6 +211,9 @@ func (s *customAgentService) GetAgentByID(ctx context.Context, id string) (*type
 	if id == "" {
 		logger.Error(ctx, "Agent ID is empty")
 		return nil, errors.New("agent ID cannot be empty")
+	}
+	if isLiteHiddenBuiltinAgentID(id) {
+		return nil, ErrAgentNotFound
 	}
 
 	// Get tenant ID from context
@@ -150,7 +226,7 @@ func (s *customAgentService) GetAgentByID(ctx context.Context, id string) (*type
 	if types.IsBuiltinAgentID(id) {
 		if isPlatformManagedBuiltinAgentID(id) {
 			if builtinAgent := types.GetBuiltinAgentWithContext(ctx, id, tenantID); builtinAgent != nil {
-				return builtinAgent, nil
+				return redactLiteAgent(builtinAgent), nil
 			}
 			return nil, ErrAgentNotFound
 		}
@@ -160,7 +236,7 @@ func (s *customAgentService) GetAgentByID(ctx context.Context, id string) (*type
 			// Found in database, overlay locale-specific name/description/avatar
 			agent.EnsureDefaults()
 			types.ApplyBuiltinAgentLocalization(ctx, agent)
-			return agent, nil
+			return redactLiteAgent(agent), nil
 		}
 		// Not in database, return default built-in agent from registry (i18n-aware)
 		if builtinAgent := types.GetBuiltinAgentWithContext(ctx, id, tenantID); builtinAgent != nil {
@@ -181,7 +257,7 @@ func (s *customAgentService) GetAgentByID(ctx context.Context, id string) (*type
 	}
 
 	agent.EnsureDefaults()
-	return agent, nil
+	return redactLiteAgent(agent), nil
 }
 
 // GetAgentByIDAndTenant retrieves an agent by ID and tenant (for shared agents; does not resolve built-in)
@@ -189,6 +265,9 @@ func (s *customAgentService) GetAgentByIDAndTenant(ctx context.Context, id strin
 	if id == "" {
 		logger.Error(ctx, "Agent ID is empty")
 		return nil, errors.New("agent ID cannot be empty")
+	}
+	if isLiteHiddenBuiltinAgentID(id) {
+		return nil, ErrAgentNotFound
 	}
 	agent, err := s.repo.GetAgentByID(ctx, id, tenantID)
 	if err != nil {
@@ -198,7 +277,7 @@ func (s *customAgentService) GetAgentByIDAndTenant(ctx context.Context, id strin
 		return nil, err
 	}
 	agent.EnsureDefaults()
-	return agent, nil
+	return redactLiteAgent(agent), nil
 }
 
 // ListAgents lists all agents for the current tenant (including built-in agents)
@@ -220,6 +299,9 @@ func (s *customAgentService) ListAgents(ctx context.Context) ([]*types.CustomAge
 	// Track which built-in agents exist in database
 	builtinInDB := make(map[string]bool)
 	for _, agent := range allAgents {
+		if isLiteHiddenBuiltinAgentID(agent.ID) {
+			continue
+		}
 		agent.EnsureDefaults()
 		if types.IsBuiltinAgentID(agent.ID) && !isPlatformManagedBuiltinAgentID(agent.ID) {
 			builtinInDB[agent.ID] = true
@@ -232,19 +314,22 @@ func (s *customAgentService) ListAgents(ctx context.Context) ([]*types.CustomAge
 
 	// Add built-in agents in order
 	for _, builtinID := range builtinIDs {
+		if isLiteHiddenBuiltinAgentID(builtinID) {
+			continue
+		}
 		if builtinInDB[builtinID] {
 			// Use customized config from database
 			for _, agent := range allAgents {
 				if agent.ID == builtinID {
 					types.ApplyBuiltinAgentLocalization(ctx, agent)
-					result = append(result, agent)
+					result = append(result, redactLiteAgent(agent))
 					break
 				}
 			}
 		} else {
 			// Use default built-in agent (i18n-aware)
 			if agent := types.GetBuiltinAgentWithContext(ctx, builtinID, tenantID); agent != nil {
-				result = append(result, agent)
+				result = append(result, redactLiteAgent(agent))
 			}
 		}
 	}
@@ -252,7 +337,7 @@ func (s *customAgentService) ListAgents(ctx context.Context) ([]*types.CustomAge
 	// Add custom agents
 	for _, agent := range allAgents {
 		if !types.IsBuiltinAgentID(agent.ID) {
-			result = append(result, agent)
+			result = append(result, redactLiteAgent(agent))
 		}
 	}
 
@@ -264,6 +349,9 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 	if agent.ID == "" {
 		logger.Error(ctx, "Agent ID is empty")
 		return nil, errors.New("agent ID cannot be empty")
+	}
+	if isLiteHiddenBuiltinAgentID(agent.ID) {
+		return nil, ErrAgentNotFound
 	}
 
 	// Get tenant ID from context
@@ -293,6 +381,10 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 	if existingAgent.IsBuiltin {
 		return nil, ErrCannotModifyBuiltin
 	}
+	legacySandboxConfigID := existingAgent.Config.SandboxConfigID
+	legacySkillsSelectionMode := existingAgent.Config.SkillsSelectionMode
+	legacySelectedSkills := cloneAgentStrings(existingAgent.Config.SelectedSkills)
+	legacyAllowedTools := cloneAgentStrings(existingAgent.Config.AllowedTools)
 
 	// Validate name
 	if strings.TrimSpace(agent.Name) == "" {
@@ -304,6 +396,15 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 	existingAgent.Description = agent.Description
 	existingAgent.Avatar = agent.Avatar
 	existingAgent.Config = agent.Config
+	if isLiteProductEdition() {
+		// A Lite editor may omit hidden fields, but changing edition must not
+		// destroy Standard's durable executable configuration. Keep it stored;
+		// reads/runtime redact it until Standard is enabled again.
+		existingAgent.Config.SandboxConfigID = legacySandboxConfigID
+		existingAgent.Config.SkillsSelectionMode = legacySkillsSelectionMode
+		existingAgent.Config.SelectedSkills = legacySelectedSkills
+		existingAgent.Config.AllowedTools = legacyAllowedTools
+	}
 	existingAgent.UpdatedAt = time.Now()
 
 	// Ensure defaults
@@ -322,7 +423,7 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 	}
 
 	logger.Infof(ctx, "Custom agent updated successfully, ID: %s", agent.ID)
-	return existingAgent, nil
+	return redactLiteAgent(existingAgent), nil
 }
 
 // updateBuiltinAgent updates a built-in agent's configuration (but not basic info)
@@ -342,7 +443,17 @@ func (s *customAgentService) updateBuiltinAgent(ctx context.Context, agent *type
 
 	if existingAgent != nil {
 		// Update existing record - only update config, keep basic info unchanged
+		legacySandboxConfigID := existingAgent.Config.SandboxConfigID
+		legacySkillsSelectionMode := existingAgent.Config.SkillsSelectionMode
+		legacySelectedSkills := cloneAgentStrings(existingAgent.Config.SelectedSkills)
+		legacyAllowedTools := cloneAgentStrings(existingAgent.Config.AllowedTools)
 		existingAgent.Config = agent.Config
+		if isLiteProductEdition() {
+			existingAgent.Config.SandboxConfigID = legacySandboxConfigID
+			existingAgent.Config.SkillsSelectionMode = legacySkillsSelectionMode
+			existingAgent.Config.SelectedSkills = legacySelectedSkills
+			existingAgent.Config.AllowedTools = legacyAllowedTools
+		}
 		existingAgent.UpdatedAt = time.Now()
 		existingAgent.EnsureDefaults()
 		if err := existingAgent.Config.QuestionSuggestions.Validate(); err != nil {
@@ -360,7 +471,7 @@ func (s *customAgentService) updateBuiltinAgent(ctx context.Context, agent *type
 
 		logger.Infof(ctx, "Built-in agent config updated successfully, ID: %s", agent.ID)
 		types.ApplyBuiltinAgentLocalization(ctx, existingAgent)
-		return existingAgent, nil
+		return redactLiteAgent(existingAgent), nil
 	}
 
 	// Create new record for built-in agent with customized config
@@ -375,6 +486,7 @@ func (s *customAgentService) updateBuiltinAgent(ctx context.Context, agent *type
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
+	clearLiteAgentExecutionConfig(&newAgent.Config)
 	newAgent.EnsureDefaults()
 	if err := newAgent.Config.QuestionSuggestions.Validate(); err != nil {
 		return nil, err
@@ -392,7 +504,7 @@ func (s *customAgentService) updateBuiltinAgent(ctx context.Context, agent *type
 
 	logger.Infof(ctx, "Built-in agent config record created successfully, ID: %s", agent.ID)
 	types.ApplyBuiltinAgentLocalization(ctx, newAgent)
-	return newAgent, nil
+	return redactLiteAgent(newAgent), nil
 }
 
 // DeleteAgent deletes an agent
@@ -471,6 +583,7 @@ func (s *customAgentService) CopyAgent(ctx context.Context, id string) (*types.C
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
+	clearLiteAgentExecutionConfig(&newAgent.Config)
 	// The clone is owned by whoever ran the copy, not the original
 	// creator — same reasoning as CopyKnowledgeBase. Skip synthetic
 	// API-key users.
@@ -492,7 +605,7 @@ func (s *customAgentService) CopyAgent(ctx context.Context, id string) (*types.C
 	}
 
 	logger.Infof(ctx, "Agent copied successfully, source ID: %s, new ID: %s", id, newAgent.ID)
-	return newAgent, nil
+	return redactLiteAgent(newAgent), nil
 }
 
 // GetSuggestedQuestions returns suggested questions for the agent based on its

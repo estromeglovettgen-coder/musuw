@@ -63,8 +63,9 @@ The backend Lite product gate SHALL permit only the existing agent CRUD/runtime,
 
 FAQ remains outside the Lite product: native FAQ creation and mutation routes,
 plus FAQ copy/duplicate paths, are rejected server-side while Standard keeps
-the upstream behavior. Historical FAQ reads/searches and deletion remain for
-inspection and cleanup. Web search follows the opposite policy: Lite forces
+the upstream behavior. Historical FAQ rows remain untouched in storage and are
+reported by the read-only startup audit, but no Lite HTTP read/search/delete
+route exposes them. Web search follows the opposite policy: Lite forces
 the existing native request field on at both router and service seams while
 keeping its UI toggle hidden; Standard retains the caller's native choice.
 

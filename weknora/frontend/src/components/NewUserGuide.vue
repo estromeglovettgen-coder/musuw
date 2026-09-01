@@ -23,7 +23,7 @@ const steps = computed<SpotlightGuideStep[]>(() => {
   const allSteps: SpotlightGuideStep[] = [
     { key: 'welcome' },
     {
-      key: 'knowledge',
+      key: authStore.isLiteMode ? 'knowledgeLite' : 'knowledge',
       target: '[data-guide="nav-knowledge-bases"]',
       placement: 'right',
       before: () => uiStore.expandSidebar(),

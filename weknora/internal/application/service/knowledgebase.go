@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/application/service/retriever"
 	"github.com/Tencent/WeKnora/internal/datasource"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -157,6 +158,7 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 		return nil, apperrors.NewBadRequestError("at least one visible indexing strategy (RAG or Wiki) must be enabled")
 	}
 	kb.EnsureDefaults()
+	enforceLiteAutoTagConfig(kb)
 	if err := s.applyConsumerKnowledgeBaseModels(ctx, kb, consumerCandidates); err != nil {
 		return nil, err
 	}
@@ -203,10 +205,53 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 }
 
 func rejectLiteFAQKnowledgeBase(kb *types.KnowledgeBase) error {
-	if isLiteProductEdition() && kb != nil && kb.Type == types.KnowledgeBaseTypeFAQ {
-		return apperrors.NewBadRequestError("FAQ knowledge bases are unavailable in Lite")
+	if isLiteProductEdition() && kb != nil {
+		kbType := strings.TrimSpace(kb.Type)
+		// Empty type is the legacy document default and is normalized by
+		// ApplyPlatformKnowledgeBaseDefaults. Every explicit non-document type
+		// (FAQ, Wiki, or an unknown future value) is outside Lite's create/copy
+		// contract and must fail before entitlement/model/storage side effects.
+		if kbType != "" && kbType != types.KnowledgeBaseTypeDocument {
+			return apperrors.NewBadRequestError("only document knowledge bases are available in Lite")
+		}
 	}
 	return nil
+}
+
+func enforceLiteAutoTagConfig(kb *types.KnowledgeBase) {
+	if !isLiteProductEdition() || kb == nil || kb.Type != types.KnowledgeBaseTypeDocument || kb.AutoTagConfig == nil {
+		return
+	}
+	kb.AutoTagConfig.ModelID = types.CheapestChatModelID
+	kb.AutoTagConfig.MaxTags = types.DefaultAutoTagMaxTags
+	skip := true
+	kb.AutoTagConfig.SkipIfTagged = &skip
+	kb.AutoTagConfig.Normalize()
+}
+
+func filterLiteKnowledgeBases(kbs []*types.KnowledgeBase) []*types.KnowledgeBase {
+	if !isLiteProductEdition() {
+		return kbs
+	}
+	filtered := make([]*types.KnowledgeBase, 0, len(kbs))
+	for _, kb := range kbs {
+		if !isLiteKnowledgeBaseVisible(kb) {
+			continue
+		}
+		filtered = append(filtered, kb)
+	}
+	return filtered
+}
+
+// isLiteKnowledgeBaseVisible is the single service-level visibility rule for
+// knowledge bases returned to Musuw Lite consumers. FAQ rows can remain in
+// storage for Standard/legacy compatibility, but they must not be surfaced by
+// any list path (including cross-tenant shared KB lists).
+func isLiteKnowledgeBaseVisible(kb *types.KnowledgeBase) bool {
+	if kb == nil {
+		return false
+	}
+	return !isLiteProductEdition() || kb.Type != types.KnowledgeBaseTypeFAQ
 }
 
 // consumerKnowledgeBaseModels captures only the model candidates supplied by
@@ -492,6 +537,13 @@ func (s *knowledgeBaseService) GetKnowledgeBaseByID(ctx context.Context, id stri
 		})
 		return nil, err
 	}
+	if kb == nil || !isLiteKnowledgeBaseVisible(kb) {
+		// FAQ rows are retained for migration/audit compatibility, but they are
+		// not consumer resources in Lite. Use the repository's normal not-found
+		// sentinel so every KB-scoped route (including shared/pin/activity paths)
+		// treats a legacy FAQ UUID exactly like a missing row.
+		return nil, apprepo.ErrKnowledgeBaseNotFound
+	}
 
 	kb.EnsureDefaults()
 	return kb, nil
@@ -512,6 +564,9 @@ func (s *knowledgeBaseService) GetKnowledgeBaseByIDOnly(ctx context.Context, id 
 		})
 		return nil, err
 	}
+	if kb == nil || !isLiteKnowledgeBaseVisible(kb) {
+		return nil, apprepo.ErrKnowledgeBaseNotFound
+	}
 
 	kb.EnsureDefaults()
 	return kb, nil
@@ -526,6 +581,7 @@ func (s *knowledgeBaseService) GetKnowledgeBasesByIDsOnly(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
+	kbs = filterLiteKnowledgeBases(kbs)
 	for _, kb := range kbs {
 		if kb != nil {
 			kb.EnsureDefaults()
@@ -549,6 +605,7 @@ func (s *knowledgeBaseService) ListKnowledgeBases(ctx context.Context) ([]*types
 		})
 		return nil, err
 	}
+	kbs = filterLiteKnowledgeBases(kbs)
 
 	// Query knowledge count and chunk count for each knowledge base
 	for _, kb := range kbs {
@@ -607,6 +664,7 @@ func (s *knowledgeBaseService) ListKnowledgeBasesByTenantID(ctx context.Context,
 		})
 		return nil, err
 	}
+	kbs = filterLiteKnowledgeBases(kbs)
 	for _, kb := range kbs {
 		kb.EnsureDefaults()
 		switch kb.Type {
@@ -698,6 +756,9 @@ func (s *knowledgeBaseService) UpdateKnowledgeBase(ctx context.Context,
 		})
 		return nil, err
 	}
+	if err := rejectLiteFAQKnowledgeBase(kb); err != nil {
+		return nil, err
+	}
 
 	changedFields := make([]string, 0, 3)
 	if kb.Name != name {
@@ -714,34 +775,38 @@ func (s *knowledgeBaseService) UpdateKnowledgeBase(ctx context.Context,
 	kb.Name = name
 	kb.Description = description
 	if config != nil {
-		kb.ChunkingConfig = config.ChunkingConfig
-		kb.ImageProcessingConfig = config.ImageProcessingConfig
-		if config.FAQConfig != nil {
-			kb.FAQConfig = config.FAQConfig
-		}
-		if config.WikiConfig != nil {
-			kb.WikiConfig = config.WikiConfig
-		}
-		if config.AutoTagConfig != nil {
-			config.AutoTagConfig.Normalize()
-			kb.AutoTagConfig = config.AutoTagConfig
-		}
-		// Update indexing strategy — syncs to ExtractConfig for backward compat
-		if config.IndexingStrategy != nil {
-			if !config.IndexingStrategy.HasAnyIndexing() {
-				return nil, errors.New("at least one indexing strategy must be enabled")
+		if isLiteProductEdition() {
+			if err := applyLiteKnowledgeBaseConfigUpdate(kb, config); err != nil {
+				return nil, err
 			}
-			kb.IndexingStrategy = *config.IndexingStrategy
-			// Ensure WikiConfig exists when wiki indexing is enabled so that
-			// wiki-specific tunables (synthesis model, granularity, …) have a home.
-			if kb.WikiConfig == nil && config.IndexingStrategy.WikiEnabled {
-				kb.WikiConfig = &types.WikiConfig{}
+		} else {
+			kb.ChunkingConfig = config.ChunkingConfig
+			kb.ImageProcessingConfig = config.ImageProcessingConfig
+			if config.FAQConfig != nil {
+				kb.FAQConfig = config.FAQConfig
 			}
-			// Sync GraphEnabled → ExtractConfig
-			if kb.ExtractConfig != nil {
-				kb.ExtractConfig.Enabled = config.IndexingStrategy.GraphEnabled
-			} else if config.IndexingStrategy.GraphEnabled {
-				kb.ExtractConfig = &types.ExtractConfig{Enabled: true}
+			if config.WikiConfig != nil {
+				kb.WikiConfig = config.WikiConfig
+			}
+			if config.AutoTagConfig != nil {
+				kb.AutoTagConfig = config.AutoTagConfig
+				kb.AutoTagConfig.Normalize()
+			}
+			// Update indexing strategy — syncs to ExtractConfig for backward compat.
+			if config.IndexingStrategy != nil {
+				if !config.IndexingStrategy.HasAnyIndexing() {
+					return nil, errors.New("at least one indexing strategy must be enabled")
+				}
+				kb.IndexingStrategy = *config.IndexingStrategy
+				if kb.WikiConfig == nil && config.IndexingStrategy.WikiEnabled {
+					kb.WikiConfig = &types.WikiConfig{}
+				}
+				// Sync GraphEnabled → ExtractConfig.
+				if kb.ExtractConfig != nil {
+					kb.ExtractConfig.Enabled = config.IndexingStrategy.GraphEnabled
+				} else if config.IndexingStrategy.GraphEnabled {
+					kb.ExtractConfig = &types.ExtractConfig{Enabled: true}
+				}
 			}
 		}
 	}
@@ -762,6 +827,50 @@ func (s *knowledgeBaseService) UpdateKnowledgeBase(ctx context.Context,
 
 	logger.Infof(ctx, "Knowledge base updated successfully, ID: %s, name: %s", kb.ID, kb.Name)
 	return kb, nil
+}
+
+// applyLiteKnowledgeBaseConfigUpdate merges only the settings exposed by the
+// Musuw consumer editor. Hidden platform configuration stays byte-for-byte
+// intact even when a caller bypasses the UI and forges the native DTO.
+func applyLiteKnowledgeBaseConfigUpdate(kb *types.KnowledgeBase, config *types.KnowledgeBaseConfig) error {
+	if kb == nil || config == nil {
+		return nil
+	}
+	if config.WikiConfig != nil {
+		if kb.WikiConfig == nil {
+			kb.WikiConfig = &types.WikiConfig{
+				SynthesisModelID:      kb.SummaryModelID,
+				ExtractionGranularity: types.WikiExtractionStandard,
+			}
+		}
+		kb.WikiConfig.ExtractionGranularity = config.WikiConfig.ExtractionGranularity.Normalize()
+		kb.WikiConfig.ContentInstructions = config.WikiConfig.ContentInstructions
+		kb.WikiConfig.ExtractionInstructions = config.WikiConfig.ExtractionInstructions
+	}
+	if config.AutoTagConfig != nil {
+		kb.AutoTagConfig = &types.AutoTagConfig{Enabled: config.AutoTagConfig.Enabled}
+		enforceLiteAutoTagConfig(kb)
+	}
+	if config.IndexingStrategy != nil {
+		if !config.IndexingStrategy.VectorEnabled && !config.IndexingStrategy.KeywordEnabled &&
+			!config.IndexingStrategy.WikiEnabled {
+			return errors.New("at least one visible indexing strategy (RAG or Wiki) must be enabled")
+		}
+		graphEnabled := kb.IndexingStrategy.GraphEnabled
+		kb.IndexingStrategy = types.IndexingStrategy{
+			VectorEnabled:  config.IndexingStrategy.VectorEnabled,
+			KeywordEnabled: config.IndexingStrategy.KeywordEnabled,
+			WikiEnabled:    config.IndexingStrategy.WikiEnabled,
+			GraphEnabled:   graphEnabled,
+		}
+		if kb.WikiConfig == nil && kb.IndexingStrategy.WikiEnabled {
+			kb.WikiConfig = &types.WikiConfig{
+				SynthesisModelID:      kb.SummaryModelID,
+				ExtractionGranularity: types.WikiExtractionStandard,
+			}
+		}
+	}
+	return nil
 }
 
 // TogglePinKnowledgeBase toggles whether the calling user has pinned

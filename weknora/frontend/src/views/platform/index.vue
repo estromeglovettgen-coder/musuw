@@ -31,6 +31,7 @@ import { MessagePlugin } from "tdesign-vue-next";
 import { useI18n } from "vue-i18n";
 import NewUserGuide from '@/components/NewUserGuide.vue'
 import { collectDroppedFiles } from './collectDroppedFiles'
+import { isKnowledgeBaseRuntimeReady } from '@/utils/knowledgeBaseRuntime'
 
 const route = useRoute();
 const router = useRouter();
@@ -89,13 +90,7 @@ const checkKnowledgeBaseInitialization = async (): Promise<boolean> => {
     const kbResponse = await getKnowledgeBaseById(currentKbId);
     const kb = kbResponse.data;
 
-    if (!kb.summary_model_id) {
-      MessagePlugin.warning(t("knowledgeBase.notInitialized"));
-      return false;
-    }
-    const strategy = kb.indexing_strategy;
-    const needsEmbedding = !strategy || strategy.vector_enabled || strategy.keyword_enabled;
-    if (needsEmbedding && !kb.embedding_model_id) {
+    if (!isKnowledgeBaseRuntimeReady(kb)) {
       MessagePlugin.warning(t("knowledgeBase.notInitialized"));
       return false;
     }

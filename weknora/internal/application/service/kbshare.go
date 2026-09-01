@@ -82,6 +82,9 @@ func (s *kbShareService) ShareKnowledgeBase(ctx context.Context, kbID string, or
 	if err != nil {
 		return nil, ErrKBNotFound
 	}
+	if kb == nil || !isLiteKnowledgeBaseVisible(kb) {
+		return nil, ErrKBNotFound
+	}
 	if kb.TenantID != tenantID {
 		return nil, ErrNotKBOwner
 	}
@@ -248,6 +251,9 @@ func (s *kbShareService) ListSharesByKnowledgeBase(ctx context.Context, kbID str
 	if err != nil {
 		return nil, ErrKBNotFound
 	}
+	if kb == nil || !isLiteKnowledgeBaseVisible(kb) {
+		return nil, ErrKBNotFound
+	}
 	if kb.TenantID != tenantID {
 		return nil, ErrNotKBOwner
 	}
@@ -256,7 +262,17 @@ func (s *kbShareService) ListSharesByKnowledgeBase(ctx context.Context, kbID str
 
 // ListSharesByOrganization lists all shares for an organization
 func (s *kbShareService) ListSharesByOrganization(ctx context.Context, orgID string) ([]*types.KnowledgeBaseShare, error) {
-	return s.shareRepo.ListByOrganization(ctx, orgID)
+	shares, err := s.shareRepo.ListByOrganization(ctx, orgID)
+	if err != nil || !isLiteProductEdition() {
+		return shares, err
+	}
+	visible := make([]*types.KnowledgeBaseShare, 0, len(shares))
+	for _, share := range shares {
+		if share != nil && isLiteKnowledgeBaseVisible(share.KnowledgeBase) {
+			visible = append(visible, share)
+		}
+	}
+	return visible, nil
 }
 
 // ListSharedKnowledgeBases lists all knowledge bases reachable from the
@@ -275,6 +291,9 @@ func (s *kbShareService) ListSharedKnowledgeBases(ctx context.Context, tenantID 
 			continue
 		}
 		if share.KnowledgeBase == nil {
+			continue
+		}
+		if !isLiteKnowledgeBaseVisible(share.KnowledgeBase) {
 			continue
 		}
 
@@ -361,6 +380,9 @@ func (s *kbShareService) ListSharedKnowledgeBasesInOrganization(ctx context.Cont
 		if share.KnowledgeBase == nil {
 			continue
 		}
+		if !isLiteKnowledgeBaseVisible(share.KnowledgeBase) {
+			continue
+		}
 
 		effective := types.MinOrgRole(share.Permission, tm.Role)
 		effective = applyTenantRoleCap(effective, callerTenantRole)
@@ -415,6 +437,12 @@ func (s *kbShareService) ListSharedKnowledgeBaseIDsByOrganizations(ctx context.C
 	byOrg := make(map[string][]string)
 	for _, share := range shares {
 		if share == nil || members[share.OrganizationID] == nil {
+			continue
+		}
+		// ListByOrganizations preloads the KB association. In Lite, fail
+		// closed when that association is absent so a stale/partial share row
+		// cannot reintroduce a hidden FAQ into sidebar resource counts.
+		if isLiteProductEdition() && (share.KnowledgeBase == nil || !isLiteKnowledgeBaseVisible(share.KnowledgeBase)) {
 			continue
 		}
 		kbID := share.KnowledgeBaseID

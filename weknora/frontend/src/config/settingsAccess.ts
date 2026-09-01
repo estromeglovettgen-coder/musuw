@@ -27,7 +27,8 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
   tenant: 'viewer',
   members: 'viewer',
   mymemory: 'viewer',
-  memory: 'admin',
+  // Every member can inspect workspace memory policy; only Admin+ can save it.
+  memory: 'viewer',
   // Every member fills in their own environment variables; the workspace-wide
   // values stay on the Admin+ skills page.
   envvars: 'viewer',

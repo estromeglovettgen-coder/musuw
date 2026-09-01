@@ -773,7 +773,64 @@ func (s *knowledgeService) GetKnowledgeBatch(ctx context.Context,
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	return s.repo.GetKnowledgeBatch(ctx, tenantID, ids)
+	rows, err := s.repo.GetKnowledgeBatch(ctx, tenantID, ids)
+	if err != nil {
+		return nil, err
+	}
+	return s.filterLiteKnowledgeRows(ctx, rows)
+}
+
+// filterLiteKnowledgeRows keeps legacy FAQ knowledge rows out of every batch
+// lookup used by consumer-facing routes. KB-scoped routes are protected by
+// RequireKBAccess, but /knowledge/batch and shared-agent refreshes address
+// documents directly, so they need the same service-level visibility rule.
+// Standard returns the repository result unchanged.
+func (s *knowledgeService) filterLiteKnowledgeRows(
+	ctx context.Context,
+	rows []*types.Knowledge,
+) ([]*types.Knowledge, error) {
+	if !isLiteProductEdition() || len(rows) == 0 || s.kbService == nil {
+		return rows, nil
+	}
+
+	kbIDs := make([]string, 0, len(rows))
+	seen := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		if row == nil || row.KnowledgeBaseID == "" {
+			continue
+		}
+		if _, ok := seen[row.KnowledgeBaseID]; ok {
+			continue
+		}
+		seen[row.KnowledgeBaseID] = struct{}{}
+		kbIDs = append(kbIDs, row.KnowledgeBaseID)
+	}
+	if len(kbIDs) == 0 {
+		return rows, nil
+	}
+
+	kbs, err := s.kbService.GetKnowledgeBasesByIDsOnly(ctx, kbIDs)
+	if err != nil {
+		return nil, err
+	}
+	visibleKBs := make(map[string]struct{}, len(kbs))
+	for _, kb := range kbs {
+		if kb != nil && isLiteKnowledgeBaseVisible(kb) {
+			visibleKBs[kb.ID] = struct{}{}
+		}
+	}
+
+	filtered := make([]*types.Knowledge, 0, len(rows))
+	for _, row := range rows {
+		if row == nil {
+			filtered = append(filtered, row)
+			continue
+		}
+		if _, ok := visibleKBs[row.KnowledgeBaseID]; ok {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered, nil
 }
 
 // GetKnowledgeBatchWithSharedAccess retrieves knowledge by IDs, including items from shared KBs the user has access to.
@@ -796,11 +853,11 @@ func (s *knowledgeService) GetKnowledgeBatchWithSharedAccess(ctx context.Context
 	}
 	userIDVal := ctx.Value(types.UserIDContextKey)
 	if userIDVal == nil {
-		return ownList, nil
+		return s.filterLiteKnowledgeRows(ctx, ownList)
 	}
 	userID, ok := userIDVal.(string)
 	if !ok || userID == "" {
-		return ownList, nil
+		return s.filterLiteKnowledgeRows(ctx, ownList)
 	}
 	// Plan 3: shared-KB permission is keyed on (tenant, tenant_role)
 	// rather than user. callerTenantRole drives the 3-D cap.
@@ -820,7 +877,7 @@ func (s *knowledgeService) GetKnowledgeBatchWithSharedAccess(ctx context.Context
 		foundSet[k.ID] = true
 		ownList = append(ownList, k)
 	}
-	return ownList, nil
+	return s.filterLiteKnowledgeRows(ctx, ownList)
 }
 
 // SetKnowledgeTags replaces all tags for a single knowledge entry.

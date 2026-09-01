@@ -97,8 +97,14 @@ func (r *fakeKBRepo) GetKnowledgeBaseByIDAndTenant(_ context.Context, id string,
 	}
 	return kb, nil
 }
-func (r *fakeKBRepo) GetKnowledgeBaseByIDs(_ context.Context, _ []string) ([]*types.KnowledgeBase, error) {
-	return nil, nil
+func (r *fakeKBRepo) GetKnowledgeBaseByIDs(_ context.Context, ids []string) ([]*types.KnowledgeBase, error) {
+	rows := make([]*types.KnowledgeBase, 0, len(ids))
+	for _, id := range ids {
+		if kb, ok := r.rows[id]; ok {
+			rows = append(rows, kb)
+		}
+	}
+	return rows, nil
 }
 func (r *fakeKBRepo) ListKnowledgeBases(_ context.Context) ([]*types.KnowledgeBase, error) {
 	return nil, nil

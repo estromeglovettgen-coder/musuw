@@ -1415,7 +1415,7 @@
                 <div v-show="currentSection === 'knowledge'" class="section">
                   <div class="section-header">
                     <h2>{{ $t('agent.editor.knowledgeConfig') }}</h2>
-                    <p class="section-description">{{ $t('agent.editor.knowledgeConfigDesc') }}</p>
+                    <p class="section-description">{{ knowledgeConfigDescription }}</p>
                   </div>
 
                   <div class="settings-group">
@@ -1826,6 +1826,10 @@ const editorResources = useEditorResourcesStore();
 
 const { t, locale: i18nLocale } = useI18n();
 
+const knowledgeConfigDescription = computed(() => authStore.isLiteMode
+  ? t('agent.editor.knowledgeConfigDescLite')
+  : t('agent.editor.knowledgeConfigDesc'));
+
 const props = defineProps<{
   visible: boolean;
   mode: 'create' | 'edit';
@@ -2091,6 +2095,7 @@ function namedSandboxConfigs(): SandboxConfigRecord[] {
 }
 
 function autoBindSoleSandbox() {
+  if (authStore.isLiteMode) return
   if (skillsSelectionMode.value === 'none') return
   if (formData.value.config.sandbox_config_id) return
   const configs = namedSandboxConfigs()
@@ -2100,6 +2105,7 @@ function autoBindSoleSandbox() {
 }
 
 function openSkillSettings() {
+  if (authStore.isLiteMode) return
   const configId = formData.value.config.sandbox_config_id || ''
   uiStore.openSettings('skills', configId || undefined)
 }
@@ -2115,6 +2121,7 @@ function pruneSelectedSkills() {
 }
 
 async function syncInstalledSkills(force = false) {
+  if (authStore.isLiteMode) return
   autoBindSoleSandbox()
   const configId = formData.value.config.sandbox_config_id || ''
   await editorResources.ensureSkills(configId, force)
@@ -2129,6 +2136,7 @@ async function syncInstalledSkills(force = false) {
 }
 
 async function installCatalogToCurrent(skill: CatalogSkillRow) {
+  if (authStore.isLiteMode) return
   const configId = formData.value.config.sandbox_config_id || ''
   if (!configId || installingCatalogId.value) return
   installingCatalogId.value = skill.id
@@ -2942,6 +2950,9 @@ const agentTypePresetLabel = (p: AgentTypePreset): string => {
   return p.i18n?.[locale]?.label || p.i18n?.default?.label || p.id;
 };
 const agentTypePresetDescription = (p: AgentTypePreset): string => {
+  if (authStore.isLiteMode && p.id === 'rag-qa') {
+    return t('agentEditor.agentType.liteDescriptions.ragQa');
+  }
   const locale = i18nLocale.value || 'default';
   return p.i18n?.[locale]?.description || p.i18n?.default?.description || '';
 };
@@ -3341,7 +3352,7 @@ watch(() => props.visible, async (val) => {
       applyDefaultModelsIfEmpty()
     }
 
-    await syncInstalledSkills()
+    if (!authStore.isLiteMode) await syncInstalledSkills()
 
     if (props.initialHighlightField) {
       await applyInitialFieldHighlight(props.initialHighlightField);
@@ -3455,7 +3466,7 @@ watch(mcpSelectionMode, (mode) => {
 });
 
 watch(() => formData.value.config.sandbox_config_id, async () => {
-  if (!props.visible) return
+  if (!props.visible || authStore.isLiteMode) return
   await syncInstalledSkills()
 })
 
@@ -3471,6 +3482,10 @@ function stopCatalogPoll() {
 watch(
   [() => props.visible, catalogSkillRows],
   () => {
+    if (authStore.isLiteMode) {
+      stopCatalogPoll()
+      return
+    }
     const busy = catalogSkillRows.value.some((skill) =>
       skill.installStatus === 'installing' || skill.installStatus === 'removing',
     )
@@ -3611,7 +3626,7 @@ watch(() => uiStore.showSettingsModal, async (visible, prevVisible) => {
       await Promise.all([
         chatResources.ensureModels(true),
         editorResources.ensureStorageEngine(true),
-        chatResources.ensureSandboxConfigs(true),
+        authStore.isLiteMode ? Promise.resolve() : chatResources.ensureSandboxConfigs(true),
       ]);
       if (chatResources.allModels.length > 0) {
         allModels.value = chatResources.allModels;
@@ -3619,7 +3634,7 @@ watch(() => uiStore.showSettingsModal, async (visible, prevVisible) => {
       if (editorResources.storageStatus.length > 0) {
         storageEngineStatus.value = editorResources.storageStatus;
       }
-      await syncInstalledSkills(true);
+      if (!authStore.isLiteMode) await syncInstalledSkills(true);
     } catch (e) {
       console.warn('Failed to refresh data after settings closed', e);
     }
@@ -3679,8 +3694,8 @@ const loadDependencies = async () => {
       authStore.isLiteMode ? Promise.resolve() : chatResources.ensureModels(),
       authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('rag') : Promise.resolve(),
       chatResources.ensureKnowledgeBases(),
-      chatResources.ensureWebSearchProviders(),
-      chatResources.ensureSandboxConfigs(),
+      authStore.isLiteMode ? Promise.resolve() : chatResources.ensureWebSearchProviders(),
+      authStore.isLiteMode ? Promise.resolve() : chatResources.ensureSandboxConfigs(),
       editorResources.prefetchAgentEditorDeps(),
     ]);
 

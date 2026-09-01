@@ -841,6 +841,14 @@ func (kb *KnowledgeBase) EnsureDefaults() {
 // and surfaced in the JSON representation of a KnowledgeBase so that the frontend
 // can filter / enable / disable KB options based on what the selected agent type needs.
 type KBCapabilities struct {
+	// Ready means the server-owned runtime models required by the enabled
+	// pipelines are configured. Lite clients use this safe boolean instead of
+	// receiving the underlying model identifiers.
+	Ready bool `json:"ready"`
+	// StorageReady is an identifier-free signal that a document KB has a
+	// concrete storage binding. Managed clients need this to enable uploads
+	// without receiving the backend UUID or provider configuration.
+	StorageReady bool `json:"storage_ready"`
 	// Vector means semantic (embedding) search is indexed.
 	Vector bool `json:"vector"`
 	// Keyword means BM25 / sparse keyword search is indexed.
@@ -860,12 +868,37 @@ func (kb *KnowledgeBase) Capabilities() KBCapabilities {
 		return KBCapabilities{}
 	}
 	return KBCapabilities{
-		Vector:  kb.IsVectorEnabled(),
-		Keyword: kb.IsKeywordEnabled(),
-		Wiki:    kb.IsWikiEnabled(),
-		Graph:   kb.IsGraphEnabled(),
-		FAQ:     kb.Type == KnowledgeBaseTypeFAQ,
+		Ready:        kb.IsRuntimeReady(),
+		StorageReady: kb.IsStorageReady(),
+		Vector:       kb.IsVectorEnabled(),
+		Keyword:      kb.IsKeywordEnabled(),
+		Wiki:         kb.IsWikiEnabled(),
+		Graph:        kb.IsGraphEnabled(),
+		FAQ:          kb.Type == KnowledgeBaseTypeFAQ,
 	}
+}
+
+// IsRuntimeReady reports whether the configured pipelines have the platform
+// models they need. It deliberately exposes no model identity and therefore
+// remains safe for the managed Lite response contract.
+func (kb *KnowledgeBase) IsRuntimeReady() bool {
+	if kb == nil || strings.TrimSpace(kb.SummaryModelID) == "" {
+		return false
+	}
+	return !kb.NeedsEmbeddingModel() || strings.TrimSpace(kb.EmbeddingModelID) != ""
+}
+
+// IsStorageReady reports whether the KB has a storage destination selected.
+// It intentionally returns only a boolean so managed clients can gate uploads
+// without learning infrastructure identifiers or provider details.
+func (kb *KnowledgeBase) IsStorageReady() bool {
+	if kb == nil {
+		return false
+	}
+	if kb.StorageBackendID != nil && strings.TrimSpace(*kb.StorageBackendID) != "" {
+		return true
+	}
+	return kb.StorageProviderConfig != nil && strings.TrimSpace(kb.StorageProviderConfig.Provider) != ""
 }
 
 // MarshalJSON augments the default JSON encoding of KnowledgeBase with a computed

@@ -1,10 +1,10 @@
 <template>
-  <SpotlightGuide v-model:active="active" :steps="config.steps" :step-i18n-prefix="config.stepI18nPrefix"
+  <SpotlightGuide v-model:active="active" :steps="guideSteps" :step-i18n-prefix="config.stepI18nPrefix"
     labels-prefix="contextualGuide" @finish="onFinish" @dismiss="onFinish" />
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
 import {
   CONTEXTUAL_GUIDE_TOURS,
@@ -13,6 +13,7 @@ import {
   type ContextualGuideTourConfig,
   type ContextualGuideTourId,
 } from '@/config/contextualGuides'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   tour: ContextualGuideTourId
@@ -22,6 +23,12 @@ const props = defineProps<{
 
 const config: ContextualGuideTourConfig = CONTEXTUAL_GUIDE_TOURS[props.tour]
 const active = ref(false)
+const authStore = useAuthStore()
+
+const guideSteps = computed(() => {
+  if (props.tour !== 'kbList' || !authStore.isLiteMode) return config.steps
+  return config.steps.map((step) => step.key === 'create' ? { ...step, key: 'createLite' } : step)
+})
 
 let openTimer: ReturnType<typeof setTimeout> | null = null
 let waitGlobalTimer: ReturnType<typeof setTimeout> | null = null

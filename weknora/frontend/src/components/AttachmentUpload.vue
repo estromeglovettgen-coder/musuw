@@ -4,6 +4,7 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
 import { MAX_FILE_SIZE_MB } from '@/utils';
 import { getParserEngines } from '@/api/system';
+import { useAuthStore } from '@/stores/auth';
 import {
   deleteTemporaryAttachment,
   getTemporaryAttachment,
@@ -12,6 +13,7 @@ import {
 } from '@/api/chat/temporary-attachments';
 
 const { t } = useI18n();
+const authStore = useAuthStore();
 
 export interface AttachmentFile {
   file: File;
@@ -58,7 +60,10 @@ onMounted(async () => {
     const discovered = (response.data || [])
       .filter(engine => engine.Available !== false)
       .flatMap(engine => engine.FileTypes || [])
-      .filter(type => type && type.toLowerCase() !== 'url')
+      .filter((type) => {
+        const normalizedType = type?.replace(/^\./, '').toLowerCase();
+        return normalizedType && normalizedType !== 'url' && (!authStore.isLiteMode || normalizedType !== 'xmind');
+      })
       .map(type => `.${type.replace(/^\./, '').toLowerCase()}`);
     supportedTypes.value = [...new Set([...supportedTypes.value, ...discovered])];
   } catch {
@@ -97,7 +102,7 @@ const addFiles = async (files: File[]) => {
     }
 
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!supportedTypes.value.includes(ext)) {
+    if ((authStore.isLiteMode && ext === '.xmind') || !supportedTypes.value.includes(ext)) {
       MessagePlugin.warning(t('chat.attachmentTypeNotSupported', { name: file.name }));
       continue;
     }

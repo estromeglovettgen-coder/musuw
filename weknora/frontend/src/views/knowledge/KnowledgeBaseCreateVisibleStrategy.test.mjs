@@ -14,7 +14,7 @@ test('Lite cannot submit a document library without visible RAG or Wiki indexing
   )
   assert.match(
     editor,
-    /if \(authStore\.isLiteMode && formData\.value\.type !== 'faq'\) \{[\s\S]*?knowledgeEditor\.indexing\.atLeastOne[\s\S]*?if \(editorMode\.value === 'create'\) return true/,
+    /if \(authStore\.isLiteMode && normalizeKnowledgeBaseType\(formData\.value\.type\) === 'document'\) \{[\s\S]*?knowledgeEditor\.indexing\.atLeastOne[\s\S]*?if \(authStore\.isLiteMode\) return true/,
   )
 })
 

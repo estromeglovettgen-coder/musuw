@@ -149,6 +149,8 @@ const normalizeSettingsSection = (section: string) => {
     && section !== 'usage'
     && section !== 'userprofile'
     && section !== 'models'
+    && section !== 'mymemory'
+    && section !== 'memory'
     && section !== 'mcp'
   ) {
     return 'general'
@@ -178,7 +180,12 @@ const isSectionSupported = (key: string): boolean => {
 const canSeeSection = (key: string): boolean => {
   if (authStore.isLiteMode) {
     if (key === 'mcp') return authStore.canAccessAllTenants || authStore.hasRole('admin')
-    return key === 'general' || key === 'usage' || key === 'userprofile' || key === 'models'
+    return key === 'general'
+      || key === 'usage'
+      || key === 'userprofile'
+      || key === 'models'
+      || key === 'mymemory'
+      || key === 'memory'
   }
   if (isIntegrationSection(key)) {
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
@@ -198,6 +205,8 @@ const navItems = computed<NavItem[]>(() => {
       { key: 'general', icon: 'setting', label: t('general.title') },
       { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
       { key: 'models', icon: 'cpu', label: t('modelSettings.sceneModels.navTitle') },
+      { key: 'mymemory', icon: 'bookmark', label: t('memorySettings.title') },
+      { key: 'memory', icon: 'bulletpoint', label: t('memoryWorkspaceSettings.title') },
       ...(authStore.canAccessAllTenants || authStore.hasRole('admin')
         ? [{ key: 'mcp', icon: 'tools', label: t('settings.mcpService') }]
         : []),

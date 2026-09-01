@@ -16422,7 +16422,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: 获取空间级别的KV配置（支持web-search-config、prompt-templates、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config）
+      description: 获取空间级别的KV配置（支持web-search-config、prompt-templates、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config、memory-config）
       parameters:
       - description: 配置键名
         in: path
@@ -16450,7 +16450,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: 更新空间级别的KV配置（支持web-search-config、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config）
+      description: 更新空间级别的KV配置（支持web-search-config、parser-engine-config、storage-engine-config、chat-history-config、retrieval-config、memory-config）
       parameters:
       - description: 配置键名
         in: path

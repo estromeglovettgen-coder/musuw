@@ -917,6 +917,9 @@ export default {
       label: '에이전트 유형',
       desc: '프리셋을 선택하면 시스템 프롬프트, 도구 목록, 권장 지식 베이스 범위가 자동으로 채워집니다.',
       defaultNamePattern: '나의 {label}',
+      liteDescriptions: {
+        ragQa: '문서 청크 기반의 근거 검색입니다. Wiki를 사용하지 않는 문서 지식 베이스에 적합합니다.'
+      },
       kbIncompatibleWarn: '선택된 {count}개의 지식 베이스가 현재 유형과 호환되지 않습니다. 수동으로 조정해 주세요.',
       kbMismatch: {
         ragQa: 'RAG 검색 비활성화',
@@ -4413,6 +4416,7 @@ export default {
   knowledgeList: {
     create: '지식베이스 생성',
     subtitle: '지식베이스를 관리하고 구성합니다. 문서형과 Q&A형 지식베이스를 지원합니다',
+    liteSubtitle: '문서 지식 베이스를 관리하고 정리하여 자료를 업로드하고 검색·질문을 시작하세요',
     favorites: {
       add: '즐겨찾기에 추가',
       remove: '즐겨찾기에서 제거'
@@ -5105,6 +5109,10 @@ export default {
     writeModeAuto: '자동 정리',
     writeModeExplicitHint: '구성원이 명시적으로 기억을 요청한 내용과 기억 페이지에서 직접 추가한 항목만 저장하며 추가 모델 호출이 없습니다.',
     writeModeAutoHint: '여기에 더해 대화가 끝난 뒤 백그라운드에서 모델을 한 번 호출해 구성원이 한 말에서 오래 남길 내용을 정리합니다.',
+    advancedLabel: '고급 설정',
+    advancedDescription: '모델, 의미 기반 검색, 자동 정리 매개변수입니다. 대부분의 공간은 기본값을 그대로 사용해도 됩니다.',
+    autoOnlyHint: '“자동 정리”로 전환하면 이 항목을 설정할 수 있습니다.',
+    vectorOnlyHint: '“의미로 기억 검색”을 켜면 이 모델을 선택할 수 있습니다.',
     extractModelLabel: '정리 모델',
     extractModelDescription: '비워 두면 해당 대화에서 사용한 모델을 씁니다.',
     extractDelayLabel: '정리 지연',
@@ -5914,6 +5922,7 @@ export default {
       toolsConfigDesc: '에이전트가 사용할 수 있는 도구 구성',
       knowledgeConfig: '지식베이스',
       knowledgeConfigDesc: '에이전트가 액세스할 수 있는 지식베이스 범위 및 FAQ 전략 구성',
+      knowledgeConfigDescLite: '에이전트가 접근할 문서 지식 베이스 범위를 구성합니다',
       webSearchConfig: '웹 검색',
       webSearchConfigDesc: '에이전트의 네트워크 검색 기능 구성',
       agentId: '에이전트 ID',
@@ -6810,6 +6819,10 @@ export default {
         create: {
           title: '첫 지식 베이스 만들기',
           desc: '지식 베이스에 문서와 FAQ를 보관합니다. 아래에 강조된 「새 지식 베이스」 버튼을 누르면 양식 작성을 안내합니다.'
+        },
+        createLite: {
+          title: '첫 지식 베이스 만들기',
+          desc: '지식 베이스에 문서와 자료를 정리합니다. 아래에 강조된 「새 지식 베이스」 버튼을 누르면 양식 작성을 안내합니다.'
         }
       }
     }
@@ -6845,6 +6858,10 @@ export default {
       knowledge: {
         title: '지식 베이스 만들기',
         desc: '모든 것의 시작점입니다. 문서, 웹페이지, FAQ를 업로드하면 Musuw가 자동으로 분석하고 색인합니다. 여기를 클릭해 지식 베이스로 이동하세요.'
+      },
+      knowledgeLite: {
+        title: '지식 베이스 만들기',
+        desc: '모든 것의 시작점입니다. 문서와 웹페이지를 업로드하면 Musuw가 자동으로 분석하고 색인합니다. 여기를 클릭해 지식 베이스로 이동하세요.'
       },
       welcome: {
         title: 'Musuw에 오신 것을 환영합니다',

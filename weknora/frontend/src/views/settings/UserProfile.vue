@@ -42,7 +42,7 @@
       </div>
 
       <!-- 修改密码：与其它 setting-row 同款只读行 + 编辑入口，表单进原地 popup -->
-      <div class="setting-row">
+      <div v-if="!authStore.isLiteMode" class="setting-row">
         <div class="setting-info">
           <label>{{ $t('userProfile.changePassword.label') }}</label>
           <p class="desc">

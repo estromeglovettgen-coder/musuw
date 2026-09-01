@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/infrastructure/docparser/anydoc"
+)
 
 func TestIsValidFileTypeHTML(t *testing.T) {
 	tests := []struct {
@@ -64,6 +68,17 @@ func TestImportExtensionSetIsSharedAcrossPaths(t *testing.T) {
 		}
 		if err := validateImportFileType(ext); err != nil {
 			t.Errorf("validateImportFileType(%q) = %v, want nil", ext, err)
+		}
+	}
+}
+
+// Every format implemented by the fixed-main AnyDoc converter must pass the
+// import gate. Otherwise uploads are rejected before parser selection even
+// though /system/parser-engines advertises AnyDoc as available.
+func TestImportExtensionSetIncludesEveryAnydocFormat(t *testing.T) {
+	for _, ext := range anydoc.SupportedFileTypes() {
+		if !isSupportedImportExtension(ext) {
+			t.Errorf("AnyDoc format %q is rejected by the import gate", ext)
 		}
 	}
 }

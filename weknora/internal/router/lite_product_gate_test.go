@@ -29,13 +29,20 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "legacy knowledge base duplicate hidden", method: "POST", path: "/api/v1/knowledge-bases/kb-1/duplicate", blocked: true},
 		{name: "knowledge", method: "PUT", path: "/api/v1/knowledge/abc", blocked: false},
 		{name: "wiki", method: "GET", path: "/api/v1/knowledge-bases/1/wiki/pages", blocked: false},
-		{name: "historical faq list", method: "GET", path: "/api/v1/knowledge-bases/1/faq/entries", blocked: false},
+		{name: "faq list hidden", method: "GET", path: "/api/v1/knowledge-bases/1/faq/entries", blocked: true},
 		{name: "faq create hidden", method: "POST", path: "/api/v1/knowledge-bases/1/faq/entry", blocked: true},
 		{name: "faq batch upsert hidden", method: "POST", path: "/api/v1/knowledge-bases/1/faq/entries", blocked: true},
 		{name: "faq update hidden", method: "PUT", path: "/api/v1/knowledge-bases/1/faq/entries/7", blocked: true},
-		{name: "historical faq delete cleanup", method: "DELETE", path: "/api/v1/knowledge-bases/1/faq/entries", blocked: false},
-		{name: "historical faq search", method: "POST", path: "/api/v1/knowledge-bases/1/faq/search", blocked: false},
-		{name: "historical faq import progress", method: "GET", path: "/api/v1/faq/import/progress/task-1", blocked: false},
+		{name: "faq delete hidden", method: "DELETE", path: "/api/v1/knowledge-bases/1/faq/entries", blocked: true},
+		{name: "faq search hidden", method: "POST", path: "/api/v1/knowledge-bases/1/faq/search", blocked: true},
+		{name: "faq import progress hidden", method: "GET", path: "/api/v1/faq/import/progress/task-1", blocked: true},
+		{name: "sandbox config hidden", method: "GET", path: "/api/v1/sandbox-configs", blocked: true},
+		{name: "sandbox file hidden", method: "GET", path: "/api/v1/sandbox-configs/cfg-1/skills/skill-1/files/content", blocked: true},
+		{name: "workspace env vars hidden", method: "GET", path: "/api/v1/me/env-vars", blocked: true},
+		{name: "session artifacts hidden", method: "GET", path: "/api/v1/sessions/session-1/artifacts", blocked: true},
+		{name: "message artifacts hidden", method: "GET", path: "/api/v1/sessions/session-1/messages/message-1/artifacts", blocked: true},
+		{name: "artifact download hidden", method: "GET", path: "/api/v1/sessions/session-1/messages/message-1/artifacts/0/download", blocked: true},
+		{name: "ordinary attachment remains", method: "GET", path: "/api/v1/sessions/session-1/attachments", blocked: false},
 		{name: "kb share", method: "POST", path: "/api/v1/knowledge-bases/1/shares", blocked: false},
 		{name: "shared kb", method: "GET", path: "/api/v1/shared-knowledge-bases", blocked: false},
 		{name: "model runtime list", method: "GET", path: "/api/v1/models", blocked: false},
@@ -53,8 +60,8 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "custom agent update", method: "PUT", path: "/api/v1/agents/custom-agent-id", blocked: false},
 		{name: "custom agent delete", method: "DELETE", path: "/api/v1/agents/custom-agent-id", blocked: false},
 		{name: "custom agent copy", method: "POST", path: "/api/v1/agents/custom-agent-id/copy", blocked: false},
-		{name: "kb initialization read", method: "GET", path: "/api/v1/initialization/config/1", blocked: false},
-		{name: "kb initialization update", method: "PUT", path: "/api/v1/initialization/config/1", blocked: false},
+		{name: "kb initialization read", method: "GET", path: "/api/v1/initialization/config/1", blocked: true},
+		{name: "kb initialization update", method: "PUT", path: "/api/v1/initialization/config/1", blocked: true},
 		{name: "kb initialize", method: "POST", path: "/api/v1/initialization/initialize/1", blocked: true},
 		{name: "parser catalog", method: "GET", path: "/api/v1/system/parser-engines", blocked: false},
 		{name: "storage status", method: "GET", path: "/api/v1/system/storage-engine-status", blocked: false},
@@ -63,6 +70,8 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "organization kb shares", method: "GET", path: "/api/v1/organizations/3/shares", blocked: false},
 		{name: "consumer retrieval config read", method: "GET", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
 		{name: "consumer retrieval config write", method: "PUT", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
+		{name: "workspace memory config read", method: "GET", path: "/api/v1/tenants/kv/memory-config", blocked: false},
+		{name: "workspace memory config write", method: "PUT", path: "/api/v1/tenants/kv/memory-config", blocked: false},
 		{name: "native prompt templates read", method: "GET", path: "/api/v1/tenants/kv/prompt-templates", blocked: false},
 		{name: "native prompt templates write", method: "PUT", path: "/api/v1/tenants/kv/prompt-templates", blocked: true},
 		{name: "native agent storage config read", method: "GET", path: "/api/v1/tenants/kv/storage-engine-config", blocked: false},
@@ -209,18 +218,29 @@ func TestLiteTemporaryAttachmentRequestBlocked(t *testing.T) {
 		name     string
 		agentID  string
 		sourceID string
+		filename string
 		blocked  bool
 	}{
 		{name: "no agent", blocked: false},
 		{name: "builtin runtime agent", agentID: liteSmartReasoningAgentID, blocked: false},
 		{name: "custom agent", agentID: "custom-agent", blocked: false},
 		{name: "shared agent source", agentID: liteSmartReasoningAgentID, sourceID: "42", blocked: true},
+		{name: "xmind attachment", filename: "roadmap.xmind", blocked: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var body bytes.Buffer
 			form := multipart.NewWriter(&body)
+			if tt.filename != "" {
+				file, err := form.CreateFormFile("file", tt.filename)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := file.Write([]byte("multipart sentinel")); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if tt.agentID != "" {
 				if err := form.WriteField("agent_id", tt.agentID); err != nil {
 					t.Fatal(err)
@@ -259,21 +279,23 @@ func TestLiteProductGateTemporaryAttachmentRequest(t *testing.T) {
 		name         string
 		agentID      string
 		sourceID     string
+		filename     string
 		wantStatus   int
 		wantSentinel bool
 	}{
-		{name: "empty agent", wantStatus: http.StatusNoContent, wantSentinel: true},
-		{name: "quick answer", agentID: liteQuickAnswerAgentID, wantStatus: http.StatusNoContent, wantSentinel: true},
-		{name: "smart reasoning", agentID: liteSmartReasoningAgentID, wantStatus: http.StatusNoContent, wantSentinel: true},
-		{name: "custom agent", agentID: "custom-agent", wantStatus: http.StatusNoContent, wantSentinel: true},
-		{name: "nonzero source tenant", agentID: liteSmartReasoningAgentID, sourceID: "42", wantStatus: http.StatusNotFound},
+		{name: "empty agent", filename: "notes.txt", wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "quick answer", agentID: liteQuickAnswerAgentID, filename: "notes.txt", wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "smart reasoning", agentID: liteSmartReasoningAgentID, filename: "notes.txt", wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "custom agent", agentID: "custom-agent", filename: "notes.txt", wantStatus: http.StatusNoContent, wantSentinel: true},
+		{name: "nonzero source tenant", agentID: liteSmartReasoningAgentID, sourceID: "42", filename: "notes.txt", wantStatus: http.StatusNotFound},
+		{name: "xmind attachment", filename: "roadmap.xmind", wantStatus: http.StatusNotFound},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var body bytes.Buffer
 			form := multipart.NewWriter(&body)
-			file, err := form.CreateFormFile("file", "notes.txt")
+			file, err := form.CreateFormFile("file", tt.filename)
 			if err != nil {
 				t.Fatal(err)
 			}

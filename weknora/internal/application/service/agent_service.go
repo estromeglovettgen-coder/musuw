@@ -200,14 +200,16 @@ func (s *agentService) CreateAgentEngine(
 	}
 	s.registerMCPTools(ctx, toolRegistry, config, eventBus, sessionID, assistantMessageID)
 
-	// File tools are a pure sandbox capability independent of the
-	// skill switch: register them whenever the workspace sandbox supports a
-	// session filesystem, even when skills are disabled.
-	s.registerSandboxFileTools(ctx, toolRegistry, sessionID, config)
-	// shell_exec follows SkillsEnabled (or install mode), not the presence
-	// of a ready skill. Register it independently of the skills manager so a
-	// fresh or still-installing sandbox still has a shell.
-	s.registerSandboxShellIfAllowed(ctx, toolRegistry, sessionID, config)
+	if !isLiteProductEdition() {
+		// File tools are a pure sandbox capability independent of the
+		// skill switch: register them whenever the workspace sandbox supports a
+		// session filesystem, even when skills are disabled.
+		s.registerSandboxFileTools(ctx, toolRegistry, sessionID, config)
+		// shell_exec follows SkillsEnabled (or install mode), not the presence
+		// of a ready skill. Register it independently of the skills manager so a
+		// fresh or still-installing sandbox still has a shell.
+		s.registerSandboxShellIfAllowed(ctx, toolRegistry, sessionID, config)
+	}
 
 	// 3. Resolve knowledge base and selected document metadata
 	kbInfos, selectedDocs := s.resolveKBAndDocInfos(ctx, config)
@@ -259,7 +261,7 @@ func (s *agentService) CreateAgentEngine(
 	// tools that need it). A sandbox whose skills are still installing —
 	// or that simply has none yet — therefore gets a shell without an
 	// empty skills manager or skill tools that cannot succeed.
-	offerSkills := config.SkillsEnabled &&
+	offerSkills := !isLiteProductEdition() && config.SkillsEnabled &&
 		(len(config.SkillDirs) > 0 || len(config.TenantSkills) > 0)
 	if offerSkills {
 		skillsManager, err := s.initializeSkillsManager(ctx, sessionID, config, toolRegistry)

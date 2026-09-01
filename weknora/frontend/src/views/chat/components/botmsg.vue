@@ -83,7 +83,7 @@
           <t-icon name="bookmark-add" />
         </button>
         <span
-          v-if="hasArtifacts || artifactsCollecting"
+          v-if="!authStore.isLiteMode && (hasArtifacts || artifactsCollecting)"
           class="visual-assistant-toolbar__artifact answer-toolbar__artifact"
           :class="{ 'is-collecting': artifactButtonCollecting }"
         >
@@ -147,7 +147,7 @@
       :on-leave="scheduleCitationClose"
     />
     <ChatArtifactsDrawer
-      v-if="hasArtifacts"
+      v-if="!authStore.isLiteMode && hasArtifacts"
       v-model:visible="showArtifactDrawer"
       :session-id="sessionId"
       :message-id="messageIdForArtifacts"
@@ -179,6 +179,7 @@ import {
 import { useI18n } from 'vue-i18n';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useUIStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
 import {
     buildManualMarkdown,
     formatManualTitle,
@@ -217,6 +218,7 @@ const mentionTagIcon = (item) => {
 const emit = defineEmits(['scroll-bottom', 'render-complete-change'])
 const { t } = useI18n()
 const uiStore = useUIStore();
+const authStore = useAuthStore();
 let parentMd = ref()
 const { float: citationFloat, rebind: rebindCitations, cancelClose: cancelCitationClose, scheduleClose: scheduleCitationClose } = useChatCitationPopover(parentMd, {
     getKnowledgeReferences: () => props.session?.knowledge_references,
@@ -274,6 +276,7 @@ const showRequestInfo = computed(() => !!(props.session?.request_id || props.ses
 // plugin routes non-TS blocks through babel which rejects those tokens.
 const showArtifactDrawer = ref(false);
 const artifactList = computed(() => {
+    if (authStore.isLiteMode) return [];
     const raw = props.session && props.session.artifacts;
     const list = Array.isArray(raw) ? raw : [];
     // Enrich each entry with its position so the download endpoint can
@@ -295,7 +298,7 @@ const messageIdForArtifacts = computed(() => {
 // lands directly on that file's preview instead of the list.
 const artifactPreviewIndex = ref(null);
 function openArtifactDrawer(previewIndex = null) {
-    if (!hasArtifacts.value) return;
+    if (authStore.isLiteMode || !hasArtifacts.value) return;
     artifactPreviewIndex.value = previewIndex;
     showArtifactDrawer.value = true;
 }
@@ -342,7 +345,7 @@ const markdownRenderer = createChatMarkdownRenderer({
         return createSafeImage(href, text || '', title || '');
     },
     invalidImageHtml: () => `<p>${t('error.invalidImageLink')}</p>`,
-    isValidImageUrl: (href) => isArtifactRefHref(href) || isValidImageURL(href),
+    isValidImageUrl: (href) => (!authStore.isLiteMode && isArtifactRefHref(href)) || isValidImageURL(href),
 });
 
 // 计算属性：将 Markdown 文本转换为 tokens
@@ -463,7 +466,7 @@ watch(renderedHTML, () => {
 onUpdated(() => {
     nextTick(async () => {
         await hydrateProtectedFileImages(parentMd.value);
-        await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
+        if (!authStore.isLiteMode) await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
         refreshMarkdownEnhancements(parentMd.value);
         if (props.session?.is_completed) {
             await renderMermaidInContainer(parentMd.value);
@@ -479,7 +482,7 @@ onMounted(async () => {
         }
         rebindCitations();
         await hydrateProtectedFileImages(parentMd.value);
-        await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
+        if (!authStore.isLiteMode) await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
         await enhanceMarkdownContainer(parentMd.value);
     });
 });

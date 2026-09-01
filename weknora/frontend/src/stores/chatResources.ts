@@ -18,6 +18,7 @@ import { isNamedSandboxBackend, listSandboxConfigs, type SandboxConfigRecord } f
 import { useOrganizationStore } from '@/stores/organization'
 import { filterChatModelsForPlan } from '@/utils/managedChatModels'
 import { getCurrentLanguage } from '@/utils/request'
+import { isKnowledgeBaseRuntimeReady } from '@/utils/knowledgeBaseRuntime'
 import {
   isLocalizedCacheFresh,
   shouldCommitLocalizedGeneration,
@@ -30,14 +31,6 @@ const CACHE_TTL_MS = 60_000
 type ResourceKey = 'knowledgeBases' | 'agents' | 'models' | 'webSearchProviders' | 'sandboxConfigs'
 
 export type ListCreatorFilter = 'all' | 'mine' | 'others'
-
-function isKbModelReady(kb: any): boolean {
-  if (!kb.summary_model_id || kb.summary_model_id === '') return false
-  const strategy = kb.indexing_strategy
-  const needsEmbedding = !strategy || strategy.vector_enabled || strategy.keyword_enabled
-  if (needsEmbedding && (!kb.embedding_model_id || kb.embedding_model_id === '')) return false
-  return true
-}
 
 /**
  * Frontend-only exposure hint. Security never depends on this value: the Lite
@@ -81,7 +74,7 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
   const sceneOptionsLoadedAt = new Map<ConsumerScene, number>()
   const sceneOptionsInflight = new Map<ConsumerScene, Promise<void>>()
 
-  const validKnowledgeBases = computed(() => rawKnowledgeBases.value.filter(isKbModelReady))
+  const validKnowledgeBases = computed(() => rawKnowledgeBases.value.filter(isKnowledgeBaseRuntimeReady))
   const chatModels = computed(() => {
     const models = allModels.value.filter((m) => m.type === 'KnowledgeQA')
     return consumerPlan.value ? filterChatModelsForPlan(models, consumerPlan.value) : models

@@ -11,6 +11,8 @@ const authorizedItems = [
   { key: 'usage', label: '使用情况与计费' },
   { key: 'userprofile', label: '用户信息' },
   { key: 'models', label: '模型选择' },
+  { key: 'mymemory', label: '我的记忆' },
+  { key: 'memory', label: '长期记忆' },
 ]
 
 test('settings search filters only the already-authorized navigation surface', () => {
@@ -23,17 +25,40 @@ test('settings search never synthesizes a hidden section', () => {
   assert.deepEqual(filterSettingsNavigation(authorizedItems, 'system-global'), [])
 })
 
-test('Lite settings expose consumer models and admin MCP without exposing system administration', () => {
+test('Lite settings expose complete workspace memory read-only to members without exposing infrastructure', () => {
   assert.match(
     settingsSource,
-    /if \(\s*authStore\.isLiteMode\s*&&\s*section !== 'usage'\s*&&\s*section !== 'userprofile'\s*&&\s*section !== 'models'\s*&&\s*section !== 'mcp'\s*\)\s*\{\s*return 'general'/,
+    /if \(\s*authStore\.isLiteMode\s*&&[\s\S]*section !== 'mymemory'[\s\S]*section !== 'memory'[\s\S]*section !== 'mcp'[\s\S]*\)\s*\{\s*return 'general'/,
   )
   assert.match(
     settingsSource,
-    /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general' \|\| key === 'usage' \|\| key === 'userprofile' \|\| key === 'models'/,
+    /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general'[\s\S]*key === 'mymemory'[\s\S]*key === 'memory'/,
   )
   assert.match(settingsSource, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
+  assert.match(settingsSource, /\{ key: 'mymemory', icon: 'bookmark', label: t\('memorySettings\.title'\) \}/)
+  assert.match(settingsSource, /\{ key: 'memory', icon: 'bulletpoint', label: t\('memoryWorkspaceSettings\.title'\) \}/)
   assert.match(settingsSource, /const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS/)
+})
+
+test('Lite and Standard both expose complete memory settings through one Advanced disclosure', () => {
+  const memory = readFileSync(new URL('./MemoryWorkspaceSettings.vue', import.meta.url), 'utf8')
+  assert.doesNotMatch(memory, /authStore\.isLiteMode/)
+  const advancedIndex = memory.indexOf('memoryWorkspaceSettings.advancedLabel')
+  assert.ok(advancedIndex >= 0, 'memory source lost the Advanced disclosure')
+  for (const token of ['extractModelLabel', 'embeddingModelLabel', 'extractDelayLabel', 'extractMinIntervalLabel']) {
+    const index = memory.indexOf(token)
+    assert.ok(index >= 0, `memory source lost ${token}`)
+    assert.ok(index > advancedIndex, `${token} must remain reachable under Advanced`)
+  }
+  assert.match(memory, /v-model="config\.enabled"/)
+  assert.match(memory, /v-model="config\.write_mode"/)
+  assert.match(memory, /v-model="config\.max_items"/)
+})
+
+test('Lite profile does not expose password rotation controls', () => {
+  const profile = readFileSync(new URL('./UserProfile.vue', import.meta.url), 'utf8')
+  const row = profile.slice(profile.indexOf('userProfile.changePassword.label') - 350, profile.indexOf('userProfile.changePassword.label') + 250)
+  assert.match(row, /v-if="!authStore\.isLiteMode"/)
 })
 
 test('settings traps focus only when it is a modal and restores the launcher', () => {

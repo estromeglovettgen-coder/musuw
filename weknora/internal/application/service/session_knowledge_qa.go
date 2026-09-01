@@ -9,6 +9,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/agent/tools"
 	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
 	"github.com/Tencent/WeKnora/internal/common"
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/modelcontext"
@@ -504,11 +505,24 @@ func (s *sessionService) buildSearchTargets(
 	if len(kbIDsToFetch) > 0 {
 		kbs, kbFetchErr := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, kbIDsToFetch)
 		if kbFetchErr != nil {
+			if isLiteProductEdition() {
+				return nil, kbFetchErr
+			}
 			logger.Warnf(ctx, "Failed to fetch knowledge bases for search targets: %v", kbFetchErr)
 		}
 		for _, kb := range kbs {
 			if kb != nil {
+				if isLiteProductEdition() && kb.Type == types.KnowledgeBaseTypeFAQ {
+					return nil, apperrors.NewNotFoundError("knowledge base not found")
+				}
 				kbByID[kb.ID] = kb
+			}
+		}
+		if isLiteProductEdition() {
+			for _, kbID := range kbIDsToFetch {
+				if kbByID[kbID] == nil {
+					return nil, apperrors.NewNotFoundError("knowledge base not found")
+				}
 			}
 		}
 	}
@@ -565,6 +579,26 @@ func (s *sessionService) buildSearchTargets(
 		for _, k := range knowledgeList {
 			if k == nil || k.KnowledgeBaseID == "" {
 				continue
+			}
+			if isLiteProductEdition() && s.knowledgeBaseService != nil && kbByID[k.KnowledgeBaseID] == nil {
+				// Knowledge-only requests do not populate kbIDsToFetch during the
+				// first pass. Resolve those KB rows before building a target so a
+				// stale/crafted FAQ ID cannot reach the retriever.
+				kbs, kbFetchErr := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, []string{k.KnowledgeBaseID})
+				if kbFetchErr != nil {
+					return nil, kbFetchErr
+				}
+				for _, kb := range kbs {
+					if kb != nil {
+						kbByID[kb.ID] = kb
+						if kb.Type == types.KnowledgeBaseTypeFAQ {
+							return nil, apperrors.NewNotFoundError("knowledge base not found")
+						}
+					}
+				}
+				if kbByID[k.KnowledgeBaseID] == nil {
+					return nil, apperrors.NewNotFoundError("knowledge base not found")
+				}
 			}
 			// Track KB -> TenantID mapping from knowledge items
 			if kbTenantMap[k.KnowledgeBaseID] == 0 {

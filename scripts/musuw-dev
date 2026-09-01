@@ -279,6 +279,48 @@ stop_host_processes() {
   done
 }
 
+# Mirror upstream main's host-development behavior: once the reviewed AnyDoc
+# archive exists for this machine, link it into every Musuw host backend run.
+# An explicitly supplied GO_BUILD_TAGS (including an empty value) remains an
+# operator override.
+host_anydoc_archive() {
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) printf '%s\n' "$weknora_root/third_party/anydoc-go/lib/darwin_arm64/libanydoc_go.a" ;;
+    Darwin-x86_64) printf '%s\n' "$weknora_root/third_party/anydoc-go/lib/darwin_amd64/libanydoc_go.a" ;;
+    Linux-x86_64)
+      if [ -f "$weknora_root/third_party/anydoc-go/lib/linux_amd64_gnu/libanydoc_go.a" ]; then
+        printf '%s\n' "$weknora_root/third_party/anydoc-go/lib/linux_amd64_gnu/libanydoc_go.a"
+      else
+        printf '%s\n' "$weknora_root/third_party/anydoc-go/lib/linux_amd64_musl/libanydoc_go.a"
+      fi
+      ;;
+    Linux-aarch64)
+      if [ -f "$weknora_root/third_party/anydoc-go/lib/linux_arm64_gnu/libanydoc_go.a" ]; then
+        printf '%s\n' "$weknora_root/third_party/anydoc-go/lib/linux_arm64_gnu/libanydoc_go.a"
+      else
+        printf '%s\n' "$weknora_root/third_party/anydoc-go/lib/linux_arm64_musl/libanydoc_go.a"
+      fi
+      ;;
+    *) printf '\n' ;;
+  esac
+}
+
+enable_host_anydoc_build_tag() {
+  if [ -n "${GO_BUILD_TAGS+x}" ]; then
+    export GO_BUILD_TAGS
+    return
+  fi
+
+  local archive
+  archive="$(host_anydoc_archive)"
+  if [ -n "$archive" ] && [ -f "$archive" ]; then
+    export GO_BUILD_TAGS=anydoc
+    printf '%s\n' 'AnyDoc archive detected; host backend will use the official AnyDoc parser.'
+  else
+    printf '%s\n' 'AnyDoc archive is absent; run `cd weknora && make anydoc-lib` to enable the main parser default.' >&2
+  fi
+}
+
 run_app() {
   load_host_environment
   require_free_port "$MUSUW_DEV_BACKEND_PORT" 'host Go backend'
@@ -286,10 +328,11 @@ run_app() {
   if [ "$(uname)" = Darwin ]; then
     export CGO_LDFLAGS='-Wl,-no_warn_duplicate_libraries'
   fi
+  enable_host_anydoc_build_tag
   local ldflags
   ldflags="$(cd "$weknora_root" && ./scripts/get_version.sh ldflags) -X 'google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn'"
   cd "$weknora_root"
-  go run -ldflags="$ldflags" ./cmd/server
+  go run -tags "${GO_BUILD_TAGS:-}" -ldflags="$ldflags" ./cmd/server
 }
 
 run_auth() {

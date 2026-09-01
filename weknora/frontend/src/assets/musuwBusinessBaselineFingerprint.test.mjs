@@ -24,11 +24,12 @@ const PRE_UI_BUSINESS_BASELINE_COMMIT = '367a0c76e48fcf8a3762c33b672cfa2e16b679f
 const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b909'
 const OPENROUTER_VIDEO_INGESTION_COMMIT = '22052ccf08c5ab2e370d94ea2508359aa367d0fe'
 const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
+const CONSUMER_SURFACE_CHANGE = 'curate-main-consumer-surface'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': 'bfe05d85e3a516bd64afa6d69bfa6f9dddf3e5c5',
   './business-baselines/Input-field.pre-view.vue': '11bc2cb650979eb55e367d370980051fa6caa429',
-  './business-baselines/KnowledgeBase.pre-view.vue': '981716cb4ccf83a7dca23ff588602a0bbd32bbb8',
+  './business-baselines/KnowledgeBase.pre-view.vue': 'caa758fc34397a8babe651688ed6c98f86cb3afe',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',
@@ -55,8 +56,9 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
+    change: CONSUMER_SURFACE_CHANGE,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
-    authority: 'WeKnora main 81142df native document import flow extended only with the managed video file types',
+    authority: 'WeKnora main 81142df native document import flow extended with managed video file types and server-projected runtime/storage readiness that does not expose hidden infrastructure fields',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
@@ -106,6 +108,8 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBase.pre-view.vue')),
   )
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.change, CONSUMER_SURFACE_CHANGE)
+  assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.authority, /server-projected runtime\/storage readiness/)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBaseList.pre-view.vue')),

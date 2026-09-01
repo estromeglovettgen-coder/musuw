@@ -108,7 +108,7 @@ export default defineComponent({
       <header class="visual-kb-list__header" style="--wails-draggable: drag">
         <div class="visual-kb-list__heading">
           <div class="visual-kb-list__title-row"><t-icon name="folder" /><h1>{{ $t('knowledgeBase.title') }}</h1></div>
-          <p>{{ $t('knowledgeList.subtitle') }}</p>
+          <p>{{ $t(authStore.isLiteMode ? 'knowledgeList.liteSubtitle' : 'knowledgeList.subtitle') }}</p>
         </div>
         <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" size="16px" aria-hidden="true" /><span>{{ $t('knowledgeList.create') }}</span></button>
       </header>

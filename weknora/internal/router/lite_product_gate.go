@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -197,6 +198,16 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 			return true
 		}
 	}
+	// The native request DTO intentionally ignores unknown fields, so a caller
+	// could otherwise smuggle executable-runtime inputs through an old/new
+	// client mismatch. Keep ordinary document attachments, images and MCP
+	// selectors intact, but deny every field that can select a sandbox, skill,
+	// shell/environment operation, or generated artifact. This check walks
+	// nested objects/arrays as well as the top-level payload.
+	var rawPayload any
+	if err := json.Unmarshal(body, &rawPayload); err == nil && liteChatContainsExecutableField(rawPayload) {
+		return true
+	}
 
 	// Lite owns this capability as a platform policy, not a client preference.
 	// Preserve every unknown/native request field as raw JSON while forcing the
@@ -214,6 +225,41 @@ func liteChatRequestBlocked(c *gin.Context) bool {
 	c.Request.Body = io.NopCloser(bytes.NewReader(rewritten))
 	c.Request.ContentLength = int64(len(rewritten))
 	c.Request.Header.Set("Content-Length", strconv.Itoa(len(rewritten)))
+	return false
+}
+
+var liteExecutableChatFieldNames = map[string]struct{}{
+	"artifact": {}, "artifacts": {}, "artifact_id": {}, "artifact_ids": {},
+	"generated_artifact": {}, "generated_artifacts": {}, "generated_file": {}, "generated_files": {},
+	"sandbox": {}, "sandbox_id": {}, "sandbox_config": {}, "sandbox_config_id": {},
+	"sandbox_file": {}, "sandbox_files": {}, "sandbox_path": {},
+	"env": {}, "env_var": {}, "env_vars": {}, "environment": {}, "environment_variables": {},
+	"shell": {}, "shell_command": {}, "shell_commands": {}, "command": {}, "commands": {},
+	"execute": {}, "execution": {}, "code_execution": {},
+	"skill": {}, "skills": {}, "skill_id": {}, "skill_ids": {}, "skill_name": {}, "skill_names": {},
+	"skill_selection_mode": {},
+	"list_sandbox_files":   {}, "read_sandbox_file": {}, "write_sandbox_file": {}, "edit_sandbox_file": {},
+}
+
+func liteChatContainsExecutableField(value any) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, nested := range typed {
+			normalized := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(key, "-", "_")))
+			if _, blocked := liteExecutableChatFieldNames[normalized]; blocked {
+				return true
+			}
+			if liteChatContainsExecutableField(nested) {
+				return true
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if liteChatContainsExecutableField(nested) {
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -240,6 +286,15 @@ func liteTemporaryAttachmentRequestBlocked(c *gin.Context) bool {
 	if c.Request.MultipartForm == nil && strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data") {
 		if err := c.Request.ParseMultipartForm(2 << 20); err != nil {
 			return false
+		}
+	}
+	if form := c.Request.MultipartForm; form != nil {
+		for _, headers := range form.File {
+			for _, header := range headers {
+				if header != nil && strings.EqualFold(filepath.Ext(header.Filename), ".xmind") {
+					return true
+				}
+			}
 		}
 	}
 	sourceTenantID := strings.TrimSpace(c.PostForm("agent_source_tenant_id"))
@@ -457,9 +512,9 @@ func liteProductRouteBlocked(method, path string) bool {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	path = strings.TrimSpace(path)
 
-	// Lite cannot create or change FAQ content. Historical FAQ reads/searches
-	// and deletion remain available so tenants can inspect or clean up data
-	// created before the capability was hidden.
+	// FAQ is not a Lite product concept. Existing rows are retained for the
+	// read-only startup audit, but every FAQ route (including list/search,
+	// import progress, edit and cleanup) is unreachable from the consumer API.
 	if strings.HasPrefix(path, "/api/v1/knowledge-bases/") {
 		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/knowledge-bases/"), "/")
 		// The legacy duplicate endpoint copies settings only. Lite exposes the
@@ -468,10 +523,12 @@ func liteProductRouteBlocked(method, path string) bool {
 		if method == http.MethodPost && len(parts) == 2 && parts[1] == "duplicate" {
 			return true
 		}
-		if len(parts) >= 2 && parts[1] == "faq" && method != http.MethodGet && method != http.MethodDelete &&
-			!(method == http.MethodPost && len(parts) == 3 && parts[2] == "search") {
+		if len(parts) >= 2 && strings.EqualFold(parts[1], "faq") {
 			return true
 		}
+	}
+	if path == "/api/v1/faq/import/progress" || strings.HasPrefix(path, "/api/v1/faq/import/progress/") {
+		return true
 	}
 
 	// Musuw uses the external OIDC/Auth shell for human identity. Native
@@ -519,10 +576,17 @@ func liteProductRouteBlocked(method, path string) bool {
 		"/api/v1/embed-channels",
 		"/api/v1/wechat",
 		"/api/v1/chunker/preview",
+		"/api/v1/sandbox-configs",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true
 		}
+	}
+	if path == "/api/v1/me/env-vars" || strings.HasPrefix(path, "/api/v1/me/env-vars/") {
+		return true
+	}
+	if liteGeneratedArtifactRoute(path) {
+		return true
 	}
 
 	// Model catalog is a chat runtime dependency. Lite may read the runtime
@@ -594,6 +658,12 @@ func liteProductRouteBlocked(method, path string) bool {
 	if path == "/api/v1/tenants/kv/storage-engine-config" {
 		return method != http.MethodGet
 	}
+	if path == "/api/v1/tenants/kv/memory-config" {
+		// The native route's Viewer/Admin guards remain authoritative: Lite
+		// exposes the existing workspace memory configuration seam only to the
+		// roles that already own it.
+		return method != http.MethodGet && method != http.MethodPut
+	}
 
 	// Workspace lifecycle/settings/member/invitation/API-key administration is
 	// not a Musuw Lite surface. The current tenant identity already comes from
@@ -622,17 +692,27 @@ func liteProductRouteBlocked(method, path string) bool {
 		}
 	}
 
-	// The consumer workflow may read and update the resolved KB configuration.
-	// Route-level OwnedKB/KBAccess guards remain authoritative; the legacy
-	// InitializeByKB operation still stays hidden because it can create/update
-	// raw provider models internally.
+	// Initialization/configuration is an operator seam. The Lite knowledge-base
+	// editor uses the curated /knowledge-bases contract and must not read or
+	// overwrite raw model, parser, storage, graph, or provider configuration.
 	if path == "/api/v1/initialization" || strings.HasPrefix(path, "/api/v1/initialization/") {
-		rest := strings.TrimPrefix(path, "/api/v1/initialization/")
-		if strings.HasPrefix(rest, "config/") {
-			return method != http.MethodGet && method != http.MethodPut
-		}
 		return true
 	}
 
 	return false
+}
+
+// liteGeneratedArtifactRoute identifies only the session artifact families.
+// Ordinary sessions, attachments and document previews remain available.
+func liteGeneratedArtifactRoute(path string) bool {
+	const prefix = "/api/v1/sessions/"
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, prefix), "/")
+	if len(parts) >= 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "artifacts" {
+		return true
+	}
+	return len(parts) >= 4 && strings.TrimSpace(parts[0]) != "" &&
+		parts[1] == "messages" && strings.TrimSpace(parts[2]) != "" && parts[3] == "artifacts"
 }

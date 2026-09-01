@@ -126,3 +126,18 @@ func TestArtifactSessionSourceResolvesNamedPin(t *testing.T) {
 	got := collector.sessionSource(ctx, "s-1")
 	require.Equal(t, named, got)
 }
+
+func TestLiteDoesNotConstructArtifactCollectorOrTouchSandboxRuntime(t *testing.T) {
+	SetProductEdition("lite")
+	t.Cleanup(func() { SetProductEdition("standard") })
+
+	collector := NewArtifactCollectorFromSandboxManager(
+		&artifactFallbackManager{source: &fakeSandboxSource{}},
+		nil,
+		nil,
+		&fakeFileService{},
+		nil,
+		nil,
+	)
+	require.Nil(t, collector)
+}

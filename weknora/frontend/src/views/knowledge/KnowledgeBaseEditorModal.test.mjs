@@ -33,10 +33,10 @@ test('FAQ create preserves the native type and FAQ configuration contract', () =
     source.indexOf('const doSubmit = async () => {'),
     source.indexOf('// 重置所有状态'),
   )
-  assert.match(doSubmit, /type:\s*formData\.value\.type/)
+  assert.match(doSubmit, /type:\s*normalizeKnowledgeBaseType\(formData\.value\.type\)/)
   assert.match(
     doSubmit,
-    /if \(formData\.value\.type === 'faq'\) \{[\s\S]*?createPayload\.faq_config = \{[\s\S]*?index_mode:[\s\S]*?question_index_mode:/,
+    /if \(normalizeKnowledgeBaseType\(formData\.value\.type\) === 'faq'\) \{[\s\S]*?createPayload\.faq_config = \{[\s\S]*?index_mode:[\s\S]*?question_index_mode:/,
   )
   assert.match(doSubmit, /else \{[\s\S]*?createPayload\.indexing_strategy = \{[\s\S]*?createPayload\.wiki_config = \{/)
 })
@@ -47,7 +47,7 @@ test('document create requires a visible RAG or Wiki strategy before the zero-co
     source.indexOf('// 构建提交数据'),
   )
   const visibleStrategyGuard = validateForm.match(
-    /if \(authStore\.isLiteMode && formData\.value\.type !== 'faq'\) \{([\s\S]*?)^\s{2}\}/m,
+    /if \(authStore\.isLiteMode && normalizeKnowledgeBaseType\(formData\.value\.type\) === 'document'\) \{([\s\S]*?)^\s{2}\}/m,
   )?.[0] ?? ''
 
   assert.match(visibleStrategyGuard, /!s\.vectorEnabled/)
@@ -88,7 +88,7 @@ test('create exposes native RAG, Wiki, Wiki instructions, and summary model whil
   )?.[1]
   assert.ok(createOpenBranch, 'expected the zero-config create open branch')
   assert.match(createOpenBranch, /loadSummaryModelOptions/)
-  assert.doesNotMatch(createOpenBranch, /loadTenantDefaultStorageProvider|kbEditorInitialSection/)
+  assert.doesNotMatch(createOpenBranch, /loadTenantDefaultStorageProvider/)
 
   assert.ok(source.includes('const consumerSceneModelsForCreate = () => {'))
   assert.match(source, /settingsStore\.getConsumerSceneModel\('rag'\)/)
@@ -103,7 +103,7 @@ test('create exposes native RAG, Wiki, Wiki instructions, and summary model whil
   assert.match(source, /data-guide="kb-create-indexing"/)
   assert.match(source, /v-model="formData\.wikiConfig\.contentInstructions"/)
   assert.match(source, /v-model="formData\.wikiConfig\.extractionInstructions"/)
-  assert.match(source, /:selected-model-id="formData\.modelConfig\.llmModelId"/)
+  assert.match(source, /<KBModelConfig[\s\S]*:config="formData\.modelConfig"/)
 
   const settingsRefreshWatcher = source.slice(
     source.indexOf('watch(\n  () => uiStore.showSettingsModal'),
@@ -133,16 +133,12 @@ test('Wiki-only authoring controls stay hidden until Wiki indexing is enabled', 
   }
 })
 
-test('Lite knowledge-base model selection uses only the same safe RAG scene catalog as model settings', () => {
+test('Lite knowledge-base creation keeps model choices managed and does not render selectors', () => {
   const template = source.slice(0, source.indexOf('<script setup'))
-  const selectorStart = template.indexOf('<ModelSelector')
-  const selectorEnd = template.indexOf('/>', selectorStart)
-  const selector = template.slice(selectorStart, selectorEnd + 2)
-
-  assert.match(selector, /:all-models="authStore\.isLiteMode \? \[\] : allModels"/)
-  assert.match(selector, /:scene-options="authStore\.isLiteMode \? summaryModelSceneOptions : \[\]"/)
-  assert.match(selector, /:show-add-model="false"/)
-  assert.match(source, /const summaryModelSceneOptions = computed\(\(\) => chatResources\.consumerSceneOptions\.rag\?\.options \|\| \[\]\)/)
+  const basic = template.slice(template.indexOf('class="kb-config-section"'), template.indexOf('<!-- Standard-tier settings'))
+  assert.doesNotMatch(basic, /<ModelSelector/)
+  assert.match(template, /<KBAdvancedSettings[\s\S]*?:consumer-mode="authStore\.isLiteMode"/)
+  assert.doesNotMatch(source, /summaryModelSceneOptions/)
   assert.match(source, /chatResources\.ensureConsumerSceneOptions\('rag', force\)/)
 })
 
@@ -183,7 +179,6 @@ test('create and edit mechanically share the reference knowledge-base configurat
     'v-model="formData.wikiConfig.extractionInstructions"',
     'data-guide="kb-create-name"',
     'v-model="formData.description"',
-    'data-guide="kb-create-llm"',
   ]
   let previousIndex = -1
   for (const field of orderedFields) {

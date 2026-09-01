@@ -78,6 +78,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { useI18n } from 'vue-i18n'
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom'
+import { isKnowledgeBaseRuntimeReady } from '@/utils/knowledgeBaseRuntime'
 
 interface KnowledgeBase {
   id: string
@@ -87,6 +88,12 @@ interface KnowledgeBase {
   chunk_count?: number
   embedding_model_id?: string
   summary_model_id?: string
+  capabilities?: { ready?: boolean }
+  indexing_strategy?: {
+    vector_enabled?: boolean
+    keyword_enabled?: boolean
+    wiki_enabled?: boolean
+  }
 }
 
 const { t } = useI18n()
@@ -112,7 +119,7 @@ const dropdownWidth = props.dropdownWidth ?? 300
 const offsetY = props.offsetY ?? 8
 
 const filteredKnowledgeBases = computed(() => {
-  const valid = knowledgeBases.value.filter(k => k.embedding_model_id && k.summary_model_id)
+  const valid = knowledgeBases.value.filter(isKnowledgeBaseRuntimeReady)
   if (!searchQuery.value) return valid
   const q = searchQuery.value.toLowerCase()
   return valid.filter(k => k.name.toLowerCase().includes(q))

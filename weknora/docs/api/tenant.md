@@ -553,6 +553,7 @@ curl --location 'http://localhost:8080/api/v1/tenants' \
 | `storage-engine-config`| 存储引擎配置（Local/MinIO/COS） |
 | `chat-history-config`  | 聊天历史索引配置             |
 | `retrieval-config`     | 全局检索配置                 |
+| `memory-config`        | 工作区长期记忆完整策略       |
 
 **请求**:
 

@@ -37,7 +37,7 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
     "path === '/checkout'",
   ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mcp'/)
+  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mymemory' && section !== 'memory' && section !== 'mcp'/)
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
@@ -89,9 +89,9 @@ test('Lite Settings also exposes native MCP for admins; Standard settings remain
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(\s*authStore\.isLiteMode\s*&& section !== 'usage'\s*&& section !== 'userprofile'\s*&& section !== 'models'\s*&& section !== 'mcp'\s*\) \{\s*return 'general'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/)
+  assert.match(settings, /if \(\s*authStore\.isLiteMode\s*&&[\s\S]*section !== 'mymemory'[\s\S]*section !== 'memory'[\s\S]*section !== 'mcp'[\s\S]*\) \{\s*return 'general'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*key === 'mymemory'[\s\S]*key === 'memory'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mymemory'[\s\S]*key: 'memory'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/)
   assert.match(settings, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
   assert.ok(settings.includes('<ModelSettings v-else-if="currentSection === \'models\'"'))
   assert.ok(settings.includes('UsageBillingSettings'))
@@ -166,6 +166,15 @@ test('reference-only demo actions are not invented as business behavior', () => 
   const bot = read('../views/chat/components/botmsg.vue')
   assert.equal(bot.includes('createReactionAPI'), false)
   assert.equal(bot.includes('createReceiptAPI'), false)
+})
+
+test('Lite chat keeps ordinary answers but hides generated artifact discovery and hydration', () => {
+  const bot = read('../views/chat/components/botmsg.vue')
+  assert.match(bot, /v-if="!authStore\.isLiteMode && \(hasArtifacts \|\| artifactsCollecting\)"/)
+  assert.match(bot, /v-if="!authStore\.isLiteMode && hasArtifacts"/)
+  assert.match(bot, /if \(authStore\.isLiteMode\) return \[\]/)
+  assert.match(bot, /if \(!authStore\.isLiteMode\) await hydrateArtifactImages/)
+  assert.match(bot, /!authStore\.isLiteMode && isArtifactRefHref/)
 })
 
 test('Graph and parsing Trace remain outside global paint ownership', () => {

@@ -84,10 +84,12 @@ func (h *KnowledgeBaseHandler) resolveResourceRewriter(c *gin.Context) (*storage
 	return storageurl.NewRequestRewriter(ctx, mode, h.fileService, h.storageResolver), nil
 }
 
-// buildKBResponse turns a knowledge base into a JSON-ready response shape,
-// merging the bound vector store's display metadata and any caller-supplied
-// extras (e.g., my_permission for shared KBs). Returns the kb pointer
-// unchanged on serialization failure so the request still succeeds.
+// buildKBResponse turns a knowledge base into a JSON-ready response shape.
+// Standard keeps WeKnora's native payload and vector-store enrichment. Lite
+// uses a fail-closed consumer projection: only settings shown by the Musuw UI
+// and non-sensitive operational metadata cross the HTTP boundary. This also
+// protects upgraded databases whose legacy JSON columns may still contain
+// storage or model-provider credentials.
 //
 // The map-merge approach (rather than a wrapper struct embedding the kb)
 // is deliberate: KnowledgeBase has a custom MarshalJSON, and embedding
@@ -106,6 +108,9 @@ func buildKBResponse(
 	storeView types.StoreDisplay,
 	extras map[string]interface{},
 ) interface{} {
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		return buildLiteKBResponse(kb, extras)
+	}
 	b, err := json.Marshal(kb)
 	if err != nil {
 		return kb
@@ -133,6 +138,118 @@ func buildKBResponse(
 		m[k] = v
 	}
 	return m
+}
+
+func buildLiteKBResponse(kb *types.KnowledgeBase, extras map[string]interface{}) interface{} {
+	if kb == nil {
+		return kb
+	}
+	capabilities := kb.Capabilities()
+	m := map[string]interface{}{
+		"id":               kb.ID,
+		"name":             kb.Name,
+		"type":             kb.Type,
+		"is_temporary":     kb.IsTemporary,
+		"description":      kb.Description,
+		"tenant_id":        kb.TenantID,
+		"creator_id":       kb.CreatorID,
+		"creator_name":     kb.CreatorName,
+		"created_at":       kb.CreatedAt,
+		"updated_at":       kb.UpdatedAt,
+		"knowledge_count":  kb.KnowledgeCount,
+		"chunk_count":      kb.ChunkCount,
+		"is_processing":    kb.IsProcessing,
+		"processing_count": kb.ProcessingCount,
+		"share_count":      kb.ShareCount,
+		"is_pinned":        kb.IsPinned,
+		"pinned_at":        kb.PinnedAt,
+		"capabilities": map[string]interface{}{
+			"ready":         capabilities.Ready,
+			"storage_ready": capabilities.StorageReady,
+			"vector":        capabilities.Vector,
+			"keyword":       capabilities.Keyword,
+			"wiki":          capabilities.Wiki,
+		},
+		"indexing_strategy": map[string]interface{}{
+			"vector_enabled":  kb.IndexingStrategy.VectorEnabled,
+			"keyword_enabled": kb.IndexingStrategy.KeywordEnabled,
+			"wiki_enabled":    kb.IndexingStrategy.WikiEnabled,
+		},
+	}
+
+	wiki := map[string]interface{}{}
+	if kb.WikiConfig != nil {
+		wiki["extraction_granularity"] = string(kb.WikiConfig.ExtractionGranularity)
+		wiki["content_instructions"] = kb.WikiConfig.ContentInstructions
+		wiki["extraction_instructions"] = kb.WikiConfig.ExtractionInstructions
+	}
+	m["wiki_config"] = wiki
+
+	autoTagEnabled := kb.AutoTagConfig != nil && kb.AutoTagConfig.Enabled
+	m["auto_tag_config"] = map[string]interface{}{"enabled": autoTagEnabled}
+
+	// my_permission is the only current KB-level response extension and is
+	// safe for Lite. Keep the projection default-deny if future callers add
+	// infrastructure-oriented extras.
+	if permission, ok := extras["my_permission"]; ok {
+		m["my_permission"] = permission
+	}
+	return m
+}
+
+// sanitizeLiteKnowledgeBaseCreateRequest applies the same allow-list as the
+// Lite editor. Platform-owned defaults are filled later by the existing create
+// service, so internal service callers keep their native configuration seam.
+func sanitizeLiteKnowledgeBaseCreateRequest(req *types.KnowledgeBase) {
+	if req == nil {
+		return
+	}
+	safe := types.KnowledgeBase{
+		Name:        req.Name,
+		Type:        req.Type,
+		Description: req.Description,
+		IndexingStrategy: types.IndexingStrategy{
+			VectorEnabled:  req.IndexingStrategy.VectorEnabled,
+			KeywordEnabled: req.IndexingStrategy.KeywordEnabled,
+			WikiEnabled:    req.IndexingStrategy.WikiEnabled,
+		},
+	}
+	if req.WikiConfig != nil {
+		safe.WikiConfig = &types.WikiConfig{
+			ExtractionGranularity:  req.WikiConfig.ExtractionGranularity,
+			ContentInstructions:    req.WikiConfig.ContentInstructions,
+			ExtractionInstructions: req.WikiConfig.ExtractionInstructions,
+		}
+	}
+	if req.AutoTagConfig != nil {
+		safe.AutoTagConfig = &types.AutoTagConfig{Enabled: req.AutoTagConfig.Enabled}
+	}
+	*req = safe
+}
+
+func sanitizeLiteKnowledgeBaseUpdateConfig(config *types.KnowledgeBaseConfig) *types.KnowledgeBaseConfig {
+	if config == nil {
+		return nil
+	}
+	safe := &types.KnowledgeBaseConfig{}
+	if config.WikiConfig != nil {
+		safe.WikiConfig = &types.WikiConfig{
+			ExtractionGranularity:  config.WikiConfig.ExtractionGranularity,
+			ContentInstructions:    config.WikiConfig.ContentInstructions,
+			ExtractionInstructions: config.WikiConfig.ExtractionInstructions,
+		}
+	}
+	if config.AutoTagConfig != nil {
+		safe.AutoTagConfig = &types.AutoTagConfig{Enabled: config.AutoTagConfig.Enabled}
+	}
+	if config.IndexingStrategy != nil {
+		safe.IndexingStrategy = &types.IndexingStrategy{
+			VectorEnabled:  config.IndexingStrategy.VectorEnabled,
+			KeywordEnabled: config.IndexingStrategy.KeywordEnabled,
+			WikiEnabled:    config.IndexingStrategy.WikiEnabled,
+		}
+	}
+	return safe
 }
 
 // buildKBListResponse turns a slice of knowledge bases into a JSON-ready
@@ -397,11 +514,18 @@ func (h *KnowledgeBaseHandler) CreateKnowledgeBase(c *gin.Context) {
 		return
 	}
 	if strings.EqualFold(strings.TrimSpace(Edition), "lite") &&
-		req.Type != types.KnowledgeBaseTypeFAQ &&
+		req.Type != "" && req.Type != types.KnowledgeBaseTypeDocument {
+		c.Error(apperrors.NewBadRequestError("only document knowledge bases are available in Lite"))
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") &&
 		!req.IndexingStrategy.VectorEnabled && !req.IndexingStrategy.KeywordEnabled &&
 		!req.IndexingStrategy.WikiEnabled {
 		c.Error(apperrors.NewBadRequestError("at least one visible indexing strategy (RAG or Wiki) must be enabled"))
 		return
+	}
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		sanitizeLiteKnowledgeBaseCreateRequest(&req)
 	}
 	if err := validateExtractConfig(req.ExtractConfig); err != nil {
 		logger.Error(ctx, "Invalid extract configuration", err)
@@ -489,6 +613,12 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 		}
 		logger.ErrorWithFields(ctx, err, nil)
 		return nil, id, 0, "", apperrors.NewInternalServerError(err.Error())
+	}
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") && kb.Type == types.KnowledgeBaseTypeFAQ {
+		// Legacy FAQ rows remain in storage for audit/operations, but are not a
+		// consumer resource. Return the same not-found shape as a missing row so
+		// a crafted ID cannot discover or mutate hidden FAQ data.
+		return nil, id, 0, "", apperrors.NewNotFoundError("knowledge base not found")
 	}
 
 	// Check 1: Verify tenant ownership (owner has full access)
@@ -913,6 +1043,9 @@ func (h *KnowledgeBaseHandler) UpdateKnowledgeBase(c *gin.Context) {
 		logger.Error(ctx, "Failed to parse request parameters", err)
 		c.Error(apperrors.NewBadRequestError("Invalid request parameters").WithDetails(err.Error()))
 		return
+	}
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		req.Config = sanitizeLiteKnowledgeBaseUpdateConfig(req.Config)
 	}
 	if req.Config != nil {
 		probe := &types.KnowledgeBase{
@@ -1486,8 +1619,23 @@ func (h *KnowledgeBaseHandler) ListMoveTargets(c *gin.Context) {
 		targets = append(targets, kb)
 	}
 
+	// KnowledgeBase has a native MarshalJSON implementation that deliberately
+	// preserves every upstream field for Standard callers. Lite must never send
+	// that native payload over the wire: upgraded rows may still contain legacy
+	// storage/VLM credentials and server-owned model/store identifiers. Reuse the
+	// same fail-closed projection as the regular KB list/detail endpoints while
+	// leaving Standard's move-target response byte-for-byte native.
+	data := interface{}(targets)
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		projected := make([]interface{}, 0, len(targets))
+		for _, kb := range targets {
+			projected = append(projected, buildLiteKBResponse(kb, nil))
+		}
+		data = projected
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    targets,
+		"data":    data,
 	})
 }

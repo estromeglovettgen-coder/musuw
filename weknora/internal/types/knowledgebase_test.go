@@ -187,6 +187,31 @@ func TestKnowledgeBase_HasVectorStore(t *testing.T) {
 	})
 }
 
+func TestKnowledgeBaseCapabilitiesExposeRuntimeReadinessWithoutModelIDs(t *testing.T) {
+	ready := &KnowledgeBase{
+		SummaryModelID:   "summary-model",
+		EmbeddingModelID: "embedding-model",
+		IndexingStrategy: IndexingStrategy{VectorEnabled: true},
+	}
+	if !ready.Capabilities().Ready {
+		t.Fatal("document KB with every required model must be runtime-ready")
+	}
+
+	missingEmbedding := *ready
+	missingEmbedding.EmbeddingModelID = ""
+	if missingEmbedding.Capabilities().Ready {
+		t.Fatal("vector-enabled KB without embedding must not be runtime-ready")
+	}
+
+	wikiOnly := &KnowledgeBase{
+		SummaryModelID:   "summary-model",
+		IndexingStrategy: IndexingStrategy{WikiEnabled: true},
+	}
+	if !wikiOnly.Capabilities().Ready {
+		t.Fatal("KB without an embedding-dependent index only requires a summary model")
+	}
+}
+
 // TestKnowledgeBase_Normalize covers the empty-string -> nil fold used to
 // keep a single representation between the create path and the factory.
 func TestKnowledgeBase_Normalize(t *testing.T) {
@@ -324,6 +349,23 @@ func TestDefaultParserEngine(t *testing.T) {
 		if got := DefaultParserEngine(input); got != want {
 			t.Errorf("DefaultParserEngine(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+func TestKnowledgeBaseStorageReadinessDoesNotExposeIdentity(t *testing.T) {
+	backendID := "private-storage-backend-id"
+	for name, kb := range map[string]*KnowledgeBase{
+		"bound backend":   {StorageBackendID: &backendID},
+		"legacy provider": {StorageProviderConfig: &StorageProviderConfig{Provider: "local"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if !kb.IsStorageReady() || !kb.Capabilities().StorageReady {
+				t.Fatalf("expected storage readiness for %#v", kb)
+			}
+		})
+	}
+	if (&KnowledgeBase{}).IsStorageReady() {
+		t.Fatal("empty knowledge base must not report storage ready")
 	}
 }
 

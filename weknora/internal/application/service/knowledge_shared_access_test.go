@@ -18,6 +18,21 @@ type fakeKBShareService struct {
 	allowedKBs map[string]bool
 }
 
+type batchLookupKBService struct {
+	interfaces.KnowledgeBaseService
+	kbs map[string]*types.KnowledgeBase
+}
+
+func (s *batchLookupKBService) GetKnowledgeBasesByIDsOnly(_ context.Context, ids []string) ([]*types.KnowledgeBase, error) {
+	result := make([]*types.KnowledgeBase, 0, len(ids))
+	for _, id := range ids {
+		if kb, ok := s.kbs[id]; ok {
+			result = append(result, kb)
+		}
+	}
+	return result, nil
+}
+
 func (f *fakeKBShareService) ShareKnowledgeBase(context.Context, string, string, string, uint64, types.OrgMemberRole) (*types.KnowledgeBaseShare, error) {
 	return nil, errors.New("not implemented")
 }
@@ -150,6 +165,49 @@ func TestGetKnowledgeBatchWithSharedAccess_ExcludesSharedKnowledgeWithoutPermiss
 
 	require.NoError(t, err)
 	require.Empty(t, got)
+}
+
+func TestKnowledgeBatchLiteHidesFAQRowsButStandardPreservesThem(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		edition string
+		wantIDs []string
+	}{
+		{name: "Lite", edition: "lite", wantIDs: []string{"k-doc"}},
+		{name: "Standard", edition: "standard", wantIDs: []string{"k-doc", "k-faq"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("MUSUW_PRODUCT_EDITION", tc.edition)
+			kbSvc := &batchLookupKBService{kbs: map[string]*types.KnowledgeBase{
+				"kb-doc": {ID: "kb-doc", TenantID: 1, Type: types.KnowledgeBaseTypeDocument},
+				"kb-faq": {ID: "kb-faq", TenantID: 1, Type: types.KnowledgeBaseTypeFAQ},
+			}}
+			svc, db := newKnowledgeSharedAccessService(t, &fakeKBShareService{allowedKBs: map[string]bool{"kb-faq": true}})
+			svc.kbService = kbSvc
+			now := time.Now()
+			seedKnowledge(t, db, &types.Knowledge{ID: "k-doc", TenantID: 1, KnowledgeBaseID: "kb-doc", Type: "file", Title: "document", ParseStatus: types.ParseStatusCompleted, EnableStatus: "enabled", CreatedAt: now, UpdatedAt: now})
+			seedKnowledge(t, db, &types.Knowledge{ID: "k-faq", TenantID: 1, KnowledgeBaseID: "kb-faq", Type: "file", Title: "faq", ParseStatus: types.ParseStatusCompleted, EnableStatus: "enabled", CreatedAt: now, UpdatedAt: now})
+
+			ctx := newSharedAccessContext()
+			got, err := svc.GetKnowledgeBatch(ctx, 1, []string{"k-doc", "k-faq"})
+			require.NoError(t, err)
+			require.ElementsMatch(t, tc.wantIDs, knowledgeIDs(got))
+
+			got, err = svc.GetKnowledgeBatchWithSharedAccess(ctx, 1, []string{"k-doc", "k-faq"})
+			require.NoError(t, err)
+			require.ElementsMatch(t, tc.wantIDs, knowledgeIDs(got))
+		})
+	}
+}
+
+func knowledgeIDs(rows []*types.Knowledge) []string {
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row != nil {
+			ids = append(ids, row.ID)
+		}
+	}
+	return ids
 }
 
 var _ interfaces.KBShareService = (*fakeKBShareService)(nil)

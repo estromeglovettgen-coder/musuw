@@ -34,7 +34,7 @@ test('settings shell exposes only source tabs plus a close circle in every mode'
   for (const legacy of ['visual-settings-back', 'visual-settings-search', 'visual-settings-title', 'visual-settings-nav__group']) {
     assert.equal(shell.includes(legacy), false, `${legacy} is not in SettingsModal source`)
   }
-  assert.match(settings, /\{ key: 'general',[\s\S]*\{ key: 'userprofile',[\s\S]*\{ key: 'models',[\s\S]*\{ key: 'mcp',[\s\S]*\{ key: 'usage'/)
+  assert.match(settings, /\{ key: 'general',[\s\S]*\{ key: 'userprofile',[\s\S]*\{ key: 'models',[\s\S]*\{ key: 'mymemory',[\s\S]*\{ key: 'memory',[\s\S]*\{ key: 'mcp',[\s\S]*\{ key: 'usage'/)
   assert.equal((settings.match(/key: 'system-audit-log'/g) || []).length, 1)
 })
 

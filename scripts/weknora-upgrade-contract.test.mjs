@@ -160,6 +160,26 @@ test("representative fixed-target capabilities are present at their owning modul
   );
 });
 
+test("Musuw host development links the official AnyDoc engine when its archive exists", async () => {
+  const musuwDev = await readFile(
+    path.join(repositoryRoot, "scripts/musuw-dev"),
+    "utf8",
+  );
+
+  assert.ok(
+    musuwDev.includes("third_party/anydoc-go/lib/darwin_arm64/libanydoc_go.a"),
+    "host development must resolve the same AnyDoc archive as upstream main",
+  );
+  assert.ok(
+    musuwDev.includes("export GO_BUILD_TAGS=anydoc"),
+    "host development must enable the AnyDoc build tag when the archive is present",
+  );
+  assert.ok(
+    musuwDev.includes('go run -tags "${GO_BUILD_TAGS:-}" -ldflags="$ldflags" ./cmd/server'),
+    "the host Go command must consume the resolved AnyDoc build tag",
+  );
+});
+
 test("high-risk Musuw product semantics remain composed with the target", async () => {
   await Promise.all([
     assertFileContains("internal/application/service/user.go", [

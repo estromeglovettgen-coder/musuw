@@ -26,7 +26,7 @@ test('workspace settings visibility matches the WeKnora main 81142df role matrix
     tenant: 'viewer',
     members: 'viewer',
     mymemory: 'viewer',
-    memory: 'admin',
+    memory: 'viewer',
     envvars: 'viewer',
   })
 })

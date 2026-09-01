@@ -919,6 +919,9 @@ export default {
       label: '智能体类型',
       desc: '选择一个预设会自动填充系统提示词、工具列表和推荐的知识库范围。',
       defaultNamePattern: '我的{label}',
+      liteDescriptions: {
+        ragQa: '基于文档分块的检索式问答，适合未启用 Wiki 的文档知识库。'
+      },
       kbIncompatibleWarn: '已选的 {count} 个知识库不适用于当前类型，请手动调整',
       kbMismatch: {
         ragQa: '未启用 RAG 检索',
@@ -4417,6 +4420,7 @@ export default {
   knowledgeList: {
     create: '新建知识库',
     subtitle: '管理和组织您的知识库，支持文档型和问答型知识库',
+    liteSubtitle: '管理和组织您的文档知识库，上传资料并快速开始检索与问答',
     favorites: {
       add: '添加到收藏',
       remove: '取消收藏'
@@ -5109,6 +5113,10 @@ export default {
     writeModeAuto: '自动提炼',
     writeModeExplicitHint: '只记录成员明确说「记住：……」的内容，以及在记忆页手动添加的条目，不额外调用模型。',
     writeModeAutoHint: '在此基础上，会话结束后在后台调用一次模型，从成员自己说过的话里提炼值得长期保留的内容。',
+    advancedLabel: '高级设置',
+    advancedDescription: '模型、语义召回与自动提炼参数。日常使用通常无需调整。',
+    autoOnlyHint: '切换为「自动提炼」后可设置此项。',
+    vectorOnlyHint: '开启「按语义召回记忆」后可选择此模型。',
     extractModelLabel: '提炼模型',
     extractModelDescription: '留空则使用该次会话所用的模型。',
     extractDelayLabel: '挖掘延迟',
@@ -5918,6 +5926,7 @@ export default {
       toolsConfigDesc: '配置 Agent 可以使用的工具',
       knowledgeConfig: '知识库',
       knowledgeConfigDesc: '配置智能体可访问的知识库范围与 FAQ 策略',
+      knowledgeConfigDescLite: '配置智能体可访问的文档知识库范围',
       webSearchConfig: '网络搜索',
       webSearchConfigDesc: '配置智能体的网络搜索能力',
       agentId: '智能体 ID',
@@ -6814,6 +6823,10 @@ export default {
         create: {
           title: '创建第一个知识库',
           desc: '知识库用来存放文档与 FAQ。点击下方高亮的「新建知识库」按钮，我们会带你完成表单填写。'
+        },
+        createLite: {
+          title: '创建第一个知识库',
+          desc: '知识库用来存放和整理你的文档资料。点击下方高亮的「新建知识库」按钮，我们会带你完成表单填写。'
         }
       }
     }
@@ -6849,6 +6862,10 @@ export default {
       knowledge: {
         title: '创建你的知识库',
         desc: '知识库是一切的起点：上传文档、网页或 FAQ，Musuw 会自动解析并建立索引。点击这里进入知识库。'
+      },
+      knowledgeLite: {
+        title: '创建你的知识库',
+        desc: '知识库是一切的起点：上传文档与网页，Musuw 会自动解析并建立索引。点击这里进入知识库。'
       },
       welcome: {
         title: '欢迎使用 Musuw',

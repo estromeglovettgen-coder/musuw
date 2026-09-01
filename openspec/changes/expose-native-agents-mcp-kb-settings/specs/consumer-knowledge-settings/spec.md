@@ -56,6 +56,6 @@ The system SHALL hide FAQ knowledge bases from the Lite consumer surface and SHA
 - **WHEN** a Lite client calls a native FAQ write route or creates, copies, or duplicates a FAQ knowledge base
 - **THEN** the server rejects it without creating or changing FAQ content
 
-#### Scenario: Historical FAQ cleanup
+#### Scenario: Historical FAQ audit
 - **WHEN** a tenant has FAQ data created before the Lite restriction
-- **THEN** read/search and deletion remain available for inspection and cleanup while it stays absent from the Lite list and manager UI
+- **THEN** startup reports the retained rows for an operator data decision while every Lite list, detail, read, search, mutation, and delete route remains unavailable

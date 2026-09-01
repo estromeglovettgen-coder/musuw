@@ -72,6 +72,7 @@ import { useI18n } from 'vue-i18n';
 import { useMarqueeSelect } from '@/hooks/useMarqueeSelect';
 import type { ParserEngineInfo } from '@/api/system';
 import { UPLOAD_VIDEO_EXTENSIONS } from '@/views/knowledge/utils/uploadSources';
+import { isKnowledgeBaseRuntimeReady, isKnowledgeBaseStorageReady } from '@/utils/knowledgeBaseRuntime';
 const route = useRoute();
 const { t } = useI18n();
 const kbId = computed(() => (route.params as any).kbId as string || '');
@@ -169,12 +170,7 @@ onUnmounted(() => {
 })
 const missingStorageEngine = computed(() => {
   if (!kbInfo.value || isFAQ.value) return false
-  // storage_backend_id is authoritative; storage_provider_config.provider is a
-  // compatibility projection for older clients. Either being present means the
-  // KB has a bound storage instance and uploads should not be blocked.
-  if (kbInfo.value.storage_backend_id) return false
-  const spc = kbInfo.value.storage_provider_config
-  return !spc || !spc.provider
+  return !isKnowledgeBaseStorageReady(kbInfo.value)
 })
 const parserEngines = computed<ParserEngineInfo[]>(() => editorResources.parserEngines);
 
@@ -1559,14 +1555,7 @@ const ensureDocumentKbReady = () => {
     MessagePlugin.warning(t('knowledgeEditor.messages.missingId'));
     return false;
   }
-  if (!kbInfo.value || !kbInfo.value.summary_model_id) {
-    MessagePlugin.warning(t('knowledgeBase.notInitialized'));
-    return false;
-  }
-  // Embedding model only required when RAG indexing is enabled
-  const strategy = (kbInfo.value as any).indexing_strategy
-  const needsEmbedding = !strategy || strategy.vector_enabled || strategy.keyword_enabled
-  if (needsEmbedding && !kbInfo.value.embedding_model_id) {
+  if (!isKnowledgeBaseRuntimeReady(kbInfo.value)) {
     MessagePlugin.warning(t('knowledgeBase.notInitialized'));
     return false;
   }

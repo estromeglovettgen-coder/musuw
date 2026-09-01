@@ -139,6 +139,12 @@ func NewArtifactCollectorFromSandboxManager(
 	repo interfaces.MessageRepository,
 	catalog interfaces.ResourceCatalog,
 ) *ArtifactCollector {
+	// Musuw Lite deliberately has no sandbox, skill, or generated-artifact
+	// runtime. Returning nil at the DI seam prevents even a session-pin lookup
+	// after an ordinary consumer turn; Standard keeps the upstream collector.
+	if isLiteProductEdition() {
+		return nil
+	}
 	if fileService == nil {
 		return nil
 	}

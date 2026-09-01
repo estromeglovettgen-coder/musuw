@@ -331,9 +331,8 @@ type MemoryItem struct {
 
 func (MemoryItem) TableName() string { return "memory_items" }
 
-// MemoryConfig is the workspace-level memory switch, stored as JSONB on
-// tenants. It is deliberately small: everything a workspace admin can decide
-// fits in four fields.
+// MemoryConfig is the complete workspace-level memory policy stored as JSONB
+// on tenants. Every member may inspect it; workspace admins may update it.
 type MemoryConfig struct {
 	// Enabled defaults to false. Memory retains user statements across
 	// sessions, so a workspace admin has to turn it on deliberately.

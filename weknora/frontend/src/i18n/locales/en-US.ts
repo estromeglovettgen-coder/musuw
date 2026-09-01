@@ -70,6 +70,10 @@ export default {
         title: 'Create your knowledge base',
         desc: 'Everything starts here: upload documents, web pages or FAQs and Musuw parses and indexes them automatically. Click here to open knowledge bases.'
       },
+      knowledgeLite: {
+        title: 'Create your knowledge base',
+        desc: 'Everything starts here: upload documents or web pages and Musuw parses and indexes them automatically. Click here to open knowledge bases.'
+      },
       chat: {
         title: 'Start an AI chat',
         desc: 'Ask questions grounded in your knowledge base and get accurate answers with cited sources. Click here to start a new chat.'
@@ -104,6 +108,10 @@ export default {
         create: {
           title: 'Create your first knowledge base',
           desc: 'Knowledge bases hold documents and FAQs. Click the highlighted "New knowledge base" button below and we will walk you through the form.'
+        },
+        createLite: {
+          title: 'Create your first knowledge base',
+          desc: 'Knowledge bases organize your documents and source materials. Click the highlighted "New knowledge base" button below and we will walk you through the form.'
         }
       }
     },
@@ -948,6 +956,7 @@ export default {
       toolsConfigDesc: 'Configure tools available to the Agent',
       knowledgeConfig: 'Knowledge Base',
       knowledgeConfigDesc: 'Configure knowledge base scope and FAQ strategy for the agent',
+      knowledgeConfigDescLite: 'Configure which document knowledge bases this agent can access',
       webSearchConfig: 'Web Search',
       webSearchConfigDesc: 'Configure web search capabilities for the agent',
       agentId: 'Agent ID',
@@ -1963,6 +1972,10 @@ export default {
     writeModeAuto: 'Distill automatically',
     writeModeExplicitHint: 'Only records what a member explicitly asks to remember, plus entries added by hand. No extra model call.',
     writeModeAutoHint: 'Additionally makes one background model call after a conversation to distill what is worth keeping from what the member said.',
+    advancedLabel: 'Advanced settings',
+    advancedDescription: 'Models, semantic recall, and automatic distillation controls. Most workspaces can keep the defaults.',
+    autoOnlyHint: 'Switch to “Distill automatically” to configure this setting.',
+    vectorOnlyHint: 'Turn on “Match memory by meaning” to select this model.',
     extractModelLabel: 'Distillation model',
     extractModelDescription: 'Leave blank to use the model the conversation itself used.',
     extractDelayLabel: 'Distillation delay',
@@ -2414,6 +2427,7 @@ export default {
   knowledgeList: {
     create: 'Create Knowledge Base',
     subtitle: 'Manage and organize your knowledge bases, supporting document-based and FAQ-based knowledge bases',
+    liteSubtitle: 'Manage and organize your document knowledge bases, upload materials, and start grounded conversations',
     favorites: {
       add: 'Add to favorites',
       remove: 'Remove from favorites'
@@ -5986,6 +6000,9 @@ export default {
       label: 'Agent Type',
       desc: 'Picking a preset auto-fills the system prompt, tool list and recommended KB scope.',
       defaultNamePattern: 'My {label}',
+      liteDescriptions: {
+        ragQa: 'Evidence-based retrieval over document chunks. Best for document KBs without Wiki.'
+      },
       kbMismatch: {
         ragQa: 'RAG retrieval not enabled',
         wikiQa: 'Wiki not enabled',

@@ -14,6 +14,7 @@ import (
 
 	filesvc "github.com/Tencent/WeKnora/internal/application/service/file"
 	werrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/infrastructure/docparser/anydoc"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -25,16 +26,23 @@ const unknownFileType = "unknown"
 
 // supportedImportFileExtensions is the single source of truth for extensions
 // accepted by every knowledge import path: direct upload, file-URL download,
-// and the worker's post-download re-check. Keeping one set avoids the drift
-// that let direct upload accept xlsx while URL import rejected it (#2447).
-var supportedImportFileExtensions = map[string]struct{}{
-	"pdf": {}, "txt": {}, "docx": {}, "doc": {}, "epub": {},
-	"html": {}, "htm": {}, "mhtml": {}, "md": {}, "markdown": {},
-	"png": {}, "jpg": {}, "jpeg": {}, "gif": {},
-	"csv": {}, "xlsx": {}, "xls": {}, "pptx": {}, "ppt": {}, "json": {},
-	"mp3": {}, "wav": {}, "m4a": {}, "flac": {}, "ogg": {},
-	"mp4": {}, "mpeg": {}, "mov": {}, "webm": {},
-}
+// and the worker's post-download re-check. It is the union of Musuw's existing
+// simple/media formats and the fixed-main AnyDoc converter's canonical list,
+// so parser metadata and the pre-upload gate cannot drift apart.
+var supportedImportFileExtensions = func() map[string]struct{} {
+	extensions := map[string]struct{}{
+		"pdf": {}, "txt": {}, "docx": {}, "doc": {}, "epub": {},
+		"html": {}, "htm": {}, "mhtml": {}, "md": {}, "markdown": {},
+		"png": {}, "jpg": {}, "jpeg": {}, "gif": {},
+		"csv": {}, "xlsx": {}, "xls": {}, "pptx": {}, "ppt": {}, "json": {},
+		"mp3": {}, "wav": {}, "m4a": {}, "flac": {}, "ogg": {},
+		"mp4": {}, "mpeg": {}, "mov": {}, "webm": {},
+	}
+	for _, ext := range anydoc.SupportedFileTypes() {
+		extensions[ext] = struct{}{}
+	}
+	return extensions
+}()
 
 // dataTableFileExtensions are the spreadsheet formats that get an extra
 // table-summary task after their document-process task.

@@ -263,6 +263,8 @@ export interface AgentTypeKBFilter {
 
 // KB 能力标签（后端 types.KBCapabilities 的 JSON）
 export interface KBCapabilities {
+  ready?: boolean;
+  storage_ready?: boolean;
   vector: boolean;
   keyword: boolean;
   wiki: boolean;

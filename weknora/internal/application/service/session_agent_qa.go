@@ -149,10 +149,14 @@ func (s *sessionService) AgentQA(
 	}
 
 	// Hold the sandbox across this turn so an install that finishes while we
-	// are running cannot rebuild the VM between tool calls. Staging below is
-	// the first resolve: if the previous turn left a stale mark, that is
-	// where the new image is picked up.
-	releaseTurn := s.holdSandboxTurn(ctx, sessionID, agentConfig.SandboxConfigID)
+	// are running cannot rebuild the VM between tool calls. Lite has no
+	// sandbox/skill capability at all; skip the resolver/pinner seam instead of
+	// relying only on a scrubbed config (an empty ID historically selected the
+	// deployment-wide fallback backend).
+	releaseTurn := func() {}
+	if !isLiteProductEdition() {
+		releaseTurn = s.holdSandboxTurn(ctx, sessionID, agentConfig.SandboxConfigID)
+	}
 	defer releaseTurn()
 
 	// Reconcile all durable session attachments into the session's remote
@@ -162,6 +166,10 @@ func (s *sessionService) AgentQA(
 	// filesystem capability so provider-neutral remote wiring stays here.
 	var stagedAttachments []stagedSessionAttachment
 	stager, ok := s.agentService.(sessionAttachmentStager)
+	if isLiteProductEdition() {
+		stager = nil
+		ok = false
+	}
 	if !ok {
 		// The production AgentService implements this optional capability. Keep
 		// QA compatible with lightweight AgentService test/dedicated adapters
@@ -313,11 +321,15 @@ func (s *sessionService) buildAgentConfig(
 	// The workspace is the one on the context rather than the agent's owner,
 	// because that is where resolveSandboxForExecution reads it; skillsForRun
 	// picks the config the same way the sandbox resolution does.
-	sandboxTenantID, _ := types.TenantIDFromContext(ctx)
-	skillConfigID, tenantSkills := skillsForRun(
-		ctx, s.sandboxPinner, s.sandboxConfigRepo, s.tenantSkillRepo,
-		sandboxTenantID, req.Session.ID, agentConfig.SandboxConfigID,
-	)
+	var skillConfigID string
+	var tenantSkills []*types.TenantSkillEntity
+	if !isLiteProductEdition() {
+		sandboxTenantID, _ := types.TenantIDFromContext(ctx)
+		skillConfigID, tenantSkills = skillsForRun(
+			ctx, s.sandboxPinner, s.sandboxConfigRepo, s.tenantSkillRepo,
+			sandboxTenantID, req.Session.ID, agentConfig.SandboxConfigID,
+		)
+	}
 	agentConfig.TenantSkills = tenantSkills
 	if len(tenantSkills) > 0 {
 		// The config named here is the one the skills came from, which is the
@@ -578,6 +590,21 @@ func (s *sessionService) configureSkillsFromAgent(
 	agentConfig *types.AgentConfig,
 	customAgent *types.CustomAgent,
 ) {
+	if agentConfig == nil {
+		return
+	}
+	if isLiteProductEdition() {
+		// Skills and their sandbox are a Standard-only execution capability.
+		// Clear every runtime field even when a caller constructs QARequest
+		// directly instead of going through the redacted agent read path.
+		agentConfig.SandboxConfigID = ""
+		agentConfig.SkillsEnabled = false
+		agentConfig.SkillDirs = nil
+		agentConfig.AllowedSkills = nil
+		agentConfig.TenantSkills = nil
+		agentConfig.PinnedSkillNames = nil
+		return
+	}
 	if customAgent == nil {
 		return
 	}

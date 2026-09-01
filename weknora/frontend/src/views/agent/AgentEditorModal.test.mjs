@@ -57,9 +57,13 @@ test('agent dependencies retain the fail-together Promise.all contract', () => {
   )
   assert.match(
     dependencies,
-    /await Promise\.all\(\[\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureModels\(\),\s*authStore\.isLiteMode \? chatResources\.ensureConsumerSceneOptions\('rag'\) : Promise\.resolve\(\),\s*chatResources\.ensureKnowledgeBases\(\),\s*chatResources\.ensureWebSearchProviders\(\),\s*chatResources\.ensureSandboxConfigs\(\),\s*editorResources\.prefetchAgentEditorDeps\(\),\s*\]\);/,
+    /await Promise\.all\(\[\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureModels\(\),\s*authStore\.isLiteMode \? chatResources\.ensureConsumerSceneOptions\('rag'\) : Promise\.resolve\(\),\s*chatResources\.ensureKnowledgeBases\(\),\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureWebSearchProviders\(\),\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureSandboxConfigs\(\),\s*editorResources\.prefetchAgentEditorDeps\(\),\s*\]\);/,
   )
   assert.doesNotMatch(dependencies, /Promise\.allSettled/)
+  assert.match(source, /if \(!authStore\.isLiteMode\) await syncInstalledSkills\(\)/)
+  assert.match(source, /if \(!props\.visible \|\| authStore\.isLiteMode\) return[\s\S]*await syncInstalledSkills\(\)/)
+  assert.match(source, /async function syncInstalledSkills\(force = false\) \{\s*if \(authStore\.isLiteMode\) return/)
+  assert.match(source, /function openSkillSettings\(\) \{\s*if \(authStore\.isLiteMode\) return/)
 })
 
 test('consumer agent editor keeps the compact Lite tabs while Standard exposes main tabs', () => {
@@ -106,6 +110,12 @@ test('consumer agent editor keeps the compact Lite tabs while Standard exposes m
   assert.match(basicSection, /:show-add-model="!authStore\.isLiteMode"/)
   assert.match(basicSection, /:scene-options="authStore\.isLiteMode \? agentModelSceneOptions : \[\]"/)
   assert.doesNotMatch(source, /data-guide="agent-create-agent-type"/)
+})
+
+test('Lite agent knowledge copy and RAG preset description stay document-only while Standard keeps FAQ wording', () => {
+  assert.match(source, /knowledgeConfigDescription/)
+  assert.match(source, /authStore\.isLiteMode\s*\?\s*t\('agent\.editor\.knowledgeConfigDescLite'\)\s*:\s*t\('agent\.editor\.knowledgeConfigDesc'\)/)
+  assert.match(source, /authStore\.isLiteMode[\s\S]*?p\.id === 'rag-qa'[\s\S]*?agentEditor\.agentType\.liteDescriptions\.ragQa/)
 })
 
 test('prompt configuration exposes only the system prompt while preserving hidden values', () => {

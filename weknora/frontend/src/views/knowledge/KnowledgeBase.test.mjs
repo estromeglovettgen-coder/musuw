@@ -52,6 +52,13 @@ test("knowledge detail does not duplicate settings in the top-right header", () 
   );
 });
 
+test("knowledge detail consumes identifier-free Lite runtime and storage readiness", () => {
+  assert.match(nativeController, /isKnowledgeBaseRuntimeReady, isKnowledgeBaseStorageReady/);
+  assert.match(nativeController, /return !isKnowledgeBaseStorageReady\(kbInfo\.value\)/);
+  assert.match(nativeController, /if \(!isKnowledgeBaseRuntimeReady\(kbInfo\.value\)\)/);
+  assert.doesNotMatch(nativeController, /!kbInfo\.value\.summary_model_id/);
+});
+
 test("knowledge detail remediation alerts use the shared dark card surface", () => {
   assert.match(
     source,

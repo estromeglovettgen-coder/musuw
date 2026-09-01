@@ -122,7 +122,7 @@
               </div>
             </aside>
 
-            <aside class="settings-sidebar">
+            <aside v-if="!authStore.isLiteMode" class="settings-sidebar">
               <div class="settings-sidebar-header">
                 <h2 class="settings-sidebar-title">{{ t('uploadConfirm.parseConfig') }}</h2>
               </div>
@@ -191,7 +191,7 @@
                     </div>
                   </div>
 
-                  <div v-show="activeSection === 'parser'" class="section">
+                  <div v-if="!authStore.isLiteMode" v-show="activeSection === 'parser'" class="section">
                     <KBParserSettings
                       :relevant-extensions="batchFileExts"
                       :parser-engine-rules="uiState.chunkingConfig.parserEngineRules"
@@ -212,7 +212,7 @@
                     </div>
                   </div>
 
-                  <div v-show="activeSection === 'chunking'" class="section">
+                  <div v-if="!authStore.isLiteMode" v-show="activeSection === 'chunking'" class="section">
                     <div class="section-content">
                       <div class="section-header">
                         <h2 class="section-title">{{ t('knowledgeEditor.chunking.title') }}</h2>
@@ -351,7 +351,7 @@
                     </div>
                   </div>
 
-                  <div v-show="activeSection === 'multimodal'" class="section" data-section="multimodal">
+                  <div v-if="!authStore.isLiteMode" v-show="activeSection === 'multimodal'" class="section" data-section="multimodal">
                     <div class="kb-settings-block">
                       <div class="section-header">
                         <h2 class="section-title">{{ t('knowledgeEditor.multimodal.title') }}</h2>
@@ -425,7 +425,7 @@
                     </div>
                   </div>
 
-                  <div v-show="activeSection === 'asr'" class="section" data-section="asr">
+                  <div v-if="!authStore.isLiteMode" v-show="activeSection === 'asr'" class="section" data-section="asr">
                     <div class="kb-settings-block">
                       <div class="section-header">
                         <h2 class="section-title">{{ t('knowledgeEditor.asr.title') }}</h2>
@@ -480,7 +480,7 @@
                     </div>
                   </div>
 
-                  <div v-show="activeSection === 'question'" class="section">
+                  <div v-if="!authStore.isLiteMode" v-show="activeSection === 'question'" class="section">
                     <div class="kb-settings-block">
                       <div class="section-header">
                         <h2 class="section-title">{{ t('knowledgeEditor.advanced.questionGeneration.label') }}</h2>
@@ -523,7 +523,7 @@
                     </div>
                   </div>
 
-                  <div v-if="isGraphSectionAvailable" v-show="activeSection === 'graph'" class="section">
+                  <div v-if="!authStore.isLiteMode && isGraphSectionAvailable" v-show="activeSection === 'graph'" class="section">
                     <GraphSettings
                       :graph-extract="uiState.nodeExtractConfig"
                       :model-id="llmModelId"
@@ -559,6 +559,7 @@ import GraphSettings from '../settings/GraphSettings.vue'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { formatFileSize, getFileIcon } from '@/utils/files'
 import { getUploadFileKey } from '../utils/uploadSources'
 import { listKnowledgeTags } from '@/api/knowledge-base'
@@ -653,6 +654,7 @@ const { t } = useI18n()
 const chatResources = useChatResourcesStore()
 const editorResources = useEditorResourcesStore()
 const uiStore = useUIStore()
+const authStore = useAuthStore()
 
 const allModels = ref<any[]>([])
 const localFiles = ref<File[]>([])
@@ -877,24 +879,29 @@ const showAsrModelError = computed(() => {
 
 const issueSectionKeys = computed(() => {
   const keys = new Set<IssueSectionKey>()
-  if (hasImages.value) {
+  if (!authStore.isLiteMode && hasImages.value) {
     if (!uiState.value.multimodalConfig.enabled || !uiState.value.multimodalConfig.vllmModelId) {
       keys.add('multimodal')
     }
-  } else if (showMultimodalModelError.value) {
+  } else if (!authStore.isLiteMode && showMultimodalModelError.value) {
     keys.add('multimodal')
   }
-  if (hasAudio.value) {
+  if (!authStore.isLiteMode && hasAudio.value) {
     if (!uiState.value.asrConfig.enabled || !uiState.value.asrConfig.modelId) {
       keys.add('asr')
     }
-  } else if (showAsrModelError.value) {
+  } else if (!authStore.isLiteMode && showAsrModelError.value) {
     keys.add('asr')
   }
   return keys
 })
 
 const navItems = computed(() => {
+  // Lite uploads use the platform-managed parser and processing defaults.
+  // Keep the confirmation surface focused on ordinary tags/files; all
+  // provider and engine controls remain unavailable even for stale deep links.
+  if (authStore.isLiteMode) return []
+
   const items: Array<{
     key: ConfigSectionKey
     icon: string
@@ -1024,23 +1031,24 @@ function getSectionNavStatus(
 const canConfirm = computed(() => {
   if (props.mode === 'file' && batchItemCount.value === 0) return false
   if (props.mode === 'manual' && !props.manualPreview?.content?.trim()) return false
-  if (hasImages.value) {
+  if (!authStore.isLiteMode && hasImages.value) {
     if (!uiState.value.multimodalConfig.enabled || !uiState.value.multimodalConfig.vllmModelId) {
       return false
     }
   }
-  if (hasAudio.value) {
+  if (!authStore.isLiteMode && hasAudio.value) {
     if (!uiState.value.asrConfig.enabled || !uiState.value.asrConfig.modelId) {
       return false
     }
   }
-  if (showMultimodalModelError.value || showAsrModelError.value) {
+  if (!authStore.isLiteMode && (showMultimodalModelError.value || showAsrModelError.value)) {
     return false
   }
   return true
 })
 
 function getDefaultSection(): ConfigSectionKey {
+  if (authStore.isLiteMode) return 'tags'
   if (props.mode === 'reparse') return 'parser'
   if (issueSectionKeys.value.has('multimodal')) return 'multimodal'
   if (issueSectionKeys.value.has('asr')) return 'asr'
@@ -1138,6 +1146,12 @@ function initFromKbInfo(kb: any) {
 }
 
 function buildProcessOverrides(): KnowledgeProcessOverrides {
+  // AnyDoc/parser, chunking, multimodal, ASR, question generation, graph,
+  // and storage choices are server-owned for Lite. Returning an empty
+  // override object prevents stale hidden state from changing the managed
+  // upload pipeline or selecting a provider through a crafted deep link.
+  if (authStore.isLiteMode) return {}
+
   const state = uiState.value
   const chunking = state.chunkingConfig
 
@@ -1300,8 +1314,10 @@ watch(
     }
     activeSection.value = getDefaultSection()
     chunkingMoreOpen.value = false
-    loadModels()
-    loadSystemInfo()
+    if (!authStore.isLiteMode) {
+      loadModels()
+      loadSystemInfo()
+    }
     loadTags()
   },
 )
@@ -1378,27 +1394,27 @@ const handleNodeExtractUpdate = (config: UploadUIState['nodeExtractConfig']) => 
 }
 
 const validateBeforeConfirm = (): boolean => {
-  if (hasImages.value) {
+  if (!authStore.isLiteMode && hasImages.value) {
     if (!uiState.value.multimodalConfig.enabled || !uiState.value.multimodalConfig.vllmModelId) {
       MessagePlugin.warning(t('uploadConfirm.vlmModelRequired'))
       uiState.value.multimodalConfig.enabled = true
       goToSection('multimodal')
       return false
     }
-  } else if (showMultimodalModelError.value) {
+  } else if (!authStore.isLiteMode && showMultimodalModelError.value) {
     MessagePlugin.warning(t('uploadConfirm.vlmModelSelectRequired'))
     goToSection('multimodal')
     return false
   }
 
-  if (hasAudio.value) {
+  if (!authStore.isLiteMode && hasAudio.value) {
     if (!uiState.value.asrConfig.enabled || !uiState.value.asrConfig.modelId) {
       MessagePlugin.warning(t('uploadConfirm.asrModelRequired'))
       uiState.value.asrConfig.enabled = true
       goToSection('asr')
       return false
     }
-  } else if (showAsrModelError.value) {
+  } else if (!authStore.isLiteMode && showAsrModelError.value) {
     MessagePlugin.warning(t('uploadConfirm.asrModelSelectRequired'))
     goToSection('asr')
     return false

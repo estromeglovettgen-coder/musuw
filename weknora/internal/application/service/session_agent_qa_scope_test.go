@@ -113,3 +113,29 @@ func TestConfigureSkillsFromAgentDoesNotLoadHostPreloadedDir(t *testing.T) {
 	assert.Empty(t, cfg.SkillDirs,
 		"the host skills/preloaded tree is not what the sandbox image carries")
 }
+
+func TestLiteConfigureSkillsFromAgentScrubsExecutableRuntimeFields(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	svc := &sessionService{}
+	cfg := &types.AgentConfig{
+		SkillsEnabled:    true,
+		SkillDirs:        []string{"/opt/skills"},
+		AllowedSkills:    []string{"analysis"},
+		SandboxConfigID:  "cfg-1",
+		TenantSkills:     []*types.TenantSkillEntity{{Name: "analysis"}},
+		PinnedSkillNames: []string{"analysis"},
+	}
+	svc.configureSkillsFromAgent(context.Background(), cfg, &types.CustomAgent{
+		Config: types.CustomAgentConfig{
+			SandboxConfigID:     "cfg-1",
+			SkillsSelectionMode: "all",
+			SelectedSkills:      []string{"analysis"},
+		},
+	})
+	assert.False(t, cfg.SkillsEnabled)
+	assert.Empty(t, cfg.SkillDirs)
+	assert.Empty(t, cfg.AllowedSkills)
+	assert.Empty(t, cfg.SandboxConfigID)
+	assert.Empty(t, cfg.TenantSkills)
+	assert.Empty(t, cfg.PinnedSkillNames)
+}

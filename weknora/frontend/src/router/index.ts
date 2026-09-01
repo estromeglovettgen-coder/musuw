@@ -491,7 +491,7 @@ router.beforeEach(async (to, from, next) => {
       const section = typeof to.query.section === 'string' ? to.query.section : ''
       const tab = typeof to.query.tab === 'string' ? to.query.tab : ''
       if (
-        (section && section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mcp') ||
+        (section && section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mymemory' && section !== 'memory' && section !== 'mcp') ||
         tab
       ) {
         next({ path: '/platform/settings' })

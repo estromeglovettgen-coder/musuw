@@ -27,7 +27,7 @@
         </div>
       </div>
 
-      <div v-if="config.enabled" class="setting-row">
+      <div class="setting-row" :class="{ 'is-disabled': !config.enabled }">
         <div class="setting-info">
           <label>{{ t('memoryWorkspaceSettings.writeModeLabel') }}</label>
           <p class="desc">{{ t('memoryWorkspaceSettings.writeModeDescription') }}</p>
@@ -40,7 +40,11 @@
           </p>
         </div>
         <div class="setting-control">
-          <t-radio-group v-model="config.write_mode" :disabled="!canEdit" @change="debouncedSave">
+          <t-radio-group
+            v-model="config.write_mode"
+            :disabled="!canEdit || !config.enabled"
+            @change="debouncedSave"
+          >
             <t-radio-button value="explicit_only">
               {{ t('memoryWorkspaceSettings.writeModeExplicit') }}
             </t-radio-button>
@@ -51,86 +55,7 @@
         </div>
       </div>
 
-      <div v-if="config.enabled && config.write_mode === 'auto'" class="setting-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.extractModelLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.extractModelDescription') }}</p>
-        </div>
-        <div class="setting-control" style="min-width: 280px">
-          <ModelSelector
-            model-type="KnowledgeQA"
-            :selected-model-id="config.extract_model_id"
-            :disabled="!canEdit"
-            @update:selected-model-id="handleModelChange"
-            @add-model="handleAddModel('chat')"
-          />
-        </div>
-      </div>
-
-      <div v-if="config.enabled && config.write_mode === 'auto'" class="setting-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.extractDelayLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.extractDelayDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <t-input-number
-            v-model="config.extract_delay_seconds"
-            :min="5"
-            :max="3600"
-            :step="15"
-            suffix="s"
-            :disabled="!canEdit"
-            @change="debouncedSave"
-          />
-        </div>
-      </div>
-
-      <div v-if="config.enabled && config.write_mode === 'auto'" class="setting-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.extractMinIntervalLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.extractMinIntervalDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <t-input-number
-            v-model="config.extract_min_interval_seconds"
-            :min="0"
-            :max="86400"
-            :step="60"
-            suffix="s"
-            :disabled="!canEdit"
-            @change="debouncedSave"
-          />
-        </div>
-      </div>
-
-      <div v-if="config.enabled" class="setting-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.vectorRecallLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.vectorRecallDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <t-switch v-model="config.vector_recall" :disabled="!canEdit" @change="debouncedSave" />
-        </div>
-      </div>
-
-      <div v-if="config.enabled && config.vector_recall" class="setting-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.embeddingModelLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.embeddingModelDescription') }}</p>
-        </div>
-        <div class="setting-control" style="min-width: 280px">
-          <ModelSelector
-            model-type="Embedding"
-            :selected-model-id="config.embedding_model_id"
-            :disabled="!canEdit"
-            :clearable="true"
-            @update:selected-model-id="handleEmbeddingModelChange"
-            @add-model="handleAddModel('embedding')"
-          />
-        </div>
-      </div>
-
-      <div v-if="config.enabled" class="setting-row">
+      <div class="setting-row" :class="{ 'is-disabled': !config.enabled }">
         <div class="setting-info">
           <label>{{ t('memoryWorkspaceSettings.conditioningLabel') }}</label>
           <p class="desc">{{ t('memoryWorkspaceSettings.conditioningDescription') }}</p>
@@ -138,47 +63,13 @@
         <div class="setting-control">
           <t-switch
             v-model="config.retrieval_conditioning"
-            :disabled="!canEdit"
+            :disabled="!canEdit || !config.enabled"
             @change="debouncedSave"
           />
         </div>
       </div>
 
-      <div v-if="config.enabled && config.write_mode === 'auto'" class="setting-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.interestThresholdLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.interestThresholdDescription') }}</p>
-        </div>
-        <div class="setting-control">
-          <t-input-number
-            v-model="config.interest_threshold"
-            :min="1"
-            :max="20"
-            :step="1"
-            :disabled="!canEdit"
-            @change="debouncedSave"
-          />
-        </div>
-      </div>
-
-      <div v-if="config.enabled && config.write_mode === 'auto'" class="setting-row instructions-row">
-        <div class="setting-info">
-          <label>{{ t('memoryWorkspaceSettings.instructionsLabel') }}</label>
-          <p class="desc">{{ t('memoryWorkspaceSettings.instructionsDescription') }}</p>
-        </div>
-        <div class="setting-control instructions-control">
-          <t-textarea
-            v-model="config.extract_instructions"
-            :autosize="{ minRows: 3, maxRows: 8 }"
-            :maxlength="1000"
-            :disabled="!canEdit"
-            :placeholder="t('memoryWorkspaceSettings.instructionsPlaceholder')"
-            @blur="debouncedSave"
-          />
-        </div>
-      </div>
-
-      <div v-if="config.enabled" class="setting-row">
+      <div class="setting-row" :class="{ 'is-disabled': !config.enabled }">
         <div class="setting-info">
           <label>{{ t('memoryWorkspaceSettings.maxItemsLabel') }}</label>
           <p class="desc">{{ t('memoryWorkspaceSettings.maxItemsDescription') }}</p>
@@ -189,9 +80,169 @@
             :min="10"
             :max="2000"
             :step="10"
-            :disabled="!canEdit"
+            :disabled="!canEdit || !config.enabled"
             @change="debouncedSave"
           />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="advanced-toggle"
+        :aria-expanded="advancedOpen"
+        aria-controls="memory-advanced-settings"
+        @click="advancedOpen = !advancedOpen"
+      >
+        <t-icon name="chevron-right" class="toggle-arrow" :class="{ open: advancedOpen }" />
+        <span class="advanced-toggle-copy">
+          <span class="advanced-toggle-title">{{ t('memoryWorkspaceSettings.advancedLabel') }}</span>
+          <span class="advanced-toggle-description">
+            {{ t('memoryWorkspaceSettings.advancedDescription') }}
+          </span>
+        </span>
+      </button>
+
+      <div v-if="advancedOpen" id="memory-advanced-settings" class="advanced-section">
+        <div class="setting-row" :class="{ 'is-disabled': advancedDisabled }">
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.vectorRecallLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.vectorRecallDescription') }}</p>
+          </div>
+          <div class="setting-control">
+            <t-switch
+              v-model="config.vector_recall"
+              :disabled="advancedDisabled"
+              @change="debouncedSave"
+            />
+          </div>
+        </div>
+
+        <div
+          class="setting-row"
+          :class="{ 'is-disabled': advancedDisabled || !config.vector_recall }"
+        >
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.embeddingModelLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.embeddingModelDescription') }}</p>
+            <p v-if="!config.vector_recall" class="desc hint">
+              {{ t('memoryWorkspaceSettings.vectorOnlyHint') }}
+            </p>
+          </div>
+          <div class="setting-control model-control">
+            <ModelSelector
+              model-type="Embedding"
+              :selected-model-id="config.embedding_model_id"
+              :disabled="advancedDisabled || !config.vector_recall"
+              :clearable="true"
+              @update:selected-model-id="handleEmbeddingModelChange"
+              @add-model="handleAddModel('embedding')"
+            />
+          </div>
+        </div>
+
+        <div
+          class="setting-row"
+          :class="{ 'is-disabled': advancedDisabled || config.write_mode !== 'auto' }"
+        >
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.extractModelLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.extractModelDescription') }}</p>
+            <p v-if="config.write_mode !== 'auto'" class="desc hint">
+              {{ t('memoryWorkspaceSettings.autoOnlyHint') }}
+            </p>
+          </div>
+          <div class="setting-control model-control">
+            <ModelSelector
+              model-type="KnowledgeQA"
+              :selected-model-id="config.extract_model_id"
+              :disabled="advancedDisabled || config.write_mode !== 'auto'"
+              :clearable="true"
+              @update:selected-model-id="handleModelChange"
+              @add-model="handleAddModel('chat')"
+            />
+          </div>
+        </div>
+
+        <div
+          class="setting-row"
+          :class="{ 'is-disabled': advancedDisabled || config.write_mode !== 'auto' }"
+        >
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.extractDelayLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.extractDelayDescription') }}</p>
+          </div>
+          <div class="setting-control">
+            <t-input-number
+              v-model="config.extract_delay_seconds"
+              :min="5"
+              :max="3600"
+              :step="15"
+              suffix="s"
+              :disabled="advancedDisabled || config.write_mode !== 'auto'"
+              @change="debouncedSave"
+            />
+          </div>
+        </div>
+
+        <div
+          class="setting-row"
+          :class="{ 'is-disabled': advancedDisabled || config.write_mode !== 'auto' }"
+        >
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.extractMinIntervalLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.extractMinIntervalDescription') }}</p>
+          </div>
+          <div class="setting-control">
+            <t-input-number
+              v-model="config.extract_min_interval_seconds"
+              :min="0"
+              :max="86400"
+              :step="60"
+              suffix="s"
+              :disabled="advancedDisabled || config.write_mode !== 'auto'"
+              @change="debouncedSave"
+            />
+          </div>
+        </div>
+
+        <div
+          class="setting-row"
+          :class="{ 'is-disabled': advancedDisabled || config.write_mode !== 'auto' }"
+        >
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.interestThresholdLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.interestThresholdDescription') }}</p>
+          </div>
+          <div class="setting-control">
+            <t-input-number
+              v-model="config.interest_threshold"
+              :min="1"
+              :max="20"
+              :step="1"
+              :disabled="advancedDisabled || config.write_mode !== 'auto'"
+              @change="debouncedSave"
+            />
+          </div>
+        </div>
+
+        <div
+          class="setting-row instructions-row"
+          :class="{ 'is-disabled': advancedDisabled || config.write_mode !== 'auto' }"
+        >
+          <div class="setting-info">
+            <label>{{ t('memoryWorkspaceSettings.instructionsLabel') }}</label>
+            <p class="desc">{{ t('memoryWorkspaceSettings.instructionsDescription') }}</p>
+          </div>
+          <div class="setting-control instructions-control">
+            <t-textarea
+              v-model="config.extract_instructions"
+              :autosize="{ minRows: 3, maxRows: 8 }"
+              :maxlength="1000"
+              :disabled="advancedDisabled || config.write_mode !== 'auto'"
+              :placeholder="t('memoryWorkspaceSettings.instructionsPlaceholder')"
+              @blur="debouncedSave"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -225,8 +276,10 @@ const config = reactive<MemoryConfig>({
   vector_recall: true,
 })
 const isInitializing = ref(true)
+const advancedOpen = ref(false)
 
 const canEdit = computed(() => authStore.hasRole('admin'))
+const advancedDisabled = computed(() => !canEdit.value || !config.enabled)
 
 const loadConfig = async () => {
   try {
@@ -276,7 +329,7 @@ const debouncedSave = () => {
 }
 
 const handleModelChange = (modelId: string) => {
-  config.extract_model_id = modelId
+  config.extract_model_id = modelId || ''
   debouncedSave()
 }
 
@@ -363,6 +416,13 @@ onMounted(loadConfig)
   &:last-child {
     border-bottom: none;
   }
+
+  &.is-disabled {
+    .setting-info label,
+    .setting-info .desc {
+      color: var(--td-text-color-disabled);
+    }
+  }
 }
 
 .setting-info {
@@ -398,6 +458,70 @@ onMounted(loadConfig)
   align-items: center;
 }
 
+.model-control {
+  width: 280px;
+}
+
+.advanced-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 0;
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--td-component-stroke);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--td-text-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--td-brand-color-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.toggle-arrow {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 16px;
+  transition: transform 0.15s ease;
+
+  &.open {
+    transform: rotate(90deg);
+  }
+}
+
+.advanced-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.advanced-toggle-title {
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.advanced-toggle-description {
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.advanced-section {
+  display: flex;
+  flex-direction: column;
+}
+
 // The custom prompt needs room to read, so this row stacks instead of putting a
 // paragraph of rules into a narrow right-hand column.
 .instructions-row {
@@ -414,5 +538,28 @@ onMounted(loadConfig)
 .instructions-control {
   width: 100%;
   justify-content: stretch;
+}
+
+@media (max-width: 720px) {
+  .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 0;
+  }
+
+  .setting-info {
+    max-width: 100%;
+    padding-right: 0;
+  }
+
+  .setting-control {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .model-control {
+    width: 100%;
+  }
 }
 </style>

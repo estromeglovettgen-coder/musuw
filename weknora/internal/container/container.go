@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	stdlog "log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/Tencent/WeKnora/internal/agent/approval"
 	"github.com/Tencent/WeKnora/internal/application/repository"
@@ -716,6 +718,16 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("unsupported database driver: %s", os.Getenv("DB_DRIVER"))
 	}
 	db, err := gorm.Open(dialector, &gorm.Config{
+		// Keep SQL values out of trace and slow-query logs. Auth tokens are
+		// query parameters in the authentication repository and must never be
+		// rendered into application logs.
+		Logger: gormlogger.New(stdlog.New(os.Stdout, "\r\n", stdlog.LstdFlags), gormlogger.Config{
+			SlowThreshold:             200 * time.Millisecond,
+			Colorful:                  true,
+			IgnoreRecordNotFoundError: false,
+			ParameterizedQueries:      true,
+			LogLevel:                  gormlogger.Warn,
+		}),
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -777,6 +789,15 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 
 	} else {
 		logger.Infof(context.Background(), "Auto-migration is disabled (AUTO_MIGRATE=false)")
+	}
+
+	// FAQ is a Standard-only surface in Musuw Lite. Keep the compatibility
+	// audit read-only: legacy rows remain intact for Standard tenants and can
+	// be reviewed or migrated explicitly by operators later.
+	if faqCount, auditErr := auditLegacyFAQRows(db); auditErr != nil {
+		logger.Warnf(context.Background(), "FAQ compatibility audit failed: %v", auditErr)
+	} else if faqCount > 0 {
+		logger.Warnf(context.Background(), "FAQ compatibility audit: %d legacy FAQ knowledge bases remain (read-only; no rows changed)", faqCount)
 	}
 
 	// Built-in models are runtime configuration, not a migration. Reconcile

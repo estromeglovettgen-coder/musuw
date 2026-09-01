@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -267,6 +268,26 @@ func (h *OrganizationHandler) buildResourceCountsByOrg(ctx context.Context, orgs
 				if len(agent.Config.KnowledgeBases) > 0 {
 					kbIDs = agent.Config.KnowledgeBases
 				}
+			}
+			if strings.EqualFold(strings.TrimSpace(Edition), "lite") && mode != "all" {
+				// Selected/default agent configs are persisted IDs and therefore
+				// bypass ListKnowledgeBasesByTenantID's Lite projection. Resolve
+				// them through the shared service seam before counting so hidden
+				// FAQ IDs cannot inflate the organization resource count.
+				visibleIDs := make([]string, 0, len(kbIDs))
+				if h.kbService != nil {
+					for _, kbID := range kbIDs {
+						if kbID == "" {
+							continue
+						}
+						kb, err := h.kbService.GetKnowledgeBaseByIDOnly(ctx, kbID)
+						if err != nil || kb == nil || kb.TenantID != agent.TenantID || kb.Type == types.KnowledgeBaseTypeFAQ {
+							continue
+						}
+						visibleIDs = append(visibleIDs, kbID)
+					}
+				}
+				kbIDs = visibleIDs
 			}
 			for _, kbID := range kbIDs {
 				if kbID != "" && !directSet[kbID] {
@@ -1602,6 +1623,13 @@ func (h *OrganizationHandler) listSpaceKnowledgeBasesInOrganization(ctx context.
 			}
 			kb, err := h.kbService.GetKnowledgeBaseByIDOnly(ctx, kbID)
 			if err != nil || kb == nil {
+				continue
+			}
+			// GetKnowledgeBaseByIDOnly is the authoritative cross-tenant
+			// visibility seam, but keep this consumer boundary fail-closed as
+			// well: a stale/mock implementation must not reintroduce legacy FAQ
+			// rows into the Lite space view.
+			if strings.EqualFold(strings.TrimSpace(Edition), "lite") && kb.Type == types.KnowledgeBaseTypeFAQ {
 				continue
 			}
 			if kb.TenantID != sourceTenantID {

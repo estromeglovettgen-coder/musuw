@@ -40,7 +40,7 @@
 
           <form v-if="formData" class="kb-config-form" @submit.prevent="handleSubmit">
             <nav
-              v-if="!authStore.isLiteMode"
+              v-if="navItems.length > 1"
               class="kb-config-nav"
               aria-label="Knowledge base settings sections"
               data-guide="kb-editor-sidebar"
@@ -74,7 +74,7 @@
               </div>
             </section>
 
-            <section class="kb-config-field">
+            <section v-if="!authStore.isLiteMode" class="kb-config-field">
               <div class="kb-config-field__heading">
                 <label class="is-required">{{ $t('knowledgeEditor.basic.typeLabel') }}</label>
                 <p>{{ $t('knowledgeEditor.basic.typeDescription') }}</p>
@@ -231,22 +231,6 @@
                 :autosize="{ minRows: 3, maxRows: 5 }"
               />
               <span class="kb-config-count">{{ formData.description.length }}/200</span>
-            </section>
-
-            <section v-if="authStore.isLiteMode" class="kb-config-field kb-config-summary-model" data-guide="kb-create-llm">
-              <div class="kb-config-field__heading">
-                <label>{{ $t('knowledgeEditor.models.llmLabel') }}</label>
-                <p>{{ $t('knowledgeEditor.models.llmDesc') }}</p>
-              </div>
-              <ModelSelector
-                model-type="KnowledgeQA"
-                :selected-model-id="formData.modelConfig.llmModelId"
-                :all-models="authStore.isLiteMode ? [] : allModels"
-                :scene-options="authStore.isLiteMode ? summaryModelSceneOptions : []"
-                :show-add-model="false"
-                :placeholder="$t('knowledgeEditor.models.llmPlaceholder')"
-                @update:selected-model-id="(val: string) => formData.modelConfig.llmModelId = val"
-              />
             </section>
 
             </div>
@@ -417,14 +401,15 @@
               />
             </div>
 
-            <div v-if="!authStore.isLiteMode && !isFAQ && currentSection === 'advanced'" class="kb-config-section">
+            <div v-if="!isFAQ && currentSection === 'advanced'" class="kb-config-section">
               <KBAdvancedSettings
                 ref="advancedSettingsRef"
                 v-if="formData"
                 :question-generation="formData.questionGenerationConfig"
                 :auto-tag="formData.autoTagConfig"
                 :rag-enabled="formData.indexingStrategy?.vectorEnabled || formData.indexingStrategy?.keywordEnabled"
-                :all-models="allModels"
+                :all-models="authStore.isLiteMode ? [] : allModels"
+                :consumer-mode="authStore.isLiteMode"
                 :table-metadata-instructions="formData.chunkingConfig.tableMetadataInstructions"
                 @update:question-generation="handleQuestionGenerationUpdate"
                 @update:auto-tag="(value) => { if (formData) formData.autoTagConfig = value }"
@@ -505,6 +490,15 @@ const editorResources = useEditorResourcesStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
+// Lite keeps the full upstream processing pipeline behind the server-owned
+// product boundary.  The browser only needs this fixed scene model when it
+// submits a managed automatic-tag request; it must never become a selector.
+const LITE_AUTO_TAG_MODEL_ID = 'builtin-deepseek-v4-flash'
+const LITE_KB_EDITOR_SECTIONS = [
+  { key: 'basic', icon: 'info-circle' },
+  { key: 'advanced', icon: 'setting' },
+] as const
+
 // Props
 const props = defineProps<{
   visible: boolean
@@ -533,10 +527,28 @@ const copyKbId = async () => {
 
 const currentSection = ref<string>('basic')
 
+/**
+ * Consumer deep links are intentionally outcome-oriented.  Keep the
+ * supported Basic/Advanced pair stable while letting Standard retain its
+ * existing section names and navigation contract.
+ */
+const normalizeKnowledgeBaseSection = (section?: string | null): string => {
+  if (!authStore.isLiteMode) return section || 'basic'
+  return section === 'advanced' ? 'advanced' : 'basic'
+}
+
+const normalizeKnowledgeBaseType = (type?: unknown): 'document' | 'faq' => {
+  if (authStore.isLiteMode) return 'document'
+  return type === 'faq' ? 'faq' : 'document'
+}
+
 const onKbEditorFocusSection = (event: Event) => {
   const section = (event as CustomEvent<{ section?: string }>).detail?.section
-  if (section && navItems.value.some((item) => item.key === section)) {
-    currentSection.value = section
+  if (section) {
+    const normalized = normalizeKnowledgeBaseSection(section)
+    if (navItems.value.some((item) => item.key === normalized)) {
+      currentSection.value = normalized
+    }
   }
 }
 
@@ -550,7 +562,6 @@ onBeforeUnmount(() => {
 const saving = ref(false)
 const loading = ref(false)
 const allModels = ref<any[]>([])
-const summaryModelSceneOptions = computed(() => chatResources.consumerSceneOptions.rag?.options || [])
 const hasFiles = ref(false)
 const initialStorageProvider = ref<string>('')
 /** Tenant-wide default from Settings → Storage engine (used when creating a KB). */
@@ -610,7 +621,12 @@ const navItems = computed(() => {
     { key: 'basic', icon: 'info-circle', label: t('knowledgeEditor.sidebar.basic') },
   ]
   if (authStore.isLiteMode) {
-    return items
+    const liteItems: { key: string; icon: string; label: string; badge?: number }[] = LITE_KB_EDITOR_SECTIONS.map((item) => ({
+      key: item.key,
+      icon: item.icon,
+      label: t(`knowledgeEditor.sidebar.${item.key}`),
+    }))
+    return liteItems
   }
   items.push(
     { key: 'models', icon: 'control-platform', label: t('knowledgeEditor.sidebar.models') },
@@ -684,10 +700,12 @@ const advancedSettingsRef = ref<InstanceType<typeof KBAdvancedSettings>>()
 
 // 表单数据
 const formData = ref<any>(null)
-const isFAQ = computed(() => formData.value?.type === 'faq')
+// FAQ remains a Standard/admin capability.  Lite's form is document-only
+// even if stale state or a crafted deep link tries to inject another type.
+const isFAQ = computed(() => !authStore.isLiteMode && formData.value?.type === 'faq')
 
 const kbCreateNeedsEmbedding = computed(() => {
-  if (!formData.value || formData.value.type === 'faq') return false
+  if (!formData.value || normalizeKnowledgeBaseType(formData.value.type) === 'faq') return false
   const s = formData.value.indexingStrategy
   return Boolean(s?.vectorEnabled || s?.keywordEnabled)
 })
@@ -708,6 +726,11 @@ watch(
   () => formData.value?.type,
   (newType, oldType) => {
     if (!formData.value) return
+    if (authStore.isLiteMode && newType !== 'document') {
+      formData.value.type = 'document'
+      currentSection.value = normalizeKnowledgeBaseSection(currentSection.value)
+      return
+    }
     if (newType === 'faq') {
       if (!formData.value.faqConfig) {
         formData.value.faqConfig = { indexMode: 'question_only', questionIndexMode: 'separate' }
@@ -722,7 +745,7 @@ watch(
 )
 
 const initFormData = (type: 'document' | 'faq' = 'document') => ({
-  type,
+  type: normalizeKnowledgeBaseType(type),
   name: '',
   description: '',
   chunkingConfig: {
@@ -749,7 +772,7 @@ const initFormData = (type: 'document' | 'faq' = 'document') => ({
   },
   autoTagConfig: {
     enabled: false,
-    modelId: '',
+    modelId: authStore.isLiteMode ? LITE_AUTO_TAG_MODEL_ID : '',
     maxTags: 3,
     skipIfTagged: true
   },
@@ -828,7 +851,7 @@ const loadKBData = async (kbIdOverride?: string) => {
     kbTenantId.value = Number((kb as any).tenant_id || 0)
 
     // 设置表单数据
-    const kbType = (kb.type as 'document' | 'faq') || 'document'
+    const kbType = normalizeKnowledgeBaseType(kb.type)
     formData.value = {
       type: kbType,
       name: kb.name || '',
@@ -890,9 +913,13 @@ const loadKBData = async (kbIdOverride?: string) => {
       },
       autoTagConfig: {
         enabled: kb.auto_tag_config?.enabled || false,
-        modelId: kb.auto_tag_config?.model_id || '',
-        maxTags: kb.auto_tag_config?.max_tags || 3,
-        skipIfTagged: kb.auto_tag_config?.skip_if_tagged ?? true
+        modelId: authStore.isLiteMode
+          ? LITE_AUTO_TAG_MODEL_ID
+          : (kb.auto_tag_config?.model_id || ''),
+        maxTags: authStore.isLiteMode ? 3 : (kb.auto_tag_config?.max_tags || 3),
+        skipIfTagged: authStore.isLiteMode
+          ? true
+          : (kb.auto_tag_config?.skip_if_tagged ?? true)
       },
       wikiConfig: {
         synthesisModelId: kb.wiki_config?.synthesis_model_id || '',
@@ -1121,7 +1148,7 @@ const validateForm = (): boolean => {
   // Consumer document libraries expose RAG and Wiki as their only selectable
   // indexing strategies. Graph stays platform-owned and hidden, so it must
   // never make an otherwise unconfigured create request appear valid.
-  if (authStore.isLiteMode && formData.value.type !== 'faq') {
+  if (authStore.isLiteMode && normalizeKnowledgeBaseType(formData.value.type) === 'document') {
     const s = formData.value.indexingStrategy
     if (!s || (!s.vectorEnabled && !s.keywordEnabled && !s.wikiEnabled)) {
       MessagePlugin.warning(t('knowledgeEditor.indexing.atLeastOne'))
@@ -1129,6 +1156,10 @@ const validateForm = (): boolean => {
       return false
     }
   }
+
+  // Lite edits only carry outcome-level fields; model, vector, parser,
+  // multimodal, chunking, and storage validation stay server-owned.
+  if (authStore.isLiteMode) return true
 
   // Creation is server-owned zero configuration. The client may forward the
   // four persisted scene candidates during submit, but does not require any
@@ -1156,7 +1187,7 @@ const validateForm = (): boolean => {
     return false
   }
 
-  if (formData.value.type === 'faq' && !formData.value.faqConfig?.indexMode) {
+  if (normalizeKnowledgeBaseType(formData.value.type) === 'faq' && !formData.value.faqConfig?.indexMode) {
     MessagePlugin.warning(t('knowledgeEditor.messages.indexModeRequired'))
     currentSection.value = 'faq'
     return false
@@ -1172,7 +1203,7 @@ const buildSubmitData = () => {
   const data: any = {
     name: formData.value.name,
     description: formData.value.description,
-    type: formData.value.type,
+    type: normalizeKnowledgeBaseType(formData.value.type),
     chunking_config: {
       chunk_size: formData.value.chunkingConfig.chunkSize,
       chunk_overlap: formData.value.chunkingConfig.chunkOverlap,
@@ -1254,14 +1285,21 @@ const buildSubmitData = () => {
     }
   }
 
-  data.auto_tag_config = {
-    enabled: formData.value.autoTagConfig?.enabled || false,
-    model_id: formData.value.autoTagConfig?.modelId || '',
-    max_tags: formData.value.autoTagConfig?.maxTags || 3,
-    skip_if_tagged: formData.value.autoTagConfig?.skipIfTagged ?? true,
-  }
+  data.auto_tag_config = authStore.isLiteMode
+    ? {
+        enabled: formData.value.autoTagConfig?.enabled || false,
+        model_id: LITE_AUTO_TAG_MODEL_ID,
+        max_tags: 3,
+        skip_if_tagged: true,
+      }
+    : {
+        enabled: formData.value.autoTagConfig?.enabled || false,
+        model_id: formData.value.autoTagConfig?.modelId || '',
+        max_tags: formData.value.autoTagConfig?.maxTags || 3,
+        skip_if_tagged: formData.value.autoTagConfig?.skipIfTagged ?? true,
+      }
 
-  if (formData.value.type === 'faq') {
+  if (normalizeKnowledgeBaseType(formData.value.type) === 'faq') {
     data.faq_config = {
       index_mode: formData.value.faqConfig?.indexMode || 'question_only',
       question_index_mode: formData.value.faqConfig?.questionIndexMode || 'separate'
@@ -1270,7 +1308,7 @@ const buildSubmitData = () => {
 
   // Wiki enablement is carried solely by indexing_strategy.wiki_enabled.
   // wiki_config only holds wiki-specific tunables.
-  if (formData.value.type !== 'faq') {
+  if (normalizeKnowledgeBaseType(formData.value.type) !== 'faq') {
     data.wiki_config = {
       synthesis_model_id: formData.value.modelConfig?.wikiSynthesisModelId || '',
       max_pages_per_ingest: formData.value.wikiConfig?.maxPagesPerIngest || 0,
@@ -1281,7 +1319,7 @@ const buildSubmitData = () => {
   }
 
   // Send indexing strategy
-  if (formData.value.type !== 'faq') {
+  if (normalizeKnowledgeBaseType(formData.value.type) !== 'faq') {
     data.indexing_strategy = {
       vector_enabled: formData.value.indexingStrategy?.vectorEnabled ?? true,
       keyword_enabled: formData.value.indexingStrategy?.keywordEnabled ?? true,
@@ -1347,12 +1385,12 @@ const doSubmit = async () => {
       const createPayload: any = {
         name: formData.value.name.trim(),
         description: formData.value.description.trim(),
-        type: formData.value.type,
+        type: normalizeKnowledgeBaseType(formData.value.type),
         ...sceneModels,
         summary_model_id: formData.value.modelConfig.llmModelId.trim()
           || String(sceneModels.summary_model_id || ''),
       }
-      if (formData.value.type === 'faq') {
+      if (normalizeKnowledgeBaseType(formData.value.type) === 'faq') {
         // FAQ is a distinct native knowledge-base type. Do not leak the
         // document-only Wiki/VLM/ASR scene configuration into its create
         // request, and preserve the native FAQ indexing choices.
@@ -1376,12 +1414,19 @@ const doSubmit = async () => {
           content_instructions: formData.value.wikiConfig.contentInstructions.trim(),
           extraction_instructions: formData.value.wikiConfig.extractionInstructions.trim(),
         }
-        createPayload.auto_tag_config = {
-          enabled: formData.value.autoTagConfig?.enabled || false,
-          model_id: formData.value.autoTagConfig?.modelId || '',
-          max_tags: formData.value.autoTagConfig?.maxTags || 3,
-          skip_if_tagged: formData.value.autoTagConfig?.skipIfTagged ?? true,
-        }
+        createPayload.auto_tag_config = authStore.isLiteMode
+          ? {
+              enabled: formData.value.autoTagConfig?.enabled || false,
+              model_id: LITE_AUTO_TAG_MODEL_ID,
+              max_tags: 3,
+              skip_if_tagged: true,
+            }
+          : {
+              enabled: formData.value.autoTagConfig?.enabled || false,
+              model_id: formData.value.autoTagConfig?.modelId || '',
+              max_tags: formData.value.autoTagConfig?.maxTags || 3,
+              skip_if_tagged: formData.value.autoTagConfig?.skipIfTagged ?? true,
+            }
       }
       const result: any = await createKnowledgeBase(createPayload)
       if (!result.success || !result.data?.id) {
@@ -1408,28 +1453,32 @@ const doSubmit = async () => {
 
       // 1. 更新基本信息（名称、描述）和 FAQ/Wiki 配置
       const updateConfig: any = {}
-      if (formData.value.type === 'faq' && formData.value.faqConfig) {
+      if (normalizeKnowledgeBaseType(formData.value.type) === 'faq' && formData.value.faqConfig) {
         updateConfig.faq_config = {
           index_mode: formData.value.faqConfig.indexMode || 'question_only',
           question_index_mode: formData.value.faqConfig.questionIndexMode || 'separate'
         }
       }
-      if (formData.value.wikiConfig && formData.value.type !== 'faq') {
+      if (formData.value.wikiConfig && normalizeKnowledgeBaseType(formData.value.type) !== 'faq') {
         updateConfig.wiki_config = {
-          synthesis_model_id: formData.value.modelConfig?.wikiSynthesisModelId || '',
-          max_pages_per_ingest: formData.value.wikiConfig.maxPagesPerIngest || 0,
           extraction_granularity: formData.value.wikiConfig.extractionGranularity || 'standard',
           content_instructions: formData.value.wikiConfig.contentInstructions || '',
           extraction_instructions: formData.value.wikiConfig.extractionInstructions || '',
         }
+        if (!authStore.isLiteMode) {
+          updateConfig.wiki_config.synthesis_model_id = formData.value.modelConfig?.wikiSynthesisModelId || ''
+          updateConfig.wiki_config.max_pages_per_ingest = formData.value.wikiConfig.maxPagesPerIngest || 0
+        }
       }
-      if (formData.value.type !== 'faq') {
+      if (normalizeKnowledgeBaseType(formData.value.type) !== 'faq') {
         updateConfig.auto_tag_config = data.auto_tag_config
         updateConfig.indexing_strategy = {
           vector_enabled: formData.value.indexingStrategy?.vectorEnabled ?? true,
           keyword_enabled: formData.value.indexingStrategy?.keywordEnabled ?? true,
           wiki_enabled: formData.value.indexingStrategy?.wikiEnabled ?? false,
-          graph_enabled: formData.value.indexingStrategy?.graphEnabled ?? false,
+        }
+        if (!authStore.isLiteMode) {
+          updateConfig.indexing_strategy.graph_enabled = formData.value.indexingStrategy?.graphEnabled ?? false
         }
       }
       await updateKnowledgeBase(kbId, {
@@ -1480,7 +1529,12 @@ const doSubmit = async () => {
         }
       }
 
-      await updateKBConfig(kbId, config)
+      // Lite's managed surface updates only the safe KB-level config above;
+      // sending the hidden infrastructure payload would let stale browser
+      // state overwrite server-owned defaults.
+      if (!authStore.isLiteMode) {
+        await updateKBConfig(kbId, config)
+      }
       MessagePlugin.success(t('knowledgeEditor.messages.updateSuccess'))
 
     emit('success', kbId)
@@ -1538,7 +1592,9 @@ watch(() => props.visible, async (newVal) => {
     resetState()
     
     if (props.mode === 'create') {
-      currentSection.value = 'basic'
+      currentSection.value = normalizeKnowledgeBaseSection(
+        authStore.isLiteMode ? uiStore.kbEditorInitialSection : 'basic',
+      )
       formData.value = initFormData(props.initialType || 'document')
       hasFiles.value = false
       await loadSummaryModelOptions()
@@ -1548,7 +1604,7 @@ watch(() => props.visible, async (newVal) => {
     // Lite remains a single consumer form; never leave it on a hidden
     // Standard-only section when a stale deep-link is present.
     if (authStore.isLiteMode) {
-      currentSection.value = 'basic'
+      currentSection.value = normalizeKnowledgeBaseSection(uiStore.kbEditorInitialSection)
     } else if (uiStore.kbEditorInitialSection) {
       currentSection.value = uiStore.kbEditorInitialSection
     }

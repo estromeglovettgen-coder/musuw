@@ -7,6 +7,8 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	neturl "net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +40,28 @@ type KnowledgeHandler struct {
 	agentShareService interfaces.AgentShareService
 	asynqClient       interfaces.TaskEnqueuer
 	spanRepo          repository.KnowledgeSpanRepository
+}
+
+// liteKnowledgeImportUsesXMind keeps the deferred XMind outline parser out of
+// Musuw Lite at the HTTP boundary. Standard retains upstream support. The
+// check covers both multipart filenames and URL-import hints because either
+// path can select the parser without a visible UI entry.
+func liteKnowledgeImportUsesXMind(fileName, customFileName, fileType, rawURL string) bool {
+	if !strings.EqualFold(strings.TrimSpace(Edition), "lite") {
+		return false
+	}
+	isXMindName := func(value string) bool {
+		return strings.EqualFold(strings.TrimPrefix(path.Ext(strings.TrimSpace(value)), "."), "xmind")
+	}
+	if isXMindName(fileName) || isXMindName(customFileName) {
+		return true
+	}
+	normalizedType := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(fileType, ".")))
+	if normalizedType == "xmind" || normalizedType == "application/x-xmind" {
+		return true
+	}
+	parsed, err := neturl.Parse(strings.TrimSpace(rawURL))
+	return err == nil && isXMindName(parsed.Path)
 }
 
 // NewKnowledgeHandler creates a new knowledge handler instance
@@ -342,6 +366,11 @@ func (h *KnowledgeHandler) CreateKnowledgeFromFile(c *gin.Context) {
 		c.Error(errors.NewBadRequestError("File upload failed").WithDetails(err.Error()))
 		return
 	}
+	customFileName := c.PostForm("fileName")
+	if liteKnowledgeImportUsesXMind(file.Filename, customFileName, "", "") {
+		c.Error(errors.NewBadRequestError("XMind import is not available"))
+		return
+	}
 
 	// Validate file size — read MAX_FILE_SIZE_MB env (50MB default).
 	// Deliberately not a runtime system_setting; see filesize.go for the
@@ -356,7 +385,6 @@ func (h *KnowledgeHandler) CreateKnowledgeFromFile(c *gin.Context) {
 	}
 
 	// Get custom filename if provided (for folder uploads with path)
-	customFileName := c.PostForm("fileName")
 	customFileName = secutils.SanitizeForLog(customFileName)
 	displayFileName := file.Filename
 	displayFileName = secutils.SanitizeForLog(displayFileName)
@@ -493,6 +521,10 @@ func (h *KnowledgeHandler) CreateKnowledgeFromURL(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		logger.Error(ctx, "Failed to parse URL request", err)
 		c.Error(errors.NewBadRequestError(err.Error()))
+		return
+	}
+	if liteKnowledgeImportUsesXMind(req.FileName, "", req.FileType, req.URL) {
+		c.Error(errors.NewBadRequestError("XMind import is not available"))
 		return
 	}
 

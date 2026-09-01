@@ -15,12 +15,16 @@ import (
 type tagTargetKnowledgeBaseService struct {
 	interfaces.KnowledgeBaseService
 	kbs map[string]*types.KnowledgeBase
+	err error
 }
 
 func (s *tagTargetKnowledgeBaseService) GetKnowledgeBasesByIDsOnly(
 	_ context.Context,
 	ids []string,
 ) ([]*types.KnowledgeBase, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	out := make([]*types.KnowledgeBase, 0, len(ids))
 	for _, id := range ids {
 		if kb := s.kbs[id]; kb != nil {
@@ -227,6 +231,35 @@ func TestBuildSearchTargets_FAQTagScopeKeepsIndexTagFilter(t *testing.T) {
 	assert.ElementsMatch(t, []string{"tag-a", "tag-b"}, targets[0].TagIDs)
 	assert.ElementsMatch(t, []string{"tag-a", "tag-b"}, targets[0].ScopeTagIDs)
 	assert.True(t, targets[0].DisableRecallThresholds)
+}
+
+func TestLiteBuildSearchTargetsRejectsFAQKnowledgeBase(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	svc := newTagTargetSessionService()
+
+	_, err := svc.buildSearchTargets(
+		tagTargetContext(),
+		100,
+		[]string{"faq-kb"},
+		nil,
+		nil,
+	)
+	require.ErrorContains(t, err, "not found")
+}
+
+func TestLiteBuildSearchTargetsFailsClosedWhenKnowledgeBasePolicyCannotBeResolved(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	svc := newTagTargetSessionService()
+	svc.knowledgeBaseService = &tagTargetKnowledgeBaseService{err: fmt.Errorf("lookup unavailable")}
+
+	_, err := svc.buildSearchTargets(
+		tagTargetContext(),
+		100,
+		[]string{"unknown-kb"},
+		nil,
+		nil,
+	)
+	require.ErrorContains(t, err, "lookup unavailable")
 }
 
 func TestBuildSearchTargets_FullKBWithTagScopeSkipsFullKBTarget(t *testing.T) {
