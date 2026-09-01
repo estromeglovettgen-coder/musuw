@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const source = readFileSync(new URL('./AgentEditorModal.vue', import.meta.url), 'utf8')
+const editorResourceSource = readFileSync(new URL('../../stores/editorResources.ts', import.meta.url), 'utf8')
 
 test('editing an agent closes the editor after a successful save', () => {
   assert.match(
@@ -40,9 +41,98 @@ test('new agents use deterministic upstream defaults with a Lite scene fallback'
   )
   assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'KnowledgeQA'\)/)
   assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'Rerank'\)/)
+  assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'VLLM'\)/)
+  assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'ASR'\)/)
   assert.match(defaultBlock, /consumerSceneOptions\.rag\?\.effective_model_id/)
+  assert.match(defaultBlock, /consumerSceneOptions\.rerank\?\.effective_model_id/)
+  assert.match(defaultBlock, /consumerSceneOptions\.vision\?\.effective_model_id/)
+  assert.match(defaultBlock, /consumerSceneOptions\.asr\?\.effective_model_id/)
   assert.match(defaultBlock, /config\.model_id = modelId/)
   assert.match(defaultBlock, /config\.rerank_model_id = rerankModelId/)
+  assert.match(defaultBlock, /config\.vlm_model_id = vlmModelId/)
+  assert.match(defaultBlock, /config\.asr_model_id = asrModelId/)
+})
+
+test('new agents alone receive ready upload, web, and regular-tool defaults', () => {
+  const createPath = source.slice(
+    source.indexOf('// 创建新智能体，使用系统默认值'),
+    source.indexOf('if (!authStore.isLiteMode) await syncInstalledSkills()'),
+  )
+  const editPathStart = source.indexOf("if (props.mode === 'edit' && props.agent)")
+  assert.notEqual(editPathStart, -1, 'expected to find the edit branch')
+  const editPath = source.slice(
+    editPathStart,
+    source.indexOf('// 创建新智能体，使用系统默认值'),
+  )
+  const policy = source.slice(
+    source.indexOf('const getDefaultSmartReasoningTools = () =>'),
+    source.indexOf('const agentMode = computed'),
+  )
+
+  assert.match(createPath, /applyAgentTypePreset\(preset\)[\s\S]*applyNewAgentCapabilityDefaults\(\)/)
+  assert.doesNotMatch(editPath, /applyNewAgentCapabilityDefaults\(\)/)
+  assert.match(policy, /image_upload_enabled = true/)
+  assert.match(policy, /audio_upload_enabled = true/)
+  assert.match(policy, /attachment_image_understanding = true/)
+  assert.match(policy, /web_search_enabled = true/)
+  assert.match(policy, /web_fetch_enabled = true/)
+  assert.match(policy, /web_search_max_results = 5/)
+  assert.match(policy, /web_fetch_top_n = 2/)
+  assert.match(policy, /allTools\.value\.map\(\(tool\) => tool\.value\)/)
+  assert.match(policy, /search_conversations/)
+  assert.match(policy, /mcp_selection_mode = 'none'/)
+  assert.match(policy, /skills_selection_mode = 'none'/)
+  assert.match(policy, /sandbox_config_id = ''/)
+
+  const legacyDefaults = source.slice(
+    source.indexOf('const defaultFormData = {'),
+    source.indexOf('const formData = ref'),
+  )
+  assert.match(legacyDefaults, /image_upload_enabled:\s*false/)
+  assert.match(legacyDefaults, /attachment_image_understanding:\s*false/)
+  assert.match(legacyDefaults, /web_search_enabled:\s*false/)
+  assert.doesNotMatch(legacyDefaults, /allowed_tools:\s*\[(?!\])/)
+})
+
+test('new regular-tool defaults exclude sandbox, skills, and governed memory', () => {
+  const policyStart = source.indexOf('const getDefaultSmartReasoningTools = () =>')
+  assert.notEqual(policyStart, -1, 'expected a creation-only capability policy')
+  const policy = source.slice(
+    policyStart,
+    source.indexOf('const agentMode = computed'),
+  )
+  for (const excluded of [
+    'shell_exec',
+    'list_sandbox_files',
+    'read_sandbox_file',
+    'write_sandbox_file',
+    'edit_sandbox_file',
+    'read_skill',
+    'execute_skill_script',
+    'search_memory',
+  ]) {
+    assert.doesNotMatch(policy, new RegExp(`['\"]${excluded}['\"]`))
+  }
+})
+
+test('explicit mode switches use full smart tools and keep quick answer tool-free', () => {
+  const modeWatcher = source.slice(
+    source.indexOf('watch(agentMode, (val, _oldVal) => {'),
+    source.indexOf('// 监听知识库启用状态变化'),
+  )
+  assert.match(
+    modeWatcher,
+    /if \(isInitializing\.value\) return/,
+    'loading an existing agent must not be mistaken for an explicit mode switch',
+  )
+  assert.match(
+    modeWatcher,
+    /val === 'smart-reasoning'[\s\S]*allowed_tools = getDefaultSmartReasoningTools\(\)/,
+  )
+  assert.match(
+    modeWatcher,
+    /else \{[\s\S]*allowed_tools = \[\][\s\S]*max_iterations = 1/,
+  )
 })
 
 test('new and legacy agents keep upstream thinking disabled', () => {
@@ -55,10 +145,15 @@ test('agent dependencies retain the fail-together Promise.all contract', () => {
     source.indexOf('const loadDependencies = async () =>'),
     source.indexOf('// 跳转到模型管理页面添加模型'),
   )
-  assert.match(
-    dependencies,
-    /await Promise\.all\(\[\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureModels\(\),\s*authStore\.isLiteMode \? chatResources\.ensureConsumerSceneOptions\('rag'\) : Promise\.resolve\(\),\s*chatResources\.ensureKnowledgeBases\(\),\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureWebSearchProviders\(\),\s*authStore\.isLiteMode \? Promise\.resolve\(\) : chatResources\.ensureSandboxConfigs\(\),\s*editorResources\.prefetchAgentEditorDeps\(\),\s*\]\);/,
-  )
+  assert.match(dependencies, /await Promise\.all\(\[/)
+  assert.match(dependencies, /chatResources\.ensureConsumerSceneOptions\('rag'\)/)
+  assert.match(dependencies, /chatResources\.ensureConsumerSceneOptions\('rerank'\)/)
+  assert.match(dependencies, /chatResources\.ensureConsumerSceneOptions\('vision'\)/)
+  assert.match(dependencies, /chatResources\.ensureConsumerSceneOptions\('asr'\)/)
+  assert.match(dependencies, /chatResources\.ensureKnowledgeBases\(\)/)
+  assert.match(dependencies, /chatResources\.ensureWebSearchProviders\(\)/)
+  assert.match(dependencies, /chatResources\.ensureSandboxConfigs\(\)/)
+  assert.match(dependencies, /editorResources\.prefetchAgentEditorDeps\(\)/)
   assert.doesNotMatch(dependencies, /Promise\.allSettled/)
   assert.match(source, /if \(!authStore\.isLiteMode\) await syncInstalledSkills\(\)/)
   assert.match(source, /if \(!props\.visible \|\| authStore\.isLiteMode\) return[\s\S]*await syncInstalledSkills\(\)/)
@@ -112,6 +207,17 @@ test('consumer agent editor keeps the compact Lite tabs while Standard exposes m
   assert.doesNotMatch(source, /data-guide="agent-create-agent-type"/)
 })
 
+test('an unreadable tenant storage config cannot discard public agent defaults', () => {
+  const storageLoader = editorResourceSource.slice(
+    editorResourceSource.indexOf('async function ensureStorageEngine'),
+    editorResourceSource.indexOf('function resolveUsableStorageProvider'),
+  )
+
+  assert.match(storageLoader, /getStorageEngineConfig\(\)\.catch\(\(\) => null\)/)
+  assert.match(storageLoader, /getStorageEngineStatus\(\)/)
+  assert.match(storageLoader, /storageConfig\.value = configRes\?\.data \?\? null/)
+})
+
 test('Lite agent knowledge copy and RAG preset description stay document-only while Standard keeps FAQ wording', () => {
   assert.match(source, /knowledgeConfigDescription/)
   assert.match(source, /authStore\.isLiteMode\s*\?\s*t\('agent\.editor\.knowledgeConfigDescLite'\)\s*:\s*t\('agent\.editor\.knowledgeConfigDesc'\)/)
@@ -135,6 +241,10 @@ test('quick agents retain hidden context validation and model errors return to B
     /!isAgentMode\.value && \(!formData\.value\.config\.context_template \|\| !formData\.value\.config\.context_template\.trim\(\)\)[\s\S]*?contextTemplateRequired[\s\S]*?currentSection\.value = 'prompts'/,
   )
   assert.match(saveBlock, /modelRequired[\s\S]*?currentSection\.value = 'basic'/)
+  assert.match(
+    saveBlock,
+    /audio_upload_enabled && !formData\.value\.config\.asr_model_id[\s\S]*?asrModelRequired[\s\S]*?currentSection\.value = 'basic'/,
+  )
 })
 
 test('knowledge scope keeps native selection controls but hides file type restrictions', () => {

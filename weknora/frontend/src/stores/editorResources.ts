@@ -87,7 +87,7 @@ export const useEditorResourcesStore = defineStore('editorResources', () => {
   async function ensureStorageEngine(force = false): Promise<void> {
     return runOnce('storageEngine', force, async () => {
       const [configRes, statusRes] = await Promise.all([
-        getStorageEngineConfig(),
+        getStorageEngineConfig().catch(() => null),
         getStorageEngineStatus(),
       ])
       storageConfig.value = configRes?.data ?? null

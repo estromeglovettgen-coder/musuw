@@ -45,3 +45,8 @@ test('rebuilt chat layout retains history, suggestions, stream wait, follow-ups,
     'ChatAttachmentPreviewDrawer',
   ]) assert.ok(source.includes(token), `chat parent lost ${token}`)
 })
+
+test('chat-only components imported by the options wrapper are registered', () => {
+  const source = read('../views/chat/index.vue')
+  assert.match(source, /components:\s*\{[\s\S]*ChatQuestionMinimap,\s*MessageTimestamp,[\s\S]*\}/)
+})

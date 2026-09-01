@@ -1,10 +1,25 @@
 import { markRaw, nextTick, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ensureRagPipelineHistoryStream } from '@/utils/rag-pipeline-history'
-import { userFacingAIError } from '@/utils/userFacingAIError'
-import { applyMessageCreatedAt, bindServerTurnTimestamps, ensureMessageCreatedAt } from '@/utils/messageTimestamp'
+import { ensureRagPipelineHistoryStream } from '../utils/rag-pipeline-history'
+import { userFacingAIError } from '../utils/userFacingAIError'
+import { applyMessageCreatedAt, bindServerTurnTimestamps, ensureMessageCreatedAt } from '../utils/messageTimestamp'
 
 export type ChatMessage = Record<string, unknown>
+
+export const shouldRenderAssistantMessage = (session: ChatMessage) => {
+  if (!session?.isAgentMode) return true
+  if (!session.is_completed) return true
+  // A terminal error can arrive before any agent event is emitted. Its
+  // user-facing message is still meaningful and must remain visible.
+  const isAgentError = session.agent_error === true
+  if (isAgentError && typeof session.content === 'string' && session.content.trim()) return true
+  const stream = session.agentEventStream
+  if (Array.isArray(stream) && stream.length > 0) return true
+  if (Array.isArray(session.knowledge_references) && session.knowledge_references.length > 0) {
+    return true
+  }
+  return false
+}
 
 export interface UseChatStreamHandlerOptions {
   messagesList: ChatMessage[]
@@ -223,17 +238,6 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       if (!message.id) message.id = requestId
       if (!message.request_id) message.request_id = requestId
     }
-  }
-
-  const shouldRenderAssistantMessage = (session: ChatMessage) => {
-    if (!session?.isAgentMode) return true
-    if (!session.is_completed) return true
-    const stream = session.agentEventStream
-    if (Array.isArray(stream) && stream.length > 0) return true
-    if (Array.isArray(session.knowledge_references) && session.knowledge_references.length > 0) {
-      return true
-    }
-    return false
   }
 
   const shouldShowGlobalTypingIndicator = (
@@ -784,6 +788,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
               errorCode,
               t('chat.billingRenewalPending'),
             )
+            message.agent_error = true
             message.content = errorMsg
             message.is_completed = true
             isReplying.value = false
@@ -800,6 +805,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             errorCode,
             t('chat.billingRenewalPending'),
           )
+          message.agent_error = true
           message.content = errorMsg
           message.is_completed = true
           isReplying.value = false

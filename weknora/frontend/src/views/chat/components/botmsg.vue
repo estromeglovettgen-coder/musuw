@@ -1,6 +1,11 @@
 <template>
   <article class="visual-assistant-message" :class="{ 'is-embedded': embeddedMode }">
-    <div class="visual-assistant-message__context">
+    <div v-if="isAgentError" class="visual-assistant-agent-error" role="alert">
+      <t-icon name="error-circle" aria-hidden="true" />
+      <span>{{ agentErrorText }}</span>
+    </div>
+
+    <div v-else class="visual-assistant-message__context">
       <div
         v-if="!session.isAgentMode && mentionedItems && mentionedItems.length > 0"
         class="visual-assistant-resources"
@@ -59,7 +64,7 @@
 
     <section
       ref="parentMd"
-      v-if="!session.hideContent && !session.isAgentMode"
+      v-if="!isAgentError && !session.hideContent && !session.isAgentMode"
       class="visual-assistant-answer"
     >
       <div v-if="hasActualContent" class="visual-assistant-answer__content">
@@ -261,6 +266,18 @@ const props = defineProps({
 });
 
 const showRequestInfo = computed(() => !!(props.session?.request_id || props.session?.id));
+
+// Agent terminal errors arrive without an event stream, so keep an explicit
+// marker separate from ordinary agent content. The parent render predicate
+// uses the same marker; this prevents a stale hidden shell from becoming a
+// visible row while still giving failures a durable, accessible message.
+const isAgentError = computed(() =>
+    props.session?.agent_error === true,
+);
+const agentErrorText = computed(() => {
+    const value = props.content || props.session?.content || '';
+    return typeof value === 'string' ? value : String(value || '');
+});
 
 // -----------------------------------------------------------------------------
 // Skill artifact download (drawer)
@@ -500,6 +517,8 @@ onBeforeUnmount(() => {
 .visual-assistant-message { width: 100%; min-width: 0; margin-right: auto; color: #111827; font-size: 14.5px; text-align: left; }
 .visual-assistant-message.is-embedded { width: 100%; }
 .visual-assistant-message.is-embedded :deep(.agent-stream-display) { width: 100%; }
+.visual-assistant-agent-error { min-width: 0; margin: 2px 0; padding: 10px 12px; border: 1px solid var(--td-error-color-focus, rgb(220 38 38 / 24%)); border-radius: 10px; display: flex; align-items: flex-start; gap: 8px; background: var(--td-error-color-light, rgb(220 38 38 / 6%)); color: var(--td-error-color, #b91c1c); line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.visual-assistant-agent-error :deep(.t-icon) { flex: 0 0 auto; margin-top: 3px; font-size: 16px; }
 .visual-assistant-message__context { display: flex; flex-direction: column; gap: 12px; }
 .visual-assistant-resources { display: flex; flex-wrap: wrap; gap: 8px; }
 .visual-assistant-resource { max-width: 240px; min-height: 28px; padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #4b5563; font-size: 12px; line-height: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }

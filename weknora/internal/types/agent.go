@@ -120,6 +120,11 @@ type AgentConfig struct {
 	// its source workspace. It is set from the verified share relation, never
 	// inferred from a client-provided tenant ID.
 	SharedAgentReadOnly bool `json:"-"`
+	// WritableWikiKBIDs is the per-request Wiki mutation scope. It is derived
+	// from the caller's effective KB permission after SearchTargets are built,
+	// and is intentionally runtime-only so a persisted agent cannot smuggle a
+	// write grant across requests.
+	WritableWikiKBIDs []string `json:"-"`
 	// LLM call timeout in seconds (default: 120). Controls the maximum time for a single LLM call.
 	LLMCallTimeout int `json:"llm_call_timeout,omitempty"`
 

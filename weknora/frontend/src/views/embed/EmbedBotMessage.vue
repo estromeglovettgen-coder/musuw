@@ -1,19 +1,24 @@
 <template>
   <div class="embed-bot-msg" :class="{ 'is-embedded': embeddedMode }">
-    <div v-if="session?.isRagMode" class="rag-answer-stack">
+    <div v-if="isAgentError" class="embed-agent-error" role="alert">
+      <t-icon name="error-circle" aria-hidden="true" />
+      <span>{{ agentErrorText }}</span>
+    </div>
+
+    <div v-else-if="session?.isRagMode" class="rag-answer-stack">
       <RagPipelineProgress :session="session" embedded-mode />
       <AgentStreamDisplay v-if="session?.isAgentMode" :session="session" :session-id="sessionId" :user-query="userQuery"
         rag-mode :embedded-mode="embeddedMode" :embed-channel-id="embedChannelId" :embed-token="embedToken"
         :embed-session-sig="embedSessionSig" :embed-visitor-id="embedVisitorId" />
     </div>
-    <template v-else>
+    <template v-else-if="!isAgentError">
       <DocInfo v-if="session?.knowledge_references?.length" :session="session" embedded-mode />
       <AgentStreamDisplay v-if="session?.isAgentMode" :session="session" :session-id="sessionId" :user-query="userQuery"
         :embedded-mode="embeddedMode" :embed-channel-id="embedChannelId" :embed-token="embedToken"
         :embed-session-sig="embedSessionSig" :embed-visitor-id="embedVisitorId" />
     </template>
-    <DeepThink v-if="session?.showThink && !session?.isAgentMode" :deep-session="session" />
-    <div v-if="!session?.hideContent && !session?.isAgentMode" ref="parentMd">
+    <DeepThink v-if="!isAgentError && session?.showThink && !session?.isAgentMode" :deep-session="session" />
+    <div v-if="!isAgentError && !session?.hideContent && !session?.isAgentMode" ref="parentMd">
       <div v-if="hasActualContent" class="content-wrapper">
         <div class="ai-markdown-template markdown-content" v-stable-html="renderedHTML" />
       </div>
@@ -90,6 +95,7 @@ type EmbedSession = {
   showThink?: boolean
   hideContent?: boolean
   is_completed?: boolean
+  agent_error?: boolean
   agentEventStream?: Array<Record<string, unknown>>
   knowledge_references?: Array<{ chunk_type?: string; knowledge_id?: string; knowledge_title?: string }>
 }
@@ -118,6 +124,14 @@ const props = withDefaults(
     embedVisitorId: '',
   },
 )
+
+const isAgentError = computed(() =>
+  props.session?.agent_error === true,
+)
+const agentErrorText = computed(() => {
+  const value = props.content || props.session?.content || ''
+  return typeof value === 'string' ? value : String(value || '')
+})
 
 const parentMd = ref<HTMLElement | null>(null)
 
@@ -228,6 +242,28 @@ onMounted(() => {
     :deep(.agent-stream-display) {
       width: 100%;
     }
+  }
+}
+
+.embed-agent-error {
+  min-width: 0;
+  margin: 2px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--td-error-color-focus, rgb(220 38 38 / 24%));
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--td-error-color-light, rgb(220 38 38 / 6%));
+  color: var(--td-error-color, #b91c1c);
+  line-height: 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  :deep(.t-icon) {
+    flex: 0 0 auto;
+    margin-top: 3px;
+    font-size: 16px;
   }
 }
 

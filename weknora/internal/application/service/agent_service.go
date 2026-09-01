@@ -773,6 +773,31 @@ func (s *agentService) registerTools(
 	}
 	wikiKBIDs = scopedWikiKBIDs
 	hasWikiKB := len(wikiKBIDs) > 0
+	// Wiki reads can span every KB in scope, but mutation tools must be
+	// restricted to the request-local permission scope computed by the session
+	// service. A missing/empty scope is fail-closed: read tools remain available
+	// while every Wiki mutation tool is omitted.
+	writableWikiKBSet := make(map[string]bool, len(config.WritableWikiKBIDs))
+	for _, kbID := range config.WritableWikiKBIDs {
+		if kbID != "" {
+			writableWikiKBSet[kbID] = true
+		}
+	}
+	writableWikiKBIDs := make([]string, 0, len(wikiKBIDs))
+	for _, kbID := range wikiKBIDs {
+		if writableWikiKBSet[kbID] {
+			writableWikiKBIDs = append(writableWikiKBIDs, kbID)
+		}
+	}
+	if len(writableWikiKBIDs) == 0 {
+		before := len(allowedTools)
+		allowedTools = filterWikiMutationTools(allowedTools, nil)
+		if len(allowedTools) != before {
+			logger.Infof(ctx, "Dropped Wiki mutation tools: no writable Wiki knowledge base in caller scope")
+		}
+	} else {
+		allowedTools = filterWikiMutationTools(allowedTools, writableWikiKBIDs)
+	}
 
 	// Filter out knowledge base tools if no knowledge scope is configured for this turn.
 	hasKnowledge := agentHasKnowledgeScope(config)
@@ -978,22 +1003,22 @@ func (s *agentService) registerTools(
 		case tools.ToolWikiReadSourceDoc:
 			toolToRegister = tools.NewWikiReadSourceDocTool(s.knowledgeService, s.chunkService, config.SearchTargets)
 		case tools.ToolWikiFlagIssue:
-			toolToRegister = tools.NewWikiFlagIssueTool(s.wikiPageService, wikiKBIDs, wikiRoutes).
+			toolToRegister = tools.NewWikiFlagIssueTool(s.wikiPageService, writableWikiKBIDs, wikiRoutes).
 				WithKnowledgeScope(s.knowledgeService, config.SearchTargets)
 		case tools.ToolWikiReadIssue:
 			toolToRegister = tools.NewWikiReadIssueTool(s.wikiPageService, wikiKBIDs)
 		case tools.ToolWikiUpdateIssue:
-			toolToRegister = tools.NewWikiUpdateIssueTool(s.wikiPageService, wikiKBIDs)
+			toolToRegister = tools.NewWikiUpdateIssueTool(s.wikiPageService, writableWikiKBIDs)
 		case tools.ToolWikiWritePage:
-			toolToRegister = tools.NewWikiWritePageTool(s.wikiPageService, wikiKBIDs, s.knowledgeService, wikiRoutes).
+			toolToRegister = tools.NewWikiWritePageTool(s.wikiPageService, writableWikiKBIDs, s.knowledgeService, wikiRoutes).
 				WithSearchTargets(config.SearchTargets)
 		case tools.ToolWikiReplaceText:
-			toolToRegister = tools.NewWikiReplaceTextTool(s.wikiPageService, wikiKBIDs, s.knowledgeService, wikiRoutes).
+			toolToRegister = tools.NewWikiReplaceTextTool(s.wikiPageService, writableWikiKBIDs, s.knowledgeService, wikiRoutes).
 				WithSearchTargets(config.SearchTargets)
 		case tools.ToolWikiRenamePage:
-			toolToRegister = tools.NewWikiRenamePageTool(s.wikiPageService, wikiKBIDs, wikiRoutes)
+			toolToRegister = tools.NewWikiRenamePageTool(s.wikiPageService, writableWikiKBIDs, wikiRoutes)
 		case tools.ToolWikiDeletePage:
-			toolToRegister = tools.NewWikiDeletePageTool(s.wikiPageService, wikiKBIDs, wikiRoutes)
+			toolToRegister = tools.NewWikiDeletePageTool(s.wikiPageService, writableWikiKBIDs, wikiRoutes)
 
 		case tools.ToolShellExec, tools.ToolReadSkill, tools.ToolExecuteSkillScript,
 			tools.ToolListSandboxFiles, tools.ToolReadSandboxFile, tools.ToolWriteSandboxFile,
@@ -1024,7 +1049,15 @@ func (s *agentService) registerTools(
 // These tools write source-workspace Wiki state and otherwise bypass the HTTP
 // KB permission middleware because they execute inside the agent engine.
 func filterSharedAgentWriteTools(allowed []string) []string {
-	sourceWorkspaceWrites := map[string]bool{
+	return filterWikiMutationTools(allowed, nil)
+}
+
+// filterWikiMutationTools removes Wiki mutation tools when writableWikiKBIDs
+// is empty. Read tools intentionally remain untouched. When one or more
+// writable KBs are present, constructors receive that exact set and enforce it
+// at execution time, so this helper only performs the registration gate.
+func filterWikiMutationTools(allowed []string, writableWikiKBIDs []string) []string {
+	wikiMutationTools := map[string]bool{
 		tools.ToolWikiFlagIssue:   true,
 		tools.ToolWikiUpdateIssue: true,
 		tools.ToolWikiWritePage:   true,
@@ -1034,9 +1067,10 @@ func filterSharedAgentWriteTools(allowed []string) []string {
 	}
 	filtered := make([]string, 0, len(allowed))
 	for _, name := range allowed {
-		if !sourceWorkspaceWrites[name] {
-			filtered = append(filtered, name)
+		if wikiMutationTools[name] && len(writableWikiKBIDs) == 0 {
+			continue
 		}
+		filtered = append(filtered, name)
 	}
 	return filtered
 }

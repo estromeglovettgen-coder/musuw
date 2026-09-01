@@ -11,6 +11,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/models/rerank"
 	"github.com/Tencent/WeKnora/internal/types"
+	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
 // AgentQA performs agent-based question answering with conversation history and streaming support
@@ -404,6 +405,24 @@ func (s *sessionService) buildAgentConfig(
 		return nil, fmt.Errorf("build search targets: %w", err)
 	}
 	agentConfig.SearchTargets = searchTargets
+	// Wiki tools run inside the agent engine and therefore do not pass through
+	// the HTTP KB permission middleware. Compute a request-local write scope
+	// from the caller's tenant-keyed permissions before the engine is built;
+	// registerTools uses it to constrain every Wiki mutation tool. The scope is
+	// never persisted on the agent record.
+	// The session owner is the authenticated caller for this request. Shared
+	// agent setup deliberately overlays TenantIDContextKey with the agent's
+	// source tenant so model/KB resolution runs in that workspace; using that
+	// value here would turn a shared viewer into the source owner and grant Wiki
+	// mutation tools. Prefer the owner recorded by GetOwnedSession, and only
+	// fall back to context for lightweight/internal callers without a session.
+	callerTenantID := uint64(0)
+	if req.Session != nil && req.Session.TenantID != 0 {
+		callerTenantID = req.Session.TenantID
+	} else if tenantID, ok := types.TenantIDFromContext(ctx); ok {
+		callerTenantID = tenantID
+	}
+	agentConfig.WritableWikiKBIDs = s.resolveWritableWikiKBIDsForCaller(ctx, searchTargets, callerTenantID)
 	// Document tags are stored in knowledge_tag_relations, so document-KB tag
 	// scopes are resolved to concrete knowledge IDs before retrieval. Preserve
 	// those resolved IDs as this turn's pinned documents as well: otherwise the
@@ -631,4 +650,108 @@ func (s *sessionService) configureSkillsFromAgent(
 		agentConfig.SkillsEnabled = false
 		logger.Warnf(ctx, "Unknown SkillsSelectionMode=%s: skills disabled", customAgent.Config.SkillsSelectionMode)
 	}
+}
+
+// resolveWritableWikiKBIDsForCaller returns the Wiki knowledge bases for which
+// this request may register mutation tools. SearchTargets carry the
+// authoritative source tenant for each KB. An own-tenant target follows the
+// conservative agent mutation policy: Admin+ may write any tenant KB, while a
+// Contributor may write only a KB they created. A cross-tenant target must have
+// an effective editor/admin share permission. Permission and ownership lookup
+// failures fail closed. The caller tenant is explicit because shared-agent
+// execution replaces TenantIDContextKey with the source tenant.
+func (s *sessionService) resolveWritableWikiKBIDsForCaller(
+	ctx context.Context,
+	targets types.SearchTargets,
+	callerTenantID uint64,
+) []string {
+	if len(targets) == 0 || callerTenantID == 0 {
+		return nil
+	}
+
+	// A KB can appear in more than one target when explicit document and full-KB
+	// scopes are merged. Preserve first-seen order, while preferring a target
+	// that explicitly resolves to the caller's tenant if one is present.
+	orderedIDs := make([]string, 0, len(targets))
+	tenantByKB := make(map[string]uint64, len(targets))
+	for _, target := range targets {
+		if target == nil || target.KnowledgeBaseID == "" {
+			continue
+		}
+		if _, seen := tenantByKB[target.KnowledgeBaseID]; !seen {
+			orderedIDs = append(orderedIDs, target.KnowledgeBaseID)
+		}
+		if target.TenantID == callerTenantID {
+			// Own-tenant resolution is authoritative even if another duplicate
+			// target was produced by a less-specific fallback.
+			tenantByKB[target.KnowledgeBaseID] = callerTenantID
+			continue
+		}
+		if _, seen := tenantByKB[target.KnowledgeBaseID]; !seen {
+			tenantByKB[target.KnowledgeBaseID] = target.TenantID
+		}
+	}
+
+	callerRole := types.TenantRoleFromContext(ctx)
+	callerUserID, _ := types.UserIDFromContext(ctx)
+	ownKBIDs := make([]string, 0, len(orderedIDs))
+	for _, kbID := range orderedIDs {
+		if tenantByKB[kbID] == callerTenantID {
+			ownKBIDs = append(ownKBIDs, kbID)
+		}
+	}
+	ownKBByID := make(map[string]*types.KnowledgeBase, len(ownKBIDs))
+	if len(ownKBIDs) > 0 && s.knowledgeBaseService != nil {
+		knowledgeBases, err := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, ownKBIDs)
+		if err != nil {
+			logger.Warnf(ctx, "Wiki mutation scope denied for own-tenant KBs: ownership lookup failed: %v", err)
+		} else {
+			for _, kb := range knowledgeBases {
+				if kb != nil {
+					ownKBByID[kb.ID] = kb
+				}
+			}
+		}
+	}
+
+	writable := make([]string, 0, len(orderedIDs))
+	for _, kbID := range orderedIDs {
+		targetTenantID := tenantByKB[kbID]
+		if targetTenantID == callerTenantID {
+			// Agent mutation matrix: Admin+ may manage any KB in the tenant;
+			// Contributors may mutate only a KB they created;
+			// Viewers and unknown roles remain read-only. SearchTarget tenant
+			// data alone is not an ownership grant.
+			kb := ownKBByID[kbID]
+			isTenantKB := kb != nil && kb.TenantID == callerTenantID
+			isAdmin := callerRole.HasPermission(types.TenantRoleAdmin)
+			isCreator := callerRole.HasPermission(types.TenantRoleContributor) &&
+				callerUserID != "" && kb != nil && kb.CreatorID == callerUserID
+			if isTenantKB && (isAdmin || isCreator) {
+				writable = append(writable, kbID)
+			} else {
+				logger.Infof(ctx, "Wiki mutation scope denied for KB %s: caller lacks tenant ownership permission", secutils.SanitizeForLog(kbID))
+			}
+			continue
+		}
+
+		// Missing source tenant or share service is an unknown cross-tenant
+		// grant. Keep the safe default of no mutation capability.
+		if targetTenantID == 0 || s.kbShareService == nil {
+			logger.Warnf(ctx, "Wiki mutation scope denied for KB %s: cross-tenant source or share service unavailable", secutils.SanitizeForLog(kbID))
+			continue
+		}
+		role, isShared, err := s.kbShareService.CheckTenantKBPermission(ctx, kbID, callerTenantID, callerRole)
+		if err != nil {
+			logger.Warnf(ctx, "Wiki mutation scope denied for KB %s: permission lookup failed: %v", secutils.SanitizeForLog(kbID), err)
+			continue
+		}
+		if !isShared || !role.HasPermission(types.OrgRoleEditor) {
+			logger.Infof(ctx, "Wiki mutation scope denied for KB %s: effective role=%s shared=%v", secutils.SanitizeForLog(kbID), role, isShared)
+			continue
+		}
+		writable = append(writable, kbID)
+	}
+
+	return writable
 }

@@ -22,6 +22,7 @@ export default defineComponent({
   components: {
     ...(legacy.components || {}), InputField, botmsg, usermsg, KnowledgeBaseEditorModal,
     ChatReferencesDrawer, ChatAttachmentPreviewDrawer, FollowUpSuggestions, ChatHeader,
+    ChatQuestionMinimap, MessageTimestamp,
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)

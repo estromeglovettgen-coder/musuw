@@ -2717,16 +2717,62 @@ const removeStarterSuggestion = (index: number) => {
 const applyDefaultModelsIfEmpty = () => {
   if (props.mode !== 'create' || !formData.value) return
   const chatModelId = selectInitialModelId(allModels.value, 'KnowledgeQA')
-  const rerankModelId = selectInitialModelId(allModels.value, 'Rerank')
+  const rerankCatalogModelId = selectInitialModelId(allModels.value, 'Rerank')
+  const vlmCatalogModelId = selectInitialModelId(allModels.value, 'VLLM')
+  const asrCatalogModelId = selectInitialModelId(allModels.value, 'ASR')
   const modelId = chatModelId
     || (authStore.isLiteMode ? chatResources.consumerSceneOptions.rag?.effective_model_id : '')
+  const rerankModelId = rerankCatalogModelId
+    || (authStore.isLiteMode ? chatResources.consumerSceneOptions.rerank?.effective_model_id : '')
+  const vlmModelId = vlmCatalogModelId
+    || (authStore.isLiteMode ? chatResources.consumerSceneOptions.vision?.effective_model_id : '')
+  const asrModelId = asrCatalogModelId
+    || (authStore.isLiteMode ? chatResources.consumerSceneOptions.asr?.effective_model_id : '')
   if (!formData.value.config.model_id && modelId) {
     formData.value.config.model_id = modelId
   }
   if (!formData.value.config.rerank_model_id && rerankModelId) {
     formData.value.config.rerank_model_id = rerankModelId
   }
+  if (!formData.value.config.vlm_model_id && vlmModelId) {
+    formData.value.config.vlm_model_id = vlmModelId
+  }
+  if (!formData.value.config.asr_model_id && asrModelId) {
+    formData.value.config.asr_model_id = asrModelId
+  }
 }
+
+const getDefaultSmartReasoningTools = () => Array.from(new Set([
+  ...allTools.value.map((tool) => tool.value),
+  // Built-in Smart Reasoning supports this regular runtime tool without a
+  // separate checkbox. Keep it when the explicit allowlist becomes non-empty.
+  'search_conversations',
+]));
+
+// Ready-to-use policy for newly created agents only. Do not move these values
+// into defaultFormData: that object is also the legacy edit fallback, and doing
+// so would silently turn missing historical fields on when an old agent is saved.
+const applyNewAgentCapabilityDefaults = () => {
+  const config = formData.value.config;
+  config.image_upload_enabled = true;
+  config.audio_upload_enabled = true;
+  config.attachment_image_understanding = true;
+  config.web_search_enabled = true;
+  config.web_fetch_enabled = true;
+  config.web_search_max_results = 5;
+  config.web_fetch_top_n = 2;
+  config.web_search_provider_id = '';
+  config.allowed_tools = config.agent_mode === 'smart-reasoning'
+    ? getDefaultSmartReasoningTools()
+    : [];
+
+  // Musuw does not expose or execute these resource-heavy integrations yet.
+  config.mcp_selection_mode = 'none';
+  config.mcp_services = [];
+  config.skills_selection_mode = 'none';
+  config.selected_skills = [];
+  config.sandbox_config_id = '';
+};
 
 const agentMode = computed({
   get: () => formData.value.config.agent_mode,
@@ -3349,6 +3395,10 @@ watch(() => props.visible, async (val) => {
           formData.value.description = getPresetDefaultDescription(preset);
         }
       }
+      // Presets intentionally remain scenario-specific. Apply the Musuw
+      // product default afterwards so the default RAG preset cannot narrow
+      // the requested ready-to-use capability set.
+      applyNewAgentCapabilityDefaults()
       applyDefaultModelsIfEmpty()
     }
 
@@ -3519,26 +3569,15 @@ watch(skillsSelectionMode, (mode) => {
 
 // 监听模式变化，自动调整配置
 watch(agentMode, (val, _oldVal) => {
+  // Assigning an existing agent into formData can change the computed mode.
+  // That is hydration, not a user mode switch: preserve the stored allowlist
+  // (including an intentionally empty one) instead of seeding new defaults.
+  if (isInitializing.value) return;
   if (val === 'smart-reasoning') {
-    // 切换到 Agent 模式，根据知识库配置启用工具。
-    // 注意：默认不注入 thinking / todo_write —— 它们用于显式反思或多步计划，
-    // 会显著增加 token 消耗，用户按需手动勾选。
+    // 用户显式切换到 Agent 模式时，按新建智能体的完整常规工具策略
+    // seed 空 allowlist；依赖不满足的工具仍由 UI / runtime fail-closed。
     if (formData.value.config.allowed_tools.length === 0) {
-      const tools: string[] = [];
-      if (hasRagKnowledgeBase.value) {
-        tools.push(
-          'knowledge_search',
-          'grep_chunks',
-          'list_knowledge_chunks',
-          'query_knowledge_graph',
-          'get_document_info',
-          'database_query',
-        );
-      }
-      if (hasWikiKnowledgeBase.value) {
-        tools.push(...wikiReadTools);
-      }
-      formData.value.config.allowed_tools = tools;
+      formData.value.config.allowed_tools = getDefaultSmartReasoningTools();
     }
     if (formData.value.config.max_iterations <= 1) {
       formData.value.config.max_iterations = 10;
@@ -3693,6 +3732,9 @@ const loadDependencies = async () => {
     await Promise.all([
       authStore.isLiteMode ? Promise.resolve() : chatResources.ensureModels(),
       authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('rag') : Promise.resolve(),
+      authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('rerank') : Promise.resolve(),
+      authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('vision') : Promise.resolve(),
+      authStore.isLiteMode ? chatResources.ensureConsumerSceneOptions('asr') : Promise.resolve(),
       chatResources.ensureKnowledgeBases(),
       authStore.isLiteMode ? Promise.resolve() : chatResources.ensureWebSearchProviders(),
       authStore.isLiteMode ? Promise.resolve() : chatResources.ensureSandboxConfigs(),
@@ -4608,6 +4650,14 @@ const handleSave = async () => {
   // 校验 VLM 模型（当图片上传启用时必填）
   if (formData.value.config.image_upload_enabled && !formData.value.config.vlm_model_id) {
     MessagePlugin.error(t('agentEditor.imageUpload.vlmModelRequired'));
+    currentSection.value = 'basic';
+    return;
+  }
+
+  // 音频上传同样必须在保存前绑定可用的 ASR，避免配置看似成功、
+  // 用户首次上传音频时才收到后端拒绝。
+  if (formData.value.config.audio_upload_enabled && !formData.value.config.asr_model_id) {
+    MessagePlugin.error(t('uploadConfirm.asrModelRequired'));
     currentSection.value = 'basic';
     return;
   }

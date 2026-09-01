@@ -80,10 +80,10 @@ export interface CustomAgentConfig {
   retrieve_kb_only_when_mentioned?: boolean;
 
   // ===== 图片上传/多模态设置 =====
-  image_upload_enabled?: boolean;    // 是否启用图片上传（默认: false）
+  image_upload_enabled?: boolean;    // Musuw 编辑器新建默认开启；旧数据按保存值
   vlm_model_id?: string;            // VLM模型ID（图片分析用）
   image_storage_provider?: string;   // 图片存储提供商
-  audio_upload_enabled?: boolean;    // 是否启用音频上传/ASR转录（默认: false）
+  audio_upload_enabled?: boolean;    // Musuw 编辑器新建默认开启；旧数据按保存值
   asr_model_id?: string;            // ASR模型ID（音频转录用）
   // 附件图片理解 / 扫描件 OCR 开关（默认: false，开启会增加解析耗时）
   attachment_image_understanding?: boolean;
@@ -105,6 +105,8 @@ export interface CustomAgentConfig {
   web_search_enabled?: boolean;
   web_search_provider_id?: string;
   web_search_max_results?: number;
+  web_fetch_enabled?: boolean;
+  web_fetch_top_n?: number;
 
   // ===== 多轮对话设置 =====
   multi_turn_enabled?: boolean;     // 是否启用多轮对话
