@@ -105,7 +105,7 @@
               <p class="desc kb-settings-hint">{{ granularityHint }}</p>
             </div>
             <div class="setting-control">
-              <t-select v-model="formData.wikiConfig.extractionGranularity">
+              <t-select v-model="formData.wikiConfig.extractionGranularity" class="visual-scene-select">
                 <t-option value="focused" :label="$t('knowledgeEditor.wiki.granularityFocused')" />
                 <t-option value="standard" :label="$t('knowledgeEditor.wiki.granularityStandard')" />
                 <t-option value="exhaustive" :label="$t('knowledgeEditor.wiki.granularityExhaustive')" />
@@ -271,6 +271,7 @@
                   </div>
                   <ModelSelector
                     model-type="VLLM"
+                    use-consumer-style
                     :selected-model-id="formData.multimodalConfig.vllmModelId"
                     :all-models="allModels"
                     @update:selected-model-id="handleMultimodalVLLMChange"
@@ -283,7 +284,7 @@
                     <label>{{ $t('knowledgeEditor.advanced.multimodal.descriptionLanguageLabel') }}</label>
                     <p>{{ $t('knowledgeEditor.advanced.multimodal.descriptionLanguageDescription') }}</p>
                   </div>
-                  <t-select v-model="formData.multimodalConfig.descriptionLanguage" clearable :placeholder="$t('knowledgeEditor.advanced.multimodal.descriptionLanguageAuto')">
+                  <t-select v-model="formData.multimodalConfig.descriptionLanguage" class="visual-scene-select" clearable :placeholder="$t('knowledgeEditor.advanced.multimodal.descriptionLanguageAuto')">
                     <t-option value="Chinese" :label="$t('language.zhCN')" />
                     <t-option value="English" :label="$t('language.enUS')" />
                     <t-option value="Korean" :label="$t('language.koKR')" />
@@ -320,6 +321,7 @@
                   </div>
                   <ModelSelector
                     model-type="ASR"
+                    use-consumer-style
                     :selected-model-id="formData.asrConfig.modelId"
                     :all-models="allModels"
                     @update:selected-model-id="(val: string) => { if (formData) formData.asrConfig.modelId = val }"

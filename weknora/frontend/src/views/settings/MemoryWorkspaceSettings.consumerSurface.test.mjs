@@ -69,6 +69,32 @@ test('one user action persists the workspace memory policy exactly once', () => 
   )
 })
 
+test('workspace memory reflects server-normalized timer values after saving', () => {
+  const saveBody = script.match(/const saveConfig = async \(\) => \{([\s\S]*?)\n\}/)?.[1] || ''
+  assert.match(
+    saveBody,
+    /const response = await updateTenantMemoryConfig\([\s\S]*?Object\.assign\(config, response\.data\)/,
+    'the UI must render the canonical values returned by the server instead of showing a stale draft',
+  )
+  assert.match(
+    template,
+    /v-model="config\.extract_min_interval_seconds"[\s\S]*?:min="1"/,
+    'zero means the server default, so the numeric control must not present it as a persisted zero-second interval',
+  )
+})
+
+test('workspace memory reuses the scene-model CustomSelect surface for both model fields', () => {
+  const selectors = template.match(/<ModelSelector\b[\s\S]*?\/>/g) || []
+  assert.equal(selectors.length, 2, 'memory advanced settings should expose exactly two model selectors')
+  for (const selector of selectors) {
+    assert.match(
+      selector,
+      /:use-consumer-style="true"/,
+      'memory model fields must use the existing scene-model dropdown variant',
+    )
+  }
+})
+
 test('clearing the extractor model persists the empty session-model fallback', () => {
   assert.match(
     script,

@@ -154,6 +154,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="KnowledgeQA" :selected-model-id="formData.config.model_id"
+                          use-consumer-style
                           :all-models="authStore.isLiteMode ? [] : allModels"
                           :scene-options="authStore.isLiteMode ? agentModelSceneOptions : []"
                           :show-add-model="!authStore.isLiteMode"
@@ -587,6 +588,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="KnowledgeQA" :selected-model-id="formData.config.model_id"
+                          use-consumer-style
                           :all-models="allModels"
                           @update:selected-model-id="(val: string) => formData.config.model_id = val"
                           @add-model="handleAddModel('llm')" :placeholder="$t('agent.editor.modelPlaceholder')" />
@@ -674,6 +676,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="Rerank" :selected-model-id="formData.config.rerank_model_id"
+                          use-consumer-style
                           :all-models="allModels"
                           :clearable="!needsRerankModel"
                           @update:selected-model-id="(val: string) => formData.config.rerank_model_id = val"
@@ -692,6 +695,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="KnowledgeQA"
+                          use-consumer-style
                           :selected-model-id="formData.config.query_understand_model_id" :all-models="allModels"
                           clearable
                           @update:selected-model-id="(val: string) => formData.config.query_understand_model_id = val"
@@ -754,6 +758,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="VLLM" :selected-model-id="formData.config.vlm_model_id"
+                          use-consumer-style
                           :all-models="allModels"
                           @update:selected-model-id="(val: string) => formData.config.vlm_model_id = val"
                           @add-model="handleAddModel('vllm')"
@@ -793,7 +798,7 @@
                         <p class="desc">{{ $t('agentEditor.imageUpload.storageProviderDesc') }}</p>
                       </div>
                       <div class="setting-control" style="flex-direction: column; align-items: flex-end;">
-                        <t-select v-model="formData.config.image_storage_provider" style="width: 280px;"
+                        <t-select v-model="formData.config.image_storage_provider" class="visual-scene-select" style="width: 280px;"
                           :placeholder="$t('agentEditor.imageUpload.storageProviderPlaceholder')" clearable>
                           <t-option value="" :label="$t('agentEditor.imageUpload.storageDefault')" />
                           <t-option v-for="opt in imageStorageOptions" :key="opt.value" :value="opt.value"
@@ -831,6 +836,7 @@
                       </div>
                       <div class="setting-control">
                         <ModelSelector model-type="ASR" :selected-model-id="formData.config.asr_model_id"
+                          use-consumer-style
                           :all-models="allModels"
                           clearable
                           @update:selected-model-id="(val: string) => formData.config.asr_model_id = val"
@@ -974,7 +980,7 @@
                         <label>{{ $t('agentEditor.questionSuggestions.sourceMode') }}</label>
                       </div>
                       <div class="setting-control">
-                        <t-select v-model="formData.config.question_suggestions.starters.mode"
+                        <t-select v-model="formData.config.question_suggestions.starters.mode" class="visual-scene-select"
                           :options="starterSuggestionModeOptions" />
                       </div>
                     </div>
@@ -1041,7 +1047,7 @@
                           <label>{{ $t('agentEditor.questionSuggestions.sourceMode') }}</label>
                         </div>
                         <div class="setting-control">
-                          <t-select v-model="formData.config.question_suggestions.follow_ups.mode"
+                          <t-select v-model="formData.config.question_suggestions.follow_ups.mode" class="visual-scene-select"
                             :options="followUpSuggestionModeOptions" />
                         </div>
                       </div>
@@ -1064,6 +1070,7 @@
                         </div>
                         <div class="setting-control">
                           <ModelSelector model-type="KnowledgeQA"
+                            use-consumer-style
                             :selected-model-id="formData.config.question_suggestions.follow_ups.model_id"
                             :all-models="allModels"
                             clearable
@@ -1247,7 +1254,7 @@
                         <p class="desc">{{ $t('agentEditor.mcp.desc') }}</p>
                       </div>
                       <div class="setting-control agent-scope-select-control">
-                        <t-select v-model="mcpSelectionMode" class="agent-scope-select" :placeholder="$t('agentEditor.mcp.label')">
+                        <t-select v-model="mcpSelectionMode" class="visual-scene-select agent-scope-select" :placeholder="$t('agentEditor.mcp.label')">
                           <t-option value="all" :label="$t('agentEditor.selection.all')" />
                           <t-option value="selected" :label="$t('agentEditor.selection.selected')" />
                           <t-option value="none" :label="$t('agentEditor.selection.disabled')" />
@@ -1262,7 +1269,7 @@
                         <p class="desc">{{ $t('agentEditor.mcp.selectDesc') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-select v-model="formData.config.mcp_services" multiple
+                        <t-select v-model="formData.config.mcp_services" class="visual-scene-select" multiple
                           :placeholder="$t('agentEditor.mcp.selectPlaceholder')" filterable>
                           <t-option v-for="mcp in mcpOptions" :key="mcp.value" :value="mcp.value" :label="mcp.label"
                             :disabled="mcp.disabled" />
@@ -1441,7 +1448,7 @@
                         <p class="desc">{{ $t('agentEditor.desc.kbScope') }}</p>
                       </div>
                       <div class="setting-control agent-scope-select-control">
-                        <t-select v-model="kbSelectionMode" class="agent-scope-select" :placeholder="$t('agent.editor.knowledgeBases')">
+                        <t-select v-model="kbSelectionMode" class="visual-scene-select agent-scope-select" :placeholder="$t('agent.editor.knowledgeBases')">
                           <t-option value="all" :label="$t('agent.editor.allKnowledgeBases')" />
                           <t-option value="selected" :label="$t('agent.editor.selectedKnowledgeBases')" />
                           <t-option value="none" :label="$t('agent.editor.noKnowledgeBase')" />
@@ -1456,7 +1463,7 @@
                         <p class="desc">{{ $t('agent.editor.selectKnowledgeBasesDesc') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-select v-model="formData.config.knowledge_bases" multiple
+                        <t-select v-model="formData.config.knowledge_bases" class="visual-scene-select" multiple
                           :placeholder="$t('agent.editor.selectKnowledgeBases')" filterable :min-collapsed-num="3">
                           <t-option-group v-if="filteredMyKbOptions.length"
                             :label="$t('agent.editor.myKnowledgeBases')">
@@ -1502,7 +1509,7 @@
                         <p class="desc">{{ $t('agentEditor.fileTypes.desc') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-select v-model="formData.config.supported_file_types" multiple
+                        <t-select v-model="formData.config.supported_file_types" class="visual-scene-select" multiple
                           :placeholder="$t('agentEditor.fileTypes.allTypes')" :min-collapsed-num="3" clearable>
                           <t-option v-for="ft in availableFileTypes" :key="ft.value" :value="ft.value"
                             :label="ft.label" />
@@ -1550,7 +1557,7 @@
                         <p class="desc">{{ $t('agentEditor.desc.webSearchProvider') }}</p>
                       </div>
                       <div class="setting-control">
-                        <t-select v-model="formData.config.web_search_provider_id" clearable
+                        <t-select v-model="formData.config.web_search_provider_id" class="visual-scene-select" clearable
                           :placeholder="$t('agent.editor.webSearchProviderPlaceholder')" style="width: 240px;">
                           <t-option v-for="p in webSearchProviderList" :key="p.id" :value="p.id" :label="p.name">
                             <span>{{ p.name }}</span>

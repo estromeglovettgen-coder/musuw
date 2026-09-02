@@ -30,6 +30,15 @@ test('ModelSelector 清空时向父组件回传空字符串，默认仍不可清
   assert.match(selector, /emit\('update:selectedModelId', value \|\| ''\)/)
 })
 
+test('场景模型 CustomSelect 仅在显式启用时复用，默认 catalog 语义不变', () => {
+  assert.match(selector, /useConsumerStyle\?: boolean/)
+  assert.match(selector, /useConsumerStyle:\s*false/)
+  assert.match(
+    selector,
+    /props\.mode === 'catalog' && \(!props\.showAddModel \|\| props\.useConsumerStyle\)/,
+  )
+})
+
 test('智能体中允许继承或关闭的可选模型可以恢复为空', () => {
   const rerank = modelSelectorTag(agentEditor, 'formData.config.rerank_model_id')
   assert.match(rerank, /:clearable="!needsRerankModel"/)

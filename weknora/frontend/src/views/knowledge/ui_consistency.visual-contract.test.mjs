@@ -33,16 +33,34 @@ test('Agent creation plus follows the button foreground in both themes', () => {
     directoryReference,
     /\.agent-list-content \.agent-create-header-btn \.t-icon,[\s\S]*?\.agent-list-content \.agent-create-header-btn \.btn-icon-wrapper\s*\{[\s\S]*?color:\s*currentColor\s*!important;/,
   )
+  assert.match(
+    directoryReference,
+    /\.agent-list-content \.agent-create-header-btn \.t-button__icon,[\s\S]*?\.agent-list-content \.agent-create-header-btn \.t-icon,[\s\S]*?\.agent-list-content \.agent-create-header-btn \.btn-icon-wrapper\s*\{[\s\S]*?color:\s*#fff\s*!important;/,
+  )
+  assert.match(
+    directoryReference,
+    /:root\[theme-mode="dark"\] \.agent-list-content \.agent-create-header-btn \.t-button__icon,[\s\S]*?color:\s*#18181b\s*!important;/,
+  )
+})
+
+test('Agent and knowledge-base directory shells keep the same geometry at every breakpoint', () => {
+  assert.match(directoryReference, /\.visual-kb-list\s*\{[\s\S]*?gap:\s*18px\s*!important;[\s\S]*?padding:\s*24px\s*!important;/)
+  assert.match(directoryReference, /\.visual-kb-list__header\s*\{[\s\S]*?padding:\s*0 0 20px\s*!important;[\s\S]*?border-bottom:\s*1px solid/)
+  assert.match(directoryReference, /\.visual-kb-list__content\s*\{[\s\S]*?padding:\s*24px 4px 12px 2px\s*!important;/)
+  assert.match(directoryReference, /@media\s*\(min-width:\s*768px\)[\s\S]*?\.visual-kb-list\s*\{\s*padding:\s*32px\s*!important;/)
+  assert.match(directoryReference, /@media\s*\(min-width:\s*1024px\)[\s\S]*?\.visual-kb-grid\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)\s*!important;/)
 })
 
 test('Knowledge-base tag filter uses the same compact control box as type and status', () => {
   assert.match(
     knowledgeBase,
-    /\.visual-knowledge-filter-button\s*\{[\s\S]*?width:\s*112px;[\s\S]*?height:\s*36px;[\s\S]*?padding:\s*8px 14px;[\s\S]*?line-height:\s*16px;/,
+    /\.visual-knowledge-filter-button\s*\{[\s\S]*?width:\s*112px;[\s\S]*?height:\s*36px;[\s\S]*?padding:\s*8px 10px;[\s\S]*?gap:\s*6px;[\s\S]*?line-height:\s*16px;/,
   )
   assert.match(knowledgeBase, /\.visual-knowledge-select\s*\{\s*flex:\s*0 0 112px;\s*width:\s*112px;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button\s*\{[\s\S]*?background:\s*#fff;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button\.is-active\s*\{[\s\S]*?border-color:\s*#d1d5db;[\s\S]*?background:\s*#f3f4f6;/)
+  assert.match(knowledgeBase, /\.visual-knowledge-filter-button > span:not\(\.visual-knowledge-filter-button__clear\)\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?text-overflow:\s*clip;[\s\S]*?white-space:\s*nowrap;/)
+  assert.doesNotMatch(knowledgeBase, /\.visual-knowledge-filter-button > span:not\(\.visual-knowledge-filter-button__clear\)\s*\{[^}]*text-overflow:\s*ellipsis;/)
   assert.match(knowledgeBase, /\.visual-tag-filter-popup \.t-popup__content\s*\{[\s\S]*?border-radius:\s*16px\s*!important;[\s\S]*?box-shadow:\s*0 20px 25px -5px/)
 })
 

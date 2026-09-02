@@ -168,6 +168,54 @@ body .settings-overlay > .settings-modal .t-select-input .t-input.t-is-focused {
   }
 }
 
+/*
+ * Ordinary non-chat selects can opt into the same trigger chrome as the
+ * scene-model CustomSelect. The TDesign component still owns its value,
+ * filtering, multiple-selection and keyboard behavior; this rule only
+ * replaces the outer paint. Homepage Input-field is a separate chat branch
+ * and never receives this class.
+ */
+body .visual-scene-select.visual-scene-select .t-select-input {
+  box-sizing: border-box !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body .visual-scene-select.visual-scene-select .t-select-input .t-input {
+  box-sizing: border-box !important;
+  min-height: 36px !important;
+  padding: 8px 14px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #1f2937 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+body .visual-scene-select.visual-scene-select .t-select-input .t-input__inner {
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+body .visual-scene-select.visual-scene-select .t-select-input .t-input:hover:not(.t-is-disabled),
+body .visual-scene-select.visual-scene-select .t-select-input.t-is-focused .t-input {
+  border-color: #d1d5db !important;
+  background: #fff !important;
+}
+body .visual-scene-select.visual-scene-select .t-select-input.t-is-focused .t-input {
+  box-shadow: 0 0 0 2px rgb(17 24 39 / 8%) !important;
+}
+@media (min-width: 640px) {
+  body .visual-scene-select.visual-scene-select .t-select-input .t-input,
+  body .visual-scene-select.visual-scene-select .t-select-input .t-input__inner {
+    font-size: 14px !important;
+    line-height: 20px !important;
+  }
+}
+
 /* Ordinary Lite custom selectors.  These selectors own chrome only; their
  * components retain position, Teleport, scroll and rich content constraints. */
 body .t-popup__content:has(> .template-popup),

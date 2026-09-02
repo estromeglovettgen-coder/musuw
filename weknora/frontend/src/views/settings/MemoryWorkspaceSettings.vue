@@ -156,6 +156,7 @@
               :selected-model-id="config.embedding_model_id"
               :disabled="advancedDisabled || !config.vector_recall"
               :clearable="true"
+              :use-consumer-style="true"
               @update:selected-model-id="handleEmbeddingModelChange"
               @add-model="handleAddModel('embedding')"
             />
@@ -179,6 +180,7 @@
               :selected-model-id="config.extract_model_id"
               :disabled="advancedDisabled || config.write_mode !== 'auto'"
               :clearable="true"
+              :use-consumer-style="true"
               @update:selected-model-id="handleModelChange"
               @add-model="handleAddModel('chat')"
             />
@@ -217,7 +219,7 @@
           <div class="setting-control">
             <t-input-number
               v-model="config.extract_min_interval_seconds"
-              :min="0"
+              :min="1"
               :max="86400"
               :step="60"
               suffix="s"
@@ -341,7 +343,8 @@ const saveConfig = async () => {
   if (!configLoaded.value || loadError.value || isInitializing.value || !canEdit.value) return
 
   try {
-    await updateTenantMemoryConfig({ ...config })
+    const response = await updateTenantMemoryConfig({ ...config })
+    Object.assign(config, response.data)
     MessagePlugin.success(t('memoryWorkspaceSettings.toasts.saveSuccess'))
   } catch (error: any) {
     MessagePlugin.error(

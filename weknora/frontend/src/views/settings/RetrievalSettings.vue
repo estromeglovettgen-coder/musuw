@@ -18,6 +18,7 @@
         <div class="setting-control-full">
           <ModelSelector
             model-type="Rerank"
+            use-consumer-style
             :selected-model-id="localConfig.rerank_model_id"
             :disabled="!canEdit"
             @update:selected-model-id="handleModelChange"

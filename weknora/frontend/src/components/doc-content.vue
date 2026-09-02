@@ -1706,8 +1706,8 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
           <div v-else class="metadata-editor">
             <div v-for="row in metadataDraft" :key="row.id" class="metadata-editor-row">
               <t-input v-model="row.key" class="metadata-key-input" :placeholder="$t('knowledgeBase.metadataKeyPlaceholder')" />
-              <t-select v-model="row.type" class="metadata-type-select" :options="metadataTypeOptions" />
-              <t-select v-if="row.type === 'boolean'" v-model="row.value" class="metadata-value-input"
+              <t-select v-model="row.type" class="metadata-type-select visual-scene-select" :options="metadataTypeOptions" />
+              <t-select v-if="row.type === 'boolean'" v-model="row.value" class="metadata-value-input visual-scene-select"
                 :options="[{ label: 'true', value: 'true' }, { label: 'false', value: 'false' }]" />
               <t-input v-else-if="row.type !== 'null'" v-model="row.value" class="metadata-value-input"
                 :placeholder="$t('knowledgeBase.metadataValuePlaceholder')" />

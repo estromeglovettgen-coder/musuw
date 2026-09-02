@@ -149,7 +149,7 @@ test('consumer scene catalog uses the reference CustomSelect surface', () => {
     'visual-model-selector__consumer-lock',
     "router.push('/plans')",
   ]) assert.ok(selector.includes(token), `consumer CustomSelect token lost ${token}`)
-  assert.match(selector, /props\.mode === 'catalog' && !props\.showAddModel/)
+  assert.match(selector, /props\.mode === 'catalog' && \(!props\.showAddModel \|\| props\.useConsumerStyle\)/)
   assert.match(selector, /type: option\.model_type/)
   assert.match(selector, /isConsumerSceneSelector\.value\)/)
   assert.doesNotMatch(selector, /type: 'KnowledgeQA' as const/)
@@ -170,6 +170,14 @@ test('compact catalog appearance can reuse caller-supplied catalog models', () =
   )
   assert.match(modelsProjection, /if \(props\.sceneOptions\.length\)/)
   assert.match(modelsProjection, /return catalogModels\.value/)
+})
+
+test('scene-style catalog without a scene projection still loads its model catalog', () => {
+  assert.match(
+    selector,
+    /props\.allModels \|\| \(isConsumerSceneSelector\.value && props\.sceneOptions\.length\)/,
+    'the opt-in scene surface must not suppress the normal catalog request when no scene options are supplied',
+  )
 })
 
 test('consumer scene dropdown raises its open selector above sibling rows in dark and light themes', () => {

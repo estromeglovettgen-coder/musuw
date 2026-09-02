@@ -122,7 +122,7 @@ test('usage and general settings retain the authoritative unboxed row scale', ()
 
 test('consumer scene loading and errors stay on the source CustomSelect branch', () => {
   const source = read('../components/ModelSelector.vue')
-  assert.match(source, /const isConsumerSceneSelector = computed\(\(\) => props\.mode === 'catalog' && !props\.showAddModel\)/)
+  assert.match(source, /const isConsumerSceneSelector = computed\(\(\) =>\s*props\.mode === 'catalog' && \(!props\.showAddModel \|\| props\.useConsumerStyle\),?\s*\)/)
   assert.match(source, /<div v-else-if="isConsumerSceneSelector"[\s\S]*visual-model-selector__consumer-dropdown/)
   assert.match(source, /v-if="loading" class="visual-model-selector__consumer-state"/)
   assert.match(source, /v-else-if="status === 'error'" class="visual-model-selector__consumer-state"/)
