@@ -19,6 +19,24 @@ export interface FilterUploadFilesResult {
   hiddenFileCount: number
 }
 
+export function partitionFilesForConsumerPlan(
+  files: File[],
+  options: { videoUpload: boolean },
+): { allowedFiles: File[]; blockedVideoFiles: File[] } {
+  if (options.videoUpload) {
+    return { allowedFiles: [...files], blockedVideoFiles: [] }
+  }
+
+  const allowedFiles: File[] = []
+  const blockedVideoFiles: File[] = []
+  for (const file of files) {
+    const extension = file.name.split('.').pop()?.toLowerCase() || ''
+    if (UPLOAD_VIDEO_EXTENSIONS.includes(extension)) blockedVideoFiles.push(file)
+    else allowedFiles.push(file)
+  }
+  return { allowedFiles, blockedVideoFiles }
+}
+
 export function filterUploadFiles(
   files: FileList | File[],
   options: FilterUploadFilesOptions = {},

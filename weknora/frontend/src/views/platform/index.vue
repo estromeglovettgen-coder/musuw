@@ -32,10 +32,16 @@ import { useI18n } from "vue-i18n";
 import NewUserGuide from '@/components/NewUserGuide.vue'
 import { collectDroppedFiles } from './collectDroppedFiles'
 import { isKnowledgeBaseRuntimeReady } from '@/utils/knowledgeBaseRuntime'
+import { getCurrentEntitlement } from '@/api/entitlement'
+import { useAuthStore } from '@/stores/auth'
+import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
+import { partitionFilesForConsumerPlan } from '@/views/knowledge/utils/uploadSources'
 
 const route = useRoute();
 const router = useRouter();
 const commandPaletteStore = useCommandPaletteStore();
+const authStore = useAuthStore();
+const showConsumerUpgradePrompt = useConsumerUpgradePrompt();
 let ismask = ref(false);
 const { t } = useI18n();
 
@@ -166,11 +172,40 @@ const handleGlobalDrop = async (event: DragEvent) => {
     return;
   }
 
-  window.dispatchEvent(
-    new CustomEvent("weknora:knowledge-file-drop", {
-      detail: { kbId: getCurrentKbId(), files: droppedFiles },
-    }),
-  );
+  let filesToDispatch = droppedFiles;
+  let blockedVideoCount = 0;
+  if (authStore.isLiteMode) {
+    const restricted = partitionFilesForConsumerPlan(droppedFiles, { videoUpload: false });
+    if (restricted.blockedVideoFiles.length > 0) {
+      try {
+        const entitlement = (await getCurrentEntitlement()).data;
+        if (entitlement.video_upload !== true) {
+          filesToDispatch = restricted.allowedFiles;
+          blockedVideoCount = restricted.blockedVideoFiles.length;
+        }
+      } catch {
+        filesToDispatch = restricted.allowedFiles;
+        MessagePlugin.error(t('entitlement.usageUnavailable'));
+      }
+    }
+  }
+
+  if (filesToDispatch.length > 0) {
+    window.dispatchEvent(
+      new CustomEvent("weknora:knowledge-file-drop", {
+        detail: { kbId: getCurrentKbId(), files: filesToDispatch },
+      }),
+    );
+  }
+  if (blockedVideoCount > 0) {
+    const body = filesToDispatch.length > 0
+      ? t('entitlement.videoMixedUpgradeBody', {
+        allowed: filesToDispatch.length,
+        blocked: blockedVideoCount,
+      })
+      : t('entitlement.videoUploadUpgradeBody');
+    showConsumerUpgradePrompt(String(body));
+  }
 };
 
 // 组件挂载时添加全局事件监听器

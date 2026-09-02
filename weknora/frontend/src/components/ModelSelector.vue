@@ -406,8 +406,8 @@ import { listModels, type ConsumerSceneOption, type ModelConfig } from '@/api/mo
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { filterModelsByType } from './modelSelectorFilter'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
 import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent'
 import type { SharedAgentInfo } from '@/api/organization'
 
@@ -483,8 +483,8 @@ const emit = defineEmits<{
 const catalogModels = ref<ModelConfig[]>([])
 const loading = ref(false)
 const { t } = useI18n()
-const router = useRouter()
 const authStore = useAuthStore()
+const showConsumerUpgradePrompt = useConsumerUpgradePrompt()
 
 const placeholderText = computed(() => {
   return props.placeholder || t('model.selectModelPlaceholder')
@@ -575,7 +575,7 @@ const handleCatalogModelChange = (value?: string) => {
   }
   const option = sceneOptionFor(value)
   if (option && (option.locked || !option.selectable)) {
-    router.push('/plans')
+    showConsumerUpgradePrompt(String(t('entitlement.advancedModelUpgradeBody')))
     return
   }
   emit('update:selectedModelId', value || '')
@@ -753,7 +753,7 @@ const selectChatModel = (value: string) => {
   const isSceneOption = option.locked !== undefined || option.selectable !== undefined
   if (isSceneOption) {
     if (option.locked || !option.selectable) {
-      router.push('/plans')
+      showConsumerUpgradePrompt(String(t('entitlement.advancedModelUpgradeBody')))
       return
     }
   }

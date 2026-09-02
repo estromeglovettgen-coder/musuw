@@ -53,6 +53,18 @@
       </template>
     </t-popup>
 
+    <button
+      type="button"
+      :class="['visual-upload-source__trigger', 'visual-upload-source__link-trigger', triggerClass]"
+      :aria-label="t('knowledgeBase.importURL')"
+      :title="t('knowledgeBase.importURL')"
+      @click="openUrlDialog()"
+    >
+      <t-icon name="link" />
+      <span>{{ t('knowledgeBase.importURL') }}</span>
+      <span v-if="authStore.isLiteMode" class="visual-upload-source__paid-badge">Plus</span>
+    </button>
+
     <Teleport to="body">
       <Transition name="visual-url-modal">
         <div
@@ -160,7 +172,10 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { filterUploadFiles } from '../utils/uploadSources'
+import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
+import { useAuthStore } from '@/stores/auth'
+import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
+import { filterUploadFiles, partitionFilesForConsumerPlan } from '../utils/uploadSources'
 
 const props = withDefaults(defineProps<{
   acceptFileTypes?: string
@@ -189,12 +204,23 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const authStore = useAuthStore()
+const showConsumerUpgradePrompt = useConsumerUpgradePrompt()
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const folderInputRef = ref<HTMLInputElement | null>(null)
 const menuVisible = ref(false)
 const urlDialogVisible = ref(false)
 const urlInputValue = ref('')
+
+const resolveConsumerEntitlement = async (): Promise<ConsumerEntitlement | null> => {
+  if (!authStore.isLiteMode) return null
+  try {
+    return (await getCurrentEntitlement()).data
+  } catch {
+    return null
+  }
+}
 
 const tooltipText = computed(() => props.tooltip || t('knowledgeBase.addDocument'))
 
@@ -209,11 +235,6 @@ const dropdownOptions = computed(() => {
       content: t('upload.uploadFolder'),
       value: 'uploadFolder',
       icon: 'folder-add',
-    },
-    {
-      content: t('knowledgeBase.importURL'),
-      value: 'importURL',
-      icon: 'link',
     },
   ]
   if (props.includeManual) {
@@ -239,10 +260,6 @@ const handleActionSelect = (data: { value: string }) => {
     case 'uploadFolder':
       folderInputRef.value?.click()
       break
-    case 'importURL':
-      urlInputValue.value = ''
-      urlDialogVisible.value = true
-      break
     case 'manualCreate':
       emit('manual')
       break
@@ -265,7 +282,7 @@ const notifyFilterResult = (result: ReturnType<typeof filterUploadFiles>, emptyA
   return true
 }
 
-const handleFilesChange = (event: Event, fromFolder: boolean) => {
+const handleFilesChange = async (event: Event, fromFolder: boolean) => {
   const input = event.target as HTMLInputElement
   const files = input.files
   if (!files || files.length === 0) return
@@ -281,11 +298,38 @@ const handleFilesChange = (event: Event, fromFolder: boolean) => {
     return
   }
 
-  emit('files', result.validFiles)
+  let allowedFiles = result.validFiles
+  let blockedVideoFiles: File[] = []
+  if (authStore.isLiteMode) {
+    const restricted = partitionFilesForConsumerPlan(result.validFiles, { videoUpload: false })
+    if (restricted.blockedVideoFiles.length > 0) {
+      const entitlement = await resolveConsumerEntitlement()
+      if (!entitlement) {
+        if (restricted.allowedFiles.length > 0) emit('files', restricted.allowedFiles)
+        MessagePlugin.error(t('entitlement.usageUnavailable'))
+        input.value = ''
+        return
+      }
+      if (entitlement.video_upload !== true) {
+        allowedFiles = restricted.allowedFiles
+        blockedVideoFiles = restricted.blockedVideoFiles
+      }
+    }
+  }
+  if (allowedFiles.length > 0) emit('files', allowedFiles)
+  if (blockedVideoFiles.length > 0) {
+    const body = allowedFiles.length > 0
+      ? t('entitlement.videoMixedUpgradeBody', {
+        blocked: blockedVideoFiles.length,
+        allowed: allowedFiles.length,
+      })
+      : t('entitlement.videoUploadUpgradeBody')
+    showConsumerUpgradePrompt(String(body))
+  }
   input.value = ''
 }
 
-const handleUrlDialogConfirm = () => {
+const handleUrlDialogConfirm = async () => {
   const url = urlInputValue.value.trim()
   if (!url) {
     MessagePlugin.warning(t('knowledgeBase.urlRequired'))
@@ -293,6 +337,20 @@ const handleUrlDialogConfirm = () => {
   }
   if (new TextEncoder().encode(url).length > 4096) {
     MessagePlugin.warning(t('knowledgeBase.urlTooLong'))
+    return
+  }
+  const entitlement = await resolveConsumerEntitlement()
+  if (authStore.isLiteMode && !entitlement) {
+    MessagePlugin.error(t('entitlement.usageUnavailable'))
+    return
+  }
+  if (authStore.isLiteMode && entitlement?.plan === 'free') {
+    urlDialogVisible.value = false
+    showConsumerUpgradePrompt(String(t('entitlement.urlImportUpgradeBody')), {
+      onCancel: () => {
+        urlDialogVisible.value = true
+      },
+    })
     return
   }
   urlDialogVisible.value = false
@@ -309,8 +367,8 @@ const handleUrlDialogCancel = () => {
   urlInputValue.value = ''
 }
 
-const openUrlDialog = () => {
-  urlInputValue.value = ''
+const openUrlDialog = (initialValue = '') => {
+  urlInputValue.value = initialValue
   urlDialogVisible.value = true
 }
 
@@ -322,6 +380,7 @@ defineExpose({ openUrlDialog })
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
 }
 
 .visual-upload-source__hidden-input {
@@ -356,6 +415,30 @@ defineExpose({ openUrlDialog })
 .visual-upload-source__trigger:hover {
   background: #000;
   box-shadow: 0 2px 5px rgb(0 0 0 / 8%);
+}
+
+.visual-upload-source__link-trigger {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  box-shadow: none;
+}
+
+.visual-upload-source__link-trigger:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #111827;
+}
+
+.visual-upload-source__paid-badge {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 9px;
+  line-height: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .visual-upload-source__trigger:active {
@@ -668,6 +751,17 @@ defineExpose({ openUrlDialog })
   background: var(--mvc-surface) !important;
   color: var(--mvc-text) !important;
   box-shadow: var(--mvc-shadow) !important;
+}
+
+:root[theme-mode="dark"] .visual-upload-source__link-trigger {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] .visual-upload-source__link-trigger:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
 }
 
 :root[theme-mode="dark"] .visual-upload-menu__item {
