@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const usageSettings = await readFile(new URL('./UsageBillingSettings.vue', import.meta.url), 'utf8')
 const settingsShell = await readFile(new URL('./Settings.vue', import.meta.url), 'utf8')
+const userMenu = await readFile(new URL('../../components/UserMenu.vue', import.meta.url), 'utf8')
 const entitlementApi = await readFile(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
 const router = await readFile(new URL('../../router/index.ts', import.meta.url), 'utf8')
 const plansPage = await readFile(new URL('../billing/Plans.vue', import.meta.url), 'utf8')
@@ -13,14 +14,25 @@ test('entitlement API types the official OpenRouter credit availability state', 
   assert.match(entitlementApi, /openrouter_credits_status:\s*OpenRouterCreditsStatus/)
 })
 
-test('usage settings shows remaining percentages without provider or dollar fields', () => {
+test('usage settings shows only remaining percentages without provider or dollar fields', () => {
   assert.match(usageSettings, /openrouter_credits_status === 'unavailable'/)
   assert.match(usageSettings, /openrouter_credits_status === 'pending'/)
   assert.match(usageSettings, /openrouter_credits_status === 'unprovisioned'\) return 100/)
   assert.match(usageSettings, /clampPercent\(\(remaining \/ total\) \* 100\)/)
   assert.match(usageSettings, /creditsRemainingPercent \}\}%/)
   assert.match(usageSettings, /storageRemainingPercent \}\}%/)
+  assert.doesNotMatch(usageSettings, /creditsUsedPercent|storageUsedPercent|entitlement\.usedPercent/)
   assert.doesNotMatch(usageSettings, /formatCredits|monthlyCredits|OpenRouter|\$\d/)
+})
+
+test('opening the account menu refreshes the quota before it is shown', () => {
+  assert.match(
+    userMenu,
+    /const handleTriggerClick = \(\) => \{[\s\S]*menuVisible\.value = !menuVisible\.value[\s\S]*if \(menuVisible\.value\) void loadEntitlement\(\)/,
+  )
+  assert.match(userMenu, /clampPercent\(\(remaining \/ total\) \* 100\)/)
+  assert.match(userMenu, /const requestSequence = \+\+entitlementRequestSequence/)
+  assert.match(userMenu, /if \(requestSequence !== entitlementRequestSequence\) return/)
 })
 
 test('credit period copy uses the tenant personal-cycle boundary', () => {

@@ -76,6 +76,7 @@ const handleTriggerClick = () => {
     return
   }
   menuVisible.value = !menuVisible.value
+  if (menuVisible.value) void loadEntitlement()
 }
 const handleQuickNav = (section: string, query: Record<string, string> = {}) => {
   menuVisible.value = false
@@ -251,11 +252,15 @@ const loadUserInfo = async () => {
   }
 }
 
+let entitlementRequestSequence = 0
 const loadEntitlement = async () => {
+  const requestSequence = ++entitlementRequestSequence
   try {
     const response = await getCurrentEntitlement()
+    if (requestSequence !== entitlementRequestSequence) return
     entitlement.value = response.data
   } catch {
+    if (requestSequence !== entitlementRequestSequence) return
     entitlement.value = null
   }
 }

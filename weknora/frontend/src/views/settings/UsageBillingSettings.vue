@@ -41,8 +41,6 @@
         </div>
         <div class="usage-billing__meter-control">
           <div class="usage-billing__meter-meta">
-            <small v-if="creditsUsedPercent !== null">{{ $t('entitlement.usedPercent', { percent: creditsUsedPercent }) }}</small>
-            <small v-else />
             <strong v-if="creditsRemainingPercent !== null">{{ creditsRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
             <strong v-else class="is-muted">{{ entitlement.openrouter_credits_status === 'pending' ? $t('entitlement.billingPendingShort') : $t('entitlement.unavailable') }}</strong>
           </div>
@@ -59,7 +57,6 @@
         </div>
         <div class="usage-billing__meter-control">
           <div class="usage-billing__meter-meta">
-            <small>{{ $t('entitlement.usedPercent', { percent: storageUsedPercent }) }}</small>
             <strong>{{ storageRemainingPercent }}% {{ $t('entitlement.remaining') }}</strong>
           </div>
           <div class="usage-billing__meter" role="progressbar" :aria-valuenow="storageRemainingPercent" aria-valuemin="0" aria-valuemax="100">
@@ -117,8 +114,6 @@ const storageRemainingPercent = computed<number | null>(() => {
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(used)) return null
   return clampPercent(((total - used) / total) * 100)
 })
-const creditsUsedPercent = computed<number | null>(() => creditsRemainingPercent.value === null ? null : 100 - creditsRemainingPercent.value)
-const storageUsedPercent = computed(() => storageRemainingPercent.value === null ? 0 : 100 - storageRemainingPercent.value)
 const formatStorageBytes = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) return '0 B'
   const gibibytes = value / 1024 ** 3
@@ -188,8 +183,7 @@ onMounted(() => { void loadEntitlement() })
 .usage-billing__copy small { color: #9ca3af; font-size: 11px; line-height: 16px; }
 .usage-billing__actions { display: flex; align-items: center; gap: 12px; }
 .usage-billing__meter-control { width: 224px; min-width: 0; flex: 0 0 224px; display: grid; gap: 6px; }
-.usage-billing__meter-meta { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.usage-billing__meter-meta > small { min-width: 0; overflow: hidden; color: #9ca3af; font-size: 11px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.usage-billing__meter-meta { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .usage-billing__meter-meta > strong { flex: 0 0 auto; color: #111827; font-family: var(--app-font-family-mono); font-size: 12px; line-height: 16px; font-weight: 700; text-align: right; white-space: nowrap; }
 .usage-billing__meter-meta > strong.is-muted { color: #9da1a8; }
 .usage-billing__storage-usage { color: #6b7280 !important; }
