@@ -1,8 +1,8 @@
 <template>
   <SpotlightGuide v-model:active="active" :steps="steps" step-i18n-prefix="newUserGuide.steps"
-    labels-prefix="newUserGuide" @finish="onFinish" @step-change="onStepChange" />
-  <GlobalInvitationBell />
-  <AgentListContextualGuideBridge />
+    labels-prefix="newUserGuide" @finish="onFinish" @dismiss="onFinish" @step-change="onStepChange" />
+  <GlobalInvitationBell v-if="!authStore.isLiteMode" />
+  <AgentListContextualGuideBridge v-if="!authStore.isLiteMode" />
 </template>
 
 <script setup lang="ts">
@@ -10,7 +10,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
 import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
 import AgentListContextualGuideBridge from '@/components/AgentListContextualGuideBridge.vue'
-import { GLOBAL_USER_GUIDE_KEY, OPEN_NEW_USER_GUIDE_EVENT } from '@/config/contextualGuides'
+import {
+  OPEN_NEW_USER_GUIDE_EVENT,
+  isGlobalUserGuideDone,
+  markGlobalUserGuideDone,
+} from '@/config/contextualGuides'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import type { SpotlightGuideStep } from '@/types/spotlightGuide'
@@ -20,10 +24,34 @@ const authStore = useAuthStore()
 let settingsOpenedByGuide = false
 
 const steps = computed<SpotlightGuideStep[]>(() => {
-  const allSteps: SpotlightGuideStep[] = [
+  const liteSteps: SpotlightGuideStep[] = [
+    { key: 'welcomeLite' },
+    {
+      key: 'knowledgeLite',
+      target: '[data-guide="nav-knowledge-bases"]',
+      placement: 'right',
+      before: () => uiStore.expandSidebar(),
+    },
+    {
+      key: 'chatLite',
+      target: '[data-guide="nav-creatChat"]',
+      placement: 'right',
+      before: () => uiStore.expandSidebar(),
+    },
+    {
+      key: 'agentsLite',
+      target: '[data-guide="nav-agents"]',
+      placement: 'right',
+      optional: true,
+      before: () => uiStore.expandSidebar(),
+    },
+    { key: 'doneLite' },
+  ]
+
+  const standardSteps: SpotlightGuideStep[] = [
     { key: 'welcome' },
     {
-      key: authStore.isLiteMode ? 'knowledgeLite' : 'knowledge',
+      key: 'knowledge',
       target: '[data-guide="nav-knowledge-bases"]',
       placement: 'right',
       before: () => uiStore.expandSidebar(),
@@ -58,7 +86,7 @@ const steps = computed<SpotlightGuideStep[]>(() => {
     },
     { key: 'done' },
   ]
-  return authStore.isLiteMode ? allSteps.filter(step => step.key !== 'models') : allSteps
+  return authStore.isLiteMode ? liteSteps : standardSteps
 })
 
 const active = ref(false)
@@ -71,7 +99,7 @@ const closeGuideSettings = () => {
 }
 
 const onFinish = () => {
-  localStorage.setItem(GLOBAL_USER_GUIDE_KEY, '1')
+  markGlobalUserGuideDone()
   closeGuideSettings()
 }
 
@@ -92,9 +120,9 @@ const handleOpenEvent = () => {
 
 onMounted(() => {
   window.addEventListener(OPEN_NEW_USER_GUIDE_EVENT, handleOpenEvent)
-  if (localStorage.getItem(GLOBAL_USER_GUIDE_KEY) !== '1') {
+  if (!isGlobalUserGuideDone()) {
     window.setTimeout(() => {
-      if (localStorage.getItem(GLOBAL_USER_GUIDE_KEY) !== '1') {
+      if (!isGlobalUserGuideDone()) {
         open()
       }
     }, 700)

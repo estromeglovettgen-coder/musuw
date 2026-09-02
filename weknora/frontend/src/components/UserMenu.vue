@@ -313,7 +313,7 @@ onUnmounted(() => {
         >
           <span class="visual-user-menu__avatar is-small"><img v-if="userAvatar && !authStore.isLiteMode" :src="userAvatar" alt="" /><span v-else>{{ userInitial }}</span></span>
           <span class="visual-user-menu__account-copy"><strong>{{ userName }}</strong></span>
-          <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
+          <button type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
         </div>
 
         <div

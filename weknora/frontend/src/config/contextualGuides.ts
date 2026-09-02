@@ -1,6 +1,7 @@
 import type { SpotlightGuideStep } from '@/types/spotlightGuide'
+import { safeGetItem, safeSetItem, userKey } from '@/composables/preferenceStorage'
 
-export const GLOBAL_USER_GUIDE_KEY = 'weknora:new-user-guide-done:v1'
+export const GLOBAL_USER_GUIDE_KEY = 'musuw:new-user-guide-done:v2'
 export const OPEN_NEW_USER_GUIDE_EVENT = 'weknora:open-new-user-guide'
 
 export function openNewUserGuide() {
@@ -129,17 +130,21 @@ export const CONTEXTUAL_GUIDE_TOURS: Record<ContextualGuideTourId, ContextualGui
 }
 
 export function isContextualGuideDone(tourId: ContextualGuideTourId): boolean {
-  return localStorage.getItem(CONTEXTUAL_GUIDE_TOURS[tourId].storageKey) === '1'
+  return safeGetItem(userKey(CONTEXTUAL_GUIDE_TOURS[tourId].storageKey)) === '1'
 }
 
 export function markContextualGuideDone(tourId: ContextualGuideTourId) {
   const config = CONTEXTUAL_GUIDE_TOURS[tourId]
-  localStorage.setItem(config.storageKey, '1')
+  safeSetItem(userKey(config.storageKey), '1')
   config.alsoCompleteTours?.forEach((id) => {
-    localStorage.setItem(CONTEXTUAL_GUIDE_TOURS[id].storageKey, '1')
+    safeSetItem(userKey(CONTEXTUAL_GUIDE_TOURS[id].storageKey), '1')
   })
 }
 
 export function isGlobalUserGuideDone(): boolean {
-  return localStorage.getItem(GLOBAL_USER_GUIDE_KEY) === '1'
+  return safeGetItem(userKey(GLOBAL_USER_GUIDE_KEY)) === '1'
+}
+
+export function markGlobalUserGuideDone() {
+  safeSetItem(userKey(GLOBAL_USER_GUIDE_KEY), '1')
 }

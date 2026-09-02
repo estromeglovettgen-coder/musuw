@@ -2,11 +2,15 @@
   <main class="workspace-onboarding">
     <section class="workspace-card">
       <div class="workspace-mark" aria-hidden="true">
-        <t-icon name="system-sum" size="30px" />
+        <t-icon :name="authStore.isLiteMode ? 'user-circle' : 'system-sum'" size="30px" />
       </div>
-      <h1 v-if="authStore.canCreateTenant">{{ $t('auth.workspaceOnboarding.title') }}</h1>
+      <h1 v-if="authStore.isLiteMode">{{ $t('auth.workspaceOnboarding.liteTitle') }}</h1>
+      <h1 v-else-if="authStore.canCreateTenant">{{ $t('auth.workspaceOnboarding.title') }}</h1>
       <h1 v-else>{{ $t('auth.workspaceOnboarding.inviteOnlyTitle') }}</h1>
-      <p v-if="authStore.canCreateTenant" class="workspace-description">
+      <p v-if="authStore.isLiteMode" class="workspace-description">
+        {{ $t('auth.workspaceOnboarding.liteDescription') }}
+      </p>
+      <p v-else-if="authStore.canCreateTenant" class="workspace-description">
         {{ $t('auth.workspaceOnboarding.description') }}
       </p>
       <p v-else class="workspace-description">
@@ -15,18 +19,25 @@
 
       <div v-if="policyLoading" class="policy-loading">
         <t-loading size="small" />
-        <span>{{ $t('auth.workspaceOnboarding.loadingPolicy') }}</span>
+        <span>{{ $t(authStore.isLiteMode ? 'auth.workspaceOnboarding.liteLoading' : 'auth.workspaceOnboarding.loadingPolicy') }}</span>
       </div>
       <div v-else-if="policyLoadFailed" class="policy-error" role="alert">
         <t-icon name="error-circle" size="20px" aria-hidden="true" />
-        <span>{{ $t('auth.workspaceOnboarding.policyLoadFailed') }}</span>
+        <span>{{ $t(authStore.isLiteMode ? 'auth.workspaceOnboarding.liteLoadFailed' : 'auth.workspaceOnboarding.policyLoadFailed') }}</span>
         <t-button size="small" variant="text" @click="loadPolicy">
           {{ $t('auth.workspaceOnboarding.retry') }}
         </t-button>
       </div>
 
       <template v-else>
-        <div v-if="!authStore.isLiteMode && !authStore.canCreateTenant" class="invite-only-notice">
+        <div v-if="authStore.isLiteMode" class="personal-space-wait">
+          <t-icon name="time" size="20px" aria-hidden="true" />
+          <span>{{ $t('auth.workspaceOnboarding.liteWaiting') }}</span>
+          <t-button size="small" variant="outline" @click="loadPolicy">
+            {{ $t('auth.workspaceOnboarding.retry') }}
+          </t-button>
+        </div>
+        <div v-else-if="!authStore.canCreateTenant" class="invite-only-notice">
           <t-icon name="lock-on" size="20px" aria-hidden="true" />
           <span>{{ $t('auth.workspaceOnboarding.inviteOnlyNotice') }}</span>
         </div>
@@ -186,6 +197,7 @@ h1 {
 }
 
 .policy-loading,
+.personal-space-wait,
 .invite-only-notice,
 .policy-error {
   display: flex;
@@ -211,6 +223,15 @@ h1 {
   border: 1px solid var(--td-component-stroke);
   border-radius: var(--musuw-radius-control);
   color: var(--td-text-color-primary);
+  background: var(--td-bg-color-secondarycontainer);
+  line-height: 1.5;
+}
+
+.personal-space-wait {
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--musuw-radius-control);
   background: var(--td-bg-color-secondarycontainer);
   line-height: 1.5;
 }

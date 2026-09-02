@@ -3,6 +3,7 @@ import { defineComponent, ref, type SetupContext } from 'vue'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
+import ContextualGuide from '@/components/ContextualGuide.vue'
 import KBSwitcherDropdown from '@/components/KBSwitcherDropdown.vue'
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import FAQEntryManager from './components/FAQEntryManager.vue'
@@ -24,7 +25,7 @@ export default defineComponent({
   name: 'KnowledgeBase',
   components: {
     ...(legacy.components || {}),
-    DocContent, EmptyKnowledge, KBSwitcherDropdown, KnowledgeBaseEditorModal, FAQEntryManager,
+    DocContent, EmptyKnowledge, ContextualGuide, KBSwitcherDropdown, KnowledgeBaseEditorModal, FAQEntryManager,
     DocumentListView, DocumentCardView, DocumentBatchBar, KbUploadSourceDropdown, KbFolderTree,
     TagEditDialog, BatchTagDialog, KbTagManageDrawer, WikiBrowser,
   },
@@ -286,6 +287,10 @@ export default defineComponent({
   <TagEditDialog :visible="tagEditDialogVisible" :knowledge-name="tagEditTarget?.display_name || tagEditTarget?.file_name || tagEditTarget?.title || ''" :kb-id="kbId" :tag-list="tagList" :selected-tags="tagEditTarget?.tags || []" :can-manage="canEdit" @update:visible="tagEditDialogVisible = $event" @confirm="onTagEditConfirm" @tag-created="loadTags(kbId, true)" @open-manage="openTagManageFromEditDialog" />
   <BatchTagDialog :visible="batchTagDialogVisible" :count="selectedIds.size" :kb-id="kbId" :tag-list="tagList" :pre-selected-tag-ids="batchTagPreSelectedIds" :can-manage="canEdit" :confirm-loading="batchTagging" @update:visible="batchTagDialogVisible = $event" @confirm="onBatchTagConfirm" @tag-created="loadTags(kbId, true)" @open-manage="openTagManageFromBatchDialog" />
   <KbTagManageDrawer v-if="!isFAQ" v-model:visible="tagManageDrawerVisible" :kb-id="kbId" :is-faq="isFAQ" @changed="onTagManageChanged" />
+  <ContextualGuide
+    tour="kbDetail"
+    :when="authStore.isLiteMode && !isFAQ && canEdit && activeKbTab === 'documents' && !docListLoading && !cardList.length && !currentChildFolders.length && !selectedFolderPath && !isFiltering"
+  />
 </template>
 
 <style scoped lang="less">

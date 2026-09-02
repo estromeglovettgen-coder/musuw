@@ -10,6 +10,7 @@ import {
   CONTEXTUAL_GUIDE_TOURS,
   isContextualGuideDone,
   isGlobalUserGuideDone,
+  markContextualGuideDone,
   type ContextualGuideTourConfig,
   type ContextualGuideTourId,
 } from '@/config/contextualGuides'
@@ -82,10 +83,7 @@ const scheduleOpen = () => {
 }
 
 const onFinish = () => {
-  localStorage.setItem(config.storageKey, '1')
-  config.alsoCompleteTours?.forEach((id) => {
-    localStorage.setItem(CONTEXTUAL_GUIDE_TOURS[id].storageKey, '1')
-  })
+  markContextualGuideDone(props.tour)
 }
 
 watch(

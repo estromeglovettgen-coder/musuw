@@ -153,7 +153,8 @@ test("Settings has one active mount on the dedicated route", () => {
 
 test("Lite UserMenu keeps account exit but does not rediscover management surfaces", () => {
   assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account(?: [^"]*)?"/);
-  assert.match(userMenu, /<button v-if="!authStore\.isLiteMode" type="button" class="visual-user-menu__guide"/);
+  assert.match(userMenu, /<button type="button" class="visual-user-menu__guide"/);
+  assert.doesNotMatch(userMenu, /v-if="!authStore\.isLiteMode"[^>]*class="visual-user-menu__guide"/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/);
   assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*openDocs[\s\S]*openGithub/);
@@ -213,7 +214,8 @@ test("chat and Knowledge Base business surfaces remain present inside the expose
 });
 
 test("Lite consumer copy keeps FAQ terminology out of reachable knowledge-base guidance", () => {
-  assert.match(newUserGuide, /key: authStore\.isLiteMode\s*\?\s*'knowledgeLite'\s*:\s*'knowledge'/);
+  assert.match(newUserGuide, /const liteSteps[\s\S]*key: 'knowledgeLite'/);
+  assert.match(newUserGuide, /const standardSteps[\s\S]*key: 'knowledge'/);
   assert.match(contextualGuide, /authStore\.isLiteMode[\s\S]*?key === 'create'[\s\S]*?createLite/);
   assert.match(knowledgeBaseList, /authStore\.isLiteMode\s*\?\s*'knowledgeList\.liteSubtitle'\s*:\s*'knowledgeList\.subtitle'/);
 });

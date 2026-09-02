@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
+import { useAuthStore } from '@/stores/auth'
 import {
   AGENT_EDITOR_FOCUS_SECTION_EVENT,
   markContextualGuideDone,
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>()
 
 const active = ref(false)
+const authStore = useAuthStore()
 
 const focusSection = (section: string) => {
   window.dispatchEvent(
@@ -28,7 +30,41 @@ const focusSection = (section: string) => {
 }
 
 const guideSteps = computed<SpotlightGuideStep[]>(() => {
-  const steps: SpotlightGuideStep[] = [
+  const liteSteps: SpotlightGuideStep[] = [
+    {
+      key: 'modeLite',
+      target: '[data-guide="agent-create-mode"]',
+      placement: 'right',
+      before: () => focusSection('basic'),
+    },
+    {
+      key: 'nameLite',
+      target: '[data-guide="agent-create-name"]',
+      placement: 'right',
+      before: () => focusSection('basic'),
+    },
+    {
+      key: 'modelLite',
+      target: '[data-guide="agent-create-model"]',
+      placement: 'right',
+      before: () => focusSection('basic'),
+    },
+    {
+      key: 'knowledgeLite',
+      target: '[data-guide="agent-create-knowledge"]',
+      placement: 'right',
+      before: () => focusSection('knowledge'),
+    },
+    {
+      key: 'submitLite',
+      target: '[data-guide="agent-create-submit"]',
+      placement: 'top',
+      before: () => focusSection('basic'),
+      interact: true,
+    },
+  ]
+
+  const standardSteps: SpotlightGuideStep[] = [
     {
       key: 'mode',
       target: '[data-guide="agent-create-mode"]',
@@ -96,7 +132,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
   ]
 
   if (props.isAgentMode) {
-    steps.push({
+    standardSteps.push({
       key: 'navTools',
       target: '[data-guide="agent-editor-nav-tools"]',
       placement: 'right',
@@ -105,7 +141,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     })
   }
 
-  steps.push({
+  standardSteps.push({
     key: 'submit',
     target: '[data-guide="agent-create-submit"]',
     placement: 'top',
@@ -113,7 +149,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     interact: true,
   })
 
-  return steps
+  return authStore.isLiteMode ? liteSteps : standardSteps
 })
 
 let openTimer: ReturnType<typeof setTimeout> | null = null

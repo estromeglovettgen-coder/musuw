@@ -62,6 +62,22 @@ export default {
     done: 'Done',
     reopen: 'Product tour',
     steps: {
+      welcomeLite: {
+        title: 'Welcome to Musuw',
+        desc: 'Your personal space and available models are ready. No setup is required — here are the three everyday entry points.'
+      },
+      chatLite: {
+        title: 'Start with a conversation',
+        desc: 'Ask a question or add an image or file. Musuw clearly explains when an advanced model or paid capability needs an upgrade.'
+      },
+      agentsLite: {
+        title: 'Choose the right agent',
+        desc: 'Quick Answer handles everyday questions, while Smart Reasoning is better for complex tasks. Create your own agent only when needed.'
+      },
+      doneLite: {
+        title: 'You are ready',
+        desc: 'Ask one question or add one source to begin. Reopen this guide anytime from the question mark beside your name.'
+      },
       welcome: {
         title: 'Welcome to Musuw',
         desc: 'A few quick steps to get you familiar with knowledge bases, chat and agents. Click "Next" to begin.'
@@ -216,6 +232,26 @@ export default {
     },
     agentCreate: {
       steps: {
+        modeLite: {
+          title: 'Choose how it answers',
+          desc: 'Quick Answer is best for direct responses; Smart Reasoning handles complex tasks that need multiple steps.'
+        },
+        nameLite: {
+          title: 'Name your agent',
+          desc: 'Give it a recognizable name. You can add or refine the description later.'
+        },
+        modelLite: {
+          title: 'Choose a model',
+          desc: 'Select any model available on your current plan. Locked advanced models clearly show when an upgrade is required.'
+        },
+        knowledgeLite: {
+          title: 'Choose its knowledge',
+          desc: 'Use all of your knowledge bases, choose specific ones, or leave knowledge unlinked for now.'
+        },
+        submitLite: {
+          title: 'Create the agent',
+          desc: 'Confirm the name, model, and knowledge scope, then click the highlighted Create button.'
+        },
         mode: {
           title: 'Choose run mode',
           desc: '"Quick answer" for straightforward Q&A; "Smart reasoning" uses tools and multi-step thinking for complex tasks.'
@@ -274,7 +310,7 @@ export default {
         },
         upload: {
           title: 'Add documents',
-          desc: 'Use this menu to upload files or folders, import a URL, or create content online.'
+          desc: 'Add a file or web link here. Musuw will parse and index it automatically.'
         },
         done: {
           title: 'Ready after parsing',
@@ -2163,6 +2199,11 @@ export default {
     loginErrorRetry: 'Login error, please try again later',
     registerError: 'Registration error, please try again later',
     workspaceOnboarding: {
+      liteTitle: 'Preparing your Musuw space',
+      liteDescription: 'Each account has one personal space. There is no workspace to create or join.',
+      liteLoading: 'Preparing your personal space…',
+      liteLoadFailed: 'Your personal space could not be prepared. Check your connection and try again.',
+      liteWaiting: 'Your personal space is still being prepared. Please check again shortly.',
       title: 'Choose your workspace',
       description: 'Create a workspace to get started, or accept an invitation to join one that already exists.',
       create: 'Create workspace',

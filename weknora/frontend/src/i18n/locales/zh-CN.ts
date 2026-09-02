@@ -4501,7 +4501,7 @@ export default {
     },
     empty: {
       title: '暂无知识库',
-      description: '点击左侧快捷操作"新建知识库"按钮创建第一个知识库',
+      description: '点击页面上的「新建知识库」按钮，创建你的第一个知识库',
       sharedTitle: '暂无共享知识库',
       sharedDescription: '您可以加入共享空间或请求他人共享知识库给您',
       favoritesTitle: '暂无收藏',
@@ -4805,6 +4805,11 @@ export default {
     loginErrorRetry: '登录错误，请稍后重试',
     registerError: '注册错误，请稍后重试',
     workspaceOnboarding: {
+      liteTitle: '正在准备你的 Musuw',
+      liteDescription: '每个账户只有一个个人空间，无需创建或加入工作区。',
+      liteLoading: '正在准备个人空间…',
+      liteLoadFailed: '暂时无法准备个人空间，请检查网络后重试。',
+      liteWaiting: '个人空间仍在准备中，请稍后重新检查。',
       title: '选择你的工作空间',
       description: '创建一个空间即可开始使用，或接受邀请加入已有空间。',
       create: '创建空间',
@@ -6667,7 +6672,7 @@ export default {
         },
         upload: {
           title: '添加文档',
-          desc: '点击此处上传文件、文件夹，或导入网页与在线编辑内容。'
+          desc: '点击此处添加文件或网页链接，Musuw 会自动解析并建立索引。'
         },
         intro: {
           title: '知识库还是空的',
@@ -6677,6 +6682,26 @@ export default {
     },
     agentCreate: {
       steps: {
+        submitLite: {
+          title: '创建智能体',
+          desc: '确认名称、模型和知识范围后，点击高亮的「创建」即可完成。'
+        },
+        knowledgeLite: {
+          title: '选择知识范围',
+          desc: '默认可使用你的全部知识库，也可以只选择指定知识库，或暂不关联。'
+        },
+        modelLite: {
+          title: '选择模型',
+          desc: '直接选择当前套餐可用的模型；锁定的高级模型会明确提示升级。'
+        },
+        nameLite: {
+          title: '给智能体起名',
+          desc: '填写一个容易识别的名称，描述可以稍后再补充。'
+        },
+        modeLite: {
+          title: '选择回答方式',
+          desc: '快速问答适合直接回答，智能推理适合需要多步处理的复杂任务。'
+        },
         submit: {
           title: '保存智能体',
           desc: '确认配置后点击高亮的「确定」完成创建，即可在对话中选择该智能体。'
@@ -6847,6 +6872,22 @@ export default {
     done: '完成',
     reopen: '新手引导',
     steps: {
+      doneLite: {
+        title: '现在就开始',
+        desc: '先问一个问题，或上传一份资料即可。以后可从昵称旁的问号重新打开本引导。'
+      },
+      agentsLite: {
+        title: '选择合适的智能体',
+        desc: '快速问答适合日常提问，智能推理适合复杂任务；需要时也可以创建自己的智能体。'
+      },
+      chatLite: {
+        title: '直接开始对话',
+        desc: '输入问题，也可以添加图片或文件。需要高级模型或付费能力时，Musuw 会明确说明并引导升级。'
+      },
+      welcomeLite: {
+        title: '欢迎使用 Musuw',
+        desc: '你的个人空间和可用模型已经准备好，无需配置即可开始。接下来只看三个常用入口。'
+      },
       done: {
         title: '一切就绪',
         desc: '你已经了解了核心功能，现在就开始构建你的知识助手吧！随时可点击菜单顶部昵称旁的帮助按钮重新查看引导。'
