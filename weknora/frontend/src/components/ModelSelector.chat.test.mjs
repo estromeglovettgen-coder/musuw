@@ -88,15 +88,16 @@ test('chat picker preserves the native business state and keeps catalog mode int
   assert.equal(inputField.includes('__thinking-switch'), false)
 })
 
-test('chat picker keeps locked scene options visible but navigates instead of selecting them', () => {
+test('chat picker keeps locked scene options visible and opens the shared upgrade prompt without selecting them', () => {
   for (const token of [
     'locked',
     'selectable',
     'aria-disabled',
-    "router.push('/plans')",
+    'showConsumerUpgradePrompt',
+    "t('entitlement.advancedModelUpgradeBody')",
     "if (option.locked || !option.selectable)",
   ]) assert.ok(source.includes(token), `scene picker lost ${token}`)
-  assert.match(source, /option\.locked[\s\S]*?router\.push\('\/plans'\)/)
+  assert.match(source, /option\.locked[\s\S]*?showConsumerUpgradePrompt/)
 })
 
 test('chat picker keeps long names in a single aligned column and adapts to narrow screens', () => {

@@ -77,7 +77,7 @@ test('chat submenu cards retain source dimensions, timing, placement, and locked
     "bottom: `${bottomInset}px`",
     'box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%)',
     'color: #9ca3af',
-    "router.push('/plans')",
+    'showConsumerUpgradePrompt',
   ]) {
     assert.ok(source.includes(token), `submenu source token lost ${token}`)
   }
@@ -147,7 +147,7 @@ test('consumer scene catalog uses the reference CustomSelect surface', () => {
     'visual-model-selector__consumer-option',
     'padding: 8px 12px;',
     'visual-model-selector__consumer-lock',
-    "router.push('/plans')",
+    'showConsumerUpgradePrompt',
   ]) assert.ok(selector.includes(token), `consumer CustomSelect token lost ${token}`)
   assert.match(selector, /props\.mode === 'catalog' && \(!props\.showAddModel \|\| props\.useConsumerStyle\)/)
   assert.match(selector, /type: option\.model_type/)

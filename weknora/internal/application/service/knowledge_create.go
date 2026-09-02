@@ -319,6 +319,9 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 	if socialRoute != nil {
 		logger.Infof(ctx, "Recognized social URL: platform=%s object_id_present=%t", socialRoute.Platform, socialRoute.ObjectID != "")
 	}
+	if plan, ok := effectivePlanFromContext(ctx); isLiteProductEdition() && ok && plan == types.ConsumerPlanFree {
+		return nil, werrors.NewForbiddenError("Free plan does not support URL import")
+	}
 
 	// Route to file_url logic when the URL points to a downloadable file
 	// A recognized social work always follows the social document path. File
