@@ -314,11 +314,28 @@
 
   /* Scoped KnowledgeBase styles use !important for the teleported select
    * popup, so keep the dark override equally explicit and body-reachable. */
-  body .visual-knowledge-select-popup,
-  body .visual-knowledge-select-popup .t-popup__content,
-  body .visual-knowledge-select-popup .t-select__list {
-    border-color: var(--mvc-line) !important;
+  /* The KnowledgeBase filters use TDesign's popup root/content pair. Keep
+   * the root transparent and let the content own the single scene-model
+   * panel, otherwise the light bridge and dark closure paint two frames. */
+  body .visual-knowledge-select-popup {
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  body .visual-knowledge-select-popup .t-popup__content {
+    margin: 0 !important;
+    padding: 6px !important;
+    border: 1px solid var(--mvc-line) !important;
+    border-radius: 16px !important;
     background: var(--mvc-surface) !important;
+    color: var(--mvc-muted-strong) !important;
+    box-shadow: var(--mvc-shadow) !important;
+  }
+  body .visual-knowledge-select-popup .t-select__list {
+    border-color: transparent !important;
+    background: transparent !important;
     color: var(--mvc-muted-strong) !important;
   }
   body .visual-knowledge-select-popup .t-select-option:hover,

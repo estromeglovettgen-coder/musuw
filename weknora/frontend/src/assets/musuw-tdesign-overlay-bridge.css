@@ -44,6 +44,20 @@ body .t-dialog .t-button--theme-primary:hover { border-color: #000 !important; b
  * The selectors are class-based because TDesign teleports the popup to body.
  */
 body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup) {
+  /* TDesign renders a popup root and a nested `.t-popup__content`. Keep the
+   * root as a positioning shell so only the content paints the scene-model
+   * panel; painting both layers creates the nested/overlapping frame seen in
+   * the settings dropdown. */
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #374151 !important;
+  box-shadow: none !important;
+  font-family: var(--app-font-family) !important;
+}
+body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup) > .t-popup__content {
+  margin: 0 !important;
   padding: 6px !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 16px !important;

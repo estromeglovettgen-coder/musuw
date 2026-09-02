@@ -70,7 +70,9 @@ const DEFAULT_SETTINGS: Readonly<ObsidianGraphSettings> = Object.freeze({
   linkStrength: 1,
   linkDistance: 250,
   scale: 1,
-  close: false,
+  // Panel visibility is a transient graph-view affordance. Start closed so
+  // entering a graph never obscures the canvas with persisted controls.
+  close: true,
 })
 
 function clamp(value: number, min: number, max: number): number {

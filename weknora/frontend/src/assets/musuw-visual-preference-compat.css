@@ -260,3 +260,47 @@
   border-color: #244b7c !important;
   color: #69a7ff !important;
 }
+
+/* Native TDesign selects use the same two-node popup structure in every
+ * non-chat settings surface: `.t-select__dropdown` is the positioning root
+ * and its child `.t-popup__content` is the painted panel. Keep only that
+ * child on the dark surface so the root cannot create a second frame. */
+:root[theme-mode="dark"] body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup) {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup) > .t-popup__content {
+  margin: 0 !important;
+  padding: 6px !important;
+  border: 1px solid var(--mvc-line) !important;
+  border-radius: 16px !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-muted-strong) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+
+/* `visual-scene-select` is the ordinary (non-homepage) TDesign equivalent
+ * of the scene-model selector. Its trigger must resolve to the same dark
+ * surface; the homepage chat selector has a separate class and is untouched.
+ */
+:root[theme-mode="dark"] body .visual-scene-select.visual-scene-select .t-select-input {
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] body .visual-scene-select.visual-scene-select .t-select-input .t-input {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-muted-strong) !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
+}
+:root[theme-mode="dark"] body .visual-scene-select.visual-scene-select .t-select-input .t-input:hover:not(.t-is-disabled),
+:root[theme-mode="dark"] body .visual-scene-select.visual-scene-select .t-select-input.t-is-focused .t-input {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}

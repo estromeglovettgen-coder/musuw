@@ -2,7 +2,7 @@
   <div class="wiki-browser">
     <!-- Graph view (full screen) -->
     <template v-if="view === 'graph'">
-      <div class="wiki-graph">
+      <div class="wiki-graph" @pointerdown.capture="handleGraphPointerDown">
         <div ref="graphRef" class="wiki-graph-canvas"></div>
 
         <!-- Graph Search Overlay -->
@@ -69,14 +69,6 @@
             }}</span>
           </div>
         </div>
-
-        <ObsidianGraphSettingsPanel
-          v-if="graphReady"
-          v-model="obsidianGraphSettings"
-          :shifted="graphDrawerVisible"
-          @reset="resetObsidianGraphSettings"
-          @animate="animateObsidianGraph"
-        />
 
         <!-- Legend Overlay -->
         <div
@@ -163,6 +155,14 @@
               <span class="legend-action-icon"><t-icon name="rollback" /></span>
               <span>{{ $t("knowledgeEditor.wikiBrowser.backToOverview") }}</span>
             </div>
+          </div>
+          <div class="legend-settings">
+            <ObsidianGraphSettingsPanel
+              v-if="graphReady"
+              v-model="obsidianGraphSettings"
+              @reset="resetObsidianGraphSettings"
+              @animate="animateObsidianGraph"
+            />
           </div>
           <template v-if="graphStatusCard">
             <div class="wiki-graph-status-card">
@@ -1500,6 +1500,29 @@ const graphReady = ref(false);
 const obsidianGraphSettings = ref<ObsidianGraphSettings>(
   loadObsidianGraphSettings(props.knowledgeBaseId),
 );
+
+// Graph settings are a transient overlay rather than a user preference. Keep
+// all physical graph settings persisted per knowledge base, but always start
+// a graph with the controls closed so they never cover the initial overview.
+function closeObsidianGraphSettings() {
+  if (obsidianGraphSettings.value.close) return;
+  obsidianGraphSettings.value = { ...obsidianGraphSettings.value, close: true };
+}
+
+// A single capture boundary covers canvas, legend, search and drawer-opening
+// interactions without coupling the panel to graph data or renderer events.
+// Events originating inside the settings wrapper are allowed through so the
+// panel's own sliders and buttons remain usable.
+function handleGraphPointerDown(event: PointerEvent) {
+  if (obsidianGraphSettings.value.close) return;
+  const target = event.target;
+  const settingsPanel = (event.currentTarget as HTMLElement).querySelector(
+    ".obsidian-graph-controls-wrap",
+  );
+  if (settingsPanel && target instanceof Node && settingsPanel.contains(target)) return;
+  closeObsidianGraphSettings();
+}
+
 // This remains the original WeKnora arrow control. The visual settings panel
 // deliberately does not own it, so the existing button and behavior contract
 // remain unchanged.
@@ -2038,6 +2061,7 @@ function renderMarkdown(content: string): string {
 }
 
 async function openGraphDrawer(slug: string) {
+  closeObsidianGraphSettings()
   try {
     const res = await getWikiPage(props.knowledgeBaseId, slug);
     graphDrawerPage.value = (res as any).data || (res as any);
@@ -4276,7 +4300,10 @@ function toggleArrows() {
 }
 
 function resetObsidianGraphSettings() {
-  obsidianGraphSettings.value = createDefaultObsidianGraphSettings();
+  obsidianGraphSettings.value = {
+    ...createDefaultObsidianGraphSettings(),
+    close: obsidianGraphSettings.value.close,
+  };
 }
 
 function animateObsidianGraph() {
@@ -4434,6 +4461,7 @@ watch(() => props.knowledgeBaseId, (knowledgeBaseId, previousKnowledgeBaseId) =>
     saveObsidianGraphSettings(previousKnowledgeBaseId, obsidianGraphSettings.value)
   }
   obsidianGraphSettings.value = loadObsidianGraphSettings(knowledgeBaseId)
+  closeObsidianGraphSettings()
   if (props.view === 'graph') void loadGraph()
 })
 
@@ -4597,6 +4625,7 @@ watch(
   () => props.view,
   (v) => {
     if (v === "graph") {
+      closeObsidianGraphSettings()
       void loadGraph();
     } else if (v === "browser") {
       disposeGraphRenderer();
@@ -4628,7 +4657,10 @@ watch(
 onMounted(() => {
   loadPages();
   loadStats();
-  if (props.view === "graph") loadGraph();
+  if (props.view === "graph") {
+    closeObsidianGraphSettings();
+    loadGraph();
+  }
 });
 
 onUnmounted(() => {
@@ -6086,6 +6118,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.legend-settings {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
 }
 
 .legend-action {

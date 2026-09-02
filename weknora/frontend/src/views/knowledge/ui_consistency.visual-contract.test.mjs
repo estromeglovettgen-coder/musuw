@@ -51,14 +51,16 @@ test('Agent and knowledge-base directory shells keep the same geometry at every 
   assert.match(directoryReference, /@media\s*\(min-width:\s*1024px\)[\s\S]*?\.visual-kb-grid\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)\s*!important;/)
 })
 
-test('Knowledge-base tag filter uses the same compact control box as type and status', () => {
+test('Knowledge-base tag, type and status filters share one popup trigger contract', () => {
   assert.match(
     knowledgeBase,
     /\.visual-knowledge-filter-button\s*\{[\s\S]*?width:\s*112px;[\s\S]*?height:\s*36px;[\s\S]*?padding:\s*8px 10px;[\s\S]*?gap:\s*6px;[\s\S]*?line-height:\s*16px;/,
   )
-  assert.match(knowledgeBase, /\.visual-knowledge-select\s*\{\s*flex:\s*0 0 112px;\s*width:\s*112px;/)
+  assert.equal((knowledgeBase.match(/class="visual-knowledge-filter-button"/g) || []).length, 3)
+  assert.doesNotMatch(knowledgeBase, /<t-select\b/)
+  assert.match(knowledgeBase, /\.visual-knowledge-filter-options\s*\{[\s\S]*?width:\s*176px;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button\s*\{[\s\S]*?background:\s*#fff;/)
-  assert.match(knowledgeBase, /\.visual-knowledge-filter-button\.is-active\s*\{[\s\S]*?border-color:\s*#d1d5db;[\s\S]*?background:\s*#f3f4f6;/)
+  assert.match(knowledgeBase, /\.visual-knowledge-filter-button\.is-active\s*\{[\s\S]*?border-color:\s*#d1d5db;[\s\S]*?background:\s*#fff;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button > span:not\(\.visual-knowledge-filter-button__clear\)\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?text-overflow:\s*clip;[\s\S]*?white-space:\s*nowrap;/)
   assert.doesNotMatch(knowledgeBase, /\.visual-knowledge-filter-button > span:not\(\.visual-knowledge-filter-button__clear\)\s*\{[^}]*text-overflow:\s*ellipsis;/)
   assert.match(knowledgeBase, /\.visual-tag-filter-popup \.t-popup__content\s*\{[\s\S]*?border-radius:\s*16px\s*!important;[\s\S]*?box-shadow:\s*0 20px 25px -5px/)

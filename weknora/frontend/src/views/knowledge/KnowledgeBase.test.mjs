@@ -12,8 +12,9 @@ test("knowledge detail keeps the compact reference toolbar without the user-hidd
   assert.match(source, /class="visual-knowledge-toolbar"[\s\S]*?visual-knowledge-toolbar__left/);
   assert.match(source, /data-guide="kb-detail-add-doc"/);
   assert.match(source, /visual-knowledge-toolbar__left[\s\S]*?visual-knowledge-toolbar__right/);
-  assert.match(source, /overlayClassName: 'visual-knowledge-select-popup visual-knowledge-select-popup--type'/);
-  assert.match(source, /\.visual-knowledge-select-popup\.t-select__dropdown[\s\S]*?max-height: 256px !important/);
+  assert.match(source, /fileTypeFilterPanelVisible[\s\S]*?visual-knowledge-filter-button/);
+  assert.match(source, /parseStatusFilterPanelVisible[\s\S]*?visual-knowledge-filter-button/);
+  assert.doesNotMatch(source, /<t-select\b/);
   assert.doesNotMatch(source, /visual-knowledge-date|<t-date-range-picker/);
 });
 
@@ -38,7 +39,7 @@ test("knowledge detail delegates setup plus empty and collapsed folder behavior 
   assert.doesNotMatch(wrapper, /currentChildFolders:\s*computed/);
   assert.doesNotMatch(wrapper, /childFolders|ROOT_FOLDER_PATH/);
   assert.match(wrapper, /const legacySetup = legacy\.setup/);
-  assert.match(wrapper, /setup\(props:[\s\S]*?return \{ \.\.\.state \}/);
+  assert.match(wrapper, /setup\(props:[\s\S]*?return \{[\s\S]*?\.\.\.state/);
   assert.match(nativeController, /const showFolderTree = computed\(\(\) => !isFAQ\.value && hasFolders\.value\)/);
   assert.match(nativeController, /if \(showFolderTree\.value && !folderTreeCollapsed\.value\) return \[\]/);
 });

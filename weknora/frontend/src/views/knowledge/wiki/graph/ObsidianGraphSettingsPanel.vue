@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="obsidian-graph-controls-wrap"
-    :class="{ 'is-shifted': shifted, 'is-open': !modelValue.close }"
-  >
+  <div class="obsidian-graph-controls-wrap">
     <button
       v-if="modelValue.close"
       type="button"
@@ -151,7 +148,6 @@ const GraphSlider = defineComponent({
 
 const props = defineProps<{
   modelValue: ObsidianGraphSettings
-  shifted?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -176,25 +172,9 @@ function toggleCollapse(key: 'collapse-display' | 'collapse-forces'): void {
 
 <style scoped lang="less">
 .obsidian-graph-controls-wrap {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 14;
+  position: static;
   color: var(--td-text-color-primary);
   font: var(--td-font-body-small, 12px/20px var(--td-font-family));
-  transition: right 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
-}
-
-.obsidian-graph-controls-wrap.is-shifted {
-  right: 496px;
-}
-
-.obsidian-graph-controls-wrap.is-open {
-  right: 164px;
-}
-
-.obsidian-graph-controls-wrap.is-open.is-shifted {
-  right: 644px;
 }
 
 button {

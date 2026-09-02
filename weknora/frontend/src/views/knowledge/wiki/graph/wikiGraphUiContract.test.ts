@@ -26,7 +26,7 @@ test('keeps the original WeKnora graph controls in their original order', () => 
     previous = index
   }
 
-  assert.match(template, /<div class="wiki-graph">/)
+  assert.match(template, /<div class="wiki-graph"(?:\s|>)/)
   assert.match(template, /<div\s+v-if="graphReady"\s+class="wiki-graph-legend"/)
   assert.doesNotMatch(template, /wiki-graph-style-panel/)
   assert.match(template, /<ObsidianGraphSettingsPanel[\s\S]*v-if="graphReady"/)

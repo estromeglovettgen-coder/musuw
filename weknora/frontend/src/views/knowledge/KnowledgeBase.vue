@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, type SetupContext } from 'vue'
+import { defineComponent, ref, type SetupContext } from 'vue'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
@@ -30,7 +30,43 @@ export default defineComponent({
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state }
+    const fileTypeFilterPanelVisible = ref(false)
+    const parseStatusFilterPanelVisible = ref(false)
+    const fileTypeFilterHover = ref(false)
+    const parseStatusFilterHover = ref(false)
+
+    const getFilterOptionLabel = (options: unknown, value: string): string => {
+      const list = Array.isArray(options) ? options : (options as { value?: unknown } | null)?.value
+      if (!Array.isArray(list)) return ''
+      return list.find((option: any) => option?.value === value)?.label || list[0]?.label || ''
+    }
+
+    const selectFileType = (value: string): void => {
+      if (state?.selectedFileType && typeof state.selectedFileType === 'object') {
+        state.selectedFileType.value = value
+      }
+      fileTypeFilterPanelVisible.value = false
+    }
+
+    const selectParseStatus = (value: string): void => {
+      if (state?.selectedParseStatus && typeof state.selectedParseStatus === 'object') {
+        state.selectedParseStatus.value = value
+      }
+      parseStatusFilterPanelVisible.value = false
+    }
+
+    if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      return {
+        ...state,
+        fileTypeFilterPanelVisible,
+        parseStatusFilterPanelVisible,
+        fileTypeFilterHover,
+        parseStatusFilterHover,
+        getFilterOptionLabel,
+        selectFileType,
+        selectParseStatus,
+      }
+    }
     return state
   },
 })
@@ -132,42 +168,86 @@ export default defineComponent({
                       <footer v-if="tagHasMore || canEdit"><button v-if="tagHasMore" type="button" :disabled="tagLoadingMore" @click.stop="kbId && loadTags(kbId)"><t-loading v-if="tagLoadingMore" size="small" /><span>{{ $t('tenant.loadMore') }}</span></button><button v-if="canEdit" type="button" @click="openTagManageDrawer">{{ $t('knowledgeBase.tagManageLink') }}</button></footer>
                     </section>
                   </template>
-                  <button type="button" class="visual-knowledge-filter-button" :class="{ 'is-active': !isTagFilterPlaceholder }" :title="activeTagFilterTitle">
+                  <button type="button" class="visual-knowledge-filter-button" :class="{ 'is-active': !isTagFilterPlaceholder }" :title="activeTagFilterTitle" @mouseenter="tagFilterTriggerHover = true" @mouseleave="tagFilterTriggerHover = false">
                     <t-icon name="tag" /><span>{{ activeTagFilterLabel }}</span><span v-if="showTagFilterClear" class="visual-knowledge-filter-button__clear" role="button" tabindex="0" @click.stop="clearTagFilter" @keydown.enter.stop.prevent="clearTagFilter"><t-icon name="close" /></span><t-icon v-else name="chevron-down" />
                   </button>
                 </t-popup>
 
-                <t-select
-                  v-model="selectedFileType"
-                  :options="fileTypeOptions"
-                  :placeholder="$t('knowledgeBase.fileTypeFilter')"
-                  :popup-props="{ overlayClassName: 'visual-knowledge-select-popup visual-knowledge-select-popup--type', popperOptions: { modifiers: [{ name: 'offset', options: { offset: [0, 6] } }] } }"
-                  class="visual-knowledge-select"
-                  :class="{ 'is-active': Boolean(selectedFileType) }"
+                <t-popup
+                  v-model:visible="fileTypeFilterPanelVisible"
+                  trigger="click"
+                  placement="bottom-left"
+                  overlay-class-name="visual-tag-filter-popup"
+                  :overlay-inner-style="{ padding: 0 }"
                 >
-                  <template #prefixIcon><t-icon name="file-1" /></template>
-                  <template #suffixIcon>
-                    <span
-                      v-if="selectedFileType"
-                      class="visual-knowledge-select__clear"
-                      role="button"
-                      tabindex="0"
-                      :aria-label="$t('common.clear')"
-                      @click.stop="selectedFileType = ''"
-                      @keydown.enter.stop.prevent="selectedFileType = ''"
-                      @keydown.space.stop.prevent="selectedFileType = ''"
-                    ><t-icon name="close" /></span>
-                    <t-icon v-else name="chevron-down" />
+                  <template #content>
+                    <section class="visual-tag-filter visual-knowledge-filter-options" role="listbox" @click.stop>
+                      <button
+                        v-for="option in fileTypeOptions"
+                        :key="option.value"
+                        type="button"
+                        class="visual-tag-filter__chip visual-knowledge-filter-option"
+                        :class="{ 'is-active': option.value === selectedFileType }"
+                        role="option"
+                        :aria-selected="option.value === selectedFileType"
+                        @click="selectFileType(option.value)"
+                      >
+                        <span>{{ option.label }}</span><t-icon v-if="option.value === selectedFileType" name="check" />
+                      </button>
+                    </section>
                   </template>
-                </t-select>
-                <t-select
-                  v-model="selectedParseStatus"
-                  :options="parseStatusOptions"
-                  :placeholder="$t('knowledgeBase.parseStatusFilter')"
-                  :popup-props="{ overlayClassName: 'visual-knowledge-select-popup visual-knowledge-select-popup--status', popperOptions: { modifiers: [{ name: 'offset', options: { offset: [0, 6] } }] } }"
-                  class="visual-knowledge-select"
-                  :class="{ 'is-active': Boolean(selectedParseStatus) }"
-                ><template #prefixIcon><t-icon name="check-circle" /></template></t-select>
+                  <button
+                    type="button"
+                    class="visual-knowledge-filter-button"
+                    :class="{ 'is-active': Boolean(selectedFileType) }"
+                    :aria-expanded="fileTypeFilterPanelVisible"
+                    aria-haspopup="listbox"
+                    @mouseenter="fileTypeFilterHover = true"
+                    @mouseleave="fileTypeFilterHover = false"
+                  >
+                    <t-icon name="file-1" /><span>{{ getFilterOptionLabel(fileTypeOptions, selectedFileType) }}</span>
+                    <span v-if="selectedFileType && fileTypeFilterHover" class="visual-knowledge-filter-button__clear" role="button" tabindex="0" :aria-label="$t('common.clear')" @click.stop="selectFileType('')" @keydown.enter.stop.prevent="selectFileType('')" @keydown.space.stop.prevent="selectFileType('')"><t-icon name="close" /></span>
+                    <t-icon v-else name="chevron-down" />
+                  </button>
+                </t-popup>
+
+                <t-popup
+                  v-model:visible="parseStatusFilterPanelVisible"
+                  trigger="click"
+                  placement="bottom-left"
+                  overlay-class-name="visual-tag-filter-popup"
+                  :overlay-inner-style="{ padding: 0 }"
+                >
+                  <template #content>
+                    <section class="visual-tag-filter visual-knowledge-filter-options" role="listbox" @click.stop>
+                      <button
+                        v-for="option in parseStatusOptions"
+                        :key="option.value"
+                        type="button"
+                        class="visual-tag-filter__chip visual-knowledge-filter-option"
+                        :class="{ 'is-active': option.value === selectedParseStatus }"
+                        role="option"
+                        :aria-selected="option.value === selectedParseStatus"
+                        @click="selectParseStatus(option.value)"
+                      >
+                        <span>{{ option.label }}</span><t-icon v-if="option.value === selectedParseStatus" name="check" />
+                      </button>
+                    </section>
+                  </template>
+                  <button
+                    type="button"
+                    class="visual-knowledge-filter-button"
+                    :class="{ 'is-active': Boolean(selectedParseStatus) }"
+                    :aria-expanded="parseStatusFilterPanelVisible"
+                    aria-haspopup="listbox"
+                    @mouseenter="parseStatusFilterHover = true"
+                    @mouseleave="parseStatusFilterHover = false"
+                  >
+                    <t-icon name="check-circle" /><span>{{ getFilterOptionLabel(parseStatusOptions, selectedParseStatus) }}</span>
+                    <span v-if="selectedParseStatus && parseStatusFilterHover" class="visual-knowledge-filter-button__clear" role="button" tabindex="0" :aria-label="$t('common.clear')" @click.stop="selectParseStatus('')" @keydown.enter.stop.prevent="selectParseStatus('')" @keydown.space.stop.prevent="selectParseStatus('')"><t-icon name="close" /></span>
+                    <t-icon v-else name="chevron-down" />
+                  </button>
+                </t-popup>
               </div>
             </div>
 
@@ -258,25 +338,18 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
 .visual-knowledge-filters::-webkit-scrollbar { display: none; }
 .visual-knowledge-toolbar :deep(.t-input),.visual-knowledge-toolbar :deep(.t-date-range-picker) { min-height: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background: rgb(249 250 251 / 80%); box-shadow: none !important; color: #374151; font-size: 12px; }
 .visual-knowledge-toolbar :deep(.t-input:hover),.visual-knowledge-toolbar :deep(.t-input.t-is-focused) { border-color: #9ca3af; background: #fff; }
-.visual-knowledge-select { flex: 0 0 112px; width: 112px; }
-.visual-knowledge-select :deep(.t-select-input) { min-height: 36px !important; }
-.visual-knowledge-select :deep(.t-input__wrap) { height: 36px !important; }
-.visual-knowledge-select :deep(.t-input) { width: 100% !important; }
-.visual-knowledge-select.is-active :deep(.t-input) { border-color: #d1d5db !important; background: #f3f4f6 !important; color: #111827 !important; font-weight: 700 !important; }
-.visual-knowledge-select :deep(.t-input__prefix) { margin-right: 8px !important; color: #9ca3af !important; }
-.visual-knowledge-select :deep(.t-input__suffix) { flex: 0 0 12px !important; width: 12px !important; margin-left: 6px !important; color: #9ca3af !important; }
-.visual-knowledge-select :deep(.t-input__prefix .t-icon) { width: 14px !important; height: 14px !important; font-size: 14px !important; }
-.visual-knowledge-select :deep(.t-input__suffix .t-icon) { width: 12px !important; height: 12px !important; font-size: 12px !important; }
-.visual-knowledge-select :deep(.t-input__inner) { height: 16px !important; color: inherit !important; font-family: var(--app-font-family) !important; font-size: 12px !important; line-height: 16px !important; font-weight: inherit !important; }
-.visual-knowledge-select__clear { width: 16px; height: 16px; margin: -2px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: #374151; cursor: pointer; }
-.visual-knowledge-select__clear:hover { background: #e5e7eb; }
 .visual-knowledge-filter-button { width: 112px; min-width: 112px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #374151; font: inherit; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-knowledge-filter-button:hover { border-color: #d1d5db; background: #fff; }
 .visual-knowledge-filter-button:focus-visible { outline: none; border-color: #d1d5db; box-shadow: 0 0 0 2px rgb(17 24 39 / 8%); }
-.visual-knowledge-filter-button.is-active { border-color: #d1d5db; background: #f3f4f6; color: #111827; font-weight: 700; }
+.visual-knowledge-filter-button.is-active { border-color: #d1d5db; background: #fff; color: #111827; font-weight: 700; }
 .visual-knowledge-filter-button > span:not(.visual-knowledge-filter-button__clear) { min-width: 0; flex: 1 1 auto; overflow: visible; text-overflow: clip; white-space: nowrap; }
 .visual-knowledge-filter-button :deep(.t-icon) { font-size: 14px; color: #9ca3af; }
 .visual-knowledge-filter-button__clear { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+.visual-knowledge-filter-options { width: 176px; max-height: min(320px,60vh); overflow-y: auto; flex-wrap: nowrap; gap: 4px; }
+.visual-knowledge-filter-option { width: 100%; min-height: 36px; padding: 8px 10px; border: 0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; color: #4b5563; font: inherit; font-size: 12px; line-height: 16px; text-align: left; cursor: pointer; }
+.visual-knowledge-filter-option:hover,.visual-knowledge-filter-option.is-active { background: #f3f4f6; color: #111827; }
+.visual-knowledge-filter-option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-knowledge-filter-option > :deep(.t-icon) { flex: 0 0 auto; font-size: 14px; }
 .visual-knowledge-view-toggle { padding: 2px; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; background: #f3f4f6; }
 .visual-knowledge-view-toggle button { width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #9ca3af; cursor: pointer; }
 .visual-knowledge-view-toggle button:hover { color: #374151; }
@@ -311,24 +384,8 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
 </style>
 <style>
 .visual-tag-filter-popup .t-popup__content { padding: 0 !important; overflow: hidden; border: 1px solid #e5e7eb !important; border-radius: 16px !important; background: #fff !important; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%),0 8px 10px -6px rgb(0 0 0 / 10%) !important; }
-body .visual-knowledge-select-popup.t-select__dropdown {
-  width: 144px !important;
-  max-height: 256px !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
-}
-body .visual-knowledge-select-popup .t-popup__content {
-  width: 100% !important;
-  max-height: 246px !important;
-  overflow-y: auto !important;
-}
-body .visual-knowledge-select-popup .t-select__dropdown-inner,
-body .visual-knowledge-select-popup .t-select__list { width: 100% !important; }
-body .visual-knowledge-select-popup .t-select-option {
-  width: 100% !important;
-}
-body .visual-knowledge-select-popup .t-popup__content::-webkit-scrollbar { width: 6px; }
-body .visual-knowledge-select-popup .t-popup__content::-webkit-scrollbar-track { background: transparent; }
-body .visual-knowledge-select-popup .t-popup__content::-webkit-scrollbar-thumb { border-radius: 10px; background: rgb(0 0 0 / 10%); }
-body .visual-knowledge-select-popup .t-popup__content::-webkit-scrollbar-thumb:hover { background: rgb(0 0 0 / 20%); }
+body .visual-tag-filter-popup .visual-knowledge-filter-options::-webkit-scrollbar { width: 6px; }
+body .visual-tag-filter-popup .visual-knowledge-filter-options::-webkit-scrollbar-track { background: transparent; }
+body .visual-tag-filter-popup .visual-knowledge-filter-options::-webkit-scrollbar-thumb { border-radius: 10px; background: rgb(0 0 0 / 10%); }
+body .visual-tag-filter-popup .visual-knowledge-filter-options::-webkit-scrollbar-thumb:hover { background: rgb(0 0 0 / 20%); }
 </style>

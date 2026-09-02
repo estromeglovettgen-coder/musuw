@@ -7,6 +7,7 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const main = read('./musuw-visual.less')
 const css = read('./musuw-tdesign-overlay-bridge.css')
+const preference = read('./musuw-visual-preference-compat.css')
 const sourceRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 function sourceFiles(dir) {
@@ -78,11 +79,51 @@ test('every t-select__dropdown definition delegates visual chrome to the bridge'
     'assets/musuw-tdesign-overlay-bridge.css',
     'assets/musuw-visual-preference-compat.css',
     'components/ShareKnowledgeBaseDialog.vue',
-    'views/knowledge/KnowledgeBase.vue',
   ])
 
   assert.match(css, /:not\(\.org-select-dropdown-popup\)/)
   assert.match(css, /:not\(\.share-org-select-popup\)/)
   assert.match(css, /:not\(\.sandbox-backend-popup\)/)
   assert.match(css, /:not\(\.sandbox-config-select-popup\)/)
+})
+
+test('select overlays paint one scene-model panel instead of nested surfaces', () => {
+  const outer = css.match(
+    /body \.t-select__dropdown:not\([^\{]+\)\s*\{([\s\S]*?)\n\}/,
+  )?.[1] || ''
+  assert.match(outer, /padding:\s*0\s*!important;/)
+  assert.match(outer, /border:\s*0\s*!important;/)
+  assert.match(outer, /background:\s*transparent\s*!important;/)
+  assert.match(outer, /box-shadow:\s*none\s*!important;/)
+
+  const content = css.match(
+    /body \.t-select__dropdown:not\([^\{]+\)\s*>\s*\.t-popup__content\s*\{([\s\S]*?)\n\}/,
+  )?.[1] || ''
+  assert.match(content, /padding:\s*6px\s*!important;/)
+  assert.match(content, /border:\s*1px solid #e5e7eb\s*!important;/)
+  assert.match(content, /border-radius:\s*16px\s*!important;/)
+  assert.match(content, /background:\s*#fff\s*!important;/)
+})
+
+test('ordinary scene-select triggers follow the dark theme without touching chat', () => {
+  const broadDarkOverlay = preference.indexOf(':root[theme-mode="dark"] body .t-dialog,')
+  const darkSinglePanelReset = preference.search(
+    /:root\[theme-mode="dark"\] body \.t-select__dropdown:not\([^\{]+\)\s*\{\s*padding:\s*0\s*!important;/,
+  )
+  assert.ok(
+    darkSinglePanelReset > broadDarkOverlay,
+    'the single-panel reset must follow and override the broad dark overlay surface',
+  )
+  assert.match(
+    preference,
+    /:root\[theme-mode="dark"\] body \.visual-scene-select\.visual-scene-select \.t-select-input \.t-input\s*\{[\s\S]*?background:\s*var\(--mvc-surface-raised\)\s*!important;[\s\S]*?color:\s*var\(--mvc-muted-strong\)\s*!important;/,
+  )
+  assert.match(
+    preference,
+    /:root\[theme-mode="dark"\] body \.visual-scene-select\.visual-scene-select \.t-select-input \.t-input:hover:not\(\.t-is-disabled\),[\s\S]*?background:\s*var\(--mvc-hover\)\s*!important;/,
+  )
+  const sceneDarkBlock = preference.match(
+    /:root\[theme-mode="dark"\] body \.visual-scene-select\.visual-scene-select \.t-select-input\s*\{([\s\S]*?)\n\}/,
+  )?.[1] || ''
+  assert.doesNotMatch(sceneDarkBlock, /visual-chat-composer|visual-model-selector__chat/)
 })
