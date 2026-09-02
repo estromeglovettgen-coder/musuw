@@ -656,7 +656,8 @@ func (s *customAgentService) getSuggestedQuestions(
 		return nil, err
 	}
 	scopeTagIDs := flattenTagScopeIDs(tagScopes)
-	explicitScopeRequested := isLiteProductEdition() && (len(kbIDs) > 0 || len(knowledgeIDs) > 0 || len(scopeTagIDs) > 0)
+	explicitScopeRequested := isLiteProductEdition() &&
+		(len(kbIDs) > 0 || len(knowledgeIDs) > 0 || len(scopeTagIDs) > 0)
 	if err := types.AuthorizeTenantAPIKeyOptionalTagIDs(ctx, scopeTagIDs); err != nil {
 		return nil, err
 	}
@@ -726,7 +727,8 @@ func (s *customAgentService) getSuggestedQuestions(
 
 	// 2. Determine knowledge base scope
 	effectiveKBIDs := kbIDs
-	if !explicitScopeRequested && len(effectiveKBIDs) == 0 && len(knowledgeIDs) == 0 && len(resolvedTags.TagIDsByTenant) == 0 {
+	if !explicitScopeRequested &&
+		len(effectiveKBIDs) == 0 && len(knowledgeIDs) == 0 && len(resolvedTags.TagIDsByTenant) == 0 {
 		// Use agent's KB configuration
 		switch agent.Config.KBSelectionMode {
 		case "all":

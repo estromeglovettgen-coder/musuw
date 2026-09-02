@@ -1138,7 +1138,9 @@ func (s *knowledgeService) SearchKnowledge(ctx context.Context, keyword string, 
 				sharedList, err := s.kbShareService.ListSharedKnowledgeBases(ctx, tenantID, callerTenantRole)
 				if err == nil {
 					for _, info := range sharedList {
-						if info != nil && info.KnowledgeBase != nil && info.KnowledgeBase.Type == types.KnowledgeBaseTypeDocument {
+						if info != nil &&
+							info.KnowledgeBase != nil &&
+							info.KnowledgeBase.Type == types.KnowledgeBaseTypeDocument {
 							scopes = append(scopes, types.KnowledgeSearchScope{
 								TenantID: info.SourceTenantID,
 								KBID:     info.KnowledgeBase.ID,

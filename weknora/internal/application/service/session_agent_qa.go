@@ -411,7 +411,9 @@ func (s *sessionService) buildAgentConfig(
 	if isLiteProductEdition() && isPlatformManagedBuiltinAgentID(customAgent.ID) && customAgent.TenantID != 0 {
 		searchTenantID = customAgent.TenantID
 	}
-	searchTargets, err := s.buildSearchTargets(ctx, searchTenantID, agentConfig.KnowledgeBases, agentConfig.KnowledgeIDs, req.TagScopes)
+	searchTargets, err := s.buildSearchTargets(
+		ctx, searchTenantID, agentConfig.KnowledgeBases, agentConfig.KnowledgeIDs, req.TagScopes,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("build search targets: %w", err)
 	}

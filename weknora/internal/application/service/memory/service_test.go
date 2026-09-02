@@ -561,7 +561,7 @@ func TestDeleteItemEmbeddingFailureKeepsItemAndDoesNotDeleteIt(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, []string{"delete_embedding"}, spy.calls,
 		"a failed vector cleanup must stop before deleting the item")
-	left, err := spy.MemoryRepository.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	left, err := spy.GetItem(ctx, scopeFor(t, ctx), item.ID)
 	require.NoError(t, err)
 	require.NotNil(t, left, "the item must remain retryable when vector cleanup fails")
 }
@@ -583,7 +583,7 @@ func TestClearEmbeddingFailureKeepsItemsAndStopsBeforeDeleteAll(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, []string{"delete_all_embeddings"}, spy.calls,
 		"clear must fail before deleting items when detached-vector cleanup fails")
-	left, err := spy.MemoryRepository.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	left, err := spy.GetItem(ctx, scopeFor(t, ctx), item.ID)
 	require.NoError(t, err)
 	require.NotNil(t, left, "the item must remain retryable when clear cleanup fails")
 }
@@ -894,7 +894,7 @@ func TestUpdateItemSucceedsWhenEmbeddingInvalidationFails(t *testing.T) {
 	require.NoError(t, err, "the content update is already committed; vector cleanup stays best effort")
 	require.Equal(t, "修正后的连接池说法", updated.Content)
 	require.Equal(t, []string{"delete_embedding"}, spy.calls)
-	stored, err := spy.MemoryRepository.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	stored, err := spy.GetItem(ctx, scopeFor(t, ctx), item.ID)
 	require.NoError(t, err)
 	require.Equal(t, "修正后的连接池说法", stored.Content)
 }

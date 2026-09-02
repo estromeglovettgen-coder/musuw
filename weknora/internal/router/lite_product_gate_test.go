@@ -45,8 +45,14 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "ordinary attachment remains", method: "GET", path: "/api/v1/sessions/session-1/attachments", blocked: false},
 		{name: "kb share create hidden", method: "POST", path: "/api/v1/knowledge-bases/1/shares", blocked: true},
 		{name: "kb share list hidden", method: "GET", path: "/api/v1/knowledge-bases/1/shares", blocked: true},
-		{name: "kb share update hidden", method: "PUT", path: "/api/v1/knowledge-bases/1/shares/share-1", blocked: true},
-		{name: "kb share delete hidden", method: "DELETE", path: "/api/v1/knowledge-bases/1/shares/share-1", blocked: true},
+		{
+			name: "kb share update hidden", method: "PUT",
+			path: "/api/v1/knowledge-bases/1/shares/share-1", blocked: true,
+		},
+		{
+			name: "kb share delete hidden", method: "DELETE",
+			path: "/api/v1/knowledge-bases/1/shares/share-1", blocked: true,
+		},
 		{name: "shared kb list hidden", method: "GET", path: "/api/v1/shared-knowledge-bases", blocked: true},
 		{name: "model runtime list", method: "GET", path: "/api/v1/models", blocked: false},
 		{name: "model runtime detail", method: "GET", path: "/api/v1/models/builtin-deepseek-v4-flash", blocked: false},
@@ -72,9 +78,18 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "organization list hidden", method: "GET", path: "/api/v1/organizations", blocked: true},
 		{name: "organization read hidden", method: "GET", path: "/api/v1/organizations/3", blocked: true},
 		{name: "organization kb shares hidden", method: "GET", path: "/api/v1/organizations/3/shares", blocked: true},
-		{name: "organization shared kb list hidden", method: "GET", path: "/api/v1/organizations/3/shared-knowledge-bases", blocked: true},
-		{name: "owner knowledge base detail remains available", method: "GET", path: "/api/v1/knowledge-bases/own-kb", blocked: false},
-		{name: "owner wiki deep link remains available", method: "GET", path: "/api/v1/knowledgebase/own-kb/wiki/pages/private", blocked: false},
+		{
+			name: "organization shared kb list hidden", method: "GET",
+			path: "/api/v1/organizations/3/shared-knowledge-bases", blocked: true,
+		},
+		{
+			name: "owner knowledge base detail remains available", method: "GET",
+			path: "/api/v1/knowledge-bases/own-kb", blocked: false,
+		},
+		{
+			name: "owner wiki deep link remains available", method: "GET",
+			path: "/api/v1/knowledgebase/own-kb/wiki/pages/private", blocked: false,
+		},
 		{name: "consumer retrieval config read", method: "GET", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
 		{name: "consumer retrieval config write", method: "PUT", path: "/api/v1/tenants/kv/retrieval-config", blocked: false},
 		{name: "workspace memory config read", method: "GET", path: "/api/v1/tenants/kv/memory-config", blocked: false},

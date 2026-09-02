@@ -30,7 +30,8 @@ func rejectLiteForeignAgent(ctx context.Context, req *types.QARequest) error {
 		callerTenantID != req.Session.TenantID {
 		return apperrors.NewNotFoundError("agent not found")
 	}
-	if req.CustomAgent != nil && !isPlatformManagedBuiltinAgentID(req.CustomAgent.ID) && req.CustomAgent.TenantID != 0 &&
+	if req.CustomAgent != nil &&
+		!isPlatformManagedBuiltinAgentID(req.CustomAgent.ID) && req.CustomAgent.TenantID != 0 &&
 		req.CustomAgent.TenantID != req.Session.TenantID {
 		return apperrors.NewNotFoundError("agent not found")
 	}
