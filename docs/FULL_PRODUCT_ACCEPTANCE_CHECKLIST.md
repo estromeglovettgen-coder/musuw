@@ -1,6 +1,6 @@
 # Musuw 全产品、全链路验收清单
 
-**用途：** Musuw 每次升级、测试环境发布和生产推广前的长期验收基线。覆盖全部可点击/可输入/可切换功能、管理员和运营入口、后台消费链路、角色权限、异常恢复，以及按产品策略必须隐藏的能力。
+**用途：** Musuw 每次升级、测试环境发布和生产推广前的长期验收基线。覆盖全部可点击/可输入/可切换功能、管理员和运营入口、后台消费链路、单用户私有工作区边界、异常恢复，以及按产品策略必须隐藏的能力。
 
 **当前基线：** WeKnora `main` 固定提交 `81142dfd17b2778087e95d3a317483a2fd909b91`；当前测试环境源码 `8e1c69c13543f95acebb66a5dadb3c21c26ab049`。项目背景、部署边界和已有证据见 [`HANDOFF.md`](HANDOFF.md)。
 
@@ -23,7 +23,7 @@
 2. 刷新、返回、重登后状态正确；取消/关闭不会误保存。
 3. 空值、非法值、边界值、重复提交有明确且就近的反馈。
 4. loading、empty、disabled、success、error、timeout、retry 状态完整，不能“点击没反应”。
-5. Viewer、Contributor、Admin、Owner、SystemAdmin 的 UI 与服务端权限一致。
+5. 普通 SaaS 用户必须保持单账号、单用户、私有工作区；多成员角色与分享入口不可见、深链/API 不可绕过。SystemAdmin 内部运维权限单独验收，不等同用户协作分享。
 6. 双击、快速重复操作、多标签页、迟到响应不能重复创建或覆盖新输入。
 7. 亮色、暗色、桌面、窄屏、键盘和焦点状态符合 §18。
 8. 凭据和 token 不出现在 URL、日志、错误、截图或持久化浏览器数据中。
@@ -34,7 +34,7 @@
 - [ ] `ENV-001` staging `/health`、HTTPS、静态资源正常，根页面为 `noindex, nofollow`。
 - [ ] `ENV-002` staging Paddle 为 Sandbox；禁止任何 Live 交易/webhook 写入。
 - [ ] `ENV-003` production 仅只读核验健康、SHA、迁移号和 Paddle Live 边界；不得发布、写数据或重启。
-- [ ] `ENV-004` 准备 Lite Viewer、Lite Admin/Owner、Standard Viewer/Contributor/Admin/Owner、SystemAdmin 身份。
+- [ ] `ENV-004` 准备普通 Lite 单用户身份与独立 SystemAdmin 运维身份；Standard 多成员角色仅用于上游兼容性隔离测试，不是消费者上线门。
 - [ ] `ENV-005` 准备 free/paid/pending/past_due/额度耗尽、空租户、升级旧数据和跨租户对照夹具。
 - [ ] `ENV-006` 记录部署 SHA、镜像 digest、DB 迁移号、容器健康/重启/OOM 和开始时间。
 
@@ -55,6 +55,7 @@
 | GitLab、Tencent IMA、XMind | `DS-001`、`DS-002`、`HIDE-002`–`HIDE-004` | Lite 不暴露 XMind/GitLab/IMA；Standard 保留上游 GitLab/IMA connector catalog |
 | MCP/OAuth/approval 增强 | `MCP-*` | 仅兼容的授权角色；普通 Lite 不管理 |
 | turn usage、consumer model/plan policy | `MODEL-005`、`BILL-010`–`BILL-013`、`OPS-005` | 保留 Musuw 套餐、额度和付费语义 |
+| Organization、成员角色与 Agent/KB 分享 | `AGENT-016`、`ORG-*`、`HIDE-013` | 普通 SaaS 明确不提供；UI、深链和 API 三层隐藏。SystemAdmin 运维不是协作分享 |
 
 ## 1. 官网、公开页和法律页
 
@@ -101,7 +102,7 @@
 
 基线：Lite 主导航与基本会话 `PASS-CURRENT`；全部控件 `PARTIAL`。
 
-- [ ] `SHELL-001` Logo、新对话、KB、Agent、Organization 按 Edition/capability/role 显示并导航。
+- [ ] `SHELL-001` Logo、新对话、KB、Agent 正确显示并导航；普通 SaaS 不显示 Organization/分享导航。
 - [ ] `SHELL-002` 侧栏折叠/展开、Logo 返回、拖拽宽度和刷新持久化。
 - [ ] `SHELL-003` 窄屏侧栏 overlay、关闭、焦点、滚动和主内容可达。
 - [ ] `SHELL-004` Standard 搜索/Cmd-K 打开命令面板；Lite 不显示。
@@ -121,10 +122,10 @@
 
 - [ ] `MENU-001` 账户→profile；折叠侧栏点击先展开，不出现错位浮层。
 - [ ] `MENU-002` Usage、Plans、General/个人设置进入正确 section。
-- [ ] `MENU-003` Standard workspace/member/model/all-settings 按角色显示；Lite 隐藏。
+- [ ] `MENU-003` 普通 SaaS 隐藏 workspace/member/organization 协作设置；内部 Standard/SystemAdmin 管理面按独立 capability 显示。
 - [ ] `MENU-004` SystemAdmin 入口只对 SystemAdmin；深链对其他角色回退。
 - [ ] `MENU-005` Standard help/GitHub/重开引导外链正确；Lite 策略一致。
-- [ ] `MENU-006` 多租户 hover/click、current/home、切换、持久化和 toast。
+- [ ] `MENU-006` 普通 SaaS 无多租户切换入口；内部 Standard/SystemAdmin 切换不串缓存。`DEFERRED-HIDDEN`（consumer）
 - [ ] `MENU-007` Create tenant capability、成功/取消/错误/禁止提示。
 - [ ] `MENU-008` Logout API、本地清理和外部 Auth handoff 完整。
 
@@ -133,18 +134,18 @@
 基线：Document KB、AnyDoc、auto-tag、Basic/Advanced Musuw UI `PASS-CURRENT`；其余 `PARTIAL`。
 
 - [ ] `KB-001` 列表 loading/skeleton/empty/error/retry/分页。
-- [ ] `KB-002` All/Mine/Favorites/Recents/Shared 过滤、数量和刷新保持。
-- [ ] `KB-003` Standard space/sidebar 与 tenant/shared/read-only/by-me 分组；Lite 简化。
+- [ ] `KB-002` All/Mine/Favorites/Recents 过滤、数量和刷新保持；普通 SaaS 无 Shared 过滤。
+- [ ] `KB-003` 内部 Standard 可保留 tenant/shared/read-only/by-me 上游分组；普通 SaaS 仅私有列表且不可通过状态注入恢复 Shared。
 - [ ] `KB-004` 搜索、清空、无结果、中英文/大小写。
-- [ ] `KB-005` Create 仅 Contributor+；Viewer UI 隐藏且接口拒绝。
+- [ ] `KB-005` 单用户 owner 可创建；未登录/错误账号拒绝，不暴露协作角色差异。
 - [ ] `KB-006` 新建默认 Document；Lite 不显示 FAQ/Wiki 类型。
 - [ ] `KB-007` 名称/描述/封面、空/重复/长度、取消和错误。
 - [ ] `KB-008` 新建默认模型、AnyDoc、chunk/retrieval/auto-tag/attachment 与预设一致。
 - [ ] `KB-009` Create 双击只建一个，成功打开详情，失败无幽灵卡片。
-- [ ] `KB-010` 卡片 open/favorite/pin/edit/copy/share/delete 按角色正确。
+- [ ] `KB-010` 卡片 open/favorite/pin/edit/copy/delete 正确；普通 SaaS 无 share 动作。
 - [ ] `KB-011` copy/duplicate 进度、数据完整、失败重试和幂等。
 - [ ] `KB-012` delete 确认、后台任务、列表消失、失败恢复。
-- [ ] `KB-013` shared viewer/editor 卡、来源、跳转、取消共享。
+- [ ] `KB-013` shared viewer/editor 卡、来源、跳转、取消共享。`DEFERRED-HIDDEN`：普通 SaaS 不提供，验证三层不可达。
 - [ ] `KB-014` 旧 v0.7.2 KB 的模型、检索、R2、图谱和权限不被新默认覆盖。
 
 ### Basic / Advanced
@@ -160,7 +161,7 @@
 - [ ] `KBSET-009` 模型只显示套餐允许/就绪项；embedding 等放 Advanced 或按策略隐藏。
 - [ ] `KBSET-010` VLM/ASR/image/audio/parser wait 设置（Standard/Admin）保存并实测。
 - [ ] `KBSET-011` storage/vector/parser 受管理员策略，普通用户不可改基础设施。
-- [ ] `KBSET-012` share role/expiry/revoke/copy；activity filter/detail/clear（owner/admin）。
+- [ ] `KBSET-012` share role/expiry/revoke/copy。`DEFERRED-HIDDEN`：普通 SaaS 不提供；activity 若保留必须与分享 UI 解耦。
 - [ ] `KBSET-013` DataSource 仅 Admin/Standard；Lite 无入口。
 - [ ] `KBSET-014` 全页复用 VisualSettingsShell、左 nav、unboxed rows、统一 footer。
 
@@ -225,7 +226,7 @@
 - [ ] `WIKI-009` Graph node search/help/type chips/fit/arrows/frontier/overview。
 - [ ] `WIKI-010` Obsidian settings reset/animate/physics/theme；node detail/neighbors/bloom。
 - [ ] `WIKI-011` 大图性能、empty/error、亮暗、窄屏、键盘和 tooltip。
-- [ ] `WIKI-012` Viewer 只读；page/folder/revision/fix/delete 服务端权限正确。`PARTIAL`：2026-09-01 隔离 Standard 已证明 Viewer 可读 shared Wiki page、page create 返回 403、禁止页保持 404，且 shared Agent runtime 不注册 Wiki mutation tools；folder/revision/fix/delete 矩阵待跑。
+- [ ] `WIKI-012` 单用户 owner 的 page/folder/revision/fix/delete 服务端权限正确；错误账号不可读写。2026-09-01 隔离 Standard Viewer/share 证据仅属上游兼容实验，不再是消费者上线门。
 - [ ] `WIKI-013` Standard KB Graph 设置的 enable/instructions/tags/random-tag/random-text/entities/relations/extract；graph DB disabled、模型未就绪、成功/失败、保存/取消和 Admin 权限。
 
 ### FAQ product gate
@@ -242,7 +243,7 @@
 
 - [ ] `CHAT-001` global/KB new-chat，首次 suggestions、空输入、创建失败。
 - [ ] `CHAT-002` Quick Answer/Smart Reasoning/custom Agent 切换后 model/KB/tools 同步。
-- [ ] `CHAT-003` KB selector 单/多/全选/取消/search/shared read-only/mention scope。
+- [ ] `CHAT-003` 私有 KB selector 单/多/全选/取消/search/mention scope；普通 SaaS 不出现 shared read-only 资源。
 - [ ] `CHAT-004` model 只显示 plan+scene 可用项；V4 Flash 默认、切换与刷新。
 - [ ] `CHAT-005` reasoning levels、unsupported 隐藏/禁用、payload 与 UI 一致。
 - [ ] `CHAT-006` send、Enter/Shift-Enter、pending disable、双击不重复 message。
@@ -271,18 +272,18 @@
 - [ ] `ATT-005` temp attachment list/get/preview/delete/expiry/cross-tenant deny。
 - [ ] `ATT-006` Lite ordinary attachments 保留；Sandbox artifact 隐藏。
 
-## 8. Agent 列表、编辑、分享和真实运行
+## 8. Agent 列表、编辑和真实运行
 
 基线：Lite allow-list、默认项和基本问答为 `PASS-CURRENT/PASS-CONTRACT`；完整 CRUD/tools `PARTIAL`。
 
-- [ ] `AGENT-001` builtin/mine/workspace/shared groups、折叠、search、empty/loading/error。
+- [ ] `AGENT-001` builtin/mine groups、折叠、search、empty/loading/error；普通 SaaS 不出现 workspace/shared groups。
 - [ ] `AGENT-002` Quick/Smart/Data Analyst/Wiki agents 用途正确；Data Analyst 只算 v0.7.2 回归。
 - [ ] `AGENT-003` Create name/description/avatar/type preset/mode；save/cancel/double/error。
 - [ ] `AGENT-004` edit/copy/favorite/delete/persist；非 owner 权限。
 - [ ] `AGENT-005` Lite 仅 Basic/Knowledge/Prompts；deep-link/watcher/validation 不暴露 hidden tab。
-- [ ] `AGENT-006` Standard Basic/Knowledge/Prompts/Conversation/Retrieval/Web/Multimodal/Suggestions/Tools/MCP/Skills/Share 按 capability/role。
+- [ ] `AGENT-006` 内部 Standard Basic/Knowledge/Prompts/Conversation/Retrieval/Web/Multimodal/Suggestions/Tools/MCP/Skills 按 capability；Share 不属于普通 SaaS 产品面。
 - [ ] `AGENT-007` mode/model/memory/system prompt/template/placeholders 保存回显。
-- [ ] `AGENT-008` KB scope all/selected/mentioned、search/delete/shared/no-KB error。
+- [ ] `AGENT-008` 私有 KB scope all/selected/mentioned、search/delete/no-KB error；普通 SaaS 不出现 shared KB。
 - [ ] `AGENT-009` multi-turn/history/query rewrite 开关影响真实请求。
 - [ ] `AGENT-010` retrieval keyword/vector/rerank/topK/threshold/FAQ/direct/boost/data-analysis。
 - [ ] `AGENT-011` Web enable/provider/max/fetch/topN；new Agent default on，off 不调用。
@@ -290,7 +291,7 @@
 - [ ] `AGENT-013` starters/followups add/delete/source/count/model/Advanced/result。
 - [ ] `AGENT-014` Tools groups/select-all/read-write/danger/default/real tool calls。
 - [ ] `AGENT-015` 新 Agent 图片/音频/Web Search+Fetch/基础 Tools 默认开；旧 Agent 不被覆盖。
-- [ ] `AGENT-016` share tenant/org/role/unshare/shared detail/disable shared Agent。`PARTIAL`：2026-09-01 隔离 Standard 已通过跨租户 organization Viewer share、shared list、真实 Wiki tool call 与 unshare cleanup；shared detail/disable 和其余角色待跑。
+- [ ] `AGENT-016` Agent tenant/org/role 分享。`DEFERRED-HIDDEN`：普通 SaaS 明确不提供；必须验证入口、深链和非必要分享 API 均不可用。2026-09-01 隔离 Standard 的跨租户分享实验仅保留为上游兼容证据，不再是消费者上线矩阵。
 - [ ] `AGENT-017` suggestions get/ensure/event；failure/late/multi-user。
 - [ ] `AGENT-018` timeout/max iterations/tool/model/quota failure 有明确 UI。
 - [x] `AGENT-019` Lite 新建 Agent 不因无权读取 storage config 而丢默认 system prompt。`PASS-CURRENT`：2026-09-01 staging 新建 `ACC-20260901T1710Z-Agent-Prefetch`，刷新后 11,649 字符 prompt 保持，真实 chat 以 3 次 tool call 返回知识库 marker `ORBITAL SAGE 4826` 与引用，再刷新后 Agent/回答/引用仍保持。
@@ -302,12 +303,12 @@
 
 ### Workspace Memory
 
-- [ ] `MEM-001` Viewer 看完整 Basic+Advanced 但只读；Admin/Owner 可保存。
+- [ ] `MEM-001` 单用户 owner 可见并可保存完整 Basic+Advanced；普通产品不暴露协作角色差异。
 - [ ] `MEM-002` enabled、explicit/auto writes、retrieval conditioning、max items。
 - [ ] `MEM-003` Advanced 显示 vector recall、embedding/extraction model、delay、min interval、interest threshold、instructions。
 - [ ] `MEM-004` embedding 可放 Advanced；默认/不可用/已有数据切换限制和说明。
 - [ ] `MEM-005` workspace off 时个人页、extract/recall、提示一致。
-- [ ] `MEM-006` 多 admin 保存、迟到响应、权限变化不覆盖新值。
+- [ ] `MEM-006` 重复保存、迟到响应和会话/身份变化不覆盖新值；多 admin 竞态不属于普通产品门。
 
 ### Personal Memory
 
@@ -322,7 +323,7 @@
 - [ ] `MEM-015` consolidate confirm/progress/double/retry。
 - [ ] `MEM-016` clear 真清 vector+lexical，chat 不再 recall，审计可追踪。
 - [ ] `MEM-017` auto extract/delay/threshold/explicit/cross-session recall 真实问答。
-- [ ] `MEM-018` cross-tenant/shared Agent/role 隔离，个人记忆不可越权。
+- [ ] `MEM-018` 跨账号、登出重登、旧浏览器状态与 Agent 会话隔离，个人记忆不可越权；shared Agent 角色矩阵移出普通产品门。
 
 ## 10. Settings、profile、models、usage
 
@@ -360,35 +361,35 @@
 - [ ] `BILL-014` 清理 tenant `10002` stale in-flight checkout，确认新订单不受阻。
 - [ ] `BILL-015` 全流程只用 Sandbox；production Live 仅只读。
 
-## 12. Tenant、member、invitation、organization、share
+## 12. 内部 Tenant/SystemAdmin 与消费者协作负向边界
 
-基线：权限契约 `PASS-CONTRACT`；消费者浏览器矩阵 `NOT-RUN`。
+基线：普通 SaaS 是单账号、单用户、私有工作区；成员、邀请、Organization 和分享不是消费者能力。内部 Standard/SystemAdmin 契约可做隔离兼容测试，但不能提升为消费者上线要求或可见入口。
 
 ### Tenant and members
 
-- [ ] `TEN-001` Tenant name/description edit；Viewer read-only，Admin/Owner persist。
-- [ ] `TEN-002` storage quota/over-limit/error；普通 Admin 不可扩大平台配额。
-- [ ] `TEN-003` member search/page/refresh/empty/role labels/audit drawer。
-- [ ] `TEN-004` invite/revoke/duplicate/existing/expired/member limit。
-- [ ] `TEN-005` invite link create/copy/rotate/revoke/expiry/login/register auto-accept。
-- [ ] `TEN-006` role Viewer/Contributor/Admin 后菜单和接口立即一致。
-- [ ] `TEN-007` remove/leave/last-owner/self-removal safeguards。
-- [ ] `TEN-008` Standard invitation inbox list/pending/accept/decline/by-token，badge 同步。
-- [ ] `TEN-009` tenant switch/home/preference/toast/cache isolation。
-- [ ] `TEN-010` tenant delete name confirmation/background cleanup/recovery/audit。
-- [ ] `TEN-011` Lite 无 invitation inbox/bell/polling；`/me/invitations*` 被 edition gate 拒绝。
+- [ ] `TEN-001` 私有工作区名称/描述若对 consumer 暴露则单用户保存；成员角色编辑 `N/A`。
+- [ ] `TEN-002` storage quota/over-limit/error；普通用户不可扩大平台配额。
+- [ ] `TEN-003` member search/page/role/audit drawer。`N/A`：普通 SaaS 不提供。
+- [ ] `TEN-004` invite/revoke/duplicate/existing/expired/member limit。`N/A`：普通 SaaS 不提供。
+- [ ] `TEN-005` invite link create/copy/rotate/revoke/expiry/login/register auto-accept。`N/A`：普通 SaaS 不提供。
+- [ ] `TEN-006` Viewer/Contributor/Admin 角色切换。`N/A`：普通 SaaS 不提供。
+- [ ] `TEN-007` remove/leave/last-owner/self-removal safeguards。`N/A`：普通 SaaS 不提供成员操作；账号删除走 erasure。
+- [ ] `TEN-008` invitation inbox list/pending/accept/decline/by-token。`N/A`：普通 SaaS 不提供。
+- [ ] `TEN-009` tenant switch/home/preference/toast。`DEFERRED-HIDDEN`：普通 SaaS 无切换入口；仍验证缓存不能跨账号。
+- [ ] `TEN-010` 私有工作区/账号删除走 account erasure 的确认、后台清理、恢复和审计。
+- [ ] `TEN-011` 普通 SaaS 无 invitation inbox/bell/polling；`/me/invitations*` 被 edition gate 拒绝。`DEFERRED-HIDDEN`
 
-### Organizations and shares
+### Organizations and shares（普通 SaaS 均为 `DEFERRED-HIDDEN`）
 
-- [ ] `ORG-001` created/joined groups/search/collapse/load/empty/error。
-- [ ] `ORG-002` create name/emoji/description、duplicate/cancel/error。
-- [ ] `ORG-003` search/code join preview/stats/request role+message/already/member limit。
-- [ ] `ORG-004` join requests approve role/reject/concurrent/expired。
-- [ ] `ORG-005` basic settings/searchable/approval/limit/invite code/link/expiry。
-- [ ] `ORG-006` members search/add tenant/role/remove/upgrade requests/page。
-- [ ] `ORG-007` shared KB/Agent add/viewer/editor/jump/source/unshare。
-- [ ] `ORG-008` leave/delete/last-owner/resources boundary。
-- [ ] `ORG-009` Lite hides Organizations and server gate denies deep links/API。
+- [ ] `ORG-001` created/joined groups/search/collapse/load/empty/error。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-002` create name/emoji/description、duplicate/cancel/error。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-003` search/code join preview/stats/request role+message/already/member limit。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-004` join requests approve role/reject/concurrent/expired。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-005` basic settings/searchable/approval/limit/invite code/link/expiry。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-006` members search/add tenant/role/remove/upgrade requests/page。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-007` shared KB/Agent add/viewer/editor/jump/source/unshare。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-008` leave/delete/last-owner/resources boundary。`N/A`：普通 SaaS 不提供。
+- [ ] `ORG-009` 普通 SaaS 隐藏 Organizations，服务端 gate 拒绝深链/API。`DEFERRED-HIDDEN`
 
 ## 13. Standard/Admin 模型、parser、vector、storage、web-search
 
@@ -525,9 +526,9 @@
 
 ## 19. 权限、安全、异常和负向矩阵
 
-- [ ] `SEC-001` 每条 Viewer/Contributor/Admin/Owner/SystemAdmin route 做 UI 与 API 正反向。
+- [ ] `SEC-001` 普通单用户与 SystemAdmin 运维 route 做 UI/API 正反向；Viewer/Contributor/Admin/Owner 只作为内部 Standard 兼容矩阵，不是消费者上线门。
 - [ ] `SEC-002` JWT/API-key capability mismatch、revoked member old JWT、wrong tenant/path tenant deny。
-- [ ] `SEC-003` KB/Agent/Org share 的 read/write/download/reshare 权限一致。
+- [ ] `SEC-003` 普通 SaaS 的 KB/Agent/Org share 入口、深链和 API 均不可用。`DEFERRED-HIDDEN`
 - [ ] `SEC-004` 跨租户 UUID/ID/file URL/artifact/message/session 不可枚举。
 - [ ] `SEC-005` upload/URL/import 防 SSRF/path traversal/MIME spoof/archive bomb/unbounded read。
 - [ ] `SEC-006` provider/API/MCP/storage secrets 写后掩码，log/audit/toast/request 不回显。
@@ -552,6 +553,7 @@
 - [ ] `HIDE-010` consumer datasource/IM/Embed/API-key/organization/system-admin surfaces。
 - [ ] `HIDE-011` direct URL/old bookmark/query/state injection/API 均不能绕过。
 - [ ] `HIDE-012` Lite KB detail 的 `?section=models/vector/parser/storage/graph/...`、`?tab=...` 和 nested deep link 也必须由 KB editor 与服务端共同拒绝；不能只依赖 `/platform/settings` guard。
+- [ ] `HIDE-013` consumer Agent/KB Organization 分享、成员角色、join/invite/shared groups；普通 UI 无入口，深链不可达，非必要分享 API 不向普通用户开放。SystemAdmin 运维权限不视为分享例外。
 
 ## 21. 陈旧接口和前后端一致性
 
@@ -574,10 +576,10 @@
 3. folder/tag/batch/move/reparse/cancel/delete/download/chunk/revision/summary 全文档动作。
 4. Wiki page/folder/revision/conflict/lint/auto-fix/Obsidian graph。
 5. Chat stop/continue/history/attachment errors/suggestions/citation drawer/title manual-race。
-6. Agent CRUD/copy/share/favorite/full config/basic Tools real call。
-7. Viewer→SystemAdmin、sharing 和 cross-tenant 权限矩阵；特别回归 shared Wiki viewer 的写工具过滤与后端拒绝。
+6. Agent CRUD/copy/favorite/full config/basic Tools real call；分享不在普通产品门。
+7. 普通单用户→SystemAdmin 的运维边界与跨账号隔离；Organization/sharing 只做三层隐藏负向验证。
 8. Auth OTP/OAuth/recovery/invite/onboarding/logout/expiry。
-9. Tenant/member/invitation/organization/share。
+9. 普通 SaaS 的 tenant/member/invitation/organization/share 隐藏门禁；内部运维能力另列。
 10. Standard/Admin model/parser/storage/vector/search/system/queue/audit/API key。
 11. Embed/IM/API integrations（capability 开启时）。
 12. 全页面 bright/dark/narrow/keyboard/Axe 与 Musuw 组件结构。
@@ -603,3 +605,4 @@
 | 2026-09-01 17:35–17:45 UTC | full-product acceptance | staging Lite `8e1c69c1` + isolated Standard `81142df` candidate | Lite ordinary user + Standard Owner | `DS-001`、`DS-002`、`HIDE-002`–`HIDE-004` | PASS-CURRENT / PARTIAL | Standard Data Source/GitLab/IMA 可见；Lite 三项计数 0；consumer-surface test 2/2；截图 evidence | 修正文档中的陈旧 Standard-hide 契约；临时 KB/tenant 删除 200，账号匿名化，token=0 |
 | 2026-09-01 17:45–17:50 UTC | full-product acceptance | local candidate / branch worktree | service/repository | `SHELL-011` | PASS-CONTRACT | deferred model race 红灯；atomic empty-title CAS；targeted Go service/repository green | 根因是旧空标题快照的无条件 update；候选 staging 浏览器竞态待跑 |
 | 2026-09-01 18:20–18:26 UTC | full-product acceptance | isolated Standard / current branch | operations console | `OPS-008`、`OPS-009`、`OPS-014` | PARTIAL / PASS-CURRENT | real-data workflow、guarded run-now/CSRF、security/redaction、七页 Axe；Playwright 3/3；frontend 1017/1017 | 修复 Storage 横向滚动键盘可达性及 Runtime Queues 低对比文字/状态；测试改为从真实 runtime 选择可 run-now task，移除 archived fixture 假设 |
+| 2026-09-02 02:00 UTC | product boundary correction | durable acceptance contract | ordinary SaaS + SystemAdmin | `AGENT-016`、`ORG-*`、`SEC-003`、`HIDE-013` | DEFERRED-HIDDEN / N/A | 普通产品确定为单账号、单用户、私有工作区；分享角色矩阵移出上线门 | 后续只验普通 UI 无入口、深链不可达、非必要分享 API 不开放；历史 Standard share 实验保留为上游兼容证据 |
