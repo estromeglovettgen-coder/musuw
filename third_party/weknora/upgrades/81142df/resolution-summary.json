@@ -6,14 +6,14 @@
   "overlapPaths": 158,
   "unionPaths": 1601,
   "counts": {
-    "adapt-musuw-for-target": 68,
+    "adapt-musuw-for-target": 71,
     "adapt-upstream-for-musuw": 71,
     "adopt-upstream-deletion": 4,
     "adopt-upstream-exact": 772,
     "append-upstream-migration": 42,
     "compose-three-way": 147,
     "preserve-musuw-deletion": 25,
-    "preserve-musuw-exact": 472
+    "preserve-musuw-exact": 469
   },
   "blocking": []
 }
