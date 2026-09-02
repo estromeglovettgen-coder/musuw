@@ -149,6 +149,13 @@ func (h *KnowledgeHandler) validateKnowledgeBaseAccessWithKBID(c *gin.Context, k
 		logger.ErrorWithFields(ctx, err, nil)
 		return nil, kbID, 0, "", errors.NewInternalServerError(err.Error())
 	}
+	// Musuw Lite is intentionally single-workspace. Resolve the KB first so
+	// owner-private access remains unchanged, then fail closed before any
+	// organization/share or shared-agent permission lookup can authorize a
+	// foreign KB deep link or aggregate request.
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") && kb.TenantID != tenantID {
+		return nil, kbID, 0, "", errors.NewNotFoundError("knowledge base not found")
+	}
 	if kb.TenantID == tenantID {
 		return kb, kbID, tenantID, types.OrgRoleAdmin, nil
 	}
@@ -193,6 +200,9 @@ func (h *KnowledgeHandler) resolveKnowledgeAndValidateKBAccess(c *gin.Context, k
 	}
 	if err := requireTenantAPIKeyKnowledgeBase(ctx, knowledge.KnowledgeBaseID); err != nil {
 		return nil, ctx, err
+	}
+	if strings.EqualFold(strings.TrimSpace(Edition), "lite") && knowledge.TenantID != tenantID {
+		return nil, ctx, errors.NewNotFoundError("Knowledge not found")
 	}
 
 	// Owner: knowledge belongs to caller's tenant

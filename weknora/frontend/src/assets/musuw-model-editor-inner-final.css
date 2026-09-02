@@ -69,7 +69,6 @@
 
 .setting-drawer .t-input,
 .setting-drawer .t-textarea__inner,
-.setting-drawer .t-select-input,
 .setting-drawer .t-input-number {
   border-color: #e5e7eb !important;
   border-radius: 9px !important;
@@ -79,10 +78,8 @@
   font-size: 11px !important;
 }
 .setting-drawer .t-input:hover,
-.setting-drawer .t-textarea__inner:hover,
-.setting-drawer .t-select-input:hover { border-color: #d1d5db !important; }
+.setting-drawer .t-textarea__inner:hover { border-color: #d1d5db !important; }
 .setting-drawer .t-input.t-is-focused,
-.setting-drawer .t-select-input.t-is-focused,
 .setting-drawer .t-textarea__inner:focus {
   border-color: #9ca3af !important;
   box-shadow: 0 0 0 2px rgb(17 24 39 / 5%) !important;
@@ -125,23 +122,6 @@
 .setting-drawer .model-option { gap: 7px !important; padding: 4px 0 !important; }
 .setting-drawer .model-option .model-name { color: #374151 !important; font-size: 11px !important; }
 .setting-drawer .model-option .model-size { color: #9ca3af !important; font-size: 9px !important; }
-
-/* Teleported provider selector */
-body .provider-select-popup .t-popup__content,
-body .provider-select-popup.t-select__dropdown {
-  border: 1px solid #e5e7eb !important;
-  border-radius: 12px !important;
-  background: #fff !important;
-  box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
-}
-body .provider-select-popup .provider-option {
-  padding: 3px 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1px !important;
-}
-body .provider-select-popup .provider-name { color: #374151 !important; font-size: 11px !important; font-weight: 600 !important; }
-body .provider-select-popup .provider-desc { color: #9ca3af !important; font-size: 9px !important; line-height: 14px !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .setting-drawer .model-type-option,

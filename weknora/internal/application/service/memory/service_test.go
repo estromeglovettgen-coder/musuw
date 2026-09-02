@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -434,6 +436,200 @@ func TestClearForgetsEverything(t *testing.T) {
 	require.Empty(t, topics)
 }
 
+// DeleteItem must remove the detached vector as well as the row. The vector
+// table intentionally has no foreign-key cascade, so leaving it behind would
+// retain a user's content after they forgot it and leak storage indefinitely.
+func TestDeleteItemRemovesItsEmbedding(t *testing.T) {
+	svc, db, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.Remember(ctx, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "编辑器", Content: "我使用 Neovim",
+	})
+	require.NoError(t, err)
+	scope := scopeFor(t, ctx)
+	require.NoError(t, svc.repo.UpsertItemEmbedding(ctx, scope, &types.MemoryItemEmbedding{
+		ItemID: item.ID, ModelID: "embed-1", Dims: 3,
+		Vector: types.EncodeEmbedding([]float32{1, 0, 0}),
+	}))
+
+	var before int64
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).
+		Where("item_id = ?", item.ID).Count(&before).Error)
+	require.Equal(t, int64(1), before)
+
+	require.NoError(t, svc.DeleteItem(ctx, item.ID))
+	var after int64
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).
+		Where("item_id = ?", item.ID).Count(&after).Error)
+	require.Zero(t, after, "forgetting a memory must also forget its detached vector")
+}
+
+// Clear has to remove vectors for every status, not only active items. A
+// superseded or archived item is still user data and its detached embedding
+// has no FK cascade to clean it up for us.
+func TestClearRemovesAllItemEmbeddings(t *testing.T) {
+	svc, db, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	first, err := svc.Remember(ctx, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "数据库", Content: "生产库是 MySQL",
+	})
+	require.NoError(t, err)
+	second, err := svc.Remember(ctx, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "数据库", Content: "生产库是 PostgreSQL",
+	})
+	require.NoError(t, err)
+	scope := scopeFor(t, ctx)
+	for _, item := range []*types.MemoryItem{first, second} {
+		require.NoError(t, svc.repo.UpsertItemEmbedding(ctx, scope, &types.MemoryItemEmbedding{
+			ItemID: item.ID, ModelID: "embed-1", Dims: 3,
+			Vector: types.EncodeEmbedding([]float32{1, 0, 0}),
+		}))
+	}
+
+	var before int64
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).
+		Where("tenant_id = ? AND subject_id = ?", scope.TenantID, scope.SubjectID).
+		Count(&before).Error)
+	require.Equal(t, int64(2), before)
+
+	_, err = svc.Clear(ctx)
+	require.NoError(t, err)
+	var after int64
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).
+		Where("tenant_id = ? AND subject_id = ?", scope.TenantID, scope.SubjectID).
+		Count(&after).Error)
+	require.Zero(t, after, "clear must remove every detached vector in the caller scope")
+}
+
+// memoryCleanupSpy lets the failure-path tests assert the destructive order
+// without replacing the real SQLite repository for unrelated operations.
+type memoryCleanupSpy struct {
+	interfaces.MemoryRepository
+	calls                  []string
+	deleteItemEmbeddingErr error
+	deleteAllEmbeddingsErr error
+}
+
+func (s *memoryCleanupSpy) DeleteItemEmbedding(
+	ctx context.Context, scope interfaces.MemoryScope, itemID string,
+) error {
+	s.calls = append(s.calls, "delete_embedding")
+	if s.deleteItemEmbeddingErr != nil {
+		return s.deleteItemEmbeddingErr
+	}
+	return s.MemoryRepository.DeleteItemEmbedding(ctx, scope, itemID)
+}
+
+func (s *memoryCleanupSpy) DeleteItem(
+	ctx context.Context, scope interfaces.MemoryScope, itemID string,
+) error {
+	s.calls = append(s.calls, "delete_item")
+	return s.MemoryRepository.DeleteItem(ctx, scope, itemID)
+}
+
+func (s *memoryCleanupSpy) DeleteAllItemEmbeddings(
+	ctx context.Context, scope interfaces.MemoryScope,
+) error {
+	s.calls = append(s.calls, "delete_all_embeddings")
+	if s.deleteAllEmbeddingsErr != nil {
+		return s.deleteAllEmbeddingsErr
+	}
+	return s.MemoryRepository.DeleteAllItemEmbeddings(ctx, scope)
+}
+
+func (s *memoryCleanupSpy) DeleteAll(
+	ctx context.Context, scope interfaces.MemoryScope,
+) (int64, error) {
+	s.calls = append(s.calls, "delete_all_items")
+	return s.MemoryRepository.DeleteAll(ctx, scope)
+}
+
+func TestDeleteItemEmbeddingFailureKeepsItemAndDoesNotDeleteIt(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.Remember(ctx, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "编辑器", Content: "我使用 Neovim",
+	})
+	require.NoError(t, err)
+	spy := &memoryCleanupSpy{
+		MemoryRepository:       svc.repo,
+		deleteItemEmbeddingErr: errors.New("embedding store unavailable"),
+	}
+	svc.repo = spy
+
+	err = svc.DeleteItem(ctx, item.ID)
+	require.Error(t, err)
+	require.Equal(t, []string{"delete_embedding"}, spy.calls,
+		"a failed vector cleanup must stop before deleting the item")
+	left, err := spy.MemoryRepository.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	require.NoError(t, err)
+	require.NotNil(t, left, "the item must remain retryable when vector cleanup fails")
+}
+
+func TestClearEmbeddingFailureKeepsItemsAndStopsBeforeDeleteAll(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.Remember(ctx, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "编辑器", Content: "我使用 Neovim",
+	})
+	require.NoError(t, err)
+	spy := &memoryCleanupSpy{
+		MemoryRepository:       svc.repo,
+		deleteAllEmbeddingsErr: errors.New("embedding store unavailable"),
+	}
+	svc.repo = spy
+
+	_, err = svc.Clear(ctx)
+	require.Error(t, err)
+	require.Equal(t, []string{"delete_all_embeddings"}, spy.calls,
+		"clear must fail before deleting items when detached-vector cleanup fails")
+	left, err := spy.MemoryRepository.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	require.NoError(t, err)
+	require.NotNil(t, left, "the item must remain retryable when clear cleanup fails")
+}
+
+func TestClearOnlyRemovesCallerEmbeddings(t *testing.T) {
+	svc, db, tenantRepo := newMemoryHarness(t)
+	alice := enabledCtx(t, tenantRepo, 1, "alice")
+	bob := enabledCtx(t, tenantRepo, 1, "bob")
+	aliceItem, err := svc.Remember(alice, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "编辑器", Content: "Alice 使用 Neovim",
+	})
+	require.NoError(t, err)
+	bobItem, err := svc.Remember(bob, types.MemoryItem{
+		Kind: types.MemoryKindFact, Topic: "编辑器", Content: "Bob 使用 Vim",
+	})
+	require.NoError(t, err)
+	aliceScope := scopeFor(t, alice)
+	bobScope := scopeFor(t, bob)
+	for _, pair := range []struct {
+		scope interfaces.MemoryScope
+		item  *types.MemoryItem
+	}{
+		{scope: aliceScope, item: aliceItem},
+		{scope: bobScope, item: bobItem},
+	} {
+		require.NoError(t, svc.repo.UpsertItemEmbedding(alice, pair.scope, &types.MemoryItemEmbedding{
+			ItemID: pair.item.ID, ModelID: "embed-1", Dims: 3,
+			Vector: types.EncodeEmbedding([]float32{1, 0, 0}),
+		}))
+	}
+	require.NoError(t, func() error {
+		_, err := svc.Clear(alice)
+		return err
+	}())
+
+	var aliceVectors, bobVectors int64
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).
+		Where("tenant_id = ? AND subject_id = ?", aliceScope.TenantID, aliceScope.SubjectID).
+		Count(&aliceVectors).Error)
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).
+		Where("tenant_id = ? AND subject_id = ?", bobScope.TenantID, bobScope.SubjectID).
+		Count(&bobVectors).Error)
+	require.Zero(t, aliceVectors)
+	require.Equal(t, int64(1), bobVectors, "clearing Alice must not remove Bob's detached vector")
+}
+
 // TestClearTombstonesLiveMemoriesFirst pins which memories get the bounded
 // rejection budget. max_items caps active memories only, so superseded and
 // archived rows accumulate without limit and a long-lived store easily holds
@@ -603,4 +799,151 @@ func TestCreateItemFromManagerGoesThroughTheWritePath(t *testing.T) {
 	require.Equal(t, "回答请用中文", items[0].Content, "manual input must be sanitized like any other")
 	require.Equal(t, types.MemoryOriginManual, items[0].Origin)
 	require.False(t, strings.Contains(items[0].Content, "\n"))
+}
+
+func TestCreateItemAcceptsEveryManualMemoryKind(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+
+	for _, kind := range types.MemoryKinds {
+		item, err := svc.CreateItem(ctx, kind, "手工记忆 "+kind, 3)
+		require.NoError(t, err)
+		require.Equal(t, kind, item.Kind)
+		require.Equal(t, types.MemoryOriginManual, item.Origin)
+		require.Equal(t, types.MemoryStatusActive, item.Status)
+	}
+
+	items, total, err := svc.ListItems(ctx, types.MemoryStatusActive, 20, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(len(types.MemoryKinds)), total)
+	require.Len(t, items, len(types.MemoryKinds))
+}
+
+func TestUpdateItemRejectsEmptyContentAndPreservesTheExistingValue(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.CreateItem(ctx, types.MemoryKindFact, "保留这条记忆", 3)
+	require.NoError(t, err)
+
+	_, err = svc.UpdateItem(ctx, item.ID, " \n\t ", 5)
+	require.Error(t, err)
+	updated, err := svc.repo.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "保留这条记忆", updated.Content,
+		"a failed edit must leave the prior content available for retry")
+	require.Equal(t, types.MemoryStatusActive, updated.Status)
+}
+
+func TestUpdateItemRedactsSensitiveContentBeforeStorage(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.CreateItem(ctx, types.MemoryKindFact, "可公开的连接说明", 3)
+	require.NoError(t, err)
+
+	updated, err := svc.UpdateItem(ctx, item.ID, "连接 PostgreSQL；password: hunter2", 3)
+	require.NoError(t, err)
+	require.NotContains(t, updated.Content, "hunter2",
+		"editing must not bypass the same credential redaction as creation")
+	require.Contains(t, updated.Content, types.RedactedMemoryPlaceholder)
+
+	_, err = svc.UpdateItem(ctx, item.ID, "password: hunter2", 3)
+	require.ErrorIs(t, err, ErrSensitiveContent,
+		"an edit that is entirely a credential must be rejected")
+	still, err := svc.repo.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	require.NoError(t, err)
+	require.NotContains(t, still.Content, "hunter2")
+}
+
+// Editing the text invalidates the detached vector. Keeping the old vector
+// would make semantic recall answer a question with wording the user already
+// corrected, and the detached table has no automatic content-change hook.
+func TestUpdateItemRemovesItsStaleEmbedding(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.CreateItem(ctx, types.MemoryKindFact, "旧的连接池说法", 3)
+	require.NoError(t, err)
+	scope := scopeFor(t, ctx)
+	require.NoError(t, svc.repo.UpsertItemEmbedding(ctx, scope, &types.MemoryItemEmbedding{
+		ItemID: item.ID, ModelID: "embed-1", Dims: 3,
+		Vector: types.EncodeEmbedding([]float32{1, 0, 0}),
+	}))
+
+	updated, err := svc.UpdateItem(ctx, item.ID, "修正后的连接池说法", 4)
+	require.NoError(t, err)
+	require.Equal(t, "修正后的连接池说法", updated.Content)
+	vectors, err := svc.repo.ItemEmbeddings(ctx, scope, []string{item.ID}, "embed-1")
+	require.NoError(t, err)
+	require.Empty(t, vectors, "an edited memory must not retain an embedding of its old wording")
+}
+
+// Rename/maintenance invalidation is best effort. An embedding-store outage
+// must not turn an already-committed edit into a reported failure that leaves
+// the UI unsure whether its text was saved.
+func TestUpdateItemSucceedsWhenEmbeddingInvalidationFails(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	item, err := svc.CreateItem(ctx, types.MemoryKindFact, "旧的连接池说法", 3)
+	require.NoError(t, err)
+	spy := &memoryCleanupSpy{
+		MemoryRepository:       svc.repo,
+		deleteItemEmbeddingErr: errors.New("embedding store unavailable"),
+	}
+	svc.repo = spy
+
+	updated, err := svc.UpdateItem(ctx, item.ID, "修正后的连接池说法", 4)
+	require.NoError(t, err, "the content update is already committed; vector cleanup stays best effort")
+	require.Equal(t, "修正后的连接池说法", updated.Content)
+	require.Equal(t, []string{"delete_embedding"}, spy.calls)
+	stored, err := spy.MemoryRepository.GetItem(ctx, scopeFor(t, ctx), item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "修正后的连接池说法", stored.Content)
+}
+
+func TestListItemsPagesStatusesDeterministically(t *testing.T) {
+	svc, db, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	scope := scopeFor(t, ctx)
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	for i, status := range []string{
+		types.MemoryStatusActive,
+		types.MemoryStatusActive,
+		types.MemoryStatusSuperseded,
+		types.MemoryStatusArchived,
+		types.MemoryStatusPending,
+	} {
+		require.NoError(t, db.Create(&types.MemoryItem{
+			ID: fmt.Sprintf("status-%d", i), TenantID: scope.TenantID, SubjectID: scope.SubjectID,
+			Kind: types.MemoryKindFact, Topic: fmt.Sprintf("状态-%d", i),
+			Content: fmt.Sprintf("状态内容 %d", i), NormalizedKey: fmt.Sprintf("状态-%d", i),
+			Importance: 3, Origin: types.MemoryOriginManual, Status: status,
+			ValidFrom: base,
+		}).Error)
+	}
+
+	items, total, err := svc.ListItems(ctx, "", 2, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(5), total)
+	require.Len(t, items, 2)
+	secondPage, total, err := svc.ListItems(ctx, "", 2, 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(5), total)
+	require.Len(t, secondPage, 2)
+	seen := map[string]bool{}
+	for _, item := range append(items, secondPage...) {
+		seen[item.ID] = true
+	}
+	require.Len(t, seen, 4, "offset paging must not repeat a row")
+
+	wantByStatus := map[string]int64{
+		types.MemoryStatusActive:     2,
+		types.MemoryStatusPending:    1,
+		types.MemoryStatusSuperseded: 1,
+		types.MemoryStatusArchived:   1,
+	}
+	for status, want := range wantByStatus {
+		_, statusTotal, err := svc.ListItems(ctx, status, 20, 0)
+		require.NoError(t, err)
+		require.Equal(t, want, statusTotal,
+			"status tab count must only include its own rows")
+	}
 }

@@ -2085,8 +2085,7 @@ watch(
   line-height: 18px;
 }
 
-.kb-config-field :deep(.t-input),
-.kb-config-field :deep(.t-select-input) {
+.kb-config-field :deep(.t-input) {
   width: 100%;
   min-height: 40px;
   border-color: #e5e7eb;
@@ -2096,15 +2095,21 @@ watch(
   box-shadow: none;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
+.kb-config-field :deep(.t-select-input) {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 
 .kb-config-field :deep(.t-input:hover),
-.kb-config-field :deep(.t-select-input:hover),
 .kb-config-field :deep(.t-textarea__inner:hover) {
   border-color: #d1d5db;
 }
 
 .kb-config-field :deep(.t-input.t-is-focused),
-.kb-config-field :deep(.t-select-input.t-is-focused),
 .kb-config-field :deep(.t-textarea__inner:focus) {
   border-color: #9ca3af;
   box-shadow: 0 0 0 2px rgb(17 24 39 / 5%);
@@ -2413,24 +2418,39 @@ watch(
 }
 
 :root[theme-mode="dark"] body .kb-config-field .t-input,
-:root[theme-mode="dark"] body .kb-config-field .t-select-input,
 :root[theme-mode="dark"] body .kb-config-field .t-textarea__inner {
+  border-color: #3f3f46;
+  background: #27272a;
+  color: #f4f4f5;
+}
+:root[theme-mode="dark"] body .kb-config-field .t-select-input {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:root[theme-mode="dark"] body .kb-config-field .t-select-input .t-input {
   border-color: #3f3f46;
   background: #27272a;
   color: #f4f4f5;
 }
 
 :root[theme-mode="dark"] body .kb-config-field .t-input:hover,
-:root[theme-mode="dark"] body .kb-config-field .t-select-input:hover,
 :root[theme-mode="dark"] body .kb-config-field .t-textarea__inner:hover {
   border-color: #52525b;
 }
 
 :root[theme-mode="dark"] body .kb-config-field .t-input.t-is-focused,
-:root[theme-mode="dark"] body .kb-config-field .t-select-input.t-is-focused,
 :root[theme-mode="dark"] body .kb-config-field .t-textarea__inner:focus {
   border-color: #a1a1aa;
   box-shadow: 0 0 0 2px rgb(255 255 255 / 6%);
+}
+:root[theme-mode="dark"] body .kb-config-field .t-select-input:hover .t-input,
+:root[theme-mode="dark"] body .kb-config-field .t-select-input.t-is-focused .t-input {
+  border-color: #a1a1aa;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 8%);
 }
 
 :root[theme-mode="dark"] body .kb-config-field .t-input__inner,

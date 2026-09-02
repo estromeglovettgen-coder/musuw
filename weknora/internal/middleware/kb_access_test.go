@@ -161,6 +161,7 @@ type guardOpts struct {
 	agentID             string                  // ?agent_id query param
 	agentSourceTenantID string                  // ?agent_source_tenant_id query param
 	agentShare          *stubAgentShareForGuard // nil means "no agent-share service"
+	privateOnly         bool                    // reject org/agent-shared KBs
 }
 
 // runGuard fires a single request through the guard and returns the
@@ -215,6 +216,10 @@ func runGuard(
 		agentSvc = opts.agentShare
 	}
 
+	privateOnly := []bool(nil)
+	if opts.privateOnly {
+		privateOnly = []bool{true}
+	}
 	guard := RequireKBAccess(
 		KBIDFromParam("id"),
 		requiredPerm,
@@ -222,6 +227,7 @@ func runGuard(
 		shareSvc,
 		agentSvc,
 		cfgRBAC(true),
+		privateOnly...,
 	)
 	guard(c)
 	return rec, c
@@ -291,6 +297,58 @@ func TestRequireKBAccess_SharedKB_RewritesTenantContext(t *testing.T) {
 	require.Equal(t, uint64(200), access.EffectiveTenantID)
 	got, _ := types.TenantIDFromContext(c.Request.Context())
 	require.Equal(t, uint64(200), got, "guard must rewrite context to source tenant")
+}
+
+func TestRequireKBAccess_PrivateOnlyRejectsSharedKB(t *testing.T) {
+	share := &stubKBShareForGuard{
+		permission: map[string]types.OrgMemberRole{"kb-shared": types.OrgRoleViewer},
+		shared:     map[string]bool{"kb-shared": true},
+		source:     map[string]uint64{"kb-shared": 200},
+	}
+	_, c := runGuard(t, 100, "kb-shared",
+		types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "kb-shared", TenantID: 200},
+		share,
+		guardOpts{privateOnly: true},
+	)
+	require.True(t, c.IsAborted(), "private workspace must reject org-shared KB reads")
+}
+
+func TestRequireKBAccess_PrivateOnlyAllowsOwnKB(t *testing.T) {
+	_, c := runGuard(t, 100, "kb-own",
+		types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "kb-own", TenantID: 100},
+		nil,
+		guardOpts{privateOnly: true},
+	)
+	require.False(t, c.IsAborted(), "private workspace must keep owned KB reads available")
+}
+
+func TestRequireKBAccess_PrivateOnlyRejectsSharedKBWhenRBACDisabled(t *testing.T) {
+	// The Lite product boundary is independent of the tenant-RBAC rollout
+	// switch. A temporary EnableRBAC=false window must not turn a shared-KB
+	// deep link into a readable route merely because the role guard logs and
+	// passes through.
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "kb-shared"}}
+	req := httptest.NewRequest("GET", "/", nil)
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(100)))
+
+	guard := RequireKBAccess(
+		KBIDFromParam("id"),
+		types.OrgRoleViewer,
+		&stubKBLookup{kbs: map[string]*types.KnowledgeBase{
+			"kb-shared": {ID: "kb-shared", TenantID: 200},
+		}},
+		nil, nil,
+		cfgRBAC(false),
+		true,
+	)
+	guard(c)
+
+	require.True(t, c.IsAborted(), "private workspace must reject shared KBs even when RBAC enforcement is disabled")
 }
 
 func TestRequireKBAccess_SharedKB_PermissionBelowMin_Aborts(t *testing.T) {

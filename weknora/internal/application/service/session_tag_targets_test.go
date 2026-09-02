@@ -262,6 +262,26 @@ func TestLiteBuildSearchTargetsFailsClosedWhenKnowledgeBasePolicyCannotBeResolve
 	require.ErrorContains(t, err, "lookup unavailable")
 }
 
+func TestLiteBuildSearchTargetsRejectsForeignKnowledgeBase(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	svc := &sessionService{
+		knowledgeBaseService: &tagTargetKnowledgeBaseService{kbs: map[string]*types.KnowledgeBase{
+			"foreign-kb": {ID: "foreign-kb", TenantID: 200, Type: types.KnowledgeBaseTypeDocument},
+		}},
+		knowledgeService: &tagTargetKnowledgeService{},
+	}
+
+	_, err := svc.buildSearchTargets(
+		tagTargetContext(),
+		100,
+		[]string{"foreign-kb"},
+		nil,
+		nil,
+	)
+
+	require.ErrorContains(t, err, "not found")
+}
+
 func TestBuildSearchTargets_FullKBWithTagScopeSkipsFullKBTarget(t *testing.T) {
 	svc := newTagTargetSessionService()
 

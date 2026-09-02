@@ -230,6 +230,7 @@ func RequireKBAccess(
 	kbShareService interfaces.KBShareService,
 	agentShareService interfaces.AgentShareService,
 	cfg *config.Config,
+	privateOnly ...bool,
 ) gin.HandlerFunc {
 	warnOnNilConfig(cfg)
 	return func(c *gin.Context) {
@@ -241,6 +242,8 @@ func RequireKBAccess(
 		}
 
 		ctx := c.Request.Context()
+		callerTenantID, _ := types.TenantIDFromContext(ctx)
+		privateWorkspace := len(privateOnly) > 0 && privateOnly[0]
 		if err := types.AuthorizeTenantAPIKeyKnowledgeBases(ctx, kbID); err != nil {
 			_ = c.Error(err)
 			c.Abort()
@@ -273,6 +276,14 @@ func RequireKBAccess(
 			c.Abort()
 			return
 		case stderrors.Is(err, errKBAccessForbidden):
+			if privateWorkspace {
+				// Lite's single-workspace boundary is product policy, not a
+				// tenant-RBAC rollout decision. Keep foreign/denied KBs hidden
+				// even while EnableRBAC=false is temporarily fail-open.
+				_ = c.Error(apperrors.NewNotFoundError("knowledge base not found"))
+				c.Abort()
+				return
+			}
 			if !enforcing {
 				logger.Warnf(ctx, "[rbac] kb-access would 403 (enforcement off): kb=%s required=%s",
 					kbID, requiredPermission)
@@ -291,6 +302,18 @@ func RequireKBAccess(
 			// Transient/internal -> 503 so monitoring catches the
 			// underlying failure rather than a misleading 500.
 			_ = c.Error(apperrors.NewServiceUnavailableError("cannot verify KB access right now"))
+			c.Abort()
+			return
+		}
+
+		// Musuw Lite is a single-user private workspace. The product gate
+		// blocks organization/share discovery and mutation routes, while this
+		// access seam closes the remaining deep-link path: a caller must not
+		// read or write a KB that resolved through an org share or shared agent.
+		// Keep the check opt-in so Standard retains WeKnora's native sharing
+		// behavior and existing middleware callers remain unchanged.
+		if privateWorkspace && access.EffectiveTenantID != callerTenantID {
+			_ = c.Error(apperrors.NewNotFoundError("knowledge base not found"))
 			c.Abort()
 			return
 		}

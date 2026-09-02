@@ -282,8 +282,7 @@
 }
 .settings-modal:not(.settings-modal--compact) .close-btn:hover { background: #f3f4f6 !important; color: #374151 !important; }
 .settings-modal:not(.settings-modal--compact) .t-input,
-.settings-modal:not(.settings-modal--compact) .t-textarea__inner,
-.settings-modal:not(.settings-modal--compact) .t-select-input {
+.settings-modal:not(.settings-modal--compact) .t-textarea__inner {
   border-color: #e5e7eb !important;
   border-radius: 10px !important;
   background: #fff !important;
@@ -292,8 +291,7 @@
   font-size: 12px !important;
 }
 .settings-modal:not(.settings-modal--compact) .t-input:hover,
-.settings-modal:not(.settings-modal--compact) .t-textarea__inner:hover,
-.settings-modal:not(.settings-modal--compact) .t-select-input:hover { border-color: #d1d5db !important; }
+.settings-modal:not(.settings-modal--compact) .t-textarea__inner:hover { border-color: #d1d5db !important; }
 .settings-modal:not(.settings-modal--compact) .t-button--theme-primary {
   border-color: #111827 !important;
   background: #111827 !important;

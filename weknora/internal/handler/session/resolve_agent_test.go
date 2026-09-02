@@ -156,3 +156,21 @@ func TestResolveAgent_FallsBackToLocalAgentWithoutSourceSelector(t *testing.T) {
 	require.Equal(t, uint64(0), effectiveTenantID)
 	require.False(t, sharedReadOnly)
 }
+
+func TestResolveAgent_LiteNeverAdoptsSharedAgentWithoutSourceSelector(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+
+	c, ctx := newResolveAgentTestContext(7)
+	localAgent := &types.CustomAgent{ID: "same-agent-id", TenantID: 7, Name: "Local"}
+	foreignSharedAgent := &types.CustomAgent{ID: "same-agent-id", TenantID: 84, Name: "Foreign shared"}
+	h := &Handler{
+		agentShareService:  &resolveAgentShareStub{agent: foreignSharedAgent},
+		customAgentService: &resolveOwnAgentStub{agent: localAgent},
+	}
+
+	agent, effectiveTenantID, sharedReadOnly := h.resolveAgent(ctx, c, "same-agent-id", 0)
+
+	require.Equal(t, localAgent, agent, "Lite must resolve a tenant-local agent, not a hidden shared-agent overlay")
+	require.Zero(t, effectiveTenantID)
+	require.False(t, sharedReadOnly)
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -13,6 +14,27 @@ import (
 // Lite's platform-managed web search mandatory for every service caller.
 func effectiveWebSearchEnabled(requested bool) bool {
 	return isLiteProductEdition() || requested
+}
+
+// rejectLiteForeignAgent keeps the authenticated session tenant as the
+// permission root for both QA entry points. The HTTP handler normally hides
+// shared-agent selectors in Lite, but service callers can still carry a stale
+// source-tenant context or invoke the service directly. Rejecting a foreign
+// agent before model, KB, tool, or context-overlay consumption closes that
+// lower-level seam without changing Standard's native sharing behavior.
+func rejectLiteForeignAgent(ctx context.Context, req *types.QARequest) error {
+	if !isLiteProductEdition() || req == nil || req.Session == nil {
+		return nil
+	}
+	if callerTenantID, ok := types.TenantIDFromContext(ctx); ok && callerTenantID != 0 &&
+		callerTenantID != req.Session.TenantID {
+		return apperrors.NewNotFoundError("agent not found")
+	}
+	if req.CustomAgent != nil && !isPlatformManagedBuiltinAgentID(req.CustomAgent.ID) && req.CustomAgent.TenantID != 0 &&
+		req.CustomAgent.TenantID != req.Session.TenantID {
+		return apperrors.NewNotFoundError("agent not found")
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -301,6 +323,14 @@ func (s *sessionService) resolveRetrievalTenantID(
 ) uint64 {
 	session := req.Session
 	customAgent := req.CustomAgent
+
+	// Lite is a single-workspace product. A shared/custom agent object may
+	// still be present in a stale internal request, but its source tenant must
+	// never become the retrieval authority. Keep the session owner's tenant as
+	// the hard boundary before applying the native Standard precedence below.
+	if isLiteProductEdition() && session != nil && session.TenantID != 0 {
+		return session.TenantID
+	}
 
 	retrievalTenantID := session.TenantID
 	if customAgent != nil && customAgent.TenantID != 0 {

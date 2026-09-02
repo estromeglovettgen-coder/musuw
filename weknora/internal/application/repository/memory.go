@@ -581,6 +581,15 @@ func (r *memoryRepository) DeleteItemEmbedding(
 		Delete(&types.MemoryItemEmbedding{}).Error
 }
 
+// DeleteAllItemEmbeddings removes every detached vector in one memory scope.
+// The embedding table deliberately has no foreign-key cascade, so forgetting
+// all memories has to clean this table explicitly before deleting the items.
+func (r *memoryRepository) DeleteAllItemEmbeddings(
+	ctx context.Context, scope interfaces.MemoryScope,
+) error {
+	return r.scoped(ctx, scope).Delete(&types.MemoryItemEmbedding{}).Error
+}
+
 func (r *memoryRepository) ItemEmbeddings(
 	ctx context.Context, scope interfaces.MemoryScope, itemIDs []string, modelID string,
 ) (map[string][]float32, error) {

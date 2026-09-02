@@ -841,9 +841,26 @@ func (s *knowledgeService) GetKnowledgeBatchWithSharedAccess(ctx context.Context
 	if len(ids) == 0 {
 		return nil, nil
 	}
+	if isLiteProductEdition() {
+		// Validate the caller/effective tenant pair before touching the
+		// repository. A handler's shared-agent path may carry the source tenant
+		// as the lookup argument while the request context still identifies the
+		// caller; Lite must fail closed without even issuing a foreign query.
+		callerTenantID, ok := types.TenantIDFromContext(ctx)
+		if !ok || callerTenantID == 0 || callerTenantID != tenantID {
+			return nil, werrors.NewNotFoundError("knowledge not found")
+		}
+	}
 	ownList, err := s.repo.GetKnowledgeBatch(ctx, tenantID, ids)
 	if err != nil {
 		return nil, err
+	}
+	// Musuw Lite is a strict single-workspace product. Keep the native
+	// shared-access method for Standard callers, but never perform the
+	// cross-tenant ID-only lookup in Lite: a crafted knowledge ID must resolve
+	// to no row even when an organization share exists.
+	if isLiteProductEdition() {
+		return s.filterLiteKnowledgeRows(ctx, ownList)
 	}
 	foundSet := make(map[string]bool)
 	for _, k := range ownList {
@@ -1104,7 +1121,8 @@ func (s *knowledgeService) SearchKnowledge(ctx context.Context, keyword string, 
 	ownKBs, err := s.kbService.ListKnowledgeBases(ctx)
 	if err == nil {
 		for _, kb := range ownKBs {
-			if kb != nil && kb.Type == types.KnowledgeBaseTypeDocument {
+			if kb != nil && kb.Type == types.KnowledgeBaseTypeDocument &&
+				(!isLiteProductEdition() || kb.TenantID == tenantID) {
 				scopes = append(scopes, types.KnowledgeSearchScope{TenantID: tenantID, KBID: kb.ID})
 			}
 		}
@@ -1113,17 +1131,19 @@ func (s *knowledgeService) SearchKnowledge(ctx context.Context, keyword string, 
 	// Shared knowledge bases (document type only). Plan 3 of #1303 keys
 	// the share lookup on (tenantID, callerTenantRole); userID is no
 	// longer load-bearing for org-share access.
-	if userIDVal := ctx.Value(types.UserIDContextKey); userIDVal != nil {
-		if userID, ok := userIDVal.(string); ok && userID != "" {
-			callerTenantRole := types.TenantRoleFromContext(ctx)
-			sharedList, err := s.kbShareService.ListSharedKnowledgeBases(ctx, tenantID, callerTenantRole)
-			if err == nil {
-				for _, info := range sharedList {
-					if info != nil && info.KnowledgeBase != nil && info.KnowledgeBase.Type == types.KnowledgeBaseTypeDocument {
-						scopes = append(scopes, types.KnowledgeSearchScope{
-							TenantID: info.SourceTenantID,
-							KBID:     info.KnowledgeBase.ID,
-						})
+	if !isLiteProductEdition() {
+		if userIDVal := ctx.Value(types.UserIDContextKey); userIDVal != nil {
+			if userID, ok := userIDVal.(string); ok && userID != "" {
+				callerTenantRole := types.TenantRoleFromContext(ctx)
+				sharedList, err := s.kbShareService.ListSharedKnowledgeBases(ctx, tenantID, callerTenantRole)
+				if err == nil {
+					for _, info := range sharedList {
+						if info != nil && info.KnowledgeBase != nil && info.KnowledgeBase.Type == types.KnowledgeBaseTypeDocument {
+							scopes = append(scopes, types.KnowledgeSearchScope{
+								TenantID: info.SourceTenantID,
+								KBID:     info.KnowledgeBase.ID,
+							})
+						}
 					}
 				}
 			}
@@ -1140,6 +1160,25 @@ func (s *knowledgeService) SearchKnowledge(ctx context.Context, keyword string, 
 func (s *knowledgeService) SearchKnowledgeForScopes(ctx context.Context, scopes []types.KnowledgeSearchScope, keyword string, offset, limit int, fileTypes []string) ([]*types.Knowledge, bool, int64, error) {
 	if len(scopes) == 0 {
 		return nil, false, 0, nil
+	}
+	if isLiteProductEdition() {
+		// Scoped search is also called by aggregate/API-key paths. Retain only
+		// caller-tenant scopes in Lite so a crafted scope cannot re-enable the
+		// Standard shared-KB behavior through this lower-level seam.
+		tenantID, ok := ctx.Value(types.TenantIDContextKey).(uint64)
+		if !ok || tenantID == 0 {
+			return nil, false, 0, werrors.NewUnauthorizedError("Workspace ID not found in context")
+		}
+		privateScopes := make([]types.KnowledgeSearchScope, 0, len(scopes))
+		for _, scope := range scopes {
+			if scope.TenantID == tenantID {
+				privateScopes = append(privateScopes, scope)
+			}
+		}
+		scopes = privateScopes
+		if len(scopes) == 0 {
+			return nil, false, 0, nil
+		}
 	}
 	return s.repo.SearchKnowledgeInScopes(ctx, scopes, keyword, offset, limit, fileTypes)
 }

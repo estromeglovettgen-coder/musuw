@@ -39,6 +39,13 @@ func (s *knowledgeBaseService) fetchKnowledgeDataWithShared(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	// Search targets are tenant-scoped before they reach this enrichment path.
+	// Keep a service-level fail-closed guard as well: Lite never follows the
+	// ID-only shared fallback, even if an internal retrieval result contains a
+	// foreign knowledge ID.
+	if isLiteProductEdition() {
+		return knowledgeMap, nil
+	}
 
 	missingIDs := s.findMissingIDs(knowledgeIDs, func(id string) bool {
 		return knowledgeMap[id] != nil
@@ -87,6 +94,11 @@ func (s *knowledgeBaseService) listChunksByIDWithShared(ctx context.Context,
 	chunks, err := s.chunkRepo.ListChunksByID(ctx, tenantID, chunkIDs)
 	if err != nil {
 		return nil, err
+	}
+	if isLiteProductEdition() {
+		// The tenant-filtered rows above are the complete Lite result. Standard
+		// retains the native shared chunk fallback below.
+		return chunks, nil
 	}
 
 	foundSet := make(map[string]bool, len(chunks))

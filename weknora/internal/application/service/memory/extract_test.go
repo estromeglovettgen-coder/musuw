@@ -3,6 +3,8 @@ package memory
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -259,6 +261,41 @@ func TestScheduleExtractionDebouncesPerSubject(t *testing.T) {
 
 	svc.ScheduleExtraction(ctx, "session-1", "message-2", "chat-model")
 	require.Len(t, enqueuer.tasks, 1, "a second turn inside the interval must not enqueue again")
+}
+
+func TestConcurrentTurnsEnqueueOneExtractionAndKeepEverySession(t *testing.T) {
+	svc, tenantRepo, _, _, enqueuer := newExtractionHarness(t)
+	tenantRepo.set(7, &types.MemoryConfig{Enabled: true, WriteMode: types.MemoryWriteAuto})
+	ctx := context.WithValue(t.Context(), types.TenantIDContextKey, uint64(7))
+	ctx = types.WithPrincipal(ctx, types.Principal{Type: types.PrincipalWebUser, ID: "alice"})
+
+	const turns = 12
+	var wg sync.WaitGroup
+	wg.Add(turns)
+	for i := 0; i < turns; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			svc.ScheduleExtraction(ctx, fmt.Sprintf("session-%d", i), fmt.Sprintf("message-%d", i), "chat-model")
+		}()
+	}
+	wg.Wait()
+
+	require.Len(t, enqueuer.tasks, 1,
+		"a burst of concurrent turns must claim one in-flight task, not one per turn")
+	scope, err := ResolveScope(ctx)
+	require.NoError(t, err)
+	subject, err := svc.repo.GetSubject(ctx, scope)
+	require.NoError(t, err)
+	require.Len(t, subject.PendingSessions, turns,
+		"every session must remain queued for the one task to drain")
+	seen := make(map[string]bool, turns)
+	for _, sessionID := range subject.PendingSessions {
+		seen[sessionID] = true
+	}
+	for i := 0; i < turns; i++ {
+		require.True(t, seen[fmt.Sprintf("session-%d", i)])
+	}
 }
 
 func TestExtractionCapsItemsPerRun(t *testing.T) {

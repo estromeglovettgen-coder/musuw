@@ -873,7 +873,7 @@ const handleConsolidate = async () => {
 const handleExport = async () => {
   try {
     const response = await exportMemoryItems()
-    const blob = new Blob([JSON.stringify(response.data || [], null, 2)], {
+    const blob = new Blob([JSON.stringify(response, null, 2)], {
       type: 'application/json',
     })
     const url = URL.createObjectURL(blob)

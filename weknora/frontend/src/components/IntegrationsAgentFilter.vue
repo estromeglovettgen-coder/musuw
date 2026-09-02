@@ -1,6 +1,6 @@
 <template>
   <t-dropdown :options="options" trigger="click" placement="bottom-left" attach="body" :max-column-width="240"
-    :max-height="280" @click="onSelect">
+    :max-height="280" :popup-props="{ overlayClassName: 'integrations-agent-filter-popup' }" @click="onSelect">
     <button type="button" class="integrations-agent-filter" :class="{ 'integrations-agent-filter--active': modelValue }"
       :aria-label="ariaLabel">
       <t-icon name="filter" size="14px" class="integrations-agent-filter__icon" />

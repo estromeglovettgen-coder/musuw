@@ -22,6 +22,9 @@ func (s *sessionService) AgentQA(
 	req *types.QARequest,
 	eventBus *event.EventBus,
 ) error {
+	if err := rejectLiteForeignAgent(ctx, req); err != nil {
+		return err
+	}
 	sessionID := req.Session.ID
 	// Propagate the session ID so stateful sandbox backends (CubeSandbox) can
 	// bind script execution to a per-session MicroVM instance.
@@ -400,8 +403,15 @@ func (s *sessionService) buildAgentConfig(
 		logger.Infof(ctx, "No knowledge bases specified for agent, running in pure agent mode")
 	}
 
-	// Build search targets using agent's tenant (handler has validated access for shared agent)
-	searchTargets, err := s.buildSearchTargets(ctx, agentTenantID, agentConfig.KnowledgeBases, agentConfig.KnowledgeIDs, req.TagScopes)
+	// Platform built-ins are product-owned rather than shared user agents. Their
+	// curated KBs may live with the builtin definition, while models/rerank stay
+	// bound to the consumer tenant. Preserve that existing split without
+	// reopening arbitrary foreign custom agents in Lite.
+	searchTenantID := agentTenantID
+	if isLiteProductEdition() && isPlatformManagedBuiltinAgentID(customAgent.ID) && customAgent.TenantID != 0 {
+		searchTenantID = customAgent.TenantID
+	}
+	searchTargets, err := s.buildSearchTargets(ctx, searchTenantID, agentConfig.KnowledgeBases, agentConfig.KnowledgeIDs, req.TagScopes)
 	if err != nil {
 		return nil, fmt.Errorf("build search targets: %w", err)
 	}

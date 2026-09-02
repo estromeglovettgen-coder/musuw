@@ -16,6 +16,49 @@ import (
 
 type fakeKBShareService struct {
 	allowedKBs map[string]bool
+	shared     []*types.SharedKnowledgeBaseInfo
+}
+
+// searchKnowledgeBaseService supplies only the KB list needed by
+// knowledgeService.SearchKnowledge while leaving the rest of the production
+// interface unavailable. This keeps the test at the public service seam.
+type searchKnowledgeBaseService struct {
+	interfaces.KnowledgeBaseService
+	own []*types.KnowledgeBase
+}
+
+func (s *searchKnowledgeBaseService) ListKnowledgeBases(context.Context) ([]*types.KnowledgeBase, error) {
+	return s.own, nil
+}
+
+// scopedSearchKnowledgeRepository makes the shared-scope expansion visible:
+// the fake returns the caller's own row for every call and appends a second
+// tenant's row only when the service passes that scope through.
+type scopedSearchKnowledgeRepository struct {
+	interfaces.KnowledgeRepository
+	own, shared *types.Knowledge
+	scopes      []types.KnowledgeSearchScope
+}
+
+func (r *scopedSearchKnowledgeRepository) SearchKnowledgeInScopes(
+	_ context.Context,
+	scopes []types.KnowledgeSearchScope,
+	_ string,
+	_, _ int,
+	_ []string,
+) ([]*types.Knowledge, bool, int64, error) {
+	r.scopes = append([]types.KnowledgeSearchScope(nil), scopes...)
+	rows := make([]*types.Knowledge, 0, 2)
+	if r.own != nil {
+		rows = append(rows, r.own)
+	}
+	for _, scope := range scopes {
+		if r.shared != nil && scope.TenantID == r.shared.TenantID && scope.KBID == r.shared.KnowledgeBaseID {
+			rows = append(rows, r.shared)
+			break
+		}
+	}
+	return rows, false, int64(len(rows)), nil
 }
 
 type batchLookupKBService struct {
@@ -49,7 +92,7 @@ func (f *fakeKBShareService) ListSharesByOrganization(context.Context, string) (
 	return nil, errors.New("not implemented")
 }
 func (f *fakeKBShareService) ListSharedKnowledgeBases(context.Context, uint64, types.TenantRole) ([]*types.SharedKnowledgeBaseInfo, error) {
-	return nil, errors.New("not implemented")
+	return f.shared, nil
 }
 func (f *fakeKBShareService) ListSharedKnowledgeBasesInOrganization(context.Context, string, uint64, types.TenantRole) ([]*types.OrganizationSharedKnowledgeBaseItem, error) {
 	return nil, errors.New("not implemented")
@@ -165,6 +208,141 @@ func TestGetKnowledgeBatchWithSharedAccess_ExcludesSharedKnowledgeWithoutPermiss
 
 	require.NoError(t, err)
 	require.Empty(t, got)
+}
+
+func TestGetKnowledgeBatchWithSharedAccess_LiteRejectsSharedKnowledge(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	service, db := newKnowledgeSharedAccessService(t, &fakeKBShareService{
+		allowedKBs: map[string]bool{"kb-shared": true},
+	})
+
+	now := time.Now()
+	seedKnowledge(t, db, &types.Knowledge{
+		ID:              "k-shared",
+		TenantID:        2,
+		KnowledgeBaseID: "kb-shared",
+		Type:            "file",
+		Title:           "shared doc",
+		FileName:        "shared.txt",
+		FileType:        "txt",
+		ParseStatus:     types.ParseStatusCompleted,
+		EnableStatus:    "enabled",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+
+	got, err := service.GetKnowledgeBatchWithSharedAccess(newSharedAccessContext(), 1, []string{"k-shared"})
+
+	require.NoError(t, err)
+	require.Empty(t, got, "Lite must not resolve a crafted knowledge ID from a shared KB")
+}
+
+func TestGetKnowledgeBatchWithSharedAccess_LiteRejectsEffectiveTenantOverride(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	service, db := newKnowledgeSharedAccessService(t, &fakeKBShareService{
+		allowedKBs: map[string]bool{"kb-source": true},
+	})
+
+	now := time.Now()
+	seedKnowledge(t, db, &types.Knowledge{
+		ID:              "k-source",
+		TenantID:        2,
+		KnowledgeBaseID: "kb-source",
+		Type:            "file",
+		Title:           "source document",
+		FileName:        "source.txt",
+		FileType:        "txt",
+		ParseStatus:     types.ParseStatusCompleted,
+		EnableStatus:    "enabled",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+
+	// The handler's shared-agent refresh path historically passed the agent's
+	// source tenant as the lookup tenant while leaving the caller tenant in
+	// context. Lite must reject that effective-tenant override even when the
+	// repository returns a document for it; otherwise an internal/direct seam
+	// can bypass the HTTP product gate and disclose a foreign row.
+	got, err := service.GetKnowledgeBatchWithSharedAccess(newSharedAccessContext(), 2, []string{"k-source"})
+
+	require.Error(t, err)
+	require.Empty(t, got, "Lite must not return rows for a foreign effective tenant")
+}
+
+func TestSearchKnowledge_LiteExcludesSharedRows(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	repo := &scopedSearchKnowledgeRepository{
+		own: &types.Knowledge{
+			ID:              "k-own",
+			TenantID:        1,
+			KnowledgeBaseID: "kb-own",
+			Title:           "own document",
+		},
+		shared: &types.Knowledge{
+			ID:              "k-shared",
+			TenantID:        2,
+			KnowledgeBaseID: "kb-shared",
+			Title:           "shared document",
+		},
+	}
+	svc := &knowledgeService{
+		repo: repo,
+		kbService: &searchKnowledgeBaseService{own: []*types.KnowledgeBase{{
+			ID:       "kb-own",
+			TenantID: 1,
+			Type:     types.KnowledgeBaseTypeDocument,
+		}}},
+		kbShareService: &fakeKBShareService{shared: []*types.SharedKnowledgeBaseInfo{{
+			KnowledgeBase:  &types.KnowledgeBase{ID: "kb-shared", TenantID: 2, Type: types.KnowledgeBaseTypeDocument},
+			SourceTenantID: 2,
+		}}},
+	}
+
+	got, _, _, err := svc.SearchKnowledge(newSharedAccessContext(), "document", 0, 20, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"k-own"}, knowledgeIDs(got), "Lite must not search shared KB scopes")
+}
+
+func TestSearchKnowledgeForScopes_LiteFiltersForeignScopes(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	repo := &scopedSearchKnowledgeRepository{
+		own: &types.Knowledge{
+			ID:              "k-own",
+			TenantID:        1,
+			KnowledgeBaseID: "kb-own",
+		},
+		shared: &types.Knowledge{
+			ID:              "k-shared",
+			TenantID:        2,
+			KnowledgeBaseID: "kb-shared",
+		},
+	}
+	svc := &knowledgeService{repo: repo}
+
+	got, _, _, err := svc.SearchKnowledgeForScopes(newSharedAccessContext(), []types.KnowledgeSearchScope{
+		{TenantID: 1, KBID: "kb-own"},
+		{TenantID: 2, KBID: "kb-shared"},
+	}, "", 0, 20, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"k-own"}, knowledgeIDs(got))
+	require.Equal(t, []types.KnowledgeSearchScope{{TenantID: 1, KBID: "kb-own"}}, repo.scopes)
+}
+
+func TestSearchKnowledgeForScopes_LiteFailsClosedWithoutTenantContext(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	repo := &scopedSearchKnowledgeRepository{own: &types.Knowledge{ID: "k-own", TenantID: 1, KnowledgeBaseID: "kb-own"}}
+	svc := &knowledgeService{repo: repo}
+
+	got, _, _, err := svc.SearchKnowledgeForScopes(context.Background(), []types.KnowledgeSearchScope{{
+		TenantID: 1,
+		KBID:     "kb-own",
+	}}, "", 0, 20, nil)
+
+	require.Error(t, err)
+	require.Nil(t, got)
+	require.Empty(t, repo.scopes, "missing tenant context must not reach the repository")
 }
 
 func TestKnowledgeBatchLiteHidesFAQRowsButStandardPreservesThem(t *testing.T) {

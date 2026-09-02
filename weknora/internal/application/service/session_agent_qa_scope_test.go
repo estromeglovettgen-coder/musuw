@@ -4,8 +4,11 @@ import (
 	"context"
 	"testing"
 
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResolvePerRequestMCPScope_SelectedIntersection(t *testing.T) {
@@ -138,4 +141,106 @@ func TestLiteConfigureSkillsFromAgentScrubsExecutableRuntimeFields(t *testing.T)
 	assert.Empty(t, cfg.SandboxConfigID)
 	assert.Empty(t, cfg.TenantSkills)
 	assert.Empty(t, cfg.PinnedSkillNames)
+}
+
+func TestLiteRetrievalUsesSessionTenantForForeignAgent(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	svc := &sessionService{}
+	req := &types.QARequest{
+		Session:     &types.Session{TenantID: 7},
+		CustomAgent: &types.CustomAgent{TenantID: 42},
+	}
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(42))
+
+	got := svc.resolveRetrievalTenantID(ctx, req)
+
+	assert.Equal(t, uint64(7), got,
+		"Lite must never adopt a foreign shared-agent tenant for retrieval")
+}
+
+func TestLiteQARejectsForeignAgentBeforeDependencies(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	req := &types.QARequest{
+		Session:     &types.Session{ID: "session-1", TenantID: 7},
+		CustomAgent: &types.CustomAgent{ID: "shared-agent", TenantID: 42},
+	}
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(42))
+	svc := &sessionService{}
+
+	// A zero-dependency service is intentional: both public QA entry points
+	// must reject the foreign agent before touching model, KB, tool, or tenant
+	// services (and before consuming the source-tenant context overlay).
+	for _, tc := range []struct {
+		name string
+		call func() error
+	}{
+		{name: "knowledge", call: func() error {
+			return svc.KnowledgeQA(ctx, req, event.NewEventBus())
+		}},
+		{name: "agent", call: func() error {
+			return svc.AgentQA(ctx, req, event.NewEventBus())
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got error
+			require.NotPanics(t, func() { got = tc.call() })
+			appErr, ok := got.(*apperrors.AppError)
+			require.True(t, ok, "foreign Lite agent must fail with a typed not-found error, got %T", got)
+			require.Equal(t, apperrors.ErrNotFound, appErr.Code)
+		})
+	}
+}
+
+func TestLiteQARejectsForeignAgentWhenSessionTenantIsMissing(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	req := &types.QARequest{
+		Session:     &types.Session{ID: "session-legacy", TenantID: 0},
+		CustomAgent: &types.CustomAgent{ID: "shared-agent", TenantID: 42},
+	}
+
+	err := rejectLiteForeignAgent(context.Background(), req)
+	appErr, ok := err.(*apperrors.AppError)
+	require.True(t, ok, "foreign agent with zero session tenant must fail closed, got %T", err)
+	require.Equal(t, apperrors.ErrNotFound, appErr.Code)
+}
+
+func TestLiteQARejectsStaleTenantOverlayForLocalAgent(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	req := &types.QARequest{
+		Session:     &types.Session{ID: "session-1", TenantID: 7},
+		CustomAgent: &types.CustomAgent{ID: "local-agent", TenantID: 7},
+	}
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(42))
+	svc := &sessionService{}
+
+	for _, call := range []func() error{
+		func() error { return svc.KnowledgeQA(ctx, req, event.NewEventBus()) },
+		func() error { return svc.AgentQA(ctx, req, event.NewEventBus()) },
+	} {
+		var err error
+		require.NotPanics(t, func() { err = call() })
+		appErr, ok := err.(*apperrors.AppError)
+		require.True(t, ok, "stale Lite tenant overlay must fail with typed not-found, got %T", err)
+		require.Equal(t, apperrors.ErrNotFound, appErr.Code)
+	}
+}
+
+func TestLiteQARejectsStaleTenantOverlayWithoutCustomAgent(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	req := &types.QARequest{
+		Session: &types.Session{ID: "session-1", TenantID: 7},
+	}
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(42))
+	svc := &sessionService{}
+
+	for _, call := range []func() error{
+		func() error { return svc.KnowledgeQA(ctx, req, event.NewEventBus()) },
+		func() error { return svc.AgentQA(ctx, req, event.NewEventBus()) },
+	} {
+		var err error
+		require.NotPanics(t, func() { err = call() })
+		appErr, ok := err.(*apperrors.AppError)
+		require.True(t, ok, "stale Lite tenant overlay must fail even without an agent, got %T", err)
+		require.Equal(t, apperrors.ErrNotFound, appErr.Code)
+	}
 }

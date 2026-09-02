@@ -225,6 +225,14 @@ func isLiteProductEdition() bool {
 	return configuredProductEdition == "lite"
 }
 
+// IsLiteProductEdition exposes the process-wide product boundary to the HTTP
+// handler packages. Keep the edition authority in this existing service seam
+// so shared-agent resolution cannot silently diverge from service-level tenant
+// guards.
+func IsLiteProductEdition() bool {
+	return isLiteProductEdition()
+}
+
 func requiresPlatformVLM() bool {
 	return isLiteProductEdition()
 }

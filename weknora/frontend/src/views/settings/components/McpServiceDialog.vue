@@ -1552,7 +1552,6 @@ body .mcp-drawer {
 
   .t-input,
   .t-textarea__inner,
-  .t-select-input,
   .t-input-number {
     border-color: #e5e7eb !important;
     border-radius: 12px !important;
@@ -1577,13 +1576,11 @@ body .mcp-drawer {
   }
 
   .t-input:hover,
-  .t-textarea__inner:hover,
-  .t-select-input:hover {
+  .t-textarea__inner:hover {
     border-color: #d1d5db !important;
   }
 
   .t-input.t-is-focused,
-  .t-select-input.t-is-focused,
   .t-textarea__inner:focus {
     border-color: #6b7280 !important;
     box-shadow: 0 0 0 2px rgb(17 24 39 / 5%) !important;
@@ -1765,6 +1762,17 @@ body .mcp-drawer {
     background: var(--mvc-surface, #1d1f23) !important;
     color: var(--mvc-text, #f2f2f2) !important;
   }
+  .t-select-input {
+    border: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    box-shadow: none !important;
+  }
+  .t-select-input .t-input {
+    border-color: var(--mvc-line, #31343a) !important;
+    background: var(--mvc-surface-raised, #202227) !important;
+    color: var(--mvc-text, #f2f2f2) !important;
+  }
 
   .t-drawer__header {
     border-bottom-color: var(--mvc-line, #31343a) !important;
@@ -1828,7 +1836,6 @@ body .mcp-drawer {
 
   .t-input,
   .t-textarea__inner,
-  .t-select-input,
   .t-input-number {
     border-color: var(--mvc-line, #31343a) !important;
     background: var(--mvc-surface-raised, #202227) !important;
@@ -1847,12 +1854,15 @@ body .mcp-drawer {
 
   .t-input:hover,
   .t-textarea__inner:hover,
-  .t-select-input:hover,
   .t-input.t-is-focused,
-  .t-select-input.t-is-focused,
   .t-textarea__inner:focus {
     border-color: var(--mvc-line-strong, #484c54) !important;
     box-shadow: 0 0 0 2px rgb(255 255 255 / 5%) !important;
+  }
+  .t-select-input:hover .t-input,
+  .t-select-input.t-is-focused .t-input {
+    border-color: var(--mvc-line-strong, #484c54) !important;
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 8%) !important;
   }
 
   .mcp-drawer__transport-options .source-option {

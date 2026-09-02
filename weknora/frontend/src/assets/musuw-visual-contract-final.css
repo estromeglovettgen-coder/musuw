@@ -421,9 +421,7 @@
 .visual-general-settings .t-input,
 .visual-model-settings .t-input,
 .visual-knowledge-page .t-input,
-.visual-manual-editor .t-input,
-.visual-manual-editor .t-select-input,
-.visual-model-selector .t-input {
+.visual-manual-editor .t-input {
   border-color: var(--mvc-ink-200) !important;
   background: #fff !important;
   color: var(--mvc-ink-700) !important;
@@ -432,16 +430,12 @@
 .visual-general-settings .t-input:hover,
 .visual-model-settings .t-input:hover,
 .visual-knowledge-page .t-input:hover,
-.visual-manual-editor .t-input:hover,
-.visual-manual-editor .t-select-input:hover,
-.visual-model-selector .t-input:hover {
+.visual-manual-editor .t-input:hover {
   border-color: var(--mvc-ink-300) !important;
 }
 .visual-general-settings .t-input.t-is-focused,
 .visual-model-settings .t-input.t-is-focused,
-.visual-manual-editor .t-input.t-is-focused,
-.visual-manual-editor .t-select-input.t-is-focused,
-.visual-model-selector .t-input.t-is-focused {
+.visual-manual-editor .t-input.t-is-focused {
   border-color: var(--mvc-ink-300) !important;
   box-shadow: 0 0 0 2px rgb(17 24 39 / 5%) !important;
 }

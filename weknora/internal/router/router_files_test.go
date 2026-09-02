@@ -519,6 +519,7 @@ func newMessageScopedFilesTestEngine(
 	tenantService interfaces.TenantService,
 	global interfaces.FileService,
 	resourceCatalog interfaces.ResourceCatalog,
+	privateOnly ...bool,
 ) *gin.Engine {
 	engine := gin.New()
 	engine.GET("/sessions/:id/messages/:message_id/files",
@@ -534,6 +535,7 @@ func newMessageScopedFilesTestEngine(
 			global,
 			nil,
 			resourceCatalog,
+			privateOnly...,
 		),
 	)
 	return engine
@@ -645,6 +647,46 @@ func TestMessageScopedFilesServesSameTenantResource(t *testing.T) {
 	}
 	if requestedPath != physical {
 		t.Fatalf("requested path = %q, want %q", requestedPath, physical)
+	}
+}
+
+func TestMessageScopedFilesLiteRejectsSharedAgentResource(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const ref = "resource://AbCdEfGhIjKlMnOpQrStUv"
+
+	engine := newMessageScopedFilesTestEngine(
+		42,
+		&stubMessageFileLookup{get: func(context.Context, string, string) (*types.Message, error) {
+			return &types.Message{AgentID: "agent-1", AgentTenantID: 7}, nil
+		}},
+		&stubSharedAgentFileLookup{get: func(
+			context.Context, uint64, types.TenantRole, string, ...uint64,
+		) (*types.CustomAgent, error) {
+			t.Fatal("Lite must not consult shared-agent access for message files")
+			return nil, nil
+		}},
+		&stubTenantService{get: func(context.Context, uint64) (*types.Tenant, error) {
+			t.Fatal("Lite must reject before owner tenant lookup")
+			return nil, nil
+		}},
+		&stubFileService{getFile: func(context.Context, string) (io.ReadCloser, error) {
+			t.Fatal("Lite must not fetch a foreign message resource")
+			return nil, nil
+		}},
+		&stubResourceCatalog{resource: &types.StoredResource{
+			TenantID:     7,
+			PhysicalPath: "local://7/exports/chart.png",
+		}},
+		true,
+	)
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/sessions/session-1/messages/message-1/files?file_path="+url.QueryEscape(ref), nil)
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status=%d, want %d", recorder.Code, http.StatusNotFound)
 	}
 }
 

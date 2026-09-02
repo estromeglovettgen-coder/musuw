@@ -111,7 +111,7 @@ export function clearMemoryItems() {
 }
 
 export function exportMemoryItems() {
-  return get<{ success: boolean; total: number; data: MemoryItem[] }>('/api/v1/memory/export')
+  return get<{ success: boolean; total: number; truncated: boolean; data: MemoryItem[] }>('/api/v1/memory/export')
 }
 
 /** Why a review changed nothing. Empty when it did change something. */
