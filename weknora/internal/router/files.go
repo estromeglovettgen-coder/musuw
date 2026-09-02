@@ -523,8 +523,10 @@ func newMessageScopedFileServeHandler(
 	globalFileService interfaces.FileService,
 	storageResolver interfaces.StorageBackendResolver,
 	resourceCatalog interfaces.ResourceCatalog,
+	privateOnly ...bool,
 ) gin.HandlerFunc {
 	absDir := localStorageAbsDir()
+	privateWorkspace := len(privateOnly) > 0 && privateOnly[0]
 
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
@@ -573,6 +575,13 @@ func newMessageScopedFileServeHandler(
 		}
 		if ownerTenantID == 0 {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: message resource workspace missing"})
+			return
+		}
+		if privateWorkspace && ownerTenantID != callerTenantID {
+			// Lite keeps message-scoped files for private sessions, but a
+			// historical shared-agent message must not become a cross-tenant
+			// storage proxy after the shared-agent surface is hidden.
+			c.Status(http.StatusNotFound)
 			return
 		}
 
@@ -671,6 +680,7 @@ func serveMessageScopedFiles(
 			globalFileService,
 			storageResolver,
 			resourceCatalog,
+			litePrivateWorkspaceEnabled(),
 		),
 	)
 }

@@ -285,6 +285,19 @@ func TestNothingIsScheduledWhileMemoryIsOff(t *testing.T) {
 	require.Zero(t, models.calls)
 }
 
+func TestNothingIsScheduledWhenTheUserOptedOut(t *testing.T) {
+	svc, tenantRepo, messages, models, enqueuer := newExtractionHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	messages.set("session-1", []*types.Message{userMessage("session-1", "一句话", time.Now())})
+	// Create the subject while enabled, then opt this principal out before the
+	// turn completes. The workspace remains enabled for other users.
+	require.NoError(t, svc.SetEnabled(ctx, false))
+	svc.ScheduleExtraction(ctx, "session-1", "message-1", "model-1")
+
+	require.Empty(t, enqueuer.tasks)
+	require.Zero(t, models.calls, "a personal opt-out must stop background extraction")
+}
+
 // transcriptBlock returns just the part of the prompt the model is asked to
 // extract from, so a test can distinguish "shown as context" from "extracted".
 func transcriptBlock(prompt string) string {

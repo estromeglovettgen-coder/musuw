@@ -117,8 +117,7 @@
   font-weight: 500 !important;
 }
 .visual-manual-editor__field > p { font-size: 10px !important; line-height: 15px !important; }
-.visual-manual-editor__field .t-input,
-.visual-manual-editor__field .t-select-input {
+.visual-manual-editor__field .t-input {
   min-height: 34px !important;
   border-color: #e5e7eb !important;
   border-radius: 8px !important;
@@ -128,9 +127,9 @@
   box-shadow: none !important;
 }
 .visual-manual-editor__field .t-input:hover,
-.visual-manual-editor__field .t-select-input:hover { border-color: #d1d5db !important; }
+.visual-manual-editor__field .t-input:hover { border-color: #d1d5db !important; }
 .visual-manual-editor__field .t-input.t-is-focused,
-.visual-manual-editor__field .t-select-input.t-is-focused {
+.visual-manual-editor__field .t-input.t-is-focused {
   border-color: #1677ff !important;
   box-shadow: 0 0 0 1px rgb(22 119 255 / 20%) !important;
 }

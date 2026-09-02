@@ -656,6 +656,8 @@ func (s *customAgentService) getSuggestedQuestions(
 		return nil, err
 	}
 	scopeTagIDs := flattenTagScopeIDs(tagScopes)
+	explicitScopeRequested := isLiteProductEdition() &&
+		(len(kbIDs) > 0 || len(knowledgeIDs) > 0 || len(scopeTagIDs) > 0)
 	if err := types.AuthorizeTenantAPIKeyOptionalTagIDs(ctx, scopeTagIDs); err != nil {
 		return nil, err
 	}
@@ -721,10 +723,12 @@ func (s *customAgentService) getSuggestedQuestions(
 			return finalizeStarterSuggestions(curated, nil, starterMode, limit), nil
 		}
 	}
+	knowledgeIDs = s.filterLiteSuggestionKnowledgeIDs(ctx, tenantID, knowledgeIDs)
 
 	// 2. Determine knowledge base scope
 	effectiveKBIDs := kbIDs
-	if len(effectiveKBIDs) == 0 && len(knowledgeIDs) == 0 && len(resolvedTags.TagIDsByTenant) == 0 {
+	if !explicitScopeRequested &&
+		len(effectiveKBIDs) == 0 && len(knowledgeIDs) == 0 && len(resolvedTags.TagIDsByTenant) == 0 {
 		// Use agent's KB configuration
 		switch agent.Config.KBSelectionMode {
 		case "all":
@@ -949,6 +953,57 @@ func (s *customAgentService) getSuggestedQuestions(
 	}
 
 	return finalizeStarterSuggestions(curated, knowledgeResult, starterMode, limit), nil
+}
+
+// filterLiteSuggestionKnowledgeIDs keeps the knowledge_ids-only form of the
+// suggestion endpoint on the same Lite visibility boundary as KB-scoped
+// requests. The repository lookup is tenant-scoped, and the existing KB
+// grouping seam then removes legacy FAQ or otherwise hidden KBs. Standard
+// returns the native WeKnora scope unchanged.
+func (s *customAgentService) filterLiteSuggestionKnowledgeIDs(
+	ctx context.Context,
+	tenantID uint64,
+	knowledgeIDs []string,
+) []string {
+	if !isLiteProductEdition() || len(knowledgeIDs) == 0 {
+		return knowledgeIDs
+	}
+	if s.knowledgeRepo == nil || s.kbService == nil {
+		return nil
+	}
+	rows, err := s.knowledgeRepo.GetKnowledgeBatch(ctx, tenantID, knowledgeIDs)
+	if err != nil {
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{
+			"knowledge_ids": knowledgeIDs,
+			"tenant_id":     tenantID,
+		})
+		return nil
+	}
+	kbIDs := make([]string, 0, len(rows))
+	rowByID := make(map[string]*types.Knowledge, len(rows))
+	for _, row := range rows {
+		if row == nil || row.KnowledgeBaseID == "" {
+			continue
+		}
+		rowByID[row.ID] = row
+		kbIDs = append(kbIDs, row.KnowledgeBaseID)
+	}
+	visibleGroups := s.groupKBIDsByEffectiveTenant(ctx, tenantID, mergeUniqueStrings(nil, kbIDs))
+	visibleKBs := make(map[string]struct{}, len(visibleGroups[tenantID]))
+	for _, kbID := range visibleGroups[tenantID] {
+		visibleKBs[kbID] = struct{}{}
+	}
+	filtered := make([]string, 0, len(knowledgeIDs))
+	for _, id := range knowledgeIDs {
+		row := rowByID[id]
+		if row == nil {
+			continue
+		}
+		if _, ok := visibleKBs[row.KnowledgeBaseID]; ok {
+			filtered = append(filtered, id)
+		}
+	}
+	return filtered
 }
 
 type resolvedSuggestionTagScopes struct {
@@ -1206,6 +1261,8 @@ func wikiSuggestionFromPage(page *types.WikiPage, locale string) string {
 //   - KBs the caller cannot reach (no membership, no share) are silently
 //     dropped — the suggestion endpoint never returns 403, it just shows
 //     nothing for that KB, mirroring how search results are scoped.
+//   - Musuw Lite is a strictly private surface: only caller-owned KBs are
+//     included and organization-share permissions are never consulted.
 //
 // The result is keyed by effective tenant id so the caller can issue one
 // chunk / wiki query per tenant group. Returns an empty (non-nil) map when
@@ -1224,6 +1281,11 @@ func (s *customAgentService) groupKBIDsByEffectiveTenant(
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"kb_ids": kbIDs,
 		})
+		if isLiteProductEdition() {
+			// Fail closed because Lite must not use the Standard shared-KB
+			// fallback when ownership cannot be resolved.
+			return out
+		}
 		// Fall back to caller's tenant so at least in-tenant KBs are queryable;
 		// chunk repo filtering will drop anything that doesn't match.
 		out[callerTenantID] = append(out[callerTenantID], kbIDs...)
@@ -1242,7 +1304,13 @@ func (s *customAgentService) groupKBIDsByEffectiveTenant(
 			continue
 		}
 		if kb.TenantID == callerTenantID {
+			if isLiteProductEdition() && !isLiteKnowledgeBaseVisible(kb) {
+				continue
+			}
 			out[callerTenantID] = append(out[callerTenantID], kbID)
+			continue
+		}
+		if isLiteProductEdition() {
 			continue
 		}
 		if s.kbShareService == nil {

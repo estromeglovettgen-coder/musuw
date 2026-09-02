@@ -18,6 +18,10 @@ The Musuw agent editor SHALL enable web search and web-page fetching for each ne
 - **WHEN** a new agent is saved without an explicit web-search provider ID
 - **THEN** its web-search and web-fetch flags are enabled and runtime provider resolution uses the tenant's default provider
 
+#### Scenario: Page fetching is disabled independently
+- **WHEN** an existing agent keeps web search enabled but disables web-page fetching
+- **THEN** runtime registers `web_search` without registering `web_fetch`, and the editor preview shows the same effective tool set
+
 ### Requirement: New smart agents select every Tool Configuration tool
 The Musuw agent editor SHALL seed each newly created smart-reasoning agent with every tool identifier displayed in the existing Tool Configuration UI, including reasoning, RAG, database, Wiki read, Wiki write, Wiki issue, and data tools, and SHALL retain the regular `search_conversations` capability used by built-in Smart Reasoning.
 

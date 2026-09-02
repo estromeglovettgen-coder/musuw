@@ -134,6 +134,7 @@ export function SiteHeader({
   const [authenticated, setAuthenticated] = useState(false);
   const mobileNavId = useId();
   const menuButtonRef = useRef(null);
+  const headerRef = useRef(null);
   const reduceMotion = useReducedMotion();
   const labels = publicNavigationLabels(copy);
   const currentLocale = locale || (copy?.pricing?.currencyCode === "CNY" ? "zh-CN" : "en");
@@ -166,6 +167,7 @@ export function SiteHeader({
   useEffect(() => {
     if (!open) return undefined;
     const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const previousBodyOverflow = document.body.style.overflow;
     const closeAtDesktop = (event) => {
       if (event.matches) setOpen(false);
     };
@@ -174,18 +176,28 @@ export function SiteHeader({
       setOpen(false);
       menuButtonRef.current?.focus();
     };
+    const closeOnOutsidePointer = (event) => {
+      if (headerRef.current?.contains(event.target)) return;
+      setOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.body.style.overflow = "hidden";
     if (desktopQuery.matches) setOpen(false);
     desktopQuery.addEventListener("change", closeAtDesktop);
     document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
     return () => {
+      document.body.style.overflow = previousBodyOverflow;
       desktopQuery.removeEventListener("change", closeAtDesktop);
       document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
     };
   }, [open]);
 
   return (
     <header
       className="site-header"
+      ref={headerRef}
       style={{
         WebkitBackdropFilter: "blur(2px)",
         backdropFilter: "blur(2px)",

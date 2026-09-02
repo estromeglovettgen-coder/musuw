@@ -2325,13 +2325,9 @@ const handleCancel = () => {
 .thinking-control-select-popup {
   min-width: 22rem;
   max-width: min(28rem, calc(100vw - 2rem));
-  padding: 4px;
 
   .t-select-option {
     height: auto !important;
-    padding: 8px 10px;
-    border-radius: 6px;
-    margin: 2px 0;
     white-space: normal;
   }
 }
@@ -2344,21 +2340,20 @@ const handleCancel = () => {
   min-width: 0;
 
   &__title {
-    font-size: 13px;
+    font-size: 12px;
+    line-height: 16px;
     color: var(--td-text-color-primary);
   }
 
   &__hint {
-    font-size: 12px;
+    font-size: 10px;
+    line-height: 14px;
     color: var(--td-text-color-placeholder);
     word-break: break-word;
   }
 }
 
 .provider-select-popup {
-  // 容器留点呼吸：避免选项贴着 popup 圆角
-  padding: 4px;
-
   // TDesign 默认会在 t-select-option 上挂一个 overflow tooltip（浮在右侧
   // 显示完整 label）。我们的选项排版是「主名称 + 次描述」两行，永远不会
   // 触发省略，tooltip 反而成了视觉噪音 → 直接隐藏 popup 自带的提示。
@@ -2369,44 +2364,15 @@ const handleCancel = () => {
 
   .t-select-option {
     height: auto !important;
-    padding: 8px 10px;
-    border-radius: 6px;
-    margin: 2px 0;
     outline: none;
-    transition: background-color 0.15s ease;
+    white-space: normal;
+    transition: none;
 
     &:focus,
     &:focus-visible {
       outline: none;
     }
 
-    // hover 态：用浅 brand 色而非强灰，跟主题色调一致
-    &:hover:not(.t-is-selected) {
-      background-color: var(--td-bg-color-container-hover);
-    }
-  }
-
-  // 命中态：浅一点的底色 + 左侧主题色条作为 affordance，不再用全填的灰底
-  .t-select-option.t-is-selected {
-    background-color: var(--td-brand-color-light);
-    color: var(--td-text-color-primary);
-    font-weight: 500;
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 8px;
-      bottom: 8px;
-      width: 3px;
-      background: var(--td-brand-color);
-      border-radius: 0 2px 2px 0;
-    }
-
-    .provider-name {
-      color: var(--td-brand-color);
-    }
   }
 
   .provider-option {
@@ -2417,16 +2383,16 @@ const handleCancel = () => {
     min-width: 0;
 
     .provider-name {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--td-text-color-primary);
-      line-height: 20px;
+      line-height: 16px;
     }
 
     .provider-desc {
-      font-size: 12px;
+      font-size: 10px;
       color: var(--td-text-color-placeholder);
-      line-height: 18px;
+      line-height: 14px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;

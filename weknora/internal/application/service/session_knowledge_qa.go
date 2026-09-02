@@ -27,6 +27,9 @@ func (s *sessionService) KnowledgeQA(
 	req *types.QARequest,
 	eventBus *event.EventBus,
 ) error {
+	if err := rejectLiteForeignAgent(ctx, req); err != nil {
+		return err
+	}
 	// Lite always includes platform-managed web search. This service-level
 	// invariant also covers non-HTTP/internal callers; the router separately
 	// rewrites browser/API requests so persisted execution context is truthful.
@@ -420,7 +423,7 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 		// unrelated KBs from other organisations into the agent's retrieval scope.
 		isSharedAgent := sessionTenantID != 0 && sessionTenantID != customAgent.TenantID
 		sharedSkipped := 0
-		if !isSharedAgent {
+		if !isSharedAgent && !isLiteProductEdition() {
 			tenantID := types.MustTenantIDFromContext(ctx)
 			userIDVal := ctx.Value(types.UserIDContextKey)
 			if userIDVal != nil {
@@ -444,9 +447,11 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 					}
 				}
 			}
-		} else {
+		} else if isSharedAgent {
 			logger.Infof(ctx, "Shared agent detected (session tenant %d != agent tenant %d): skipping user's shared KBs",
 				sessionTenantID, customAgent.TenantID)
+		} else {
+			logger.Infof(ctx, "Lite private workspace: skipping user's shared KBs")
 		}
 
 		if ownSkipped+sharedSkipped > 0 {
@@ -515,6 +520,9 @@ func (s *sessionService) buildSearchTargets(
 				if isLiteProductEdition() && kb.Type == types.KnowledgeBaseTypeFAQ {
 					return nil, apperrors.NewNotFoundError("knowledge base not found")
 				}
+				if isLiteProductEdition() && kb.TenantID != tenantID {
+					return nil, apperrors.NewNotFoundError("knowledge base not found")
+				}
 				kbByID[kb.ID] = kb
 			}
 		}
@@ -579,6 +587,9 @@ func (s *sessionService) buildSearchTargets(
 		for _, k := range knowledgeList {
 			if k == nil || k.KnowledgeBaseID == "" {
 				continue
+			}
+			if isLiteProductEdition() && k.TenantID != tenantID {
+				return nil, apperrors.NewNotFoundError("knowledge not found")
 			}
 			if isLiteProductEdition() && s.knowledgeBaseService != nil && kbByID[k.KnowledgeBaseID] == nil {
 				// Knowledge-only requests do not populate kbIDsToFetch during the

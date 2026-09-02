@@ -1344,7 +1344,7 @@ onUnmounted(() => {
 .rq-pool-meta {
   display: block;
   margin-top: 4px;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -1373,7 +1373,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -1491,7 +1491,7 @@ onUnmounted(() => {
 
 .rq-task-state-option__count {
   flex-shrink: 0;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 11px;
   font-weight: 500;
   line-height: 1;
@@ -1559,7 +1559,7 @@ onUnmounted(() => {
   gap: 10px;
   border: 1px dashed var(--td-component-stroke);
   border-radius: 10px;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 13px;
 }
 
@@ -1585,7 +1585,7 @@ onUnmounted(() => {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -1637,7 +1637,7 @@ onUnmounted(() => {
   min-width: 0;
   height: 18px;
   padding: 0;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 11px;
 }
 
@@ -1648,7 +1648,7 @@ onUnmounted(() => {
   gap: 1px;
 
   small {
-    color: var(--td-text-color-placeholder);
+    color: var(--td-text-color-secondary);
     font-size: 11px;
     white-space: nowrap;
   }
@@ -1680,7 +1680,7 @@ onUnmounted(() => {
 
   &--attention,
   &--paused {
-    color: var(--td-warning-color);
+    color: var(--td-warning-color-8);
   }
 
   &--danger {
@@ -1733,7 +1733,7 @@ onUnmounted(() => {
 
 .rq-footnote {
   margin: 12px 0 0;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -1796,7 +1796,7 @@ onUnmounted(() => {
 
   &--retry,
   &--scheduled {
-    color: var(--td-warning-color);
+    color: var(--td-warning-color-8);
     background: var(--td-warning-color-1);
   }
 
@@ -1812,7 +1812,7 @@ onUnmounted(() => {
 }
 
 .rq-failed-row-sep {
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
 }
 
 .rq-failed-row-stat,
@@ -1836,7 +1836,7 @@ onUnmounted(() => {
 
   dt {
     margin: 0;
-    color: var(--td-text-color-placeholder);
+    color: var(--td-text-color-secondary);
     font-size: 12px;
     line-height: 1.45;
     white-space: nowrap;
@@ -1856,7 +1856,7 @@ onUnmounted(() => {
 
 .rq-failed-row-unknown {
   margin: 2px 0 0;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -1901,7 +1901,7 @@ onUnmounted(() => {
 }
 
 .rq-failed-list-status {
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-size: 12px;
   line-height: 1.5;
   text-align: center;

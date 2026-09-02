@@ -384,6 +384,14 @@ func liteProductGate() gin.HandlerFunc {
 	}
 }
 
+// litePrivateWorkspaceEnabled mirrors the product gate's process-wide
+// edition decision for KB-access middleware. Keeping the decision in the
+// existing edition seam lets Standard retain native WeKnora sharing while
+// Lite rejects shared-KB deep links after the resource is resolved.
+func litePrivateWorkspaceEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(handler.Edition), "lite")
+}
+
 func liteAgentPathAllowed(method, path string) bool {
 	const base = "/api/v1/agents"
 	if path == base {
@@ -617,34 +625,22 @@ func liteProductRouteBlocked(method, path string) bool {
 		return !liteAgentPathAllowed(method, path)
 	}
 
-	// Standalone organization management is hidden, but KB sharing is an
-	// exposed Knowledge Base workflow. Read-only organization data required by
-	// the KB share picker/list is therefore allowed; all org mutations and
-	// agent-share projections are denied.
+	// Musuw Lite is a single-user private workspace. Organization discovery,
+	// collaboration collection/detail, and every shared-KB projection are not
+	// product capabilities, including read-only routes. The deep-link KB
+	// resource guard below handles an already-known shared KB ID.
 	if path == "/api/v1/organizations" || strings.HasPrefix(path, "/api/v1/organizations/") {
-		if method != http.MethodGet {
-			return true
-		}
-		if strings.Contains(path, "/agent-shares") || strings.Contains(path, "/shared-agents") {
-			return true
-		}
-		for _, managementSegment := range []string{
-			"/members",
-			"/join-requests",
-			"/search-tenants",
-			"/search-users",
-		} {
-			if strings.Contains(path, managementSegment) {
-				return true
-			}
-		}
-		if path == "/api/v1/organizations/search" || strings.Contains(path, "/preview/") {
+		return true
+	}
+	if path == "/api/v1/shared-knowledge-bases" || strings.HasPrefix(path, "/api/v1/shared-knowledge-bases/") {
+		return true
+	}
+	if strings.HasPrefix(path, "/api/v1/knowledge-bases/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/knowledge-bases/"), "/")
+		if len(parts) >= 2 && strings.EqualFold(parts[1], "shares") {
 			return true
 		}
 	}
-
-	// KB share routes are intentionally NOT blocked: they are part of the
-	// exposed Knowledge Base UI. Shared-KB reads are allowed for the same reason.
 
 	// These are the only tenant KV entries consumed by exposed Lite surfaces:
 	// retrieval settings, the native prompt defaults, and the read-only storage

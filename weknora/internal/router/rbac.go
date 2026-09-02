@@ -561,6 +561,7 @@ func (g *rbacGuards) KBAccessRead(param string) gin.HandlerFunc {
 		g.kbShareService,
 		g.agentShareService,
 		g.cfg,
+		litePrivateWorkspaceEnabled(),
 	)
 }
 
@@ -575,6 +576,7 @@ func (g *rbacGuards) KBAccessWrite(param string) gin.HandlerFunc {
 		g.kbShareService,
 		g.agentShareService,
 		g.cfg,
+		litePrivateWorkspaceEnabled(),
 	)
 }
 
@@ -590,6 +592,7 @@ func (g *rbacGuards) KBAccessReadFromKnowledgeIDParam(param string) gin.HandlerF
 		g.kbShareService,
 		g.agentShareService,
 		g.cfg,
+		litePrivateWorkspaceEnabled(),
 	)
 }
 
@@ -603,6 +606,7 @@ func (g *rbacGuards) KBAccessWriteFromKnowledgeIDParam(param string) gin.Handler
 		g.kbShareService,
 		g.agentShareService,
 		g.cfg,
+		litePrivateWorkspaceEnabled(),
 	)
 }
 
@@ -617,6 +621,7 @@ func (g *rbacGuards) KBAccessReadFromChunkIDParam(param string) gin.HandlerFunc 
 		g.kbShareService,
 		g.agentShareService,
 		g.cfg,
+		litePrivateWorkspaceEnabled(),
 	)
 }
 
@@ -631,5 +636,6 @@ func (g *rbacGuards) KBAccessWriteFromChunkIDParam(param string) gin.HandlerFunc
 		g.kbShareService,
 		g.agentShareService,
 		g.cfg,
+		litePrivateWorkspaceEnabled(),
 	)
 }

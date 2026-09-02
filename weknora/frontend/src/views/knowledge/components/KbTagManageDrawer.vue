@@ -762,3 +762,82 @@ watch(searchQuery, (newVal, oldVal) => {
   }
 }
 </style>
+
+<style lang="less">
+/* The drawer is teleported to body, outside the workspace surface that owns
+ * most dark-theme selectors. Reuse the global Musuw visual tokens here so the
+ * same markup follows the active theme without duplicating a second palette. */
+:root[theme-mode="dark"] body .visual-tag-manage__overlay {
+  background: rgb(0 0 0 / 48%);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage {
+  border-color: var(--mvc-line);
+  background: var(--mvc-page);
+  color: var(--mvc-text);
+  box-shadow: var(--mvc-shadow);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__header {
+  border-color: var(--mvc-line);
+  background: var(--mvc-page);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__heading-icon,
+:root[theme-mode="dark"] body .visual-tag-tile__badge {
+  background: var(--mvc-hover);
+  color: var(--mvc-muted-strong);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__heading h3,
+:root[theme-mode="dark"] body .visual-tag-manage__section-head h4,
+:root[theme-mode="dark"] body .visual-tag-tile__copy strong {
+  color: var(--mvc-text-strong);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__heading p,
+:root[theme-mode="dark"] body .visual-tag-manage__section-head,
+:root[theme-mode="dark"] body .visual-tag-tile__copy small,
+:root[theme-mode="dark"] body .visual-tag-manage__close,
+:root[theme-mode="dark"] body .visual-tag-tile__action,
+:root[theme-mode="dark"] body .visual-tag-manage__load-more button {
+  color: var(--mvc-muted);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__search .t-input,
+:root[theme-mode="dark"] body .visual-tag-tile__input .t-input {
+  border-color: var(--mvc-line);
+  background: var(--mvc-surface);
+  color: var(--mvc-text);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__search .t-input:hover,
+:root[theme-mode="dark"] body .visual-tag-manage__search .t-input.t-is-focused,
+:root[theme-mode="dark"] body .visual-tag-tile__input .t-input.t-is-focused {
+  border-color: var(--mvc-line-strong);
+  background: var(--mvc-surface-raised);
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__create-trigger,
+:root[theme-mode="dark"] body .visual-tag-tile {
+  border-color: var(--mvc-line);
+  background: var(--mvc-surface);
+  color: var(--mvc-text);
+}
+
+:root[theme-mode="dark"] body .visual-tag-tile:hover:not(.is-editing),
+:root[theme-mode="dark"] body .visual-tag-tile.is-editing,
+:root[theme-mode="dark"] body .visual-tag-manage__close:hover,
+:root[theme-mode="dark"] body .visual-tag-manage__create-trigger:hover:not(:disabled),
+:root[theme-mode="dark"] body .visual-tag-tile__action:hover:not(:disabled),
+:root[theme-mode="dark"] body .visual-tag-manage__load-more button:hover:not(:disabled) {
+  border-color: var(--mvc-line-strong);
+  background: var(--mvc-hover);
+  color: var(--mvc-text-strong);
+}
+
+:root[theme-mode="dark"] body .visual-tag-tile__action.is-danger:hover:not(:disabled) {
+  background: rgb(127 29 29 / 28%);
+  color: #fca5a5;
+}
+</style>

@@ -78,3 +78,45 @@ func TestClearDropsDocumentAffinity(t *testing.T) {
 	require.Zero(t, total)
 	require.Empty(t, docs)
 }
+
+func TestRecordAnswerSourcesHonorsWorkspaceAndUserSwitches(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	ref := []types.MemoryDocAffinity{{KnowledgeID: "doc-off", Title: "不会被记录"}}
+
+	// A workspace-level off switch must stop both retrieval conditioning and the
+	// write-side affinity signal.
+	tenantRepo.set(1, &types.MemoryConfig{Enabled: false})
+	svc.RecordAnswerSources(ctx, ref)
+	docs, total, err := svc.ListDocuments(ctx, 10, 0)
+	require.NoError(t, err)
+	require.Zero(t, total)
+	require.Empty(t, docs)
+
+	// Re-enable the workspace, then opt only this user out. Other users may
+	// still collect their own document habits, but this one must not.
+	tenantRepo.set(1, &types.MemoryConfig{Enabled: true, WriteMode: types.MemoryWriteAuto})
+	require.NoError(t, svc.SetEnabled(ctx, false))
+	svc.RecordAnswerSources(ctx, ref)
+	docs, total, err = svc.ListDocuments(ctx, 10, 0)
+	require.NoError(t, err)
+	require.Zero(t, total)
+	require.Empty(t, docs)
+}
+
+func TestRecordAnswerSourcesHonorsRetrievalConditioningSwitch(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	off := false
+	tenantRepo.set(1, &types.MemoryConfig{
+		Enabled: true, WriteMode: types.MemoryWriteAuto, RetrievalConditioning: &off,
+	})
+
+	svc.RecordAnswerSources(ctx, []types.MemoryDocAffinity{{
+		KnowledgeID: "doc-off", Title: "检索关闭时不记录",
+	}})
+	docs, total, err := svc.ListDocuments(ctx, 10, 0)
+	require.NoError(t, err)
+	require.Zero(t, total)
+	require.Empty(t, docs)
+}

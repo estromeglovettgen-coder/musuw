@@ -747,6 +747,15 @@ func (s *Service) UpdateItem(
 	if sanitized == "" {
 		return nil, errors.New("memory: empty content")
 	}
+	// Editing is another write path. Apply the same credential/identity
+	// redaction as Remember/CreateItem so a user cannot reintroduce sensitive
+	// material into a memory that was safe when it was first created.
+	if redacted, changed := types.RedactSensitive(sanitized); changed {
+		if types.IsMostlyRedacted(redacted) {
+			return nil, ErrSensitiveContent
+		}
+		sanitized = types.SanitizeMemoryContent(redacted)
+	}
 	// Keep the original topic: the user is correcting the statement, not
 	// re-filing it under a different subject, and reusing the topic is what
 	// keeps the correction able to supersede a future extraction.
@@ -754,6 +763,15 @@ func (s *Service) UpdateItem(
 	importance = types.ClampMemoryImportance(importance)
 	if err := s.repo.UpdateItemContent(ctx, scope, id, sanitized, normalizedKey, importance); err != nil {
 		return nil, err
+	}
+	// The detached vector still represents the pre-edit wording. Invalidate it
+	// after the content commit so semantic recall cannot keep serving stale
+	// text; maintenance can backfill the replacement later. Match rename and
+	// other maintenance paths by keeping this cleanup best effort: the edit is
+	// already durable and must not be reported as failed when the vector store
+	// is temporarily unavailable.
+	if err := s.repo.DeleteItemEmbedding(ctx, scope, id); err != nil {
+		logger.Warnf(ctx, "memory: drop edited item embedding failed: %v", err)
 	}
 	s.rebuildBlock(ctx, scope)
 	return s.repo.GetItem(ctx, scope, id)
@@ -780,6 +798,12 @@ func (s *Service) DeleteItem(ctx context.Context, id string) error {
 	); err != nil {
 		logger.Warnf(ctx, "memory: record tombstone failed: %v", err)
 	}
+	// Embeddings live in a detached table without a foreign-key cascade. Delete
+	// the vector before the item can disappear, and surface a cleanup failure so
+	// a retry can finish the operation instead of silently retaining user data.
+	if err := s.repo.DeleteItemEmbedding(ctx, scope, id); err != nil {
+		return err
+	}
 	if err := s.repo.DeleteItem(ctx, scope, id); err != nil {
 		return err
 	}
@@ -791,6 +815,12 @@ func (s *Service) DeleteItem(ctx context.Context, id string) error {
 func (s *Service) Clear(ctx context.Context) (int64, error) {
 	scope, err := ResolveScope(ctx)
 	if err != nil {
+		return 0, err
+	}
+	// Vectors are detached from memory_items and therefore are not removed by
+	// DeleteAll. Clean them explicitly before deleting rows so a failure leaves
+	// the user's memories intact and the operation can be retried safely.
+	if err := s.repo.DeleteAllItemEmbeddings(ctx, scope); err != nil {
 		return 0, err
 	}
 	// Clearing is a rejection of everything currently stored, so it leaves the

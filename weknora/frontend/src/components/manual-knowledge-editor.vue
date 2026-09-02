@@ -576,17 +576,29 @@ export default defineComponent({
 }
 
 :root[theme-mode="dark"] body .manual-editor-drawer .t-input,
-:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input,
 :root[theme-mode="dark"] body .manual-editor-drawer .t-textarea__inner {
   border-color: var(--mvc-line) !important;
   background: var(--mvc-surface-raised) !important;
   color: var(--mvc-text) !important;
   box-shadow: none !important;
 }
+:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input {
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+}
+:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input .t-input {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+}
 
 :root[theme-mode="dark"] body .manual-editor-drawer .t-input:hover,
-:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input:hover,
 :root[theme-mode="dark"] body .manual-editor-drawer .t-textarea__inner:hover {
+  border-color: var(--mvc-line-strong) !important;
+}
+:root[theme-mode="dark"] body .manual-editor-drawer .t-select-input:hover .t-input {
   border-color: var(--mvc-line-strong) !important;
 }
 

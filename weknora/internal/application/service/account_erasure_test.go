@@ -186,9 +186,12 @@ func (s *accountErasureRuntimeInspectorStub) DeleteRuntimeTask(
 
 type accountErasureKBStub struct {
 	interfaces.KnowledgeBaseService
-	kbs           []*types.KnowledgeBase
-	deleted       []string
-	strictDeleted []string
+	kbs                   []*types.KnowledgeBase
+	deleted               []string
+	strictDeleted         []string
+	erasureFiles          interfaces.FileService
+	erasureFileTenantIDs  []uint64
+	erasureFileReferences []string
 }
 
 func (k *accountErasureKBStub) ListKnowledgeBasesByTenantID(context.Context, uint64) ([]*types.KnowledgeBase, error) {
@@ -203,6 +206,16 @@ func (k *accountErasureKBStub) DeleteKnowledgeBase(_ context.Context, id string)
 func (k *accountErasureKBStub) DeleteKnowledgeBaseForAccountErasure(_ context.Context, id string) error {
 	k.strictDeleted = append(k.strictDeleted, id)
 	return nil
+}
+
+func (k *accountErasureKBStub) deleteFileForAccountErasure(
+	ctx context.Context,
+	tenantID uint64,
+	reference string,
+) error {
+	k.erasureFileTenantIDs = append(k.erasureFileTenantIDs, tenantID)
+	k.erasureFileReferences = append(k.erasureFileReferences, reference)
+	return deleteFileIdempotent(ctx, k.erasureFiles, reference)
 }
 
 type accountErasureFileStub struct {
@@ -534,27 +547,42 @@ func TestAccountErasureWorkerDeletesRemainingResourcesBeforeTenant(t *testing.T)
 	order := []string{}
 	target := eligibleErasureTarget()
 	repo := &accountErasureRepoStub{target: target, order: &order}
-	files := &accountErasureFileStub{order: &order}
+	routedFiles := &accountErasureFileStub{order: &order}
+	globalFiles := &accountErasureFileStub{err: errors.New("global storage must not receive a catalog reference")}
 	// Override the repository method with a purpose-built wrapper so active
 	// non-KB resources are included in the worker inventory.
-	wrapped := &accountErasureRepoWithResources{accountErasureRepoStub: repo, refs: []string{"resource://attachment"}}
+	const resourceRef = "resource://y16XEhoTvy07RNTh7QUIfw"
+	wrapped := &accountErasureRepoWithResources{accountErasureRepoStub: repo, refs: []string{resourceRef}}
 	tenants := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}, order: &order}
 	identity := &accountErasureIdentityStub{order: &order}
-	svc := newAccountErasureService(wrapped, &accountErasureKBStub{}, files, tenants, nil, nil, &accountErasureBillingStub{}, identity)
+	knowledge := &accountErasureKBStub{erasureFiles: routedFiles}
+	svc := newAccountErasureService(
+		wrapped, knowledge, globalFiles, tenants, nil, nil, &accountErasureBillingStub{}, identity,
+	)
 	task, err := NewAccountErasureTask("user-1")
 	require.NoError(t, err)
 
 	require.NoError(t, svc.Process(context.Background(), task))
 	require.Equal(t, []string{"file", "tenant", "identity", "purge"}, order)
+	require.Equal(t, []uint64{7}, knowledge.erasureFileTenantIDs)
+	require.Equal(t, []string{resourceRef}, knowledge.erasureFileReferences)
+	require.Equal(t, []string{resourceRef}, routedFiles.deleted)
+	require.Empty(t, globalFiles.deleted)
 }
 
 func TestAccountErasureWorkerTreatsAlreadyDeletedRemainingResourceAsRetrySuccess(t *testing.T) {
 	target := eligibleErasureTarget()
 	repo := &accountErasureRepoStub{target: target}
-	wrapped := &accountErasureRepoWithResources{accountErasureRepoStub: repo, refs: []string{"resource://attachment"}}
-	files := &accountErasureFileStub{errs: []error{errors.New("catalog update failed"), fs.ErrNotExist}}
+	const resourceRef = "resource://y16XEhoTvy07RNTh7QUIfw"
+	wrapped := &accountErasureRepoWithResources{accountErasureRepoStub: repo, refs: []string{resourceRef}}
+	routedFiles := &accountErasureFileStub{errs: []error{errors.New("catalog update failed"), fs.ErrNotExist}}
+	globalFiles := &accountErasureFileStub{err: errors.New("global storage must not receive a catalog reference")}
 	tenants := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}}
-	svc := newAccountErasureService(wrapped, &accountErasureKBStub{}, files, tenants, nil, nil, &accountErasureBillingStub{}, &accountErasureIdentityStub{})
+	knowledge := &accountErasureKBStub{erasureFiles: routedFiles}
+	svc := newAccountErasureService(
+		wrapped, knowledge, globalFiles, tenants, nil, nil,
+		&accountErasureBillingStub{}, &accountErasureIdentityStub{},
+	)
 	task, err := NewAccountErasureTask("user-1")
 	require.NoError(t, err)
 
@@ -562,6 +590,8 @@ func TestAccountErasureWorkerTreatsAlreadyDeletedRemainingResourceAsRetrySuccess
 	require.False(t, repo.purged)
 	require.NoError(t, svc.Process(context.Background(), task))
 	require.True(t, repo.purged)
+	require.Equal(t, []string{resourceRef, resourceRef}, routedFiles.deleted)
+	require.Empty(t, globalFiles.deleted)
 }
 
 type accountErasureRepoWithResources struct {

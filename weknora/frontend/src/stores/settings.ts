@@ -4,8 +4,8 @@ import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent
 import { getApiBaseUrl } from "@/utils/api-base";
 import { isAgentStreamAgentId } from "@/utils/agent-mode";
 import { reconcileLiteChatSettings } from "@/utils/liteChatSettings";
-import { useAuthStore } from "@/stores/auth";
 import { loadAndReconcileSettings } from "@/stores/settingsStorage";
+import { resetSettingsForIdentityBoundary } from "@/stores/settingsIdentityBoundary";
 import type { ConsumerScene } from "@/api/model";
 
 // 定义设置接口
@@ -187,6 +187,13 @@ export const useSettingsStore = defineStore("settings", {
   },
 
   actions: {
+    resetForIdentityBoundary() {
+      this.settings = resetSettingsForIdentityBoundary(defaultSettings);
+      this._defaultsSnapshot = null;
+      this._isApplyingSessionState = false;
+      localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+    },
+
     // 保存设置
     saveSettings(settings: Settings) {
       this.settings = { ...settings };
@@ -605,7 +612,7 @@ export const useSettingsStore = defineStore("settings", {
         if (typeof state.web_search_enabled === "boolean") {
           this.settings.webSearchEnabled = state.web_search_enabled;
         }
-        if (useAuthStore().isLiteMode) {
+        if (localStorage.getItem('weknora_lite_mode') === 'true') {
           this.settings = reconcileLiteChatSettings(this.settings);
         }
       } finally {

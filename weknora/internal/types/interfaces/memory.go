@@ -106,6 +106,11 @@ type MemoryRepository interface {
 	// of its subject — and dropping the vector is how the existing backfill is
 	// asked to rebuild it.
 	DeleteItemEmbedding(ctx context.Context, scope MemoryScope, itemID string) error
+	// DeleteAllItemEmbeddings drops every vector in the caller's memory space.
+	// Embeddings are stored separately from items without a foreign-key cascade,
+	// so clear must remove them explicitly before deleting the rows they belong
+	// to.
+	DeleteAllItemEmbeddings(ctx context.Context, scope MemoryScope) error
 	// ItemEmbeddings loads the vectors for the given items, keyed by item id.
 	// Only vectors produced by modelID are returned: vectors from a different
 	// model are not comparable, so mixing them would score nonsense.

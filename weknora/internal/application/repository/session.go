@@ -323,6 +323,29 @@ func (r *sessionRepository) Update(ctx context.Context, session *types.Session, 
 	return res.RowsAffected, res.Error
 }
 
+// UpdateTitleIfEmpty prevents a delayed automatic title from overwriting a
+// manual rename (or another automatic title) that completed while the model
+// request was in flight. The title predicate and update stay in one SQL
+// statement so there is no read-then-write race.
+func (r *sessionRepository) UpdateTitleIfEmpty(
+	ctx context.Context,
+	tenantID uint64,
+	userID string,
+	sessionID string,
+	title string,
+) (int64, error) {
+	now := time.Now()
+	res := applySessionUserScope(r.db.WithContext(ctx).
+		Model(&types.Session{}).
+		Where("tenant_id = ? AND id = ?", tenantID, sessionID).
+		Where("title IS NULL OR title = ''"), userID).
+		Updates(map[string]interface{}{
+			"title":      title,
+			"updated_at": now,
+		})
+	return res.RowsAffected, res.Error
+}
+
 // SetOwnerID assigns sessions.user_id for a tenant-scoped row.
 func (r *sessionRepository) SetOwnerID(ctx context.Context, tenantID uint64, id, ownerID string) (int64, error) {
 	res := r.db.WithContext(ctx).

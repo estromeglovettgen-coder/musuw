@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -544,7 +545,7 @@ func (h *Handler) resolveAgent(
 	var sharedAgentReadOnly bool
 	userIDVal, _ := c.Get(types.UserIDContextKey.String())
 	currentTenantID := c.GetUint64(types.TenantIDContextKey.String())
-	if h.agentShareService != nil && userIDVal != nil && currentTenantID != 0 {
+	if !service.IsLiteProductEdition() && h.agentShareService != nil && userIDVal != nil && currentTenantID != 0 {
 		callerTenantRole := types.TenantRoleFromContext(ctx)
 		var agent *types.CustomAgent
 		var err error

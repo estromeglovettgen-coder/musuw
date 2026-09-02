@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const main = read('./musuw-visual.less')
 const css = read('./musuw-model-editor-inner-final.css')
+const bridge = read('./musuw-tdesign-overlay-bridge.css')
 
 test('model editor inner bridge loads after the common SettingDrawer visual layer', () => {
   const i = main.indexOf('musuw-model-editor-inner-final.css')
@@ -19,8 +20,14 @@ test('model type/source/provider controls use reference ink/gray instead of bran
     '.setting-drawer .source-option.is-active',
     '.setting-drawer .t-input.t-is-focused',
     '.setting-drawer .status-icon.available',
-    'body .provider-select-popup .t-popup__content',
   ]) assert.ok(css.includes(token), `model editor visual token missing: ${token}`)
+  for (const token of [
+    'body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup)',
+    'border-radius: 16px !important',
+    'padding: 8px 12px !important',
+    'font-size: 12px !important',
+  ]) assert.ok(bridge.includes(token), `model editor select must use shared overlay bridge token: ${token}`)
+  assert.doesNotMatch(css, /provider-select-popup[\s\S]*?(?:border-radius|box-shadow|padding):/)
 })
 
 test('semantic success/warning/error states remain distinct while business stays untouched', () => {

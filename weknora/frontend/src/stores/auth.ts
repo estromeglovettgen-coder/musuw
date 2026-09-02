@@ -11,6 +11,7 @@ import { BUILTIN_SMART_REASONING_ID } from '@/api/agent'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useOrganizationStore } from '@/stores/organization'
+import { useSettingsStore } from '@/stores/settings'
 
 /** 登出时丢弃 Pinia 内的空间级资源缓存，避免 SPA 重登复用上一账号数据。 */
 function clearSessionResourceCaches() {
@@ -192,6 +193,7 @@ export const useAuthStore = defineStore('auth', () => {
     // 保存到localStorage
     localStorage.setItem('weknora_user', JSON.stringify(userData))
     if (previousId !== userData.id) {
+      clearTenantScopedClientState()
       reloadUserPreferences()
     }
   }
@@ -231,35 +233,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Wipe chat / KB selections that were saved under the previous tenant.
-  // These keys are NOT tenant-scoped in storage; after a tenant switch they
-  // would otherwise be reloaded verbatim and the chat input would post under
-  // the new tenant with an Agent / model id that only existed in the old
-  // tenant — backend 403s or "model not found". Called from setSelectedTenant
-  // only on an actual tenant change, so logout / init paths are not touched.
+  // Wipe every account/tenant-owned composer preference at an identity or
+  // tenant boundary. These keys are not namespaced in storage; retaining a
+  // custom Agent, KB, file, MCP or model ID can leak prior-account names and
+  // makes a fresh account fail readiness before its own resources load.
   const clearTenantScopedClientState = () => {
     try {
       localStorage.removeItem('weknora_last_chat_model_id')
       localStorage.removeItem('weknora_current_kb')
-      const raw = localStorage.getItem('WeKnora_settings')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed && typeof parsed === 'object') {
-          parsed.selectedAgentId = BUILTIN_SMART_REASONING_ID
-          parsed.selectedAgentSourceTenantId = null
-          parsed.isAgentEnabled = true
-          if (parsed.conversationModels && typeof parsed.conversationModels === 'object') {
-            parsed.conversationModels.summaryModelId = ''
-            parsed.conversationModels.rerankModelId = ''
-            parsed.conversationModels.selectedChatModelId = ''
-          }
-          parsed.selectedKnowledgeBases = []
-          parsed.selectedFiles = []
-          parsed.selectedFileKbMap = {}
-          parsed.knowledgeBaseId = ''
-          localStorage.setItem('WeKnora_settings', JSON.stringify(parsed))
-        }
-      }
+      useSettingsStore().resetForIdentityBoundary()
     } catch (e) {
       // localStorage may be disabled or contain malformed JSON — best effort.
       console.warn('[auth] failed to clear tenant-scoped client state', e)
@@ -418,6 +400,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = () => {
+    clearTenantScopedClientState()
     // 清空状态
     user.value = null
     tenant.value = null

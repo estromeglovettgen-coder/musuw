@@ -32,7 +32,7 @@ test("uses the reference Musuw typefaces and cool-neutral visual tokens", () => 
   assert.match(theme, /:root\[theme-mode="dark"\]\s*\{\s*color-scheme:\s*dark/);
 });
 
-test("keeps the knowledge graph outside the Musuw presentation layer", () => {
+test("keeps graph behavior isolated while sharing native select chrome", () => {
   const bareRootBlocks = [
     ...theme.matchAll(/(?:^|\n):root(?:,\s*:root\[theme-mode="light"\])?\s*\{([\s\S]*?)\}/g),
     ...theme.matchAll(/(?:^|\n):root\[theme-mode="dark"\]\s*\{([\s\S]*?)\}/g),
@@ -46,7 +46,8 @@ test("keeps the knowledge graph outside the Musuw presentation layer", () => {
   assert.match(knowledgeBase, /'is-graph-tab':\s*activeKbTab\s*===\s*'graph'/);
   assert.match(wikiBrowser, /overlayClassName:\s*'wiki-graph-search-dropdown'/);
   assert.match(wikiBrowser, /drawer-class-name="wiki-graph-drawer"/);
-  assert.match(overlayBridge, /\.t-select__dropdown:not\(\.wiki-graph-search-dropdown\)/);
+  assert.match(overlayBridge, /body \.t-select__dropdown:not\(\.org-select-dropdown-popup\)/);
+  assert.match(overlayBridge, /not\(\.sandbox-backend-popup\)/);
   assert.doesNotMatch(preferenceCompat, /body \.t-popconfirm/);
   assert.doesNotMatch(finalTheme, /body \.t-popconfirm/);
   assert.doesNotMatch(finalClosure, /(?:^|\n)\.wiki-graph/m);

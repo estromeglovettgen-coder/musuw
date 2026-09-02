@@ -16,6 +16,7 @@ import (
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/storageallowlist"
+	"github.com/Tencent/WeKnora/internal/storageurl"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -1481,26 +1482,24 @@ func (s *knowledgeBaseService) processKBDeleteStrict(
 	// Delete physical files and extracted images before chunks. Keeping chunk
 	// metadata until these calls succeed makes retries safe even for local file
 	// drivers that do not expose an object-exists probe.
-	if s.fileSvc == nil {
-		for _, knowledge := range knowledgeList {
-			if knowledge != nil && strings.TrimSpace(knowledge.FilePath) != "" {
-				return errors.New("strict KB delete file service is unavailable")
-			}
-		}
-		if len(imageURLs) > 0 {
-			return errors.New("strict KB delete file service is unavailable")
-		}
-	}
 	for _, knowledge := range knowledgeList {
 		if knowledge == nil || strings.TrimSpace(knowledge.FilePath) == "" {
 			continue
 		}
-		if err := deleteFileIdempotent(ctx, s.fileSvc, knowledge.FilePath); err != nil {
+		fileSvc, deletePath, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, knowledge.FilePath)
+		if err != nil {
+			return fmt.Errorf("resolve source file for strict KB delete: %w", err)
+		}
+		if err := deleteFileIdempotent(ctx, fileSvc, deletePath); err != nil {
 			return fmt.Errorf("delete source file for strict KB delete: %w", err)
 		}
 	}
 	for _, imageURL := range imageURLs {
-		if err := deleteFileIdempotent(ctx, s.fileSvc, imageURL); err != nil {
+		fileSvc, deletePath, err := s.resolveFileServiceForPersistedPath(ctx, payload.TenantID, imageURL)
+		if err != nil {
+			return fmt.Errorf("resolve extracted image for strict KB delete: %w", err)
+		}
+		if err := deleteFileIdempotent(ctx, fileSvc, deletePath); err != nil {
 			return fmt.Errorf("delete extracted image for strict KB delete: %w", err)
 		}
 	}
@@ -1569,6 +1568,114 @@ func collectImageURLsStrict(imageInfos []string) ([]string, error) {
 		}
 	}
 	return urls, nil
+}
+
+// resolveFileServiceForPersistedPath returns both the concrete storage
+// instance encoded in a persisted path and the provider path that instance
+// must receive. Catalog handles need resolving before backend selection:
+// resource:// records deliberately hide their physical storage:// path.
+// Strict account erasure leaves the catalog row intact until the final tenant
+// purge so a retry can still resolve an object deleted by an earlier attempt.
+func (s *knowledgeBaseService) resolveFileServiceForPersistedPath(
+	ctx context.Context,
+	tenantID uint64,
+	path string,
+) (interfaces.FileService, string, error) {
+	persistedPath := strings.TrimSpace(path)
+	physicalPath := persistedPath
+	resourceBackendID := ""
+	resourceProvider := ""
+	isResource := false
+	if _, ok := types.ParseResourcePath(persistedPath); ok {
+		isResource = true
+		if s.resourceCatalog == nil {
+			return nil, "", errors.New("resource catalog is unavailable for storage cleanup")
+		}
+		resource, err := s.resourceCatalog.Resolve(ctx, persistedPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("resolve catalog resource: %w", err)
+		}
+		if resource == nil {
+			return nil, "", errors.New("resolve catalog resource: resource is unavailable")
+		}
+		if resource.TenantID != tenantID {
+			return nil, "", fmt.Errorf("catalog resource tenant mismatch: got %d, want %d", resource.TenantID, tenantID)
+		}
+		physicalPath = strings.TrimSpace(resource.PhysicalPath)
+		if physicalPath == "" {
+			return nil, "", errors.New("catalog resource physical path is empty")
+		}
+		resourceBackendID = strings.TrimSpace(resource.StorageBackendID)
+		resourceProvider = strings.ToLower(strings.TrimSpace(resource.Provider))
+	}
+
+	backendID, inner, scoped := types.ParseStorageBackendPath(physicalPath)
+	providerPath := physicalPath
+	if scoped {
+		providerPath = inner
+		if resourceBackendID != "" && resourceBackendID != backendID {
+			return nil, "", errors.New("catalog resource storage backend mismatch")
+		}
+	} else if resourceBackendID != "" {
+		backendID = resourceBackendID
+	}
+	provider := types.ParseProviderScheme(providerPath)
+	if resourceProvider != "" && provider != "" && resourceProvider != provider {
+		return nil, "", errors.New("catalog resource storage provider mismatch")
+	}
+	if provider == "" {
+		provider = resourceProvider
+	}
+
+	if !isResource && !scoped {
+		if s.fileSvc == nil {
+			return nil, "", errors.New("file service is unavailable")
+		}
+		return s.fileSvc, persistedPath, nil
+	}
+	if s.storageResolver == nil {
+		return nil, "", errors.New("storage backend resolver is unavailable")
+	}
+	tenant, _ := ctx.Value(types.TenantInfoContextKey).(*types.Tenant)
+	if tenant == nil || tenant.ID != tenantID {
+		if s.tenantRepo == nil {
+			return nil, "", errors.New("tenant repository is unavailable for storage cleanup")
+		}
+		var err error
+		tenant, err = s.tenantRepo.GetTenantByID(ctx, tenantID)
+		if err != nil {
+			return nil, "", fmt.Errorf("load storage cleanup tenant: %w", err)
+		}
+	}
+	if tenant == nil {
+		return nil, "", errors.New("storage cleanup tenant is unavailable")
+	}
+	fileSvc, _, err := s.storageResolver.ResolveFileService(
+		ctx,
+		tenant,
+		backendID,
+		provider,
+		storageurl.LocalStorageBaseDir(),
+	)
+	if err != nil {
+		return nil, "", fmt.Errorf("resolve storage backend %s: %w", backendID, err)
+	}
+	if fileSvc == nil {
+		return nil, "", fmt.Errorf("resolve storage backend %s: file service is unavailable", backendID)
+	}
+	return fileSvc, providerPath, nil
+}
+
+func (s *knowledgeBaseService) deleteFileForAccountErasure(
+	ctx context.Context,
+	tenantID uint64,
+	reference string,
+) error {
+	fileSvc, deletePath, err := s.resolveFileServiceForPersistedPath(ctx, tenantID, reference)
+	if err != nil {
+		return err
+	}
+	return deleteFileIdempotent(ctx, fileSvc, deletePath)
 }
 
 // deleteFileIdempotent treats an object that is already gone as success. This

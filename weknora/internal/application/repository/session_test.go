@@ -113,6 +113,40 @@ func TestSessionRepositoryUpdateHonorsUserScope(t *testing.T) {
 	require.Equal(t, "alice updated session", changed.Title)
 }
 
+func TestSessionRepositoryUpdateTitleIfEmptyPreservesConcurrentManualRename(t *testing.T) {
+	repo, db := newSessionRepositoryForTest(t)
+	ctx := context.Background()
+	session := createSessionForTest(t, db, 1, "alice")
+	require.NoError(t, db.Model(&types.Session{}).
+		Where("id = ?", session.ID).
+		Update("title", "").Error)
+
+	rows, err := repo.UpdateTitleIfEmpty(ctx, 1, "bob", session.ID, "out-of-scope title")
+	require.NoError(t, err)
+	require.Zero(t, rows)
+
+	rows, err = repo.UpdateTitleIfEmpty(ctx, 1, "alice", session.ID, "first automatic title")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, rows)
+
+	rows, err = repo.Update(ctx, &types.Session{
+		ID:       session.ID,
+		TenantID: 1,
+		UserID:   "alice",
+		Title:    "manual title",
+	}, "alice")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, rows)
+
+	rows, err = repo.UpdateTitleIfEmpty(ctx, 1, "alice", session.ID, "late automatic title")
+	require.NoError(t, err)
+	require.Zero(t, rows)
+
+	var persisted types.Session
+	require.NoError(t, db.First(&persisted, "id = ?", session.ID).Error)
+	require.Equal(t, "manual title", persisted.Title)
+}
+
 func TestSessionRepositoryDeleteHonorsUserScope(t *testing.T) {
 	repo, db := newSessionRepositoryForTest(t)
 	ctx := context.Background()

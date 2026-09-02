@@ -80,7 +80,7 @@ test("agent selection keeps platform web search enabled while Lite hides the tog
 test("Lite conversation restore cannot re-enable hidden capabilities", () => {
   assert.match(
     settingsStore,
-    /applyLastRequestState\([\s\S]*?if \(useAuthStore\(\)\.isLiteMode\) \{[\s\S]*?reconcileLiteChatSettings/,
+    /applyLastRequestState\([\s\S]*?if \(localStorage\.getItem\('weknora_lite_mode'\) === 'true'\) \{[\s\S]*?reconcileLiteChatSettings/,
   );
 });
 

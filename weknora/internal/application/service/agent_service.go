@@ -839,10 +839,13 @@ func (s *agentService) registerTools(
 		logger.Infof(ctx, "Pure Agent Mode: Knowledge base tools filtered out, remaining: %v", allowedTools)
 	}
 
-	// If web search is enabled, add web_search to allowedTools
+	// Web fetch is independently configurable, but it cannot run without web
+	// search because its inputs are the selected search results.
 	if config.WebSearchEnabled {
 		allowedTools = append(allowedTools, tools.ToolWebSearch)
-		allowedTools = append(allowedTools, tools.ToolWebFetch)
+		if config.WebFetchEnabled {
+			allowedTools = append(allowedTools, tools.ToolWebFetch)
+		}
 	}
 
 	// Long-term memory search follows the memory switches, not the tool list.

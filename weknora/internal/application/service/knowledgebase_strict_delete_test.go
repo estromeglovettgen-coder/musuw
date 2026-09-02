@@ -127,11 +127,62 @@ func (g strictDeleteGraph) DelGraph(context.Context, []types.NameSpace) error { 
 
 type strictDeleteTenantRepo struct {
 	interfaces.TenantRepository
-	err error
+	tenant *types.Tenant
+	err    error
 }
 
 func (r strictDeleteTenantRepo) AdjustStorageUsed(context.Context, uint64, int64) error {
 	return r.err
+}
+
+func (r strictDeleteTenantRepo) GetTenantByID(_ context.Context, tenantID uint64) (*types.Tenant, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.tenant != nil {
+		return r.tenant, nil
+	}
+	return &types.Tenant{ID: tenantID}, nil
+}
+
+type strictDeleteStorageResolver struct {
+	svc              interfaces.FileService
+	backendID        string
+	provider         string
+	resolveCallCount int
+}
+
+func (r *strictDeleteStorageResolver) ResolveBackend(
+	_ context.Context,
+	_ *types.Tenant,
+	_, _ string,
+) (*types.StorageBackend, error) {
+	return nil, nil
+}
+
+func (r *strictDeleteStorageResolver) ResolveFileService(
+	_ context.Context,
+	_ *types.Tenant,
+	backendID string,
+	provider string,
+	_ string,
+) (interfaces.FileService, string, error) {
+	r.resolveCallCount++
+	r.backendID = backendID
+	r.provider = provider
+	return r.svc, provider, nil
+}
+
+type strictDeleteResourceCatalog struct {
+	interfaces.ResourceCatalog
+	resource *types.StoredResource
+	err      error
+	calls    []string
+}
+
+func (c *strictDeleteResourceCatalog) Resolve(_ context.Context, reference string) (*types.StoredResource, error) {
+	c.calls = append(c.calls, reference)
+	return c.resource, c.err
 }
 
 type strictDeleteTaskPendingRepo struct {
@@ -329,6 +380,123 @@ func TestProcessKBDeleteStrictDeletesRowsAfterAllResourcesSucceed(t *testing.T) 
 	assert.Equal(t, []string{"local://source.txt"}, fileSvc.calls)
 }
 
+func TestProcessKBDeleteStrictResolvesPersistedBackendScopedSourcePath(t *testing.T) {
+	const (
+		backendID = "e4596357-c110-4ce9-8481-e1221cfde92d"
+		innerPath = "s3://musuw-staging/weknora/10002/knowledge/document.md"
+	)
+	knowledge := strictDeleteKnowledge()
+	knowledge.FilePath = "storage://" + backendID + "/" + innerPath
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{knowledge}}
+	defaultSvc := &strictDeleteFileService{err: errors.New("default storage must not receive a backend-scoped path")}
+	resolvedInner := &strictDeleteFileService{}
+	resolver := &strictDeleteStorageResolver{
+		// Resolver implementations are allowed to return the concrete provider
+		// service directly. Strict cleanup must therefore pass the parsed inner
+		// provider path rather than relying on a backend-scoping decorator to
+		// unwrap it a second time.
+		svc: resolvedInner,
+	}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.fileSvc = defaultSvc
+	svc.tenantRepo = strictDeleteTenantRepo{tenant: &types.Tenant{ID: 1}}
+	svc.storageResolver = resolver
+
+	require.NoError(t, svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, true)))
+	assert.Equal(t, 1, resolver.resolveCallCount)
+	assert.Equal(t, backendID, resolver.backendID)
+	assert.Equal(t, "s3", resolver.provider)
+	assert.Empty(t, defaultSvc.calls)
+	assert.Equal(t, []string{innerPath}, resolvedInner.calls)
+	assert.Equal(t, 1, knowledgeRepo.deleteCall)
+}
+
+func TestProcessKBDeleteStrictResolvesCatalogBackedSourcePath(t *testing.T) {
+	const (
+		resourceRef = "resource://y16XEhoTvy07RNTh7QUIfw"
+		backendID   = "e4596357-c110-4ce9-8481-e1221cfde92d"
+		innerPath   = "s3://musuw-staging/weknora/10002/knowledge/document.md"
+	)
+	knowledge := strictDeleteKnowledge()
+	knowledge.FilePath = resourceRef
+	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{knowledge}}
+	defaultSvc := &strictDeleteFileService{err: errors.New("default storage must not receive a catalog reference")}
+	resolvedInner := &strictDeleteFileService{}
+	resolver := &strictDeleteStorageResolver{svc: resolvedInner}
+	catalog := &strictDeleteResourceCatalog{resource: &types.StoredResource{
+		Handle:           "y16XEhoTvy07RNTh7QUIfw",
+		TenantID:         1,
+		StorageBackendID: backendID,
+		Provider:         "s3",
+		PhysicalPath:     "storage://" + backendID + "/" + innerPath,
+	}}
+	svc := strictDeleteService(knowledgeRepo, &strictDeleteEngine{})
+	svc.fileSvc = defaultSvc
+	svc.tenantRepo = strictDeleteTenantRepo{tenant: &types.Tenant{ID: 1}}
+	svc.storageResolver = resolver
+	svc.resourceCatalog = catalog
+
+	require.NoError(t, svc.ProcessKBDelete(context.Background(), strictDeletePayload(t, true)))
+	assert.Equal(t, []string{resourceRef}, catalog.calls)
+	assert.Equal(t, 1, resolver.resolveCallCount)
+	assert.Equal(t, backendID, resolver.backendID)
+	assert.Equal(t, "s3", resolver.provider)
+	assert.Empty(t, defaultSvc.calls)
+	assert.Equal(t, []string{innerPath}, resolvedInner.calls)
+	assert.Equal(t, 1, knowledgeRepo.deleteCall)
+}
+
+func TestResolveFileServiceForPersistedPathRejectsCatalogScopeMismatch(t *testing.T) {
+	const (
+		resourceRef = "resource://y16XEhoTvy07RNTh7QUIfw"
+		backendID   = "e4596357-c110-4ce9-8481-e1221cfde92d"
+		innerPath   = "s3://musuw-staging/weknora/1/knowledge/document.md"
+	)
+	tests := []struct {
+		name     string
+		resource *types.StoredResource
+		want     string
+	}{
+		{
+			name: "tenant mismatch",
+			resource: &types.StoredResource{
+				TenantID: 2, PhysicalPath: "storage://" + backendID + "/" + innerPath,
+			},
+			want: "tenant mismatch",
+		},
+		{
+			name: "backend mismatch",
+			resource: &types.StoredResource{
+				TenantID: 1, StorageBackendID: "another-backend",
+				Provider: "s3", PhysicalPath: "storage://" + backendID + "/" + innerPath,
+			},
+			want: "storage backend mismatch",
+		},
+		{
+			name: "provider mismatch",
+			resource: &types.StoredResource{
+				TenantID: 1, StorageBackendID: backendID,
+				Provider: "local", PhysicalPath: "storage://" + backendID + "/" + innerPath,
+			},
+			want: "storage provider mismatch",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resolver := &strictDeleteStorageResolver{svc: &strictDeleteFileService{}}
+			svc := strictDeleteService(&strictDeleteKnowledgeRepo{}, &strictDeleteEngine{})
+			svc.resourceCatalog = &strictDeleteResourceCatalog{resource: test.resource}
+			svc.storageResolver = resolver
+
+			_, _, err := svc.resolveFileServiceForPersistedPath(context.Background(), 1, resourceRef)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), test.want)
+			assert.Zero(t, resolver.resolveCallCount)
+		})
+	}
+}
+
 func TestProcessKBDeleteNonStrictRetainsRowsWhenVectorCleanupFails(t *testing.T) {
 	knowledgeRepo := &strictDeleteKnowledgeRepo{items: []*types.Knowledge{strictDeleteKnowledge()}}
 	engine := &strictDeleteEngine{err: errors.New("vector backend unavailable")}
@@ -377,7 +545,7 @@ func TestProcessKBDeleteNonStrictRetainsImageMetadataWhenImageCleanupFails(t *te
 	chunkRepo := &strictDeleteChunkRepo{
 		imageInfo: []interfaces.ChunkImageInfo{{
 			KnowledgeID: knowledge.ID,
-			ImageInfo:  `[{"url":"r2://bucket/image.png"}]`,
+			ImageInfo:   `[{"url":"r2://bucket/image.png"}]`,
 		}},
 	}
 	fileSvc := &strictDeleteFileService{err: errors.New("R2 unavailable")}

@@ -224,8 +224,13 @@
   .visual-knowledge-toolbar .t-date-range-picker,
   /* Repeat the select class to outrank the component's scoped !important
    * declarations when its lazy CSS is loaded after this shared layer. */
-  .visual-knowledge-select.visual-knowledge-select .t-input,
   .visual-knowledge-select.visual-knowledge-select .t-select-input {
+    border: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    box-shadow: none !important;
+  }
+  .visual-knowledge-select.visual-knowledge-select .t-select-input .t-input {
     border-color: var(--mvc-line) !important;
     background: var(--mvc-surface-raised) !important;
     color: var(--mvc-muted-strong) !important;
@@ -350,13 +355,18 @@
    * dropdown.  The generic visual contract targets every knowledge-page
    * input with a light !important fill, so close this exact dark graph
    * selector (including the nested prefix/suffix input) here. */
-  .visual-knowledge-page.is-graph-tab .graph-search-select,
-  .visual-knowledge-page.is-graph-tab .graph-search-select .t-select-input,
+  .visual-knowledge-page.is-graph-tab .graph-search-select .t-select-input {
+    border: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    box-shadow: none !important;
+  }
+  .visual-knowledge-page.is-graph-tab .graph-search-select .t-select-input .t-input,
   .visual-knowledge-page.is-graph-tab .graph-search-select .t-input {
     border-color: var(--mvc-line) !important;
     background: var(--mvc-surface-raised) !important;
     color: var(--mvc-text) !important;
-    box-shadow: none !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
   }
   .visual-knowledge-page.is-graph-tab .graph-search-select .t-input:hover,
   .visual-knowledge-page.is-graph-tab .graph-search-select .t-input.t-is-focused,
@@ -1696,6 +1706,103 @@ body .t-drawer.t-drawer--right.wiki-graph-drawer > .t-drawer__content-wrapper {
 :root[theme-mode="dark"] .visual-session-filter__chevron { color: var(--mvc-muted) !important; }
 :root[theme-mode="dark"] .visual-session-filter__trigger:hover,
 :root[theme-mode="dark"] .visual-session-filter__trigger[aria-expanded="true"] {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+/* Prompt templates are used by the Agent editor.  Keep their two-line content
+ * in the same semantic dark surface while leaving placement and scrolling to
+ * the component. */
+:root[theme-mode="dark"] body .t-popup__content:has(> .template-popup) {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] body .template-item {
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .template-item:hover {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .template-header {
+  border-color: var(--mvc-line) !important;
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .template-title,
+:root[theme-mode="dark"] body .template-name { color: var(--mvc-text-strong) !important; }
+:root[theme-mode="dark"] body .template-desc { color: var(--mvc-muted) !important; }
+
+/* Login language, activity filters and tag chips use custom listboxes but still
+ * resolve to the same semantic dark surface/state palette. */
+:root[theme-mode="dark"] body .language-switch > button,
+:root[theme-mode="dark"] body .language-dropdown,
+:root[theme-mode="dark"] body .t-popup__content:has(> .kb-activity-filter-menu),
+:root[theme-mode="dark"] body .tag-filter-popup .t-popup__content,
+:root[theme-mode="dark"] body .visual-tag-filter-popup .t-popup__content {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] body .language-switch > button:hover,
+:root[theme-mode="dark"] body .language-switch > button:focus-visible {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .language-option,
+:root[theme-mode="dark"] body .kb-activity-filter-option,
+:root[theme-mode="dark"] body .tag-filter-chip,
+:root[theme-mode="dark"] body .visual-tag-filter__chip,
+:root[theme-mode="dark"] body .kb-activity-filter-trigger,
+:root[theme-mode="dark"] body .doc-tag-filter-trigger,
+:root[theme-mode="dark"] body .integrations-agent-filter {
+  border-color: var(--mvc-line) !important;
+  background: transparent !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .language-option:hover,
+:root[theme-mode="dark"] body .language-option:focus-visible,
+:root[theme-mode="dark"] body .language-option.active,
+:root[theme-mode="dark"] body .kb-activity-filter-option:hover,
+:root[theme-mode="dark"] body .kb-activity-filter-option:focus-visible,
+:root[theme-mode="dark"] body .kb-activity-filter-option.active,
+:root[theme-mode="dark"] body .tag-filter-chip:hover,
+:root[theme-mode="dark"] body .tag-filter-chip:focus-visible,
+:root[theme-mode="dark"] body .tag-filter-chip.active,
+:root[theme-mode="dark"] body .visual-tag-filter__chip:hover,
+:root[theme-mode="dark"] body .visual-tag-filter__chip:focus-visible,
+:root[theme-mode="dark"] body .visual-tag-filter__chip.is-active,
+:root[theme-mode="dark"] body .kb-activity-filter-trigger:hover,
+:root[theme-mode="dark"] body .kb-activity-filter-trigger:focus-visible,
+:root[theme-mode="dark"] body .kb-activity-filter-trigger.active,
+:root[theme-mode="dark"] body .doc-tag-filter-trigger:hover,
+:root[theme-mode="dark"] body .doc-tag-filter-trigger:focus-visible,
+:root[theme-mode="dark"] body .doc-tag-filter-trigger.open,
+:root[theme-mode="dark"] body .integrations-agent-filter:hover,
+:root[theme-mode="dark"] body .integrations-agent-filter:focus-visible,
+:root[theme-mode="dark"] body .integrations-agent-filter.integrations-agent-filter--active {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .language-option .check-icon,
+:root[theme-mode="dark"] body .kb-activity-filter-option-check {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .integrations-agent-filter-popup .t-dropdown__menu {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] body .integrations-agent-filter-popup .t-dropdown__item {
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .integrations-agent-filter-popup .t-dropdown__item:hover,
+:root[theme-mode="dark"] body .integrations-agent-filter-popup .t-dropdown__item.t-is-active {
   background: var(--mvc-hover) !important;
   color: var(--mvc-text-strong) !important;
 }
