@@ -111,13 +111,45 @@ cleanup_release_inputs() {
 }
 trap cleanup_release_inputs EXIT
 
+staging_prepare_already_current_status=75
+staging_release_reused_current=0
 remote_prepare_with_retry() {
-    local attempt
+    local attempt prepare_error prepare_status
     for attempt in 1 2 3; do
-        if remote_gate prepare; then return 0; fi
+        prepare_status=0
+        prepare_error="$(remote_gate prepare 2>&1 >/dev/null)" || prepare_status=$?
+        if [ "$prepare_status" -eq 0 ]; then
+            [ -z "$prepare_error" ] || printf '%s\n' "$prepare_error" >&2
+            return 0
+        fi
+        if [ "$prepare_error" = 'requested staging release is already current' ]; then
+            printf '%s\n' "$prepare_error" >&2
+            return "$staging_prepare_already_current_status"
+        fi
+        [ -z "$prepare_error" ] || printf '%s\n' "$prepare_error" >&2
         [ "$attempt" -lt 3 ] && sleep "$((attempt * 10))"
     done
     die 'staging release preparation failed after three bounded SSH attempts'
+}
+
+remote_prepare_or_reuse_current() {
+    local prepare_status verify_status
+    staging_release_reused_current=0
+    if remote_prepare_with_retry; then
+        return 0
+    else
+        prepare_status=$?
+    fi
+    if [ "$prepare_status" -eq "$staging_prepare_already_current_status" ]; then
+        if remote_gate verify; then
+            staging_release_reused_current=1
+            return 0
+        else
+            verify_status=$?
+            return "$verify_status"
+        fi
+    fi
+    return "$prepare_status"
 }
 
 manifest_dir="$(mktemp -d "$runtime_dir/source-manifest.XXXXXX")"
@@ -129,7 +161,15 @@ source_bundle_sha256="$($staging_dir/source-manifest.sh materialize \
     "$repo_root" "$runtime_dir" "$release_id" "$revision" update \
     "$manifest_dir" "$deploy_tree")"
 
-remote_prepare_with_retry
+if remote_prepare_or_reuse_current; then
+    if [ "$staging_release_reused_current" -eq 1 ]; then
+        printf '%s\n' "staging release requested: $release_id source_bundle_sha256=$source_bundle_sha256"
+        exit 0
+    fi
+else
+    prepare_status=$?
+    exit "$prepare_status"
+fi
 common_rsync=( -a --timeout=120 --no-owner --no-group -e "$ssh_transport" )
 rsync_with_retry() {
     local attempt

@@ -167,4 +167,78 @@ grep -Fq 'remote_gate verify' "$repo_root/scripts/weknora-staging-deploy.sh" || 
 grep -Fq 'musuw-staging-gate $verb $revision $expected_app $expected_frontend' "$repo_root/scripts/weknora-staging-deploy.sh" || fail 'staging runner does not send exact digest refs to remote verify'
 grep -Fq 'musuw-staging-deploy@' "$repo_root/scripts/weknora-staging-deploy.sh" || fail 'staging runner target is not the dedicated account'
 
+# Behavior seam for an immutable release retry. A first deployment can leave
+# the requested SHA current while its verify step fails; a retry must classify
+# the exact server response and verify in place instead of uploading/deploying
+# the same release again. Extract only the two runner helpers so this remains
+# local and never contacts SSH or mutates a checkout.
+deploy_script="$repo_root/scripts/weknora-staging-deploy.sh"
+runner_probe_root="$(mktemp -d "${TMPDIR:-/tmp}/musuw-staging-runner.XXXXXX")"
+trap 'find "$runner_probe_root" -depth -delete 2>/dev/null || true' EXIT
+
+prepare_retry_body="$(sed -n '/^remote_prepare_with_retry()/,/^}/p' "$deploy_script")"
+[ -n "$prepare_retry_body" ] || fail 'staging runner prepare retry helper is missing'
+prepare_probe="$runner_probe_root/prepare-retry.sh"
+prepare_calls="$runner_probe_root/prepare.calls"
+{
+    printf '%s\n' '#!/usr/bin/env bash'
+    printf '%s\n' 'set -u'
+    printf '%s\n' 'staging_prepare_already_current_status=75'
+    printf '%s\n' 'die() { printf "die:%s\\n" "$1" >&2; exit 99; }'
+    printf '%s\n' 'sleep() { :; }'
+    printf '%s\n' 'remote_gate() { printf "%s\\n" prepare >> "${CALLS_FILE:?}"; printf "%s\\n" "${PREPARE_ERROR:-requested staging release is already current}" >&2; return 1; }'
+    printf '%s\n' "$prepare_retry_body"
+    printf '%s\n' 'if remote_prepare_with_retry; then printf "%s\\n" status=0; else status=$?; printf "status=%s\\n" "$status"; fi'
+    printf '%s\n' 'printf "calls=%s\\n" "$(wc -l < "${CALLS_FILE:?}" | tr -d " ")"'
+} > "$prepare_probe"
+chmod 700 "$prepare_probe"
+prepare_probe_output="$(CALLS_FILE="$prepare_calls" "$prepare_probe" 2>&1 || true)"
+grep -Fxq 'status=75' <<<"$prepare_probe_output" ||
+    fail 'staging runner does not classify the exact already-current prepare response'
+grep -Fxq 'calls=1' <<<"$prepare_probe_output" ||
+    fail 'staging runner retries an already-current prepare response'
+transient_calls="$runner_probe_root/transient.calls"
+transient_probe_output="$(CALLS_FILE="$transient_calls" PREPARE_ERROR='temporary prepare failure' "$prepare_probe" 2>&1 || true)"
+grep -Fxq 'die:staging release preparation failed after three bounded SSH attempts' <<<"$transient_probe_output" ||
+    fail 'staging runner changed the failure contract for other prepare errors'
+if [ "$(wc -l < "$transient_calls" | tr -d ' ')" != 3 ]; then
+    fail 'staging runner stopped retrying a non-current prepare error'
+fi
+
+reuse_body="$(sed -n '/^remote_prepare_or_reuse_current()/,/^}/p' "$deploy_script")"
+[ -n "$reuse_body" ] || fail 'staging runner does not expose the prepare/verify reuse seam'
+reuse_probe="$runner_probe_root/prepare-reuse.sh"
+reuse_trace="$runner_probe_root/reuse.trace"
+{
+    printf '%s\n' '#!/usr/bin/env bash'
+    printf '%s\n' 'set -u'
+    printf '%s\n' 'staging_prepare_already_current_status=75'
+    printf '%s\n' 'staging_release_reused_current=0'
+    printf '%s\n' 'remote_prepare_with_retry() { return 75; }'
+    printf '%s\n' 'remote_gate() { [ "$1" = verify ] || return 98; printf "%s\\n" "$*" >> "${TRACE_FILE:?}"; return "${VERIFY_STATUS:-0}"; }'
+    printf '%s\n' "$reuse_body"
+    printf '%s\n' 'if remote_prepare_or_reuse_current; then printf "%s\\n" status=0; else status=$?; printf "status=%s\\n" "$status"; fi'
+    printf '%s\n' 'printf "reused=%s\\n" "$staging_release_reused_current"'
+} > "$reuse_probe"
+chmod 700 "$reuse_probe"
+reuse_probe_output="$(TRACE_FILE="$reuse_trace" "$reuse_probe" 2>&1 || true)"
+grep -Fxq 'status=0' <<<"$reuse_probe_output" ||
+    fail 'staging runner prepare/verify reuse seam returned an unexpected status'
+grep -Fxq 'reused=1' <<<"$reuse_probe_output" ||
+    fail 'staging runner did not mark an already-current release as reused'
+grep -Fxq 'verify' "$reuse_trace" ||
+    fail 'staging runner did not verify an already-current release in place'
+if grep -Evx 'verify' "$reuse_trace" | grep -q .; then
+    fail 'staging runner invoked a non-verify gate for an already-current release'
+fi
+reuse_failure_trace="$runner_probe_root/reuse-failure.trace"
+reuse_failure_output="$(TRACE_FILE="$reuse_failure_trace" VERIFY_STATUS=17 "$reuse_probe" 2>&1 || true)"
+grep -Fxq 'status=17' <<<"$reuse_failure_output" ||
+    fail 'staging runner did not propagate a verify failure for an already-current release'
+grep -Fxq 'reused=0' <<<"$reuse_failure_output" ||
+    fail 'staging runner marked a failed verify as a reused release'
+if grep -Eq '^status=(0|75)$' <<<"$reuse_failure_output"; then
+    fail 'staging runner converted a verify failure into success'
+fi
+
 printf '%s\n' 'staging isolation contract green'
