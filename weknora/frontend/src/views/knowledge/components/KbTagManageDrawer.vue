@@ -768,31 +768,31 @@ watch(searchQuery, (newVal, oldVal) => {
  * most dark-theme selectors. Reuse the global Musuw visual tokens here so the
  * same markup follows the active theme without duplicating a second palette. */
 :root[theme-mode="dark"] body .visual-tag-manage__overlay {
-  background: rgb(0 0 0 / 48%);
+  background: rgb(0 0 0 / 48%) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage {
-  border-color: var(--mvc-line);
-  background: var(--mvc-page);
-  color: var(--mvc-text);
-  box-shadow: var(--mvc-shadow);
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-page) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__header {
-  border-color: var(--mvc-line);
-  background: var(--mvc-page);
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-page) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__heading-icon,
 :root[theme-mode="dark"] body .visual-tag-tile__badge {
-  background: var(--mvc-hover);
-  color: var(--mvc-muted-strong);
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-muted-strong) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__heading h3,
 :root[theme-mode="dark"] body .visual-tag-manage__section-head h4,
 :root[theme-mode="dark"] body .visual-tag-tile__copy strong {
-  color: var(--mvc-text-strong);
+  color: var(--mvc-text-strong) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__heading p,
@@ -801,28 +801,46 @@ watch(searchQuery, (newVal, oldVal) => {
 :root[theme-mode="dark"] body .visual-tag-manage__close,
 :root[theme-mode="dark"] body .visual-tag-tile__action,
 :root[theme-mode="dark"] body .visual-tag-manage__load-more button {
-  color: var(--mvc-muted);
+  color: var(--mvc-muted) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__search .t-input,
 :root[theme-mode="dark"] body .visual-tag-tile__input .t-input {
-  border-color: var(--mvc-line);
-  background: var(--mvc-surface);
-  color: var(--mvc-text);
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__search .t-input__inner,
+:root[theme-mode="dark"] body .visual-tag-tile__input .t-input__inner {
+  background: transparent !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__search .t-input__inner::placeholder,
+:root[theme-mode="dark"] body .visual-tag-tile__input .t-input__inner::placeholder {
+  color: var(--mvc-muted) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__search .t-input:hover,
 :root[theme-mode="dark"] body .visual-tag-manage__search .t-input.t-is-focused,
 :root[theme-mode="dark"] body .visual-tag-tile__input .t-input.t-is-focused {
-  border-color: var(--mvc-line-strong);
-  background: var(--mvc-surface-raised);
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-surface-raised) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-manage__create-trigger,
 :root[theme-mode="dark"] body .visual-tag-tile {
-  border-color: var(--mvc-line);
-  background: var(--mvc-surface);
-  color: var(--mvc-text);
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+}
+
+:root[theme-mode="dark"] body .visual-tag-manage__content,
+:root[theme-mode="dark"] body .visual-tag-manage__empty,
+:root[theme-mode="dark"] body .visual-tag-manage__loading {
+  background: var(--mvc-page) !important;
+  color: var(--mvc-muted) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-tile:hover:not(.is-editing),
@@ -831,13 +849,13 @@ watch(searchQuery, (newVal, oldVal) => {
 :root[theme-mode="dark"] body .visual-tag-manage__create-trigger:hover:not(:disabled),
 :root[theme-mode="dark"] body .visual-tag-tile__action:hover:not(:disabled),
 :root[theme-mode="dark"] body .visual-tag-manage__load-more button:hover:not(:disabled) {
-  border-color: var(--mvc-line-strong);
-  background: var(--mvc-hover);
-  color: var(--mvc-text-strong);
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
 }
 
 :root[theme-mode="dark"] body .visual-tag-tile__action.is-danger:hover:not(:disabled) {
-  background: rgb(127 29 29 / 28%);
-  color: #fca5a5;
+  background: rgb(127 29 29 / 28%) !important;
+  color: #fca5a5 !important;
 }
 </style>

@@ -16,6 +16,7 @@
           <ModelSelector
             ref="llmSelectorRef"
             model-type="KnowledgeQA"
+            use-consumer-style
             :selected-model-id="config.llmModelId"
             :all-models="allModels"
             @update:selected-model-id="handleLLMChange"
@@ -44,6 +45,7 @@
           <ModelSelector
             ref="embeddingSelectorRef"
             model-type="Embedding"
+            use-consumer-style
             :selected-model-id="config.embeddingModelId"
             :all-models="allModels"
             :disabled="ragEnabled && hasFiles"
@@ -64,6 +66,7 @@
         <div class="setting-control">
           <ModelSelector
             model-type="KnowledgeQA"
+            use-consumer-style
             :selected-model-id="config.wikiSynthesisModelId"
             :all-models="allModels"
             clearable

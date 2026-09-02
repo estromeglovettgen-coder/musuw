@@ -133,6 +133,7 @@
         <div class="visual-setting-row__control is-stacked">
           <t-select
             id="visual-sans-font-select"
+            class="visual-scene-select"
             v-model="localSansFont"
             :placeholder="$t('font.selectFont')"
             @change="handleSansFontChange"
@@ -158,6 +159,7 @@
         <div class="visual-setting-row__control is-stacked">
           <t-select
             id="visual-mono-font-select"
+            class="visual-scene-select"
             v-model="localMonoFont"
             :placeholder="$t('font.selectFont')"
             @change="handleMonoFontChange"

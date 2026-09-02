@@ -32,6 +32,7 @@
         <div class="setting-control" style="min-width: 280px;">
           <ModelSelector
             model-type="Embedding"
+            use-consumer-style
             :selected-model-id="localEmbeddingModelId"
             :disabled="modelLocked"
             @update:selected-model-id="handleModelChange"

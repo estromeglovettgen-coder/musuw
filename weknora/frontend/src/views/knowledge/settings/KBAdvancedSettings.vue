@@ -84,6 +84,7 @@
           <div class="setting-control">
             <ModelSelector
               model-type="KnowledgeQA"
+              use-consumer-style
               :selected-model-id="localAutoTag.modelId"
               :all-models="allModels"
               clearable

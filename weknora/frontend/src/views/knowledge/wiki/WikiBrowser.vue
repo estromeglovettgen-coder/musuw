@@ -22,7 +22,7 @@
                   zIndex: 100,
                   overlayClassName: 'wiki-graph-search-dropdown',
                 }"
-                class="graph-search-select"
+                class="graph-search-select visual-scene-select"
               >
                 <template #prefixIcon><t-icon name="search" /></template>
               </t-select>
@@ -1217,7 +1217,7 @@
         </div>
         <div class="wiki-create-page-field">
           <label>{{ $t("knowledgeEditor.wikiBrowser.newPageTypeLabel") }}</label>
-          <t-select v-model="createPageForm.pageType">
+          <t-select v-model="createPageForm.pageType" class="visual-scene-select">
             <t-option value="concept" :label="$t('knowledgeEditor.wikiBrowser.filterConcept')" />
             <t-option value="entity" :label="$t('knowledgeEditor.wikiBrowser.filterEntity')" />
             <t-option

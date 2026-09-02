@@ -33,6 +33,60 @@
   background: transparent !important;
 }
 .agent-list-content { gap: 18px !important; }
+.visual-kb-list {
+  gap: 18px !important;
+  padding: 24px !important;
+}
+.visual-kb-list__header {
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 0 20px !important;
+  border-bottom: 1px solid rgb(229 231 235 / 80%) !important;
+  background: transparent !important;
+}
+.visual-kb-list__heading { margin: 0 !important; padding: 0 !important; }
+.visual-kb-list__title-row {
+  min-height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.visual-kb-list__title-row .t-icon {
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 20px !important;
+}
+.visual-kb-list__header h1 {
+  margin: 0 !important;
+  font-size: 20px !important;
+  line-height: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+.visual-kb-list__header p {
+  margin: 4px 0 0 !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+.visual-kb-list__content {
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  padding: 24px 4px 12px 2px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+}
+.visual-kb-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 18px !important;
+}
+.visual-kb-list__create {
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 14px !important;
+  border-radius: 12px !important;
+}
 .agent-list-content > .header,
 .org-list-content > .header {
   min-height: 0 !important;
@@ -79,6 +133,11 @@
 
 @media (min-width: 768px) {
   .agent-list-content { padding: 32px !important; }
+  .visual-kb-list { padding: 32px !important; }
+  .visual-kb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (min-width: 1024px) {
+  .visual-kb-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 }
 
 /* Header actions use the same compact control language as reference KB tools. */
@@ -117,6 +176,11 @@
 .agent-list-content .agent-create-header-btn .t-icon,
 .agent-list-content .agent-create-header-btn .btn-icon-wrapper {
   color: currentColor !important;
+}
+.agent-list-content .agent-create-header-btn .t-button__icon,
+.agent-list-content .agent-create-header-btn .t-icon,
+.agent-list-content .agent-create-header-btn .btn-icon-wrapper {
+  color: #fff !important;
 }
 .org-list-content .org-join-btn {
   min-height: 32px !important;
@@ -583,6 +647,11 @@
 :root[theme-mode="dark"] .invite-preview-title { color: var(--mvc-text-strong, #fff) !important; }
 :root[theme-mode="dark"] .agent-list-content .title-row h2,
 :root[theme-mode="dark"] .agent-card .card-title { color: #f4f4f5 !important; }
+:root[theme-mode="dark"] .agent-list-content .agent-create-header-btn .t-button__icon,
+:root[theme-mode="dark"] .agent-list-content .agent-create-header-btn .t-icon,
+:root[theme-mode="dark"] .agent-list-content .agent-create-header-btn .btn-icon-wrapper {
+  color: #18181b !important;
+}
 :root[theme-mode="dark"] .org-card:hover,
 :root[theme-mode="dark"] .list-space-sidebar .icon-item-labeled:hover,
 :root[theme-mode="dark"] .list-space-sidebar .sidebar-item:hover,

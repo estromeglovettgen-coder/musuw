@@ -172,6 +172,7 @@
                           <div class="setting-control setting-control-full">
                             <t-select
                               v-model="selectedTagIds"
+                              class="visual-scene-select"
                               :options="tagOptions"
                               :loading="tagsLoading"
                               multiple
@@ -227,6 +228,7 @@
                           <div class="setting-control">
                             <t-select
                               v-model="uiState.chunkingConfig.strategy"
+                              class="visual-scene-select"
                               :options="chunkingStrategyOptions"
                               :clearable="false"
                               :style="{ width: '280px' }"
@@ -286,6 +288,7 @@
                           <div class="setting-control">
                             <t-select
                               v-model="uiState.chunkingConfig.separators"
+                              class="visual-scene-select"
                               :options="separatorOptions"
                               multiple
                               creatable
@@ -316,6 +319,7 @@
                           <div class="setting-control">
                             <t-select
                               v-model="uiState.chunkingConfig.languages"
+                              class="visual-scene-select"
                               :options="languageOptions"
                               multiple
                               :style="{ width: '280px' }"
@@ -379,6 +383,7 @@
                           <div class="setting-control">
                             <ModelSelector
                               model-type="VLLM"
+                              use-consumer-style
                               :selected-model-id="uiState.multimodalConfig.vllmModelId"
                               :all-models="allModels"
                               :status="showMultimodalModelError ? 'error' : 'default'"
@@ -396,6 +401,7 @@
                           <div class="setting-control">
                             <t-select
                               v-model="uiState.multimodalConfig.descriptionLanguage"
+                              class="visual-scene-select"
                               clearable
                               :placeholder="t('knowledgeEditor.advanced.multimodal.descriptionLanguageAuto')"
                               :style="{ width: '280px' }"
@@ -453,6 +459,7 @@
                           <div class="setting-control">
                             <ModelSelector
                               model-type="ASR"
+                              use-consumer-style
                               :selected-model-id="uiState.asrConfig.modelId"
                               :all-models="allModels"
                               :status="showAsrModelError ? 'error' : 'default'"

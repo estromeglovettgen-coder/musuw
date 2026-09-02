@@ -270,11 +270,11 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
 .visual-knowledge-select :deep(.t-input__inner) { height: 16px !important; color: inherit !important; font-family: var(--app-font-family) !important; font-size: 12px !important; line-height: 16px !important; font-weight: inherit !important; }
 .visual-knowledge-select__clear { width: 16px; height: 16px; margin: -2px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: #374151; cursor: pointer; }
 .visual-knowledge-select__clear:hover { background: #e5e7eb; }
-.visual-knowledge-filter-button { width: 112px; min-width: 112px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 8px 14px; border: 1px solid #e5e7eb; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #374151; font: inherit; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.visual-knowledge-filter-button { width: 112px; min-width: 112px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #374151; font: inherit; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .visual-knowledge-filter-button:hover { border-color: #d1d5db; background: #fff; }
 .visual-knowledge-filter-button:focus-visible { outline: none; border-color: #d1d5db; box-shadow: 0 0 0 2px rgb(17 24 39 / 8%); }
 .visual-knowledge-filter-button.is-active { border-color: #d1d5db; background: #f3f4f6; color: #111827; font-weight: 700; }
-.visual-knowledge-filter-button > span:not(.visual-knowledge-filter-button__clear) { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visual-knowledge-filter-button > span:not(.visual-knowledge-filter-button__clear) { min-width: 0; flex: 1 1 auto; overflow: visible; text-overflow: clip; white-space: nowrap; }
 .visual-knowledge-filter-button :deep(.t-icon) { font-size: 14px; color: #9ca3af; }
 .visual-knowledge-filter-button__clear { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
 .visual-knowledge-view-toggle { padding: 2px; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; background: #f3f4f6; }

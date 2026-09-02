@@ -302,8 +302,49 @@
               <span v-if="model.id === selectedModelId && !sceneOptionFor(model.id)?.locked && sceneOptionFor(model.id)?.selectable !== false" class="visual-model-selector__consumer-check" aria-hidden="true"><t-icon name="check" /></span>
               <span v-if="sceneOptionFor(model.id)?.locked || sceneOptionFor(model.id)?.selectable === false" class="visual-model-selector__consumer-lock" :aria-label="$t('model.lockedTag')"><t-icon name="lock-on" aria-hidden="true" /></span>
             </button>
+            <button
+              v-if="clearable && selectedModelId"
+              type="button"
+              role="option"
+              class="visual-model-selector__consumer-option is-clear"
+              :aria-label="$t('common.clear')"
+              @click="clearConsumerSelection"
+            >
+              <span class="visual-model-selector__consumer-option-copy">
+                <strong>{{ $t('common.clear') }}</strong>
+              </span>
+              <t-icon name="close" aria-hidden="true" />
+            </button>
+            <button
+              v-if="!disabled && showAddModel && !authStore.isLiteMode"
+              type="button"
+              role="option"
+              class="visual-model-selector__consumer-option is-add"
+              :aria-label="$t('model.addModelInSettings')"
+              @click="addModelFromConsumerSelect"
+            >
+              <span class="visual-model-selector__consumer-option-copy">
+                <strong>{{ $t('model.addModelInSettings') }}</strong>
+              </span>
+              <t-icon name="add" aria-hidden="true" />
+            </button>
           </template>
-          <div v-else class="visual-model-selector__consumer-state">{{ placeholderText }}</div>
+          <template v-else>
+            <div class="visual-model-selector__consumer-state">{{ placeholderText }}</div>
+            <button
+              v-if="!disabled && showAddModel && !authStore.isLiteMode"
+              type="button"
+              role="option"
+              class="visual-model-selector__consumer-option is-add"
+              :aria-label="$t('model.addModelInSettings')"
+              @click="addModelFromConsumerSelect"
+            >
+              <span class="visual-model-selector__consumer-option-copy">
+                <strong>{{ $t('model.addModelInSettings') }}</strong>
+              </span>
+              <t-icon name="add" aria-hidden="true" />
+            </button>
+          </template>
         </div>
       </Transition>
     </div>
@@ -389,6 +430,10 @@ interface Props {
   mode?: 'catalog' | 'chat'
   models?: ModelSelectorModel[]
   sceneOptions?: ConsumerSceneOption[]
+  // Reuse the native scene-model CustomSelect surface without requiring a
+  // scene policy projection. This is opt-in so existing catalog/chat callers
+  // retain their exact rendering and behavior.
+  useConsumerStyle?: boolean
   showAddModel?: boolean
   selectedModelDisplayName?: string
   selectedReasoningLabel?: string
@@ -411,6 +456,7 @@ const props = withDefaults(defineProps<Props>(), {
   mode: 'catalog',
   models: () => [],
   sceneOptions: () => [],
+  useConsumerStyle: false,
   showAddModel: true,
   selectedModelDisplayName: '',
   selectedReasoningLabel: '',
@@ -457,7 +503,9 @@ watch(() => [props.allModels, props.modelType] as const, ([newModels]) => {
 
 const sceneOptionById = computed(() => new Map((props.sceneOptions || []).map(option => [option.model_id, option])))
 const sceneOptionFor = (modelId?: string) => modelId ? sceneOptionById.value.get(modelId) : undefined
-const isConsumerSceneSelector = computed(() => props.mode === 'catalog' && !props.showAddModel)
+const isConsumerSceneSelector = computed(() =>
+  props.mode === 'catalog' && (!props.showAddModel || props.useConsumerStyle),
+)
 const selectorModels = computed<ModelSelectorModel[]>(() => {
   if (props.sceneOptions.length) {
     if (isConsumerSceneSelector.value) {
@@ -493,10 +541,11 @@ const selectedCatalogModel = computed(() => {
 void selectedCatalogModel
 
 const loadModels = async () => {
-  // Compact selectors either receive the safe scene projection used by the
-  // settings page or an explicit allModels catalog supplied by their caller.
+  // Compact scene selectors receive the safe scene projection used by the
+  // settings page. A caller that only opts into the scene CustomSelect surface
+  // still owns a normal catalog, so it must load the same catalog as before.
   // Neither variant should issue a second, competing /models request.
-  if (props.allModels || isConsumerSceneSelector.value) {
+  if (props.allModels || (isConsumerSceneSelector.value && props.sceneOptions.length)) {
     return
   }
 
@@ -560,6 +609,16 @@ const toggleConsumerSelect = () => {
   }
 }
 const closeConsumerSelect = () => { consumerSelectOpen.value = false }
+const clearConsumerSelection = () => {
+  if (!props.clearable) return
+  emit('update:selectedModelId', '')
+  closeConsumerSelect()
+}
+const addModelFromConsumerSelect = () => {
+  if (props.disabled || authStore.isLiteMode || !props.showAddModel) return
+  emit('add-model')
+  closeConsumerSelect()
+}
 const selectConsumerModel = (value: string) => {
   if (!value) return
   const option = sceneOptionFor(value)
@@ -989,6 +1048,25 @@ onUnmounted(() => {
 
 .visual-model-selector__consumer-option.is-locked:hover,
 .visual-model-selector__consumer-option.is-locked:focus-visible { background: #f9fafb; }
+
+.visual-model-selector__consumer-option.is-clear,
+.visual-model-selector__consumer-option.is-add {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.visual-model-selector__consumer-option.is-clear {
+  border-top: 1px solid #f3f4f6;
+  border-radius: 0 0 12px 12px;
+  margin-top: 2px;
+}
+
+.visual-model-selector__consumer-option.is-clear > :deep(.t-icon),
+.visual-model-selector__consumer-option.is-add > :deep(.t-icon) {
+  flex: 0 0 auto;
+  color: #9ca3af;
+  font-size: 14px;
+}
 
 .visual-model-selector__consumer-option-copy {
   min-width: 0;
