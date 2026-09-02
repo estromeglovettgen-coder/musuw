@@ -21,7 +21,7 @@ test('identity boundary returns an isolated copy of safe defaults', () => {
       selectedChatModelId: '',
       thinkingEnabled: true,
       reasoningEffort: 'high',
-      consumerSceneModelIds: {},
+      consumerSceneModelIds: {} as Record<string, string>,
     },
   }
 
