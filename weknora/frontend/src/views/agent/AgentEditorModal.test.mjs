@@ -115,6 +115,21 @@ test('new regular-tool defaults exclude sandbox, skills, and governed memory', (
   }
 })
 
+test('effective web tools respect the independent page-fetch switch', () => {
+  const effectiveTools = source.slice(
+    source.indexOf('const effectiveTools = computed'),
+    source.indexOf('// 勾选了但当前配置下无法生效的工具数量'),
+  )
+  assert.match(
+    effectiveTools,
+    /if \(formData\.value\.config\.web_search_enabled\) \{[\s\S]*?value: 'web_search'/,
+  )
+  assert.match(
+    effectiveTools,
+    /if \(formData\.value\.config\.web_search_enabled && formData\.value\.config\.web_fetch_enabled\) \{[\s\S]*?value: 'web_fetch'/,
+  )
+})
+
 test('explicit mode switches use full smart tools and keep quick answer tool-free', () => {
   const modeWatcher = source.slice(
     source.indexOf('watch(agentMode, (val, _oldVal) => {'),

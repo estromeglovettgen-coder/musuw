@@ -2433,7 +2433,7 @@ const groupedAvailableTools = computed(() => {
 // 最终运行时智能体实际能使用的工具集合（仅做预览展示）
 // 规则：基于 allowed_tools 过滤
 //   1) 勾选但缺失对应能力（无 KB / 无 Wiki 能力 KB）的工具会被灰显/隐藏
-//   2) 无论是否勾选，web_search / web_fetch 随 web_search_enabled 出现
+//   2) web_search 随 web_search_enabled 出现；web_fetch 还需独立开关开启
 //   3) 当 kb_selection_mode === 'none' 时，RAG/Wiki 工具都视为不可用
 const effectiveTools = computed(() => {
   const chosen = new Set(formData.value.config.allowed_tools || []);
@@ -2449,6 +2449,8 @@ const effectiveTools = computed(() => {
   }
   if (formData.value.config.web_search_enabled) {
     items.push({ value: 'web_search', label: t('agentEditor.tools.webSearch'), active: true });
+  }
+  if (formData.value.config.web_search_enabled && formData.value.config.web_fetch_enabled) {
     items.push({ value: 'web_fetch', label: t('agentEditor.tools.webFetch'), active: true });
   }
   return items;

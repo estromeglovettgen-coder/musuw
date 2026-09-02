@@ -21,3 +21,4 @@
 - [x] 4.1 Run focused and full frontend tests, i18n validation, type-check, and production build
 - [x] 4.2 Run one bounded adversarial review, fix only confirmed blockers, and rerun affected verification
 - [x] 4.3 Validate the OpenSpec change, inspect the final diff, and commit the completed change on the upgrade branch
+- [x] 4.4 Reconcile the preset-inventory finding for the independent web-fetch gate with focused frontend and runtime regressions

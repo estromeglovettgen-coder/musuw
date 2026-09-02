@@ -291,6 +291,7 @@ func (s *sessionService) buildAgentConfig(
 		MaxIterations:               customAgent.Config.MaxIterations,
 		Temperature:                 customAgent.Config.Temperature,
 		WebSearchEnabled:            effectiveWebSearchEnabled(customAgent.Config.WebSearchEnabled && req.WebSearchEnabled),
+		WebFetchEnabled:             customAgent.Config.WebFetchEnabled,
 		WebSearchMaxResults:         customAgent.Config.WebSearchMaxResults,
 		WebSearchProviderID:         customAgent.Config.WebSearchProviderID,
 		MultiTurnEnabled:            customAgent.Config.MultiTurnEnabled,
