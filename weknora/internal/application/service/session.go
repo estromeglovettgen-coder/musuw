@@ -827,8 +827,9 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 	if modelID == "" {
 		models, err := s.modelService.ListModels(ctx)
 		if err != nil {
-			logger.ErrorWithFields(ctx, err, nil)
-			return "", fmt.Errorf("failed to list models: %w", err)
+			return s.persistFallbackSessionTitle(
+				ctx, session, message.Content, modelID, "list_models", fmt.Errorf("failed to list models: %w", err),
+			)
 		}
 		for _, model := range models {
 			if model == nil {
@@ -841,8 +842,10 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 			}
 		}
 		if modelID == "" {
-			logger.Error(ctx, "No KnowledgeQA model found")
-			return "", stderrors.New("no KnowledgeQA model available for title generation")
+			return s.persistFallbackSessionTitle(
+				ctx, session, message.Content, modelID, "resolve_default_model",
+				stderrors.New("no KnowledgeQA model available for title generation"),
+			)
 		}
 	} else {
 		logger.Infof(ctx, "Using specified model for title generation: %s", modelID)
@@ -850,10 +853,27 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 
 	chatModel, err := s.modelService.GetChatModel(ctx, modelID)
 	if err != nil {
-		logger.ErrorWithFields(ctx, err, map[string]interface{}{
-			"model_id": modelID,
-		})
-		return "", err
+		return s.persistFallbackSessionTitle(
+			ctx, session, message.Content, modelID, "get_chat_model", err,
+		)
+	}
+	if chatModel == nil {
+		return s.persistFallbackSessionTitle(
+			ctx, session, message.Content, modelID, "get_chat_model",
+			stderrors.New("resolved title model is nil"),
+		)
+	}
+	var modelInfo *types.Model
+	if resolved, metadataErr := s.modelService.GetModelByID(ctx, modelID); metadataErr != nil {
+		// Title generation is auxiliary and must remain available when metadata
+		// lookup is transiently unavailable. Omitting a reasoning override lets
+		// the provider apply its own safe default.
+		logger.Warnf(ctx,
+			"Failed to load title model metadata; using provider defaults, session=%s, model=%s, error_type=%T",
+			session.ID, modelID, metadataErr,
+		)
+	} else {
+		modelInfo = resolved
 	}
 
 	// Prepare messages for title generation
@@ -869,29 +889,62 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 	)
 
 	// Call model to generate title
-	thinking := false
-	response, err := chatModel.Chat(ctx, chatMessages, &chat.ChatOptions{
-		Temperature: 0.3,
-		Thinking:    &thinking,
-	})
-	if err != nil {
-		logger.ErrorWithFields(ctx, err, nil)
-		return "", err
-	}
-
-	// Process and store the generated title. A model completion that does not
-	// honor the title-only contract falls back to the user's own first question.
-	title, rejected := sanitizeGeneratedTitle(response.Content)
-	if rejected {
-		title = fallbackSessionTitle(message.Content)
-		logger.Warnf(ctx,
-			"Generated session title violated the plain-text contract; used user-query fallback, session=%s, model=%s",
-			session.ID, modelID,
+	titleCtx := types.WithLLMCallMetadata(ctx, "session_title", "")
+	response, modelErr := chatModel.Chat(titleCtx, chatMessages, titleGenerationChatOptions(modelInfo))
+	var title string
+	if modelErr != nil {
+		return s.persistFallbackSessionTitle(
+			ctx, session, message.Content, modelID, "chat", modelErr,
 		)
+	} else {
+		// Process and store the generated title. A model completion that does not
+		// honor the title-only contract falls back to the user's first question.
+		responseContent := ""
+		if response != nil {
+			responseContent = response.Content
+		}
+		var rejected bool
+		title, rejected = sanitizeGeneratedTitle(responseContent)
+		if rejected {
+			title = fallbackSessionTitle(message.Content)
+			logger.Warnf(ctx,
+				"Generated session title violated the plain-text contract; used user-query fallback, session=%s, model=%s",
+				session.ID, modelID,
+			)
+		}
 	}
 	if title == "" {
 		return "", stderrors.New("generated session title is empty")
 	}
+
+	return s.persistSessionTitle(ctx, session, title)
+}
+
+// persistFallbackSessionTitle keeps automatic titles usable when their
+// auxiliary model path is unavailable. The first user query is deterministic,
+// local, and already subject to the same title-length limit.
+func (s *sessionService) persistFallbackSessionTitle(
+	ctx context.Context,
+	session *types.Session,
+	query, modelID, stage string,
+	cause error,
+) (string, error) {
+	title := fallbackSessionTitle(query)
+	if title == "" {
+		return "", cause
+	}
+	logger.Warnf(ctx,
+		"Session title generation failed; used user-query fallback, session=%s, model=%s, stage=%s, error_type=%T",
+		session.ID, modelID, stage, cause,
+	)
+	return s.persistSessionTitle(ctx, session, title)
+}
+
+func (s *sessionService) persistSessionTitle(
+	ctx context.Context,
+	session *types.Session,
+	title string,
+) (string, error) {
 	// Commit the generated candidate only if the persisted title is still empty.
 	// A manual rename (or another generator) may have completed while Chat was
 	// in flight, so an unconditional Update here would overwrite the winner.
@@ -917,7 +970,7 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 			logger.ErrorWithFields(ctx, getErr, nil)
 			return "", getErr
 		}
-		if persisted.Title == "" {
+		if persisted == nil || persisted.Title == "" {
 			return "", stderrors.New("session title was not updated")
 		}
 		session.Title = persisted.Title
@@ -926,6 +979,49 @@ func (s *sessionService) GenerateTitle(ctx context.Context,
 	session.Title = title
 
 	return session.Title, nil
+}
+
+// titleGenerationChatOptions keeps inexpensive title calls non-reasoning for
+// ordinary models without explicitly disabling reasoning on models whose
+// provider contract requires it.
+func titleGenerationChatOptions(model *types.Model) *chat.ChatOptions {
+	options := &chat.ChatOptions{Temperature: 0.3}
+	if model == nil {
+		return options
+	}
+	if !model.Parameters.Reasoning.Mandatory {
+		thinking := false
+		options.Thinking = &thinking
+		return options
+	}
+
+	options.ReasoningEffort = titleMandatoryReasoningEffort(model.Parameters.Reasoning)
+	return options
+}
+
+func titleMandatoryReasoningEffort(reasoning types.ReasoningParameters) string {
+	supported := make(map[string]struct{}, len(reasoning.SupportedEfforts))
+	for _, value := range reasoning.SupportedEfforts {
+		effort, err := chat.NormalizeReasoningEffort(value)
+		if err == nil && effort != "" && effort != "none" {
+			supported[effort] = struct{}{}
+		}
+	}
+
+	if effort, err := chat.NormalizeReasoningEffort(reasoning.DefaultEffort); err == nil &&
+		effort != "" && effort != "none" {
+		_, advertised := supported[effort]
+		if len(supported) == 0 || advertised {
+			return effort
+		}
+	}
+	for _, value := range reasoning.SupportedEfforts {
+		effort, err := chat.NormalizeReasoningEffort(value)
+		if err == nil && effort != "" && effort != "none" {
+			return effort
+		}
+	}
+	return ""
 }
 
 // GenerateTitleAsync generates a title for the session asynchronously

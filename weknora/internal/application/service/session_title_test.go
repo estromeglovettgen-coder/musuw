@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -13,18 +14,23 @@ import (
 
 type generatedTitleChatModel struct {
 	response     string
+	err          error
 	beforeReturn func()
+	options      *chat.ChatOptions
+	callPurpose  string
 }
 
 func (m *generatedTitleChatModel) Chat(
-	context.Context,
-	[]chat.Message,
-	*chat.ChatOptions,
+	ctx context.Context,
+	_ []chat.Message,
+	options *chat.ChatOptions,
 ) (*types.ChatResponse, error) {
+	m.options = options
+	m.callPurpose, _ = types.LLMCallMetadataFromContext(ctx)
 	if m.beforeReturn != nil {
 		m.beforeReturn()
 	}
-	return &types.ChatResponse{Content: m.response}, nil
+	return &types.ChatResponse{Content: m.response}, m.err
 }
 
 func (*generatedTitleChatModel) ChatStream(
@@ -40,11 +46,22 @@ func (*generatedTitleChatModel) GetModelID() string   { return "generated-title-
 
 type generatedTitleModelService struct {
 	interfaces.ModelService
-	model chat.Chat
+	model         chat.Chat
+	modelInfo     *types.Model
+	getChatErr    error
+	listModelsErr error
 }
 
 func (s *generatedTitleModelService) GetChatModel(context.Context, string) (chat.Chat, error) {
-	return s.model, nil
+	return s.model, s.getChatErr
+}
+
+func (s *generatedTitleModelService) GetModelByID(context.Context, string) (*types.Model, error) {
+	return s.modelInfo, nil
+}
+
+func (s *generatedTitleModelService) ListModels(context.Context) ([]*types.Model, error) {
+	return nil, s.listModelsErr
 }
 
 type generatedTitleSessionRepository struct {
@@ -155,6 +172,133 @@ func TestGenerateTitleDoesNotOverwriteManualRenameThatWinsDuringModelCall(t *tes
 	}
 	if repo.currentTitle != manualTitle {
 		t.Fatalf("persisted title = %q, want concurrent manual title %q", repo.currentTitle, manualTitle)
+	}
+}
+
+func TestGenerateTitleHonorsMandatoryReasoningModel(t *testing.T) {
+	t.Parallel()
+
+	model := &generatedTitleChatModel{response: "轻松闲聊"}
+	svc := &sessionService{
+		cfg: &config.Config{Conversation: &config.ConversationConfig{
+			GenerateSessionTitlePrompt: "Return only a short title.",
+		}},
+		sessionRepo: &generatedTitleSessionRepository{},
+		modelService: &generatedTitleModelService{
+			model: model,
+			modelInfo: &types.Model{Parameters: types.ModelParameters{Reasoning: types.ReasoningParameters{
+				Supported:        true,
+				Mandatory:        true,
+				SupportedEfforts: []string{"low", "high"},
+				DefaultEffort:    "low",
+			}}},
+		},
+	}
+
+	_, err := svc.GenerateTitle(context.Background(), &types.Session{
+		ID: "session-mandatory-reasoning", UserID: "user-1",
+	}, []types.Message{{Role: "user", Content: "随便聊两句"}}, "model-1")
+	if err != nil {
+		t.Fatalf("GenerateTitle() error = %v", err)
+	}
+	if model.options == nil {
+		t.Fatal("title model options are nil")
+	}
+	if model.options.Thinking != nil {
+		t.Fatal("mandatory reasoning model must not receive Thinking=false")
+	}
+	if model.options.ReasoningEffort != "low" {
+		t.Fatalf("ReasoningEffort = %q, want low", model.options.ReasoningEffort)
+	}
+	if model.callPurpose != "session_title" {
+		t.Fatalf("call purpose = %q, want session_title", model.callPurpose)
+	}
+}
+
+func TestGenerateTitleFallsBackToQueryWhenModelCallFails(t *testing.T) {
+	t.Parallel()
+
+	const query = "  晚上想简单放松一下。再给我很多细节  "
+	repo := &generatedTitleSessionRepository{}
+	svc := &sessionService{
+		cfg: &config.Config{Conversation: &config.ConversationConfig{
+			GenerateSessionTitlePrompt: "Return only a short title.",
+		}},
+		sessionRepo: repo,
+		modelService: &generatedTitleModelService{
+			model: &generatedTitleChatModel{err: errors.New("provider unavailable")},
+		},
+	}
+
+	title, err := svc.GenerateTitle(context.Background(), &types.Session{
+		ID: "session-provider-error", UserID: "user-1",
+	}, []types.Message{{Role: "user", Content: query}}, "model-1")
+	if err != nil {
+		t.Fatalf("GenerateTitle() error = %v", err)
+	}
+	if want := "晚上想简单放松一下。再给我很多细节"; title != want {
+		t.Fatalf("GenerateTitle() = %q, want %q", title, want)
+	}
+	if repo.currentTitle != title {
+		t.Fatalf("persisted title = %q, want %q", repo.currentTitle, title)
+	}
+}
+
+func TestGenerateTitleFallsBackWhenModelCannotBeResolved(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		modelID      string
+		modelService *generatedTitleModelService
+	}{
+		{
+			name:    "specified model cannot be created",
+			modelID: "model-1",
+			modelService: &generatedTitleModelService{
+				getChatErr: errors.New("temporary model construction failure"),
+			},
+		},
+		{
+			name:         "specified model resolves to nil",
+			modelID:      "model-1",
+			modelService: &generatedTitleModelService{},
+		},
+		{
+			name:    "default model list is unavailable",
+			modelID: "",
+			modelService: &generatedTitleModelService{
+				listModelsErr: errors.New("temporary model list failure"),
+			},
+		},
+		{
+			name:         "default model is unavailable",
+			modelID:      "",
+			modelService: &generatedTitleModelService{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &generatedTitleSessionRepository{}
+			svc := &sessionService{
+				cfg: &config.Config{Conversation: &config.ConversationConfig{
+					GenerateSessionTitlePrompt: "Return only a short title.",
+				}},
+				sessionRepo:  repo,
+				modelService: tt.modelService,
+			}
+
+			title, err := svc.GenerateTitle(context.Background(), &types.Session{
+				ID: "session-model-resolution", UserID: "user-1",
+			}, []types.Message{{Role: "user", Content: "今天想早点休息"}}, tt.modelID)
+			if err != nil {
+				t.Fatalf("GenerateTitle() error = %v", err)
+			}
+			if title != "今天想早点休息" || repo.currentTitle != title {
+				t.Fatalf("title=%q persisted=%q, want deterministic fallback", title, repo.currentTitle)
+			}
+		})
 	}
 }
 
