@@ -1,8 +1,12 @@
 import { markRaw, nextTick, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ensureRagPipelineHistoryStream } from '../utils/rag-pipeline-history'
-import { userFacingAIError } from '../utils/userFacingAIError'
+import {
+  OPENROUTER_CREDITS_EXHAUSTED_CODE,
+  userFacingAIError,
+} from '../utils/userFacingAIError'
 import { applyMessageCreatedAt, bindServerTurnTimestamps, ensureMessageCreatedAt } from '../utils/messageTimestamp'
+import { useConsumerUpgradePrompt } from '../hooks/useConsumerUpgradePrompt'
 
 export type ChatMessage = Record<string, unknown>
 
@@ -47,10 +51,13 @@ export interface UseChatStreamHandlerOptions {
   onAgentAnswerDone?: (message: ChatMessage) => void
   onAgentChunkBound?: (message: ChatMessage, created: boolean) => void
   debug?: boolean
+  /** Embedded/internal stream consumers keep their own error presentation. */
+  showCreditUpgradePrompt?: boolean
 }
 
 export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
   const { t } = useI18n()
+  const showConsumerUpgradePrompt = useConsumerUpgradePrompt()
   const {
     messagesList,
     loading,
@@ -72,6 +79,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     onAgentAnswerDone,
     onAgentChunkBound,
     debug = false,
+    showCreditUpgradePrompt = true,
   } = options
 
   const emitMessageCreated = (message: ChatMessage) => {
@@ -501,6 +509,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
   }
 
   const reportError = (errorMsg: string, errorCode?: string) => {
+    if (showCreditUpgradePrompt && errorCode === OPENROUTER_CREDITS_EXHAUSTED_CODE) {
+      showConsumerUpgradePrompt(errorMsg)
+      return
+    }
     if (onError) {
       onError(errorMsg, errorCode ? { code: errorCode } : undefined)
     }
@@ -787,6 +799,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
               t('chat.aiServiceUnavailable'),
               errorCode,
               t('chat.billingRenewalPending'),
+              t('chat.aiCreditsExhausted'),
             )
             message.agent_error = true
             message.content = errorMsg
@@ -804,6 +817,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             t('chat.aiServiceUnavailable'),
             errorCode,
             t('chat.billingRenewalPending'),
+            t('chat.aiCreditsExhausted'),
           )
           message.agent_error = true
           message.content = errorMsg
@@ -1059,6 +1073,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         t('chat.aiServiceUnavailable'),
         errorCode,
         t('chat.billingRenewalPending'),
+        t('chat.aiCreditsExhausted'),
       )
       message.content = errorMsg
       message.is_completed = true

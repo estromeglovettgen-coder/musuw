@@ -26,7 +26,7 @@ import Settings from "@/views/settings/Settings.vue";
 import GlobalCommandPalette from "@/components/GlobalCommandPalette.vue";
 import { useCommandPaletteStore } from "@/stores/commandPalette";
 import { useChatResourcesStore } from "@/stores/chatResources";
-import { getKnowledgeBaseById } from "@/api/knowledge-base/index";
+import { getKnowledgeBaseById, listKnowledgeFolders } from "@/api/knowledge-base/index";
 import { MessagePlugin } from "tdesign-vue-next";
 import { useI18n } from "vue-i18n";
 import NewUserGuide from '@/components/NewUserGuide.vue'
@@ -36,6 +36,10 @@ import { getCurrentEntitlement } from '@/api/entitlement'
 import { useAuthStore } from '@/stores/auth'
 import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
 import { partitionFilesForConsumerPlan } from '@/views/knowledge/utils/uploadSources'
+import {
+  exceedsConsumerDocumentLimit,
+  exceedsConsumerStorageQuota,
+} from '@/utils/consumerUploadLimits'
 
 const route = useRoute();
 const router = useRouter();
@@ -174,19 +178,38 @@ const handleGlobalDrop = async (event: DragEvent) => {
 
   let filesToDispatch = droppedFiles;
   let blockedVideoCount = 0;
+  let blockingUpgradeBody: string | null = null;
   if (authStore.isLiteMode) {
     const restricted = partitionFilesForConsumerPlan(droppedFiles, { videoUpload: false });
-    if (restricted.blockedVideoFiles.length > 0) {
-      try {
-        const entitlement = (await getCurrentEntitlement()).data;
-        if (entitlement.video_upload !== true) {
-          filesToDispatch = restricted.allowedFiles;
-          blockedVideoCount = restricted.blockedVideoFiles.length;
-        }
-      } catch {
+    try {
+      const entitlement = (await getCurrentEntitlement()).data;
+      if (entitlement.video_upload !== true) {
         filesToDispatch = restricted.allowedFiles;
-        MessagePlugin.error(t('entitlement.usageUnavailable'));
+        blockedVideoCount = restricted.blockedVideoFiles.length;
       }
+
+      if (filesToDispatch.length > 0 && exceedsConsumerStorageQuota(entitlement, filesToDispatch)) {
+        filesToDispatch = [];
+        blockingUpgradeBody = String(t('entitlement.storageQuotaUpgradeBody'));
+      } else if (filesToDispatch.length > 0 && entitlement.max_documents_per_kb > 0) {
+        const kbId = getCurrentKbId();
+        if (kbId) {
+          try {
+            const folders: any = await listKnowledgeFolders(kbId);
+            const count = folders?.data?.total_document_count ?? folders?.total_document_count;
+            if (exceedsConsumerDocumentLimit(entitlement, Number(count), filesToDispatch.length)) {
+              filesToDispatch = [];
+              blockingUpgradeBody = String(t('entitlement.freeDocumentLimit'));
+            }
+          } catch {
+            // The page-level upload handler repeats this guard and remains the
+            // source of truth when the lightweight preflight cannot load.
+          }
+        }
+      }
+    } catch {
+      filesToDispatch = restricted.allowedFiles;
+      MessagePlugin.error(t('entitlement.usageUnavailable'));
     }
   }
 
@@ -197,7 +220,9 @@ const handleGlobalDrop = async (event: DragEvent) => {
       }),
     );
   }
-  if (blockedVideoCount > 0) {
+  if (blockingUpgradeBody) {
+    showConsumerUpgradePrompt(blockingUpgradeBody);
+  } else if (blockedVideoCount > 0) {
     const body = filesToDispatch.length > 0
       ? t('entitlement.videoMixedUpgradeBody', {
         allowed: filesToDispatch.length,

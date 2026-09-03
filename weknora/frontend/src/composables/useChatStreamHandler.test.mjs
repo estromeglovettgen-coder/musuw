@@ -53,3 +53,10 @@ test('keeps an empty completed agent shell hidden', () => {
 test('marks both terminal agent error branches explicitly', () => {
   assert.equal((source.match(/message\.agent_error = true/g) || []).length, 2)
 })
+
+test('monthly credit exhaustion uses one localized upgrade prompt in the primary product', () => {
+  assert.match(source, /OPENROUTER_CREDITS_EXHAUSTED_CODE/)
+  assert.match(source, /showCreditUpgradePrompt && errorCode === OPENROUTER_CREDITS_EXHAUSTED_CODE/)
+  assert.match(source, /showConsumerUpgradePrompt\(errorMsg\)/)
+  assert.match(source, /t\('chat\.aiCreditsExhausted'\)/)
+})

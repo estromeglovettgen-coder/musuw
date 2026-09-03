@@ -138,6 +138,7 @@ export function useEmbedChatSession(options: {
     // Embedded consumers get the honest localized text only; billing repair
     // navigation belongs to the authenticated primary product shell.
     onError: (message) => embedToast(message),
+    showCreditUpgradePrompt: false,
     isFirstEnter,
     scrollContainer,
   })

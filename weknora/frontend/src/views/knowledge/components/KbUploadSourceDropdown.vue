@@ -174,6 +174,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
+import { exceedsConsumerStorageQuota } from '@/utils/consumerUploadLimits'
 import { useAuthStore } from '@/stores/auth'
 import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
 import { filterUploadFiles, partitionFilesForConsumerPlan } from '../utils/uploadSources'
@@ -301,10 +302,11 @@ const handleFilesChange = async (event: Event, fromFolder: boolean) => {
 
   let allowedFiles = result.validFiles
   let blockedVideoFiles: File[] = []
+  let entitlement: ConsumerEntitlement | null = null
   if (authStore.isLiteMode) {
+    entitlement = await resolveConsumerEntitlement()
     const restricted = partitionFilesForConsumerPlan(result.validFiles, { videoUpload: false })
     if (restricted.blockedVideoFiles.length > 0) {
-      const entitlement = await resolveConsumerEntitlement()
       if (!entitlement) {
         if (restricted.allowedFiles.length > 0) emit('files', restricted.allowedFiles)
         MessagePlugin.error(t('entitlement.usageUnavailable'))
@@ -317,8 +319,14 @@ const handleFilesChange = async (event: Event, fromFolder: boolean) => {
       }
     }
   }
+  let storageUpgradeShown = false
+  if (allowedFiles.length > 0 && exceedsConsumerStorageQuota(entitlement, allowedFiles)) {
+    allowedFiles = []
+    storageUpgradeShown = true
+    showConsumerUpgradePrompt(String(t('entitlement.storageQuotaUpgradeBody')))
+  }
   if (allowedFiles.length > 0) emit('files', allowedFiles)
-  if (blockedVideoFiles.length > 0) {
+  if (blockedVideoFiles.length > 0 && !storageUpgradeShown) {
     const body = allowedFiles.length > 0
       ? t('entitlement.videoMixedUpgradeBody', {
         blocked: blockedVideoFiles.length,
@@ -348,6 +356,15 @@ const handleUrlDialogConfirm = async () => {
   if (authStore.isLiteMode && entitlement?.plan === 'free') {
     urlDialogVisible.value = false
     showConsumerUpgradePrompt(String(t('entitlement.urlImportUpgradeBody')), {
+      onCancel: () => {
+        urlDialogVisible.value = true
+      },
+    })
+    return
+  }
+  if (exceedsConsumerStorageQuota(entitlement)) {
+    urlDialogVisible.value = false
+    showConsumerUpgradePrompt(String(t('entitlement.storageQuotaUpgradeBody')), {
       onCancel: () => {
         urlDialogVisible.value = true
       },

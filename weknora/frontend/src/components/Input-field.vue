@@ -1,5 +1,5 @@
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, type SetupContext } from 'vue'
+import { computed, defineComponent, nextTick, ref, watch, type SetupContext } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LegacyInputFieldBusiness from '@/assets/business-baselines/Input-field.pre-view.vue'
 import AttachmentUpload from './AttachmentUpload.vue'
@@ -39,11 +39,46 @@ export default defineComponent({
     ModelSelector,
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
-    const state = legacySetup?.(props, context)
+    let legacyExposed: Record<string, unknown> = {}
+    const legacyContext = {
+      ...context,
+      expose(exposed?: Record<string, unknown>) {
+        legacyExposed = exposed || {}
+      },
+    } as SetupContext
+    const state = legacySetup?.(props, legacyContext)
     const authStore = useAuthStore()
     const orgStore = useOrganizationStore()
     const { t } = useI18n()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const legacyCreateSession = (state as any).createSession as ((value: string) => Promise<unknown>) | undefined
+      const waitForModelLoad = async () => {
+        if (!readStateValue<boolean>((state as any).modelsLoading)) return
+        await new Promise<void>((resolve) => {
+          const stop = watch(
+            () => Boolean(readStateValue<boolean>((state as any).modelsLoading)),
+            (loading) => {
+              if (loading) return
+              stop()
+              resolve()
+            },
+            { flush: 'sync' },
+          )
+        })
+      }
+      const createSession = async (value: string) => {
+        // The visual adapter owns only send-time coordination. Keep the frozen
+        // business controller intact while ensuring a picker-triggered refresh
+        // has settled and mandatory reasoning defaults are current.
+        if (!value.trim() || props.embeddedMode || props.isReplying) {
+          return legacyCreateSession?.(value)
+        }
+        await waitForModelLoad()
+        await (state as any).loadChatModels?.()
+        await waitForModelLoad()
+        ;(state as any).ensureReasoningSelection?.()
+        return legacyCreateSession?.(value)
+      }
       const modelPickerView = ref<'overview' | 'models' | 'reasoning'>('overview')
       const selectedAgentPresentation = computed(() => {
         const selectedAgentRef = (state as any).selectedAgent
@@ -121,7 +156,19 @@ export default defineComponent({
       const handleNativeKeydown = (event: KeyboardEvent) => {
         const queryRef = (state as any).query
         const value = queryRef && typeof queryRef === 'object' && 'value' in queryRef ? queryRef.value : ''
+        const showMention = Boolean(readStateValue<boolean>((state as any).showMention))
+        if (event.keyCode === 13 && !event.shiftKey && !event.ctrlKey && !showMention) {
+          event.preventDefault()
+          void createSession(value)
+          return
+        }
         ;(state as any).onKeydown?.(value, { e: event })
+      }
+      const triggerSend = (text: string) => {
+        if (!text.trim()) return
+        const queryRef = (state as any).query
+        if (queryRef && typeof queryRef === 'object' && 'value' in queryRef) queryRef.value = text
+        void nextTick(() => createSession(text))
       }
       const openModelPicker = () => {
         modelPickerView.value = 'overview'
@@ -147,10 +194,15 @@ export default defineComponent({
         await (state as any).handleSelectAgent?.(agent, sourceTenantId)
         closeModelPicker()
       }
+      context.expose({
+        ...legacyExposed,
+        triggerSend,
+      })
       return {
         ...state,
         authStore,
         orgStore,
+        createSession,
         modelPickerView,
         selectedAgentDisplayName,
         selectedModelCapsuleName,
@@ -164,6 +216,7 @@ export default defineComponent({
         handleNativeKeydown,
       }
     }
+    context.expose(legacyExposed)
     return state
   },
 })

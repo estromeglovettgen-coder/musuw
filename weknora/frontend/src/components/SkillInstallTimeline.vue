@@ -70,6 +70,7 @@ const { handleMsgList, processStreamChunk } = useChatStreamHandler({
   fullContent,
   isAgentStreamSession: () => true,
   scrollToBottom,
+  showCreditUpgradePrompt: false,
 })
 
 // install_prompt is the installer's opening line. It is not an assistant

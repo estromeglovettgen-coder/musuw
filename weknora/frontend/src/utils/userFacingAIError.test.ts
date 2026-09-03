@@ -29,3 +29,16 @@ test('prefers a stable billing code over provider error text', () => {
     'Billing confirmation is pending or needs repair',
   )
 })
+
+test('maps exhausted AI credits by stable code instead of provider copy', () => {
+  assert.equal(
+    userFacingAIError(
+      'Monthly AI Credits exhausted',
+      'AI service unavailable',
+      'openrouter_credits_exhausted',
+      'Billing pending',
+      'Monthly AI allowance exhausted; upgrade or wait for reset',
+    ),
+    'Monthly AI allowance exhausted; upgrade or wait for reset',
+  )
+})

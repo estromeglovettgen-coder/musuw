@@ -128,6 +128,34 @@ func TestLoadBuiltinModelsConfig_Idempotent(t *testing.T) {
 	assert.Equal(t, int64(1), count, "second load must not duplicate")
 }
 
+func TestLoadBuiltinModelsConfig_RenamesExistingYAMLManagedModel(t *testing.T) {
+	db := setupBuiltinModelsDB(t)
+	const modelID = "builtin-openrouter-glm-5-2-free"
+	require.NoError(t, db.Create(&Model{
+		ID: modelID, Name: "z-ai/glm-5.2:free", DisplayName: "GLM 5.2 (Free)",
+		Type: ModelTypeKnowledgeQA, Source: ModelSourceRemote, Status: ModelStatusActive,
+		IsBuiltin: true, ManagedBy: BuiltinModelManagedBy,
+	}).Error)
+
+	dir := writeYAML(t, `builtin_models:
+  - id: builtin-openrouter-glm-5-2-free
+    name: z-ai/glm-5.2
+    display_name: GLM 5.2
+    type: KnowledgeQA
+    source: remote
+    status: active
+    parameters:
+      provider: openrouter
+`)
+	require.NoError(t, LoadBuiltinModelsConfig(context.Background(), db, dir))
+
+	var model Model
+	require.NoError(t, db.Where("id = ?", modelID).First(&model).Error)
+	assert.Equal(t, "z-ai/glm-5.2", model.Name)
+	assert.Equal(t, "GLM 5.2", model.DisplayName)
+	assert.Equal(t, BuiltinModelManagedBy, model.ManagedBy)
+}
+
 func TestLoadBuiltinModelsConfig_PreservesRuntimeOverride(t *testing.T) {
 	db := setupBuiltinModelsDB(t)
 	dir := writeYAML(t, `builtin_models:
@@ -149,6 +177,29 @@ func TestLoadBuiltinModelsConfig_PreservesRuntimeOverride(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "builtin-llm").First(&m).Error)
 	assert.Equal(t, "from-admin-ui", m.Name)
 	assert.Empty(t, m.ManagedBy)
+}
+
+func TestLoadBuiltinModelsConfig_PreservesOverrideWhenProviderSlugChanges(t *testing.T) {
+	db := setupBuiltinModelsDB(t)
+	const modelID = "builtin-openrouter-nemotron-lightning-free"
+	require.NoError(t, db.Create(&Model{
+		ID: modelID, Name: "nvidia/nemotron-3.5-lightning:free",
+		Type: ModelTypeKnowledgeQA, Source: ModelSourceRemote, Status: ModelStatusActive,
+		IsBuiltin: true, ManagedBy: "",
+	}).Error)
+
+	dir := writeYAML(t, `builtin_models:
+  - id: builtin-openrouter-nemotron-lightning-free
+    name: nvidia/nemotron-3.5-lightning
+    type: KnowledgeQA
+    source: remote
+`)
+	require.NoError(t, LoadBuiltinModelsConfig(context.Background(), db, dir))
+
+	var model Model
+	require.NoError(t, db.Where("id = ?", modelID).First(&model).Error)
+	assert.Equal(t, "nvidia/nemotron-3.5-lightning:free", model.Name)
+	assert.Empty(t, model.ManagedBy)
 }
 
 func TestLoadBuiltinModelsConfig_EnvInterpolation(t *testing.T) {
@@ -424,6 +475,27 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.False(t, byID["builtin-openrouter-claude-haiku"].Parameters.Reasoning.Supported)
 	assert.Equal(t, "anthropic/claude-opus-5", byID["builtin-openrouter-claude-opus"].Name)
 
+	// These consumer-visible rows must use the paid, non-`:free` OpenRouter
+	// slugs.  The free aliases are availability-limited and are not suitable
+	// for the production paid catalog. Keep the display copy in sync with the
+	// provider's canonical model names as well.
+	nemotron := byID["builtin-openrouter-nemotron-lightning-free"]
+	assert.Equal(t, "nvidia/nemotron-3.5-lightning", nemotron.Name)
+	assert.Equal(t, "Nemotron 3.5 Lightning", nemotron.DisplayName)
+	assert.Equal(t, "NVIDIA Nemotron 3.5 Lightning through OpenRouter · tool-capable long-context reasoning", nemotron.Description)
+	glm := byID["builtin-openrouter-glm-5-2-free"]
+	assert.Equal(t, "z-ai/glm-5.2", glm.Name)
+	assert.Equal(t, "GLM 5.2", glm.DisplayName)
+	assert.Equal(t, "GLM 5.2 through OpenRouter · multilingual tool-capable reasoning", glm.Description)
+	assert.True(t, glm.Parameters.Reasoning.Supported)
+	assert.False(t, glm.Parameters.Reasoning.Mandatory)
+	assert.Equal(t, []string{"high", "xhigh"}, glm.Parameters.Reasoning.SupportedEfforts)
+	assert.Equal(t, "high", glm.Parameters.Reasoning.DefaultEffort)
+	nano := byID["builtin-openrouter-gpt-5-nano"]
+	assert.True(t, nano.Parameters.Reasoning.Mandatory)
+	assert.NotContains(t, nano.Parameters.Reasoning.SupportedEfforts, "none")
+	assert.Equal(t, "low", nano.Parameters.Reasoning.DefaultEffort)
+
 	embedding := byID["builtin-openrouter-embedding"]
 	assert.Equal(t, "qwen/qwen3-embedding-8b", embedding.Name)
 	assert.Equal(t, 4096, embedding.Parameters.EmbeddingParameters.Dimension)
@@ -446,8 +518,8 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 		name      string
 		modelType ModelType
 	}{
-		"builtin-openrouter-nemotron-lightning-free": {"nvidia/nemotron-3.5-lightning:free", ModelTypeKnowledgeQA},
-		"builtin-openrouter-glm-5-2-free":            {"z-ai/glm-5.2:free", ModelTypeKnowledgeQA},
+		"builtin-openrouter-nemotron-lightning-free": {"nvidia/nemotron-3.5-lightning", ModelTypeKnowledgeQA},
+		"builtin-openrouter-glm-5-2-free":            {"z-ai/glm-5.2", ModelTypeKnowledgeQA},
 		"builtin-openrouter-minimax-m3-free":         {"minimax/minimax-m3:free", ModelTypeKnowledgeQA},
 		"builtin-openrouter-ling-flash":              {"inclusionai/ling-3.0-flash", ModelTypeKnowledgeQA},
 		"builtin-openrouter-qwen-3-7-flash":          {"qwen/qwen3.7-flash", ModelTypeKnowledgeQA},

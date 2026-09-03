@@ -26,6 +26,17 @@ test("knowledge detail lets the empty state open the existing document picker", 
   );
 });
 
+test("knowledge detail routes chooser and global drops through the same consumer upload guard", () => {
+  assert.match(source, /const handleUploadSourceFiles = async \(files: File\[\]\) =>/);
+  assert.match(source, /exceedsConsumerStorageQuota/);
+  assert.match(source, /exceedsConsumerDocumentLimit/);
+  assert.match(source, /listKnowledgeFolders/);
+  assert.match(source, /showConsumerUpgradePrompt/);
+  assert.match(source, /addEventListener\(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true\)/);
+  assert.match(source, /stopImmediatePropagation\(\)/);
+  assert.match(source, /removeEventListener\(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true\)/);
+});
+
 test("graph view keeps the original layout chrome instead of inheriting document-only spacing", () => {
   assert.match(
     source,

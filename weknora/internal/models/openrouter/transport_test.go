@@ -31,6 +31,16 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
+type closeTrackingBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *closeTrackingBody) Close() error {
+	b.closed = true
+	return nil
+}
+
 func TestTransportUsesTenantKeyAndInjectsStableUser(t *testing.T) {
 	meter := &meterStub{key: "tenant-child-key", user: "musuw_opaque"}
 	base := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -102,6 +112,56 @@ func TestTransportClassifiesHTTP402AsCreditExhausted(t *testing.T) {
 	assert.Contains(t, err.Error(), "monthly AI credits")
 }
 
+func TestTransportClassifiesOpenRouterHTTP403KeyLimitAsCreditExhausted(t *testing.T) {
+	meter := &meterStub{key: "tenant-child-key", user: "musuw_opaque"}
+	base := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"error":{"code":403,"message":"Key limit exceeded (total limit)"}}`)),
+			Request:    req,
+		}, nil
+	})}
+	client := WrapHTTPClient(base, meter)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://openrouter.ai/api/v1/chat/completions", bytes.NewBufferString(`{"model":"test"}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	assert.Nil(t, resp)
+	require.Error(t, err)
+	assert.True(t, IsCreditExhausted(err))
+	assert.Equal(t, CreditExhaustedCode, ErrorCode(err))
+}
+
+func TestTransportPreservesUnrelatedHTTP403Response(t *testing.T) {
+	meter := &meterStub{key: "tenant-child-key", user: "musuw_opaque"}
+	const responseBody = `{"error":{"code":403,"message":"model access denied"}}`
+	providerBody := &closeTrackingBody{Reader: strings.NewReader(responseBody)}
+	base := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Header:     make(http.Header),
+			Body:       providerBody,
+			Request:    req,
+		}, nil
+	})}
+	client := WrapHTTPClient(base, meter)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://openrouter.ai/api/v1/chat/completions", bytes.NewBufferString(`{"model":"test"}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, responseBody, string(body))
+	assert.True(t, providerBody.closed)
+}
+
 func TestCreditExhaustedClassificationStaysProviderScoped(t *testing.T) {
 	// Generic task/business errors are not assumed to be OpenRouter just because
 	// their text happens to mention a credit limit.
@@ -112,6 +172,7 @@ func TestCreditExhaustedClassificationStaysProviderScoped(t *testing.T) {
 	// the OpenRouter SSE stream.
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":402,"message":"payment_required"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"message":"spending limit reached"}}`)))
+	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":403,"message":"Key limit exceeded (total limit)"}}`)))
 	assert.False(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":429,"message":"rate limited"}}`)))
 }
 

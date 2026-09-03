@@ -73,6 +73,21 @@ test("consumer chat can select a native agent and sends model-specific reasoning
   assert.match(streamClient, /postBody\.reasoning_effort = params\.reasoning_effort/);
 });
 
+test("visual adapter waits for model refresh and repairs mandatory reasoning before first send", () => {
+  assert.match(inputField, /const waitForModelLoad = async \(\) =>/);
+  assert.match(
+    inputField,
+    /const createSession = async \(value: string\) => \{[\s\S]*await waitForModelLoad\(\)[\s\S]*await \(state as any\)\.loadChatModels\?\.\(\)[\s\S]*ensureReasoningSelection\?\.\(\)[\s\S]*legacyCreateSession\?\.\(value\)/,
+  );
+  assert.match(inputField, /let legacyExposed:[\s\S]*expose\(exposed/);
+  assert.match(inputField, /context\.expose\(\{[\s\S]*\.\.\.legacyExposed[\s\S]*triggerSend/);
+  assert.match(inputField, /const triggerSend = \(text: string\) => \{[\s\S]*createSession\(text\)/);
+  assert.match(
+    inputField,
+    /const handleNativeKeydown = \(event: KeyboardEvent\) => \{[\s\S]*showMention[\s\S]*event\.shiftKey[\s\S]*event\.ctrlKey[\s\S]*createSession\(value\)/,
+  );
+});
+
 test("consumer chat routes the downstream request through the selected native agent", () => {
   const sendStart = chatBusiness.indexOf("const sendMsg = async");
   const sendEnd = chatBusiness.indexOf("onMounted", sendStart);

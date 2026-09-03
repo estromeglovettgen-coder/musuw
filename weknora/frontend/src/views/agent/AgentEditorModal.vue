@@ -1828,6 +1828,8 @@ import { SKILL_ICON } from '@/types/mention';
 import { listEmbedChannels } from '@/api/embed';
 import { getRootZoom, rectToCssPx } from '@/utils/zoom';
 import { integrationSectionKey } from '@/config/settingsRoute';
+import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt';
+import { consumerPlanErrorKeyFromError } from '@/utils/consumerPlanError';
 import {
   evaluateToolRequirement,
   deriveKbFilterFromTools,
@@ -1850,6 +1852,7 @@ const chatResources = useChatResourcesStore();
 const editorResources = useEditorResourcesStore();
 
 const { t, locale: i18nLocale } = useI18n();
+const showConsumerUpgradePrompt = useConsumerUpgradePrompt();
 
 const knowledgeConfigDescription = computed(() => authStore.isLiteMode
   ? t('agent.editor.knowledgeConfigDescLite')
@@ -4764,6 +4767,11 @@ const handleSave = async () => {
       handleClose();
     }
   } catch (e: any) {
+    const planErrorKey = consumerPlanErrorKeyFromError(e);
+    if (planErrorKey) {
+      showConsumerUpgradePrompt(String(t(planErrorKey)));
+      return;
+    }
     MessagePlugin.error(e?.message || t('agent.messages.saveFailed'));
   } finally {
     saving.value = false;

@@ -424,6 +424,8 @@ import KnowledgeBaseActivitySettings from './settings/KnowledgeBaseActivitySetti
 import { useI18n } from 'vue-i18n'
 import { resolveConsumerSceneCandidate } from '@/utils/consumerSceneModels'
 import { nextAvailableLocalizedName } from '@/utils/localizedDefaultName'
+import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
+import { consumerPlanErrorKeyFromError } from '@/utils/consumerPlanError'
 
 const uiStore = useUIStore()
 const authStore = useAuthStore()
@@ -431,6 +433,7 @@ const chatResources = useChatResourcesStore()
 const editorResources = useEditorResourcesStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const showConsumerUpgradePrompt = useConsumerUpgradePrompt()
 
 // Lite keeps the full upstream processing pipeline behind the server-owned
 // product boundary.  The browser only needs this fixed scene model when it
@@ -1505,6 +1508,11 @@ const doSubmit = async () => {
     handleClose()
   } catch (error: any) {
     console.error('Knowledge base operation failed:', error)
+    const planErrorKey = consumerPlanErrorKeyFromError(error)
+    if (planErrorKey) {
+      showConsumerUpgradePrompt(String(t(planErrorKey)))
+      return
+    }
     // Vector-store-binding error codes from the server. Both indicate
     // the selected store cannot be used: 2200 is "the binding itself
     // is invalid" (e.g. unknown id, foreign tenant), 2201 is "the

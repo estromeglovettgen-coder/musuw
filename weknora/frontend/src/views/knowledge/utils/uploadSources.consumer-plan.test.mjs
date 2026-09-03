@@ -128,8 +128,13 @@ test('knowledge upload dropdown passes the entitlement decision to the same part
 
 test('global knowledge drops reuse the video gate without changing chat drops', () => {
   assert.match(platform, /if \(isChatDropRoute\(\)\)[\s\S]*?return;[\s\S]*?partitionFilesForConsumerPlan/)
+  assert.match(platform, /listKnowledgeFolders/)
+  assert.match(platform, /exceedsConsumerStorageQuota/)
+  assert.match(platform, /exceedsConsumerDocumentLimit/)
   assert.match(platform, /entitlement\.video_upload !== true/)
   assert.match(platform, /files: filesToDispatch/)
   assert.match(platform, /videoMixedUpgradeBody/)
   assert.match(platform, /showConsumerUpgradePrompt/)
+  assert.match(platform, /let blockingUpgradeBody: string \| null = null/)
+  assert.match(platform, /if \(blockingUpgradeBody\)[\s\S]*?else if \(blockedVideoCount > 0\)/)
 })

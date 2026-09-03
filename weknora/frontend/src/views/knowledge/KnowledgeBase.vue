@@ -1,6 +1,15 @@
 <script lang="ts">
-import { defineComponent, ref, type SetupContext } from 'vue'
+import { defineComponent, onMounted, onUnmounted, ref, type SetupContext } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
+import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
+import { listKnowledgeFolders, type KnowledgeFolderTree } from '@/api/knowledge-base'
+import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
+import { useAuthStore } from '@/stores/auth'
+import {
+  exceedsConsumerDocumentLimit,
+  exceedsConsumerStorageQuota,
+} from '@/utils/consumerUploadLimits'
 import DocContent from '@/components/doc-content.vue'
 import EmptyKnowledge from '@/components/empty-knowledge.vue'
 import ContextualGuide from '@/components/ContextualGuide.vue'
@@ -19,6 +28,12 @@ import WikiBrowser from './wiki/WikiBrowser.vue'
 
 const legacy = LegacyKnowledgeBaseBusiness as any
 const legacySetup = legacy.setup
+const KNOWLEDGE_FILE_DROP_EVENT = 'weknora:knowledge-file-drop'
+
+const readStateValue = <T,>(value: T | { value: T }): T => {
+  if (value && typeof value === 'object' && 'value' in value) return value.value
+  return value as T
+}
 
 export default defineComponent({
   ...legacy,
@@ -31,6 +46,9 @@ export default defineComponent({
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
+    const authStore = useAuthStore()
+    const { t } = useI18n()
+    const showConsumerUpgradePrompt = useConsumerUpgradePrompt()
     const fileTypeFilterPanelVisible = ref(false)
     const parseStatusFilterPanelVisible = ref(false)
     const fileTypeFilterHover = ref(false)
@@ -57,8 +75,76 @@ export default defineComponent({
     }
 
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const legacyHandleUploadSourceFiles = (state as any).handleUploadSourceFiles as ((files: File[]) => void) | undefined
+      const legacyHandleManualCreate = (state as any).handleManualCreate as (() => void) | undefined
+
+      const currentDocumentCount = async (kbId: string): Promise<number | null> => {
+        const cached = readStateValue<KnowledgeFolderTree | null>((state as any).folderTree)
+        if (Number.isFinite(Number(cached?.total_document_count))) {
+          return Number(cached?.total_document_count)
+        }
+        try {
+          const response: any = await listKnowledgeFolders(kbId)
+          const count = response?.data?.total_document_count ?? response?.total_document_count
+          return Number.isFinite(Number(count)) ? Number(count) : null
+        } catch {
+          return null
+        }
+      }
+
+      const resolveEntitlement = async (): Promise<ConsumerEntitlement | null> => {
+        if (!authStore.isLiteMode) return null
+        try {
+          return (await getCurrentEntitlement()).data
+        } catch {
+          return null
+        }
+      }
+
+      const canAddDocuments = async (files: File[], incomingDocuments: number): Promise<boolean> => {
+        const entitlement = await resolveEntitlement()
+        if (!entitlement) return true
+        if (files.length > 0 && exceedsConsumerStorageQuota(entitlement, files)) {
+          showConsumerUpgradePrompt(String(t('entitlement.storageQuotaUpgradeBody')))
+          return false
+        }
+        const kbId = String(readStateValue<unknown>((state as any).kbId) || '')
+        if (!kbId || entitlement.max_documents_per_kb <= 0) return true
+        const count = await currentDocumentCount(kbId)
+        if (exceedsConsumerDocumentLimit(entitlement, count, incomingDocuments)) {
+          showConsumerUpgradePrompt(String(t('entitlement.freeDocumentLimit')))
+          return false
+        }
+        return true
+      }
+
+      const handleUploadSourceFiles = async (files: File[]) => {
+        if (files.length === 0 || !(await canAddDocuments(files, files.length))) return
+        legacyHandleUploadSourceFiles?.(files)
+      }
+
+      const handleManualCreate = async () => {
+        if (!(await canAddDocuments([], 1))) return
+        legacyHandleManualCreate?.()
+      }
+
+      const handleKnowledgeFileDrop = (event: Event) => {
+        const detail = (event as CustomEvent).detail
+        const kbId = String(readStateValue<unknown>((state as any).kbId) || '')
+        const isFAQ = Boolean(readStateValue<boolean>((state as any).isFAQ))
+        const files = Array.isArray(detail?.files) ? detail.files as File[] : []
+        if (!kbId || detail?.kbId !== kbId || isFAQ || files.length === 0) return
+        event.stopImmediatePropagation()
+        void handleUploadSourceFiles(files)
+      }
+
+      onMounted(() => window.addEventListener(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true))
+      onUnmounted(() => window.removeEventListener(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true))
+
       return {
         ...state,
+        handleUploadSourceFiles,
+        handleManualCreate,
         fileTypeFilterPanelVisible,
         parseStatusFilterPanelVisible,
         fileTypeFilterHover,

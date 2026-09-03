@@ -213,11 +213,11 @@ builtin_models:
 
   - id: builtin-openrouter-nemotron-lightning-free
     tenant_id: 10000
-    name: nvidia/nemotron-3.5-lightning:free
-    display_name: Nemotron 3.5 Lightning (Free)
+    name: nvidia/nemotron-3.5-lightning
+    display_name: Nemotron 3.5 Lightning
     type: KnowledgeQA
     source: remote
-    description: NVIDIA Nemotron 3.5 Lightning through OpenRouter · free tool-capable long-context reasoning
+    description: NVIDIA Nemotron 3.5 Lightning through OpenRouter · tool-capable long-context reasoning
     is_default: false
     status: active
     parameters:
@@ -232,11 +232,11 @@ builtin_models:
 
   - id: builtin-openrouter-glm-5-2-free
     tenant_id: 10000
-    name: z-ai/glm-5.2:free
-    display_name: GLM 5.2 (Free)
+    name: z-ai/glm-5.2
+    display_name: GLM 5.2
     type: KnowledgeQA
     source: remote
-    description: GLM 5.2 through OpenRouter · free multilingual tool-capable reasoning
+    description: GLM 5.2 through OpenRouter · multilingual tool-capable reasoning
     is_default: false
     status: active
     parameters:
@@ -246,8 +246,8 @@ builtin_models:
       reasoning:
         supported: true
         mandatory: false
-        supported_efforts: [high, medium, low]
-        default_effort: medium
+        supported_efforts: [high, xhigh]
+        default_effort: high
 
   - id: builtin-openrouter-minimax-m3-free
     tenant_id: 10000
@@ -321,7 +321,7 @@ builtin_models:
       supports_vision: true
       reasoning:
         supported: true
-        mandatory: false
+        mandatory: true
         supported_efforts: [high, medium, low, minimal]
         default_effort: low
 

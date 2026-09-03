@@ -86,6 +86,7 @@ func textIndicatesCreditExhausted(value string) bool {
 		"credits exhausted",
 		"credit exhausted",
 		"spending limit",
+		"key limit exceeded",
 	} {
 		if strings.Contains(lower, marker) {
 			return true
@@ -104,6 +105,15 @@ type Meter interface {
 type trackingTransport struct {
 	base  http.RoundTripper
 	meter Meter
+}
+
+type replayReadCloser struct {
+	io.Reader
+	closer io.Closer
+}
+
+func (r *replayReadCloser) Close() error {
+	return r.closer.Close()
 }
 
 func WrapHTTPClient(base *http.Client, meter Meter) *http.Client {
@@ -154,8 +164,26 @@ func (t *trackingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	if resp != nil && resp.StatusCode == http.StatusPaymentRequired {
-		// Never pass a 402 into generic provider retry/fallback machinery. Drain a
+	creditExhausted := resp != nil && resp.StatusCode == http.StatusPaymentRequired
+	if resp != nil && resp.StatusCode == http.StatusForbidden && resp.Body != nil {
+		// OpenRouter child-key total limits currently use a provider-scoped 403
+		// payload rather than 402. Inspect only this known provider response and
+		// restore the bytes for every unrelated 403 so normal SDK error handling
+		// remains byte-for-byte intact.
+		providerBody := resp.Body
+		prefix, readErr := io.ReadAll(io.LimitReader(providerBody, 64*1024))
+		if readErr != nil {
+			_ = providerBody.Close()
+			return nil, readErr
+		}
+		resp.Body = &replayReadCloser{
+			Reader: io.MultiReader(bytes.NewReader(prefix), providerBody),
+			closer: providerBody,
+		}
+		creditExhausted = PayloadIndicatesCreditExhausted(prefix)
+	}
+	if creditExhausted {
+		// Never pass a provider credit boundary into generic retry/fallback machinery. Drain a
 		// bounded body for connection reuse but do not surface provider text that
 		// may contain account metadata.
 		if resp.Body != nil {
