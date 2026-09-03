@@ -436,9 +436,12 @@
 
   /* Restored native Agent / Organization directory surfaces. */
   .agent-list-container,
-  .agent-list-content,
-  .agent-list-main {
+  .agent-list-content {
     background: var(--mvc-page) !important;
+    color: var(--mvc-text) !important;
+  }
+  .agent-list-main {
+    background: transparent !important;
     color: var(--mvc-text) !important;
   }
   .org-list-container,
@@ -457,7 +460,7 @@
     border-color: var(--mvc-line) !important;
     background: var(--mvc-surface) !important;
     color: var(--mvc-text) !important;
-    box-shadow: var(--mvc-shadow) !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important;
   }
   .agent-list-content .header-action-btn:not(.agent-create-header-btn) {
     border-color: #3f3f46 !important;

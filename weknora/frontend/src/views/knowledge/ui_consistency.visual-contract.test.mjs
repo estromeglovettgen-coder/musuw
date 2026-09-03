@@ -53,13 +53,26 @@ test('Agent directory uses the KnowledgeBase header cadence and page surface', (
   )
   assert.match(
     finalTheme,
-    /\.agent-list-container,[\s\S]*?\.agent-list-content,[\s\S]*?\.agent-list-main\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
+    /\.agent-list-container,[\s\S]*?\.agent-list-content\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
     'late dark-theme closure must keep the Agent shell on the shared page token',
+  )
+  assert.match(
+    finalTheme,
+    /\.agent-list-main\s*\{[\s\S]*?background:\s*transparent\s*!important;/,
+    'Agent content layer must remain transparent like KnowledgeBase content',
   )
   assert.match(
     finalTheme,
     /\.agent-list-content > \.header\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
     'Agent header must not introduce a darker island than its page shell',
+  )
+})
+
+test('Agent and knowledge-base cards use the same resting shadow in dark mode', () => {
+  assert.match(
+    finalTheme,
+    /\.agent-card,[\s\S]*?\.agent-card-skeleton\s*\{[\s\S]*?box-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 28%\)\s*!important;/,
+    'Agent cards must mechanically reuse the KnowledgeBase resting shadow',
   )
 })
 
