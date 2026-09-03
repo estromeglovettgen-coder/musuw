@@ -352,7 +352,7 @@ onUnmounted(() => {
           <small v-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
           <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>
-        <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openPlans">
+        <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" :class="{ 'is-free': billingIsFree }" @click="openPlans">
           <t-icon v-if="billingIsFree" name="arrow-up" /><t-icon v-else name="crown" /><span>{{ billingIsFree ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
         </button>
         <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>

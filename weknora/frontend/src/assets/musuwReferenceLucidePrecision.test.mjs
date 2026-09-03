@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const main = read('./musuw-visual.less')
 const glyphs = read('./musuw-reference-lucide-precision.css')
+const userMenu = read('../components/UserMenu.vue')
 
 test('exact reference glyph layer is the final visual CSS import', () => {
   const glyphIndex = main.indexOf('musuw-reference-lucide-precision.css')
@@ -31,6 +32,19 @@ test('QAPanel and Sidebar bottom menu use exact reference glyph geometry where d
     '.visual-user-menu__item:has(.t-icon-setting)::before',
     '.visual-user-menu__item:has(.t-icon-logout)::before',
   ]) assert.ok(glyphs.includes(token), `missing reference shell glyph contract: ${token}`)
+})
+
+test('billing menu action keeps an explicit icon marker while entitlement loads', () => {
+  assert.match(
+    userMenu,
+    /class="visual-user-menu__item visual-user-menu__billing-item" :class="\{ 'is-free': billingIsFree \}"/,
+  )
+  assert.match(userMenu, /v-if="billingIsFree" name="arrow-up"/)
+  assert.match(userMenu, /v-else name="crown"/)
+  assert.match(glyphs, /\.visual-user-menu__billing-item > \.t-icon,/)
+  assert.match(glyphs, /\.visual-user-menu__billing-item::before,/)
+  assert.match(glyphs, /\.visual-user-menu__billing-item\.is-free::before[\s\S]*?mask-image: var\(--mvp-sparkles\)/)
+  assert.match(glyphs, /\.visual-user-menu__billing-item:not\(\.is-free\)::before[\s\S]*?mask-image: var\(--mvp-crown\)/)
 })
 
 test('glyph translation does not add or call business handlers', () => {

@@ -598,7 +598,12 @@
  * target that root directly while leaving organization/share surfaces alone. */
 body .t-dialog.visual-confirm-dialog,
 body .t-dialog.visual-kb-delete-dialog {
+  box-sizing: border-box !important;
   width: min(440px, calc(100vw - 32px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: calc(100dvh - 32px) !important;
+  padding: 0 !important;
   border-radius: 16px !important;
 }
 body .t-dialog.visual-confirm-dialog .t-dialog__body,

@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
+const emit = defineEmits<{ upload: [] }>()
 </script>
 <template>
-    <div class="empty-dropzone" role="status" aria-live="polite">
+    <button type="button" class="empty-dropzone" @click="emit('upload')">
         <span class="empty-icon" aria-hidden="true">
             <t-icon name="upload" size="20px" />
         </span>
         <span class="empty-txt">{{ $t('knowledgeBase.emptyKnowledgeDragDrop') }}</span>
-        <div class="empty-formats">
+        <span class="empty-formats">
             <span class="empty-type-txt">{{ $t('knowledgeBase.pdfDocFormat') }}</span>
             <span class="empty-format-separator" aria-hidden="true">·</span>
             <span class="empty-type-txt">{{ $t('knowledgeBase.textMarkdownFormat') }}</span>
-        </div>
-    </div>
+        </span>
+    </button>
 </template>
 <style scoped lang="less">
 .empty-dropzone {
@@ -30,6 +31,15 @@ const { t } = useI18n()
     border-radius: 10px;
     background: var(--td-bg-color-container);
     color: var(--td-text-color-secondary);
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+.empty-dropzone:hover,
+.empty-dropzone:focus-visible {
+    border-color: var(--td-component-stroke);
+    outline: none;
 }
 
 .empty-icon {

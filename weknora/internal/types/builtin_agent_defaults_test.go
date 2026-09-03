@@ -126,8 +126,8 @@ func TestBuiltinSmartReasoningUsesUpstreamModeNameWithManagedModelDefaults(t *te
 
 	cfg := smart.Config
 	assert.Equal(t, AgentModeSmartReasoning, cfg.AgentMode)
-	assert.Equal(t, "builtin-deepseek-v4-pro", cfg.ModelID)
-	assert.Equal(t, "builtin-deepseek-v4-pro", cfg.QueryUnderstandModelID)
+	assert.Equal(t, "builtin-deepseek-v4-flash", cfg.ModelID)
+	assert.Equal(t, "builtin-deepseek-v4-flash", cfg.QueryUnderstandModelID)
 	require.NotNil(t, cfg.Thinking)
 	assert.True(t, *cfg.Thinking)
 	assert.Equal(t, "hybrid_rag_wiki_agent", cfg.SystemPromptID)
@@ -162,4 +162,24 @@ func TestBuiltinSmartReasoningUsesUpstreamModeNameWithManagedModelDefaults(t *te
 		assert.Contains(t, cfg.AllowedTools, writeTool)
 	}
 	assert.NotContains(t, cfg.AllowedTools, "execute_skill_script", "skill scripts are enabled by skills_selection_mode, not the regular tool whitelist")
+}
+
+func TestBuiltinAgentsUseDeepSeekV4FlashAsTheirDefaultChatModel(t *testing.T) {
+	configPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+
+	var file builtinAgentsFile
+	require.NoError(t, yaml.Unmarshal(data, &file))
+
+	for _, entry := range file.BuiltinAgents {
+		if entry.Config.ModelID != "" {
+			assert.Equalf(t, "builtin-deepseek-v4-flash", entry.Config.ModelID,
+				"built-in agent %s should use the Lite-safe Flash default", entry.ID)
+		}
+		if entry.Config.QueryUnderstandModelID != "" {
+			assert.Equalf(t, "builtin-deepseek-v4-flash", entry.Config.QueryUnderstandModelID,
+				"built-in agent %s should use the Lite-safe Flash query model", entry.ID)
+		}
+	}
 }

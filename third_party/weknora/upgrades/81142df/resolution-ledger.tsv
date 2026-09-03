@@ -62,7 +62,7 @@ cmd/desktop/main_bindings.go	D	-	000000	0000000000000000000000000000000000000000
 cmd/desktop/prefs.go	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
 cmd/desktop/update.go	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
 cmd/desktop/wails.json	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
-config/builtin_agents.yaml	M	M	100644	72c27f7828a4798a7c74ba1d97b31956ede676ba	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+config/builtin_agents.yaml	M	M	100644	33dcce8b4b629884ccb580857fb1b0cbde876b06	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 config/builtin_models.yaml	A	-	100644	25b3eca7bea042f0cba1bf8ab1f0d82cbcb962d5	preserve-musuw-exact		audited local-only content is byte-identical
 config/config.yaml	M	-	100644	7ca9102c7f55b6a71c13ac975e86184427b86b73	preserve-musuw-exact		audited local-only content is byte-identical
 config/prompt_templates/agent_system_prompt.yaml	M	M	100644	44f51813d39ec30fba521073ce3748261c3ff61c	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
@@ -185,11 +185,11 @@ frontend/src/assets/musuw-final-theme-closure.css	A	-	100644	74d9941d4f6147eea5b
 frontend/src/assets/musuw-guide-reference.css	A	-	100644	036947a3b51e64583026a72fae8cd30f3732a413	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-kb-editor-inner-final.css	A	-	100644	1a713966128ac375623db936c736cda02d374642	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-model-editor-inner-final.css	A	-	100644	e041c0d8412cf65f11d092f09013ac91c920fa80	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/assets/musuw-native-directory-reference.css	A	-	100644	53c5ca70d3b4e0338b02dbf74d6d71812732e85e	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/musuw-native-directory-reference.css	A	-	100644	95fa0d9fa6ebbecb4d6926de3101b68acdc4604d	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuw-onboarding-native.css	A	-	100644	7b2f921587cd58e4b0381d4367ae2a12c72cad0c	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-qapanel-reference-final.css	A	-	100644	7d560bbd215c497f63e5278f7dc1af12460e4e3b	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-reachable-surface-final.css	A	-	100644	c549f4cbc2ccadae25faa9618dd84489a3a8d559	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/assets/musuw-reference-lucide-precision.css	A	-	100644	b00fecd1c8831e56d67e35bfa302035538470fb4	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/assets/musuw-reference-lucide-precision.css	A	-	100644	6f0fdfc13aa3904c31f74fe69239ca2bae5dcb1c	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuw-reference-precision-fixes.css	A	-	100644	4d568ffe0ffba0e53adcdeafdefec361af2de138	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuw-settings-reference-inner.css	A	-	100644	0a34de4b8d46dd9dccbc43248286706690573601	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuw-tdesign-overlay-bridge.css	A	-	100644	f4e109cd55d2b0e8c3badc3fb3dbdcd4b23acfc1	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
@@ -222,7 +222,7 @@ frontend/src/assets/musuwOnboardingNative.test.mjs	A	-	100644	eef0ba4d48c168feff
 frontend/src/assets/musuwReachableSurfaceFinal.test.mjs	A	-	100644	45c97220313ff3a737484dd634d620b86c10196c	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwReferenceBusinessBaseline.test.mjs	A	-	100644	d4ccb824bf24dd53be297506a521688466ef7bbb	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwReferenceBusinessDomContract.test.mjs	A	-	100644	e33162a245b7a8405efeeecbb90056cfe91853f9	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/assets/musuwReferenceLucidePrecision.test.mjs	A	-	100644	efaf905a98f6e53349a332d5d33b2f81709cf44e	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/assets/musuwReferenceLucidePrecision.test.mjs	A	-	100644	eba52c31acd1a08f314c210ddf6a4a68ed5050c6	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwReferencePixelContract.test.mjs	A	-	100644	2e3ffd7c8f37cf504247fe0395cefbad466a9d2d	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwReferencePrecisionFixes.test.mjs	A	-	100644	8c831aa8dc2bdb7f85bf80c4cacb1a7b0b125ce9	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwReferenceSourceTokenContract.test.mjs	A	-	100644	29c74adce07e80b61d7043f3ce08f8d380f8b86d	preserve-musuw-exact		audited local-only content is byte-identical
@@ -276,7 +276,7 @@ frontend/src/components/SkillFilesDrawer.vue	-	A	100644	6f41bc48af830e8866c96d35
 frontend/src/components/SkillFilesPanel.vue	-	A	100644	4434f9a7f699eeb409da17cb702ff1af00f6d80b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/SkillInstallTimeline.vue	-	A	100644	c9bf6d21ce7c5b483af083e641c82bb3af502936	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/TenantModelsGuide.vue	M	-	100644	b416b113b8849b6378b8a03600e0a6bc38235423	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/components/UserMenu.vue	M	-	100644	3a7466ec7ab192c705712abf3dc244194ec4ede0	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/components/UserMenu.vue	M	-	100644	b348b6718d5de93ef98b8d3f4d0e50f7964c4faf	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/chat/ChatQuestionMinimap.test.ts	-	A	100644	bbda23aa11076f938703bd3ffa9d08b16c2a2be6	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/chat/ChatQuestionMinimap.vue	-	A	100644	20d0ec43284415cff917b8979359ddc1ec21e6f9	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/chat/MessageTimestamp.vue	-	A	100644	3972f188d4c60d4116478a401ca4043cfbe98c82	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -287,8 +287,8 @@ frontend/src/components/css/chat-message-shared.less	-	M	100644	f4d1b31437a6ce32
 frontend/src/components/css/chat-resource-chips.less	M	-	100644	8c512a88e1895335ca8bb44863c10fef53f070a2	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/components/doc-content.vue	M	M	100644	190c481481ce1b9822a6efc97dec3f553517e927	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/components/document-preview.vue	M	M	100644	4d3df09d0a1481d0e68d895ed9d339f736e4980e	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-frontend/src/components/empty-knowledge.test.mjs	A	-	100644	277c9950b5d71a40a05d0e2e9a302297c2d08b2a	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/components/empty-knowledge.vue	M	-	100644	671a1a38024108722fcb481233a7a73e45863027	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/components/empty-knowledge.test.mjs	A	-	100644	a9974175be7691b65aebc8e94343e639c00696f6	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/components/empty-knowledge.vue	M	-	100644	aaf4cc6f8faaf225de504eb6b94997892813db8e	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/knowledge-processing-timeline.vue	-	M	100644	8776bc0e64432e37e1d641262d0e522c486d0b3e	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/manual-knowledge-editor.vue	M	-	100644	a11d04657344c18f09ac940824d786aaae6ead5f	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/menu.resource-nav.visual-contract.test.mjs	A	-	100644	c5945ad56f45238f991b478ad049cb516b2de01c	preserve-musuw-exact		audited local-only content is byte-identical
@@ -405,7 +405,7 @@ frontend/src/utils/mermaidStreaming.test.ts	-	A	100644	3e2382c92a1048f8a526dfd08
 frontend/src/utils/mermaidStreaming.ts	-	A	100644	7440fbd32c49c65bff28131cd1ff8565a58ac8f4	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/utils/messageTimestamp.test.ts	-	A	100644	d549eb0e2b7e092607593c6f7bac087146c2a6cf	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/utils/messageTimestamp.ts	-	A	100644	ec3b72e384b327a1638aebad9bc83732c53bc0de	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/utils/modelDefaults.ts	-	A	100644	203c0fbaa8866bc354796d4305b4b83654161d0c	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
+frontend/src/utils/modelDefaults.ts	-	A	100644	92e6815fb47c6d7a749cc7d3d454afdf87159d35	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/utils/nativeAuthHandoff.test.ts	A	-	100644	e90b64a4ccdbb5a5c340935033df346299146064	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/utils/nativeAuthHandoff.ts	A	-	100644	2ea6d4c0a675f25d2c2fc1892c77fa70e68e90b6	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/utils/paddleCheckout.test.mjs	A	-	100644	b8ea23f98bffb592399f5f17e3ca18db6e97299d	preserve-musuw-exact		audited local-only content is byte-identical
@@ -429,8 +429,8 @@ frontend/src/utils/tenantSwitch.ts	-	M	100644	b5dba02bdf70c3c48cdbfab58fc366f2b9
 frontend/src/utils/userFacingAIError.test.ts	A	-	100644	90167ef9c5c276ace6f025a6cb5e068b4766f108	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/utils/userFacingAIError.ts	A	-	100644	734ab4a956c458aba49d0635d2109b414f4bad1e	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/agent/AgentConsumerSurface.visual-contract.test.mjs	A	-	100644	7bc5ec486b770137b1b93d8368ef9a051b64a184	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/views/agent/AgentEditorModal.test.mjs	M	M	100644	4760a517cb1efc9599d6a78ea776f9de1907c6a9	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-frontend/src/views/agent/AgentEditorModal.vue	M	M	100644	1b903237b097801b9ce3dcc367922bae23947914	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/views/agent/AgentEditorModal.test.mjs	M	M	100644	003776c8b76859c34f4e2c33771e722bd7b77e3d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/views/agent/AgentEditorModal.vue	M	M	100644	434f273cf0ec865ceb89ab05773c1c03acfe70f4	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/agent/AgentList.vue	M	M	100644	2357bfeeb911ea291227b23c15d0c6fc86745b7a	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/auth/Login.vue	M	M	100755	5775b07e48473b39d2f76977f67f569eb53c0cf0	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/auth/WorkspaceOnboarding.vue	M	M	100644	b7cbc66457fb6ee3525b4c52b2d24bbfea446fc4	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
@@ -479,8 +479,8 @@ frontend/src/views/integrations/apiKeyScope.test.ts	-	A	100644	47a54c217cdeeb59f
 frontend/src/views/integrations/apiKeyScope.ts	-	A	100644	b4183967c75e85869a4ccc1c92a8ea6717354a0c	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/integrations/apiPlaygroundSSE.test.ts	-	A	100644	524df8f458e187fbc33e36c029e19caeedfec32a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/integrations/apiPlaygroundSSE.ts	-	A	100644	09f2a4eb231025f0e871e6cd034bf468905540be	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/views/knowledge/KnowledgeBase.test.mjs	A	-	100644	21a43691c5f832a3f032e9469c16a6d99fefc376	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/views/knowledge/KnowledgeBase.vue	M	M	100644	f2881771edb04a4dd087d846a9cdd96c8ddfb814	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/views/knowledge/KnowledgeBase.test.mjs	A	-	100644	2e750a3cb2d01d5e7fe67ae60b93189fbfeabbbd	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/views/knowledge/KnowledgeBase.vue	M	M	100644	c8556356750d7441fb8b1ed1fbb800784f276044	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/knowledge/KnowledgeBaseCreateVisibleStrategy.test.mjs	A	-	100644	2e17dfe3cd3557073b39690eebe4cf95f132b15c	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/knowledge/KnowledgeBaseDuplicateNativeCopy.test.mjs	A	-	100644	2ec7f9e5e18d40cd25c80d127737bbd78e1543a9	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/knowledge/KnowledgeBaseEditorModal.consumerScene.test.mjs	A	-	100644	226b4d56d562bc7ad1e1232ea982546f4e09554e	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
@@ -505,7 +505,7 @@ frontend/src/views/knowledge/components/KbFolderTree.test.ts	M	M	100644	6ac39b98
 frontend/src/views/knowledge/components/KbFolderTree.vue	M	-	100644	472761f627494758cc0dae7fba0a0520af65a682	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/knowledge/components/KbTagManageDrawer.vue	M	-	100644	228cff1cb39d5c7b115cd440e24f547655b7e529	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/knowledge/components/KbUploadSourceDropdown.share-input.test.mjs	A	-	100644	adf40c302851e65d5a7b6d872f9959b74aab0fe9	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue	M	-	100644	ca7aabab13f0d9dec361dd4eb8900c4d73d144fa	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue	M	-	100644	60817ee2d8152c1b0409b7fc4fe4fee00c1f2967	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/knowledge/components/KnowledgeBaseListReferenceCard.test.mjs	A	-	100644	3321ce0ad12351563ea8853b32e59136174658b9	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/knowledge/components/KnowledgeBaseListReferenceCard.vue	A	-	100644	cd94ca1184e12664d19d8b18c117392d82d1923e	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/knowledge/components/TagEditDialog.test.ts	M	-	100644	04a93c89bd54bbb425a0e1d4414f98ad3d8a6ef5	preserve-musuw-exact		audited local-only content is byte-identical
@@ -1325,7 +1325,7 @@ internal/types/agent_test.go	-	M	100644	47006e45d1bc875b525cf33cf50f56af0a970400
 internal/types/audit_log.go	M	M	100644	376e2e62e94cce750ca3847c8a401f5a75aa09fa	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/types/audit_log_test.go	-	M	100644	d4a38cdec1df3bd175719adbff807ce292c55ebd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/types/builtin_agent_config.go	-	M	100644	bd7899edd70b7052c38c88a4eceda7aec5ed99a9	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/types/builtin_agent_defaults_test.go	A	-	100644	46acdd8c22daaa1f7c524d3984b35864e7902cf1	preserve-musuw-exact		audited local-only content is byte-identical
+internal/types/builtin_agent_defaults_test.go	A	-	100644	845a4991fdf0355350868f95dc6687072333ad2e	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/types/builtin_agent_localization_test.go	-	A	100644	83151ba26e3066d2610583da7157ae78b0315fb0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/types/builtin_models_config.go	M	-	100644	473e9518b2f15aafa15c49a25090123b7f4f1724	preserve-musuw-exact		audited local-only content is byte-identical
 internal/types/builtin_models_config_test.go	M	-	100644	3a117b86cce198abc0cd5f8b4f9e6eac0b38431b	preserve-musuw-exact		audited local-only content is byte-identical

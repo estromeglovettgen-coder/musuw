@@ -135,6 +135,7 @@
 .visual-user-menu__item:has(.t-icon-chart-line) > .t-icon,
 .visual-user-menu__item:has(.t-icon-arrow-up) > .t-icon,
 .visual-user-menu__item:has(.t-icon-crown) > .t-icon,
+.visual-user-menu__billing-item > .t-icon,
 .visual-settings-close > .t-icon,
 .visual-model-selector__consumer-control > .t-icon,
 .visual-model-selector__consumer-check > .t-icon,
@@ -145,6 +146,7 @@
 .visual-user-menu__item:has(.t-icon-chart-line)::before,
 .visual-user-menu__item:has(.t-icon-arrow-up)::before,
 .visual-user-menu__item:has(.t-icon-crown)::before,
+.visual-user-menu__billing-item::before,
 .visual-settings-close::before,
 .visual-model-selector__consumer-control::after,
 .visual-model-selector__consumer-check::before,
@@ -179,6 +181,21 @@
   mask-image: var(--mvp-sparkles);
 }
 .visual-user-menu__item:has(.t-icon-crown)::before {
+  width: 16px;
+  height: 16px;
+  -webkit-mask-image: var(--mvp-crown);
+  mask-image: var(--mvp-crown);
+}
+/* Keep the billing affordance visible even while TDesign is resolving the
+ * dynamic icon name. The button state is the stable semantic marker; the
+ * existing reference masks supply the same glyphs as the other menu rows. */
+.visual-user-menu__billing-item.is-free::before {
+  width: 16px;
+  height: 16px;
+  -webkit-mask-image: var(--mvp-sparkles);
+  mask-image: var(--mvp-sparkles);
+}
+.visual-user-menu__billing-item:not(.is-free)::before {
   width: 16px;
   height: 16px;
   -webkit-mask-image: var(--mvp-crown);

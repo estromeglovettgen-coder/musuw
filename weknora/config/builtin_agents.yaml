@@ -79,9 +79,9 @@ builtin_agents:
         description: "ReAct 추론 프레임워크, 다단계 사고 및 도구 호출 지원"
     config:
       agent_mode: "smart-reasoning"
-      model_id: "builtin-deepseek-v4-pro"
+      model_id: "builtin-deepseek-v4-flash"
       rerank_model_id: "builtin-openrouter-rerank"
-      query_understand_model_id: "builtin-deepseek-v4-pro"
+      query_understand_model_id: "builtin-deepseek-v4-flash"
       vlm_model_id: "builtin-openrouter-vlm"
       asr_model_id: "builtin-openrouter-asr"
       thinking: true
@@ -156,9 +156,9 @@ builtin_agents:
         description: "CSV/Excel 파일에 대한 SQL 쿼리 및 통계 분석을 지원하는 전문 데이터 분석 에이전트"
     config:
       agent_mode: "smart-reasoning"
-      model_id: "builtin-deepseek-v4-pro"
+      model_id: "builtin-deepseek-v4-flash"
       rerank_model_id: "builtin-openrouter-rerank"
-      query_understand_model_id: "builtin-deepseek-v4-pro"
+      query_understand_model_id: "builtin-deepseek-v4-flash"
       vlm_model_id: "builtin-openrouter-vlm"
       asr_model_id: "builtin-openrouter-asr"
       thinking: true
@@ -207,9 +207,9 @@ builtin_agents:
         description: "위키 지식 베이스에서 답변하는 데 특화된 에이전트"
     config:
       agent_mode: "smart-reasoning"
-      model_id: "builtin-deepseek-v4-pro"
+      model_id: "builtin-deepseek-v4-flash"
       rerank_model_id: "builtin-openrouter-rerank"
-      query_understand_model_id: "builtin-deepseek-v4-pro"
+      query_understand_model_id: "builtin-deepseek-v4-flash"
       vlm_model_id: "builtin-openrouter-vlm"
       asr_model_id: "builtin-openrouter-asr"
       thinking: true
@@ -257,9 +257,9 @@ builtin_agents:
         description: "검사 문제를 기반으로 Wiki 페이지를 修復하고 最適化하는 전용 에이전트"
     config:
       agent_mode: "smart-reasoning"
-      model_id: "builtin-deepseek-v4-pro"
+      model_id: "builtin-deepseek-v4-flash"
       rerank_model_id: "builtin-openrouter-rerank"
-      query_understand_model_id: "builtin-deepseek-v4-pro"
+      query_understand_model_id: "builtin-deepseek-v4-flash"
       vlm_model_id: "builtin-openrouter-vlm"
       asr_model_id: "builtin-openrouter-asr"
       thinking: true

@@ -18,8 +18,12 @@ test("knowledge detail keeps the compact reference toolbar without the user-hidd
   assert.doesNotMatch(source, /visual-knowledge-date|<t-date-range-picker/);
 });
 
-test("knowledge detail uses the restrained document empty state component", () => {
-  assert.match(source, /class="visual-knowledge-empty"[\s\S]*?<EmptyKnowledge v-else \/>/);
+test("knowledge detail lets the empty state open the existing document picker", () => {
+  assert.match(source, /class="visual-knowledge-empty"[\s\S]*?<EmptyKnowledge v-else @upload="uploadSourceRef\?\.openFileDialog\(\)" \/>/);
+  assert.match(
+    readFileSync(new URL("./components/KbUploadSourceDropdown.vue", import.meta.url), "utf8"),
+    /defineExpose\(\{\s*openFileDialog,\s*openUrlDialog\s*\}\)/,
+  );
 });
 
 test("graph view keeps the original layout chrome instead of inheriting document-only spacing", () => {

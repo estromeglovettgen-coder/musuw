@@ -1789,6 +1789,7 @@ import {
 } from '@/config/contextualGuides';
 import { useI18n } from 'vue-i18n';
 import { selectInitialModelId } from '@/utils/modelDefaults';
+import { DEFAULT_CHAT_MODEL_ID } from '@/utils/managedChatModels';
 import { copyWithToast } from '@/utils/clipboard';
 import { nextAvailableLocalizedName } from '@/utils/localizedDefaultName';
 import { MessagePlugin } from 'tdesign-vue-next';
@@ -2743,7 +2744,7 @@ const removeStarterSuggestion = (index: number) => {
 
 const applyDefaultModelsIfEmpty = () => {
   if (props.mode !== 'create' || !formData.value) return
-  const chatModelId = selectInitialModelId(allModels.value, 'KnowledgeQA')
+  const chatModelId = selectInitialModelId(allModels.value, 'KnowledgeQA', DEFAULT_CHAT_MODEL_ID)
   const rerankCatalogModelId = selectInitialModelId(allModels.value, 'Rerank')
   const vlmCatalogModelId = selectInitialModelId(allModels.value, 'VLLM')
   const asrCatalogModelId = selectInitialModelId(allModels.value, 'ASR')
@@ -3435,15 +3436,12 @@ watch(() => props.visible, async (val) => {
         if (defaultTypeId && defaultTypeId !== 'custom') {
           applyAgentTypePreset(preset);
         }
-        // 给新建表单补上"我的 XXX"默认名 + 预设描述，让用户可直接保存；
-        // 用户输入过的值不会被覆盖（此处是新建场景，字段必定为空）。
+        // 给新建表单补上"我的 XXX"默认名，让用户可直接保存；
+        // 描述保持为空，由用户按需填写。
         if (!formData.value.name) {
           if (!authStore.isLiteMode) {
             formData.value.name = getPresetDefaultName(preset);
           }
-        }
-        if (!formData.value.description) {
-          formData.value.description = getPresetDefaultDescription(preset);
         }
       }
       // Lite always starts a personal agent with a saveable name, regardless
