@@ -185,7 +185,7 @@ frontend/src/assets/musuw-final-theme-closure.css	A	-	100644	ca644a4e8ea34a8a604
 frontend/src/assets/musuw-guide-reference.css	A	-	100644	036947a3b51e64583026a72fae8cd30f3732a413	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-kb-editor-inner-final.css	A	-	100644	1a713966128ac375623db936c736cda02d374642	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-model-editor-inner-final.css	A	-	100644	e041c0d8412cf65f11d092f09013ac91c920fa80	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/assets/musuw-native-directory-reference.css	A	-	100644	2fbaaf9ada2b83c6b6b51fc2414c140aa4e68928	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/musuw-native-directory-reference.css	A	-	100644	53c5ca70d3b4e0338b02dbf74d6d71812732e85e	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuw-onboarding-native.css	A	-	100644	7b2f921587cd58e4b0381d4367ae2a12c72cad0c	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-qapanel-reference-final.css	A	-	100644	7d560bbd215c497f63e5278f7dc1af12460e4e3b	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuw-reachable-surface-final.css	A	-	100644	c549f4cbc2ccadae25faa9618dd84489a3a8d559	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract

@@ -22,6 +22,11 @@ test('Agent and knowledge-base directories share the same shell geometry', () =>
 
   assert.match(knowledgeBaseList, /\.visual-kb-list\s*\{[\s\S]*?gap:\s*18px;/)
   assert.match(knowledgeBaseList, /\.visual-kb-list__header\s*\{[\s\S]*?padding-bottom:\s*20px;[\s\S]*?border-bottom:\s*1px solid/)
+  assert.match(
+    directoryReference,
+    /\.agent-list-content > \.header,[\s\S]*?\.org-list-content > \.header\s*\{[\s\S]*?flex:\s*0 0 auto\s*!important;/,
+    'Agent header must not flex-shrink its divider above overflowing title or toolbar content',
+  )
   assert.match(knowledgeBaseList, /\.visual-kb-list__content\s*\{[\s\S]*?padding:\s*24px 4px 12px 2px;/)
   assert.match(knowledgeBaseList, /@media\s*\(min-width:\s*768px\)[\s\S]*?\.visual-kb-list\s*\{\s*padding:\s*32px;/)
   assert.match(knowledgeBaseList, /@media\s*\(min-width:\s*1024px\)[\s\S]*?\.visual-kb-grid[\s\S]*?repeat\(3,minmax\(0,1fr\)\)/)

@@ -90,6 +90,7 @@
 }
 .agent-list-content > .header,
 .org-list-content > .header {
+  flex: 0 0 auto !important;
   min-height: 0 !important;
   margin: 0 !important;
   padding: 0 0 20px !important;
