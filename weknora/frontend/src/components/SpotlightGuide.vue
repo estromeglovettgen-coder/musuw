@@ -13,7 +13,9 @@
 
         <div v-if="hole" class="guide__ring" :style="ringStyle" aria-hidden="true" />
 
-        <div ref="cardRef" class="guide__card" :class="{ 'guide__card--center': !hole }" :style="cardStyle">
+        <div ref="cardRef" class="guide__card"
+          :class="{ 'guide__card--center': !hole, 'guide__card--interact': step.interact }"
+          :style="cardStyle">
           <button type="button" class="guide__close" :aria-label="t(`${labelsPrefix}.skip`)" @click="dismiss">
             <t-icon name="close" size="18px" />
           </button>
@@ -638,7 +640,9 @@ defineExpose({ open, close })
 }
 
 @media (max-width: 720px) {
-  .guide__card {
+  // Keep the compact bottom-dock for informational steps. Interactive steps
+  // must retain their computed placement so the native target stays exposed.
+  .guide__card:not(.guide__card--interact) {
     left: 16px !important;
     right: 16px;
     width: auto !important;
