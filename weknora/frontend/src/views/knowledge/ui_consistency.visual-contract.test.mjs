@@ -53,6 +53,11 @@ test('Agent directory uses the KnowledgeBase header cadence and page surface', (
   )
   assert.match(
     finalTheme,
+    /\.visual-kb-workspace\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
+    'the late theme owner must not repaint the KnowledgeBase shell as a card surface',
+  )
+  assert.match(
+    finalTheme,
     /\.agent-list-container,[\s\S]*?\.agent-list-content\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
     'late dark-theme closure must keep the Agent shell on the shared page token',
   )

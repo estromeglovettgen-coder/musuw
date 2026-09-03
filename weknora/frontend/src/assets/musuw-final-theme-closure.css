@@ -73,7 +73,9 @@
   .visual-document-list__mono { color: var(--mvc-muted) !important; }
 
   /* Knowledge-list native scope/status additions. */
-  .visual-kb-workspace,
+  .visual-kb-workspace {
+    background: var(--mvc-page) !important;
+  }
   .visual-kb-warning,
   .visual-kb-upload-status article,
   .visual-shared-detail,
