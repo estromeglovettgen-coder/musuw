@@ -466,23 +466,25 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
                   <t-icon name="chevron-left" size="16px" />
                   <span>{{ $t('knowledgeBase.moveToKnowledgeBase') }}</span>
                 </button>
-                <div v-if="moveTargetsLoading" class="visual-list-menu__state"><t-loading size="small" /></div>
-                <div v-else-if="moveTargetKbs.length === 0" class="visual-list-menu__state">
-                  {{ $t('knowledgeBase.moveNoTargets') }}
+                <div class="visual-list-menu__targets">
+                  <div v-if="moveTargetsLoading" class="visual-list-menu__state"><t-loading size="small" /></div>
+                  <div v-else-if="moveTargetKbs.length === 0" class="visual-list-menu__state">
+                    {{ $t('knowledgeBase.moveNoTargets') }}
+                  </div>
+                  <template v-else>
+                    <button
+                      v-for="kb in moveTargetKbs"
+                      :key="kb.id"
+                      type="button"
+                      class="visual-list-menu__target"
+                      @click.stop="emit('move-select-target', kb)"
+                    >
+                      <t-icon name="root-list" />
+                      <span class="visual-list-menu__target-name">{{ kb.name }}</span>
+                      <small v-if="kb.knowledge_count !== undefined" class="visual-list-menu__target-count">{{ kb.knowledge_count }}</small>
+                    </button>
+                  </template>
                 </div>
-                <template v-else>
-                  <button
-                    v-for="kb in moveTargetKbs"
-                    :key="kb.id"
-                    type="button"
-                    class="visual-list-menu__target"
-                    @click.stop="emit('move-select-target', kb)"
-                  >
-                    <t-icon name="root-list" />
-                    <span>{{ kb.name }}</span>
-                    <small v-if="kb.knowledge_count !== undefined">{{ kb.knowledge_count }}</small>
-                  </button>
-                </template>
               </div>
 
               <div v-else-if="moveMenuMode === 'confirm'" class="visual-list-menu visual-list-menu--move">
@@ -493,7 +495,7 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
                 <div class="visual-list-menu__confirm">
                   <div class="visual-list-menu__destination">
                     <t-icon name="arrow-right" size="14px" />
-                    <span>{{ moveSelectedTargetName }}</span>
+                    <span class="visual-list-menu__destination-name">{{ moveSelectedTargetName }}</span>
                   </div>
                   <button
                     type="button"
@@ -847,17 +849,27 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
 }
 
 .visual-list-menu--move {
-  width: 300px;
-  padding: 6px;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: visible;
 }
 
 .visual-list-menu__back,
 .visual-list-menu__target {
   width: 100%;
-  min-height: 34px;
-  padding: 7px 8px;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -865,23 +877,185 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
   color: #374151;
   font: inherit;
   font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.visual-list-menu__back:hover,
+.visual-list-menu__back:focus-visible,
+.visual-list-menu__target:hover,
+.visual-list-menu__target:focus-visible {
+  outline: none;
+  background: #f9fafb;
+  color: #111827;
+}
+
+.visual-list-menu__back span {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.visual-list-menu__targets {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+.visual-list-menu__state {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.visual-list-menu__target-name,
+.visual-list-menu__destination-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-list-menu__target-count {
+  flex: 0 0 auto;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.visual-list-menu__confirm {
+  padding: 6px 2px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.visual-list-menu__destination {
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.visual-list-menu__mode {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
   text-align: left;
   cursor: pointer;
 }
 
-.visual-list-menu__back:hover,
-.visual-list-menu__target:hover { background: #f3f4f6; }
-.visual-list-menu__target span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.visual-list-menu__target small { color: #9ca3af; }
-.visual-list-menu__state { padding: 16px 8px; text-align: center; color: #9ca3af; font-size: 12px; }
-.visual-list-menu__confirm { display: flex; flex-direction: column; gap: 8px; padding: 6px 2px 2px; }
-.visual-list-menu__destination { padding: 8px; border-radius: 8px; display: flex; gap: 7px; background: #f9fafb; color: #374151; font-size: 12px; }
-.visual-list-menu__mode { width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: flex-start; gap: 8px; background: #fff; text-align: left; cursor: pointer; }
-.visual-list-menu__mode.is-active { border-color: #9ca3af; background: #f9fafb; }
-.visual-list-menu__mode > span { display: flex; flex-direction: column; gap: 2px; }
-.visual-list-menu__mode strong { color: #1f2937; font-size: 12px; }
-.visual-list-menu__mode small { color: #9ca3af; font-size: 10px; line-height: 1.45; }
-.visual-list-menu__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.visual-list-menu__mode:hover,
+.visual-list-menu__mode.is-active {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.visual-list-menu__mode > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.visual-list-menu__mode strong {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.visual-list-menu__mode small {
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.visual-list-menu__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* The popup component contributes the canonical panel and the only scroll
+ * container. Keep move content on that authority surface and flatten
+ * FolderPickerMenu when it is nested here. */
+:global(.card-more .t-popup__content:has(> .visual-list-menu--move)) {
+  width: 288px !important;
+  max-width: min(288px, calc(100vw - 32px)) !important;
+  max-height: 256px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 6px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%) !important;
+}
+
+:global(:root[theme-mode="dark"] body .card-more .t-popup__content:has(> .visual-list-menu--move)) {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+
+.visual-list-menu--move :deep(.visual-folder-picker) {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.visual-list-menu--move :deep(.visual-folder-picker__list) {
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+@media (min-width: 640px) {
+  .visual-list-menu__back,
+  .visual-list-menu__target,
+  .visual-list-menu__destination,
+  .visual-list-menu__mode {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
 
 @keyframes visual-list-spin { to { transform: rotate(360deg); } }
 

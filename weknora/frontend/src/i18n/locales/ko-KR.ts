@@ -829,6 +829,8 @@ export default {
     }
   },
   agentEditor: {
+    defaultName: '내 에이전트',
+    defaultNameWithIndex: '{name} ({index})',
     builtinHint: '내장 에이전트입니다. 이름과 설명은 수정할 수 없지만, 설정 매개변수는 조정할 수 있습니다.',
     fileTypes: {
       label: '지원 파일 유형',
@@ -1112,7 +1114,7 @@ export default {
       historyRounds: '컨텍스트로 유지할 최근 대화 라운드 수',
       retainRetrievalHistory: '이전 턴의 지식베이스 검색 결과를 유지합니다. 끄면 매 턴 새로 검색합니다',
       rewrite: '다중 턴 대화에서 사용자 질문을 자동으로 재작성하여 지시대명사 해소 및 생략 보완',
-      memoryEnabled: '이 에이전트가 장기 기억을 읽고 추가하도록 허용합니다. 끄면 이 에이전트와의 대화에서 기억을 읽지도, 새로 추가하지도 않습니다. 공간 또는 개인 설정이 꺼져 있으면 여기서 켜도 적용되지 않습니다',
+      memoryEnabled: '이 에이전트가 장기 기억을 읽고 추가하도록 허용합니다. 끄면 이 에이전트와의 대화에서 기억을 읽지도, 새로 추가하지도 않습니다. 설정에서 장기 기억을 끈 경우 여기서 켜도 적용되지 않습니다',
       queryUnderstandModel: '질문 이해(재작성과 의도 분류)에 사용할 모델입니다. 비워 두면 기본 대화 모델을 사용합니다.',
       rewriteSystemPrompt: '질문 재작성용 시스템 프롬프트 (비워두면 기본값 사용)',
       rewriteUserPrompt: '질문 재작성용 사용자 프롬프트 템플릿 (비워두면 기본값 사용)',
@@ -4136,6 +4138,8 @@ export default {
       typeDescription: 'FAQ 유형은 구조화된 Q&A 데이터에 적합합니다. 문서 유형은 파일 파싱과 청킹을 지원합니다. Wiki 유형은 LLM을 통해 상호 연결된 지식 페이지를 자동으로 구축합니다.',
       nameLabel: '지식베이스 이름',
       namePlaceholder: '지식베이스 이름을 입력해주세요',
+      defaultName: '내 지식베이스',
+      defaultNameWithIndex: '{name} ({index})',
       descriptionLabel: '지식베이스 설명(선택)',
       descriptionPlaceholder: '지식베이스 설명을 입력해주세요 (선택)'
     },
@@ -4921,7 +4925,7 @@ export default {
   memorySettings: {
     title: '내 기억',
     description: '어시스턴트가 대화를 넘어 기억하고 있는 내용입니다. 언제든지 확인, 수정, 삭제할 수 있으며 삭제한 기억은 다시 사용되지 않습니다.',
-    workspaceDisabled: '이 워크스페이스에서는 장기 기억이 꺼져 있습니다. 관리자가 켜야 이 스위치가 적용됩니다.',
+    workspaceDisabled: '장기 기억이 아직 켜지지 않았습니다. 장기 기억을 켜면 이 스위치가 적용됩니다.',
     enableLabel: '내 장기 기억 사용',
     enableDescription: '끄면 어시스턴트가 기억을 읽거나 추가하지 않습니다. 기존 기억은 유지되며 다시 켜면 계속 사용됩니다.',
     agentDisabledHint: '개별 에이전트도 장기 기억을 따로 끌 수 있습니다. 꺼 둔 에이전트와의 대화에서는 기억을 읽지도 추가하지도 않으며, 다른 에이전트는 영향을 받지 않습니다.',
@@ -4974,7 +4978,7 @@ export default {
     trackingHint: '반복해서 묻고 있지만 아직 「장기 관심사」가 될 횟수에 도달하지 않은 주제입니다. 그때까지는 대화에 사용되지 않습니다.',
     documentsHint: '답변에 반복해서 등장하는 문서이며, 검색이 조금 더 이쪽을 선호합니다. 추적을 멈추면 가중치가 사라지고, 두 번 더 인용되면 다시 나타납니다.',
     supersededHint: '이 내용은 새로 갱신된 기억으로 대체되어 대화에 다시 들어가지 않으며, 변경 기록으로만 남습니다.',
-    archivedHint: '보관된 기억은 대화에 다시 들어가지 않습니다. 인당 한도를 넘으면 덜 쓰인 항목이 자동으로 접힙니다.',
+    archivedHint: '보관된 기억은 대화에 다시 들어가지 않습니다. 기억 한도를 넘으면 덜 쓰인 항목이 자동으로 접힙니다.',
     pendingEmptyTitle: '확인할 항목이 없습니다',
     pendingEmptyDescription: '질문에서 사용자에 대해 추론한 내용이 생기면 여기에서 확인을 기다립니다.',
     trackingEmptyTitle: '관찰 중인 주제가 없습니다',
@@ -5110,20 +5114,20 @@ export default {
   },
   memoryWorkspaceSettings: {
     title: '장기 기억',
-    description: '구성원이 말한 개인 정보, 선호, 사실, 진행 중인 일을 어시스턴트가 대화를 넘어 기억하도록 합니다.',
+    description: '대화 속 개인 정보, 선호, 사실, 진행 중인 일을 어시스턴트가 대화를 넘어 기억하도록 합니다.',
     loadError: '장기 기억 설정을 불러오지 못했습니다. 다시 시도해 주세요.',
     introTitle: '기본값은 꺼짐이며 직접 켜야 합니다',
-    introDescription: '장기 기억은 구성원이 대화에서 말한 내용을 보관하므로 기본으로 켜지지 않습니다. 켜면 구성원마다 기억 공간이 분리되며 "내 기억"에서 확인, 수정, 삭제하거나 전체를 끌 수 있습니다. 사용 중인 내 정보와 선호는 이후 매 턴에 들어가고, 사실과 진행 중인 일은 질문과 관련될 때만 불러옵니다.',
-    enableLabel: '이 워크스페이스에서 장기 기억 사용',
-    enableDescription: '끄면 이 워크스페이스의 모든 대화가 기억을 읽거나 쓰지 않습니다.',
+    introDescription: '장기 기억은 대화에서 말한 내용을 보관하므로 기본으로 켜지지 않습니다. 켜면 "내 기억"에서 확인, 수정, 삭제하거나 전체를 끌 수 있습니다. 사용 중인 내 정보와 선호는 이후 매 턴에 들어가고, 사실과 진행 중인 일은 질문과 관련될 때만 불러옵니다.',
+    enableLabel: '장기 기억 사용',
+    enableDescription: '끄면 대화가 기억을 읽거나 쓰지 않습니다.',
     writeModeLabel: '기억 저장 방식',
     writeModeDescription: '무엇을 기억할지 결정합니다.',
     writeModeExplicit: '명시적 요청만',
     writeModeAuto: '자동 정리',
-    writeModeExplicitHint: '구성원이 명시적으로 기억을 요청한 내용과 기억 페이지에서 직접 추가한 항목만 저장하며 추가 모델 호출이 없습니다.',
-    writeModeAutoHint: '여기에 더해 대화가 끝난 뒤 백그라운드에서 모델을 한 번 호출해 구성원이 한 말에서 오래 남길 내용을 정리합니다.',
+    writeModeExplicitHint: '명시적으로 기억을 요청한 내용과 기억 페이지에서 직접 추가한 항목만 저장하며 추가 모델 호출이 없습니다.',
+    writeModeAutoHint: '여기에 더해 대화가 끝난 뒤 백그라운드에서 모델을 한 번 호출해 오래 남길 내용을 정리합니다.',
     advancedLabel: '고급 설정',
-    advancedDescription: '모델, 의미 기반 검색, 자동 정리 매개변수입니다. 대부분의 공간은 기본값을 그대로 사용해도 됩니다.',
+    advancedDescription: '모델, 의미 기반 검색, 자동 정리 매개변수입니다. 일상적인 사용에는 기본값이 적합합니다.',
     autoOnlyHint: '“자동 정리”로 전환하면 이 항목을 설정할 수 있습니다.',
     vectorOnlyHint: '“의미로 기억 검색”을 켜면 이 모델을 선택할 수 있습니다.',
     extractModelLabel: '정리 모델',
@@ -5131,7 +5135,7 @@ export default {
     extractDelayLabel: '정리 지연',
     extractDelayDescription: '대화가 끝난 뒤 정리를 시작하기까지의 대기 시간입니다. 잠시 기다리면 사용자가 연달아 보낸 여러 메시지를 모델 호출 한 번으로 처리할 수 있습니다.',
     extractMinIntervalLabel: '정리 간 최소 간격',
-    extractMinIntervalDescription: '같은 사람에 대한 두 번의 정리 사이 최소 간격으로, 비용을 제한합니다. 간격 안에 생긴 메시지는 버려지지 않고 다음 정리로 넘어갑니다.',
+    extractMinIntervalDescription: '두 번의 정리 사이 최소 간격으로 비용을 제한합니다. 간격 안에 생긴 메시지는 버려지지 않고 다음 정리로 넘어갑니다.',
     vectorRecallLabel: '의미로 기억 검색',
     vectorRecallDescription: '표현이 아니라 의미로도 검색합니다. 사용자가 다르게 표현해도 기존 기억을 찾을 수 있습니다. 턴마다 임베딩 호출이 한 번 추가되며, 시간 초과 시 표현 기반 검색으로 되돌아갑니다.',
     embeddingModelLabel: '기억 Embedding 모델',
@@ -5141,9 +5145,9 @@ export default {
     interestThresholdLabel: '장기 관심사가 되기까지의 질문 수',
     interestThresholdDescription: '같은 주제가 이만큼 반복된 뒤에야 기록됩니다. 1로 두면 스쳐 가는 질문까지 모두 기록되어 보통 너무 시끄럽습니다.',
     instructionsLabel: '사용자 정의 정리 규칙',
-    instructionsDescription: '정리 프롬프트에 덧붙는 워크스페이스 규칙으로, 제품이 알 수 없는 정책을 표현합니다. 예: "고객 이름은 절대 기록하지 않는다".',
+    instructionsDescription: '정리 프롬프트에 덧붙는 사용자 정의 규칙으로, 제품이 알 수 없는 정책을 표현합니다. 예: "고객 이름은 절대 기록하지 않는다".',
     instructionsPlaceholder: '한 줄에 규칙 하나, 예: 고객 이름은 기록하지 않기',
-    maxItemsLabel: '구성원당 기억 상한',
+    maxItemsLabel: '기억 상한',
     maxItemsDescription: '초과하면 중요도와 사용 시점이 낮은 항목부터 보관 처리되며 "내 기억"에서 계속 확인할 수 있습니다.',
     toasts: {
       saveSuccess: '장기 기억 설정을 저장했습니다',
@@ -6642,6 +6646,10 @@ export default {
     interactHint: '강조된 영역을 클릭하여 계속하세요',
     chat: {
       steps: {
+        picker: {
+          title: '답변 방식 선택',
+          desc: '여기에서 에이전트, 모델, 사고 강도를 선택합니다. 일부 고급 모델은 요금제 업그레이드가 필요하며 사용 전에 명확히 안내합니다.'
+        },
         done: {
           title: '이제 탐색해 보세요',
           desc: '업로드한 문서와 관련된 질문을 해 보고, 인용이 포함된 답변을 확인해 보세요.'
@@ -6666,9 +6674,13 @@ export default {
           title: '분석 후 사용 가능',
           desc: '문서가 색인되면 대화에서 {\'@\'}로 이 지식 베이스를 지정해 출처가 포함된 답변을 받을 수 있습니다.'
         },
-        upload: {
+        uploadFile: {
           title: '문서 추가',
-          desc: '여기에서 파일이나 웹 링크를 추가하면 Musuw가 자동으로 분석하고 인덱싱합니다.'
+          desc: '지원되는 파일을 업로드하거나 끌어오면 Musuw가 자동으로 분석하고 인덱싱합니다.'
+        },
+        uploadUrl: {
+          title: '웹페이지 가져오기',
+          desc: '공개 웹페이지나 소셜 미디어 링크는 여기에서 가져옵니다. 기존 요금제 규칙은 사용 전에 안내됩니다.'
         },
         intro: {
           title: '지식 베이스가 비어 있습니다',
@@ -6758,6 +6770,14 @@ export default {
     },
     kbCreate: {
       steps: {
+        nameLite: {
+          title: '지식베이스 이름 확인',
+          desc: '바로 쓸 수 있는 이름이 입력되어 있습니다. 그대로 사용하거나 알아보기 쉬운 이름으로 바꾸세요.'
+        },
+        submitLite: {
+          title: '지식베이스 만들기',
+          desc: '강조된 「만들기」 버튼을 누르세요. 다음 페이지에서 첫 자료를 추가할 수 있습니다.'
+        },
         submit: {
           title: '지식 베이스 생성',
           desc: '유형·이름·모델을 확인한 뒤 강조된 「생성」을 클릭하세요. 이후 첫 문서 업로드를 안내합니다.'
@@ -6870,7 +6890,7 @@ export default {
     steps: {
       doneLite: {
         title: '이제 시작하세요',
-        desc: '질문 하나를 하거나 자료 하나를 추가하면 됩니다. 이름 옆 물음표에서 언제든 이 가이드를 다시 열 수 있습니다.'
+        desc: '질문 하나를 하거나 자료 하나를 추가하면 됩니다. 다음 페이지에서는 필요한 위치에서 이어서 안내합니다.'
       },
       agentsLite: {
         title: '알맞은 에이전트 선택',

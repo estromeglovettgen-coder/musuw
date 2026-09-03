@@ -88,10 +88,10 @@
                 <label class="add-field">
                   <span class="add-label">{{ t('memorySettings.addKindLabel') }}</span>
                   <t-select
+                    class="visual-scene-select"
                     v-model="draftKind"
                     size="small"
                     :disabled="creating"
-                    :popup-props="{ overlayClassName: 'memory-add-kind-popup' }"
                   >
                     <t-option v-for="kind in kinds" :key="kind" :value="kind" :label="kindLabel(kind)" />
                   </t-select>
@@ -1251,11 +1251,6 @@ onMounted(async () => {
     justify-content: flex-end;
     gap: 8px;
   }
-}
-
-/* The kind dropdown mounts to body too, above the popup that opened it. */
-.memory-add-kind-popup {
-  z-index: 6200;
 }
 
 :root[theme-mode='dark'] .memory-add-popup-overlay .t-popup__content {

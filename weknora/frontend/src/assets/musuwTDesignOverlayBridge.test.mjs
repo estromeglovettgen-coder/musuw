@@ -100,9 +100,19 @@ test('select overlays paint one scene-model panel instead of nested surfaces', (
     /body \.t-select__dropdown:not\([^\{]+\)\s*>\s*\.t-popup__content\s*\{([\s\S]*?)\n\}/,
   )?.[1] || ''
   assert.match(content, /padding:\s*6px\s*!important;/)
+  assert.match(content, /width:\s*288px\s*!important;/)
+  assert.match(content, /max-height:\s*256px\s*!important;/)
   assert.match(content, /border:\s*1px solid #e5e7eb\s*!important;/)
   assert.match(content, /border-radius:\s*16px\s*!important;/)
   assert.match(content, /background:\s*#fff\s*!important;/)
+
+  const list = css.match(
+    /\.t-select__dropdown:not\([^\{]+\)\s*>\s*\.t-popup__content \.t-select__list\s*\{([\s\S]*?)\n\}/,
+  )?.[1] || ''
+  assert.match(list, /overflow:\s*visible\s*!important;/)
+  assert.match(list, /background:\s*transparent\s*!important;/)
+  assert.match(css, /\.t-select__dropdown:not\([^\{]+\) \.t-select-option\s*\{[\s\S]*?width:\s*100%\s*!important;/)
+  assert.match(css, /\.t-select__dropdown:not\([^\{]+\) \.t-select-option__content\s*\{[\s\S]*?font-size:\s*inherit\s*!important;/)
 })
 
 test('ordinary scene-select triggers follow the dark theme without touching chat', () => {

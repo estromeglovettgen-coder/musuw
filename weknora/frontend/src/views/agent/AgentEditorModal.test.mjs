@@ -53,6 +53,19 @@ test('new agents use deterministic upstream defaults with a Lite scene fallback'
   assert.match(defaultBlock, /config\.asr_model_id = asrModelId/)
 })
 
+test('Lite new agents receive a first available localized name in either mode', () => {
+  const createPath = source.slice(
+    source.indexOf('// 创建新智能体，使用系统默认值'),
+    source.indexOf('if (!authStore.isLiteMode) await syncInstalledSkills()'),
+  )
+  assert.match(source, /import \{ nextAvailableLocalizedName \} from '@\/utils\/localizedDefaultName'/)
+  assert.match(source, /agentEditor\.defaultNameWithIndex/)
+  assert.match(source, /chatResources\.agents/)
+  assert.match(createPath, /if \(authStore\.isLiteMode && !formData\.value\.name\) \{[\s\S]*getLiteDefaultAgentName\(\)/)
+  assert.match(createPath, /if \(newFormData\.config\.agent_mode === 'smart-reasoning'\)/)
+  assert.match(createPath, /if \(!authStore\.isLiteMode\) \{[\s\S]*getPresetDefaultName\(preset\)/)
+})
+
 test('new agents alone receive ready upload, web, and regular-tool defaults', () => {
   const createPath = source.slice(
     source.indexOf('// 创建新智能体，使用系统默认值'),

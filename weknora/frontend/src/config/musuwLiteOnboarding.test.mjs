@@ -10,6 +10,7 @@ const guideConfig = read('./contextualGuides.ts')
 const userMenu = read('../components/UserMenu.vue')
 const workspaceOnboarding = read('../views/auth/WorkspaceOnboarding.vue')
 const knowledgeBase = read('../views/knowledge/KnowledgeBase.vue')
+const uploadSource = read('../views/knowledge/components/KbUploadSourceDropdown.vue')
 
 test('Lite onboarding follows the shortest current Musuw activation path', () => {
   const liteStart = globalGuide.indexOf('const liteSteps')
@@ -65,14 +66,14 @@ test('guide storage namespace follows the active account at runtime', async () =
   }
 })
 
-test('Lite users can reopen the guide without exposing a management surface', () => {
+test('Lite users do not get a replay control that the consumer surface cannot support', () => {
   assert.match(
     userMenu,
-    /class="visual-user-menu__guide"[^>]*@click\.stop="reopenGuide"/,
+    /v-if="!authStore\.isLiteMode"[^>]*class="visual-user-menu__guide"[^>]*@click\.stop="reopenGuide"/,
   )
   assert.doesNotMatch(
     userMenu,
-    /v-if="!authStore\.isLiteMode"[^>]*class="visual-user-menu__guide"/,
+    /<button type="button" class="visual-user-menu__guide"[^>]*@click\.stop="reopenGuide"/,
   )
 })
 
@@ -109,13 +110,42 @@ test('tenantless Lite fallback explains automatic personal-space preparation', (
   )
 })
 
-test('an empty Lite knowledge base continues the onboarding path at the existing upload control', () => {
+test('an empty Lite knowledge base explains file and URL ingestion as separate actions', () => {
   assert.match(knowledgeBase, /import ContextualGuide from '@\/components\/ContextualGuide\.vue'/)
   assert.match(
     knowledgeBase,
     /<ContextualGuide\s+tour="kbDetail"\s+:when="authStore\.isLiteMode\s*&&\s*!isFAQ\s*&&\s*canEdit[^"]*"\s*\/>/,
   )
   assert.match(knowledgeBase, /data-guide="kb-detail-add-doc"/)
+  assert.match(uploadSource, /data-guide="kb-detail-import-url"/)
+  assert.match(guideConfig, /key: 'uploadFile'[\s\S]*data-guide="kb-detail-add-doc"/)
+  assert.match(guideConfig, /key: 'uploadUrl'[\s\S]*data-guide="kb-detail-import-url"/)
+})
+
+test('Lite new resource defaults use loaded names and fill the first available suffix', () => {
+  const knowledgeEditor = read('../views/knowledge/KnowledgeBaseEditorModal.vue')
+  const agentEditor = read('../views/agent/AgentEditorModal.vue')
+  const defaultName = read('../utils/localizedDefaultName.ts')
+
+  assert.match(knowledgeEditor, /nextAvailableLocalizedName\(/)
+  assert.match(knowledgeEditor, /knowledgeEditor\.basic\.defaultNameWithIndex/)
+  assert.match(agentEditor, /nextAvailableLocalizedName\(/)
+  assert.match(agentEditor, /agentEditor\.defaultNameWithIndex/)
+  assert.match(defaultName, /while \(usedNames\.has\(candidate\)\)/)
+  assert.match(defaultName, /index \+= 1/)
+})
+
+test('Lite home chat guide starts with the combined picker and preserves the native composer', () => {
+  const chat = read('../views/creatChat/creatChat.vue')
+  const input = read('../components/Input-field.vue')
+  const pickerIndex = guideConfig.indexOf("key: 'picker'")
+  const kbIndex = guideConfig.indexOf("key: 'kb'")
+  const inputIndex = guideConfig.indexOf("key: 'input'")
+  const sendIndex = guideConfig.indexOf("key: 'send'")
+
+  assert.match(chat, /<ContextualGuide\s+tour="chat"[\s\S]*authStore\.isLiteMode[\s\S]*route\.name === 'globalCreatChat'/)
+  assert.match(input, /class="visual-chat-composer__combined-picker"[\s\S]*data-guide="chat-picker"/)
+  assert.ok(pickerIndex >= 0 && pickerIndex < kbIndex && kbIndex < inputIndex && inputIndex < sendIndex)
 })
 
 test('all supported locales carry the complete Lite onboarding copy', () => {
@@ -131,6 +161,9 @@ test('all supported locales carry the complete Lite onboarding copy', () => {
       'nameLite:',
       'modelLite:',
       'submitLite:',
+      'uploadFile:',
+      'uploadUrl:',
+      'picker:',
       'liteTitle:',
       'liteDescription:',
     ]) {

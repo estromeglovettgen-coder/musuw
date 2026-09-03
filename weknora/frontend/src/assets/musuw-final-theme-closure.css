@@ -343,12 +343,16 @@
     background: var(--mvc-hover) !important;
     color: var(--mvc-text-strong) !important;
   }
-  body .visual-tag-filter-popup .t-popup__content,
-  body .visual-tag-filter {
+  body .visual-tag-filter-popup .t-popup__content {
     border-color: var(--mvc-line) !important;
     background: var(--mvc-surface) !important;
     color: var(--mvc-muted-strong) !important;
     box-shadow: var(--mvc-shadow) !important;
+  }
+  body .visual-tag-filter {
+    background: transparent !important;
+    color: var(--mvc-muted-strong) !important;
+    box-shadow: none !important;
   }
   body .visual-tag-filter__chip,
   body .visual-tag-filter > footer button {
@@ -1925,8 +1929,20 @@ body .t-drawer.t-drawer--right.wiki-graph-drawer > .t-drawer__content-wrapper {
   color: var(--mvc-page) !important;
 }
 
-/* FolderPickerMenu is shared by both list and card move flows. */
-:root[theme-mode="dark"] body .visual-folder-picker,
+/* FolderPickerMenu paints the one authoritative shell when it is used on its
+ * own. Card/list move menus already paint that shell and therefore flatten
+ * only their direct nested picker. */
+:root[theme-mode="dark"] body .visual-folder-picker {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-muted-strong) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] body :is(.visual-list-menu--move, .visual-card-menu--move) > .visual-folder-picker {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
 :root[theme-mode="dark"] body .visual-folder-picker__back,
 :root[theme-mode="dark"] body .visual-folder-picker__select,
 :root[theme-mode="dark"] body .visual-folder-picker__create-button,
@@ -2273,4 +2289,220 @@ body .t-drawer.t-drawer--right.wiki-graph-drawer > .t-drawer__content-wrapper {
 :root[theme-mode="dark"] .document-preview.is-fullscreen {
   background: var(--mvc-page) !important;
   color: var(--mvc-text) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Knowledge-base toolbar authority                                          */
+/* -------------------------------------------------------------------------- */
+
+/* The document toolbar is the only consumer of this contract.  The homepage
+ * composer/model picker intentionally has different geometry and is not
+ * included here.  Keep all three filters and both source actions on the same
+ * 36px scene-model control rhythm; width remains content-driven so labels are
+ * never shortened to an ellipsis. */
+body .visual-knowledge-toolbar .visual-knowledge-filter-button,
+body .visual-knowledge-toolbar .visual-upload-source__trigger {
+  box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 8px 14px !important;
+  border-radius: 12px !important;
+  gap: 8px !important;
+  font-family: var(--app-font-family) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+body .visual-knowledge-toolbar .visual-knowledge-filter-button {
+  width: auto !important;
+  min-width: 128px !important;
+}
+body .visual-knowledge-toolbar .visual-knowledge-filter-button > span:not(.visual-knowledge-filter-button__clear) {
+  min-width: max-content !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+body .visual-knowledge-toolbar .visual-upload-source__trigger {
+  width: auto !important;
+}
+body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger) {
+  border: 1px solid #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+body .visual-knowledge-toolbar .visual-upload-source__link-trigger {
+  border: 1px solid #e5e7eb !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger):hover,
+body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger):focus-visible {
+  border-color: #000 !important;
+  background: #000 !important;
+  color: #fff !important;
+}
+body .visual-knowledge-toolbar .visual-upload-source__link-trigger:hover,
+body .visual-knowledge-toolbar .visual-upload-source__link-trigger:focus-visible {
+  border-color: #d1d5db !important;
+  background: #f9fafb !important;
+  color: #111827 !important;
+}
+body .visual-tag-filter-popup .visual-knowledge-filter-options {
+  width: 288px !important;
+  max-width: min(288px, calc(100vw - 32px)) !important;
+  max-height: 256px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  flex-wrap: nowrap !important;
+  gap: 2px !important;
+  padding: 6px !important;
+}
+body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge-filter-option {
+  width: 100% !important;
+  min-height: 36px !important;
+  box-sizing: border-box !important;
+  padding: 8px 12px !important;
+  border-radius: 12px !important;
+  font-family: var(--app-font-family) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
+@media (min-width: 640px) {
+  body .visual-knowledge-toolbar .visual-knowledge-filter-button,
+  body .visual-knowledge-toolbar .visual-upload-source__trigger,
+  body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge-filter-option {
+    font-size: 14px !important;
+    line-height: 20px !important;
+  }
+}
+
+/* Dark mode reverses only the primary Add Document action, matching the
+ * Agent/KnowledgeBase directory CTA contract.  Import URL stays neutral. */
+:root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger) {
+  border-color: #f4f4f5 !important;
+  background: #f4f4f5 !important;
+  color: #18181b !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
+}
+:root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger):hover,
+:root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger):focus-visible {
+  border-color: #fff !important;
+  background: #fff !important;
+  color: #09090b !important;
+}
+:root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__link-trigger {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%) !important;
+}
+:root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__link-trigger:hover,
+:root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__link-trigger:focus-visible {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-tag-filter-popup .visual-knowledge-filter-options,
+:root[theme-mode="dark"] body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge-filter-option {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-muted-strong) !important;
+}
+:root[theme-mode="dark"] body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge-filter-option:hover,
+:root[theme-mode="dark"] body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge-filter-option.is-active {
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+
+/* The shared confirmation popup is also the owner of the Agent delete
+ * dialog.  Keep its dark palette paired with the native light contract while
+ * leaving organization/tenant dialogs outside this surface. */
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog,
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .circle-title,
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog .visual-kb-delete strong {
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .circle-icon {
+  color: #ff7b72 !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .del-circle-txt,
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog .visual-kb-delete p {
+  color: var(--mvc-muted) !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .circle-btn-txt,
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-surface-raised) !important;
+  color: var(--mvc-text) !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .circle-btn-txt:hover:not(:disabled),
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button:hover:not(:disabled) {
+  border-color: var(--mvc-line-strong) !important;
+  background: var(--mvc-hover) !important;
+  color: var(--mvc-text-strong) !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .circle-btn-txt.confirm,
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button.is-danger {
+  border-color: #b91c1c !important;
+  background: #b91c1c !important;
+  color: #fff !important;
+}
+:root[theme-mode="dark"] body .t-dialog.visual-confirm-dialog .circle-btn-txt.confirm:hover:not(:disabled),
+:root[theme-mode="dark"] body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button.is-danger:hover:not(:disabled) {
+  border-color: #dc2626 !important;
+  background: #dc2626 !important;
+  color: #fff !important;
+}
+
+/* MemoryWorkspaceSettings uses the same segmented write-mode control as the
+ * Agent editor. Keep it on the shared authority without changing the home
+ * composer or any tenant/organization surface. */
+.memory-workspace-settings .agent-segmented-control {
+  border-color: rgb(229 231 235 / 60%) !important;
+  background: #f3f4f6 !important;
+}
+.memory-workspace-settings .agent-segmented-control .t-radio-button {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #4b5563 !important;
+  padding: 6px 14px !important;
+  font-family: var(--app-font-family) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600 !important;
+  transition: all 200ms ease-in-out !important;
+}
+.memory-workspace-settings .agent-segmented-control .t-radio-button.t-is-checked {
+  background: #fff !important;
+  color: #111827 !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%) !important;
+}
+.memory-workspace-settings .agent-segmented-control .t-radio-button:not(.t-is-checked):hover {
+  color: #111827 !important;
+}
+:root[theme-mode="dark"] .memory-workspace-settings .agent-segmented-control {
+  border-color: rgb(63 63 70 / 60%) !important;
+  background: #27272a !important;
+}
+:root[theme-mode="dark"] .memory-workspace-settings .agent-segmented-control .t-radio-button {
+  background: transparent !important;
+  color: #a1a1aa !important;
+}
+:root[theme-mode="dark"] .memory-workspace-settings .agent-segmented-control .t-radio-button:hover {
+  color: #fff !important;
+}
+:root[theme-mode="dark"] .memory-workspace-settings .agent-segmented-control .t-radio-button.t-is-checked {
+  background: #3f3f46 !important;
+  color: #fff !important;
 }

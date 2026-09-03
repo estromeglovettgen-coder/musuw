@@ -56,6 +56,7 @@
     <button
       type="button"
       :class="['visual-upload-source__trigger', 'visual-upload-source__link-trigger', triggerClass]"
+      data-guide="kb-detail-import-url"
       :aria-label="t('knowledgeBase.importURL')"
       :title="t('knowledgeBase.importURL')"
       @click="openUrlDialog()"
@@ -392,6 +393,8 @@ defineExpose({ openUrlDialog })
 }
 
 .visual-upload-source__trigger {
+  box-sizing: border-box;
+  height: 36px;
   min-height: 36px;
   padding: 8px 14px;
   border: 0;
@@ -399,13 +402,13 @@ defineExpose({ openUrlDialog })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   background: #111827;
   color: #fff;
   box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   font: inherit;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -450,6 +453,10 @@ defineExpose({ openUrlDialog })
   width: 14px;
   height: 14px;
   font-size: 14px;
+}
+
+@media (min-width: 640px) {
+  .visual-upload-source__trigger { font-size: 14px; line-height: 20px; }
 }
 
 .visual-upload-source__trigger-caret {

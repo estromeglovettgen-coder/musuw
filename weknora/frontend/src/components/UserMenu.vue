@@ -59,6 +59,14 @@ const userEmail = computed(() => userInfo.value.email)
 const userAvatar = computed(() => userInfo.value.avatar)
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase())
 const entitlement = ref<ConsumerEntitlement | null>(null)
+const entitlementLoading = ref(true)
+const billingIsFree = computed(() =>
+  entitlement.value?.plan === 'free'
+  // Keep the Lite upgrade affordance stable while the entitlement request is
+  // in flight. A failed request still falls back to the neutral plans action
+  // instead of guessing that the user is on the free plan.
+  || (!entitlement.value && entitlementLoading.value && authStore.isLiteMode),
+)
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const usageRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
@@ -255,13 +263,16 @@ const loadUserInfo = async () => {
 let entitlementRequestSequence = 0
 const loadEntitlement = async () => {
   const requestSequence = ++entitlementRequestSequence
+  entitlementLoading.value = true
   try {
     const response = await getCurrentEntitlement()
     if (requestSequence !== entitlementRequestSequence) return
     entitlement.value = response.data
+    entitlementLoading.value = false
   } catch {
     if (requestSequence !== entitlementRequestSequence) return
     entitlement.value = null
+    entitlementLoading.value = false
   }
 }
 
@@ -318,7 +329,7 @@ onUnmounted(() => {
         >
           <span class="visual-user-menu__avatar is-small"><img v-if="userAvatar && !authStore.isLiteMode" :src="userAvatar" alt="" /><span v-else>{{ userInitial }}</span></span>
           <span class="visual-user-menu__account-copy"><strong>{{ userName }}</strong></span>
-          <button type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
+          <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__guide" :title="$t('newUserGuide.reopen')" :aria-label="$t('newUserGuide.reopen')" @click.stop="reopenGuide"><t-icon name="help-circle" /></button>
         </div>
 
         <div
@@ -342,7 +353,7 @@ onUnmounted(() => {
           <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>
         <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" @click="openPlans">
-          <t-icon v-if="entitlement?.plan === 'free'" name="arrow-up" /><t-icon v-else name="crown" /><span>{{ entitlement?.plan === 'free' ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
+          <t-icon v-if="billingIsFree" name="arrow-up" /><t-icon v-else name="crown" /><span>{{ billingIsFree ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
         </button>
         <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__item" @click="handleQuickNav('tenant')"><t-icon name="user-circle" /><span>{{ $t('settings.workspaceSettings') }}</span></button>
@@ -396,7 +407,7 @@ onUnmounted(() => {
 .visual-user-menu.is-collapsed .visual-user-menu__trigger { justify-content: center; padding: 6px 2px; }
 .visual-user-menu__avatar { flex: 0 0 30px; width: 30px; height: 30px; overflow: hidden; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #000; color: #fff; font-size: 12px; line-height: 1; font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); position: relative; }
 .visual-user-menu.is-collapsed .visual-user-menu__avatar { flex-basis: 32px; width: 32px; height: 32px; }
-.visual-user-menu__avatar.is-small { flex-basis: 24px; width: 24px; height: 24px; background: #4a80e8; font-weight: 500; }
+.visual-user-menu__avatar.is-small { flex-basis: 24px; width: 24px; height: 24px; background: #000; font-weight: 500; }
 .visual-user-menu__avatar img { width: 100%; height: 100%; object-fit: cover; }
 .visual-user-menu__identity { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 1px; }
 .visual-user-menu__identity strong,.visual-user-menu__identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -405,7 +416,7 @@ onUnmounted(() => {
 .visual-user-menu__caret { flex: 0 0 14px; width: 14px; height: 14px; font-size: 14px; color: #9ca3af; transition: transform 200ms ease; }
 .visual-user-menu__caret.is-open { transform: rotate(180deg); color: #374151; }
 .visual-user-menu__dropdown { position: absolute; left: 0; right: 0; bottom: 56px; z-index: 3000; max-height: min(620px, calc(100vh - 88px)); overflow-y: auto; padding: 6px; box-sizing: border-box; border: 1px solid rgb(229 231 235 / 90%); border-radius: 16px; background: #fff; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%),0 8px 10px -6px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 2px; text-align: left; }
-.visual-user-menu__account { width: 100%; padding: 6px 10px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; gap: 8px; color: #374151; font: inherit; text-align: left; cursor: default; }
+.visual-user-menu__account { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; gap: 8px; color: #374151; font: inherit; text-align: left; cursor: default; }
 .visual-user-menu__account.is-clickable { cursor: pointer; }
 .visual-user-menu__account.is-clickable:hover { background: #f3f4f6; }
 .visual-user-menu__account-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }
@@ -424,7 +435,7 @@ onUnmounted(() => {
 .visual-user-menu__tenant-trail { flex: 0 0 12px; font-size: 12px; color: #9ca3af; }
 .visual-user-menu__divider { height: 1px; margin: 4px; background: #f3f4f6; }
 .visual-user-menu__divider--dashed { height: 0; border-top: 1px dashed #e5e7eb; background: transparent; }
-.visual-user-menu__item { width: 100%; min-height: 34px; padding: 8px 12px; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: #4b5563; font: inherit; font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; cursor: pointer; }
+.visual-user-menu__item { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 0; border-radius: 12px; display: flex; align-items: center; gap: 8px; background: transparent; color: #4b5563; font: inherit; font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; cursor: pointer; }
 .visual-user-menu__item:hover { background: #f3f4f6; color: #111827; }
 .visual-user-menu__item.visual-user-menu__usage-item { gap: 8px; }
 .visual-user-menu__usage-item > small { flex: 0 0 auto; margin-left: auto; color: #8b919b; font-size: 10px; line-height: 14px; font-weight: 500; white-space: nowrap; }

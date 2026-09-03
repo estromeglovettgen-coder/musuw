@@ -61,6 +61,25 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
   )
 })
 
+test('Agent delete confirmation uses the shared TDesign confirmation surface', () => {
+  assert.match(list, /dialog-class-name="visual-confirm-dialog"/)
+  assert.match(list, /<button type="button" class="circle-btn-txt"[\s\S]*?common\.cancel/)
+  assert.match(list, /<button type="button" class="circle-btn-txt confirm"[\s\S]*?confirmDelete/)
+  assert.doesNotMatch(list, /del-agent-dialog/)
+  assert.doesNotMatch(list, /<span class="circle-btn-txt"/)
+  assert.doesNotMatch(list, /:deep\(\.del-agent-dialog\)/)
+  assert.match(
+    nativeDirectoryStyles,
+    /body \.t-dialog\.visual-confirm-dialog,[\s\S]*?body \.t-dialog\.visual-kb-delete-dialog\s*\{[\s\S]*?border-radius:\s*16px !important;/,
+  )
+  assert.match(nativeDirectoryStyles, /body \.t-dialog\.visual-confirm-dialog \.circle-btn-txt,[\s\S]*?body \.t-dialog\.visual-kb-delete-dialog \.visual-kb-delete footer button\s*\{[\s\S]*?min-height:\s*32px !important;[\s\S]*?border-radius:\s*10px !important;/)
+  assert.doesNotMatch(nativeDirectoryStyles, /body \.t-dialog\.del-org-dialog/)
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] body \.t-dialog\.visual-confirm-dialog,[\s\S]*?body \.t-dialog\.visual-kb-delete-dialog\s*\{[\s\S]*?background:\s*var\(--mvc-surface\) !important;/,
+  )
+})
+
 test('Settings and Agent editor render the same shared visual shell while Agent keeps native save fields', () => {
   for (const token of [
     'handleSave',

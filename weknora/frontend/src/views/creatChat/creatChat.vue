@@ -67,17 +67,23 @@
     </main>
 
     <KnowledgeBaseEditorModal
-        :visible="uiStore.showKBEditorModal"
-        :mode="uiStore.kbEditorMode"
-        :kb-id="uiStore.currentKBId || undefined"
-        :initial-type="uiStore.kbEditorType"
-        @update:visible="(val) => val ? null : uiStore.closeKBEditor()"
-        @success="handleKBEditorSuccess"
+      :visible="uiStore.showKBEditorModal"
+      :mode="uiStore.kbEditorMode"
+      :kb-id="uiStore.currentKBId || undefined"
+      :initial-type="uiStore.kbEditorType"
+      @update:visible="(val) => val ? null : uiStore.closeKBEditor()"
+      @success="handleKBEditorSuccess"
+    />
+
+    <ContextualGuide
+      tour="chat"
+      :when="authStore.isLiteMode && route.name === 'globalCreatChat'"
     />
 </template>
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue';
 import InputField from '@/components/Input-field.vue';
+import ContextualGuide from '@/components/ContextualGuide.vue';
 import { createSessions } from "@/api/chat/index";
 import { getSuggestedQuestions } from "@/api/agent/index";
 import type { SuggestedQuestion } from "@/api/agent/index";
@@ -89,12 +95,14 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
 import KnowledgeBaseEditorModal from '@/views/knowledge/KnowledgeBaseEditorModal.vue';
 import { useKnowledgeBaseCreationNavigation } from '@/hooks/useKnowledgeBaseCreationNavigation';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const route = useRoute();
 const usemenuStore = useMenuStore();
 const settingsStore = useSettingsStore();
 const uiStore = useUIStore();
+const authStore = useAuthStore();
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 

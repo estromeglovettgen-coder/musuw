@@ -185,14 +185,16 @@ const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | '
                 <div v-else-if="moveMenuMode === 'normal'" class="visual-card-menu"><DocumentActionMenu :item="item" :can-download="canDownload" :can-mutate-knowledge="canMutateKnowledge" :trace-visible="isTraceMenuVisible(item)" @download="handleAction('download', item)" @edit="handleAction('edit', item)" @view-trace="handleAction('view-trace', item)" @reparse="handleAction('reparse', item)" @cancel-parse="handleAction('cancel-parse', item)" @move="handleAction('move', item)" @move-folder="handleAction('move-folder', item)" @batch-manage="handleAction('batch-manage', item)" @delete="handleAction('delete', item)" /></div>
                 <div v-else-if="moveMenuMode === 'targets'" class="visual-card-menu visual-card-menu--move">
                   <button type="button" class="visual-card-menu__back" @click.stop="emit('move-back')"><t-icon name="chevron-left" size="16px" /><span>{{ $t('knowledgeBase.moveToKnowledgeBase') }}</span></button>
-                  <div v-if="moveTargetsLoading" class="visual-card-menu__state"><t-loading size="small" /></div>
-                  <div v-else-if="moveTargetKbs.length === 0" class="visual-card-menu__state">{{ $t('knowledgeBase.moveNoTargets') }}</div>
-                  <template v-else><button v-for="kb in moveTargetKbs" :key="kb.id" type="button" class="visual-card-menu__target" @click.stop="emit('move-select-target', kb)"><t-icon name="root-list" /><span class="visual-card-menu__target-name">{{ kb.name }}</span><span v-if="kb.knowledge_count !== undefined" class="visual-card-menu__target-count">{{ kb.knowledge_count }}</span></button></template>
+                  <div class="visual-card-menu__targets">
+                    <div v-if="moveTargetsLoading" class="visual-card-menu__state"><t-loading size="small" /></div>
+                    <div v-else-if="moveTargetKbs.length === 0" class="visual-card-menu__state">{{ $t('knowledgeBase.moveNoTargets') }}</div>
+                    <template v-else><button v-for="kb in moveTargetKbs" :key="kb.id" type="button" class="visual-card-menu__target" @click.stop="emit('move-select-target', kb)"><t-icon name="root-list" /><span class="visual-card-menu__target-name">{{ kb.name }}</span><span v-if="kb.knowledge_count !== undefined" class="visual-card-menu__target-count">{{ kb.knowledge_count }}</span></button></template>
+                  </div>
                 </div>
                 <div v-else-if="moveMenuMode === 'confirm'" class="visual-card-menu visual-card-menu--move">
                   <button type="button" class="visual-card-menu__back" @click.stop="emit('move-back')"><t-icon name="chevron-left" size="16px" /><span>{{ $t('knowledgeBase.moveConfirmTitle') }}</span></button>
                   <div class="visual-card-menu__confirm">
-                    <div class="visual-card-menu__destination"><t-icon name="arrow-right" size="14px" /><span>{{ moveSelectedTargetName }}</span></div>
+                    <div class="visual-card-menu__destination"><t-icon name="arrow-right" size="14px" /><span class="visual-card-menu__destination-name">{{ moveSelectedTargetName }}</span></div>
                     <button type="button" class="visual-card-menu__mode" :class="{ 'is-active': moveMode === 'reuse_vectors' }" @click.stop="emit('update:moveMode', 'reuse_vectors')"><t-radio :checked="moveMode === 'reuse_vectors'" /><span><strong>{{ $t('knowledgeBase.moveModeReuseVectors') }}</strong><small>{{ $t('knowledgeBase.moveModeReuseVectorsDesc') }}</small></span></button>
                     <button type="button" class="visual-card-menu__mode" :class="{ 'is-active': moveMode === 'reparse' }" @click.stop="emit('update:moveMode', 'reparse')"><t-radio :checked="moveMode === 'reparse'" /><span><strong>{{ $t('knowledgeBase.moveModeReparse') }}</strong><small>{{ $t('knowledgeBase.moveModeReparseDesc') }}</small></span></button>
                     <div class="visual-card-menu__actions"><t-button size="small" variant="outline" @click.stop="emit('move-back')">{{ $t('common.cancel') }}</t-button><t-button size="small" theme="primary" :loading="moveSubmitting" @click.stop="emit('move-confirm')">{{ $t('knowledgeBase.moveConfirm') }}</t-button></div>
@@ -285,22 +287,224 @@ const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | '
 .visual-document-card__folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .visual-document-card__folder :deep(.t-icon) { flex: 0 0 10px; font-size: 10px; }
 .visual-document-card__type { flex: 0 0 auto; min-width: 30px; padding: 2px 8px; border-radius: 4px; background: #f3f4f6; color: #4b5563; font-family: var(--app-font-family); font-size: 9px; line-height: 13px; font-weight: 700; text-align: center; text-transform: uppercase; }
-.visual-card-menu { width: 230px; max-width: calc(100vw - 24px); padding: 5px; box-sizing: border-box; }
-.visual-card-menu--move { max-height: 340px; overflow-y: auto; }
-.visual-card-menu__back { width: 100%; min-height: 32px; padding: 5px 7px; border: 0; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px; background: transparent; color: #6b7280; font: inherit; font-size: 10px; text-align: left; cursor: pointer; }
-.visual-card-menu__state { min-height: 80px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 10px; }
-.visual-card-menu__target { width: 100%; min-height: 34px; padding: 6px 7px; border: 0; border-radius: 7px; display: flex; align-items: center; gap: 6px; background: transparent; color: #4b5563; font: inherit; font-size: 10px; text-align: left; cursor: pointer; }
-.visual-card-menu__target:hover { background: #f3f4f6; color: #111827; }
-.visual-card-menu__target-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.visual-card-menu__target-count { color: #9ca3af; font-size: 9px; }
-.visual-card-menu__confirm { padding: 7px; display: flex; flex-direction: column; gap: 7px; }
-.visual-card-menu__destination { min-height: 30px; padding: 5px 7px; border-radius: 7px; display: flex; align-items: center; gap: 6px; background: #f9fafb; color: #374151; font-size: 10px; }
-.visual-card-menu__mode { width: 100%; padding: 7px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: flex-start; gap: 7px; background: #fff; color: #4b5563; font: inherit; text-align: left; cursor: pointer; }
-.visual-card-menu__mode.is-active { border-color: #d1d5db; background: #f9fafb; }
-.visual-card-menu__mode > span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.visual-card-menu__mode strong { font-size: 10px; line-height: 15px; }
-.visual-card-menu__mode small { color: #9ca3af; font-size: 9px; line-height: 14px; }
-.visual-card-menu__actions { display: flex; justify-content: flex-end; gap: 5px; }
+.visual-card-menu {
+  width: 230px;
+  max-width: calc(100vw - 24px);
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+/* Move targets use the same 288px scene-model popup geometry as Settings. The
+ * teleported card-more content owns the painted panel and single scroll
+ * container; this node is only the unpainted move-state layout. */
+.visual-card-menu--move {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: visible;
+}
+
+.visual-card-menu__back,
+.visual-card-menu__target {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.visual-card-menu__back:hover,
+.visual-card-menu__back:focus-visible,
+.visual-card-menu__target:hover,
+.visual-card-menu__target:focus-visible {
+  outline: none;
+  background: #f9fafb;
+  color: #111827;
+}
+
+.visual-card-menu__back span {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.visual-card-menu__targets {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+.visual-card-menu__state {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.visual-card-menu__target-name,
+.visual-card-menu__destination-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-card-menu__target-count {
+  flex: 0 0 auto;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.visual-card-menu__confirm {
+  padding: 6px 2px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.visual-card-menu__destination {
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.visual-card-menu__mode {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.visual-card-menu__mode:hover,
+.visual-card-menu__mode.is-active {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.visual-card-menu__mode > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.visual-card-menu__mode strong {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.visual-card-menu__mode small {
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.visual-card-menu__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* The popup component contributes the canonical panel and the only scroll
+ * container. Keep move content on that authority surface and flatten
+ * FolderPickerMenu when it is nested here. */
+:global(.card-more .t-popup__content:has(> .visual-card-menu--move)) {
+  width: 288px !important;
+  max-width: min(288px, calc(100vw - 32px)) !important;
+  max-height: 256px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 6px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%) !important;
+}
+
+:global(:root[theme-mode="dark"] body .card-more .t-popup__content:has(> .visual-card-menu--move)) {
+  border-color: var(--mvc-line) !important;
+  background: var(--mvc-surface) !important;
+  color: var(--mvc-text) !important;
+  box-shadow: var(--mvc-shadow) !important;
+}
+
+.visual-card-menu--move :deep(.visual-folder-picker) {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.visual-card-menu--move :deep(.visual-folder-picker__list) {
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+@media (min-width: 640px) {
+  .visual-card-menu__back,
+  .visual-card-menu__target,
+  .visual-card-menu__destination,
+  .visual-card-menu__mode {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
 .visual-document-popover { position: fixed; z-index: 10002; width: 360px; max-width: calc(100vw - 20px); max-height: min(420px,calc(100vh - 20px)); overflow-y: auto; box-sizing: border-box; padding: 14px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; color: #374151; box-shadow: 0 16px 38px rgb(15 23 42 / 14%); pointer-events: none; }
 .visual-document-popover__title { margin: 0 0 8px; overflow: hidden; color: #111827; font-size: 12px; line-height: 18px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .visual-document-popover__timeline { margin: 2px 0 5px; }

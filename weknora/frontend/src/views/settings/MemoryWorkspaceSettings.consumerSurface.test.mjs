@@ -5,6 +5,7 @@ import test from 'node:test'
 const source = readFileSync(new URL('./MemoryWorkspaceSettings.vue', import.meta.url), 'utf8')
 const template = source.slice(0, source.indexOf('<script setup'))
 const script = source.slice(source.indexOf('<script setup'), source.indexOf('<style'))
+const finalTheme = readFileSync(new URL('../../assets/musuw-final-theme-closure.css', import.meta.url), 'utf8')
 
 test('workspace memory keeps every setting visible and groups low-frequency controls under Advanced', () => {
   assert.doesNotMatch(template, /authStore\.isLiteMode/)
@@ -37,6 +38,11 @@ test('workspace memory keeps every setting visible and groups low-frequency cont
 
   assert.match(template, /:aria-expanded="advancedOpen"/)
   assert.match(script, /const advancedOpen = ref\(false\)/)
+  assert.match(
+    template,
+    /<t-radio-group\s+class="agent-segmented-control"[\s\S]*?v-model="config\.write_mode"/,
+    'the write-mode choices must reuse the existing Agent segmented-control DOM contract',
+  )
   assert.match(template, /:disabled="advancedDisabled \|\| config\.write_mode !== 'auto'"/)
   assert.match(template, /:disabled="advancedDisabled \|\| !config\.vector_recall"/)
   assert.match(
@@ -69,6 +75,15 @@ test('one user action persists the workspace memory policy exactly once', () => 
   )
 })
 
+test('workspace memory autosave is quiet on success and clears pending debounce on unmount', () => {
+  const saveBody = script.match(/const saveConfig = async \(\) => \{([\s\S]*?)\n\}/)?.[1] || ''
+  assert.doesNotMatch(saveBody, /MessagePlugin\.success\(/, 'autosave success must not stack duplicate toasts')
+  assert.match(saveBody, /MessagePlugin\.error\(/, 'save failures must still produce an explicit error')
+  assert.match(script, /import \{ computed, onMounted, onUnmounted, reactive, ref \} from 'vue'/)
+  assert.match(script, /onUnmounted\(\(\) => \{[\s\S]*?clearTimeout\(saveTimer\)[\s\S]*?saveTimer = null/)
+  assert.match(script, /saveTimer = window\.setTimeout\(\(\) => \{\s*saveTimer = null/)
+})
+
 test('workspace memory reflects server-normalized timer values after saving', () => {
   const saveBody = script.match(/const saveConfig = async \(\) => \{([\s\S]*?)\n\}/)?.[1] || ''
   assert.match(
@@ -93,6 +108,29 @@ test('workspace memory reuses the scene-model CustomSelect surface for both mode
       'memory model fields must use the existing scene-model dropdown variant',
     )
   }
+})
+
+test('workspace memory write-mode reuses the Agent segmented-control authority in both themes', () => {
+  assert.match(
+    finalTheme,
+    /\.memory-workspace-settings \.agent-segmented-control\s*\{/,
+    'memory write-mode must opt into the shared segmented-control container contract',
+  )
+  assert.match(
+    finalTheme,
+    /\.memory-workspace-settings \.agent-segmented-control \.t-radio-button\s*\{/,
+    'memory write-mode options must use the shared segmented-control typography and geometry',
+  )
+  assert.match(
+    finalTheme,
+    /\.memory-workspace-settings \.agent-segmented-control \.t-radio-button\.t-is-checked\s*\{/,
+    'memory write-mode checked state must share the light authority',
+  )
+  assert.match(
+    finalTheme,
+    /:root\[theme-mode="dark"\] \.memory-workspace-settings \.agent-segmented-control[\s\S]*?:root\[theme-mode="dark"\] \.memory-workspace-settings \.agent-segmented-control \.t-radio-button\.t-is-checked\s*\{/,
+    'memory write-mode must keep the same checked state in dark mode',
+  )
 })
 
 test('clearing the extractor model persists the empty session-model fallback', () => {

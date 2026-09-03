@@ -89,7 +89,13 @@ const handleFolderConfirm = (path: string) => {
           trigger="click"
           placement="top"
           destroy-on-close
-          :overlay-inner-style="{ padding: '6px' }"
+          :overlay-inner-style="{
+            padding: 0,
+            border: '0',
+            borderRadius: 0,
+            background: 'transparent',
+            boxShadow: 'none',
+          }"
         >
           <button
             type="button"

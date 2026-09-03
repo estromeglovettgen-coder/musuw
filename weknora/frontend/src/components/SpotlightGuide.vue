@@ -148,6 +148,42 @@ const rootRef = ref<HTMLElement | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
 
 let retryTimer: ReturnType<typeof setTimeout> | null = null
+let interactTarget: HTMLElement | null = null
+let interactListener: ((event: Event) => void) | null = null
+let sessionActive = true
+
+// Interact steps borrow the target's native click. Keep that listener scoped
+// to the currently highlighted element so a stale target cannot advance a
+// later step (or keep a guide alive after it has closed).
+const detachInteractTarget = () => {
+  if (interactTarget && interactListener) {
+    interactTarget.removeEventListener('click', interactListener)
+  }
+  interactTarget = null
+  interactListener = null
+}
+
+const handleInteractClick = () => {
+  if (!sessionActive || !interactTarget) return
+
+  // Remove before navigating/finishing. Event dispatch takes a snapshot of
+  // listeners, so this also makes rapid repeated clicks advance only once.
+  detachInteractTarget()
+  if (isLast.value) {
+    finish()
+    return
+  }
+  void goTo(index.value + 1)
+}
+
+const attachInteractTarget = (el: HTMLElement) => {
+  detachInteractTarget()
+  if (!sessionActive || !props.active || !step.value.interact) return
+
+  interactTarget = el
+  interactListener = () => handleInteractClick()
+  el.addEventListener('click', interactListener)
+}
 
 const step = computed(() => props.steps[index.value] ?? props.steps[0])
 const isLast = computed(() => index.value === props.steps.length - 1)
@@ -272,11 +308,13 @@ const measureCard = async () => {
 }
 
 const locate = async (retry = 0) => {
+  if (!sessionActive || !props.active) return
   vw.value = window.innerWidth
   vh.value = window.innerHeight
 
   const cur = step.value
   if (!cur.target) {
+    detachInteractTarget()
     targetEl.value = null
     targetRect.value = null
     await measureCard()
@@ -285,12 +323,15 @@ const locate = async (retry = 0) => {
 
   const el = queryTarget(cur.target)
   if (!el) {
+    detachInteractTarget()
     if (retry < 12) {
       if (retryTimer) clearTimeout(retryTimer)
       retryTimer = setTimeout(() => locate(retry + 1), 120)
       return
     }
     if (cur.optional) {
+      targetEl.value = null
+      targetRect.value = null
       goTo(index.value + 1)
       return
     }
@@ -303,11 +344,13 @@ const locate = async (retry = 0) => {
   el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
   targetEl.value = el
   targetRect.value = el.getBoundingClientRect()
+  attachInteractTarget(el)
   await measureCard()
 }
 
 const goTo = async (i: number) => {
-  if (i < 0 || i >= props.steps.length) return
+  if (!sessionActive || i < 0 || i >= props.steps.length) return
+  detachInteractTarget()
   if (retryTimer) {
     clearTimeout(retryTimer)
     retryTimer = null
@@ -329,10 +372,12 @@ const next = () => goTo(index.value + 1)
 const prev = () => goTo(index.value - 1)
 
 const close = () => {
+  sessionActive = false
   if (retryTimer) {
     clearTimeout(retryTimer)
     retryTimer = null
   }
+  detachInteractTarget()
   emit('update:active', false)
   targetEl.value = null
   targetRect.value = null
@@ -354,6 +399,7 @@ const onViewportChange = () => {
 }
 
 const open = async () => {
+  sessionActive = true
   index.value = 0
   emit('update:active', true)
   await nextTick()
@@ -366,6 +412,8 @@ watch(
     if (val && !old) {
       open()
     } else if (!val && old) {
+      sessionActive = false
+      detachInteractTarget()
       if (retryTimer) {
         clearTimeout(retryTimer)
         retryTimer = null
@@ -375,9 +423,11 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  sessionActive = false
   window.removeEventListener('resize', onViewportChange)
   window.removeEventListener('scroll', onViewportChange, true)
   if (retryTimer) clearTimeout(retryTimer)
+  detachInteractTarget()
 })
 
 watch(

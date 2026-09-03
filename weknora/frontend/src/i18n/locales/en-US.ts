@@ -76,7 +76,7 @@ export default {
       },
       doneLite: {
         title: 'You are ready',
-        desc: 'Ask one question or add one source to begin. Reopen this guide anytime from the question mark beside your name.'
+        desc: 'Ask one question or add one source to begin. The relevant page will introduce each next step when you reach it.'
       },
       welcome: {
         title: 'Welcome to Musuw',
@@ -164,6 +164,14 @@ export default {
     },
     kbCreate: {
       steps: {
+        nameLite: {
+          title: 'Name your knowledge base',
+          desc: 'A ready-to-use name is filled in. Keep it or replace it with something you will recognize.'
+        },
+        submitLite: {
+          title: 'Create the knowledge base',
+          desc: 'Click the highlighted Create button. You can add your first source on the next page.'
+        },
         type: {
           title: 'Choose a type',
           desc: 'Document bases are for PDFs, Word files, and similar uploads. FAQ bases are for question–answer pairs. The type cannot be changed later.'
@@ -308,9 +316,13 @@ export default {
           title: 'This knowledge base is empty',
           desc: 'Add your first item so you can search and chat over it. You can also drag and drop supported file types.'
         },
-        upload: {
-          title: 'Add documents',
-          desc: 'Add a file or web link here. Musuw will parse and index it automatically.'
+        uploadFile: {
+          title: 'Add a document',
+          desc: 'Upload or drag in a supported file. Musuw will parse and index it automatically.'
+        },
+        uploadUrl: {
+          title: 'Import a webpage',
+          desc: 'Use Import Webpage when your source is a public page or social-media link. Existing plan rules still apply.'
         },
         done: {
           title: 'Ready after parsing',
@@ -320,6 +332,10 @@ export default {
     },
     chat: {
       steps: {
+        picker: {
+          title: 'Choose how Musuw answers',
+          desc: 'Use this control to choose an agent, model, and reasoning level. Some advanced models require an upgrade; Musuw will explain that before use.'
+        },
         kb: {
           title: 'Choose knowledge scope',
           desc: 'Click {\'@\'} to pick one or more knowledge bases or files. Answers use only the selection; otherwise the current agent settings apply.'
@@ -1808,7 +1824,7 @@ export default {
   memorySettings: {
     title: 'My memory',
     description: 'What the assistant remembers about you across conversations. You can review, edit and delete anything here; deleted memories are never used again.',
-    workspaceDisabled: 'Long-term memory is off for this workspace. This switch takes effect once an admin turns it on.',
+    workspaceDisabled: 'Long-term memory is not enabled yet. This switch takes effect after it is turned on.',
     enableLabel: 'Use long-term memory for me',
     enableDescription: 'When off, the assistant neither reads nor adds your memories. Existing ones are kept and resume when you turn it back on.',
     agentDisabledHint: 'An individual agent can also turn long-term memory off for itself. In a conversation with such an agent your memories are neither read nor added to; other agents are unaffected.',
@@ -1861,7 +1877,7 @@ export default {
     trackingHint: 'These are topics you keep asking about, but they have not yet hit the threshold to become a long-term interest. They are not used in conversation until then.',
     documentsHint: 'These documents keep showing up in answers, so retrieval leans toward them a little. Stop tracking to drop the boost; they reappear after two more citations.',
     supersededHint: 'These have been replaced by newer memories. They are kept as a history of what changed and are not used in conversation.',
-    archivedHint: 'Archived memories are not used in conversation. When you hit the per-person limit, less-used items are tucked away automatically.',
+    archivedHint: 'Archived memories are not used in conversation. When you hit the memory limit, less-used items are tucked away automatically.',
     pendingEmptyTitle: 'Nothing to review',
     pendingEmptyDescription: 'When something is inferred about you from your questions, it waits here for your confirmation.',
     trackingEmptyTitle: 'No topics being watched',
@@ -1997,20 +2013,20 @@ export default {
   },
   memoryWorkspaceSettings: {
     title: 'Long-term memory',
-    description: 'Let the assistant remember what members tell it — who they are, how they like to work, stable facts and what they are working on — across conversations.',
+    description: 'Let the assistant remember personal details, preferences, stable facts, and ongoing work across conversations.',
     loadError: 'Could not load long-term memory settings. Please try again.',
     introTitle: 'Off by default, you have to turn it on',
-    introDescription: 'Long-term memory retains what members say in conversations, so it does not arrive enabled. Once on, each member has their own isolated memory space and can review, edit, delete or switch it off entirely under "My memory". Active profile and preference memories are included in every later turn; facts and ongoing tasks are recalled only when the question is related.',
-    enableLabel: 'Enable long-term memory in this workspace',
-    enableDescription: 'When off, no conversation in this workspace reads or writes memory.',
+    introDescription: 'Long-term memory retains what is said in conversations, so it does not arrive enabled. Once on, you can review, edit, delete, or switch it off entirely under "My memory". Active profile and preference memories are included in every later turn; facts and ongoing tasks are recalled only when the question is related.',
+    enableLabel: 'Enable long-term memory',
+    enableDescription: 'When off, conversations do not read or write memory.',
     writeModeLabel: 'How memories are written',
     writeModeDescription: 'Controls what gets remembered.',
     writeModeExplicit: 'Explicit only',
     writeModeAuto: 'Distill automatically',
-    writeModeExplicitHint: 'Only records what a member explicitly asks to remember, plus entries added by hand. No extra model call.',
-    writeModeAutoHint: 'Additionally makes one background model call after a conversation to distill what is worth keeping from what the member said.',
+    writeModeExplicitHint: 'Only records what is explicitly requested, plus entries added by hand. No extra model call.',
+    writeModeAutoHint: 'Additionally makes one background model call after a conversation to distill what is worth keeping.',
     advancedLabel: 'Advanced settings',
-    advancedDescription: 'Models, semantic recall, and automatic distillation controls. Most workspaces can keep the defaults.',
+    advancedDescription: 'Models, semantic recall, and automatic distillation controls. The defaults suit everyday use.',
     autoOnlyHint: 'Switch to “Distill automatically” to configure this setting.',
     vectorOnlyHint: 'Turn on “Match memory by meaning” to select this model.',
     extractModelLabel: 'Distillation model',
@@ -2018,7 +2034,7 @@ export default {
     extractDelayLabel: 'Distillation delay',
     extractDelayDescription: 'How long a finished turn waits before distillation runs. Waiting lets one model call cover the several messages a user usually sends in a row.',
     extractMinIntervalLabel: 'Minimum interval between runs',
-    extractMinIntervalDescription: 'The floor between two distillation runs for one person, used to bound cost. Messages produced inside the interval are not dropped — they are carried over to the next run.',
+    extractMinIntervalDescription: 'The minimum time between two distillation runs, used to bound cost. Messages produced inside the interval are not dropped — they are carried over to the next run.',
     vectorRecallLabel: 'Match memory by meaning',
     vectorRecallDescription: 'Adds semantic matching on top of wording, so a memory still surfaces after the user re-phrases the subject — and most memories get re-phrased eventually. Costs one embedding call per turn, and falls back to wording-only matching on timeout.',
     embeddingModelLabel: 'Memory embedding model',
@@ -2028,9 +2044,9 @@ export default {
     interestThresholdLabel: 'Questions before a topic becomes an interest',
     interestThresholdDescription: 'A subject is recorded only after it has come up this many times. Setting it to 1 records every passing question, which is usually too noisy.',
     instructionsLabel: 'Custom distillation rules',
-    instructionsDescription: 'Workspace rules appended to the distillation prompt, for policies the product cannot guess — for example "never record customer names".',
+    instructionsDescription: 'Custom rules appended to the distillation prompt for policies the product cannot guess — for example "never record customer names".',
     instructionsPlaceholder: 'One rule per line, for example: never record customer names',
-    maxItemsLabel: 'Memories per member',
+    maxItemsLabel: 'Memory limit',
     maxItemsDescription: 'Beyond this, the lowest ranked memories are archived by importance and recency. Archived memories stay visible under "My memory".',
     toasts: {
       saveSuccess: 'Long-term memory settings saved',
@@ -2847,6 +2863,8 @@ export default {
       typeDescription: 'FAQ suits structured Q&A datasets; document type supports file parsing and chunking; Wiki type auto-builds interlinked knowledge pages via LLM.',
       nameLabel: 'Knowledge Base Name',
       namePlaceholder: 'Enter knowledge base name',
+      defaultName: 'My Knowledge Base',
+      defaultNameWithIndex: '{name} ({index})',
       descriptionLabel: 'Knowledge Base Description (optional)',
       descriptionPlaceholder: 'Enter knowledge base description (optional)'
     },
@@ -5771,6 +5789,8 @@ export default {
     }
   },
   agentEditor: {
+    defaultName: 'My Agent',
+    defaultNameWithIndex: '{name} ({index})',
     builtinHint: 'This is a built-in agent. Name and description cannot be modified, but configuration parameters can be adjusted.',
     navGroups: {
       basic: 'Basics',
@@ -5857,7 +5877,7 @@ export default {
       historyRounds: 'Number of recent conversation rounds to keep as context',
       retainRetrievalHistory: 'Keep knowledge base results from earlier turns. When off, each turn searches again',
       rewrite: 'Automatically rewrite user questions in multi-turn conversations to resolve references and omissions',
-      memoryEnabled: 'Let this agent read and add to your long-term memory. When off, conversations with it neither read your memories nor add new ones. Turning it on here has no effect while the workspace or personal switch is off',
+      memoryEnabled: 'Let this agent read and add to your long-term memory. When off, conversations with it neither read your memories nor add new ones. Turning it on here has no effect while long-term memory is disabled in Settings',
       queryUnderstandModel: 'Model used for query understanding (rewriting and intent detection). Leave empty to reuse the main chat model.',
       rewriteSystemPrompt: 'System prompt for question rewriting (leave empty for default)',
       rewriteUserPrompt: 'User prompt template for question rewriting (leave empty for default)',

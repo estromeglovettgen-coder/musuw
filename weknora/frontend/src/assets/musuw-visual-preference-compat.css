@@ -203,7 +203,7 @@
  * This intentionally comes after the light reference bridge. */
 :root[theme-mode="dark"] body .t-dialog,
 :root[theme-mode="dark"] body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup),
-:root[theme-mode="dark"] body .t-popup__content:not(.wiki-graph-help-popup):not(.visual-mention-detail-popup):not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup):not(:has(.wiki-graph-help)):not(:has(.kp-proccfg-pop)) {
+:root[theme-mode="dark"] body .t-popup__content:not(.wiki-graph-help-popup):not(.visual-mention-detail-popup):not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup):not(:has(.wiki-graph-help)):not(:has(.kp-proccfg-pop)):not(:has(.visual-folder-picker)) {
   border-color: var(--mvc-line) !important;
   background: var(--mvc-surface) !important;
   color: var(--mvc-text) !important;

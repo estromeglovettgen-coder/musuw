@@ -577,25 +577,96 @@
 .shared-detail-value { color: #374151 !important; font-size: 12px !important; }
 .shared-detail-drawer-footer .t-button--theme-primary { border-color: #111827 !important; background: #111827 !important; color: #fff !important; }
 
-.del-agent-dialog .t-dialog,
+/* Organization delete dialog remains on its original native contract. */
 .del-org-dialog .t-dialog {
   width: min(440px, calc(100vw - 32px)) !important;
   border-radius: 16px !important;
 }
-.del-agent-dialog .circle-wrap,
 .del-org-dialog .circle-wrap { padding: 12px !important; }
-.del-agent-dialog .circle-img,
 .del-org-dialog .circle-img { display: none !important; }
-.del-agent-dialog .circle-title,
 .del-org-dialog .circle-title { color: #111827 !important; font-size: 14px !important; line-height: 20px !important; font-weight: 700 !important; }
-.del-agent-dialog .del-circle-txt,
 .del-org-dialog .del-circle-txt { color: #6b7280 !important; font-size: 11px !important; line-height: 17px !important; }
-.del-agent-dialog .circle-btn,
 .del-org-dialog .circle-btn { margin-top: 16px !important; display: flex !important; justify-content: flex-end !important; gap: 8px !important; }
-.del-agent-dialog .circle-btn-txt,
 .del-org-dialog .circle-btn-txt { min-height: 30px !important; padding: 6px 12px !important; border: 1px solid #e5e7eb !important; border-radius: 10px !important; background: #fff !important; color: #374151 !important; font-size: 11px !important; }
-.del-agent-dialog .circle-btn-txt.confirm,
 .del-org-dialog .circle-btn-txt.confirm { border-color: #dc2626 !important; background: #dc2626 !important; color: #fff !important; }
+
+/* Shared Agent/KnowledgeBase confirmation surface.  TDesign applies
+ * `dialog-class-name` to the dialog root itself (not to a descendant), so
+ * target that root directly while leaving organization/share surfaces alone. */
+body .t-dialog.visual-confirm-dialog,
+body .t-dialog.visual-kb-delete-dialog {
+  width: min(440px, calc(100vw - 32px)) !important;
+  border-radius: 16px !important;
+}
+body .t-dialog.visual-confirm-dialog .t-dialog__body,
+body .t-dialog.visual-kb-delete-dialog .t-dialog__body { padding: 20px !important; }
+body .t-dialog.visual-confirm-dialog .circle-wrap,
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete { padding: 0 !important; }
+body .t-dialog.visual-confirm-dialog .dialog-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 0 8px !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-icon {
+  flex: 0 0 20px !important;
+  color: #dc2626 !important;
+  font-size: 20px !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-title,
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete strong {
+  color: #111827 !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 700 !important;
+}
+body .t-dialog.visual-confirm-dialog .del-circle-txt,
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete p {
+  display: block !important;
+  margin: 0 !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-btn,
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer {
+  margin-top: 16px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-btn-txt,
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button {
+  min-height: 32px !important;
+  padding: 7px 12px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #374151 !important;
+  font: inherit !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+  cursor: pointer !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-btn-txt.confirm,
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button.is-danger {
+  border-color: #dc2626 !important;
+  background: #dc2626 !important;
+  color: #fff !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-btn-txt:hover:not(:disabled),
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button:hover:not(:disabled) {
+  border-color: #d1d5db !important;
+  background: #f9fafb !important;
+  color: #111827 !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-btn-txt.confirm:hover:not(:disabled),
+body .t-dialog.visual-kb-delete-dialog .visual-kb-delete footer button.is-danger:hover:not(:disabled) {
+  border-color: #b91c1c !important;
+  background: #b91c1c !important;
+  color: #fff !important;
+}
+body .t-dialog.visual-confirm-dialog .circle-img { display: none !important; }
 
 /* Organization invitation modal follows reference BatchManageModal family. */
 .invite-preview-overlay { background: rgb(0 0 0 / 45%) !important; backdrop-filter: blur(4px) !important; }

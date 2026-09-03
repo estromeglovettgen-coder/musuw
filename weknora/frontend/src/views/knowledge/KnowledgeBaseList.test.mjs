@@ -32,7 +32,7 @@ test("non-empty KB grids keep the single header creation action while preserving
   assert.doesNotMatch(source, /class="header-action-btn"/);
   assert.match(source, /class="visual-kb-list__create"[\s\S]*?data-guide="kb-list-create"/);
   assert.doesNotMatch(source, /visual-kb-list__create-card/);
-  assert.match(source, /class="visual-kb-empty"[\s\S]*?data-guide="kb-list-create"/);
+  assert.match(source, /class="visual-kb-empty"[\s\S]*?class="empty-state-btn"[^>]*data-guide="kb-list-create"/);
   assert.match(source, /class="visual-kb-section"/);
 });
 

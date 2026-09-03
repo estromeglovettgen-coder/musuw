@@ -7,7 +7,9 @@ const agentList = read('../agent/AgentList.vue')
 const knowledgeBase = read('./KnowledgeBase.vue')
 const knowledgeBaseList = read('./KnowledgeBaseList.vue')
 const tagDrawer = read('./components/KbTagManageDrawer.vue')
+const uploadSource = read('./components/KbUploadSourceDropdown.vue')
 const directoryReference = read('../../assets/musuw-native-directory-reference.css')
+const finalTheme = read('../../assets/musuw-final-theme-closure.css')
 
 test('Agent and knowledge-base directories share the same shell geometry', () => {
   assert.match(directoryReference, /\.agent-list-content\s*\{\s*gap:\s*18px\s*!important;/)
@@ -54,16 +56,33 @@ test('Agent and knowledge-base directory shells keep the same geometry at every 
 test('Knowledge-base tag, type and status filters share one popup trigger contract', () => {
   assert.match(
     knowledgeBase,
-    /\.visual-knowledge-filter-button\s*\{[\s\S]*?width:\s*112px;[\s\S]*?height:\s*36px;[\s\S]*?padding:\s*8px 10px;[\s\S]*?gap:\s*6px;[\s\S]*?line-height:\s*16px;/,
+    /\.visual-knowledge-filter-button\s*\{[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*128px;[\s\S]*?height:\s*36px;[\s\S]*?padding:\s*8px 14px;[\s\S]*?gap:\s*8px;[\s\S]*?line-height:\s*16px;/,
   )
   assert.equal((knowledgeBase.match(/class="visual-knowledge-filter-button"/g) || []).length, 3)
   assert.doesNotMatch(knowledgeBase, /<t-select\b/)
-  assert.match(knowledgeBase, /\.visual-knowledge-filter-options\s*\{[\s\S]*?width:\s*176px;/)
+  assert.match(knowledgeBase, /\.visual-knowledge-filter-options\s*\{[\s\S]*?width:\s*288px;[\s\S]*?max-height:\s*256px;[\s\S]*?padding:\s*6px;/)
+  assert.match(knowledgeBase, /\.visual-knowledge-filter-option\s*\{[\s\S]*?padding:\s*8px 12px;[\s\S]*?border-radius:\s*12px;/)
+  assert.match(knowledgeBase, /\.visual-tag-filter\s*\{[\s\S]*?width:\s*288px;[\s\S]*?max-height:\s*256px;[\s\S]*?padding:\s*6px;/)
+  assert.match(knowledgeBase, /\.visual-tag-filter__body\s*\{[\s\S]*?flex-direction:\s*column;[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?gap:\s*2px;/)
+  assert.match(knowledgeBase, /\.visual-tag-filter__chip\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-height:\s*36px;[\s\S]*?padding:\s*8px 12px;[\s\S]*?border-radius:\s*12px;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button\s*\{[\s\S]*?background:\s*#fff;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button\.is-active\s*\{[\s\S]*?border-color:\s*#d1d5db;[\s\S]*?background:\s*#fff;/)
   assert.match(knowledgeBase, /\.visual-knowledge-filter-button > span:not\(\.visual-knowledge-filter-button__clear\)\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?text-overflow:\s*clip;[\s\S]*?white-space:\s*nowrap;/)
   assert.doesNotMatch(knowledgeBase, /\.visual-knowledge-filter-button > span:not\(\.visual-knowledge-filter-button__clear\)\s*\{[^}]*text-overflow:\s*ellipsis;/)
   assert.match(knowledgeBase, /\.visual-tag-filter-popup \.t-popup__content\s*\{[\s\S]*?border-radius:\s*16px\s*!important;[\s\S]*?box-shadow:\s*0 20px 25px -5px/)
+  assert.match(finalTheme, /body \.visual-tag-filter\s*\{[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;/)
+})
+
+test('Knowledge-base toolbar keeps the five top controls on the scene-model contract', () => {
+  assert.match(uploadSource, /data-guide="kb-detail-import-url"/)
+  assert.match(uploadSource, /\.visual-upload-source__trigger\s*\{[\s\S]*?height:\s*36px;[\s\S]*?padding:\s*8px 14px;[\s\S]*?gap:\s*8px;[\s\S]*?line-height:\s*16px;/)
+  assert.match(
+    finalTheme,
+    /body \.visual-knowledge-toolbar \.visual-knowledge-filter-button,[\s\S]*?body \.visual-knowledge-toolbar \.visual-upload-source__trigger\s*\{[\s\S]*?height:\s*36px !important;[\s\S]*?padding:\s*8px 14px !important;[\s\S]*?border-radius:\s*12px !important;[\s\S]*?gap:\s*8px !important;/,
+  )
+  assert.match(finalTheme, /body \.visual-knowledge-toolbar \.visual-knowledge-filter-button\s*\{[\s\S]*?width:\s*auto !important;[\s\S]*?min-width:\s*128px !important;/)
+  assert.match(finalTheme, /body \.visual-knowledge-toolbar \.visual-upload-source__link-trigger\s*\{[\s\S]*?background:\s*#fff !important;/)
+  assert.match(finalTheme, /:root\[theme-mode="dark"\] body \.visual-knowledge-toolbar \.visual-upload-source__trigger:not\(\.visual-upload-source__link-trigger\)\s*\{[\s\S]*?background:\s*#f4f4f5 !important;[\s\S]*?color:\s*#18181b !important;/)
 })
 
 test('Tag management drawer has semantic dark-theme ownership for every visible surface', () => {

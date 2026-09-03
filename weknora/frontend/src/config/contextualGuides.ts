@@ -46,8 +46,11 @@ export const CONTEXTUAL_GUIDE_TOURS: Record<ContextualGuideTourId, ContextualGui
     steps: [
       {
         key: 'create',
-        // 空列表时优先高亮居中的主 CTA，否则退化为顶栏新建按钮
-        target: '.empty-state-btn[data-guide="kb-list-create"], [data-guide="kb-list-create"]',
+        // Empty states expose the same guide marker as the header action. Keep
+        // the empty CTA first so the guide lands on the action users can see in
+        // the middle of an empty list, while retaining a deterministic header
+        // fallback for populated lists.
+        target: '.visual-kb-empty .empty-state-btn[data-guide="kb-list-create"], .visual-kb-list__header [data-guide="kb-list-create"]',
         placement: 'bottom',
         interact: true,
       },
@@ -76,9 +79,15 @@ export const CONTEXTUAL_GUIDE_TOURS: Record<ContextualGuideTourId, ContextualGui
         key: 'intro',
       },
       {
-        key: 'upload',
+        key: 'uploadFile',
         target: '[data-guide="kb-detail-add-doc"]',
         placement: 'bottom',
+      },
+      {
+        key: 'uploadUrl',
+        target: '[data-guide="kb-detail-import-url"]',
+        placement: 'bottom',
+        optional: true,
       },
       { key: 'done' },
     ],
@@ -88,6 +97,11 @@ export const CONTEXTUAL_GUIDE_TOURS: Record<ContextualGuideTourId, ContextualGui
     stepI18nPrefix: 'contextualGuide.chat.steps',
     openDelayMs: 800,
     steps: [
+      {
+        key: 'picker',
+        target: '[data-guide="chat-picker"]',
+        placement: 'top',
+      },
       {
         key: 'kb',
         target: '[data-guide="chat-kb-mention"]',

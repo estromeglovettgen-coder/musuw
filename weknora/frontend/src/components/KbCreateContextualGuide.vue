@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
+import { useAuthStore } from '@/stores/auth'
 import {
   KB_EDITOR_FOCUS_SECTION_EVENT,
   markContextualGuideDone,
@@ -21,6 +22,7 @@ const props = defineProps<{
 }>()
 
 const active = ref(false)
+const authStore = useAuthStore()
 
 const focusSection = (section: string) => {
   window.dispatchEvent(
@@ -29,7 +31,23 @@ const focusSection = (section: string) => {
 }
 
 const guideSteps = computed<SpotlightGuideStep[]>(() => {
-  const steps: SpotlightGuideStep[] = [
+  const liteSteps: SpotlightGuideStep[] = [
+    {
+      key: 'nameLite',
+      target: '[data-guide="kb-create-name"]',
+      placement: 'right',
+      before: () => focusSection('basic'),
+    },
+    {
+      key: 'submitLite',
+      target: '[data-guide="kb-create-submit"]',
+      placement: 'top',
+      before: () => focusSection('basic'),
+      interact: true,
+    },
+  ]
+
+  const standardSteps: SpotlightGuideStep[] = [
     {
       key: 'type',
       target: '[data-guide="kb-create-type"]',
@@ -45,7 +63,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
   ]
 
   if (!props.isFaq) {
-    steps.push({
+    standardSteps.push({
       key: 'indexing',
       target: '[data-guide="kb-create-indexing"]',
       placement: 'right',
@@ -53,7 +71,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     })
   }
 
-  steps.push(
+  standardSteps.push(
     {
       key: 'navModels',
       target: '[data-guide="kb-editor-nav-models"]',
@@ -69,7 +87,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
   )
 
   if (props.needsEmbedding) {
-    steps.push({
+    standardSteps.push({
       key: 'embedding',
       target: '[data-guide="kb-create-embedding"]',
       placement: 'right',
@@ -79,7 +97,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
   }
 
   if (!props.isFaq) {
-    steps.push(
+    standardSteps.push(
       {
         key: 'parser',
         target: '[data-guide="kb-editor-nav-parser"]',
@@ -124,7 +142,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
       },
     )
   } else {
-    steps.push({
+    standardSteps.push({
       key: 'faq',
       target: '[data-guide="kb-editor-nav-faq"]',
       placement: 'right',
@@ -133,7 +151,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     })
   }
 
-  steps.push({
+  standardSteps.push({
     key: 'submit',
     target: '[data-guide="kb-create-submit"]',
     placement: 'top',
@@ -141,7 +159,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     interact: true,
   })
 
-  return steps
+  return authStore.isLiteMode ? liteSteps : standardSteps
 })
 
 let openTimer: ReturnType<typeof setTimeout> | null = null

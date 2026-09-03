@@ -390,7 +390,7 @@
   </VisualSettingsShell>
 
   <KbCreateContextualGuide
-    :when="false"
+    :when="visible && editorMode === 'create'"
     :is-faq="isFAQ"
     :needs-embedding="kbCreateNeedsEmbedding"
   />
@@ -423,6 +423,7 @@ import DataSourceSettings from './settings/DataSourceSettings.vue'
 import KnowledgeBaseActivitySettings from './settings/KnowledgeBaseActivitySettings.vue'
 import { useI18n } from 'vue-i18n'
 import { resolveConsumerSceneCandidate } from '@/utils/consumerSceneModels'
+import { nextAvailableLocalizedName } from '@/utils/localizedDefaultName'
 
 const uiStore = useUIStore()
 const authStore = useAuthStore()
@@ -694,9 +695,29 @@ watch(
   }
 )
 
+/**
+ * Lite creates a personal knowledge base without asking the user to invent a
+ * name first. Use the names already present in the shared resource cache so
+ * repeated creates remain predictable without adding a uniqueness endpoint.
+ */
+const getLiteDefaultKnowledgeBaseName = (): string => {
+  const baseName = t('knowledgeEditor.basic.defaultName').trim()
+  const loadedNames = Array.isArray(chatResources.rawKnowledgeBases)
+    ? chatResources.rawKnowledgeBases.map((kb: any) => kb?.name)
+    : []
+  return nextAvailableLocalizedName(
+    baseName,
+    loadedNames,
+    (index) => t('knowledgeEditor.basic.defaultNameWithIndex', {
+      name: baseName,
+      index,
+    }),
+  )
+}
+
 const initFormData = (type: 'document' | 'faq' = 'document') => ({
   type: normalizeKnowledgeBaseType(type),
-  name: '',
+  name: authStore.isLiteMode ? getLiteDefaultKnowledgeBaseName() : '',
   description: '',
   chunkingConfig: {
     tableMetadataInstructions: '',

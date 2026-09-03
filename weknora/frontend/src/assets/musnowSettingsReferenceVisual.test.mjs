@@ -50,15 +50,15 @@ test('settings navigation is the source plain-text stack and close button uses t
 test('left avatar menu keeps the reference profile and divider treatment', () => {
   const source = read('../components/UserMenu.vue')
   assert.match(source, /class="visual-user-menu__divider visual-user-menu__divider--dashed"/)
-  assert.match(source, /\.visual-user-menu__avatar\.is-small[\s\S]*background: #4a80e8;/)
+  assert.match(source, /\.visual-user-menu__avatar\.is-small[\s\S]*background: #000;/)
   assert.match(source, /\.visual-user-menu__dropdown[\s\S]*padding: 6px;/)
   assert.match(source, /\.visual-user-menu__dropdown[\s\S]*gap: 2px;/)
-  assert.match(source, /\.visual-user-menu__account[\s\S]*padding: 6px 10px;/)
+  assert.match(source, /\.visual-user-menu__account[\s\S]*min-height: 40px;[\s\S]*box-sizing: border-box;[\s\S]*padding: 8px 12px;/)
   assert.match(source, /\.visual-user-menu__account[\s\S]*background: transparent;/)
   assert.match(source, /\.visual-user-menu__account-copy strong[\s\S]*font-weight: 500;/)
   assert.match(source, /\.visual-user-menu__divider\s*\{[\s\S]*margin: 4px;/)
   assert.match(source, /\.visual-user-menu\.is-collapsed \.visual-user-menu__avatar\s*\{[\s\S]*width: 32px;[\s\S]*height: 32px;/)
-  assert.match(source, /\.visual-user-menu__item[\s\S]*padding: 8px 12px;/)
+  assert.match(source, /\.visual-user-menu__item[\s\S]*min-height: 40px;[\s\S]*box-sizing: border-box;[\s\S]*padding: 8px 12px;/)
   assert.match(source, /\.visual-user-menu__item[\s\S]*border-radius: 12px;/)
   assert.match(source, /visual-user-menu__divider visual-user-menu__divider--dashed[\s\S]*visual-user-menu__usage-item[\s\S]*visual-user-menu__billing-item[\s\S]*handleQuickNav\('general'\)[\s\S]*handleLogout/)
   assert.doesNotMatch(source, /visual-user-menu__account-copy[^\n]*<small>/)
@@ -66,7 +66,8 @@ test('left avatar menu keeps the reference profile and divider treatment', () =>
   assert.match(source, /@click="handleTriggerClick"/)
   assert.match(source, /userAvatar && !authStore\.isLiteMode/)
   assert.doesNotMatch(source, /visual-user-menu-pop/)
-  assert.match(source, /v-if="entitlement\?\.plan === 'free'"[\s\S]*name="arrow-up"[\s\S]*v-else[\s\S]*name="crown"/)
+  assert.match(source, /v-if="billingIsFree"[\s\S]*name="arrow-up"[\s\S]*v-else[\s\S]*name="crown"/)
+  assert.match(source, /const billingIsFree = computed\(/)
 })
 
 test('consumer model settings hide legacy catalog management in Lite mode', () => {

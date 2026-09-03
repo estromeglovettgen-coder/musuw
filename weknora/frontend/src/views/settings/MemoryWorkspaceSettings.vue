@@ -63,6 +63,7 @@
         </div>
         <div class="setting-control">
           <t-radio-group
+            class="agent-segmented-control"
             v-model="config.write_mode"
             :disabled="!canEdit || !configLoaded || !config.enabled"
             @change="debouncedSave"
@@ -274,7 +275,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import ModelSelector from '@/components/ModelSelector.vue'
@@ -345,7 +346,6 @@ const saveConfig = async () => {
   try {
     const response = await updateTenantMemoryConfig({ ...config })
     Object.assign(config, response.data)
-    MessagePlugin.success(t('memoryWorkspaceSettings.toasts.saveSuccess'))
   } catch (error: any) {
     MessagePlugin.error(
       t('memoryWorkspaceSettings.toasts.saveFailed', { message: error?.message || '' }),
@@ -358,6 +358,7 @@ const debouncedSave = () => {
   if (isInitializing.value || !configLoaded.value || loadError.value || !canEdit.value) return
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = window.setTimeout(() => {
+    saveTimer = null
     saveConfig().catch(() => {})
   }, 500)
 }
@@ -380,6 +381,13 @@ const handleAddModel = (subSection: 'chat' | 'embedding') => {
 }
 
 onMounted(loadConfig)
+
+onUnmounted(() => {
+  if (saveTimer !== null) {
+    window.clearTimeout(saveTimer)
+    saveTimer = null
+  }
+})
 </script>
 
 <style lang="less" scoped>

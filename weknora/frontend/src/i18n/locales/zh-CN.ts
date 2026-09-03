@@ -831,6 +831,8 @@ export default {
     }
   },
   agentEditor: {
+    defaultName: '我的智能体',
+    defaultNameWithIndex: '{name}（{index}）',
     builtinHint: '这是内置智能体，名称和描述不可修改，但可以调整配置参数',
     fileTypes: {
       label: '支持的文件类型',
@@ -1114,7 +1116,7 @@ export default {
       historyRounds: '保留最近几轮对话作为上下文',
       retainRetrievalHistory: '保留此前轮次的知识库检索结果。关闭时每轮重新检索',
       rewrite: '多轮对话时自动改写用户问题，消解指代和补全省略',
-      memoryEnabled: '允许该智能体读取并补充你的长期记忆。关闭后，与它的对话既不会读取记忆，也不会新增记忆。空间或个人设置关闭时，这里开启也不会生效',
+      memoryEnabled: '允许该智能体读取并补充你的长期记忆。关闭后，与它的对话既不会读取记忆，也不会新增记忆。长期记忆在设置中关闭时，这里开启也不会生效',
       queryUnderstandModel: '用于问题理解（改写与意图识别）的模型，留空则复用主对话模型',
       rewriteSystemPrompt: '用于问题改写的系统提示词（留空使用默认）',
       rewriteUserPrompt: '用于问题改写的用户提示词模板（留空使用默认）',
@@ -4140,6 +4142,8 @@ export default {
       typeDescription: 'FAQ 类型适合结构化问答数据；文档型支持文件解析与分块；Wiki 类型由 LLM 自动构建互链知识页面。',
       nameLabel: '知识库名称',
       namePlaceholder: '请输入知识库名称',
+      defaultName: '我的知识库',
+      defaultNameWithIndex: '{name}（{index}）',
       descriptionLabel: '知识库描述（可选）',
       descriptionPlaceholder: '请输入知识库描述（可选）'
     },
@@ -4925,7 +4929,7 @@ export default {
   memorySettings: {
     title: '我的记忆',
     description: '这里是助手跨会话记住的关于你的内容。你可以随时查看、修改和删除，删除后不会再被使用。',
-    workspaceDisabled: '当前空间尚未开启长期记忆，管理员开启后这里的开关才会生效。',
+    workspaceDisabled: '长期记忆尚未开启，开启后这里的开关才会生效。',
     enableLabel: '为我启用长期记忆',
     enableDescription: '关闭后助手不再读取或新增你的记忆，已有记忆会保留，重新开启即可继续使用。',
     agentDisabledHint: '单个智能体也可以单独关闭长期记忆。被关闭的智能体在对话中既不会读取你的记忆，也不会新增记忆；换用其他智能体不受影响。',
@@ -4978,7 +4982,7 @@ export default {
     trackingHint: '这些是你反复问到、但还没达到「长期关注」次数的主题。记下来之前不会进入对话。',
     documentsHint: '这些文档在回答里反复出现，检索会稍微偏向它们。停止跟踪后不再加权，再被引用两次会重新出现。',
     supersededHint: '这些内容已被更新的记忆替代，不会再进入对话，只作为变更记录保留。',
-    archivedHint: '已归档的记忆不会再进入对话。超出每人上限后，较少用到的条目会被自动收起。',
+    archivedHint: '已归档的记忆不会再进入对话。超出记忆上限后，较少用到的条目会被自动收起。',
     pendingEmptyTitle: '没有待确认的推断',
     pendingEmptyDescription: '当系统从你的提问里推断出关于你的信息时，会先放在这里等你确认。',
     trackingEmptyTitle: '没有正在观察的主题',
@@ -5114,18 +5118,18 @@ export default {
   },
   memoryWorkspaceSettings: {
     title: '长期记忆',
-    description: '让助手跨会话记住成员说过的个人信息、偏好、事实与在办事项。',
+    description: '让助手跨会话记住对话中的个人信息、偏好、事实与在办事项。',
     loadError: '长期记忆设置加载失败，请重试。',
     introTitle: '默认关闭，需要你显式开启',
-    introDescription: '长期记忆会保留成员在对话中说过的内容，因此默认不开启。开启后每位成员的记忆彼此隔离，成员可以在「我的记忆」里随时查看、修改、删除或整体关闭。生效中的个人信息与偏好会进入之后的每一轮对话；事实和在办事项只在相关问题时召回。',
-    enableLabel: '在本空间启用长期记忆',
-    enableDescription: '关闭后本空间的所有会话都不会读取或写入记忆。',
+    introDescription: '长期记忆会保留对话中说过的内容，因此默认不开启。开启后可以在「我的记忆」里随时查看、修改、删除或整体关闭。生效中的个人信息与偏好会进入之后的每一轮对话；事实和在办事项只在相关问题时召回。',
+    enableLabel: '启用长期记忆',
+    enableDescription: '关闭后所有会话都不会读取或写入记忆。',
     writeModeLabel: '记忆写入方式',
     writeModeDescription: '决定什么内容会被记住。',
     writeModeExplicit: '仅显式记录',
     writeModeAuto: '自动提炼',
-    writeModeExplicitHint: '只记录成员明确说「记住：……」的内容，以及在记忆页手动添加的条目，不额外调用模型。',
-    writeModeAutoHint: '在此基础上，会话结束后在后台调用一次模型，从成员自己说过的话里提炼值得长期保留的内容。',
+    writeModeExplicitHint: '只记录明确说「记住：……」的内容，以及在记忆页手动添加的条目，不额外调用模型。',
+    writeModeAutoHint: '在此基础上，会话结束后在后台调用一次模型，从对话中提炼值得长期保留的内容。',
     advancedLabel: '高级设置',
     advancedDescription: '模型、语义召回与自动提炼参数。日常使用通常无需调整。',
     autoOnlyHint: '切换为「自动提炼」后可设置此项。',
@@ -5135,7 +5139,7 @@ export default {
     extractDelayLabel: '挖掘延迟',
     extractDelayDescription: '一轮对话结束后等待多久再挖掘。等一等可以让一次模型调用覆盖用户连着发的几条消息。',
     extractMinIntervalLabel: '两次挖掘的最小间隔',
-    extractMinIntervalDescription: '同一个人两次挖掘之间至少间隔多久，用来控制成本。间隔内产生的消息不会被丢弃，会顺延到下一次挖掘一并处理。',
+    extractMinIntervalDescription: '两次挖掘之间至少间隔多久，用来控制成本。间隔内产生的消息不会被丢弃，会顺延到下一次挖掘一并处理。',
     vectorRecallLabel: '按语义召回记忆',
     vectorRecallDescription: '除了字面匹配，再按含义匹配。用户换个说法之后，原来那条记忆仍然能被找到——而多数记忆迟早会被换说法。每轮问答多一次向量调用，超时会自动退回字面匹配。',
     embeddingModelLabel: '记忆 Embedding 模型',
@@ -5145,9 +5149,9 @@ export default {
     interestThresholdLabel: '成为长期关注的次数',
     interestThresholdDescription: '同一个主题被问到这么多次后，才会作为长期关注记下来。设为 1 会把每个一次性问题都记下来，通常太吵。',
     instructionsLabel: '自定义挖掘规则',
-    instructionsDescription: '追加到挖掘提示词里的空间规则，用来表达产品猜不到的策略，例如「永远不要记录客户姓名」。',
+    instructionsDescription: '追加到挖掘提示词里的自定义规则，用来表达产品猜不到的策略，例如「永远不要记录客户姓名」。',
     instructionsPlaceholder: '一行一条规则，例如：永远不要记录客户姓名',
-    maxItemsLabel: '每人记忆上限',
+    maxItemsLabel: '记忆上限',
     maxItemsDescription: '超出后按重要度与使用时间归档最低的若干条，归档的记忆仍可在「我的记忆」里查看。',
     toasts: {
       saveSuccess: '长期记忆配置已保存',
@@ -6646,6 +6650,10 @@ export default {
     interactHint: '请直接点击高亮区域继续',
     chat: {
       steps: {
+        picker: {
+          title: '选择回答方式',
+          desc: '在这里选择智能体、模型和思考强度。部分高级模型需要升级套餐，使用前会明确提示。'
+        },
         done: {
           title: '开始探索吧',
           desc: '试试提一个与已上传文档相关的问题，体验带引用的精准回答。'
@@ -6670,9 +6678,13 @@ export default {
           title: '解析完成后即可使用',
           desc: '文档解析入库后，可在对话中 {\'@\'} 本知识库提问，回答会附带引用来源。'
         },
-        upload: {
+        uploadFile: {
           title: '添加文档',
-          desc: '点击此处添加文件或网页链接，Musuw 会自动解析并建立索引。'
+          desc: '上传或拖入支持的文件，Musuw 会自动解析并建立索引。'
+        },
+        uploadUrl: {
+          title: '导入网页',
+          desc: '资料来自公开网页或社媒链接时，从这里导入；现有套餐规则仍会正常提示。'
         },
         intro: {
           title: '知识库还是空的',
@@ -6762,6 +6774,14 @@ export default {
     },
     kbCreate: {
       steps: {
+        nameLite: {
+          title: '确认知识库名称',
+          desc: '名称已经填好，可以直接使用，也可以改成更容易识别的名称。'
+        },
+        submitLite: {
+          title: '创建知识库',
+          desc: '点击高亮的「创建」按钮，下一页即可添加第一份资料。'
+        },
         submit: {
           title: '创建知识库',
           desc: '确认类型、名称与模型已选好后，点击高亮的「创建」按钮。创建成功后将引导你上传第一份文档。'
@@ -6874,7 +6894,7 @@ export default {
     steps: {
       doneLite: {
         title: '现在就开始',
-        desc: '先问一个问题，或上传一份资料即可。以后可从昵称旁的问号重新打开本引导。'
+        desc: '先问一个问题，或上传一份资料即可。进入相关页面时，我们会在需要的地方继续提示。'
       },
       agentsLite: {
         title: '选择合适的智能体',

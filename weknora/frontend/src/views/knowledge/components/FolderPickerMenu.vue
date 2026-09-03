@@ -258,32 +258,47 @@ const commitNewFolder = async () => {
 <style scoped lang="less">
 .visual-folder-picker {
   --visual-folder-indent: 14px;
-  width: min(280px, calc(100vw - 32px));
-  min-width: 220px;
+  width: 288px;
+  max-width: min(288px, calc(100vw - 32px));
+  max-height: 256px;
   box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  color: #374151;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 8px 10px -6px rgb(0 0 0 / 10%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
 }
 
 .visual-folder-picker__back {
   width: 100%;
-  min-height: 34px;
-  margin: 0 0 4px;
-  padding: 7px 8px;
+  min-height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 12px;
   border: 0;
   border-bottom: 1px solid #f3f4f6;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   background: transparent;
-  color: #6b7280;
+  color: #374151;
   font: inherit;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
   font-weight: 600;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .visual-folder-picker__back:hover {
+  background: #f9fafb;
   color: #111827;
 }
 
@@ -291,8 +306,16 @@ const commitNewFolder = async () => {
   font-size: 14px;
 }
 
+.visual-folder-picker__back span {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
 .visual-folder-picker__list {
-  max-height: 280px;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 2px;
@@ -302,7 +325,7 @@ const commitNewFolder = async () => {
 .visual-folder-picker__row,
 .visual-folder-picker__create-row {
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   box-sizing: border-box;
   padding-left: calc(var(--visual-folder-depth, 0) * var(--visual-folder-indent));
   display: flex;
@@ -311,29 +334,35 @@ const commitNewFolder = async () => {
 }
 
 .visual-folder-picker__row {
-  border-radius: 9px;
+  border-radius: 12px;
 }
 
 .visual-folder-picker__row:hover {
   background: #f9fafb;
 }
 
+.visual-folder-picker__row.is-current {
+  background: #f3f4f6;
+}
+
 .visual-folder-picker__select {
   min-width: 0;
-  min-height: 34px;
+  min-height: 36px;
   flex: 1 1 auto;
-  padding: 7px 6px 7px 8px;
+  box-sizing: border-box;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
   background: transparent;
-  color: #4b5563;
+  color: #374151;
   font: inherit;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -416,7 +445,7 @@ const commitNewFolder = async () => {
   color: #111827;
   font: inherit;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
   outline: none;
 }
 
@@ -427,6 +456,24 @@ const commitNewFolder = async () => {
 
 .visual-folder-picker__create-row .visual-folder-picker__cancel-create {
   opacity: 1;
+}
+
+@media (min-width: 640px) {
+  .visual-folder-picker__back,
+  .visual-folder-picker__select,
+  .visual-folder-picker__input {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+
+/* Dark mode keeps the selected row on the shared semantic hover token. */
+:global(:root[theme-mode="dark"] body .visual-folder-picker__row.is-current) {
+  background: var(--mvc-hover) !important;
+}
+
+:global(:root[theme-mode="dark"] body .visual-folder-picker__back) {
+  border-bottom-color: var(--mvc-line) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

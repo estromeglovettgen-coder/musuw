@@ -1788,6 +1788,7 @@ import {
 import { useI18n } from 'vue-i18n';
 import { selectInitialModelId } from '@/utils/modelDefaults';
 import { copyWithToast } from '@/utils/clipboard';
+import { nextAvailableLocalizedName } from '@/utils/localizedDefaultName';
 import { MessagePlugin } from 'tdesign-vue-next';
 import {
   createAgent,
@@ -3041,6 +3042,27 @@ const getPresetDefaultName = (preset: AgentTypePreset | null): string => {
   if (!preset || preset.id === 'custom') return '';
   return t('agentEditor.agentType.defaultNamePattern', { label: agentTypePresetLabel(preset) });
 };
+
+/**
+ * Lite's personal-agent flow starts with a ready-to-save custom name. Read
+ * only the agents already present in the shared resource cache so repeated
+ * creates get a deterministic suffix without introducing another API call or
+ * changing the server's uniqueness contract.
+ */
+const getLiteDefaultAgentName = (): string => {
+  const baseName = t('agentEditor.defaultName').trim()
+  const loadedNames = Array.isArray(chatResources.agents)
+    ? chatResources.agents.map((agent: any) => agent?.name)
+    : []
+  return nextAvailableLocalizedName(
+    baseName,
+    loadedNames,
+    (index) => t('agentEditor.defaultNameWithIndex', {
+      name: baseName,
+      index,
+    }),
+  )
+}
 const getPresetDefaultDescription = (preset: AgentTypePreset | null): string => {
   if (!preset) return '';
   return agentTypePresetDescription(preset);
@@ -3412,11 +3434,18 @@ watch(() => props.visible, async (val) => {
         // 给新建表单补上"我的 XXX"默认名 + 预设描述，让用户可直接保存；
         // 用户输入过的值不会被覆盖（此处是新建场景，字段必定为空）。
         if (!formData.value.name) {
-          formData.value.name = getPresetDefaultName(preset);
+          if (!authStore.isLiteMode) {
+            formData.value.name = getPresetDefaultName(preset);
+          }
         }
         if (!formData.value.description) {
           formData.value.description = getPresetDefaultDescription(preset);
         }
+      }
+      // Lite always starts a personal agent with a saveable name, regardless
+      // of whether the compact form defaults to quick answers or reasoning.
+      if (authStore.isLiteMode && !formData.value.name) {
+        formData.value.name = getLiteDefaultAgentName()
       }
       // Presets intentionally remain scenario-specific. Apply the Musuw
       // product default afterwards so the default RAG preset cannot narrow

@@ -153,8 +153,8 @@ test("Settings has one active mount on the dedicated route", () => {
 
 test("Lite UserMenu keeps account exit but does not rediscover management surfaces", () => {
   assert.match(userMenu, /<div\s+[\s\S]*class="visual-user-menu__account(?: [^"]*)?"/);
-  assert.match(userMenu, /<button type="button" class="visual-user-menu__guide"/);
-  assert.doesNotMatch(userMenu, /v-if="!authStore\.isLiteMode"[^>]*class="visual-user-menu__guide"/);
+  assert.match(userMenu, /v-if="!authStore\.isLiteMode"[^>]*class="visual-user-menu__guide"/);
+  assert.doesNotMatch(userMenu, /<button type="button" class="visual-user-menu__guide"[^>]*@click\.stop="reopenGuide"/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageMembers/);
   assert.match(userMenu, /!authStore\.isLiteMode && canManageModels/);
   assert.match(userMenu, /<template v-if="!authStore\.isLiteMode">[\s\S]*openDocs[\s\S]*openGithub/);

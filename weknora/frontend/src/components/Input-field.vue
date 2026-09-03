@@ -265,6 +265,7 @@ export default defineComponent({
             ref="modelButtonRef"
             type="button"
             class="visual-chat-composer__combined-picker"
+            data-guide="chat-picker"
             :class="{ 'is-open': showModelSelector }"
             :aria-expanded="showModelSelector"
             :aria-label="`${selectedAgentDisplayName} ${selectedModelCapsuleName} ${selectedReasoningLabel}`"

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const editor = readFileSync(new URL('./KnowledgeBaseEditorModal.vue', import.meta.url), 'utf8')
+const createGuide = readFileSync(new URL('../../components/KbCreateContextualGuide.vue', import.meta.url), 'utf8')
 const template = editor.slice(0, editor.indexOf('<script setup'))
 
 test('Lite knowledge editor renders only the Basic and Advanced product sections', () => {
@@ -39,6 +40,16 @@ test('Lite technical section deep links fall back to Basic while Advanced remain
       `Lite must not render ${section}`,
     )
   }
+})
+
+test('Lite knowledge-base creation pre-fills a first available localized name and final guide action', () => {
+  assert.match(editor, /import \{ nextAvailableLocalizedName \} from '@\/utils\/localizedDefaultName'/)
+  assert.match(editor, /knowledgeEditor\.basic\.defaultNameWithIndex/)
+  assert.match(editor, /chatResources\.rawKnowledgeBases/)
+  assert.match(editor, /name: authStore\.isLiteMode \? getLiteDefaultKnowledgeBaseName\(\) : ''/)
+  assert.match(editor, /<KbCreateContextualGuide\s+:when="visible && editorMode === 'create'"/)
+  assert.match(createGuide, /key: 'nameLite'/)
+  assert.match(createGuide, /key: 'submitLite'/)
 })
 
 test('Lite knowledge editor does not expose model, embedding, or parser selectors', () => {

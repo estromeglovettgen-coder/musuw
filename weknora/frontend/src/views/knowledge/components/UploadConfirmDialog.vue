@@ -2246,16 +2246,13 @@ const handleConfirm = () => {
   z-index: 3100 !important;
 
   .t-popup__content {
-    padding: 4px !important;
+    padding: 0 !important;
     margin-top: 6px !important;
     min-width: 208px;
-    border-radius: 10px !important;
-    background: var(--td-bg-color-container) !important;
-    border: 0.5px solid var(--td-component-stroke) !important;
-    box-shadow:
-      0 0 0 0.5px rgba(0, 0, 0, 0.03),
-      0 2px 4px rgba(0, 0, 0, 0.04),
-      0 8px 24px rgba(0, 0, 0, 0.1) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }
 </style>
