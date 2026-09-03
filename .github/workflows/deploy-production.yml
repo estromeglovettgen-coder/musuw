@@ -399,8 +399,24 @@ jobs:
               ')" || return 1
             test "$tag_digest" = "$digest" || return 1
           }
-          validate_registry_digest "$APP_DIGEST" "$app_tag" "$app_repository"
-          validate_registry_digest "$FRONTEND_DIGEST" "$frontend_tag" "$frontend_repository"
+          wait_for_registry_digest() {
+            local digest="$1"
+            local expected_tag="$2"
+            local repository="$3"
+            local attempt
+            for attempt in {1..12}; do
+              if validate_registry_digest "$digest" "$expected_tag" "$repository"; then
+                return 0
+              fi
+              if [ "$attempt" -eq 12 ]; then
+                printf '%s\n' "registry did not expose the expected immutable digest after $attempt attempts" >&2
+                return 1
+              fi
+              sleep 5
+            done
+          }
+          wait_for_registry_digest "$APP_DIGEST" "$app_tag" "$app_repository"
+          wait_for_registry_digest "$FRONTEND_DIGEST" "$frontend_tag" "$frontend_repository"
           {
             printf 'app_digest=%s\n' "$APP_DIGEST"
             printf 'app_ref=%s@%s\n' "$app_repository" "$APP_DIGEST"
