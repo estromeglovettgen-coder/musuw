@@ -996,6 +996,7 @@ export default {
       postCreateHint: {
         title: 'Created successfully',
         footer: 'Keep adjusting settings, configure sharing and publishing, then click "Save and Close".',
+        footerLite: 'Keep adjusting settings, then click "Save and Close" when you are done.',
         integrationDesc: 'Go to Integrations to configure IM, web embed, and other publishing channels',
       },
       basicInfo: 'Basic Info',

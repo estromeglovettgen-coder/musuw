@@ -5927,6 +5927,7 @@ export default {
       postCreateHint: {
         title: '생성 완료',
         footer: '설정을 계속 조정하고 공유·배포 채널을 구성한 뒤 "저장 후 닫기"를 클릭하세요.',
+        footerLite: '설정을 계속 조정한 뒤 완료되면 "저장 후 닫기"를 클릭하세요.',
         integrationDesc: '통합 센터에서 IM, 웹 임베드 등 배포 채널을 설정하세요',
       },
       basicInfo: '기본정보',

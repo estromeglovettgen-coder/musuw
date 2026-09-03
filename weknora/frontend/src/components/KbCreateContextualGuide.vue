@@ -41,7 +41,9 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     {
       key: 'submitLite',
       target: '[data-guide="kb-create-submit"]',
-      placement: 'top',
+      // The submit action lives in the editor footer. Keep the card beside
+      // it so compact viewports never cover the highlighted native button.
+      placement: 'left',
       before: () => focusSection('basic'),
       interact: true,
     },

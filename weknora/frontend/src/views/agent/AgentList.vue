@@ -686,6 +686,7 @@
 
     <!-- 智能体编辑器弹窗 -->
     <AgentEditorModal :visible="editorVisible" :mode="editorMode" :agent="editingAgent"
+      :existing-agent-names="agents.map((agent) => agent.name)"
       :initialSection="editorInitialSection"
       :initialHighlightField="editorInitialHighlightField"
       :readOnly="editorMode === 'edit' && editingAgent != null && !canManageAgent(editingAgent as AgentWithUI)"

@@ -5931,6 +5931,7 @@ export default {
       postCreateHint: {
         title: '创建成功',
         footer: '可继续调整配置，设置共享与发布渠道，完成后点击「保存并关闭」。',
+        footerLite: '可继续调整配置，完成后点击「保存并关闭」。',
         integrationDesc: '前往集成中心配置 IM、网页嵌入等发布渠道',
       },
       basicInfo: '基本信息',

@@ -1758,7 +1758,9 @@
         <t-icon name="check-circle-filled" class="settings-footer-note__icon" />
         <span>
           <strong>{{ $t('agent.editor.postCreateHint.title') }}</strong>
-          {{ $t('agent.editor.postCreateHint.footer') }}
+          {{ $t(authStore.isLiteMode
+            ? 'agent.editor.postCreateHint.footerLite'
+            : 'agent.editor.postCreateHint.footer') }}
         </span>
       </p>
       <div class="settings-footer-actions">
@@ -1856,6 +1858,7 @@ const props = defineProps<{
   visible: boolean;
   mode: 'create' | 'edit';
   agent?: CustomAgent | null;
+  existingAgentNames?: string[];
   initialSection?: string;
   initialHighlightField?: string;
   // readOnly hides the save button so a Viewer who clicks an agent
@@ -3045,15 +3048,16 @@ const getPresetDefaultName = (preset: AgentTypePreset | null): string => {
 
 /**
  * Lite's personal-agent flow starts with a ready-to-save custom name. Read
- * only the agents already present in the shared resource cache so repeated
- * creates get a deterministic suffix without introducing another API call or
- * changing the server's uniqueness contract.
+ * the names already loaded by the directory (falling back to the shared
+ * resource cache) so repeated creates get a deterministic suffix without an
+ * extra API call or any change to the server's uniqueness contract.
  */
 const getLiteDefaultAgentName = (): string => {
   const baseName = t('agentEditor.defaultName').trim()
-  const loadedNames = Array.isArray(chatResources.agents)
-    ? chatResources.agents.map((agent: any) => agent?.name)
-    : []
+  const loadedNames = props.existingAgentNames
+    ?? (Array.isArray(chatResources.agents)
+      ? chatResources.agents.map((agent: any) => agent?.name)
+      : [])
   return nextAvailableLocalizedName(
     baseName,
     loadedNames,

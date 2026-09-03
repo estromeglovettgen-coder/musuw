@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const source = readFileSync(new URL('./AgentEditorModal.vue', import.meta.url), 'utf8')
+const listSource = readFileSync(new URL('./AgentList.vue', import.meta.url), 'utf8')
 const editorResourceSource = readFileSync(new URL('../../stores/editorResources.ts', import.meta.url), 'utf8')
 
 test('editing an agent closes the editor after a successful save', () => {
@@ -32,6 +33,7 @@ test('shows a post-create hint after the first successful save', () => {
   assert.match(source, /const isPostCreateSession = computed\(\(\) => !!savedAgent\.value\)/)
   assert.match(source, /settings-footer-note/)
   assert.match(source, /agent\.editor\.postCreateHint\.title/)
+  assert.match(source, /authStore\.isLiteMode[\s\S]*agent\.editor\.postCreateHint\.footerLite/)
 })
 
 test('new agents use deterministic upstream defaults with a Lite scene fallback', () => {
@@ -60,6 +62,9 @@ test('Lite new agents receive a first available localized name in either mode', 
   )
   assert.match(source, /import \{ nextAvailableLocalizedName \} from '@\/utils\/localizedDefaultName'/)
   assert.match(source, /agentEditor\.defaultNameWithIndex/)
+  assert.match(source, /existingAgentNames\?: string\[\]/)
+  assert.match(source, /props\.existingAgentNames\s*\?\?\s*\(Array\.isArray\(chatResources\.agents\)/)
+  assert.match(listSource, /:existing-agent-names="agents\.map\(\(agent\) => agent\.name\)"/)
   assert.match(source, /chatResources\.agents/)
   assert.match(createPath, /if \(authStore\.isLiteMode && !formData\.value\.name\) \{[\s\S]*getLiteDefaultAgentName\(\)/)
   assert.match(createPath, /if \(newFormData\.config\.agent_mode === 'smart-reasoning'\)/)
