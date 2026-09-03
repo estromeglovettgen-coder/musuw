@@ -116,16 +116,12 @@ func (p *PluginQueryUnderstand) OnEvent(ctx context.Context,
 	}
 
 	// --- Call model ---
-	thinking := false
+	modelInfo := p.queryUnderstandModelInfo(ctx, rewriteModel)
 	modelCtx := types.WithLLMCallMetadata(ctx, "query_rewrite", "")
 	response, err := rewriteModel.Chat(modelCtx, []chat.Message{
 		{Role: "system", Content: systemContent},
 		userMsg,
-	}, &chat.ChatOptions{
-		Temperature:         0.3,
-		MaxCompletionTokens: maxTokens,
-		Thinking:            &thinking,
-	})
+	}, queryUnderstandChatOptions(maxTokens, modelInfo))
 	if err != nil {
 		pipelineError(ctx, "QueryUnderstand", "model_call", map[string]interface{}{
 			"session_id": chatManage.SessionID,
@@ -162,6 +158,86 @@ func (p *PluginQueryUnderstand) OnEvent(ctx context.Context,
 		"original_output":     response.Content,
 	})
 	return next()
+}
+
+// queryUnderstandModelInfo loads the selected model's capability metadata for
+// the non-streaming rewrite call. GetChatModel intentionally returns only the
+// runtime client, so the model row is needed to honor reasoning parameters.
+func (p *PluginQueryUnderstand) queryUnderstandModelInfo(ctx context.Context, model chat.Chat) *types.Model {
+	if p == nil || p.modelService == nil || model == nil {
+		return nil
+	}
+	modelID := strings.TrimSpace(model.GetModelID())
+	if modelID == "" {
+		return nil
+	}
+	modelInfo, err := p.modelService.GetModelByID(ctx, modelID)
+	if err != nil {
+		pipelineWarn(ctx, "QueryUnderstand", "get_model_metadata", map[string]interface{}{
+			"model_id": modelID,
+			"error":    err.Error(),
+		})
+		return nil
+	}
+	return modelInfo
+}
+
+// queryUnderstandChatOptions keeps the historical explicit Thinking=false
+// request only when model metadata confirms reasoning is optional. Models
+// marked mandatory must instead receive a supported reasoning effort, while
+// missing metadata leaves both fields unset so a transient lookup failure can
+// never turn into an invalid effort=none provider request.
+func queryUnderstandChatOptions(maxTokens int, model *types.Model) *chat.ChatOptions {
+	options := &chat.ChatOptions{
+		Temperature:         0.3,
+		MaxCompletionTokens: maxTokens,
+	}
+	if model == nil {
+		return options
+	}
+	if !model.Parameters.Reasoning.Mandatory {
+		thinking := false
+		options.Thinking = &thinking
+		return options
+	}
+
+	// Do not send an explicit boolean for mandatory models. If no usable effort
+	// is present in metadata, leaving both fields unset lets the provider choose
+	// its own mandatory default instead of explicitly disabling reasoning.
+	options.Thinking = nil
+	options.ReasoningEffort = mandatoryReasoningEffort(model.Parameters.Reasoning)
+	return options
+}
+
+// mandatoryReasoningEffort chooses the model's configured default when it is
+// valid for the advertised capabilities, then falls back to the first valid
+// supported effort. "none" is intentionally excluded for mandatory models:
+// it is a valid OpenRouter enum but would violate the model's requirement.
+func mandatoryReasoningEffort(reasoning types.ReasoningParameters) string {
+	supported := make(map[string]struct{}, len(reasoning.SupportedEfforts))
+	for _, value := range reasoning.SupportedEfforts {
+		effort, err := chat.NormalizeReasoningEffort(value)
+		if err != nil || effort == "" || effort == "none" {
+			continue
+		}
+		supported[effort] = struct{}{}
+	}
+
+	if effort, err := chat.NormalizeReasoningEffort(reasoning.DefaultEffort); err == nil &&
+		effort != "" && effort != "none" {
+		_, supportedByModel := supported[effort]
+		if len(supported) == 0 || supportedByModel {
+			return effort
+		}
+	}
+
+	for _, value := range reasoning.SupportedEfforts {
+		effort, err := chat.NormalizeReasoningEffort(value)
+		if err == nil && effort != "" && effort != "none" {
+			return effort
+		}
+	}
+	return ""
 }
 
 // updateUserMessageImageCaption writes the generated ImageDescription back to

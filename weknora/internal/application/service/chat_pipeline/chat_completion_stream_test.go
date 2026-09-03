@@ -191,6 +191,28 @@ func TestStreamIgnoresDuplicateTerminalAnswer(t *testing.T) {
 	require.Equal(t, []event.AgentFinalAnswerData{{Content: "hello"}, {Done: true}}, answerEvents)
 }
 
+func TestStreamForwardsTerminalUsageToFinalAnswer(t *testing.T) {
+	bus := &syncEventBus{}
+	usage := &types.TokenUsage{PromptTokens: 12, CompletionTokens: 3, TotalTokens: 15}
+	model := &openStreamChat{closeStream: true, chunks: []types.StreamResponse{
+		{ResponseType: types.ResponseTypeAnswer, Content: "hello"},
+		{ResponseType: types.ResponseTypeAnswer, Done: true},
+		{ResponseType: types.ResponseTypeAnswer, Done: true, Usage: usage},
+	}}
+
+	chatManage := &types.ChatManage{}
+	chatManage.SessionID = "sess-usage"
+	chatManage.EventBus = bus
+	plugin := &PluginChatCompletionStream{modelService: &stubModelService{model: model}}
+	require.Nil(t, plugin.OnEvent(context.Background(), types.CHAT_COMPLETION_STREAM, chatManage, func() *PluginError { return nil }))
+
+	require.Eventually(t, func() bool { return len(bus.finalAnswerEvents()) == 2 }, 2*time.Second, 5*time.Millisecond)
+	answerEvents := bus.finalAnswerEvents()
+	got, ok := answerEvents[1].Usage.(*types.TokenUsage)
+	require.True(t, ok, "terminal answer must carry typed token usage")
+	require.Equal(t, usage, got)
+}
+
 func TestStreamCreditExhaustionPreservesPartialAnswerAndTerminates(t *testing.T) {
 	bus := &syncEventBus{}
 	model := &openStreamChat{closeStream: true, chunks: []types.StreamResponse{

@@ -1273,37 +1273,88 @@ func (s *sessionService) consumeFallbackStream(
 	eventBus := chatManage.EventBus
 	var finalContent string
 	streamCompleted := false
+	terminalPending := false
+	var streamUsage *types.TokenUsage
 	decoder := modelContext.StreamDecoder()
+	completeStream := func() {
+		if streamCompleted {
+			return
+		}
+		var usageValue interface{}
+		if streamUsage != nil {
+			usageValue = streamUsage
+		}
+		if err := eventBus.Emit(ctx, types.Event{
+			ID:        fallbackID,
+			Type:      types.EventType(event.EventAgentFinalAnswer),
+			SessionID: chatManage.SessionID,
+			Data: event.AgentFinalAnswerData{
+				Done:       true,
+				IsFallback: true,
+				Usage:      usageValue,
+			},
+		}); err != nil {
+			logger.Errorf(ctx, "Failed to emit fallback completion event: %v", err)
+		}
+		chatManage.ChatResponse = &types.ChatResponse{Content: finalContent}
+		if streamUsage != nil {
+			chatManage.ChatResponse.Usage = *streamUsage
+		}
+		streamCompleted = true
+		terminalPending = false
+		logger.Infof(ctx, "Fallback streaming response completed")
+	}
 
 	for response := range responseChan {
+		if response.Usage != nil {
+			usage := *response.Usage
+			streamUsage = &usage
+		}
+
 		// Emit event for each answer chunk
 		if response.ResponseType == types.ResponseTypeAnswer {
+			if streamCompleted {
+				continue
+			}
+			var usageValue interface{}
+			if streamUsage != nil {
+				usageValue = streamUsage
+			}
 			response.Content = decoder.Feed(response.Content)
 			if response.Done {
 				response.Content += decoder.Flush()
 			}
 			finalContent += response.Content
-			if err := eventBus.Emit(ctx, types.Event{
-				ID:        fallbackID,
-				Type:      types.EventType(event.EventAgentFinalAnswer),
-				SessionID: chatManage.SessionID,
-				Data: event.AgentFinalAnswerData{
-					Content:    response.Content,
-					Done:       response.Done,
-					IsFallback: true,
-				},
-			}); err != nil {
-				logger.Errorf(ctx, "Failed to emit fallback answer chunk event: %v", err)
+			emitDone := response.Done && response.Usage != nil
+			if response.Done {
+				terminalPending = !emitDone
+			}
+			if response.Content != "" || emitDone {
+				if err := eventBus.Emit(ctx, types.Event{
+					ID:        fallbackID,
+					Type:      types.EventType(event.EventAgentFinalAnswer),
+					SessionID: chatManage.SessionID,
+					Data: event.AgentFinalAnswerData{
+						Content:    response.Content,
+						Done:       emitDone,
+						IsFallback: true,
+						Usage:      usageValue,
+					},
+				}); err != nil {
+					logger.Errorf(ctx, "Failed to emit fallback answer chunk event: %v", err)
+				}
 			}
 
-			// Update ChatResponse with final content when done
-			if response.Done {
-				chatManage.ChatResponse = &types.ChatResponse{Content: finalContent}
+			if emitDone {
+				chatManage.ChatResponse = &types.ChatResponse{Content: finalContent, Usage: *streamUsage}
 				streamCompleted = true
+				terminalPending = false
 				logger.Infof(ctx, "Fallback streaming response completed")
-				break
 			}
 		}
+	}
+	if terminalPending {
+		completeStream()
 	}
 
 	// If channel closed without Done=true, emit final event with fixed response

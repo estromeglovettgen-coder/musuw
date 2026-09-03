@@ -6,6 +6,103 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
+func TestQueryUnderstandChatOptions_ReasoningCapability(t *testing.T) {
+	tests := []struct {
+		name            string
+		reasoning       types.ReasoningParameters
+		wantEffort      string
+		wantThinkingNil bool
+	}{
+		{
+			name: "mandatory uses configured default effort",
+			reasoning: types.ReasoningParameters{
+				Supported:        true,
+				Mandatory:        true,
+				SupportedEfforts: []string{"xhigh", "high", "low"},
+				DefaultEffort:    "high",
+			},
+			wantEffort:      "high",
+			wantThinkingNil: true,
+		},
+		{
+			name: "mandatory falls back to first supported effort",
+			reasoning: types.ReasoningParameters{
+				Supported:        true,
+				Mandatory:        true,
+				SupportedEfforts: []string{"medium", "low"},
+			},
+			wantEffort:      "medium",
+			wantThinkingNil: true,
+		},
+		{
+			name: "mandatory without an effort omits thinking override",
+			reasoning: types.ReasoningParameters{
+				Supported: true,
+				Mandatory: true,
+			},
+			wantEffort:      "",
+			wantThinkingNil: true,
+		},
+		{
+			name: "non mandatory keeps explicit thinking disabled",
+			reasoning: types.ReasoningParameters{
+				Supported:        true,
+				Mandatory:        false,
+				SupportedEfforts: []string{"high", "none"},
+				DefaultEffort:    "high",
+			},
+			wantEffort:      "",
+			wantThinkingNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &types.Model{Parameters: types.ModelParameters{Reasoning: tt.reasoning}}
+			got := queryUnderstandChatOptions(150, model)
+			if got.MaxCompletionTokens != 150 {
+				t.Fatalf("MaxCompletionTokens = %d, want 150", got.MaxCompletionTokens)
+			}
+			if got.ReasoningEffort != tt.wantEffort {
+				t.Errorf("ReasoningEffort = %q, want %q", got.ReasoningEffort, tt.wantEffort)
+			}
+			if (got.Thinking == nil) != tt.wantThinkingNil {
+				t.Errorf("Thinking nil = %v, want %v", got.Thinking == nil, tt.wantThinkingNil)
+			}
+			if got.Thinking != nil && *got.Thinking {
+				t.Error("non-mandatory query understanding must keep Thinking=false")
+			}
+		})
+	}
+}
+
+func TestQueryUnderstandChatOptions_MandatoryDefaultMustBeSupported(t *testing.T) {
+	model := &types.Model{Parameters: types.ModelParameters{Reasoning: types.ReasoningParameters{
+		Supported:        true,
+		Mandatory:        true,
+		SupportedEfforts: []string{"medium", "low"},
+		DefaultEffort:    "none",
+	}}}
+
+	got := queryUnderstandChatOptions(150, model)
+	if got.ReasoningEffort != "medium" {
+		t.Fatalf("ReasoningEffort = %q, want first supported effort medium", got.ReasoningEffort)
+	}
+	if got.Thinking != nil {
+		t.Fatal("mandatory model must not send an explicit Thinking override")
+	}
+}
+
+func TestQueryUnderstandChatOptions_NilModelOmitsThinkingOverride(t *testing.T) {
+	got := queryUnderstandChatOptions(150, nil)
+	if got.Thinking != nil {
+		t.Fatalf("nil model Thinking = %#v, want nil", got.Thinking)
+	}
+	if got.ReasoningEffort != "" {
+		t.Fatalf("nil model ReasoningEffort = %q, want empty", got.ReasoningEffort)
+	}
+}
+
 func TestApplyIntentPromptOverride_AgentOverrideWins(t *testing.T) {
 	cm := &types.ChatManage{
 		PipelineRequest: types.PipelineRequest{

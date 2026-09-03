@@ -1023,6 +1023,7 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 				return nil
 			}
 			streamCtx.assistantMessage.Content += data.Content
+			applyFinalAnswerUsage(streamCtx.assistantMessage, data.Usage)
 			if data.IsFallback {
 				streamCtx.assistantMessage.IsFallback = true
 			}
@@ -1427,6 +1428,18 @@ func (h *Handler) partitionReadyAttachments(ctx context.Context, tenantID uint64
 		ready = append(ready, id)
 	}
 	return ready, skipped
+}
+
+// applyFinalAnswerUsage copies the typed usage emitted by a model stream onto
+// the assistant message before completeAssistantMessage persists it. Event
+// data stays interface-typed to keep the event package independent of types.
+func applyFinalAnswerUsage(assistantMessage *types.Message, rawUsage interface{}) {
+	if assistantMessage == nil {
+		return
+	}
+	if usage, ok := rawUsage.(*types.TokenUsage); ok && usage != nil {
+		assistantMessage.Usage = usage
+	}
 }
 
 // persistLastRequestState records the input-bar state the user just sent so

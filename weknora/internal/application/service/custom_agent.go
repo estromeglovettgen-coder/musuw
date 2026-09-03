@@ -180,6 +180,16 @@ func (s *customAgentService) CreateAgent(ctx context.Context, agent *types.Custo
 	if agent.Config.AgentMode == "" {
 		agent.Config.AgentMode = types.AgentModeQuickAnswer
 	}
+	// Keep every newly-created agent immediately runnable even when a direct
+	// API caller omits the model fields that the browser normally supplies.
+	// The product default is the plan-safe Flash model; an explicitly selected
+	// chat model remains authoritative for query understanding as well.
+	if strings.TrimSpace(agent.Config.ModelID) == "" {
+		agent.Config.ModelID = types.CheapestChatModelID
+	}
+	if strings.TrimSpace(agent.Config.QueryUnderstandModelID) == "" {
+		agent.Config.QueryUnderstandModelID = agent.Config.ModelID
+	}
 
 	// Cannot create built-in agents
 	agent.IsBuiltin = false

@@ -121,6 +121,25 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 		thinkingOpen := false
 		answerStarted := false
 		answerCompleted := false
+		answerTerminalPending := false
+		var streamUsage *types.TokenUsage
+
+		// Providers report aggregate turn usage on the terminal stream response.
+		// Keep a detached copy for the completion event so provider state cannot
+		// be mutated after the stream closes.
+		rememberUsage := func(usage *types.TokenUsage) {
+			if usage == nil {
+				return
+			}
+			copy := *usage
+			streamUsage = &copy
+		}
+		usageValue := func() interface{} {
+			if streamUsage == nil {
+				return nil
+			}
+			return streamUsage
+		}
 
 		closeThinking := func() {
 			if !thinkingOpen {
@@ -159,9 +178,22 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 					ID:        answerID,
 					Type:      types.EventType(event.EventAgentFinalAnswer),
 					SessionID: chatManage.SessionID,
-					Data:      event.AgentFinalAnswerData{Content: answerTail},
+					Data:      event.AgentFinalAnswerData{Content: answerTail, Usage: usageValue()},
 				})
 			}
+		}
+		completePendingAnswer := func() {
+			if !answerTerminalPending || answerCompleted {
+				return
+			}
+			_ = eventBus.Emit(ctx, types.Event{
+				ID:        answerID,
+				Type:      types.EventType(event.EventAgentFinalAnswer),
+				SessionID: chatManage.SessionID,
+				Data:      event.AgentFinalAnswerData{Done: true, Usage: usageValue()},
+			})
+			answerCompleted = true
+			answerTerminalPending = false
 		}
 
 		finishCreditExhausted := func() {
@@ -172,7 +204,7 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 					ID:        answerID,
 					Type:      types.EventType(event.EventAgentFinalAnswer),
 					SessionID: chatManage.SessionID,
-					Data:      event.AgentFinalAnswerData{Done: true},
+					Data:      event.AgentFinalAnswerData{Done: true, Usage: usageValue()},
 				})
 				answerCompleted = true
 			}
@@ -203,11 +235,13 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 				if !ok {
 					flushDecoders()
 					closeThinking()
+					completePendingAnswer()
 					pipelineInfo(ctx, "Stream", "channel_close", map[string]interface{}{
 						"session_id": chatManage.SessionID,
 					})
 					return
 				}
+				rememberUsage(response.Usage)
 
 				if response.ResponseType == types.ResponseTypeError {
 					if openrouter.PayloadIndicatesCreditExhausted([]byte(response.Content)) {
@@ -267,6 +301,7 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 						continue
 					}
 					response.Content = answerDecoder.Feed(response.Content)
+					emitDone := response.Done && response.Usage != nil
 					if response.Content != "" {
 						answerStarted = true
 					}
@@ -275,16 +310,25 @@ func (p *PluginChatCompletionStream) OnEvent(ctx context.Context,
 						if response.Content != "" {
 							answerStarted = true
 						}
-						answerCompleted = true
+						answerTerminalPending = !emitDone
+						answerCompleted = emitDone
 					}
 					closeThinking()
+					// OpenAI-compatible providers commonly send finish_reason first
+					// and aggregate usage in a following EOF sentinel. Forward any
+					// final content immediately, but defer the one terminal event
+					// until usage arrives or the channel actually closes.
+					if response.Content == "" && !emitDone {
+						continue
+					}
 					eventBus.Emit(ctx, types.Event{
 						ID:        answerID,
 						Type:      types.EventType(event.EventAgentFinalAnswer),
 						SessionID: chatManage.SessionID,
 						Data: event.AgentFinalAnswerData{
 							Content: response.Content,
-							Done:    response.Done,
+							Done:    emitDone,
+							Usage:   usageValue(),
 						},
 					})
 				}

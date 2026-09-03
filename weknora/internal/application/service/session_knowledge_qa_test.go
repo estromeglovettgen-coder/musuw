@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Tencent/WeKnora/internal/event"
+	"github.com/Tencent/WeKnora/internal/modelcontext"
 	"github.com/Tencent/WeKnora/internal/models/asr"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/models/embedding"
@@ -211,4 +213,48 @@ func TestHandleModelFallbackEmitsBillingRenewalPendingWithoutFixedAnswer(t *test
 	assert.Equal(t, modelopenrouter.AllowanceRenewalPendingCode, errors[0].ErrorCode)
 	assert.Equal(t, "model_fallback", errors[0].Stage)
 	assert.Nil(t, cm.ChatResponse)
+}
+
+func TestConsumeFallbackStreamPersistsUsage(t *testing.T) {
+	bus := event.NewEventBus()
+	var answer event.AgentFinalAnswerData
+	bus.On(event.EventAgentFinalAnswer, func(_ context.Context, evt event.Event) error {
+		answer = evt.Data.(event.AgentFinalAnswerData)
+		return nil
+	})
+
+	usage := &types.TokenUsage{PromptTokens: 9, CompletionTokens: 4, TotalTokens: 13}
+	responses := make(chan types.StreamResponse)
+	producerDone := make(chan struct{})
+	go func() {
+		defer close(producerDone)
+		defer close(responses)
+		responses <- types.StreamResponse{
+			ResponseType: types.ResponseTypeAnswer,
+			Content:      "fallback",
+			Done:         true,
+		}
+		responses <- types.StreamResponse{
+			ResponseType: types.ResponseTypeAnswer,
+			Done:         true,
+			Usage:        usage,
+		}
+	}()
+
+	cm := &types.ChatManage{
+		PipelineContext: types.PipelineContext{EventBus: bus.AsEventBusInterface()},
+	}
+	svc := &sessionService{}
+	svc.consumeFallbackStream(context.Background(), cm, responses, modelcontext.NewRegistry(false))
+	select {
+	case <-producerDone:
+	case <-time.After(time.Second):
+		t.Fatal("fallback consumer stopped before draining late usage")
+	}
+
+	gotUsage, ok := answer.Usage.(*types.TokenUsage)
+	require.True(t, ok, "fallback completion event must carry typed token usage")
+	assert.Equal(t, usage, gotUsage)
+	require.NotNil(t, cm.ChatResponse)
+	assert.Equal(t, *usage, cm.ChatResponse.Usage)
 }
