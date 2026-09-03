@@ -89,6 +89,26 @@ grep -Fq 'source: tikhub_api_key' "$staging_root/compose.yaml" || fail 'staging 
 grep -Fq 'file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/tikhub_api_key' "$staging_root/compose.yaml" ||
     fail 'staging TikHub secret is not file-backed'
 grep -Fq 'tikhub_api_key' "$script_dir/prepare-runtime.sh" || fail 'staging runtime does not require the TikHub secret'
+grep -Fq 'export LANGFUSE_PUBLIC_KEY="$(read_required_secret /run/secrets/langfuse_public_key langfuse-public-key)"' "$staging_root/app-entrypoint.sh" ||
+    fail 'staging entrypoint does not export the Langfuse public key'
+grep -Fq 'export LANGFUSE_SECRET_KEY="$(read_required_secret /run/secrets/langfuse_secret_key langfuse-secret-key)"' "$staging_root/app-entrypoint.sh" ||
+    fail 'staging entrypoint does not export the Langfuse secret key'
+for langfuse_secret in langfuse_public_key langfuse_secret_key; do
+    grep -Fq "source: $langfuse_secret" "$staging_root/compose.yaml" ||
+        fail "staging app does not mount the Langfuse $langfuse_secret secret"
+    grep -Fq "file: \${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/$langfuse_secret" "$staging_root/compose.yaml" ||
+        fail "staging Langfuse $langfuse_secret is not file-backed"
+done
+grep -Fq 'LANGFUSE_ENABLED: "true"' "$staging_root/compose.yaml" ||
+    fail 'staging Langfuse tracing is not enabled by default'
+grep -Fq 'LANGFUSE_ENABLED=true' "$staging_root/staging.env.example" ||
+    fail 'staging Langfuse tracing example is not enabled'
+grep -Fq "LANGFUSE_ENABLED=true" "$script_dir/verify-deployed.sh" ||
+    fail 'staging deployed verification does not assert Langfuse tracing is enabled'
+for langfuse_secret in langfuse_public_key langfuse_secret_key; do
+    grep -Fq "$langfuse_secret" "$script_dir/prepare-runtime.sh" ||
+        fail "staging runtime does not require the Langfuse $langfuse_secret"
+done
 if grep -Eq '^\s+build:' "$staging_root/compose.yaml" &&
    ! grep -Eq '^\s+build: !reset null$' "$staging_root/compose.yaml"; then
     fail 'staging overlay still permits a server-side build'

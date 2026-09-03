@@ -4659,6 +4659,7 @@ export default {
     quickPayment: 'Express checkout',
     secureCheckoutLoading: 'Choose a secure payment method provided by Paddle to subscribe.',
     checkoutLoadFailed: 'Checkout could not be loaded. Return to plans and try again.',
+    checkoutPaymentFailed: 'Payment was not completed. Check your payment details and try again below. Your plan and allowance have not changed.',
     upgradePaymentMethod: 'Use the current subscription payment method, securely handled by Paddle',
     checkoutSuccessTitle: 'Your plan is being activated',
     checkoutSuccessDescription: 'Payment is confirmed. Your plan and allowance update after server synchronization.',

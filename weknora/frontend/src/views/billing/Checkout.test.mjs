@@ -21,3 +21,16 @@ test('direct checkout navigation is gated to workspace owners and admins', () =>
   assert.match(checkout, /createPaddleCheckoutIntent\(/)
   assert.match(checkout, /upgradePaddleSubscription\(/)
 })
+
+test('a declined payment keeps the hosted checkout mounted for an immediate retry', () => {
+  assert.match(checkout, /const checkoutAttemptError = ref\(''\)/)
+  assert.match(checkout, /CHECKOUT_PAYMENT_FAILED[\s\S]*checkoutAttemptError\.value/)
+  assert.match(checkout, /CHECKOUT_PAYMENT_ERROR[\s\S]*checkoutAttemptError\.value/)
+  assert.match(checkout, /checkout-page__attempt-error/)
+
+  const templateStart = checkout.indexOf('<template>')
+  const scriptStart = checkout.indexOf('<script setup', templateStart)
+  const template = checkout.slice(templateStart, scriptStart)
+  assert.doesNotMatch(template, /v-else-if="checkoutAttemptError"/)
+  assert.match(template, /checkout-page__attempt-error[\s\S]*paddle-inline-target/)
+})

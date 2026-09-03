@@ -83,7 +83,7 @@ for key in \
     MUSUW_PADDLE_PLUS_MONTHLY_PRICE_ID MUSUW_PADDLE_PLUS_YEARLY_PRICE_ID \
     MUSUW_PADDLE_PRO_MONTHLY_PRICE_ID MUSUW_PADDLE_PRO_YEARLY_PRICE_ID \
     MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID MUSUW_PADDLE_MAX_YEARLY_PRICE_ID \
-    OPENROUTER_WORKSPACE_ID; do
+    OPENROUTER_WORKSPACE_ID LANGFUSE_ENABLED LANGFUSE_HOST LANGFUSE_RELEASE LANGFUSE_ENVIRONMENT; do
     weknora_staging_require_env_value "$tmp_env" "$key" >/dev/null
 done
 
@@ -99,6 +99,10 @@ done
 [ "$(weknora_staging_require_env_value "$tmp_env" MUSUW_PADDLE_ENVIRONMENT)" = sandbox ] || weknora_staging_die 'staging Paddle environment must be Sandbox'
 [ "$(weknora_staging_require_env_value "$tmp_env" MUSUW_PADDLE_API_URL)" = 'https://sandbox-api.paddle.com' ] || weknora_staging_die 'staging Paddle API URL must be Sandbox'
 [ "$(weknora_staging_require_env_value "$tmp_env" NEO4J_ENABLE)" = false ] || weknora_staging_die 'staging must disable Neo4j'
+[ "$(weknora_staging_require_env_value "$tmp_env" LANGFUSE_ENABLED)" = true ] || weknora_staging_die 'staging Langfuse tracing must remain enabled'
+[ "$(weknora_staging_require_env_value "$tmp_env" LANGFUSE_HOST)" = 'https://jp.cloud.langfuse.com' ] || weknora_staging_die 'staging Langfuse host must remain the JP Cloud endpoint'
+[ "$(weknora_staging_require_env_value "$tmp_env" LANGFUSE_RELEASE)" = 'musuw-staging' ] || weknora_staging_die 'staging Langfuse release identity is not approved'
+[ "$(weknora_staging_require_env_value "$tmp_env" LANGFUSE_ENVIRONMENT)" = staging ] || weknora_staging_die 'staging Langfuse environment must remain staging'
 
 r2_endpoint="$(weknora_staging_require_env_value "$tmp_env" MUSUW_STAGING_R2_ENDPOINT)"
 case "$r2_endpoint" in https://*.r2.cloudflarestorage.com) ;; *) weknora_staging_die 'staging R2 endpoint is invalid' ;; esac
@@ -154,7 +158,7 @@ unset input_secret_dir input_redis_namespace
 
 # Only non-secret metadata is checked. Values are read exclusively by the
 # container entrypoints from their mounted secret files.
-required_secrets=(db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret)
+required_secrets=(db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key tikhub_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key searxng_secret)
 for secret in "${required_secrets[@]}"; do
     weknora_staging_require_secret_file "$secret_dir/$secret"
 done

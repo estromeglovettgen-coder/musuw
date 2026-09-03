@@ -396,6 +396,24 @@ func (r *chunkRepository) SaveChunks(ctx context.Context, chunks []*types.Chunk)
 	})
 }
 
+// RestoreChunks restores soft-deleted chunks by primary key. It is deliberately
+// separate from SaveChunks so ordinary updates retain GORM's soft-delete scope
+// and cannot resurrect a row during a concurrent delete race.
+func (r *chunkRepository) RestoreChunks(ctx context.Context, chunks []*types.Chunk) error {
+	if len(chunks) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, chunk := range chunks {
+			chunk.DeletedAt = gorm.DeletedAt{}
+			if err := tx.Unscoped().Omit("SeqID").Save(chunk).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // UpdateChunks updates chunks in batch using raw SQL for efficiency.
 // Uses raw SQL to bypass GORM's default value handling for boolean fields.
 //

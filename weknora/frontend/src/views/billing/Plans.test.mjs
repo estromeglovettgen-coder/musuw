@@ -41,5 +41,12 @@ test('billing actions are visible only to workspace owners and admins', () => {
   assert.match(mutationGate, /const handlePortal = async \(\) => \{\s*if \(!canManageBilling\.value/)
 
   assert.match(plans, /v-if="!canManageBilling"[^>]*>\{\{ \$t\('entitlement\.billingAdminOnly'\) \}\}/)
-  assert.match(plans, /v-if="canManageBilling && entitlement\.plan !== 'free' && portalAvailable"/)
+  assert.match(plans, /v-if="canManageBilling && canManageSubscription"/)
+})
+
+test('expired past_due subscriptions keep portal recovery visible and block duplicate checkout', () => {
+  assert.match(plans, /can_manage_billing\s*===\s*true/)
+  assert.match(plans, /if \(canManageSubscription\.value\) return 'unavailable'/)
+  assert.match(plans, /const canManageSubscription = computed\(\(\) => billing\.value\?\.can_manage_billing/)
+  assert.match(plans, /const billingPending = computed\(\(\) => entitlement\.value\?\.openrouter_credits_status === 'pending' \|\|\s*\(entitlement\.value\?\.plan === 'free' && canManageSubscription\.value\)/)
 })

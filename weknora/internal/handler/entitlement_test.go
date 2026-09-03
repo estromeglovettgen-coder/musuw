@@ -1275,6 +1275,45 @@ func TestPaddleCheckoutIntentReconcilesCanceledProviderTransactionBeforeReuse(t 
 	assert.Equal(t, types.PaddleBillingOperationFailed, operations.finishStatus)
 }
 
+func TestPaddleCheckoutIntentReusesPastDueProviderTransactionAfterDecline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config := PaddleConfig{
+		Environment: "sandbox", APIKey: "pdl_sdbx_apikey_test", ClientToken: "test_client_token", WebhookSecret: "pdl_ntfset_secret",
+		Prices: map[types.ConsumerPlan]map[string]string{
+			types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+			types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+			types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+		},
+	}
+	operations := &paddleBillingOperationRepoStub{operation: &types.PaddleBillingOperation{
+		ID: 1, TenantID: 42, OperationKey: "00000000-0000-4000-8000-000000000001",
+		OperationType: types.PaddleBillingOperationCheckout,
+		Plan:          types.ConsumerPlanPlus, BillingPeriod: "monthly", PriceID: "pri_plus_monthly",
+		RequestFingerprint:  paddleBillingOperationFingerprint(types.PaddleBillingOperationCheckout, types.ConsumerPlanPlus, "monthly", "pri_plus_monthly", ""),
+		PaddleTransactionID: "txn_declined", Status: types.PaddleBillingOperationInFlight,
+	}}
+	transactions := &paddleTransactionClientStub{getResult: &paddle.Transaction{ID: "txn_declined", Status: paddle.TransactionStatusPastDue}}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{ConsumerPlanLimits: types.LimitsForConsumerPlan(types.ConsumerPlanFree)}},
+		paddle:  config, transactions: transactions, operations: operations,
+	}
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/billing/paddle/checkout-intent", strings.NewReader(`{"plan":"plus","billing_period":"monthly","operation_key":"00000000-0000-4000-8000-000000000002"}`))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+
+	h.PaddleCheckoutIntent(c)
+
+	require.Empty(t, c.Errors)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.JSONEq(t, `{"transaction_id":"txn_declined","pending":true}`, recorder.Body.String())
+	assert.Equal(t, 1, transactions.getCalls)
+	assert.Zero(t, transactions.createCalls, "a declined transaction must be retried in Paddle instead of duplicated")
+	assert.Zero(t, transactions.updateCalls)
+	assert.Empty(t, operations.finishStatus, "a declined checkout must remain pending until a signed success event")
+}
+
 func TestPaddleCheckoutIntentReplacesOnlyThePreviousUnpaidTransaction(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config := PaddleConfig{
@@ -1402,12 +1441,13 @@ func TestCurrentReturnsOnlyServerCatalogForCheckoutIntent(t *testing.T) {
 	assert.Equal(t, "no-store", recorder.Header().Get("Cache-Control"))
 	var response struct {
 		Billing struct {
-			Configured      bool   `json:"configured"`
-			PortalAvailable bool   `json:"portal_available"`
-			Environment     string `json:"environment"`
-			ClientToken     string `json:"client_token"`
-			PWCustomerID    string `json:"pw_customer_id"`
-			Catalog         map[string]map[string]struct {
+			Configured       bool   `json:"configured"`
+			PortalAvailable  bool   `json:"portal_available"`
+			CanManageBilling bool   `json:"can_manage_billing"`
+			Environment      string `json:"environment"`
+			ClientToken      string `json:"client_token"`
+			PWCustomerID     string `json:"pw_customer_id"`
+			Catalog          map[string]map[string]struct {
 				PriceID string `json:"price_id"`
 			} `json:"catalog"`
 		} `json:"billing"`
@@ -1415,6 +1455,7 @@ func TestCurrentReturnsOnlyServerCatalogForCheckoutIntent(t *testing.T) {
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	assert.True(t, response.Billing.Configured)
 	assert.True(t, response.Billing.PortalAvailable)
+	assert.False(t, response.Billing.CanManageBilling, "an effective Free tenant without a Paddle subscription cannot manage billing")
 	assert.Equal(t, "sandbox", response.Billing.Environment)
 	assert.Equal(t, "test_client_token", response.Billing.ClientToken)
 	assert.Equal(t, paddleCustomerID, response.Billing.PWCustomerID)
@@ -1422,6 +1463,48 @@ func TestCurrentReturnsOnlyServerCatalogForCheckoutIntent(t *testing.T) {
 	assert.Equal(t, "pri_plus_monthly", option.PriceID)
 	assert.NotContains(t, recorder.Body.String(), "checkout_binding")
 	assert.NotContains(t, recorder.Body.String(), "tenant_id")
+}
+
+func TestCurrentExposesBillingRecoveryForExpiredPastDueSubscription(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	portal := &paddlePortalSessionCreatorStub{}
+	h := &EntitlementHandler{
+		service: entitlementHandlerServiceStub{current: &types.ConsumerEntitlement{
+			ConsumerPlanLimits:   types.LimitsForConsumerPlan(types.ConsumerPlanFree),
+			PlanStatus:           "past_due",
+			PaddleCustomerID:     "ctm_owned_by_tenant",
+			PaddleSubscriptionID: "sub_expired_past_due",
+		}},
+		paddle: PaddleConfig{
+			Environment:   "sandbox",
+			APIKey:        "pdl_sdbx_apikey_test",
+			ClientToken:   "test_client_token",
+			WebhookSecret: "pdl_ntfset_secret",
+			Prices: map[types.ConsumerPlan]map[string]string{
+				types.ConsumerPlanPlus: {"monthly": "pri_plus_monthly", "yearly": "pri_plus_yearly"},
+				types.ConsumerPlanPro:  {"monthly": "pri_pro_monthly", "yearly": "pri_pro_yearly"},
+				types.ConsumerPlanMax:  {"monthly": "pri_max_monthly", "yearly": "pri_max_yearly"},
+			},
+		},
+		portal: portal,
+	}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entitlements/current", nil)
+	c.Request = req.WithContext(context.WithValue(req.Context(), types.TenantIDContextKey, uint64(42)))
+
+	h.Current(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Billing struct {
+			CanManageBilling bool `json:"can_manage_billing"`
+		} `json:"billing"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.True(t, response.Billing.CanManageBilling)
+	assert.NotContains(t, recorder.Body.String(), "sub_expired_past_due", "the recovery signal must not expose provider identifiers")
 }
 
 func TestCurrentOmitsRetainCustomerWithoutAuthenticatedTenantOwnedPaddleCustomer(t *testing.T) {

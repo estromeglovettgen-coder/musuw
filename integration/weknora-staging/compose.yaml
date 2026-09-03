@@ -75,9 +75,9 @@ services:
       S3_PATH_PREFIX: weknora
       S3_USE_SSL: "true"
       S3_FORCE_PATH_STYLE: "true"
-      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://jp.cloud.langfuse.com}
-      LANGFUSE_RELEASE: ${LANGFUSE_RELEASE:-musuw-staging}
+      LANGFUSE_ENABLED: "true"
+      LANGFUSE_HOST: https://jp.cloud.langfuse.com
+      LANGFUSE_RELEASE: musuw-staging
       LANGFUSE_ENVIRONMENT: staging
       LOCAL_STORAGE_BASE_DIR: /data/files
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
@@ -154,6 +154,12 @@ services:
         mode: 0400
       - source: r2_secret_access_key
         target: r2_secret_access_key
+        mode: 0400
+      - source: langfuse_public_key
+        target: langfuse_public_key
+        mode: 0400
+      - source: langfuse_secret_key
+        target: langfuse_secret_key
         mode: 0400
     depends_on: !override
       redis:
@@ -347,5 +353,9 @@ secrets:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/r2_access_key_id
   r2_secret_access_key:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/r2_secret_access_key
+  langfuse_public_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/langfuse_public_key
+  langfuse_secret_key:
+    file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/langfuse_secret_key
   searxng_secret:
     file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/searxng_secret

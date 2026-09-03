@@ -472,7 +472,7 @@ test('R2 inventory reports TEST local storage as not applicable instead of a cre
   assert.match(result.reason, /TEST uses local storage/)
 })
 
-test('Langfuse query uses bounded v2 observations without prompt or output fields', async () => {
+test('Langfuse query is pinned to the selected environment and projects safe v2 model fields', async () => {
   let call
   const fetcher = async (url, options) => {
     call = { url: String(url), options }
@@ -482,8 +482,14 @@ test('Langfuse query uses bounded v2 observations without prompt or output field
         data: [{
           id: 'obs-1', traceId: 'trace-1', name: 'chat', type: 'GENERATION',
           startTime: '2026-08-22T00:00:00Z', endTime: '2026-08-22T00:00:01Z',
-          environment: 'production', level: 'DEFAULT', providedModelName: 'model-a',
+          environment: 'staging', level: 'DEFAULT', model: 'model-a', providedModelName: 'legacy-model',
           totalCost: 0.001, input: 'must not escape', output: 'must not escape',
+        }, {
+          id: 'obs-2', traceId: 'trace-2', name: 'chat', type: 'GENERATION',
+          environment: 'staging', providedModelName: 'legacy-only',
+        }, {
+          id: 'obs-prod', traceId: 'trace-prod', name: 'chat', type: 'GENERATION',
+          environment: 'production', model: 'must-not-escape',
         }],
         meta: { cursor: null },
       },
@@ -494,15 +500,22 @@ test('Langfuse query uses bounded v2 observations without prompt or output field
     host: 'https://jp.cloud.langfuse.com',
     publicKey: 'public-key',
     secretKey: 'secret-key',
+    environment: 'staging',
     fetcher,
   })
 
   assert.equal(result.available, true)
-  assert.equal(result.observations.length, 1)
+  assert.equal(result.observations.length, 2)
+  assert.deepEqual(result.observations.map((observation) => observation.id), ['obs-1', 'obs-2'])
+  assert.equal(result.observations.every((observation) => observation.environment === 'staging'), true)
+  assert.equal(result.observations[0].model, 'model-a')
+  assert.equal(result.observations[1].model, 'legacy-only')
   assert.equal('input' in result.observations[0], false)
   assert.equal('output' in result.observations[0], false)
+  assert.equal('metadata' in result.observations[0], false)
   assert.match(call.url, /\/api\/public\/v2\/observations\?/)
   assert.match(call.url, /fields=core%2Cbasic%2Ctime%2Cmodel%2Cusage%2Cmetrics%2Ctrace_context/)
+  assert.match(call.url, /environment=staging/)
   assert.doesNotMatch(call.url, /fields=[^&]*io/)
   assert.equal(call.options.headers.Authorization, `Basic ${Buffer.from('public-key:secret-key').toString('base64')}`)
 })

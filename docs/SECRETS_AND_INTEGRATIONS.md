@@ -80,7 +80,7 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 | `.runtime/weknora/secrets/*` | OIDC、数据库、Redis、AES、JWT 等服务运行 secret；仅本机受控进程读取。 |
 | `/opt/weknora/staging-runtime/staging.public.env` | Tokyo staging 的非密钥 Compose/Paddle/Supabase/OpenRouter/R2 选择；由 `staging` Environment 受控输入生成。 |
 | `/opt/weknora/staging-runtime/auth-public.env` | staging browser public origin、Supabase public coordinates 和 OAuth client ID；不含 service/API key。 |
-| `/opt/weknora/staging-runtime/secrets/*` | staging 独立数据库、Redis、OIDC、Supabase service、OpenRouter、TikHub、Paddle Sandbox、R2 等 server-only secret，regular non-symlink、非空、`0600`。 |
+| `/opt/weknora/staging-runtime/secrets/*` | staging 独立数据库、Redis、OIDC、Supabase service、OpenRouter、TikHub、Paddle Sandbox、R2、Langfuse test pair 等 server-only secret，regular non-symlink、非空、`0600`。 |
 
 旧的 `candidate`/迁移目录不是生产权威。部署前必须从对应 provider 环境
 重新生成公开环境并运行静态校验；staging Sandbox 输入不能覆盖 production Live，
@@ -126,6 +126,12 @@ environment-specific values and provider resources are never shared. TikHub has
 no Musuw Sandbox/Live split, but each overlay still receives its own protected
 file mount. The staging Compose project is `weknora-v072-staging`; production
 remains `weknora-v072-production`.
+
+Staging 的 Langfuse 坐标固定为 `LANGFUSE_ENABLED=true`、JP Cloud host、release
+`musuw-staging` 和 environment `staging`。`langfuse_public_key` 与
+`langfuse_secret_key` 必须分别来自 staging 的 Langfuse test project；Compose
+只读挂载，entrypoint 仅在 app 进程内导出，值绝不进入 public env、release
+artifact、浏览器或日志。
 
 Both overlays require a file named `tikhub_api_key` in their own protected
 secret directory. Preflight verifies only regular-file shape, non-emptiness,

@@ -77,6 +77,10 @@ type ChunkRepository interface {
 	UpdateChunks(ctx context.Context, chunks []*types.Chunk) error
 	// SaveChunks persists full chunk objects in a single transaction using GORM Save (UPDATE).
 	SaveChunks(ctx context.Context, chunks []*types.Chunk) error
+	// RestoreChunks restores soft-deleted chunks by primary key. This is an
+	// explicit compensation primitive; normal SaveChunks remains scoped so a
+	// concurrent delete cannot accidentally resurrect a row.
+	RestoreChunks(ctx context.Context, chunks []*types.Chunk) error
 	// DeleteChunk deletes a chunk
 	DeleteChunk(ctx context.Context, tenantID uint64, id string) error
 	// DeleteChunks deletes chunks by IDs in batch

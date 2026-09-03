@@ -12,6 +12,8 @@ export interface PaddleCatalogOption {
 export interface PaddleBillingConfig {
   configured: boolean
   portal_available: boolean
+  /** True when the authenticated tenant has a recoverable/manageable Paddle subscription. */
+  can_manage_billing?: boolean
   environment?: 'sandbox' | 'live'
   client_token?: string
   pw_customer_id?: string

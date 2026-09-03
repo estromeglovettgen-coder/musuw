@@ -64,7 +64,7 @@
           <p v-else-if="billingPending">{{ $t('entitlement.billingRenewalPending') }}</p>
           <p v-else-if="!billingConfigured">{{ $t('entitlement.billingNotConfigured') }}</p>
           <p v-else>{{ $t('entitlement.checkoutSecureNote') }}</p>
-          <button v-if="canManageBilling && entitlement.plan !== 'free' && portalAvailable" type="button" :disabled="portalOpening" @click="handlePortal">
+          <button v-if="canManageBilling && canManageSubscription" type="button" :disabled="portalOpening" @click="handlePortal">
             {{ $t('entitlement.manageBilling') }}
           </button>
         </footer>
@@ -126,11 +126,17 @@ const requestedPlan = computed<ConsumerPlan | null>(() => {
 })
 const billingConfigured = computed(() => billing.value?.configured === true)
 const portalAvailable = computed(() => billing.value?.portal_available === true)
+// This server-owned flag also covers an effective Free plan that still has a
+// non-canceled Paddle subscription in dunning. Keep the paid-plan fallback so
+// older responses do not hide an existing portal action during rollout.
+const canManageSubscription = computed(() => billing.value?.can_manage_billing === true ||
+  (entitlement.value?.plan !== 'free' && portalAvailable.value))
 // Billing mutations are an Owner/Admin capability. The server remains the
 // authority; this gate only keeps ordinary workspace members from seeing
 // actions that the guarded endpoints would reject.
 const canManageBilling = computed(() => authStore.hasRole('admin'))
-const billingPending = computed(() => entitlement.value?.openrouter_credits_status === 'pending')
+const billingPending = computed(() => entitlement.value?.openrouter_credits_status === 'pending' ||
+  (entitlement.value?.plan === 'free' && canManageSubscription.value))
 const subscriptionUpgradeAvailable = computed(() =>
   canManageBilling.value && billingConfigured.value && portalAvailable.value && entitlement.value?.plan_status === 'active',
 )
@@ -207,7 +213,13 @@ const planActionKind = (plan: ConsumerPlan): 'current' | 'included' | 'choose' |
   const current = entitlement.value?.plan || 'free'
   if (plan === current) return 'current'
   if (plan === 'free' || planRank[plan] < planRank[current]) return 'included'
-  if (current === 'free') return hasCheckout(plan as PaidConsumerPlan) ? 'choose' : 'unavailable'
+  // An expired/past_due subscription may be effective Free while Paddle still
+  // owns the subscription. Route recovery through the portal; never create a
+  // second checkout that the server will reject for the same tenant.
+  if (current === 'free') {
+    if (canManageSubscription.value) return 'unavailable'
+    return hasCheckout(plan as PaidConsumerPlan) ? 'choose' : 'unavailable'
+  }
   return subscriptionUpgradeAvailable.value ? 'choose' : 'unavailable'
 }
 

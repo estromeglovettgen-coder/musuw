@@ -32,6 +32,9 @@
           <template v-if="entitlement.plan === 'free'">
             <h2>{{ $t('entitlement.quickPayment') }}</h2>
             <p>{{ $t('entitlement.secureCheckoutLoading') }}</p>
+            <p v-if="checkoutAttemptError" class="checkout-page__attempt-error" role="alert">
+              {{ checkoutAttemptError }}
+            </p>
             <div class="paddle-inline-target" />
           </template>
 
@@ -126,6 +129,7 @@ const completed = ref(false)
 const syncing = ref(false)
 const syncDelayed = ref(false)
 const errorMessage = ref('')
+const checkoutAttemptError = ref('')
 const entitlement = ref<ConsumerEntitlement | null>(null)
 const billing = ref<PaddleBillingConfig | null>(null)
 const totals = ref<CheckoutTotals | null>(null)
@@ -260,7 +264,15 @@ const handlePaddleEvent = (event: PaddleEventData) => {
       total: data.totals.total,
     }
   }
-  if (event.name === CheckoutEventNames.CHECKOUT_ERROR || event.name === CheckoutEventNames.CHECKOUT_FAILED) {
+  if (
+    event.name === CheckoutEventNames.CHECKOUT_FAILED
+    || event.name === CheckoutEventNames.CHECKOUT_PAYMENT_FAILED
+    || event.name === CheckoutEventNames.CHECKOUT_PAYMENT_ERROR
+  ) {
+    checkoutAttemptError.value = t('entitlement.checkoutPaymentFailed')
+    return
+  }
+  if (event.name === CheckoutEventNames.CHECKOUT_ERROR) {
     errorMessage.value = t('entitlement.checkoutLoadFailed')
   }
 }
@@ -399,6 +411,7 @@ onUnmounted(() => {
 .checkout-page__payment { min-width: 0; padding-top: 4px; }
 .checkout-page__payment > h2 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 650; }
 .checkout-page__payment > p { margin: 8px 0 24px; color: #747474; font-size: 14px; line-height: 22px; }
+.checkout-page__payment > .checkout-page__attempt-error { margin: -8px 0 18px; padding: 12px 14px; border: 1px solid #f1c4c4; border-radius: 12px; background: #fff7f7; color: #a32121; }
 .paddle-inline-target { width: 100%; min-height: 640px; }
 .checkout-page__summary { padding: 34px 34px 30px; border: 1px solid #dedede; border-radius: 24px; background: #fff; }
 .checkout-page__summary h2 { margin: 0; font-size: 30px; line-height: 38px; font-weight: 600; letter-spacing: -.03em; }

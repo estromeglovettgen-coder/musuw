@@ -233,6 +233,7 @@ function loadRuntime(target) {
         host: (runtime.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
         publicKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
         secretKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
+        environment: 'production',
       },
     }
   }
@@ -285,6 +286,7 @@ function loadRuntime(target) {
       host: (process.env.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
       publicKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
       secretKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
+      environment: 'staging',
     },
   }
 }
@@ -564,7 +566,7 @@ function projectLangfuseObservation(observation) {
     end_time: observation?.endTime || null,
     environment: observation?.environment || '',
     level: observation?.level || '',
-    model: observation?.providedModelName || '',
+    model: observation?.model || observation?.providedModelName || '',
     total_usage: observation?.totalUsage ?? observation?.usageDetails?.total ?? null,
     total_cost: observation?.totalCost ?? observation?.costDetails?.total ?? null,
     latency: observation?.latency ?? null,
@@ -573,15 +575,20 @@ function projectLangfuseObservation(observation) {
   }
 }
 
-export async function readLangfuseData({ host, publicKey, secretKey, fetcher = fetchJSON }) {
+export async function readLangfuseData({ host, publicKey, secretKey, environment, fetcher = fetchJSON }) {
   const unavailable = (reason) => ({ available: false, reason, observations: [], cursor: null })
   if (!publicKey || !secretKey) return unavailable('Langfuse query credentials are not configured in macOS Keychain')
+  const normalizedEnvironment = String(environment || '').trim()
+  if (!['staging', 'production'].includes(normalizedEnvironment)) {
+    return unavailable('Langfuse query environment is not configured')
+  }
   try {
     const endpoint = new URL('/api/public/v2/observations', host)
     endpoint.searchParams.set('fields', 'core,basic,time,model,usage,metrics,trace_context')
     endpoint.searchParams.set('limit', '100')
     endpoint.searchParams.set('fromStartTime', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
     endpoint.searchParams.set('toStartTime', new Date().toISOString())
+    endpoint.searchParams.set('environment', normalizedEnvironment)
     const result = await fetcher(endpoint, {
       headers: {
         Accept: 'application/json',
@@ -593,7 +600,11 @@ export async function readLangfuseData({ host, publicKey, secretKey, fetcher = f
       available: true,
       reason: '',
       observations: Array.isArray(result.payload?.data)
-        ? result.payload.data.map(projectLangfuseObservation)
+        // The project contains both TEST and production observations. Keep this
+        // client-side guard even when the upstream environment filter is set.
+        ? result.payload.data
+          .filter((observation) => observation?.environment === normalizedEnvironment)
+          .map(projectLangfuseObservation)
         : [],
       cursor: result.payload?.meta?.cursor || null,
     }

@@ -273,8 +273,8 @@ rotate one field in isolation.
 
 Staging keeps a separate Sandbox unit in `/opt/weknora/staging-runtime`: its
 `staging.public.env` and `auth-public.env` contain only public coordinates, while
-database/Redis/AES/JWT/OIDC/Supabase service, OpenRouter, TikHub, Paddle Sandbox
-and R2 credentials stay in the staging `secrets/` directory. Production and
+database/Redis/AES/JWT/OIDC/Supabase service, OpenRouter, TikHub, Paddle Sandbox,
+R2 and Langfuse test credentials stay in the staging `secrets/` directory. Production and
 staging keep separate protected TikHub file mounts even when the provider
 credential is environment-agnostic; it never travels through a public env or
 release artifact. The six Sandbox price IDs,

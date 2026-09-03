@@ -2744,7 +2744,16 @@ const removeStarterSuggestion = (index: number) => {
 
 const applyDefaultModelsIfEmpty = () => {
   if (props.mode !== 'create' || !formData.value) return
-  const chatModelId = selectInitialModelId(allModels.value, 'KnowledgeQA', DEFAULT_CHAT_MODEL_ID)
+  // V4 Flash is the product-wide creation default. Keep the catalog fallback
+  // for installations that do not expose the managed model, but never let a
+  // different `is_default` flag silently select V4 Pro for a new agent.
+  const flashModel = allModels.value.find((model) =>
+    model.id === DEFAULT_CHAT_MODEL_ID
+      && model.type === 'KnowledgeQA'
+      && (!model.status || model.status === 'active'),
+  )
+  const chatModelId = flashModel?.id
+    || (authStore.isLiteMode ? DEFAULT_CHAT_MODEL_ID : selectInitialModelId(allModels.value, 'KnowledgeQA'))
   const rerankCatalogModelId = selectInitialModelId(allModels.value, 'Rerank')
   const vlmCatalogModelId = selectInitialModelId(allModels.value, 'VLLM')
   const asrCatalogModelId = selectInitialModelId(allModels.value, 'ASR')
@@ -2758,6 +2767,9 @@ const applyDefaultModelsIfEmpty = () => {
     || (authStore.isLiteMode ? chatResources.consumerSceneOptions.asr?.effective_model_id : '')
   if (!formData.value.config.model_id && modelId) {
     formData.value.config.model_id = modelId
+  }
+  if (!formData.value.config.query_understand_model_id && modelId) {
+    formData.value.config.query_understand_model_id = modelId
   }
   if (!formData.value.config.rerank_model_id && rerankModelId) {
     formData.value.config.rerank_model_id = rerankModelId

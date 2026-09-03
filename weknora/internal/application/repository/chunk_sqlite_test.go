@@ -64,6 +64,31 @@ func TestCreateChunks_SQLite_SeqIDAutoAssigned(t *testing.T) {
 	}
 }
 
+func TestRestoreChunksRestoresSoftDeletedChunkWithoutDuplicate(t *testing.T) {
+	db := setupChunkTestDB(t)
+	repo := NewChunkRepository(db)
+	ctx := context.Background()
+	chunk := makeChunk(uuid.NewString(), uuid.NewString(), types.ChunkTypeFAQ)
+	require.NoError(t, repo.CreateChunks(ctx, []*types.Chunk{chunk}))
+
+	require.NoError(t, repo.DeleteChunk(ctx, chunk.TenantID, chunk.ID))
+	var active types.Chunk
+	require.ErrorIs(t, db.First(&active, "id = ?", chunk.ID).Error, gorm.ErrRecordNotFound)
+	var softDeleted types.Chunk
+	require.NoError(t, db.Unscoped().First(&softDeleted, "id = ?", chunk.ID).Error)
+	require.True(t, softDeleted.DeletedAt.Valid)
+
+	// RestoreChunks is the recovery primitive and must clear the soft-delete
+	// marker in place rather than attempting a second INSERT with same primary key.
+	chunk.DeletedAt = gorm.DeletedAt{}
+	require.NoError(t, repo.RestoreChunks(ctx, []*types.Chunk{chunk}))
+	require.NoError(t, db.First(&active, "id = ?", chunk.ID).Error)
+	assert.False(t, active.DeletedAt.Valid)
+	var rowCount int64
+	require.NoError(t, db.Unscoped().Model(&types.Chunk{}).Where("id = ?", chunk.ID).Count(&rowCount).Error)
+	assert.Equal(t, int64(1), rowCount)
+}
+
 func TestCreateChunks_CleansContextHeaderBeforePersistence(t *testing.T) {
 	db := setupChunkTestDB(t)
 	repo := NewChunkRepository(db)

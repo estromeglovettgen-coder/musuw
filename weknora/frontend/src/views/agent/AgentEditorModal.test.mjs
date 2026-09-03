@@ -41,7 +41,10 @@ test('new agents use deterministic upstream defaults with a Lite scene fallback'
     source.indexOf('const applyDefaultModelsIfEmpty = () =>'),
     source.indexOf('const agentMode = computed'),
   )
-  assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'KnowledgeQA', DEFAULT_CHAT_MODEL_ID\)/)
+  assert.match(source, /import \{ DEFAULT_CHAT_MODEL_ID \} from '@\/utils\/managedChatModels'/)
+  assert.match(defaultBlock, /model\.id === DEFAULT_CHAT_MODEL_ID/)
+  assert.match(defaultBlock, /authStore\.isLiteMode \? DEFAULT_CHAT_MODEL_ID/)
+  assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'KnowledgeQA'\)/)
   assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'Rerank'\)/)
   assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'VLLM'\)/)
   assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'ASR'\)/)
@@ -50,9 +53,23 @@ test('new agents use deterministic upstream defaults with a Lite scene fallback'
   assert.match(defaultBlock, /consumerSceneOptions\.vision\?\.effective_model_id/)
   assert.match(defaultBlock, /consumerSceneOptions\.asr\?\.effective_model_id/)
   assert.match(defaultBlock, /config\.model_id = modelId/)
+  assert.match(defaultBlock, /config\.query_understand_model_id = modelId/)
   assert.match(defaultBlock, /config\.rerank_model_id = rerankModelId/)
   assert.match(defaultBlock, /config\.vlm_model_id = vlmModelId/)
   assert.match(defaultBlock, /config\.asr_model_id = asrModelId/)
+})
+
+test('new agents keep the description empty until the user writes one', () => {
+  const createPath = source.slice(
+    source.indexOf('// 创建新智能体，使用系统默认值'),
+    source.indexOf('if (!authStore.isLiteMode) await syncInstalledSkills()'),
+  )
+  const defaultForm = source.slice(
+    source.indexOf('const defaultFormData = {'),
+    source.indexOf('const formData = ref'),
+  )
+  assert.match(defaultForm, /description:\s*''/)
+  assert.doesNotMatch(createPath, /formData\.value\.description\s*=\s*getPresetDefaultDescription\(preset\)/)
 })
 
 test('new agents leave the description blank instead of copying a type preset', () => {
@@ -74,7 +91,8 @@ test('new agents prefer the managed DeepSeek V4 Flash chat model', () => {
     source.indexOf('const agentMode = computed'),
   )
   assert.match(source, /DEFAULT_CHAT_MODEL_ID/)
-  assert.match(defaultBlock, /selectInitialModelId\(allModels\.value, 'KnowledgeQA', DEFAULT_CHAT_MODEL_ID\)/)
+  assert.match(defaultBlock, /model\.id === DEFAULT_CHAT_MODEL_ID/)
+  assert.match(defaultBlock, /authStore\.isLiteMode \? DEFAULT_CHAT_MODEL_ID/)
 })
 
 test('Lite new agents receive a first available localized name in either mode', () => {

@@ -272,6 +272,16 @@ func (h *EntitlementHandler) Current(c *gin.Context) {
 	tenantID, _ := types.TenantIDFromContext(c.Request.Context())
 	portalAvailable := h.portal != nil && strings.TrimSpace(current.PaddleCustomerID) != ""
 	billing := h.paddle.billingResponse(tenantID, current.Plan, portalAvailable)
+	// Keep a stable, non-sensitive recovery signal for the plans UI. A tenant
+	// whose effective plan has fallen back to Free during Paddle dunning must
+	// still be sent to the customer portal instead of starting a second
+	// checkout. Paid entitlements retain the existing customer-portal behavior
+	// even if an older record does not have a subscription id.
+	subscriptionID := strings.TrimSpace(current.PaddleSubscriptionID)
+	effectivePlan := types.NormalizeConsumerPlan(current.Plan)
+	canManageBilling := portalAvailable && (effectivePlan != types.ConsumerPlanFree ||
+		(subscriptionID != "" && !strings.EqualFold(strings.TrimSpace(current.PlanStatus), "canceled")))
+	billing["can_manage_billing"] = canManageBilling
 	if customerID := paddleCustomerIDForRetain(current.PaddleCustomerID); tenantID != 0 && customerID != "" && h.paddle.Configured() && h.paddle.PortalConfigured() {
 		// Paddle Retain requires the authenticated customer's Paddle ID in the
 		// browser. This value is derived from signed provider state, never from
@@ -660,7 +670,11 @@ func (h *EntitlementHandler) reconcilePaddleCheckoutTransaction(ctx context.Cont
 		return "", apperrors.NewServiceUnavailableError("Paddle checkout reconciliation is temporarily unavailable")
 	}
 	switch transaction.Status {
-	case paddle.TransactionStatusDraft, paddle.TransactionStatusReady:
+	case paddle.TransactionStatusDraft, paddle.TransactionStatusReady, paddle.TransactionStatusPastDue:
+		// A declined initial payment leaves Paddle's provider-owned transaction
+		// past_due. Reopening that exact transaction lets the customer correct the
+		// payment method without creating a duplicate checkout or granting access.
+		// Only the later signed subscription event can activate entitlement.
 		return strings.TrimSpace(transaction.ID), nil
 	case paddle.TransactionStatusCanceled:
 		_ = h.operations.Finish(ctx, operation.ID, types.PaddleBillingOperationFailed, `{}`, "Paddle checkout transaction is canceled")

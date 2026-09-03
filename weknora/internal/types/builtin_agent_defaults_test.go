@@ -39,8 +39,8 @@ func TestBuiltinQuickAnswerUsesUpstreamModeNameWithManagedModelDefaults(t *testi
 
 	cfg := quick.Config
 	assert.Equal(t, AgentModeQuickAnswer, cfg.AgentMode)
-	assert.Equal(t, "builtin-deepseek-v4-flash", cfg.ModelID)
-	assert.Equal(t, "builtin-deepseek-v4-flash", cfg.QueryUnderstandModelID)
+	assert.Equal(t, CheapestChatModelID, cfg.ModelID)
+	assert.Equal(t, CheapestChatModelID, cfg.QueryUnderstandModelID)
 	require.NotNil(t, cfg.Thinking)
 	assert.False(t, *cfg.Thinking)
 
@@ -164,7 +164,7 @@ func TestBuiltinSmartReasoningUsesUpstreamModeNameWithManagedModelDefaults(t *te
 	assert.NotContains(t, cfg.AllowedTools, "execute_skill_script", "skill scripts are enabled by skills_selection_mode, not the regular tool whitelist")
 }
 
-func TestBuiltinAgentsUseDeepSeekV4FlashAsTheirDefaultChatModel(t *testing.T) {
+func TestBuiltinAgentsUseFlashAsTheirChatModelDefault(t *testing.T) {
 	configPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
@@ -173,13 +173,14 @@ func TestBuiltinAgentsUseDeepSeekV4FlashAsTheirDefaultChatModel(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(data, &file))
 
 	for _, entry := range file.BuiltinAgents {
-		if entry.Config.ModelID != "" {
-			assert.Equalf(t, "builtin-deepseek-v4-flash", entry.Config.ModelID,
-				"built-in agent %s should use the Lite-safe Flash default", entry.ID)
+		// The internal skill installer intentionally resolves its model through
+		// the active catalog and therefore has no chat model field in YAML.
+		if entry.Config.ModelID == "" {
+			continue
 		}
-		if entry.Config.QueryUnderstandModelID != "" {
-			assert.Equalf(t, "builtin-deepseek-v4-flash", entry.Config.QueryUnderstandModelID,
-				"built-in agent %s should use the Lite-safe Flash query model", entry.ID)
-		}
+		assert.Equalf(t, CheapestChatModelID, entry.Config.ModelID,
+			"builtin agent %s must default to V4 Flash", entry.ID)
+		assert.Equalf(t, CheapestChatModelID, entry.Config.QueryUnderstandModelID,
+			"builtin agent %s must use V4 Flash for query understanding", entry.ID)
 	}
 }

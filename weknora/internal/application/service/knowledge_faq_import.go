@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"runtime"
 	"slices"
 	"strings"
@@ -1358,7 +1359,8 @@ func (s *knowledgeService) executeFAQImport(ctx context.Context, taskID string, 
 	var embeddingModel embedding.Embedder
 	totalEntries := len(payload.Entries) + processedCount
 
-	// Recovery机制：如果发生任何错误或panic，回滚所有已创建的chunks和索引数据
+	// Convert unexpected panics into an explicit task error. Each indexing
+	// boundary below performs its own compensating cleanup before returning.
 	defer func() {
 		// 捕获panic
 		if r := recover(); r != nil {
@@ -1412,16 +1414,22 @@ func (s *knowledgeService) executeFAQImport(ctx context.Context, taskID string, 
 
 		// 删除需要删除的chunks（包括需要更新的旧chunks）
 		if len(chunksToDelete) > 0 {
+			oldStorageSize := faqKnowledge.StorageSize
 			chunkIDsToDelete := make([]string, 0, len(chunksToDelete))
 			for _, chunk := range chunksToDelete {
 				chunkIDsToDelete = append(chunkIDsToDelete, chunk.ID)
 			}
-			if err := s.chunkRepo.DeleteChunks(ctx, tenantID, chunkIDsToDelete); err != nil {
-				return fmt.Errorf("failed to delete chunks: %w", err)
-			}
-			// 删除索引
+			// Delete the retriever footprint first. The vector operation can fail,
+			// in which case keeping the source chunks makes the replace retryable.
 			if err := s.deleteFAQChunkVectors(ctx, kb, faqKnowledge, chunksToDelete); err != nil {
 				return fmt.Errorf("failed to delete chunk vectors: %w", err)
+			}
+			if err := s.chunkRepo.DeleteChunks(ctx, tenantID, chunkIDsToDelete); err != nil {
+				rollbackErr := s.restoreFAQDeleteState(ctx, kb, faqKnowledge, chunksToDelete, chunksToDelete, oldStorageSize)
+				if rollbackErr != nil {
+					return errors.Join(fmt.Errorf("failed to delete chunks: %w", err), rollbackErr)
+				}
+				return fmt.Errorf("failed to delete chunks: %w", err)
 			}
 			logger.Infof(ctx, "FAQ import task %s: deleted %d chunks (including updates)", taskID, len(chunksToDelete))
 		}
@@ -1557,8 +1565,17 @@ func (s *knowledgeService) executeFAQImport(ctx context.Context, taskID string, 
 
 		// 索引chunks
 		indexStartTime := time.Now()
-		// 注意：如果索引失败，defer中的recovery机制会自动回滚已创建的chunks和索引数据
+		// Indexing compensates partial vectors itself; remove newly-created source
+		// rows here so an unsuccessful batch cannot leave hidden FAQ entries.
 		if err := s.indexFAQChunks(ctx, kb, faqKnowledge, chunks, embeddingModel, true, false); err != nil {
+			// indexFAQChunks compensates any partially written vectors before
+			// returning. Remove only the newly-created source rows here; calling
+			// deleteFAQChunkVectors again would deduct storage twice after an
+			// indexing failure that never committed its paired write.
+			if deleteErr := s.chunkRepo.DeleteChunks(ctx, tenantID, chunkIds); deleteErr != nil {
+				return errors.Join(fmt.Errorf("failed to index chunks: %w", err),
+					fmt.Errorf("failed to rollback created FAQ chunks: %w", deleteErr))
+			}
 			return fmt.Errorf("failed to index chunks: %w", err)
 		}
 		indexDuration := time.Since(indexStartTime)
@@ -1840,6 +1857,53 @@ func (s *knowledgeService) incrementalIndexFAQEntry(
 		indexMode = kb.FAQConfig.IndexMode
 	}
 
+	// Incremental edits still replace the retriever footprint. Build the old
+	// and new FAQ index descriptions up front so the knowledge row receives the
+	// exact new-minus-old storage delta rather than an additive charge.
+	oldChunk := *chunk
+	oldMeta := &types.FAQChunkMetadata{
+		StandardQuestion: oldStandardQuestion,
+		SimilarQuestions: append([]string(nil), oldSimilarQuestions...),
+		Answers:          append([]string(nil), oldAnswers...),
+	}
+	if existingMeta, metaErr := chunk.FAQMetadata(); metaErr == nil && existingMeta != nil {
+		oldMeta.AnswerStrategy = existingMeta.AnswerStrategy
+		oldMeta.NegativeQuestions = append([]string(nil), existingMeta.NegativeQuestions...)
+		oldMeta.Version = existingMeta.Version
+		oldMeta.Source = existingMeta.Source
+	}
+	if err := oldChunk.SetFAQMetadata(oldMeta); err != nil {
+		return err
+	}
+	oldIndexInfo, err := s.buildFAQIndexInfoList(ctx, kb, &oldChunk)
+	if err != nil {
+		return err
+	}
+	newIndexInfo, err := s.buildFAQIndexInfoList(ctx, kb, chunk)
+	if err != nil {
+		return err
+	}
+	oldStorageEstimate := retrieveEngine.EstimateStorageSize(ctx, embeddingModel, oldIndexInfo)
+	newStorageEstimate := retrieveEngine.EstimateStorageSize(ctx, embeddingModel, newIndexInfo)
+	if oldStorageEstimate < 0 {
+		oldStorageEstimate = 0
+	}
+	if newStorageEstimate < 0 {
+		newStorageEstimate = 0
+	}
+	storageDelta := newStorageEstimate - oldStorageEstimate
+
+	// Separate mode historically used positional source IDs. Remove the whole
+	// chunk footprint before rebuilding every entry with the canonical IDs so
+	// old vectors cannot survive a reorder or migration. Restore the complete
+	// previous footprint if this cleanup itself fails.
+	if err := retrieveEngine.DeleteByChunkIDList(ctx, []string{chunk.ID}, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ); err != nil {
+		if restoreErr := retrieveEngine.BatchIndex(ctx, embeddingModel, oldIndexInfo); restoreErr != nil {
+			return errors.Join(err, fmt.Errorf("failed to restore FAQ vectors after cleanup failure: %w", restoreErr))
+		}
+		return err
+	}
+
 	// 对新旧数据进行归一化处理，确保与 buildFAQIndexInfoList 的行为一致
 	// 旧数据归一化
 	oldStandardQuestion = types.NormalizeQuestion(oldStandardQuestion)
@@ -1910,12 +1974,9 @@ func (s *knowledgeService) incrementalIndexFAQEntry(
 	}
 
 	// 找出需要删除的问题（在旧集合中但不在新集合中）
-	var sourceIDsToDelete []string
 	var deletedQuestions []string
 	for oldQ := range oldQuestionsSet {
 		if _, exists := newQuestionsSet[oldQ]; !exists {
-			sourceID := fmt.Sprintf("%s-%s", chunk.ID, hashQuestion(oldQ))
-			sourceIDsToDelete = append(sourceIDsToDelete, sourceID)
 			deletedQuestions = append(deletedQuestions, oldQ)
 		}
 	}
@@ -1928,7 +1989,7 @@ func (s *knowledgeService) incrementalIndexFAQEntry(
 		// 1. 新问题（之前不存在）
 		// 2. 答案变化（需要重新embedding）
 		if !existedBefore || answersChanged {
-			sourceID := fmt.Sprintf("%s-%s", chunk.ID, hashQuestion(newQ))
+			sourceID := faqSimilarQuestionSourceID(chunk.ID, newQ)
 			indexInfoToUpdate = append(indexInfoToUpdate, &types.IndexInfo{
 				Content:         buildContent(newQ, normalizedNewMeta.Answers),
 				SourceID:        sourceID,
@@ -1960,31 +2021,48 @@ func (s *knowledgeService) incrementalIndexFAQEntry(
 		logger.Debugf(ctx, "incrementalIndexFAQEntry: updated similar questions (answers changed): %v", updatedQuestions)
 	}
 
-	// 3. 删除不再存在的相似问索引
-	if len(sourceIDsToDelete) > 0 {
-		logger.Debugf(ctx, "incrementalIndexFAQEntry: deleting %d obsolete sourceIDs: %v", len(sourceIDsToDelete), sourceIDsToDelete)
-		if delErr := retrieveEngine.DeleteBySourceIDList(ctx, sourceIDsToDelete, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ); delErr != nil {
-			logger.Warnf(ctx, "incrementalIndexFAQEntry: failed to delete obsolete source IDs: %v", delErr)
-		}
-	}
+	// 3. The complete old footprint was removed above. Rebuild every current
+	// entry below, including unchanged questions, using canonical source IDs.
 
 	// 4. 批量索引需要更新的内容
 	newCount := len(normalizedNewMeta.SimilarQuestions)
+	indexInfoToUpdate = newIndexInfo
 	if len(indexInfoToUpdate) > 0 {
-		logger.Debugf(ctx, "incrementalIndexFAQEntry: updating %d index entries (skipped %d unchanged)",
-			len(indexInfoToUpdate), 1+newCount-len(indexInfoToUpdate))
+		logger.Debugf(ctx, "incrementalIndexFAQEntry: rebuilding %d index entries", len(indexInfoToUpdate))
 		if err := retrieveEngine.BatchIndex(ctx, embeddingModel, indexInfoToUpdate); err != nil {
-			return err
+			cleanupErr := retrieveEngine.DeleteByChunkIDList(
+				ctx, []string{chunk.ID}, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ,
+			)
+			restoreErr := retrieveEngine.BatchIndex(ctx, embeddingModel, oldIndexInfo)
+			return errors.Join(err, cleanupErr, restoreErr)
 		}
 	} else {
 		logger.Debugf(ctx, "incrementalIndexFAQEntry: all %d entries unchanged, skipping index update", 1+newCount)
 	}
 
-	// 5. 更新 knowledge 记录
+	// 5. 更新 knowledge 记录 and apply the exact index-footprint delta
 	now := time.Now()
+	oldKnowledgeStorageSize := knowledge.StorageSize
+	knowledge.StorageSize = faqStorageSizeWithDelta(oldKnowledgeStorageSize, storageDelta)
 	knowledge.UpdatedAt = now
 	knowledge.ProcessedAt = &now
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	tenantInfo, _ := types.TenantInfoFromContext(ctx)
+	storageQuota := effectiveStorageQuota(tenantInfo, now.UTC())
+	if err := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, storageQuota); err != nil {
+		knowledge.StorageSize = oldKnowledgeStorageSize
+		// BatchIndex may have overwritten old vectors under the same source IDs.
+		// Remove the attempted revision and restore the previous index best-effort
+		// before surfacing the paired storage mutation error.
+		if cleanupErr := retrieveEngine.DeleteByChunkIDList(
+			ctx, []string{chunk.ID}, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ,
+		); cleanupErr != nil {
+			logger.Warnf(ctx, "incrementalIndexFAQEntry: failed to cleanup vectors after storage mutation failure: %v", cleanupErr)
+		}
+		if len(oldIndexInfo) > 0 {
+			if restoreErr := retrieveEngine.BatchIndex(ctx, embeddingModel, oldIndexInfo); restoreErr != nil {
+				logger.Warnf(ctx, "incrementalIndexFAQEntry: failed to restore previous vectors after storage mutation failure: %v", restoreErr)
+			}
+		}
 		return err
 	}
 
@@ -1999,6 +2077,20 @@ func (s *knowledgeService) indexFAQChunks(ctx context.Context,
 	kb *types.KnowledgeBase, knowledge *types.Knowledge,
 	chunks []*types.Chunk, embeddingModel embedding.Embedder,
 	adjustStorage bool, needDelete bool,
+) error {
+	return s.indexFAQChunksWithPrevious(ctx, kb, knowledge, chunks, embeddingModel,
+		adjustStorage, needDelete, nil)
+}
+
+// indexFAQChunksWithPrevious indexes FAQ chunks and updates the FAQ knowledge
+// storage contribution through the paired repository mutation. When
+// previousChunks is supplied, the estimated footprint is replaced (new minus
+// old) instead of blindly added; this is the path used by edits and merges,
+// where the same source IDs are overwritten in the retriever.
+func (s *knowledgeService) indexFAQChunksWithPrevious(ctx context.Context,
+	kb *types.KnowledgeBase, knowledge *types.Knowledge,
+	chunks []*types.Chunk, embeddingModel embedding.Embedder,
+	adjustStorage bool, needDelete bool, previousChunks []*types.Chunk,
 ) error {
 	if len(chunks) == 0 {
 		return nil
@@ -2034,16 +2126,39 @@ func (s *knowledgeService) indexFAQChunks(ctx context.Context,
 		buildIndexInfoDuration,
 	)
 
-	var size int64
+	var (
+		size         int64
+		storageDelta int64
+		previousInfo []*types.IndexInfo
+	)
 	if adjustStorage {
 		estimateStartTime := time.Now()
 		size = retrieveEngine.EstimateStorageSize(ctx, embeddingModel, indexInfo)
-		estimateDuration := time.Since(estimateStartTime)
-		logger.Debugf(ctx, "indexFAQChunks: estimated storage size %d bytes in %v", size, estimateDuration)
-		storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
-		if storageQuota > 0 && tenantInfo.StorageUsed+size > storageQuota {
-			return types.NewStorageQuotaExceededError()
+		if size < 0 {
+			size = 0
 		}
+		storageDelta = size
+		if len(previousChunks) > 0 {
+			previousInfo = make([]*types.IndexInfo, 0, len(previousChunks))
+			for _, previousChunk := range previousChunks {
+				if previousChunk == nil {
+					continue
+				}
+				infoList, infoErr := s.buildFAQIndexInfoList(ctx, kb, previousChunk)
+				if infoErr != nil {
+					return infoErr
+				}
+				previousInfo = append(previousInfo, infoList...)
+			}
+			previousSize := retrieveEngine.EstimateStorageSize(ctx, embeddingModel, previousInfo)
+			if previousSize < 0 {
+				previousSize = 0
+			}
+			storageDelta = size - previousSize
+		}
+		estimateDuration := time.Since(estimateStartTime)
+		logger.Debugf(ctx, "indexFAQChunks: estimated storage size %d bytes (delta %d) in %v",
+			size, storageDelta, estimateDuration)
 	}
 
 	// 删除旧向量
@@ -2062,7 +2177,13 @@ func (s *knowledgeService) indexFAQChunks(ctx context.Context,
 	// 批量索引（这里可能是性能瓶颈）
 	batchIndexStartTime := time.Now()
 	if err := retrieveEngine.BatchIndex(ctx, embeddingModel, indexInfo); err != nil {
-		return err
+		cleanupErr := retrieveEngine.DeleteByChunkIDList(
+			ctx, chunkIDs, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ,
+		)
+		if len(previousInfo) > 0 {
+			cleanupErr = errors.Join(cleanupErr, retrieveEngine.BatchIndex(ctx, embeddingModel, previousInfo))
+		}
+		return errors.Join(err, cleanupErr)
 	}
 	batchIndexDuration := time.Since(batchIndexStartTime)
 	var avgPerEntry time.Duration
@@ -2072,23 +2193,45 @@ func (s *knowledgeService) indexFAQChunks(ctx context.Context,
 	logger.Debugf(ctx, "indexFAQChunks: batch indexed %d index info entries in %v (avg: %v per entry)",
 		len(indexInfo), batchIndexDuration, avgPerEntry)
 
-	if adjustStorage && size > 0 {
+	updateStartTime := time.Now()
+	if adjustStorage {
 		adjustStartTime := time.Now()
-		if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, size); err == nil {
-			tenantInfo.StorageUsed += size
+		oldStorageSize := knowledge.StorageSize
+		knowledge.StorageSize = faqStorageSizeWithDelta(oldStorageSize, storageDelta)
+		now := time.Now()
+		knowledge.UpdatedAt = now
+		knowledge.ProcessedAt = &now
+		storageQuota := effectiveStorageQuota(tenantInfo, time.Now().UTC())
+		if err := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, storageQuota); err != nil {
+			knowledge.StorageSize = oldStorageSize
+			// The paired write is deliberately attempted after indexing so a
+			// rejected quota/counter mutation cannot charge bytes that were
+			// never persisted. Remove this call's vectors before returning.
+			if cleanupErr := retrieveEngine.DeleteByChunkIDList(
+				ctx, chunkIDs, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ,
+			); cleanupErr != nil {
+				logger.Warnf(ctx, "indexFAQChunks: failed to cleanup vectors after storage mutation failure: %v", cleanupErr)
+			}
+			// Re-indexing can overwrite the old vectors under the same source
+			// IDs. Restore the previous footprint after cleanup so a rejected
+			// paired write does not turn a failed edit into a missing answer.
+			if len(previousInfo) > 0 {
+				if restoreErr := retrieveEngine.BatchIndex(ctx, embeddingModel, previousInfo); restoreErr != nil {
+					logger.Warnf(ctx, "indexFAQChunks: failed to restore previous vectors after storage mutation failure: %v", restoreErr)
+				}
+			}
+			return err
 		}
-		knowledge.StorageSize += size
 		adjustDuration := time.Since(adjustStartTime)
 		if adjustDuration > 50*time.Millisecond {
 			logger.Debugf(ctx, "indexFAQChunks: adjusted storage in %v", adjustDuration)
 		}
+	} else {
+		now := time.Now()
+		knowledge.UpdatedAt = now
+		knowledge.ProcessedAt = &now
+		err = s.repo.UpdateKnowledge(ctx, knowledge)
 	}
-
-	updateStartTime := time.Now()
-	now := time.Now()
-	knowledge.UpdatedAt = now
-	knowledge.ProcessedAt = &now
-	err = s.repo.UpdateKnowledge(ctx, knowledge)
 	updateDuration := time.Since(updateStartTime)
 	if updateDuration > 50*time.Millisecond {
 		logger.Debugf(ctx, "indexFAQChunks: updated knowledge in %v", updateDuration)
@@ -2107,6 +2250,29 @@ func (s *knowledgeService) indexFAQChunks(ctx context.Context,
 	)
 
 	return err
+}
+
+// faqStorageSizeWithDelta computes a non-negative storage target without
+// allowing malformed estimates to wrap an int64 aggregate. The paired
+// repository mutation performs the authoritative persisted delta calculation;
+// this helper only prepares the proposed knowledge row.
+func faqStorageSizeWithDelta(current, delta int64) int64 {
+	if current < 0 {
+		current = 0
+	}
+	if delta > 0 {
+		if current > math.MaxInt64-delta {
+			return math.MaxInt64
+		}
+		return current + delta
+	}
+	if delta < 0 {
+		if delta == math.MinInt64 || current < -delta {
+			return 0
+		}
+		return current + delta
+	}
+	return current
 }
 
 func (s *knowledgeService) deleteFAQChunkVectors(ctx context.Context,
@@ -2138,24 +2304,92 @@ func (s *knowledgeService) deleteFAQChunkVectors(ctx context.Context,
 	}
 
 	size := retrieveEngine.EstimateStorageSize(ctx, embeddingModel, indexInfo)
+	if size < 0 {
+		size = 0
+	}
 	if err := retrieveEngine.DeleteByChunkIDList(ctx, chunkIDs, embeddingModel.GetDimensions(), types.KnowledgeTypeFAQ); err != nil {
 		return err
 	}
-	if size > 0 {
-		if err := s.tenantRepo.AdjustStorageUsed(ctx, tenantInfo.ID, -size); err == nil {
-			tenantInfo.StorageUsed -= size
-			if tenantInfo.StorageUsed < 0 {
-				tenantInfo.StorageUsed = 0
-			}
+	oldStorageSize := knowledge.StorageSize
+	knowledge.StorageSize = faqStorageSizeWithDelta(oldStorageSize, -size)
+	now := time.Now()
+	knowledge.UpdatedAt = now
+	knowledge.ProcessedAt = &now
+	storageQuota := effectiveStorageQuota(tenantInfo, now.UTC())
+	if err := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, storageQuota); err != nil {
+		knowledge.StorageSize = oldStorageSize
+		// Keep the source rows and restore their vectors when the paired write
+		// fails, so deletion can be retried without losing active answers.
+		if restoreErr := retrieveEngine.BatchIndex(ctx, embeddingModel, indexInfo); restoreErr != nil {
+			logger.Warnf(ctx, "deleteFAQChunkVectors: failed to restore vectors after storage mutation failure: %v", restoreErr)
 		}
-		if knowledge.StorageSize >= size {
-			knowledge.StorageSize -= size
-		} else {
-			knowledge.StorageSize = 0
+		return err
+	}
+	return nil
+}
+
+// restoreFAQDeleteState compensates the non-transactional boundary between
+// vector storage, tenant accounting, and chunk rows. It is used only when a
+// source-row delete fails after deleteFAQChunkVectors has already committed.
+// Every failed compensation is returned so callers can surface an honest
+// retry/reconciliation error instead of silently leaving drift behind.
+func (s *knowledgeService) restoreFAQDeleteState(
+	ctx context.Context,
+	kb *types.KnowledgeBase,
+	knowledge *types.Knowledge,
+	deletedChunks []*types.Chunk,
+	vectorChunks []*types.Chunk,
+	oldStorageSize int64,
+) error {
+	var failures []error
+	if len(deletedChunks) > 0 {
+		// RestoreChunks is explicitly unscoped and writes DeletedAt=zero by
+		// primary key. Normal SaveChunks stays scoped so concurrent updates cannot
+		// accidentally resurrect a row.
+		if err := s.chunkRepo.RestoreChunks(ctx, deletedChunks); err != nil {
+			failures = append(failures, fmt.Errorf("failed to restore deleted FAQ chunks: %w", err))
 		}
 	}
-	knowledge.UpdatedAt = time.Now()
-	return s.repo.UpdateKnowledge(ctx, knowledge)
+
+	tenantInfo, _ := types.TenantInfoFromContext(ctx)
+	embeddingModel, err := s.modelService.GetEmbeddingModel(ctx, kb.EmbeddingModelID)
+	if err != nil {
+		failures = append(failures, fmt.Errorf("failed to restore FAQ embedding model: %w", err))
+	} else {
+		retrieveEngine, engineErr := retriever.CreateRetrieveEngineForKB(
+			ctx, s.retrieveEngine, s.ownership, types.MustTenantIDFromContext(ctx), kb.VectorStoreID)
+		if engineErr != nil {
+			failures = append(failures, fmt.Errorf("failed to restore FAQ retriever: %w", engineErr))
+		} else if len(vectorChunks) > 0 {
+			indexInfo := make([]*types.IndexInfo, 0)
+			for _, chunk := range vectorChunks {
+				infoList, infoErr := s.buildFAQIndexInfoList(ctx, kb, chunk)
+				if infoErr != nil {
+					failures = append(failures, fmt.Errorf("failed to rebuild FAQ vector payload: %w", infoErr))
+					continue
+				}
+				indexInfo = append(indexInfo, infoList...)
+			}
+			if len(indexInfo) > 0 {
+				if indexErr := retrieveEngine.BatchIndex(ctx, embeddingModel, indexInfo); indexErr != nil {
+					failures = append(failures, fmt.Errorf("failed to restore FAQ vectors: %w", indexErr))
+				}
+			}
+		}
+	}
+
+	// Restore the exact knowledge contribution only after attempting the
+	// external repairs. UpdateKnowledgeWithStorage applies the tenant delta
+	// atomically with the row update and therefore makes retry accounting safe.
+	knowledge.StorageSize = oldStorageSize
+	now := time.Now()
+	knowledge.UpdatedAt = now
+	knowledge.ProcessedAt = &now
+	quota := effectiveStorageQuota(tenantInfo, now.UTC())
+	if storageErr := s.repo.UpdateKnowledgeWithStorage(ctx, knowledge, quota); storageErr != nil {
+		failures = append(failures, fmt.Errorf("failed to restore FAQ storage accounting: %w", storageErr))
+	}
+	return errors.Join(failures...)
 }
 
 func faqImportCompletedOutcome(successCount, failedCount, skippedCount int) types.AuditOutcome {
@@ -2624,12 +2858,27 @@ func (s *knowledgeService) executeFAQMergeOperations(
 
 		// 2. 逐条应用合并数据
 		mergedChunks := make([]*types.Chunk, 0, len(batch))
+		previousChunks := make([]*types.Chunk, 0, len(batch))
 		for _, op := range batch {
 			fullChunk, ok := chunkMap[op.ExistingChunk.ID]
 			if !ok {
 				logger.Errorf(ctx, "FAQ import task %s: chunk %s not found during batch reload", taskID, op.ExistingChunk.ID)
 				return mergedCount, fmt.Errorf("chunk %s not found during batch reload", op.ExistingChunk.ID)
 			}
+
+			// Keep an immutable description of the old retriever footprint. The
+			// merge overwrites the same source IDs; if the paired storage write is
+			// rejected after indexing, those old vectors must be restorable.
+			previousChunk := *fullChunk
+			if op.ExistingChunk != nil {
+				if previousMeta, metaErr := op.ExistingChunk.FAQMetadata(); metaErr == nil && previousMeta != nil {
+					if metaErr := previousChunk.SetFAQMetadata(previousMeta); metaErr != nil {
+						return mergedCount, fmt.Errorf("failed to preserve previous FAQ metadata: %w", metaErr)
+					}
+					previousChunk.Content = buildFAQChunkContent(previousMeta, indexMode)
+				}
+			}
+			previousChunks = append(previousChunks, &previousChunk)
 
 			if err := fullChunk.SetFAQMetadata(op.MergedMeta); err != nil {
 				logger.Errorf(ctx, "FAQ import task %s: failed to set merged metadata for chunk %s: %v", taskID, fullChunk.ID, err)
@@ -2662,7 +2911,16 @@ func (s *knowledgeService) executeFAQMergeOperations(
 		}
 
 		// 4. 重建索引（EFPutDocument 会自动覆盖相同 SourceID）
-		if err := s.indexFAQChunks(ctx, kb, faqKnowledge, mergedChunks, embeddingModel, false, false); err != nil {
+		if err := s.indexFAQChunksWithPrevious(ctx, kb, faqKnowledge, mergedChunks, embeddingModel, true, false, previousChunks); err != nil {
+			// SaveChunks ran before indexing. Restore the complete previous rows
+			// on every downstream failure so a retry does not see a half-merged
+			// source while the retriever still contains the old revision.
+			if restoreErr := s.chunkRepo.SaveChunks(ctx, previousChunks); restoreErr != nil {
+				return mergedCount, errors.Join(
+					fmt.Errorf("failed to re-index merged chunks: %w", err),
+					fmt.Errorf("failed to restore merged chunks: %w", restoreErr),
+				)
+			}
 			return mergedCount, fmt.Errorf("failed to re-index merged chunks: %w", err)
 		}
 

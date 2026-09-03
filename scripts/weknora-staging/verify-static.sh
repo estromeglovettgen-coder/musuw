@@ -65,6 +65,26 @@ grep -Fq 'source: tikhub_api_key' "$staging_root/compose.yaml" || fail 'staging 
 grep -Fq 'file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/tikhub_api_key' "$staging_root/compose.yaml" ||
     fail 'staging TikHub secret is not file-backed'
 grep -Fq 'tikhub_api_key' "$script_dir/prepare-runtime.sh" || fail 'staging runtime does not require the TikHub secret'
+for langfuse_secret in langfuse_public_key langfuse_secret_key; do
+    grep -Fq "source: $langfuse_secret" "$staging_root/compose.yaml" ||
+        fail "staging app does not mount the Langfuse $langfuse_secret secret"
+    grep -Fq "file: \${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/$langfuse_secret" "$staging_root/compose.yaml" ||
+        fail "staging Langfuse $langfuse_secret is not file-backed"
+done
+grep -Fq 'export LANGFUSE_PUBLIC_KEY="$(read_required_secret /run/secrets/langfuse_public_key langfuse-public-key)"' "$staging_root/app-entrypoint.sh" ||
+    fail 'staging entrypoint does not export the Langfuse public key'
+grep -Fq 'export LANGFUSE_SECRET_KEY="$(read_required_secret /run/secrets/langfuse_secret_key langfuse-secret-key)"' "$staging_root/app-entrypoint.sh" ||
+    fail 'staging entrypoint does not export the Langfuse secret key'
+grep -Fq 'LANGFUSE_ENABLED: "true"' "$staging_root/compose.yaml" ||
+    fail 'staging Langfuse tracing is not enabled by default'
+grep -Fq 'LANGFUSE_ENABLED=true' "$staging_root/staging.env.example" ||
+    fail 'staging Langfuse tracing example is not enabled'
+grep -Fq "LANGFUSE_ENABLED=true" "$script_dir/verify-deployed.sh" ||
+    fail 'staging deployed verification does not assert Langfuse tracing is enabled'
+for langfuse_secret in langfuse_public_key langfuse_secret_key; do
+    grep -Fq "$langfuse_secret" "$script_dir/prepare-runtime.sh" ||
+        fail "staging runtime does not require the Langfuse $langfuse_secret"
+done
 grep -Fq 'staging-web' "$staging_root/compose.edge.yaml" || fail 'staging edge alias is missing'
 grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'staging tunnel network is missing'
 grep -Fq 'HostConfig.Memory' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert memory limits'
@@ -76,7 +96,7 @@ trap 'find "$tmp_root" -depth -delete 2>/dev/null || true' EXIT
 runtime_dir="$tmp_root/runtime"
 secret_dir="$runtime_dir/secrets"
 mkdir -m 700 -p "$secret_dir"
-for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key searxng_secret tikhub_api_key; do
+for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key searxng_secret tikhub_api_key; do
     printf '%s\n' 'staging-static-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -140,7 +160,7 @@ MUSUW_PADDLE_PRO_YEARLY_PRICE_ID=pri_static_pro_yearly
 MUSUW_PADDLE_MAX_MONTHLY_PRICE_ID=pri_static_max_monthly
 MUSUW_PADDLE_MAX_YEARLY_PRICE_ID=pri_static_max_yearly
 OPENROUTER_WORKSPACE_ID=$workspace_id
-LANGFUSE_ENABLED=false
+LANGFUSE_ENABLED=true
 LANGFUSE_HOST=https://jp.cloud.langfuse.com
 LANGFUSE_RELEASE=musuw-staging
 LANGFUSE_ENVIRONMENT=staging
@@ -173,6 +193,10 @@ expect_prepare_rejects() {
 replace_env_value "$runtime_dir/staging.public.env" MUSUW_STAGING_R2_BUCKET musuw-production
 expect_prepare_rejects 'the production R2 bucket'
 replace_env_value "$runtime_dir/staging.public.env" MUSUW_STAGING_R2_BUCKET musuw-staging
+
+replace_env_value "$runtime_dir/staging.public.env" LANGFUSE_ENABLED false
+expect_prepare_rejects 'disabled Langfuse tracing'
+replace_env_value "$runtime_dir/staging.public.env" LANGFUSE_ENABLED true
 
 replace_env_value "$runtime_dir/auth-public.env" MUSUW_SUPABASE_URL https://production-identity.example
 replace_env_value "$runtime_dir/staging.public.env" OIDC_AUTH_ISSUER_URL https://production-identity.example/auth/v1
@@ -225,6 +249,10 @@ jq -e '
     .services.app.environment.MUSUW_DEPLOYMENT_ENVIRONMENT == "staging" and
     .services.app.environment.MUSUW_PADDLE_ENVIRONMENT == "sandbox" and
     .services.app.environment.MUSUW_PADDLE_API_URL == "https://sandbox-api.paddle.com" and
+    .services.app.environment.LANGFUSE_ENABLED == "true" and
+    .services.app.environment.LANGFUSE_HOST == "https://jp.cloud.langfuse.com" and
+    .services.app.environment.LANGFUSE_RELEASE == "musuw-staging" and
+    .services.app.environment.LANGFUSE_ENVIRONMENT == "staging" and
     .services.app.environment.OPENROUTER_WORKSPACE_ID == "00000000-0000-4000-8000-000000000001" and
     .services.app.environment.S3_BUCKET_NAME == "musuw-staging" and
     .services.app.environment.NEO4J_ENABLE == "false" and
@@ -240,7 +268,9 @@ jq -e '
     (.services.searxng.profiles | length == 0) and (.services["searxng-init"].profiles | length == 0) and
     ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 7 and
     ([.services[].cpus | tonumber] | add) <= 1.5 and
-    ([.services[].mem_limit | tonumber] | add) <= 1932735283
+    ([.services[].mem_limit | tonumber] | add) <= 1932735283 and
+    ([.services.app.secrets[] | select(.source == "langfuse_public_key" and .target == "langfuse_public_key")] | length) == 1 and
+    ([.services.app.secrets[] | select(.source == "langfuse_secret_key" and .target == "langfuse_secret_key")] | length) == 1
 ' "$config_json" >/dev/null || fail 'staging Compose topology/resource contract failed'
 
 jq -e '
@@ -248,7 +278,9 @@ jq -e '
     (.services.frontend.networks.edge.aliases | index("staging-web")) and
     (.networks["WeKnora-network"].name == "weknora-v072-staging-internal") and
     ([.volumes[].name] | all(test("^weknora-v072-staging-"))) and
-    ([.secrets[].file] | all(startswith("'"$secret_dir"'")))
+    ([.secrets[].file] | all(startswith("'"$secret_dir"'"))) and
+    (.secrets.langfuse_public_key.file == "'"$secret_dir"'/langfuse_public_key") and
+    (.secrets.langfuse_secret_key.file == "'"$secret_dir"'/langfuse_secret_key")
 ' "$edge_config_json" >/dev/null || fail 'staging edge/data/secret isolation contract failed'
 
 # Verify that the fixture itself cannot be expanded into an app credential

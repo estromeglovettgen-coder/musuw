@@ -2417,6 +2417,7 @@ export default {
     quickPayment: '快捷支付',
     secureCheckoutLoading: '选择 Paddle 提供的安全支付方式完成订阅。',
     checkoutLoadFailed: '暂时无法载入结账页，请返回套餐页后重试。',
+    checkoutPaymentFailed: '付款未完成，请检查付款信息后在下方重试。当前不会开通套餐，也不会扣减额度。',
     upgradePaymentMethod: '使用当前订阅的付款方式，由 Paddle 安全处理',
     checkoutSuccessTitle: '套餐正在生效',
     checkoutSuccessDescription: '付款已确认。套餐和额度会在服务端同步完成后自动更新。',

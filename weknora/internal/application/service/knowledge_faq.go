@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -359,6 +360,9 @@ func (s *knowledgeService) UpdateFAQEntry(ctx context.Context,
 	if chunk.ChunkType != types.ChunkTypeFAQ {
 		return nil, werrors.NewBadRequestError("仅支持更新 FAQ 条目")
 	}
+	// Preserve the pre-edit metadata so storage accounting can replace the
+	// retriever footprint (new estimate minus old estimate) atomically.
+	oldChunk := *chunk
 	meta, err := sanitizeFAQEntryPayload(payload)
 	if err != nil {
 		return nil, err
@@ -442,6 +446,9 @@ func (s *knowledgeService) UpdateFAQEntry(ctx context.Context,
 		// 分别索引模式下的增量更新
 		if err := s.incrementalIndexFAQEntry(ctx, kb, faqKnowledge, chunk, embeddingModel,
 			oldStandardQuestion, oldSimilarQuestions, oldAnswers, meta); err != nil {
+			if rollbackErr := s.chunkService.UpdateChunk(ctx, &oldChunk); rollbackErr != nil {
+				logger.Warnf(ctx, "UpdateFAQEntry: failed to restore chunk after indexing failure: %v", rollbackErr)
+			}
 			return nil, err
 		}
 	} else {
@@ -455,7 +462,8 @@ func (s *knowledgeService) UpdateFAQEntry(ctx context.Context,
 			if engineErr == nil {
 				sourceIDsToDelete := make([]string, 0, oldSimilarQuestionCount-newSimilarQuestionCount)
 				for i := newSimilarQuestionCount; i < oldSimilarQuestionCount; i++ {
-					sourceIDsToDelete = append(sourceIDsToDelete, fmt.Sprintf("%s-%d", chunk.ID, i))
+					sourceIDsToDelete = append(sourceIDsToDelete,
+						faqSimilarQuestionSourceID(chunk.ID, oldSimilarQuestions[i]))
 				}
 				if len(sourceIDsToDelete) > 0 {
 					logger.Debugf(ctx, "UpdateFAQEntry: incremental delete %d obsolete source IDs", len(sourceIDsToDelete))
@@ -467,7 +475,11 @@ func (s *knowledgeService) UpdateFAQEntry(ctx context.Context,
 		}
 
 		// 使用 needDelete=false，因为 EFPutDocument 会自动覆盖相同 SourceID 的文档
-		if err := s.indexFAQChunks(ctx, kb, faqKnowledge, []*types.Chunk{chunk}, embeddingModel, false, false); err != nil {
+		if err := s.indexFAQChunksWithPrevious(ctx, kb, faqKnowledge, []*types.Chunk{chunk}, embeddingModel, true, false,
+			[]*types.Chunk{&oldChunk}); err != nil {
+			if rollbackErr := s.chunkService.UpdateChunk(ctx, &oldChunk); rollbackErr != nil {
+				logger.Warnf(ctx, "UpdateFAQEntry: failed to restore chunk after indexing failure: %v", rollbackErr)
+			}
 			return nil, err
 		}
 	}
@@ -528,6 +540,8 @@ func (s *knowledgeService) AddSimilarQuestions(ctx context.Context,
 	if chunk.ChunkType != types.ChunkTypeFAQ {
 		return nil, werrors.NewBadRequestError("仅支持更新 FAQ 条目")
 	}
+	// Keep the old metadata for exact storage replacement during re-indexing.
+	oldChunk := *chunk
 
 	// Get existing metadata
 	meta, err := chunk.FAQMetadata()
@@ -618,11 +632,18 @@ func (s *knowledgeService) AddSimilarQuestions(ctx context.Context,
 		// Only index the new similar questions
 		if err := s.incrementalIndexFAQEntry(ctx, kb, faqKnowledge, chunk, embeddingModel,
 			meta.StandardQuestion, oldSimilarQuestions, meta.Answers, meta); err != nil {
+			if rollbackErr := s.chunkService.UpdateChunk(ctx, &oldChunk); rollbackErr != nil {
+				logger.Warnf(ctx, "AddSimilarQuestions: failed to restore chunk after indexing failure: %v", rollbackErr)
+			}
 			return nil, err
 		}
 	} else {
 		// Combined mode, re-index the whole entry
-		if err := s.indexFAQChunks(ctx, kb, faqKnowledge, []*types.Chunk{chunk}, embeddingModel, false, false); err != nil {
+		if err := s.indexFAQChunksWithPrevious(ctx, kb, faqKnowledge, []*types.Chunk{chunk}, embeddingModel, true, false,
+			[]*types.Chunk{&oldChunk}); err != nil {
+			if rollbackErr := s.chunkService.UpdateChunk(ctx, &oldChunk); rollbackErr != nil {
+				logger.Warnf(ctx, "AddSimilarQuestions: failed to restore chunk after indexing failure: %v", rollbackErr)
+			}
 			return nil, err
 		}
 	}
@@ -1408,9 +1429,6 @@ func (s *knowledgeService) DeleteFAQEntries(ctx context.Context,
 		if chunk.KnowledgeBaseID != kb.ID || chunk.ChunkType != types.ChunkTypeFAQ {
 			return werrors.NewBadRequestError("包含无效的 FAQ 条目")
 		}
-		if err := s.chunkService.DeleteChunk(ctx, chunk.ID); err != nil {
-			return err
-		}
 		if faqKnowledge == nil {
 			faqKnowledge, err = s.repo.GetKnowledgeByID(ctx, tenantID, chunk.KnowledgeID)
 			if err != nil {
@@ -1420,8 +1438,25 @@ func (s *knowledgeService) DeleteFAQEntries(ctx context.Context,
 		chunksToRemove = append(chunksToRemove, chunk)
 	}
 	if len(chunksToRemove) > 0 && faqKnowledge != nil {
+		oldStorageSize := faqKnowledge.StorageSize
 		if err := s.deleteFAQChunkVectors(ctx, kb, faqKnowledge, chunksToRemove); err != nil {
 			return err
+		}
+		// Keep the source rows until vector deletion and the paired storage
+		// mutation succeed; a failed external delete remains retryable.
+		deletedChunks := make([]*types.Chunk, 0, len(chunksToRemove))
+		for _, chunk := range chunksToRemove {
+			if err := s.chunkService.DeleteChunk(ctx, chunk.ID); err != nil {
+				// The storage mutation already committed. Restore the source rows,
+				// vectors, and knowledge contribution before returning so a retry
+				// cannot deduct the same bytes a second time.
+				rollbackErr := s.restoreFAQDeleteState(ctx, kb, faqKnowledge, deletedChunks, chunksToRemove, oldStorageSize)
+				if rollbackErr != nil {
+					return errors.Join(err, rollbackErr)
+				}
+				return err
+			}
+			deletedChunks = append(deletedChunks, chunk)
 		}
 	}
 	details := map[string]any{"count": len(chunksToRemove), "source_type": "faq"}
@@ -1941,6 +1976,13 @@ func hashQuestion(question string) string {
 	return hex.EncodeToString(h[:4])
 }
 
+// faqSimilarQuestionSourceID is the single source-id contract for separate
+// question indexing. It is content-stable so reordering similar questions does
+// not orphan the previous vector or create duplicate footprints.
+func faqSimilarQuestionSourceID(chunkID, question string) string {
+	return fmt.Sprintf("%s-%s", chunkID, hashQuestion(types.NormalizeQuestion(question)))
+}
+
 // resolveTagID resolves tag ID (UUID) from payload, prioritizing tag_id (seq_id) over tag_name
 // If no tag is specified, creates or finds the "未分类" tag
 // Returns the internal UUID of the tag
@@ -2091,7 +2133,7 @@ func (s *knowledgeService) buildFAQIndexInfoList(
 	})
 
 	// 每个相似问创建一个索引项
-	for i, similarQ := range meta.SimilarQuestions {
+	for _, similarQ := range meta.SimilarQuestions {
 		similarContent := similarQ
 		if indexMode == types.FAQIndexModeQuestionAnswer && len(meta.Answers) > 0 {
 			var builder strings.Builder
@@ -2102,7 +2144,7 @@ func (s *knowledgeService) buildFAQIndexInfoList(
 			}
 			similarContent = builder.String()
 		}
-		sourceID := fmt.Sprintf("%s-%d", chunk.ID, i)
+		sourceID := faqSimilarQuestionSourceID(chunk.ID, similarQ)
 		indexInfoList = append(indexInfoList, &types.IndexInfo{
 			Content:         similarContent,
 			SourceID:        sourceID,

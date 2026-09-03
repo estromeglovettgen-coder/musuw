@@ -2413,6 +2413,7 @@ export default {
     quickPayment: '간편 결제',
     secureCheckoutLoading: 'Paddle이 제공하는 안전한 결제 수단을 선택해 구독하세요.',
     checkoutLoadFailed: '결제를 불러올 수 없습니다. 요금제 페이지로 돌아가 다시 시도하세요.',
+    checkoutPaymentFailed: '결제가 완료되지 않았습니다. 결제 정보를 확인한 뒤 아래에서 다시 시도하세요. 요금제와 사용 한도는 변경되지 않았습니다.',
     upgradePaymentMethod: '현재 구독 결제 수단을 사용하며 Paddle이 안전하게 처리합니다',
     checkoutSuccessTitle: '요금제를 활성화하고 있습니다',
     checkoutSuccessDescription: '결제가 확인되었습니다. 서버 동기화 후 요금제와 한도가 업데이트됩니다.',
