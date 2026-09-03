@@ -2317,7 +2317,7 @@ defineExpose({
 :root[theme-mode="dark"] .agent-list-content .agents-panel__title-icon { color: var(--mvc-text-strong, #fff) !important; }
 :root[theme-mode="dark"] .agent-card,
 :root[theme-mode="dark"] .agent-card.agent-mode-normal,
-:root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: var(--mvc-line, #31343a); background: var(--mvc-surface, #1d1f23); color: var(--mvc-text, #f2f2f2); box-shadow: var(--mvc-shadow) !important; }
+:root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: var(--mvc-line, #31343a); background: var(--mvc-surface, #1d1f23); color: var(--mvc-text, #f2f2f2); box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important; }
 :root[theme-mode="dark"] .agent-card .card-bottom {
   gap: 6px !important;
   border-top-color: var(--mvc-line, #31343a) !important;

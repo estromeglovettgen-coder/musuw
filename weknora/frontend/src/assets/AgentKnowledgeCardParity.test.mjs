@@ -29,3 +29,11 @@ test('Agent cards omit web-search badges and reuse the knowledge-card divider in
   assert.match(directoryTheme, /\.agent-card \.card-bottom,[\s\S]*?border-top:\s*1px solid #f3f4f6\s*!important;/)
   assert.match(directoryTheme, /:root\[theme-mode="dark"\] \.agent-card \.card-bottom\s*\{[^}]*border-top-color:\s*var\(--mvc-line, #31343a\)\s*!important;/)
 })
+
+test('the route-scoped Agent dark card keeps the KnowledgeBase resting shadow', () => {
+  assert.match(kbCard, /:root\[theme-mode="dark"\] \.visual-reference-kb-card\s*\{[^}]*box-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 28%\);/)
+  assert.match(
+    agentList,
+    /:root\[theme-mode="dark"\] \.agent-card,[\s\S]*?\.agent-card\.agent-mode-agent\s*\{[^}]*box-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 28%\)\s*!important;/,
+  )
+})
