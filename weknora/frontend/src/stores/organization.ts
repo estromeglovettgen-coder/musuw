@@ -56,6 +56,15 @@ import {
   reviewMemberCountDelta
 } from './organizationState'
 
+function isLiteProductMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('weknora_lite_mode') === 'true'
+  } catch {
+    return false
+  }
+}
+
 export const useOrganizationStore = defineStore('organization', () => {
   // State
   const organizations = ref<Organization[]>([])
@@ -130,6 +139,10 @@ export const useOrganizationStore = defineStore('organization', () => {
   )
 
   async function fetchOrganizations(options?: { force?: boolean }) {
+    if (isLiteProductMode()) {
+      clearState()
+      return
+    }
     const force = options?.force ?? false
     if (
       !force &&
@@ -482,6 +495,10 @@ export const useOrganizationStore = defineStore('organization', () => {
   )
 
   async function fetchSharedKnowledgeBases(options?: { force?: boolean }) {
+    if (isLiteProductMode()) {
+      clearState()
+      return []
+    }
     const force = options?.force ?? false
     if (
       !force &&

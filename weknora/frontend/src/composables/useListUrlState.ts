@@ -36,13 +36,24 @@ export interface ListUrlStateOptions {
   defaultCreator?: CreatorFilter
 }
 
+function isLiteProductMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('weknora_lite_mode') === 'true'
+  } catch {
+    return false
+  }
+}
+
 export function useListUrlState(opts: ListUrlStateOptions): ListUrlState {
   const route = useRoute()
   const router = useRouter()
 
-  const initScope = typeof route.query.scope === 'string' && route.query.scope
+  const liteMode = isLiteProductMode()
+  const routeScope = typeof route.query.scope === 'string' && route.query.scope
     ? route.query.scope
     : opts.defaultScope
+  const initScope = liteMode ? opts.defaultScope : routeScope
 
   const initCreator: CreatorFilter =
     route.query.creator === 'mine' || route.query.creator === 'others' || route.query.creator === 'all'
@@ -95,7 +106,9 @@ export function useListUrlState(opts: ListUrlStateOptions): ListUrlState {
   watch(
     () => route.query,
     (q) => {
-      const ns = (typeof q.scope === 'string' && q.scope) ? q.scope : opts.defaultScope
+      const ns = isLiteProductMode()
+        ? opts.defaultScope
+        : ((typeof q.scope === 'string' && q.scope) ? q.scope : opts.defaultScope)
       const nc: CreatorFilter =
         q.creator === 'mine' || q.creator === 'others' || q.creator === 'all'
           ? (q.creator as CreatorFilter)

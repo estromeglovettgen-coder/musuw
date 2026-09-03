@@ -34,6 +34,9 @@ for script in "$script_dir"/*.sh "$script_dir/server"/*.sh "$repo_root/scripts/w
 done
 
 grep -Fq 'MUSUW_DEPLOYMENT_ENVIRONMENT: staging' "$staging_root/compose.yaml" || fail 'staging selector is missing'
+grep -Fq 'MUSUW_PRODUCT_EDITION: lite' "$staging_root/compose.yaml" || fail 'staging product edition is not explicitly Lite'
+grep -Fqx 'MUSUW_PRODUCT_EDITION=lite' "$staging_root/staging.env.example" || fail 'staging product edition fixture is missing'
+grep -Fq 'MUSUW_PRODUCT_EDITION' "$script_dir/prepare-runtime.sh" || fail 'staging runtime does not carry the Lite product edition'
 grep -Fq 'MUSUW_PADDLE_ENVIRONMENT: sandbox' "$staging_root/compose.yaml" || fail 'staging Paddle selector is not Sandbox'
 grep -Fq 'MUSUW_PADDLE_API_URL: ${MUSUW_PADDLE_API_URL:-https://sandbox-api.paddle.com}' "$staging_root/compose.yaml" || fail 'staging Paddle API URL is not Sandbox'
 grep -Fq 'NEO4J_ENABLE: "false"' "$staging_root/compose.yaml" || fail 'staging unexpectedly enables Neo4j'
@@ -141,6 +144,7 @@ AUTO_MIGRATE=true
 AUTO_RECOVER_DIRTY=true
 DISABLE_REGISTRATION=false
 WEKNORA_AUTH_DEFAULT_TENANT_MODE=create_personal
+MUSUW_PRODUCT_EDITION=lite
 APP_EXTERNAL_URL=https://staging.musuw.com
 FRONTEND_BASE_URL=https://staging.musuw.com
 OIDC_AUTH_ENABLE=true
@@ -194,6 +198,10 @@ replace_env_value "$runtime_dir/staging.public.env" MUSUW_STAGING_R2_BUCKET musu
 expect_prepare_rejects 'the production R2 bucket'
 replace_env_value "$runtime_dir/staging.public.env" MUSUW_STAGING_R2_BUCKET musuw-staging
 
+replace_env_value "$runtime_dir/staging.public.env" MUSUW_PRODUCT_EDITION standard
+expect_prepare_rejects 'the Standard product edition'
+replace_env_value "$runtime_dir/staging.public.env" MUSUW_PRODUCT_EDITION lite
+
 replace_env_value "$runtime_dir/staging.public.env" LANGFUSE_ENABLED false
 expect_prepare_rejects 'disabled Langfuse tracing'
 replace_env_value "$runtime_dir/staging.public.env" LANGFUSE_ENABLED true
@@ -215,6 +223,7 @@ WEKNORA_STAGING_PUBLIC_ENV="$runtime_dir/staging.public.env" \
 WEKNORA_STAGING_AUTH_PUBLIC_ENV="$runtime_dir/auth-public.env" \
     "$script_dir/prepare-runtime.sh" >/dev/null
 weknora_staging_require_unique_env_keys "$runtime_dir/staging.env" || fail 'generated staging environment contains duplicate keys'
+grep -Fqx 'MUSUW_PRODUCT_EDITION=lite' "$runtime_dir/staging.env" || fail 'generated staging environment is not explicitly Lite'
 
 config_json="$runtime_dir/compose.json"
 edge_config_json="$runtime_dir/compose-edge.json"

@@ -1,9 +1,10 @@
 <script lang="ts">
-import { defineComponent, onUnmounted, type SetupContext } from 'vue'
+import { computed, defineComponent, onUnmounted, type SetupContext } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseListBusiness from '@/assets/business-baselines/KnowledgeBaseList.pre-view.vue'
 import { duplicateKnowledgeBase, getKnowledgeBaseCopyProgress } from '@/api/knowledge-base'
+import { useAuthStore } from '@/stores/auth'
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import KnowledgeBaseListReferenceCard from './components/KnowledgeBaseListReferenceCard.vue'
@@ -25,8 +26,42 @@ export default defineComponent({
     ContextualGuide,
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
+    const authStore = useAuthStore()
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const legacyState = state as Record<string, any>
+      const readRef = (source: any) =>
+        source && typeof source === 'object' && 'value' in source ? source.value : source
+
+      // The business baseline remains byte-for-byte intact. Lite presentation
+      // is narrowed here so stale Standard shared data cannot render in the
+      // consumer list, while Standard keeps the original state unchanged.
+      const baseSharedKbs = legacyState.sharedKbs
+      const baseAllKnowledgeBases = legacyState.allKnowledgeBases
+      const baseSpaceSelectionOrgId = legacyState.spaceSelectionOrgId
+      const baseShowShareGroupHeaders = legacyState.showShareGroupHeaders
+      const baseFilteredKnowledgeBases = legacyState.filteredKnowledgeBases
+
+      legacyState.sharedKbs = computed(() =>
+        authStore.isLiteMode ? [] : readRef(baseSharedKbs),
+      )
+      legacyState.allKnowledgeBases = computed(() =>
+        authStore.isLiteMode
+          ? (readRef(legacyState.kbs) || []).length
+          : readRef(baseAllKnowledgeBases),
+      )
+      legacyState.spaceSelectionOrgId = computed(() =>
+        authStore.isLiteMode ? false : readRef(baseSpaceSelectionOrgId),
+      )
+      legacyState.showShareGroupHeaders = computed(() =>
+        authStore.isLiteMode ? false : readRef(baseShowShareGroupHeaders),
+      )
+      legacyState.filteredKnowledgeBases = computed(() => {
+        const list = readRef(baseFilteredKnowledgeBases) || []
+        if (!authStore.isLiteMode) return list
+        return list.filter((kb: any) => kb?.isMine !== false)
+      })
+
       const { t } = useI18n()
       let disposed = false
 

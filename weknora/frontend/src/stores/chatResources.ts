@@ -149,7 +149,13 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
         rawKnowledgeBases.value = data
         loadedAt.value.knowledgeBases = Date.now()
         const orgStore = useOrganizationStore()
-        await orgStore.fetchSharedKnowledgeBases({ force })
+        if (isLiteProductMode()) {
+          // Lite has no shared spaces. Clear any state left by a Standard
+          // session and, importantly, do not call the shared-resource API.
+          orgStore.clearState()
+        } else {
+          await orgStore.fetchSharedKnowledgeBases({ force })
+        }
         return data
       } finally {
         if (kbAllGen === gen) kbAllInflight = null

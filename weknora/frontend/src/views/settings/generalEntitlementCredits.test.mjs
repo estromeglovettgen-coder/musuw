@@ -8,6 +8,7 @@ const userMenu = await readFile(new URL('../../components/UserMenu.vue', import.
 const entitlementApi = await readFile(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
 const router = await readFile(new URL('../../router/index.ts', import.meta.url), 'utf8')
 const plansPage = await readFile(new URL('../billing/Plans.vue', import.meta.url), 'utf8')
+const referenceIcons = await readFile(new URL('../../assets/musuw-reference-lucide-precision.css', import.meta.url), 'utf8')
 
 test('entitlement API types the official OpenRouter credit availability state', () => {
   assert.match(entitlementApi, /OpenRouterCreditsStatus\s*=\s*'available'\s*\|\s*'unavailable'\s*\|\s*'unprovisioned'\s*\|\s*'pending'/)
@@ -33,6 +34,12 @@ test('opening the account menu refreshes the quota before it is shown', () => {
   assert.match(userMenu, /clampPercent\(\(remaining \/ total\) \* 100\)/)
   assert.match(userMenu, /const requestSequence = \+\+entitlementRequestSequence/)
   assert.match(userMenu, /if \(requestSequence !== entitlementRequestSequence\) return/)
+})
+
+test('the free-plan upgrade affordance keeps a valid visible icon mask', () => {
+  assert.match(userMenu, /visual-user-menu__billing-item[\s\S]*class="\{ 'is-free': billingIsFree \}"/)
+  assert.match(referenceIcons, /--mvp-sparkles:[^\n]*1\.594-1\.594z%22%2F%3E/)
+  assert.match(referenceIcons, /\.visual-user-menu__billing-item\.is-free::before[\s\S]*mask-image: var\(--mvp-sparkles\)/)
 })
 
 test('credit period copy uses the tenant personal-cycle boundary', () => {

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteLocationGeneric } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useOrganizationStore } from '@/stores/organization'
 import { useSettingsStore } from '@/stores/settings'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
 import { getSystemInfo } from '@/api/system'
@@ -62,6 +63,11 @@ function applyResolvedProductEdition(
   authStore.setLiteMode(isLite)
   if (!isLite) return
 
+  // A Standard session may have populated organization/shared-resource stores
+  // before the server edition probe resolves. Lite has no shared spaces, so
+  // discard that in-memory state as soon as the authoritative edition arrives.
+  const organizationStore = useOrganizationStore()
+  organizationStore.clearState()
   authStore.setSelectedTenant(null)
   const settingsStore = useSettingsStore()
   settingsStore.saveSettings(reconcileLiteChatSettings(settingsStore.getSettings()))
@@ -81,12 +87,18 @@ async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) 
           const isLite = edition === 'lite'
           resolvedLiteMode = isLite
           applyResolvedProductEdition(authStore, isLite)
+          editionProbeDone = true
+        } else {
+          // An empty/unknown payload is as inconclusive as a network failure;
+          // retry it on the next navigation instead of pinning stale UI state.
+          editionProbeDone = false
         }
       } catch {
         // Backend API authorization remains authoritative. A transient edition
         // probe failure must not sign the user out or break normal navigation.
+        // Leave the probe retryable for the next navigation in this SPA.
+        editionProbeDone = false
       } finally {
-        editionProbeDone = true
         editionProbePromise = null
       }
     })()
