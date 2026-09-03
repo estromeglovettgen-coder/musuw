@@ -132,7 +132,7 @@ export default defineComponent({
         </div>
 
         <div v-else-if="(spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredKnowledgeBases.length > 0 && filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq')" class="visual-kb-grid">
-          <button v-if="filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ filteredKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
+          <button v-if="!authStore.isLiteMode && filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ filteredKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
 
           <template v-for="(kb, index) in filteredKnowledgeBases" :key="`${kb.isMine ? 'mine' : 'shared'}-${kb.id}`">
             <template v-if="!authStore.isLiteMode || kb.type !== 'faq'">
@@ -140,7 +140,7 @@ export default defineComponent({
             <button v-if="showShareGroupHeaders && !kb.isMine && isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[Number(index) - 1].isMine)" type="button" class="visual-kb-section" @click="toggleKbSection('sharedEditable')"><t-icon name="usergroup-add" /><span>{{ $t('knowledgeList.sections.sharedEditable') }}</span><small>{{ filteredKbSectionCounts.sharedEditable }}</small><t-icon :name="isKbSectionCollapsed('sharedEditable') ? 'chevron-right' : 'chevron-down'" /></button>
             <button v-if="showShareGroupHeaders && !kb.isMine && !isSharedKbEditable(kb.permission) && (index === 0 || filteredKnowledgeBases[Number(index) - 1].isMine || isSharedKbEditable(filteredKnowledgeBases[Number(index) - 1].permission))" type="button" class="visual-kb-section" @click="toggleKbSection('sharedReadonly')"><t-icon name="browse" /><span>{{ $t('knowledgeList.sections.sharedReadonly') }}</span><small>{{ filteredKbSectionCounts.sharedReadonly }}</small><t-icon :name="isKbSectionCollapsed('sharedReadonly') ? 'chevron-right' : 'chevron-down'" /></button>
 
-            <div v-if="kb.isMine" v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
+            <div v-if="kb.isMine" v-show="authStore.isLiteMode || !isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
               <KnowledgeBaseListReferenceCard
                 :kb="kb"
                 :favorited="isKbFavorited(kb.id)"
@@ -177,11 +177,11 @@ export default defineComponent({
         </div>
 
         <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0 && sortedMineKbs.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq')" class="visual-kb-grid">
-          <button v-if="sortedMineKbs[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ mineKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
+          <button v-if="!authStore.isLiteMode && sortedMineKbs[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ mineKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
           <template v-for="(kb, index) in sortedMineKbs" :key="kb.id">
             <template v-if="!authStore.isLiteMode || kb.type !== 'faq'">
             <button v-if="showShareGroupHeaders && !isMyKb(kb) && !kb.is_pinned && (index === 0 || isMyKb(sortedMineKbs[Number(index) - 1]) || sortedMineKbs[Number(index) - 1].is_pinned)" type="button" class="visual-kb-section" @click="toggleKbSection('tenantOthers')"><t-icon :name="tenantSectionIconName" /><span>{{ $t(tenantSectionLabelKey) }}</span><small>{{ mineKbSectionCounts.tenantOthers }}</small><t-icon :name="isKbSectionCollapsed('tenantOthers') ? 'chevron-right' : 'chevron-down'" /></button>
-            <div v-show="!isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
+            <div v-show="authStore.isLiteMode || !isKbSectionCollapsed(kbSectionOf(kb))" class="visual-reference-kb-card-host" :ref="(el) => { if (highlightedKbId !== null && highlightedKbId === kb.id && el) highlightedCardRef = el as HTMLElement }">
               <KnowledgeBaseListReferenceCard
                 :kb="kb"
                 :favorited="isKbFavorited(kb.id)"

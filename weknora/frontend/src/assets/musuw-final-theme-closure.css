@@ -438,8 +438,8 @@
   .agent-list-container,
   .agent-list-content,
   .agent-list-main {
-    background: #121214 !important;
-    color: #f4f4f5 !important;
+    background: var(--mvc-page) !important;
+    color: var(--mvc-text) !important;
   }
   .org-list-container,
   .org-list-content,
@@ -448,15 +448,16 @@
     color: var(--mvc-text) !important;
   }
   .agent-list-content > .header {
-    border-color: #27272a !important;
-    background: #121214 !important;
-    color: #a1a1aa !important;
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-page) !important;
+    color: var(--mvc-muted-strong) !important;
   }
   .agent-card,
   .agent-card-skeleton {
-    border-color: #27272a !important;
-    background: #18181b !important;
-    color: #a1a1aa !important;
+    border-color: var(--mvc-line) !important;
+    background: var(--mvc-surface) !important;
+    color: var(--mvc-text) !important;
+    box-shadow: var(--mvc-shadow) !important;
   }
   .agent-list-content .header-action-btn:not(.agent-create-header-btn) {
     border-color: #3f3f46 !important;
@@ -488,14 +489,14 @@
   .org-list-main .empty-txt { color: var(--mvc-text-strong) !important; }
   .agent-list-content .title-row h2,
   .agent-card .card-title,
-  .agent-list-main .empty-txt { color: #f4f4f5 !important; }
+  .agent-list-main .empty-txt { color: var(--mvc-text-strong) !important; }
   .agent-list-content .header-subtitle,
-  .org-list-content .header-subtitle,
   .agent-card .card-description,
-  .org-card .card-description,
   .agent-section-header,
+  .agent-list-main .empty-desc { color: var(--mvc-muted-strong) !important; }
+  .org-list-content .header-subtitle,
+  .org-card .card-description,
   .org-section-header,
-  .agent-list-main .empty-desc,
   .org-list-main .empty-desc { color: var(--mvc-muted) !important; }
   .agent-card .builtin-avatar,
   .org-card .org-avatar,
@@ -516,9 +517,9 @@
   }
   .org-card:hover { border-color: var(--mvc-line-strong) !important; box-shadow: var(--mvc-shadow) !important; }
   .agent-card:hover {
-    border-color: #52525b !important;
-    background: #18181b !important;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
+    border-color: var(--mvc-line-strong) !important;
+    background: var(--mvc-hover) !important;
+    box-shadow: var(--mvc-shadow) !important;
   }
 
   /* Native list-space and cross-tenant switcher chrome. */

@@ -34,4 +34,9 @@ test('mobile bottom-dock does not override interactive guide placement', () => {
     /'guide__card--interact':\s*step\.interact/,
     'interactive steps must expose a class for the mobile placement guard',
   )
+  assert.match(
+    spotlightSource,
+    /\.guide__card\s*\{[\s\S]*?box-sizing:\s*border-box/,
+    'the placement width must include padding and border so overlap checks match rendered geometry',
+  )
 })

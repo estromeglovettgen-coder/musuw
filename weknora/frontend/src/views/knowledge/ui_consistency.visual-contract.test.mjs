@@ -30,6 +30,34 @@ test('Agent and knowledge-base directories share the same shell geometry', () =>
   assert.match(knowledgeBaseList, /\.visual-kb-list__create\s*\{[\s\S]*?height:\s*34px\s*!important;[\s\S]*?padding:\s*0 14px\s*!important;[\s\S]*?border-radius:\s*12px\s*!important;/)
 })
 
+test('Agent directory uses the KnowledgeBase header cadence and page surface', () => {
+  assert.match(
+    directoryReference,
+    /\.agent-list-content \.header-title\s*\{[^}]*gap:\s*0\s*!important;/,
+    'Agent title stack must not add a second gap on top of the shared subtitle margin',
+  )
+  assert.match(
+    directoryReference,
+    /:root\[theme-mode="dark"\] \.agent-list-container,[\s\S]*?:root\[theme-mode="dark"\] \.agent-list-content \{[\s\S]*?background:\s*var\(--mvc-page(?:,\s*#151619)?\)\s*!important;/,
+    'Agent dark shell must use the same page token as KnowledgeBase',
+  )
+  assert.match(
+    knowledgeBaseList,
+    /:root\[theme-mode="dark"\] \.visual-kb-workspace,[\s\S]*?:root\[theme-mode="dark"\] \.visual-kb-list\s*\{\s*background:\s*var\(--mvc-page,\s*#151619\)\s*!important;/,
+    'the scoped KnowledgeBase rule is the authoritative dark page surface',
+  )
+  assert.match(
+    finalTheme,
+    /\.agent-list-container,[\s\S]*?\.agent-list-content,[\s\S]*?\.agent-list-main\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
+    'late dark-theme closure must keep the Agent shell on the shared page token',
+  )
+  assert.match(
+    finalTheme,
+    /\.agent-list-content > \.header\s*\{[\s\S]*?background:\s*var\(--mvc-page\)\s*!important;/,
+    'Agent header must not introduce a darker island than its page shell',
+  )
+})
+
 test('Agent creation plus follows the button foreground in both themes', () => {
   assert.match(
     directoryReference,
@@ -47,10 +75,29 @@ test('Agent creation plus follows the button foreground in both themes', () => {
 
 test('Agent and knowledge-base directory shells keep the same geometry at every breakpoint', () => {
   assert.match(directoryReference, /\.visual-kb-list\s*\{[\s\S]*?gap:\s*18px\s*!important;[\s\S]*?padding:\s*24px\s*!important;/)
+  assert.match(directoryReference, /\.visual-kb-list\s*\{[\s\S]*?background:\s*transparent\s*!important;/)
   assert.match(directoryReference, /\.visual-kb-list__header\s*\{[\s\S]*?padding:\s*0 0 20px\s*!important;[\s\S]*?border-bottom:\s*1px solid/)
   assert.match(directoryReference, /\.visual-kb-list__content\s*\{[\s\S]*?padding:\s*24px 4px 12px 2px\s*!important;/)
   assert.match(directoryReference, /@media\s*\(min-width:\s*768px\)[\s\S]*?\.visual-kb-list\s*\{\s*padding:\s*32px\s*!important;/)
   assert.match(directoryReference, /@media\s*\(min-width:\s*1024px\)[\s\S]*?\.visual-kb-grid\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)\s*!important;/)
+})
+
+test('Lite directory cards keep the same first-row origin even when a knowledge base is pinned', () => {
+  assert.match(
+    knowledgeBaseList,
+    /v-if="!authStore\.isLiteMode && filteredKnowledgeBases\[0\]\?\.isMine && filteredKnowledgeBases\[0\]\?\.is_pinned"/,
+    'Lite must not render a pinned section row above the first knowledge-base card',
+  )
+  assert.match(
+    knowledgeBaseList,
+    /v-if="!authStore\.isLiteMode && sortedMineKbs\[0\]\?\.is_pinned"/,
+    'the mine view must preserve the same Lite first-card origin',
+  )
+  assert.equal(
+    (knowledgeBaseList.match(/v-show="authStore\.isLiteMode \|\| !isKbSectionCollapsed\(kbSectionOf\(kb\)\)"/g) || []).length,
+    2,
+    'hidden Lite section headings must not leave pinned cards trapped in persisted collapsed state',
+  )
 })
 
 test('Knowledge-base tag, type and status filters share one popup trigger contract', () => {

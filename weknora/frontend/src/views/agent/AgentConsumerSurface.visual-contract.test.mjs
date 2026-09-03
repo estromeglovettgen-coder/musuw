@@ -27,8 +27,8 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
     'padding: 18px',
     ':root[theme-mode="dark"] .agent-list-container',
     ':root[theme-mode="dark"] .agent-list-content > .header',
-    'background: #121214 !important',
-    'box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important',
+    'background: var(--mvc-page, #151619) !important',
+    'box-shadow: var(--mvc-shadow) !important',
   ]) assert.ok(list.includes(token), `Agent list contract lost ${token}`)
   assert.doesNotMatch(list, /class="sparkles-icon"/)
   assert.match(list, /\.agents-panel__header\s*\{[\s\S]*?padding-bottom:\s*20px;[\s\S]*?border-bottom:\s*1px solid #e5e7eb;/)
@@ -51,13 +51,23 @@ test('consumer Agent list preserves native CRUD while matching the compact refer
   assert.doesNotMatch(list, /\.agent-card\s*\{[\s\S]{0,900}linear-gradient/, 'consumer cards must not keep the decorative gradient')
   assert.match(
     nativeDirectoryStyles,
-    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[\s\S]*?border-color:\s*#52525b !important;[\s\S]*?background:\s*#18181b !important;[\s\S]*?box-shadow:\s*0 4px 6px -1px/,
-    'Agent hover must preserve the authoritative zinc card surface and shadow',
+    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[\s\S]*?border-color:\s*var\(--mvc-line-strong, #484c54\) !important;[\s\S]*?background:\s*var\(--mvc-hover, #25272c\) !important;[\s\S]*?box-shadow:\s*var\(--mvc-shadow\) !important;/,
+    'Agent hover must reuse the KnowledgeBase dark surface tokens and shadow',
   )
   assert.match(
     list,
-    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[^}]*background:\s*#18181b !important;[^}]*border-color:\s*#52525b !important;[^}]*box-shadow:\s*0 4px 6px -1px/,
-    'the component-level dark rule must keep the authoritative zinc hover treatment',
+    /:root\[theme-mode="dark"\] \.agent-card:hover\s*\{[^}]*background:\s*var\(--mvc-hover, #25272c\) !important;[^}]*border-color:\s*var\(--mvc-line-strong, #484c54\) !important;[^}]*box-shadow:\s*var\(--mvc-shadow\) !important;/,
+    'the component-level dark rule must keep the shared KnowledgeBase hover treatment',
+  )
+  assert.match(
+    list,
+    /:root\[theme-mode="dark"\] \.agent-list-content \.agents-panel__title-icon\s*\{[^}]*color:\s*var\(--mvc-text-strong, #fff\) !important;/,
+    'Agent title icon must use the shared strong-text token in dark mode',
+  )
+  assert.match(
+    list,
+    /const showShareGroupHeaders = computed\(\(\) => !authStore\.isLiteMode\)/,
+    'Lite must keep the same first-card origin as KnowledgeBase while Standard retains grouping',
   )
 })
 

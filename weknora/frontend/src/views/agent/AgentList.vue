@@ -1252,9 +1252,9 @@ const AGENT_EDITABLE_PERMS = new Set(['admin', 'editor'])
 function isSharedAgentEditable(perm: string | undefined): boolean {
   return !!perm && AGENT_EDITABLE_PERMS.has(perm)
 }
-// 与 KnowledgeBaseList 同理：分组标题对所有角色生效，依据"创建者 + 来源"
-// 这种客观信息分段，不再按当前用户的可写权限筛掉。
-const showShareGroupHeaders = computed(() => true)
+// Lite 是单用户目录，保留排序和卡片内来源标识，不再用分组行推低首张卡片。
+// Standard 仍保留 WeKnora 原有分组与折叠行为。
+const showShareGroupHeaders = computed(() => !authStore.isLiteMode)
 
 // 同空间、非当前用户创建的 Agent 分组标题。
 // contributor / viewer 在本空间里对这些 Agent 没有写权限，所以打"仅查看"；
@@ -2288,8 +2288,8 @@ defineExpose({
   }
 }
 
-:root[theme-mode="dark"] .agent-list-container { background: #121214; }
-:root[theme-mode="dark"] .agent-list-content > .header { background: #121214 !important; border-bottom-color: #27272a; }
+:root[theme-mode="dark"] .agent-list-container { background: var(--mvc-page, #151619) !important; }
+:root[theme-mode="dark"] .agent-list-content > .header { background: var(--mvc-page, #151619) !important; border-bottom-color: var(--mvc-line, #31343a); }
 :root[theme-mode="dark"] .agents-panel__search {
   border-color: #3f3f46;
   background: #27272a;
@@ -2314,18 +2314,18 @@ defineExpose({
   background: #fff !important;
   color: #09090b !important;
 }
-:root[theme-mode="dark"] .agent-list-content .agents-panel__title-icon { color: #d4d4d8; }
+:root[theme-mode="dark"] .agent-list-content .agents-panel__title-icon { color: var(--mvc-text-strong, #fff) !important; }
 :root[theme-mode="dark"] .agent-card,
 :root[theme-mode="dark"] .agent-card.agent-mode-normal,
-:root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: #27272a; background: #18181b; color: #a1a1aa; box-shadow: 0 1px 2px rgb(0 0 0 / 28%) !important; }
+:root[theme-mode="dark"] .agent-card.agent-mode-agent { border-color: var(--mvc-line, #31343a); background: var(--mvc-surface, #1d1f23); color: var(--mvc-text, #f2f2f2); box-shadow: var(--mvc-shadow) !important; }
 :root[theme-mode="dark"] .agent-card .card-bottom {
   gap: 6px !important;
   border-top-color: var(--mvc-line, #31343a) !important;
 }
 :root[theme-mode="dark"] .agent-card:hover {
-  background: #18181b !important;
-  border-color: #52525b !important;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
+  background: var(--mvc-hover, #25272c) !important;
+  border-color: var(--mvc-line-strong, #484c54) !important;
+  box-shadow: var(--mvc-shadow) !important;
 }
 </style>
 

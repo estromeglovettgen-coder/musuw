@@ -36,6 +36,7 @@
 .visual-kb-list {
   gap: 18px !important;
   padding: 24px !important;
+  background: transparent !important;
 }
 .visual-kb-list__header {
   min-height: 0 !important;
@@ -97,6 +98,7 @@
 }
 .agent-list-content .header-title,
 .org-list-content .header-title { margin: 0 !important; padding: 0 !important; }
+.agent-list-content .header-title { gap: 0 !important; }
 .agent-list-content .title-row,
 .org-list-content .title-row {
   min-height: 28px !important;
@@ -688,16 +690,17 @@ body .t-dialog.visual-confirm-dialog .circle-img { display: none !important; }
 /* Dark native preference compatibility                                       */
 /* -------------------------------------------------------------------------- */
 :root[theme-mode="dark"] .agent-list-container,
-:root[theme-mode="dark"] .agent-list-content { background: #121214 !important; color: #f4f4f5 !important; }
+:root[theme-mode="dark"] .agent-list-content { background: var(--mvc-page, #151619) !important; color: var(--mvc-text, #f2f2f2) !important; }
 :root[theme-mode="dark"] .org-list-container,
 :root[theme-mode="dark"] .org-list-content { background: var(--mvc-page, #151619) !important; color: var(--mvc-text, #f2f2f2) !important; }
 :root[theme-mode="dark"] .agent-card,
 :root[theme-mode="dark"] .agent-card-skeleton,
 :root[theme-mode="dark"] .agent-card.agent-mode-normal,
 :root[theme-mode="dark"] .agent-card.agent-mode-agent {
-  border-color: #27272a !important;
-  background: #18181b !important;
-  color: #a1a1aa !important;
+  border-color: var(--mvc-line, #31343a) !important;
+  background: var(--mvc-surface, #1d1f23) !important;
+  color: var(--mvc-text, #f2f2f2) !important;
+  box-shadow: var(--mvc-shadow) !important;
 }
 :root[theme-mode="dark"] .org-card,
 :root[theme-mode="dark"] .org-card-skeleton,
@@ -740,7 +743,7 @@ body .t-dialog.visual-confirm-dialog .circle-img { display: none !important; }
   box-shadow: var(--mvc-shadow) !important;
 }
 :root[theme-mode="dark"] .agent-card:hover {
-  border-color: #52525b !important;
-  background: #18181b !important;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 28%), 0 2px 4px -2px rgb(0 0 0 / 24%) !important;
+  border-color: var(--mvc-line-strong, #484c54) !important;
+  background: var(--mvc-hover, #25272c) !important;
+  box-shadow: var(--mvc-shadow) !important;
 }
