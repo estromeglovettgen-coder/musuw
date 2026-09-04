@@ -60,7 +60,7 @@ test("public copy presents the exact lowercase musuw brand without stale names o
   assert.doesNotMatch(dataSource, /Jonathan Hayes|Clearframe Agency|Portivio|ClientHub/);
 });
 
-test("public capability copy follows the RAG, agent, Wiki, graph, model, import, and compounding path", () => {
+test("public capability copy follows the answer, agent, Wiki, graph, model, import, and compounding path", () => {
   const englishDefaults = collectStrings({
     benefits,
     comparisonGroups,
@@ -83,20 +83,21 @@ test("public capability copy follows the RAG, agent, Wiki, graph, model, import,
     /reviewable (?:changes|knowledge|high-impact changes)|answer review|saved-answer review|review decisions|accept(?:ed)?,? or reject|accepted, rejected|review before acceptance|review contradictions|review high-impact changes|change control|visible diffs|可审查变更|可审查的重要变更|可以审核的知识|答案(?:保存与)?审核|审查决定|接受或拒绝|接受、拒绝|接受前先审核|审核相互矛盾的信息|审核高影响变化|变化控制/i,
   );
 
-  assert.match(homepageEnglish, /RAG \+ Agent/);
+  assert.match(homepageEnglish, /Agent reasoning/);
   assert.match(homepageEnglish, /AI Wiki/);
   assert.match(homepageEnglish, /Backlinks/);
   assert.match(homepageEnglish, /30\+ leading models/);
   assert.match(homepageEnglish, /One-click web and video import/);
-  assert.match(homepageEnglish, /Save useful answers back to the knowledge base/i);
+  assert.match(homepageEnglish, /Save useful answers.*(?:knowledge|Wiki)/i);
   assert.match(homepageEnglish, /Exact citations/i);
 
-  assert.match(homepageChinese, /RAG \+ Agent/);
+  assert.doesNotMatch(homepageChinese, /RAG|Agent/);
+  assert.match(homepageChinese, /智能体问答/);
   assert.match(homepageChinese, /AI Wiki/);
   assert.match(homepageChinese, /反向链接/);
   assert.match(homepageChinese, /30\+ 主流模型接入/);
   assert.match(homepageChinese, /社媒文章与视频一键入库/);
-  assert.match(homepageChinese, /有用回答重新沉淀进知识库/);
+  assert.match(homepageChinese, /有用回答.*沉淀.*知识库/);
   assert.match(homepageChinese, /精确原文引用/);
 });
 
@@ -206,7 +207,7 @@ test("homepage keeps the smooth hero while removing examples and repeated workfl
   assert.deepEqual(
     [...referencedAssets].sort(),
     [...expectedAssets].sort(),
-    "homepage evidence closure must contain only current Query, Knowledge Base, Wiki page, and graph captures",
+    "the owned screenshot inventory must remain limited to Query, Knowledge Base, Wiki page, and graph captures",
   );
   for (const asset of expectedAssets) {
     const file = join(root, "public", asset.replace(/^\//, ""));

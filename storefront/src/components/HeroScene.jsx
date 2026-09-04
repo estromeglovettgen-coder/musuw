@@ -116,6 +116,7 @@ export function HeroScene({ copy, locale }) {
             typewriterPhrases[0]
           ) : (
             <Typewriter
+              key={locale}
               phrases={typewriterPhrases}
               typingSpeed={50}
               deletingSpeed={35}

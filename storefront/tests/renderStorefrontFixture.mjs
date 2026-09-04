@@ -25,8 +25,12 @@ try {
     server.ssrLoadModule("/src/LegalPage.jsx"),
   ]);
   const copy = getStorefrontCopy("en");
+  const chineseCopy = getStorefrontCopy("zh-CN");
   process.stdout.write(JSON.stringify({
     home: renderToStaticMarkup(React.createElement(HomePage, { copy })),
+    chineseHome: renderToStaticMarkup(
+      React.createElement(HomePage, { copy: chineseCopy }),
+    ),
     japanHome: renderToStaticMarkup(
       React.createElement(HomePage, { copy, pricingCurrency: "JPY" }),
     ),

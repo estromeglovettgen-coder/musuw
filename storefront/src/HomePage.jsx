@@ -26,25 +26,26 @@ export function HomePage({
   onThemeToggle,
 }) {
   const homepageCopy = applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy));
+  const resolvedLocale = locale || (copy?.pricing?.currencyCode === "CNY" ? "zh-CN" : "en");
 
   return (
     <>
       <SiteHeader
         copy={homepageCopy}
         navigation={MARKETING_NAVIGATION}
-        locale={locale}
+        locale={resolvedLocale}
         onLocaleChange={onLocaleChange}
         theme={theme}
         onThemeToggle={onThemeToggle}
       />
       <main>
-        <HeroScene copy={homepageCopy} locale={locale} />
-        <FeaturesSection copy={homepageCopy} />
-        <PlatformSection copy={homepageCopy} />
+        <HeroScene copy={homepageCopy} locale={resolvedLocale} />
+        <FeaturesSection copy={homepageCopy} locale={resolvedLocale} />
+        <PlatformSection copy={homepageCopy} locale={resolvedLocale} />
         <MarketingPricingSection copy={homepageCopy} pricingCurrency={pricingCurrency} />
         <MarketingComparisonSection copy={homepageCopy} />
         <FAQSection copy={homepageCopy} />
-        <FinalCTA copy={homepageCopy} />
+        <FinalCTA copy={homepageCopy} locale={resolvedLocale} />
       </main>
       <SiteFooter copy={homepageCopy} groups={MARKETING_FOOTER_GROUPS} />
     </>

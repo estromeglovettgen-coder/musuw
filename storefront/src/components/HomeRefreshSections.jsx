@@ -1,25 +1,11 @@
 import { useState } from "react";
-import { ArrowsClockwise } from "@phosphor-icons/react/ArrowsClockwise";
 import { Check } from "@phosphor-icons/react/Check";
-import { FileText } from "@phosphor-icons/react/FileText";
-import { Lightning } from "@phosphor-icons/react/Lightning";
 import { Minus } from "@phosphor-icons/react/Minus";
-import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
-import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
-import { Stack } from "@phosphor-icons/react/Stack";
 import { comparisonGroups, currencySymbols, priceBooks, plans } from "../data/homeContent";
 import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
-import { Reveal, StaggerGroup, StaggerItem } from "./MotionPrimitives";
+import { Reveal } from "./MotionPrimitives";
+import { KnowledgeLoopDemo } from "./ProductCapabilityDemos";
 import { ButtonLink, SectionIntro } from "./SiteChrome";
-
-const PLATFORM_ICONS = Object.freeze([
-  FileText,
-  Lightning,
-  ShareNetwork,
-  Stack,
-  PaperPlaneTilt,
-  ArrowsClockwise,
-]);
 
 const PUBLIC_COMPARISON_CAPABILITIES = Object.freeze([
   "Storage",
@@ -53,35 +39,15 @@ function comparisonValue(copy, value) {
   return copy.comparison.valueLabels?.[value] ?? value;
 }
 
-export function PlatformSection({ copy }) {
+export function PlatformSection({ copy, locale }) {
   return (
     <section className="section benefits-section platform-section" id="platform">
       <div className="container">
-        <Reveal>
-          <SectionIntro
-            title={copy.platform.intro.title}
-            body={copy.platform.intro.body}
-          />
-        </Reveal>
-        <StaggerGroup className="benefit-grid platform-grid" amount={0.12} stagger={0.06}>
-          {copy.platform.cards.map(({ title, body }, index) => {
-            const Icon = PLATFORM_ICONS[index];
-            return (
-              <StaggerItem
-                className="benefit-item platform-card"
-                direction="up"
-                distance={18}
-                key={title}
-              >
-                <span>
-                  <Icon size={23} weight="regular" aria-hidden="true" />
-                </span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </StaggerItem>
-            );
-          })}
-        </StaggerGroup>
+        <SectionIntro
+          title={copy.platform.intro.title}
+          body={copy.platform.intro.body}
+        />
+        <KnowledgeLoopDemo cards={copy.platform.cards} locale={locale} />
       </div>
     </section>
   );

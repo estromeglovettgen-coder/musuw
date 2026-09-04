@@ -23,6 +23,12 @@ import {
 import { Reveal, StaggerGroup, StaggerItem } from "./MotionPrimitives";
 import { ButtonLink, SectionIntro } from "./SiteChrome";
 import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
+import {
+  AnswerCapabilityDemo,
+  GraphCapabilityDemo,
+  ReasoningCapabilityDemo,
+  WikiCapabilityDemo,
+} from "./ProductCapabilityDemos";
 
 function formatPlanAmount(symbol, amount) {
   return `${symbol}${amount.toLocaleString("en-US")}`;
@@ -79,11 +85,18 @@ export function CustomerStrip({ copy }) {
   );
 }
 
-function FeatureStory({ feature, index }) {
+const FEATURE_DEMOS = Object.freeze({
+  0: ReasoningCapabilityDemo,
+  2: GraphCapabilityDemo,
+  3: WikiCapabilityDemo,
+});
+
+function FeatureStory({ feature, index, locale, sourceIndex }) {
   const reverse = index % 2 === 1;
+  const CapabilityDemo = FEATURE_DEMOS[sourceIndex];
 
   return (
-    <Reveal className={`feature-story ${reverse ? "feature-story-reverse" : ""}`} amount={0.16}>
+    <article className={`feature-story ${reverse ? "feature-story-reverse" : ""}`}>
       <div className="feature-copy">
         <h3>{feature.title}</h3>
         <p>{feature.description}</p>
@@ -97,39 +110,33 @@ function FeatureStory({ feature, index }) {
         </ul>
       </div>
       <div className="feature-visual">
-        <img
-          src={feature.image}
-          alt={feature.imageAlt}
-          width="830"
-          height="864"
-          draggable={false}
-          loading="lazy"
-        />
+        <CapabilityDemo locale={locale} />
       </div>
-    </Reveal>
+    </article>
   );
 }
 
-export function FeaturesSection({ copy }) {
+export function FeaturesSection({ copy, locale }) {
   const visibleFeatureIndexes = [0, 3, 2];
   const localizedFeatures = visibleFeatureIndexes.map((sourceIndex) => ({
     ...features[sourceIndex],
-    ...copy.features.items[sourceIndex]
+    ...copy.features.items[sourceIndex],
+    sourceIndex,
   }));
   return (
     <section className="section features-section" id="feature">
       <div className="container">
-        <Reveal>
-          <SectionIntro
-            title={copy.features.intro.title}
-            body={copy.features.intro.body}
-          />
-        </Reveal>
+        <SectionIntro
+          title={copy.features.intro.title}
+          body={copy.features.intro.body}
+        />
         <div className="feature-stack">
           {localizedFeatures.map((feature, index) => (
             <FeatureStory
               feature={feature}
               index={index}
+              locale={locale}
+              sourceIndex={feature.sourceIndex}
               key={feature.title}
             />
           ))}
@@ -626,11 +633,11 @@ export function FAQSection({ copy }) {
   );
 }
 
-export function FinalCTA({ copy }) {
+export function FinalCTA({ copy, locale }) {
   return (
     <section className="final-cta">
       <div className="container">
-        <Reveal className="final-cta-card">
+        <div className="final-cta-card">
           <img
             src="/images/dot-background.png"
             className="final-cta-bg"
@@ -645,17 +652,10 @@ export function FinalCTA({ copy }) {
           </div>
           <div className="final-cta-visual" aria-hidden="true">
             <div className="final-cta-dashboard-frame">
-              <img
-                src="/images/musuw-query-citation.jpg"
-                alt=""
-                width="3024"
-                height="1898"
-                draggable={false}
-                loading="lazy"
-              />
+              <AnswerCapabilityDemo locale={locale} />
             </div>
           </div>
-        </Reveal>
+        </div>
       </div>
     </section>
   );

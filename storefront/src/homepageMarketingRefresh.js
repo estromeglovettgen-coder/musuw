@@ -41,12 +41,12 @@ const MARKETING_COPY = Object.freeze({
     meta: Object.freeze({
       title: "musuw | Turn source material into intelligent knowledge assets",
       description:
-        "Capture documents webpages and video reason with agents and organize what matters into a connected Wiki and knowledge graph",
+        "Capture documents, webpages, and video; ask with evidence; keep the results as connected knowledge in a Wiki and graph",
     }),
     hero: Object.freeze({
-      eyebrow: "RAG · Agents · Wiki",
+      eyebrow: "Agents · Wiki · Graph",
       typewriterPhrases: Object.freeze([
-        "RAG · Agent · Wiki",
+        "Agents · Wiki · Graph",
         "Turn documents into a living Wiki",
         "Retrieve precise cited answers",
         "Let agents reason with evidence",
@@ -56,9 +56,9 @@ const MARKETING_COPY = Object.freeze({
       titleLine1: "Turn source material into",
       titleLine2: "intelligent knowledge assets",
       titleFocusSegments: Object.freeze(["intelligent", "knowledge", "assets"]),
-      descriptionLine1: "RAG answers agent reasoning and a connected Wiki in one system",
+      descriptionLine1: "Cited answers, agent reasoning, and a connected Wiki in one system",
       descriptionLine2:
-        "Capture documents webpages and video work through complex tasks and keep every useful result as knowledge",
+        "Capture documents, webpages, and video, then keep every useful result as knowledge",
       getStarted: "Start free",
       talkToSales: "Contact",
       dashboardAlt:
@@ -69,14 +69,14 @@ const MARKETING_COPY = Object.freeze({
         label: "Three core modes",
         title: "RAG agents and connected knowledge—working as one",
         body:
-          "Ask with evidence let agents work through complex tasks and turn raw sources into a Wiki and graph that stay connected to the originals",
+          "Ask with evidence, let agents handle complex work, and keep every Wiki page and graph link tied to its source",
       }),
       items: Object.freeze([
         Object.freeze({
-          label: "RAG + Agent",
+          label: "Agent reasoning",
           title: "Reason through complex work",
           description:
-            "Agents break down the task search across the knowledge base use enabled tools and assemble a cited result you can verify against the source",
+            "Agents break down the task, search your knowledge, and return a cited result you can verify",
           image: "/images/musuw-query-citation.jpg",
           imageAlt:
             "musuw agent working through a complex task with knowledge-base retrieval and exact citations",
@@ -92,7 +92,7 @@ const MARKETING_COPY = Object.freeze({
           label: "Knowledge Graph",
           title: "Reveal the connections across your knowledge",
           description:
-            "Backlinks shared entities and cross-source references expose how ideas relate while every path remains traceable to supporting material",
+            "Backlinks and shared entities reveal how ideas connect while every path remains traceable",
           image: "/images/musuw-wiki-graph.jpg",
           imageAlt:
             "musuw knowledge graph showing backlinks shared entities and traceable cross-source relationships",
@@ -107,7 +107,7 @@ const MARKETING_COPY = Object.freeze({
           label: "AI Wiki",
           title: "Distill raw sources into a living Wiki",
           description:
-            "Musuw extracts summaries entities categories and source links turning unstructured material into pages that stay useful as the library grows",
+            "Musuw turns summaries, entities, categories, and source links into pages that stay useful as your library grows",
           image: "/images/musuw-wiki-page.jpg",
           imageAlt:
             "musuw AI Wiki with generated summaries entities categories and source links",
@@ -125,38 +125,38 @@ const MARKETING_COPY = Object.freeze({
         label: "Platform",
         title: "Built for the full knowledge loop",
         body:
-          "Parse every source access leading models capture the web and keep the knowledge system maintained as it grows",
+          "Parse each source, use leading models, capture the web, and keep your knowledge current",
       }),
       cards: Object.freeze([
         Object.freeze({
           title: "Multimodal source parsing",
           body:
-            "Bring documents webpages images tables and Markdown into one searchable knowledge system",
+            "Turn documents, webpages, images, tables, and Markdown into searchable knowledge",
         }),
         Object.freeze({
           title: "Agent reasoning",
           body:
-            "Agents plan searches use enabled tools and work through complex tasks with cited results",
+            "Plan searches, use enabled tools, and finish complex work with cited results",
         }),
         Object.freeze({
           title: "AI Wiki and graph",
           body:
-            "Turn raw sources into summaries entities linked pages and traceable relationships automatically",
+            "Build summaries, entities, linked pages, and traceable relationships automatically",
         }),
         Object.freeze({
           title: "30+ leading models",
           body:
-            "Access 30+ leading models through managed provider connections then choose the right capability for each task",
+            "Use 30+ managed models and choose the right capability for each task",
         }),
         Object.freeze({
           title: "One-click web and video import",
           body:
-            "Send webpages YouTube videos TikTok or Douyin links and other supported sources straight into the knowledge base as searchable text or transcripts",
+            "Turn webpages, YouTube, TikTok, or Douyin links into searchable text or transcripts",
         }),
         Object.freeze({
           title: "Knowledge that maintains itself",
           body:
-            "Save useful answers back to the knowledge base while AI keeps the Wiki entities and connections up to date",
+            "Save useful answers while AI updates the Wiki, entities, and connections",
         }),
       ]),
     }),
@@ -164,7 +164,7 @@ const MARKETING_COPY = Object.freeze({
       intro: Object.freeze({
         title: "Plans & Pricing",
         body:
-          "Every plan includes RAG answers exact citations an AI-organized Wiki and a knowledge graph Paid plans add capacity video import and advanced models",
+          "Every plan includes cited answers, an AI-organized Wiki, and a knowledge graph. Paid plans add capacity, video import, and advanced models",
       }),
       descriptions: Object.freeze([
         "Explore the full workflow",
@@ -200,44 +200,44 @@ const MARKETING_COPY = Object.freeze({
     faq: Object.freeze({
       label: "FAQ",
       title: "Questions before you start",
-      body: "The essentials about imports agents citations models limits and control of your data",
+      body: "The essentials about imports, agents, citations, models, limits, and data control",
       items: Object.freeze([
         Object.freeze({
           question: "What can I add to musuw?",
           answer:
-            "You can add common document formats and webpages Paid plans also support video links from currently supported platforms including YouTube and TikTok or Douyin where available",
+            "Add common documents and webpages. Paid plans also support video links from available YouTube, TikTok, and Douyin integrations",
         }),
         Object.freeze({
           question: "How do agents and citations work?",
           answer:
-            "Agents can break down a task run multiple searches and use enabled tools Important claims link to supporting passages when evidence is available",
+            "Agents can split a task, search several times, and use enabled tools. Supported claims link to source passages",
         }),
         Object.freeze({
           question: "Which models can I use?",
           answer:
-            "Musuw provides access to 30+ leading models through managed provider connections Available models depend on the plan and the current catalog shown in the product",
+            "Musuw provides 30+ managed models. Availability depends on your plan and the current product catalog",
         }),
         Object.freeze({
           question: "Is my content used to train models?",
           answer:
-            "Musuw does not claim ownership of your content Model-provider processing follows the provider and model shown in the product as described in the Privacy Policy",
+            "Musuw does not claim ownership of your content. Provider processing follows the model shown in the product and our Privacy Policy",
         }),
         Object.freeze({
           question: "What happens when I reach a plan limit?",
           answer:
-            "Your existing knowledge remains available You can upgrade remove content or wait for usage-based limits to reset where applicable",
+            "Your knowledge stays available. You can upgrade, remove content, or wait for eligible limits to reset",
         }),
         Object.freeze({
           question: "Can I export delete or cancel?",
           answer:
-            "Musuw provides export and deletion controls Subscription changes and cancellation are handled through the billing flow described in the Subscription Policy",
+            "Musuw provides export and deletion controls. Manage subscription changes through the billing flow in our Subscription Policy",
         }),
       ]),
     }),
     finalCta: Object.freeze({
       title: "Put your knowledge to work",
       body:
-        "Start with a document a webpage or a video Turn scattered sources into a knowledge system you can ask reason with connect and keep building",
+        "Start with a document, webpage, or video. Turn scattered sources into connected knowledge you can query, verify, and reuse",
       action: "Start free",
     }),
     footerGroups: Object.freeze([
@@ -250,47 +250,47 @@ const MARKETING_COPY = Object.freeze({
     navLabels: Object.freeze(["功能", "平台", "定价", "安全", "联系"]),
     meta: Object.freeze({
       title: "musuw｜把资料转化为会思考的知识资产",
-      description: "采集文档 网页与视频 通过 RAG 问答 Agent 推理和 Wiki 图谱 让知识真正参与工作",
+      description: "采集文档、网页与视频，让智能体问答、推理与 Wiki、知识图谱协同工作",
     }),
     hero: Object.freeze({
-      eyebrow: "RAG · Agent · Wiki",
+      eyebrow: "智能体 · Wiki · 图谱",
       typewriterPhrases: Object.freeze([
-        "RAG · Agent · Wiki",
-        "文档自动长成 Wiki",
-        "检索每一个精确答案",
-        "Agent 带着证据推理",
+        "智能体 · Wiki · 图谱",
+        "文档变成 Wiki",
+        "找到每个精确答案",
+        "智能体带证据推理",
         "图谱连接隐藏关系",
         "知识随使用持续进化",
       ]),
       titleLine1: "把资料转化为",
       titleLine2: "会思考的知识资产",
       titleFocusSegments: Object.freeze(["会", "思考的", "知识资产"]),
-      descriptionLine1: "RAG 问答 Agent 推理与 Wiki 图谱一体化",
-      descriptionLine2: "采集文档 网页与视频 完成复杂任务 并让每个有用结果继续沉淀为知识",
+      descriptionLine1: "智能体问答、推理与 Wiki 图谱一体化",
+      descriptionLine2: "采集文档、网页与视频，完成复杂任务，让有用结果沉淀为知识",
       getStarted: "免费开始",
       talkToSales: "联系",
-      dashboardAlt: "展示 Agent 推理 精确引用 Wiki 整理和知识图谱连接的 musuw 产品操作视频",
+      dashboardAlt: "展示智能体推理、精确引用、Wiki 整理和知识图谱连接的 musuw 操作视频",
     }),
     features: Object.freeze({
       intro: Object.freeze({
-        label: "三大模式",
-        title: "RAG Agent 与相互连接的知识 协同工作",
-        body: "带着证据提问 让 Agent 完成复杂任务 再把原始资料整理成始终可追溯的 Wiki 与图谱",
+        label: "三种核心能力",
+        title: "智能体与相互连接的知识 协同工作",
+        body: "带证据提问，让智能体完成复杂任务，把资料整理成可追溯的 Wiki 与图谱",
       }),
       items: Object.freeze([
         Object.freeze({
-          label: "RAG + Agent",
+          label: "智能体问答",
           title: "自主编排 完成复杂任务",
-          description: "Agent 会拆解任务 多轮检索知识库 调用允许的工具 并组合出可以返回原文核验的结果",
+          description: "智能体拆解任务，多轮检索知识库，调用允许的工具，组合出可回到原文核验的结果",
           image: "/images/musuw-query-citation.jpg",
-          imageAlt: "通过知识库检索和精确引用完成复杂任务的 musuw Agent",
+          imageAlt: "通过知识库检索和精确引用完成复杂任务的 musuw 智能体",
           bullets: Object.freeze(["多步任务推理", "知识库检索", "工具自主编排", "精确原文引用"]),
         }),
         Object.freeze({}),
         Object.freeze({
           label: "知识图谱",
           title: "发掘隐藏关系 连接每一条知识",
-          description: "反向链接 共享实体和跨资料引用会揭示知识之间的联系 同时让每条关系都能回到支持它的资料",
+          description: "反向链接、共享实体与跨资料引用，揭示知识联系；每条关系都能回到支持它的资料",
           image: "/images/musuw-wiki-graph.jpg",
           imageAlt: "展示反向链接 共享实体和可追溯跨资料关系的 musuw 知识图谱",
           bullets: Object.freeze(["反向链接", "实体关系", "跨资料发现", "关系证据可追溯"]),
@@ -298,7 +298,7 @@ const MARKETING_COPY = Object.freeze({
         Object.freeze({
           label: "AI Wiki",
           title: "文档自动蒸馏 长成结构化 Wiki",
-          description: "Musuw 自动提取摘要 实体 分类与资料关联 把非结构化内容整理成会随知识库持续更新的页面",
+          description: "Musuw 自动提取摘要、实体、分类与资料关联，把内容整理成持续更新的页面",
           image: "/images/musuw-wiki-page.jpg",
           imageAlt: "包含自动摘要 实体 分类和资料关联的 musuw AI Wiki",
           bullets: Object.freeze(["自动摘要", "实体提取", "结构化页面", "资料来源关联"]),
@@ -309,39 +309,39 @@ const MARKETING_COPY = Object.freeze({
       intro: Object.freeze({
         label: "平台能力",
         title: "覆盖完整知识闭环",
-        body: "解析每一种资料 接入主流模型 采集网页与视频 并让整个知识系统随着使用持续维护",
+        body: "解析资料、接入主流模型、采集网页与视频，让知识系统持续更新",
       }),
       cards: Object.freeze([
         Object.freeze({
           title: "多模态全格式解析",
-          body: "将文档 网页 图片 表格与 Markdown 等资料统一转化为可检索的知识",
+          body: "文档、网页、图片、表格和 Markdown，统一变成可检索知识",
         }),
         Object.freeze({
-          title: "Agent 渐进式多步推理",
-          body: "Agent 自主规划检索 调用允许的工具 并以带引用结果完成复杂任务",
+          title: "智能体多步推理",
+          body: "智能体规划检索、调用工具，以带引用的结果完成复杂任务",
         }),
         Object.freeze({
           title: "AI 自动 Wiki 与图谱",
-          body: "自动生成摘要 实体 关联页面和可追溯关系 把原始资料整理成结构化知识",
+          body: "自动生成摘要、实体、关联页面与可追溯关系，整理原始资料",
         }),
         Object.freeze({
           title: "30+ 主流模型接入",
-          body: "Musuw 提供 30+ 主流模型的托管接入 在同一界面统一使用与切换 按任务选择合适能力",
+          body: "托管接入 30+ 主流模型，同一界面切换，按任务选择能力",
         }),
         Object.freeze({
           title: "社媒文章与视频一键入库",
-          body: "将网页文章 YouTube TikTok／抖音等支持平台的链接转化为可检索正文或字幕",
+          body: "网页文章、YouTube、TikTok／抖音等链接，一键转成可检索正文或字幕",
         }),
         Object.freeze({
           title: "知识复利与自动维护",
-          body: "把有用回答重新沉淀进知识库 并由 AI 持续更新 Wiki 实体和知识关系",
+          body: "把有用回答沉淀回知识库，AI 持续更新 Wiki、实体与关系",
         }),
       ]),
     }),
     pricing: Object.freeze({
       intro: Object.freeze({
         title: "方案与定价",
-        body: "所有方案都包含 RAG 问答 精确引用 AI Wiki 与知识图谱 付费方案主要增加容量 视频导入和高级模型",
+        body: "所有方案含智能体问答、精确引用、AI Wiki 与知识图谱；付费方案增加容量、视频导入、高级模型",
       }),
       descriptions: Object.freeze([
         "体验完整知识闭环",
@@ -356,7 +356,7 @@ const MARKETING_COPY = Object.freeze({
         Object.freeze(["100 GiB 存储空间", "不限知识库与文档数", "高级模型", "视频与多平台导入"]),
       ]),
       yearlyDiscount: "约省 17%",
-      checkoutNote: "登录后确认本地化价格 年付方案一次性按年扣款",
+      checkoutNote: "登录后确认本地化价格；年付方案一次性扣款",
       checkoutAction: "选择方案",
     }),
     comparison: Object.freeze({
@@ -377,37 +377,37 @@ const MARKETING_COPY = Object.freeze({
     faq: Object.freeze({
       label: "常见问题",
       title: "开始前的常见问题",
-      body: "关于资料导入 Agent 引用 模型 套餐限制和数据控制的必要说明",
+      body: "资料导入、智能体、引用、模型与套餐限制，一次说明",
       items: Object.freeze([
         Object.freeze({
           question: "可以向 musuw 添加什么？",
-          answer: "你可以添加常见文档格式和网页 付费方案也支持当前已接入平台的视频链接 包括可用的 YouTube TikTok／抖音来源",
+          answer: "可添加常见文档和网页；付费方案支持已接入平台的视频链接，包括 YouTube、TikTok／抖音",
         }),
         Object.freeze({
-          question: "Agent 和引用如何工作？",
-          answer: "Agent 可以拆解任务 多轮检索并调用允许的工具 在存在证据时 重要结论会连接到支持它的原文段落",
+          question: "智能体和引用如何工作？",
+          answer: "智能体会拆解任务，多轮检索并调用工具；有证据时，重要结论会连到原文段落",
         }),
         Object.freeze({
           question: "可以使用哪些模型？",
-          answer: "Musuw 提供 30+ 主流模型的托管接入 具体可用模型取决于套餐和产品中当前展示的平台目录",
+          answer: "Musuw 托管接入 30+ 主流模型；可用范围取决于套餐和产品目录",
         }),
         Object.freeze({
           question: "我的内容会被用于训练模型吗？",
-          answer: "Musuw 不主张拥有你的内容 模型服务商如何处理数据 取决于产品中显示的服务商与模型 具体说明见隐私政策",
+          answer: "Musuw 不拥有你的内容；数据处理取决于产品显示的服务商与模型，详见隐私政策",
         }),
         Object.freeze({
           question: "达到套餐上限后会怎样？",
-          answer: "已有知识仍然可以访问 你可以升级套餐 删除部分内容 或在适用时等待按周期计算的额度重置",
+          answer: "已有知识仍可访问；你可以升级、删除内容，或在适用时等待额度重置",
         }),
         Object.freeze({
           question: "可以导出 删除或取消订阅吗？",
-          answer: "Musuw 提供导出和删除控制 订阅变更与取消通过订阅政策中说明的计费流程完成",
+          answer: "Musuw 提供导出和删除控制；订阅变更与取消按订阅政策的计费流程处理",
         }),
       ]),
     }),
     finalCta: Object.freeze({
       title: "让知识真正为你工作",
-      body: "从一份文档 一个网页或一段视频开始 把零散资料变成可以提问 推理 连接并持续成长的知识系统",
+      body: "从文档、网页或视频开始，把零散资料变成可提问、可连接的知识系统",
       action: "免费开始",
     }),
     footerGroups: Object.freeze([

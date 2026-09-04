@@ -19,7 +19,7 @@ test("hero copy keeps the approved two-line title and six localized typewriter p
   assert.equal(en.hero.titleLine2, "intelligent knowledge assets");
   assert.deepEqual(en.hero.titleFocusSegments, ["intelligent", "knowledge", "assets"]);
   assert.deepEqual(en.hero.typewriterPhrases, [
-    "RAG · Agent · Wiki",
+    "Agents · Wiki · Graph",
     "Turn documents into a living Wiki",
     "Retrieve precise cited answers",
     "Let agents reason with evidence",
@@ -31,10 +31,10 @@ test("hero copy keeps the approved two-line title and six localized typewriter p
   assert.equal(zh.hero.titleLine2, "会思考的知识资产");
   assert.deepEqual(zh.hero.titleFocusSegments, ["会", "思考的", "知识资产"]);
   assert.deepEqual(zh.hero.typewriterPhrases, [
-    "RAG · Agent · Wiki",
-    "文档自动长成 Wiki",
-    "检索每一个精确答案",
-    "Agent 带着证据推理",
+    "智能体 · Wiki · 图谱",
+    "文档变成 Wiki",
+    "找到每个精确答案",
+    "智能体带证据推理",
     "图谱连接隐藏关系",
     "知识随使用持续进化",
   ]);
@@ -82,6 +82,7 @@ test("hero reuses the captured TikHub timing and LiquidEther parameter contract"
   assert.match(styles, /\.hero-liquid\s*\{[\s\S]*?inset:\s*0;[\s\S]*?opacity:\s*0\.45;/);
   assert.match(hero, /!reduceMotion \? \(/);
   assert.match(hero, /reduceMotion \? \([\s\S]*?typewriterPhrases\[0\]/);
+  assert.match(hero, /<Typewriter[\s\S]*?key=\{locale\}/);
   assert.doesNotMatch(hero, /Sparkle|hero-eyebrow-icon/);
 });
 
@@ -89,7 +90,7 @@ test("theme bootstrap and the header toggle share one persisted Musuw theme cont
   const html = source("index.html");
   const theme = source("src/theme.js");
   const chrome = source("src/components/SiteChrome.jsx");
-  const styles = `${source("src/styles.css")}\n${source("src/marketing-refresh.css")}`;
+  const styles = `${source("src/styles.css")}\n${source("src/marketing-refresh.css")}\n${source("src/product-demos.css")}`;
 
   assert.match(html, /localStorage\.getItem\("musuw-theme"\)/);
   assert.match(theme, /THEME_STORAGE_KEY = "musuw-theme"/);
@@ -100,7 +101,7 @@ test("theme bootstrap and the header toggle share one persisted Musuw theme cont
   assert.match(styles, /\.hero-liquid/);
   assert.match(styles, /\.hero-dots/);
   assert.match(styles, /html\[data-theme="dark"\] \.hero-product-demo[\s\S]*?invert\(1\)/);
-  assert.match(styles, /html\[data-theme="dark"\] :is\([\s\S]*?\.feature-visual img[\s\S]*?invert\(1\)/);
+  assert.match(styles, /html\[data-theme="dark"\] \.capability-demo[\s\S]*?box-shadow/);
   assert.match(styles, /\.site-header :is\([\s\S]*?\.nav-actions > \.button[\s\S]*?border-color: var\(--ink\)/);
   assert.match(styles, /html\[data-theme="dark"\] \.button-primary[\s\S]*?background: transparent/);
   assert.match(styles, /html\[data-theme="dark"\] \.feature-bullets li[\s\S]*?var\(--line-strong\)[\s\S]*?var\(--ink-soft\)/);

@@ -39,7 +39,8 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /id="faq"/);
   assert.doesNotMatch(home, /id="blog"|id="use-cases"/);
   assert.equal((home.match(/class="feature-story/g) ?? []).length, 3);
-  assert.equal((home.match(/class="benefit-item platform-card"/g) ?? []).length, 6);
+  assert.match(home, /data-capability-demo="loop"/);
+  assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 5);
   assert.doesNotMatch(home, /class="(?:section|feature)-label"/);
   assert.match(home, /Reason through complex work/);
   assert.match(home, /Distill raw sources into a living Wiki/);
