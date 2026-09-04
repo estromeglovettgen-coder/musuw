@@ -101,7 +101,7 @@ test("theme bootstrap and the header toggle share one persisted Musuw theme cont
   assert.match(styles, /\.hero-liquid/);
   assert.match(styles, /\.hero-dots/);
   assert.match(styles, /html\[data-theme="dark"\] \.hero-product-demo[\s\S]*?invert\(1\)/);
-  assert.match(styles, /html\[data-theme="dark"\] \.capability-demo[\s\S]*?box-shadow/);
+  assert.match(styles, /html\[data-theme="dark"\] \.musuw-product-shell[\s\S]*?invert\(1\)/);
   assert.match(styles, /\.site-header :is\([\s\S]*?\.nav-actions > \.button[\s\S]*?border-color: var\(--ink\)/);
   assert.match(styles, /html\[data-theme="dark"\] \.button-primary[\s\S]*?background: transparent/);
   assert.match(styles, /html\[data-theme="dark"\] \.feature-bullets li[\s\S]*?var\(--line-strong\)[\s\S]*?var\(--ink-soft\)/);

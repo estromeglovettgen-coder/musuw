@@ -27,7 +27,7 @@ function section(markup, id, nextId) {
 test("homepage capability areas render as real DOM demos without product screenshots", () => {
   const { home } = renderFixture();
 
-  for (const kind of ["reasoning", "wiki", "graph", "loop", "answer"]) {
+  for (const kind of ["reasoning", "wiki", "graph", "answer"]) {
     assert.match(home, new RegExp(`data-capability-demo="${kind}"`));
   }
   assert.doesNotMatch(home, /\/images\/musuw-[a-z-]+\.jpg/);
@@ -43,6 +43,25 @@ test("homepage capability areas render as real DOM demos without product screens
   );
 });
 
+test("product demos share the Musuw application shell while the knowledge loop keeps six cards", () => {
+  const { home } = renderFixture();
+  const platform = section(home, "platform", "pricing");
+
+  assert.equal(
+    (home.match(/data-musuw-product-shell="true"/g) ?? []).length,
+    5,
+    "the hero and four product flows should use the same owned Musuw shell",
+  );
+  assert.equal(
+    (platform.match(/data-platform-capability=/g) ?? []).length,
+    6,
+    "the knowledge-loop section should restore the original six-card structure",
+  );
+  assert.match(platform, /class="benefit-grid platform-grid"/);
+  assert.doesNotMatch(home, /capability-window-dots/);
+  assert.doesNotMatch(home, /capability-demo-header|knowledge-loop-primary|knowledge-loop-rail/);
+});
+
 test("essential homepage content is visible in server HTML before observers or timers run", () => {
   const { home } = renderFixture();
   const features = section(home, "feature", "platform");
@@ -51,7 +70,7 @@ test("essential homepage content is visible in server HTML before observers or t
   assert.doesNotMatch(features, /opacity:0/);
   assert.doesNotMatch(platform, /opacity:0/);
   assert.match(platform, /Built for the full knowledge loop/);
-  assert.match(platform, /data-capability-demo="loop"/);
+  assert.equal((platform.match(/data-platform-capability=/g) ?? []).length, 6);
 });
 
 test("homepage headings stay fixed except for the required Chinese terminology correction", () => {

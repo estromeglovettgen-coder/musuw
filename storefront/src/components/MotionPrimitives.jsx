@@ -58,13 +58,15 @@ export function StaggerItem({
   children,
   className = "",
   direction = "up",
-  distance = 48
+  distance = 48,
+  ...rootProps
 }) {
   const reduceMotion = useReducedMotion();
   const offset = directionOffsets[direction]?.(distance) ?? directionOffsets.up(distance);
 
   return (
     <motion.div
+      {...rootProps}
       className={className}
       variants={{
         hidden: reduceMotion

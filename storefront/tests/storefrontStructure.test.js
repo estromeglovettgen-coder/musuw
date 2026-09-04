@@ -39,8 +39,8 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /id="faq"/);
   assert.doesNotMatch(home, /id="blog"|id="use-cases"/);
   assert.equal((home.match(/class="feature-story/g) ?? []).length, 3);
-  assert.match(home, /data-capability-demo="loop"/);
-  assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 5);
+  assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 4);
+  assert.equal((home.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.doesNotMatch(home, /class="(?:section|feature)-label"/);
   assert.match(home, /Reason through complex work/);
   assert.match(home, /Distill raw sources into a living Wiki/);
@@ -69,7 +69,7 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(japanHome, />¥798</);
   assert.match(japanHome, />¥1,595</);
   assert.match(home, /100 GiB/);
-  assert.match(home, /class="hero-product-demo"/);
+  assert.match(home, /class="[^"]*hero-product-demo/);
   assert.match(home, /class="hero-demo-composer/);
   assert.doesNotMatch(home, /<video/);
   assert.doesNotMatch(home, /hero-float/);

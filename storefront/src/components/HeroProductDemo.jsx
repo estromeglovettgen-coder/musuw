@@ -3,16 +3,13 @@ import { At } from "@phosphor-icons/react/At";
 import { BookmarkSimple } from "@phosphor-icons/react/BookmarkSimple";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
 import { CaretRight } from "@phosphor-icons/react/CaretRight";
-import { ChatCentered } from "@phosphor-icons/react/ChatCentered";
 import { Copy } from "@phosphor-icons/react/Copy";
-import { DotsThree } from "@phosphor-icons/react/DotsThree";
-import { FolderSimple } from "@phosphor-icons/react/FolderSimple";
 import { ImageSquare } from "@phosphor-icons/react/ImageSquare";
 import { Info } from "@phosphor-icons/react/Info";
 import { Paperclip } from "@phosphor-icons/react/Paperclip";
 import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
-import { Plus } from "@phosphor-icons/react/Plus";
 import { motion, useInView, useReducedMotion } from "motion/react";
+import { MusuwProductShell } from "./MusuwProductShell";
 
 const DEMO_COPY = Object.freeze({
   en: Object.freeze({
@@ -187,35 +184,12 @@ export function HeroProductDemo({ locale = "en" }) {
   };
 
   return (
-    <div className="hero-product-demo" ref={containerRef} aria-hidden="true">
-      <aside className="hero-demo-sidebar">
-        <div className="hero-demo-logo">
-          <img src="/images/musuw-logo.png" alt="" draggable={false} />
-        </div>
-        <span className="hero-demo-collapse">
-          <CaretRight size={13} weight="bold" />
-        </span>
-        <span className="hero-demo-side-divider" />
-        <div className="hero-demo-side-actions">
-          <span className="is-active">
-            <span className="hero-demo-chat-new">
-              <ChatCentered size={16} weight="regular" />
-              <Plus size={7} weight="bold" />
-            </span>
-          </span>
-          <span>
-            <FolderSimple size={16} weight="regular" />
-          </span>
-        </div>
-        <span className="hero-demo-avatar">E</span>
-      </aside>
-
-      <div className="hero-demo-workspace">
-        <div className="hero-demo-title">
-          <strong>{copy.conversation}</strong>
-          <DotsThree size={13} weight="bold" />
-        </div>
-
+    <MusuwProductShell
+      ariaHidden
+      className="hero-product-demo"
+      shellRef={containerRef}
+      title={copy.conversation}
+    >
         {hasSubmitted ? (
           <motion.div
             className="hero-demo-question"
@@ -336,7 +310,6 @@ export function HeroProductDemo({ locale = "en" }) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </MusuwProductShell>
   );
 }

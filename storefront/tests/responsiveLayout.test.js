@@ -57,8 +57,11 @@ test("storefront responsive media and final CTA rules stay bounded", () => {
     activeTablet,
     /\.final-cta-dashboard-frame\s*\{[^}]*height:\s*auto\s*;[^}]*aspect-ratio:\s*auto\s*;/s,
   );
-  assert.match(compactFeature, /\.wiki-demo-body\s*\{[^}]*grid-template-columns:\s*1fr\s*;/s);
-  assert.match(compactFeature, /\.wiki-transfer\s*\{[^}]*display:\s*none\s*;/s);
+  assert.match(
+    compactFeature,
+    /\.wiki-demo-body\s*\{[^}]*grid-template-columns:\s*128px\s+minmax\(0,\s*1fr\)\s*;/s,
+  );
+  assert.doesNotMatch(demos, /\.wiki-transfer|\.knowledge-loop-primary|\.knowledge-loop-rail/);
 });
 
 test("desktop-floor footer keeps every legal link inside the 1024px viewport", () => {
@@ -87,9 +90,7 @@ test("mobile navigation locks scrolling and restores focus after outside dismiss
 
 test("marketing comparison and pricing stay aligned across desktop and mobile", () => {
   const styles = readFileSync(join(root, "src/marketing-refresh.css"), "utf8");
-  const demos = readFileSync(join(root, "src/product-demos.css"), "utf8");
   const mobile = mediaBlock(styles, "max-width: 767px");
-  const demoMobile = mediaBlock(demos, "max-width: 767px");
   const desktopRow = cssRule(styles, "\\.comparison-feature-row");
   const description = cssRule(styles, "\\.plan-description");
 
@@ -105,6 +106,6 @@ test("marketing comparison and pricing stay aligned across desktop and mobile", 
     mobile,
     /\.comparison-feature-row\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)\s*;/s,
   );
-  assert.match(demoMobile, /\.knowledge-loop-primary,[\s\S]*?\.knowledge-loop-rail\s*\{[^}]*grid-template-columns:\s*1fr\s*;/s);
-  assert.match(demoMobile, /\.knowledge-loop-primary p,[\s\S]*?overflow:\s*visible\s*;[^}]*white-space:\s*normal\s*;/s);
+  assert.match(mobile, /\.platform-grid\s*\{[^}]*grid-template-columns:\s*1fr\s*;/s);
+  assert.match(mobile, /\.platform-card,[\s\S]*?min-height:\s*auto\s*;/s);
 });

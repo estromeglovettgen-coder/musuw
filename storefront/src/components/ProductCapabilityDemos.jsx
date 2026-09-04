@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight } from "@phosphor-icons/react/ArrowRight";
-import { ArrowsClockwise } from "@phosphor-icons/react/ArrowsClockwise";
-import { Brain } from "@phosphor-icons/react/Brain";
+import { At } from "@phosphor-icons/react/At";
+import { BookmarkSimple } from "@phosphor-icons/react/BookmarkSimple";
+import { CaretDown } from "@phosphor-icons/react/CaretDown";
+import { CaretRight } from "@phosphor-icons/react/CaretRight";
 import { Check } from "@phosphor-icons/react/Check";
+import { Copy } from "@phosphor-icons/react/Copy";
 import { FileText } from "@phosphor-icons/react/FileText";
-import { GlobeSimple } from "@phosphor-icons/react/GlobeSimple";
+import { ImageSquare } from "@phosphor-icons/react/ImageSquare";
 import { LinkSimple } from "@phosphor-icons/react/LinkSimple";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
-import { Quotes } from "@phosphor-icons/react/Quotes";
+import { Paperclip } from "@phosphor-icons/react/Paperclip";
+import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
 import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
-import { Stack } from "@phosphor-icons/react/Stack";
 import { useInView, useReducedMotion } from "motion/react";
+import { MusuwProductShell } from "./MusuwProductShell";
 import {
   CAPABILITY_DEMO_PHASES,
   nextCapabilityDemoPhase,
@@ -19,29 +22,39 @@ import {
 
 const COPY = Object.freeze({
   en: Object.freeze({
-    live: "Live product flow",
-    ready: "Ready",
+    shared: Object.freeze({
+      placeholder: "Ask questions directly to the model",
+      model: "DeepSeek V4 Flash",
+      effort: "Off",
+    }),
     reasoning: Object.freeze({
-      title: "Evidence workspace",
+      title: "Launch plan evidence review",
+      status: "3 sources connected",
       question: "What changed in the launch plan, and why?",
-      sources: "Sources",
       sourceItems: Object.freeze(["Launch brief", "Research notes", "Team update"]),
       steps: Object.freeze(["Search the library", "Compare the evidence", "Draft with citations"]),
       answer: "The release moved to October so the team can finish the accessibility review.",
       citation: "Team update · §4",
+      rounds: "reasoning rounds",
+      tools: "tool calls",
     }),
     wiki: Object.freeze({
-      title: "Living Wiki",
-      source: "Quarterly research notes",
+      title: "Market signals · Wiki",
+      status: "Saved just now",
+      library: "Research library",
+      items: Object.freeze(["Market signals", "Quarterly research notes", "Interview synthesis"]),
       sourceMeta: "18 pages · added today",
+      breadcrumb: "Wiki / Research",
       pageTitle: "Market signals",
       summary: "Demand is shifting toward private, source-grounded knowledge tools.",
       entities: Object.freeze(["Privacy", "Knowledge work", "AI adoption"]),
       sourceLink: "4 linked sources",
+      updated: "Updated from Quarterly research notes",
     }),
     graph: Object.freeze({
-      title: "Knowledge graph",
+      title: "Launch strategy · Graph",
       status: "Mapping relationships",
+      search: "Find an entity or relation",
       nodeUnit: "node",
       nodeUnits: "nodes",
       linkUnit: "link",
@@ -56,13 +69,9 @@ const COPY = Object.freeze({
         metrics: "Success metrics",
       }),
     }),
-    loop: Object.freeze({
-      title: "Knowledge loop",
-      status: "System in sync",
-      stages: Object.freeze(["Capture", "Reason", "Connect", "Reuse"]),
-    }),
     answer: Object.freeze({
-      title: "From answer to knowledge",
+      title: "Launch risk review",
+      status: "Citations verified",
       question: "Which launch risk needs attention first?",
       response: "Accessibility review is the only risk blocking the release date.",
       citation: "Launch brief · Risk register",
@@ -70,29 +79,39 @@ const COPY = Object.freeze({
     }),
   }),
   zh: Object.freeze({
-    live: "产品流程演示",
-    ready: "已就绪",
+    shared: Object.freeze({
+      placeholder: "直接向模型提问",
+      model: "DeepSeek V4 Flash",
+      effort: "关闭",
+    }),
     reasoning: Object.freeze({
-      title: "证据工作台",
+      title: "发布计划证据审查",
+      status: "已连接 3 份资料",
       question: "发布计划改了什么？原因是什么？",
-      sources: "资料来源",
       sourceItems: Object.freeze(["发布简报", "研究笔记", "团队更新"]),
       steps: Object.freeze(["检索知识库", "比对资料证据", "生成带引用回答"]),
       answer: "发布时间调整到十月，以便团队完成无障碍审查。",
       citation: "团队更新 · 第 4 节",
+      rounds: "轮推理",
+      tools: "次工具调用",
     }),
     wiki: Object.freeze({
-      title: "动态 Wiki",
-      source: "季度研究笔记",
+      title: "市场信号 · Wiki",
+      status: "刚刚保存",
+      library: "研究资料库",
+      items: Object.freeze(["市场信号", "季度研究笔记", "访谈洞察汇总"]),
       sourceMeta: "18 页 · 今日添加",
+      breadcrumb: "Wiki / 研究",
       pageTitle: "市场信号",
       summary: "用户更需要私密、可追溯来源的知识工具。",
       entities: Object.freeze(["隐私", "知识工作", "智能体应用"]),
       sourceLink: "关联 4 份资料",
+      updated: "已根据《季度研究笔记》更新",
     }),
     graph: Object.freeze({
-      title: "知识图谱",
+      title: "发布策略 · 图谱",
       status: "正在连接关系",
+      search: "查找实体或关系",
       nodeUnit: "个节点",
       nodeUnits: "个节点",
       linkUnit: "条关系",
@@ -107,13 +126,9 @@ const COPY = Object.freeze({
         metrics: "成功指标",
       }),
     }),
-    loop: Object.freeze({
-      title: "知识闭环",
-      status: "系统已同步",
-      stages: Object.freeze(["采集", "推理", "连接", "复用"]),
-    }),
     answer: Object.freeze({
-      title: "从回答到知识",
+      title: "发布风险审查",
+      status: "引用已核验",
       question: "哪个发布风险最需要优先处理？",
       response: "无障碍审查是当前唯一影响发布日期的风险。",
       citation: "发布简报 · 风险清单",
@@ -123,13 +138,13 @@ const COPY = Object.freeze({
 });
 
 const GRAPH_NODES = Object.freeze([
-  Object.freeze({ key: "strategy", x: 280, y: 164, r: 30, phase: 0 }),
-  Object.freeze({ key: "research", x: 128, y: 92, r: 22, phase: 1 }),
-  Object.freeze({ key: "privacy", x: 104, y: 238, r: 19, phase: 2 }),
-  Object.freeze({ key: "roadmap", x: 426, y: 86, r: 24, phase: 1 }),
-  Object.freeze({ key: "models", x: 454, y: 220, r: 20, phase: 2 }),
-  Object.freeze({ key: "sources", x: 284, y: 286, r: 19, phase: 3 }),
-  Object.freeze({ key: "metrics", x: 284, y: 48, r: 17, phase: 3 }),
+  Object.freeze({ key: "strategy", x: 280, y: 164, r: 22, phase: 0 }),
+  Object.freeze({ key: "research", x: 128, y: 92, r: 16, phase: 1 }),
+  Object.freeze({ key: "privacy", x: 104, y: 238, r: 13, phase: 2 }),
+  Object.freeze({ key: "roadmap", x: 426, y: 86, r: 17, phase: 1 }),
+  Object.freeze({ key: "models", x: 454, y: 220, r: 14, phase: 2 }),
+  Object.freeze({ key: "sources", x: 284, y: 286, r: 13, phase: 3 }),
+  Object.freeze({ key: "metrics", x: 284, y: 48, r: 12, phase: 3 }),
 ]);
 
 const GRAPH_EDGES = Object.freeze([
@@ -140,15 +155,6 @@ const GRAPH_EDGES = Object.freeze([
   Object.freeze({ from: "privacy", to: "sources", phase: 3 }),
   Object.freeze({ from: "models", to: "sources", phase: 3 }),
   Object.freeze({ from: "roadmap", to: "metrics", phase: 3 }),
-]);
-
-const LOOP_ICONS = Object.freeze([
-  FileText,
-  Brain,
-  ShareNetwork,
-  Stack,
-  GlobeSimple,
-  ArrowsClockwise,
 ]);
 
 function localize(locale) {
@@ -188,12 +194,19 @@ function useCapabilityDemoPhase() {
   };
 }
 
-function DemoHeader({ title, status }) {
+function DemoComposer({ copy }) {
   return (
-    <div className="capability-demo-header">
-      <span className="capability-window-dots" aria-hidden="true"><i /><i /><i /></span>
-      <strong>{title}</strong>
-      <span className="capability-demo-status"><i aria-hidden="true" />{status}</span>
+    <div className="product-demo-composer">
+      <span>{copy.placeholder}</span>
+      <div className="product-demo-composer-tools">
+        <span><At size={13} weight="bold" /><ImageSquare size={13} /><Paperclip size={13} /></span>
+        <span>
+          <span className="product-demo-model">
+            <strong>{copy.model}</strong><small>{copy.effort}</small><CaretDown size={9} />
+          </span>
+          <i><PaperPlaneTilt size={12} /></i>
+        </span>
+      </div>
     </div>
   );
 }
@@ -204,47 +217,41 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
   const activeIndex = phaseIndex(phase);
 
   return (
-    <div
+    <MusuwProductShell
       className="capability-demo capability-demo-reasoning"
       data-capability-demo="reasoning"
       data-demo-phase={phase}
-      ref={ref}
+      shellRef={ref}
+      title={copy.reasoning.title}
     >
-      <DemoHeader title={copy.reasoning.title} status={copy.live} />
-      <div className="reasoning-demo-body">
-        <aside className="reasoning-sources">
-          <span className="demo-overline">{copy.reasoning.sources}</span>
-          {copy.reasoning.sourceItems.map((item, index) => (
-            <div className={activeIndex >= index ? "is-reached" : ""} key={item}>
-              <FileText size={15} aria-hidden="true" />
-              <span>{item}</span>
-              <Check size={13} weight="bold" aria-hidden="true" />
-            </div>
+      <div className="product-demo-query">
+        <strong>{copy.reasoning.question}</strong>
+      </div>
+      <div className="product-demo-thread reasoning-demo-thread">
+        <div className="product-demo-summary">
+          <strong>2</strong> {copy.reasoning.rounds}<span>·</span>
+          <strong>3</strong> {copy.reasoning.tools}<span>·</span><strong>15s</strong>
+          <CaretRight size={10} weight="bold" aria-hidden="true" />
+        </div>
+        <ol className="reasoning-process">
+          {copy.reasoning.steps.map((step, index) => (
+            <li
+              className={`${activeIndex === index + 1 ? "is-active" : ""} ${activeIndex > index + 1 ? "is-complete" : ""}`}
+              key={step}
+            >
+              <span>{index + 1}</span>
+              <div><strong>{step}</strong><small>{copy.reasoning.sourceItems[index]}</small></div>
+              <Check size={12} weight="bold" aria-hidden="true" />
+            </li>
           ))}
-        </aside>
-        <div className="reasoning-workspace">
-          <div className="reasoning-question">
-            <Quotes size={18} aria-hidden="true" />
-            <strong>{copy.reasoning.question}</strong>
-          </div>
-          <ol className="reasoning-steps">
-            {copy.reasoning.steps.map((step, index) => (
-              <li
-                className={`${activeIndex === index + 1 ? "is-active" : ""} ${activeIndex > index + 1 ? "is-complete" : ""}`}
-                key={step}
-              >
-                <span>{index + 1}</span>
-                {step}
-              </li>
-            ))}
-          </ol>
-          <div className={`reasoning-answer ${phase === "complete" ? "is-complete" : ""}`}>
-            <p>{copy.reasoning.answer}</p>
-            <span><LinkSimple size={13} aria-hidden="true" />{copy.reasoning.citation}</span>
-          </div>
+        </ol>
+        <div className={`product-demo-answer ${phase === "complete" ? "is-complete" : ""}`}>
+          <p>{copy.reasoning.answer}</p>
+          <span><LinkSimple size={12} aria-hidden="true" />{copy.reasoning.citation}</span>
         </div>
       </div>
-    </div>
+      <DemoComposer copy={copy.shared} />
+    </MusuwProductShell>
   );
 }
 
@@ -254,38 +261,47 @@ export function WikiCapabilityDemo({ locale = "en" }) {
   const activeIndex = phaseIndex(phase);
 
   return (
-    <div
+    <MusuwProductShell
+      activeItem="library"
       className="capability-demo capability-demo-wiki"
       data-capability-demo="wiki"
       data-demo-phase={phase}
-      ref={ref}
+      shellRef={ref}
+      title={copy.wiki.title}
     >
-      <DemoHeader title={copy.wiki.title} status={copy.ready} />
       <div className="wiki-demo-body">
-        <div className={`wiki-source-card ${activeIndex >= 1 ? "is-active" : ""}`}>
-          <FileText size={22} aria-hidden="true" />
-          <strong>{copy.wiki.source}</strong>
-          <span>{copy.wiki.sourceMeta}</span>
-          <i /><i /><i /><i />
-        </div>
-        <div className="wiki-transfer" aria-hidden="true">
-          <ArrowRight size={20} />
-          <span />
-        </div>
-        <div className={`wiki-page-card ${activeIndex >= 2 ? "is-active" : ""}`}>
-          <span className="wiki-page-path">WIKI / RESEARCH</span>
+        <aside className="wiki-demo-nav">
+          <span className="demo-overline">{copy.wiki.library}</span>
+          {copy.wiki.items.map((item, index) => (
+            <div
+              className={`${index === 0 ? "is-current" : ""} ${activeIndex >= Math.min(index, 2) ? "is-reached" : ""}`}
+              key={item}
+            >
+              <FileText size={14} aria-hidden="true" />
+              <span>{item}</span>
+            </div>
+          ))}
+          <small>{copy.wiki.sourceMeta}</small>
+        </aside>
+        <article className={`wiki-demo-page ${activeIndex >= 1 ? "is-updated" : ""}`}>
+          <div className="wiki-demo-page-meta">
+            <span>{copy.wiki.breadcrumb}</span>
+            <small>{copy.wiki.updated}</small>
+          </div>
           <h4>{copy.wiki.pageTitle}</h4>
           <p>{copy.wiki.summary}</p>
           <div className="wiki-entities">
             {copy.wiki.entities.map((entity) => <span key={entity}>{entity}</span>)}
           </div>
           <div className="wiki-source-link">
-            <LinkSimple size={14} aria-hidden="true" />
+            <LinkSimple size={13} aria-hidden="true" />
             {copy.wiki.sourceLink}
+            <CaretRight size={10} weight="bold" aria-hidden="true" />
           </div>
-        </div>
+          <div className="wiki-page-lines" aria-hidden="true"><i /><i /><i /></div>
+        </article>
       </div>
-    </div>
+    </MusuwProductShell>
   );
 }
 
@@ -298,13 +314,18 @@ export function GraphCapabilityDemo({ locale = "en" }) {
   const activeEdgeCount = GRAPH_EDGES.filter((edge) => edge.phase <= activeIndex).length;
 
   return (
-    <div
+    <MusuwProductShell
+      activeItem="library"
       className="capability-demo capability-demo-graph"
       data-capability-demo="graph"
       data-demo-phase={phase}
-      ref={ref}
+      shellRef={ref}
+      title={copy.graph.title}
     >
-      <DemoHeader title={copy.graph.title} status={copy.graph.status} />
+      <div className="graph-demo-toolbar">
+        <span><MagnifyingGlass size={12} aria-hidden="true" />{copy.graph.search}</span>
+        <span><ShareNetwork size={13} aria-hidden="true" />{activeNodeCount} / {GRAPH_NODES.length}</span>
+      </div>
       <div className="graph-demo-canvas">
         <svg viewBox="0 0 560 330" role="img" aria-label={copy.graph.title}>
           <g className="graph-live-edges" aria-hidden="true">
@@ -319,7 +340,7 @@ export function GraphCapabilityDemo({ locale = "en" }) {
                   y1={from.y}
                   x2={to.x}
                   y2={to.y}
-                  key={`${edge.from}-${edge.to}-live`}
+                  key={`${edge.from}-${edge.to}`}
                 />
               );
             })}
@@ -342,59 +363,7 @@ export function GraphCapabilityDemo({ locale = "en" }) {
           <span><i />{activeEdgeCount} {activeEdgeCount === 1 ? copy.graph.linkUnit : copy.graph.linkUnits}</span>
         </div>
       </div>
-    </div>
-  );
-}
-
-export function KnowledgeLoopDemo({ cards, locale = "en" }) {
-  const copy = localize(locale);
-  const { ref, phase } = useCapabilityDemoPhase();
-  const activeIndex = phaseIndex(phase);
-  const cardPhases = [0, 1, 2, 1, 0, 3];
-
-  return (
-    <div
-      className="capability-demo capability-demo-loop"
-      data-capability-demo="loop"
-      data-demo-phase={phase}
-      ref={ref}
-    >
-      <DemoHeader title={copy.loop.title} status={copy.loop.status} />
-      <div className="knowledge-loop-progress" aria-hidden="true">
-        {copy.loop.stages.map((stage, index) => (
-          <div className={activeIndex >= index ? "is-active" : ""} key={stage}>
-            <span>{index + 1}</span>
-            <strong>{stage}</strong>
-          </div>
-        ))}
-      </div>
-      <div className="knowledge-loop-body">
-        <div className="knowledge-loop-primary">
-          {cards.slice(0, 3).map(({ title, body }, index) => {
-            const Icon = LOOP_ICONS[index];
-            return (
-              <article className={activeIndex >= cardPhases[index] ? "is-reached" : ""} key={title}>
-                <Icon size={19} aria-hidden="true" />
-                <div><h3>{title}</h3><p>{body}</p></div>
-              </article>
-            );
-          })}
-        </div>
-        <div className="knowledge-loop-rail">
-          {cards.slice(3).map(({ title, body }, offset) => {
-            const index = offset + 3;
-            const Icon = LOOP_ICONS[index];
-            return (
-              <article className={activeIndex >= cardPhases[index] ? "is-reached" : ""} key={title}>
-                <Icon size={18} aria-hidden="true" />
-                <div><h3>{title}</h3><p>{body}</p></div>
-                <Check size={14} weight="bold" aria-hidden="true" />
-              </article>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    </MusuwProductShell>
   );
 }
 
@@ -403,27 +372,35 @@ export function AnswerCapabilityDemo({ locale = "en" }) {
   const { ref, phase } = useCapabilityDemoPhase();
 
   return (
-    <div
+    <MusuwProductShell
       className="capability-demo capability-demo-answer"
       data-capability-demo="answer"
       data-demo-phase={phase}
-      ref={ref}
+      shellRef={ref}
+      title={copy.answer.title}
     >
-      <DemoHeader title={copy.answer.title} status={copy.ready} />
-      <div className="answer-demo-body">
-        <div className="answer-demo-question">
-          <MagnifyingGlass size={17} aria-hidden="true" />
-          <strong>{copy.answer.question}</strong>
+      <div className="product-demo-query answer-demo-query">
+        <strong>{copy.answer.question}</strong>
+      </div>
+      <div className="product-demo-thread answer-demo-thread">
+        <div className="product-demo-summary">
+          <strong>2</strong> {copy.reasoning.rounds}<span>·</span>
+          <strong>3</strong> {copy.reasoning.tools}<span>·</span><strong>15s</strong>
+          <CaretRight size={10} weight="bold" aria-hidden="true" />
         </div>
-        <div className="answer-demo-result">
+        <div className="product-demo-answer is-complete">
           <p>{copy.answer.response}</p>
-          <span><LinkSimple size={13} aria-hidden="true" />{copy.answer.citation}</span>
+          <span><LinkSimple size={12} aria-hidden="true" />{copy.answer.citation}</span>
+          <div className="answer-demo-actions" aria-hidden="true">
+            <Copy size={13} /><BookmarkSimple size={13} />
+          </div>
         </div>
         <div className={`answer-demo-saved ${phase === "complete" ? "is-complete" : ""}`}>
-          <Check size={14} weight="bold" aria-hidden="true" />
+          <Check size={12} weight="bold" aria-hidden="true" />
           {copy.answer.saved}
         </div>
       </div>
-    </div>
+      <DemoComposer copy={copy.shared} />
+    </MusuwProductShell>
   );
 }
