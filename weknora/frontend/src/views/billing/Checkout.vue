@@ -205,7 +205,6 @@ const planFeatures = computed(() => {
   const storage = { plus: 10, pro: 30, max: 100 }[plan]
   return [
     t('entitlement.featureStorage', { amount: storage }),
-    t('entitlement.featureAllowance', { level: t(`entitlement.allowanceLevels.${plan}`) }),
     t('entitlement.featureUnlimitedKnowledge'),
     t('entitlement.featureAllModels'),
     t('entitlement.featureVideo'),

@@ -103,6 +103,12 @@ const localizedPrices = ref<Record<string, string>>({})
 const portalOpening = ref(false)
 const paidPlans: PaidConsumerPlan[] = ['plus', 'pro', 'max']
 const planRank: Record<ConsumerPlan, number> = { free: 0, plus: 1, pro: 2, max: 3 }
+// The public pricing page currently publishes Chinese and English marketing
+// copy only. Keep this one free-plan line byte-for-byte aligned without adding
+// unsupported marketing translations to the other locale bundles.
+const freeImportFeature = computed(() => locale.value.toLowerCase().startsWith('zh')
+  ? '文档与网页导入'
+  : 'Documents and web links')
 const planCards: Array<{ plan: ConsumerPlan; descriptionKey: string }> = [
   { plan: 'free', descriptionKey: 'entitlement.planDescriptions.free' },
   { plan: 'plus', descriptionKey: 'entitlement.planDescriptions.plus' },
@@ -191,9 +197,12 @@ const planFeatures = (plan: ConsumerPlan) => {
   const storage = { free: 1, plus: 10, pro: 30, max: 100 }[plan]
   const features = [
     t('entitlement.featureStorage', { amount: storage }),
-    t('entitlement.featureAllowance', { level: t(`entitlement.allowanceLevels.${plan}`) }),
   ]
-  if (plan === 'free') features.push(t('entitlement.featureFreeKnowledge'), t('entitlement.featureBudgetModel'))
+  if (plan === 'free') features.push(
+    t('entitlement.featureFreeKnowledge'),
+    t('entitlement.featureBudgetModel'),
+    freeImportFeature.value,
+  )
   else features.push(t('entitlement.featureUnlimitedKnowledge'), t('entitlement.featureAllModels'), t('entitlement.featureVideo'))
   return features
 }
