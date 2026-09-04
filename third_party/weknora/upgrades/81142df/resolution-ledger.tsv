@@ -694,10 +694,10 @@ internal/application/repository/tenant_sandbox_config_test.go	-	A	100644	00e8942
 internal/application/repository/tenant_skill.go	-	A	100644	547a860529bdd1c1b8562c1b58f643cb7d249256	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/repository/tenant_skill_test.go	-	A	100644	2661141e9d16c64ea86253cb47815e5a82286e84	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/repository/wiki_page.go	-	M	100644	b5df908e2a502bbb3c9df35d70aa2e7f0f23453d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/account_erasure.go	A	-	100644	d7bed89226a1bf55812d7cf66519071c26d81db3	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/application/service/account_erasure.go	A	-	100644	e23ac140f67d3f2f66b76294b444cb828679e9b9	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/account_erasure_providers.go	A	-	100644	6c9eb4db5e639b15cd27f2da3f7636aa1a7e10b2	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/account_erasure_providers_test.go	A	-	100644	af53e35657509ffb7e8ec01705e5741b268cfd45	preserve-musuw-exact		audited local-only content is byte-identical
-internal/application/service/account_erasure_test.go	A	-	100644	f2393fee060126082dcb0e21ba4cfc2d2b563867	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/application/service/account_erasure_test.go	A	-	100644	adc3f8a1cfe876133a0599dbfe8dc708569f9f94	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/agent_history.go	M	M	100644	dd3be63737504e279ef7b71e0bb3e8fa69c8a91d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/application/service/agent_history_test.go	-	M	100644	9630087c6ceff80ce466f13b9480b48878bb6784	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/agent_memory_config_test.go	-	A	100644	2cc5cf7fa276fd0b10ac72f7b1423002ce6b3bf0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
