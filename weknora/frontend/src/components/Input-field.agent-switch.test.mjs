@@ -162,6 +162,23 @@ test("combined selector mechanically preserves native labels, hover entry, and t
   ]) assert.ok(modelSelector.includes(token), `shared picker source token lost ${token}`);
 });
 
+test("model overview always renders the complete selected model name", () => {
+  assert.match(
+    modelSelector,
+    /class="visual-model-selector__chat-row-value is-model"[^>]*>\{\{ selectedModelDisplayName \}\}<\/span>/,
+  );
+
+  const ruleStart = modelSelector.indexOf('.visual-model-selector__chat-row-value.is-model');
+  const ruleEnd = modelSelector.indexOf('}', ruleStart);
+  const rule = modelSelector.slice(ruleStart, ruleEnd);
+
+  assert.notEqual(ruleStart, -1);
+  assert.notEqual(ruleEnd, -1);
+  assert.match(rule, /white-space:\s*normal/);
+  assert.match(rule, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(rule, /text-overflow:\s*ellipsis/);
+});
+
 test("model selector controller distinguishes the initial catalog load from missing configuration", () => {
   const labelStart = inputBusiness.indexOf("const selectedModelDisplayName = computed");
   const labelEnd = inputBusiness.indexOf("const modelDisplayName", labelStart);

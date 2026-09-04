@@ -16,6 +16,14 @@ Musuw Lite SHALL initialize a browser with no saved chat preference to the manag
 - **WHEN** a user opens a conversation with a recorded request state
 - **THEN** the model and reasoning state from that conversation are restored for that view
 
+### Requirement: The selected model name remains fully visible
+The compact chat model overview SHALL render the complete selected model display name without replacing any part of it with an ellipsis.
+
+#### Scenario: Model name exceeds the previous summary width
+- **WHEN** the selected model name is wider than the former one-line value limit
+- **THEN** the complete name remains visible in the model overview
+- **AND** the value may wrap within the existing menu instead of overflowing the viewport
+
 ### Requirement: Lite onboarding is the visible subset of the original WeKnora journey
 The first-run guide SHALL preserve the useful order, tone, completion behavior and visible targets of the fixed WeKnora tutorial while excluding only controls hidden from Musuw Lite.
 

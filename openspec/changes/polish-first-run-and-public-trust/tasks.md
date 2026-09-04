@@ -16,6 +16,7 @@
 - [x] 3.1 Set only the no-preference Lite default to DeepSeek V4 Flash with reasoning disabled
 - [x] 3.2 Restore each useful upstream guide step whose target remains visible in Lite and filter hidden product surfaces
 - [x] 3.3 Update supported guide locales and tests without changing homepage composer presentation or Standard behavior
+- [x] 3.4 Keep the selected model name complete in the compact model overview without widening the menu beyond the viewport
 
 ## 4. Public trust surfaces
 

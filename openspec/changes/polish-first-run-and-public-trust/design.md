@@ -32,6 +32,8 @@ The store continues to own one user-and-tenant-scoped snapshot and one in-flight
 
 The shared Standard defaults remain unchanged. When Lite is resolved for an identity with no saved chat preference, the existing settings store fills DeepSeek V4 Flash with reasoning `none`. Existing persisted values and session `last_request_state` remain authoritative. The managed Free catalog continues to resolve V4 Flash through the existing plan filter and model resolver. No model capability or request schema changes.
 
+The compact model overview keeps its existing width and hierarchy, but the selected model value never uses an ellipsis. Current names stay on one line; a future longer name wraps inside the value column instead of being hidden or widening the floating menu beyond the viewport.
+
 ### Derive onboarding from the fixed upstream source
 
 The implementation will build a step inventory from WeKnora commit `81142df`, retain the existing Driver.js lifecycle and translate only product names or hidden-surface references. A target is included when the current Lite DOM exposes it and the task contributes to first value; hidden tenant/member/share/admin/infrastructure targets are excluded at the edition boundary. This avoids a second guide engine or a long one-shot wizard.
