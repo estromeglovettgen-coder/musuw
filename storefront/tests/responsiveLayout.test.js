@@ -32,7 +32,7 @@ test("storefront responsive media and final CTA rules stay bounded", () => {
   const mobile = mediaBlock(reviewReady, "max-width: 767px");
   const tablet = mediaBlock(reviewReady, "max-width: 1023px");
   const activeTablet = mediaBlock(demos, "max-width: 1023px");
-  const compactFeature = mediaBlock(demos, "max-width: 1080px");
+  const productWiki = cssRule(demos, "\\.kb-preview-wiki-browser");
 
   assert.match(baseArticleImage, /aspect-ratio:\s*1\.25\s*;/s);
   assert.match(baseArticleImageImage, /height:\s*100%\s*;/s);
@@ -58,8 +58,8 @@ test("storefront responsive media and final CTA rules stay bounded", () => {
     /\.final-cta-dashboard-frame\s*\{[^}]*height:\s*auto\s*;[^}]*aspect-ratio:\s*auto\s*;/s,
   );
   assert.match(
-    compactFeature,
-    /\.wiki-demo-body\s*\{[^}]*grid-template-columns:\s*128px\s+minmax\(0,\s*1fr\)\s*;/s,
+    productWiki,
+    /grid-template-columns:\s*minmax\(150px,\s*25%\)\s+minmax\(0,\s*1fr\)\s*;/s,
   );
   assert.doesNotMatch(demos, /\.wiki-transfer|\.knowledge-loop-primary|\.knowledge-loop-rail/);
 });

@@ -43,14 +43,19 @@ test("homepage capability areas render as real DOM demos without product screens
   );
 });
 
-test("product demos share the Musuw application shell while the knowledge loop keeps six cards", () => {
+test("hero and chat demos keep the compact shell while Wiki and Graph use the full product page", () => {
   const { home } = renderFixture();
   const platform = section(home, "platform", "pricing");
 
   assert.equal(
     (home.match(/data-musuw-product-shell="true"/g) ?? []).length,
-    5,
-    "the hero and four product flows should use the same owned Musuw shell",
+    3,
+    "the hero and two chat flows should keep the compact Musuw shell",
+  );
+  assert.equal(
+    (home.match(/data-product-page-shell=/g) ?? []).length,
+    2,
+    "Wiki and Graph should use the mechanically ported full product page",
   );
   assert.equal(
     (platform.match(/data-platform-capability=/g) ?? []).length,
@@ -60,6 +65,52 @@ test("product demos share the Musuw application shell while the knowledge loop k
   assert.match(platform, /class="benefit-grid platform-grid"/);
   assert.doesNotMatch(home, /capability-window-dots/);
   assert.doesNotMatch(home, /capability-demo-header|knowledge-loop-primary|knowledge-loop-rail/);
+});
+
+test("wiki and graph demos mechanically mirror the real knowledge-base surfaces", () => {
+  const { chineseHome } = renderFixture();
+
+  assert.match(chineseHome, /data-product-page-shell="wiki"/);
+  assert.match(chineseHome, /data-product-page-shell="graph"/);
+  assert.equal(
+    (chineseHome.match(/data-kb-tab="documents"/g) ?? []).length,
+    2,
+    "both product previews must carry the real Documents, Wiki, Graph tab strip",
+  );
+  assert.equal((chineseHome.match(/data-kb-tab="wiki"/g) ?? []).length, 2);
+  assert.equal((chineseHome.match(/data-kb-tab="graph"/g) ?? []).length, 2);
+
+  assert.match(chineseHome, /data-wiki-sidebar="true"/);
+  assert.match(chineseHome, /data-wiki-reader="true"/);
+  assert.equal((chineseHome.match(/visual-sidebar kb-preview-app-sidebar/g) ?? []).length, 2);
+  assert.equal((chineseHome.match(/visual-knowledge-page kb-preview-knowledge-page/g) ?? []).length, 2);
+  assert.equal((chineseHome.match(/wiki-browser kb-preview-wiki-browser/g) ?? []).length, 2);
+  assert.match(chineseHome, /wiki-sidebar kb-preview-wiki-sidebar/);
+  assert.match(chineseHome, /wiki-content kb-preview-wiki-content/);
+  assert.match(chineseHome, /wiki-reader kb-preview-wiki-reader/);
+  assert.match(chineseHome, /wiki-graph kb-preview-graph/);
+  assert.match(chineseHome, /wiki-graph-canvas kb-preview-graph-canvas/);
+  assert.equal((chineseHome.match(/搜索 Wiki 页面\.\.\./g) ?? []).length, 2);
+  assert.match(chineseHome, /产品评估/);
+  assert.match(chineseHome, /Listmonk/);
+
+  assert.equal(
+    (chineseHome.match(/data-graph-legend-type=/g) ?? []).length,
+    5,
+    "the graph preview must carry the five real product legend types",
+  );
+  assert.equal(
+    (chineseHome.match(/data-graph-node=/g) ?? []).length,
+    14,
+    "the graph preview must use the same 14-node product fixture",
+  );
+  assert.match(chineseHome, /data-graph-action="fit-view"/);
+  assert.match(chineseHome, /data-graph-action="toggle-arrows"/);
+  assert.match(chineseHome, /data-graph-settings="true"/);
+  assert.match(chineseHome, /14 \/ 14 个节点/);
+
+  assert.doesNotMatch(chineseHome, /wiki-demo-body|graph-demo-toolbar/);
+  assert.doesNotMatch(chineseHome, /MAX_FIXED_OK|FREE_FIXED_OK|RESTORED_MAX_OK|FREE_OK|PRO_OK|demo@musuw\.com/);
 });
 
 test("essential homepage content is visible in server HTML before observers or timers run", () => {
@@ -147,8 +198,7 @@ test("capability motion exposes bounded phases and a static reduced-motion end s
   assert.match(source, /window\.clearInterval/);
   assert.doesNotMatch(source, /initial=\{[^}]*opacity:\s*0/);
   assert.doesNotMatch(source, /graph-base-edges/);
-  assert.match(styles, /\.graph-live-edges line\.is-linked[\s\S]*?stroke-dashoffset:\s*0/);
-  assert.match(styles, /\.graph-nodes g circle[\s\S]*?opacity:\s*0/);
-  assert.match(styles, /\.graph-nodes g\.is-linked circle[\s\S]*?transform:\s*scale\(1\)/);
+  assert.match(styles, /\.kb-preview-graph-edges line[\s\S]*?opacity:\s*0\.56/);
+  assert.match(styles, /\.kb-preview-graph-nodes g[\s\S]*?opacity:\s*1/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation:\s*none !important/);
 });
