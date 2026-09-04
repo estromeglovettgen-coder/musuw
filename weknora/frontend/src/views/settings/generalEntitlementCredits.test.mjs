@@ -111,6 +111,18 @@ test('Paddle customer portal stays server-authenticated and redirects with a fre
   assert.match(entitlementApi, /post\('\/api\/v1\/billing\/paddle\/portal-session'\)/)
   assert.match(usageSettings, /billing\.value\?\.portal_available\s*===\s*true/)
   assert.match(usageSettings, /window\.location\.assign\(response\.authorization_url\)/)
+  const assertPortalInvalidatesBeforeRedirect = (source, label) => {
+    const start = source.indexOf('const handlePortal = async () =>')
+    const end = source.indexOf('\n}\n', start)
+    const handler = source.slice(start, end)
+    const sessionUrl = handler.indexOf('response.authorization_url')
+    const invalidate = handler.indexOf('entitlementStore.invalidate()')
+    const redirect = handler.indexOf('window.location.assign(response.authorization_url)')
+    assert.ok(start >= 0 && end > start, `${label} portal handler is present`)
+    assert.ok(sessionUrl >= 0 && invalidate > sessionUrl && redirect > invalidate, `${label} invalidates stale quota before returning from Paddle portal`)
+  }
+  assertPortalInvalidatesBeforeRedirect(usageSettings, 'usage settings')
+  assertPortalInvalidatesBeforeRedirect(plansPage, 'plans')
   assert.match(usageSettings, /router\.push\('\/plans'\)/)
   const start = entitlementApi.indexOf('export async function createPaddlePortalSession')
   const end = entitlementApi.indexOf('\nexport async function', start + 1)

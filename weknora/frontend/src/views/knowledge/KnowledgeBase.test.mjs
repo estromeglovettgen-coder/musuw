@@ -50,6 +50,19 @@ test("knowledge upload completion silently revalidates the shared quota snapshot
   assert.match(source, /removeEventListener\(KNOWLEDGE_FILE_UPLOADED_EVENT, handleKnowledgeFileUploaded\)/);
 });
 
+test("knowledge URL imports refresh quota only after a successful import", () => {
+  const start = nativeController.indexOf("const executeUrlImport = async (");
+  const end = nativeController.indexOf("const startPlatformDefaultUpload", start);
+  assert.ok(start >= 0 && end > start, "URL import controller is present");
+  const executeUrlImport = nativeController.slice(start, end);
+  const successCheck = executeUrlImport.indexOf("const isSuccess =");
+  const refreshEvent = executeUrlImport.indexOf("window.dispatchEvent(new CustomEvent('knowledgeFileUploaded'");
+  assert.ok(successCheck >= 0, "URL import checks the API result");
+  assert.ok(refreshEvent > successCheck, "quota refresh event is emitted only after success is known");
+  const successBranch = executeUrlImport.indexOf("if (isSuccess) {");
+  assert.ok(successBranch >= 0 && refreshEvent > successBranch, "quota refresh event is emitted from the success branch");
+});
+
 test("graph view keeps the original layout chrome instead of inheriting document-only spacing", () => {
   assert.match(
     source,

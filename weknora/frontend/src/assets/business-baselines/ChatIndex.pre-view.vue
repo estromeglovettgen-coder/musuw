@@ -136,6 +136,7 @@ import { deleteTemporaryAttachment, uploadTemporaryAttachment } from '@/api/chat
 import { useStream } from '../../api/chat/streame'
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
+import { useCurrentEntitlementStore } from '@/stores/entitlement';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
 import { useUIStore } from '@/stores/ui';
@@ -173,6 +174,11 @@ const props = defineProps({
 
 const usemenuStore = useMenuStore();
 const useSettingsStoreInstance = useSettingsStore();
+const entitlementStore = useCurrentEntitlementStore();
+
+const refreshEntitlementAfterAttachmentUpload = () => {
+    if (!props.embeddedMode) void entitlementStore.refresh();
+};
 
 // Whether the active chat session is using the Agent pipeline (not quick-answer).
 const isAgentStreamSession = () => {
@@ -697,6 +703,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
                     session_id.value, file, selectedAgentId, selectedAgentSourceTenantId, 'auto'
                 );
                 imageAttachmentIds.push(upload.data.id);
+                refreshEntitlementAfterAttachmentUpload();
             } catch (e) {
                 console.error('[Image] Temporary image upload failed, falling back to inline:', e);
                 imageAttachments.push({ data: dataURI });
@@ -719,6 +726,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
                 );
                 attachment.documentId = upload.data.id;
                 attachment.status = upload.data.status;
+                refreshEntitlementAfterAttachmentUpload();
             }));
         } catch (error) {
             console.error('[Attachment] Temporary document upload failed:', error);

@@ -1695,11 +1695,11 @@ const executeUrlImport = async (
       tag_ids: tagIdsToUpload,
     };
     const responseData: any = await createKnowledgeFromURL(targetKbId, uploadData);
-    window.dispatchEvent(new CustomEvent('knowledgeFileUploaded', {
-      detail: { kbId: targetKbId },
-    }));
     const isSuccess = responseData?.success || responseData?.code === 200 || responseData?.status === 'success' || (!responseData?.error && responseData);
     if (isSuccess) {
+      window.dispatchEvent(new CustomEvent('knowledgeFileUploaded', {
+        detail: { kbId: targetKbId },
+      }));
       MessagePlugin.success(t('knowledgeBase.urlImportSuccess'));
     } else {
       let errorMessage = t('knowledgeBase.urlImportFailed');
