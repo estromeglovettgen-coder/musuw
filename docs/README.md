@@ -11,6 +11,7 @@ snapshots are not retained as operating instructions.
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Immutable build, staging, promotion, rollback, and production delivery contract. |
 | [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) | Staging environment operation and acceptance workflow. |
 | [`HANDOFF.md`](HANDOFF.md) | Current no-context project handoff: source identity, Musuw product boundary, merged capabilities, deployment status, and remaining acceptance matrix. |
+| [`FULL_PRODUCT_ACCEPTANCE_CHECKLIST.md`](FULL_PRODUCT_ACCEPTANCE_CHECKLIST.md) | Durable scenario matrix and chronological evidence log; unchecked items are not implied complete. |
 | [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md) | Secret ownership, provider boundaries, and safe operator handling. |
 | [`PADDLE_LIVE_READINESS.md`](PADDLE_LIVE_READINESS.md) | Paddle Live readiness and evidence requirements. |
 | [`LOCAL_ADMIN.md`](LOCAL_ADMIN.md) | Loopback-only operations console. |
@@ -33,6 +34,13 @@ snapshots are not retained as operating instructions.
 [`HANDOFF.md`](HANDOFF.md) is the current continuity document for a fresh
 reviewer. It does not replace the deployment or staging runbooks and must not be
 used to infer that an unrecorded or partial check passed.
+
+Document roles are intentionally separate: `HANDOFF.md` records the current
+snapshot, the acceptance checklist retains durable scenarios and historical
+evidence, runbooks define procedures, and OpenSpec retains product decisions.
+The handoff and the checklist's current metadata may advance with the product;
+historical execution-log evidence must stay explicitly dated rather than being
+rewritten or presented as current proof.
 
 When a document conflicts with current source or configuration, correct or
 remove it in the same change. Do not add another dated handoff file as a second

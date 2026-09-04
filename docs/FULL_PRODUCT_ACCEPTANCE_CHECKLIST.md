@@ -2,7 +2,7 @@
 
 **用途：** Musuw 每次升级、测试环境发布和生产推广前的长期验收基线。覆盖全部可点击/可输入/可切换功能、管理员和运营入口、后台消费链路、单用户私有工作区边界、异常恢复，以及按产品策略必须隐藏的能力。
 
-**当前基线：** WeKnora `main` 固定提交 `81142dfd17b2778087e95d3a317483a2fd909b91`；当前测试环境源码 `8e1c69c13543f95acebb66a5dadb3c21c26ab049`。项目背景、部署边界和已有证据见 [`HANDOFF.md`](HANDOFF.md)。
+**当前基线：** WeKnora `main` 固定提交 `81142dfd17b2778087e95d3a317483a2fd909b91`；已检查实现、CI 和测试环境基线为 `1d215c338c59118b5f032a195edd424365802dfa`。实现、CI、测试环境和生产环境是四种不同状态，当前准确边界见 [`HANDOFF.md`](HANDOFF.md)。
 
 ## 0. 执行规则
 
@@ -112,7 +112,7 @@
 - [ ] `SHELL-008` 会话打开、重命名、pin/unpin、复制 ID/link/Markdown、清空、删除。
 - [ ] `SHELL-009` 批量模式、全选/反选/部分选择、批量删除、取消和失败恢复。
 - [ ] `SHELL-010` 自动标题拒绝长答案/Markdown/URL，刷新后安全持久化。
-- [ ] `SHELL-011` 并发手动重命名不被迟到自动标题覆盖。`PASS-CONTRACT`：2026-09-01 deferred-model 红灯稳定复现迟到自动标题覆盖；repository 原子 `UpdateTitleIfEmpty` CAS 修复后 service/repository 定向套件通过。候选 staging 真实浏览器竞态待跑后升级为 `PASS-CURRENT`。
+- [ ] `SHELL-011` 并发手动重命名不被迟到自动标题覆盖。`PASS-CONTRACT`：2026-09-01 deferred-model 红灯稳定复现迟到自动标题覆盖；repository 原子 `UpdateTitleIfEmpty` CAS 修复后 service/repository 定向套件通过。尚无当前部署版本的真实浏览器竞态证据，因此保持 `PASS-CONTRACT`。
 - [ ] `SHELL-012` 文件拖到 chat→附件，拖到 KB→文档，其他页不误接收；遮罩不残留。
 - [ ] `SHELL-013` New User Guide/Spotlight 开始、下一步、跳过、完成、重开。
 - [ ] `SHELL-014` Standard 邀请 bell badge、打开、刷新、空、错、关闭。
@@ -564,15 +564,15 @@
 
 ## 22. 当前证据与剩余优先级
 
-### 当前已有真实证据，可抽查回归
+### 当前已有证据，可抽查回归
 
-- `PASS-CURRENT`：测试身份、Document KB、AnyDoc DOCX/Markdown、citation、auto-tag、DeepSeek V4 Flash、强制 web retrieval、image OCR、audio ASR、Memory Basic/Advanced/单击保存/recall、Lite Agent tabs、Sandbox/Skills/Env deep-link gate、KB/Memory/Agent/General 亮暗 UI、generated-title safety。
-- `PASS-CONTRACT`：全 Go/AnyDoc、frontend 1017、i18n/typecheck/build、Auth、Storefront、DocReader、CLI/SDK/DSH、migration、release/isolation/security gates。
+- `PASS-CURRENT`（历史部署证据，具体 SHA/时间见执行日志）：测试身份、Document KB、AnyDoc DOCX/Markdown、citation、auto-tag、DeepSeek V4 Flash、强制 web retrieval、image OCR、audio ASR、Memory Basic/Advanced/单击保存/recall、Lite Agent tabs、Sandbox/Skills/Env deep-link gate、KB/Memory/Agent/General 亮暗 UI。
+- `PASS-CONTRACT`：generated-title 原子 CAS；当前套餐文案与官网中文/英文契约；Memory 注销清理；以及各次日志明确记录的 Go/frontend/i18n/typecheck/build/升级账本与发布隔离检查。历史总量不得替代当前候选的 fresh CI。
 
 ### 新无上下文任务必须优先补齐
 
-1. `AGENT-019` 普通 Lite 新建 Agent conditional prefetch 修复的 staging create→reload→chat 回归。
-2. `BILL-003`–`BILL-015` Paddle Sandbox hosted lifecycle。
+1. `BILL-003`–`BILL-015` Paddle Sandbox 完整 hosted lifecycle；2026-09-04 已完成即时取消切片，但仍是 `PARTIAL`。
+2. `1d215c3` 测试环境定向浏览器回归，尤其套餐文案、Memory 注销和额度静默刷新；部署成功不替代这些用户动作。
 3. folder/tag/batch/move/reparse/cancel/delete/download/chunk/revision/summary 全文档动作。
 4. Wiki page/folder/revision/conflict/lint/auto-fix/Obsidian graph。
 5. Chat stop/continue/history/attachment errors/suggestions/citation drawer/title manual-race。
@@ -606,3 +606,8 @@
 | 2026-09-01 17:45–17:50 UTC | full-product acceptance | local candidate / branch worktree | service/repository | `SHELL-011` | PASS-CONTRACT | deferred model race 红灯；atomic empty-title CAS；targeted Go service/repository green | 根因是旧空标题快照的无条件 update；候选 staging 浏览器竞态待跑 |
 | 2026-09-01 18:20–18:26 UTC | full-product acceptance | isolated Standard / current branch | operations console | `OPS-008`、`OPS-009`、`OPS-014` | PARTIAL / PASS-CURRENT | real-data workflow、guarded run-now/CSRF、security/redaction、七页 Axe；Playwright 3/3；frontend 1017/1017 | 修复 Storage 横向滚动键盘可达性及 Runtime Queues 低对比文字/状态；测试改为从真实 runtime 选择可 run-now task，移除 archived fixture 假设 |
 | 2026-09-02 02:00 UTC | product boundary correction | durable acceptance contract | ordinary SaaS + SystemAdmin | `AGENT-016`、`ORG-*`、`SEC-003`、`HIDE-013` | DEFERRED-HIDDEN / N/A | 普通产品确定为单账号、单用户、私有工作区；分享角色矩阵移出上线门 | 后续只验普通 UI 无入口、深链不可达、非必要分享 API 不开放；历史 Standard share 实验保留为上游兼容证据 |
+| 2026-09-04 07:33–07:56 UTC | quota/UI release verification | CI + staging + storefront / `e960b6a` | release operator | `BILL-010`–`BILL-013`、`UI-015`、`ENV-001` | BILL/UI PASS-CONTRACT；ENV PASS-CURRENT | CI `33849276311`、staging-only release `33849915028`、storefront `33849914809`；远端 app/frontend running、restart 0；公开 health 200、staging noindex | 未把环境健康写成额度浏览器行为通过；production job 按契约跳过，生产仍为 `886bd74a` |
+| 2026-09-04 | quota refresh correction | source + targeted tests / ancestor of `e960b6a` | Lite ordinary user | `BILL-010`–`BILL-013`、`UI-015` | PASS-CONTRACT | tenant-scoped entitlement store；stale-while-revalidate；模型完成、成功上传/导入、支付返回和菜单/设置路径后台刷新；菜单与设置消费同一快照 | 当前候选部署后的浏览器时序仍需按条目抽查 |
+| 2026-09-04 | Paddle cancellation slice | Paddle Sandbox | traceable test account | `BILL-003`–`BILL-015` | PARTIAL | Sandbox Max 即时取消；签名通知一次 200；本地降级 Free/canceled、1 GiB、周期清空；迟到更新被忽略；OpenRouter 目标重算 | 平台管理 API key 过期，取消后的浏览器 entitlement JSON 未复读；Live 未动，不能宣称完整 lifecycle |
+| 2026-09-04 09:50–10:15 UTC | account erasure + pricing copy | local + CI + staging / `0a5f3fe` + `1d215c3` | repository + application UI + release operator | `DATA-006`、`WEB-006`、`BILL-001`、`BILL-002`、`ENV-001` | 功能 PASS-CONTRACT；ENV PASS-CURRENT | Memory erasure repository test PASS；Plans/Checkout 直接对照官网活跃中英文文案 2/2；i18n 11/11；typecheck/build PASS；升级账本 1,601 路径、0 blocker，contract 6/6；CI `33860306655`、storefront `33860991086`、staging-only `33860991149` 成功 | 未扩充韩/俄翻译；生产仍为 `886bd74a`，没有推广；部署成功不冒充套餐/注销浏览器动作已验收 |
+| 2026-09-04 | failed-document resource diagnosis | staging trace + source comparison | Lite ordinary user | `DOC-005`、`UI-015` | OBSERVATION / DEFERRED | 初始导入失败无自动应用重试；显式 reparse 产生 attempt 2 并完成；之后只观察到浏览器轮询旧 attempt spans，无 parser/TikHub/VLM/model 重复调用；timeline 与 fixed upstream 字节一致 | 卡片失败而旧 timeline 显示进行中属于陈旧/orphan trace 表现；用户明确暂不修改 |
