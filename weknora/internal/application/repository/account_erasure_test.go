@@ -291,6 +291,27 @@ func TestAccountErasureRepositoryPurgeMatchesCurrentSQLiteSchema(t *testing.T) {
 	require.NoError(t, db.Exec(`INSERT INTO users (id, username, email, password_hash, tenant_id, identity_provider, identity_subject, deletion_requested_at)
 		VALUES ('u-current', 'current', 'current@example.com', '', 7, 'supabase', '00000000-0000-0000-0000-000000000007', CURRENT_TIMESTAMP)`).Error)
 	require.NoError(t, db.Exec(`INSERT INTO tenant_members (user_id, tenant_id, role, status) VALUES ('u-current', 7, 'owner', 'active')`).Error)
+	// Memory is tenant-scoped product data. A completed account purge must
+	// remove every row for the erased personal workspace while preserving rows
+	// belonging to an unrelated tenant.
+	require.NoError(t, db.Exec(`INSERT INTO memory_subjects (id, tenant_id, subject_id) VALUES
+		('memory-subject-current', 7, 'user:u-current'),
+		('memory-subject-foreign', 8, 'user:u-foreign')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO memory_items (id, tenant_id, subject_id, kind, content) VALUES
+		('memory-item-current', 7, 'user:u-current', 'fact', 'erase me'),
+		('memory-item-foreign', 8, 'user:u-foreign', 'fact', 'keep me')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO memory_tombstones (id, tenant_id, subject_id, fingerprint) VALUES
+		('memory-tombstone-current', 7, 'user:u-current', 'fingerprint-current'),
+		('memory-tombstone-foreign', 8, 'user:u-foreign', 'fingerprint-foreign')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO memory_topic_stats (id, tenant_id, subject_id, normalized_key) VALUES
+		('memory-topic-current', 7, 'user:u-current', 'current'),
+		('memory-topic-foreign', 8, 'user:u-foreign', 'foreign')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO memory_doc_affinity (id, tenant_id, subject_id, knowledge_id) VALUES
+		('memory-affinity-current', 7, 'user:u-current', 'knowledge-current'),
+		('memory-affinity-foreign', 8, 'user:u-foreign', 'knowledge-foreign')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO memory_item_embeddings (item_id, tenant_id, subject_id, model_id, dims) VALUES
+		('memory-item-current', 7, 'user:u-current', 'embedding-current', 3),
+		('memory-item-foreign', 8, 'user:u-foreign', 'embedding-foreign', 3)`).Error)
 
 	repo := NewAccountErasureRepository(db)
 	require.NoError(t, repo.Purge(context.Background(), &types.AccountErasureTarget{UserID: "u-current", TenantID: 7}))
@@ -298,6 +319,13 @@ func TestAccountErasureRepositoryPurgeMatchesCurrentSQLiteSchema(t *testing.T) {
 		var count int64
 		require.NoError(t, db.Table(table).Count(&count).Error)
 		require.Zero(t, count, table)
+	}
+	for _, table := range []string{"memory_subjects", "memory_items", "memory_tombstones", "memory_topic_stats", "memory_doc_affinity", "memory_item_embeddings"} {
+		var currentCount, foreignCount int64
+		require.NoError(t, db.Table(table).Where("tenant_id = ?", 7).Count(&currentCount).Error)
+		require.NoError(t, db.Table(table).Where("tenant_id = ?", 8).Count(&foreignCount).Error)
+		require.Zero(t, currentCount, table)
+		require.EqualValues(t, 1, foreignCount, table)
 	}
 
 	// A completed purge must release the local email/username and external-

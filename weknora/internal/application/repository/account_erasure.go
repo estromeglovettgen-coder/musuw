@@ -86,6 +86,12 @@ var accountErasureKnownTables = []string{
 	"resource_access_grants",
 	"tenant_api_keys",
 	"temporary_documents",
+	"memory_subjects",
+	"memory_items",
+	"memory_tombstones",
+	"memory_topic_stats",
+	"memory_doc_affinity",
+	"memory_item_embeddings",
 	"wiki_pages",
 	"wiki_folders",
 	"wiki_page_issues",
@@ -586,6 +592,40 @@ func accountErasurePurgeRows(tx *gorm.DB, present map[string]bool, target *types
 			}
 		}
 		if err := tx.Exec("DELETE FROM knowledge_bases WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+
+	// Memory is tenant-scoped product data. Remove vector/affinity and
+	// tombstone/stat rows before the subjects/items they describe so a retry
+	// cannot leave any personal-memory residue behind.
+	if present["memory_item_embeddings"] {
+		if err := tx.Exec("DELETE FROM memory_item_embeddings WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+	if present["memory_doc_affinity"] {
+		if err := tx.Exec("DELETE FROM memory_doc_affinity WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+	if present["memory_tombstones"] {
+		if err := tx.Exec("DELETE FROM memory_tombstones WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+	if present["memory_topic_stats"] {
+		if err := tx.Exec("DELETE FROM memory_topic_stats WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+	if present["memory_items"] {
+		if err := tx.Exec("DELETE FROM memory_items WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+	if present["memory_subjects"] {
+		if err := tx.Exec("DELETE FROM memory_subjects WHERE tenant_id = ?", tenantID).Error; err != nil {
 			return err
 		}
 	}
