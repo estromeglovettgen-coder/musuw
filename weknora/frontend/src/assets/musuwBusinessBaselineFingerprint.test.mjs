@@ -25,11 +25,12 @@ const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b
 const OPENROUTER_VIDEO_INGESTION_COMMIT = '22052ccf08c5ab2e370d94ea2508359aa367d0fe'
 const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
 const CONSUMER_SURFACE_CHANGE = 'curate-main-consumer-surface'
+const ENTITLEMENT_USAGE_REVALIDATION_CHANGE = 'refresh-entitlement-after-metered-usage'
 
 const LOCKED_BUSINESS_BLOBS = {
-  './business-baselines/ChatIndex.pre-view.vue': 'bfe05d85e3a516bd64afa6d69bfa6f9dddf3e5c5',
+  './business-baselines/ChatIndex.pre-view.vue': 'a678a30cc2dc24f8f48797a0dfb390cbb75e8c88',
   './business-baselines/Input-field.pre-view.vue': '11bc2cb650979eb55e367d370980051fa6caa429',
-  './business-baselines/KnowledgeBase.pre-view.vue': 'caa758fc34397a8babe651688ed6c98f86cb3afe',
+  './business-baselines/KnowledgeBase.pre-view.vue': 'd08464ac13257d540aa2089298a1c472a7650e74',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',
@@ -51,14 +52,15 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
     authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy',
   },
   chatParent: {
+    change: ENTITLEMENT_USAGE_REVALIDATION_CHANGE,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
-    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort',
+    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads',
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
-    change: CONSUMER_SURFACE_CHANGE,
+    change: `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
-    authority: 'WeKnora main 81142df native document import flow extended with managed video file types and server-projected runtime/storage readiness that does not expose hidden infrastructure fields',
+    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, and server-projected runtime/storage readiness that does not expose hidden infrastructure fields',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
@@ -104,11 +106,15 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.resultingBlob,
     gitBlobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
   )
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, ENTITLEMENT_USAGE_REVALIDATION_CHANGE)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBase.pre-view.vue')),
   )
-  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.change, CONSUMER_SURFACE_CHANGE)
+  assert.equal(
+    INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.change,
+    `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}`,
+  )
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.authority, /server-projected runtime\/storage readiness/)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBaseList.resultingBlob,
