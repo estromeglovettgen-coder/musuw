@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -18,15 +19,14 @@ import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom'
 import { openNewUserGuide } from '@/config/contextualGuides'
 import { SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE } from '@/config/settingsAccess'
 import { handoffToExternalAuth } from '@/utils/nativeAuthHandoff'
-import {
-  getCurrentEntitlement,
-  type ConsumerEntitlement,
-} from '@/api/entitlement'
+import { useCurrentEntitlementStore } from '@/stores/entitlement'
 
 const { t } = useI18n()
 const router = useRouter()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
+const entitlementStore = useCurrentEntitlementStore()
+const { entitlement, loading: entitlementLoading } = storeToRefs(entitlementStore)
 const { formatRole, roleIcon } = useRoleLabel()
 const { homeTenantId, isHomeTenant } = useHomeTenant()
 
@@ -58,8 +58,6 @@ const userName = computed(() => userInfo.value.username)
 const userEmail = computed(() => userInfo.value.email)
 const userAvatar = computed(() => userInfo.value.avatar)
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase())
-const entitlement = ref<ConsumerEntitlement | null>(null)
-const entitlementLoading = ref(true)
 const billingIsFree = computed(() =>
   entitlement.value?.plan === 'free'
   // Keep the Lite upgrade affordance stable while the entitlement request is
@@ -260,21 +258,7 @@ const loadUserInfo = async () => {
   }
 }
 
-let entitlementRequestSequence = 0
-const loadEntitlement = async () => {
-  const requestSequence = ++entitlementRequestSequence
-  entitlementLoading.value = true
-  try {
-    const response = await getCurrentEntitlement()
-    if (requestSequence !== entitlementRequestSequence) return
-    entitlement.value = response.data
-    entitlementLoading.value = false
-  } catch {
-    if (requestSequence !== entitlementRequestSequence) return
-    entitlement.value = null
-    entitlementLoading.value = false
-  }
-}
+const loadEntitlement = () => entitlementStore.refresh()
 
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as Node
@@ -288,7 +272,7 @@ const handleClickOutside = (event: MouseEvent) => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   loadUserInfo()
-  void loadEntitlement()
+  void entitlementStore.ensureFresh()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
@@ -349,7 +333,8 @@ onUnmounted(() => {
         <button type="button" class="visual-user-menu__item visual-user-menu__usage-item" @click="handleQuickNav('usage')">
           <t-icon name="chart-line" />
           <span>{{ $t('entitlement.usageMenu') }}</span>
-          <small v-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
+          <small v-if="entitlementLoading">{{ $t('common.loading') }}</small>
+          <small v-else-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
           <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>
         <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" :class="{ 'is-free': billingIsFree }" @click="openPlans">

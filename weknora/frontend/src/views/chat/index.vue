@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, onBeforeUnmount, ref, type SetupContext } from 'vue'
+import { defineComponent, onBeforeUnmount, ref, watch, type SetupContext } from 'vue'
 import LegacyChatBusiness from '@/assets/business-baselines/ChatIndex.pre-view.vue'
 import InputField from '../../components/Input-field.vue'
 import botmsg from './components/botmsg.vue'
@@ -12,6 +12,7 @@ import ChatQuestionMinimap from '@/components/chat/ChatQuestionMinimap.vue'
 import MessageTimestamp from '@/components/chat/MessageTimestamp.vue'
 import { shouldShowConversationTimestamp } from '@/utils/messageTimestamp'
 import ChatHeader from '@/components/ChatHeader.vue'
+import { useCurrentEntitlementStore } from '@/stores/entitlement'
 
 const legacy = LegacyChatBusiness as any
 const legacySetup = legacy.setup
@@ -27,6 +28,15 @@ export default defineComponent({
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      const entitlementStore = useCurrentEntitlementStore()
+      const replyState = (state as any).isReplying
+      const stopEntitlementLifecycleWatch = watch(
+        () => Boolean(replyState?.value),
+        (replying, wasReplying) => {
+          if (replying || wasReplying) entitlementStore.invalidate()
+        },
+        { flush: 'sync' },
+      )
       const minimapTargetId = ref('')
       let minimapFlashTimer: ReturnType<typeof setTimeout> | null = null
       const clearMinimapFlash = () => {
@@ -53,7 +63,10 @@ export default defineComponent({
         if (minimapFlashTimer !== null) clearTimeout(minimapFlashTimer)
         minimapFlashTimer = setTimeout(clearMinimapFlash, 1200)
       }
-      onBeforeUnmount(clearMinimapFlash)
+      onBeforeUnmount(() => {
+        clearMinimapFlash()
+        stopEntitlementLifecycleWatch()
+      })
       return {
         ...state,
         minimapTargetId,

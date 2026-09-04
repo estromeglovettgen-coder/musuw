@@ -76,23 +76,21 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import {
   createPaddlePortalSession,
-  getCurrentEntitlement,
-  type ConsumerEntitlement,
-  type PaddleBillingConfig,
 } from '@/api/entitlement'
 import { useAuthStore } from '@/stores/auth'
+import { useCurrentEntitlementStore } from '@/stores/entitlement'
 
 const { locale, t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
-const entitlement = ref<ConsumerEntitlement | null>(null)
-const billing = ref<PaddleBillingConfig | null>(null)
-const entitlementLoading = ref(true)
+const entitlementStore = useCurrentEntitlementStore()
+const { entitlement, billing, loading: entitlementLoading } = storeToRefs(entitlementStore)
 const portalOpening = ref(false)
 
 const planName = computed(() => t(`entitlement.plans.${entitlement.value?.plan || 'free'}`))
@@ -133,19 +131,7 @@ const formattedResetAt = computed(() => {
 const portalAvailable = computed(() => billing.value?.portal_available === true)
 const formatLimit = (limit: number) => limit > 0 ? String(limit) : t('entitlement.unlimited')
 
-const loadEntitlement = async () => {
-  entitlementLoading.value = true
-  try {
-    const response = await getCurrentEntitlement()
-    entitlement.value = response.data
-    billing.value = response.billing
-  } catch {
-    entitlement.value = null
-    billing.value = null
-  } finally {
-    entitlementLoading.value = false
-  }
-}
+const loadEntitlement = () => entitlementStore.ensureFresh()
 
 const openPlans = () => { void router.push('/plans') }
 

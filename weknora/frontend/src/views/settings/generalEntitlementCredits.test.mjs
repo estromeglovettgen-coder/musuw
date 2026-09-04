@@ -6,6 +6,8 @@ const usageSettings = await readFile(new URL('./UsageBillingSettings.vue', impor
 const settingsShell = await readFile(new URL('./Settings.vue', import.meta.url), 'utf8')
 const userMenu = await readFile(new URL('../../components/UserMenu.vue', import.meta.url), 'utf8')
 const entitlementApi = await readFile(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
+const entitlementStore = await readFile(new URL('../../stores/entitlement.ts', import.meta.url), 'utf8')
+const chatView = await readFile(new URL('../chat/index.vue', import.meta.url), 'utf8')
 const router = await readFile(new URL('../../router/index.ts', import.meta.url), 'utf8')
 const plansPage = await readFile(new URL('../billing/Plans.vue', import.meta.url), 'utf8')
 const referenceIcons = await readFile(new URL('../../assets/musuw-reference-lucide-precision.css', import.meta.url), 'utf8')
@@ -32,8 +34,31 @@ test('opening the account menu refreshes the quota before it is shown', () => {
     /const handleTriggerClick = \(\) => \{[\s\S]*menuVisible\.value = !menuVisible\.value[\s\S]*if \(menuVisible\.value\) void loadEntitlement\(\)/,
   )
   assert.match(userMenu, /clampPercent\(\(remaining \/ total\) \* 100\)/)
-  assert.match(userMenu, /const requestSequence = \+\+entitlementRequestSequence/)
-  assert.match(userMenu, /if \(requestSequence !== entitlementRequestSequence\) return/)
+  assert.match(entitlementStore, /const requestSequence = \+\+activeRequestSequence/)
+  assert.match(entitlementStore, /if \(requestSequence !== activeRequestSequence/)
+  assert.match(
+    userMenu,
+    /<small v-if="entitlementLoading">\{\{ \$t\('common\.loading'\) \}\}<\/small>[\s\S]*<small v-else-if="usageRemainingPercent !== null">/,
+    'the menu must not render its previous quota snapshot while the fresh request is in flight',
+  )
+})
+
+test('account menu and usage settings consume one freshness-scoped entitlement snapshot', () => {
+  assert.match(userMenu, /useCurrentEntitlementStore/)
+  assert.match(userMenu, /entitlementStore\.refresh\(\)/)
+  assert.match(usageSettings, /useCurrentEntitlementStore/)
+  assert.match(usageSettings, /entitlementStore\.ensureFresh\(\)/)
+  assert.doesNotMatch(userMenu, /const entitlement = ref<ConsumerEntitlement/)
+  assert.doesNotMatch(usageSettings, /const entitlement = ref<ConsumerEntitlement/)
+  assert.match(entitlementStore, /CURRENT_ENTITLEMENT_FRESH_MS\s*=\s*2_000/)
+  assert.match(entitlementStore, /if \(inFlight && inFlightScope === scope\) return inFlight/)
+  assert.match(entitlementStore, /if \(requestSequence !== activeRequestSequence \|\| scope !== scopeKey\.value\) return/)
+  assert.match(chatView, /useCurrentEntitlementStore/)
+  assert.match(
+    chatView,
+    /const replyState = \(state as any\)\.isReplying[\s\S]*watch\([\s\S]*Boolean\(replyState\?\.value\)[\s\S]*if \(replying \|\| wasReplying\) entitlementStore\.invalidate\(\)[\s\S]*flush: 'sync'/,
+    'the normalized parent must observe the native reply lifecycle so direct and first-query sends both invalidate quota at start and completion',
+  )
 })
 
 test('the free-plan upgrade affordance keeps a valid visible icon mask', () => {

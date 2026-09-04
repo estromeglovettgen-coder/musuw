@@ -276,7 +276,7 @@ frontend/src/components/SkillFilesDrawer.vue	-	A	100644	6f41bc48af830e8866c96d35
 frontend/src/components/SkillFilesPanel.vue	-	A	100644	4434f9a7f699eeb409da17cb702ff1af00f6d80b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/SkillInstallTimeline.vue	-	A	100644	00238d52d374bcaba6571dfc003cb68b44494ae0	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/components/TenantModelsGuide.vue	M	-	100644	b416b113b8849b6378b8a03600e0a6bc38235423	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/components/UserMenu.vue	M	-	100644	b348b6718d5de93ef98b8d3f4d0e50f7964c4faf	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/components/UserMenu.vue	M	-	100644	32dcbaa84cdecda8289742a073de21a20ae3a6e6	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/chat/ChatQuestionMinimap.test.ts	-	A	100644	bbda23aa11076f938703bd3ffa9d08b16c2a2be6	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/chat/ChatQuestionMinimap.vue	-	A	100644	20d0ec43284415cff917b8979359ddc1ec21e6f9	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/chat/MessageTimestamp.vue	-	A	100644	3972f188d4c60d4116478a401ca4043cfbe98c82	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -467,7 +467,7 @@ frontend/src/views/chat/components/tool-results/WikiEditResult.vue	M	-	100644	ce
 frontend/src/views/chat/components/tool-results/WriteSandboxFileResult.vue	-	A	100644	c0cbc4e02cb7a78bfeadbcd2383b2e58386cab28	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/chat/components/tool-results/tool-results.less	M	-	100644	38e9b77552bef58b26c6755e8528ae4ca7a469a8	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/chat/components/usermsg.vue	M	M	100644	fa8b6d4b701f8840703eccbbdaae329d161db8fb	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-frontend/src/views/chat/index.vue	M	M	100644	6ef89d551ea66911733c5a8627d7decd80b412db	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/views/chat/index.vue	M	M	100644	fe6b395d8d51f7dfd2544441550e1d762a6f3282	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/creatChat/creatChat.vue	M	-	100644	08b662480804a52fd837a50bf46309256f99fe9a	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/dev/MarkdownTestPage.vue	-	M	100644	72e565a41e6548617184dfdd27f2feef6d580106	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/views/embed/EmbedChatCore.vue	-	M	100644	6845877bd8d57dd06e4d14e5ee202a252dabfb6a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -569,14 +569,14 @@ frontend/src/views/settings/StorageBackendSettings.vue	M	-	100644	d9f28ef8a3741e
 frontend/src/views/settings/SystemInfo.vue	M	-	100644	2661d8c6eba5177b63f871673c88594750de8063	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/TenantInfo.vue	M	-	100644	cf9f692c8ef5904f34abceac3c167c0749a75b4a	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/TenantMembers.vue	M	M	100644	25b7b9300fb98cff37e575d6cd95792c8c4bcb55	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-frontend/src/views/settings/UsageBillingSettings.vue	A	-	100644	d77cd4be6ca3ddbfced7cb91e1ca5fe228fd81b8	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/views/settings/UsageBillingSettings.vue	A	-	100644	7497575d21012dd91a52db9864513c4884666630	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/settings/UserProfile.vue	M	M	100644	0935450bd0b1878acb573f2adac76e993982e6d0	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/settings/WeKnoraCloudSettings.vue	M	-	100644	2a726032bef7123d274ff56c94216322cfbabbe8	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/components/McpServiceDialog.vue	M	-	100644	f5204e83c506fc1845d0ab33beb814a3324c6757	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/settings/components/VisualSettingsShell.vue	A	-	100644	7684d863be7b50eebf7ab842d24bc06abc7fd80a	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/settings/envVarState.test.ts	-	A	100644	c95f59ac40f96c4cf7dd85782002f53316c09467	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/settings/envVarState.ts	-	A	100644	04072c70fa2e106df42bab7dfa51e048828745b3	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/views/settings/generalEntitlementCredits.test.mjs	A	-	100644	5825d8e8c9a10b6222142f2f6376201cc10f175a	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/views/settings/generalEntitlementCredits.test.mjs	A	-	100644	4ee17d74ab4c3b1a8c169f6ec0551950ae93103d	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/settings/mcpVisualContract.test.mjs	A	-	100644	d2563658be33cc9ca373ce6610b5556ca4a23b77	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/settings/providerLogos.ts	-	M	100644	53ed76771da57a549de3a976b9730b908afecad0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/settings/settingsNavigation.test.ts	A	-	100644	f3c7ce941b0ee77c183dfbb56039acd311c3e6fe	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
