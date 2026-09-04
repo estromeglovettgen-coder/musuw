@@ -13,6 +13,7 @@ import {
 import {
   OBSIDIAN_NATIVE_RENDER,
   clamp,
+  obsidianGraphProgressionCursor,
   obsidianEase,
   obsidianNodeRadius,
   obsidianNodeScale,
@@ -35,6 +36,8 @@ import {
 import type {
   WikiGraphFitOptions,
   WikiGraphFocusOptions,
+  WikiGraphPlaybackSnapshot,
+  WikiGraphPlaybackState,
   WikiGraphRenderRequest,
   WikiGraphRenderer,
 } from './wikiGraphRenderer.ts'
@@ -47,6 +50,7 @@ import {
 
 interface NativeNode {
   id: string
+  playbackIndex: number
   title: string
   weight: number
   totalLinks: number
@@ -139,6 +143,13 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   private resizeObserver: ResizeObserver | null = null
   private themeObserver: MutationObserver | null = null
   private frameId: number | null = null
+  private progressionFrameId: number | null = null
+  private progressionGeneration = 0
+  private progressionState: WikiGraphPlaybackState = 'idle'
+  private progressionVisibleNodes = 0
+  private progressionLinkTotal = 0
+  private progressionStartedAt = 0
+  private progressionElapsedMs = 0
   private cameraAnimationGeneration = 0
   private request: WikiGraphRenderRequest | null = null
   private nodes: NativeNode[] = []
@@ -149,6 +160,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   private sharedVersion: Int32Array | Uint32Array | null = null
   private workerNodeIds: string[] = []
   private workerIndexById = new Map<string, number>()
+  private expectedWorkerNodeIds: Set<string> | null = null
   private lastSharedVersion = -1
   private selectedSlug: string | null = null
   private hoveredSlug: string | null = null
@@ -242,6 +254,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.world = world
 
     this.buildData(request, positions)
+    this.emitProgression('idle', this.nodes.length)
     this.bindInteractions()
     this.startWorker()
     this.resizeObserver = new ResizeObserver(() => this.resize())
@@ -318,6 +331,61 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.changed()
   }
 
+  startProgression(): void {
+    if (!this.app || this.destroyed) return
+    this.cancelProgression()
+
+    const total = this.nodes.length
+    if (total === 0) {
+      this.emitProgression('complete', 0)
+      return
+    }
+
+    this.resetRenderedGraph()
+    this.progressionVisibleNodes = 1
+    this.progressionElapsedMs = 0
+    this.progressionStartedAt = Date.now()
+    this.progressionState = 'playing'
+    this.emitProgression('playing', 1)
+    this.syncProgressionWorker()
+
+    if (this.prefersReducedMotion()) {
+      this.progressionVisibleNodes = total
+      this.syncProgressionWorker()
+      this.progressionState = 'complete'
+      this.revealProgressionImmediately()
+      this.emitProgression('complete', total)
+      this.changed()
+      return
+    }
+
+    if (total === 1) {
+      this.emitProgression('complete', 1)
+      this.changed()
+      return
+    }
+
+    this.changed()
+    this.queueProgressionFrame()
+  }
+
+  pauseProgression(): void {
+    if (this.progressionState !== 'playing') return
+    this.progressionElapsedMs += Math.max(0, Date.now() - this.progressionStartedAt)
+    this.cancelProgressionFrame()
+    this.progressionState = 'paused'
+    this.emitProgression('paused', this.progressionVisibleNodes)
+  }
+
+  resumeProgression(): void {
+    if (this.progressionState !== 'paused' || !this.app || this.destroyed) return
+    this.progressionStartedAt = Date.now()
+    this.progressionState = 'playing'
+    this.restartSimulation()
+    this.emitProgression('playing', this.progressionVisibleNodes)
+    this.queueProgressionFrame()
+  }
+
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true
@@ -340,7 +408,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     const anchorPosition = request.preserveLayout && request.anchorSlug
       ? positions.get(request.anchorSlug)
       : undefined
-    this.nodes = request.data.nodes.map((source) => {
+    this.nodes = request.data.nodes.map((source, playbackIndex) => {
       const previous = positions.get(source.slug)
       const angle = Math.random() * Math.PI * 2
       const radius = anchorPosition ? 40 : Math.sqrt(Math.random()) * diskRadius
@@ -348,6 +416,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
       const y = previous?.y ?? (anchorPosition?.y ?? 0) + Math.sin(angle) * radius
       return {
         id: source.slug,
+        playbackIndex,
         title: source.title,
         weight: source.link_count,
         totalLinks: source.link_count,
@@ -379,6 +448,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     // adapter as tolerant as the original WeKnora renderer for isolated
     // overview/ego nodes instead of failing the entire canvas.
     const sourceEdges = Array.isArray(request.data.edges) ? request.data.edges : []
+    this.progressionLinkTotal = sourceEdges.length
     const directedEdges = new Set(
       sourceEdges.map(edge => `${edge.source}\u0000${edge.target}`),
     )
@@ -439,9 +509,11 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
           name: 'Obsidian Compatibility Graph Worker',
         })
     worker.onmessage = (event: MessageEvent) => {
+      if (this.worker !== worker) return
       if (event.data?.ignore) return
       if (this.exactWorker && Array.isArray(event.data?.id) && event.data?.buffer) {
         const result = readObsidianWorkerResult(event.data)
+        if (!this.matchesExpectedWorkerNodes(result.ids)) return
         this.workerNodeIds = result.ids
         this.workerIndexById = new Map(result.ids.map((id, index) => [id, index]))
         if (result.version) {
@@ -467,7 +539,9 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
       this.changed()
     }
     worker.onerror = (error) => console.error('Obsidian graph worker failed:', error)
+    this.worker = worker
     if (this.exactWorker) {
+      this.expectedWorkerNodeIds = new Set(this.nodes.map(node => node.id))
       worker.postMessage(buildObsidianWorkerInitMessage(
         this.nodes.map(node => ({ id: node.id, x: node.x, y: node.y })),
         this.edges.map(edge => ({ source: edge.source.id, target: edge.target.id })),
@@ -480,7 +554,41 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
         links: this.edges.map(edge => ({ source: edge.source.id, target: edge.target.id })),
       })
     }
-    this.worker = worker
+  }
+
+  private syncProgressionWorker(): void {
+    if (!this.exactWorker || !this.worker) return
+
+    // Obsidian's data engine re-sends only the currently unlocked prefix to
+    // its graph worker on every progression step. Hidden nodes therefore do
+    // not pull on the layout before they are revealed.
+    const visibleNodes = this.nodes.slice(0, this.progressionVisibleNodes)
+    const visibleIds = new Set(visibleNodes.map(node => node.id))
+    const visibleEdges = this.edges.filter(edge => (
+      visibleIds.has(edge.source.id) && visibleIds.has(edge.target.id)
+    ))
+    this.clearWorkerPositionCache()
+    this.expectedWorkerNodeIds = visibleIds
+    this.worker.postMessage(buildObsidianWorkerInitMessage(
+      visibleNodes.map(node => ({ id: node.id, x: node.x, y: node.y })),
+      visibleEdges.map(edge => ({ source: edge.source.id, target: edge.target.id })),
+      this.settings,
+    ))
+  }
+
+  private matchesExpectedWorkerNodes(ids: string[]): boolean {
+    const expected = this.expectedWorkerNodeIds
+    return expected === null
+      || (ids.length === expected.size && ids.every(id => expected.has(id)))
+  }
+
+  private clearWorkerPositionCache(): void {
+    this.latestPositions = null
+    this.sharedPositions = null
+    this.sharedVersion = null
+    this.workerNodeIds = []
+    this.workerIndexById.clear()
+    this.lastSharedVersion = -1
   }
 
   private initializeNode(node: NativeNode): void {
@@ -807,9 +915,14 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     if (!positions) return
     for (let index = 0; index < this.nodes.length; index += 1) {
       const node = this.nodes[index]
-      const workerIndex = this.workerIndexById.get(node.id) ?? index
-      node.x = positions[workerIndex * 2]
-      node.y = positions[workerIndex * 2 + 1]
+      const mappedIndex = this.workerIndexById.get(node.id)
+      const workerIndex = this.exactWorker ? mappedIndex : (mappedIndex ?? index)
+      if (workerIndex === undefined || workerIndex * 2 + 1 >= positions.length) continue
+      const x = positions[workerIndex * 2]
+      const y = positions[workerIndex * 2 + 1]
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      node.x = x
+      node.y = y
     }
     // SharedArrayBuffer mode publishes one buffer and only increments its
     // atomic version afterwards. Keep rendering while that version changes;
@@ -848,7 +961,11 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   }
 
   private initializeNearestNodes(): void {
-    const unrendered = this.nodes.filter(node => !node.rendered)
+    const progressionActive = this.progressionState === 'playing' || this.progressionState === 'paused'
+    const unrendered = this.nodes.filter(node => (
+      !node.rendered
+      && (!progressionActive || node.playbackIndex < this.progressionVisibleNodes)
+    ))
     if (unrendered.length === 0) return
     const centerX = (this.width / 2 - this.panX) / this.scale
     const centerY = (this.height / 2 - this.panY) / this.scale
@@ -1164,6 +1281,128 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.queueFrame()
   }
 
+  private queueProgressionFrame(): void {
+    if (
+      this.progressionFrameId !== null
+      || this.progressionState !== 'playing'
+      || this.destroyed
+    ) return
+    const generation = this.progressionGeneration
+    this.progressionFrameId = requestAnimationFrame(() => this.advanceProgression(generation))
+  }
+
+  private advanceProgression(generation: number): void {
+    if (
+      generation !== this.progressionGeneration
+      || this.progressionState !== 'playing'
+      || this.destroyed
+    ) return
+    this.progressionFrameId = null
+    const elapsed = this.progressionElapsedMs + Math.max(0, Date.now() - this.progressionStartedAt)
+    const next = obsidianGraphProgressionCursor(
+      elapsed,
+      this.nodes.length,
+      this.progressionLinkTotal,
+    )
+    const advanced = next !== this.progressionVisibleNodes
+    if (advanced) {
+      this.progressionVisibleNodes = next
+      this.syncProgressionWorker()
+      this.changed()
+    }
+    if (next >= this.nodes.length) {
+      this.emitProgression('complete', next)
+      return
+    }
+    if (advanced) {
+      this.emitProgression('playing', next)
+    }
+    this.queueProgressionFrame()
+  }
+
+  private emitProgression(state: WikiGraphPlaybackState, visible: number): void {
+    this.progressionState = state
+    this.progressionVisibleNodes = visible
+    const snapshot: WikiGraphPlaybackSnapshot = {
+      state,
+      visible,
+      total: this.nodes.length,
+    }
+    this.request?.callbacks.onPlaybackChange?.(snapshot)
+  }
+
+  private prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  }
+
+  private resetRenderedGraph(): void {
+    const dispose = (
+      object: { removeFromParent(): unknown; destroy(options?: { children?: boolean }): void } | null,
+      children = false,
+    ) => {
+      if (!object) return
+      object.removeFromParent()
+      object.destroy(children ? { children: true } : undefined)
+    }
+
+    this.dragState = null
+    this.hoveredSlug = null
+    for (const edge of this.edges) {
+      dispose(edge.container, true)
+      dispose(edge.arrow)
+      dispose(edge.reverseArrow)
+      edge.rendered = false
+      edge.container = null
+      edge.line = null
+      edge.arrow = null
+      edge.reverseArrow = null
+    }
+    for (const node of this.nodes) {
+      dispose(node.circle)
+      dispose(node.label)
+      dispose(node.outline)
+      dispose(node.expansionRing)
+      dispose(node.bloomButton, true)
+      node.rendered = false
+      node.fadeAlpha = 0
+      node.labelLift = 0
+      node.circle = null
+      node.label = null
+      node.outline = null
+      node.expansionRing = null
+      node.bloomButton = null
+    }
+  }
+
+  private revealProgressionImmediately(): void {
+    for (const node of this.nodes) {
+      this.initializeNode(node)
+      node.fadeAlpha = 1
+    }
+    for (const edge of this.edges) {
+      this.initializeEdge(edge)
+      if (edge.line) edge.line.alpha = 1
+      if (edge.arrow) edge.arrow.alpha = 0.5
+      if (edge.reverseArrow) edge.reverseArrow.alpha = 0.5
+    }
+  }
+
+  private cancelProgressionFrame(): void {
+    this.progressionGeneration += 1
+    if (this.progressionFrameId !== null) cancelAnimationFrame(this.progressionFrameId)
+    this.progressionFrameId = null
+  }
+
+  private cancelProgression(): void {
+    this.cancelProgressionFrame()
+    this.progressionState = 'idle'
+    this.progressionVisibleNodes = this.nodes.length
+    this.progressionStartedAt = 0
+    this.progressionElapsedMs = 0
+  }
+
   private bindThemeObserver(): void {
     if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return
     this.themeObserver = new MutationObserver(() => this.refreshTheme())
@@ -1212,6 +1451,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
 
   private teardownRuntime(): void {
     this.cameraAnimationGeneration += 1
+    this.cancelProgression()
     if (this.frameId !== null) cancelAnimationFrame(this.frameId)
     this.frameId = null
     if (this.hoverLeaveTimer) clearTimeout(this.hoverLeaveTimer)
@@ -1231,17 +1471,14 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.canvas = null
     this.background = null
     this.world = null
-    this.latestPositions = null
-    this.sharedPositions = null
-    this.sharedVersion = null
-    this.workerNodeIds = []
-    this.workerIndexById.clear()
-    this.lastSharedVersion = -1
+    this.clearWorkerPositionCache()
+    this.expectedWorkerNodeIds = null
     this.dragState = null
     this.panState = null
     this.nodes = []
     this.nodeLookup.clear()
     this.edges = []
+    this.progressionLinkTotal = 0
     this.idleFrames = 0
     this.exactWorker = false
     this.container.replaceChildren()

@@ -66,6 +66,34 @@
         </div>
       </section>
 
+      <section class="graph-control-section graph-playback-section">
+        <div class="graph-playback-heading">
+          <div class="graph-playback-title">
+            <t-icon name="animation-1" />
+            <span>{{ t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackTitle') }}</span>
+          </div>
+          <span class="graph-playback-progress" aria-live="polite">
+            {{ t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackProgress', {
+              visible: playback.visible,
+              total: playback.total,
+            }) }}
+          </span>
+        </div>
+        <p class="graph-playback-description">
+          {{ t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackDescription') }}
+        </p>
+        <button
+          type="button"
+          class="playback-button"
+          :disabled="playback.total === 0"
+          :aria-label="playbackActionLabel"
+          @click="handlePlaybackAction"
+        >
+          <t-icon :name="playbackActionIcon" />
+          <span>{{ playbackActionLabel }}</span>
+        </button>
+      </section>
+
       <section class="graph-control-section">
         <button type="button" class="tree-item-self" @click="toggleCollapse('collapse-forces')">
           <t-icon :name="modelValue['collapse-forces'] ? 'chevron-right' : 'chevron-down'" />
@@ -104,10 +132,6 @@
             :step="1"
             @change="update('linkDistance', $event)"
           />
-          <button type="button" class="restart-button" @click="emit('animate')">
-            <t-icon name="refresh" />
-            {{ t('knowledgeEditor.wikiBrowser.obsidianGraph.animate') }}
-          </button>
         </div>
       </section>
     </div>
@@ -115,8 +139,9 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h } from 'vue'
+import { computed, defineComponent, h } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { WikiGraphPlaybackSnapshot } from './wikiGraphRenderer.ts'
 import type { ObsidianGraphSettings } from './obsidianGraphSettings.ts'
 
 const GraphSlider = defineComponent({
@@ -148,15 +173,49 @@ const GraphSlider = defineComponent({
 
 const props = defineProps<{
   modelValue: ObsidianGraphSettings
+  playback: WikiGraphPlaybackSnapshot
 }>()
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: ObsidianGraphSettings): void
   (event: 'reset'): void
-  (event: 'animate'): void
+  (event: 'play'): void
+  (event: 'pause'): void
+  (event: 'resume'): void
 }>()
 
 const { t } = useI18n()
+
+const playbackActionLabel = computed(() => {
+  if (props.playback.state === 'playing') {
+    return t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackPause')
+  }
+  if (props.playback.state === 'paused') {
+    return t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackResume')
+  }
+  if (props.playback.state === 'complete') {
+    return t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackReplay')
+  }
+  return t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackPlay')
+})
+
+const playbackActionIcon = computed(() => {
+  if (props.playback.state === 'playing') return 'pause-circle'
+  if (props.playback.state === 'complete') return 'refresh'
+  return 'play-circle'
+})
+
+function handlePlaybackAction(): void {
+  if (props.playback.state === 'playing') {
+    emit('pause')
+    return
+  }
+  if (props.playback.state === 'paused') {
+    emit('resume')
+    return
+  }
+  emit('play')
+}
 
 function update<K extends keyof ObsidianGraphSettings>(
   key: K,
@@ -318,14 +377,49 @@ button {
   box-shadow: 0 0 0 2px var(--td-brand-color-focus);
 }
 
-.restart-button {
+.graph-playback-heading,
+.graph-playback-title {
+  display: inline-flex;
+  align-items: center;
+}
+
+.graph-playback-heading {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 26px;
+}
+
+.graph-playback-title {
+  gap: 6px;
+  color: var(--td-text-color-primary);
+  font-weight: 500;
+}
+
+.graph-playback-title :deep(.t-icon) {
+  color: var(--td-brand-color);
+}
+
+.graph-playback-progress {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-playback-description {
+  margin: 3px 0 8px;
+  color: var(--td-text-color-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.playback-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   width: 100%;
   min-height: 30px;
-  margin: 6px 0 2px;
+  margin: 0 0 2px;
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-default, 3px);
   color: var(--td-text-color-primary);
@@ -333,9 +427,15 @@ button {
   cursor: pointer;
 }
 
-.restart-button:hover {
+.playback-button:hover:not(:disabled) {
   border-color: var(--td-brand-color);
   color: var(--td-brand-color);
   background: var(--td-bg-color-container-hover);
+}
+
+.playback-button:disabled {
+  color: var(--td-text-color-disabled);
+  background: var(--td-bg-color-secondarycontainer);
+  cursor: not-allowed;
 }
 </style>

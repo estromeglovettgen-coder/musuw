@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { createDefaultObsidianGraphSettings } from './obsidianGraphSettings.ts'
@@ -8,6 +10,17 @@ import {
   buildObsidianWorkerInitMessage,
   readObsidianWorkerResult,
 } from './obsidianGraphWorkerProtocol.ts'
+
+test('keeps the local Obsidian 1.13.7 worker byte-for-byte unchanged', () => {
+  const worker = readFileSync(new URL(
+    '../../../../../public/vendor/obsidian-1.13.7/graph-sim.js',
+    import.meta.url,
+  ))
+  assert.equal(
+    createHash('sha256').update(worker).digest('hex'),
+    '549be2f69710af360d521c92b80c83718f673594d3dc2255a65e251199eee25d',
+  )
+})
 
 test('init message matches the vendored Obsidian worker protocol', () => {
   const message = buildObsidianWorkerInitMessage(

@@ -34,3 +34,11 @@
 - [ ] 6.2 Verify the running Musuw graph after authentication: both themes, persistence, drag propagation, all original controls, source drawer, bloom, and arrows
   - Musuw's full local stack is running at `http://localhost:4190`; authenticated graph inspection remains pending because the fresh local origin is currently at the login screen.
 - [x] 6.3 Run one consolidated adversarial review and fix all current blockers
+
+## 7. Obsidian growth playback block
+
+- [x] 7.1 Add red contract/unit tests for the standalone settings block, play/pause/resume/replay state transitions, progress reporting, exact clamp/RAF pacing, stable API-order playback, reduced-motion completion, Worker-prefix synchronization, single-node completion, and teardown cancellation
+- [x] 7.2 Port the audited Obsidian progression state machine at the renderer seam while keeping the local `graph-sim.js` Worker unchanged and excluding private/`UNLICENSED` `app.js` source
+- [x] 7.3 Wire renderer/controller callbacks into WikiBrowser and expose one state-aware playback action plus visible/total progress in the independent graph-settings block; add translations and preserve all existing graph controls
+- [x] 7.4 Verify playback behavior with focused and full tests, type checking, production build, diff checks, and a runtime harness using the real settings component, renderer, and exact Worker
+  - Full authenticated graph-route verification remains tracked by 6.2 because the fresh local origin currently redirects to login.

@@ -180,12 +180,25 @@ export interface WikiGraphPointerModifiers {
   shiftKey: boolean
 }
 
+export type WikiGraphPlaybackState = 'idle' | 'playing' | 'paused' | 'complete'
+
+export interface WikiGraphPlaybackSnapshot {
+  state: WikiGraphPlaybackState
+  visible: number
+  total: number
+}
+
+export function createIdleWikiGraphPlaybackSnapshot(total = 0): WikiGraphPlaybackSnapshot {
+  return { state: 'idle', visible: total, total }
+}
+
 export interface WikiGraphRendererCallbacks {
   onNodeClick: (slug: string, modifiers: WikiGraphPointerModifiers) => void
   onNodeDoubleClick: (slug: string) => void
   onNodeHover: (slug: string | null) => void
   onStageClick: () => void
   onCameraScaleChange?: (scale: number) => void
+  onPlaybackChange?: (snapshot: WikiGraphPlaybackSnapshot) => void
 }
 
 export interface WikiGraphRenderRequest {
@@ -263,6 +276,9 @@ export interface WikiGraphRenderer {
   setSelection(selectedSlug: string | null, hoveredSlug?: string | null): void
   setObsidianSettings?(settings: ObsidianGraphSettings): void
   restartSimulation?(): void
+  startProgression?(): void
+  pauseProgression?(): void
+  resumeProgression?(): void
   destroy(): void
 }
 
@@ -360,6 +376,18 @@ export class WikiGraphRendererController {
 
   restartSimulation(): void {
     this.active?.renderer.restartSimulation?.()
+  }
+
+  startProgression(): void {
+    this.active?.renderer.startProgression?.()
+  }
+
+  pauseProgression(): void {
+    this.active?.renderer.pauseProgression?.()
+  }
+
+  resumeProgression(): void {
+    this.active?.renderer.resumeProgression?.()
   }
 
   destroy(): void {

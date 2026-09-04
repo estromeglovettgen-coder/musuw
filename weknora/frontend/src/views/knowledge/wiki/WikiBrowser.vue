@@ -160,8 +160,11 @@
             <ObsidianGraphSettingsPanel
               v-if="graphReady"
               v-model="obsidianGraphSettings"
+              :playback="graphPlayback"
               @reset="resetObsidianGraphSettings"
-              @animate="animateObsidianGraph"
+              @play="startObsidianGraphProgression"
+              @pause="pauseObsidianGraphProgression"
+              @resume="resumeObsidianGraphProgression"
             />
           </div>
           <template v-if="graphStatusCard">
@@ -1290,6 +1293,8 @@ import ObsidianGraphSettingsPanel from "./graph/ObsidianGraphSettingsPanel.vue";
 import {
   DEFAULT_WIKI_GRAPH_STYLE,
   WikiGraphRendererController,
+  createIdleWikiGraphPlaybackSnapshot,
+  type WikiGraphPlaybackSnapshot,
   type WikiGraphPointerModifiers,
 } from "./graph/wikiGraphRenderer";
 import {
@@ -1497,6 +1502,7 @@ const drawerBodyRef = ref<HTMLElement | null>(null);
 const loading = ref(false);
 const graphLoading = ref(false);
 const graphReady = ref(false);
+const graphPlayback = ref<WikiGraphPlaybackSnapshot>(createIdleWikiGraphPlaybackSnapshot());
 const obsidianGraphSettings = ref<ObsidianGraphSettings>(
   loadObsidianGraphSettings(props.knowledgeBaseId),
 );
@@ -4306,8 +4312,24 @@ function resetObsidianGraphSettings() {
   };
 }
 
-function animateObsidianGraph() {
-  graphRendererController?.restartSimulation();
+function handleObsidianGraphPlaybackChange(snapshot: WikiGraphPlaybackSnapshot) {
+  graphPlayback.value = snapshot;
+}
+
+function resetObsidianGraphPlayback(total = 0) {
+  graphPlayback.value = createIdleWikiGraphPlaybackSnapshot(total);
+}
+
+function startObsidianGraphProgression() {
+  graphRendererController?.startProgression();
+}
+
+function pauseObsidianGraphProgression() {
+  graphRendererController?.pauseProgression();
+}
+
+function resumeObsidianGraphProgression() {
+  graphRendererController?.resumeProgression();
 }
 
 function formatDate(dateStr: string) {
@@ -4395,6 +4417,7 @@ const graphRendererCallbacks = {
   onNodeHover: handleRendererNodeHover,
   onStageClick: handleRendererStageClick,
   onCameraScaleChange: handleRendererCameraScaleChange,
+  onPlaybackChange: handleObsidianGraphPlaybackChange,
 }
 
 function disposeGraphRenderer() {
@@ -4403,6 +4426,7 @@ function disposeGraphRenderer() {
   graphRendererController?.destroy()
   graphRendererController = null
   graphRendererContainer = null
+  resetObsidianGraphPlayback()
 }
 
 async function renderGraph(opts: RenderGraphOpts = {}): Promise<boolean> {

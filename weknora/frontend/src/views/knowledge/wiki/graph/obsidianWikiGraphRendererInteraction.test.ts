@@ -390,3 +390,274 @@ test('releases renderer-owned text textures through the public destroy lifecycle
 
   assert.deepEqual(destroyCalls, [[false, { children: true }]])
 })
+
+test('plays, pauses and resumes the audited node progression without refetching graph data', () => {
+  const renderer = createRenderer()
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame
+  const originalDateNow = Date.now
+  let now = 0
+  let nextFrame: FrameRequestCallback | null = null
+  const cancelled: number[] = []
+  const snapshots: Array<{ state: string; visible: number; total: number }> = []
+  let resets = 0
+
+  globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    nextFrame = callback
+    return 41
+  }) as typeof requestAnimationFrame
+  globalThis.cancelAnimationFrame = ((id: number) => cancelled.push(id)) as typeof cancelAnimationFrame
+  Date.now = () => now
+
+  renderer.app = {}
+  renderer.exactWorker = true
+  renderer.nodes = [{}, {}, {}]
+  renderer.edges = []
+  renderer.request = rendererRequest({ nodes: [], edges: [] }, {
+    callbacks: {
+      onNodeClick: () => undefined,
+      onNodeDoubleClick: () => undefined,
+      onNodeHover: () => undefined,
+      onStageClick: () => undefined,
+      onPlaybackChange: (snapshot: { state: string; visible: number; total: number }) => {
+        snapshots.push({ ...snapshot })
+      },
+    },
+  })
+  renderer.resetRenderedGraph = () => { resets += 1 }
+  renderer.changed = () => undefined
+  renderer.prefersReducedMotion = () => false
+
+  try {
+    renderer.startProgression()
+    assert.equal(resets, 1)
+    assert.deepEqual(snapshots.at(-1), { state: 'playing', visible: 1, total: 3 })
+
+    now = 100
+    renderer.pauseProgression()
+    assert.deepEqual(snapshots.at(-1), { state: 'paused', visible: 1, total: 3 })
+    assert.deepEqual(cancelled, [41])
+
+    now = 1_000
+    renderer.resumeProgression()
+    assert.deepEqual(snapshots.at(-1), { state: 'playing', visible: 1, total: 3 })
+
+    now = 1_100
+    assert.ok(nextFrame)
+    ;(nextFrame as FrameRequestCallback)(now)
+    assert.deepEqual(snapshots.at(-1), { state: 'playing', visible: 2, total: 3 })
+
+    now = 1_300
+    assert.ok(nextFrame)
+    ;(nextFrame as FrameRequestCallback)(now)
+    assert.deepEqual(snapshots.at(-1), { state: 'complete', visible: 3, total: 3 })
+    assert.equal(resets, 1, 'resume must continue the same in-memory graph instead of rebuilding it')
+
+    now = 2_000
+    renderer.startProgression()
+    assert.equal(resets, 2, 'play after completion must replay from the first node')
+    assert.deepEqual(snapshots.at(-1), { state: 'playing', visible: 1, total: 3 })
+    renderer.cancelProgression()
+  } finally {
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame
+    Date.now = originalDateNow
+  }
+})
+
+test('reduced motion completes progression immediately and reports every node visible', () => {
+  const renderer = createRenderer()
+  const snapshots: Array<{ state: string; visible: number; total: number }> = []
+  renderer.app = {}
+  renderer.nodes = [{}, {}, {}, {}]
+  renderer.edges = []
+  renderer.request = rendererRequest({ nodes: [], edges: [] }, {
+    callbacks: {
+      onNodeClick: () => undefined,
+      onNodeDoubleClick: () => undefined,
+      onNodeHover: () => undefined,
+      onStageClick: () => undefined,
+      onPlaybackChange: (snapshot: { state: string; visible: number; total: number }) => {
+        snapshots.push({ ...snapshot })
+      },
+    },
+  })
+  renderer.resetRenderedGraph = () => undefined
+  renderer.changed = () => undefined
+  renderer.prefersReducedMotion = () => true
+
+  renderer.startProgression()
+
+  assert.deepEqual(snapshots, [
+    { state: 'playing', visible: 1, total: 4 },
+    { state: 'complete', visible: 4, total: 4 },
+  ])
+})
+
+test('a single-node graph completes without leaving a progression frame running forever', () => {
+  const renderer = createRenderer()
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame
+  let scheduled = 0
+  const snapshots: Array<{ state: string; visible: number; total: number }> = []
+  globalThis.requestAnimationFrame = (() => {
+    scheduled += 1
+    return 91
+  }) as typeof requestAnimationFrame
+  renderer.app = {}
+  renderer.nodes = [{ id: 'only', x: 0, y: 0 }]
+  renderer.edges = []
+  renderer.request = rendererRequest({ nodes: [], edges: [] }, {
+    callbacks: {
+      onNodeClick: () => undefined,
+      onNodeDoubleClick: () => undefined,
+      onNodeHover: () => undefined,
+      onStageClick: () => undefined,
+      onPlaybackChange: (snapshot: { state: string; visible: number; total: number }) => {
+        snapshots.push({ ...snapshot })
+      },
+    },
+  })
+  renderer.resetRenderedGraph = () => undefined
+  renderer.changed = () => undefined
+  renderer.prefersReducedMotion = () => false
+
+  try {
+    renderer.startProgression()
+    assert.deepEqual(snapshots.at(-1), { state: 'complete', visible: 1, total: 1 })
+    assert.equal(scheduled, 0)
+    assert.equal(renderer.progressionFrameId, null)
+  } finally {
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame
+  }
+})
+
+test('feeds only the unlocked node prefix and its internal edges to the exact Worker', () => {
+  const renderer = createRenderer()
+  const messages: any[] = []
+  const first = { id: 'first', x: 1, y: 2 }
+  const second = { id: 'second', x: 3, y: 4 }
+  const third = { id: 'third', x: 5, y: 6 }
+  renderer.exactWorker = true
+  renderer.worker = { postMessage: (message: unknown) => messages.push(message) }
+  renderer.nodes = [first, second, third]
+  renderer.edges = [
+    { source: first, target: second },
+    { source: second, target: third },
+  ]
+  renderer.progressionVisibleNodes = 2
+  renderer.latestPositions = new Float32Array([90, 91, 92, 93, 94, 95])
+  renderer.sharedPositions = new Float32Array([80, 81, 82, 83, 84, 85])
+  renderer.sharedVersion = new Uint32Array([7])
+  renderer.workerIndexById = new Map([['third', 2]])
+
+  renderer.syncProgressionWorker()
+
+  assert.deepEqual(Object.keys(messages[0].nodes), ['first', 'second'])
+  assert.deepEqual(messages[0].links, [['first', 'second']])
+  assert.equal(renderer.latestPositions, null)
+  assert.equal(renderer.sharedPositions, null)
+  assert.equal(renderer.sharedVersion, null)
+  assert.equal(renderer.workerIndexById.size, 0)
+  assert.equal(renderer.matchesExpectedWorkerNodes(['first', 'second']), true)
+  assert.equal(
+    renderer.matchesExpectedWorkerNodes(['first', 'second', 'third']),
+    false,
+    'a queued full-graph result from before replay must not overwrite prefix coordinates',
+  )
+})
+
+test('keeps hidden-node coordinates intact while the exact Worker returns a shorter prefix', () => {
+  const renderer = createRenderer()
+  renderer.exactWorker = true
+  renderer.latestPositions = new Float32Array([11, 12])
+  renderer.workerIndexById = new Map([['first', 0]])
+  renderer.nodes = [
+    { id: 'first', x: 1, y: 2 },
+    { id: 'hidden', x: 30, y: 40 },
+  ]
+
+  renderer.applyWorkerPositions()
+
+  assert.deepEqual(
+    renderer.nodes.map((node: { x: number; y: number }) => ({ x: node.x, y: node.y })),
+    [{ x: 11, y: 12 }, { x: 30, y: 40 }],
+  )
+})
+
+test('unlocks only the stable API-order node prefix during progression', () => {
+  const renderer = createRenderer()
+  const initialized: string[] = []
+  renderer.width = 100
+  renderer.height = 100
+  renderer.scale = 1
+  renderer.panX = 50
+  renderer.panY = 50
+  renderer.progressionState = 'playing'
+  renderer.progressionVisibleNodes = 2
+  renderer.nodes = [
+    { id: 'first', playbackIndex: 0, rendered: false, x: 0, y: 0 },
+    { id: 'second', playbackIndex: 1, rendered: false, x: 1, y: 0 },
+    { id: 'third', playbackIndex: 2, rendered: false, x: 2, y: 0 },
+  ]
+  renderer.initializeNode = (node: { id: string; rendered: boolean }) => {
+    node.rendered = true
+    initialized.push(node.id)
+  }
+
+  renderer.initializeNearestNodes()
+  assert.deepEqual(initialized, ['first', 'second'])
+
+  renderer.progressionVisibleNodes = 3
+  renderer.initializeNearestNodes()
+  assert.deepEqual(initialized, ['first', 'second', 'third'])
+})
+
+test('destroy cancels progression and stale scheduled callbacks cannot report again', () => {
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame
+  let scheduled: FrameRequestCallback | null = null
+  const cancelled: number[] = []
+  const snapshots: unknown[] = []
+  globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    scheduled = callback
+    return 73
+  }) as typeof requestAnimationFrame
+  globalThis.cancelAnimationFrame = ((id: number) => cancelled.push(id)) as typeof cancelAnimationFrame
+
+  const container = {
+    dataset: { graphVisual: 'obsidian-exact', graphStyle: 'obsidian-exact' },
+    style: { removeProperty: () => undefined },
+    replaceChildren: () => undefined,
+  } as unknown as HTMLElement
+  const renderer = new ObsidianWikiGraphRenderer(container) as any
+  renderer.app = { destroy: () => undefined }
+  renderer.nodes = [{}, {}]
+  renderer.edges = []
+  renderer.request = rendererRequest({ nodes: [], edges: [] }, {
+    callbacks: {
+      onNodeClick: () => undefined,
+      onNodeDoubleClick: () => undefined,
+      onNodeHover: () => undefined,
+      onStageClick: () => undefined,
+      onPlaybackChange: (snapshot: unknown) => snapshots.push(snapshot),
+    },
+  })
+  renderer.resetRenderedGraph = () => undefined
+  renderer.changed = () => undefined
+  renderer.prefersReducedMotion = () => false
+
+  try {
+    renderer.startProgression()
+    const callback = scheduled as FrameRequestCallback | null
+    assert.ok(callback)
+    assert.equal(snapshots.length, 1)
+
+    renderer.destroy()
+    assert.deepEqual(cancelled, [73])
+    callback(performance.now())
+    assert.equal(snapshots.length, 1)
+  } finally {
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame
+  }
+})

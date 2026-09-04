@@ -59,6 +59,15 @@ function fakeRenderer(name: string, calls: string[]): WikiGraphRenderer {
     restartSimulation() {
       calls.push(`${name}:restart`)
     },
+    startProgression() {
+      calls.push(`${name}:play`)
+    },
+    pauseProgression() {
+      calls.push(`${name}:pause`)
+    },
+    resumeProgression() {
+      calls.push(`${name}:resume`)
+    },
     destroy() {
       calls.push(`${name}:destroy`)
     },
@@ -108,7 +117,7 @@ test('converts resolved WeKnora theme colors into Pixi RGB values', () => {
   assert.equal(parseGraphThemeColor('not-a-color', 0x123456), 0x123456)
 })
 
-test('forwards live native settings and simulation restart through the active renderer', async () => {
+test('forwards live native settings and progression controls through the active renderer', async () => {
   const calls: string[] = []
   const factories: WikiGraphRendererFactories = {
     obsidian: async () => fakeRenderer('obsidian', calls),
@@ -124,11 +133,17 @@ test('forwards live native settings and simulation restart through the active re
     linkDistance: 300,
   })
   controller.restartSimulation()
+  controller.startProgression()
+  controller.pauseProgression()
+  controller.resumeProgression()
 
   assert.deepEqual(calls, [
     'obsidian:render:summary/alpha',
     'obsidian:settings:300',
     'obsidian:restart',
+    'obsidian:play',
+    'obsidian:pause',
+    'obsidian:resume',
   ])
 })
 

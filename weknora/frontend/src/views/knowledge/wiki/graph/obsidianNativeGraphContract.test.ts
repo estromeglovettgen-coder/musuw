@@ -4,6 +4,8 @@ import test from 'node:test'
 import {
   OBSIDIAN_NATIVE_PHYSICS,
   OBSIDIAN_NATIVE_RENDER,
+  obsidianGraphProgressionCursor,
+  obsidianGraphProgressionSpeed,
   obsidianEase,
   obsidianNodeRadius,
   obsidianNodeScale,
@@ -39,4 +41,17 @@ test('matches native wheel normalization and inertial interpolation', () => {
   assert.ok(Math.abs(obsidianEase(0, 1) - 0.1) < Number.EPSILON)
   assert.equal(OBSIDIAN_NATIVE_RENDER.dragThresholdSquared, 25)
   assert.equal(OBSIDIAN_NATIVE_RENDER.progressiveNodeBatch, 50)
+})
+
+test('matches the audited Obsidian timelapse progression formula', () => {
+  assert.equal(obsidianGraphProgressionSpeed(0), 5)
+  assert.equal(obsidianGraphProgressionSpeed(100), 5)
+  assert.equal(obsidianGraphProgressionSpeed(400), 10)
+  assert.equal(obsidianGraphProgressionSpeed(1_000_000), 100)
+
+  assert.equal(obsidianGraphProgressionCursor(0, 10, 100), 1)
+  assert.equal(obsidianGraphProgressionCursor(199, 10, 100), 1)
+  assert.equal(obsidianGraphProgressionCursor(200, 10, 100), 2)
+  assert.equal(obsidianGraphProgressionCursor(10_000, 10, 100), 10)
+  assert.equal(obsidianGraphProgressionCursor(10_000, 0, 100), 0)
 })

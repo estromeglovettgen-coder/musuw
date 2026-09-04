@@ -37,8 +37,41 @@ export const OBSIDIAN_NATIVE_RENDER = Object.freeze({
   idleFrameLimit: 60,
 })
 
+/**
+ * Observable timelapse constants from Obsidian 1.13.7's
+ * `dataEngine.renderProgression()` path. The application bundle owns the
+ * counter; the vendored graph Worker continues to own only force simulation.
+ */
+export const OBSIDIAN_GRAPH_PROGRESSION = Object.freeze({
+  initial: 1,
+  speedFactor: 0.5,
+  minSpeed: 5,
+  maxSpeed: 100,
+})
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+export function obsidianGraphProgressionSpeed(totalLinks: number): number {
+  return clamp(
+    OBSIDIAN_GRAPH_PROGRESSION.speedFactor * Math.sqrt(Math.max(0, totalLinks)),
+    OBSIDIAN_GRAPH_PROGRESSION.minSpeed,
+    OBSIDIAN_GRAPH_PROGRESSION.maxSpeed,
+  )
+}
+
+export function obsidianGraphProgressionCursor(
+  elapsedMs: number,
+  totalNodes: number,
+  totalLinks: number,
+): number {
+  if (totalNodes <= 0) return 0
+  return Math.min(
+    totalNodes,
+    OBSIDIAN_GRAPH_PROGRESSION.initial
+      + Math.floor(obsidianGraphProgressionSpeed(totalLinks) * Math.max(0, elapsedMs) / 1_000),
+  )
 }
 
 /** Obsidian treats this value as a radius, not a diameter. */

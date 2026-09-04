@@ -77,10 +77,33 @@ test('graph interactions close settings through one capture boundary without clo
   const drawerOpen = functionSlice('async function openGraphDrawer', 'function handleGraphDrawerClick')
   assert.match(drawerOpen, /closeObsidianGraphSettings\(\)/)
 
-  const reset = functionSlice('function resetObsidianGraphSettings', 'function animateObsidianGraph')
+  const reset = functionSlice('function resetObsidianGraphSettings', 'function startObsidianGraphProgression')
   assert.match(
     reset,
     /close:\s*obsidianGraphSettings\.value\.close/,
     'resetting graph physics must preserve the currently open settings panel',
   )
+})
+
+test('growth playback is a standalone settings block with one state-aware action', () => {
+  const display = graphSettingsPanel.indexOf("toggleCollapse('collapse-display')")
+  const playback = graphSettingsPanel.indexOf('graph-playback-section')
+  const forces = graphSettingsPanel.indexOf("toggleCollapse('collapse-forces')")
+
+  assert.ok(display >= 0, 'display settings must remain present')
+  assert.ok(playback > display, 'playback must follow display settings')
+  assert.ok(forces > playback, 'playback must be independent from force settings')
+  assert.match(graphSettingsPanel, /playback:\s*WikiGraphPlaybackSnapshot/)
+  assert.match(graphSettingsPanel, /handlePlaybackAction/)
+  assert.match(graphSettingsPanel, /playback\.state === 'playing'/)
+  assert.match(graphSettingsPanel, /emit\('pause'\)/)
+  assert.match(graphSettingsPanel, /emit\('resume'\)/)
+  assert.match(graphSettingsPanel, /emit\('play'\)/)
+  assert.doesNotMatch(graphSettingsPanel, /emit\('animate'\)/)
+
+  assert.match(template, /:playback="graphPlayback"/)
+  assert.match(template, /@play="startObsidianGraphProgression"/)
+  assert.match(template, /@pause="pauseObsidianGraphProgression"/)
+  assert.match(template, /@resume="resumeObsidianGraphProgression"/)
+  assert.doesNotMatch(template, /@animate=/)
 })
