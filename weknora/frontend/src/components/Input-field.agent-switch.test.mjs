@@ -35,8 +35,13 @@ test("shared-agent web search button waits for source readiness metadata", () =>
 
 test("consumer chat can select a native agent and sends model-specific reasoning effort", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
+  assert.match(settingsStore, /thinkingEnabled:\s*false/);
+  assert.match(settingsStore, /selectedChatModelId:\s*""/);
   assert.match(settingsStore, /thinkingEnabled:\s*true/);
   assert.match(settingsStore, /reasoningEffort:\s*"high"/);
+  assert.match(settingsStore, /applyLiteFirstRunDefaults\(\)/);
+  assert.match(settingsStore, /selectedChatModelId:\s*DEFAULT_CHAT_MODEL_ID/);
+  assert.match(settingsStore, /reasoningEffort:\s*"none"/);
   assert.match(settingsStore, /selectedAgentId:\s*BUILTIN_SMART_REASONING_ID/);
   assert.match(inputBusiness, /const thinkingEnabled = computed/);
   assert.match(inputBusiness, /const selectedAgentId = computed\(\{/);

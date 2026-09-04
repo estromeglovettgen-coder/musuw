@@ -5,9 +5,10 @@ import { useI18n } from "vue-i18n";
 import { MessagePlugin, NotifyPlugin } from "tdesign-vue-next";
 import ManualKnowledgeEditor from "@/components/manual-knowledge-editor.vue";
 import { useAuthStore } from "@/stores/auth";
+import { useCurrentEntitlementStore } from "@/stores/entitlement";
 import { useSettingsStore } from "@/stores/settings";
 import { getCurrentUser, userInfoFromApi } from "@/api/auth";
-import { getCurrentEntitlement, getPaddlePublicConfig } from "@/api/entitlement";
+import { getPaddlePublicConfig } from "@/api/entitlement";
 import { consumePendingTenantSwitchToast } from "@/utils/tenantSwitch";
 import { useRoleLabel } from "@/composables/useRoleLabel";
 import { notifyLoginSuccess } from "@/utils/loginNotify";
@@ -25,6 +26,7 @@ const { locale, t, tm } = useI18n();
 const { formatRole, roleIcon } = useRoleLabel();
 const router = useRouter();
 const authStore = useAuthStore();
+const entitlementStore = useCurrentEntitlementStore();
 const settingsStore = useSettingsStore();
 
 const tdLocaleMap: Record<string, object> = {
@@ -237,33 +239,46 @@ const stopInvitationPolling = () => {
 // from the authenticated entitlement response; logout clears it with
 // Paddle.Update through the existing singleton.
 let paddleRetainSyncSequence = 0;
+const getPaddleRetainScope = () => {
+  const userId = String(authStore.currentUserId || "").trim();
+  const tenantId = authStore.effectiveTenantId;
+  return authStore.isLoggedIn && userId && tenantId != null
+    ? `${userId}:${String(tenantId)}`
+    : "";
+};
+
 const syncPaddleRetain = async () => {
   const sequence = ++paddleRetainSyncSequence;
+  const scope = getPaddleRetainScope();
+  const isCurrent = () => sequence === paddleRetainSyncSequence && scope === getPaddleRetainScope();
   try {
     const config = await getPaddlePublicConfig();
-    if (sequence !== paddleRetainSyncSequence) return;
+    if (!isCurrent()) return;
     if (
       !config.configured ||
       (config.environment !== "sandbox" && config.environment !== "live") ||
       !config.client_token
     ) return;
 
-    if (authStore.isLoggedIn && authStore.effectiveTenantId) {
-      const entitlement = await getCurrentEntitlement();
-      if (sequence !== paddleRetainSyncSequence) return;
-      await initializePaddlePaymentLink({
-        environment: config.environment,
-        clientToken: config.client_token,
-        pwCustomerId: entitlement.billing.pw_customer_id,
-      });
-      return;
+    let pwCustomerId: string | undefined;
+    if (scope) {
+      // Entitlement is the single customer-identity source for the app. Keep
+      // its scope-aware snapshot and deduped request instead of issuing a
+      // second GET from the root component.
+      await entitlementStore.ensureFresh();
+      if (!isCurrent() || !entitlementStore.entitlement) return;
+      pwCustomerId = entitlementStore.billing?.pw_customer_id;
     }
 
     await initializePaddlePaymentLink({
       environment: config.environment,
       clientToken: config.client_token,
-      pwCustomerId: undefined,
+      pwCustomerId,
     });
+    // Retain initialization is asynchronous and may outlive a logout or
+    // workspace switch. Do not let a stale completion publish identity into
+    // the current session; the watcher will start the current sequence.
+    if (!isCurrent()) return;
   } catch {
     // Paddle is optional outside Musuw's fixed production overlay. Checkout
     // pages retry through the same singleton and expose their own error state.

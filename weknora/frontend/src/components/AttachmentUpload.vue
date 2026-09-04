@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { MAX_FILE_SIZE_MB } from '@/utils';
 import { getParserEngines } from '@/api/system';
 import { useAuthStore } from '@/stores/auth';
+import { useCurrentEntitlementStore } from '@/stores/entitlement';
 import {
   deleteTemporaryAttachment,
   getTemporaryAttachment,
@@ -14,6 +15,7 @@ import {
 
 const { t } = useI18n();
 const authStore = useAuthStore();
+const entitlementStore = useCurrentEntitlementStore();
 
 export interface AttachmentFile {
   file: File;
@@ -145,6 +147,7 @@ const uploadAttachment = async (attachment: AttachmentFile) => {
       await deleteTemporaryAttachment(props.sessionId, response.data.id).catch(() => undefined);
       return;
     }
+    void entitlementStore.refresh();
     attachment.status = response.data.status;
     attachment.progress = 100;
     emitFiles();

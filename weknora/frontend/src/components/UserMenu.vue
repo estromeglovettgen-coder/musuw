@@ -333,7 +333,7 @@ onUnmounted(() => {
         <button type="button" class="visual-user-menu__item visual-user-menu__usage-item" @click="handleQuickNav('usage')">
           <t-icon name="chart-line" />
           <span>{{ $t('entitlement.usageMenu') }}</span>
-          <small v-if="entitlementLoading">{{ $t('common.loading') }}</small>
+          <small v-if="entitlementLoading && !entitlement">{{ $t('common.loading') }}</small>
           <small v-else-if="usageRemainingPercent !== null">{{ usageRemainingPercent }}% {{ $t('entitlement.remaining') }}</small>
           <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>

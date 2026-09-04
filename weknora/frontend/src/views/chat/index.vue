@@ -33,7 +33,11 @@ export default defineComponent({
       const stopEntitlementLifecycleWatch = watch(
         () => Boolean(replyState?.value),
         (replying, wasReplying) => {
-          if (replying || wasReplying) entitlementStore.invalidate()
+          if (replying) {
+            entitlementStore.invalidate()
+            return
+          }
+          if (wasReplying) void entitlementStore.ensureFresh()
         },
         { flush: 'sync' },
       )

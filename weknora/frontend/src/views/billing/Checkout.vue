@@ -89,19 +89,18 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { CheckoutEventNames, type PaddleEventData } from '@paddle/paddle-js'
 import { useAuthStore } from '@/stores/auth'
 import { useChatResourcesStore } from '@/stores/chatResources'
+import { useCurrentEntitlementStore } from '@/stores/entitlement'
 import {
-  getCurrentEntitlement,
   createPaddleCheckoutIntent,
   previewPaddleSubscriptionUpgrade,
   upgradePaddleSubscription,
   type BillingPeriod,
-  type ConsumerEntitlement,
-  type PaddleBillingConfig,
   type PaddleCheckoutIntent,
   type PaddleSubscriptionUpgradePreview,
   type PaidConsumerPlan,
@@ -123,6 +122,8 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const chatResources = useChatResourcesStore()
+const entitlementStore = useCurrentEntitlementStore()
+const { entitlement, billing } = storeToRefs(entitlementStore)
 const { locale, t } = useI18n()
 const loading = ref(true)
 const completed = ref(false)
@@ -130,8 +131,6 @@ const syncing = ref(false)
 const syncDelayed = ref(false)
 const errorMessage = ref('')
 const checkoutAttemptError = ref('')
-const entitlement = ref<ConsumerEntitlement | null>(null)
-const billing = ref<PaddleBillingConfig | null>(null)
 const totals = ref<CheckoutTotals | null>(null)
 const previewSubtotal = ref('')
 const previewPrice = ref('')
@@ -287,10 +286,8 @@ const refreshAfterPayment = async () => {
     await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
     if (run !== syncRun) return
     try {
-      const response = await getCurrentEntitlement()
-      if (response.data.plan === targetPlan.value) {
-        entitlement.value = response.data
-        billing.value = response.billing
+      await entitlementStore.refresh()
+      if (entitlement.value?.plan === targetPlan.value) {
         chatResources.invalidate('models')
         syncing.value = false
         completed.value = true
@@ -353,15 +350,14 @@ const initializeCheckout = async () => {
   }
   loading.value = true
   try {
-    const response = await getCurrentEntitlement()
-    entitlement.value = response.data
-    billing.value = response.billing
-    if (planRank[plan] <= planRank[response.data.plan]) {
+    await entitlementStore.refresh()
+    if (!entitlement.value || !billing.value) throw new Error('Entitlement unavailable')
+    if (planRank[plan] <= planRank[entitlement.value.plan]) {
       await router.replace('/plans')
       return
     }
     loading.value = false
-    if (response.data.plan === 'free') await mountCheckout()
+    if (entitlement.value.plan === 'free') await mountCheckout()
     else upgradePreview.value = await previewPaddleSubscriptionUpgrade(plan)
   } catch {
     errorMessage.value = t('entitlement.checkoutLoadFailed')
@@ -388,6 +384,10 @@ const confirmUpgrade = async () => {
 const backToPlans = () => { void router.push({ path: '/plans', query: { plan: targetPlan.value || undefined, period: period.value } }) }
 const leaveCheckout = () => {
   chatResources.invalidate('models')
+  if (completed.value || syncing.value || syncDelayed.value) {
+    entitlementStore.invalidate()
+    void entitlementStore.ensureFresh()
+  }
   void router.push('/platform/knowledge-bases')
 }
 

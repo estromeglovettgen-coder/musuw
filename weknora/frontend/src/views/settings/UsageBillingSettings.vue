@@ -6,9 +6,9 @@
       </div>
     </header>
 
-    <div v-if="entitlementLoading" class="usage-billing__loading">{{ $t('common.loading') }}</div>
+    <div v-if="entitlementLoading && !entitlement" class="usage-billing__loading">{{ $t('common.loading') }}</div>
 
-    <div v-else-if="entitlement" class="usage-billing__rows">
+    <div v-else-if="entitlement" class="usage-billing__rows" :aria-busy="entitlementLoading">
       <div class="usage-billing__row usage-billing__row--split">
         <strong class="usage-billing__quota-title">{{ $t('entitlement.currentPlan') }}</strong>
         <div class="usage-billing__actions">

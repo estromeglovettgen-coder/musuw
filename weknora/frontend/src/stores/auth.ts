@@ -241,7 +241,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       localStorage.removeItem('weknora_last_chat_model_id')
       localStorage.removeItem('weknora_current_kb')
-      useSettingsStore().resetForIdentityBoundary()
+      useSettingsStore().resetForIdentityBoundary(isLiteMode.value)
     } catch (e) {
       // localStorage may be disabled or contain malformed JSON — best effort.
       console.warn('[auth] failed to clear tenant-scoped client state', e)

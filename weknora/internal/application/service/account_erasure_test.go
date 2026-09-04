@@ -294,19 +294,19 @@ func TestAccountErasureRequestRejectsMissingTargetBeforeSideEffects(t *testing.T
 	require.Empty(t, queue.tasks)
 }
 
-func TestAccountErasureRequestLeavesAccountActiveWhenPaddleCancellationCannotBePrepared(t *testing.T) {
+func TestAccountErasureRequestFencesAndQueuesWhenPaddleCancellationCannotBePrepared(t *testing.T) {
 	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
 	billing := &accountErasureBillingStub{prepareErr: ErrAccountBillingUnavailable}
 	queue := &accountErasureTaskStub{}
 	svc := newAccountErasureService(repo, nil, nil, nil, queue, nil, billing, &accountErasureIdentityStub{})
 
-	err := svc.Request(context.Background(), "user-1")
-	require.ErrorIs(t, err, ErrAccountBillingUnavailable)
-	require.False(t, repo.fenced)
-	require.Empty(t, queue.tasks)
+	require.NoError(t, svc.Request(context.Background(), "user-1"))
+	require.True(t, repo.fenced)
+	require.Len(t, queue.tasks, 1)
+	require.Equal(t, 1, billing.prepareCalls)
 }
 
-func TestAccountErasureRequestPreparesPaidCancellationBeforeFencing(t *testing.T) {
+func TestAccountErasureRequestPreparesPaidCancellationAfterFencing(t *testing.T) {
 	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
 	billing := &accountErasureBillingStub{}
 	queue := &accountErasureTaskStub{}
@@ -418,9 +418,12 @@ func TestAccountErasureWorkerUsesExistingKnowledgeLifecycleBeforeTenantDeletion(
 	require.False(t, repo.purged)
 }
 
-func TestAccountErasureWorkerWaitsForTerminalPaddleState(t *testing.T) {
+func TestAccountErasureWorkerDefersFinalPurgeAfterBillingPreparationFailure(t *testing.T) {
 	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
-	billing := &accountErasureBillingStub{terminalErr: ErrAccountBillingActionRequired}
+	billing := &accountErasureBillingStub{
+		prepareErr:  ErrAccountBillingUnavailable,
+		terminalErr: ErrAccountBillingActionRequired,
+	}
 	tenant := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}}
 	svc := newAccountErasureService(
 		repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenant,
@@ -431,10 +434,89 @@ func TestAccountErasureWorkerWaitsForTerminalPaddleState(t *testing.T) {
 
 	err = svc.Process(context.Background(), task)
 
-	require.ErrorIs(t, err, ErrAccountBillingActionRequired)
+	require.ErrorIs(t, err, ErrAccountErasureBillingPending)
 	require.Equal(t, 1, billing.terminalCalls)
 	require.Empty(t, tenant.deleted)
 	require.False(t, repo.purged)
+	require.Equal(t, "sub_legacy", repo.target.PaddleSubscriptionID)
+}
+
+func TestAccountErasureWorkerDoesNotWaitForPeriodEndAfterCancellationPrepared(t *testing.T) {
+	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
+	// Prepare succeeds (the provider confirmed a scheduled cancellation), while
+	// the terminal read would report the subscription as active until period-end.
+	// Final purge should not retain account data for that already-confirmed wait.
+	billing := &accountErasureBillingStub{terminalErr: ErrAccountBillingActionRequired}
+	tenant := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}}
+	svc := newAccountErasureService(
+		repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenant,
+		nil, nil, billing, &accountErasureIdentityStub{},
+	)
+	task, err := NewAccountErasureTask("user-1")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.Process(context.Background(), task))
+	require.Equal(t, 1, billing.prepareCalls)
+	require.Zero(t, billing.terminalCalls)
+	require.True(t, repo.purged)
+}
+
+func TestAccountErasureWorkerCompletesWhenPaddleIsAlreadyTerminal(t *testing.T) {
+	repo := &accountErasureRepoStub{target: eligibleErasureTarget()}
+	billing := &accountErasureBillingStub{prepareErr: ErrAccountBillingActionRequired}
+	tenant := &accountErasureTenantStub{tenant: &types.Tenant{ID: 7}}
+	svc := newAccountErasureService(
+		repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenant,
+		nil, nil, billing, &accountErasureIdentityStub{},
+	)
+	task, err := NewAccountErasureTask("user-1")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.Process(context.Background(), task))
+	require.Equal(t, 1, billing.prepareCalls)
+	require.Equal(t, 1, billing.terminalCalls)
+	require.True(t, repo.purged)
+}
+
+func TestAccountErasureWorkerRetainsBillingCoordinatesAcrossRetries(t *testing.T) {
+	target := eligibleErasureTarget()
+	repo := &accountErasureRepoStub{target: target}
+	billing := &accountErasureBillingStub{
+		prepareErr:  ErrAccountBillingUnavailable,
+		terminalErr: ErrAccountBillingActionRequired,
+	}
+	tenant := &accountErasureTenantStub{tenant: &types.Tenant{ID: target.TenantID}}
+	identity := &accountErasureIdentityStub{}
+	svc := newAccountErasureService(
+		repo, &accountErasureKBStub{}, &accountErasureFileStub{}, tenant,
+		nil, nil, billing, identity,
+	)
+	task, err := NewAccountErasureTask(target.UserID)
+	require.NoError(t, err)
+
+	// Two failed attempts must leave the durable target coordinates intact so
+	// housekeeping can retry cancellation after Paddle recovers. Local access
+	// remains fenced; the worker must not delete the tenant or external identity
+	// while billing is unresolved.
+	for range 2 {
+		err = svc.Process(context.Background(), task)
+		require.ErrorIs(t, err, ErrAccountErasureBillingPending)
+		require.False(t, repo.purged)
+		require.Equal(t, "sub_legacy", target.PaddleSubscriptionID)
+		require.Empty(t, tenant.deleted)
+		require.Zero(t, identity.calls)
+	}
+	require.Equal(t, 2, billing.prepareCalls)
+	require.Equal(t, 2, billing.terminalCalls)
+
+	// Once Paddle reports a terminal/not-found state, the same deterministic
+	// task completes and only then permits final local purge.
+	billing.prepareErr = nil
+	billing.terminalErr = nil
+	require.NoError(t, svc.Process(context.Background(), task))
+	require.True(t, repo.purged)
+	require.Equal(t, 3, billing.prepareCalls)
+	require.Equal(t, 2, billing.terminalCalls)
 }
 
 func TestAccountErasureWorkerPropagatesTenantLookupFailure(t *testing.T) {

@@ -19,6 +19,11 @@ var (
 	ErrAccountErasureIneligible       = errors.New("account is not eligible for managed deletion")
 	ErrAccountIdentityBindingRequired = errors.New("verified identity binding is required before account deletion")
 	ErrAccountErasureCleanupPending   = errors.New("account cleanup is still pending")
+	// ErrAccountErasureBillingPending means local access/content cleanup has
+	// completed, but the provider has not confirmed cancellation or an
+	// authoritative terminal/not-found state. The fenced tenant remains as the
+	// durable billing coordinate until a later worker retry gets that evidence.
+	ErrAccountErasureBillingPending = errors.New("account billing cancellation is still pending")
 )
 
 const (
@@ -130,22 +135,16 @@ func (s *accountErasureService) Request(ctx context.Context, userID string) erro
 	if err := s.resolveAndBindIdentity(ctx, target); err != nil {
 		return err
 	}
-	// Validation above checks deterministic provider coordinates and
-	// server-side configuration before the irreversible local access fence.
-	// Billing preparation may schedule Paddle cancellation, but it never refunds
-	// or changes local entitlement state synchronously.
-	if strings.TrimSpace(target.PaddleCustomerID) != "" || strings.TrimSpace(target.PaddleSubscriptionID) != "" {
-		if s.billing == nil {
-			return ErrAccountBillingUnavailable
-		}
-		if err := s.billing.PrepareAccountDeletion(ctx, target.PaddleCustomerID, target.PaddleSubscriptionID); err != nil {
-			return err
-		}
-	}
+	// Fence local access before touching Paddle. Billing cancellation is a
+	// separate follow-up: a past_due or otherwise non-cancellable provider
+	// subscription must never leave the Musuw account usable or make this
+	// deletion request fail. The worker retries this best-effort preparation
+	// while local content cleanup remains the authoritative lifecycle.
 	requestedAt := s.now().UTC()
 	if err := s.repo.Fence(ctx, target.UserID, requestedAt); err != nil {
 		return fmt.Errorf("fence account deletion: %w", err)
 	}
+	s.prepareBillingCancellationBestEffort(ctx, target)
 	if err := s.enqueue(ctx, target.UserID); err != nil {
 		// The durable deletion_requested_at fence is the outbox. Housekeeping
 		// will enqueue the same deterministic task; returning success here avoids
@@ -153,6 +152,76 @@ func (s *accountErasureService) Request(ctx context.Context, userID string) erro
 		logger.Errorf(ctx, "Account deletion task enqueue deferred: %v", err)
 	}
 	return nil
+}
+
+// prepareBillingCancellationBestEffort keeps provider cancellation independent
+// from the local erasure fence. Paddle may require hosted billing recovery
+// (past_due) or be temporarily unavailable; either condition is logged for
+// operations/retry visibility but cannot block revoking access or deleting
+// active Musuw content. If preparation fails, the worker keeps the provider
+// coordinates durable until a later retry confirms cancellation or not-found.
+// The provider guard remains idempotent, so invoking it from both Request and a
+// retried worker is safe.
+func (s *accountErasureService) prepareBillingCancellationBestEffort(
+	ctx context.Context,
+	target *types.AccountErasureTarget,
+) {
+	if s == nil || target == nil {
+		return
+	}
+	customerID := strings.TrimSpace(target.PaddleCustomerID)
+	subscriptionID := strings.TrimSpace(target.PaddleSubscriptionID)
+	if customerID == "" && subscriptionID == "" {
+		return
+	}
+	if err := s.prepareBillingCancellation(ctx, customerID, subscriptionID); err != nil {
+		logger.Warnf(ctx,
+			"Account billing cancellation deferred after local erasure fence customer=%t subscription=%t: %v",
+			customerID != "", subscriptionID != "", err,
+		)
+	}
+}
+
+// prepareBillingCancellation returns the provider result for the worker while
+// keeping Request's user-facing contract best-effort. Provider coordinates are
+// loaded from the fenced tenant; they are never serialized into the task.
+func (s *accountErasureService) prepareBillingCancellation(
+	ctx context.Context,
+	customerID,
+	subscriptionID string,
+) error {
+	if strings.TrimSpace(customerID) == "" && strings.TrimSpace(subscriptionID) == "" {
+		return nil
+	}
+	if s == nil || s.billing == nil {
+		return ErrAccountBillingUnavailable
+	}
+	return s.billing.PrepareAccountDeletion(ctx, strings.TrimSpace(customerID), strings.TrimSpace(subscriptionID))
+}
+
+func (s *accountErasureService) ensureBillingTerminal(
+	ctx context.Context,
+	customerID,
+	subscriptionID string,
+) error {
+	if strings.TrimSpace(customerID) == "" && strings.TrimSpace(subscriptionID) == "" {
+		return nil
+	}
+	if s == nil || s.billing == nil {
+		return ErrAccountBillingUnavailable
+	}
+	return s.billing.EnsureAccountTerminal(ctx, strings.TrimSpace(customerID), strings.TrimSpace(subscriptionID))
+}
+
+func accountErasureBillingPendingError(preparationErr, terminalErr error) error {
+	errs := []error{ErrAccountErasureBillingPending}
+	if preparationErr != nil {
+		errs = append(errs, preparationErr)
+	}
+	if terminalErr != nil {
+		errs = append(errs, terminalErr)
+	}
+	return errors.Join(errs...)
 }
 
 func (s *accountErasureService) resolveAndBindIdentity(ctx context.Context, target *types.AccountErasureTarget) error {
@@ -339,13 +408,17 @@ func (s *accountErasureService) Process(ctx context.Context, task *asynq.Task) e
 	if !target.IsDeletionPending {
 		return errors.New("account erasure task target is not fenced")
 	}
-	if strings.TrimSpace(target.PaddleCustomerID) != "" || strings.TrimSpace(target.PaddleSubscriptionID) != "" {
-		if s.billing == nil {
-			return ErrAccountBillingUnavailable
-		}
-		if err := s.billing.EnsureAccountTerminal(ctx, target.PaddleCustomerID, target.PaddleSubscriptionID); err != nil {
-			return err
-		}
+	// Provider cancellation is deliberately independent from the local fence.
+	// Retry the idempotent cancellation request, but retain its result so the
+	// final tenant purge can keep provider coordinates durable until Paddle has
+	// confirmed cancellation (or an authoritative not-found).
+	billingPreparationErr := s.prepareBillingCancellation(
+		ctx,
+		strings.TrimSpace(target.PaddleCustomerID),
+		strings.TrimSpace(target.PaddleSubscriptionID),
+	)
+	if billingPreparationErr != nil {
+		logger.Warnf(ctx, "Account billing cancellation preparation deferred: %v", billingPreparationErr)
 	}
 	if err := s.resolveAndBindIdentity(ctx, target); err != nil {
 		return err
@@ -419,6 +492,23 @@ func (s *accountErasureService) Process(ctx context.Context, task *asynq.Task) e
 	}
 	target = latest
 	lifecycleCtx = accountErasureContext(ctx, target, tenant)
+	// A successful Prepare is the provider's confirmation that cancellation was
+	// scheduled (or that no cancellation is required), so do not retain account
+	// data until the subscription reaches period-end. When preparation failed,
+	// perform the terminal/not-found read as a recovery shortcut; otherwise keep
+	// the billing coordinates durable for the next task retry. The fenced user
+	// cannot regain access while this follow-up is pending.
+	if billingPreparationErr != nil {
+		billingTerminalErr := s.ensureBillingTerminal(
+			ctx,
+			strings.TrimSpace(target.PaddleCustomerID),
+			strings.TrimSpace(target.PaddleSubscriptionID),
+		)
+		if billingTerminalErr != nil {
+			logger.Warnf(ctx, "Account billing cancellation remains pending: %v", billingTerminalErr)
+			return accountErasureBillingPendingError(billingPreparationErr, billingTerminalErr)
+		}
+	}
 	if !target.IsTenantDeleted {
 		providerCleaner, ok := s.tenants.(interfaces.AccountErasureTenantProviderCleaner)
 		if !ok {

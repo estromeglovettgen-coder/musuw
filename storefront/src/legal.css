@@ -6,7 +6,7 @@
   background:
     radial-gradient(circle at 8% 5%, rgba(76, 114, 237, 0.09), transparent 26%),
     radial-gradient(circle at 92% 28%, rgba(198, 159, 255, 0.11), transparent 28%),
-    #fbfbfc;
+    var(--page);
 }
 
 .legal-glow {
@@ -74,7 +74,7 @@
 
 .legal-sidebar nav a:hover,
 .legal-sidebar nav a.active {
-  background: rgba(76, 114, 237, 0.1);
+  background: var(--accent-soft);
   color: var(--accent-dark);
 }
 
@@ -84,17 +84,17 @@
 
 .legal-document {
   overflow: hidden;
-  border: 1px solid rgba(209, 214, 223, 0.85);
+  border: 1px solid var(--line);
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 28px 90px rgba(30, 44, 72, 0.09);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
   backdrop-filter: blur(18px);
 }
 
 .legal-hero {
   padding: 56px 58px 48px;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.92), rgba(238, 243, 255, 0.75));
+  background: linear-gradient(150deg, var(--surface), var(--surface-tint));
 }
 
 .legal-eyebrow {
@@ -142,7 +142,7 @@
 .legal-sections > section {
   padding: 42px 0 38px;
   scroll-margin-top: 104px;
-  border-bottom: 1px solid #e9ebef;
+  border-bottom: 1px solid var(--line);
 }
 
 .legal-sections > section:last-child {
@@ -164,7 +164,7 @@
 
 .legal-section-copy p,
 .legal-section-copy li {
-  color: #505762;
+  color: var(--ink-soft);
   font-size: 15.5px;
   line-height: 1.8;
 }
@@ -184,8 +184,8 @@
   padding: 16px 18px;
   border: 1px solid rgba(76, 114, 237, 0.2);
   border-radius: 13px;
-  background: rgba(233, 239, 255, 0.7);
-  color: #334a8d;
+  background: var(--surface-tint);
+  color: var(--accent-dark);
   font-size: 14.5px;
   line-height: 1.65;
 }
@@ -205,7 +205,7 @@
   padding: 9px 13px;
   border: 1px solid rgba(76, 114, 237, 0.2);
   border-radius: 11px;
-  background: rgba(233, 239, 255, 0.58);
+  background: var(--accent-soft);
   font-size: 14px;
 }
 
@@ -288,7 +288,7 @@
     padding: 16px 18px;
     border: 1px solid var(--line);
     border-radius: 13px;
-    background: #fafbfc;
+    background: var(--surface-soft);
   }
 
   .legal-mobile-contents summary {
@@ -361,4 +361,84 @@
   .legal-section-copy li {
     font-size: 15px;
   }
+}
+
+/* The legal surface follows the same page/surface contract as the rest of
+   the storefront. Keep this explicit because the documents contain their
+   own panel, hero, notice, and table-of-contents surfaces. */
+html[data-theme="dark"] .legal-page {
+  background:
+    radial-gradient(circle at 8% 5%, rgba(99, 102, 241, 0.08), transparent 28%),
+    radial-gradient(circle at 92% 28%, rgba(167, 139, 250, 0.08), transparent 30%),
+    var(--page);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .legal-glow {
+  background-image: radial-gradient(rgba(129, 140, 248, 0.22) 1px, transparent 1px);
+  opacity: 0.45;
+}
+
+html[data-theme="dark"] .legal-sidebar,
+html[data-theme="dark"] .legal-contents {
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .legal-sidebar nav a:hover,
+html[data-theme="dark"] .legal-sidebar nav a.active {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .legal-document {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+html[data-theme="dark"] .legal-hero {
+  border-color: var(--line);
+  background: linear-gradient(150deg, var(--surface), var(--surface-tint));
+}
+
+html[data-theme="dark"] .legal-hero > p,
+html[data-theme="dark"] .legal-section-copy,
+html[data-theme="dark"] .legal-section-copy p,
+html[data-theme="dark"] .legal-section-copy li,
+html[data-theme="dark"] .legal-contents a,
+html[data-theme="dark"] .legal-mobile-contents a {
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .legal-sections > section {
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .legal-notice {
+  border-color: var(--line-strong);
+  background: var(--surface-tint);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .legal-action {
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .legal-action:hover,
+html[data-theme="dark"] .legal-inline-link:hover,
+html[data-theme="dark"] .legal-contents a:hover {
+  border-color: var(--ink-soft);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .legal-mobile-contents {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+html[data-theme="dark"] .legal-contents li::marker,
+html[data-theme="dark"] .legal-mobile-contents li::marker {
+  color: var(--ink-faint);
 }

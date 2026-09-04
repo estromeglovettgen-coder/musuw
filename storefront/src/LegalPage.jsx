@@ -30,6 +30,13 @@ const navigation = {
   ]
 };
 
+// Section headings retain their numbered copy in the document body. The
+// ordered table of contents supplies its own marker, so remove only a leading
+// editorial number there to avoid rendering labels such as "1. 1. Security".
+function stripSectionNumber(heading) {
+  return String(heading).replace(/^\s*\d+\s*[.、)]\s*/, "");
+}
+
 function renderBlock(block, index) {
   if (block.type === "list") {
     return (
@@ -65,9 +72,8 @@ function renderBlock(block, index) {
   return <p key={index}>{block.text}</p>;
 }
 
-function ContactPage({ document, copy, locale, onLocaleChange }) {
-  const [draftState, setDraftState] = useState("idle");
-  const [draftHref, setDraftHref] = useState("");
+function ContactPage({ document, copy, locale, onLocaleChange, theme, onThemeToggle }) {
+  const [copyState, setCopyState] = useState("idle");
   const isChinese = locale === "zh-CN";
   const labels = locale === "zh-CN"
     ? {
@@ -76,19 +82,15 @@ function ContactPage({ document, copy, locale, onLocaleChange }) {
         heroTitle: "让你的知识在 musuw 中真正流动。",
         heroSummary: "告诉我们你正在解决的问题，我们会从产品支持、知识工作流和账户事项开始帮你梳理下一步。",
         reasons: ["有来源依据的回答与引用", "计划、隐私与数据控制"],
-        formLabel: "发送给 musuw 团队",
-        firstName: "名",
-        lastName: "姓",
-        email: "邮箱",
-        message: "留言",
-        firstNamePlaceholder: "张",
-        lastNamePlaceholder: "三",
-        emailPlaceholder: "name@example.com",
-        messagePlaceholder: "请简要告诉我们你需要什么帮助",
-        submit: "提交",
-        formNote: "提交后会打开你的邮件应用并生成草稿；musuw 不会从此表单直接发送邮件。",
-        openDraft: "在邮件应用中打开草稿",
-        ready: "草稿已准备好。请在邮件应用中检查并发送。",
+        channelLabel: "联系 musuw 团队",
+        channelEyebrow: "直接联系",
+        channelTitle: "通过本机邮件应用联系我们",
+        channelNote: "选择邮箱后会打开本机邮件应用并生成草稿。网站不会直接发送邮件，也不会显示已送达状态。",
+        emailLabel: "发送邮件",
+        phoneLabel: "致电支持",
+        copyEmail: "复制邮箱",
+        copiedEmail: "已复制",
+        copyUnavailable: "请手动复制邮箱",
         detailsEyebrow: "支持详情",
         detailsTitle: "需要更具体的帮助？",
         operator: "运营主体",
@@ -101,41 +103,34 @@ function ContactPage({ document, copy, locale, onLocaleChange }) {
         heroTitle: "Keep your knowledge moving with musuw.",
         heroSummary: "Tell us what you are working through and we will help with product support, grounded knowledge workflows, and account questions.",
         reasons: ["Grounded answers with source citations", "Plans, privacy, and data controls"],
-        formLabel: "Send a message to the musuw team",
-        firstName: "First name",
-        lastName: "Last name",
-        email: "Email",
-        message: "Message",
-        firstNamePlaceholder: "Jane",
-        lastNamePlaceholder: "Smith",
-        emailPlaceholder: "jane@example.com",
-        messagePlaceholder: "Tell us briefly what you are working on",
-        submit: "Submit",
-        formNote: "Submitting opens your email app with a draft. musuw does not send messages directly from this form.",
-        openDraft: "Open the draft in your email app",
-        ready: "Your draft is ready. Review it in your email app before sending.",
+        channelLabel: "Contact the musuw team",
+        channelEyebrow: "Direct contact",
+        channelTitle: "Email us from your local app",
+        channelNote: "Choosing email opens your local email app with a draft. The website does not send messages directly or show a delivery status.",
+        emailLabel: "Send an email",
+        phoneLabel: "Call support",
+        copyEmail: "Copy email",
+        copiedEmail: "Copied",
+        copyUnavailable: "Copy the email manually",
         detailsEyebrow: "Support details",
         detailsTitle: "Need a more specific answer?",
         operator: "Operator",
         categories: ["Support", "Billing and refunds", "Privacy and security", "Merchant review"],
         updated: "Effective",
       };
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    const subject = isChinese ? "musuw 联系请求" : "musuw contact request";
-    const body = [
-      `${labels.firstName}: ${String(values.get("firstName") ?? "").trim()}`,
-      `${labels.lastName}: ${String(values.get("lastName") ?? "").trim()}`,
-      `${labels.email}: ${String(values.get("email") ?? "").trim()}`,
-      "",
-      `${labels.message}:`,
-      String(values.get("message") ?? "").trim()
-    ].join("\\n");
-    const href = `mailto:${LEGAL_OPERATOR.supportEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    setDraftHref(href);
-    setDraftState("ready");
-    window.location.assign(href);
+  const supportEmailHref = `mailto:${LEGAL_OPERATOR.supportEmail}`;
+  const supportPhoneHref = `tel:${LEGAL_OPERATOR.supportPhone.replaceAll(" ", "")}`;
+  const copySupportEmail = async () => {
+    if (!navigator.clipboard?.writeText) {
+      setCopyState("unavailable");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(LEGAL_OPERATOR.supportEmail);
+      setCopyState("copied");
+    } catch {
+      setCopyState("unavailable");
+    }
   };
   const contactSections = document.sections.map((section, index) => {
     if (index === 0 && !isChinese) {
@@ -149,7 +144,13 @@ function ContactPage({ document, copy, locale, onLocaleChange }) {
 
   return (
     <>
-      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} />
+      <SiteHeader
+        copy={copy}
+        locale={locale}
+        onLocaleChange={onLocaleChange}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+      />
       <main className="contact-page">
         <div className="container contact-layout">
           <section className="contact-intro">
@@ -173,37 +174,30 @@ function ContactPage({ document, copy, locale, onLocaleChange }) {
             </ul>
           </section>
 
-          <section className="contact-form-shell" aria-label={labels.formLabel}>
-            <form className="contact-form" onSubmit={handleSubmit} aria-describedby="contact-form-note">
-              <div className="contact-field-grid">
-                <label htmlFor="contact-first-name">
-                  <span>{labels.firstName}</span>
-                  <input id="contact-first-name" name="firstName" type="text" placeholder={labels.firstNamePlaceholder} autoComplete="given-name" required />
-                </label>
-                <label htmlFor="contact-last-name">
-                  <span>{labels.lastName}</span>
-                  <input id="contact-last-name" name="lastName" type="text" placeholder={labels.lastNamePlaceholder} autoComplete="family-name" required />
-                </label>
+          <section className="contact-channel-shell" aria-label={labels.channelLabel}>
+            <div className="contact-channel">
+              <span className="legal-eyebrow">{labels.channelEyebrow}</span>
+              <h2>{labels.channelTitle}</h2>
+              <p className="contact-channel-note">{labels.channelNote}</p>
+              <div className="contact-channel-actions">
+                <a className="contact-email-action" href={supportEmailHref}>
+                  <span>{labels.emailLabel}</span>
+                  <span className="contact-address">{LEGAL_OPERATOR.supportEmail}</span>
+                  <ArrowUpRight size={17} weight="bold" aria-hidden="true" />
+                </a>
+                <button className="contact-copy-button" type="button" onClick={copySupportEmail}>
+                  {copyState === "copied" ? labels.copiedEmail : labels.copyEmail}
+                </button>
               </div>
-              <label htmlFor="contact-email">
-                <span>{labels.email}</span>
-                <input id="contact-email" name="email" type="email" placeholder={labels.emailPlaceholder} autoComplete="email" required />
-              </label>
-              <label htmlFor="contact-message">
-                <span>{labels.message}</span>
-                <textarea id="contact-message" name="message" placeholder={labels.messagePlaceholder} required rows="7" />
-              </label>
-              <button className="contact-submit" type="submit">
-                <span>{labels.submit}</span>
-                <ArrowUpRight size={17} weight="bold" aria-hidden="true" />
-              </button>
-              <p className="contact-form-note" id="contact-form-note" role="status" aria-live="polite">
-                {draftState === "ready" ? labels.ready : labels.formNote}
+              <a className="contact-phone-action" href={supportPhoneHref}>
+                <span>{labels.phoneLabel}</span>
+                <span>{LEGAL_OPERATOR.supportPhone}</span>
+                <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+              </a>
+              <p className="contact-channel-status" role="status" aria-live="polite">
+                {copyState === "unavailable" ? labels.copyUnavailable : null}
               </p>
-              {draftState === "ready" && draftHref ? (
-                <a className="contact-draft-link" href={draftHref}>{labels.openDraft}</a>
-              ) : null}
-            </form>
+            </div>
           </section>
         </div>
 
@@ -233,9 +227,18 @@ function ContactPage({ document, copy, locale, onLocaleChange }) {
   );
 }
 
-export function LegalPage({ document, copy, locale, onLocaleChange }) {
+export function LegalPage({ document, copy, locale, onLocaleChange, theme, onThemeToggle }) {
   if (document.path === "/contact") {
-    return <ContactPage document={document} copy={copy} locale={locale} onLocaleChange={onLocaleChange} />;
+    return (
+      <ContactPage
+        document={document}
+        copy={copy}
+        locale={locale}
+        onLocaleChange={onLocaleChange}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+      />
+    );
   }
 
   const labels = locale === "zh-CN"
@@ -244,7 +247,13 @@ export function LegalPage({ document, copy, locale, onLocaleChange }) {
 
   return (
     <>
-      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} />
+      <SiteHeader
+        copy={copy}
+        locale={locale}
+        onLocaleChange={onLocaleChange}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+      />
       <main className="legal-page">
         <div className="legal-glow" aria-hidden="true" />
         <div className="container legal-layout">
@@ -279,7 +288,7 @@ export function LegalPage({ document, copy, locale, onLocaleChange }) {
               <ol>
                 {document.sections.map((section, index) => (
                   <li key={section.heading}>
-                    <a href={`#legal-section-${index + 1}`}>{section.heading}</a>
+                    <a href={`#legal-section-${index + 1}`}>{stripSectionNumber(section.heading)}</a>
                   </li>
                 ))}
               </ol>
@@ -302,7 +311,7 @@ export function LegalPage({ document, copy, locale, onLocaleChange }) {
             <ol>
               {document.sections.map((section, index) => (
                 <li key={section.heading}>
-                  <a href={`#legal-section-${index + 1}`}>{section.heading}</a>
+                  <a href={`#legal-section-${index + 1}`}>{stripSectionNumber(section.heading)}</a>
                 </li>
               ))}
             </ol>
@@ -314,10 +323,16 @@ export function LegalPage({ document, copy, locale, onLocaleChange }) {
   );
 }
 
-export function NotFoundPage({ copy, locale, onLocaleChange }) {
+export function NotFoundPage({ copy, locale, onLocaleChange, theme, onThemeToggle }) {
   return (
     <>
-      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} />
+      <SiteHeader
+        copy={copy}
+        locale={locale}
+        onLocaleChange={onLocaleChange}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+      />
       <main className="not-found-page">
         <div>
           <span>404</span>

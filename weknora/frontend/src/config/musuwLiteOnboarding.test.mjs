@@ -21,10 +21,12 @@ test('Lite onboarding follows the shortest current Musuw activation path', () =>
 
   const liteBlock = globalGuide.slice(liteStart, standardStart)
   const keys = [...liteBlock.matchAll(/key:\s*'([^']+)'/g)].map((match) => match[1])
-  assert.deepEqual(keys, ['welcomeLite', 'knowledgeLite', 'chatLite', 'agentsLite', 'doneLite'])
+  assert.deepEqual(keys, ['welcomeLite', 'knowledgeLite', 'agentsLite', 'chatLite', 'settingsLite', 'doneLite'])
   for (const legacyStep of ['settings', 'models', 'members', 'workspace']) {
     assert.equal(liteBlock.includes(`key: '${legacyStep}'`), false)
   }
+  assert.match(liteBlock, /key: 'settingsLite'\s*,\s*target: '\[data-guide="user-menu"\]'/)
+  assert.match(liteBlock, /key: 'agentsLite'[\s\S]*optional: true[\s\S]*key: 'chatLite'/)
 
   assert.match(globalGuide, /<GlobalInvitationBell v-if="!authStore\.isLiteMode"/)
   assert.match(globalGuide, /<AgentListContextualGuideBridge v-if="!authStore\.isLiteMode"/)
@@ -156,6 +158,7 @@ test('all supported locales carry the complete Lite onboarding copy', () => {
       'chatLite:',
       'knowledgeLite:',
       'agentsLite:',
+      'settingsLite:',
       'doneLite:',
       'modeLite:',
       'nameLite:',
@@ -169,5 +172,9 @@ test('all supported locales carry the complete Lite onboarding copy', () => {
     ]) {
       assert.ok(source.includes(key), `${locale} is missing ${key}`)
     }
+    const settingsStart = source.indexOf('settingsLite:')
+    const settingsEnd = source.indexOf('\n      },', settingsStart)
+    const settingsLiteCopy = source.slice(settingsStart, settingsEnd)
+    assert.doesNotMatch(settingsLiteCopy, /member|tenant|workspace|成员|租户|멤버|участник/i)
   }
 })

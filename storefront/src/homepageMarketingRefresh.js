@@ -29,6 +29,8 @@ export const MARKETING_FOOTER_GROUPS = Object.freeze([
       Object.freeze(["Terms", "/terms"]),
       Object.freeze(["Privacy", "/privacy"]),
       Object.freeze(["Refunds", "/refund-policy"]),
+      Object.freeze(["Subscription", "/subscription-policy"]),
+      Object.freeze(["Cookies", "/cookies"]),
     ]),
   }),
 ]);
@@ -241,7 +243,7 @@ const MARKETING_COPY = Object.freeze({
     footerGroups: Object.freeze([
       Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing"]) }),
       Object.freeze({ title: "Trust", links: Object.freeze(["FAQ", "Security", "Contact"]) }),
-      Object.freeze({ title: "Legal", links: Object.freeze(["Terms", "Privacy", "Refunds"]) }),
+      Object.freeze({ title: "Legal", links: Object.freeze(["Terms", "Privacy", "Refunds", "Subscription", "Cookies"]) }),
     ]),
   }),
   zh: Object.freeze({
@@ -411,7 +413,7 @@ const MARKETING_COPY = Object.freeze({
     footerGroups: Object.freeze([
       Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价"]) }),
       Object.freeze({ title: "信任", links: Object.freeze(["常见问题", "安全", "联系"]) }),
-      Object.freeze({ title: "法律", links: Object.freeze(["服务条款", "隐私", "退款"]) }),
+      Object.freeze({ title: "法律", links: Object.freeze(["服务条款", "隐私", "退款", "订阅与取消", "Cookie"]) }),
     ]),
   }),
 });
