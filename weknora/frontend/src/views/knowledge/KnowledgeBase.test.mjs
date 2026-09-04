@@ -37,6 +37,19 @@ test("knowledge detail routes chooser and global drops through the same consumer
   assert.match(source, /removeEventListener\(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true\)/);
 });
 
+test("knowledge upload completion silently revalidates the shared quota snapshot", () => {
+  assert.match(source, /import \{ useCurrentEntitlementStore \} from '@\/stores\/entitlement'/);
+  assert.match(source, /const entitlementStore = useCurrentEntitlementStore\(\)/);
+  assert.doesNotMatch(source, /getCurrentEntitlement/);
+  assert.match(source, /await entitlementStore\.ensureFresh\(\)[\s\S]*?return entitlementStore\.entitlement/);
+  assert.match(
+    source,
+    /const handleKnowledgeFileUploaded = \(event: Event\) => \{[\s\S]*?detail\?\.kbId !== kbId[\s\S]*?void entitlementStore\.refresh\(\)/,
+  );
+  assert.match(source, /addEventListener\(KNOWLEDGE_FILE_UPLOADED_EVENT, handleKnowledgeFileUploaded\)/);
+  assert.match(source, /removeEventListener\(KNOWLEDGE_FILE_UPLOADED_EVENT, handleKnowledgeFileUploaded\)/);
+});
+
 test("graph view keeps the original layout chrome instead of inheriting document-only spacing", () => {
   assert.match(
     source,

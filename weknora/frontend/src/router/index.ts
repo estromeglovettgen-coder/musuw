@@ -5,7 +5,6 @@ import { useOrganizationStore } from '@/stores/organization'
 import { useSettingsStore } from '@/stores/settings'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
 import { getSystemInfo } from '@/api/system'
-import { reconcileLiteChatSettings } from '@/utils/liteChatSettings'
 import {
   AUTHENTICATED_HOME_PATH,
   handoffToExternalAuth,
@@ -70,7 +69,7 @@ function applyResolvedProductEdition(
   organizationStore.clearState()
   authStore.setSelectedTenant(null)
   const settingsStore = useSettingsStore()
-  settingsStore.saveSettings(reconcileLiteChatSettings(settingsStore.getSettings()))
+  settingsStore.applyLiteFirstRunDefaults()
 }
 
 async function ensureProductEdition(authStore: ReturnType<typeof useAuthStore>) {

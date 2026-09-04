@@ -4024,15 +4024,15 @@ textarea {
 }
 
 .contact-page {
-  padding: clamp(156px, 17vw, 220px) 0 clamp(84px, 10vw, 132px);
+  padding: clamp(132px, 13vw, 176px) 0 clamp(72px, 8vw, 112px);
   background: var(--page);
 }
 
 .contact-layout {
   display: grid;
-  width: min(calc(100% - 40px), 1000px);
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(40px, 5vw, 72px);
+  width: min(calc(100% - 40px), 1080px);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(32px, 5vw, 64px);
   align-items: start;
 }
 
@@ -4043,7 +4043,7 @@ textarea {
 .contact-intro .legal-back {
   display: flex;
   width: max-content;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
 }
 
 .contact-pill {
@@ -4061,26 +4061,26 @@ textarea {
 }
 
 .contact-intro h1 {
-  max-width: 560px;
+  max-width: 500px;
   margin-top: 28px;
-  font-size: clamp(50px, 5.2vw, 76px);
+  font-size: clamp(42px, 4.6vw, 64px);
   letter-spacing: -0.06em;
-  line-height: 0.97;
+  line-height: 1;
 }
 
 .contact-summary {
-  max-width: 540px;
-  margin-top: 26px;
+  max-width: 500px;
+  margin-top: 22px;
   color: var(--ink-soft);
-  font-size: 18px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
 }
 
 .contact-reason-list {
   display: grid;
-  max-width: 540px;
+  max-width: 500px;
   gap: 12px;
-  margin: 42px 0 0;
+  margin: 30px 0 0;
   padding: 0;
   color: var(--ink-soft);
   font-size: 15px;
@@ -4098,7 +4098,7 @@ textarea {
   color: var(--accent);
 }
 
-.contact-form-shell {
+.contact-channel-shell {
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -4107,106 +4107,105 @@ textarea {
   box-shadow: var(--shadow-soft);
 }
 
-.contact-form {
+.contact-channel {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   border-radius: 15px;
-  padding: 20px;
+  padding: clamp(24px, 3vw, 34px);
   background: var(--surface-soft);
 }
 
-.contact-field-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-
-.contact-form label {
-  display: grid;
-  min-width: 0;
-  gap: 8px;
-  color: var(--ink);
+.contact-email-action {
+  display: inline-flex;
+  width: 100%;
+  min-height: 52px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 1px solid var(--ink);
+  border-radius: 12px;
+  padding: 0 16px;
+  color: var(--page);
+  background: var(--ink);
   font-size: 14px;
   font-weight: 650;
 }
 
-.contact-form input,
-.contact-form textarea {
-  width: 100%;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  padding: 13px 14px;
-  color: var(--ink);
-  background: var(--surface);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.35;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+.contact-email-action:hover {
+  background: color-mix(in srgb, var(--ink) 88%, var(--page));
 }
 
-.contact-form input {
-  min-height: 48px;
+.contact-channel h2 {
+  max-width: 420px;
+  font-size: clamp(24px, 2.4vw, 34px);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
 }
 
-.contact-form textarea {
-  min-height: 180px;
-  resize: vertical;
-}
-
-.contact-form input::placeholder,
-.contact-form textarea::placeholder {
+.contact-channel-note,
+.contact-channel-status {
   color: var(--ink-faint);
-  opacity: 1;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
-.contact-form input:focus,
-.contact-form textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(76, 114, 237, 0.15);
-  outline: 0;
+.contact-channel-note {
+  max-width: 470px;
 }
 
-.contact-submit {
+.contact-channel-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.contact-address {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+.contact-copy-button,
+.contact-phone-action {
   display: inline-flex;
-  width: 100%;
-  min-height: 50px;
+  min-height: 42px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  border: 0;
-  border-radius: 999px;
-  color: #ffffff;
-  background: var(--ink);
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.contact-submit:hover {
-  background: #2b2e35;
-}
-
-.contact-form-note {
-  min-height: 2.7em;
-  color: var(--ink-faint);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.contact-draft-link {
-  width: max-content;
-  color: var(--accent-dark);
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  background: var(--surface);
   font-size: 13px;
   font-weight: 650;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+}
+
+.contact-copy-button {
+  cursor: pointer;
+}
+
+.contact-copy-button:hover,
+.contact-phone-action:hover {
+  border-color: var(--ink-soft);
+  color: var(--ink);
+}
+
+.contact-phone-action {
+  width: max-content;
+  justify-content: flex-start;
+}
+
+.contact-channel-status {
+  min-height: 1.55em;
 }
 
 .contact-legal-strip {
-  width: min(calc(100% - 40px), 1000px);
-  margin-top: clamp(88px, 11vw, 150px);
+  width: min(calc(100% - 40px), 1080px);
+  margin-top: clamp(64px, 8vw, 104px);
   border-top: 1px solid var(--line-strong);
   padding-top: 34px;
 }
@@ -4231,7 +4230,7 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin-top: 42px;
+  margin-top: 32px;
 }
 
 .contact-legal-item {
@@ -4369,20 +4368,20 @@ textarea {
   }
 
   .contact-intro .legal-back {
-    margin-bottom: 48px;
+    margin-bottom: 36px;
   }
 
   .contact-intro h1 {
     font-size: clamp(44px, 13vw, 64px);
   }
 
-  .contact-field-grid {
+  .contact-channel-actions {
     grid-template-columns: 1fr;
   }
 
   .contact-legal-strip {
     width: min(calc(100% - 40px), 680px);
-    margin-top: 88px;
+    margin-top: 64px;
   }
 
   .contact-legal-list {
@@ -4825,4 +4824,44 @@ html[data-theme="dark"] .final-cta-card::before {
   .hero-typewriter-cursor {
     animation: none;
   }
+}
+
+/* Contact channels use the same surface contract in both themes. Explicit
+   overrides keep the primary email CTA readable when --ink flips to white. */
+html[data-theme="dark"] .contact-page {
+  background: var(--page);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .contact-channel-shell {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+html[data-theme="dark"] .contact-channel {
+  background: var(--surface-soft);
+}
+
+html[data-theme="dark"] .contact-email-action {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--page);
+}
+
+html[data-theme="dark"] .contact-email-action:hover {
+  background: color-mix(in srgb, var(--ink) 88%, var(--page));
+}
+
+html[data-theme="dark"] .contact-copy-button,
+html[data-theme="dark"] .contact-phone-action {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+html[data-theme="dark"] .contact-copy-button:hover,
+html[data-theme="dark"] .contact-phone-action:hover {
+  border-color: var(--ink-soft);
+  color: var(--ink);
 }

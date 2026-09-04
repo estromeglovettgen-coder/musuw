@@ -6,6 +6,7 @@ import { isAgentStreamAgentId } from "@/utils/agent-mode";
 import { reconcileLiteChatSettings } from "@/utils/liteChatSettings";
 import { loadAndReconcileSettings } from "@/stores/settingsStorage";
 import { resetSettingsForIdentityBoundary } from "@/stores/settingsIdentityBoundary";
+import { DEFAULT_CHAT_MODEL_ID } from "@/utils/managedChatModels";
 import type { ConsumerScene } from "@/api/model";
 
 // 定义设置接口
@@ -108,7 +109,7 @@ const defaultSettings: Settings = {
   conversationModels: {
     summaryModelId: "",
     rerankModelId: "",
-    selectedChatModelId: "",  // 用户当前选择的对话模型ID
+    selectedChatModelId: "",
     thinkingEnabled: true,
     reasoningEffort: "high",
     consumerSceneModelIds: {},
@@ -187,10 +188,41 @@ export const useSettingsStore = defineStore("settings", {
   },
 
   actions: {
-    resetForIdentityBoundary() {
+    resetForIdentityBoundary(isLiteMode = false) {
       this.settings = resetSettingsForIdentityBoundary(defaultSettings);
+      if (isLiteMode) {
+        this.settings = reconcileLiteChatSettings({
+          ...this.settings,
+          conversationModels: {
+            ...this.settings.conversationModels,
+            selectedChatModelId: DEFAULT_CHAT_MODEL_ID,
+            thinkingEnabled: false,
+            reasoningEffort: "none",
+          },
+        });
+      }
       this._defaultsSnapshot = null;
       this._isApplyingSessionState = false;
+      localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+    },
+
+    // The edition probe can resolve after the native login callback has
+    // already established a new identity. Only fill an untouched empty model
+    // selection; a returning user's explicit model/reasoning choice wins.
+    applyLiteFirstRunDefaults() {
+      const current = this.settings.conversationModels || defaultSettings.conversationModels;
+      const isUntouched = !String(current.selectedChatModelId || "").trim();
+      this.settings = reconcileLiteChatSettings({
+        ...this.settings,
+        conversationModels: isUntouched
+          ? {
+              ...current,
+              selectedChatModelId: DEFAULT_CHAT_MODEL_ID,
+              thinkingEnabled: false,
+              reasoningEffort: "none",
+            }
+          : current,
+      });
       localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
     },
 

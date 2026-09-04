@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   getCurrentEntitlement,
@@ -11,6 +11,10 @@ import { useAuthStore } from '@/stores/auth'
 // usage page. This closes the brief OpenRouter settlement window without
 // polling or inventing a local credit counter.
 const CURRENT_ENTITLEMENT_FRESH_MS = 2_000
+// A tab can emit focus and visibilitychange together (and repeatedly while
+// switching windows). Revalidate at most once per cooldown from those
+// activity signals; explicit refresh() calls remain immediate.
+const ENTITLEMENT_REVALIDATION_COOLDOWN_MS = 30_000
 
 export const useCurrentEntitlementStore = defineStore('current-entitlement', () => {
   const authStore = useAuthStore()
@@ -36,10 +40,12 @@ export const useCurrentEntitlementStore = defineStore('current-entitlement', () 
   let activeRequestSequence = 0
   let inFlight: Promise<void> | null = null
   let inFlightScope = ''
+  let lastActivityRevalidationAt = 0
 
   const invalidate = () => {
     activeRequestSequence += 1
     lastUpdatedAt.value = 0
+    lastActivityRevalidationAt = 0
     loadingScope.value = ''
     inFlight = null
     inFlightScope = ''
@@ -69,6 +75,12 @@ export const useCurrentEntitlementStore = defineStore('current-entitlement', () 
     }
 
     const requestSequence = ++activeRequestSequence
+    lastActivityRevalidationAt = Date.now()
+    if (storedScope.value !== scope) {
+      storedEntitlement.value = null
+      storedBilling.value = null
+      lastUpdatedAt.value = 0
+    }
     storedScope.value = scope
     loadingScope.value = scope
     const request = (async () => {
@@ -80,8 +92,13 @@ export const useCurrentEntitlementStore = defineStore('current-entitlement', () 
         lastUpdatedAt.value = Date.now()
       } catch {
         if (requestSequence !== activeRequestSequence || scope !== scopeKey.value) return
-        storedEntitlement.value = null
-        storedBilling.value = null
+        lastActivityRevalidationAt = 0
+        // A failed revalidation must not replace a usable, scope-matched
+        // provider snapshot with a loading/unavailable flash. With no prior
+        // snapshot, keep the existing honest unavailable state.
+        if (!storedEntitlement.value) {
+          storedBilling.value = null
+        }
         lastUpdatedAt.value = 0
       } finally {
         if (requestSequence === activeRequestSequence && scope === scopeKey.value) {
@@ -99,6 +116,24 @@ export const useCurrentEntitlementStore = defineStore('current-entitlement', () 
   }
 
   const ensureFresh = () => refresh(false)
+
+  const handleActivityRevalidation = () => {
+    if (!scopeKey.value) return
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+    const now = Date.now()
+    if (now - lastActivityRevalidationAt < ENTITLEMENT_REVALIDATION_COOLDOWN_MS) return
+    lastActivityRevalidationAt = now
+    void ensureFresh()
+  }
+
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    window.addEventListener('focus', handleActivityRevalidation)
+    document.addEventListener('visibilitychange', handleActivityRevalidation)
+    onScopeDispose(() => {
+      window.removeEventListener('focus', handleActivityRevalidation)
+      document.removeEventListener('visibilitychange', handleActivityRevalidation)
+    })
+  }
 
   watch(scopeKey, (nextScope, previousScope) => {
     if (nextScope === previousScope) return

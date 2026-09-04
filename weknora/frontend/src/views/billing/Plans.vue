@@ -77,17 +77,16 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useCurrentEntitlementStore } from '@/stores/entitlement'
 import {
   createPaddlePortalSession,
-  getCurrentEntitlement,
   type BillingPeriod,
-  type ConsumerEntitlement,
   type ConsumerPlan,
-  type PaddleBillingConfig,
   type PaidConsumerPlan,
 } from '@/api/entitlement'
 import { previewPaddlePrices } from '@/utils/paddleCheckout'
@@ -95,10 +94,10 @@ import { previewPaddlePrices } from '@/utils/paddleCheckout'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const entitlementStore = useCurrentEntitlementStore()
 const { locale, t } = useI18n()
-const entitlement = ref<ConsumerEntitlement | null>(null)
-const billing = ref<PaddleBillingConfig | null>(null)
-const loading = ref(true)
+const { entitlement, billing } = storeToRefs(entitlementStore)
+const loading = ref(!entitlement.value)
 const pricePreviewLoading = ref(false)
 const localizedPrices = ref<Record<string, string>>({})
 const portalOpening = ref(false)
@@ -167,15 +166,10 @@ const loadPrices = async () => {
 }
 
 const loadEntitlement = async () => {
-  loading.value = true
+  loading.value = !entitlement.value
   try {
-    const response = await getCurrentEntitlement()
-    entitlement.value = response.data
-    billing.value = response.billing
-    await loadPrices()
-  } catch {
-    entitlement.value = null
-    billing.value = null
+    await entitlementStore.refresh()
+    if (entitlement.value && billing.value) await loadPrices()
   } finally {
     loading.value = false
   }

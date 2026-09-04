@@ -18,8 +18,8 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
 ]);
 
 const updated = "2026-08-27";
-const billingPolicyUpdated = "2026-08-29";
-const accountLifecycleUpdated = "2026-08-30";
+const billingPolicyUpdated = "2026-09-03";
+const accountLifecycleUpdated = "2026-09-03";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -58,14 +58,14 @@ const englishDocuments = {
       {
         heading: "2. Acceptance and eligibility",
         blocks: [
-          p("By creating an account, using musuw, or completing a purchase, you agree to these terms and the policies linked from them. If you use musuw for an organization, you confirm that you have authority to bind that organization."),
-          p("You must be legally able to enter into this agreement. musuw is not directed to children under 16, and a person under the age of legal majority may use it only with valid consent from a parent or guardian where permitted by law.")
+          p("By creating an account, using musuw, or completing a purchase, you agree to these terms and the policies linked from them. A musuw Lite account is a personal account for one user, and its plan and limits apply only to that account."),
+          p("You must be at least 16 to create or use a musuw account and legally able to enter into this agreement. If you are under the age of legal majority where you live, you also need valid consent from a parent or guardian where the law permits your use.")
         ]
       },
       {
         heading: "3. The service",
         blocks: [
-          p("musuw is a knowledge workspace that preserves source materials, uploads and parses common formats, organizes connected Wiki pages with a graph view inside Wiki, and provides AI-assisted dialogue with exact evidence links, export, and deletion controls."),
+          p("musuw is a personal knowledge service that preserves source materials, uploads and parses common formats, organizes connected Wiki pages with a graph view inside Wiki, and provides AI-assisted dialogue with exact evidence links, export, and deletion controls."),
           p("Features may evolve. We may improve, replace, or discontinue a feature when reasonably necessary for security, legal compliance, reliability, or product development. If a material change significantly reduces a paid feature, we will provide reasonable notice and any remedy required by law."),
           note("Available paid upgrades use Paddle's secure checkout. A URL or checkout return is not proof of payment; musuw grants a paid plan only after verifying Paddle's signed server notification.")
         ]
@@ -85,7 +85,8 @@ const englishDocuments = {
       {
         heading: "5. Your content and permissions",
         blocks: [
-          p("You retain ownership of notes, documents, prompts, saved answers, and other material you submit to musuw. You grant us a limited, non-exclusive license to host, copy, process, transmit, and display that content only as needed to provide, secure, support, and improve the service for you, or as required by law."),
+          p("Your content includes notes, documents, prompts, saved answers, and AI output requested by you. You retain ownership of material you submit and, as between you and musuw, we do not claim ownership of requested AI output. Rights or restrictions in an output may still depend on applicable law and the selected model or provider terms. You grant us a limited, non-exclusive license to host, copy, process, transmit, and display that content only as needed to deliver the features you request, secure and support the service, troubleshoot failures, or comply with law."),
+          p("musuw does not use content stored in your personal account to train general-purpose or foundation models unless you make a separate, express opt-in choice."),
           p("You confirm that you have the rights and permissions needed to upload and process your content. You must not upload content that unlawfully infringes intellectual property, privacy, confidentiality, or other rights."),
           p(`You can export content through the available product controls. To request account deletion, contact ${LEGAL_OPERATOR.supportEmail} or the published support channel. Authorized operations staff use a restricted internal deletion control; the workflow removes Musuw-controlled active product data subject to the retention boundary in the Privacy Policy.`)
         ]
@@ -109,8 +110,7 @@ const englishDocuments = {
       {
         heading: "8. Seller and Merchant of Record",
         blocks: [
-          p("Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns."),
-          p("musuw provides product and technical support."),
+          p("Our order process is conducted by Paddle. The applicable Paddle entity shown at checkout or on the receipt acts as authorized reseller and Merchant of Record. Paddle handles purchase and transaction administration, buyer-support inquiries, and eligible refund requests. musuw provides product and technical support and works with Paddle on defect remediation and refund escalation under Paddle's current policy."),
           link("Read Paddle Buyer Terms", PADDLE_LINKS.buyerTerms),
           link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport),
           p("These provider terms apply to the purchase transaction. These musuw Terms govern your use of the product. If a mandatory consumer rule provides greater protection, that rule prevails.")
@@ -119,7 +119,7 @@ const englishDocuments = {
       {
         heading: "9. Cancellation and refunds",
         blocks: [
-          p("You can cancel a recurring plan through the management link in your receipt, Paddle's buyer portal, an in-product billing link when available, or by contacting us. Paddle's confirmation controls the recorded cancellation time; cancellation stops future renewals and takes effect at the end of the current paid period unless mandatory law provides otherwise."),
+          p("You can cancel a recurring plan through the management link in your receipt, Paddle's buyer portal, an in-product billing link when available, or by contacting us. Paddle records and confirms cancellation. A request received through a listed channel before renewal is treated as effective when applicable law requires, even if confirmation is delayed; keep the request evidence and contact us if that happens. Cancellation stops future renewals and takes effect at the end of the current paid period unless mandatory law provides otherwise."),
           p("musuw does not offer voluntary refunds. Transactions are final and non-refundable, subject to Paddle's current Refund Policy and mandatory consumer rights."),
           link("Read Musuw Refund Policy", "/refund-policy"),
           link("Read Paddle Refund Policy", PADDLE_LINKS.refundPolicy)
@@ -135,7 +135,7 @@ const englishDocuments = {
       {
         heading: "11. Our intellectual property",
         blocks: [
-          p("musuw, its software, interfaces, branding, documentation, and service-generated materials other than your content are owned by us or our licensors. These terms give you a limited, revocable, non-transferable right to use the service according to your plan. They do not transfer ownership of our intellectual property."),
+          p("musuw, its software, interfaces, branding, documentation, and service materials other than your content (including prompts and AI output requested by you) are owned by us or our licensors. These terms give you a limited, revocable, non-transferable right to use the service according to your plan. They do not transfer ownership of our intellectual property."),
           p("Feedback is voluntary. If you provide feedback, you allow us to use it without restriction or payment, but we will not identify you publicly without permission.")
         ]
       },
@@ -151,7 +151,7 @@ const englishDocuments = {
         blocks: [
           p("We provide the service with reasonable care and skill. Except for warranties that cannot lawfully be excluded, musuw is provided on an “as available” basis and we do not promise uninterrupted operation or error-free AI output."),
           p("To the maximum extent permitted by law, neither party is liable for indirect, incidental, special, punitive, or consequential loss, or loss of profits, revenue, goodwill, or data, that was not reasonably foreseeable."),
-          p("To the maximum extent permitted by law, our aggregate liability arising from the service is limited to the greater of USD 100 or the amount you paid for musuw during the 12 months before the event giving rise to the claim. This limit does not apply where liability cannot legally be limited, including fraud, willful misconduct, death or personal injury caused by negligence, or mandatory consumer rights.")
+          p("To the maximum extent permitted by law, our aggregate liability arising from the service is limited to the greater of USD 100 or the amount you paid for musuw during the 12 months before the event giving rise to the claim. This limit does not apply to the extent liability cannot legally be limited, including fraud, willful misconduct, death or personal injury caused by negligence, breaches of statutory data-protection or security obligations, or mandatory consumer rights.")
         ]
       },
       {
@@ -190,7 +190,7 @@ const englishDocuments = {
         heading: "2. Data we collect",
         blocks: [
           list(
-            "Account and contact data, such as name, email address, account identifiers, language, and workspace membership.",
+            "Account and contact data, such as name, email address, account identifiers, language, and profile preferences.",
             "Knowledge content, such as documents, notes, prompts, saved answers, citations, topics, Wiki pages, graph links, and files you choose to upload.",
             "Usage and technical data, such as feature events, aggregate page-performance metrics, IP address, device and browser information, locale, timestamps, diagnostics, security events, and cookie or local-storage identifiers where used.",
             "Support and communication data, including messages, attachments, feedback, and records needed to resolve a request.",
@@ -201,7 +201,7 @@ const englishDocuments = {
       {
         heading: "3. Sources of data",
         blocks: [
-          p("We collect data directly from you, automatically from your device when you use the service, from workspace administrators who invite you, from integrations you authorize, and from payment, fraud-prevention, support, or infrastructure providers involved in delivering the service."),
+          p("We collect data directly from you, automatically from your device when you use the service, from connected services you authorize, and from payment, fraud-prevention, support, or infrastructure providers involved in delivering the service."),
           p("Cloudflare may provide a country code for storefront language selection. We use that code to select Chinese for visitors in mainland China and English elsewhere; we do not use it to infer a precise location."),
           p("Cloudflare processes request metadata at the public edge for delivery, TLS, abuse prevention, and country-level language selection. The current storefront does not load an analytics or advertising beacon.")
         ]
@@ -211,13 +211,13 @@ const englishDocuments = {
         blocks: [
           list(
             "Provide the service and requested features, under our contract with you.",
-            "Process accounts, purchases, subscriptions, support, and product communications, under the contract and our legitimate interests in operating the service.",
-            "Secure, troubleshoot, prevent fraud and abuse, enforce policies, and maintain auditability, based on legitimate interests and legal obligations.",
+            "Process accounts, purchases, subscriptions, support, and service communications as needed to perform the contract, respond to your request, or comply with law.",
+            "Secure, troubleshoot, prevent fraud and abuse, enforce policies, and maintain auditability as needed to perform the contract, comply with legal obligations, or protect users and the service.",
             "Comply with tax, accounting, sanctions, law-enforcement, and other legal requirements.",
-            "Improve usability and reliability using aggregated, de-identified, or limited service data, based on legitimate interests where permitted.",
-            "Send optional marketing only with consent where consent is required. You can unsubscribe at any time."
+            "Improve usability and reliability using aggregated, de-identified, or limited service data where applicable law permits it.",
+            "Send optional marketing only when you requested it or gave any consent required by law. You can unsubscribe at any time."
           ),
-          p("Where we rely on consent, you may withdraw it at any time without affecting processing that was lawful before withdrawal. Where we rely on legitimate interests, you may object as described below.")
+          p("The available legal bases depend on where you live. They may include performing a contract, complying with legal obligations, your consent, and other grounds expressly permitted by applicable law. A legitimate-interest basis is used only in jurisdictions that recognize it and only after the required balancing; you may object where that right applies. You may withdraw consent at any time without affecting earlier lawful processing.")
         ]
       },
       {
@@ -225,21 +225,25 @@ const englishDocuments = {
         blocks: [
           p("musuw processes the source scope and prompts you select to retrieve evidence and generate requested output. For a requested AI feature, the minimum relevant prompts, retrieved excerpts, images, audio, or video may be sent through OpenRouter to the model and inference provider identified by the selected model. Embedding and reranking send the text needed to index or rank your sources."),
           p("OpenRouter states that it does not use API inputs or outputs for model training. A downstream model or inference provider may have different retention or training practices. The product identifies the selected model; review OpenRouter's current provider information before sending sensitive content and contact us if you need help identifying the route used for a request."),
-          p("We do not sell private workspace content or use it for cross-context behavioral advertising. We do not make solely automated decisions about you that produce legal or similarly significant effects."),
-          p("Avoid uploading unnecessary sensitive personal data. If you use musuw to process data about another person, you are responsible for having an appropriate legal basis, giving required notices, and respecting that person's rights.")
+          p("musuw does not use content stored in your personal account to train general-purpose or foundation models unless you separately and expressly opt in. This commitment describes musuw's own purpose; the current practices of OpenRouter and each downstream provider are separate and are described by their notices."),
+          p("We do not sell content stored in your personal account or use it for cross-context behavioral advertising. We do not make solely automated decisions about you that produce legal or similarly significant effects."),
+          p("The service is not designed to require sensitive personal data such as biometric, health, financial-account, precise-location, or children's data. Do not upload it unless the processing is specifically necessary and lawfully authorized. If musuw intentionally introduces a purpose that requires sensitive personal data, we will give the required specific notice and obtain separate consent where applicable before that processing. If you process data about another person, you are responsible for the required legal basis, notices, and rights handling.")
         ]
       },
       {
         heading: "6. Service providers and recipients",
         blocks: [
           p("We disclose personal data only as reasonably needed for the roles below. The current principal service providers and independent recipients are:"),
+          p("Infrastructure and support providers generally process data for the service role described below under the applicable agreement. Paddle independently handles the purchase as Merchant of Record; Google handles the sign-in you choose; and OpenRouter, downstream model providers, and TikHub may have separate roles for their routed services. The exact legal role can vary by request and governing agreement, so their current notices also apply."),
           list(
             "Supabase, Inc. provides identity and one-time-code services and processes account email, profile claims, identity identifiers, and login/session data for that role.",
             "Resend, Inc. delivers transactional authentication email and processes the recipient address, authentication-message content and metadata, and delivery and security events for that role.",
             "Google LLC processes Google-account data when you choose Google sign-in. musuw requests only the openid, profile, and email scopes and receives the identifiers and profile fields that Google returns for them.",
             "Cloudflare, Inc. provides DNS and edge delivery, transport security, abuse prevention, country-level language selection, and R2 object storage. It may process IP and request metadata, security signals, and uploaded source objects for those roles.",
-            "OpenRouter, Inc. routes prompts, relevant source excerpts, media, model requests, usage, and a scoped user-tracking identifier to the selected model and inference provider. The model catalog currently includes models developed by DeepSeek, Alibaba Cloud's Qwen, OpenAI, Google, Anthropic, and Cohere; routing providers and their practices can vary by model.",
-            "Langfuse GmbH provides production AI observability and debugging in its Japan Cloud region. Bounded traces may include prompts or queries, retrieved or source previews, model responses, model and tool identifiers, usage, latency, and error metadata needed to operate and troubleshoot requested AI features.",
+            "Musuw's self-hosted SearXNG instance performs the product's web search and currently sends the search query from your request to Microsoft Bing, which returns public result titles, URLs, and snippets. The request does not include your musuw email or account identifier, but the query itself may reveal what you ask; Microsoft processes it under its own notice. The configured upstream search engine may change, and this notice will be updated when the production route changes.",
+            "TikHub, LLC. resolves a supported public social-media URL when you choose the paid social-link import feature. Depending on the platform endpoint, musuw sends the normalized public share URL or share text, or the public post or video identifier; it does not send your musuw email or account identifier. TikHub returns public media and metadata and states that it may keep service logs and usage statistics and use service-related data for diagnostics, development, and correction.",
+            "OpenRouter, Inc. routes prompts, relevant source excerpts, media, model requests, usage, and a stable pseudonymous user-attribution identifier to the selected model and inference provider. The identifier does not contain your email address and is used for request and usage attribution. Available models and providers can change; the product identifies the selected model, while the actual downstream inference route and provider practices may vary by model and request.",
+            "Langfuse GmbH provides production AI observability and debugging in its Japan Cloud region. Bounded traces may include prompts or queries, retrieved or source previews, model responses, pseudonymous internal user, session, and request identifiers, endpoint and task metadata, model and tool identifiers, usage, latency, and error metadata needed to operate and troubleshoot requested AI features. Retention follows the current Langfuse project setting and applicable plan rather than a universal fixed period; contact us for the current setting or a rights request.",
             "Paddle entities act as the authorized reseller and Merchant of Record for paid musuw orders and process buyer contact, transaction, tax-location, payment, receipt, fraud-prevention, subscription, cancellation, and refund data under Paddle's buyer and privacy terms.",
             "Professional advisers, auditors, regulators, courts, and authorities when legally required or reasonably necessary to protect rights and safety.",
             "A successor in a merger, financing, reorganization, or sale, subject to appropriate confidentiality and notice requirements."
@@ -249,6 +253,8 @@ const englishDocuments = {
           link("Resend Privacy Policy", "https://resend.com/legal/privacy-policy"),
           link("Google Privacy Policy", "https://policies.google.com/privacy"),
           link("Cloudflare Privacy Policy", "https://www.cloudflare.com/privacypolicy/"),
+          link("Microsoft Privacy Statement", "https://privacy.microsoft.com/en-us/privacystatement"),
+          link("TikHub Privacy Policy", "https://docs.tikhub.io/5508543m0"),
           link("OpenRouter Privacy Policy", "https://openrouter.ai/privacy"),
           link("Langfuse Privacy Policy", "https://langfuse.com/privacy"),
           link("Langfuse Data Regions", "https://langfuse.com/security/data-regions"),
@@ -258,15 +264,15 @@ const englishDocuments = {
       {
         heading: "7. International transfers",
         blocks: [
-          p("musuw and its providers may process data outside the country where you live. When law requires safeguards for an international transfer, we use an approved transfer mechanism, contractual safeguards, consent where appropriate, or another lawful basis, and apply supplementary technical or organizational measures when needed."),
-          p("You may contact us for information about safeguards relevant to your data, subject to legitimate confidentiality restrictions.")
+          p("musuw and its providers may process data outside the country where you live. The recipient list above identifies the current categories, but the exact downstream inference recipient can vary with the model and route selected for a request. You may contact us for request-specific recipient and safeguard information, subject to lawful confidentiality restrictions."),
+          p("Where applicable law requires a transfer mechanism, a separate notice, or separate consent, musuw must complete that requirement before the affected transfer. This Privacy Policy itself is not separate consent.")
         ]
       },
       {
         heading: "8. Retention",
         blocks: [
           p("We retain account and knowledge content while your account is active or as needed to provide the service. After a verified deletion request or account closure, we delete or de-identify content from active systems without undue delay, subject to lawful retention, security investigations, disputes, and normal backup rotation."),
-          p("When managed account closure is accepted, musuw schedules each cancellable Paddle subscription to stop future automatic renewals at the end of its current billing period and ends product access immediately. Account closure does not automatically refund a completed payment; a past-due or otherwise non-cancelable provider state may need to be resolved before closure can be accepted. Paddle is the Merchant of Record and may retain invoices, transaction records, and tax, accounting, fraud-prevention, chargeback, and dispute records for the periods required or permitted by applicable law and its provider terms. musuw retains only the minimum corresponding records needed for legal, accounting, fraud-prevention, security, or dispute obligations, detaches or minimizes them where possible, and does not present them as active account data. These Paddle and musuw records follow their own retention periods; we do not promise immediate physical disappearance from Paddle or bounded backups."),
+          p("When managed account closure is accepted, musuw immediately ends product access and begins removing active knowledge content. It schedules each cancellable Paddle subscription to stop future automatic renewals at the end of its current billing period. A past-due, temporarily unavailable, or otherwise non-cancelable provider state does not delay acceptance or the access fence. Once Paddle confirms that cancellation has been scheduled, musuw can complete deletion of the fenced account and billing-linkage record immediately; it does not wait for the current billing period to end. If Paddle reports every linked subscription as terminal or authoritatively not found, no cancellation is required. During any pending interval, the fenced identity and Paddle customer/subscription linkage are retained only to complete cancellation and erasure and are not presented as an active account. Account closure does not automatically refund a completed payment. Paddle is the Merchant of Record and may retain invoices, transaction records, and tax, accounting, fraud-prevention, chargeback, and dispute records for the periods required or permitted by applicable law and its provider terms. musuw retains only the minimum corresponding records needed for legal, accounting, fraud-prevention, security, dispute, cancellation, or erasure obligations, detaches or minimizes them where possible, and does not present them as active account data. These Paddle and musuw records follow their own retention periods; we do not promise immediate physical disappearance from Paddle or bounded backups."),
           p("Security logs and support records are retained only as long as reasonably needed for their purpose."),
           p("When data is no longer needed, we delete, de-identify, or securely isolate it. De-identified information may be retained where it cannot reasonably be linked back to you.")
         ]
@@ -275,6 +281,7 @@ const englishDocuments = {
         heading: "9. Your privacy rights",
         blocks: [
           p("Depending on where you live, you may have rights to be informed, access data, correct inaccurate data, delete data, restrict or object to processing, obtain portable data, withdraw consent, and appeal or complain to a data-protection authority."),
+          p("Where applicable, you may request an explanation of a decision made using automated processing, object to a solely automated decision with a significant effect, and request human review."),
           p("Residents of California may also have rights to know, delete, correct, limit use of sensitive information where applicable, opt out of sale or sharing, and receive equal service. musuw does not sell or share personal information for cross-context behavioral advertising."),
           p(`To request account closure, email ${LEGAL_OPERATOR.supportEmail} with “Privacy request” or “Account deletion” in the subject, or use the published support channel. You may delete individual documents and knowledge bases with the product controls. We may request proportionate verification and may decline or limit a request only where law permits. Authorized agents must provide valid authority.`),
           p("Authorized operations staff use a restricted internal account-deletion control. The product does not expose a self-service account-deletion action in user settings."),
@@ -299,7 +306,7 @@ const englishDocuments = {
       {
         heading: "12. Children",
         blocks: [
-          p("musuw is not directed to children under 16 and we do not knowingly collect their personal data. If you believe a child submitted personal data without valid authorization, contact us so we can investigate and delete it where required.")
+          p("A musuw account user must be at least 16. The service is not directed to children and we do not knowingly collect their personal data. If you believe a child submitted personal data, contact us so we can investigate, disable the account, and delete the data where required.")
         ]
       },
       {
@@ -316,7 +323,7 @@ const englishDocuments = {
     eyebrow: "Purchases",
     title: "Refund Policy",
     summary:
-      "musuw does not offer voluntary refunds. Transactions are final and non-refundable except where required by law or allowed under Paddle's current Refund Policy, including mandatory rights and remedies for faulty, misdescribed, or unfit products.",
+      "Statutory withdrawal and mandatory consumer rights apply first. Outside those rights and Paddle's current Refund Policy, musuw does not offer voluntary refunds and completed transactions are final and non-refundable.",
     updated: billingPolicyUpdated,
     sections: [
       {
@@ -327,7 +334,17 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "2. No voluntary refunds",
+        heading: "2. Statutory withdrawal rights",
+        blocks: [
+          p("Paddle's current Refund Policy says buyers in China, South Korea, and Brazil have an unconditional right to cancel eligible digital content or services after delivery when the request is made within 7 days of the transaction."),
+          p("It also describes a 14-day withdrawal period for eligible buyers in the EU, EEA, Switzerland, and the UK for a one-time purchase or the first subscription payment, including a new period after a free trial ends; the current policy also describes an additional UK right for an annual subscription renewal."),
+          p("As of this policy's effective date, Paddle also lists current regional withdrawal periods for eligible buyers in Turkey and Israel (14 days), Canada (7 days), and Singapore (5 days). These examples are not an exhaustive substitute for Paddle's current policy or stronger local law."),
+          p("For eligible digital content, a withdrawal right may be lost only after the buyer gives express consent to begin using it during the withdrawal period and acknowledges the resulting loss of that right. Paddle's current Refund Policy and any stronger non-waivable local law control the exact eligibility and timing."),
+          link("Read Paddle Refund Policy", PADDLE_LINKS.refundPolicy)
+        ]
+      },
+      {
+        heading: "3. No voluntary refunds",
         blocks: [
           p("We do not offer voluntary or routine refunds. Completed transactions are final and non-refundable except where required by applicable law or allowed under Paddle's current Refund Policy."),
           p("Paddle may approve refunds at its discretion and may decline requests involving fraud, refund abuse, or other manipulative behavior. Mandatory consumer rights remain unaffected."),
@@ -335,7 +352,7 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "3. How to request a refund",
+        heading: "4. How to request a refund",
         blocks: [
           list(
             "Use the refund or buyer-support link in your payment receipt.",
@@ -347,7 +364,7 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "4. Who processes the refund",
+        heading: "5. Who processes the refund",
         blocks: [
           p("Paddle processes eligible refunds to the original payment method where possible. Follow the Paddle receipt, Customer Portal, or buyer-support process."),
           p("We will cooperate with Paddle, the Merchant of Record, to process any refund required or approved under the applicable policy. Transaction verification, payment-network timing, currency conversion, and provider buyer terms may affect how the refund appears."),
@@ -355,21 +372,21 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "5. Timing and access",
+        heading: "6. Timing and access",
         blocks: [
           p("Paddle's current Refund Policy says an eligible refund is processed to the original payment method where possible within 14 days after approval. Your bank or payment network may need additional time to display the credit; the current Paddle policy controls."),
           p("When a full refund is issued, access to the refunded paid entitlement may end immediately. Before requesting deletion, export any material you are entitled to keep.")
         ]
       },
       {
-        heading: "6. Defects, misdescription, and mandatory rights",
+        heading: "7. Defects, misdescription, and mandatory rights",
         blocks: [
           p("If musuw is materially defective, not as described, or not supplied with legally required care, contact us through the support channels above. Remedies required by applicable law remain available."),
           p("Nothing in this policy excludes or limits mandatory consumer rights, statutory withdrawal rights, or a payment provider's buyer protections. Where different terms apply, the highest non-waivable level of protection controls.")
         ]
       },
       {
-        heading: "7. Cancellations are separate",
+        heading: "8. Cancellations are separate",
         blocks: [
           p("Canceling a subscription stops future renewals but does not by itself refund an existing charge. Request a refund separately under this policy."),
           link("Read the Subscription and Cancellation Policy", "/subscription-policy")
@@ -408,7 +425,7 @@ const englishDocuments = {
             "Use an in-product billing link when production account billing is available.",
             `Email ${LEGAL_OPERATOR.supportEmail} from your account email and include the transaction identifier.`
           ),
-          p("Paddle's confirmation controls the recorded cancellation time. Cancellation stops future renewals and takes effect at the end of the current billing period, subject to mandatory law."),
+          p("Paddle records and confirms cancellation. A request received through a listed channel before renewal is treated as effective when applicable law requires, even if confirmation is delayed; keep the request evidence and contact us if that happens. Cancellation stops future renewals and takes effect at the end of the current billing period, subject to mandatory law."),
           link("Paddle buyer support (paddle.net)", PADDLE_LINKS.buyerSupport),
           contact()
         ]
@@ -430,7 +447,7 @@ const englishDocuments = {
       {
         heading: "6. Renewal notices and receipts",
         blocks: [
-          p("The Merchant of Record sends a receipt for each paid order. Renewal reminders are sent where required by law or supported by the provider. You are responsible for keeping the account and receipt email current.")
+          p("The Merchant of Record sends a receipt for each paid order. For consumers in China, applicable platform-pricing rules require notice before each recurring charge that states the charge time, amount, cancellation method, and any price change. In other jurisdictions and subscription intervals for which law requires an advance renewal reminder, Paddle or musuw will send the legally required notice before renewal. Where no such rule applies, not every interval necessarily receives a separate reminder, so keep the account and receipt email current; you may cancel at any time before renewal through the methods above.")
         ]
       },
       {
@@ -469,6 +486,7 @@ const englishDocuments = {
         blocks: [
           p("Do not upload or process material that you lack the right to use. Do not infringe intellectual property, privacy, publicity, confidentiality, contractual, database, or other rights."),
           p("URL imports are for private knowledge indexing of content you own or are authorized to use; they are not a streaming downloader or content redistribution service."),
+          p("Supported social-link imports use an unaffiliated third-party data API. You remain responsible for the source platform's terms and for having permission to retrieve and process the public post or media."),
           p("Video uploads are for private knowledge analysis of content you own or are authorized to use; musuw is not a public video hosting, streaming, downloading, or redistribution service."),
           p("Do not collect credentials, sensitive data, or personal data deceptively, or use musuw for unlawful surveillance or identification.")
         ]
@@ -578,10 +596,10 @@ const englishDocuments = {
         ]
       },
       {
-        heading: "2. Workspace and retrieval scope",
+        heading: "2. Account and retrieval scope",
         blocks: [
-          p("Knowledge retrieval is bounded to the authenticated workspace and to the topics, sources, and versions authorized for a conversation. Access-control checks are applied at service boundaries rather than relying only on interface visibility."),
-          p("Users should still avoid sharing accounts and should grant integrations only the permissions they need.")
+          p("Knowledge retrieval is bounded to the authenticated personal account and to the topics, sources, and versions authorized for a conversation. Access-control checks are applied at service boundaries rather than relying only on interface visibility."),
+          p("Keep your personal account private and grant connected services only the minimum permissions needed.")
         ]
       },
       {
@@ -705,14 +723,14 @@ const chineseDocuments = {
       {
         heading: "2. 接受条款与使用资格",
         blocks: [
-          p("创建账户、使用 musuw 或完成购买，即表示您同意本条款及其中链接的政策。代表组织使用时，您确认有权使该组织受本条款约束。"),
-          p("您必须具有订立本协议的法律能力。musuw 不面向 16 岁以下儿童；未达到法定成年年龄的人，仅可在法律允许且已取得父母或监护人有效同意时使用。")
+          p("创建账户、使用 musuw 或完成购买，即表示您同意本条款及其中链接的政策。musuw Lite 是一人使用的个人账户，套餐与额度仅适用于该账户。"),
+          p("您必须年满 16 周岁且具有订立本协议的法律能力，才能创建或使用 musuw 账户。若您在所在地未达到法定成年年龄，还须在法律允许使用的前提下取得父母或监护人的有效同意。")
         ]
       },
       {
         heading: "3. 服务内容与当前状态",
         blocks: [
-          p("musuw 是知识工作空间，用于保留原始资料、上传并解析常见格式、组织相互连接的 Wiki 页面及其中的图谱视图，并通过精确证据链接、导出和删除控制提供 AI 辅助对话。"),
+          p("musuw 是个人知识服务，用于保留原始资料、上传并解析常见格式、组织相互连接的 Wiki 页面及其中的图谱视图，并通过精确证据链接、导出和删除控制提供 AI 辅助对话。"),
           p("功能会持续演进。为安全、合规、可靠性或产品发展之合理需要，我们可以改进、替换或停止某项功能。若重大变化显著减少已付费功能，我们将提供合理通知及法律要求的救济。"),
           note("可用付费升级使用 Paddle 安全结账。网址参数或结账返回不代表付款成功；仅在 musuw 服务器验证 Paddle 签名通知后，产品才授予付费方案。")
         ]
@@ -732,7 +750,8 @@ const chineseDocuments = {
       {
         heading: "5. 您的内容与授权",
         blocks: [
-          p("您保留对提交至 musuw 的笔记、文档、提示词、已保存答案及其他材料的所有权。您授予我们有限、非独占的许可，仅为向您提供、保护、支持和改进服务或履行法律义务之需要，对这些内容进行托管、复制、处理、传输和展示。"),
+          p("您的内容包括笔记、文档、提示词、已保存答案及您请求生成的 AI 输出。您保留对提交材料的权利；就您与 musuw 之间而言，我们不主张您请求生成的 AI 输出的所有权。某项输出的权利或限制仍可能取决于适用法律及所选模型或服务商条款。您授予我们有限、非独占的许可，仅为交付您请求的功能、保护和支持服务、排查故障或履行法律义务之需要，对这些内容进行托管、复制、处理、传输和展示。"),
+          p("除非您另行明确选择加入，musuw 不会使用您个人账户中存储的内容训练通用模型或基础模型。"),
           p("您确认有权上传和处理相关内容。不得上传非法侵犯知识产权、隐私权、保密义务或其他权利的材料。"),
           p(`您可通过产品控制导出内容。如需注销账户，请联系 ${LEGAL_OPERATOR.supportEmail} 或已公布的客服渠道。获授权的运营人员通过受限内部功能提交注销，流程会移除 Musuw 控制的活动产品数据，但受隐私政策所述留存边界约束。`)
         ]
@@ -756,8 +775,7 @@ const chineseDocuments = {
       {
         heading: "8. 卖方与商户记录方",
         blocks: [
-          p("订单流程由在线经销商 Paddle.com 处理。Paddle.com 是所有订单的商户记录方；Paddle 负责所有客户服务咨询并处理退货。"),
-          p("musuw 提供产品和技术支持。"),
+          p("订单流程由 Paddle 处理。结账页或收据上列明的相应 Paddle 实体作为授权经销商和商户记录方。Paddle 处理购买与交易管理、买家支持咨询及符合条件的退款申请。musuw 提供产品和技术支持，并依 Paddle 当前政策配合处理缺陷补救与退款升级。"),
           link("查看 Paddle 买家条款", PADDLE_LINKS.buyerTerms),
           link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport),
           p("付款服务商条款适用于购买交易，本 musuw 条款适用于产品使用。若强制性消费者规则提供更高保护，以该规则为准。")
@@ -766,7 +784,7 @@ const chineseDocuments = {
       {
         heading: "9. 取消与退款",
         blocks: [
-          p("您可通过收据中的管理链接、Paddle 买家门户、可用时的产品内账单入口或联系我们取消循环订阅。Paddle 的确认记录取消时间；取消会停止未来续费，并在当前已付费周期结束时生效，除非强制性法律另有规定。"),
+          p("您可通过收据中的管理链接、Paddle 买家门户、可用时的产品内账单入口或联系我们取消循环订阅。Paddle 会记录并确认取消；如适用法律要求，在续费前通过上述列明渠道提出的请求，不因确认延迟而失效。请保留请求证据并在发生延迟时联系我们。取消会停止未来续费，并在当前已付费周期结束时生效，除非强制性法律另有规定。"),
           p("musuw 不提供自愿退款。交易均为最终交易且不予退款，但以 Paddle 当前《退款政策》和强制性消费者权利适用的情形为准。"),
           link("查看 musuw 退款政策", "/refund-policy"),
           link("查看 Paddle 退款政策", PADDLE_LINKS.refundPolicy)
@@ -782,7 +800,7 @@ const chineseDocuments = {
       {
         heading: "11. 我们的知识产权",
         blocks: [
-          p("除您的内容外，musuw 的软件、界面、品牌、文档及服务生成材料归我们或许可方所有。本条款仅根据套餐授予您有限、可撤销、不可转让的使用权，不转移我们的知识产权所有权。"),
+          p("除您的内容（包括提示词及您请求生成的 AI 输出）外，musuw 的软件、界面、品牌、文档及服务材料归我们或许可方所有。本条款仅根据套餐授予您有限、可撤销、不可转让的使用权，不转移我们的知识产权所有权。"),
           p("反馈完全自愿。提交反馈即允许我们不受限制且无需付费地使用，但未经许可我们不会公开识别您的身份。")
         ]
       },
@@ -798,7 +816,7 @@ const chineseDocuments = {
         blocks: [
           p("我们以合理注意和技能提供服务。除法律不得排除的保证外，musuw 按“可用状态”提供，我们不保证服务不中断或 AI 输出无错误。"),
           p("在法律允许的最大范围内，任何一方均不对间接、附带、特殊、惩罚性或后果性损失，以及不可合理预见的利润、收入、商誉或数据损失承担责任。"),
-          p("在法律允许的最大范围内，我们因服务产生的累计责任，以 100 美元或导致索赔事件前 12 个月您为 musuw 支付的金额中较高者为限。该限制不适用于法律不得限制的责任，包括欺诈、故意不当行为、因过失造成的死亡或人身伤害，以及强制性消费者权利。")
+          p("在法律允许的最大范围内，我们因服务产生的累计责任，以 100 美元或导致索赔事件前 12 个月您为 musuw 支付的金额中较高者为限。对于法律不得限制的责任，该限制不适用，包括欺诈、故意不当行为、因过失造成的死亡或人身伤害、违反法定个人信息保护或数据安全义务，以及强制性消费者权利。")
         ]
       },
       {
@@ -836,7 +854,7 @@ const chineseDocuments = {
         heading: "2. 我们收集的信息",
         blocks: [
           list(
-            "账户与联系信息，例如姓名、电子邮箱、账户标识、语言和工作空间成员关系。",
+            "账户与联系信息，例如姓名、电子邮箱、账户标识、语言和个人偏好。",
             "知识内容，例如您主动上传的文档、笔记、提示词、保存的答案、引用、主题、Wiki 页面、图谱链接和文件。",
             "使用与技术信息，例如功能事件、汇总页面性能指标、IP 地址、设备和浏览器信息、地区语言、时间戳、诊断、安全事件，以及使用时的 Cookie 或本地存储标识。",
             "支持与沟通信息，包括消息、附件、反馈和解决请求所需记录。",
@@ -847,7 +865,7 @@ const chineseDocuments = {
       {
         heading: "3. 信息来源",
         blocks: [
-          p("信息可能直接来自您、您使用服务时的设备、邀请您的工作空间管理员、您授权的集成，以及参与交付服务的付款、反欺诈、支持或基础设施服务商。"),
+          p("信息可能直接来自您、您使用服务时的设备、您授权连接的服务，以及参与交付服务的付款、反欺诈、支持或基础设施服务商。"),
           p("Cloudflare 可能向我们提供国家或地区代码，用于向中国大陆访问者显示中文、向其他访问者显示英文。我们不会借此推断精确位置。"),
           p("Cloudflare 在公开网站边缘处理请求元数据，用于内容交付、TLS、滥用防护和国家或地区层级的语言选择。当前官网不加载分析或广告信标。")
         ]
@@ -857,13 +875,13 @@ const chineseDocuments = {
         blocks: [
           list(
             "履行与您的合同并提供您请求的服务和功能。",
-            "处理账户、购买、订阅、支持和产品通知，以履行合同并满足合理运营利益。",
-            "保障安全、排查故障、防止欺诈和滥用、执行政策并保持可审计性，以满足合法利益和法定义务。",
+            "为履行合同、响应您的请求或遵守法律，处理账户、购买、订阅、支持和服务通知。",
+            "为履行合同、履行法定义务或保护用户与服务，保障安全、排查故障、防止欺诈和滥用、执行政策并保持可审计性。",
             "履行税务、会计、制裁、执法及其他法律义务。",
             "在允许范围内使用汇总、去标识化或有限服务数据改进可用性和可靠性。",
-            "仅在法律要求时取得同意后发送可选营销信息，您可随时退订。"
+            "仅在您主动请求或已取得法律要求的同意时发送可选营销信息，您可随时退订。"
           ),
-          p("依赖同意处理时，您可随时撤回，但不影响撤回前处理的合法性；依赖合法利益时，您可按下文方式提出异议。")
+          p("在中华人民共和国境内，我们仅在为订立或履行合同所必需、履行法定义务、已取得您的同意或个人信息保护法允许的其他情形下处理个人信息。依赖同意处理时，您可随时撤回，但不影响撤回前处理的合法性；其他地区适用当地法律认可的处理依据和相应权利。")
         ]
       },
       {
@@ -871,21 +889,25 @@ const chineseDocuments = {
         blocks: [
           p("musuw 处理您选择的来源范围和提示词，以检索证据并生成请求的输出。为完成您主动请求的 AI 功能，必要范围内的提示词、检索片段、图片、音频或视频可能经 OpenRouter 发送给所选模型对应的模型方和推理服务商；向量化和重排会发送建立索引或排序来源所需的文本。"),
           p("OpenRouter 声明其不使用 API 输入或输出训练模型，但下游模型方或推理服务商的保留和训练做法可能不同。产品会显示所选模型；提交敏感内容前请查看 OpenRouter 最新服务商信息，如需确认某次请求的处理路径可联系我们。"),
-          p("我们不出售私人工作空间内容，也不将其用于跨场景行为广告。我们不会仅通过自动化方式对您作出具有法律或类似重大影响的决定。"),
-          p("请避免上传不必要的敏感个人信息。若您使用 musuw 处理他人信息，您有责任具备适当处理依据、提供必要告知并尊重其权利。")
+          p("除非您另行明确选择加入，musuw 不会使用您个人账户中存储的内容训练通用模型或基础模型。该承诺说明 musuw 自身的处理目的；OpenRouter 及各下游服务商的现行做法另受其自身说明约束。"),
+          p("我们不出售您个人账户中的内容，也不将其用于跨场景行为广告。我们不会仅通过自动化方式对您作出具有法律或类似重大影响的决定。"),
+          p("本服务并不要求您提供生物识别、医疗健康、金融账户、精确行踪或未成年人信息等敏感个人信息。除非确有特定必要性且已取得合法授权，请勿上传。若 musuw 主动引入必须处理敏感个人信息的用途，我们会在处理前提供法律要求的专门告知，并在适用时取得单独同意；若您处理他人信息，您有责任具备相应依据、完成告知并保障其权利。")
         ]
       },
       {
         heading: "6. 服务商、委托处理与接收方清单",
         blocks: [
           p("我们仅在履行以下职责所合理必要的范围提供个人信息。目前主要服务商和独立接收方如下："),
+          p("基础设施和支持服务商通常根据适用协议，为下述服务职责处理信息。Paddle 作为商户记录方独立处理购买；Google 处理您主动选择的登录；OpenRouter、下游模型服务商和 TikHub 可能就其路由服务承担独立角色。具体法律角色可能随请求和适用协议变化，同时适用其当前公告。"),
           list(
             "Supabase, Inc. 提供身份认证和一次性验证码服务，为此处理账户邮箱、资料声明、身份标识以及登录和会话数据。",
             "Resend, Inc. 发送身份认证事务邮件，为此处理收件地址、认证邮件内容和元数据，以及投递与安全事件。",
             "您选择 Google 登录时，Google LLC 处理 Google 账户数据。musuw 仅请求 openid、profile 和 email 范围，并接收 Google 就这些范围返回的标识和资料字段。",
             "Cloudflare, Inc. 提供 DNS 与边缘交付、传输安全、滥用防护、国家或地区层级语言选择和 R2 对象存储，为此可能处理 IP 与请求元数据、安全信号和上传的原始资料对象。",
-            "OpenRouter, Inc. 将提示词、相关来源片段、媒体、模型请求、用量和范围化用户追踪标识路由给所选模型方和推理服务商。当前模型目录包括 DeepSeek、阿里云 Qwen、OpenAI、Google、Anthropic 和 Cohere 开发的模型；具体推理路由及其做法可能因模型而异。",
-            "Langfuse GmbH 在其日本云区域提供生产 AI 可观测与故障排查。为运营和排查用户请求的 AI 功能，范围受限的追踪可能包含提示词或查询、检索或来源预览、模型回复、模型与工具标识、用量、延迟和错误元数据。",
+            "Musuw 自托管的 SearXNG 实例执行产品网络搜索，目前会将来自您请求的搜索查询发送给 Microsoft Bing，并取回公开结果标题、URL 和摘要。请求不包含您的 musuw 邮箱或账户标识，但查询本身可能透露您所问的内容；Microsoft 依其自身声明处理该查询。配置的上游搜索引擎可能变化，生产路由变更时我们会更新本说明。",
+            "当您主动使用付费社媒链接导入功能时，TikHub, LLC. 会解析支持的公开社媒链接。根据平台接口，musuw 会发送标准化的公开分享 URL 或分享文本，或公开帖子/视频标识；不会发送您的 musuw 邮箱或账户标识。TikHub 返回公开媒体与元数据，并在其政策中说明可留存服务日志和使用统计，且可将服务相关数据用于诊断、开发和纠错。",
+            "OpenRouter, Inc. 将提示词、相关来源片段、媒体、模型请求、用量和稳定的假名化用户归因标识路由给所选模型方和推理服务商。该标识不含您的邮箱，用于请求和用量归因。可用模型和服务商可能变化；产品会显示所选模型，但实际下游推理路由及服务商做法可能因模型和请求而异。",
+            "Langfuse GmbH 在其日本云区域提供生产 AI 可观测与故障排查。为运营和排查用户请求的 AI 功能，范围受限的追踪可能包含提示词或查询、检索或来源预览、模型回复、假名化的内部用户、会话和请求标识、端点与任务元数据、模型与工具标识、用量、延迟和错误元数据。留存时间取决于当前 Langfuse 项目配置和适用套餐，不是统一固定期限；您可联系我们查询当前配置或行使相关权利。",
             "Paddle 相关实体作为 musuw 付费订单的授权经销商和商户记录方，依据其买家条款和隐私政策处理买家联系、交易、税务地区、付款、收据、反欺诈、订阅、取消和退款数据。",
             "在法律要求或为保护权利与安全所合理必要时的专业顾问、审计人员、监管机构、法院和主管机关。",
             "合并、融资、重组或出售中的继受方，但须采取适当保密和告知措施。"
@@ -895,6 +917,8 @@ const chineseDocuments = {
           link("Resend 隐私政策", "https://resend.com/legal/privacy-policy"),
           link("Google 隐私政策", "https://policies.google.com/privacy"),
           link("Cloudflare 隐私政策", "https://www.cloudflare.com/privacypolicy/"),
+          link("Microsoft 隐私声明", "https://privacy.microsoft.com/en-us/privacystatement"),
+          link("TikHub 隐私政策", "https://docs.tikhub.io/5508543m0"),
           link("OpenRouter 隐私政策", "https://openrouter.ai/privacy"),
           link("Langfuse 隐私政策", "https://langfuse.com/privacy"),
           link("Langfuse 数据区域", "https://langfuse.com/security/data-regions"),
@@ -904,15 +928,15 @@ const chineseDocuments = {
       {
         heading: "7. 跨境处理",
         blocks: [
-          p("musuw 及其服务商可能在您所在国家或地区之外处理信息。法律要求跨境传输保护措施时，我们会采用获认可的传输机制、合同保护、适当同意或其他合法依据，并在需要时采取补充技术和组织措施。"),
-          p("在不违反合法保密限制的前提下，您可联系我们了解适用于本人信息的跨境保护措施。")
+          p("musuw 及其服务商可能在您所在国家或地区之外处理信息。上方清单列出当前接收方类别，但某次请求的实际下游推理接收方可能随所选模型和路由变化；在不违反合法保密限制的前提下，您可联系我们了解该次请求的接收方和保护措施。"),
+          p("适用法律要求传输机制、另行告知或单独同意时，musuw 必须在相关跨境处理前完成相应要求；本隐私政策本身不构成您的单独同意。")
         ]
       },
       {
         heading: "8. 保留与删除",
         blocks: [
           p("账户处于活动状态或提供服务所需期间，我们会保留账户和知识内容。收到经核验的删除请求或账户关闭后，我们会在不无故拖延的情况下从活动系统删除或去标识化，但可能受法定留存、安全调查、争议和正常备份轮换限制。"),
-          p("账户注销获接受后，musuw 会安排每个可取消的 Paddle 订阅在当前计费周期结束时停止后续自动续费，并立即终止产品访问。账户注销不会自动退款已完成的付款；欠费或其他暂不可取消的服务商状态可能需要先处理，注销请求才能获接受。Paddle 是订单的商户记录方，可能依据适用法律及其服务条款在法定或允许期限内保留发票、交易记录、税务、会计、反欺诈、拒付和争议记录。musuw 仅为履行法律、会计、反欺诈、安全或争议义务保留相应最小记录，并在可行时脱离账户、最小化，不会作为活跃账户数据展示。这些 Paddle 和 musuw 记录按各自留存期限处理；我们不承诺立即从 Paddle 或受限备份中物理消失。"),
+          p("账户注销获接受后，musuw 会立即终止产品访问并开始移除活动知识内容，同时安排每个可取消的 Paddle 订阅在当前计费周期结束时停止后续自动续费。欠费、服务商暂不可用或其他暂不可取消状态不会延迟接受注销或停止访问。Paddle 确认已安排取消后，musuw 即可立即完成已封禁账户及账单关联记录的最终删除，不必等待当前计费周期结束；如果 Paddle 确认全部关联订阅已终止或权威返回不存在，则无需取消。在任何待处理期间，已封禁的身份及 Paddle 客户/订阅关联只为完成取消和注销而保留，不会作为活动账户展示。账户注销不会自动退款已完成的付款。Paddle 是订单的商户记录方，可能依据适用法律及其服务条款在法定或允许期限内保留发票、交易记录、税务、会计、反欺诈、拒付和争议记录。musuw 仅为履行法律、会计、反欺诈、安全、争议、取消或注销义务保留相应最小记录，并在可行时脱离账户、最小化，不会作为活跃账户数据展示。这些 Paddle 和 musuw 记录按各自留存期限处理；我们不承诺立即从 Paddle 或受限备份中物理消失。"),
           p("安全日志和支持记录仅在实现其目的所合理需要的期限内保留。"),
           p("信息不再需要时，我们会删除、去标识化或安全隔离。无法合理重新关联到您的去标识化信息可继续保留。")
         ]
@@ -921,6 +945,7 @@ const chineseDocuments = {
         heading: "9. 您的权利",
         blocks: [
           p("根据您所在地区，您可能享有知情、查阅、复制、更正、删除、限制或拒绝处理、获取可携带副本、撤回同意，以及申诉或向监管机构投诉等权利。"),
+          p("在适用情形下，您可要求说明自动化决策的处理情况，拒绝仅由自动化决策对您产生重大影响，并要求人工复核。"),
           p("加利福尼亚居民还可能享有知情、删除、更正、在适用时限制敏感信息使用、选择退出出售或共享，以及不受差别待遇的权利。musuw 不出售个人信息，也不为跨场景行为广告共享个人信息。"),
           p(`如需注销账户，请向 ${LEGAL_OPERATOR.supportEmail} 发送主题为“Privacy request”或“Account deletion”的邮件，或使用已公布的客服渠道。您可通过产品控件删除单篇文档或知识库。我们可能进行适度身份核验，仅在法律允许时拒绝或限制请求。授权代理人须提供有效授权。`),
           p("获授权的运营人员通过受限内部功能执行账户注销；用户设置中不提供自助注销入口。"),
@@ -945,7 +970,7 @@ const chineseDocuments = {
       {
         heading: "12. 未成年人",
         blocks: [
-          p("musuw 不面向 16 岁以下儿童，我们不会明知而收集其个人信息。如您认为儿童未经有效授权提交了个人信息，请联系我们调查并在法律要求时删除。")
+          p("musuw 账户使用者必须年满 16 周岁。本服务不面向儿童，我们不会明知而收集其个人信息；如您认为儿童提交了个人信息，请联系我们调查、停用相关账户并在法律要求时删除。")
         ]
       },
       {
@@ -961,7 +986,7 @@ const chineseDocuments = {
     path: "/refund-policy",
     eyebrow: "购买",
     title: "退款政策",
-    summary: "musuw 不提供自愿退款。除适用法律要求或 Paddle 当前《退款政策》允许（包括强制性权利及产品缺陷、描述不符或不适用时的救济）外，交易均为最终交易且不予退款。",
+    summary: "法定撤回权和强制性消费者权利优先适用；在这些权利及 Paddle 当前《退款政策》之外，musuw 不提供自愿退款，已完成交易均为最终交易且不予退款。",
     updated: billingPolicyUpdated,
     sections: [
       {
@@ -972,7 +997,17 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "2. 不提供自愿退款",
+        heading: "2. 法定撤回权",
+        blocks: [
+          p("Paddle 当前《退款政策》说明，中国、韩国和巴西的买家，在数字内容或服务交付后，可对符合条件的交易行使无条件取消权，但须在交易发生后 7 日内提出。"),
+          p("该政策还说明，欧盟、欧洲经济区、瑞士和英国的符合条件买家，就单次购买或首次订阅付款享有 14 日撤回期；免费试用结束后会开始新的撤回期，英国年度订阅续费还适用该政策列明的额外权利。"),
+          p("截至本政策生效日，Paddle 还列明了土耳其和以色列（14 日）、加拿大（7 日）以及新加坡（5 日）符合条件买家的地区性撤回期。这些示例不是完整清单，不替代 Paddle 当前政策或更高的当地法律保护。"),
+          p("对于符合条件的数字内容，只有买家明确同意在撤回期内开始使用，并确认因此丧失撤回权后，该权利才可能失效。具体资格和期限以 Paddle 当前《退款政策》及更高的不可放弃当地法律保护为准。"),
+          link("查看 Paddle 退款政策", PADDLE_LINKS.refundPolicy)
+        ]
+      },
+      {
+        heading: "3. 不提供自愿退款",
         blocks: [
           p("我们不提供自愿或常规退款。除适用法律要求或 Paddle 当前《退款政策》允许外，已完成交易均为最终交易且不予退款。"),
           p("Paddle 可酌情批准退款，也可拒绝涉及欺诈、退款滥用或其他操纵行为的申请。强制性消费者权利不受影响。"),
@@ -980,7 +1015,7 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "3. 如何申请",
+        heading: "4. 如何申请",
         blocks: [
           list(
             "使用付款收据中的退款或买家支持链接。",
@@ -992,7 +1027,7 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "4. 谁处理退款",
+        heading: "5. 谁处理退款",
         blocks: [
           p("Paddle 会在可能时将符合条件的退款退回原付款方式。请使用 Paddle 收据、客户门户或买家支持流程。"),
           p("我们会与商户记录方 Paddle 配合处理适用政策要求或批准的退款。交易核验、支付网络处理时间、汇率换算和服务商买家条款可能影响退款到账方式。"),
@@ -1000,21 +1035,21 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "5. 时间与访问权",
+        heading: "6. 时间与访问权",
         blocks: [
           p("Paddle 当前退款政策说明，符合条件的退款会在可能时原路处理，并在批准后 14 日内处理；银行或支付网络可能需要额外时间显示入账，以当前 Paddle 政策为准。"),
           p("全额退款完成后，相应付费权益可能立即终止。申请删除前，请先导出您有权保留的材料。")
         ]
       },
       {
-        heading: "6. 缺陷、描述不符与法定权利",
+        heading: "7. 缺陷、描述不符与法定权利",
         blocks: [
           p("若 musuw 存在重大缺陷、与描述不符或未以法律要求的合理注意提供，请通过上述支持渠道联系我们。适用法律要求的救济仍然有效。"),
           p("本政策不排除或限制强制性消费者权利、法定撤回权或付款服务商提供的买家保护。不同规则并存时，以不可放弃的最高保护为准。")
         ]
       },
       {
-        heading: "7. 取消与退款不同",
+        heading: "8. 取消与退款不同",
         blocks: [
           p("取消订阅会停止未来续费，但不会自动退还已经完成的扣款。退款须根据本政策另行申请。"),
           link("查看订阅与取消政策", "/subscription-policy")
@@ -1052,7 +1087,7 @@ const chineseDocuments = {
             "生产账户账单功能可用时，使用产品内账单入口。",
             `使用账户邮箱联系 ${LEGAL_OPERATOR.supportEmail} 并提供交易标识。`
           ),
-          p("Paddle 的确认记录取消时间。取消会停止未来续费，并在当前计费周期结束时生效，受强制性法律约束。"),
+          p("Paddle 会记录并确认取消。如适用法律要求，在续费前通过上述列明渠道提出的请求，不因确认延迟而失效；请保留请求证据并在发生延迟时联系我们。取消会停止未来续费，并在当前计费周期结束时生效，受强制性法律约束。"),
           link("Paddle 买家支持（paddle.net）", PADDLE_LINKS.buyerSupport),
           contact("请求取消")
         ]
@@ -1074,7 +1109,7 @@ const chineseDocuments = {
       {
         heading: "6. 续费提醒与收据",
         blocks: [
-          p("商户记录方会为每笔真实付款发送收据。法律要求或服务商支持时会发送续费提醒。您有责任保持账户和收据邮箱有效。")
+          p("商户记录方会为每笔真实付款发送收据。对中国消费者，适用的平台价格规则要求在每次自动续费扣款前告知扣款时间、金额、取消途径及价格变化。对于其他法律要求的地区和订阅周期，Paddle 或 musuw 会在续费前提前发送续费提醒。没有此类强制规则时，并非每种周期都必然收到单独提醒；请保持账户和收据邮箱有效，您可在续费前随时通过上述方式取消。")
         ]
       },
       {
@@ -1110,6 +1145,7 @@ const chineseDocuments = {
         blocks: [
           p("不得上传或处理您无权使用的材料，不得侵犯知识产权、隐私权、公开权、保密义务、合同权利、数据库权利或其他权利。"),
           p("网页导入仅用于对您拥有或获授权使用的内容建立私人知识索引，不是流媒体下载或内容再分发服务。"),
+          p("支持的社媒链接导入使用与来源平台无关联的第三方数据 API。您仍须遵守来源平台条款，并确保有权获取和处理相应公开帖子或媒体。"),
           p("视频上传仅用于对您拥有或获授权使用的内容进行私人知识分析；musuw 不是面向公众的视频托管、流媒体播放、下载或内容再分发服务。"),
           p("不得以欺骗方式收集凭据、敏感信息或个人信息，也不得将 musuw 用于非法监控或身份识别。")
         ]
@@ -1211,10 +1247,10 @@ const chineseDocuments = {
         ]
       },
       {
-        heading: "2. 工作空间与检索范围",
+        heading: "2. 账户与检索范围",
         blocks: [
-          p("知识检索限定在已认证的工作空间，以及本次对话获授权的主题、来源和版本范围。访问控制在服务边界执行，而非仅依赖界面是否可见。"),
-          p("用户仍应避免共享账户，并仅授予集成所需的最小权限。")
+          p("知识检索限定在已认证的个人账户，以及本次对话获授权的主题、来源和版本范围。访问控制在服务边界执行，而非仅依赖界面是否可见。"),
+          p("请妥善保管个人账户，并仅授予所连接服务必要的最小权限。")
         ]
       },
       {

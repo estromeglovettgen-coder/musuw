@@ -33,9 +33,9 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(
         document.updated,
         ["/privacy", "/subscription-policy"].includes(route)
-          ? "2026-08-30"
+          ? "2026-09-03"
           : ["/terms", "/refund-policy"].includes(route)
-            ? "2026-08-29"
+            ? "2026-09-03"
             : "2026-08-27",
       );
       assert.ok(document.sections.length >= 3, `${route} needs substantive sections in ${locale}`);
@@ -108,8 +108,12 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
     assert.match(
       terms,
       locale === "zh-CN"
-        ? /Paddle 负责所有客户服务咨询并处理退货/
-        : /Paddle provides all customer service inquiries and handles returns/,
+        ? /Paddle.*购买与交易.*买家支持.*退款.*musuw.*产品和技术支持/
+        : /Paddle.*purchase and transaction.*buyer-support.*refund.*musuw.*product and technical support/is,
+    );
+    assert.doesNotMatch(
+      terms,
+      locale === "zh-CN" ? /Paddle 负责所有客户服务咨询/ : /Paddle provides all customer service inquiries/i,
     );
     for (const href of [
       "https://www.paddle.com/legal/buyer-terms",
@@ -169,7 +173,31 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
       privacy,
       locale === "zh-CN" ? /各自.*留存期限/ : /own retention periods/i,
     );
-    for (const provider of ["Supabase", "Resend", "Google", "Cloudflare", "OpenRouter", "Langfuse", "Paddle"]) {
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /欠费.*不会延迟接受注销|不会延迟接受注销.*欠费/
+        : /past-due.*does not delay acceptance|does not delay acceptance.*past-due/i,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /Paddle.*确认.*取消.*最终删除|最终删除.*Paddle.*确认.*取消/s
+        : /Paddle.*confirms.*cancellation.*(?:complete|final).*deletion|final deletion.*Paddle.*confirms cancellation/is,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /TikHub.*社媒.*链接|社媒.*TikHub.*链接/s
+        : /TikHub.*social-media.*(?:URL|link)/is,
+    );
+    assert.match(
+      privacy,
+      locale === "zh-CN"
+        ? /Langfuse.*用户.*会话.*请求标识/s
+        : /Langfuse.*user.*session.*request identifiers/is,
+    );
+    for (const provider of ["Supabase", "Resend", "Google", "Cloudflare", "SearXNG", "Microsoft", "TikHub", "OpenRouter", "Langfuse", "Paddle"]) {
       assert.match(privacy, new RegExp(provider));
     }
 
@@ -213,6 +241,8 @@ test("privacy policy links to the named providers' own notices", async () => {
       "https://resend.com/legal/privacy-policy",
       "https://policies.google.com/privacy",
       "https://www.cloudflare.com/privacypolicy/",
+      "https://privacy.microsoft.com/en-us/privacystatement",
+      "https://docs.tikhub.io/5508543m0",
       "https://openrouter.ai/privacy",
       "https://langfuse.com/privacy",
       "https://langfuse.com/security/data-regions",
@@ -230,6 +260,7 @@ test("the application and footer expose direct document routes", async () => {
   const siteChrome = await readFile(new URL("../src/components/SiteChrome.jsx", import.meta.url), "utf8");
   const legalContent = await readFile(new URL("../src/legalContent.js", import.meta.url), "utf8");
   const i18n = await readFile(new URL("../src/i18n.js", import.meta.url), "utf8");
+  const homepage = await readFile(new URL("../src/homepageMarketingRefresh.js", import.meta.url), "utf8");
   const legacyCompanyToken = ["Didi", "ren"].join("");
   const legacyDomain = ["didi", "ren.com"].join("");
 
@@ -240,6 +271,22 @@ test("the application and footer expose direct document routes", async () => {
   for (const route of ["/terms", "/privacy", "/refund-policy", "/security", "/contact"]) {
     assert.match(chrome, new RegExp(route.replace("/", "\\/")));
   }
+  for (const route of ["/subscription-policy", "/cookies"]) {
+    assert.match(homepage, new RegExp(route.replace("/", "\\/")));
+  }
+});
+
+test("terms preserve requested AI output rights and do not make delayed confirmation authoritative", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+  const english = JSON.stringify(getPublicDocument("en", "/terms"));
+  const chinese = JSON.stringify(getPublicDocument("zh-CN", "/terms"));
+
+  assert.match(english, /your content.*prompts.*AI output requested by you/is);
+  assert.match(chinese, /您的内容.*提示词.*您请求生成的 AI 输出/s);
+  assert.doesNotMatch(english, /Paddle(?:'s)? confirmation controls the recorded cancellation time/i);
+  assert.doesNotMatch(chinese, /Paddle 的确认记录取消时间/);
+  assert.match(english, /received through a listed channel before renewal.*effective/is);
+  assert.match(chinese, /续费前.*列明渠道.*提出.*有效/s);
 });
 
 test("account security guidance matches Google and email-code sign-in", async () => {
@@ -250,4 +297,88 @@ test("account security guidance matches Google and email-code sign-in", async ()
   assert.match(english, /Google account.*email inbox.*multi-factor authentication/i);
   assert.match(chinese, /Google 账户.*邮箱.*多因素认证/);
   assert.doesNotMatch(`${english}\n${chinese}`, /strong,? unique password|唯一强密码/i);
+});
+
+test("public policies describe the current personal Lite product, not workspace membership", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+  const english = ["/terms", "/privacy", "/security"]
+    .map((route) => JSON.stringify(getPublicDocument("en", route)))
+    .join("\n");
+  const chinese = ["/terms", "/privacy", "/security"]
+    .map((route) => JSON.stringify(getPublicDocument("zh-CN", route)))
+    .join("\n");
+
+  assert.match(english, /personal account/i);
+  assert.match(chinese, /个人账户/);
+  assert.doesNotMatch(english, /workspace membership|workspace administrators?|bind that organization/i);
+  assert.doesNotMatch(chinese, /工作空间成员|工作空间管理员|代表组织使用/);
+});
+
+test("billing policies put statutory withdrawal rights before the no-voluntary-refund rule", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+
+  for (const locale of ["en", "zh-CN"]) {
+    const refund = getPublicDocument(locale, "/refund-policy");
+    const text = JSON.stringify(refund);
+    const statutorySection = refund.sections.findIndex((section) =>
+      locale === "zh-CN" ? /法定撤回权/.test(section.heading) : /statutory withdrawal rights/i.test(section.heading),
+    );
+    const noVoluntarySection = refund.sections.findIndex((section) =>
+      locale === "zh-CN" ? /不提供自愿退款/.test(section.heading) : /no voluntary refunds/i.test(section.heading),
+    );
+
+    assert.ok(statutorySection >= 0 && statutorySection < noVoluntarySection);
+    assert.match(text, locale === "zh-CN" ? /中国、韩国和巴西.*7\s*日/ : /China, South Korea, and Brazil.*7 days/i);
+    assert.match(text, locale === "zh-CN" ? /欧盟、欧洲经济区、瑞士和英国.*14\s*日/ : /EU, EEA, Switzerland, and the UK.*14 days/i);
+    assert.match(
+      text,
+      locale === "zh-CN"
+        ? /土耳其.*以色列.*加拿大.*新加坡/s
+        : /Turkey.*Israel.*Canada.*Singapore/is,
+    );
+    assert.match(
+      text,
+      locale === "zh-CN" ? /明确同意.*开始使用.*撤回权/ : /express consent.*begin using.*withdrawal right/i,
+    );
+    assert.match(text, /https:\/\/www\.paddle\.com\/legal\/refund-policy/);
+  }
+});
+
+test("privacy and terms make narrow, jurisdiction-correct promises", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+  const englishPrivacy = JSON.stringify(getPublicDocument("en", "/privacy"));
+  const chinesePrivacy = JSON.stringify(getPublicDocument("zh-CN", "/privacy"));
+  const englishTerms = JSON.stringify(getPublicDocument("en", "/terms"));
+  const chineseTerms = JSON.stringify(getPublicDocument("zh-CN", "/terms"));
+
+  assert.match(englishPrivacy, /musuw does not use.*personal account content.*train.*general-purpose|foundation models/i);
+  assert.match(chinesePrivacy, /musuw 不会.*个人账户内容.*训练.*通用模型|基础模型/);
+  assert.match(englishTerms, /separate, express opt-in/i);
+  assert.match(chineseTerms, /另行明确选择加入/);
+
+  assert.doesNotMatch(chinesePrivacy, /合理运营利益|依赖合法利益/);
+  assert.match(chinesePrivacy, /履行合同.*法定义务.*同意.*法律允许/);
+  assert.match(chinesePrivacy, /隐私政策本身不构成.*单独同意/);
+  assert.match(englishPrivacy, /privacy policy itself is not separate consent/i);
+  assert.match(chinesePrivacy, /敏感个人信息.*单独同意/);
+  assert.match(englishPrivacy, /sensitive personal data.*separate consent/i);
+  assert.match(englishPrivacy, /explanation.*automated decision.*human review/is);
+  assert.match(chinesePrivacy, /说明.*自动化决策.*人工复核/s);
+
+  assert.match(englishTerms, /data-protection or security obligations/i);
+  assert.match(chineseTerms, /个人信息保护或数据安全义务/);
+  assert.match(englishTerms, /must be at least 16/i);
+  assert.match(chineseTerms, /必须年满 16 周岁/);
+});
+
+test("renewal policy states the qualified legal reminder duty without promising every-cycle reminders", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+  const english = JSON.stringify(getPublicDocument("en", "/subscription-policy"));
+  const chinese = JSON.stringify(getPublicDocument("zh-CN", "/subscription-policy"));
+
+  assert.match(english, /jurisdictions and subscription intervals for which law requires.*advance renewal reminder/i);
+  assert.match(chinese, /法律要求的地区和订阅周期.*提前发送续费提醒/);
+  assert.match(english, /China.*before each recurring charge.*time.*amount.*cancel/is);
+  assert.match(chinese, /中国.*每次自动续费扣款前.*扣款时间.*金额.*取消途径/s);
+  assert.doesNotMatch(`${english}\n${chinese}`, /supported by the provider|服务商支持时/);
 });

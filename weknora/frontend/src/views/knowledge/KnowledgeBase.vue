@@ -2,10 +2,11 @@
 import { defineComponent, onMounted, onUnmounted, ref, type SetupContext } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
-import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
+import type { ConsumerEntitlement } from '@/api/entitlement'
 import { listKnowledgeFolders, type KnowledgeFolderTree } from '@/api/knowledge-base'
 import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
 import { useAuthStore } from '@/stores/auth'
+import { useCurrentEntitlementStore } from '@/stores/entitlement'
 import {
   exceedsConsumerDocumentLimit,
   exceedsConsumerStorageQuota,
@@ -29,6 +30,7 @@ import WikiBrowser from './wiki/WikiBrowser.vue'
 const legacy = LegacyKnowledgeBaseBusiness as any
 const legacySetup = legacy.setup
 const KNOWLEDGE_FILE_DROP_EVENT = 'weknora:knowledge-file-drop'
+const KNOWLEDGE_FILE_UPLOADED_EVENT = 'knowledgeFileUploaded'
 
 const readStateValue = <T,>(value: T | { value: T }): T => {
   if (value && typeof value === 'object' && 'value' in value) return value.value
@@ -47,6 +49,7 @@ export default defineComponent({
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const authStore = useAuthStore()
+    const entitlementStore = useCurrentEntitlementStore()
     const { t } = useI18n()
     const showConsumerUpgradePrompt = useConsumerUpgradePrompt()
     const fileTypeFilterPanelVisible = ref(false)
@@ -94,11 +97,8 @@ export default defineComponent({
 
       const resolveEntitlement = async (): Promise<ConsumerEntitlement | null> => {
         if (!authStore.isLiteMode) return null
-        try {
-          return (await getCurrentEntitlement()).data
-        } catch {
-          return null
-        }
+        await entitlementStore.ensureFresh()
+        return entitlementStore.entitlement
       }
 
       const canAddDocuments = async (files: File[], incomingDocuments: number): Promise<boolean> => {
@@ -138,8 +138,17 @@ export default defineComponent({
         void handleUploadSourceFiles(files)
       }
 
+      const handleKnowledgeFileUploaded = (event: Event) => {
+        const detail = (event as CustomEvent).detail
+        const kbId = String(readStateValue<unknown>((state as any).kbId) || '')
+        if (!kbId || detail?.kbId !== kbId) return
+        void entitlementStore.refresh()
+      }
+
       onMounted(() => window.addEventListener(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true))
       onUnmounted(() => window.removeEventListener(KNOWLEDGE_FILE_DROP_EVENT, handleKnowledgeFileDrop, true))
+      onMounted(() => window.addEventListener(KNOWLEDGE_FILE_UPLOADED_EVENT, handleKnowledgeFileUploaded))
+      onUnmounted(() => window.removeEventListener(KNOWLEDGE_FILE_UPLOADED_EVENT, handleKnowledgeFileUploaded))
 
       return {
         ...state,

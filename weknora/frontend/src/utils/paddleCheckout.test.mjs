@@ -28,11 +28,13 @@ test('an initialized Paddle singleton fails closed if the runtime environment ch
 
 test('the app initializes official Paddle.js on public and authenticated pages for Retain', () => {
   assert.match(app, /getPaddlePublicConfig/)
-  assert.match(app, /getCurrentEntitlement/)
+  assert.match(app, /useCurrentEntitlementStore/)
+  assert.match(app, /await entitlementStore\.ensureFresh\(\)/)
+  assert.doesNotMatch(app, /getCurrentEntitlement/)
   assert.match(app, /initializePaddlePaymentLink/)
   assert.match(app, /authStore\.effectiveTenantId/)
-  assert.match(app, /pwCustomerId:\s*entitlement\.billing\.pw_customer_id/)
-  assert.match(app, /pwCustomerId:\s*undefined/)
+  assert.match(app, /pwCustomerId = entitlementStore\.billing\?\.pw_customer_id/)
+  assert.match(app, /pwCustomerId,/)
 })
 
 test('self-service checkout opens exactly one server-created official Paddle transaction', () => {

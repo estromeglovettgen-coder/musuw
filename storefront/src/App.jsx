@@ -123,11 +123,28 @@ export default function App() {
   }, []);
 
   if (publicDocument) {
-    return <LegalPage copy={copy} document={publicDocument} locale={locale} onLocaleChange={handleLocaleChange} />;
+    return (
+      <LegalPage
+        copy={copy}
+        document={publicDocument}
+        locale={locale}
+        onLocaleChange={handleLocaleChange}
+        theme={theme}
+        onThemeToggle={handleThemeToggle}
+      />
+    );
   }
 
   if (!isHome) {
-    return <NotFoundPage copy={copy} locale={locale} onLocaleChange={handleLocaleChange} />;
+    return (
+      <NotFoundPage
+        copy={copy}
+        locale={locale}
+        onLocaleChange={handleLocaleChange}
+        theme={theme}
+        onThemeToggle={handleThemeToggle}
+      />
+    );
   }
 
   return (

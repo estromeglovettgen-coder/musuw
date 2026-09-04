@@ -5,6 +5,7 @@ import test from "node:test";
 const SETTINGS_STORAGE_KEY = "WeKnora_settings";
 const BUILTIN_QUICK_ANSWER_ID = "builtin-quick-answer";
 const BUILTIN_SMART_REASONING_ID = "builtin-smart-reasoning";
+const DEFAULT_CHAT_MODEL_ID = "builtin-deepseek-v4-flash";
 const settingsStorageSource = readFileSync(new URL("./settingsStorage.ts", import.meta.url), "utf8");
 
 function cloneSettings(settings) {
@@ -15,22 +16,57 @@ function isStoredSettingsRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function reconcileLoadedSettings(loaded) {
+function reconcileLoadedSettings(loaded, defaults = makeDefaults(), options = {}, sourceWasStored = true) {
+  const isLiteMode = options.isLiteMode ?? localStorage.getItem("weknora_lite_mode") === "true";
   loaded.selectedTags ||= [];
   loaded.selectedMCPServices ||= [];
   loaded.selectedSkills ||= loaded.selectedTools || [];
   loaded.selectedFileKbMap ||= {};
 
+  const defaultConversation = isStoredSettingsRecord(defaults.conversationModels)
+    ? defaults.conversationModels
+    : {};
+  const loadedConversation = isStoredSettingsRecord(loaded.conversationModels)
+    ? loaded.conversationModels
+    : null;
+  const storedConversation = sourceWasStored ? loadedConversation : null;
+  const storedThinkingExplicit = typeof storedConversation?.thinkingEnabled === "boolean";
+  const storedReasoningExplicit = typeof storedConversation?.reasoningEffort === "string"
+    && storedConversation.reasoningEffort.trim() !== "";
   let reconciledThinking = false;
-  if (!isStoredSettingsRecord(loaded.conversationModels)) {
-    loaded.conversationModels = { thinkingEnabled: true };
+  if (!storedConversation) {
+    loaded.conversationModels = !sourceWasStored || isLiteMode
+      ? cloneSettings(defaultConversation)
+      : { thinkingEnabled: true };
     reconciledThinking = true;
-  } else if (typeof loaded.conversationModels.thinkingEnabled !== "boolean") {
-    loaded.conversationModels.thinkingEnabled = true;
+  } else {
+    loaded.conversationModels = isLiteMode
+      ? { ...cloneSettings(defaultConversation), ...storedConversation }
+      : storedConversation;
+    if (typeof loaded.conversationModels.thinkingEnabled !== "boolean") {
+      loaded.conversationModels.thinkingEnabled = isLiteMode
+        ? false
+        : true;
+      reconciledThinking = true;
+    }
+  }
+  if (!storedReasoningExplicit
+    || typeof loaded.conversationModels.reasoningEffort !== "string"
+    || loaded.conversationModels.reasoningEffort.trim() === "") {
+    loaded.conversationModels.reasoningEffort = isLiteMode && !storedThinkingExplicit
+      ? "none"
+      : loaded.conversationModels.thinkingEnabled === false ? "none" : "high";
     reconciledThinking = true;
   }
-  if (typeof loaded.conversationModels.reasoningEffort !== "string") {
-    loaded.conversationModels.reasoningEffort = loaded.conversationModels.thinkingEnabled === false ? "none" : "high";
+  if (isLiteMode && !storedConversation) {
+    loaded.conversationModels.selectedChatModelId =
+      loaded.conversationModels.selectedChatModelId || DEFAULT_CHAT_MODEL_ID;
+  } else if (isLiteMode && (
+    typeof loaded.conversationModels.selectedChatModelId !== "string"
+    || !loaded.conversationModels.selectedChatModelId.trim()
+  )) {
+    loaded.conversationModels.selectedChatModelId =
+      defaultConversation.selectedChatModelId || DEFAULT_CHAT_MODEL_ID;
     reconciledThinking = true;
   }
   const thinkingEnabled = loaded.conversationModels.reasoningEffort !== "none";
@@ -55,26 +91,26 @@ function reconcileLoadedSettings(loaded) {
 
   const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
   if (removedLegacyMemorySetting) delete loaded.enableMemory;
-  if (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking) {
+  if (sourceWasStored && (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking)) {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
   }
   return loaded;
 }
 
-function resetStoredSettings(defaultSettings) {
+function resetStoredSettings(defaultSettings, options = {}) {
   localStorage.removeItem(SETTINGS_STORAGE_KEY);
-  return reconcileLoadedSettings(cloneSettings(defaultSettings));
+  return reconcileLoadedSettings(cloneSettings(defaultSettings), defaultSettings, options, false);
 }
 
-function loadAndReconcileSettings(defaultSettings) {
+function loadAndReconcileSettings(defaultSettings, options = {}) {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return reconcileLoadedSettings(cloneSettings(defaultSettings));
+    if (!raw) return reconcileLoadedSettings(cloneSettings(defaultSettings), defaultSettings, options, false);
     const parsed = JSON.parse(raw);
-    if (!isStoredSettingsRecord(parsed)) return resetStoredSettings(defaultSettings);
-    return reconcileLoadedSettings(parsed);
+    if (!isStoredSettingsRecord(parsed)) return resetStoredSettings(defaultSettings, options);
+    return reconcileLoadedSettings(parsed, defaultSettings, options, true);
   } catch {
-    return resetStoredSettings(defaultSettings);
+    return resetStoredSettings(defaultSettings, options);
   }
 }
 
@@ -88,7 +124,14 @@ function makeDefaults() {
     selectedMCPServices: [],
     selectedSkills: [],
     selectedFileKbMap: {},
-    conversationModels: { thinkingEnabled: true, reasoningEffort: "high" },
+    conversationModels: {
+      summaryModelId: "",
+      rerankModelId: "",
+      selectedChatModelId: "",
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+      consumerSceneModelIds: {},
+    },
     nested: { items: ["a"] },
   };
 }
@@ -220,6 +263,88 @@ test("first-Musuw thinking preference is backfilled but existing value is preser
   assert.equal(preserved.conversationModels.reasoningEffort, "none");
 });
 
+test("Lite fresh settings start on V4 Flash with reasoning disabled", () => {
+  installMockLocalStorage();
+  const defaults = makeDefaults();
+  const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
+
+  assert.equal(loaded.conversationModels.selectedChatModelId, DEFAULT_CHAT_MODEL_ID);
+  assert.equal(loaded.conversationModels.thinkingEnabled, false);
+  assert.equal(loaded.conversationModels.reasoningEffort, "none");
+});
+
+test("Lite mode is inferred from the login bootstrap flag", () => {
+  const store = installMockLocalStorage();
+  store.weknora_lite_mode = "true";
+  const loaded = loadAndReconcileSettings(makeDefaults());
+
+  assert.equal(loaded.conversationModels.selectedChatModelId, DEFAULT_CHAT_MODEL_ID);
+  assert.equal(loaded.conversationModels.reasoningEffort, "none");
+  assert.equal(loaded.conversationModels.thinkingEnabled, false);
+});
+
+test("Lite missing or semi-structured conversation settings use safe defaults", () => {
+  const defaults = makeDefaults();
+  for (const conversationModels of [
+    undefined,
+    { selectedChatModelId: "" },
+    { selectedChatModelId: 42 },
+    { thinkingEnabled: "stale" },
+  ]) {
+    const store = installMockLocalStorage();
+    store[SETTINGS_STORAGE_KEY] = JSON.stringify({
+      isAgentEnabled: true,
+      selectedAgentId: BUILTIN_SMART_REASONING_ID,
+      conversationModels,
+    });
+    const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
+
+    assert.equal(loaded.conversationModels.selectedChatModelId, DEFAULT_CHAT_MODEL_ID);
+    assert.equal(loaded.conversationModels.thinkingEnabled, false);
+    assert.equal(loaded.conversationModels.reasoningEffort, "none");
+  }
+});
+
+test("Lite preserves an explicit high reasoning preference", () => {
+  const store = installMockLocalStorage();
+  const defaults = makeDefaults();
+  store[SETTINGS_STORAGE_KEY] = JSON.stringify({
+    conversationModels: {
+      selectedChatModelId: DEFAULT_CHAT_MODEL_ID,
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    },
+  });
+  const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
+
+  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.thinkingEnabled, true);
+});
+
+test("Lite preserves an explicit legacy thinking toggle when effort is absent", () => {
+  const store = installMockLocalStorage();
+  const defaults = makeDefaults();
+  store[SETTINGS_STORAGE_KEY] = JSON.stringify({
+    conversationModels: {
+      selectedChatModelId: DEFAULT_CHAT_MODEL_ID,
+      thinkingEnabled: true,
+    },
+  });
+  const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
+
+  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.thinkingEnabled, true);
+});
+
+test("Standard fresh settings retain the upstream empty-model high-reasoning default", () => {
+  installMockLocalStorage();
+  const loaded = loadAndReconcileSettings(makeDefaults(), { isLiteMode: false });
+
+  assert.equal(loaded.conversationModels.selectedChatModelId, "");
+  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.thinkingEnabled, true);
+});
+
 test("source code preserves native local Agents while removing shared scope", () => {
   assert.match(settingsStorageSource, /loaded\.selectedAgentId\s*=\s*storedAgentID \|\| BUILTIN_SMART_REASONING_ID/);
   assert.match(settingsStorageSource, /loaded\.selectedAgentSourceTenantId\s*=\s*null/);
@@ -228,4 +353,8 @@ test("source code preserves native local Agents while removing shared scope", ()
   assert.doesNotMatch(settingsStorageSource, /webSearchEnabled\s*=/);
   assert.doesNotMatch(settingsStorageSource, /withAuthorityDefaults/);
   assert.match(settingsStorageSource, /thinkingEnabled/);
+  assert.match(settingsStorageSource, /isLiteMode/);
+  assert.match(settingsStorageSource, /DEFAULT_CHAT_MODEL_ID/);
+  assert.match(settingsStorageSource, /selectedChatModelId/);
+  assert.match(settingsStorageSource, /storedReasoningExplicit/);
 });

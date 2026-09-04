@@ -35,8 +35,13 @@ test("shared-agent web search button waits for source readiness metadata", () =>
 
 test("consumer chat can select a native agent and sends model-specific reasoning effort", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
+  assert.match(settingsStore, /thinkingEnabled:\s*false/);
+  assert.match(settingsStore, /selectedChatModelId:\s*""/);
   assert.match(settingsStore, /thinkingEnabled:\s*true/);
   assert.match(settingsStore, /reasoningEffort:\s*"high"/);
+  assert.match(settingsStore, /applyLiteFirstRunDefaults\(\)/);
+  assert.match(settingsStore, /selectedChatModelId:\s*DEFAULT_CHAT_MODEL_ID/);
+  assert.match(settingsStore, /reasoningEffort:\s*"none"/);
   assert.match(settingsStore, /selectedAgentId:\s*BUILTIN_SMART_REASONING_ID/);
   assert.match(inputBusiness, /const thinkingEnabled = computed/);
   assert.match(inputBusiness, /const selectedAgentId = computed\(\{/);
@@ -155,6 +160,23 @@ test("combined selector mechanically preserves native labels, hover entry, and t
     '.visual-model-selector__chat-flyout.is-agents',
     'width: 256px',
   ]) assert.ok(modelSelector.includes(token), `shared picker source token lost ${token}`);
+});
+
+test("model overview always renders the complete selected model name", () => {
+  assert.match(
+    modelSelector,
+    /class="visual-model-selector__chat-row-value is-model"[^>]*>\{\{ selectedModelDisplayName \}\}<\/span>/,
+  );
+
+  const ruleStart = modelSelector.indexOf('.visual-model-selector__chat-row-value.is-model');
+  const ruleEnd = modelSelector.indexOf('}', ruleStart);
+  const rule = modelSelector.slice(ruleStart, ruleEnd);
+
+  assert.notEqual(ruleStart, -1);
+  assert.notEqual(ruleEnd, -1);
+  assert.match(rule, /white-space:\s*normal/);
+  assert.match(rule, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(rule, /text-overflow:\s*ellipsis/);
 });
 
 test("model selector controller distinguishes the initial catalog load from missing configuration", () => {

@@ -74,6 +74,10 @@ export default {
         title: 'Choose the right agent',
         desc: 'Quick Answer handles everyday questions, while Smart Reasoning is better for complex tasks. Create your own agent only when needed.'
       },
+      settingsLite: {
+        title: 'Account and settings',
+        desc: 'Open this menu to view your account, usage, and appearance settings.'
+      },
       doneLite: {
         title: 'You are ready',
         desc: 'Ask one question or add one source to begin. The relevant page will introduce each next step when you reach it.'

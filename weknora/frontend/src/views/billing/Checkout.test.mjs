@@ -15,9 +15,10 @@ test('direct checkout navigation is gated to workspace owners and admins', () =>
 
   assert.match(initialize, /if \(!canManageBilling\.value\) \{[\s\S]*billingAdminOnly[\s\S]*return\n  \}/)
   assert.ok(
-    initialize.indexOf("billingAdminOnly") < initialize.indexOf('getCurrentEntitlement()'),
+    initialize.indexOf("billingAdminOnly") < initialize.indexOf('entitlementStore.refresh()'),
     'a viewer must be rejected before checkout/upgrade provider work starts',
   )
+  assert.doesNotMatch(checkout, /getCurrentEntitlement/)
   assert.match(checkout, /createPaddleCheckoutIntent\(/)
   assert.match(checkout, /upgradePaddleSubscription\(/)
 })

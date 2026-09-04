@@ -8,8 +8,10 @@ const userMenu = await readFile(new URL('../../components/UserMenu.vue', import.
 const entitlementApi = await readFile(new URL('../../api/entitlement.ts', import.meta.url), 'utf8')
 const entitlementStore = await readFile(new URL('../../stores/entitlement.ts', import.meta.url), 'utf8')
 const chatView = await readFile(new URL('../chat/index.vue', import.meta.url), 'utf8')
+const appShell = await readFile(new URL('../../App.vue', import.meta.url), 'utf8')
 const router = await readFile(new URL('../../router/index.ts', import.meta.url), 'utf8')
 const plansPage = await readFile(new URL('../billing/Plans.vue', import.meta.url), 'utf8')
+const checkoutPage = await readFile(new URL('../billing/Checkout.vue', import.meta.url), 'utf8')
 const referenceIcons = await readFile(new URL('../../assets/musuw-reference-lucide-precision.css', import.meta.url), 'utf8')
 
 test('entitlement API types the official OpenRouter credit availability state', () => {
@@ -28,7 +30,7 @@ test('usage settings shows only remaining percentages without provider or dollar
   assert.doesNotMatch(usageSettings, /formatCredits|monthlyCredits|OpenRouter|\$\d/)
 })
 
-test('opening the account menu refreshes the quota before it is shown', () => {
+test('opening the account menu revalidates quota without hiding a usable snapshot', () => {
   assert.match(
     userMenu,
     /const handleTriggerClick = \(\) => \{[\s\S]*menuVisible\.value = !menuVisible\.value[\s\S]*if \(menuVisible\.value\) void loadEntitlement\(\)/,
@@ -38,8 +40,18 @@ test('opening the account menu refreshes the quota before it is shown', () => {
   assert.match(entitlementStore, /if \(requestSequence !== activeRequestSequence/)
   assert.match(
     userMenu,
-    /<small v-if="entitlementLoading">\{\{ \$t\('common\.loading'\) \}\}<\/small>[\s\S]*<small v-else-if="usageRemainingPercent !== null">/,
-    'the menu must not render its previous quota snapshot while the fresh request is in flight',
+    /<small v-if="entitlementLoading && !entitlement">\{\{ \$t\('common\.loading'\) \}\}<\/small>[\s\S]*<small v-else-if="usageRemainingPercent !== null">/,
+    'loading may replace the value only before the first usable snapshot exists',
+  )
+  assert.match(
+    usageSettings,
+    /<div v-if="entitlementLoading && !entitlement" class="usage-billing__loading">/,
+    'the settings page must keep cached rows mounted during background revalidation',
+  )
+  assert.match(
+    entitlementStore,
+    /catch \{[\s\S]*if \(requestSequence !== activeRequestSequence \|\| scope !== scopeKey\.value\) return[\s\S]*if \(!storedEntitlement\.value\) \{[\s\S]*storedBilling\.value = null/,
+    'a failed background refresh must not destroy a successful scope-matched snapshot',
   )
 })
 
@@ -52,13 +64,25 @@ test('account menu and usage settings consume one freshness-scoped entitlement s
   assert.doesNotMatch(usageSettings, /const entitlement = ref<ConsumerEntitlement/)
   assert.match(entitlementStore, /CURRENT_ENTITLEMENT_FRESH_MS\s*=\s*2_000/)
   assert.match(entitlementStore, /if \(inFlight && inFlightScope === scope\) return inFlight/)
+  assert.match(entitlementStore, /if \(storedScope\.value !== scope\) \{[\s\S]*storedEntitlement\.value = null[\s\S]*storedBilling\.value = null/)
   assert.match(entitlementStore, /if \(requestSequence !== activeRequestSequence \|\| scope !== scopeKey\.value\) return/)
   assert.match(chatView, /useCurrentEntitlementStore/)
   assert.match(
     chatView,
-    /const replyState = \(state as any\)\.isReplying[\s\S]*watch\([\s\S]*Boolean\(replyState\?\.value\)[\s\S]*if \(replying \|\| wasReplying\) entitlementStore\.invalidate\(\)[\s\S]*flush: 'sync'/,
-    'the normalized parent must observe the native reply lifecycle so direct and first-query sends both invalidate quota at start and completion',
+    /const replyState = \(state as any\)\.isReplying[\s\S]*watch\([\s\S]*Boolean\(replyState\?\.value\)[\s\S]*if \(replying\)[\s\S]*entitlementStore\.invalidate\(\)[\s\S]*if \(wasReplying\) void entitlementStore\.ensureFresh\(\)[\s\S]*flush: 'sync'/,
+    'the normalized parent must invalidate quota when generation starts and silently revalidate it as soon as the reply settles',
   )
+})
+
+test('app shell, pricing and checkout share the entitlement request and payment refresh path', () => {
+  for (const source of [appShell, plansPage, checkoutPage]) {
+    assert.match(source, /useCurrentEntitlementStore/)
+    assert.doesNotMatch(source, /getCurrentEntitlement/)
+  }
+  assert.match(appShell, /await entitlementStore\.ensureFresh\(\)/)
+  assert.match(plansPage, /await entitlementStore\.refresh\(\)/)
+  assert.match(checkoutPage, /const refreshAfterPayment = async \(\) =>[\s\S]*await entitlementStore\.refresh\(\)/)
+  assert.match(checkoutPage, /entitlementStore\.invalidate\(\)[\s\S]*void entitlementStore\.ensureFresh\(\)/)
 })
 
 test('the free-plan upgrade affordance keeps a valid visible icon mask', () => {

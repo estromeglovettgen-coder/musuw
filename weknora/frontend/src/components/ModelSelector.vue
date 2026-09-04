@@ -35,7 +35,7 @@
           >
             <span class="visual-model-selector__chat-row-label">{{ modelLabel }}</span>
             <div class="visual-model-selector__chat-row-trailing">
-              <span class="visual-model-selector__chat-row-value" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
+              <span class="visual-model-selector__chat-row-value is-model" :title="selectedModelDisplayName">{{ selectedModelDisplayName }}</span>
               <t-icon name="chevron-right" aria-hidden="true" />
             </div>
           </button>
@@ -1332,6 +1332,16 @@ onUnmounted(() => {
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.visual-model-selector__chat-row-value.is-model {
+  flex: 0 1 132px;
+  max-width: 132px;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-align: right;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .visual-model-selector__chat-row-trailing > :deep(.t-icon) {
