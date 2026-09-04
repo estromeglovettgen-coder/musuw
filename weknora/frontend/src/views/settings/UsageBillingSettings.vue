@@ -141,6 +141,10 @@ const handlePortal = async () => {
   try {
     const response = await createPaddlePortalSession()
     if (!response.authorization_url) throw new Error('Missing portal URL')
+    // Paddle may change subscription state outside this tab. Mark the cached
+    // snapshot stale before leaving so the focus/visibility handler fetches
+    // the webhook-converged entitlement on return, even within its cooldown.
+    entitlementStore.invalidate()
     window.location.assign(response.authorization_url)
   } catch {
     MessagePlugin.error(t('entitlement.portalUnavailable'))

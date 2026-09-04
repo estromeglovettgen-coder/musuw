@@ -238,6 +238,8 @@ const handlePortal = async () => {
   try {
     const response = await createPaddlePortalSession()
     if (!response.authorization_url) throw new Error('Missing portal URL')
+    // Force a fresh entitlement read when returning after portal changes.
+    entitlementStore.invalidate()
     window.location.assign(response.authorization_url)
   } catch {
     MessagePlugin.error(t('entitlement.portalUnavailable'))
