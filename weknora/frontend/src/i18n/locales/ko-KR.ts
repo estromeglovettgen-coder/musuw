@@ -4038,6 +4038,7 @@ export default {
         link: '링크 포스',
         linkDistance: '링크 거리',
         reset: '기본값 복원',
+        settings: '그래프 설정',
         open: '그래프 설정 열기',
         close: '그래프 설정 닫기',
         switchStyle: '그래프 스타일 전환',

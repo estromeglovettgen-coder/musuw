@@ -17,6 +17,11 @@ import (
 
 const (
 	ProductionBaseURL = "https://api.tikhub.io"
+	// A smaller H.264 rendition is useful for VLM ingestion, but dropping below
+	// 480p makes slide text and UI labels materially harder to read. Codec
+	// compatibility remains the first constraint; this is only a quality floor
+	// when TikHub exposes dimensions for multiple H.264 alternatives.
+	minimumVLMVideoShortSide = 480
 
 	tiktokSharePath      = "/api/v1/tiktok/app/v3/fetch_one_video_by_share_url"
 	douyinSharePath      = "/api/v1/douyin/app/v3/fetch_one_video_by_share_url"
@@ -312,24 +317,28 @@ func videoURL(platform Platform, data any) string {
 	var keys []string
 	switch platform {
 	case PlatformTikTok, PlatformDouyin:
-		// App responses may include bitrate alternatives under video.bit_rate.
-		// Pick the smallest bitrate when it is present; otherwise keep using
-		// the provider's primary play address below.
-		for _, value := range valuesByKey(data, "bit_rate") {
-			if candidate := lowestBitrateURL(value); candidate != "" {
-				return candidate
-			}
+		// TikHub exposes codec-specific alternatives in video.bit_rate. The
+		// lowest-bitrate entry is not necessarily H.264 (Douyin can return a
+		// ByteVC2 stream in an MP4 container), and downstream video models may
+		// accept the container while producing no text for that codec. Select the
+		// lowest explicitly identified H.264 rendition that keeps a 480p short
+		// side, then use the provider's primary H.264 address.
+		h264Candidates := workH264BitrateCandidates(data)
+		if candidate := lowestH264BitrateURL(h264Candidates, minimumVLMVideoShortSide); candidate != "" {
+			return candidate
 		}
-		// The App response exposes one primary address under
-		// aweme_detail.video. Prefer it deterministically; recursive map walks
-		// can otherwise select an arbitrary bitrate/codec alternative first.
-		for _, key := range []string{"play_addr_h264", "play_addr", "download_addr", "play_addr_265", "video_url"} {
-			if candidate := firstPlayableURL(nestedMapValue(data, "aweme_detail", "video", key)); candidate != "" {
-				return candidate
-			}
+		if candidate := primaryWorkVideoURL(data, "play_addr_h264"); candidate != "" {
+			return candidate
 		}
-		// Never search the whole video object: it also contains cover URLs.
-		keys = []string{"play_addr_h264", "play_addr_265", "play_addr", "download_addr", "video_url"}
+		// If every explicitly identified H.264 alternative is below the quality
+		// floor, it is still safer for the VLM than an unknown/ByteVC stream.
+		if candidate := lowestH264BitrateURL(h264Candidates, 0); candidate != "" {
+			return candidate
+		}
+		// Do not fall back to play_addr, download_addr, video_url, a codec-mixed
+		// bit_rate entry, or play_addr_265. Their container/extension does not
+		// prove codec compatibility and can silently reintroduce ByteVC2/HEVC.
+		return ""
 	case PlatformYouTube:
 		// TikHub's merged formats are already audio+video MP4 candidates.
 		// adaptive_formats are intentionally ignored (they require a merge).
@@ -368,6 +377,180 @@ func videoURL(platform Platform, data any) string {
 		}
 	}
 	return ""
+}
+
+type h264Candidate struct {
+	url         string
+	bitrate     float64
+	dataSize    float64
+	width       float64
+	height      float64
+	hasBitrate  bool
+	hasDataSize bool
+	hasSize     bool
+}
+
+// workH264BitrateCandidates walks only the deterministic work video objects,
+// preserving provider array order and aggregating plural TikTok responses.
+// A recursive map walk would make the selected work depend on Go map order.
+func workH264BitrateCandidates(data any) []h264Candidate {
+	var result []h264Candidate
+	for _, rawVideo := range workVideoObjects(data) {
+		video, ok := rawVideo.(map[string]any)
+		if !ok {
+			continue
+		}
+		items, ok := video["bit_rate"].([]any)
+		if !ok {
+			if video["bit_rate"] != nil {
+				items = []any{video["bit_rate"]}
+			}
+		}
+		for _, item := range items {
+			object, ok := item.(map[string]any)
+			if !ok || !isH264Rendition(object) {
+				continue
+			}
+			candidateURL := firstPlayableURL(item)
+			if candidateURL == "" {
+				continue
+			}
+			candidate := h264Candidate{url: candidateURL}
+			candidate.bitrate, candidate.hasBitrate = numberField(object, "bitrate", "bit_rate", "bitRate")
+			candidate.dataSize, candidate.hasDataSize = numberField(object, "data_size", "dataSize")
+			width, hasWidth := numberField(object, "width", "video_width")
+			height, hasHeight := numberField(object, "height", "video_height")
+			if playAddress, ok := object["play_addr"].(map[string]any); ok {
+				if !candidate.hasDataSize {
+					candidate.dataSize, candidate.hasDataSize = numberField(playAddress, "data_size", "dataSize")
+				}
+				if !hasWidth {
+					width, hasWidth = numberField(playAddress, "width", "video_width")
+				}
+				if !hasHeight {
+					height, hasHeight = numberField(playAddress, "height", "video_height")
+				}
+			}
+			candidate.width = width
+			candidate.height = height
+			candidate.hasSize = hasWidth && hasHeight && width > 0 && height > 0
+			result = append(result, candidate)
+		}
+	}
+	return result
+}
+
+// lowestH264BitrateURL chooses only renditions that positively identify as
+// H.264/AVC. Unknown codecs are deliberately excluded: an MP4 container alone
+// does not make ByteVC2 decodable by a VLM.
+func lowestH264BitrateURL(candidates []h264Candidate, minimumShortSide float64) string {
+	var best *h264Candidate
+	for index := range candidates {
+		candidate := &candidates[index]
+		if minimumShortSide > 0 && (!candidate.hasSize || min(candidate.width, candidate.height) < minimumShortSide) {
+			continue
+		}
+		if best == nil || lowerH264Cost(*candidate, *best) {
+			best = candidate
+		}
+	}
+	if best == nil {
+		return ""
+	}
+	return best.url
+}
+
+func lowerH264Cost(a, b h264Candidate) bool {
+	if a.hasBitrate != b.hasBitrate {
+		return a.hasBitrate
+	}
+	if a.hasBitrate && a.bitrate != b.bitrate {
+		return a.bitrate < b.bitrate
+	}
+	if a.hasDataSize != b.hasDataSize {
+		return a.hasDataSize
+	}
+	if a.hasDataSize && a.dataSize != b.dataSize {
+		return a.dataSize < b.dataSize
+	}
+	if a.hasSize && b.hasSize {
+		return a.width*a.height < b.width*b.height
+	}
+	return false
+}
+
+func isH264Rendition(value map[string]any) bool {
+	metadata := []string{
+		stringValue(value["codec"]),
+		stringValue(value["codec_name"]),
+		stringValue(value["codec_type"]),
+		stringValue(value["gear_name"]),
+		stringValue(value["vcodec"]),
+		stringValue(nestedMapValue(value, "play_addr", "url_key")),
+	}
+	if isH264, exists := boolField(value, "is_h264"); exists && !isH264 {
+		return false
+	}
+	codecFlagSeen := false
+	for _, key := range []string{"is_h265", "is_bytevc1", "is_bytevc2"} {
+		flag, exists := boolField(value, key)
+		if !exists {
+			continue
+		}
+		codecFlagSeen = true
+		if flag {
+			return false
+		}
+	}
+	for _, field := range metadata {
+		normalized := strings.ToLower(strings.TrimSpace(field))
+		for _, incompatible := range []string{"bytevc", "h265", "hevc", "vp9", "av1"} {
+			if strings.Contains(normalized, incompatible) {
+				return false
+			}
+		}
+	}
+	if isH264, exists := boolField(value, "is_h264"); exists {
+		return isH264
+	}
+	for _, field := range metadata {
+		normalized := strings.ToLower(strings.TrimSpace(field))
+		if strings.Contains(normalized, "h264") || strings.Contains(normalized, "avc") {
+			return true
+		}
+	}
+	return codecFlagSeen
+}
+
+// primaryWorkVideoURL reads the deterministic primary work object used by the
+// TikTok/Douyin App endpoints. Douyin commonly returns aweme_detail while
+// TikTok commonly returns aweme_details; a recursive key search is unsuitable
+// here because it can select the same-named play_addr nested in bit_rate.
+func primaryWorkVideoURL(data any, keys ...string) string {
+	videoObjects := workVideoObjects(data)
+	for _, video := range videoObjects {
+		for _, key := range keys {
+			if candidate := firstPlayableURL(nestedMapValue(video, key)); candidate != "" {
+				return candidate
+			}
+		}
+	}
+	return ""
+}
+
+func workVideoObjects(data any) []any {
+	videoObjects := []any{
+		nestedMapValue(data, "aweme_detail", "video"),
+		nestedMapValue(data, "video"),
+	}
+	if object, ok := data.(map[string]any); ok {
+		if details, ok := object["aweme_details"].([]any); ok {
+			for _, detail := range details {
+				videoObjects = append(videoObjects, nestedMapValue(detail, "video"))
+			}
+		}
+	}
+	return videoObjects
 }
 
 type qualityCandidate struct {
@@ -461,6 +644,37 @@ func numberField(values map[string]any, keys ...string) (float64, bool) {
 		}
 	}
 	return 0, false
+}
+
+func boolField(values map[string]any, key string) (bool, bool) {
+	value, exists := values[key]
+	if !exists {
+		return false, false
+	}
+	switch typed := value.(type) {
+	case bool:
+		return typed, true
+	case float64:
+		return typed != 0, true
+	case float32:
+		return typed != 0, true
+	case int:
+		return typed != 0, true
+	case int64:
+		return typed != 0, true
+	case json.Number:
+		number, err := typed.Float64()
+		return number != 0, err == nil
+	case string:
+		normalized := strings.ToLower(strings.TrimSpace(typed))
+		switch normalized {
+		case "1", "true":
+			return true, true
+		case "0", "false":
+			return false, true
+		}
+	}
+	return false, false
 }
 
 func numberValue(value any) (float64, bool) {

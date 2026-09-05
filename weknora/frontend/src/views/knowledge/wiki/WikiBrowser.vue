@@ -124,11 +124,26 @@
           </div>
           <div class="legend-divider"></div>
           <div class="legend-actions">
-            <div class="legend-action" @click="fitGraphToView" title="Fit to View">
+            <div
+              class="legend-action"
+              role="button"
+              tabindex="0"
+              @click="fitGraphToView"
+              @keydown.enter.prevent="fitGraphToView"
+              @keydown.space.prevent="fitGraphToView"
+              :title="$t('knowledgeEditor.wikiBrowser.fitView')"
+            >
               <span class="legend-action-icon"><t-icon name="focus" /></span>
               <span>{{ $t("knowledgeEditor.wikiBrowser.fitView") || "适应屏幕" }}</span>
             </div>
-            <div class="legend-action" @click="toggleArrows">
+            <div
+              class="legend-action"
+              role="button"
+              tabindex="0"
+              @click="toggleArrows"
+              @keydown.enter.prevent="toggleArrows"
+              @keydown.space.prevent="toggleArrows"
+            >
               <span class="legend-action-icon"
                 ><t-icon :name="showArrows ? 'browse-off' : 'browse'"
               /></span>
@@ -141,7 +156,11 @@
             <div
               v-if="graphMode === 'ego' && graphFrontierCount > 0"
               class="legend-action"
+              role="button"
+              tabindex="0"
               @click="growFrontier"
+              @keydown.enter.prevent="growFrontier"
+              @keydown.space.prevent="growFrontier"
               :title="
                 $t('knowledgeEditor.wikiBrowser.growFrontierTitle', { count: graphFrontierCount })
               "
@@ -151,7 +170,15 @@
                 $t("knowledgeEditor.wikiBrowser.growFrontier", { count: graphFrontierCount })
               }}</span>
             </div>
-            <div v-if="graphMode === 'ego'" class="legend-action" @click="loadGraph">
+            <div
+              v-if="graphMode === 'ego'"
+              class="legend-action"
+              role="button"
+              tabindex="0"
+              @click="loadGraph"
+              @keydown.enter.prevent="loadGraph"
+              @keydown.space.prevent="loadGraph"
+            >
               <span class="legend-action-icon"><t-icon name="rollback" /></span>
               <span>{{ $t("knowledgeEditor.wikiBrowser.backToOverview") }}</span>
             </div>
@@ -6146,7 +6173,7 @@ onUnmounted(() => {
 
 .legend-settings {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   width: 100%;
 }
 
@@ -6154,15 +6181,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-height: 26px;
+  padding: 0 4px;
+  border-radius: var(--td-radius-default, 8px);
   font-size: 11px;
   line-height: 14px;
   color: var(--td-text-color-secondary);
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 
   &:hover {
     color: var(--td-brand-color);
+    background: var(--td-bg-color-container-hover);
 
     .legend-action-icon {
       color: var(--td-brand-color);
@@ -6171,6 +6205,18 @@ onUnmounted(() => {
 
   &.active {
     color: var(--td-brand-color);
+    background: var(--td-bg-color-container-hover);
+
+    .legend-action-icon {
+      color: var(--td-brand-color);
+    }
+  }
+
+  &:focus-visible {
+    outline: none;
+    color: var(--td-brand-color);
+    background: var(--td-bg-color-container-hover);
+    box-shadow: 0 0 0 3px var(--td-brand-color-focus);
 
     .legend-action-icon {
       color: var(--td-brand-color);

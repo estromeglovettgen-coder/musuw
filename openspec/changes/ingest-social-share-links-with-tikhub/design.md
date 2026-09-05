@@ -59,9 +59,9 @@ For `Video`, the worker validates and downloads the returned URL using the exist
 
 For `Document`, the worker persists normalized Markdown as an ordinary `.md` file, updates the same file fields, clears `payload.URL`, and calls the existing document conversion path. Remote image URLs embedded in the Markdown remain untrusted and go through the existing image resolver. Persisting both result kinds before conversion also means a later user-requested reparse uses the saved artifact rather than billing TikHub again.
 
-### 5. Paid social tasks do not automatically retry
+### 5. Paid TikHub calls do not automatically retry
 
-Social URL tasks are enqueued with `asynq.MaxRetry(0)`. The social worker branch records a failed/unknown result and returns success to the queue after an attempted paid call, so downstream errors cannot cause another TikHub request. A user may explicitly retry. A crash between provider success and local persistence can still cause an additional charge after task recovery; eliminating that narrow window would require durable billing state, which is deliberately outside this lightweight first version.
+Social URL tasks use the normal document retry budget. The social worker branch records a failed/unknown result and returns success to the queue when the TikHub request itself fails, so provider timeout and business errors do not re-enter Asynq's retry loop. After TikHub succeeds, the worker persists the returned video or Markdown and records the file checkpoint before entering the existing document pipeline. A later downstream retry restores that file checkpoint and skips TikHub, allowing transient VLM, parser, embedding, or post-processing failures to recover without another paid call. A user may still explicitly request a fresh import. A crash or concurrent delivery between provider success and the durable source claim can cause an additional charge; eliminating that narrow window would require durable billing state, which is deliberately outside this lightweight version.
 
 ### 6. Do not log raw share input or signed URLs
 
@@ -73,7 +73,7 @@ The URL handler and creation service log only knowledge IDs and sanitized host/p
 - **A social video exceeds `MAX_FILE_SIZE_MB` or no VLM is configured** -> Mark the knowledge failed with an actionable message; do not fall back to a web page or fetch another format automatically.
 - **A short and long link for one work can still bypass deduplication when the short link hides the object ID** -> Use stable-ID hashes wherever the ID is locally extractable and accept the unresolved-short-link trade-off without a schema migration.
 - **Shared TikHub balance can be consumed by authenticated users** -> Limit each job to its fixed request count, use existing URL-import authorization, and expose provider errors; each Musuw overlay must also set an operator balance alert before enabling `TIKHUB_API_KEY`.
-- **Provider success followed by worker crash is not exactly once** -> Disable normal retries and make the residual uncertainty visible rather than adding a transaction/lease subsystem.
+- **Provider success followed by worker crash or a concurrent pre-claim delivery is not exactly once** -> Consume provider failures without queue retry, reuse every durable source checkpoint on downstream retries, and make the remaining pre-claim uncertainty visible rather than adding a transaction/lease subsystem.
 
 ## Migration Plan
 

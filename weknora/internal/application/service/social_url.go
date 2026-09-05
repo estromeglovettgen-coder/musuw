@@ -31,6 +31,10 @@ var (
 	// without a space. Restrict the candidate to the ASCII URL alphabet so the
 	// extraction stops at that copy instead of treating it as path text.
 	httpURLPattern = regexp.MustCompile(`(?i)https?://[A-Za-z0-9][A-Za-z0-9._~:/?#[\]@!$&()*+,;=%_-]*`)
+	// Collapse a Markdown link to its destination before the generic URL scan.
+	// Otherwise a URL-shaped label followed by its destination can either look
+	// like two links or be consumed as one malformed `URL](URL)` candidate.
+	markdownHTTPLinkPattern = regexp.MustCompile(`(?i)\[[^\]\r\n]*\]\(\s*(https?://[^\s)]+)\s*\)`)
 
 	// Work IDs are intentionally narrower than an arbitrary path segment. The
 	// parser should fail closed for profile/channel/playlist URLs before a
@@ -80,7 +84,8 @@ func extractNormalizedHTTPURL(input string) (string, error) {
 		return "", ErrSocialInputTooLong
 	}
 
-	cleanedInput := removeZeroWidth(input)
+	cleanedInput := removeMarkdownEscapes(removeZeroWidth(input))
+	cleanedInput = markdownHTTPLinkPattern.ReplaceAllString(cleanedInput, "$1")
 	candidates := httpURLPattern.FindAllString(cleanedInput, -1)
 	if len(candidates) == 0 {
 		return "", ErrNoHTTPURL
@@ -135,6 +140,24 @@ func removeZeroWidth(input string) string {
 			return r
 		}
 	}, input)
+}
+
+// removeMarkdownEscapes normalizes URLs copied from rich-text/chat surfaces.
+// Those clients commonly serialize an underscore as `\_` inside the visible
+// label of `[URL](URL)`. Without this pass the first candidate stops at the
+// backslash and looks different from the link target, so one logical link is
+// rejected as two distinct URLs.
+func removeMarkdownEscapes(input string) string {
+	const escapable = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+	var builder strings.Builder
+	builder.Grow(len(input))
+	for index := 0; index < len(input); index++ {
+		if input[index] == '\\' && index+1 < len(input) && strings.ContainsRune(escapable, rune(input[index+1])) {
+			index++
+		}
+		builder.WriteByte(input[index])
+	}
+	return builder.String()
 }
 
 func trimURLTrailingPunctuation(raw string) string {
@@ -256,7 +279,13 @@ func classifyYouTube(parsed *url.URL, cleanedURL string, segments []string) (*ti
 func classifyXiaohongshu(parsed *url.URL, cleanedURL string, segments []string) (*tikhub.Route, error) {
 	host := parsed.Hostname()
 	if isXiaohongshuShortHost(host) {
-		shortPrefix := len(segments) == 2 && (segments[0] == "a" || segments[0] == "m" || segments[0] == "o")
+		shortPrefix := false
+		if len(segments) == 2 {
+			switch segments[0] {
+			case "a", "m", "n", "o":
+				shortPrefix = true
+			}
+		}
 		if (len(segments) == 1 || shortPrefix) && shortCodePattern.MatchString(segments[len(segments)-1]) {
 			// xhslink short tokens are share-text values, not note IDs. TikHub
 			// must receive share_text so it can resolve the token itself.

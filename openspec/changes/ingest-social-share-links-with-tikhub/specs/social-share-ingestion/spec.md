@@ -54,7 +54,7 @@ The system SHALL normalize a successful TikHub response into either an existing 
 
 #### Scenario: Multiple renditions of one video
 - **WHEN** a response contains multiple playable renditions of one video
-- **THEN** the worker selects the lowest known resolution or bitrate, and otherwise preserves the provider's playable order
+- **THEN** the worker first selects the lowest explicitly identified H.264 rendition whose known short side is at least 480 pixels, then falls back to the provider's primary H.264 address, and never substitutes an unknown, ByteVC, or HEVC rendition
 
 ### Requirement: Paid-call safety
 The system MUST keep TikHub credentials server-side, MUST NOT probe endpoints to discover the platform, and MUST NOT automatically retry a social TikHub call.
@@ -66,6 +66,10 @@ The system MUST keep TikHub credentials server-side, MUST NOT probe endpoints to
 #### Scenario: Provider timeout or error
 - **WHEN** an attempted TikHub call times out or returns an invalid business response
 - **THEN** the knowledge import records a failed or unknown result and the queue does not automatically call TikHub again
+
+#### Scenario: Downstream retry after durable materialization
+- **WHEN** TikHub media has been persisted and a later video or document processing step fails transiently
+- **THEN** the normal document retry budget reuses the persisted file and does not call TikHub again
 
 #### Scenario: Returned media URL
 - **WHEN** TikHub returns a media URL
