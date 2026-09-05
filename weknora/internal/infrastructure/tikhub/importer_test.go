@@ -325,7 +325,7 @@ func TestNormalizeDouyinPhotoChoosesOneURLPerImage(t *testing.T) {
 	}
 }
 
-func TestNormalizeDouyinSelectsLowestH264AboveQualityFloor(t *testing.T) {
+func TestNormalizeDouyinSelectsLowestH264AtQualityFloor(t *testing.T) {
 	t.Parallel()
 
 	lowH264 := testVideoRendition("https://cdn.example/low-h264.mp4", "", 600000, 1024, 576)
@@ -335,7 +335,7 @@ func TestNormalizeDouyinSelectsLowestH264AboveQualityFloor(t *testing.T) {
 		"bit_rate": []any{
 			testVideoRendition("https://cdn.example/high-h264.mp4", "h264_720p", 1800000, 1280, 720),
 			lowH264,
-			testVideoRendition("https://cdn.example/too-small-h264.mp4", "h264_360p", 200000, 640, 360),
+			testVideoRendition("https://cdn.example/low-bitrate-h264.mp4", "h264_360p", 200000, 640, 360),
 			map[string]any{"play_addr": map[string]any{"url_list": []any{"https://cdn.example/unknown.mp4"}}},
 			testVideoRendition("https://cdn.example/bytevc2-low.mp4", "bytevc2_576p", 240000, 1024, 576),
 		},
@@ -345,13 +345,13 @@ func TestNormalizeDouyinSelectsLowestH264AboveQualityFloor(t *testing.T) {
 		if err != nil {
 			t.Fatalf("normalizeWork() error = %v", err)
 		}
-		if result.MediaURL != "https://cdn.example/low-h264.mp4" {
-			t.Fatalf("MediaURL = %q, want lowest H.264 rendition at or above 480p", result.MediaURL)
+		if result.MediaURL != "https://cdn.example/low-bitrate-h264.mp4" {
+			t.Fatalf("MediaURL = %q, want lowest H.264 rendition at or above 360p", result.MediaURL)
 		}
 	}
 }
 
-func TestNormalizeDouyinUsesPrimaryH264WhenAlternativesAreBelowQualityFloor(t *testing.T) {
+func TestNormalizeDouyinUsesLowBitrateH264BeforePrimaryAddress(t *testing.T) {
 	t.Parallel()
 
 	data := map[string]any{"aweme_detail": map[string]any{"video": map[string]any{
@@ -365,8 +365,8 @@ func TestNormalizeDouyinUsesPrimaryH264WhenAlternativesAreBelowQualityFloor(t *t
 	if err != nil {
 		t.Fatalf("normalizeWork() error = %v", err)
 	}
-	if result.MediaURL != "https://cdn.example/primary-h264.mp4" {
-		t.Fatalf("MediaURL = %q, want primary H.264 before sub-480p or ByteVC2 alternatives", result.MediaURL)
+	if result.MediaURL != "https://cdn.example/small-h264.mp4" {
+		t.Fatalf("MediaURL = %q, want the compatible low-bitrate H.264 rendition", result.MediaURL)
 	}
 }
 
@@ -417,7 +417,7 @@ func TestNormalizeDouyinUsesShortSideForPortraitAndLandscapeQualityFloor(t *test
 		"bit_rate": []any{
 			testVideoRendition("https://cdn.example/portrait.mp4", "h264_portrait", 650000, 576, 1024),
 			testVideoRendition(
-				"https://cdn.example/landscape-too-small.mp4", "h264_landscape", 200000, 854, 360,
+				"https://cdn.example/landscape-too-small.mp4", "h264_landscape", 200000, 426, 240,
 			),
 		},
 	}}}
@@ -426,7 +426,7 @@ func TestNormalizeDouyinUsesShortSideForPortraitAndLandscapeQualityFloor(t *test
 		t.Fatalf("normalizeWork() error = %v", err)
 	}
 	if result.MediaURL != "https://cdn.example/portrait.mp4" {
-		t.Fatalf("MediaURL = %q, want portrait rendition whose short side is at least 480", result.MediaURL)
+		t.Fatalf("MediaURL = %q, want portrait rendition whose short side is at least 360", result.MediaURL)
 	}
 }
 

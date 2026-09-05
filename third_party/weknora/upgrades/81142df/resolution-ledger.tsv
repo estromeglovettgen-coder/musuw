@@ -1128,8 +1128,8 @@ internal/infrastructure/docparser/mineru_converter_test.go	-	M	100644	4310d9fdb8
 internal/infrastructure/docparser/paddleocr_vl_cloud_converter.go	-	M	100644	98cfc01336c4cb01ad2058a22393576cf98d90b4	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/infrastructure/docparser/paddleocr_vl_converter.go	-	M	100644	313d3b74e74cc8a6f8a5066838f1d011c8018b8d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/infrastructure/docparser/weknoracloud_http_reader.go	-	M	100644	f19ef7106e9a9e66d8f8620a761a57b08c48390b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/infrastructure/tikhub/importer.go	A	-	100644	db1476bbd87ec1b7f2b1761a6a8804961903b384	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/infrastructure/tikhub/importer_test.go	A	-	100644	0b5787cb6a47294992310b22c7982f93adf796d0	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/infrastructure/tikhub/importer.go	A	-	100644	4d2263358e117ea7f5499621e7c44f82048b573a	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/infrastructure/tikhub/importer_test.go	A	-	100644	e134ed2540a4abbeadab3b64727625fc9dcbebc3	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/infrastructure/tikhub/route.go	A	-	100644	ff7a1e8e7a4f00136793d4a0be9c7be4dc59457a	preserve-musuw-exact		audited local-only content is byte-identical
 internal/infrastructure/web_search/baidu.go	-	M	100644	3a8490e12fdad5b6b556643e303da4d68cbdb125	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/infrastructure/web_search/exa.go	-	A	100644	5e04520940cf1a6d7d3c2ca31b585b414b2e1cf6	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
