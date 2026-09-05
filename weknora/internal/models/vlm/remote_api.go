@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -480,7 +481,7 @@ func (v *RemoteAPIVLM) predictOpenRouterVideoPayload(
 	if err != nil {
 		return "", fmt.Errorf("OpenRouter video request: %w", err)
 	}
-	content, err := completionText(resp, "OpenRouter video")
+	content, err := videoCompletionText(resp, "OpenRouter video")
 	if err != nil {
 		return "", err
 	}
@@ -492,6 +493,44 @@ func (v *RemoteAPIVLM) predictOpenRouterVideoPayload(
 		len(content),
 	)
 	return content, nil
+}
+
+// videoCompletionText classifies syntactically valid but empty responses as
+// transient, except when the provider explicitly reports a permanent stop such
+// as content filtering or token truncation.
+func videoCompletionText(resp openai.ChatCompletionResponse, operation string) (string, error) {
+	content, err := completionText(resp, operation)
+	if err == nil {
+		return content, nil
+	}
+	if len(resp.Choices) == 0 {
+		return "", RetryableVideoError(err)
+	}
+	choice := resp.Choices[0]
+	if strings.TrimSpace(choice.Message.Content) != "" {
+		return choice.Message.Content, nil
+	}
+	finishReason := strings.TrimSpace(string(choice.FinishReason))
+	switch finishReason {
+	case "", string(openai.FinishReasonNull), string(openai.FinishReasonStop):
+		return "", RetryableVideoError(err)
+	default:
+		return "", permanentVideoError(err)
+	}
+}
+
+func retryableVideoHTTPStatus(status int) bool {
+	return status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || status >= 500
+}
+
+func retryableEmbeddedVideoError(raw json.RawMessage) bool {
+	var envelope struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return false
+	}
+	return retryableVideoHTTPStatus(envelope.Code)
 }
 
 func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
@@ -513,26 +552,41 @@ func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
 	logger.Infof(ctx, "[VLM] Calling OpenRouter video API, model=%s", v.modelName)
 	resp, err := v.httpClient.Do(req)
 	if err != nil {
-		return openai.ChatCompletionResponse{}, err
+		// A caller cancellation is deliberate and should not start a new paid
+		// attempt. Network failures and request deadlines are transient.
+		if errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			return openai.ChatCompletionResponse{}, permanentVideoError(err)
+		}
+		return openai.ChatCompletionResponse{}, RetryableVideoError(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
-		return openai.ChatCompletionResponse{}, fmt.Errorf(
+		requestErr := fmt.Errorf(
 			"OpenRouter video request returned %s: %s",
 			resp.Status,
 			strings.TrimSpace(string(detail)),
 		)
+		if retryableVideoHTTPStatus(resp.StatusCode) {
+			return openai.ChatCompletionResponse{}, RetryableVideoError(requestErr)
+		}
+		return openai.ChatCompletionResponse{}, permanentVideoError(requestErr)
 	}
 	var decoded struct {
 		openai.ChatCompletionResponse
 		Error json.RawMessage `json:"error,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return openai.ChatCompletionResponse{}, fmt.Errorf("decode OpenRouter video response: %w", err)
+		return openai.ChatCompletionResponse{}, permanentVideoError(
+			fmt.Errorf("decode OpenRouter video response: %w", err),
+		)
 	}
 	if errorJSON := bytes.TrimSpace(decoded.Error); len(errorJSON) > 0 && !bytes.Equal(errorJSON, []byte("null")) {
-		return openai.ChatCompletionResponse{}, fmt.Errorf("OpenRouter video response error: %s", string(errorJSON))
+		responseErr := fmt.Errorf("OpenRouter video response error: %s", string(errorJSON))
+		if retryableEmbeddedVideoError(errorJSON) {
+			return openai.ChatCompletionResponse{}, RetryableVideoError(responseErr)
+		}
+		return openai.ChatCompletionResponse{}, permanentVideoError(responseErr)
 	}
 	return decoded.ChatCompletionResponse, nil
 }

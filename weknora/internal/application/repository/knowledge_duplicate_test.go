@@ -62,6 +62,44 @@ func TestCheckKnowledgeExists_FileHashIsScopedByFileType(t *testing.T) {
 	})
 }
 
+func TestCheckKnowledgeExists_SocialFailedRowReusesOnlyMaterializedSource(t *testing.T) {
+	db := setupKnowledgeTestDB(t)
+	repo := NewKnowledgeRepository(db)
+	ctx := context.Background()
+	const tenantID = uint64(7)
+	kbID := uuid.NewString()
+	const fileHash = "normalized-social-link"
+
+	reusableID := uuid.NewString()
+	require.NoError(t, db.Exec(`
+		INSERT INTO knowledges (id, tenant_id, knowledge_base_id, type, title, source, file_type, file_hash, file_path, parse_status)
+		VALUES (?, ?, ?, 'url', 'saved video', 'https://example.test/work', 'mp4', ?, 'resource://abcdefghijklmnopqrstuv', 'failed')
+	`, reusableID, tenantID, kbID, fileHash).Error)
+
+	exists, knowledge, err := repo.CheckKnowledgeExists(ctx, tenantID, kbID, &types.KnowledgeCheckParams{
+		Type: "url", FileHash: fileHash, ReuseStoredSource: true,
+	})
+	require.NoError(t, err)
+	require.True(t, exists)
+	require.NotNil(t, knowledge)
+	assert.Equal(t, reusableID, knowledge.ID)
+
+	exists, knowledge, err = repo.CheckKnowledgeExists(ctx, tenantID, kbID, &types.KnowledgeCheckParams{
+		Type: "url", FileHash: fileHash,
+	})
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.Nil(t, knowledge)
+
+	require.NoError(t, db.Model(&types.Knowledge{}).Where("id = ?", reusableID).Update("file_path", "").Error)
+	exists, knowledge, err = repo.CheckKnowledgeExists(ctx, tenantID, kbID, &types.KnowledgeCheckParams{
+		Type: "url", FileHash: fileHash, ReuseStoredSource: true,
+	})
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.Nil(t, knowledge)
+}
+
 func TestAminusB_IgnoresFailedAndInFlightTargetRows(t *testing.T) {
 	db := setupKnowledgeTestDB(t)
 	repo := NewKnowledgeRepository(db)

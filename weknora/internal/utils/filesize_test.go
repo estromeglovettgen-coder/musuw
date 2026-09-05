@@ -16,6 +16,7 @@ func TestGetMaxVideoFileSizeBytesOverrideAndInvalidValues(t *testing.T) {
 		want  int64
 	}{
 		{name: "positive", value: "123456789", want: 123456789},
+		{name: "above product maximum", value: "300000001", want: 300_000_000},
 		{name: "zero", value: "0", want: 300_000_000},
 		{name: "negative", value: "-1", want: 300_000_000},
 		{name: "fraction", value: "1.5", want: 300_000_000},

@@ -201,6 +201,10 @@ func (s *videoCreditSpanTrackerStub) FailSpan(
 	_ error,
 ) {
 	s.stageFailCode = errorCode
+	// The production tracker closes the root when a main pipeline stage fails.
+	// Mirror that interface contract so this test can also prove the generic
+	// credit middleware did not replace the video-safe root code afterward.
+	s.rootFailCode = errorCode
 }
 
 func (s *videoCreditSpanTrackerStub) FinalizeAttempt(
@@ -226,6 +230,7 @@ func TestOpenRouterVideoCreditExhaustionSurvivesIngestionAndStopsWorkerRetry(t *
 		TenantID:        tenantID,
 		KnowledgeBaseID: kbID,
 		FileType:        "mp4",
+		FileSize:        int64(len("bounded-video-fixture")),
 		ParseStatus:     types.ParseStatusPending,
 	}}
 	tracker := &videoCreditSpanTrackerStub{}
@@ -283,8 +288,9 @@ func TestOpenRouterVideoCreditExhaustionSurvivesIngestionAndStopsWorkerRetry(t *
 	require.ErrorAs(t, err, &creditErr)
 	require.ErrorIs(t, err, asynq.SkipRetry)
 	require.True(t, openrouter.IsCreditExhausted(err))
-	require.Equal(t, werrors.ErrCodeDocReaderParseFailed, tracker.stageFailCode)
-	require.Equal(t, openrouter.CreditExhaustedCode, tracker.rootFailCode)
-	require.Equal(t, types.ParseStatusFailed, repo.updates["parse_status"])
-	require.Equal(t, openRouterCreditExhaustedMessage, repo.updates["error_message"])
+	require.Equal(t, werrors.ErrCodeVideoParseFailed, tracker.stageFailCode)
+	require.Equal(t, werrors.ErrCodeVideoParseFailed, tracker.rootFailCode)
+	require.Nil(t, repo.updates, "generic credit middleware must preserve the video-specific state")
+	require.Equal(t, types.ParseStatusFailed, repo.knowledge.ParseStatus)
+	require.Equal(t, service.VideoParseFailedPublicMessage, repo.knowledge.ErrorMessage)
 }

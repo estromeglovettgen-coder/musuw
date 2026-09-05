@@ -2,15 +2,48 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/vlm"
 	"github.com/Tencent/WeKnora/internal/types"
+	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/hibiken/asynq"
+)
+
+const (
+	defaultVideoModelID = "builtin-openrouter-vlm-mimo-v2-5"
+
+	VideoParsingPublicMessage      = "原视频已保存，正在解析"
+	VideoRetryingPublicMessage     = "视频解析暂时没有得到结果，正在重试"
+	VideoParseFailedPublicMessage  = "视频解析失败，原视频已保存，可以重新解析"
+	VideoTooLargePublicMessage     = "视频超过 300 MB，当前版本暂不支持"
+	VideoSourceFailedPublicMessage = "视频来源获取失败，请稍后重试"
+	VideoFormatFailedPublicMessage = "暂不支持此视频格式"
+)
+
+func fixedVideoModelID() string {
+	if configured := strings.TrimSpace(os.Getenv("MUSUW_VIDEO_VLM_MODEL_ID")); configured != "" {
+		return configured
+	}
+	return defaultVideoModelID
+}
+
+type videoFailureKind string
+
+const (
+	videoFailureParse  videoFailureKind = "parse"
+	videoFailureSource videoFailureKind = "source"
+	videoFailureSize   videoFailureKind = "size"
+	videoFailureFormat videoFailureKind = "format"
 )
 
 const videoUnderstandingPrompt = `<system_prompt>
@@ -40,32 +73,52 @@ func (s *knowledgeService) convertVideo(
 	kb *types.KnowledgeBase,
 	knowledge *types.Knowledge,
 	eff types.EffectiveProcessConfig,
-	isLastRetry bool,
+	_ bool,
 ) (*types.ReadResult, error) {
 	mimeType := videoMIMEType(payload.FileType)
 	if mimeType == "" {
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "unsupported video type: %s", payload.FileType)
+		return s.failVideoKnowledge(
+			ctx, knowledge, videoFailureFormat, false,
+			fmt.Errorf("unsupported video type: %s", payload.FileType),
+		)
 	}
 
-	model, err := s.modelService.GetVLMModel(ctx, eff.VLMConfig.ModelID)
+	videoSize, err := s.authoritativeVideoSourceSize(ctx, knowledge, payload.FilePath)
 	if err != nil {
-		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "failed to load video model", err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to load video model: %v", err)
+		return s.failVideoKnowledge(ctx, knowledge, videoFailureSource, videoFailureRetryable(err), err)
+	}
+	if videoSize > secutils.GetMaxVideoFileSizeBytes() {
+		return s.failVideoKnowledge(
+			ctx, knowledge, videoFailureSize, false,
+			fmt.Errorf("video source size %d exceeds product maximum %d", videoSize, secutils.GetMaxVideoFileSizeBytes()),
+		)
+	}
+
+	knowledge.ParseStatus = types.ParseStatusProcessing
+	knowledge.ErrorMessage = VideoParsingPublicMessage
+	knowledge.UpdatedAt = time.Now()
+	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+		logger.Warnf(ctx, "[Video] failed to publish parsing state for %s: %v", knowledge.ID, err)
+	}
+
+	modelID := fixedVideoModelID()
+	model, err := s.modelService.GetVLMModel(ctx, modelID)
+	if err != nil {
+		logger.Errorf(ctx, "[Video] failed to load fixed model id=%s knowledge=%s: %v", modelID, knowledge.ID, err)
+		return s.failVideoKnowledge(ctx, knowledge, videoFailureParse, videoFailureRetryable(err), err)
 	}
 
 	fileService := s.resolveFileServiceForPath(ctx, kb, payload.FilePath)
 	if fileService == nil {
 		err := fmt.Errorf("video storage service is not configured")
-		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "failed to load video storage", err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to load video storage: %v", err)
+		return s.failVideoKnowledge(ctx, knowledge, videoFailureSource, false, err)
 	}
 
 	prompt := buildVideoUnderstandingPrompt(ctx, eff.VLMConfig)
-	videoSource := "base64"
 	var videoBytes []byte
 	var markdown string
+	usedURL := false
+	var urlSourceErr error
 
 	// Object storage implementations can return a signed HTTP(S) URL. Pass it
 	// directly to explicitly URL-capable OpenRouter models so large videos never
@@ -78,78 +131,172 @@ func (s *knowledgeService) convertVideo(
 			videoURL, urlErr = fileService.GetFileURL(ctx, videoURLPath)
 		}
 		if urlErr == nil && isUsableVideoURL(videoURL) {
-			videoSource = "url"
+			usedURL = true
 			markdown, err = vlm.PredictVideoURL(ctx, model, videoURL, mimeType, prompt)
 		} else {
+			urlSourceErr = urlErr
+			if urlSourceErr == nil {
+				urlSourceErr = fmt.Errorf("video storage returned a non-HTTP URL")
+			}
 			if urlErr != nil {
 				logger.Warnf(
 					ctx,
-					"[Video] URL transport unavailable for %s, falling back to inline video: %v",
+					"[Video] URL transport unavailable for %s: %v",
 					knowledge.ID,
 					urlErr,
 				)
 			} else {
 				logger.Warnf(
 					ctx,
-					"[Video] storage returned a non-HTTP URL for %s, falling back to inline video",
+					"[Video] storage returned a non-HTTP URL for %s",
 					knowledge.ID,
 				)
 			}
 		}
 	}
 
-	if videoSource == "base64" {
+	if !usedURL && err == nil {
+		// Inline video is a compatibility path for small existing objects only.
+		// A near-limit object must never be read into application memory or
+		// Base64-encoded when URL delivery is unavailable.
+		if videoSize > int64(vlm.MaxInlineVideoBytes) {
+			if urlSourceErr == nil {
+				urlSourceErr = fmt.Errorf("fixed video model does not expose URL input")
+			}
+			return s.failVideoKnowledge(ctx, knowledge, videoFailureParse, videoFailureRetryable(urlSourceErr), urlSourceErr)
+		}
 		fileReader, readErr := fileService.GetFile(ctx, payload.FilePath)
 		if readErr != nil {
-			s.failStage(ctx, knowledge.ID, types.StageDocReader,
-				werrors.ErrCodeDocReaderParseFailed, "failed to get video", readErr)
-			return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to get video: %v", readErr)
+			return s.failVideoKnowledge(ctx, knowledge, videoFailureSource, videoFailureRetryable(readErr), readErr)
 		}
-		// Keep the inline fallback bounded even when an object was uploaded with
-		// the larger video limit. Reading one byte past the raw ceiling lets the
-		// VLM return its precise encoded-size error without buffering a 300 MB
-		// object that cannot be sent inline.
 		videoBytes, err = io.ReadAll(io.LimitReader(fileReader, int64(vlm.MaxInlineVideoBytes)+1))
 		closeErr := fileReader.Close()
 		if err == nil {
 			err = closeErr
 		}
 		if err != nil {
-			s.failStage(ctx, knowledge.ID, types.StageDocReader,
-				werrors.ErrCodeDocReaderParseFailed, "failed to read video", err)
-			return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to read video: %v", err)
+			return s.failVideoKnowledge(ctx, knowledge, videoFailureSource, videoFailureRetryable(err), err)
 		}
 		markdown, err = vlm.PredictVideo(ctx, model, videoBytes, mimeType, prompt)
 	}
 
 	if err != nil {
-		logger.Errorf(ctx, "[Video] native understanding failed for %s: %v", knowledge.ID, err)
-		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "video understanding failed: "+err.Error(), err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "video understanding failed: %w", err)
+		logger.Errorf(ctx, "[Video] fixed model failed id=%s knowledge=%s: %v", modelID, knowledge.ID, err)
+		return s.failVideoKnowledge(ctx, knowledge, videoFailureParse, videoFailureRetryable(err), err)
 	}
 	markdown = strings.TrimSpace(markdown)
 	if markdown == "" {
-		err = fmt.Errorf("video understanding returned empty content")
-		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "video understanding returned empty content", err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "video understanding returned empty content")
+		err = vlm.RetryableVideoError(fmt.Errorf("video understanding returned empty content"))
+		return s.failVideoKnowledge(ctx, knowledge, videoFailureParse, true, err)
 	}
 
 	s.endStage(ctx, knowledge.ID, types.StageDocReader, types.JSONMap{
-		"text_length":  len(markdown),
-		"video_bytes":  len(videoBytes),
-		"video_source": videoSource,
-		"model":        model.GetModelName(),
+		"text_length": len(markdown),
 	})
 	return &types.ReadResult{
 		MarkdownContent: markdown,
 		Metadata: map[string]string{
-			"source_type":      "video",
-			"video_model":      model.GetModelName(),
-			"video_input_mode": videoSource,
+			"source_type": "video",
 		},
 	}, nil
+}
+
+func (s *knowledgeService) authoritativeVideoSourceSize(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	filePath string,
+) (int64, error) {
+	size := int64(0)
+	if knowledge != nil && knowledge.FileSize > 0 {
+		size = knowledge.FileSize
+	}
+	if _, ok := types.ParseResourcePath(filePath); ok {
+		if s == nil || s.resourceCatalog == nil {
+			return 0, fmt.Errorf("video resource catalog is not configured")
+		}
+		resource, err := s.resourceCatalog.Resolve(ctx, filePath)
+		if err != nil {
+			return 0, fmt.Errorf("resolve stored video resource: %w", err)
+		}
+		if resource == nil || resource.State != types.ResourceStateActive {
+			return 0, fmt.Errorf("stored video resource is unavailable")
+		}
+		if resource.Size > 0 {
+			size = resource.Size
+		}
+	}
+	if size <= 0 {
+		return 0, fmt.Errorf("stored video size is unavailable")
+	}
+	return size, nil
+}
+
+func currentVideoRetryCount(ctx context.Context) int {
+	if retried, ok := asynq.GetRetryCount(ctx); ok {
+		return retried
+	}
+	if retried, _, ok := types.TaskRetryMetadataFromContext(ctx); ok {
+		return retried
+	}
+	return 0
+}
+
+func videoFailureRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if vlm.IsRetryableVideoError(err) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var networkErr net.Error
+	return errors.As(err, &networkErr)
+}
+
+func videoFailurePublicState(kind videoFailureKind) (code, message string) {
+	switch kind {
+	case videoFailureSource:
+		return werrors.ErrCodeVideoSourceFailed, VideoSourceFailedPublicMessage
+	case videoFailureSize:
+		return werrors.ErrCodeVideoTooLarge, VideoTooLargePublicMessage
+	case videoFailureFormat:
+		return werrors.ErrCodeVideoFormatUnsupported, VideoFormatFailedPublicMessage
+	default:
+		return werrors.ErrCodeVideoParseFailed, VideoParseFailedPublicMessage
+	}
+}
+
+func (s *knowledgeService) failVideoKnowledge(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	kind videoFailureKind,
+	retryable bool,
+	failureErr error,
+) (*types.ReadResult, error) {
+	if failureErr == nil {
+		failureErr = errors.New("video processing failed")
+	}
+	retryCount := currentVideoRetryCount(ctx)
+	if retryable && retryCount < 1 {
+		knowledge.ParseStatus = types.ParseStatusProcessing
+		knowledge.ErrorMessage = VideoRetryingPublicMessage
+		knowledge.UpdatedAt = time.Now()
+		if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+			logger.Warnf(ctx, "[Video] failed to publish retry state for %s: %v", knowledge.ID, err)
+		}
+		logger.Warnf(ctx, "[Video] scheduling sole retry knowledge=%s retry=%d err=%v", knowledge.ID, retryCount, failureErr)
+		return nil, failureErr
+	}
+
+	code, message := videoFailurePublicState(kind)
+	knowledge.ParseStatus = types.ParseStatusFailed
+	knowledge.ErrorMessage = message
+	knowledge.UpdatedAt = time.Now()
+	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+		logger.Warnf(ctx, "[Video] failed to publish terminal state for %s: %v", knowledge.ID, err)
+	}
+	s.failStage(ctx, knowledge.ID, types.StageDocReader, code, message, failureErr)
+	logger.Errorf(ctx, "[Video] terminal failure knowledge=%s kind=%s retry=%d err=%v", knowledge.ID, kind, retryCount, failureErr)
+	return nil, errors.Join(asynq.SkipRetry, failureErr)
 }
 
 // videoURLSourcePath unwraps a stable resource handle before asking its owning

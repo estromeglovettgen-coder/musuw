@@ -3,7 +3,9 @@ export const DIRECT_VIDEO_EXTENSIONS = ['mp4', 'mpeg', 'mov', 'webm'] as const
 // environment-level MAX_FILE_SIZE_MB increase route large videos back through
 // FormData. Files above this fixed ceiling use the object-store direct path.
 export const DIRECT_VIDEO_UPLOAD_THRESHOLD_BYTES = 50 * 1024 * 1024
-export const MAX_VIDEO_UPLOAD_BYTES = 300_000_000
+const runtimeVideoMax = typeof window === 'undefined' ? undefined : window.__RUNTIME_CONFIG__?.MAX_VIDEO_FILE_SIZE_BYTES
+export const MAX_VIDEO_UPLOAD_BYTES =
+  runtimeVideoMax && runtimeVideoMax > 0 && runtimeVideoMax <= 300_000_000 ? runtimeVideoMax : 300_000_000
 
 const VIDEO_MIME_TYPES: Record<string, string> = {
   mp4: 'video/mp4',

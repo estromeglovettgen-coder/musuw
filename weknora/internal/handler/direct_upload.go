@@ -20,6 +20,7 @@ import (
 
 	filesvc "github.com/Tencent/WeKnora/internal/application/service/file"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/Tencent/WeKnora/internal/utils"
@@ -36,6 +37,11 @@ const (
 	directUploadMaxPart    = int64(5 * 1024 * 1024 * 1024)
 	directUploadMaxParts   = int64(10_000)
 	directUploadTokenLimit = 16 * 1024
+
+	directUploadFailedPublicMessage   = "视频上传失败，请稍后重试"
+	directUploadExpiredPublicMessage  = "上传已失效，请重新选择视频"
+	directUploadFormatPublicMessage   = "暂不支持此视频格式"
+	directUploadTooLargePublicMessage = "视频超过 300 MB，当前版本暂不支持"
 )
 
 // DirectUploadStoreFactory resolves the caller's tenant-scoped object store.
@@ -667,7 +673,7 @@ func normalizeDirectUploadRequest(req *directUploadRequest) (string, string, str
 func validateDirectUploadSize(kind string, size int64) error {
 	if kind == "video" {
 		if size > utils.GetMaxVideoFileSizeBytes() {
-			return fmt.Errorf("video size cannot exceed %d bytes", utils.GetMaxVideoFileSizeBytes())
+			return fmt.Errorf("%s", directUploadTooLargePublicMessage)
 		}
 		return nil
 	}
@@ -928,7 +934,27 @@ func readAndRestoreBody(c *gin.Context, limit int64) ([]byte, error) {
 }
 
 func directUploadError(c *gin.Context, status int, message string) {
-	c.AbortWithStatusJSON(status, gin.H{"success": false, "error": message})
+	logger.Warnf(c.Request.Context(), "direct upload rejected status=%d detail=%s", status, message)
+	c.AbortWithStatusJSON(status, gin.H{"success": false, "error": safeDirectUploadMessage(status, message)})
+}
+
+func safeDirectUploadMessage(status int, detail string) string {
+	lower := strings.ToLower(strings.TrimSpace(detail))
+	if strings.Contains(detail, directUploadTooLargePublicMessage) ||
+		(strings.Contains(lower, "video") && strings.Contains(lower, "size") && strings.Contains(lower, "exceed")) {
+		return directUploadTooLargePublicMessage
+	}
+	if strings.Contains(lower, "mime") || strings.Contains(lower, "content_type") ||
+		strings.Contains(lower, "extension") || strings.Contains(lower, "supported video") {
+		return directUploadFormatPublicMessage
+	}
+	if status == http.StatusGone || strings.Contains(lower, "expired") {
+		return directUploadExpiredPublicMessage
+	}
+	if strings.Contains(lower, "quota") {
+		return "存储空间不足，无法上传视频"
+	}
+	return directUploadFailedPublicMessage
 }
 
 var (

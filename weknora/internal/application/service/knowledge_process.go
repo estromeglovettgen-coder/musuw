@@ -2547,24 +2547,55 @@ func (s *knowledgeService) ReparseKnowledge(
 		return nil, err
 	}
 
-	// Allocate a fresh span tree attempt up front. Doing this BEFORE
-	// the cleanup + enqueue means: (a) the UI immediately sees a new
-	// attempt with all five stages back to "pending" instead of the
-	// previous run's "failed" badge lingering; (b) the worker's
-	// fallback path won't double-allocate when payload.Attempt is
-	// already set on the queued task.
-	reparseAttempt := 0
-	if root, n, err := s.tracker().OpenAttempt(ctx, existing.ID, ""); err == nil && root != nil {
-		reparseAttempt = n
-	} else if err != nil {
-		logger.Warnf(ctx, "[Reparse] OpenAttempt failed for %s: %v (will fall back in worker)", existing.ID, err)
-	}
-
 	// Get knowledge base configuration
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, existing.KnowledgeBaseID)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to get knowledge base for reparse: %v", err)
 		return nil, err
+	}
+
+	// A video reparse is allowed to mutate derived data only after the durable
+	// source has been verified. This keeps a failed preflight from deleting the
+	// old chunks and guarantees the worker receives the same stored object,
+	// never the original social URL.
+	fileTypes := reparseFileTypes(existing)
+	if len(fileTypes) == 1 && IsVideoType(fileTypes[0]) {
+		if strings.TrimSpace(existing.FilePath) == "" {
+			return nil, werrors.NewBadRequestError(VideoSourceFailedPublicMessage)
+		}
+		size, sizeErr := s.authoritativeVideoSourceSize(ctx, existing, existing.FilePath)
+		if sizeErr != nil {
+			logger.Errorf(ctx, "[Reparse] video source size unavailable knowledge=%s: %v", existing.ID, sizeErr)
+			return nil, werrors.NewBadRequestError(VideoSourceFailedPublicMessage)
+		}
+		if size > secutils.GetMaxVideoFileSizeBytes() {
+			logger.Warnf(ctx, "[Reparse] oversized video source knowledge=%s size=%d", existing.ID, size)
+			return nil, werrors.NewBadRequestError(VideoTooLargePublicMessage)
+		}
+		fileSvc := s.resolveFileServiceForPath(ctx, kb, existing.FilePath)
+		if fileSvc == nil {
+			return nil, werrors.NewBadRequestError(VideoSourceFailedPublicMessage)
+		}
+		reader, sourceErr := fileSvc.GetFile(ctx, existing.FilePath)
+		if sourceErr == nil && reader == nil {
+			sourceErr = errors.New("stored video reader is nil")
+		}
+		if sourceErr == nil {
+			sourceErr = reader.Close()
+		}
+		if sourceErr != nil {
+			logger.Errorf(ctx, "[Reparse] stored video unavailable knowledge=%s: %v", existing.ID, sourceErr)
+			return nil, werrors.NewBadRequestError(VideoSourceFailedPublicMessage)
+		}
+	}
+
+	// Allocate a fresh span tree only after preflight. The UI now sees a new
+	// attempt when work can actually be scheduled, and retries keep this attempt.
+	reparseAttempt := 0
+	if root, n, err := s.tracker().OpenAttempt(ctx, existing.ID, ""); err == nil && root != nil {
+		reparseAttempt = n
+	} else if err != nil {
+		logger.Warnf(ctx, "[Reparse] OpenAttempt failed for %s: %v (will fall back in worker)", existing.ID, err)
 	}
 
 	// When the caller supplies new overrides (e.g. via the reparse confirm
@@ -2666,6 +2697,10 @@ func (s *knowledgeService) ReparseKnowledge(
 		if questionCount <= 0 {
 			questionCount = 3
 		}
+		reparseFileType := strings.TrimSpace(existing.FileType)
+		if reparseFileType == "" {
+			reparseFileType = getFileType(existing.FileName)
+		}
 
 		lang := types.LanguageFromContextOrDefault(ctx)
 		taskPayload := types.DocumentProcessPayload{
@@ -2674,7 +2709,7 @@ func (s *knowledgeService) ReparseKnowledge(
 			KnowledgeBaseID:          existing.KnowledgeBaseID,
 			FilePath:                 existing.FilePath,
 			FileName:                 existing.FileName,
-			FileType:                 getFileType(existing.FileName),
+			FileType:                 reparseFileType,
 			EnableMultimodel:         enableMultimodel,
 			EnableQuestionGeneration: enableQuestionGeneration,
 			QuestionCount:            questionCount,
@@ -3439,6 +3474,9 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 			knowledge.ErrorMessage = socialImportPublicMessage(socialErr)
 			knowledge.UpdatedAt = time.Now()
 			_ = s.repo.UpdateKnowledge(ctx, knowledge)
+			s.beginStage(ctx, knowledge.ID, types.StageDocReader, nil)
+			s.failStage(ctx, knowledge.ID, types.StageDocReader,
+				werrors.ErrCodeVideoSourceFailed, knowledge.ErrorMessage, socialErr)
 			return nil
 		}
 		if handled && (knowledge.ParseStatus == types.ParseStatusCancelled || knowledge.ParseStatus == types.ParseStatusDeleting) {
@@ -3469,16 +3507,6 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 			Errorf("processDocument audio without ASR model configured")
 		knowledge.ParseStatus = "failed"
 		knowledge.ErrorMessage = "上传音频文件需要设置ASR语音识别模型"
-		knowledge.UpdatedAt = time.Now()
-		s.repo.UpdateKnowledge(ctx, knowledge)
-		return nil
-	}
-
-	if payload.FilePath != "" && IsVideoType(payload.FileType) && !eff.VLMConfig.IsEnabled() {
-		logger.GetLogger(ctx).WithField("knowledge_id", knowledge.ID).
-			Errorf("processDocument video without VLM model configured")
-		knowledge.ParseStatus = "failed"
-		knowledge.ErrorMessage = "上传视频文件需要设置VLM模型"
 		knowledge.UpdatedAt = time.Now()
 		s.repo.UpdateKnowledge(ctx, knowledge)
 		return nil

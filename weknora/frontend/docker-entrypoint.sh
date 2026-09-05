@@ -58,6 +58,17 @@ case "$max_file_size_mb" in
   ''|*[!0-9]*) fail "maximum file size is invalid" ;;
 esac
 
+# Keep the browser preflight aligned with the server's emergency rollback
+# seam, while never allowing an environment value to raise the 300 MB product
+# ceiling.
+max_video_file_size_bytes="${VIDEO_MAX_BYTES:-300000000}"
+case "$max_video_file_size_bytes" in
+  ''|*[!0-9]*) max_video_file_size_bytes="300000000" ;;
+esac
+if [ "$max_video_file_size_bytes" -le 0 ] || [ "$max_video_file_size_bytes" -gt 300000000 ]; then
+  max_video_file_size_bytes="300000000"
+fi
+
 # Only emit whitelisted locale tags to avoid config.js injection from env values.
 runtime_default_locale=""
 case "${DEFAULT_LOCALE:-}" in
@@ -70,6 +81,7 @@ esac
 cat > /usr/share/nginx/html/config.js <<EOF
 window.__RUNTIME_CONFIG__ = {
   MAX_FILE_SIZE_MB: ${max_file_size_mb},
+  MAX_VIDEO_FILE_SIZE_BYTES: ${max_video_file_size_bytes},
   auth: {
     publicOrigin: "${auth_public_origin}",
     supabaseUrl: "${supabase_url}",
