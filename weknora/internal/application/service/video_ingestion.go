@@ -173,7 +173,9 @@ func (s *knowledgeService) videoURLSourcePath(ctx context.Context, filePath stri
 		return "", fmt.Errorf("resolve video resource for direct URL transport: resource is unavailable")
 	}
 	if _, nested := types.ParseResourcePath(physical); nested {
-		return "", fmt.Errorf("resolve video resource for direct URL transport: physical path is another resource handle")
+		return "", fmt.Errorf(
+			"resolve video resource for direct URL transport: physical path is another resource handle",
+		)
 	}
 	return physical, nil
 }
