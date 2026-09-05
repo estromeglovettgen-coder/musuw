@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -83,6 +85,62 @@ func TestCreateKnowledgeBaseResolvesNativeConsumerCandidatesAndKeepsEmbeddingPla
 	require.Equal(t, "asr-effective", kb.ASRConfig.ModelID)
 	require.Equal(t, types.PlatformKnowledgeBaseEmbeddingModelID, kb.EmbeddingModelID)
 	require.Len(t, repo.rows, 1)
+}
+
+// TestCreateKnowledgeBaseUsesPlanAwareVisionDefaults exercises the real
+// consumer resolver at the KB-create seam.  A zero-config paid (including a
+// complimentary Pro grant) KB must bind the URL-capable MiMo model, while a
+// Free KB keeps the existing Gemini/Vertex compatibility model.  This is
+// intentionally an end-to-end service test rather than a resolver-only test:
+// it protects the ordering where platform defaults are applied before the
+// plan-aware consumer bindings are persisted.
+func TestCreateKnowledgeBaseUsesPlanAwareVisionDefaults(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+
+	models := make([]*types.Model, 0)
+	for _, id := range defaultConsumerPaidModelIDs() {
+		models = append(models, consumerSceneModel(id, id))
+	}
+	for _, id := range defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM) {
+		models = append(models, consumerSceneVLMModel(id, id))
+	}
+	for _, id := range defaultConsumerPaidModelIDsForType(types.ModelTypeASR) {
+		model := consumerSceneModel(id, id)
+		model.Type = types.ModelTypeASR
+		models = append(models, model)
+	}
+	resolver := NewConsumerModelResolver(
+		&consumerSceneModelRepo{models: models},
+		registryConsumerSceneSettings{},
+		nil,
+	)
+	newService := func(repo *fakeKBRepo) *knowledgeBaseService {
+		return &knowledgeBaseService{
+			repo:                  repo,
+			modelService:          &platformCatalogStub{models: readyPlatformKnowledgeBaseModels()},
+			consumerModelResolver: resolver,
+		}
+	}
+
+	paidRepo := newFakeKBRepo()
+	paidKB, err := newService(paidRepo).CreateKnowledgeBase(
+		contextWithComplimentaryPlan(1, types.ConsumerPlanPro, time.Now().UTC().Add(time.Hour)),
+		&types.KnowledgeBase{Name: "complimentary-pro"},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, paidKB)
+	assert.Equal(t, "builtin-openrouter-vlm-mimo-v2-5", paidKB.VLMConfig.ModelID)
+	assert.Equal(t, paidKB.VLMConfig.ModelID, paidKB.ImageProcessingConfig.ModelID)
+
+	freeRepo := newFakeKBRepo()
+	freeKB, err := newService(freeRepo).CreateKnowledgeBase(
+		contextWithConsumerPlan(2, types.ConsumerPlanFree),
+		&types.KnowledgeBase{Name: "free"},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, freeKB)
+	assert.Equal(t, types.PlatformKnowledgeBaseVLMModelID, freeKB.VLMConfig.ModelID)
+	assert.Equal(t, freeKB.VLMConfig.ModelID, freeKB.ImageProcessingConfig.ModelID)
 }
 
 func TestCreateKnowledgeBasePreservesStandardModelAuthority(t *testing.T) {

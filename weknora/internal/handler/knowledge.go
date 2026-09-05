@@ -382,12 +382,14 @@ func (h *KnowledgeHandler) CreateKnowledgeFromFile(c *gin.Context) {
 		return
 	}
 
-	// Validate file size — read MAX_FILE_SIZE_MB env (50MB default).
+	// This legacy multipart endpoint keeps the ordinary MAX_FILE_SIZE_MB limit.
+	// Larger videos use the KB-scoped presigned multipart route so their bytes
+	// never traverse Cloudflare/Nginx/the Go request body.
 	// Deliberately not a runtime system_setting; see filesize.go for the
 	// rationale (nginx / docreader / browser bundle all cache this at
 	// container startup, so a UI knob would silently mismatch).
 	maxSizeMB := utils.GetMaxFileSizeMB()
-	maxSize := maxSizeMB * 1024 * 1024
+	maxSize := utils.GetMaxFileSize()
 	if file.Size > maxSize {
 		logger.Error(ctx, "File size too large")
 		c.Error(errors.NewBadRequestError(fmt.Sprintf("文件大小不能超过%dMB", maxSizeMB)))

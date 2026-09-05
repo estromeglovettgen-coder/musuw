@@ -33,6 +33,14 @@ func (w *concurrencyVLM) PredictVideo(ctx context.Context, videoBytes []byte, mi
 	return PredictVideo(ctx, w.inner, videoBytes, mimeType, prompt)
 }
 
+func (w *concurrencyVLM) PredictVideoURL(ctx context.Context, videoURL, mimeType, prompt string) (string, error) {
+	release := limiter.GateNamedN(ctx, w.inner.GetModelID(), w.inner.GetModelName(), w.limit)
+	defer release()
+	return PredictVideoURL(ctx, w.inner, videoURL, mimeType, prompt)
+}
+
+func (w *concurrencyVLM) SupportsVideoURL() bool { return SupportsVideoURL(w.inner) }
+
 // wrapVLMConcurrency installs the background concurrency governor as the
 // outermost VLM decorator. Always applied; a cheap passthrough when no limiter
 // is installed or the call is interactive.

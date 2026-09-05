@@ -22,6 +22,8 @@ type backendScopedFileService struct {
 	inner     interfaces.FileService
 }
 
+// NewBackendScopedFileService scopes persisted paths to backendID while
+// delegating storage operations to inner.
 func NewBackendScopedFileService(backendID string, inner interfaces.FileService) interfaces.FileService {
 	return &backendScopedFileService{backendID: backendID, inner: inner}
 }
@@ -40,9 +42,11 @@ func (s *backendScopedFileService) unwrap(path string) (string, error) {
 func (s *backendScopedFileService) wrap(path string) string {
 	return types.BuildStorageBackendPath(s.backendID, path)
 }
+
 func (s *backendScopedFileService) CheckConnectivity(ctx context.Context) error {
 	return s.inner.CheckConnectivity(ctx)
 }
+
 func (s *backendScopedFileService) SaveFile(ctx context.Context, f *multipart.FileHeader, tenantID uint64, knowledgeID string) (string, error) {
 	p, err := s.inner.SaveFile(ctx, f, tenantID, knowledgeID)
 	if err != nil {
@@ -50,6 +54,7 @@ func (s *backendScopedFileService) SaveFile(ctx context.Context, f *multipart.Fi
 	}
 	return s.wrap(p), nil
 }
+
 func (s *backendScopedFileService) SaveBytes(ctx context.Context, data []byte, tenantID uint64, name string, temp bool) (string, error) {
 	p, err := s.inner.SaveBytes(ctx, data, tenantID, name, temp)
 	if err != nil {
@@ -57,6 +62,26 @@ func (s *backendScopedFileService) SaveBytes(ctx context.Context, data []byte, t
 	}
 	return s.wrap(p), nil
 }
+
+func (s *backendScopedFileService) SaveReader(
+	ctx context.Context,
+	reader io.Reader,
+	size int64,
+	tenantID uint64,
+	name, contentType string,
+	temp bool,
+) (string, error) {
+	streamer, ok := s.inner.(interfaces.StreamingFileService)
+	if !ok {
+		return "", fmt.Errorf("storage backend does not support streaming uploads")
+	}
+	p, err := streamer.SaveReader(ctx, reader, size, tenantID, name, contentType, temp)
+	if err != nil {
+		return "", err
+	}
+	return s.wrap(p), nil
+}
+
 func (s *backendScopedFileService) GetFile(ctx context.Context, path string) (io.ReadCloser, error) {
 	p, err := s.unwrap(path)
 	if err != nil {
@@ -64,6 +89,7 @@ func (s *backendScopedFileService) GetFile(ctx context.Context, path string) (io
 	}
 	return s.inner.GetFile(ctx, p)
 }
+
 func (s *backendScopedFileService) GetFileURL(ctx context.Context, path string) (string, error) {
 	p, err := s.unwrap(path)
 	if err != nil {
@@ -80,19 +106,26 @@ func (s *backendScopedFileService) GetFileURL(ctx context.Context, path string) 
 	// Local storage may return an app-level presigned URL. Re-sign it with
 	// the scoped path so the proxy resolves the exact local instance instead
 	// of falling back to another backend of the same provider.
-	if u, parseErr := url.Parse(result); parseErr == nil && strings.HasSuffix(u.Path, "/api/v1/files/presigned") && u.Query().Get("file_path") == p {
+	if u, parseErr := url.Parse(result); parseErr == nil &&
+		strings.HasSuffix(u.Path, "/api/v1/files/presigned") && u.Query().Get("file_path") == p {
 		basePath := strings.TrimSuffix(u.Path, "/api/v1/files/presigned")
 		baseURL := u.Scheme + "://" + u.Host + basePath
 		ttl := time.Duration(0)
 		if expires, convErr := strconv.ParseInt(u.Query().Get("expires"), 10, 64); convErr == nil {
 			ttl = time.Until(time.Unix(expires, 0))
 		}
-		if signed, signErr := secutils.SignFileURL(baseURL, scoped, secutils.ParseTenantIDFromStoragePath(scoped), ttl); signErr == nil {
+		if signed, signErr := secutils.SignFileURL(
+			baseURL,
+			scoped,
+			secutils.ParseTenantIDFromStoragePath(scoped),
+			ttl,
+		); signErr == nil {
 			return signed, nil
 		}
 	}
 	return result, nil
 }
+
 func (s *backendScopedFileService) DeleteFile(ctx context.Context, path string) error {
 	p, err := s.unwrap(path)
 	if err != nil {
@@ -100,6 +133,7 @@ func (s *backendScopedFileService) DeleteFile(ctx context.Context, path string) 
 	}
 	return s.inner.DeleteFile(ctx, p)
 }
+
 func (s *backendScopedFileService) CopyFile(ctx context.Context, path string, tenantID uint64, knowledgeID string) (string, error) {
 	p, err := s.unwrap(path)
 	if err != nil {

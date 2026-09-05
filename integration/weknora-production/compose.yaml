@@ -79,6 +79,9 @@ services:
       LANGFUSE_ENVIRONMENT: ${LANGFUSE_ENVIRONMENT:-production}
       LOCAL_STORAGE_BASE_DIR: /data/files
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+      # URL-backed video understanding can include a 300 MB remote fetch plus
+      # model inference; keep it below the 2h document-task deadline.
+      VLM_HTTP_TIMEOUT_SECONDS: "600"
       APP_EXTERNAL_URL: ${APP_EXTERNAL_URL:?set APP_EXTERNAL_URL in production.env}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL in production.env}
       NEO4J_ENABLE: ${NEO4J_ENABLE:-true}

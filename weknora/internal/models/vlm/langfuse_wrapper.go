@@ -64,6 +64,12 @@ func (l *langfuseVLM) PredictVideo(ctx context.Context, videoBytes []byte, mimeT
 	return PredictVideo(ctx, l.inner, videoBytes, mimeType, prompt)
 }
 
+func (l *langfuseVLM) PredictVideoURL(ctx context.Context, videoURL, mimeType, prompt string) (string, error) {
+	return PredictVideoURL(ctx, l.inner, videoURL, mimeType, prompt)
+}
+
+func (l *langfuseVLM) SupportsVideoURL() bool { return SupportsVideoURL(l.inner) }
+
 // wrapVLMLangfuse applies the Langfuse decorator when the manager is enabled.
 func wrapVLMLangfuse(v VLM, err error) (VLM, error) {
 	if err != nil || v == nil {

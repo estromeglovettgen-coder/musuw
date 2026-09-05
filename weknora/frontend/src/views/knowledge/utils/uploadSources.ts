@@ -1,6 +1,13 @@
 import { kbFileTypeVerification } from '@/utils'
+import { shouldRejectKnowledgeFileType } from '@/utils/fileTypeVerification'
+import {
+  DIRECT_VIDEO_EXTENSIONS,
+  isDirectVideoUploadFile,
+  MAX_VIDEO_UPLOAD_BYTES,
+} from '@/utils/directVideoUpload'
 
-export const UPLOAD_VIDEO_EXTENSIONS = ['mp4', 'mpeg', 'mov', 'webm']
+export const UPLOAD_VIDEO_EXTENSIONS: string[] = [...DIRECT_VIDEO_EXTENSIONS]
+export { MAX_VIDEO_UPLOAD_BYTES }
 
 export function getUploadFileKey(file: File): string {
   const path = (file as File & { webkitRelativePath?: string }).webkitRelativePath || ''
@@ -69,7 +76,15 @@ export function filterUploadFiles(
       }
     }
 
-    if (kbFileTypeVerification(file, multiFile, acceptedTypes)) {
+    // The shared verifier intentionally keeps ordinary documents at 50 MiB.
+    // Supported videos use the exact byte ceiling here so a 300 MB browser
+    // file can reach the direct R2 transport without changing the existing UI.
+    const isVideo = isDirectVideoUploadFile(file)
+    const rejectedType = shouldRejectKnowledgeFileType(file.name, acceptedTypes)
+    const rejectedSize = isVideo
+      ? file.size > MAX_VIDEO_UPLOAD_BYTES
+      : kbFileTypeVerification(file, multiFile, acceptedTypes)
+    if (rejectedType || rejectedSize) {
       skippedCount++
       continue
     }

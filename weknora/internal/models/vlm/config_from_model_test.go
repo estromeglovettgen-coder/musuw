@@ -15,7 +15,7 @@ func TestConfigFromModel_RemoteDefaultsToOpenAI(t *testing.T) {
 			BaseURL:       "https://api.example.com/v1",
 			APIKey:        "sk",
 			Provider:      "openai",
-			ExtraConfig:   map[string]string{"x": "y"},
+			ExtraConfig:   map[string]string{"x": "y", "video_input_mode": VideoInputModeURL, "video_provider": "mimo"},
 			CustomHeaders: map[string]string{"H": "v"},
 		},
 	}
@@ -28,6 +28,9 @@ func TestConfigFromModel_RemoteDefaultsToOpenAI(t *testing.T) {
 	}
 	if cfg.Extra["x"] != "y" {
 		t.Errorf("ExtraConfig not propagated as Extra: %+v", cfg.Extra)
+	}
+	if cfg.Extra["video_input_mode"] != VideoInputModeURL || cfg.Extra["video_provider"] != "mimo" {
+		t.Errorf("video capability config not propagated as Extra: %+v", cfg.Extra)
 	}
 	if cfg.AppID != "app" || cfg.AppSecret != "secret" {
 		t.Errorf("cloud creds mismatch: %+v", cfg)

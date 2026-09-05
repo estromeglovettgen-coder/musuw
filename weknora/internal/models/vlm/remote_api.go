@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -28,17 +29,32 @@ const (
 	defaultTimeout = 180 * time.Second
 	defaultMaxToks = 5000
 	defaultTemp    = float32(0.1)
-	// Keep video ingestion on exact OpenRouter models with provider endpoints
-	// that advertise native base64 video support. Tokyo's default VLM is Gemini;
-	// Qwen remains admitted for the historical regional fallback route.
+	// OpenRouterQwenVideoModel is retained for callers that used the old name;
+	// OpenRouterGeminiVideoModel is likewise retained for compatibility.
+	//
+	// video capability is no longer inferred from a model name. It is explicitly
+	// selected with Config.Extra["video_input_mode"].
 	OpenRouterQwenVideoModel   = "qwen/qwen3.7-flash"
 	OpenRouterGeminiVideoModel = "google/gemini-2.5-flash"
-)
 
-var openRouterVideoProviders = map[string]string{
-	OpenRouterQwenVideoModel:   "alibaba",
-	OpenRouterGeminiVideoModel: "google-vertex",
-}
+	VideoInputModeURL    = "url"
+	VideoInputModeBase64 = "base64"
+
+	// OpenRouter/MiMo document a 50,000,000-byte limit for an encoded inline
+	// video. 37,500,000 raw bytes encodes to exactly that size, so this is a
+	// conservative raw-input ceiling; PredictVideo also checks EncodedLen so the
+	// actual request limit remains exact if this value changes.
+	maxInlineVideoBytes        = 37_500_000
+	maxInlineVideoEncodedBytes = 50_000_000
+	maxRemoteVideoBytes        = 300_000_000
+
+	// MaxInlineVideoBytes and the related exported ceilings are shared with the
+	// ingestion caller so it can stop reading an oversized inline object before
+	// allocating the full file.
+	MaxInlineVideoBytes        = maxInlineVideoBytes
+	MaxInlineVideoEncodedBytes = maxInlineVideoEncodedBytes
+	MaxRemoteVideoBytes        = maxRemoteVideoBytes
+)
 
 // vlmHTTPTimeout returns the HTTP client timeout for VLM requests, read from
 // the VLM_HTTP_TIMEOUT_SECONDS env var when set (and positive), falling back to
@@ -54,14 +70,16 @@ func vlmHTTPTimeout() time.Duration {
 
 // RemoteAPIVLM implements VLM via an OpenAI-compatible chat completions API.
 type RemoteAPIVLM struct {
-	modelName   string
-	modelID     string
-	client      *openai.Client
-	httpClient  *http.Client
-	baseURL     string
-	apiKey      string
-	provider    provider.ProviderName
-	temperature float32
+	modelName      string
+	modelID        string
+	client         *openai.Client
+	httpClient     *http.Client
+	baseURL        string
+	apiKey         string
+	provider       provider.ProviderName
+	temperature    float32
+	videoInputMode string
+	videoProvider  string
 }
 
 type openRouterReasoning struct {
@@ -125,17 +143,68 @@ func NewRemoteAPIVLM(config *Config) (*RemoteAPIVLM, error) {
 			}
 		}
 	}
+	videoInputMode := configuredVideoInputMode(config.Extra)
+	videoProvider := configuredVideoProvider(config.Extra)
+	// Existing persisted built-in rows can predate the explicit transport
+	// fields. Preserve only the two exact native-video routes supported by the
+	// previous release; every new/custom model still requires explicit config.
+	if providerName == provider.ProviderOpenRouter && videoInputMode == "" {
+		switch strings.TrimSpace(config.ModelName) {
+		case OpenRouterGeminiVideoModel:
+			videoInputMode = VideoInputModeBase64
+			if videoProvider == "" {
+				videoProvider = "google-vertex"
+			}
+		case OpenRouterQwenVideoModel:
+			videoInputMode = VideoInputModeBase64
+			if videoProvider == "" {
+				videoProvider = "alibaba"
+			}
+		}
+	}
 
 	return &RemoteAPIVLM{
-		modelName:   config.ModelName,
-		modelID:     config.ModelID,
-		client:      openai.NewClientWithConfig(apiCfg),
-		httpClient:  requestClient,
-		baseURL:     config.BaseURL,
-		apiKey:      config.APIKey,
-		provider:    providerName,
-		temperature: temp,
+		modelName:      config.ModelName,
+		modelID:        config.ModelID,
+		client:         openai.NewClientWithConfig(apiCfg),
+		httpClient:     requestClient,
+		baseURL:        config.BaseURL,
+		apiKey:         config.APIKey,
+		provider:       providerName,
+		temperature:    temp,
+		videoInputMode: videoInputMode,
+		videoProvider:  videoProvider,
 	}, nil
+}
+
+func configuredVideoInputMode(extra map[string]any) string {
+	mode := strings.ToLower(strings.TrimSpace(extraString(extra, "video_input_mode")))
+	switch mode {
+	case VideoInputModeURL, "video_url", "remote_url":
+		return VideoInputModeURL
+	case VideoInputModeBase64, "inline", "data_uri":
+		return VideoInputModeBase64
+	default:
+		return ""
+	}
+}
+
+func configuredVideoProvider(extra map[string]any) string {
+	return strings.TrimSpace(extraString(extra, "video_provider"))
+}
+
+func extraString(extra map[string]any, key string) string {
+	if extra == nil {
+		return ""
+	}
+	value, ok := extra[key]
+	if !ok || value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return fmt.Sprint(value)
 }
 
 // Predict sends an image with a text prompt to the OpenAI-compatible API.
@@ -196,24 +265,41 @@ func (v *RemoteAPIVLM) Predict(ctx context.Context, imgBytesList [][]byte, promp
 	if err != nil {
 		return "", fmt.Errorf("OpenAI VLM request: %w", err)
 	}
+	content, err := completionText(resp, "OpenAI VLM")
+	if err != nil {
+		return "", err
+	}
+	logger.Infof(ctx, "[VLM] OpenAI response received, len=%d", len(content))
+	return content, nil
+}
+
+// completionText turns an OpenAI-compatible completion into user-visible text
+// while preserving the provider's finish reason. An HTTP 2xx response with no
+// choices/content is a provider failure, not a successful empty extraction;
+// keeping the reason in the error makes retries and operator diagnosis useful.
+func completionText(resp openai.ChatCompletionResponse, operation string) (string, error) {
 	if len(resp.Choices) == 0 {
-		return "", fmt.Errorf("OpenAI VLM returned no choices")
+		return "", fmt.Errorf("%s response contained no choices", operation)
 	}
 
 	choice := resp.Choices[0]
 	content := choice.Message.Content
-	if strings.TrimSpace(content) == "" && choice.FinishReason == openai.FinishReasonLength {
-		// Reasoning models spend max_completion_tokens on reasoning before any
-		// visible output, so an exhausted budget yields an empty message rather
-		// than an API error. Returning "" here would be recorded as
-		// "no_extracted_content" and look identical to an image with no text.
+	if strings.TrimSpace(content) != "" {
+		return content, nil
+	}
+
+	finishReason := strings.TrimSpace(string(choice.FinishReason))
+	if finishReason == "" || finishReason == string(openai.FinishReasonNull) {
+		finishReason = "empty"
+	}
+	if finishReason == string(openai.FinishReasonLength) {
 		return "", fmt.Errorf(
-			"OpenAI VLM returned no content: completion truncated at %d tokens (finish_reason=length)",
+			"%s response contained no text (finish_reason=length; completion truncated at %d tokens)",
+			operation,
 			defaultMaxToks,
 		)
 	}
-	logger.Infof(ctx, "[VLM] OpenAI response received, len=%d", len(content))
-	return content, nil
+	return "", fmt.Errorf("%s response contained no text (finish_reason=%s)", operation, finishReason)
 }
 
 func (v *RemoteAPIVLM) createOpenRouterImageCompletion(
@@ -285,85 +371,170 @@ func shapeReasoningVLMRequest(req *openai.ChatCompletionRequest) {
 func (v *RemoteAPIVLM) GetModelName() string { return v.modelName }
 func (v *RemoteAPIVLM) GetModelID() string   { return v.modelID }
 
-// PredictVideo sends a private video through OpenRouter's documented
-// video_url chat-completions contract. Exact model-to-provider routing keeps
-// the native-video capability explicit and prevents an image-only endpoint
-// from being selected silently.
-func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mimeType, prompt string) (string, error) {
-	if v.provider != provider.ProviderOpenRouter {
-		return "", fmt.Errorf("video input requires OpenRouter")
-	}
-	videoProvider, supported := openRouterVideoProviders[v.modelName]
-	if !supported {
-		return "", fmt.Errorf("video input requires an approved native-video model")
-	}
-	if len(videoBytes) == 0 {
-		return "", fmt.Errorf("video input is empty")
-	}
+// SupportsVideoURL reports whether this instance was explicitly configured to
+// send a public/signed URL to OpenRouter. Provider and capability are both
+// checked; setting a URL mode on a non-OpenRouter backend cannot change its
+// transport semantics.
+func (v *RemoteAPIVLM) SupportsVideoURL() bool {
+	return v.provider == provider.ProviderOpenRouter && v.videoInputMode == VideoInputModeURL
+}
+
+func validateVideoMIMEType(mimeType string) error {
 	switch mimeType {
 	case "video/mp4", "video/mpeg", "video/mov", "video/webm":
+		return nil
 	default:
-		return "", fmt.Errorf("unsupported OpenRouter video MIME type %q", mimeType)
+		return fmt.Errorf("unsupported OpenRouter video MIME type %q", mimeType)
 	}
+}
 
-	dataURI := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(videoBytes)
-	payload := map[string]any{
-		"model": v.modelName,
-		// OpenRouter exposes a stable provider slug for each approved native
-		// video endpoint. Keep the transport and tenant metering unchanged.
-		"provider": map[string]any{
-			"only":            []string{videoProvider},
-			"allow_fallbacks": true,
-		},
+func validateInlineVideoSize(videoBytes []byte) error {
+	if len(videoBytes) == 0 {
+		return fmt.Errorf("video input is empty")
+	}
+	encodedLen := base64.StdEncoding.EncodedLen(len(videoBytes))
+	if encodedLen > maxInlineVideoEncodedBytes {
+		return fmt.Errorf(
+			"video input exceeds inline Base64 limit: encoded size %d bytes (max %d; raw input %d bytes)",
+			encodedLen,
+			maxInlineVideoEncodedBytes,
+			len(videoBytes),
+		)
+	}
+	return nil
+}
+
+func (v *RemoteAPIVLM) buildOpenRouterVideoPayload(videoURL, _ string, prompt string) map[string]any {
+	routing := map[string]any{"allow_fallbacks": true}
+	if v.videoProvider != "" {
+		routing["only"] = []string{v.videoProvider}
+	}
+	return map[string]any{
+		"model":    v.modelName,
+		"provider": routing,
 		"messages": []map[string]any{{
 			"role": "user",
 			"content": []map[string]any{
 				{"type": "text", "text": prompt},
-				{"type": "video_url", "video_url": map[string]string{"url": dataURI}},
+				{"type": "video_url", "video_url": map[string]string{"url": videoURL}},
 			},
 		}},
 		"max_tokens":  defaultMaxToks,
 		"temperature": v.temperature,
+		"reasoning":   map[string]string{"effort": "none"},
 	}
-	// Keep video ingestion non-reasoning with OpenRouter's native nested
-	// control, matching the image path above.
-	payload["reasoning"] = map[string]string{"effort": "none"}
+}
+
+// PredictVideo sends inline Base64 video through OpenRouter's documented
+// video_url contract. URL-configured models may use this only as a bounded
+// fallback when storage cannot produce an HTTP(S) URL; all inline requests
+// still obey the encoded 50 MB ceiling.
+func (v *RemoteAPIVLM) PredictVideo(ctx context.Context, videoBytes []byte, mimeType, prompt string) (string, error) {
+	if v.provider != provider.ProviderOpenRouter {
+		return "", fmt.Errorf("video input requires OpenRouter")
+	}
+	if v.videoInputMode != VideoInputModeURL && v.videoInputMode != VideoInputModeBase64 {
+		return "", fmt.Errorf("video input capability is not configured for model %q", v.modelName)
+	}
+	if err := validateVideoMIMEType(mimeType); err != nil {
+		return "", err
+	}
+	if err := validateInlineVideoSize(videoBytes); err != nil {
+		return "", err
+	}
+
+	dataURI := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(videoBytes)
+	return v.predictOpenRouterVideoPayload(
+		ctx,
+		v.buildOpenRouterVideoPayload(dataURI, mimeType, prompt),
+		len(videoBytes),
+	)
+}
+
+// PredictVideoURL sends a public or signed HTTP(S) URL without reading the
+// object into application memory. The capability must be explicitly enabled
+// in model ExtraConfig with video_input_mode=url.
+func (v *RemoteAPIVLM) PredictVideoURL(ctx context.Context, videoURL, mimeType, prompt string) (string, error) {
+	if v.provider != provider.ProviderOpenRouter {
+		return "", fmt.Errorf("video URL input requires OpenRouter")
+	}
+	if !v.SupportsVideoURL() {
+		return "", fmt.Errorf("video URL input is not configured for model %q", v.modelName)
+	}
+	if err := validateVideoMIMEType(mimeType); err != nil {
+		return "", err
+	}
+	parsed, err := url.Parse(strings.TrimSpace(videoURL))
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", fmt.Errorf("video URL must use an http or https URL")
+	}
+	return v.predictOpenRouterVideoPayload(ctx, v.buildOpenRouterVideoPayload(parsed.String(), mimeType, prompt), 0)
+}
+
+func (v *RemoteAPIVLM) predictOpenRouterVideoPayload(
+	ctx context.Context,
+	payload map[string]any,
+	videoSize int,
+) (string, error) {
+	resp, err := v.createOpenRouterVideoCompletion(ctx, payload)
+	if err != nil {
+		return "", fmt.Errorf("OpenRouter video request: %w", err)
+	}
+	content, err := completionText(resp, "OpenRouter video")
+	if err != nil {
+		return "", err
+	}
+	logger.Infof(
+		ctx,
+		"[VLM] OpenRouter video response received, model=%s, videoSize=%d, len=%d",
+		v.modelName,
+		videoSize,
+		len(content),
+	)
+	return content, nil
+}
+
+func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
+	ctx context.Context,
+	payload map[string]any,
+) (openai.ChatCompletionResponse, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("marshal OpenRouter video request: %w", err)
+		return openai.ChatCompletionResponse{}, fmt.Errorf("marshal OpenRouter video request: %w", err)
 	}
 	endpoint := strings.TrimRight(v.baseURL, "/") + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("create OpenRouter video request: %w", err)
+		return openai.ChatCompletionResponse{}, fmt.Errorf("create OpenRouter video request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+v.apiKey)
 
-	logger.Infof(ctx, "[VLM] Calling OpenRouter video API, model=%s, videoSize=%d", v.modelName, len(videoBytes))
+	logger.Infof(ctx, "[VLM] Calling OpenRouter video API, model=%s", v.modelName)
 	resp, err := v.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("OpenRouter video request: %w", err)
+		return openai.ChatCompletionResponse{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
-		return "", fmt.Errorf("OpenRouter video request returned %s: %s", resp.Status, strings.TrimSpace(string(detail)))
+		return openai.ChatCompletionResponse{}, fmt.Errorf(
+			"OpenRouter video request returned %s: %s",
+			resp.Status,
+			strings.TrimSpace(string(detail)),
+		)
 	}
 	var decoded struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
+		openai.ChatCompletionResponse
+		Error json.RawMessage `json:"error,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return "", fmt.Errorf("decode OpenRouter video response: %w", err)
+		return openai.ChatCompletionResponse{}, fmt.Errorf("decode OpenRouter video response: %w", err)
 	}
-	if len(decoded.Choices) == 0 || strings.TrimSpace(decoded.Choices[0].Message.Content) == "" {
-		return "", fmt.Errorf("OpenRouter video response contained no text")
+	if errorJSON := bytes.TrimSpace(decoded.Error); len(errorJSON) > 0 && !bytes.Equal(errorJSON, []byte("null")) {
+		return openai.ChatCompletionResponse{}, fmt.Errorf("OpenRouter video response error: %s", string(errorJSON))
 	}
-	return decoded.Choices[0].Message.Content, nil
+	return decoded.ChatCompletionResponse, nil
 }
 
 // detectImageMIME returns the MIME type for the given image bytes.

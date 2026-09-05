@@ -19,8 +19,10 @@ import (
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 )
 
-var errTikHubNotConfigured = errors.New("TikHub social import is not configured")
-var errSocialVideoNotAllowed = errors.New("current plan does not support social video import")
+var (
+	errTikHubNotConfigured   = errors.New("TikHub social import is not configured")
+	errSocialVideoNotAllowed = errors.New("current plan does not support social video import")
+)
 
 func cleanupTikHubResolvedImages(ctx context.Context, fileSvc interfaces.FileService, images []docparser.StoredImage) {
 	if fileSvc == nil {
@@ -121,6 +123,7 @@ func (s *knowledgeService) prepareTikHubArtifact(
 	}
 
 	var content []byte
+	var media *tikHubMediaStream
 	var resolvedImages []docparser.StoredImage
 	// ResolveRemoteImages can persist image copies before the source artifact
 	// itself is admitted. Keep one compensation hook in scope for every
@@ -158,10 +161,15 @@ func (s *knowledgeService) prepareTikHubArtifact(
 		if !socialVideoUploadAllowed(ctx) {
 			return true, nil, errSocialVideoNotAllowed
 		}
-		content, err = downloadTikHubMedia(ctx, result.MediaURL, s.tikhubMediaClient)
+		media, err = downloadTikHubMedia(ctx, result.MediaURL, s.tikhubMediaClient)
 		if err != nil {
 			return true, nil, err
 		}
+		defer func() {
+			if closeErr := media.Close(); closeErr != nil {
+				logger.Warnf(ctx, "Failed to close TikHub media stream: %v", closeErr)
+			}
+		}()
 		result.FileType = normalizeFileExtension(result.FileType)
 		if !IsVideoType(result.FileType) {
 			result.FileType = "mp4"
@@ -171,8 +179,14 @@ func (s *knowledgeService) prepareTikHubArtifact(
 	}
 
 	maxBytes := secutils.GetMaxFileSize()
-	if int64(len(content)) > maxBytes {
+	if result.Kind == tikhub.ResultVideo {
+		maxBytes = secutils.GetMaxVideoFileSizeBytes()
+	}
+	if media == nil && int64(len(content)) > maxBytes {
 		cleanupResolvedImages()
+		if result.Kind == tikhub.ResultVideo {
+			return true, nil, fmt.Errorf("social video exceeds the configured %d byte upload limit", maxBytes)
+		}
 		return true, nil, fmt.Errorf("social artifact exceeds the configured %d MB upload limit", secutils.GetMaxFileSizeMB())
 	}
 	fileName := tikHubArtifactFileName(*route, result)
@@ -182,7 +196,49 @@ func (s *knowledgeService) prepareTikHubArtifact(
 		return true, nil, errors.New("social artifact storage is not configured")
 	}
 	// This file is the knowledge source and retry checkpoint, not scratch data.
-	filePath, err := fileSvc.SaveBytes(ctx, content, payload.TenantID, fileName, false)
+	var filePath string
+	var fileSize int64
+	if media != nil {
+		streamer, ok := fileSvc.(interfaces.StreamingFileService)
+		if !ok {
+			cleanupResolvedImages()
+			return true, nil, errors.New("social video storage backend does not support streaming uploads")
+		}
+		filePath, err = streamer.SaveReader(
+			ctx,
+			media,
+			media.contentLength,
+			payload.TenantID,
+			fileName,
+			media.contentType,
+			false,
+		)
+		if err != nil {
+			if strings.TrimSpace(filePath) != "" {
+				_ = fileSvc.DeleteFile(ctx, filePath)
+			}
+			cleanupResolvedImages()
+			return true, nil, fmt.Errorf("failed to persist social artifact: %w", err)
+		}
+		fileSize = media.bytesRead
+		if fileSize == 0 {
+			if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+				logger.Warnf(ctx, "Failed to clean empty social video, path: %s, error: %v", filePath, deleteErr)
+			}
+			cleanupResolvedImages()
+			return true, nil, errors.New("TikHub media response was empty")
+		}
+		if fileSize > maxBytes {
+			if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
+				logger.Warnf(ctx, "Failed to clean oversized social video, path: %s, error: %v", filePath, deleteErr)
+			}
+			cleanupResolvedImages()
+			return true, nil, fmt.Errorf("social video exceeds the configured %d byte upload limit", maxBytes)
+		}
+	} else {
+		fileSize = int64(len(content))
+		filePath, err = fileSvc.SaveBytes(ctx, content, payload.TenantID, fileName, false)
+	}
 	if err != nil {
 		cleanupResolvedImages()
 		return true, nil, fmt.Errorf("failed to persist social artifact: %w", err)
@@ -196,7 +252,7 @@ func (s *knowledgeService) prepareTikHubArtifact(
 	updatedKnowledge.FilePath = filePath
 	updatedKnowledge.FileName = fileName
 	updatedKnowledge.FileType = result.FileType
-	updatedKnowledge.FileSize = int64(len(content))
+	updatedKnowledge.FileSize = fileSize
 	if strings.TrimSpace(result.Title) != "" && (strings.TrimSpace(knowledge.Title) == "" || knowledge.Title == knowledge.Source) {
 		updatedKnowledge.Title = strings.TrimSpace(result.Title)
 	}
@@ -315,7 +371,34 @@ func tikHubArtifactFileName(route tikhub.Route, result tikhub.Result) string {
 // URL. In production (injectedClient == nil), every hop is validated by the
 // repository's SSRF-safe dialer and redirect policy. Tests may inject a local
 // transport to exercise the byte/materialization contract without public I/O.
-func downloadTikHubMedia(ctx context.Context, mediaURL string, injectedClient *http.Client) ([]byte, error) {
+type tikHubMediaStream struct {
+	reader        *io.LimitedReader
+	closer        io.Closer
+	contentLength int64
+	contentType   string
+	bytesRead     int64
+}
+
+func (s *tikHubMediaStream) Read(p []byte) (int, error) {
+	n, err := s.reader.Read(p)
+	if n > 0 {
+		s.bytesRead += int64(n)
+	}
+	return n, err
+}
+
+func (s *tikHubMediaStream) Close() error {
+	if s == nil || s.closer == nil {
+		return nil
+	}
+	return s.closer.Close()
+}
+
+func downloadTikHubMedia(
+	ctx context.Context,
+	mediaURL string,
+	injectedClient *http.Client,
+) (*tikHubMediaStream, error) {
 	if strings.TrimSpace(mediaURL) == "" {
 		return nil, errors.New("TikHub video response contained no media URL")
 	}
@@ -325,7 +408,11 @@ func downloadTikHubMedia(ctx context.Context, mediaURL string, injectedClient *h
 			return nil, errors.New("TikHub media URL failed security validation")
 		}
 		client = secutils.NewSSRFSafeHTTPClient(secutils.SSRFSafeHTTPClientConfig{
-			Timeout:      60 * time.Second,
+			// A 300 MB video cannot reliably finish inside the old 60-second
+			// whole-request timeout on ordinary uplinks. Keep one bounded timeout
+			// below the document-processing deadline without introducing a custom
+			// downloader or resumable-download state machine.
+			Timeout:      10 * time.Minute,
 			MaxRedirects: 5,
 		})
 	}
@@ -338,29 +425,33 @@ func downloadTikHubMedia(ctx context.Context, mediaURL string, injectedClient *h
 	if err != nil {
 		return nil, errors.New("failed to fetch TikHub media")
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("TikHub media server returned HTTP %d", resp.StatusCode)
 	}
 
-	maxBytes := secutils.GetMaxFileSize()
+	maxBytes := secutils.GetMaxVideoFileSizeBytes()
 	if resp.ContentLength > maxBytes {
-		return nil, fmt.Errorf("social video exceeds the configured %d MB upload limit", secutils.GetMaxFileSizeMB())
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("social video exceeds the configured %d byte upload limit", maxBytes)
 	}
-	contentType := strings.ToLower(strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0]))
-	if contentType != "" && !strings.HasPrefix(contentType, "video/") && contentType != "application/octet-stream" && contentType != "binary/octet-stream" {
+	contentType := strings.ToLower(
+		strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0]),
+	)
+	if contentType != "" &&
+		!strings.HasPrefix(contentType, "video/") &&
+		contentType != "application/octet-stream" &&
+		contentType != "binary/octet-stream" {
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("TikHub media response has unsupported content type %q", contentType)
 	}
-	limited := &io.LimitedReader{R: resp.Body, N: maxBytes + 1}
-	content, err := io.ReadAll(limited)
-	if err != nil {
-		return nil, errors.New("failed to read TikHub media")
-	}
-	if int64(len(content)) > maxBytes {
-		return nil, fmt.Errorf("social video exceeds the configured %d MB upload limit", secutils.GetMaxFileSizeMB())
-	}
-	if len(content) == 0 {
-		return nil, errors.New("TikHub media response was empty")
-	}
-	return content, nil
+	return &tikHubMediaStream{
+		reader: &io.LimitedReader{R: resp.Body, N: maxBytes + 1},
+		closer: resp.Body,
+		// Do not forward a remote Content-Length as the storage request length.
+		// A CDN can lie or truncate that header; -1 forces providers to consume
+		// the bounded reader so the post-copy byte count remains authoritative.
+		contentLength: -1,
+		contentType:   contentType,
+	}, nil
 }

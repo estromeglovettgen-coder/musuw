@@ -275,6 +275,17 @@ func NewRouter(params RouterParams) *gin.Engine {
 		)
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
+		var storedKnowledgeCreator interfaces.StoredKnowledgeCreator
+		if candidate, ok := params.KnowledgeService.(interfaces.StoredKnowledgeCreator); ok {
+			storedKnowledgeCreator = candidate
+		}
+		RegisterDirectUploadRoutes(
+			v1,
+			params.StorageBackendResolver,
+			params.KBService,
+			storedKnowledgeCreator,
+			rbacGuards,
+		)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
 		RegisterSessionRoutes(v1, params.SessionHandler, params.MessageSuggestionHandler, rbacGuards)

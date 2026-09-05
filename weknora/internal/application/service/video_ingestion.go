@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	werrors "github.com/Tencent/WeKnora/internal/errors"
@@ -46,20 +47,6 @@ func (s *knowledgeService) convertVideo(
 		return s.failKnowledge(ctx, knowledge, isLastRetry, "unsupported video type: %s", payload.FileType)
 	}
 
-	fileReader, err := s.resolveFileServiceForPath(ctx, kb, payload.FilePath).GetFile(ctx, payload.FilePath)
-	if err != nil {
-		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "failed to get video", err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to get video: %v", err)
-	}
-	defer fileReader.Close()
-	videoBytes, err := io.ReadAll(fileReader)
-	if err != nil {
-		s.failStage(ctx, knowledge.ID, types.StageDocReader,
-			werrors.ErrCodeDocReaderParseFailed, "failed to read video", err)
-		return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to read video: %v", err)
-	}
-
 	model, err := s.modelService.GetVLMModel(ctx, eff.VLMConfig.ModelID)
 	if err != nil {
 		s.failStage(ctx, knowledge.ID, types.StageDocReader,
@@ -67,7 +54,70 @@ func (s *knowledgeService) convertVideo(
 		return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to load video model: %v", err)
 	}
 
-	markdown, err := vlm.PredictVideo(ctx, model, videoBytes, mimeType, buildVideoUnderstandingPrompt(ctx, eff.VLMConfig))
+	fileService := s.resolveFileServiceForPath(ctx, kb, payload.FilePath)
+	if fileService == nil {
+		err := fmt.Errorf("video storage service is not configured")
+		s.failStage(ctx, knowledge.ID, types.StageDocReader,
+			werrors.ErrCodeDocReaderParseFailed, "failed to load video storage", err)
+		return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to load video storage: %v", err)
+	}
+
+	prompt := buildVideoUnderstandingPrompt(ctx, eff.VLMConfig)
+	videoSource := "base64"
+	var videoBytes []byte
+	var markdown string
+
+	// Object storage implementations can return a signed HTTP(S) URL. Pass it
+	// directly to explicitly URL-capable OpenRouter models so large videos never
+	// take the read-all -> Base64 path. A local:// URL is intentionally treated
+	// as unavailable and falls back to the existing bounded inline path.
+	if vlm.SupportsVideoURL(model) {
+		videoURL, urlErr := fileService.GetFileURL(ctx, payload.FilePath)
+		if urlErr == nil && isUsableVideoURL(videoURL) {
+			videoSource = "url"
+			markdown, err = vlm.PredictVideoURL(ctx, model, videoURL, mimeType, prompt)
+		} else {
+			if urlErr != nil {
+				logger.Warnf(
+					ctx,
+					"[Video] URL transport unavailable for %s, falling back to inline video: %v",
+					knowledge.ID,
+					urlErr,
+				)
+			} else {
+				logger.Warnf(
+					ctx,
+					"[Video] storage returned a non-HTTP URL for %s, falling back to inline video",
+					knowledge.ID,
+				)
+			}
+		}
+	}
+
+	if videoSource == "base64" {
+		fileReader, readErr := fileService.GetFile(ctx, payload.FilePath)
+		if readErr != nil {
+			s.failStage(ctx, knowledge.ID, types.StageDocReader,
+				werrors.ErrCodeDocReaderParseFailed, "failed to get video", readErr)
+			return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to get video: %v", readErr)
+		}
+		// Keep the inline fallback bounded even when an object was uploaded with
+		// the larger video limit. Reading one byte past the raw ceiling lets the
+		// VLM return its precise encoded-size error without buffering a 300 MB
+		// object that cannot be sent inline.
+		videoBytes, err = io.ReadAll(io.LimitReader(fileReader, int64(vlm.MaxInlineVideoBytes)+1))
+		closeErr := fileReader.Close()
+		if err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			s.failStage(ctx, knowledge.ID, types.StageDocReader,
+				werrors.ErrCodeDocReaderParseFailed, "failed to read video", err)
+			return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to read video: %v", err)
+		}
+		markdown, err = vlm.PredictVideo(ctx, model, videoBytes, mimeType, prompt)
+	}
+
 	if err != nil {
 		logger.Errorf(ctx, "[Video] native understanding failed for %s: %v", knowledge.ID, err)
 		s.failStage(ctx, knowledge.ID, types.StageDocReader,
@@ -83,15 +133,22 @@ func (s *knowledgeService) convertVideo(
 	}
 
 	s.endStage(ctx, knowledge.ID, types.StageDocReader, types.JSONMap{
-		"text_length": len(markdown),
-		"video_bytes": len(videoBytes),
-		"model":       model.GetModelName(),
+		"text_length":  len(markdown),
+		"video_bytes":  len(videoBytes),
+		"video_source": videoSource,
+		"model":        model.GetModelName(),
 	})
 	return &types.ReadResult{
 		MarkdownContent: markdown,
 		Metadata: map[string]string{
-			"source_type": "video",
-			"video_model": model.GetModelName(),
+			"source_type":      "video",
+			"video_model":      model.GetModelName(),
+			"video_input_mode": videoSource,
 		},
 	}, nil
+}
+
+func isUsableVideoURL(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
 }

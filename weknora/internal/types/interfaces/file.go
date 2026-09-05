@@ -29,3 +29,17 @@ type FileService interface {
 	// when srcPath belongs to a different storage provider than this service.
 	CopyFile(ctx context.Context, srcPath string, tenantID uint64, knowledgeID string) (string, error)
 }
+
+// StreamingFileService is an optional capability for storage backends that
+// can persist a non-seekable reader without buffering it in application
+// memory. TikHub social video imports use this capability when available.
+type StreamingFileService interface {
+	SaveReader(
+		ctx context.Context,
+		reader io.Reader,
+		size int64,
+		tenantID uint64,
+		fileName, contentType string,
+		temp bool,
+	) (string, error)
+}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -120,6 +121,48 @@ func (s *resourceCatalogFileService) SaveBytes(
 	}
 	sum := sha256.Sum256(data)
 	return s.register(ctx, physical, tenantID, fileName, int64(len(data)), temp, hex.EncodeToString(sum[:]))
+}
+
+type resourceHashReader struct {
+	io.Reader
+	hash hash.Hash
+	size int64
+}
+
+func (r *resourceHashReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if n > 0 {
+		_, _ = r.hash.Write(p[:n])
+		r.size += int64(n)
+	}
+	return n, err
+}
+
+// SaveReader streams and hashes a resource in one pass. The catalog receives
+// the actual bytes consumed by the provider rather than trusting a remote
+// Content-Length header.
+func (s *resourceCatalogFileService) SaveReader(
+	ctx context.Context,
+	reader io.Reader,
+	size int64,
+	tenantID uint64,
+	fileName string,
+	contentType string,
+	temp bool,
+) (string, error) {
+	if reader == nil {
+		return "", fmt.Errorf("reader is nil")
+	}
+	counted := &resourceHashReader{Reader: reader, hash: sha256.New()}
+	streamer, ok := s.inner.(interfaces.StreamingFileService)
+	if !ok {
+		return "", fmt.Errorf("storage backend does not support streaming uploads")
+	}
+	physical, err := streamer.SaveReader(ctx, counted, size, tenantID, fileName, contentType, temp)
+	if err != nil {
+		return "", err
+	}
+	return s.register(ctx, physical, tenantID, fileName, counted.size, temp, hex.EncodeToString(counted.hash.Sum(nil)))
 }
 
 func (s *resourceCatalogFileService) resolve(ctx context.Context, value string) (string, bool, error) {

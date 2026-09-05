@@ -1,6 +1,8 @@
 import { get, post, put, del, postUpload, getDown } from "../../utils/request";
 import type { KnowledgeProcessOverrides } from '@/types/knowledgeProcess';
 import type { AuditLog, AuditOutcome, ListAuditLogResponse } from '@/api/tenant/audit-log';
+import { uploadVideoKnowledgeFile } from './direct-upload';
+import { DIRECT_VIDEO_UPLOAD_THRESHOLD_BYTES, isDirectVideoUploadFile } from '@/utils/directVideoUpload';
 
 export type KnowledgeBaseActivity = AuditLog;
 
@@ -219,6 +221,9 @@ export function uploadKnowledgeFile(
   } = { file: new File([], '') },
   onProgress?: (progressEvent: any) => void,
 ) {
+  if (data.file && data.file.size > DIRECT_VIDEO_UPLOAD_THRESHOLD_BYTES && isDirectVideoUploadFile(data.file)) {
+    return uploadVideoKnowledgeFile(kbId, data, onProgress);
+  }
   const formData = new FormData();
   Object.keys(data).forEach(key => {
     const value = data[key];
