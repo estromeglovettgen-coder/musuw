@@ -4,9 +4,44 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/application/service"
+	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSanitizeConsumerVideoSpansRemovesInfrastructureDetails(t *testing.T) {
+	rows := []types.KnowledgeProcessingSpan{{
+		ErrorCode:    werrors.ErrCodeVideoParseFailed,
+		ErrorMessage: "OpenRouter upstream returned 500 from provider",
+		ErrorDetail:  "sensitive response body",
+		Input:        types.JSONMap{"model_id": "builtin-secret", "file_name": "clip.mp4"},
+		Output:       types.JSONMap{"video_source": "url", "text_length": 0},
+	}}
+
+	got := sanitizeConsumerVideoSpans(rows)
+	assert.Equal(t, "", got[0].ErrorCode)
+	assert.Equal(t, "", got[0].ErrorDetail)
+	assert.Equal(t, service.VideoParseFailedPublicMessage, got[0].ErrorMessage)
+	assert.NotContains(t, got[0].Input, "model_id")
+	assert.Equal(t, "clip.mp4", got[0].Input["file_name"])
+	assert.NotContains(t, got[0].Output, "video_source")
+	assert.Equal(t, 0, got[0].Output["text_length"])
+	assert.Equal(t, werrors.ErrCodeVideoParseFailed, rows[0].ErrorCode, "persisted diagnostics must remain unchanged")
+}
+
+func TestConsumerVideoPublicErrorPreservesProductStates(t *testing.T) {
+	for _, message := range []string{
+		service.VideoParsingPublicMessage,
+		service.VideoRetryingPublicMessage,
+		service.VideoParseFailedPublicMessage,
+		service.VideoTooLargePublicMessage,
+		service.VideoSourceFailedPublicMessage,
+		service.VideoFormatFailedPublicMessage,
+	} {
+		assert.Equal(t, message, consumerVideoPublicError("", message))
+	}
+}
 
 // TestBuildSpanTree_AssemblesParentChild covers the basic shape: a root
 // with stage children and an image generation grandchild. The handler's

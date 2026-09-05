@@ -23,6 +23,7 @@ export interface FilterUploadFilesOptions {
 export interface FilterUploadFilesResult {
   validFiles: File[]
   skippedCount: number
+  oversizedVideoCount: number
   hiddenFileCount: number
 }
 
@@ -61,6 +62,7 @@ export function filterUploadFiles(
 
   const validFiles: File[] = []
   let skippedCount = 0
+  let oversizedVideoCount = 0
   let hiddenFileCount = 0
   const multiFile = options.multiFile ?? list.length > 1
   const acceptedTypes = dynamicTypes
@@ -86,11 +88,12 @@ export function filterUploadFiles(
       : kbFileTypeVerification(file, multiFile, acceptedTypes)
     if (rejectedType || rejectedSize) {
       skippedCount++
+      if (isVideo && file.size > MAX_VIDEO_UPLOAD_BYTES) oversizedVideoCount++
       continue
     }
 
     validFiles.push(file)
   }
 
-  return { validFiles, skippedCount, hiddenFileCount }
+  return { validFiles, skippedCount, oversizedVideoCount, hiddenFileCount }
 }

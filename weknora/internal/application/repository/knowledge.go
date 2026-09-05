@@ -687,7 +687,15 @@ func (r *knowledgeRepository) CheckKnowledgeExists(
 	params *types.KnowledgeCheckParams,
 ) (bool, *types.Knowledge, error) {
 	query := r.db.WithContext(ctx).Model(&types.Knowledge{}).
-		Where("tenant_id = ? AND knowledge_base_id = ? AND parse_status <> ?", tenantID, kbID, "failed")
+		Where("tenant_id = ? AND knowledge_base_id = ?", tenantID, kbID)
+	if params.ReuseStoredSource {
+		query = query.
+			Where("parse_status <> ? OR TRIM(COALESCE(file_path, '')) <> ''", types.ParseStatusFailed).
+			Order("CASE WHEN parse_status = 'failed' THEN 1 ELSE 0 END").
+			Order("updated_at DESC")
+	} else {
+		query = query.Where("parse_status <> ?", types.ParseStatusFailed)
+	}
 
 	switch params.Type {
 	case "file":

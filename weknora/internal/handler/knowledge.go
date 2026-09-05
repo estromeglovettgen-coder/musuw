@@ -275,7 +275,7 @@ func (h *KnowledgeHandler) handleDuplicateKnowledgeError(c *gin.Context,
 		c.JSON(http.StatusConflict, gin.H{
 			"success": false,
 			"message": dupErr.Error(),
-			"data":    knowledge, // knowledge contains the existing document
+			"data":    sanitizeConsumerKnowledge(knowledge), // knowledge contains the existing document
 			"code":    fmt.Sprintf("duplicate_%s", duplicateType),
 		})
 		return true
@@ -388,6 +388,16 @@ func (h *KnowledgeHandler) CreateKnowledgeFromFile(c *gin.Context) {
 	// Deliberately not a runtime system_setting; see filesize.go for the
 	// rationale (nginx / docreader / browser bundle all cache this at
 	// container startup, so a UI knob would silently mismatch).
+	uploadFileName := file.Filename
+	if strings.TrimSpace(customFileName) != "" {
+		uploadFileName = customFileName
+	}
+	uploadFileType := strings.TrimPrefix(strings.ToLower(path.Ext(uploadFileName)), ".")
+	if service.IsVideoType(uploadFileType) && file.Size > utils.GetMaxVideoFileSizeBytes() {
+		logger.Warnf(ctx, "Rejected oversized multipart video: size=%d max=%d", file.Size, utils.GetMaxVideoFileSizeBytes())
+		c.Error(errors.NewBadRequestError(service.VideoTooLargePublicMessage))
+		return
+	}
 	maxSizeMB := utils.GetMaxFileSizeMB()
 	maxSize := utils.GetMaxFileSize()
 	if file.Size > maxSize {
@@ -478,7 +488,7 @@ func (h *KnowledgeHandler) CreateKnowledgeFromFile(c *gin.Context) {
 	)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -577,7 +587,7 @@ func (h *KnowledgeHandler) CreateKnowledgeFromURL(c *gin.Context) {
 	)
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -636,7 +646,7 @@ func (h *KnowledgeHandler) CreateManualKnowledge(c *gin.Context) {
 		secutils.SanitizeForLog(knowledge.ID))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -683,7 +693,7 @@ func (h *KnowledgeHandler) GetKnowledge(c *gin.Context) {
 		secutils.SanitizeForLog(knowledge.ID), secutils.SanitizeForLog(knowledge.Title))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -753,6 +763,10 @@ func (h *KnowledgeHandler) GetKnowledgeSpans(c *gin.Context) {
 			}
 		}
 	}
+	publicVideo := knowledgeIsVideo(knowledge)
+	if publicVideo {
+		rows = sanitizeConsumerVideoSpans(rows)
+	}
 
 	// Build tree: index by SpanID, then attach to parents. Stages
 	// missing from the DB are synthesized as "pending" placeholders
@@ -773,20 +787,121 @@ func (h *KnowledgeHandler) GetKnowledgeSpans(c *gin.Context) {
 		"current_stage":   currentStageName,
 		"trace":           tree,
 	}
+	knowledgeErrorMessage := knowledge.ErrorMessage
+	if publicVideo {
+		knowledgeErrorMessage = consumerVideoPublicError("", knowledgeErrorMessage)
+	}
 	if lastError := knowledgeSpansLastError(
 		currentAttempt,
 		latestAttempt,
 		knowledge.ParseStatus,
-		knowledge.ErrorMessage,
+		knowledgeErrorMessage,
 		knowledge.UpdatedAt,
 		lastErr,
 	); lastError != nil {
+		if publicVideo {
+			delete(lastError, "code")
+			delete(lastError, "error_code")
+		}
 		resp["last_error"] = lastError
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    resp,
 	})
+}
+
+func knowledgeIsVideo(knowledge *types.Knowledge) bool {
+	if knowledge == nil {
+		return false
+	}
+	fileType := strings.TrimSpace(knowledge.FileType)
+	if fileType == "" {
+		fileType = strings.TrimPrefix(path.Ext(knowledge.FileName), ".")
+	}
+	return service.IsVideoType(fileType)
+}
+
+func consumerVideoPublicError(code, message string) string {
+	trimmed := strings.TrimSpace(message)
+	switch trimmed {
+	case service.VideoParsingPublicMessage,
+		service.VideoRetryingPublicMessage,
+		service.VideoParseFailedPublicMessage,
+		service.VideoTooLargePublicMessage,
+		service.VideoSourceFailedPublicMessage,
+		service.VideoFormatFailedPublicMessage:
+		return trimmed
+	}
+	switch strings.TrimSpace(code) {
+	case errors.ErrCodeVideoTooLarge:
+		return service.VideoTooLargePublicMessage
+	case errors.ErrCodeVideoSourceFailed:
+		return service.VideoSourceFailedPublicMessage
+	case errors.ErrCodeVideoFormatUnsupported:
+		return service.VideoFormatFailedPublicMessage
+	}
+	lower := strings.ToLower(trimmed)
+	if strings.Contains(message, "300 MB") || strings.Contains(lower, "too large") || strings.Contains(lower, "upload limit") {
+		return service.VideoTooLargePublicMessage
+	}
+	if strings.Contains(trimmed, "来源") || strings.Contains(lower, "source") || strings.Contains(lower, "download") || strings.Contains(lower, "storage") || strings.Contains(lower, "get video") {
+		return service.VideoSourceFailedPublicMessage
+	}
+	return service.VideoParseFailedPublicMessage
+}
+
+func sanitizeConsumerKnowledge(knowledge *types.Knowledge) *types.Knowledge {
+	if !knowledgeIsVideo(knowledge) || strings.TrimSpace(knowledge.ErrorMessage) == "" {
+		return knowledge
+	}
+	sanitized := *knowledge
+	sanitized.ErrorMessage = consumerVideoPublicError("", knowledge.ErrorMessage)
+	return &sanitized
+}
+
+func sanitizeConsumerKnowledges(knowledges []*types.Knowledge) []*types.Knowledge {
+	if len(knowledges) == 0 {
+		return knowledges
+	}
+	sanitized := make([]*types.Knowledge, len(knowledges))
+	for i, knowledge := range knowledges {
+		sanitized[i] = sanitizeConsumerKnowledge(knowledge)
+	}
+	return sanitized
+}
+
+func sanitizeConsumerVideoSpans(rows []types.KnowledgeProcessingSpan) []types.KnowledgeProcessingSpan {
+	sanitized := make([]types.KnowledgeProcessingSpan, len(rows))
+	copy(sanitized, rows)
+	for i := range sanitized {
+		row := &sanitized[i]
+		if row.ErrorCode != "" || row.ErrorMessage != "" {
+			row.ErrorMessage = consumerVideoPublicError(row.ErrorCode, row.ErrorMessage)
+		}
+		row.ErrorCode = ""
+		row.ErrorDetail = ""
+		row.Input = sanitizeConsumerVideoSpanMap(row.Input)
+		row.Output = sanitizeConsumerVideoSpanMap(row.Output)
+		row.Metadata = sanitizeConsumerVideoSpanMap(row.Metadata)
+	}
+	return sanitized
+}
+
+func sanitizeConsumerVideoSpanMap(values types.JSONMap) types.JSONMap {
+	if values == nil {
+		return nil
+	}
+	sanitized := make(types.JSONMap, len(values))
+	for key, value := range values {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "model", "model_id", "video_model", "provider", "route", "router", "base_url", "video_source", "video_input_mode":
+			continue
+		default:
+			sanitized[key] = value
+		}
+	}
+	return sanitized
 }
 
 // knowledgeSpansLastError builds the last_error payload for GetKnowledgeSpans.
@@ -1068,7 +1183,7 @@ func (h *KnowledgeHandler) ListKnowledge(c *gin.Context) {
 	)
 	c.JSON(http.StatusOK, gin.H{
 		"success":   true,
-		"data":      result.Data,
+		"data":      sanitizeConsumerKnowledgePageData(result.Data),
 		"total":     result.Total,
 		"page":      result.Page,
 		"page_size": result.PageSize,
@@ -1819,8 +1934,15 @@ func (h *KnowledgeHandler) GetKnowledgeBatch(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    knowledges,
+		"data":    sanitizeConsumerKnowledges(knowledges),
 	})
+}
+
+func sanitizeConsumerKnowledgePageData(data interface{}) interface{} {
+	if knowledges, ok := data.([]*types.Knowledge); ok {
+		return sanitizeConsumerKnowledges(knowledges)
+	}
+	return data
 }
 
 // UpdateKnowledgeRequest defines the partial-update body for PUT /knowledge/:id.
@@ -1925,7 +2047,7 @@ func (h *KnowledgeHandler) RegenerateKnowledgeSummary(c *gin.Context) {
 		c.Error(errors.NewBadRequestError(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": knowledge})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": sanitizeConsumerKnowledge(knowledge)})
 }
 
 // UpdateManualKnowledge godoc
@@ -1981,7 +2103,7 @@ func (h *KnowledgeHandler) UpdateManualKnowledge(c *gin.Context) {
 	logger.Infof(ctx, "Manual knowledge updated successfully, knowledge ID: %s", id)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -2050,7 +2172,7 @@ func (h *KnowledgeHandler) ReparseKnowledge(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Knowledge reparse task submitted",
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -2103,7 +2225,7 @@ func (h *KnowledgeHandler) CancelKnowledgeParse(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Knowledge parse cancelled",
-		"data":    knowledge,
+		"data":    sanitizeConsumerKnowledge(knowledge),
 	})
 }
 
@@ -2391,7 +2513,7 @@ func (h *KnowledgeHandler) SearchKnowledge(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"success":  true,
-			"data":     knowledges,
+			"data":     sanitizeConsumerKnowledges(knowledges),
 			"has_more": hasMore,
 			"total":    total,
 		})
@@ -2416,7 +2538,7 @@ func (h *KnowledgeHandler) SearchKnowledge(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"success":  true,
-			"data":     knowledges,
+			"data":     sanitizeConsumerKnowledges(knowledges),
 			"has_more": hasMore,
 			"total":    total,
 		})
@@ -2433,7 +2555,7 @@ func (h *KnowledgeHandler) SearchKnowledge(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":  true,
-		"data":     knowledges,
+		"data":     sanitizeConsumerKnowledges(knowledges),
 		"has_more": hasMore,
 		"total":    total,
 	})

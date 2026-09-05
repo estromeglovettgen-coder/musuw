@@ -30,7 +30,10 @@ func openRouterCreditExhaustionMiddleware(
 	return func(next asynq.Handler) asynq.Handler {
 		return asynq.HandlerFunc(func(ctx context.Context, t *asynq.Task) error {
 			err := next.ProcessTask(ctx, t)
-			if err == nil || !openrouter.IsCreditExhausted(err) {
+			// A specialized ingestion path may already have published a safer,
+			// product-specific terminal state and attached SkipRetry. Preserve it
+			// instead of replacing it with provider credit terminology.
+			if err == nil || errors.Is(err, asynq.SkipRetry) || !openrouter.IsCreditExhausted(err) {
 				return err
 			}
 

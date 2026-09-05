@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -124,6 +125,11 @@ func (e *SyncTaskExecutor) Enqueue(task *asynq.Task, opts ...asynq.Option) (*asy
 			if lastErr == nil {
 				logger.Infof(ctx, "[SyncTask] Task completed type=%s id=%s elapsed=%v",
 					task.Type(), taskID, time.Since(start))
+				return
+			}
+			if errors.Is(lastErr, asynq.SkipRetry) {
+				logger.Warnf(ctx, "[SyncTask] Task stopped without retry type=%s id=%s elapsed=%v err=%v",
+					task.Type(), taskID, time.Since(start), lastErr)
 				return
 			}
 		}

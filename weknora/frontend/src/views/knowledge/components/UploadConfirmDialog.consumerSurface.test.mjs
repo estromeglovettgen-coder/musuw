@@ -9,9 +9,10 @@ test('Lite upload confirmation has no parser, model, chunking, media, question, 
   assert.match(source, /useAuthStore/)
   assert.match(template, /<aside v-if="!authStore\.isLiteMode" class="settings-sidebar">/)
   for (const section of ['parser', 'chunking', 'multimodal', 'asr', 'question']) {
+    const extraGuard = section === 'multimodal' ? ' && !isVideoOnly' : ''
     assert.match(
       template,
-      new RegExp(`<div v-if="!authStore\\.isLiteMode" v-show="activeSection === '${section}'"`),
+      new RegExp(`<div v-if="!authStore\\.isLiteMode${extraGuard}" v-show="activeSection === '${section}'"`),
       `Lite must not render ${section} upload controls`,
     )
   }
@@ -28,7 +29,13 @@ test('Lite uploads use server-managed parsing and skip hidden media validation',
   assert.match(source, /if \(!authStore\.isLiteMode\) \{\s*loadModels\(\)\s*loadSystemInfo\(\)/)
   assert.match(source, /if \(!authStore\.isLiteMode && hasImages\.value\)/)
   assert.match(source, /if \(!authStore\.isLiteMode && hasAudio\.value\)/)
-  assert.match(source, /if \(!authStore\.isLiteMode && \(showMultimodalModelError\.value \|\| showAsrModelError\.value\)\)/)
+  assert.match(source, /if \(!authStore\.isLiteMode && \(\(!isVideoOnly\.value && showMultimodalModelError\.value\) \|\| showAsrModelError\.value\)\)/)
+})
+
+test('video-only upload and reparse remove the user-facing video model choice', () => {
+  assert.match(source, /const isVideoOnly = computed/)
+  assert.match(template, /v-if="!authStore\.isLiteMode && !isVideoOnly" v-show="activeSection === 'multimodal'"/)
+  assert.match(source, /if \(isVideoOnly\.value\) \{\s*delete overrides\.enable_multimodel\s*delete overrides\.vlm_config\s*\}/)
 })
 
 test('Lite upload source catalog contains only ordinary file, folder, URL, and optional manual actions', () => {

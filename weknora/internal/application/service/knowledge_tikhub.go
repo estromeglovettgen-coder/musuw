@@ -41,8 +41,6 @@ func socialImportFailureReason(err error) string {
 	switch {
 	case errors.Is(err, errTikHubNotConfigured):
 		return "not_configured"
-	case strings.Contains(err.Error(), "VLM"):
-		return "vlm_not_configured"
 	case errors.Is(err, errSocialVideoNotAllowed):
 		return "video_not_allowed"
 	case strings.Contains(err.Error(), "upload limit"):
@@ -57,17 +55,15 @@ func socialImportFailureReason(err error) string {
 func socialImportPublicMessage(err error) string {
 	switch socialImportFailureReason(err) {
 	case "not_configured":
-		return "Social link import is not configured"
-	case "vlm_not_configured":
-		return "Social video import requires a configured VLM model"
+		return VideoSourceFailedPublicMessage
 	case "video_not_allowed":
 		return "Current plan does not support social video import"
 	case "artifact_too_large":
-		return "Social media exceeds the configured upload limit"
+		return VideoTooLargePublicMessage
 	case "unsafe_media_url":
-		return "Social media URL failed security validation"
+		return VideoSourceFailedPublicMessage
 	default:
-		return "Social link import failed"
+		return VideoSourceFailedPublicMessage
 	}
 }
 
@@ -100,7 +96,7 @@ func (s *knowledgeService) prepareTikHubArtifact(
 	payload *types.DocumentProcessPayload,
 	kb *types.KnowledgeBase,
 	knowledge *types.Knowledge,
-	eff types.EffectiveProcessConfig,
+	_ types.EffectiveProcessConfig,
 ) (bool, []docparser.StoredImage, error) {
 	if payload == nil || strings.TrimSpace(payload.URL) == "" {
 		return false, nil, nil
@@ -155,9 +151,6 @@ func (s *knowledgeService) prepareTikHubArtifact(
 		}
 		result.FileType = "md"
 	case tikhub.ResultVideo:
-		if !eff.VLMConfig.IsEnabled() {
-			return true, nil, errors.New("social video import requires a configured VLM model")
-		}
 		if !socialVideoUploadAllowed(ctx) {
 			return true, nil, errSocialVideoNotAllowed
 		}
