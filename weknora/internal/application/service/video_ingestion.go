@@ -72,7 +72,11 @@ func (s *knowledgeService) convertVideo(
 	// take the read-all -> Base64 path. A local:// URL is intentionally treated
 	// as unavailable and falls back to the existing bounded inline path.
 	if vlm.SupportsVideoURL(model) {
-		videoURL, urlErr := fileService.GetFileURL(ctx, payload.FilePath)
+		videoURLPath, urlErr := s.videoURLSourcePath(ctx, payload.FilePath)
+		var videoURL string
+		if urlErr == nil {
+			videoURL, urlErr = fileService.GetFileURL(ctx, videoURLPath)
+		}
 		if urlErr == nil && isUsableVideoURL(videoURL) {
 			videoSource = "url"
 			markdown, err = vlm.PredictVideoURL(ctx, model, videoURL, mimeType, prompt)
@@ -146,6 +150,32 @@ func (s *knowledgeService) convertVideo(
 			"video_input_mode": videoSource,
 		},
 	}, nil
+}
+
+// videoURLSourcePath unwraps a stable resource handle before asking its owning
+// storage backend for a model-facing URL. Resource handles normally become an
+// application /r/<token> proxy, which is useful for images and IM clients but
+// lacks the object-store download semantics expected by video providers. The
+// physical path keeps the same tenant/backend resolution performed above and
+// lets S3-compatible storage return its native short-lived GET URL instead.
+func (s *knowledgeService) videoURLSourcePath(ctx context.Context, filePath string) (string, error) {
+	if _, ok := types.ParseResourcePath(filePath); !ok {
+		return filePath, nil
+	}
+	if s == nil || s.resourceCatalog == nil {
+		return "", fmt.Errorf("video resource catalog is not configured")
+	}
+	physical, resource, err := s.resourceCatalog.ResolvePath(ctx, filePath)
+	if err != nil {
+		return "", fmt.Errorf("resolve video resource for direct URL transport: %w", err)
+	}
+	if resource == nil || strings.TrimSpace(physical) == "" {
+		return "", fmt.Errorf("resolve video resource for direct URL transport: resource is unavailable")
+	}
+	if _, nested := types.ParseResourcePath(physical); nested {
+		return "", fmt.Errorf("resolve video resource for direct URL transport: physical path is another resource handle")
+	}
+	return physical, nil
 }
 
 func isUsableVideoURL(raw string) bool {

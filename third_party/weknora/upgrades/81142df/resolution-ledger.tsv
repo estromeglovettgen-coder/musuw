@@ -927,7 +927,7 @@ internal/application/service/user_provisioning_test.go	-	M	100644	52e8231adf32af
 internal/application/service/vectorstore_healthcheck.go	-	M	100644	44f1caf9ff2d176778e79fcea21e1e4043c6eebf	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/vectorstore_healthcheck_ssrf_test.go	-	A	100644	2e23cf0049d8e94354805b178f49bec938282fa1	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/vectorstore_test.go	-	M	100644	7a9fd2c1ef0fa59b438199723acdc222ac37209b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/video_ingestion.go	A	-	100644	01229ab982be87346220dede249ae592e594a469	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/application/service/video_ingestion.go	A	-	100644	7ffce15b10597a70c570ef092d787c8217688e85	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/web_search_provider.go	-	M	100644	cb472f4dd9689528ce74bc7a5245d06d43bd3ebb	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/web_search_provider_test.go	-	M	100644	14b3b8fe2dd13f129e130655f4d3a3ed728ca052	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/weknoracloud.go	-	M	100644	0c838602f787e85117219b4ff7e33d0396186490	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
