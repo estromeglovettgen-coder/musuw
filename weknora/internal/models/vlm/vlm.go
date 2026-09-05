@@ -28,6 +28,21 @@ type VideoPredictor interface {
 	PredictVideo(ctx context.Context, videoBytes []byte, mimeType, prompt string) (string, error)
 }
 
+// VideoURLPredictor is an optional capability for transports that can pass a
+// publicly reachable (or signed) video URL to the upstream model. It is kept
+// separate from VideoPredictor because URL and inline Base64 inputs have
+// different provider limits and failure modes.
+type VideoURLPredictor interface {
+	PredictVideoURL(ctx context.Context, videoURL, mimeType, prompt string) (string, error)
+}
+
+// VideoURLCapability reports whether a VLM is explicitly configured to use
+// the URL input path. Capability is configuration-driven, not inferred from a
+// model name, so an unknown/custom model cannot silently receive a URL.
+type VideoURLCapability interface {
+	SupportsVideoURL() bool
+}
+
 // PredictVideo invokes the optional video capability through any decorators.
 func PredictVideo(ctx context.Context, model VLM, videoBytes []byte, mimeType, prompt string) (string, error) {
 	predictor, ok := model.(VideoPredictor)
@@ -35,6 +50,23 @@ func PredictVideo(ctx context.Context, model VLM, videoBytes []byte, mimeType, p
 		return "", fmt.Errorf("VLM %q does not support video input", model.GetModelName())
 	}
 	return predictor.PredictVideo(ctx, videoBytes, mimeType, prompt)
+}
+
+// SupportsVideoURL reports whether the model and all of its decorators expose
+// the explicitly configured URL capability.
+func SupportsVideoURL(model VLM) bool {
+	capability, ok := model.(VideoURLCapability)
+	return ok && capability.SupportsVideoURL()
+}
+
+// PredictVideoURL invokes the optional URL video capability through any
+// decorators.
+func PredictVideoURL(ctx context.Context, model VLM, videoURL, mimeType, prompt string) (string, error) {
+	predictor, ok := model.(VideoURLPredictor)
+	if !ok || !SupportsVideoURL(model) {
+		return "", fmt.Errorf("VLM %q does not support video URL input", model.GetModelName())
+	}
+	return predictor.PredictVideoURL(ctx, videoURL, mimeType, prompt)
 }
 
 // Config holds the configuration needed to create a VLM instance.

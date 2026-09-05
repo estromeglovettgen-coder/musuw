@@ -79,20 +79,24 @@ func (r *tikHubWorkerRepoStub) ClaimKnowledgeSourceWithStorage(
 }
 
 type tikHubWorkerFileServiceStub struct {
-	savedData     []byte
-	savedFileName string
-	savedTemp     bool
-	saveCalls     int
-	deleteCalls   int
-	deletedPath   string
-	deletedPaths  []string
-	deleteErr     error
+	savedData        []byte
+	savedFileName    string
+	savedTemp        bool
+	saveCalls        int
+	saveReaderCalls  int
+	savedReaderSize  int64
+	savedContentType string
+	deleteCalls      int
+	deletedPath      string
+	deletedPaths     []string
+	deleteErr        error
 }
 
 func (s *tikHubWorkerFileServiceStub) CheckConnectivity(context.Context) error { return nil }
 func (s *tikHubWorkerFileServiceStub) SaveFile(context.Context, *multipart.FileHeader, uint64, string) (string, error) {
 	return "", errors.New("not implemented")
 }
+
 func (s *tikHubWorkerFileServiceStub) SaveBytes(_ context.Context, data []byte, _ uint64, fileName string, temp bool) (string, error) {
 	s.saveCalls++
 	s.savedData = append([]byte(nil), data...)
@@ -100,18 +104,44 @@ func (s *tikHubWorkerFileServiceStub) SaveBytes(_ context.Context, data []byte, 
 	s.savedTemp = temp
 	return "stored/" + fileName, nil
 }
+
+func (s *tikHubWorkerFileServiceStub) SaveReader(
+	_ context.Context,
+	reader io.Reader,
+	size int64,
+	_ uint64,
+	fileName string,
+	contentType string,
+	temp bool,
+) (string, error) {
+	s.saveReaderCalls++
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	s.savedData = append([]byte(nil), data...)
+	s.savedFileName = fileName
+	s.savedTemp = temp
+	s.savedReaderSize = size
+	s.savedContentType = contentType
+	return "stored/" + fileName, nil
+}
+
 func (s *tikHubWorkerFileServiceStub) GetFile(context.Context, string) (io.ReadCloser, error) {
 	return nil, errors.New("not implemented")
 }
+
 func (s *tikHubWorkerFileServiceStub) GetFileURL(context.Context, string) (string, error) {
 	return "", errors.New("not implemented")
 }
+
 func (s *tikHubWorkerFileServiceStub) DeleteFile(_ context.Context, path string) error {
 	s.deleteCalls++
 	s.deletedPath = path
 	s.deletedPaths = append(s.deletedPaths, path)
 	return s.deleteErr
 }
+
 func (s *tikHubWorkerFileServiceStub) CopyFile(context.Context, string, uint64, string) (string, error) {
 	return "", errors.New("not implemented")
 }
@@ -265,10 +295,12 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 		require.Empty(t, req.Header.Get("Authorization"))
 		require.Empty(t, req.Header.Get("Cookie"))
 		return &http.Response{
-			StatusCode:    http.StatusOK,
-			Header:        http.Header{"Content-Type": []string{"video/mp4"}},
-			Body:          io.NopCloser(bytes.NewReader([]byte("video-bytes"))),
-			ContentLength: int64(len("video-bytes")),
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"video/mp4"}},
+			Body:       io.NopCloser(bytes.NewReader([]byte("video-bytes"))),
+			// Deliberately lie about the size: the storage layer must still read
+			// the bounded stream rather than trusting this header.
+			ContentLength: 1,
 			Request:       req,
 		}, nil
 	})}
@@ -297,6 +329,10 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	require.True(t, IsVideoType(payload.FileType), "the existing convert() function must delegate this artifact to convertVideo")
 	require.Equal(t, "stored/youtube-dQw4w9WgXcQ.mp4", payload.FilePath)
 	require.Equal(t, []byte("video-bytes"), files.savedData)
+	require.Equal(t, 1, files.saveReaderCalls)
+	require.Equal(t, 0, files.saveCalls, "social videos must use the streaming storage capability")
+	require.Equal(t, int64(-1), files.savedReaderSize, "remote Content-Length must not truncate the bounded stream")
+	require.Equal(t, "video/mp4", files.savedContentType)
 	require.False(t, files.savedTemp, "social videos must survive worker retries and reparses")
 	require.False(t, strings.Contains(files.savedFileName, "/"))
 	require.Equal(
@@ -317,6 +353,54 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 		t, int32(1), tikHubCalls.Load(),
 		"retries must reuse the persisted MP4 instead of paying TikHub again",
 	)
+}
+
+func TestPrepareTikHubArtifactStreamsUnknownLengthAndDeletesWhenVideoExceedsLimit(t *testing.T) {
+	t.Setenv("VIDEO_MAX_BYTES", "8")
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(
+			w,
+			`{"code":200,"data":{"title":"A video","formats":[{"mime_type":"video/mp4",`+
+				`"url":"https://media.example/video.mp4"}]}}`,
+		)
+	}))
+	defer api.Close()
+
+	mediaClient := &http.Client{Transport: tikHubWorkerRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode:    http.StatusOK,
+			Header:        http.Header{"Content-Type": []string{"video/mp4"}},
+			Body:          io.NopCloser(strings.NewReader("video-bytes")),
+			ContentLength: -1,
+			Request:       req,
+		}, nil
+	})}
+	files := &tikHubWorkerFileServiceStub{}
+	repo := &tikHubWorkerRepoStub{}
+	svc := &knowledgeService{
+		repo:              repo,
+		fileSvc:           files,
+		tikhubImporter:    tikhub.NewTikHubImporterForTest(api.URL, "provider-key", api.Client()),
+		tikhubMediaClient: mediaClient,
+	}
+	payload := types.DocumentProcessPayload{TenantID: 9, URL: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+	knowledge := &types.Knowledge{ID: "knowledge-too-large", TenantID: 9, FileType: "html"}
+
+	handled, _, err := svc.prepareTikHubArtifact(
+		context.Background(),
+		&payload,
+		&types.KnowledgeBase{ID: "kb-2"},
+		knowledge,
+		types.EffectiveProcessConfig{VLMConfig: types.VLMConfig{Enabled: true, ModelID: "vlm-1"}},
+	)
+	require.True(t, handled)
+	require.EqualError(t, err, "social video exceeds the configured 8 byte upload limit")
+	require.Equal(t, 1, files.saveReaderCalls)
+	require.Equal(t, 1, files.deleteCalls, "the over-limit object must be removed after streaming max+1 bytes")
+	require.Empty(t, knowledge.FilePath)
+	require.NotEmpty(t, payload.URL, "failed source materialization must remain retryable")
 }
 
 func TestPrepareTikHubArtifactCleansObjectWhenStorageMutationFails(t *testing.T) {

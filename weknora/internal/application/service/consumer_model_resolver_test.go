@@ -72,6 +72,13 @@ func consumerSceneModel(id, display string) *types.Model {
 	}
 }
 
+func consumerSceneVLMModel(id, display string) *types.Model {
+	model := consumerSceneModel(id, display)
+	model.Type = types.ModelTypeVLLM
+	model.Parameters.SupportsVision = true
+	return model
+}
+
 func TestConsumerModelResolverFreeAndPaidOptions(t *testing.T) {
 	flash := consumerSceneModel(types.CheapestChatModelID, "Flash")
 	pro := consumerSceneModel("builtin-deepseek-v4-pro", "Pro")
@@ -147,7 +154,11 @@ func TestConsumerSceneSettingRegistry(t *testing.T) {
 		defaults, ok := paid.Default.([]string)
 		require.True(t, ok)
 		require.NotEmpty(t, defaults)
-		assert.Equal(t, scene.CompatibilityDefaultID(), defaults[0])
+		if scene == types.ConsumerSceneVision {
+			assert.Equal(t, "builtin-openrouter-vlm-mimo-v2-5", defaults[0])
+		} else {
+			assert.Equal(t, scene.CompatibilityDefaultID(), defaults[0])
+		}
 	}
 }
 
@@ -195,6 +206,86 @@ func TestConsumerModelResolverRegistryDefaultsRemainValidAndDeduplicated(t *test
 	}
 }
 
+func TestConsumerVisionRegistryUsesMiMoAsPaidDefaultAndKeepsGeminiFree(t *testing.T) {
+	visionIDs := defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM)
+	models := make([]*types.Model, 0, len(visionIDs))
+	for _, id := range visionIDs {
+		models = append(models, consumerSceneVLMModel(id, id))
+	}
+	resolver := NewConsumerModelResolver(
+		&consumerSceneModelRepo{models: models},
+		registryConsumerSceneSettings{},
+		nil,
+	)
+
+	free, err := resolver.ResolveConsumerModel(
+		contextWithConsumerPlan(1, types.ConsumerPlanFree),
+		types.ConsumerSceneVision,
+		"",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, types.PlatformKnowledgeBaseVLMModelID, free.ID,
+		"Free keeps the existing Gemini/Vertex compatibility model")
+
+	paid, err := resolver.ResolveConsumerModel(
+		contextWithConsumerPlan(1, types.ConsumerPlanPlus),
+		types.ConsumerSceneVision,
+		"",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "builtin-openrouter-vlm-mimo-v2-5", paid.ID,
+		"paid vision defaults to the URL-capable MiMo model")
+
+	options, err := resolver.ListConsumerModelOptions(
+		contextWithConsumerPlan(1, types.ConsumerPlanPlus),
+		types.ConsumerSceneVision,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, options)
+	assert.Equal(t, "builtin-openrouter-vlm-mimo-v2-5", options[0].ModelID)
+	assert.True(t, options[0].SceneDefault)
+	assert.True(t, options[0].Effective)
+	assert.Equal(t, types.PlatformKnowledgeBaseVLMModelID, options[1].ModelID,
+		"Gemini remains selectable for small Base64-compatible videos")
+}
+
+func TestConsumerVisionPersistedPolicyRemainsAnExplicitOverride(t *testing.T) {
+	visionIDs := defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM)
+	models := make([]*types.Model, 0, len(visionIDs))
+	for _, id := range visionIDs {
+		models = append(models, consumerSceneVLMModel(id, id))
+	}
+	// A persisted policy row is intentionally authoritative. This models an
+	// existing deployment that explicitly kept Gemini first; changing the
+	// registry default must not silently rewrite that operator choice.
+	settings := &consumerSceneSettings{rows: map[string]*types.SystemSetting{
+		types.ConsumerSceneVision.FreeDefaultKey(): sceneSettingString(
+			types.ConsumerSceneVision.FreeDefaultKey(), types.PlatformKnowledgeBaseVLMModelID),
+		types.ConsumerSceneVision.PaidOptionsKey(): sceneSettingList(
+			types.ConsumerSceneVision.PaidOptionsKey(),
+			[]string{
+				types.PlatformKnowledgeBaseVLMModelID,
+				"builtin-openrouter-vlm-mimo-v2-5",
+				"builtin-openrouter-vlm-muse-spark-1-2",
+			},
+		),
+	}}
+	resolver := NewConsumerModelResolver(
+		&consumerSceneModelRepo{models: models},
+		settings,
+		nil,
+	)
+
+	paid, err := resolver.ResolveConsumerModel(
+		contextWithConsumerPlan(1, types.ConsumerPlanPlus),
+		types.ConsumerSceneVision,
+		"",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, types.PlatformKnowledgeBaseVLMModelID, paid.ID,
+		"persisted settings remain authoritative until an operator resets/updates them")
+}
+
 func TestConsumerModelPolicyDefaultsExposeExpandedOpenRouterCatalog(t *testing.T) {
 	assert.Subset(t, defaultConsumerPaidModelIDs(), []string{
 		"builtin-openrouter-nemotron-lightning-free",
@@ -209,6 +300,8 @@ func TestConsumerModelPolicyDefaultsExposeExpandedOpenRouterCatalog(t *testing.T
 		"builtin-openrouter-rerank-qwen3",
 	})
 	assert.Subset(t, defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), []string{
+		"builtin-openrouter-vlm-mimo-v2-5",
+		"builtin-openrouter-vlm-muse-spark-1-2",
 		"builtin-openrouter-vlm-minimax-m3-free",
 		"builtin-openrouter-vlm-qwen-3-7-flash",
 		"builtin-openrouter-vlm-gemma-4-free",

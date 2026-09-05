@@ -248,6 +248,60 @@ func (s *localFileService) SaveBytes(ctx context.Context, data []byte, tenantID 
 	return localScheme + filepath.ToSlash(relPath), nil
 }
 
+// SaveReader streams reader data to local storage without materializing the
+// complete object in memory. The size and content type are supplied by the
+// caller for provider parity; the actual byte count is determined by io.Copy.
+func (s *localFileService) SaveReader(
+	ctx context.Context,
+	reader io.Reader,
+	size int64,
+	tenantID uint64,
+	fileName, contentType string,
+	_ bool,
+) (string, error) {
+	if reader == nil {
+		return "", fmt.Errorf("reader is nil")
+	}
+	safeName, err := secutils.SafeFileName(fileName)
+	if err != nil {
+		return "", fmt.Errorf("invalid file name: %w", err)
+	}
+	dir := filepath.Join(s.baseDir, fmt.Sprintf("%d", tenantID), "exports")
+	if _, err := secutils.SafePathUnderBase(s.baseDir, dir); err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create directory: %w", err)
+	}
+	ext := filepath.Ext(safeName)
+	baseName := safeName[:len(safeName)-len(ext)]
+	uniqueFileName := fmt.Sprintf("%s_%d%s", baseName, time.Now().UnixNano(), ext)
+	filePath := filepath.Join(dir, uniqueFileName)
+	dst, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return "", fmt.Errorf("failed to create file: %w", err)
+	}
+	_, copyErr := io.Copy(dst, reader)
+	closeErr := dst.Close()
+	if copyErr != nil {
+		_ = os.Remove(filePath)
+		return "", fmt.Errorf("failed to save streamed file: %w", copyErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(filePath)
+		return "", fmt.Errorf("failed to close streamed file: %w", closeErr)
+	}
+	if _, err := os.Stat(filePath); err != nil {
+		return "", fmt.Errorf("failed to stat streamed file: %w", err)
+	}
+	logger.Infof(ctx,
+		"Streamed file saved successfully: name=%s size=%d contentType=%s path=%s",
+		fileName, size, contentType, filePath,
+	)
+	relPath, _ := filepath.Rel(s.baseDir, filePath)
+	return localScheme + filepath.ToSlash(relPath), nil
+}
+
 // GetFileURL returns a download URL for the file.
 // When externalURL is configured, returns a presigned HTTP URL suitable for external access.
 // Otherwise returns the local://... path for backward compatibility.

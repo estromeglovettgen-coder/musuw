@@ -393,6 +393,43 @@ builtin_models:
       provider: openrouter
       interface_type: openai
       supports_vision: true
+      extra_config:
+        video_input_mode: base64
+        video_provider: google-vertex
+
+  - id: builtin-openrouter-vlm-mimo-v2-5
+    tenant_id: 10000
+    name: xiaomi/mimo-v2.5
+    type: VLLM
+    source: remote
+    display_name: MiMo V2.5 Video
+    description: MiMo V2.5 · video and audio understanding through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      interface_type: openai
+      supports_vision: true
+      extra_config:
+        video_input_mode: url
+
+  - id: builtin-openrouter-vlm-muse-spark-1-2
+    tenant_id: 10000
+    name: meta/muse-spark-1.2
+    type: VLLM
+    source: remote
+    display_name: Muse Spark 1.2 Video
+    description: Muse Spark 1.2 · video and audio understanding through OpenRouter
+    is_default: false
+    status: active
+    parameters:
+      base_url: https://openrouter.ai/api/v1
+      provider: openrouter
+      interface_type: openai
+      supports_vision: true
+      extra_config:
+        video_input_mode: url
 
   - id: builtin-openrouter-vlm-minimax-m3-free
     tenant_id: 10000
@@ -423,6 +460,9 @@ builtin_models:
       provider: openrouter
       interface_type: openai
       supports_vision: true
+      extra_config:
+        video_input_mode: base64
+        video_provider: alibaba
 
   - id: builtin-openrouter-vlm-gemma-4-free
     tenant_id: 10000

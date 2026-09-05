@@ -2795,16 +2795,13 @@ func (s *knowledgeService) ReparseKnowledge(
 			return existing, werrors.NewInternalServerError("Failed to submit processing task")
 		}
 
-		maxRetry := asynq.MaxRetry(3)
-		if route, _, parseErr := ParseSocialShareInput(existing.Source); parseErr == nil && route != nil {
-			maxRetry = asynq.MaxRetry(0)
-		}
-		task := asynq.NewTask(
-			types.TypeDocumentProcess,
-			payloadBytes,
-			documentProcessTaskOptions(s.config, maxRetry)...,
-		)
-		info, err := s.task.Enqueue(task)
+		task := asynq.NewTask(types.TypeDocumentProcess, payloadBytes)
+		// Pass the retry policy at the enqueue boundary. This keeps the
+		// effective contract observable and prevents recognized social URLs from
+		// regressing to the historical MaxRetry(0) special case: TikHub provider
+		// failures stop before materialization, while downstream VLM failures can
+		// safely retry the already persisted source object.
+		info, err := s.task.Enqueue(task, documentProcessTaskOptions(s.config)...)
 		if err != nil {
 			logger.Errorf(ctx, "Failed to enqueue URL reparse task: %v", err)
 			s.markKnowledgeEnqueueFailed(ctx, existing)

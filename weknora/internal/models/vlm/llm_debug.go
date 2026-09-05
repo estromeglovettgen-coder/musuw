@@ -25,6 +25,12 @@ func (d *debugVLM) PredictVideo(ctx context.Context, videoBytes []byte, mimeType
 	return PredictVideo(ctx, d.inner, videoBytes, mimeType, prompt)
 }
 
+func (d *debugVLM) PredictVideoURL(ctx context.Context, videoURL, mimeType, prompt string) (string, error) {
+	return PredictVideoURL(ctx, d.inner, videoURL, mimeType, prompt)
+}
+
+func (d *debugVLM) SupportsVideoURL() bool { return SupportsVideoURL(d.inner) }
+
 func (d *debugVLM) GetModelName() string { return d.inner.GetModelName() }
 func (d *debugVLM) GetModelID() string   { return d.inner.GetModelID() }
 

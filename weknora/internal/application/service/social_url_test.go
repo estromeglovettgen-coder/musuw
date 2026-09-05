@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -256,6 +257,33 @@ func TestCreateKnowledgeFromURLNormalizesShareTextAndUsesNormalDocumentRetries(t
 	_, _, maxRetry := parseDocumentProcessOpts(t, task.options)
 	require.NotNil(t, maxRetry)
 	require.Equal(t, 3, *maxRetry)
+}
+
+func TestReparseMaterializableSocialURLKeepsDownstreamRetryBudget(t *testing.T) {
+	task := &socialURLTaskCapture{}
+	knowledge := &types.Knowledge{
+		ID:              "knowledge-social-reparse",
+		TenantID:        7,
+		KnowledgeBaseID: "kb-1",
+		Type:            "url",
+		Source:          "https://v.douyin.com/AbCdEf12",
+		ParseStatus:     types.ManualKnowledgeStatusDraft,
+	}
+	svc := &knowledgeService{
+		repo:      &reparseFailureKnowledgeRepo{knowledge: knowledge},
+		kbService: &reparseFailureKBService{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		task:      task,
+	}
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(7))
+
+	got, err := svc.ReparseKnowledge(ctx, knowledge.ID, nil)
+	require.NoError(t, err)
+	require.Same(t, knowledge, got)
+	require.NotNil(t, task.task)
+	_, _, maxRetry := parseDocumentProcessOpts(t, task.options)
+	require.NotNil(t, maxRetry)
+	require.Equal(t, 3, *maxRetry,
+		"TikHub failures are swallowed before retry; later video-model failures must reuse the stored source and retry")
 }
 
 func TestParseSocialShareInputKnownHostBadPathFailsClosed(t *testing.T) {

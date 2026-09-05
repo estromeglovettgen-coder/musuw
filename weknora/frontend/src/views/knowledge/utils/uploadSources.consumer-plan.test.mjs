@@ -4,6 +4,7 @@ import test from 'node:test'
 import ts from 'typescript'
 
 const source = readFileSync(new URL('./uploadSources.ts', import.meta.url), 'utf8')
+const directUpload = readFileSync(new URL('../../../api/knowledge-base/direct-upload.ts', import.meta.url), 'utf8')
 const dropdown = readFileSync(new URL('../components/KbUploadSourceDropdown.vue', import.meta.url), 'utf8')
 const platform = readFileSync(new URL('../../platform/index.vue', import.meta.url), 'utf8')
 
@@ -137,4 +138,10 @@ test('global knowledge drops reuse the video gate without changing chat drops', 
   assert.match(platform, /showConsumerUpgradePrompt/)
   assert.match(platform, /let blockingUpgradeBody: string \| null = null/)
   assert.match(platform, /if \(blockingUpgradeBody\)[\s\S]*?else if \(blockedVideoCount > 0\)/)
+})
+
+test('large videos use recoverable multipart transport and retry idempotent completion', () => {
+  assert.match(directUpload, /const multipart = true/)
+  assert.match(directUpload, /retryDirectControlRequest\(\(\) => post\(/)
+  assert.match(directUpload, /DIRECT_UPLOAD_MAX_ATTEMPTS = 3/)
 })

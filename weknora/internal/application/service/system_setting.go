@@ -102,9 +102,10 @@ type settingSpec struct {
 var registry = map[string]settingSpec{
 	// Consumer scene policy is intentionally represented by the existing
 	// typed settings authority. Keep paid defaults aligned with the current
-	// builtin catalog while retaining the existing platform defaults for
-	// rollout compatibility. Chat remains registered for the existing runtime
-	// path, but is not a consumer settings row.
+	// builtin catalog. Vision deliberately puts the URL-capable MiMo model
+	// first for paid video while retaining Gemini as the Free/compatibility
+	// default. Chat remains registered for the existing runtime path, but is
+	// not a consumer settings row.
 	"consumer_models.chat.free_default": {
 		Type:        "string",
 		Default:     types.PlatformKnowledgeBaseChatModelID,
@@ -392,7 +393,9 @@ func defaultConsumerPaidModelIDsForType(modelType types.ModelType) []string {
 		}
 	case types.ModelTypeVLLM:
 		return []string{
+			"builtin-openrouter-vlm-mimo-v2-5",
 			types.PlatformKnowledgeBaseVLMModelID,
+			"builtin-openrouter-vlm-muse-spark-1-2",
 			"builtin-openrouter-vlm-minimax-m3-free",
 			"builtin-openrouter-vlm-qwen-3-7-flash",
 			"builtin-openrouter-vlm-gemma-4-free",

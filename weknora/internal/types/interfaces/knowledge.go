@@ -9,6 +9,49 @@ import (
 	"github.com/hibiken/asynq"
 )
 
+// StoredObjectDeleter rolls back a verified object when adoption fails before
+// the normal knowledge pipeline owns it. It is a callback so this optional
+// capability does not couple KnowledgeService to an S3/R2 implementation.
+type StoredObjectDeleter func(context.Context) error
+
+// StoredKnowledgeCreator is an optional capability implemented by knowledge
+// services that can import an object already uploaded to an S3-compatible
+// store. Keeping this separate from KnowledgeService preserves existing test
+// doubles and non-S3 backends while allowing the direct-upload handler to
+// create the normal Knowledge row and enqueue the existing parser task.
+type StoredKnowledgeCreator interface {
+	// ValidateStoredKnowledgeUpload authorizes the metadata-only preflight
+	// before a browser is given an object-store upload URL. Completion repeats
+	// the checks because entitlement and quota can change while bytes upload.
+	ValidateStoredKnowledgeUpload(
+		ctx context.Context,
+		kbID string,
+		fileName string,
+		size int64,
+		contentType string,
+	) error
+	CreateKnowledgeFromStoredObject(
+		ctx context.Context,
+		// uploadID is the signed direct-upload intent ID. It is reused as the
+		// Knowledge primary key so Complete retries are idempotent under the
+		// database constraint instead of creating a second row.
+		uploadID string,
+		kbID string,
+		fileName string,
+		size int64,
+		contentType string,
+		filePath string,
+		etag string,
+		deleteObject StoredObjectDeleter,
+		metadata map[string]string,
+		enableMultimodel *bool,
+		customFileName string,
+		tagIDs []string,
+		channel string,
+		processOverrides *types.KnowledgeProcessOverrides,
+	) (*types.Knowledge, error)
+}
+
 // KnowledgeService defines the interface for knowledge services.
 type KnowledgeService interface {
 	// CreateKnowledgeFromFile creates knowledge from a file.

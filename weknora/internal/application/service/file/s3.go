@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/google/uuid"
@@ -50,7 +51,6 @@ func newS3Client(endpoint, accessKey, secretKey, bucketName, region, pathPrefix 
 		))
 	}
 	cfg, err = config.LoadDefaultConfig(context.Background(), loadOptions...)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -343,6 +343,58 @@ func (s *s3FileService) SaveBytes(ctx context.Context, data []byte, tenantID uin
 		return "", fmt.Errorf("failed to upload bytes to S3: %w", err)
 	}
 
+	return fmt.Sprintf("s3://%s/%s", s.bucketName, objectName), nil
+}
+
+// SaveReader streams reader data directly to S3/R2. The transfer manager is
+// important here: social/TikHub responses are often non-seekable and have no
+// reliable Content-Length. The manager buffers bounded 8 MiB chunks and uses
+// multipart upload when more than one chunk is needed; this avoids handing an
+// unknown-length reader to raw PutObject (which is not reliable for R2/S3).
+func (s *s3FileService) SaveReader(
+	ctx context.Context,
+	reader io.Reader,
+	size int64,
+	tenantID uint64,
+	fileName, contentType string,
+	_ bool,
+) (string, error) {
+	if reader == nil {
+		return "", fmt.Errorf("reader is nil")
+	}
+	safeName, err := utils.SafeFileName(fileName)
+	if err != nil {
+		return "", fmt.Errorf("invalid file name: %w", err)
+	}
+	ext := filepath.Ext(safeName)
+	objectName := fmt.Sprintf("%s%d/exports/%s%s", s.pathPrefix, tenantID, uuid.New().String(), ext)
+	if strings.TrimSpace(contentType) == "" {
+		contentType = utils.GetContentTypeByExt(ext)
+	}
+	input := &s3.PutObjectInput{
+		Bucket:      aws.String(s.bucketName),
+		Key:         aws.String(objectName),
+		Body:        reader,
+		ContentType: aws.String(contentType),
+	}
+	if size >= 0 {
+		input.ContentLength = aws.Int64(size)
+	}
+	// Keep memory bounded for non-seekable streams while still satisfying
+	// S3/R2's 5 MiB minimum multipart part size. Two workers are enough for
+	// this ingestion path; browser direct uploads handle high concurrency.
+	// R2 cannot accept the replacement transfer manager's default full-object
+	// CRC32 on small uploads, so retain the stable SDK uploader for this path.
+	//nolint:staticcheck // Compatibility exception is narrower than a custom uploader.
+	uploader := manager.NewUploader(s.client, func(u *manager.Uploader) {
+		u.PartSize = 8 * 1024 * 1024
+		u.Concurrency = 2
+		u.LeavePartsOnError = false
+	})
+	//nolint:staticcheck // See the R2 checksum compatibility exception above.
+	if _, err := uploader.Upload(ctx, input); err != nil {
+		return "", fmt.Errorf("failed to upload streamed file to S3: %w", err)
+	}
 	return fmt.Sprintf("s3://%s/%s", s.bucketName, objectName), nil
 }
 

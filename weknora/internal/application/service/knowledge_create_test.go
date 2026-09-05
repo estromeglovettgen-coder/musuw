@@ -22,7 +22,11 @@ type createKnowledgeFileRepoStub struct {
 	createWithStorageCalls int
 	createStorageQuota     int64
 	createErr              error
+	createErrs             []error
 	createdKnowledge       *types.Knowledge
+	knowledgeByID          *types.Knowledge
+	getKnowledgeErr        error
+	updatedKnowledge       *types.Knowledge
 }
 
 func (r *createKnowledgeFileRepoStub) CheckKnowledgeExists(
@@ -51,7 +55,40 @@ func (r *createKnowledgeFileRepoStub) CreateKnowledgeWithStorage(
 	r.createCalls++
 	copied := *knowledge
 	r.createdKnowledge = &copied
-	return r.createErr
+	if len(r.createErrs) > 0 {
+		err := r.createErrs[0]
+		r.createErrs = r.createErrs[1:]
+		return err
+	}
+	if r.createErr != nil {
+		return r.createErr
+	}
+	r.knowledgeByID = &copied
+	return nil
+}
+
+func (r *createKnowledgeFileRepoStub) GetKnowledgeByID(
+	_ context.Context,
+	tenantID uint64,
+	id string,
+) (*types.Knowledge, error) {
+	if r.getKnowledgeErr != nil {
+		return nil, r.getKnowledgeErr
+	}
+	if r.knowledgeByID == nil || r.knowledgeByID.TenantID != tenantID || r.knowledgeByID.ID != id {
+		return nil, errors.New("knowledge not found")
+	}
+	copied := *r.knowledgeByID
+	return &copied, nil
+}
+
+func (r *createKnowledgeFileRepoStub) UpdateKnowledge(_ context.Context, knowledge *types.Knowledge) error {
+	if knowledge == nil {
+		return nil
+	}
+	copied := *knowledge
+	r.updatedKnowledge = &copied
+	return nil
 }
 
 // GetKnowledgeTags is invoked by setAndAttachKnowledgeTags after create even
@@ -131,7 +168,10 @@ func (s *createKnowledgeFileServiceStub) CopyFile(ctx context.Context, srcPath s
 }
 
 type createKnowledgeTaskEnqueuerStub struct {
-	calls int
+	calls   int
+	errs    []error
+	infos   []*asynq.TaskInfo
+	taskIDs []string
 }
 
 func (s *createKnowledgeTaskEnqueuerStub) Enqueue(
@@ -139,7 +179,23 @@ func (s *createKnowledgeTaskEnqueuerStub) Enqueue(
 	opts ...asynq.Option,
 ) (*asynq.TaskInfo, error) {
 	s.calls++
-	return &asynq.TaskInfo{ID: "task-1", Queue: "default"}, nil
+	for _, opt := range opts {
+		if opt.Type() == asynq.TaskIDOpt {
+			if id, ok := opt.Value().(string); ok {
+				s.taskIDs = append(s.taskIDs, id)
+			}
+		}
+	}
+	if len(s.errs) > 0 {
+		err := s.errs[0]
+		s.errs = s.errs[1:]
+		if err != nil {
+			return nil, err
+		}
+	}
+	info := &asynq.TaskInfo{ID: "task-1", Queue: "default"}
+	s.infos = append(s.infos, info)
+	return info, nil
 }
 
 func TestCreateKnowledgeFromFileDoesNotPersistWhenStorageSaveFails(t *testing.T) {
@@ -435,6 +491,146 @@ func TestCreateKnowledgeFromFile_PersistsProcessOverrides(t *testing.T) {
 	metadataMap, err := repo.createdKnowledge.Metadata.Map()
 	require.NoError(t, err)
 	require.Equal(t, "test", metadataMap["source"])
+}
+
+func newStoredKnowledgeService(repo interfaces.KnowledgeRepository, task interfaces.TaskEnqueuer) *knowledgeService {
+	return &knowledgeService{
+		repo: repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{
+			ID:        "kb-1",
+			VLMConfig: types.VLMConfig{Enabled: true, ModelID: "vlm-1"},
+		}},
+		fileSvc: &createKnowledgeFileServiceStub{},
+		task:    task,
+	}
+}
+
+func TestCreateKnowledgeFromStoredObjectUsesUploadIDAsKnowledgeID(t *testing.T) {
+	t.Parallel()
+
+	const uploadID = "direct-intent-1"
+	repo := &createKnowledgeFileRepoStub{}
+	task := &createKnowledgeTaskEnqueuerStub{}
+	svc := newStoredKnowledgeService(repo, task)
+	deleted := false
+
+	knowledge, err := svc.CreateKnowledgeFromStoredObject(
+		newCreateKnowledgeFileContext(),
+		uploadID,
+		"kb-1",
+		"clip.mp4",
+		6,
+		"video/mp4",
+		"s3://bucket/direct/"+uploadID,
+		"etag-1",
+		func(context.Context) error { deleted = true; return nil },
+		nil,
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, knowledge)
+	require.Equal(t, uploadID, knowledge.ID)
+	require.NotNil(t, repo.createdKnowledge)
+	require.Equal(t, uploadID, repo.createdKnowledge.ID)
+	require.Equal(t, 1, task.calls)
+	require.Equal(t, []string{directKnowledgeProcessTaskID(uploadID)}, task.taskIDs)
+	require.False(t, deleted, "an adopted source must not be cleaned up")
+}
+
+func TestCreateKnowledgeFromStoredObjectRecoversConcurrentInsertAndTaskConflict(t *testing.T) {
+	t.Parallel()
+
+	const uploadID = "direct-intent-replay"
+	const filePath = "s3://bucket/direct/" + uploadID
+	existing := &types.Knowledge{
+		ID:              uploadID,
+		TenantID:        1,
+		KnowledgeBaseID: "kb-1",
+		Type:            "file",
+		FileName:        "clip.mp4",
+		FileType:        "mp4",
+		FileSize:        6,
+		FilePath:        filePath,
+		ParseStatus:     types.ParseStatusPending,
+	}
+	repo := &createKnowledgeFileRepoStub{
+		createErr:     errors.New("UNIQUE constraint failed: knowledge.id"),
+		knowledgeByID: existing,
+	}
+	task := &createKnowledgeTaskEnqueuerStub{errs: []error{asynq.ErrTaskIDConflict}}
+	svc := newStoredKnowledgeService(repo, task)
+	deleted := false
+
+	knowledge, err := svc.CreateKnowledgeFromStoredObject(
+		newCreateKnowledgeFileContext(),
+		uploadID,
+		"kb-1",
+		"clip.mp4",
+		6,
+		"video/mp4",
+		filePath,
+		"etag-1",
+		func(context.Context) error { deleted = true; return nil },
+		nil,
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, knowledge)
+	require.Equal(t, uploadID, knowledge.ID)
+	require.Equal(t, 1, repo.createWithStorageCalls)
+	require.Equal(t, 1, task.calls, "the loser should continue through the deterministic enqueue")
+	require.Equal(t, []string{directKnowledgeProcessTaskID(uploadID)}, task.taskIDs)
+	require.False(t, deleted, "a concurrent winner owns the object")
+}
+
+func TestCreateKnowledgeFromStoredObjectRetriesTransientEnqueueWithoutDeletingSource(t *testing.T) {
+	t.Parallel()
+
+	repo := &createKnowledgeFileRepoStub{}
+	task := &createKnowledgeTaskEnqueuerStub{errs: []error{
+		errors.New("temporary queue failure"),
+		errors.New("temporary queue failure"),
+		nil,
+	}}
+	svc := newStoredKnowledgeService(repo, task)
+	deleted := false
+
+	_, err := svc.CreateKnowledgeFromStoredObject(
+		newCreateKnowledgeFileContext(),
+		"direct-intent-retry",
+		"kb-1",
+		"clip.mp4",
+		6,
+		"video/mp4",
+		"s3://bucket/direct/retry",
+		"etag-1",
+		func(context.Context) error { deleted = true; return nil },
+		nil,
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, 3, task.calls)
+	require.Equal(t, []string{
+		directKnowledgeProcessTaskID("direct-intent-retry"),
+		directKnowledgeProcessTaskID("direct-intent-retry"),
+		directKnowledgeProcessTaskID("direct-intent-retry"),
+	}, task.taskIDs)
+	require.False(t, deleted, "enqueue retries happen after ownership transfer")
 }
 
 func newCreateKnowledgeFileContext() context.Context {
