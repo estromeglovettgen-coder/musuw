@@ -335,15 +335,9 @@ func videoURL(platform Platform, data any) string {
 		if candidate := lowestH264BitrateURL(h264Candidates, 0); candidate != "" {
 			return candidate
 		}
-		if candidate := primaryWorkVideoURL(data, "play_addr"); candidate != "" {
-			return candidate
-		}
-		// Legacy responses may expose only a download address. Do not select a
-		// codec-mixed bit_rate entry or play_addr_265 here: that is how a tiny
-		// ByteVC2/HEVC file can outrank a model-compatible stream.
-		if candidate := primaryWorkVideoURL(data, "download_addr", "video_url"); candidate != "" {
-			return candidate
-		}
+		// Do not fall back to play_addr, download_addr, video_url, a codec-mixed
+		// bit_rate entry, or play_addr_265. Their container/extension does not
+		// prove codec compatibility and can silently reintroduce ByteVC2/HEVC.
 		return ""
 	case PlatformYouTube:
 		// TikHub's merged formats are already audio+video MP4 candidates.

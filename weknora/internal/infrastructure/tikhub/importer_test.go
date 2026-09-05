@@ -411,6 +411,22 @@ func TestNormalizeDouyinUsesShortSideForPortraitAndLandscapeQualityFloor(t *test
 	}
 }
 
+func TestNormalizeDouyinRejectsUnknownAndByteVCFallbacks(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]any{"aweme_detail": map[string]any{"video": map[string]any{
+		"play_addr":     map[string]any{"url_list": []any{"https://cdn.example/unknown-primary.mp4"}},
+		"download_addr": map[string]any{"url_list": []any{"https://cdn.example/unknown-download.mp4"}},
+		"play_addr_265": map[string]any{"url_list": []any{"https://cdn.example/hevc.mp4"}},
+		"bit_rate": []any{
+			map[string]any{"bit_rate": float64(120000), "gear_name": "bytevc2_576p", "play_addr": map[string]any{"url_list": []any{"https://cdn.example/bytevc2.mp4"}}},
+		},
+	}}}
+	if got := videoURL(PlatformDouyin, data); got != "" {
+		t.Fatalf("videoURL() = %q, want no unverified codec fallback", got)
+	}
+}
+
 func TestNormalizeTikTokPrefersPrimaryH264InPluralWorkResponse(t *testing.T) {
 	t.Parallel()
 
@@ -698,7 +714,7 @@ func TestTikHubImporterDoesNotLeakBearerToReturnedMediaURL(t *testing.T) {
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"title","video":{"play_addr":{"url_list":["`+mediaServer.URL+`/video.mp4"]}}}}}`)
+		io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"title","video":{"play_addr_h264":{"url_list":["`+mediaServer.URL+`/video.mp4"]}}}}}`)
 	}))
 	defer apiServer.Close()
 
@@ -725,7 +741,7 @@ func TestTikHubImporterRequestEscapesQueryValues(t *testing.T) {
 			t.Errorf("unescaped RequestURI = %q", r.RequestURI)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"title","video":{"play_addr":{"url_list":["https://cdn.example/v.mp4"]}}}}}`)
+		io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"title","video":{"play_addr_h264":{"url_list":["https://cdn.example/v.mp4"]}}}}}`)
 	}))
 	defer server.Close()
 

@@ -54,7 +54,7 @@ The system SHALL normalize a successful TikHub response into either an existing 
 
 #### Scenario: Multiple renditions of one video
 - **WHEN** a response contains multiple playable renditions of one video
-- **THEN** the worker first selects the lowest explicitly identified H.264 rendition whose known short side is at least 480 pixels, then falls back to the provider's primary H.264 address before considering unknown codecs
+- **THEN** the worker first selects the lowest explicitly identified H.264 rendition whose known short side is at least 480 pixels, then falls back to the provider's primary H.264 address, and never substitutes an unknown, ByteVC, or HEVC rendition
 
 ### Requirement: Paid-call safety
 The system MUST keep TikHub credentials server-side, MUST NOT probe endpoints to discover the platform, and MUST NOT automatically retry a social TikHub call.
