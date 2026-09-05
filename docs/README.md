@@ -15,6 +15,7 @@ snapshots are not retained as operating instructions.
 | [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md) | Secret ownership, provider boundaries, and safe operator handling. |
 | [`PADDLE_LIVE_READINESS.md`](PADDLE_LIVE_READINESS.md) | Paddle Live readiness and evidence requirements. |
 | [`LOCAL_ADMIN.md`](LOCAL_ADMIN.md) | Loopback-only operations console. |
+| [`VIDEO_SOURCE_AND_AUTO_MODEL_PLAN.md`](VIDEO_SOURCE_AND_AUTO_MODEL_PLAN.md) | Minimal source-once video ingestion, automatic compatible-model routing, reparse reuse, and provider-neutral UI contract. |
 | [`external-credentials-registry.yaml`](external-credentials-registry.yaml) | Metadata-only credential inventory; never store secret values here. |
 
 ## Product and source documentation
