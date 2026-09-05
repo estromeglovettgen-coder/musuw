@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
@@ -250,7 +251,9 @@ func TestPrepareTikHubArtifactKeepsDocumentWhenProviderImageCannotBeStored(t *te
 func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideoPath(t *testing.T) {
 	t.Parallel()
 
+	var tikHubCalls atomic.Int32
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tikHubCalls.Add(1)
 		require.Equal(t, "/api/v1/youtube/web_v2/get_video_streams_v2", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"code":200,"data":{"title":"A video","formats":[{"mime_type":"video/mp4","url":"https://media.example/video.mp4"}]}}`)
@@ -276,7 +279,8 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 		tikhubImporter:    tikhub.NewTikHubImporterForTest(api.URL, "provider-key", api.Client()),
 		tikhubMediaClient: mediaClient,
 	}
-	payload := types.DocumentProcessPayload{TenantID: 9, URL: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+	const sourceURL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+	payload := types.DocumentProcessPayload{TenantID: 9, URL: sourceURL}
 	knowledge := &types.Knowledge{ID: "knowledge-2", TenantID: 9, FileType: "html"}
 
 	handled, _, err := svc.prepareTikHubArtifact(
@@ -295,6 +299,18 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	require.Equal(t, []byte("video-bytes"), files.savedData)
 	require.False(t, files.savedTemp, "social videos must survive worker retries and reparses")
 	require.False(t, strings.Contains(files.savedFileName, "/"))
+	require.Equal(t, int32(1), tikHubCalls.Load(), "the provider should be called once to materialize the durable source")
+
+	// A downstream VLM failure redelivers the original social URL. The stored
+	// source checkpoint must turn that redelivery into an ordinary local-file
+	// payload, without invoking TikHub again.
+	retryPayload := types.DocumentProcessPayload{TenantID: 9, URL: sourceURL}
+	require.True(t, resumeMaterializedTikHubArtifact(&retryPayload, knowledge))
+	require.Empty(t, retryPayload.URL)
+	require.Equal(t, knowledge.FilePath, retryPayload.FilePath)
+	require.Equal(t, knowledge.FileName, retryPayload.FileName)
+	require.Equal(t, knowledge.FileType, retryPayload.FileType)
+	require.Equal(t, int32(1), tikHubCalls.Load(), "retries must reuse the persisted MP4 instead of paying TikHub again")
 }
 
 func TestPrepareTikHubArtifactCleansObjectWhenStorageMutationFails(t *testing.T) {

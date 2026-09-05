@@ -473,13 +473,13 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 	taskOpts := documentProcessTaskOptions(s.config)
 	var enqueueOpts []asynq.Option
 	if socialRoute != nil {
-		// A social task performs a paid TikHub call in the worker. Never let a
-		// provider timeout/error re-enter Asynq's automatic retry loop.
-		taskOpts = documentProcessTaskOptions(s.config, asynq.MaxRetry(0))
-		// The Lite-mode synchronous enqueuer receives options at Enqueue time
-		// (it cannot inspect asynq.Task's private opts), so pass the same safety
-		// options there as well. Redis-backed Asynq merges these with the task
-		// options and the last value remains MaxRetry(0).
+		// TikHub materializes the social source as a durable file before the
+		// existing document pipeline parses it. On a downstream retry the worker
+		// restores that FilePath checkpoint and skips TikHub, so social videos can
+		// use the normal document retry budget without downloading or billing the
+		// source again. Lite mode can only read options passed to Enqueue, while
+		// Redis-backed Asynq also reads the task's options; pass the same set to
+		// both so the two runtimes keep identical retry behavior.
 		enqueueOpts = taskOpts
 	}
 	task := asynq.NewTask(types.TypeDocumentProcess, payloadBytes, taskOpts...)

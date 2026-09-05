@@ -75,6 +75,12 @@ func TestParseSocialShareInputRoutesSupportedWorks(t *testing.T) {
 			url:      "https://xhslink.com/m/AbCdEf12",
 		},
 		{
+			name:     "xiaohongshu current short link uses share_text",
+			input:    "https://xhslink.com/n/AbCdEf12",
+			platform: "xiaohongshu",
+			url:      "https://xhslink.com/n/AbCdEf12",
+		},
+		{
 			name:     "instagram reel",
 			input:    "https://www.instagram.com/reel/C0ffee_1234/?igsh=secret",
 			platform: "instagram",
@@ -125,6 +131,35 @@ func TestParseSocialShareInputCleansZeroWidthAndTrailingPunctuation(t *testing.T
 	require.NoError(t, err)
 	require.NotNil(t, route)
 	require.Equal(t, "https://v.douyin.com/AbCdEf12", cleanedURL)
+}
+
+func TestParseSocialShareInputAllowsMarkdownDuplicateWithEscapedUnderscore(t *testing.T) {
+	t.Parallel()
+
+	input := `9.28 复制打开抖音，看看【小白debug的作品】 [https://v.douyin.com/BBJQVsKr\_-w/](https://v.douyin.com/BBJQVsKr_-w/) RXz:/`
+	route, cleanedURL, err := ParseSocialShareInput(input)
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Equal(t, "douyin", string(route.Platform))
+	require.Equal(t, "https://v.douyin.com/BBJQVsKr_-w", cleanedURL)
+}
+
+func TestParseSocialShareInputUsesMarkdownDestinationWhenLabelIsPlainText(t *testing.T) {
+	t.Parallel()
+
+	route, cleanedURL, err := ParseSocialShareInput(`[查看作品](https://v.douyin.com/BBJQVsKr_-w/)`)
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Equal(t, "douyin", string(route.Platform))
+	require.Equal(t, "https://v.douyin.com/BBJQVsKr_-w", cleanedURL)
+}
+
+func TestParseSocialShareInputRejectsDistinctMarkdownDestinations(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := ParseSocialShareInput(`[作品一](https://example.com/one) [作品二](https://example.com/two)`)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrMultipleHTTPURLs)
 }
 
 func TestParseSocialShareInputRejectsNoOrMultipleURLs(t *testing.T) {
@@ -188,7 +223,7 @@ func (c *socialURLTaskCapture) Enqueue(task *asynq.Task, options ...asynq.Option
 	return &asynq.TaskInfo{ID: "social-task", Queue: types.QueueDefault}, nil
 }
 
-func TestCreateKnowledgeFromURLNormalizesShareTextAndDisablesSocialRetries(t *testing.T) {
+func TestCreateKnowledgeFromURLNormalizesShareTextAndUsesNormalDocumentRetries(t *testing.T) {
 	repo := &createKnowledgeFileRepoStub{}
 	task := &socialURLTaskCapture{}
 	svc := &knowledgeService{
@@ -220,7 +255,7 @@ func TestCreateKnowledgeFromURLNormalizesShareTextAndDisablesSocialRetries(t *te
 	require.Equal(t, knowledge.Source, payload.URL)
 	_, _, maxRetry := parseDocumentProcessOpts(t, task.options)
 	require.NotNil(t, maxRetry)
-	require.Zero(t, *maxRetry)
+	require.Equal(t, 3, *maxRetry)
 }
 
 func TestParseSocialShareInputKnownHostBadPathFailsClosed(t *testing.T) {
