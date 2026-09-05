@@ -17,11 +17,11 @@ import (
 
 const (
 	ProductionBaseURL = "https://api.tikhub.io"
-	// A smaller H.264 rendition is useful for VLM ingestion, but dropping below
-	// 480p makes slide text and UI labels materially harder to read. Codec
-	// compatibility remains the first constraint; this is only a quality floor
-	// when TikHub exposes dimensions for multiple H.264 alternatives.
-	minimumVLMVideoShortSide = 480
+	// Prefer a low-bitrate H.264 rendition that remains useful to the VLM. A
+	// 360p floor reduces source size against the existing upload limit while
+	// avoiding the tiny thumbnail renditions some providers expose. Codec
+	// compatibility remains the first constraint.
+	minimumVLMVideoShortSide = 360
 
 	tiktokSharePath      = "/api/v1/tiktok/app/v3/fetch_one_video_by_share_url"
 	douyinSharePath      = "/api/v1/douyin/app/v3/fetch_one_video_by_share_url"
@@ -321,7 +321,7 @@ func videoURL(platform Platform, data any) string {
 		// lowest-bitrate entry is not necessarily H.264 (Douyin can return a
 		// ByteVC2 stream in an MP4 container), and downstream video models may
 		// accept the container while producing no text for that codec. Select the
-		// lowest explicitly identified H.264 rendition that keeps a 480p short
+		// lowest explicitly identified H.264 rendition that keeps a 360p short
 		// side, then use the provider's primary H.264 address.
 		h264Candidates := workH264BitrateCandidates(data)
 		if candidate := lowestH264BitrateURL(h264Candidates, minimumVLMVideoShortSide); candidate != "" {
