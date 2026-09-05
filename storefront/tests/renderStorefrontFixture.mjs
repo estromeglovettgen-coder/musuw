@@ -19,11 +19,12 @@ const server = await createServer({
 });
 
 try {
-  const [{ HomePage }, { SiteFooter }, { LegalPage }] = await Promise.all([
-    server.ssrLoadModule("/src/HomePage.jsx"),
-    server.ssrLoadModule("/src/components/SiteChrome.jsx"),
-    server.ssrLoadModule("/src/LegalPage.jsx"),
-  ]);
+  // HomePage already imports SiteChrome. Loading both concurrently can make
+  // Vite request the same module twice through its SSR runner, so warm the
+  // dependency graph once before reading the cached companion modules.
+  const { HomePage } = await server.ssrLoadModule("/src/HomePage.jsx");
+  const { SiteFooter } = await server.ssrLoadModule("/src/components/SiteChrome.jsx");
+  const { LegalPage } = await server.ssrLoadModule("/src/LegalPage.jsx");
   const copy = getStorefrontCopy("en");
   const chineseCopy = getStorefrontCopy("zh-CN");
   process.stdout.write(JSON.stringify({

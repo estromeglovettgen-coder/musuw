@@ -1,4 +1,6 @@
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "@phosphor-icons/react/ArrowLeft";
+import { ArrowsClockwise } from "@phosphor-icons/react/ArrowsClockwise";
 import { BookOpenText } from "@phosphor-icons/react/BookOpenText";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
 import { CaretLeft } from "@phosphor-icons/react/CaretLeft";
@@ -13,13 +15,18 @@ import { GearSix } from "@phosphor-icons/react/GearSix";
 import { Graph } from "@phosphor-icons/react/Graph";
 import { ListBullets } from "@phosphor-icons/react/ListBullets";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { PauseCircle } from "@phosphor-icons/react/PauseCircle";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
+import { PlayCircle } from "@phosphor-icons/react/PlayCircle";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { Question } from "@phosphor-icons/react/Question";
 import { Tag } from "@phosphor-icons/react/Tag";
 import { Trash } from "@phosphor-icons/react/Trash";
 import { TreeStructure } from "@phosphor-icons/react/TreeStructure";
 import { UsersThree } from "@phosphor-icons/react/UsersThree";
+import { X } from "@phosphor-icons/react/X";
+import { ObsidianGraphCanvas } from "./ObsidianGraphCanvas";
+import { createDefaultObsidianGraphSettings } from "./obsidian-graph/obsidianGraphSettings";
 
 // Mechanical React translation of the production Vue surface. Keep the source
 // class contracts from menu.vue, KnowledgeBase.vue, and WikiBrowser.vue so the
@@ -58,7 +65,12 @@ const PRODUCT_COPY = Object.freeze({
     }),
     wiki: Object.freeze({
       search: "搜索 Wiki 页面...",
+      searching: "正在搜索…",
+      loading: "加载中…",
       index: "索引",
+      indexOverview: "知识库概览",
+      indexLead: "这里汇总知识库中的摘要、实体、概念与它们之间的来源关系。",
+      indexHint: "从左侧选择页面，或搜索整个 Wiki。",
       knowledge: "知识 12",
       summaries: "摘要 1",
       back: "FreeScout",
@@ -86,6 +98,8 @@ const PRODUCT_COPY = Object.freeze({
       linkedFrom: "反向链接",
       sources: "资料来源",
       sourceTitle: "季度研究笔记",
+      resultSummary: "开源自托管邮件简报与 EDM 营销平台，包含邮件列表、订阅与投递能力。",
+      resultDate: "2026/09/04",
       groups: Object.freeze([
         Object.freeze({ label: "产品评估", count: 4, items: Object.freeze(["暴利程度", "短期爆单潜力", "自带自然流量", "魔改上手难度"]) }),
         Object.freeze({ label: "商业模式", count: 2, items: Object.freeze(["云端托管SaaS订阅模式", "长期躺赚能力"]) }),
@@ -105,7 +119,28 @@ const PRODUCT_COPY = Object.freeze({
       overview: "全库概览",
       count: "14 / 14 个节点",
       status: "已展示知识库全部节点",
-      settings: "打开图谱设置",
+      settings: "图谱设置",
+      settingsOpen: "打开图谱设置",
+      settingsClose: "关闭图谱设置",
+      settingsReset: "重置图谱设置",
+      display: "显示",
+      textFade: "文字淡化",
+      nodeSize: "节点大小",
+      linkThickness: "连线粗细",
+      forces: "力",
+      center: "中心力",
+      repel: "排斥力",
+      link: "连接力",
+      linkDistance: "连接距离",
+      playbackTitle: "图谱生长",
+      playbackDescription: "按 Obsidian 的原生顺序逐个展示节点与关系。",
+      playbackPlay: "播放",
+      playbackPause: "暂停",
+      playbackResume: "继续",
+      playbackReplay: "重新播放",
+      playbackProgress: "{visible} / {total}",
+      playbackRunning: "正在按顺序展示节点与关系",
+      playbackPaused: "播放已暂停",
       labels: Object.freeze({
         index: "Index",
         difficulty: "魔改上手难度",
@@ -150,7 +185,12 @@ const PRODUCT_COPY = Object.freeze({
     }),
     wiki: Object.freeze({
       search: "Search Wiki pages...",
+      searching: "Searching…",
+      loading: "Loading…",
       index: "Index",
+      indexOverview: "Knowledge base overview",
+      indexLead: "A directory of summaries, entities, concepts, and the source relationships between them.",
+      indexHint: "Select a page from the sidebar or search the entire Wiki.",
       knowledge: "Knowledge 12",
       summaries: "Summaries 1",
       back: "FreeScout",
@@ -178,6 +218,8 @@ const PRODUCT_COPY = Object.freeze({
       linkedFrom: "Linked from",
       sources: "Sources",
       sourceTitle: "Quarterly research notes",
+      resultSummary: "An open-source self-hosted newsletter and EDM platform with lists, subscriptions, and delivery tooling.",
+      resultDate: "2026/09/04",
       groups: Object.freeze([
         Object.freeze({ label: "Product evaluation", count: 4, items: Object.freeze(["Profit margin", "Short-term sales", "Organic traffic", "Modification difficulty"]) }),
         Object.freeze({ label: "Business model", count: 2, items: Object.freeze(["Hosted SaaS subscription", "Long-term recurring revenue"]) }),
@@ -197,7 +239,28 @@ const PRODUCT_COPY = Object.freeze({
       overview: "Knowledge-base overview",
       count: "14 / 14 nodes",
       status: "Showing every node in the knowledge base",
-      settings: "Open graph settings",
+      settings: "Graph settings",
+      settingsOpen: "Open graph settings",
+      settingsClose: "Close graph settings",
+      settingsReset: "Reset graph settings",
+      display: "Display",
+      textFade: "Text fade",
+      nodeSize: "Node size",
+      linkThickness: "Link thickness",
+      forces: "Forces",
+      center: "Center force",
+      repel: "Repel force",
+      link: "Link force",
+      linkDistance: "Link distance",
+      playbackTitle: "Graph growth",
+      playbackDescription: "Reveal nodes and links in Obsidian's native order.",
+      playbackPlay: "Play",
+      playbackPause: "Pause",
+      playbackResume: "Resume",
+      playbackReplay: "Replay",
+      playbackProgress: "{visible} / {total}",
+      playbackRunning: "Revealing nodes and links in sequence",
+      playbackPaused: "Playback paused",
       labels: Object.freeze({
         index: "Index",
         difficulty: "Modification difficulty",
@@ -237,11 +300,20 @@ const GRAPH_EDGES = Object.freeze([
   ...CONCEPT_NODE_IDS.map((concept) => ["summary", concept]),
 ]);
 
-const NODE_COLORS = Object.freeze({
-  index: "#8c8c8c",
-  summary: "#0052d9",
-  entity: "#2ba471",
-  concept: "#e37318",
+const GRAPH_DATA = Object.freeze({
+  nodes: Object.freeze(GRAPH_NODES.map((node) => Object.freeze({
+    slug: node.id,
+    title: node.label,
+    page_type: node.type,
+    link_count: GRAPH_EDGES.filter(([source, target]) => source === node.id || target === node.id).length,
+  }))),
+  edges: Object.freeze(GRAPH_EDGES.map(([source, target]) => Object.freeze({ source, target }))),
+  meta: Object.freeze({ mode: "overview" }),
+});
+
+export const GRAPH_PREVIEW_TOTALS = Object.freeze({
+  nodes: GRAPH_NODES.length,
+  links: GRAPH_EDGES.length,
 });
 
 function isChinese(locale) {
@@ -294,35 +366,72 @@ function KnowledgeHeader({ active, copy }) {
   );
 }
 
-function WikiSidebar({ copy }) {
+function WikiSidebar({ copy, stage }) {
+  const hasDirectory = stage !== "loading-index";
+  const hasSelectedPage = stage === "loading-page" || stage === "page";
+
   return (
     <aside className="wiki-sidebar kb-preview-wiki-sidebar" data-wiki-sidebar="true">
       <div className="wiki-sidebar-header kb-preview-wiki-sidebar-header">
-        <div className="kb-preview-wiki-search"><MagnifyingGlass size={13} /><span>{copy.search}</span></div>
+        <label className="kb-preview-wiki-search">
+          <MagnifyingGlass size={13} />
+          <input aria-label={copy.search} placeholder={copy.search} readOnly type="search" value="" />
+        </label>
       </div>
       <div className="wiki-page-list kb-preview-wiki-page-list">
-        <div className="wiki-nav-item kb-preview-wiki-index"><FileText size={12} /><span>{copy.index}</span></div>
-        <div className="wiki-sidebar-divider kb-preview-wiki-divider" />
-        <div className="wiki-tab-bar kb-preview-wiki-tabbar">
-          <strong>{copy.knowledge}</strong><span>{copy.summaries}</span>
-          <i><TreeStructure size={12} /><ListBullets size={12} /></i>
-          <FolderSimple size={12} /><Plus size={11} />
-        </div>
-        <div className="wiki-tree-list kb-preview-wiki-tree">
-          {copy.groups.map((group) => (
-            <section key={group.label}>
-              <div><CaretRight className={group.items.length ? "is-open" : ""} size={10} /><strong>{group.label}</strong><small>{group.count}</small></div>
-              {group.items.map((item) => (
-                <span className={item === "Listmonk" ? "is-selected" : ""} key={item}>
-                  {group.label.includes("项目") || group.label.includes("source") ? <Tag size={11} /> : <span className="kb-preview-bulb" />}
-                  <b>{item}</b>
-                </span>
+        {hasDirectory ? (
+          <>
+            <div className={`wiki-nav-item kb-preview-wiki-index ${hasSelectedPage ? "" : "is-active"}`}><FileText size={12} /><span>{copy.index}</span></div>
+            <div className="wiki-sidebar-divider kb-preview-wiki-divider" />
+            <div className="wiki-tab-bar kb-preview-wiki-tabbar">
+              <strong>{copy.knowledge}</strong><span>{copy.summaries}</span>
+              <i><TreeStructure size={12} /><ListBullets size={12} /></i>
+              <FolderSimple size={12} /><Plus size={11} />
+            </div>
+            <div className="wiki-tree-list kb-preview-wiki-tree">
+              {copy.groups.map((group) => (
+                <section key={group.label}>
+                  <div><CaretRight className={group.items.length ? "is-open" : ""} size={10} /><strong>{group.label}</strong><small>{group.count}</small></div>
+                  {group.items.map((item) => (
+                    <span className={item === "Listmonk" && hasSelectedPage ? "is-selected" : ""} key={item}>
+                      {group.label.includes("项目") || group.label.includes("source") ? <Tag size={11} /> : <span className="kb-preview-bulb" />}
+                      <b>{item}</b>
+                    </span>
+                  ))}
+                </section>
               ))}
-            </section>
-          ))}
-        </div>
+            </div>
+          </>
+        ) : null}
       </div>
     </aside>
+  );
+}
+
+function WikiIndexReader({ copy, loading = false }) {
+  return (
+    <article className="wiki-reader kb-preview-wiki-reader" data-wiki-index="true">
+      <div className="wiki-reader-inner kb-preview-wiki-reader-inner">
+        <header className="wiki-reader-header kb-preview-index-header">
+          <h4 className="wiki-reader-title">{copy.index}</h4>
+          <span>{copy.indexOverview}</span>
+        </header>
+        {loading ? (
+          <div className="wiki-reader-empty kb-preview-reader-empty"><p className="wiki-empty-title">{copy.loading}</p></div>
+        ) : (
+          <div className="wiki-reader-body wiki-index-body kb-preview-index-body">
+            <p className="kb-preview-reader-lead">{copy.indexLead}</p>
+            <p>{copy.indexHint}</p>
+            {copy.groups.slice(0, 3).map((group) => (
+              <section key={group.label}>
+                <h5>{group.label}</h5>
+                {group.items.length ? <ul>{group.items.map((item) => <li key={item}><a className="wiki-content-link kb-preview-content-link" href="#feature">{item}</a></li>)}</ul> : null}
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -360,17 +469,120 @@ function WikiReader({ copy }) {
   );
 }
 
-function WikiProductSurface({ copy }) {
+function WikiProductSurface({ copy, flow }) {
+  const stage = flow?.stage ?? "page";
+
   return (
-    <div className="wiki-browser kb-preview-wiki-browser">
-      <WikiSidebar copy={copy} />
-      <div className="wiki-content kb-preview-wiki-content"><WikiReader copy={copy} /></div>
+    <div className="wiki-browser kb-preview-wiki-browser" data-wiki-flow-state={stage}>
+      <WikiSidebar copy={copy} stage={stage} />
+      <div className="wiki-content kb-preview-wiki-content">
+        {stage === "page" ? <WikiReader copy={copy} /> : null}
+        {stage === "loading-page" ? <div className="wiki-reader kb-preview-wiki-reader"><div className="wiki-reader-empty kb-preview-reader-empty"><div className="wiki-empty-icon"><BookOpenText size={22} /></div><p className="wiki-empty-title">{copy.indexHint}</p></div></div> : null}
+        {stage === "index" ? <WikiIndexReader copy={copy} /> : null}
+        {stage === "loading-index" ? <WikiIndexReader copy={copy} loading /> : null}
+      </div>
     </div>
   );
 }
 
-function GraphProductSurface({ copy }) {
-  const nodeById = Object.fromEntries(GRAPH_NODES.map((node) => [node.id, node]));
+function GraphSettingSlider({ label, max, min, onChange, step, value }) {
+  const fillRatio = (value - min) / (max - min);
+
+  return (
+    <label className="setting-item kb-preview-setting-item">
+      <span>{label}</span>
+      <input
+        aria-label={label}
+        className="graph-slider"
+        max={max}
+        min={min}
+        onChange={(event) => onChange(Number(event.target.value))}
+        step={step}
+        style={{ "--slider-fill-ratio": fillRatio }}
+        type="range"
+        value={value}
+      />
+    </label>
+  );
+}
+
+function GraphSettingsPanel({ copy, onClose, onPlaybackAction, onReset, onSettingChange, playback, settings }) {
+  const displayOpen = !settings["collapse-display"];
+  const forcesOpen = !settings["collapse-forces"];
+  const actionLabel = playback.state === "playing"
+    ? copy.playbackPause
+    : playback.state === "paused"
+      ? copy.playbackResume
+      : playback.state === "complete"
+        ? copy.playbackReplay
+        : copy.playbackPlay;
+  const ActionIcon = playback.state === "playing"
+    ? PauseCircle
+    : playback.state === "complete"
+      ? ArrowsClockwise
+      : PlayCircle;
+  const progress = copy.playbackProgress
+    .replace("{visible}", playback.visible)
+    .replace("{total}", playback.total);
+
+  return (
+    <div className="obsidian-graph-controls-wrap kb-preview-graph-controls-wrap" data-graph-settings-panel="true">
+      <div className="graph-controls kb-preview-graph-controls">
+      <div className="graph-controls-actions kb-preview-graph-controls-actions">
+        <button aria-label={copy.settingsReset} onClick={onReset} title={copy.settingsReset} type="button"><ArrowsClockwise size={12} /></button>
+        <button aria-label={copy.settingsClose} onClick={onClose} title={copy.settingsClose} type="button"><X size={12} /></button>
+      </div>
+      <section className="graph-control-section kb-preview-graph-control-section">
+        <button className="tree-item-self kb-preview-settings-heading" onClick={() => onSettingChange("collapse-display", displayOpen)} type="button">
+          <CaretRight className={displayOpen ? "is-open" : ""} size={10} />{copy.display}
+        </button>
+        {displayOpen ? (
+          <div className="tree-item-children kb-preview-settings-fields">
+            <GraphSettingSlider label={copy.textFade} max={3} min={-3} onChange={(value) => onSettingChange("textFadeMultiplier", value)} step={0.1} value={settings.textFadeMultiplier} />
+            <GraphSettingSlider label={copy.nodeSize} max={5} min={0.1} onChange={(value) => onSettingChange("nodeSizeMultiplier", value)} step={0.1} value={settings.nodeSizeMultiplier} />
+            <GraphSettingSlider label={copy.linkThickness} max={5} min={0.1} onChange={(value) => onSettingChange("lineSizeMultiplier", value)} step={0.1} value={settings.lineSizeMultiplier} />
+          </div>
+        ) : null}
+      </section>
+      <section className="graph-control-section graph-playback-section kb-preview-graph-control-section kb-preview-graph-playback-section">
+        <div className="graph-playback-heading kb-preview-graph-playback-heading">
+          <strong><Graph size={11} />{copy.playbackTitle}</strong>
+          <span aria-live="polite">{progress}</span>
+        </div>
+        <p>{copy.playbackDescription}</p>
+        <button className="playback-button kb-preview-playback-button" disabled={playback.total === 0} onClick={onPlaybackAction} type="button">
+          <ActionIcon size={12} />{actionLabel}
+        </button>
+      </section>
+      <section className="graph-control-section kb-preview-graph-control-section">
+        <button className="tree-item-self kb-preview-settings-heading" onClick={() => onSettingChange("collapse-forces", forcesOpen)} type="button">
+          <CaretRight className={forcesOpen ? "is-open" : ""} size={10} />{copy.forces}
+        </button>
+        {forcesOpen ? (
+          <div className="tree-item-children kb-preview-settings-fields">
+            <GraphSettingSlider label={copy.center} max={1} min={0} onChange={(value) => onSettingChange("centerStrength", value)} step={0.01} value={settings.centerStrength} />
+            <GraphSettingSlider label={copy.repel} max={20} min={0} onChange={(value) => onSettingChange("repelStrength", value)} step={0.1} value={settings.repelStrength} />
+            <GraphSettingSlider label={copy.link} max={1} min={0} onChange={(value) => onSettingChange("linkStrength", value)} step={0.01} value={settings.linkStrength} />
+            <GraphSettingSlider label={copy.linkDistance} max={500} min={30} onChange={(value) => onSettingChange("linkDistance", value)} step={1} value={settings.linkDistance} />
+          </div>
+        ) : null}
+      </section>
+      </div>
+    </div>
+  );
+}
+
+function GraphProductSurface({ autoPlay, copy }) {
+  const canvasRef = useRef(null);
+  const [settings, setSettings] = useState(() => createDefaultObsidianGraphSettings());
+  const [showArrows, setShowArrows] = useState(false);
+  const [playback, setPlayback] = useState(() => ({ state: "idle", visible: GRAPH_NODES.length, total: GRAPH_NODES.length }));
+  const settingsOpen = !settings.close;
+  const visibleCount = Math.max(0, Math.min(playback.visible, GRAPH_NODES.length));
+  const graphData = useMemo(() => ({
+    ...GRAPH_DATA,
+    nodes: GRAPH_DATA.nodes.map((node) => ({ ...node, title: copy.labels[node.slug] ?? node.title })),
+  }), [copy]);
   const labels = [
     ["summary", copy.summary, "#0052d9"],
     ["entity", copy.entity, "#2ba471"],
@@ -389,43 +601,47 @@ function GraphProductSurface({ copy }) {
           </div>
         </div>
         <div className="wiki-graph-canvas kb-preview-graph-canvas">
-          <svg viewBox="0 0 920 510" role="img" aria-label={copy.overview}>
-            <defs>
-              <marker id="kb-preview-arrow" markerHeight="6" markerWidth="6" orient="auto" refX="5" refY="3">
-                <path d="M0,0 L6,3 L0,6 Z" fill="#9ca3af" />
-              </marker>
-            </defs>
-            <g className="kb-preview-graph-edges">
-              {GRAPH_EDGES.map(([fromId, toId]) => {
-                const from = nodeById[fromId];
-                const to = nodeById[toId];
-                return <line key={`${fromId}-${toId}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} markerEnd="url(#kb-preview-arrow)" />;
-              })}
-            </g>
-            <g className="kb-preview-graph-nodes">
-              {GRAPH_NODES.map((node) => (
-                <g data-graph-node={node.id} key={node.id} transform={`translate(${node.x} ${node.y})`}>
-                  <circle r={node.r} fill={NODE_COLORS[node.type]} />
-                  <text y={node.r + 18} textAnchor="middle">{copy.labels[node.id] ?? node.label}</text>
-                </g>
-              ))}
-            </g>
-          </svg>
+          <ObsidianGraphCanvas
+            autoPlay={autoPlay}
+            data={graphData}
+            onPlaybackChange={setPlayback}
+            ref={canvasRef}
+            settings={settings}
+            showArrows={showArrows}
+          />
         </div>
-        <aside className="wiki-graph-legend kb-preview-graph-legend">
+        <aside className={`wiki-graph-legend kb-preview-graph-legend ${settingsOpen ? "is-settings-open" : ""}`}>
           <div className="legend-items kb-preview-legend-items">
             {labels.map(([type, label, color]) => <span className="legend-item clickable" data-graph-legend-type={type} key={type}><i className="legend-dot" style={{ background: color }} />{label}</span>)}
           </div>
           <div className="legend-divider kb-preview-legend-divider" />
           <div className="legend-actions kb-preview-legend-actions">
-            <span className="legend-action" data-graph-action="fit-view"><CornersOut size={11} />{copy.fit}</span>
-            <span className="legend-action" data-graph-action="toggle-arrows"><EyeSlash size={11} />{copy.arrows}</span>
+            <button className="legend-action" data-graph-action="fit-view" onClick={() => canvasRef.current?.fit()} type="button"><CornersOut size={11} />{copy.fit}</button>
+            <button className="legend-action" data-graph-action="toggle-arrows" onClick={() => setShowArrows((visible) => !visible)} type="button"><EyeSlash size={11} />{copy.arrows}</button>
           </div>
-          <div className="legend-settings"><button aria-label={copy.settings} className="kb-preview-legend-settings" data-graph-settings="true" title={copy.settings} type="button"><GearSix size={13} /></button></div>
+          <div className="legend-settings kb-preview-legend-settings-wrap">
+            {settingsOpen ? (
+              <GraphSettingsPanel
+                copy={copy}
+                onClose={() => setSettings((current) => ({ ...current, close: true }))}
+                onPlaybackAction={() => {
+                  if (playback.state === "playing") canvasRef.current?.pause();
+                  else if (playback.state === "paused") canvasRef.current?.resume();
+                  else canvasRef.current?.play();
+                }}
+                onReset={() => setSettings({ ...createDefaultObsidianGraphSettings(), close: false })}
+                onSettingChange={(key, value) => setSettings((current) => ({ ...current, [key]: value }))}
+                playback={playback}
+                settings={settings}
+              />
+            ) : (
+              <button aria-expanded="false" aria-label={copy.settingsOpen} className="graph-settings-trigger legend-action kb-preview-legend-settings" data-graph-settings="true" onClick={() => setSettings((current) => ({ ...current, close: false }))} title={copy.settingsOpen} type="button"><GearSix size={11} /><span>{copy.settings}</span></button>
+            )}
+          </div>
           <div className="wiki-graph-status-card kb-preview-legend-status">
             <span><Graph size={11} />{copy.overview}</span>
-            <strong>{copy.count}</strong>
-            <small>{copy.status}</small>
+            <strong>{visibleCount} / {GRAPH_NODES.length} {copy.count.replace(/^14 \/ 14\s*/, "")}</strong>
+            <small>{playback.state === "playing" ? copy.playbackRunning : playback.state === "paused" ? copy.playbackPaused : copy.status}</small>
           </div>
         </aside>
       </div>
@@ -433,14 +649,21 @@ function GraphProductSurface({ copy }) {
   );
 }
 
-export function KnowledgeBaseProductPreview({ locale = "en", shellRef, view }) {
+export function KnowledgeBaseProductPreview({
+  graphAutoPlay = false,
+  locale = "en",
+  phase = "complete",
+  shellRef,
+  view,
+  wikiFlow,
+}) {
   const copy = isChinese(locale) ? PRODUCT_COPY.zh : PRODUCT_COPY.en;
 
   return (
     <div
       className={`kb-product-preview-viewport kb-product-preview-${view}`}
       data-capability-demo={view}
-      data-demo-phase="complete"
+      data-demo-phase={view === "wiki" ? wikiFlow?.stage ?? phase : "obsidian-native"}
       data-product-page-shell={view}
       ref={shellRef}
     >
@@ -449,7 +672,9 @@ export function KnowledgeBaseProductPreview({ locale = "en", shellRef, view }) {
         <main className={`visual-knowledge-page kb-preview-knowledge-page ${view === "graph" ? "is-graph-tab" : ""}`}>
           <KnowledgeHeader active={view} copy={copy.header} />
           <section className="visual-knowledge-wiki-host kb-preview-wiki-host">
-            {view === "wiki" ? <WikiProductSurface copy={copy.wiki} /> : <GraphProductSurface copy={copy.graph} />}
+            {view === "wiki"
+              ? <WikiProductSurface copy={copy.wiki} flow={wikiFlow} />
+              : <GraphProductSurface autoPlay={graphAutoPlay} copy={copy.graph} />}
           </section>
         </main>
       </div>

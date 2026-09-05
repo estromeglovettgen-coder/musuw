@@ -5,16 +5,24 @@ import { join } from "node:path";
 import test from "node:test";
 import { getStorefrontCopy } from "../src/i18n.js";
 import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
+import {
+  obsidianGraphProgressionCursor,
+  obsidianGraphProgressionSpeed,
+} from "../src/components/obsidian-graph/obsidianNativeGraphContract.ts";
 
 const root = new URL("../", import.meta.url).pathname;
+let renderedFixture;
 
 function renderFixture() {
-  return JSON.parse(
-    execFileSync(process.execPath, [join(root, "tests/renderStorefrontFixture.mjs")], {
-      cwd: root,
-      encoding: "utf8",
-    }),
-  );
+  if (!renderedFixture) {
+    renderedFixture = JSON.parse(
+      execFileSync(process.execPath, [join(root, "tests/renderStorefrontFixture.mjs")], {
+        cwd: root,
+        encoding: "utf8",
+      }),
+    );
+  }
+  return renderedFixture;
 }
 
 function section(markup, id, nextId) {
@@ -69,6 +77,7 @@ test("hero and chat demos keep the compact shell while Wiki and Graph use the fu
 
 test("wiki and graph demos mechanically mirror the real knowledge-base surfaces", () => {
   const { chineseHome } = renderFixture();
+  const previewSource = readFileSync(join(root, "src/components/KnowledgeBaseProductPreview.jsx"), "utf8");
 
   assert.match(chineseHome, /data-product-page-shell="wiki"/);
   assert.match(chineseHome, /data-product-page-shell="graph"/);
@@ -81,7 +90,8 @@ test("wiki and graph demos mechanically mirror the real knowledge-base surfaces"
   assert.equal((chineseHome.match(/data-kb-tab="graph"/g) ?? []).length, 2);
 
   assert.match(chineseHome, /data-wiki-sidebar="true"/);
-  assert.match(chineseHome, /data-wiki-reader="true"/);
+  assert.match(chineseHome, /data-wiki-index="true"/);
+  assert.match(chineseHome, /data-wiki-flow-state="loading-index"/);
   assert.equal((chineseHome.match(/visual-sidebar kb-preview-app-sidebar/g) ?? []).length, 2);
   assert.equal((chineseHome.match(/visual-knowledge-page kb-preview-knowledge-page/g) ?? []).length, 2);
   assert.equal((chineseHome.match(/wiki-browser kb-preview-wiki-browser/g) ?? []).length, 2);
@@ -90,20 +100,22 @@ test("wiki and graph demos mechanically mirror the real knowledge-base surfaces"
   assert.match(chineseHome, /wiki-reader kb-preview-wiki-reader/);
   assert.match(chineseHome, /wiki-graph kb-preview-graph/);
   assert.match(chineseHome, /wiki-graph-canvas kb-preview-graph-canvas/);
-  assert.equal((chineseHome.match(/搜索 Wiki 页面\.\.\./g) ?? []).length, 2);
-  assert.match(chineseHome, /产品评估/);
-  assert.match(chineseHome, /Listmonk/);
+  assert.equal(
+    (chineseHome.match(/搜索 Wiki 页面\.\.\./g) ?? []).length,
+    3,
+    "the real Wiki input exposes both its accessible label and placeholder, while Graph carries the same visible search copy",
+  );
+  assert.match(previewSource, /产品评估/);
+  assert.match(previewSource, /Listmonk/);
 
   assert.equal(
     (chineseHome.match(/data-graph-legend-type=/g) ?? []).length,
     5,
     "the graph preview must carry the five real product legend types",
   );
-  assert.equal(
-    (chineseHome.match(/data-graph-node=/g) ?? []).length,
-    14,
-    "the graph preview must use the same 14-node product fixture",
-  );
+  assert.match(chineseHome, /class="obsidian-graph-canvas"/);
+  assert.match(chineseHome, /data-playback-state="idle"/);
+  assert.match(chineseHome, /data-playback-total="14"/);
   assert.match(chineseHome, /data-graph-action="fit-view"/);
   assert.match(chineseHome, /data-graph-action="toggle-arrows"/);
   assert.match(chineseHome, /data-graph-settings="true"/);
@@ -182,23 +194,64 @@ test("visible Chinese homepage marketing uses 智能体 and contains no RAG or A
   assert.doesNotMatch(visibleText, /(?:^|\s)RAG(?:\s|$)|Agent/i);
 });
 
-test("capability motion exposes bounded phases and a static reduced-motion end state", async () => {
-  const motion = await import("../src/components/productDemoMotion.js");
-
-  assert.deepEqual(motion.CAPABILITY_DEMO_PHASES, ["capture", "reason", "connect", "complete"]);
-  assert.equal(motion.nextCapabilityDemoPhase("capture"), "reason");
-  assert.equal(motion.nextCapabilityDemoPhase("complete"), "capture");
-  assert.equal(motion.resolveCapabilityDemoPhase("reason", true), "complete");
-  assert.equal(motion.resolveCapabilityDemoPhase("reason", false), "reason");
+test("capability demos use production-visible states and the native Obsidian renderer", () => {
+  assert.equal(obsidianGraphProgressionSpeed(48), 5);
+  assert.equal(obsidianGraphProgressionCursor(0, 14, 48), 1);
+  assert.equal(obsidianGraphProgressionCursor(1_000, 14, 48), 6);
+  assert.equal(obsidianGraphProgressionCursor(2_600, 14, 48), 14);
 
   const source = readFileSync(join(root, "src/components/ProductCapabilityDemos.jsx"), "utf8");
+  const chatSource = readFileSync(join(root, "src/components/RealChatCapabilityDemo.jsx"), "utf8");
+  const motionSource = readFileSync(join(root, "src/components/productDemoMotion.js"), "utf8");
+  const previewSource = readFileSync(join(root, "src/components/KnowledgeBaseProductPreview.jsx"), "utf8");
+  const graphCanvasSource = readFileSync(join(root, "src/components/ObsidianGraphCanvas.jsx"), "utf8");
+  const graphRendererSource = readFileSync(join(root, "src/components/obsidian-graph/obsidianWikiGraphRenderer.ts"), "utf8");
   const styles = readFileSync(join(root, "src/product-demos.css"), "utf8");
-  assert.match(source, /useReducedMotion/);
-  assert.match(source, /window\.setInterval/);
-  assert.match(source, /window\.clearInterval/);
+  assert.match(chatSource, /"idle",\s*"typing",\s*"sent",\s*"searching",\s*"comparing",\s*"drafting",\s*"answering",\s*"complete"/);
+  assert.match(chatSource, /visual-chat-composer/);
+  assert.match(chatSource, /visual-rag-pipeline/);
+  assert.match(chatSource, /visual-assistant-message/);
+  assert.match(motionSource, /"loading-index",\s*"index",\s*"loading-page",\s*"page"/);
+  assert.match(source, /useWikiDemoFlow/);
+  assert.match(motionSource, /useReducedMotion/);
+  assert.match(source, /graphAutoPlay=\{inView && !reducedMotion\}/);
+  assert.doesNotMatch(previewSource, /data-wiki-reveal-step/);
+  assert.match(previewSource, /data-graph-settings-panel/);
+  assert.match(previewSource, /<ObsidianGraphCanvas/);
+  assert.match(previewSource, /linkDistance/);
+  assert.match(graphCanvasSource, /new ObsidianWikiGraphRenderer\(container\)/);
+  assert.match(graphCanvasSource, /renderer\.startProgression/);
+  assert.doesNotMatch(graphCanvasSource, /setInterval|replayTimer/);
+  assert.match(graphRendererSource, /new Application\(/);
+  assert.match(graphRendererSource, /OBSIDIAN_GRAPH_WORKER_PATH/);
+  assert.ok(existsSync(join(root, "public/vendor/obsidian-1.13.7/graph-sim.js")));
   assert.doesNotMatch(source, /initial=\{[^}]*opacity:\s*0/);
-  assert.doesNotMatch(source, /graph-base-edges/);
-  assert.match(styles, /\.kb-preview-graph-edges line[\s\S]*?opacity:\s*0\.56/);
-  assert.match(styles, /\.kb-preview-graph-nodes g[\s\S]*?opacity:\s*1/);
+  assert.doesNotMatch(previewSource, /<svg|data-graph-node=/);
+  assert.doesNotMatch(styles, /kb-preview-node-arrival|kb-preview-graph-nodes g\.is-visible/);
+  assert.doesNotMatch(styles, /grayscale\(1\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation:\s*none !important/);
+});
+
+test("the storefront graph engine stays byte-for-byte aligned with the production Wiki graph", () => {
+  const graphSources = [
+    "obsidianWikiGraphRenderer.ts",
+    "obsidianGraphSettings.ts",
+    "obsidianGraphWorkerProtocol.ts",
+    "obsidianForce.worker.ts",
+    "weknoraGraphTheme.ts",
+  ];
+
+  for (const file of graphSources) {
+    assert.equal(
+      readFileSync(join(root, "src/components/obsidian-graph", file), "utf8"),
+      readFileSync(join(root, "../weknora/frontend/src/views/knowledge/wiki/graph", file), "utf8"),
+      `${file} must remain a mechanical copy of the production implementation`,
+    );
+  }
+
+  assert.deepEqual(
+    readFileSync(join(root, "public/vendor/obsidian-1.13.7/graph-sim.js")),
+    readFileSync(join(root, "../weknora/frontend/public/vendor/obsidian-1.13.7/graph-sim.js")),
+    "the Obsidian worker asset must remain identical to production",
+  );
 });

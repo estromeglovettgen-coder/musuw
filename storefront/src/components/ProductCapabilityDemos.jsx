@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { At } from "@phosphor-icons/react/At";
 import { BookmarkSimple } from "@phosphor-icons/react/BookmarkSimple";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
@@ -9,14 +8,16 @@ import { ImageSquare } from "@phosphor-icons/react/ImageSquare";
 import { LinkSimple } from "@phosphor-icons/react/LinkSimple";
 import { Paperclip } from "@phosphor-icons/react/Paperclip";
 import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
+import { useRef } from "react";
 import { useInView, useReducedMotion } from "motion/react";
 import { KnowledgeBaseProductPreview } from "./KnowledgeBaseProductPreview";
 import { MusuwProductShell } from "./MusuwProductShell";
 import {
-  CAPABILITY_DEMO_PHASES,
-  nextCapabilityDemoPhase,
-  resolveCapabilityDemoPhase,
+  useCapabilityDemoPhase,
+  useWikiDemoFlow,
 } from "./productDemoMotion";
+
+export { ReasoningCapabilityDemo } from "./RealChatCapabilityDemo";
 
 const COPY = Object.freeze({
   en: Object.freeze({
@@ -77,39 +78,6 @@ function localize(locale) {
   return locale === "zh" || locale === "zh-CN" ? COPY.zh : COPY.en;
 }
 
-function phaseIndex(phase) {
-  return CAPABILITY_DEMO_PHASES.indexOf(phase);
-}
-
-function useCapabilityDemoPhase() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { amount: 0.28 });
-  const reducedMotion = useReducedMotion();
-  const [phase, setPhase] = useState(CAPABILITY_DEMO_PHASES[0]);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      setPhase("complete");
-      return undefined;
-    }
-    if (!inView) {
-      setPhase("capture");
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setPhase((current) => nextCapabilityDemoPhase(current));
-    }, 1500);
-
-    return () => window.clearInterval(timer);
-  }, [inView, reducedMotion]);
-
-  return {
-    ref,
-    phase: resolveCapabilityDemoPhase(phase, reducedMotion),
-  };
-}
-
 function DemoComposer({ copy }) {
   return (
     <div className="product-demo-composer">
@@ -127,67 +95,27 @@ function DemoComposer({ copy }) {
   );
 }
 
-export function ReasoningCapabilityDemo({ locale = "en" }) {
-  const copy = localize(locale);
-  const { ref, phase } = useCapabilityDemoPhase();
-  const activeIndex = phaseIndex(phase);
-
-  return (
-    <MusuwProductShell
-      className="capability-demo capability-demo-reasoning"
-      data-capability-demo="reasoning"
-      data-demo-phase={phase}
-      shellRef={ref}
-      title={copy.reasoning.title}
-    >
-      <div className="product-demo-query">
-        <strong>{copy.reasoning.question}</strong>
-      </div>
-      <div className="product-demo-thread reasoning-demo-thread">
-        <div className="product-demo-summary">
-          <strong>2</strong> {copy.reasoning.rounds}<span>·</span>
-          <strong>3</strong> {copy.reasoning.tools}<span>·</span><strong>15s</strong>
-          <CaretRight size={10} weight="bold" aria-hidden="true" />
-        </div>
-        <ol className="reasoning-process">
-          {copy.reasoning.steps.map((step, index) => (
-            <li
-              className={`${activeIndex === index + 1 ? "is-active" : ""} ${activeIndex > index + 1 ? "is-complete" : ""}`}
-              key={step}
-            >
-              <span>{index + 1}</span>
-              <div><strong>{step}</strong><small>{copy.reasoning.sourceItems[index]}</small></div>
-              <Check size={12} weight="bold" aria-hidden="true" />
-            </li>
-          ))}
-        </ol>
-        <div className={`product-demo-answer ${phase === "complete" ? "is-complete" : ""}`}>
-          <p>{copy.reasoning.answer}</p>
-          <span><LinkSimple size={12} aria-hidden="true" />{copy.reasoning.citation}</span>
-        </div>
-      </div>
-      <DemoComposer copy={copy.shared} />
-    </MusuwProductShell>
-  );
-}
-
 export function WikiCapabilityDemo({ locale = "en" }) {
-  const ref = useRef(null);
+  const flow = useWikiDemoFlow();
 
   return (
     <KnowledgeBaseProductPreview
       locale={locale}
-      shellRef={ref}
+      shellRef={flow.ref}
       view="wiki"
+      wikiFlow={flow}
     />
   );
 }
 
 export function GraphCapabilityDemo({ locale = "en" }) {
   const ref = useRef(null);
+  const inView = useInView(ref, { amount: 0.28 });
+  const reducedMotion = useReducedMotion();
 
   return (
     <KnowledgeBaseProductPreview
+      graphAutoPlay={inView && !reducedMotion}
       locale={locale}
       shellRef={ref}
       view="graph"
