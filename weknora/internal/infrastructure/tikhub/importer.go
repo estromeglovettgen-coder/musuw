@@ -488,17 +488,8 @@ func isH264Rendition(value map[string]any) bool {
 		stringValue(value["vcodec"]),
 		stringValue(nestedMapValue(value, "play_addr", "url_key")),
 	}
-	for _, field := range metadata {
-		normalized := strings.ToLower(strings.TrimSpace(field))
-		if strings.Contains(normalized, "bytevc") || strings.Contains(normalized, "h265") || strings.Contains(normalized, "hevc") || strings.Contains(normalized, "vp9") || strings.Contains(normalized, "av1") {
-			return false
-		}
-		if strings.Contains(normalized, "h264") || strings.Contains(normalized, "avc") {
-			return true
-		}
-	}
-	if isH264, exists := boolField(value, "is_h264"); exists {
-		return isH264
+	if isH264, exists := boolField(value, "is_h264"); exists && !isH264 {
+		return false
 	}
 	codecFlagSeen := false
 	for _, key := range []string{"is_h265", "is_bytevc1", "is_bytevc2"} {
@@ -509,6 +500,23 @@ func isH264Rendition(value map[string]any) bool {
 		codecFlagSeen = true
 		if flag {
 			return false
+		}
+	}
+	for _, field := range metadata {
+		normalized := strings.ToLower(strings.TrimSpace(field))
+		for _, incompatible := range []string{"bytevc", "h265", "hevc", "vp9", "av1"} {
+			if strings.Contains(normalized, incompatible) {
+				return false
+			}
+		}
+	}
+	if isH264, exists := boolField(value, "is_h264"); exists {
+		return isH264
+	}
+	for _, field := range metadata {
+		normalized := strings.ToLower(strings.TrimSpace(field))
+		if strings.Contains(normalized, "h264") || strings.Contains(normalized, "avc") {
+			return true
 		}
 	}
 	return codecFlagSeen

@@ -20,6 +20,16 @@ func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) 
 	return fn(req)
 }
 
+func testVideoRendition(url, gearName string, bitrate, width, height float64) map[string]any {
+	return map[string]any{
+		"bit_rate":  bitrate,
+		"gear_name": gearName,
+		"play_addr": map[string]any{
+			"width": width, "height": height, "url_list": []any{url},
+		},
+	}
+}
+
 func TestTikHubImporterFetchesTikTokAndDouyinShareURLs(t *testing.T) {
 	t.Parallel()
 
@@ -44,7 +54,11 @@ func TestTikHubImporterFetchesTikTokAndDouyinShareURLs(t *testing.T) {
 			if got := r.URL.Query().Get("share_url"); got != "https://v.douyin.com/abc/" {
 				t.Errorf("Douyin share_url = %q", got)
 			}
-			io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"Douyin title","video":{"play_addr_h264":{"url_list":["https://cdn.example/douyin.mp4"]}}}}}`)
+			_, _ = io.WriteString(
+				w,
+				`{"code":200,"data":{"aweme_detail":{"desc":"Douyin title",`+
+					`"video":{"play_addr_h264":{"url_list":["https://cdn.example/douyin.mp4"]}}}}}`,
+			)
 		default:
 			http.NotFound(w, r)
 		}
@@ -314,14 +328,16 @@ func TestNormalizeDouyinPhotoChoosesOneURLPerImage(t *testing.T) {
 func TestNormalizeDouyinSelectsLowestH264AboveQualityFloor(t *testing.T) {
 	t.Parallel()
 
+	lowH264 := testVideoRendition("https://cdn.example/low-h264.mp4", "", 600000, 1024, 576)
+	lowH264["play_addr"].(map[string]any)["url_key"] = "video_h264_576p_600000"
 	data := map[string]any{"aweme_detail": map[string]any{"video": map[string]any{
 		"play_addr_h264": map[string]any{"url_list": []any{"https://cdn.example/primary-h264.mp4"}},
 		"bit_rate": []any{
-			map[string]any{"bit_rate": float64(1800000), "gear_name": "h264_720p", "play_addr": map[string]any{"width": float64(1280), "height": float64(720), "url_list": []any{"https://cdn.example/high-h264.mp4"}}},
-			map[string]any{"bit_rate": float64(600000), "play_addr": map[string]any{"width": float64(1024), "height": float64(576), "url_key": "video_h264_576p_600000", "url_list": []any{"https://cdn.example/low-h264.mp4"}}},
-			map[string]any{"bit_rate": float64(200000), "gear_name": "h264_360p", "play_addr": map[string]any{"width": float64(640), "height": float64(360), "url_list": []any{"https://cdn.example/too-small-h264.mp4"}}},
+			testVideoRendition("https://cdn.example/high-h264.mp4", "h264_720p", 1800000, 1280, 720),
+			lowH264,
+			testVideoRendition("https://cdn.example/too-small-h264.mp4", "h264_360p", 200000, 640, 360),
 			map[string]any{"play_addr": map[string]any{"url_list": []any{"https://cdn.example/unknown.mp4"}}},
-			map[string]any{"bit_rate": float64(240000), "gear_name": "bytevc2_576p", "play_addr": map[string]any{"url_list": []any{"https://cdn.example/bytevc2-low.mp4"}}},
+			testVideoRendition("https://cdn.example/bytevc2-low.mp4", "bytevc2_576p", 240000, 1024, 576),
 		},
 	}}}
 	for i := 0; i < 50; i++ {
@@ -341,8 +357,8 @@ func TestNormalizeDouyinUsesPrimaryH264WhenAlternativesAreBelowQualityFloor(t *t
 	data := map[string]any{"aweme_detail": map[string]any{"video": map[string]any{
 		"play_addr_h264": map[string]any{"url_list": []any{"https://cdn.example/primary-h264.mp4"}},
 		"bit_rate": []any{
-			map[string]any{"bit_rate": float64(200000), "gear_name": "h264_360p", "play_addr": map[string]any{"width": float64(640), "height": float64(360), "url_list": []any{"https://cdn.example/small-h264.mp4"}}},
-			map[string]any{"bit_rate": float64(120000), "gear_name": "bytevc2_576p", "play_addr": map[string]any{"width": float64(1024), "height": float64(576), "url_list": []any{"https://cdn.example/bytevc2.mp4"}}},
+			testVideoRendition("https://cdn.example/small-h264.mp4", "h264_360p", 200000, 640, 360),
+			testVideoRendition("https://cdn.example/bytevc2.mp4", "bytevc2_576p", 120000, 1024, 576),
 		},
 	}}}
 	result, err := normalizeWork(PlatformDouyin, "video-id", data, true)
@@ -357,11 +373,12 @@ func TestNormalizeDouyinUsesPrimaryH264WhenAlternativesAreBelowQualityFloor(t *t
 func TestNormalizeDouyinUsesLowestExplicitH264WhenPrimaryAddressIsMissing(t *testing.T) {
 	t.Parallel()
 
+	high := testVideoRendition("https://cdn.example/high.mp4", "", 1800000, 0, 0)
+	high["is_h265"] = float64(0)
+	low := testVideoRendition("https://cdn.example/low.mp4", "", 240000, 0, 0)
+	low["is_h265"] = float64(0)
 	data := map[string]any{"aweme_detail": map[string]any{"video": map[string]any{
-		"bit_rate": []any{
-			map[string]any{"bit_rate": float64(1800000), "is_h265": float64(0), "play_addr": map[string]any{"url_list": []any{"https://cdn.example/high.mp4"}}},
-			map[string]any{"bit_rate": float64(240000), "is_h265": float64(0), "play_addr": map[string]any{"url_list": []any{"https://cdn.example/low.mp4"}}},
-		},
+		"bit_rate": []any{high, low},
 	}}}
 	result, err := normalizeWork(PlatformDouyin, "video-id", data, true)
 	if err != nil {
@@ -377,10 +394,10 @@ func TestNormalizeTikTokAggregatesH264CandidatesAcrossPluralWorks(t *testing.T) 
 
 	data := map[string]any{"aweme_details": []any{
 		map[string]any{"video": map[string]any{"bit_rate": []any{
-			map[string]any{"bit_rate": float64(1800000), "gear_name": "h264_720p", "play_addr": map[string]any{"width": float64(1280), "height": float64(720), "url_list": []any{"https://cdn.example/first-high.mp4"}}},
+			testVideoRendition("https://cdn.example/first-high.mp4", "h264_720p", 1800000, 1280, 720),
 		}}},
 		map[string]any{"video": map[string]any{"bit_rate": []any{
-			map[string]any{"bit_rate": float64(620000), "gear_name": "h264_576p", "play_addr": map[string]any{"width": float64(576), "height": float64(1024), "url_list": []any{"https://cdn.example/second-low.mp4"}}},
+			testVideoRendition("https://cdn.example/second-low.mp4", "h264_576p", 620000, 576, 1024),
 		}}},
 	}}
 	result, err := normalizeWork(PlatformTikTok, "video-id", data, true)
@@ -398,8 +415,10 @@ func TestNormalizeDouyinUsesShortSideForPortraitAndLandscapeQualityFloor(t *test
 	data := map[string]any{"aweme_detail": map[string]any{"video": map[string]any{
 		"play_addr_h264": map[string]any{"url_list": []any{"https://cdn.example/primary-h264.mp4"}},
 		"bit_rate": []any{
-			map[string]any{"bit_rate": float64(650000), "gear_name": "h264_portrait", "play_addr": map[string]any{"width": float64(576), "height": float64(1024), "url_list": []any{"https://cdn.example/portrait.mp4"}}},
-			map[string]any{"bit_rate": float64(200000), "gear_name": "h264_landscape", "play_addr": map[string]any{"width": float64(854), "height": float64(360), "url_list": []any{"https://cdn.example/landscape-too-small.mp4"}}},
+			testVideoRendition("https://cdn.example/portrait.mp4", "h264_portrait", 650000, 576, 1024),
+			testVideoRendition(
+				"https://cdn.example/landscape-too-small.mp4", "h264_landscape", 200000, 854, 360,
+			),
 		},
 	}}}
 	result, err := normalizeWork(PlatformDouyin, "video-id", data, true)
@@ -419,11 +438,27 @@ func TestNormalizeDouyinRejectsUnknownAndByteVCFallbacks(t *testing.T) {
 		"download_addr": map[string]any{"url_list": []any{"https://cdn.example/unknown-download.mp4"}},
 		"play_addr_265": map[string]any{"url_list": []any{"https://cdn.example/hevc.mp4"}},
 		"bit_rate": []any{
-			map[string]any{"bit_rate": float64(120000), "gear_name": "bytevc2_576p", "play_addr": map[string]any{"url_list": []any{"https://cdn.example/bytevc2.mp4"}}},
+			testVideoRendition("https://cdn.example/bytevc2.mp4", "bytevc2_576p", 120000, 1024, 576),
 		},
 	}}}
 	if got := videoURL(PlatformDouyin, data); got != "" {
 		t.Fatalf("videoURL() = %q, want no unverified codec fallback", got)
+	}
+}
+
+func TestIsH264RenditionRejectsConflictingCodecSignals(t *testing.T) {
+	t.Parallel()
+
+	for name, rendition := range map[string]map[string]any{
+		"metadata": {"codec": "h264", "gear_name": "bytevc2_576p"},
+		"flag":     {"codec": "h264", "is_bytevc2": true},
+		"negative": {"codec": "h264", "is_h264": false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if isH264Rendition(rendition) {
+				t.Fatalf("isH264Rendition(%v) = true, want false", rendition)
+			}
+		})
 	}
 }
 
@@ -433,7 +468,7 @@ func TestNormalizeTikTokPrefersPrimaryH264InPluralWorkResponse(t *testing.T) {
 	data := map[string]any{"aweme_details": []any{map[string]any{"video": map[string]any{
 		"play_addr_h264": map[string]any{"url_list": []any{"https://cdn.example/h264.mp4"}},
 		"bit_rate": []any{
-			map[string]any{"bit_rate": float64(240000), "play_addr": map[string]any{"url_list": []any{"https://cdn.example/bytevc2-low.mp4"}}},
+			testVideoRendition("https://cdn.example/bytevc2-low.mp4", "", 240000, 1024, 576),
 		},
 	}}}}
 	result, err := normalizeWork(PlatformTikTok, "video-id", data, true)
@@ -714,7 +749,11 @@ func TestTikHubImporterDoesNotLeakBearerToReturnedMediaURL(t *testing.T) {
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"title","video":{"play_addr_h264":{"url_list":["`+mediaServer.URL+`/video.mp4"]}}}}}`)
+		_, _ = io.WriteString(
+			w,
+			`{"code":200,"data":{"aweme_detail":{"desc":"title",`+
+				`"video":{"play_addr_h264":{"url_list":["`+mediaServer.URL+`/video.mp4"]}}}}}`,
+		)
 	}))
 	defer apiServer.Close()
 
@@ -741,7 +780,11 @@ func TestTikHubImporterRequestEscapesQueryValues(t *testing.T) {
 			t.Errorf("unescaped RequestURI = %q", r.RequestURI)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"title","video":{"play_addr_h264":{"url_list":["https://cdn.example/v.mp4"]}}}}}`)
+		_, _ = io.WriteString(
+			w,
+			`{"code":200,"data":{"aweme_detail":{"desc":"title",`+
+				`"video":{"play_addr_h264":{"url_list":["https://cdn.example/v.mp4"]}}}}}`,
+		)
 	}))
 	defer server.Close()
 

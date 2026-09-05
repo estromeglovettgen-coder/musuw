@@ -279,7 +279,13 @@ func classifyYouTube(parsed *url.URL, cleanedURL string, segments []string) (*ti
 func classifyXiaohongshu(parsed *url.URL, cleanedURL string, segments []string) (*tikhub.Route, error) {
 	host := parsed.Hostname()
 	if isXiaohongshuShortHost(host) {
-		shortPrefix := len(segments) == 2 && (segments[0] == "a" || segments[0] == "m" || segments[0] == "n" || segments[0] == "o")
+		shortPrefix := false
+		if len(segments) == 2 {
+			switch segments[0] {
+			case "a", "m", "n", "o":
+				shortPrefix = true
+			}
+		}
 		if (len(segments) == 1 || shortPrefix) && shortCodePattern.MatchString(segments[len(segments)-1]) {
 			// xhslink short tokens are share-text values, not note IDs. TikHub
 			// must receive share_text so it can resolve the token itself.

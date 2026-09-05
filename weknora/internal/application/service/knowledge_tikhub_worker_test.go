@@ -299,7 +299,10 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	require.Equal(t, []byte("video-bytes"), files.savedData)
 	require.False(t, files.savedTemp, "social videos must survive worker retries and reparses")
 	require.False(t, strings.Contains(files.savedFileName, "/"))
-	require.Equal(t, int32(1), tikHubCalls.Load(), "the provider should be called once to materialize the durable source")
+	require.Equal(
+		t, int32(1), tikHubCalls.Load(),
+		"the provider should be called once to materialize the durable source",
+	)
 
 	// A downstream VLM failure redelivers the original social URL. The stored
 	// source checkpoint must turn that redelivery into an ordinary local-file
@@ -310,7 +313,10 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	require.Equal(t, knowledge.FilePath, retryPayload.FilePath)
 	require.Equal(t, knowledge.FileName, retryPayload.FileName)
 	require.Equal(t, knowledge.FileType, retryPayload.FileType)
-	require.Equal(t, int32(1), tikHubCalls.Load(), "retries must reuse the persisted MP4 instead of paying TikHub again")
+	require.Equal(
+		t, int32(1), tikHubCalls.Load(),
+		"retries must reuse the persisted MP4 instead of paying TikHub again",
+	)
 }
 
 func TestPrepareTikHubArtifactCleansObjectWhenStorageMutationFails(t *testing.T) {
