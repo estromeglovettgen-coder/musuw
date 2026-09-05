@@ -53,6 +53,13 @@ test('settings entry is in the legend between actions and the overview status ca
   )
   const panelStyle = graphSettingsPanel.slice(graphSettingsPanel.indexOf('<style'))
   assert.match(panelStyle, /\.obsidian-graph-controls-wrap\s*\{[\s\S]*position:\s*static;/)
+  assert.match(panelStyle, /\.obsidian-graph-controls-wrap\s*\{[\s\S]*width:\s*100%;/)
+  assert.match(graphSettingsPanel, /class="graph-settings-trigger legend-action"/)
+  assert.match(
+    graphSettingsPanel,
+    /knowledgeEditor\.wikiBrowser\.obsidianGraph\.settings/,
+    'the settings trigger should be a labeled legend row, not an icon-only square',
+  )
   assert.doesNotMatch(
     panelStyle,
     /\.obsidian-graph-controls-wrap\s*\{[^}]*position:\s*absolute;/,

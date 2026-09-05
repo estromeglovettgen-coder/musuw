@@ -3079,6 +3079,7 @@ export default {
         link: 'Link force',
         linkDistance: 'Link distance',
         reset: 'Restore defaults',
+        settings: 'Graph settings',
         open: 'Open graph settings',
         close: 'Close graph settings',
         switchStyle: 'Switch graph style',

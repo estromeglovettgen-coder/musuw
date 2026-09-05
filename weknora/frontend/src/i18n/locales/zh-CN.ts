@@ -4042,6 +4042,7 @@ export default {
         link: '链接力',
         linkDistance: '链接距离',
         reset: '恢复默认设置',
+        settings: '图谱设置',
         open: '打开图谱设置',
         close: '关闭图谱设置',
         switchStyle: '切换图谱风格',

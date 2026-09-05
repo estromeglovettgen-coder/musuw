@@ -3,12 +3,14 @@
     <button
       v-if="modelValue.close"
       type="button"
-      class="graph-settings-trigger"
+      class="graph-settings-trigger legend-action"
       :title="t('knowledgeEditor.wikiBrowser.obsidianGraph.open')"
       :aria-label="t('knowledgeEditor.wikiBrowser.obsidianGraph.open')"
+      :aria-expanded="!modelValue.close"
       @click="update('close', false)"
     >
-      <t-icon name="setting" />
+      <span class="legend-action-icon"><t-icon name="setting" /></span>
+      <span>{{ t('knowledgeEditor.wikiBrowser.obsidianGraph.settings') }}</span>
     </button>
 
     <div v-else class="graph-controls">
@@ -232,6 +234,7 @@ function toggleCollapse(key: 'collapse-display' | 'collapse-forces'): void {
 <style scoped lang="less">
 .obsidian-graph-controls-wrap {
   position: static;
+  width: 100%;
   color: var(--td-text-color-primary);
   font: var(--td-font-body-small, 12px/20px var(--td-font-family));
 }
@@ -245,23 +248,42 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--td-component-stroke);
   color: var(--td-text-color-secondary);
-  background: var(--td-bg-color-container);
+  background: transparent;
   cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .graph-settings-trigger {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--td-radius-medium, 6px);
-  box-shadow: var(--td-shadow-1);
+  width: 100%;
+  min-height: 26px;
+  gap: 6px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--td-radius-default, 8px);
+  justify-content: flex-start;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: left;
+  user-select: none;
 }
 
 .graph-settings-trigger:hover,
 .clickable-icon:hover {
-  color: var(--td-text-color-primary);
+  color: var(--td-brand-color);
   background: var(--td-bg-color-container-hover);
+}
+
+.graph-settings-trigger:focus-visible,
+.clickable-icon:focus-visible,
+.tree-item-self:focus-visible,
+.playback-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--td-brand-color-focus);
 }
 
 .graph-controls {
@@ -290,7 +312,7 @@ button {
   width: 26px;
   height: 26px;
   padding: 0;
-  border-color: transparent;
+  border: 0;
   border-radius: var(--td-radius-default, 3px);
 }
 
@@ -307,13 +329,22 @@ button {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 26px;
-  padding: 0 64px 0 0;
+  min-height: 28px;
+  padding: 0 64px 0 4px;
   border: 0;
+  border-radius: var(--td-radius-default, 8px);
   color: var(--td-text-color-primary);
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.tree-item-self:hover {
+  color: var(--td-brand-color);
+  background: var(--td-bg-color-container-hover);
 }
 
 .tree-item-self :deep(.t-icon) {
@@ -322,13 +353,18 @@ button {
   color: var(--td-text-color-secondary);
 }
 
+.tree-item-self:hover :deep(.t-icon),
+.tree-item-self:focus-visible :deep(.t-icon) {
+  color: var(--td-brand-color);
+}
+
 .tree-item-children {
-  padding: 5px 0 2px;
+  padding: 6px 4px 2px;
 }
 
 .setting-item {
   display: block;
-  padding: 5px 0 8px;
+  padding: 5px 0 9px;
 }
 
 .setting-item-name {
@@ -377,6 +413,10 @@ button {
   box-shadow: 0 0 0 2px var(--td-brand-color-focus);
 }
 
+.graph-slider:focus-visible {
+  box-shadow: none;
+}
+
 .graph-playback-heading,
 .graph-playback-title {
   display: inline-flex;
@@ -421,10 +461,15 @@ button {
   min-height: 30px;
   margin: 0 0 2px;
   border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-default, 3px);
+  border-radius: var(--td-radius-default, 8px);
   color: var(--td-text-color-primary);
   background: var(--td-bg-color-container);
   cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .playback-button:hover:not(:disabled) {
@@ -436,6 +481,30 @@ button {
 .playback-button:disabled {
   color: var(--td-text-color-disabled);
   background: var(--td-bg-color-secondarycontainer);
+  border-color: var(--td-component-stroke);
   cursor: not-allowed;
+}
+
+.legend-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.legend-action-icon :deep(.t-icon) {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.graph-settings-trigger:hover .legend-action-icon,
+.graph-settings-trigger:focus-visible .legend-action-icon {
+  color: var(--td-brand-color);
 }
 </style>
