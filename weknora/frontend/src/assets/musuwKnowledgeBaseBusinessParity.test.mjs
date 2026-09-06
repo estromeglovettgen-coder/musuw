@@ -6,9 +6,9 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('audited KnowledgeBase controller remains locked after success-scoped usage revalidation', () => {
+test('audited KnowledgeBase controller remains locked after live AI-title materialization', () => {
   const controller = read('./business-baselines/KnowledgeBase.pre-view.vue')
-  assert.equal(blobSha(controller), 'd08464ac13257d540aa2089298a1c472a7650e74')
+  assert.equal(blobSha(controller), '62faa49842403fbe8aa2fbb0faee2d08ff145553')
 })
 
 test('rebuilt KnowledgeBase delegates setup to the frozen native controller and keeps Graph host binding intact', () => {

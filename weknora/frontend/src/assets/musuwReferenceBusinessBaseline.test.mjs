@@ -9,7 +9,7 @@ const scriptOf = (path) => read(path).match(/<script setup(?: lang="ts")?>([\s\S
 
 const frozen = new Map([
   ['./business-baselines/Input-field.pre-view.vue', '11bc2cb650979eb55e367d370980051fa6caa429'],
-  ['./business-baselines/KnowledgeBase.pre-view.vue', 'd08464ac13257d540aa2089298a1c472a7650e74'],
+  ['./business-baselines/KnowledgeBase.pre-view.vue', '62faa49842403fbe8aa2fbb0faee2d08ff145553'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
   ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
