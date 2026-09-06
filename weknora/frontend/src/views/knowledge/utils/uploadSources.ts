@@ -9,6 +9,49 @@ import {
 export const UPLOAD_VIDEO_EXTENSIONS: string[] = [...DIRECT_VIDEO_EXTENSIONS]
 export { MAX_VIDEO_UPLOAD_BYTES }
 
+const SOCIAL_HOSTS = new Set([
+  'tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com',
+  'youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be',
+  'xiaohongshu.com', 'www.xiaohongshu.com', 'm.xiaohongshu.com',
+  'xhslink.com', 'www.xhslink.com', 'xhslink.cn', 'www.xhslink.cn',
+  'instagram.com', 'www.instagram.com', 'm.instagram.com', 'instagr.am',
+  'x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com',
+  'douyin.com', 'www.douyin.com', 'm.douyin.com', 'v.douyin.com',
+  'iesdouyin.com', 'www.iesdouyin.com',
+])
+
+const SOCIAL_URL_PATTERN = /https?:\/\/[A-Za-z0-9][A-Za-z0-9._~:/?#[\]@!$&()*+,;=%_-]*/gi
+const SOCIAL_TRAILING_PUNCTUATION = /[.,!?;:'"，。！？；：、)\]}》」』”’）】…]+$/u
+
+/**
+ * Returns true only when a pasted value contains one URL on a supported
+ * social host. The backend remains the authoritative work/path classifier;
+ * this conservative UI seam only decides whether provider-owned media model
+ * controls should be hidden before submission.
+ */
+export function isSupportedSocialShareInput(input: string): boolean {
+  if (!input || new TextEncoder().encode(input).length > 4096) return false
+  const cleaned = input.replace(/[\u00ad\u200b\u200c\u200d\u2060\ufeff]/gu, '')
+  const candidates = cleaned.match(SOCIAL_URL_PATTERN) || []
+  const normalized = new Set<string>()
+  for (const candidate of candidates) {
+    const raw = candidate.replace(SOCIAL_TRAILING_PUNCTUATION, '')
+    try {
+      const parsed = new URL(raw)
+      if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.username || parsed.password || parsed.port) {
+        return false
+      }
+      parsed.hash = ''
+      normalized.add(parsed.toString())
+    } catch {
+      return false
+    }
+  }
+  if (normalized.size !== 1) return false
+  const [only] = normalized
+  return SOCIAL_HOSTS.has(new URL(only).hostname.toLowerCase())
+}
+
 export function getUploadFileKey(file: File): string {
   const path = (file as File & { webkitRelativePath?: string }).webkitRelativePath || ''
   return `${path || file.name}\0${file.size}`

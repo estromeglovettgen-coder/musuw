@@ -105,6 +105,63 @@ func TestCheckKnowledgeExists_SocialFailedRowReusesOnlyMaterializedSource(t *tes
 	assert.Nil(t, knowledge)
 }
 
+func TestCreateURLKnowledgeIfAbsentSerializesConcurrentClaims(t *testing.T) {
+	db := setupKnowledgeTestDB(t)
+	repo := NewKnowledgeRepository(db)
+	ctx := context.Background()
+	const tenantID = uint64(9)
+	kbID := uuid.NewString()
+	require.NoError(t, db.Exec(`
+		CREATE TABLE knowledge_bases (
+			id VARCHAR(36) PRIMARY KEY,
+			tenant_id INTEGER NOT NULL,
+			deleted_at DATETIME
+		)
+	`).Error)
+	require.NoError(t, db.Exec(
+		"INSERT INTO knowledge_bases (id, tenant_id) VALUES (?, ?)", kbID, tenantID,
+	).Error)
+
+	type result struct {
+		knowledge *types.Knowledge
+		created   bool
+		err       error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			candidate := &types.Knowledge{
+				ID: uuid.NewString(), TenantID: tenantID, KnowledgeBaseID: kbID,
+				Type: "url", Source: "https://youtu.be/dQw4w9WgXcQ",
+				FileType: "html", FileHash: "social:youtube:dQw4w9WgXcQ",
+				ParseStatus: types.ParseStatusPending,
+			}
+			current, created, err := repo.CreateURLKnowledgeIfAbsent(
+				ctx,
+				candidate,
+				&types.KnowledgeCheckParams{
+					Type: "url", URL: candidate.Source, FileHash: candidate.FileHash,
+				},
+			)
+			results <- result{knowledge: current, created: created, err: err}
+		}()
+	}
+
+	first := <-results
+	second := <-results
+	require.NoError(t, first.err)
+	require.NoError(t, second.err)
+	assert.NotEqual(t, first.created, second.created, "exactly one concurrent request must win")
+	require.NotNil(t, first.knowledge)
+	require.NotNil(t, second.knowledge)
+	assert.Equal(t, first.knowledge.ID, second.knowledge.ID)
+	var count int64
+	require.NoError(t, db.Model(&types.Knowledge{}).
+		Where("tenant_id = ? AND knowledge_base_id = ? AND file_hash = ?", tenantID, kbID, "social:youtube:dQw4w9WgXcQ").
+		Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+}
+
 func TestAminusB_IgnoresFailedAndInFlightTargetRows(t *testing.T) {
 	db := setupKnowledgeTestDB(t)
 	repo := NewKnowledgeRepository(db)

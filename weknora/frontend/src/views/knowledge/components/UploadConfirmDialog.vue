@@ -61,7 +61,7 @@
                     </template>
                   </t-popup>
                 </div>
-                <p v-if="hasVideo" class="video-capability">
+                <p v-if="hasVideo || hasSupportedSocialSource" class="video-capability">
                   <t-icon name="video" aria-hidden="true" />
                   <span>{{ t('uploadConfirm.videoCapability') }}</span>
                 </p>
@@ -359,7 +359,7 @@
                     </div>
                   </div>
 
-                  <div v-if="!authStore.isLiteMode && !isVideoOnly" v-show="activeSection === 'multimodal'" class="section" data-section="multimodal">
+                  <div v-if="!authStore.isLiteMode && !usesManagedMediaRouting" v-show="activeSection === 'multimodal'" class="section" data-section="multimodal">
                     <div class="kb-settings-block">
                       <div class="section-header">
                         <h2 class="section-title">{{ t('knowledgeEditor.multimodal.title') }}</h2>
@@ -572,7 +572,7 @@ import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { formatFileSize, getFileIcon } from '@/utils/files'
-import { getUploadFileKey } from '../utils/uploadSources'
+import { getUploadFileKey, isSupportedSocialShareInput } from '../utils/uploadSources'
 import { listKnowledgeTags } from '@/api/knowledge-base'
 import KbUploadSourceDropdown from './KbUploadSourceDropdown.vue'
 import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue'
@@ -881,6 +881,23 @@ const isVideoOnly = computed(() => {
     batchFileExts.value.every(ext => VIDEO_EXTENSIONS.includes(ext))
 })
 
+const hasSupportedSocialSource = computed(() => {
+  return localUrls.value.some(isSupportedSocialShareInput)
+})
+
+// Social works and video-only inputs are parsed by server-owned routing. Hide
+// the user VLM selector only when every item in this batch follows that route;
+// a mixed image/document batch still needs the normal multimodal controls.
+const usesManagedMediaRouting = computed(() => {
+  if (props.mode === 'reparse') return isVideoOnly.value
+  if (props.mode !== 'file' || batchItemCount.value === 0) return false
+  const filesAreVideos = localFiles.value.every(file => VIDEO_EXTENSIONS.includes(getFileExt(file)))
+  const urlsAreManaged = localUrls.value.every((url) => {
+    return isSupportedSocialShareInput(url) || VIDEO_EXTENSIONS.includes(getExtFromUrl(url))
+  })
+  return filesAreVideos && urlsAreManaged && (localFiles.value.length > 0 || localUrls.value.length > 0)
+})
+
 const isGraphDatabaseEnabled = computed(() => {
   const engine = editorResources.systemInfo?.graph_database_engine
   return !!engine && engine !== 'Not Enabled'
@@ -904,7 +921,7 @@ const issueSectionKeys = computed(() => {
     if (!uiState.value.multimodalConfig.enabled || !uiState.value.multimodalConfig.vllmModelId) {
       keys.add('multimodal')
     }
-  } else if (!authStore.isLiteMode && !isVideoOnly.value && showMultimodalModelError.value) {
+  } else if (!authStore.isLiteMode && !usesManagedMediaRouting.value && showMultimodalModelError.value) {
     keys.add('multimodal')
   }
   if (!authStore.isLiteMode && hasAudio.value) {
@@ -952,7 +969,7 @@ const navItems = computed(() => {
   }
   push('parser', 'file-search', t('settings.parserEngine'))
   push('chunking', 'file-copy', t('knowledgeEditor.sidebar.chunking'))
-  if (!isVideoOnly.value) {
+  if (!usesManagedMediaRouting.value) {
     push(
       'multimodal',
       'image',
@@ -1064,7 +1081,7 @@ const canConfirm = computed(() => {
       return false
     }
   }
-  if (!authStore.isLiteMode && ((!isVideoOnly.value && showMultimodalModelError.value) || showAsrModelError.value)) {
+  if (!authStore.isLiteMode && ((!usesManagedMediaRouting.value && showMultimodalModelError.value) || showAsrModelError.value)) {
     return false
   }
   return true
@@ -1220,7 +1237,7 @@ function buildProcessOverrides(): KnowledgeProcessOverrides {
     },
   }
 
-  if (isVideoOnly.value) {
+  if (usesManagedMediaRouting.value) {
     delete overrides.enable_multimodel
     delete overrides.vlm_config
   }
@@ -1356,8 +1373,8 @@ watch(isGraphSectionAvailable, (available) => {
   }
 })
 
-watch(isVideoOnly, (videoOnly) => {
-  if (videoOnly && activeSection.value === 'multimodal') {
+watch(usesManagedMediaRouting, (managed) => {
+  if (managed && activeSection.value === 'multimodal') {
     activeSection.value = getDefaultSection()
   }
 })
@@ -1435,7 +1452,7 @@ const validateBeforeConfirm = (): boolean => {
       goToSection('multimodal')
       return false
     }
-  } else if (!authStore.isLiteMode && !isVideoOnly.value && showMultimodalModelError.value) {
+  } else if (!authStore.isLiteMode && !usesManagedMediaRouting.value && showMultimodalModelError.value) {
     MessagePlugin.warning(t('uploadConfirm.vlmModelSelectRequired'))
     goToSection('multimodal')
     return false

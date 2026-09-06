@@ -854,20 +854,7 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		}
 	}
 	if exists {
-		logger.Infof(ctx, "URL already exists: host_path=%s", urlForLog(url))
-		// Update creation time for existing knowledge
-		existingKnowledge.CreatedAt = time.Now()
-		existingKnowledge.UpdatedAt = time.Now()
-		if err := s.repo.UpdateKnowledge(ctx, existingKnowledge); err != nil {
-			logger.Errorf(ctx, "Failed to update existing knowledge: %v", err)
-			return nil, err
-		}
-		if socialRoute != nil && existingKnowledge.ParseStatus == types.ParseStatusFailed &&
-			strings.TrimSpace(existingKnowledge.FilePath) != "" {
-			logger.Infof(ctx, "Reusing materialized social source for knowledge %s", existingKnowledge.ID)
-			return s.ReparseKnowledge(ctx, existingKnowledge.ID, processOverrides)
-		}
-		return existingKnowledge, types.NewDuplicateURLError(existingKnowledge)
+		return s.handleExistingURLKnowledge(ctx, existingKnowledge, socialRoute != nil, url, processOverrides)
 	}
 	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, "html", 1024*1024); err != nil {
 		return nil, err
@@ -907,7 +894,25 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		return nil, err
 	}
 
-	if err := s.repo.CreateKnowledge(ctx, knowledge); err != nil {
+	if socialRoute != nil {
+		// The fast duplicate check above preserves the existing reparse/stale-
+		// source behavior. This transactional claim is the final authority for
+		// simultaneous submissions: only its winner can attach tags or enqueue a
+		// paid provider task.
+		claimedKnowledge, created, claimErr := s.repo.CreateURLKnowledgeIfAbsent(
+			ctx,
+			knowledge,
+			&types.KnowledgeCheckParams{Type: "url", URL: url, FileHash: fileHash},
+		)
+		if claimErr != nil {
+			logger.Errorf(ctx, "Failed to claim social knowledge record: %v", claimErr)
+			return nil, claimErr
+		}
+		if !created {
+			return s.handleExistingURLKnowledge(ctx, claimedKnowledge, true, url, processOverrides)
+		}
+		knowledge = claimedKnowledge
+	} else if err := s.repo.CreateKnowledge(ctx, knowledge); err != nil {
 		logger.Errorf(ctx, "Failed to create knowledge record: %v", err)
 		return nil, err
 	}
@@ -984,6 +989,30 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 
 	logger.Infof(ctx, "Knowledge from URL created successfully, ID: %s", knowledge.ID)
 	return knowledge, nil
+}
+
+func (s *knowledgeService) handleExistingURLKnowledge(
+	ctx context.Context,
+	existing *types.Knowledge,
+	social bool,
+	rawURL string,
+	processOverrides *types.KnowledgeProcessOverrides,
+) (*types.Knowledge, error) {
+	if existing == nil {
+		return nil, errors.New("duplicate URL claim returned no knowledge")
+	}
+	logger.Infof(ctx, "URL already exists: host_path=%s", urlForLog(rawURL))
+	existing.CreatedAt = time.Now()
+	existing.UpdatedAt = time.Now()
+	if err := s.repo.UpdateKnowledge(ctx, existing); err != nil {
+		logger.Errorf(ctx, "Failed to update existing knowledge: %v", err)
+		return nil, err
+	}
+	if social && existing.ParseStatus == types.ParseStatusFailed && strings.TrimSpace(existing.FilePath) != "" {
+		logger.Infof(ctx, "Reusing materialized social source for knowledge %s", existing.ID)
+		return s.ReparseKnowledge(ctx, existing.ID, processOverrides)
+	}
+	return existing, types.NewDuplicateURLError(existing)
 }
 
 // validateMaterializedSocialSource verifies that a dedupe hit is a readable,

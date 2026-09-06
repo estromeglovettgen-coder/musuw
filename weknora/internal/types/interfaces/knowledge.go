@@ -272,6 +272,14 @@ type KnowledgeService interface {
 // KnowledgeRepository defines the interface for knowledge repositories.
 type KnowledgeRepository interface {
 	CreateKnowledge(ctx context.Context, knowledge *types.Knowledge) error
+	// CreateURLKnowledgeIfAbsent serializes the duplicate check and insert on
+	// the owning knowledge-base row. It returns the winning existing row when a
+	// concurrent request already claimed the same URL identity.
+	CreateURLKnowledgeIfAbsent(
+		ctx context.Context,
+		knowledge *types.Knowledge,
+		params *types.KnowledgeCheckParams,
+	) (current *types.Knowledge, created bool, err error)
 	// CreateKnowledgeWithStorage creates a knowledge row and accounts its full
 	// source-plus-index contribution atomically with the tenant usage counter.
 	// A positive effectiveQuota enforces the exact-boundary rule; zero or less

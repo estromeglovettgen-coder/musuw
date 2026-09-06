@@ -60,6 +60,62 @@ func (r *knowledgeRepository) CreateKnowledge(ctx context.Context, knowledge *ty
 	return err
 }
 
+// CreateURLKnowledgeIfAbsent closes the check-then-create race for social URL
+// imports. Locking the stable owning knowledge-base row gives every process a
+// shared serialization point without introducing a claim table or preventing
+// a soft-deleted/failed source from being imported again.
+func (r *knowledgeRepository) CreateURLKnowledgeIfAbsent(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	params *types.KnowledgeCheckParams,
+) (current *types.Knowledge, created bool, err error) {
+	if knowledge == nil {
+		return nil, false, errors.New("knowledge is nil")
+	}
+	if knowledge.Type != "url" || knowledge.TenantID == 0 || strings.TrimSpace(knowledge.KnowledgeBaseID) == "" {
+		return nil, false, errors.New("URL knowledge identity is incomplete")
+	}
+	if params == nil {
+		return nil, false, errors.New("URL knowledge check parameters are required")
+	}
+
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var kb types.KnowledgeBase
+		if lockErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id").
+			Where("tenant_id = ? AND id = ?", knowledge.TenantID, knowledge.KnowledgeBaseID).
+			First(&kb).Error; lockErr != nil {
+			return lockErr
+		}
+
+		exists, winner, checkErr := checkKnowledgeExistsWithDB(
+			tx,
+			knowledge.TenantID,
+			knowledge.KnowledgeBaseID,
+			params,
+		)
+		if checkErr != nil {
+			return checkErr
+		}
+		if exists {
+			current = winner
+			return nil
+		}
+
+		knowledge.ErrorMessage = common.CleanInvalidUTF8(knowledge.ErrorMessage)
+		if createErr := tx.Create(knowledge).Error; createErr != nil {
+			return createErr
+		}
+		current = knowledge
+		created = true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return current, created, nil
+}
+
 // CreateKnowledgeWithStorage creates a knowledge row and accounts its full
 // source-plus-index contribution while holding the tenant row lock. The row
 // and counter update share one transaction, so a quota rejection or database
@@ -686,7 +742,16 @@ func (r *knowledgeRepository) CheckKnowledgeExists(
 	kbID string,
 	params *types.KnowledgeCheckParams,
 ) (bool, *types.Knowledge, error) {
-	query := r.db.WithContext(ctx).Model(&types.Knowledge{}).
+	return checkKnowledgeExistsWithDB(r.db.WithContext(ctx), tenantID, kbID, params)
+}
+
+func checkKnowledgeExistsWithDB(
+	db *gorm.DB,
+	tenantID uint64,
+	kbID string,
+	params *types.KnowledgeCheckParams,
+) (bool, *types.Knowledge, error) {
+	query := db.Model(&types.Knowledge{}).
 		Where("tenant_id = ? AND knowledge_base_id = ?", tenantID, kbID)
 	if params.ReuseStoredSource {
 		query = query.

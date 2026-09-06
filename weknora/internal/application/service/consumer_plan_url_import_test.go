@@ -38,6 +38,17 @@ func (r *urlImportPlanRepo) CreateKnowledge(context.Context, *types.Knowledge) e
 	return nil
 }
 
+func (r *urlImportPlanRepo) CreateURLKnowledgeIfAbsent(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	_ *types.KnowledgeCheckParams,
+) (*types.Knowledge, bool, error) {
+	if err := r.CreateKnowledge(ctx, knowledge); err != nil {
+		return nil, false, err
+	}
+	return knowledge, true, nil
+}
+
 func (r *urlImportPlanRepo) CreateKnowledgeWithStorage(
 	ctx context.Context,
 	knowledge *types.Knowledge,

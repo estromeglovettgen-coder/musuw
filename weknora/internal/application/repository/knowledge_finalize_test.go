@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS knowledges (
     file_hash VARCHAR(64),
     storage_size BIGINT NOT NULL DEFAULT 0,
     metadata TEXT,
+    custom_metadata TEXT,
     tag_id VARCHAR(36),
     summary_status VARCHAR(32) DEFAULT 'none',
     last_faq_import_result TEXT DEFAULT NULL,

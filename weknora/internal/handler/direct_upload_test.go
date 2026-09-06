@@ -214,7 +214,6 @@ func directUploadContext(method, path string, body string, tenantID uint64) (*gi
 }
 
 func TestDirectUploadCreateRejectsVideoAboveExactLimit(t *testing.T) {
-	t.Setenv("VIDEO_MAX_BYTES", "")
 	store := &directUploadStoreStub{putURL: "https://r2.example/put"}
 	h := directUploadTestHandler(store)
 	body := `{"file_name":"clip.mp4","size":300000001,"content_type":"video/mp4"}`
@@ -231,7 +230,6 @@ func TestDirectUploadCreateRejectsVideoAboveExactLimit(t *testing.T) {
 }
 
 func TestDirectUploadCreateAllowsVideoAtExactLimit(t *testing.T) {
-	t.Setenv("VIDEO_MAX_BYTES", "")
 	store := &directUploadStoreStub{putURL: "https://r2.example/put"}
 	h := directUploadTestHandler(store)
 	body := `{"file_name":"clip.mp4","size":300000000,"content_type":"video/mp4"}`
@@ -277,6 +275,25 @@ func TestDirectUploadCreateAllowsDocumentAtExisting50MiBBoundary(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"url":"https://r2.example/put"`) {
 		t.Fatalf("response did not include presigned URL: %s", recorder.Body.String())
+	}
+}
+
+func TestDirectUploadDocumentErrorsNeverUseVideoCopy(t *testing.T) {
+	store := &directUploadStoreStub{putURL: "https://r2.example/put"}
+	h := directUploadTestHandler(store)
+	body := `{"file_name":"manual.pdf","size":52428801,"content_type":"application/pdf"}`
+	c, recorder := directUploadContext(http.MethodPost, "/api/v1/uploads", body, 7)
+
+	h.Create(c)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "视频") {
+		t.Fatalf("document error used video copy: %s", recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), directUploadFileTooLargePublicMessage) {
+		t.Fatalf("document size error was not sanitized: %s", recorder.Body.String())
 	}
 }
 

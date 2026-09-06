@@ -239,7 +239,7 @@ func TestConvertVideoNeverFallsBackToInlineNearLimit(t *testing.T) {
 	if fileSvc.getFileCalls != 0 || model.inlineCalls != 0 {
 		t.Fatalf("large fallback read object: getFile=%d inline=%d", fileSvc.getFileCalls, model.inlineCalls)
 	}
-	if knowledge.ErrorMessage != VideoParseFailedPublicMessage {
+	if knowledge.ErrorMessage != VideoSourceFailedPublicMessage {
 		t.Fatalf("public error = %q", knowledge.ErrorMessage)
 	}
 }

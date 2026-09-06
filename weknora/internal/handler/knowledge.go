@@ -768,9 +768,9 @@ func (h *KnowledgeHandler) GetKnowledgeSpans(c *gin.Context) {
 			}
 		}
 	}
-	publicVideo := knowledgeIsVideo(knowledge)
-	if publicVideo {
-		rows = sanitizeConsumerVideoSpans(rows)
+	publicManagedSource := knowledgeNeedsManagedIngestionSanitization(knowledge)
+	if publicManagedSource {
+		rows = sanitizeConsumerManagedSpans(rows, knowledge)
 	}
 
 	// Build tree: index by SpanID, then attach to parents. Stages
@@ -793,8 +793,8 @@ func (h *KnowledgeHandler) GetKnowledgeSpans(c *gin.Context) {
 		"trace":           tree,
 	}
 	knowledgeErrorMessage := knowledge.ErrorMessage
-	if publicVideo {
-		knowledgeErrorMessage = consumerVideoPublicError("", knowledgeErrorMessage)
+	if publicManagedSource {
+		knowledgeErrorMessage = consumerManagedPublicError(knowledge, "", knowledgeErrorMessage)
 	}
 	if lastError := knowledgeSpansLastError(
 		currentAttempt,
@@ -804,7 +804,7 @@ func (h *KnowledgeHandler) GetKnowledgeSpans(c *gin.Context) {
 		knowledge.UpdatedAt,
 		lastErr,
 	); lastError != nil {
-		if publicVideo {
+		if publicManagedSource {
 			delete(lastError, "code")
 			delete(lastError, "error_code")
 		}
@@ -825,6 +825,18 @@ func knowledgeIsVideo(knowledge *types.Knowledge) bool {
 		fileType = strings.TrimPrefix(path.Ext(knowledge.FileName), ".")
 	}
 	return service.IsVideoType(fileType)
+}
+
+func knowledgeIsManagedSocialSource(knowledge *types.Knowledge) bool {
+	if knowledge == nil || strings.TrimSpace(knowledge.Source) == "" {
+		return false
+	}
+	route, _, err := service.ParseSocialShareInput(knowledge.Source)
+	return err == nil && route != nil
+}
+
+func knowledgeNeedsManagedIngestionSanitization(knowledge *types.Knowledge) bool {
+	return knowledgeIsVideo(knowledge) || knowledgeIsManagedSocialSource(knowledge)
 }
 
 func consumerVideoPublicError(code, message string) string {
@@ -862,12 +874,37 @@ func consumerVideoPublicError(code, message string) string {
 	return service.VideoParseFailedPublicMessage
 }
 
+func consumerSocialPublicError(code, message string) string {
+	trimmed := strings.TrimSpace(message)
+	switch trimmed {
+	case service.SocialImportFailedPublicMessage,
+		service.SocialFormatUnsupportedPublicMessage,
+		service.VideoTooLargePublicMessage:
+		return trimmed
+	}
+	switch strings.TrimSpace(code) {
+	case errors.ErrCodeVideoTooLarge:
+		return service.VideoTooLargePublicMessage
+	case errors.ErrCodeVideoFormatUnsupported:
+		return service.SocialFormatUnsupportedPublicMessage
+	default:
+		return service.SocialImportFailedPublicMessage
+	}
+}
+
+func consumerManagedPublicError(knowledge *types.Knowledge, code, message string) string {
+	if knowledgeIsVideo(knowledge) {
+		return consumerVideoPublicError(code, message)
+	}
+	return consumerSocialPublicError(code, message)
+}
+
 func sanitizeConsumerKnowledge(knowledge *types.Knowledge) *types.Knowledge {
-	if !knowledgeIsVideo(knowledge) || strings.TrimSpace(knowledge.ErrorMessage) == "" {
+	if !knowledgeNeedsManagedIngestionSanitization(knowledge) || strings.TrimSpace(knowledge.ErrorMessage) == "" {
 		return knowledge
 	}
 	sanitized := *knowledge
-	sanitized.ErrorMessage = consumerVideoPublicError("", knowledge.ErrorMessage)
+	sanitized.ErrorMessage = consumerManagedPublicError(knowledge, "", knowledge.ErrorMessage)
 	return &sanitized
 }
 
@@ -882,21 +919,41 @@ func sanitizeConsumerKnowledges(knowledges []*types.Knowledge) []*types.Knowledg
 	return sanitized
 }
 
-func sanitizeConsumerVideoSpans(rows []types.KnowledgeProcessingSpan) []types.KnowledgeProcessingSpan {
+func sanitizeConsumerManagedSpans(
+	rows []types.KnowledgeProcessingSpan,
+	knowledge *types.Knowledge,
+) []types.KnowledgeProcessingSpan {
 	sanitized := make([]types.KnowledgeProcessingSpan, len(rows))
 	copy(sanitized, rows)
 	for i := range sanitized {
 		row := &sanitized[i]
 		if row.ErrorCode != "" || row.ErrorMessage != "" {
-			row.ErrorMessage = consumerVideoPublicError(row.ErrorCode, row.ErrorMessage)
+			row.ErrorMessage = consumerManagedPublicError(knowledge, row.ErrorCode, row.ErrorMessage)
 		}
 		row.ErrorCode = ""
 		row.ErrorDetail = ""
+		row.Name = consumerSafeSpanName(*row)
 		row.Input = sanitizeConsumerVideoSpanMap(row.Input)
 		row.Output = sanitizeConsumerVideoSpanMap(row.Output)
 		row.Metadata = sanitizeConsumerVideoSpanMap(row.Metadata)
 	}
 	return sanitized
+}
+
+func consumerSafeSpanName(row types.KnowledgeProcessingSpan) string {
+	switch row.Kind {
+	case types.SpanKindRoot:
+		return "knowledge_processing"
+	case types.SpanKindStage:
+		for _, stage := range types.AllStages {
+			if row.Name == stage {
+				return stage
+			}
+		}
+		return "processing"
+	default:
+		return "processing_detail"
+	}
 }
 
 func sanitizeConsumerVideoSpanMap(values types.JSONMap) types.JSONMap {
@@ -907,13 +964,32 @@ func sanitizeConsumerVideoSpanMap(values types.JSONMap) types.JSONMap {
 	for key, value := range values {
 		switch strings.ToLower(strings.TrimSpace(key)) {
 		case "model", "model_id", "video_model", "provider", "route", "router",
-			"base_url", "video_source", "video_input_mode":
+			"base_url", "video_source", "video_input_mode", "url", "media_url",
+			"source_url", "endpoint", "host", "request", "response", "headers",
+			"authorization", "token", "api_key", "error", "error_detail":
 			continue
 		default:
-			sanitized[key] = value
+			sanitized[key] = sanitizeConsumerVideoSpanValue(value)
 		}
 	}
 	return sanitized
+}
+
+func sanitizeConsumerVideoSpanValue(value any) any {
+	switch typed := value.(type) {
+	case types.JSONMap:
+		return sanitizeConsumerVideoSpanMap(typed)
+	case map[string]any:
+		return sanitizeConsumerVideoSpanMap(types.JSONMap(typed))
+	case []any:
+		result := make([]any, len(typed))
+		for i := range typed {
+			result[i] = sanitizeConsumerVideoSpanValue(typed[i])
+		}
+		return result
+	default:
+		return value
+	}
 }
 
 // knowledgeSpansLastError builds the last_error payload for GetKnowledgeSpans.

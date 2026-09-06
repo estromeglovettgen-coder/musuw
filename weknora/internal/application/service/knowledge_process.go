@@ -3471,12 +3471,13 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 			logger.GetLogger(ctx).WithField("knowledge_id", knowledge.ID).
 				WithField("reason", socialImportFailureReason(socialErr)).Error("social link import failed")
 			knowledge.ParseStatus = types.ParseStatusFailed
-			knowledge.ErrorMessage = socialImportPublicMessage(socialErr)
+			failureCode, publicMessage := socialImportPublicState(socialErr)
+			knowledge.ErrorMessage = publicMessage
 			knowledge.UpdatedAt = time.Now()
 			_ = s.repo.UpdateKnowledge(ctx, knowledge)
 			s.beginStage(ctx, knowledge.ID, types.StageDocReader, nil)
 			s.failStage(ctx, knowledge.ID, types.StageDocReader,
-				werrors.ErrCodeVideoSourceFailed, knowledge.ErrorMessage, socialErr)
+				failureCode, knowledge.ErrorMessage, socialErr)
 			return nil
 		}
 		if handled && (knowledge.ParseStatus == types.ParseStatusCancelled || knowledge.ParseStatus == types.ParseStatusDeleting) {

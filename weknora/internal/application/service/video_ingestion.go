@@ -176,7 +176,7 @@ func (s *knowledgeService) convertVideo(
 			return s.failVideoKnowledge(
 				ctx,
 				knowledge,
-				videoFailureParse,
+				videoFailureSource,
 				videoFailureRetryable(urlSourceErr),
 				urlSourceErr,
 			)
