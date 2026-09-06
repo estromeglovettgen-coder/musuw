@@ -431,7 +431,12 @@ func newDeadLetterKnowledgeFailer(ks interfaces.KnowledgeService, tracker servic
 			updated, err := repo.FailKnowledgeParseAttempt(
 				ctx, probe.KnowledgeID, probe.Attempt, service.ImageParseFailedPublicMessage)
 			if err != nil {
-				logger.Warnf(ctx, "dead-letter callback: failed to mark image knowledge %s as failed: %v", probe.KnowledgeID, err)
+				logger.Warnf(
+					ctx,
+					"dead-letter callback: failed to mark image knowledge %s as failed: %v",
+					probe.KnowledgeID,
+					err,
+				)
 				return
 			}
 			if updated && tracker != nil && probe.Attempt > 0 {

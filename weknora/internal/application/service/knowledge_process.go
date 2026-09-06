@@ -4182,7 +4182,12 @@ func (s *knowledgeService) enqueueImageMultimodalTasks(
 		task := asynq.NewTask(types.TypeImageMultimodal, payloadBytes,
 			asynq.Queue(types.QueueMultimodal), asynq.MaxRetry(3), asynq.Timeout(30*time.Minute))
 		if _, err := s.task.Enqueue(task); err != nil {
-			logger.Errorf(ctx, "Failed to enqueue image multimodal task for host_path=%s: %v", urlForLog(img.ServingURL), err)
+			logger.Errorf(
+				ctx,
+				"Failed to enqueue image multimodal task for host_path=%s: %v",
+				urlForLog(img.ServingURL),
+				err,
+			)
 			_, _ = s.repo.FailKnowledgeParseAttempt(
 				ctx, knowledge.ID, attempt, ImageParseFailedPublicMessage)
 			return

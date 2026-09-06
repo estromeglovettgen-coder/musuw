@@ -490,7 +490,12 @@ func TestImageMultimodalResolveVLMRoutesLegacyVideoModelToImageModel(t *testing.
 		t.Fatalf("resolveVLM: %v", err)
 	}
 	if requestedID != types.PlatformKnowledgeBaseVLMModelID || config.ModelID != types.PlatformKnowledgeBaseVLMModelID {
-		t.Fatalf("requested/config model = %q/%q, want %q", requestedID, config.ModelID, types.PlatformKnowledgeBaseVLMModelID)
+		t.Fatalf(
+			"requested/config model = %q/%q, want %q",
+			requestedID,
+			config.ModelID,
+			types.PlatformKnowledgeBaseVLMModelID,
+		)
 	}
 }
 
@@ -513,6 +518,11 @@ func TestImageMultimodalResolveVLMRoutesLegacyVideoModelInStandard(t *testing.T)
 		t.Fatalf("resolveVLM: %v", err)
 	}
 	if requestedID != types.PlatformKnowledgeBaseVLMModelID || config.ModelID != types.PlatformKnowledgeBaseVLMModelID {
-		t.Fatalf("requested/config model = %q/%q, want %q", requestedID, config.ModelID, types.PlatformKnowledgeBaseVLMModelID)
+		t.Fatalf(
+			"requested/config model = %q/%q, want %q",
+			requestedID,
+			config.ModelID,
+			types.PlatformKnowledgeBaseVLMModelID,
+		)
 	}
 }
