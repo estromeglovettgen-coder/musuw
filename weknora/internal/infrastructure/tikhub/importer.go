@@ -349,7 +349,7 @@ func videoURL(platform Platform, data any) string {
 		}
 		return ""
 	case PlatformXiaohongshu:
-		keys = []string{"master_url", "play_url", "video_url", "video"}
+		return xiaohongshuH264VideoURL(data)
 	case PlatformInstagram:
 		for _, key := range []string{"video_versions", "videoVersions"} {
 			for _, value := range valuesByKey(data, key) {
@@ -377,6 +377,28 @@ func videoURL(platform Platform, data any) string {
 		}
 	}
 	return ""
+}
+
+// xiaohongshuH264VideoURL reads the requested work (the first item) instead of
+// recursively mixing it with related works, and never falls back to the HEVC
+// stream that Xiaohongshu marks as the default rendition.
+func xiaohongshuH264VideoURL(data any) string {
+	work := data
+	switch items := nestedMapValue(data, "data").(type) {
+	case []any:
+		if len(items) == 0 {
+			return ""
+		}
+		work = items[0]
+	case map[string]any:
+		work = items
+	}
+
+	stream, ok := nestedMapValue(work, "video_info_v2", "media", "stream").(map[string]any)
+	if !ok {
+		return ""
+	}
+	return lowestQualityURL(stream["h264"])
 }
 
 type h264Candidate struct {
