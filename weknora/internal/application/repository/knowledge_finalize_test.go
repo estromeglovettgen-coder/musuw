@@ -118,6 +118,60 @@ func TestKnowledgeRepository_UpdateKnowledgeColumnsSanitizesErrorMessage(t *test
 	assert.Equal(t, "parse failed .", got)
 }
 
+func TestKnowledgeRepository_FailKnowledgeParseAttemptGuardsTerminalAndNewerWork(t *testing.T) {
+	db := setupKnowledgeTestDB(t)
+	require.NoError(t, db.Exec(spansTestDDL).Error)
+	repo := NewKnowledgeRepository(db)
+	ctx := context.Background()
+
+	t.Run("active attempt fails", func(t *testing.T) {
+		id := insertProcessingKnowledge(t, db)
+		updated, err := repo.FailKnowledgeParseAttempt(ctx, id, 1, "image failed")
+		require.NoError(t, err)
+		require.True(t, updated)
+		status, _ := reloadKnowledgeRow(t, db, id)
+		assert.Equal(t, types.ParseStatusFailed, status)
+		assert.Equal(t, "image failed", reloadKnowledgeErrorMessage(t, db, id))
+	})
+
+	t.Run("terminal row is unchanged", func(t *testing.T) {
+		id := insertKnowledgeWithStatus(t, db, types.ParseStatusCompleted, false)
+		updated, err := repo.FailKnowledgeParseAttempt(ctx, id, 1, "late worker")
+		require.NoError(t, err)
+		assert.False(t, updated)
+		status, _ := reloadKnowledgeRow(t, db, id)
+		assert.Equal(t, types.ParseStatusCompleted, status)
+	})
+
+	t.Run("newer attempt wins", func(t *testing.T) {
+		id := insertProcessingKnowledge(t, db)
+		require.NoError(t, db.Exec(`
+			INSERT INTO knowledge_processing_spans
+				(knowledge_id, attempt, span_id, name, kind, status)
+			VALUES (?, 2, 'root-2', 'knowledge_processing', 'root', 'running')
+		`, id).Error)
+		updated, err := repo.FailKnowledgeParseAttempt(ctx, id, 1, "stale worker")
+		require.NoError(t, err)
+		assert.False(t, updated)
+		status, _ := reloadKnowledgeRow(t, db, id)
+		assert.Equal(t, types.ParseStatusProcessing, status)
+	})
+
+	t.Run("legacy worker cannot overwrite tracked attempt", func(t *testing.T) {
+		id := insertProcessingKnowledge(t, db)
+		require.NoError(t, db.Exec(`
+			INSERT INTO knowledge_processing_spans
+				(knowledge_id, attempt, span_id, name, kind, status)
+			VALUES (?, 1, 'root-1', 'knowledge_processing', 'root', 'running')
+		`, id).Error)
+		updated, err := repo.FailKnowledgeParseAttempt(ctx, id, 0, "legacy worker")
+		require.NoError(t, err)
+		assert.False(t, updated)
+		status, _ := reloadKnowledgeRow(t, db, id)
+		assert.Equal(t, types.ParseStatusProcessing, status)
+	})
+}
+
 func insertKnowledgeWithStatus(t *testing.T, db *gorm.DB, status string, deleted bool) string {
 	t.Helper()
 	id := uuid.New().String()

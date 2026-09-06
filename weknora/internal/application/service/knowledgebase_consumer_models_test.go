@@ -129,7 +129,7 @@ func TestCreateKnowledgeBaseUsesPlanAwareVisionDefaults(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paidKB)
-	assert.Equal(t, "builtin-openrouter-vlm-mimo-v2-5", paidKB.VLMConfig.ModelID)
+	assert.Equal(t, types.PlatformKnowledgeBaseVLMModelID, paidKB.VLMConfig.ModelID)
 	assert.Equal(t, paidKB.VLMConfig.ModelID, paidKB.ImageProcessingConfig.ModelID)
 
 	freeRepo := newFakeKBRepo()

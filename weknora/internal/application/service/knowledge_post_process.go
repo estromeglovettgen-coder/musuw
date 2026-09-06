@@ -95,6 +95,11 @@ func (s *KnowledgePostProcessService) Handle(ctx context.Context, task *asynq.Ta
 	if attempt <= 0 {
 		attempt = s.tracker().LatestAttempt(ctx, payload.KnowledgeID)
 	}
+	if payload.Attempt > 0 && attemptSuperseded(ctx, s.tracker(), payload.KnowledgeID, payload.Attempt) {
+		logger.Infof(ctx, "[KnowledgePostProcess] Attempt %d superseded for %s; dropping stale task",
+			payload.Attempt, payload.KnowledgeID)
+		return nil
+	}
 
 	// Close the multimodal stage span (parent enqueued it as "running"
 	// and we never see the per-image fan-in here other than by reaching

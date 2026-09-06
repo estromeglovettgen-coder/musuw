@@ -4131,10 +4131,13 @@ func (s *knowledgeService) enqueueImageMultimodalTasks(
 	}
 
 	attempt := attemptFromCtx(ctx)
-	redisKey := fmt.Sprintf("multimodal:pending:%s", knowledge.ID)
+	redisKey := multimodalPendingKey(knowledge.ID, attempt)
 	if s.redisClient != nil {
 		if err := s.redisClient.Set(ctx, redisKey, len(images), 24*time.Hour).Err(); err != nil {
-			logger.Warnf(ctx, "Failed to set multimodal pending count for %s: %v", knowledge.ID, err)
+			logger.Errorf(ctx, "Failed to set multimodal pending count for %s: %v", knowledge.ID, err)
+			_, _ = s.repo.FailKnowledgeParseAttempt(
+				ctx, knowledge.ID, attempt, ImageParseFailedPublicMessage)
+			return
 		}
 	}
 
@@ -4170,14 +4173,19 @@ func (s *knowledgeService) enqueueImageMultimodalTasks(
 		langfuse.InjectTracing(ctx, &payload)
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
-			logger.Warnf(ctx, "Failed to marshal image multimodal payload: %v", err)
-			continue
+			logger.Errorf(ctx, "Failed to marshal image multimodal payload: %v", err)
+			_, _ = s.repo.FailKnowledgeParseAttempt(
+				ctx, knowledge.ID, attempt, ImageParseFailedPublicMessage)
+			return
 		}
 
 		task := asynq.NewTask(types.TypeImageMultimodal, payloadBytes,
 			asynq.Queue(types.QueueMultimodal), asynq.MaxRetry(3), asynq.Timeout(30*time.Minute))
 		if _, err := s.task.Enqueue(task); err != nil {
-			logger.Warnf(ctx, "Failed to enqueue image multimodal task for host_path=%s: %v", urlForLog(img.ServingURL), err)
+			logger.Errorf(ctx, "Failed to enqueue image multimodal task for host_path=%s: %v", urlForLog(img.ServingURL), err)
+			_, _ = s.repo.FailKnowledgeParseAttempt(
+				ctx, knowledge.ID, attempt, ImageParseFailedPublicMessage)
+			return
 		} else {
 			logger.Infof(ctx, "Enqueued image:multimodal task for host_path=%s", urlForLog(img.ServingURL))
 		}

@@ -2,12 +2,27 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestKnowledgePostProcessDropsSupersededAttemptBeforeReadingState(t *testing.T) {
+	tracker := multimodalFailureSpanTracker{SpanTracker: noopSpanTracker{}, latest: 2}
+	service := &KnowledgePostProcessService{spanTracker: tracker}
+	payload, err := json.Marshal(types.KnowledgePostProcessPayload{
+		KnowledgeID: "knowledge-1",
+		Attempt:     1,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, service.Handle(
+		context.Background(), asynq.NewTask(types.TypeKnowledgePostProcess, payload)))
+}
 
 func TestFinishRunningMultimodalStage_PreservesSkippedStage(t *testing.T) {
 	tracker, db := setupSpanTrackerTest(t)

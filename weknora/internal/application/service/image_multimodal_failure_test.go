@@ -15,12 +15,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
 	"github.com/Tencent/WeKnora/internal/models/vlm"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
 )
 
 type multimodalFailureVLM struct {
@@ -101,10 +103,14 @@ func (m *multimodalFailureVLM) GetModelID() string   { return "multimodal-failur
 
 type multimodalFailureModelService struct {
 	interfaces.ModelService
-	model vlm.VLM
+	model       vlm.VLM
+	requestedID *string
 }
 
-func (s multimodalFailureModelService) GetVLMModel(context.Context, string) (vlm.VLM, error) {
+func (s multimodalFailureModelService) GetVLMModel(_ context.Context, id string) (vlm.VLM, error) {
+	if s.requestedID != nil {
+		*s.requestedID = id
+	}
 	return s.model, nil
 }
 
@@ -129,10 +135,43 @@ func (r multimodalFailureTenantRepo) GetTenantByID(context.Context, uint64) (*ty
 type multimodalFailureFileService struct {
 	interfaces.FileService
 	data []byte
+	err  error
 }
 
 func (s multimodalFailureFileService) GetFile(context.Context, string) (io.ReadCloser, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	return io.NopCloser(bytes.NewReader(s.data)), nil
+}
+
+type multimodalFailureKnowledgeRepo struct {
+	interfaces.KnowledgeRepository
+	knowledge *types.Knowledge
+	failErr   error
+	failCalls int
+}
+
+func (r *multimodalFailureKnowledgeRepo) GetKnowledgeByIDOnly(context.Context, string) (*types.Knowledge, error) {
+	return r.knowledge, nil
+}
+
+func (r *multimodalFailureKnowledgeRepo) FailKnowledgeParseAttempt(
+	_ context.Context,
+	_ string,
+	_ int,
+	errorMessage string,
+) (bool, error) {
+	r.failCalls++
+	if r.failErr != nil {
+		return false, r.failErr
+	}
+	if r.knowledge == nil || r.knowledge.ParseStatus != types.ParseStatusProcessing {
+		return false, nil
+	}
+	r.knowledge.ParseStatus = types.ParseStatusFailed
+	r.knowledge.ErrorMessage = errorMessage
+	return true, nil
 }
 
 type multimodalFailureChunkService struct {
@@ -161,11 +200,42 @@ func (s *multimodalFailureChunkService) UpdateChunk(_ context.Context, _ *types.
 type multimodalFailureTaskEnqueuer struct {
 	interfaces.TaskEnqueuer
 	tasks []*asynq.Task
+	err   error
 }
 
+type multimodalFailureSpanTracker struct {
+	SpanTracker
+	latest int
+}
+
+func (t multimodalFailureSpanTracker) LatestAttempt(context.Context, string) int { return t.latest }
+
 func (e *multimodalFailureTaskEnqueuer) Enqueue(task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+	if e.err != nil {
+		return nil, e.err
+	}
 	e.tasks = append(e.tasks, task)
 	return &asynq.TaskInfo{ID: "post-process"}, nil
+}
+
+func TestEnqueueImageMultimodalFailureFailsParentBeforePartialCompletion(t *testing.T) {
+	repo := &multimodalFailureKnowledgeRepo{knowledge: &types.Knowledge{
+		ID: "knowledge-1", ParseStatus: types.ParseStatusProcessing,
+	}}
+	queue := &multimodalFailureTaskEnqueuer{err: errors.New("queue unavailable")}
+	service := &knowledgeService{repo: repo, task: queue}
+
+	service.enqueueImageMultimodalTasks(
+		withAttempt(context.Background(), 1),
+		repo.knowledge,
+		&types.KnowledgeBase{ID: "kb-1"},
+		[]docparser.StoredImage{{ServingURL: "local://image.png"}},
+		nil,
+		nil,
+	)
+
+	require.Equal(t, types.ParseStatusFailed, repo.knowledge.ParseStatus)
+	require.Equal(t, 1, repo.failCalls)
 }
 
 func newMultimodalFailureService(model vlm.VLM, chunks *multimodalFailureChunkService) *ImageMultimodalService {
@@ -177,8 +247,11 @@ func newMultimodalFailureService(model vlm.VLM, chunks *multimodalFailureChunkSe
 		chunkService: chunks,
 		modelService: multimodalFailureModelService{model: model},
 		kbService:    multimodalFailureKBService{kb: kb},
-		tenantRepo:   multimodalFailureTenantRepo{tenant: &types.Tenant{ID: 1}},
-		fileSvc:      multimodalFailureFileService{data: []byte("not-really-an-image")},
+		knowledgeRepo: &multimodalFailureKnowledgeRepo{knowledge: &types.Knowledge{
+			ID: "knowledge-1", ParseStatus: types.ParseStatusProcessing,
+		}},
+		tenantRepo: multimodalFailureTenantRepo{tenant: &types.Tenant{ID: 1}},
+		fileSvc:    multimodalFailureFileService{data: []byte("not-really-an-image")},
 	}
 }
 
@@ -192,6 +265,7 @@ func multimodalFailureTask(t *testing.T) *asynq.Task {
 		ImageURL:        "local://image.png",
 		EnableOCR:       true,
 		EnableCaption:   true,
+		Attempt:         1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -244,7 +318,7 @@ func TestImageMultimodalHandlePersistsSuccessfulCaptionWhenOCRFails(t *testing.T
 	}
 }
 
-func TestImageMultimodalHandleAllowsEmptyImageWithoutVLMError(t *testing.T) {
+func TestImageMultimodalHandleRejectsEmptyImageWithoutEvidence(t *testing.T) {
 	t.Parallel()
 	chunks := &multimodalFailureChunkService{}
 	svc := newMultimodalFailureService(&multimodalFailureVLM{
@@ -252,15 +326,16 @@ func TestImageMultimodalHandleAllowsEmptyImageWithoutVLMError(t *testing.T) {
 		captionText: "",
 	}, chunks)
 
-	if err := svc.Handle(context.Background(), multimodalFailureTask(t)); err != nil {
-		t.Fatalf("empty image should be treated as a successful no-content result: %v", err)
+	err := svc.Handle(context.Background(), multimodalFailureTask(t))
+	if err == nil || !strings.Contains(err.Error(), "no usable image content") {
+		t.Fatalf("empty image error = %v, want no usable image content", err)
 	}
 	if len(chunks.chunks) != 0 {
 		t.Fatalf("created %d chunks for an empty image, want 0", len(chunks.chunks))
 	}
 }
 
-func TestImageMultimodalHandleFinalFailedAttemptFinalizesPendingCounter(t *testing.T) {
+func TestImageMultimodalHandleFinalFailedAttemptFailsParentWithoutPostProcess(t *testing.T) {
 	t.Parallel()
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -279,8 +354,9 @@ func TestImageMultimodalHandleFinalFailedAttemptFinalizesPendingCounter(t *testi
 	}, chunks)
 	svc.redisClient = rdb
 	svc.taskEnqueuer = enqueuer
+	repo := svc.knowledgeRepo.(*multimodalFailureKnowledgeRepo)
 
-	const redisKey = "multimodal:pending:knowledge-1"
+	redisKey := multimodalPendingKey("knowledge-1", 1)
 	if err := rdb.Set(context.Background(), redisKey, 1, 0).Err(); err != nil {
 		t.Fatal(err)
 	}
@@ -289,10 +365,154 @@ func TestImageMultimodalHandleFinalFailedAttemptFinalizesPendingCounter(t *testi
 	if err == nil {
 		t.Fatal("expected final failed attempt to return the VLM error")
 	}
-	if mr.Exists(redisKey) {
-		t.Fatal("final failed attempt should consume the pending image counter")
+	if !mr.Exists(redisKey) {
+		t.Fatal("terminal failure must keep the success fan-in gate closed")
 	}
-	if len(enqueuer.tasks) != 1 || enqueuer.tasks[0].Type() != types.TypeKnowledgePostProcess {
-		t.Fatalf("post-process enqueue = %d tasks, want one", len(enqueuer.tasks))
+	if len(enqueuer.tasks) != 0 {
+		t.Fatalf("post-process enqueue = %d tasks after failed image, want zero", len(enqueuer.tasks))
+	}
+	if repo.knowledge.ParseStatus != types.ParseStatusFailed {
+		t.Fatalf("parent status = %q, want failed", repo.knowledge.ParseStatus)
+	}
+	if repo.knowledge.ErrorMessage != ImageParseFailedPublicMessage {
+		t.Fatalf("parent error = %q, want %q", repo.knowledge.ErrorMessage, ImageParseFailedPublicMessage)
+	}
+	if repo.failCalls != 1 {
+		t.Fatalf("guarded failure calls = %d, want one", repo.failCalls)
+	}
+}
+
+func TestImageMultimodalHandleUnreadableImageRetries(t *testing.T) {
+	t.Parallel()
+	svc := newMultimodalFailureService(&multimodalFailureVLM{}, &multimodalFailureChunkService{})
+	svc.fileSvc = multimodalFailureFileService{err: errors.New("stored image unavailable")}
+
+	err := svc.Handle(context.Background(), multimodalFailureTask(t))
+	if err == nil || !strings.Contains(err.Error(), "read image") {
+		t.Fatalf("unreadable image error = %v, want retryable read error", err)
+	}
+}
+
+func TestImageMultimodalHandleDropsSupersededAttemptBeforeVLM(t *testing.T) {
+	t.Parallel()
+	model := &multimodalFailureVLM{captionText: "must not run"}
+	svc := newMultimodalFailureService(model, &multimodalFailureChunkService{})
+	svc.spanTracker = multimodalFailureSpanTracker{SpanTracker: noopSpanTracker{}, latest: 2}
+
+	if err := svc.Handle(context.Background(), multimodalFailureTask(t)); err != nil {
+		t.Fatalf("Handle stale attempt: %v", err)
+	}
+	if len(model.seenImages) != 0 {
+		t.Fatalf("stale attempt made %d VLM calls, want zero", len(model.seenImages))
+	}
+	if calls := svc.knowledgeRepo.(*multimodalFailureKnowledgeRepo).failCalls; calls != 0 {
+		t.Fatalf("stale attempt failure writes = %d, want zero", calls)
+	}
+}
+
+func TestImageMultimodalMissingPendingCounterDoesNotPostProcess(t *testing.T) {
+	t.Parallel()
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mr.Close)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	enqueuer := &multimodalFailureTaskEnqueuer{}
+	svc := newMultimodalFailureService(
+		&multimodalFailureVLM{captionText: "usable caption"},
+		&multimodalFailureChunkService{},
+	)
+	svc.redisClient = rdb
+	svc.taskEnqueuer = enqueuer
+
+	if err := svc.Handle(context.Background(), multimodalFailureTask(t)); err != nil {
+		t.Fatalf("Handle successful image: %v", err)
+	}
+	if len(enqueuer.tasks) != 0 {
+		t.Fatalf("missing counter enqueued %d post-process tasks, want zero", len(enqueuer.tasks))
+	}
+	repo := svc.knowledgeRepo.(*multimodalFailureKnowledgeRepo)
+	if repo.knowledge.ParseStatus != types.ParseStatusProcessing {
+		t.Fatalf("parent status = %q, want processing for housekeeping recovery", repo.knowledge.ParseStatus)
+	}
+}
+
+func TestImageMultimodalSuccessfulFanInPreservesAttempt(t *testing.T) {
+	t.Parallel()
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mr.Close)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	requireSet := func(key string, value int) {
+		if err := rdb.Set(context.Background(), key, value, 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	requireSet(multimodalPendingKey("knowledge-1", 1), 1)
+
+	enqueuer := &multimodalFailureTaskEnqueuer{}
+	svc := newMultimodalFailureService(
+		&multimodalFailureVLM{captionText: "usable caption"},
+		&multimodalFailureChunkService{},
+	)
+	svc.redisClient = rdb
+	svc.taskEnqueuer = enqueuer
+	require.NoError(t, svc.Handle(context.Background(), multimodalFailureTask(t)))
+	require.Len(t, enqueuer.tasks, 1)
+
+	var payload types.KnowledgePostProcessPayload
+	require.NoError(t, json.Unmarshal(enqueuer.tasks[0].Payload(), &payload))
+	require.Equal(t, 1, payload.Attempt)
+}
+
+func TestImageMultimodalResolveVLMRoutesLegacyVideoModelToImageModel(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	requestedID := ""
+	model := &multimodalFailureVLM{}
+	svc := newMultimodalFailureService(model, &multimodalFailureChunkService{})
+	svc.modelService = multimodalFailureModelService{model: model, requestedID: &requestedID}
+	svc.kbService = multimodalFailureKBService{kb: &types.KnowledgeBase{
+		ID: "kb-1",
+		VLMConfig: types.VLMConfig{
+			Enabled: true,
+			ModelID: defaultVideoModelID,
+		},
+	}}
+
+	_, config, err := svc.resolveVLM(context.Background(), "kb-1", "knowledge-1")
+	if err != nil {
+		t.Fatalf("resolveVLM: %v", err)
+	}
+	if requestedID != types.PlatformKnowledgeBaseVLMModelID || config.ModelID != types.PlatformKnowledgeBaseVLMModelID {
+		t.Fatalf("requested/config model = %q/%q, want %q", requestedID, config.ModelID, types.PlatformKnowledgeBaseVLMModelID)
+	}
+}
+
+func TestImageMultimodalResolveVLMRoutesLegacyVideoModelInStandard(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
+	requestedID := ""
+	model := &multimodalFailureVLM{}
+	svc := newMultimodalFailureService(model, &multimodalFailureChunkService{})
+	svc.modelService = multimodalFailureModelService{model: model, requestedID: &requestedID}
+	svc.kbService = multimodalFailureKBService{kb: &types.KnowledgeBase{
+		ID: "kb-1",
+		VLMConfig: types.VLMConfig{
+			Enabled: true,
+			ModelID: defaultVideoModelID,
+		},
+	}}
+
+	_, config, err := svc.resolveVLM(context.Background(), "kb-1", "knowledge-1")
+	if err != nil {
+		t.Fatalf("resolveVLM: %v", err)
+	}
+	if requestedID != types.PlatformKnowledgeBaseVLMModelID || config.ModelID != types.PlatformKnowledgeBaseVLMModelID {
+		t.Fatalf("requested/config model = %q/%q, want %q", requestedID, config.ModelID, types.PlatformKnowledgeBaseVLMModelID)
 	}
 }

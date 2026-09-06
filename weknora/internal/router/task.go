@@ -371,11 +371,8 @@ type deadLetterKnowledgePayload struct {
 // terminal task types are listed here:
 //
 //   - TypeDocumentProcess: the entry point of the parsing pipeline.
-//   - TypeImageMultimodal: a single image hitting dead-letter would have
-//     been counted by isFinalAsynqAttempt (see image_multimodal.go), so
-//     the parent might still complete via remaining images. We DO NOT mark
-//     the parent failed for this case — finalize-on-last-attempt already
-//     ensures progress.
+//   - TypeImageMultimodal: terminal image failure fails the guarded parent
+//     attempt; this callback retries that state write if the handler could not.
 //   - TypeKnowledgePostProcess: terminal stage; failure here strands the
 //     knowledge in "processing".
 //   - TypeManualProcess: same shape as DocumentProcess for re-indexing.
@@ -384,6 +381,7 @@ type deadLetterKnowledgePayload struct {
 // has already become "completed" and have their own status fields.
 var taskTypesAffectingKnowledgeStatus = map[string]struct{}{
 	types.TypeDocumentProcess:      {},
+	types.TypeImageMultimodal:      {},
 	types.TypeKnowledgePostProcess: {},
 	types.TypeManualProcess:        {},
 }
@@ -428,6 +426,19 @@ func newDeadLetterKnowledgeFailer(ks interfaces.KnowledgeService, tracker servic
 		// 8KB is the same cap the dead-letter row uses for last_error.
 		if len(errMsg) > 8192 {
 			errMsg = errMsg[:8192]
+		}
+		if t.Type() == types.TypeImageMultimodal {
+			updated, err := repo.FailKnowledgeParseAttempt(
+				ctx, probe.KnowledgeID, probe.Attempt, service.ImageParseFailedPublicMessage)
+			if err != nil {
+				logger.Warnf(ctx, "dead-letter callback: failed to mark image knowledge %s as failed: %v", probe.KnowledgeID, err)
+				return
+			}
+			if updated && tracker != nil && probe.Attempt > 0 {
+				tracker.FinalizeAttempt(ctx, probe.KnowledgeID, probe.Attempt,
+					types.SpanStatusFailed, nil, "MULTIMODAL_VLM_FAILED", service.ImageParseFailedPublicMessage)
+			}
+			return
 		}
 		// Single UPDATE so we never end up with parse_status=failed but
 		// stale error_message (or vice versa) when the second write
