@@ -47,7 +47,7 @@ test("public copy presents the exact lowercase musuw brand without stale names o
     assert.match(copy.meta.description, locale === "zh-CN" ? /知识|资料/ : /knowledge|sources/i);
     assert.match(allCopy, locale === "zh-CN" ? /精确引用|原文引用/ : /exact (?:source )?citations?/i);
     assert.match(allCopy, locale === "zh-CN" ? /知识图谱/ : /knowledge graph/i);
-    assert.match(allCopy, locale === "zh-CN" ? /知识复利|自动维护/ : /maintains itself|keeps? building/i);
+    assert.match(allCopy, locale === "zh-CN" ? /持续完善|持续维护/ : /keep building|keeps evolving/i);
     assert.match(allCopy, locale === "zh-CN" ? /30\+ 主流模型/ : /30\+ leading models/i);
     assert.match(allCopy, locale === "zh-CN" ? /YouTube.*抖音/ : /YouTube.*TikTok/i);
     assert.match(allCopy, locale === "zh-CN" ? /导出/ : /export/i);
@@ -60,7 +60,7 @@ test("public copy presents the exact lowercase musuw brand without stale names o
   assert.doesNotMatch(dataSource, /Jonathan Hayes|Clearframe Agency|Portivio|ClientHub/);
 });
 
-test("public capability copy follows the answer, agent, Wiki, graph, model, import, and compounding path", () => {
+test("public capability copy connects evidence, decisions, research, reading, and reuse", () => {
   const englishDefaults = collectStrings({
     benefits,
     comparisonGroups,
@@ -83,22 +83,24 @@ test("public capability copy follows the answer, agent, Wiki, graph, model, impo
     /reviewable (?:changes|knowledge|high-impact changes)|answer review|saved-answer review|review decisions|accept(?:ed)?,? or reject|accepted, rejected|review before acceptance|review contradictions|review high-impact changes|change control|visible diffs|可审查变更|可审查的重要变更|可以审核的知识|答案(?:保存与)?审核|审查决定|接受或拒绝|接受、拒绝|接受前先审核|审核相互矛盾的信息|审核高影响变化|变化控制/i,
   );
 
-  assert.match(homepageEnglish, /Agent reasoning/);
-  assert.match(homepageEnglish, /AI Wiki/);
-  assert.match(homepageEnglish, /Backlinks/);
+  assert.match(homepageEnglish, /Find and verify across sources/);
+  assert.match(homepageEnglish, /Organize papers, research notes, and evaluation plans/);
+  assert.match(homepageEnglish, /backlinks/i);
   assert.match(homepageEnglish, /30\+ leading models/);
   assert.match(homepageEnglish, /One-click web and video import/);
-  assert.match(homepageEnglish, /keep the useful answer as knowledge/i);
+  assert.match(homepageEnglish, /Keep building on what you know/);
   assert.match(homepageEnglish, /Exact citations/i);
 
   assert.doesNotMatch(homepageChinese, /RAG|Agent/);
   assert.match(homepageChinese, /智能体问答/);
-  assert.match(homepageChinese, /AI Wiki/);
+  assert.match(homepageChinese, /围绕研究问题组织论文/);
   assert.match(homepageChinese, /反向链接/);
   assert.match(homepageChinese, /30\+ 主流模型接入/);
-  assert.match(homepageChinese, /社媒文章与视频一键入库/);
-  assert.match(homepageChinese, /有用结论.*沉淀.*Wiki.*知识图谱|把有用结果留下来/);
+  assert.match(homepageChinese, /文章与视频一键入库/);
+  assert.match(homepageChinese, /在已有理解上继续积累/);
   assert.match(homepageChinese, /精确(?:原文)?引用/);
+  assert.match(homepageChinese, /人物、情节与主题/);
+  assert.doesNotMatch(homepageChinese, /找不到已有内容/);
 });
 
 test("consumer pricing presents aligned descriptions, capacity, model access, and annual savings", () => {
