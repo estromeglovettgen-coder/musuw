@@ -153,6 +153,7 @@ func TestCleanupTikHubResolvedImagesDeletesServingURLs(t *testing.T) {
 	cleanupTikHubResolvedImages(context.Background(), files, []docparser.StoredImage{
 		{ServingURL: "stored/image-one.png"},
 		{ServingURL: "  stored/image-two.png  "},
+		{ServingURL: "https://trusted.example/kept.jpg"},
 		{ServingURL: ""},
 	})
 	require.ElementsMatch(t, []string{"stored/image-one.png", "stored/image-two.png"}, files.deletedPaths)
@@ -387,7 +388,7 @@ func TestPrepareTikHubArtifactAllowsDouyinPhotoOnFreePlanWithoutVLM(t *testing.T
 	require.Contains(t, string(files.savedData), "photo.jpg")
 }
 
-func TestPrepareTikHubArtifactKeepsDocumentWhenProviderImageCannotBeStored(t *testing.T) {
+func TestPrepareTikHubArtifactFailsWhenProviderImageCannotBeStored(t *testing.T) {
 	t.Parallel()
 
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -414,10 +415,21 @@ func TestPrepareTikHubArtifactKeepsDocumentWhenProviderImageCannotBeStored(t *te
 		knowledge,
 		types.EffectiveProcessConfig{},
 	)
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "social image materialization incomplete")
 	require.True(t, handled)
-	require.Contains(t, string(files.savedData), "正文仍应入库")
-	require.NotContains(t, string(files.savedData), "127.0.0.1")
+	require.Empty(t, files.savedData, "an incomplete image post must not be persisted as a false success")
+	require.Empty(t, payload.FilePath)
+}
+
+func TestUnresolvedSocialImageURLs(t *testing.T) {
+	t.Parallel()
+
+	got := unresolvedSocialImageURLs(
+		[]string{" https://img.example/one.jpg ", "https://img.example/two.jpg", "https://img.example/two.jpg", ""},
+		[]docparser.StoredImage{{OriginalRef: "https://img.example/one.jpg"}},
+	)
+
+	require.Equal(t, []string{"https://img.example/two.jpg"}, got)
 }
 
 func TestPrepareTikHubArtifactDownloadsSocialVideoWithoutProviderBearerAndSelectsVideoPath(t *testing.T) {

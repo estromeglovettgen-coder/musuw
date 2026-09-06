@@ -18,6 +18,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/common"
 	"github.com/Tencent/WeKnora/internal/infrastructure/chunker"
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
+	"github.com/Tencent/WeKnora/internal/infrastructure/imagecodec"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -505,6 +506,22 @@ func (s *temporaryDocumentService) applyImageUnderstanding(
 func (s *temporaryDocumentService) understandImagesWithVLM(
 	ctx context.Context, vlmModelID string, images [][]byte, scanned, captionFallback bool,
 ) string {
+	// Normalize once at the temporary-upload boundary so OCR and caption reuse
+	// identical model-ready bytes. Ordinary JPEG/PNG data passes through as-is.
+	normalizedImages := make([][]byte, len(images))
+	for idx, image := range images {
+		if len(image) == 0 {
+			continue
+		}
+		normalized, _, normalizeErr := imagecodec.NormalizeHEIC(ctx, image)
+		if normalizeErr != nil {
+			logger.Warnf(ctx, "temporary document image normalization failed on image %d: %v", idx, normalizeErr)
+			continue
+		}
+		normalizedImages[idx] = normalized
+	}
+	images = normalizedImages
+
 	model, err := s.modelService.GetVLMModel(ctx, vlmModelID)
 	if err != nil {
 		logger.Warnf(ctx, "temporary document VLM model load failed: %v", err)

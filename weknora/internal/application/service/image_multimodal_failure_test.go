@@ -6,7 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -23,13 +28,72 @@ type multimodalFailureVLM struct {
 	ocrErr      error
 	captionText string
 	captionErr  error
+	seenImages  [][]byte
 }
 
-func (m *multimodalFailureVLM) Predict(_ context.Context, _ [][]byte, prompt string) (string, error) {
+func (m *multimodalFailureVLM) Predict(_ context.Context, images [][]byte, prompt string) (string, error) {
+	if len(images) > 0 {
+		m.seenImages = append(m.seenImages, append([]byte(nil), images[0]...))
+	}
 	if strings.Contains(prompt, "OCR assistant") || strings.Contains(prompt, "OCR and document layout") {
 		return m.ocrText, m.ocrErr
 	}
 	return m.captionText, m.captionErr
+}
+
+func TestImageMultimodalHandleNormalizesStoredHEICBeforeVLM(t *testing.T) {
+	jpegPath, converterDir := installMultimodalFakeHEICConverter(t)
+	t.Setenv("MUSUW_TEST_JPEG", jpegPath)
+	t.Setenv("PATH", converterDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	model := &multimodalFailureVLM{
+		ocrText:     "Readable text",
+		captionText: "A useful caption",
+	}
+	chunks := &multimodalFailureChunkService{}
+	svc := newMultimodalFailureService(model, chunks)
+	svc.fileSvc = multimodalFailureFileService{
+		data: []byte("\x00\x00\x00\x1cftypheic\x00\x00\x00\x00mif1heicmiaf"),
+	}
+
+	if err := svc.Handle(context.Background(), multimodalFailureTask(t)); err != nil {
+		t.Fatalf("Handle: %v", err)
+	}
+	if len(model.seenImages) != 2 {
+		t.Fatalf("VLM inputs = %d, want OCR and caption inputs", len(model.seenImages))
+	}
+	for i, input := range model.seenImages {
+		if _, err := jpeg.Decode(bytes.NewReader(input)); err != nil {
+			t.Fatalf("VLM input %d is not normalized JPEG: %v", i, err)
+		}
+	}
+	if len(chunks.chunks) != 2 {
+		t.Fatalf("created chunks = %d, want OCR and caption chunks", len(chunks.chunks))
+	}
+}
+
+func installMultimodalFakeHEICConverter(t *testing.T) (jpegPath, converterDir string) {
+	t.Helper()
+	dir := t.TempDir()
+	img := image.NewRGBA(image.Rect(0, 0, 200, 200))
+	for y := 0; y < 200; y++ {
+		for x := 0; x < 200; x++ {
+			img.Set(x, y, color.RGBA{R: byte(x), G: byte(y), B: 96, A: 255})
+		}
+	}
+	var encoded bytes.Buffer
+	if err := jpeg.Encode(&encoded, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("encode test JPEG: %v", err)
+	}
+	jpegPath = filepath.Join(dir, "expected.jpg")
+	if err := os.WriteFile(jpegPath, encoded.Bytes(), 0o600); err != nil {
+		t.Fatalf("write test JPEG: %v", err)
+	}
+	converter := filepath.Join(dir, "heif-convert")
+	if err := os.WriteFile(converter, []byte("#!/bin/sh\ncp \"$MUSUW_TEST_JPEG\" \"$4\"\n"), 0o700); err != nil {
+		t.Fatalf("write fake heif-convert: %v", err)
+	}
+	return jpegPath, dir
 }
 
 func (m *multimodalFailureVLM) GetModelName() string { return "multimodal-failure-test" }

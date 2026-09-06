@@ -47,7 +47,8 @@ func cleanupTikHubResolvedImages(ctx context.Context, fileSvc interfaces.FileSer
 		return
 	}
 	for _, image := range images {
-		if imagePath := strings.TrimSpace(image.ServingURL); imagePath != "" {
+		if imagePath := strings.TrimSpace(image.ServingURL); imagePath != "" &&
+			!strings.HasPrefix(imagePath, "http://") && !strings.HasPrefix(imagePath, "https://") {
 			if deleteErr := fileSvc.DeleteFile(ctx, imagePath); deleteErr != nil {
 				logger.Warnf(ctx, "Failed to clean social image after source materialization failure, path: %s, error: %v", imagePath, deleteErr)
 			}
@@ -227,9 +228,20 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 			cleanupResolvedImages = func() {
 				cleanupTikHubResolvedImages(ctx, fileSvc, resolvedImages)
 			}
-			updated, images, _ := s.imageResolver.ResolveRemoteImages(ctx, markdown, fileSvc, payload.TenantID)
-			markdown = dropUnresolvedSocialImageLines(updated, result.ImageURLs)
+			updated, images, resolveErr := s.imageResolver.ResolveRemoteImages(ctx, markdown, fileSvc, payload.TenantID)
 			resolvedImages = images
+			if resolveErr != nil {
+				cleanupResolvedImages()
+				return true, nil, fmt.Errorf("social image materialization failed: %w", resolveErr)
+			}
+			if unresolved := unresolvedSocialImageURLs(result.ImageURLs, images); len(unresolved) > 0 {
+				cleanupResolvedImages()
+				return true, nil, fmt.Errorf(
+					"social image materialization incomplete: %d image(s) unresolved",
+					len(unresolved),
+				)
+			}
+			markdown = updated
 		}
 		content = []byte(markdown)
 		if len(content) == 0 {
@@ -366,6 +378,8 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 		if deleteErr := fileSvc.DeleteFile(ctx, filePath); deleteErr != nil {
 			logger.Warnf(ctx, "Failed to clean losing social artifact, path: %s, winner: %s, error: %v", filePath, currentKnowledge.FilePath, deleteErr)
 		}
+	}
+	if !claimed {
 		cleanupResolvedImages()
 	}
 
@@ -421,22 +435,30 @@ func boundedSocialTitle(value string) string {
 	return string(runes[:maxPersistedKnowledgeTitleRunes-1]) + "…"
 }
 
-func dropUnresolvedSocialImageLines(markdown string, imageURLs []string) string {
-	lines := strings.Split(markdown, "\n")
-	kept := lines[:0]
-	for _, line := range lines {
-		drop := false
-		for _, imageURL := range imageURLs {
-			if imageURL != "" && strings.Contains(line, imageURL) {
-				drop = true
-				break
-			}
-		}
-		if !drop {
-			kept = append(kept, line)
+func unresolvedSocialImageURLs(expected []string, resolved []docparser.StoredImage) []string {
+	resolvedByURL := make(map[string]struct{}, len(resolved))
+	for _, image := range resolved {
+		if original := strings.TrimSpace(image.OriginalRef); original != "" {
+			resolvedByURL[original] = struct{}{}
 		}
 	}
-	return strings.TrimSpace(strings.Join(kept, "\n"))
+
+	seen := make(map[string]struct{}, len(expected))
+	unresolved := make([]string, 0)
+	for _, rawURL := range expected {
+		imageURL := strings.TrimSpace(rawURL)
+		if imageURL == "" {
+			continue
+		}
+		if _, duplicate := seen[imageURL]; duplicate {
+			continue
+		}
+		seen[imageURL] = struct{}{}
+		if _, ok := resolvedByURL[imageURL]; !ok {
+			unresolved = append(unresolved, imageURL)
+		}
+	}
+	return unresolved
 }
 
 func socialVideoUploadAllowed(ctx context.Context) bool {

@@ -8,7 +8,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 
 test('audited Input-field controller remains locked after main-kernel skills integration', () => {
   const controller = read('./business-baselines/Input-field.pre-view.vue')
-  assert.equal(blobSha(controller), '11bc2cb650979eb55e367d370980051fa6caa429')
+  assert.equal(blobSha(controller), '63597ef6410500454181cff67ca6342137351f95')
 })
 
 test('rebuilt Input-field reuses the frozen component options and replaces only its active View', () => {

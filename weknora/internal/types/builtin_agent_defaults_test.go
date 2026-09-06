@@ -49,6 +49,10 @@ func TestBuiltinQuickAnswerUsesUpstreamModeNameWithManagedModelDefaults(t *testi
 
 	assert.True(t, cfg.MultiTurnEnabled)
 	assert.Equal(t, 20, cfg.HistoryTurns)
+	require.NotNil(t, cfg.MemoryEnabled)
+	assert.True(t, *cfg.MemoryEnabled)
+	assert.Equal(t, "all", cfg.KBSelectionMode)
+	assert.False(t, cfg.RetrieveKBOnlyWhenMentioned)
 
 	assert.True(t, cfg.WebSearchEnabled)
 	assert.Equal(t, 5, cfg.WebSearchMaxResults)
@@ -140,6 +144,10 @@ func TestBuiltinSmartReasoningUsesUpstreamModeNameWithManagedModelDefaults(t *te
 	assert.Equal(t, 2, cfg.WebFetchTopN)
 	assert.Equal(t, "all", cfg.MCPSelectionMode)
 	assert.Equal(t, "all", cfg.SkillsSelectionMode)
+	assert.Equal(t, "all", cfg.KBSelectionMode)
+	assert.False(t, cfg.RetrieveKBOnlyWhenMentioned)
+	require.NotNil(t, cfg.MemoryEnabled)
+	assert.True(t, *cfg.MemoryEnabled)
 	assert.True(t, cfg.ImageUploadEnabled)
 	assert.True(t, cfg.AudioUploadEnabled)
 	assert.True(t, cfg.AttachmentImageUnderstanding)
@@ -155,6 +163,7 @@ func TestBuiltinSmartReasoningUsesUpstreamModeNameWithManagedModelDefaults(t *te
 	} {
 		assert.Contains(t, smart.Config.AllowedTools, tool)
 	}
+	assert.NotContains(t, cfg.AllowedTools, "search_conversations")
 	for _, writeTool := range []string{
 		"wiki_flag_issue", "wiki_update_issue", "wiki_write_page",
 		"wiki_replace_text", "wiki_rename_page", "wiki_delete_page",
@@ -183,4 +192,23 @@ func TestBuiltinAgentsUseFlashAsTheirChatModelDefault(t *testing.T) {
 		assert.Equalf(t, CheapestChatModelID, entry.Config.QueryUnderstandModelID,
 			"builtin agent %s must use V4 Flash for query understanding", entry.ID)
 	}
+}
+
+func TestSpecialistBuiltinsStayOutOfTheConsumerAgentList(t *testing.T) {
+	allIDs := GetBuiltinAgentIDs()
+	visibleIDs := GetUserVisibleBuiltinAgentIDs()
+	assert.Contains(t, allIDs, BuiltinWikiResearcherID,
+		"runtime/session compatibility must retain the specialist builtin ID")
+	assert.Contains(t, allIDs, BuiltinDataAnalystID,
+		"runtime/session compatibility must retain the specialist builtin ID")
+	assert.NotContains(t, visibleIDs, BuiltinWikiResearcherID)
+	assert.NotContains(t, visibleIDs, BuiltinDataAnalystID)
+	assert.Contains(t, visibleIDs, BuiltinQuickAnswerID)
+	assert.Contains(t, visibleIDs, BuiltinSmartReasoningID)
+	assert.True(t, IsHiddenBuiltinAgentID(BuiltinWikiResearcherID))
+	assert.True(t, IsHiddenBuiltinAgentID(BuiltinDataAnalystID))
+	assert.True(t, IsHiddenBuiltinAgentID(BuiltinWikiFixerID))
+	assert.True(t, IsHiddenBuiltinAgentID(BuiltinSkillInstallerID))
+	assert.False(t, IsHiddenBuiltinAgentID(BuiltinQuickAnswerID))
+	assert.False(t, IsHiddenBuiltinAgentID("tenant-custom-agent"))
 }

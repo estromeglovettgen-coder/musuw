@@ -56,6 +56,33 @@ func agentRequiresRerankModel(agent *types.CustomAgent) bool {
 	return false
 }
 
+// userVisibleAgentShare reports whether a share may appear in a user-facing
+// agent/share list. Hidden builtins remain valid runtime targets, so this
+// filter is deliberately applied only on list/count paths and never on direct
+// GetSharedAgentForTenant or session resolution.
+func userVisibleAgentShare(share *types.AgentShare) bool {
+	if share == nil {
+		return false
+	}
+	if types.IsHiddenBuiltinAgentID(share.AgentID) {
+		return false
+	}
+	if share.Agent != nil && types.IsHiddenBuiltinAgentID(share.Agent.ID) {
+		return false
+	}
+	return true
+}
+
+func filterUserVisibleAgentShares(shares []*types.AgentShare) []*types.AgentShare {
+	visible := make([]*types.AgentShare, 0, len(shares))
+	for _, share := range shares {
+		if userVisibleAgentShare(share) {
+			visible = append(visible, share)
+		}
+	}
+	return visible
+}
+
 // agentShareService implements AgentShareService.
 //
 // Plan 3 of #1303: visibility and access checks key on the caller's
@@ -265,12 +292,20 @@ func (s *agentShareService) ListSharesByAgent(
 	if agent.TenantID != tenantID {
 		return nil, ErrNotAgentOwner
 	}
-	return s.shareRepo.ListByAgent(ctx, agentID)
+	shares, err := s.shareRepo.ListByAgent(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+	return filterUserVisibleAgentShares(shares), nil
 }
 
 // ListSharesByOrganization lists all agent shares for an organization
 func (s *agentShareService) ListSharesByOrganization(ctx context.Context, orgID string) ([]*types.AgentShare, error) {
-	return s.shareRepo.ListByOrganization(ctx, orgID)
+	shares, err := s.shareRepo.ListByOrganization(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return filterUserVisibleAgentShares(shares), nil
 }
 
 // ListSharedAgents lists agents reachable from the caller's tenant.
@@ -283,6 +318,9 @@ func (s *agentShareService) ListSharedAgents(ctx context.Context, tenantID uint6
 	agentInfoMap := make(map[string]*types.SharedAgentInfo)
 	webSearchReadyCache := make(map[string]bool)
 	for _, share := range shares {
+		if !userVisibleAgentShare(share) {
+			continue
+		}
 		if share.SourceTenantID == tenantID {
 			continue
 		}
@@ -348,6 +386,9 @@ func (s *agentShareService) ListSharedAgentsInOrganization(ctx context.Context, 
 	result := make([]*types.OrganizationSharedAgentItem, 0, len(shares))
 	webSearchReadyCache := make(map[string]bool)
 	for _, share := range shares {
+		if !userVisibleAgentShare(share) {
+			continue
+		}
 		if share.Agent == nil {
 			continue
 		}
@@ -397,7 +438,7 @@ func (s *agentShareService) ListSharedAgentsInOrganizations(ctx context.Context,
 	}
 	byOrg := make(map[string][]*types.AgentShare)
 	for _, share := range shares {
-		if share != nil && members[share.OrganizationID] != nil {
+		if userVisibleAgentShare(share) && members[share.OrganizationID] != nil {
 			byOrg[share.OrganizationID] = append(byOrg[share.OrganizationID], share)
 		}
 	}
@@ -412,6 +453,9 @@ func (s *agentShareService) ListSharedAgentsInOrganizations(ctx context.Context,
 		tm := members[orgID]
 		result := make([]*types.OrganizationSharedAgentItem, 0, len(list))
 		for _, share := range list {
+			if !userVisibleAgentShare(share) {
+				continue
+			}
 			if share.Agent == nil {
 				continue
 			}
@@ -434,7 +478,27 @@ func (s *agentShareService) ListSharedAgentsInOrganizations(ctx context.Context,
 
 // CountByOrganizations returns share counts per organization (for list sidebar); excludes deleted agents
 func (s *agentShareService) CountByOrganizations(ctx context.Context, orgIDs []string) (map[string]int64, error) {
-	return s.shareRepo.CountByOrganizations(ctx, orgIDs)
+	// The repository count cannot apply the user-facing builtin policy without
+	// coupling persistence to presentation. Reuse its already scoped list query
+	// and count the same rows the list endpoints expose, keeping sidebar badges
+	// consistent with the actual catalog.
+	shares, err := s.shareRepo.ListByOrganizations(ctx, orgIDs)
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int64, len(orgIDs))
+	for _, orgID := range orgIDs {
+		counts[orgID] = 0
+	}
+	for _, share := range shares {
+		if userVisibleAgentShare(share) {
+			if _, ok := counts[share.OrganizationID]; !ok {
+				continue
+			}
+			counts[share.OrganizationID]++
+		}
+	}
+	return counts, nil
 }
 
 // SetSharedAgentDisabledByMe adds or removes (tenantID, agentID, sourceTenantID) from tenant_disabled_shared_agents.

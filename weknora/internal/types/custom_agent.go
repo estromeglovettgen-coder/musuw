@@ -565,15 +565,12 @@ type SuggestedQuestion struct {
 // config/builtin_agents.yaml at startup via rebuildRegistryFromConfig.
 var BuiltinAgentRegistry = map[string]func(uint64) *CustomAgent{}
 
-// builtinAgentIDsOrdered defines the fixed display order of built-in agents
-// that are exposed in the user-facing agent list (ListAgents).
-//
-// NOTE: BuiltinWikiFixerID and BuiltinSkillInstallerID are intentionally
-// excluded here. Both are internal agents invoked programmatically — the wiki
-// fixer from the Wiki editor, the skill installer from the sandbox-config skill
-// upload flow — and should not clutter the tenant's agent picker. They remain
-// fully usable via GetAgentByID because the YAML entries still register them in
-// BuiltinAgentRegistry.
+// builtinAgentIDsOrdered defines the fixed order of every built-in agent that
+// can be selected by a persisted channel/session. This is intentionally the
+// internal/all-builtin list, not the user-facing picker list. Older IM
+// channels and persisted sessions use it to distinguish a built-in agent from
+// a soft-deleted custom agent. Keep specialist IDs here so those records remain
+// visible to the runtime after they are hidden from new user-facing lists.
 var builtinAgentIDsOrdered = []string{
 	BuiltinQuickAnswerID,
 	BuiltinSmartReasoningID,
@@ -584,9 +581,53 @@ var builtinAgentIDsOrdered = []string{
 	BuiltinDocumentAssistantID,
 }
 
-// GetBuiltinAgentIDs returns all built-in agent IDs in fixed order
+// userVisibleBuiltinAgentIDsOrdered is the stable user-facing subset of the
+// built-in registry. Specialist agents are still valid runtime IDs, but must
+// not appear in tenant agent pickers or shared-agent catalogs.
+var userVisibleBuiltinAgentIDsOrdered = []string{
+	BuiltinQuickAnswerID,
+	BuiltinSmartReasoningID,
+	BuiltinDeepResearcherID,
+	BuiltinKnowledgeGraphExpertID,
+	BuiltinDocumentAssistantID,
+}
+
+// GetBuiltinAgentIDs returns all channel/session-compatible built-in IDs in
+// fixed order. Callers that build a user-facing list must use
+// GetUserVisibleBuiltinAgentIDs instead; this function remains broad for
+// compatibility with persisted sessions and IM channels.
 func GetBuiltinAgentIDs() []string {
 	return builtinAgentIDsOrdered
+}
+
+// GetUserVisibleBuiltinAgentIDs returns the built-in IDs that may be shown in
+// a tenant-facing agent picker or shared-agent catalog. The returned order is
+// stable and intentionally excludes specialist/internal builtins.
+func GetUserVisibleBuiltinAgentIDs() []string {
+	return userVisibleBuiltinAgentIDsOrdered
+}
+
+// IsHiddenBuiltinAgentID reports whether id is a built-in agent intentionally
+// omitted from user-facing lists. Known specialist/internal IDs are recognized
+// even before YAML startup; unknown/custom IDs return false so callers can
+// preserve ordinary tenant agents.
+func IsHiddenBuiltinAgentID(id string) bool {
+	// These IDs must stay hidden even before the YAML registry has been loaded
+	// (for example, in a lightweight API process or a unit test). The registry
+	// check below still hides any future specialist builtin automatically.
+	switch id {
+	case BuiltinDataAnalystID, BuiltinWikiResearcherID, BuiltinWikiFixerID, BuiltinSkillInstallerID:
+		return true
+	}
+	if !IsBuiltinAgentID(id) {
+		return false
+	}
+	for _, visibleID := range userVisibleBuiltinAgentIDsOrdered {
+		if id == visibleID {
+			return false
+		}
+	}
+	return true
 }
 
 // IsBuiltinAgentID checks if the given ID is a built-in agent ID

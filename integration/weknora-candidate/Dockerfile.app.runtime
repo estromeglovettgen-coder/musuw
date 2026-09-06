@@ -64,5 +64,8 @@ COPY --from=builder /src/skills/preloaded/ ./skills/_builtin/
 COPY --from=builder /root/.duckdb /home/appuser/.duckdb
 COPY --from=builder /src/WeKnora ./WeKnora
 
-RUN chmod +x ./WeKnora ./scripts/*.sh \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libheif-examples \
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod +x ./WeKnora ./scripts/*.sh \
     && chown -R appuser:appuser /home/appuser/.duckdb
