@@ -8,6 +8,12 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.nvmrc'
+  push:
+    branches:
+      - 'feat/storefront-knowledge-stories'
+    paths:
+      - 'storefront/**'
+      - '.github/workflows/storefront-browser.yml'
 
 permissions:
   contents: read
@@ -43,6 +49,10 @@ jobs:
       - name: Build and run storefront contracts
         id: contracts
         run: npm --prefix storefront test
+      - name: Validate Worker bundle without uploading
+        if: steps.contracts.outcome == 'success'
+        working-directory: storefront
+        run: npx wrangler deploy --dry-run --config wrangler.jsonc
       - name: Install browser
         if: always() && steps.install.outcome == 'success'
         run: npx playwright install --with-deps chromium
@@ -53,7 +63,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: storefront-browser-${{ github.event.pull_request.head.sha }}
+          name: storefront-browser-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             storefront/browser-results/
             storefront/browser-report/
