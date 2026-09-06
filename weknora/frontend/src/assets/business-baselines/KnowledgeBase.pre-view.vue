@@ -73,6 +73,7 @@ import { useMarqueeSelect } from '@/hooks/useMarqueeSelect';
 import type { ParserEngineInfo } from '@/api/system';
 import { UPLOAD_VIDEO_EXTENSIONS } from '@/views/knowledge/utils/uploadSources';
 import { isKnowledgeBaseRuntimeReady, isKnowledgeBaseStorageReady } from '@/utils/knowledgeBaseRuntime';
+import { resolveKnowledgeDisplayName } from '@/utils/knowledgeDisplayName';
 const route = useRoute();
 const { t } = useI18n();
 const kbId = computed(() => (route.params as any).kbId as string || '');
@@ -1303,8 +1304,10 @@ type KnowledgeCard = {
   display_name?: string;
   title?: string;
   type?: string;
+  source?: string;
   updated_at?: string;
   file_type?: string;
+  file_size?: number | string;
   isMore?: boolean;
   metadata?: any;
   error_message?: string;
@@ -1339,6 +1342,7 @@ const updateStatus = (analyzeList: KnowledgeCard[]) => {
         (result.data as KnowledgeCard[]).forEach((item: KnowledgeCard) => {
           const index = cardList.value.findIndex(card => card.id == item.id);
           if (index == -1) return;
+          const card = cardList.value[index];
 
           let parseStatus = item.parse_status;
           if (pendingReparseAck.value.has(item.id)) {
@@ -1349,18 +1353,46 @@ const updateStatus = (analyzeList: KnowledgeCard[]) => {
             }
           }
 
-          if (cardList.value[index].parse_status !== parseStatus ||
-            cardList.value[index].summary_status !== item.summary_status ||
-            cardList.value[index].description !== item.description) {
+          const nextTitle = typeof item.title === 'string' ? item.title : card.title;
+          const nextSource = typeof item.source === 'string' ? item.source : card.source;
+          const nextOriginalFileName = typeof item.file_name === 'string'
+            ? item.file_name
+            : card.original_file_name;
+          const nextDisplayName = resolveKnowledgeDisplayName({
+            ...item,
+            title: nextTitle,
+            source: nextSource,
+            file_name: nextOriginalFileName,
+          }, t('knowledgeBase.untitledDocument'));
+          const nextFileType = typeof item.file_type === 'string'
+            ? item.file_type.toLocaleUpperCase()
+            : card.file_type;
+          const nextFileSize = item.file_size ?? card.file_size;
+
+          if (card.parse_status !== parseStatus ||
+            card.summary_status !== item.summary_status ||
+            card.description !== item.description ||
+            card.title !== nextTitle ||
+            card.display_name !== nextDisplayName ||
+            card.original_file_name !== nextOriginalFileName ||
+            card.file_type !== nextFileType ||
+            card.file_size !== nextFileSize) {
             shouldRefreshWikiStatus ||= shouldRefreshWikiStatusAfterKnowledgePoll(
-              cardList.value[index],
+              card,
               { ...item, parse_status: parseStatus },
             );
 
             // Always update the card data
-            cardList.value[index].parse_status = parseStatus;
-            cardList.value[index].summary_status = item.summary_status;
-            cardList.value[index].description = item.description;
+            card.parse_status = parseStatus;
+            card.summary_status = item.summary_status;
+            card.description = item.description;
+            card.title = nextTitle;
+            card.source = nextSource;
+            card.original_file_name = nextOriginalFileName;
+            card.display_name = nextDisplayName;
+            card.file_name = nextDisplayName;
+            card.file_type = nextFileType;
+            card.file_size = nextFileSize;
             delete traceAvailableById[item.id];
             hasChanges = true;
           }
