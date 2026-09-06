@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft } from "@phosphor-icons/react/ArrowLeft";
 import { BookOpenText } from "@phosphor-icons/react/BookOpenText";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
@@ -165,18 +166,22 @@ function WikiReader({ copy, stage, sourceId, onSource }) {
 
 function WikiProductSurface({ copy, flow, locale }) {
   const stage = flow?.stage ?? "page";
+  const hostRef = useRef(null);
   const [manualSource, setManualSource] = useState(null);
   useEffect(() => { if (!flow?.inView) setManualSource(null); }, [flow?.inView, copy]);
   const autoSource = !flow?.paused && ["source-open", "focus-source"].includes(stage) ? copy.sourceIds[0] : null;
   const sourceId = manualSource || autoSource;
   const openSource = (id) => { flow?.pause?.(); setManualSource(id); };
   const closeSource = () => { setManualSource(null); flow?.resume?.(); };
+  // Keep evidence readable outside the template's mobile product scale.
+  const portalHost = hostRef.current?.closest('[data-wiki-camera="true"]');
+  const source = <DemoSourcePreview sourceId={sourceId} locale={locale} onClose={closeSource} />;
   return (
-    <div className="wiki-browser kb-preview-wiki-browser" data-wiki-flow-state={stage}>
+    <div className="wiki-browser kb-preview-wiki-browser" data-wiki-flow-state={stage} ref={hostRef}>
       <WikiSidebar copy={copy} />
       <div className="wiki-content kb-preview-wiki-content">
         <WikiReader copy={copy} stage={stage} sourceId={sourceId} onSource={openSource} />
-        <DemoSourcePreview sourceId={sourceId} locale={locale} onClose={closeSource} />
+        {sourceId && portalHost ? createPortal(source, portalHost) : source}
       </div>
     </div>
   );
@@ -310,7 +315,7 @@ export function KnowledgeBaseProductPreview({ graphAutoPlay = false, locale = "e
     if (stage === "page") { setOrigin("50% 50%"); return; }
     if (stage !== "source-open") return;
     const root = viewportRef.current;
-    const surface = root?.querySelector(".kb-product-preview");
+    const surface = root?.querySelector('[data-wiki-camera="true"]');
     const panel = root?.querySelector(".demo-source-preview");
     if (!surface || !panel) return;
     const bounds = surface.getBoundingClientRect();
@@ -318,17 +323,26 @@ export function KnowledgeBaseProductPreview({ graphAutoPlay = false, locale = "e
     if (bounds.width && bounds.height) setOrigin(`${((rect.left + rect.width / 2 - bounds.left) / bounds.width) * 100}% ${((rect.top + rect.height / 2 - bounds.top) / bounds.height) * 100}%`);
   }, [view, stage, locale]);
   const camera = view === "wiki" ? wikiCamera(stage, Boolean(wikiFlow?.reducedMotion), origin) : { scale: 1, x: 0, y: 0, transformOrigin: "50% 50%" };
+  const surface = (
+    <>
+      <ProductSidebar copy={viewCopy.app} />
+      <main className={`visual-knowledge-page kb-preview-knowledge-page ${view === "graph" ? "is-graph-tab" : ""}`}>
+        <KnowledgeHeader active={view} copy={viewCopy.header} />
+        <section className="visual-knowledge-wiki-host kb-preview-wiki-host">
+          {view === "wiki" ? <WikiProductSurface copy={viewCopy.content} flow={wikiFlow} locale={locale} /> : <GraphProductSurface autoPlay={graphAutoPlay} copy={viewCopy.content} />}
+        </section>
+      </main>
+    </>
+  );
   return (
     <div className={`kb-product-preview-viewport kb-product-preview-${view}`} data-capability-demo={view} data-demo-phase={view === "wiki" ? stage : "obsidian-directed"} data-product-page-shell={view} ref={attachRef} style={{ position: "relative", overflow: "hidden" }}>
-      <motion.div className="kb-product-preview" animate={{ scale: camera.scale, x: camera.x, y: camera.y }} initial={false} transition={{ type: "spring", stiffness: 110, damping: 24, mass: 0.85 }} style={{ transformOrigin: camera.transformOrigin }}>
-        <ProductSidebar copy={viewCopy.app} />
-        <main className={`visual-knowledge-page kb-preview-knowledge-page ${view === "graph" ? "is-graph-tab" : ""}`}>
-          <KnowledgeHeader active={view} copy={viewCopy.header} />
-          <section className="visual-knowledge-wiki-host kb-preview-wiki-host">
-            {view === "wiki" ? <WikiProductSurface copy={viewCopy.content} flow={wikiFlow} locale={locale} /> : <GraphProductSurface autoPlay={graphAutoPlay} copy={viewCopy.content} />}
-          </section>
-        </main>
-      </motion.div>
+      {view === "wiki" ? (
+        <motion.div data-wiki-camera="true" className="kb-preview-wiki-camera" animate={{ scale: camera.scale, x: camera.x, y: camera.y }} initial={false} transition={{ type: "spring", stiffness: 110, damping: 24, mass: 0.85 }} style={{ transformOrigin: camera.transformOrigin }}>
+          <div className="kb-product-preview">{surface}</div>
+        </motion.div>
+      ) : (
+        <motion.div className="kb-product-preview" animate={{ scale: camera.scale, x: camera.x, y: camera.y }} initial={false} transition={{ type: "spring", stiffness: 110, damping: 24, mass: 0.85 }} style={{ transformOrigin: camera.transformOrigin }}>{surface}</motion.div>
+      )}
       {view === "wiki" ? <DemoPointer stage={stage} reducedMotion={Boolean(wikiFlow?.reducedMotion)} rootRef={viewportRef} paused={wikiFlow?.paused} /> : null}
     </div>
   );
