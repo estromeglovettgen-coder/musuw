@@ -221,7 +221,10 @@ func (v *RemoteAPIVLM) Predict(ctx context.Context, imgBytesList [][]byte, promp
 	// Add images
 	for _, imgBytes := range imgBytesList {
 		if len(imgBytes) > 0 {
-			mimeType := detectImageMIME(imgBytes)
+			mimeType, err := detectImageMIME(imgBytes)
+			if err != nil {
+				return "", err
+			}
 			b64 := base64.StdEncoding.EncodeToString(imgBytes)
 			dataURI := fmt.Sprintf("data:%s;base64,%s", mimeType, b64)
 			parts = append(parts, openai.ChatMessagePart{
@@ -591,11 +594,15 @@ func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
 	return decoded.ChatCompletionResponse, nil
 }
 
-// detectImageMIME returns the MIME type for the given image bytes.
-func detectImageMIME(data []byte) string {
+// detectImageMIME accepts only the image formats supported by the shared
+// OpenAI-compatible image_url contract. Unknown bytes must never be relabelled
+// as PNG: providers correctly reject a data URI whose MIME and bytes disagree.
+func detectImageMIME(data []byte) (string, error) {
 	ct := http.DetectContentType(data)
-	if strings.HasPrefix(ct, "image/") {
-		return ct
+	switch ct {
+	case "image/png", "image/jpeg", "image/webp", "image/gif":
+		return ct, nil
+	default:
+		return "", fmt.Errorf("unsupported image format: %s", ct)
 	}
-	return "image/png"
 }

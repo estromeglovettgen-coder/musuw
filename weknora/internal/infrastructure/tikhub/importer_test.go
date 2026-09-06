@@ -677,6 +677,39 @@ func TestNormalizeTikTokIgnoresCoverAndSupportsPhotoPost(t *testing.T) {
 	}
 }
 
+func TestNormalizeDouyinPrefersStandardImageRendition(t *testing.T) {
+	t.Parallel()
+
+	vvicURL := "https://p26-sign.douyinpic.com/photo_vvic~tplv-origin.image?x-signature=vvic"
+	jpegURL := "https://p3-sign.douyinpic.com/photo~tplv-aweme:q80.jpeg?x-signature=jpeg"
+	webpURL := "https://p3-sign.douyinpic.com/photo~tplv-water:q80.webp?x-signature=webp"
+	result, err := normalizeDocument(PlatformDouyin, "", map[string]any{
+		"aweme_detail": map[string]any{
+			"desc": "photo post",
+			"images": []any{map[string]any{
+				"url":               vvicURL,
+				"url_list":          []any{vvicURL, jpegURL},
+				"download_url_list": []any{webpURL},
+			}},
+		},
+	}, false)
+	if err != nil {
+		t.Fatalf("normalizeDocument() error = %v", err)
+	}
+	if len(result.ImageURLs) != 1 || result.ImageURLs[0] != jpegURL {
+		t.Fatalf("image URLs = %#v, want compatible JPEG rendition", result.ImageURLs)
+	}
+}
+
+func TestFirstImageURLKeepsProviderFallbackWhenNoStandardRenditionExists(t *testing.T) {
+	t.Parallel()
+
+	want := "https://images.example/photo"
+	if got := firstImageURL(map[string]any{"url_list": []any{want}}); got != want {
+		t.Fatalf("firstImageURL() = %q, want fallback %q", got, want)
+	}
+}
+
 func TestTikHubImporterRejectsMalformedResponsesWithoutRetry(t *testing.T) {
 	t.Parallel()
 

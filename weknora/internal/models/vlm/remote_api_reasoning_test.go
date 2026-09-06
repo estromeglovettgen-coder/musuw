@@ -46,7 +46,7 @@ func TestRemoteAPIVLMPredictDisablesOpenRouterReasoning(t *testing.T) {
 		t.Fatalf("NewRemoteAPIVLM: %v", err)
 	}
 
-	if _, err := model.Predict(context.Background(), [][]byte{[]byte("tiny-image")}, "Describe it"); err != nil {
+	if _, err := model.Predict(context.Background(), [][]byte{testPNG}, "Describe it"); err != nil {
 		t.Fatalf("Predict: %v", err)
 	}
 	if _, ok := requestBody["reasoning_effort"]; ok {
@@ -86,7 +86,7 @@ func TestRemoteAPIVLMPredictDoesNotAddReasoningForOpenAI(t *testing.T) {
 		t.Fatalf("NewRemoteAPIVLM: %v", err)
 	}
 
-	if _, err := model.Predict(context.Background(), [][]byte{[]byte("tiny-image")}, "Describe it"); err != nil {
+	if _, err := model.Predict(context.Background(), [][]byte{testPNG}, "Describe it"); err != nil {
 		t.Fatalf("Predict: %v", err)
 	}
 	if _, ok := requestBody["reasoning"]; ok {
@@ -209,6 +209,35 @@ func newVLMChatTestServer(t *testing.T, lastRequest *map[string]interface{}) *ht
 
 // testPNG is a minimal byte slice that http.DetectContentType reports as a PNG.
 var testPNG = []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 16))
+
+func TestRemoteAPIVLMPredictRejectsUnknownImageBeforeRequest(t *testing.T) {
+	withVLMSSRFWhitelist(t, "127.0.0.1")
+
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"unexpected"}}]}`))
+	}))
+	defer server.Close()
+
+	v, err := NewRemoteAPIVLM(&Config{
+		BaseURL:   server.URL,
+		ModelName: "gpt-4o",
+		APIKey:    "sk-test",
+	})
+	if err != nil {
+		t.Fatalf("NewRemoteAPIVLM: %v", err)
+	}
+
+	_, err = v.Predict(t.Context(), [][]byte{[]byte("not an image")}, "extract the text")
+	if err == nil || !strings.Contains(err.Error(), "unsupported image format") {
+		t.Fatalf("Predict error = %v, want unsupported image format", err)
+	}
+	if requests != 0 {
+		t.Fatalf("provider requests = %d, want 0", requests)
+	}
+}
 
 // TestRemoteAPIVLMSendsMaxCompletionTokensForReasoningModel is the regression
 // test for issue #2537: with a GPT-5 / o-series vision model, every OCR and
