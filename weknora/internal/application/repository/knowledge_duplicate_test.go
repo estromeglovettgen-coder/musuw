@@ -157,7 +157,10 @@ func TestCreateURLKnowledgeIfAbsentSerializesConcurrentClaims(t *testing.T) {
 	assert.Equal(t, first.knowledge.ID, second.knowledge.ID)
 	var count int64
 	require.NoError(t, db.Model(&types.Knowledge{}).
-		Where("tenant_id = ? AND knowledge_base_id = ? AND file_hash = ?", tenantID, kbID, "social:youtube:dQw4w9WgXcQ").
+		Where(
+			"tenant_id = ? AND knowledge_base_id = ? AND file_hash = ?",
+			tenantID, kbID, "social:youtube:dQw4w9WgXcQ",
+		).
 		Count(&count).Error)
 	assert.Equal(t, int64(1), count)
 }

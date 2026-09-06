@@ -246,11 +246,11 @@ func (r *concurrentSocialClaimRepo) CreateURLKnowledgeIfAbsent(
 	defer r.mu.Unlock()
 	r.claims++
 	if r.winner != nil {
-		copy := *r.winner
-		return &copy, false, nil
+		winnerCopy := *r.winner
+		return &winnerCopy, false, nil
 	}
-	copy := *knowledge
-	r.winner = &copy
+	winnerCopy := *knowledge
+	r.winner = &winnerCopy
 	return knowledge, true, nil
 }
 
