@@ -517,6 +517,30 @@ func (r *knowledgeRepository) UpdateKnowledge(ctx context.Context, knowledge *ty
 	return err
 }
 
+// UpdateURLKnowledgeTitleIfAutomatic publishes a parser/model title without
+// racing a manual rename. The source comparison is part of the UPDATE itself,
+// so a title chosen after parsing began always wins.
+func (r *knowledgeRepository) UpdateURLKnowledgeTitleIfAutomatic(
+	ctx context.Context,
+	tenantID uint64,
+	id string,
+	source string,
+	title string,
+) (bool, error) {
+	if tenantID == 0 || strings.TrimSpace(id) == "" || strings.TrimSpace(source) == "" || strings.TrimSpace(title) == "" {
+		return false, nil
+	}
+	result := r.db.WithContext(ctx).
+		Model(&types.Knowledge{}).
+		Where("tenant_id = ? AND id = ? AND type = ? AND source = ?", tenantID, id, "url", source).
+		Where("title IS NULL OR title = '' OR title = ?", source).
+		Updates(map[string]interface{}{
+			"title":      common.CleanInvalidUTF8(title),
+			"updated_at": time.Now(),
+		})
+	return result.RowsAffected > 0, result.Error
+}
+
 // UpdateKnowledgeWithStorage updates a knowledge row and applies the delta
 // between its persisted and proposed source-plus-index contributions under the
 // same tenant lock. A positive delta is checked against effectiveQuota with an

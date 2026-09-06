@@ -257,6 +257,7 @@ func (s *ImageMultimodalService) Handle(ctx context.Context, task *asynq.Task) e
 		OriginalURL: payload.ImageURL,
 	}
 
+	var ocrErr error
 	if payload.EnableOCR {
 		prompt := vlmOCRPrompt
 		if payload.ImageSourceType == "scanned_pdf" {
@@ -268,7 +269,8 @@ func (s *ImageMultimodalService) Handle(ctx context.Context, task *asynq.Task) e
 		}
 		prompt = types.AppendCustomPromptInstructions(prompt, vlmCfg.CustomInstructions, "image_ocr")
 
-		ocrText, ocrErr := vlmModel.Predict(ctx, [][]byte{imgBytes}, prompt)
+		ocrText, err := vlmModel.Predict(ctx, [][]byte{imgBytes}, prompt)
+		ocrErr = err
 		if ocrErr != nil {
 			logger.Warnf(ctx, "[ImageMultimodal] OCR failed for %s: %v", payload.ImageURL, ocrErr)
 			imgOut["ocr_error"] = ocrErr.Error()
@@ -336,6 +338,16 @@ func (s *ImageMultimodalService) Handle(ctx context.Context, task *asynq.Task) e
 	imgOut["chunks_created"] = len(newChunks)
 
 	if len(newChunks) == 0 {
+		// An image with no recognizable text is a valid result when the VLM
+		// answered normally (for example, a decorative photo). In contrast,
+		// two provider errors mean the image was never analyzed. Return the
+		// combined error so Asynq's existing bounded retry can recover a
+		// transient upstream failure; the final retry still reaches the
+		// deferred pending-counter finalizer.
+		if ocrErr != nil && capErr != nil {
+			handleErr = fmt.Errorf("image multimodal extraction failed: %w", errors.Join(ocrErr, capErr))
+			return handleErr
+		}
 		// Deferred finalize will count this image on success.
 		imgOut["skipped"] = "no_extracted_content"
 		return nil

@@ -302,6 +302,15 @@ type KnowledgeRepository interface {
 		tenantID uint64, kbID string, page *types.Pagination, filter types.KnowledgeListFilter,
 	) ([]*types.Knowledge, int64, error)
 	UpdateKnowledge(ctx context.Context, knowledge *types.Knowledge) error
+	// UpdateURLKnowledgeTitleIfAutomatic atomically replaces an empty/source URL
+	// title while preserving a title that another writer has already chosen.
+	UpdateURLKnowledgeTitleIfAutomatic(
+		ctx context.Context,
+		tenantID uint64,
+		id string,
+		source string,
+		title string,
+	) (bool, error)
 	// UpdateKnowledgeWithStorage updates a knowledge row and applies the
 	// persisted-to-new contribution delta atomically with tenant usage.
 	UpdateKnowledgeWithStorage(ctx context.Context, knowledge *types.Knowledge, effectiveQuota int64) error

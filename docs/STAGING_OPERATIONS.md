@@ -116,8 +116,9 @@ known hosts 上传 manifest-backed source，并让远端 root gate 调用冻结 
 TikHub 首次安装或轮换后，还要用一个受支持的公开社交作品 URL 做真实 staging
 验收。任务必须从 `processing`/`finalizing` 到 `completed`，持久化为现有 Markdown
 或视频文件并产生可检索分块；页面和数据库均不能继续显示
-`Social link import is not configured`。供应商调用不自动重试，只有操作者明确点击
-重新解析才可再次调用。证据只记录平台类别、终态、文件类型、分块计数、耗时和
+`Social link import is not configured`。对于 TikHub 或其媒体/存储链路的瞬时失败，现有文档任务
+最多自动重投一次；确定性的配置、路由、格式、大小和安全校验失败不重投。源文件
+一旦持久化，后续任务重试只复用已保存的文件，不再次计费调用 TikHub。证据只记录平台类别、终态、文件类型、分块计数、耗时和
 脱敏 request ID，不记录原始分享文本、完整 URL、响应体、签名媒体地址或密钥。
 
 上线前逐项确认：

@@ -85,7 +85,9 @@ func TestVideoURLSourcePathRejectsNestedResourceHandle(t *testing.T) {
 
 type videoIngestionRepoStub struct {
 	interfaces.KnowledgeRepository
-	updates []types.Knowledge
+	updates                    []types.Knowledge
+	automaticTitleUpdates      []string
+	rejectAutomaticTitleUpdate bool
 }
 
 func (s *videoIngestionRepoStub) UpdateKnowledge(_ context.Context, knowledge *types.Knowledge) error {
@@ -180,6 +182,9 @@ func TestConvertVideoUsesFixedModelAndSignedURLWithoutReadingObject(t *testing.T
 	fileSvc := &videoIngestionFileServiceStub{url: "https://objects.example.test/source.mp4?signature=short"}
 	svc, _, models := newVideoIngestionService(model, fileSvc)
 	payload, kb, knowledge := videoIngestionFixture(300_000_000)
+	knowledge.Type = "url"
+	knowledge.Source = "https://www.instagram.com/reel/example/"
+	knowledge.Title = knowledge.Source
 
 	result, err := svc.convertVideo(
 		types.WithTaskRetryMetadata(context.Background(), 0, 3),
@@ -196,6 +201,9 @@ func TestConvertVideoUsesFixedModelAndSignedURLWithoutReadingObject(t *testing.T
 	}
 	if result == nil || result.MarkdownContent != "# Parsed video" {
 		t.Fatalf("result = %#v", result)
+	}
+	if result.Metadata["title"] != "Parsed video" {
+		t.Fatalf("analysis title = %q, want %q", result.Metadata["title"], "Parsed video")
 	}
 	if models.requestedID != defaultVideoModelID {
 		t.Fatalf("requested model = %q, want %q", models.requestedID, defaultVideoModelID)

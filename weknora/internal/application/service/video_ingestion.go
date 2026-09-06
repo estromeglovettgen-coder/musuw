@@ -248,11 +248,19 @@ func (s *knowledgeService) convertVideo(
 	s.endStage(ctx, knowledge.ID, types.StageDocReader, types.JSONMap{
 		"text_length": len(markdown),
 	})
+	metadata := map[string]string{
+		"source_type": "video",
+	}
+	// The video understanding prompt already requires the first line to be a
+	// concise Markdown heading. Expose that same analysis output to the common
+	// URL-title update path instead of issuing a second model request or copying
+	// a provider caption into the knowledge title.
+	if title := conciseAnalysisTitle(markdown); title != "" {
+		metadata["title"] = title
+	}
 	return &types.ReadResult{
 		MarkdownContent: markdown,
-		Metadata: map[string]string{
-			"source_type": "video",
-		},
+		Metadata:        metadata,
 	}, nil
 }
 
