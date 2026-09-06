@@ -1,8 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"image/jpeg"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -45,17 +48,68 @@ type promptAwareVLM struct {
 	mu           sync.Mutex
 	ocrCalls     int
 	captionCalls int
+	seenImages   [][]byte
 }
 
-func (f *promptAwareVLM) Predict(_ context.Context, _ [][]byte, prompt string) (string, error) {
+func (f *promptAwareVLM) Predict(_ context.Context, images [][]byte, prompt string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if len(images) > 0 {
+		f.seenImages = append(f.seenImages, append([]byte(nil), images[0]...))
+	}
 	if strings.Contains(prompt, "description of the main content") {
 		f.captionCalls++
 		return f.captionResponse, nil
 	}
 	f.ocrCalls++
 	return f.ocrResponse, nil
+}
+
+func TestUnderstandImagesWithVLMNormalizesHEICBeforeOCRAndCaption(t *testing.T) {
+	jpegPath, converterDir := installMultimodalFakeHEICConverter(t)
+	t.Setenv("MUSUW_TEST_JPEG", jpegPath)
+	t.Setenv("PATH", converterDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	fv := &promptAwareVLM{
+		ocrResponse:     "No text content.",
+		captionResponse: "a useful image description",
+	}
+	svc := &temporaryDocumentService{modelService: &fakeVLMModelService{model: fv}}
+	heic := []byte("\x00\x00\x00\x1cftypheic\x00\x00\x00\x00mif1heicmiaf")
+
+	got := svc.understandImagesWithVLM(context.Background(), "fake", [][]byte{heic}, false, true)
+	if !strings.Contains(got, "a useful image description") {
+		t.Fatalf("normalized image was not described: %q", got)
+	}
+	if len(fv.seenImages) != 2 {
+		t.Fatalf("VLM inputs = %d, want OCR and caption", len(fv.seenImages))
+	}
+	for idx, input := range fv.seenImages {
+		if _, err := jpeg.Decode(bytes.NewReader(input)); err != nil {
+			t.Fatalf("VLM input %d is not JPEG: %v", idx, err)
+		}
+	}
+}
+
+func TestUnderstandImagesWithVLMLeavesJPEGUntouched(t *testing.T) {
+	jpegPath, _ := installMultimodalFakeHEICConverter(t)
+	jpegData, err := os.ReadFile(jpegPath)
+	if err != nil {
+		t.Fatalf("read test JPEG: %v", err)
+	}
+	// A regular JPEG must not require the optional HEIC converter.
+	t.Setenv("PATH", t.TempDir())
+
+	fv := &promptAwareVLM{ocrResponse: strings.Repeat("readable text ", 4)}
+	svc := &temporaryDocumentService{modelService: &fakeVLMModelService{model: fv}}
+	svc.understandImagesWithVLM(context.Background(), "fake", [][]byte{jpegData}, false, true)
+
+	if len(fv.seenImages) != 1 {
+		t.Fatalf("VLM inputs = %d, want one OCR input", len(fv.seenImages))
+	}
+	if !bytes.Equal(fv.seenImages[0], jpegData) {
+		t.Fatal("ordinary JPEG bytes changed during image normalization")
+	}
 }
 
 func (f *promptAwareVLM) GetModelName() string { return "prompt-aware-vlm" }

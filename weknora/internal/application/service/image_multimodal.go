@@ -12,6 +12,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/application/service/retriever"
+	"github.com/Tencent/WeKnora/internal/infrastructure/imagecodec"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/utils/ollama"
 	"github.com/Tencent/WeKnora/internal/models/vlm"
@@ -251,6 +252,19 @@ func (s *ImageMultimodalService) Handle(ctx context.Context, task *asynq.Task) e
 		return nil
 	}
 	imgOut["image_bytes"] = len(imgBytes)
+	normalizedBytes, normalizedHEIC, normalizeErr := imagecodec.NormalizeHEIC(ctx, imgBytes)
+	if normalizeErr != nil {
+		handleErr = fmt.Errorf("normalize HEIC image: %w", normalizeErr)
+		imgOut["normalization_error"] = normalizeErr.Error()
+		return handleErr
+	}
+	if normalizedHEIC {
+		imgOut["source_image_bytes"] = len(imgBytes)
+		imgOut["normalized_format"] = "image/jpeg"
+		imgOut["normalized_image_bytes"] = len(normalizedBytes)
+		imgBytes = normalizedBytes
+		imgOut["image_bytes"] = len(imgBytes)
+	}
 
 	imageInfo := types.ImageInfo{
 		URL:         payload.ImageURL,

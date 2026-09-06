@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/infrastructure/imagecodec"
 	"github.com/Tencent/WeKnora/internal/searchutil"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
 
@@ -199,7 +200,9 @@ func (r *ImageResolver) saveReferencedImage(
 	}
 
 	fileName := uuid.New().String() + ext
-	servingURL, saveErr := fileSvc.SaveBytes(ctx, ref.ImageData, tenantID, fileName, false)
+	servingURL, storedMIME, saveErr := saveNormalizedImageBytes(
+		ctx, fileSvc, ref.ImageData, tenantID, fileName, ref.MimeType,
+	)
 	if saveErr != nil {
 		log.Printf("WARN: failed to save image %s: %v", refPath, saveErr)
 		return StoredImage{}, false
@@ -208,13 +211,33 @@ func (r *ImageResolver) saveReferencedImage(
 	stored := StoredImage{
 		OriginalRef: refPath,
 		ServingURL:  servingURL,
-		MimeType:    ref.MimeType,
+		MimeType:    storedMIME,
 	}
 	savedRefs[refPath] = stored
 	if ref.Filename != "" {
 		savedRefs["__filename__:"+ref.Filename] = stored
 	}
 	return stored, true
+}
+
+func saveNormalizedImageBytes(
+	ctx context.Context,
+	fileSvc interfaces.FileService,
+	data []byte,
+	tenantID uint64,
+	fileName string,
+	mimeType string,
+) (string, string, error) {
+	normalized, convertedHEIC, err := imagecodec.NormalizeHEIC(ctx, data)
+	if err != nil {
+		return "", "", err
+	}
+	if convertedHEIC {
+		mimeType = "image/jpeg"
+		fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName)) + ".jpg"
+	}
+	servingURL, err := fileSvc.SaveBytes(ctx, normalized, tenantID, fileName, false)
+	return servingURL, mimeType, err
 }
 
 func extFromMime(mime string) string {
@@ -392,7 +415,9 @@ func (r *ImageResolver) ResolveHTMLDataURIImages(
 			ext = ".png"
 		}
 		fileName := uuid.New().String() + ext
-		servingURL, saveErr := fileSvc.SaveBytes(ctx, data, tenantID, fileName, false)
+		servingURL, storedMIME, saveErr := saveNormalizedImageBytes(
+			ctx, fileSvc, data, tenantID, fileName, mimeType,
+		)
 		if saveErr != nil {
 			log.Printf("WARN: failed to save HTML img data URI image: %v", saveErr)
 			continue
@@ -400,7 +425,7 @@ func (r *ImageResolver) ResolveHTMLDataURIImages(
 		images = append(images, StoredImage{
 			OriginalRef: "html-img-data-uri",
 			ServingURL:  servingURL,
-			MimeType:    mimeType,
+			MimeType:    storedMIME,
 		})
 		markdown = markdown[:m[0]] + fmt.Sprintf("![image](%s)", servingURL) + markdown[m[1]:]
 		processed++
@@ -531,7 +556,9 @@ func (r *ImageResolver) resolveBareDataURIs(
 			ext = ".png"
 		}
 		fileName := uuid.New().String() + ext
-		servingURL, saveErr := fileSvc.SaveBytes(ctx, data, tenantID, fileName, false)
+		servingURL, storedMIME, saveErr := saveNormalizedImageBytes(
+			ctx, fileSvc, data, tenantID, fileName, mimeType,
+		)
 		if saveErr != nil {
 			log.Printf("WARN: failed to save bare data URI image: %v", saveErr)
 			continue
@@ -539,7 +566,7 @@ func (r *ImageResolver) resolveBareDataURIs(
 		images = append(images, StoredImage{
 			OriginalRef: "bare-data-uri",
 			ServingURL:  servingURL,
-			MimeType:    mimeType,
+			MimeType:    storedMIME,
 		})
 		if insideWrapper {
 			// Inside a broken markdown ref like ![weird]alt](data:...) — replace data URI only
@@ -599,7 +626,9 @@ func (r *ImageResolver) resolveBareBase64Prefix(
 			ext = ".png"
 		}
 		fileName := uuid.New().String() + ext
-		servingURL, saveErr := fileSvc.SaveBytes(ctx, data, tenantID, fileName, false)
+		servingURL, storedMIME, saveErr := saveNormalizedImageBytes(
+			ctx, fileSvc, data, tenantID, fileName, mimeType,
+		)
 		if saveErr != nil {
 			log.Printf("WARN: failed to save bare base64 image: %v", saveErr)
 			continue
@@ -607,7 +636,7 @@ func (r *ImageResolver) resolveBareBase64Prefix(
 		images = append(images, StoredImage{
 			OriginalRef: "bare-base64",
 			ServingURL:  servingURL,
-			MimeType:    mimeType,
+			MimeType:    storedMIME,
 		})
 		markdown = markdown[:m[0]] + fmt.Sprintf("![image](%s)", servingURL) + markdown[m[1]:]
 		processed++
@@ -731,7 +760,9 @@ func (r *ImageResolver) ResolveDataURIImages(
 			ext = ".png"
 		}
 		fileName := uuid.New().String() + ext
-		servingURL, saveErr := fileSvc.SaveBytes(ctx, data, tenantID, fileName, false)
+		servingURL, storedMIME, saveErr := saveNormalizedImageBytes(
+			ctx, fileSvc, data, tenantID, fileName, mimeType,
+		)
 		if saveErr != nil {
 			log.Printf("WARN: failed to save data URI image: %v", saveErr)
 			continue
@@ -739,7 +770,7 @@ func (r *ImageResolver) ResolveDataURIImages(
 		images = append(images, StoredImage{
 			OriginalRef: dataURI,
 			ServingURL:  servingURL,
-			MimeType:    mimeType,
+			MimeType:    storedMIME,
 		})
 		markdown = markdown[:m[4]] + servingURL + markdown[m[5]:]
 		processed++
@@ -791,12 +822,19 @@ func fetchAndStoreRemoteImage(
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)
 	}
+	data, normalizedHEIC, err := imagecodec.NormalizeHEIC(ctx, data)
+	if err != nil {
+		return nil, fmt.Errorf("normalize HEIC: %w", err)
+	}
+	if normalizedHEIC {
+		mimeType = "image/jpeg"
+	}
 
 	if isIconImage(data) {
 		return nil, errRemoteImageIsIcon
 	}
 
-	if whitelisted {
+	if whitelisted && !normalizedHEIC {
 		return &remoteImageResult{MimeType: mimeType, KeepOriginalURL: true}, nil
 	}
 
@@ -1057,6 +1095,10 @@ func downloadImage(ctx context.Context, client *http.Client, remoteURL string) (
 		detected := http.DetectContentType(body)
 		if strings.HasPrefix(detected, "image/") {
 			mimeType = detected
+		} else if imagecodec.IsHEIC(body) {
+			// Go's generic sniffer does not recognize HEIC. Accept the verified
+			// ISO-BMFF brand here so the shared normalizer can convert it.
+			mimeType = "image/heic"
 		} else {
 			return nil, "", fmt.Errorf("downloaded data is not an image (sniffed: %s)", detected)
 		}
