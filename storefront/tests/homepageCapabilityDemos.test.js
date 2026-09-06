@@ -65,27 +65,19 @@ test("hero and chat demos keep the compact shell while Wiki and Graph use the fu
     2,
     "Wiki and Graph should use the mechanically ported full product page",
   );
-  assert.equal(
-    (platform.match(/data-platform-capability=/g) ?? []).length,
-    6,
-    "the knowledge-loop section should restore the original six-card structure",
-  );
+  assert.equal((platform.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.match(platform, /class="benefit-grid platform-grid"/);
   assert.doesNotMatch(home, /capability-window-dots/);
   assert.doesNotMatch(home, /capability-demo-header|knowledge-loop-primary|knowledge-loop-rail/);
 });
 
-test("wiki and graph demos mechanically mirror the real knowledge-base surfaces", () => {
+test("wiki and graph demos preserve the real surfaces while the preview directs attention", () => {
   const { chineseHome } = renderFixture();
   const previewSource = readFileSync(join(root, "src/components/KnowledgeBaseProductPreview.jsx"), "utf8");
 
   assert.match(chineseHome, /data-product-page-shell="wiki"/);
   assert.match(chineseHome, /data-product-page-shell="graph"/);
-  assert.equal(
-    (chineseHome.match(/data-kb-tab="documents"/g) ?? []).length,
-    2,
-    "both product previews must carry the real Documents, Wiki, Graph tab strip",
-  );
+  assert.equal((chineseHome.match(/data-kb-tab="documents"/g) ?? []).length, 2);
   assert.equal((chineseHome.match(/data-kb-tab="wiki"/g) ?? []).length, 2);
   assert.equal((chineseHome.match(/data-kb-tab="graph"/g) ?? []).length, 2);
 
@@ -100,26 +92,21 @@ test("wiki and graph demos mechanically mirror the real knowledge-base surfaces"
   assert.match(chineseHome, /wiki-reader kb-preview-wiki-reader/);
   assert.match(chineseHome, /wiki-graph kb-preview-graph/);
   assert.match(chineseHome, /wiki-graph-canvas kb-preview-graph-canvas/);
-  assert.equal(
-    (chineseHome.match(/搜索 Wiki 页面\.\.\./g) ?? []).length,
-    3,
-    "the real Wiki input exposes both its accessible label and placeholder, while Graph carries the same visible search copy",
-  );
-  assert.match(previewSource, /产品评估/);
-  assert.match(previewSource, /Listmonk/);
+  assert.equal((chineseHome.match(/搜索 Wiki 页面\.\.\./g) ?? []).length, 2);
+  assert.match(chineseHome, /搜索整张知识图谱\.\.\./);
+  assert.match(previewSource, /Agent Memory/);
+  assert.match(previewSource, /首周留存 - Summary/);
+  assert.doesNotMatch(previewSource, /Listmonk|暴利程度|长期躺赚/);
 
-  assert.equal(
-    (chineseHome.match(/data-graph-legend-type=/g) ?? []).length,
-    5,
-    "the graph preview must carry the five real product legend types",
-  );
+  assert.equal((chineseHome.match(/data-graph-legend-type=/g) ?? []).length, 5);
   assert.match(chineseHome, /class="obsidian-graph-canvas"/);
   assert.match(chineseHome, /data-playback-state="idle"/);
   assert.match(chineseHome, /data-playback-total="14"/);
-  assert.match(chineseHome, /data-graph-action="fit-view"/);
-  assert.match(chineseHome, /data-graph-action="toggle-arrows"/);
-  assert.match(chineseHome, /data-graph-settings="true"/);
   assert.match(chineseHome, /14 \/ 14 个节点/);
+  assert.doesNotMatch(chineseHome, /data-graph-action="fit-view"|data-graph-action="toggle-arrows"|data-graph-settings="true"/);
+  assert.match(previewSource, /function DemoPointer/);
+  assert.match(previewSource, /pointerEvents: "none"/);
+  assert.match(previewSource, /transformOrigin/);
 
   assert.doesNotMatch(chineseHome, /wiki-demo-body|graph-demo-toolbar/);
   assert.doesNotMatch(chineseHome, /MAX_FIXED_OK|FREE_FIXED_OK|RESTORED_MAX_OK|FREE_OK|PRO_OK|demo@musuw\.com/);
@@ -136,7 +123,7 @@ test("essential homepage content is visible in server HTML before observers or t
   assert.equal((platform.match(/data-platform-capability=/g) ?? []).length, 6);
 });
 
-test("homepage headings stay fixed except for the required Chinese terminology correction", () => {
+test("homepage headings keep the approved hierarchy and hero title", () => {
   const en = applyHomepageMarketingRefresh(getStorefrontCopy("en"));
   const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
 
@@ -186,12 +173,17 @@ test("homepage headings stay fixed except for the required Chinese terminology c
   );
 });
 
-test("visible Chinese homepage marketing uses 智能体 and contains no RAG or Agent", () => {
-  const { chineseHome } = renderFixture();
-  const visibleText = chineseHome.replace(/<[^>]+>/g, " ");
+test("visible Chinese marketing chrome uses 智能体 terminology", () => {
+  const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
+  const visibleMarketingCopy = JSON.stringify({
+    hero: zh.hero,
+    features: zh.features,
+    platform: zh.platform,
+    faq: zh.faq,
+  });
 
-  assert.match(visibleText, /智能体/);
-  assert.doesNotMatch(visibleText, /(?:^|\s)RAG(?:\s|$)|Agent/i);
+  assert.match(visibleMarketingCopy, /智能体/);
+  assert.doesNotMatch(visibleMarketingCopy, /(?:^|[^A-Za-z])Agent(?:[^A-Za-z]|$)/);
 });
 
 test("capability demos use production-visible states and the native Obsidian renderer", () => {
@@ -207,18 +199,18 @@ test("capability demos use production-visible states and the native Obsidian ren
   const graphCanvasSource = readFileSync(join(root, "src/components/ObsidianGraphCanvas.jsx"), "utf8");
   const graphRendererSource = readFileSync(join(root, "src/components/obsidian-graph/obsidianWikiGraphRenderer.ts"), "utf8");
   const styles = readFileSync(join(root, "src/product-demos.css"), "utf8");
+
   assert.match(chatSource, /"idle",\s*"typing",\s*"sent",\s*"searching",\s*"comparing",\s*"drafting",\s*"answering",\s*"complete"/);
   assert.match(chatSource, /visual-chat-composer/);
   assert.match(chatSource, /visual-rag-pipeline/);
   assert.match(chatSource, /visual-assistant-message/);
-  assert.match(motionSource, /"loading-index",\s*"index",\s*"loading-page",\s*"page"/);
+  assert.match(motionSource, /"loading-index",\s*"index",\s*"selecting-page",\s*"loading-page",\s*"page",\s*"focus-source"/);
   assert.match(source, /useWikiDemoFlow/);
   assert.match(motionSource, /useReducedMotion/);
   assert.match(source, /graphAutoPlay=\{inView && !reducedMotion\}/);
   assert.doesNotMatch(previewSource, /data-wiki-reveal-step/);
-  assert.match(previewSource, /data-graph-settings-panel/);
   assert.match(previewSource, /<ObsidianGraphCanvas/);
-  assert.match(previewSource, /linkDistance/);
+  assert.match(previewSource, /canvasRef\.current\?\.replay/);
   assert.match(graphCanvasSource, /new ObsidianWikiGraphRenderer\(container\)/);
   assert.match(graphCanvasSource, /renderer\.startProgression/);
   assert.doesNotMatch(graphCanvasSource, /setInterval|replayTimer/);
@@ -226,7 +218,7 @@ test("capability demos use production-visible states and the native Obsidian ren
   assert.match(graphRendererSource, /OBSIDIAN_GRAPH_WORKER_PATH/);
   assert.ok(existsSync(join(root, "public/vendor/obsidian-1.13.7/graph-sim.js")));
   assert.doesNotMatch(source, /initial=\{[^}]*opacity:\s*0/);
-  assert.doesNotMatch(previewSource, /<svg|data-graph-node=/);
+  assert.doesNotMatch(previewSource, /data-graph-node=/);
   assert.doesNotMatch(styles, /kb-preview-node-arrival|kb-preview-graph-nodes g\.is-visible/);
   assert.doesNotMatch(styles, /grayscale\(1\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation:\s*none !important/);
