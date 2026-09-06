@@ -37,6 +37,7 @@ export function useWikiDemoFlow() {
   const [paused, setPaused] = useState(false);
   const pause = useCallback(() => setPaused(true), []);
   const resume = useCallback(() => { setPaused(false); setStage("restore"); }, []);
+
   useEffect(() => {
     if (reducedMotion || !inView) {
       setStage("page");
@@ -50,5 +51,26 @@ export function useWikiDemoFlow() {
     }, WIKI_STAGE_DURATIONS[stage]);
     return () => window.clearTimeout(timer);
   }, [inView, reducedMotion, stage, paused]);
-  return { ref, stage, reducedMotion, inView, paused, pause, resume };
+
+  // Scroll only the existing reader, never the surrounding page or app chrome.
+  // Element bounds account for the template's mobile scale and current camera.
+  useEffect(() => {
+    const reader = ref.current?.querySelector('[data-wiki-reader="true"]');
+    if (!reader) return;
+    if (!inView || stage === "restore") {
+      reader.scrollTo({ top: 0, left: 0, behavior: reducedMotion || !inView ? "instant" : "smooth" });
+      return;
+    }
+    if (stage !== "moving-source" || paused) return;
+    const target = reader.querySelector('[data-wiki-source-trigger="true"]');
+    if (!target) return;
+    const readerBounds = reader.getBoundingClientRect();
+    const targetBounds = target.getBoundingClientRect();
+    const scale = readerBounds.height / (reader.offsetHeight || 1);
+    if (scale <= 0) return;
+    const below = (targetBounds.bottom - readerBounds.bottom) / scale + 20;
+    if (below > 0) reader.scrollTo({ top: reader.scrollTop + below, left: 0, behavior: "smooth" });
+  }, [inView, reducedMotion, stage, paused]);
+
+  return { ref, stage, reducedMotion, inView, paused: paused || !inView, pause, resume };
 }
