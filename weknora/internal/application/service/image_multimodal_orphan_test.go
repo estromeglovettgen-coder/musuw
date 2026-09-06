@@ -59,12 +59,18 @@ func TestShouldDropOrphanedMultimodal(t *testing.T) {
 		t.Fatalf("missing knowledge should drop: drop=%v err=%v", drop, err)
 	}
 
-	svc.knowledgeRepo = &orphanKnowledgeRepo{knowledge: &types.Knowledge{ParseStatus: types.ParseStatusCancelled}}
-	drop, err = svc.shouldDropOrphanedMultimodal(context.Background(), &types.ImageMultimodalPayload{
-		KnowledgeID: "cancelled",
-	})
-	if err != nil || !drop {
-		t.Fatalf("cancelled knowledge should drop: drop=%v err=%v", drop, err)
+	for _, status := range []string{
+		types.ParseStatusCancelled,
+		types.ParseStatusFinalizing,
+		types.ParseStatusCompleted,
+	} {
+		svc.knowledgeRepo = &orphanKnowledgeRepo{knowledge: &types.Knowledge{ParseStatus: status}}
+		drop, err = svc.shouldDropOrphanedMultimodal(context.Background(), &types.ImageMultimodalPayload{
+			KnowledgeID: status,
+		})
+		if err != nil || !drop {
+			t.Fatalf("%s knowledge should drop: drop=%v err=%v", status, drop, err)
+		}
 	}
 
 	svc.knowledgeRepo = &orphanKnowledgeRepo{knowledge: &types.Knowledge{ParseStatus: types.ParseStatusProcessing}}
@@ -108,7 +114,7 @@ func (e *orphanTaskEnqueuer) Enqueue(task *asynq.Task, _ ...asynq.Option) (*asyn
 	return &asynq.TaskInfo{ID: "post-process"}, nil
 }
 
-func TestImageMultimodalHandleDropFinalizesPendingCounter(t *testing.T) {
+func TestImageMultimodalHandleDropDoesNotOpenPendingCounter(t *testing.T) {
 	t.Parallel()
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -142,11 +148,11 @@ func TestImageMultimodalHandleDropFinalizesPendingCounter(t *testing.T) {
 	if err := svc.Handle(context.Background(), asynq.NewTask(types.TypeImageMultimodal, payload)); err != nil {
 		t.Fatalf("orphan drop should succeed: %v", err)
 	}
-	if mr.Exists(redisKey) {
-		t.Fatal("pending counter should be cleared after drop finalize")
+	if !mr.Exists(redisKey) {
+		t.Fatal("orphaned work must not open the success fan-in gate")
 	}
-	if len(enqueuer.enqueued) != 1 || enqueuer.enqueued[0].Type() != types.TypeKnowledgePostProcess {
-		t.Fatalf("expected post-process enqueue, got %d tasks", len(enqueuer.enqueued))
+	if len(enqueuer.enqueued) != 0 {
+		t.Fatalf("orphaned work enqueued %d post-process tasks, want zero", len(enqueuer.enqueued))
 	}
 }
 
