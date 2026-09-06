@@ -776,7 +776,7 @@ internal/application/service/knowledge_housekeeping_test.go	-	M	100644	7339102d1
 internal/application/service/knowledge_image_cleanup_test.go	M	-	100644	ee9c449d4a15847904d7d9f05fc310263201cbbe	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/knowledge_move_wiki_test.go	-	M	100644	bf18bf01e4c3efceaddf6fe16fd19b9ad2c5938a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/knowledge_post_process.go	-	M	100644	108412d08e2b517a7e4877f0c87ebfa4df840d5a	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
-internal/application/service/knowledge_process.go	M	M	100644	a249526ce4083baaa812f9ddc11a9232cd34becd	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/application/service/knowledge_process.go	M	M	100644	be84f54bd6036f6dfcd83e3457dba6bfd1497f59	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/application/service/knowledge_process_config.go	M	-	100644	fd3b852c9e67632001f61acb2a5ff65b0103fced	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/knowledge_process_config_test.go	M	-	100644	bf4dad6545b8efe02476facf13a7405a4379b4b8	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/knowledge_process_embedding_failure_test.go	A	-	100644	0a97e747be72b3ec633d2412a8b92af7567a8e25	preserve-musuw-exact		audited local-only content is byte-identical
@@ -1230,7 +1230,7 @@ internal/router/routes_infra.go	M	M	100644	55ce1f88234b62ed759b69a2f8cc802146f44
 internal/router/routes_memory.go	-	A	100644	60024efafc9ec6a7f62d44400cff5f2f07f1d8f3	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/router/sync_task.go	M	M	100644	51c0d3ac2d3f0e9ebe22ab51ba0ae23b9cff5e75	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/router/sync_task_retry_test.go	M	-	100644	94e8fbfb4d32f6c46a1f34cab93d74a6968f6bec	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/router/task.go	M	M	100644	552d3384cfe759ae9e160a8b4fcbf69ff5b065b6	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/router/task.go	M	M	100644	978ddaa05e1ac99cd6a8978ee2b00f420e3ec05b	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/router/task_openrouter_credit.go	A	-	100644	8d48de3f25e6b0f5a850f6b1bfca9a9f56ae02ce	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/router/task_openrouter_credit_test.go	A	-	100644	0f39be6a522779349965f64306a5447985404d95	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/sandbox/capabilities.go	-	A	100644	841cbdf999c7d2ed65923c598acdce2e70de0000	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
