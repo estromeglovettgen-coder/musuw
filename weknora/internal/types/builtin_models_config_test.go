@@ -438,7 +438,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	var models []Model
 	require.NoError(t, db.Order("id").Find(&models).Error)
-	require.Len(t, models, 31)
+	require.Len(t, models, 32)
 
 	byID := make(map[string]Model, len(models))
 	defaultByType := make(map[ModelType]int)
@@ -474,6 +474,11 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, "google/gemini-3.7-flash", byID["builtin-openrouter-gemini-flash"].Name)
 	assert.False(t, byID["builtin-openrouter-claude-haiku"].Parameters.Reasoning.Supported)
 	assert.Equal(t, "anthropic/claude-opus-5", byID["builtin-openrouter-claude-opus"].Name)
+	youtube := byID["builtin-openrouter-vlm-youtube"]
+	assert.Equal(t, "google/gemini-2.5-flash-lite", youtube.Name)
+	assert.Equal(t, "url", youtube.Parameters.ExtraConfig["video_input_mode"])
+	assert.Equal(t, "google-ai-studio", youtube.Parameters.ExtraConfig["video_provider"])
+	assert.False(t, youtube.IsDefault)
 
 	// These consumer-visible rows must use the paid, non-`:free` OpenRouter
 	// slugs.  The free aliases are availability-limited and are not suitable

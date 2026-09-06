@@ -34,6 +34,8 @@ var (
 	SocialFormatUnsupportedPublicMessage = "暂不支持此社媒视频格式"
 )
 
+const maxPersistedKnowledgeTitleRunes = 255
+
 func cleanupTikHubResolvedImages(ctx context.Context, fileSvc interfaces.FileService, images []docparser.StoredImage) {
 	if fileSvc == nil {
 		return
@@ -111,10 +113,11 @@ func resumeMaterializedTikHubArtifact(payload *types.DocumentProcessPayload, kno
 	return true
 }
 
-// prepareTikHubArtifact recognizes a supported social work, makes the single
-// provider fetch, and materializes its normalized result as a real file. Once
-// it returns handled=true, payload.URL is empty, so the existing pipeline sees
-// either an ordinary Markdown document or an ordinary video instead of sending
+// prepareTikHubArtifact recognizes a supported social work and materializes its
+// normalized result as a real file. YouTube is understood directly by the
+// fixed Google AI Studio model and saved as Markdown; the other social sources
+// continue through TikHub. Once it returns handled=true, payload.URL is empty,
+// so the existing pipeline sees an ordinary stored artifact instead of sending
 // the social page to WebParser.
 func (s *knowledgeService) prepareTikHubArtifact(
 	ctx context.Context,
@@ -133,7 +136,7 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 	payload *types.DocumentProcessPayload,
 	kb *types.KnowledgeBase,
 	knowledge *types.Knowledge,
-	_ types.EffectiveProcessConfig,
+	eff types.EffectiveProcessConfig,
 	videoMaxBytes int64,
 ) (bool, []docparser.StoredImage, error) {
 	if payload == nil || strings.TrimSpace(payload.URL) == "" {
@@ -147,13 +150,28 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 	if route == nil {
 		return false, nil, nil
 	}
-	if s.tikhubImporter == nil {
-		return true, nil, errTikHubNotConfigured
-	}
-
-	result, err := s.tikhubImporter.Fetch(ctx, *route)
-	if err != nil {
-		return true, nil, fmt.Errorf("TikHub social import failed for %s: %w", route.Platform, err)
+	var result tikhub.Result
+	if route.Platform == tikhub.PlatformYouTube {
+		youtubeURL := "https://www.youtube.com/watch?v=" + route.ObjectID
+		markdown, analyzeErr := s.analyzeYouTubeVideo(ctx, youtubeURL, eff.VLMConfig)
+		if analyzeErr != nil {
+			return true, nil, analyzeErr
+		}
+		result = tikhub.Result{
+			Kind:     tikhub.ResultDocument,
+			Title:    firstMarkdownTitle(markdown),
+			Markdown: markdown,
+			FileName: "youtube-" + route.ObjectID + ".md",
+			FileType: "md",
+		}
+	} else {
+		if s.tikhubImporter == nil {
+			return true, nil, errTikHubNotConfigured
+		}
+		result, err = s.tikhubImporter.Fetch(ctx, *route)
+		if err != nil {
+			return true, nil, fmt.Errorf("TikHub social import failed for %s: %w", route.Platform, err)
+		}
 	}
 
 	var content []byte
@@ -285,7 +303,7 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 	updatedKnowledge.FileType = result.FileType
 	updatedKnowledge.FileSize = fileSize
 	if strings.TrimSpace(result.Title) != "" && (strings.TrimSpace(knowledge.Title) == "" || knowledge.Title == knowledge.Source) {
-		updatedKnowledge.Title = strings.TrimSpace(result.Title)
+		updatedKnowledge.Title = boundedSocialTitle(result.Title)
 	}
 	if strings.TrimSpace(result.Description) != "" {
 		updatedKnowledge.Description = strings.TrimSpace(result.Description)
@@ -336,6 +354,35 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 		return true, nil, nil
 	}
 	return true, resolvedImages, nil
+}
+
+func firstMarkdownTitle(markdown string) string {
+	var firstLine string
+	for _, line := range strings.Split(markdown, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if firstLine == "" {
+			firstLine = line
+		}
+		if strings.HasPrefix(line, "#") {
+			title := strings.TrimSpace(strings.TrimLeft(line, "#"))
+			if title != "" {
+				return title
+			}
+		}
+	}
+	return strings.TrimSpace(strings.Trim(firstLine, "*_`"))
+}
+
+func boundedSocialTitle(value string) string {
+	title := strings.TrimSpace(value)
+	runes := []rune(title)
+	if len(runes) <= maxPersistedKnowledgeTitleRunes {
+		return title
+	}
+	return string(runes[:maxPersistedKnowledgeTitleRunes-1]) + "…"
 }
 
 func dropUnresolvedSocialImageLines(markdown string, imageURLs []string) string {

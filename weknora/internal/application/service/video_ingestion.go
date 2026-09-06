@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	defaultVideoModelID = "builtin-openrouter-vlm-mimo-v2-5"
+	defaultVideoModelID       = "builtin-openrouter-vlm-mimo-v2-5"
+	directYouTubeVideoModelID = "builtin-openrouter-vlm-youtube"
 
 	// VideoParsingPublicMessage is the consumer-visible active parsing state.
 	VideoParsingPublicMessage = "原视频已保存，正在解析"
@@ -35,6 +36,43 @@ const (
 	// VideoFormatFailedPublicMessage is the sanitized unsupported-format failure.
 	VideoFormatFailedPublicMessage = "暂不支持此视频格式"
 )
+
+// analyzeYouTubeVideo asks Google AI Studio to read the public YouTube work
+// directly. This deliberately avoids resolving or downloading temporary
+// googlevideo URLs; the returned Markdown is the durable knowledge source.
+func (s *knowledgeService) analyzeYouTubeVideo(
+	ctx context.Context,
+	videoURL string,
+	cfg types.VLMConfig,
+) (string, error) {
+	if s == nil || s.modelService == nil {
+		return "", errors.New("YouTube video model is not configured")
+	}
+	model, err := s.modelService.GetVLMModel(ctx, directYouTubeVideoModelID)
+	if err != nil {
+		return "", fmt.Errorf("load YouTube video model: %w", err)
+	}
+	if !vlm.SupportsVideoURL(model) {
+		return "", errors.New("YouTube video model does not support URL input")
+	}
+
+	prompt := buildVideoUnderstandingPrompt(ctx, cfg)
+	var markdown string
+	for attempt := 0; attempt < 2; attempt++ {
+		markdown, err = vlm.PredictVideoURL(ctx, model, videoURL, "video/mp4", prompt)
+		markdown = strings.TrimSpace(markdown)
+		if err == nil && markdown != "" {
+			return markdown, nil
+		}
+		if err == nil {
+			err = vlm.RetryableVideoError(errors.New("YouTube video understanding returned empty content"))
+		}
+		if !vlm.IsRetryableVideoError(err) {
+			break
+		}
+	}
+	return "", fmt.Errorf("analyze YouTube video: %w", err)
+}
 
 func fixedVideoModelID() string {
 	if configured := strings.TrimSpace(os.Getenv("MUSUW_VIDEO_VLM_MODEL_ID")); configured != "" {
@@ -57,7 +95,8 @@ You are a factual video understanding assistant. Convert the video into searchab
 </system_prompt>
 
 <instructions>
-1. Start with a concise title and summary.
+1. The first line must be a level-1 Markdown heading containing a concise title: # <title>.
+   Follow it with a concise summary.
 2. Record important visual events in chronological order with timestamps when they can be determined.
 3. Transcribe spoken content and visible on-screen text as accurately as possible.
 4. Identify people, objects, actions, locations, and relationships only when supported by the video.

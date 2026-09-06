@@ -15,6 +15,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
 	"github.com/Tencent/WeKnora/internal/infrastructure/tikhub"
+	"github.com/Tencent/WeKnora/internal/models/vlm"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/require"
@@ -163,6 +164,146 @@ func (f tikHubWorkerRoundTripFunc) RoundTrip(req *http.Request) (*http.Response,
 	return f(req)
 }
 
+type youtubeDirectVLMStub struct {
+	result   string
+	err      error
+	errs     []error
+	url      string
+	mimeType string
+	prompt   string
+	calls    int
+}
+
+func (*youtubeDirectVLMStub) Predict(context.Context, [][]byte, string) (string, error) {
+	return "", errors.New("unexpected image prediction")
+}
+
+func (m *youtubeDirectVLMStub) PredictVideoURL(_ context.Context, videoURL, mimeType, prompt string) (string, error) {
+	m.calls++
+	m.url = videoURL
+	m.mimeType = mimeType
+	m.prompt = prompt
+	if len(m.errs) >= m.calls {
+		return m.result, m.errs[m.calls-1]
+	}
+	return m.result, m.err
+}
+
+func (*youtubeDirectVLMStub) SupportsVideoURL() bool { return true }
+func (*youtubeDirectVLMStub) GetModelName() string   { return "google/gemini-2.5-flash-lite" }
+func (*youtubeDirectVLMStub) GetModelID() string     { return "builtin-openrouter-vlm-youtube" }
+
+type youtubeDirectModelServiceStub struct {
+	interfaces.ModelService
+	model       vlm.VLM
+	requestedID string
+}
+
+func (s *youtubeDirectModelServiceStub) GetVLMModel(_ context.Context, id string) (vlm.VLM, error) {
+	s.requestedID = id
+	return s.model, nil
+}
+
+func TestPrepareTikHubArtifactAnalyzesYouTubeDirectlyAndPersistsMarkdown(t *testing.T) {
+	t.Parallel()
+
+	const markdown = "# AI generated title\n\n## Timeline\n\n- 00:01 A terminal is visible."
+	model := &youtubeDirectVLMStub{result: markdown}
+	models := &youtubeDirectModelServiceStub{model: model}
+	files := &tikHubWorkerFileServiceStub{}
+	repo := &tikHubWorkerRepoStub{}
+	svc := &knowledgeService{
+		repo:         repo,
+		fileSvc:      files,
+		modelService: models,
+		// YouTube direct analysis must not require TikHub to be configured.
+		tikhubImporter: nil,
+	}
+	payload := types.DocumentProcessPayload{
+		TenantID: 17,
+		URL:      "https://youtu.be/Es0JCkbUGSI?si=share-token",
+	}
+	knowledge := &types.Knowledge{
+		ID:       "knowledge-youtube-direct",
+		TenantID: 17,
+		Source:   payload.URL,
+		Title:    payload.URL,
+		FileType: "html",
+	}
+
+	handled, _, err := svc.prepareTikHubArtifact(
+		context.Background(),
+		&payload,
+		&types.KnowledgeBase{ID: "kb-youtube-direct"},
+		knowledge,
+		types.EffectiveProcessConfig{},
+	)
+
+	require.NoError(t, err)
+	require.True(t, handled)
+	require.Equal(t, "builtin-openrouter-vlm-youtube", models.requestedID)
+	require.Equal(t, 1, model.calls)
+	require.Equal(t, "https://www.youtube.com/watch?v=Es0JCkbUGSI", model.url)
+	require.Equal(t, "video/mp4", model.mimeType)
+	require.Contains(t, model.prompt, "searchable Markdown")
+	require.Equal(t, markdown, string(files.savedData))
+	require.Equal(t, "youtube-Es0JCkbUGSI.md", files.savedFileName)
+	require.Empty(t, payload.URL)
+	require.Equal(t, "md", payload.FileType)
+	require.Equal(t, "stored/youtube-Es0JCkbUGSI.md", payload.FilePath)
+	require.NotNil(t, repo.updatedKnowledge)
+	require.Equal(t, "AI generated title", repo.updatedKnowledge.Title)
+	require.Equal(t, int64(len(markdown)), repo.updatedKnowledge.FileSize)
+}
+
+func TestAnalyzeYouTubeVideoRetriesOneTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	model := &youtubeDirectVLMStub{
+		result: "# Recovered video",
+		errs: []error{
+			vlm.RetryableVideoError(errors.New("temporary upstream failure")),
+			nil,
+		},
+	}
+	models := &youtubeDirectModelServiceStub{model: model}
+	svc := &knowledgeService{modelService: models}
+
+	markdown, err := svc.analyzeYouTubeVideo(
+		context.Background(),
+		"https://www.youtube.com/watch?v=Es0JCkbUGSI",
+		types.VLMConfig{},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, "# Recovered video", markdown)
+	require.Equal(t, 2, model.calls)
+}
+
+func TestAnalyzeYouTubeVideoDoesNotRetryPermanentFailure(t *testing.T) {
+	t.Parallel()
+
+	model := &youtubeDirectVLMStub{err: errors.New("unsupported public video")}
+	models := &youtubeDirectModelServiceStub{model: model}
+	svc := &knowledgeService{modelService: models}
+
+	_, err := svc.analyzeYouTubeVideo(
+		context.Background(),
+		"https://www.youtube.com/watch?v=Es0JCkbUGSI",
+		types.VLMConfig{},
+	)
+
+	require.ErrorContains(t, err, "unsupported public video")
+	require.Equal(t, 1, model.calls)
+}
+
+func TestFirstMarkdownTitleFallsBackToAIOutputFirstLine(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "AI generated title", firstMarkdownTitle("## AI generated title\n\nSummary"))
+	require.Equal(t, "AI generated plain title", firstMarkdownTitle("**AI generated plain title**\n\nSummary"))
+}
+
 func TestPrepareTikHubArtifactPersistsDocumentBeforeExistingParser(t *testing.T) {
 	t.Parallel()
 
@@ -279,15 +420,20 @@ func TestPrepareTikHubArtifactKeepsDocumentWhenProviderImageCannotBeStored(t *te
 	require.NotContains(t, string(files.savedData), "127.0.0.1")
 }
 
-func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideoPath(t *testing.T) {
+func TestPrepareTikHubArtifactDownloadsSocialVideoWithoutProviderBearerAndSelectsVideoPath(t *testing.T) {
 	t.Parallel()
 
 	var tikHubCalls atomic.Int32
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tikHubCalls.Add(1)
-		require.Equal(t, "/api/v1/youtube/web_v2/get_video_streams_v2", r.URL.Path)
+		require.Equal(t, "/api/v1/instagram/v2/fetch_post_info", r.URL.Path)
+		require.Equal(t, "DaU63nnAkoo", r.URL.Query().Get("code_or_url"))
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"code":200,"data":{"title":"A video","formats":[{"mime_type":"video/mp4","url":"https://media.example/video.mp4"}]}}`)
+		_, _ = io.WriteString(
+			w,
+			`{"code":200,"data":{"caption":"A video","media":[{"media_type":"VIDEO",`+
+				`"video_url":"https://media.example/video.mp4"}]}}`,
+		)
 	}))
 	defer api.Close()
 
@@ -312,7 +458,7 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 		tikhubImporter:    tikhub.NewTikHubImporterForTest(api.URL, "provider-key", api.Client()),
 		tikhubMediaClient: mediaClient,
 	}
-	const sourceURL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+	const sourceURL = "https://www.instagram.com/reel/DaU63nnAkoo/"
 	payload := types.DocumentProcessPayload{TenantID: 9, URL: sourceURL}
 	knowledge := &types.Knowledge{ID: "knowledge-2", TenantID: 9, FileType: "html"}
 
@@ -328,7 +474,7 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	require.Empty(t, payload.URL)
 	require.Equal(t, "mp4", payload.FileType)
 	require.True(t, IsVideoType(payload.FileType), "the existing convert() function must delegate this artifact to convertVideo")
-	require.Equal(t, "stored/youtube-dQw4w9WgXcQ.mp4", payload.FilePath)
+	require.Equal(t, "stored/instagram.mp4", payload.FilePath)
 	require.Equal(t, []byte("video-bytes"), files.savedData)
 	require.Equal(t, 1, files.saveReaderCalls)
 	require.Equal(t, 0, files.saveCalls, "social videos must use the streaming storage capability")
@@ -356,13 +502,78 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 	)
 }
 
+func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) {
+	t.Parallel()
+
+	longTitle := strings.Repeat("长", 300)
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/twitter/web/fetch_tweet_detail", r.URL.Path)
+		require.Equal(t, "2096478745494175886", r.URL.Query().Get("tweet_id"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(
+			w,
+			`{"code":200,"data":{"legacy":{"full_text":%q,"extended_entities":{"media":[{"type":"video",`+
+				`"video_info":{"variants":[{"content_type":"video/mp4",`+
+				`"url":"https://media.example/x.mp4"}]}}]}}}}`,
+			longTitle,
+		)
+	}))
+	defer api.Close()
+
+	mediaClient := &http.Client{Transport: tikHubWorkerRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "https://media.example/x.mp4", req.URL.String())
+		return &http.Response{
+			StatusCode:    http.StatusOK,
+			Header:        http.Header{"Content-Type": []string{"video/mp4"}},
+			Body:          io.NopCloser(bytes.NewReader([]byte("video-bytes"))),
+			ContentLength: int64(len("video-bytes")),
+			Request:       req,
+		}, nil
+	})}
+	files := &tikHubWorkerFileServiceStub{}
+	repo := &tikHubWorkerRepoStub{}
+	svc := &knowledgeService{
+		repo:              repo,
+		fileSvc:           files,
+		tikhubImporter:    tikhub.NewTikHubImporterForTest(api.URL, "provider-key", api.Client()),
+		tikhubMediaClient: mediaClient,
+	}
+	payload := types.DocumentProcessPayload{
+		TenantID: 17,
+		URL:      "https://x.com/shownotover/status/2096478745494175886?s=20",
+	}
+	knowledge := &types.Knowledge{ID: "knowledge-long-x", TenantID: 17, FileType: "html"}
+
+	handled, _, err := svc.prepareTikHubArtifact(
+		context.Background(),
+		&payload,
+		&types.KnowledgeBase{ID: "kb-long-x"},
+		knowledge,
+		types.EffectiveProcessConfig{VLMConfig: types.VLMConfig{Enabled: true, ModelID: "vlm-1"}},
+	)
+
+	require.NoError(t, err)
+	require.True(t, handled)
+	require.NotNil(t, repo.updatedKnowledge)
+	require.Len(t, []rune(repo.updatedKnowledge.Title), 255)
+	require.Equal(t, strings.Repeat("长", 254)+"…", repo.updatedKnowledge.Title)
+	require.Equal(
+		t,
+		longTitle,
+		repo.updatedKnowledge.Description,
+		"the full social text remains available to downstream knowledge processing",
+	)
+	require.Equal(t, "x.mp4", repo.updatedKnowledge.FileName)
+}
+
 func TestPrepareTikHubArtifactStreamsUnknownLengthAndDeletesWhenVideoExceedsLimit(t *testing.T) {
-	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/instagram/v2/fetch_post_info", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(
 			w,
-			`{"code":200,"data":{"title":"A video","formats":[{"mime_type":"video/mp4",`+
-				`"url":"https://media.example/video.mp4"}]}}`,
+			`{"code":200,"data":{"caption":"A video","media":[{"media_type":"VIDEO",`+
+				`"video_url":"https://media.example/video.mp4"}]}}`,
 		)
 	}))
 	defer api.Close()
@@ -384,7 +595,7 @@ func TestPrepareTikHubArtifactStreamsUnknownLengthAndDeletesWhenVideoExceedsLimi
 		tikhubImporter:    tikhub.NewTikHubImporterForTest(api.URL, "provider-key", api.Client()),
 		tikhubMediaClient: mediaClient,
 	}
-	payload := types.DocumentProcessPayload{TenantID: 9, URL: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+	payload := types.DocumentProcessPayload{TenantID: 9, URL: "https://www.instagram.com/reel/DaU63nnAkoo/"}
 	knowledge := &types.Knowledge{ID: "knowledge-too-large", TenantID: 9, FileType: "html"}
 
 	handled, _, err := svc.prepareTikHubArtifactWithVideoLimit(
