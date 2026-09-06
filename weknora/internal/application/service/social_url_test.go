@@ -381,7 +381,7 @@ func TestReparseMaterializableSocialURLKeepsDownstreamRetryBudget(t *testing.T) 
 	_, _, maxRetry := parseDocumentProcessOpts(t, task.options)
 	require.NotNil(t, maxRetry)
 	require.Equal(t, 3, *maxRetry,
-		"TikHub failures are swallowed before retry; later video-model failures must reuse the stored source and retry")
+		"the source may retry once and later video-model failures must reuse the stored artifact")
 }
 
 func TestParseSocialShareInputKnownHostBadPathFailsClosed(t *testing.T) {

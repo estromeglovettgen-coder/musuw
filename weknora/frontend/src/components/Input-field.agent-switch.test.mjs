@@ -33,6 +33,31 @@ test("shared-agent web search button waits for source readiness metadata", () =>
   assert.match(showWebSearchButton, /selectedSharedAgent\.value\?\.web_search_ready/);
 });
 
+test("platform agents keep image upload visible while the agent catalog loads", () => {
+  const start = inputBusiness.indexOf("const isImageUploadEnabledByAgent = computed");
+  const end = inputBusiness.indexOf("const showWebSearchButton", start);
+  const block = inputBusiness.slice(start, end);
+
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  assert.match(block, /BUILTIN_QUICK_ANSWER_ID/);
+  assert.match(block, /BUILTIN_SMART_REASONING_ID/);
+  assert.match(block, /!settingsStore\.selectedAgentSourceTenantId/);
+  assert.match(block, /currentAgentConfig\.value\?\.image_upload_enabled === true/);
+});
+
+test("empty new workspaces are not mislabeled as knowledge capability mismatches", () => {
+  assert.match(inputBusiness, /const mentionCompatibilityFilteredAll = ref\(false\)/);
+  assert.match(
+    inputBusiness,
+    /mentionCompatibilityFilteredAll\.value = scopedKbCount > 0 && availableKbs\.length === 0/,
+  );
+  assert.match(
+    inputBusiness,
+    /mentionCompatibilityFilteredAll\.value\s*\? t\("mentionDetail\.noCompatibleKbForAgent"\)\s*:\s*t\("knowledgeList\.empty\.title"\)/,
+  );
+});
+
 test("consumer chat can select a native agent and sends model-specific reasoning effort", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
   assert.match(settingsStore, /thinkingEnabled:\s*false/);

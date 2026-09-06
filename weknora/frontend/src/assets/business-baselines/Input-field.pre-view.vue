@@ -527,6 +527,11 @@ const isKbCompatibleWithAgent = (kb: any): boolean => {
   return kbSatisfiesAgentRequirements(kbToScopeCaps(kb), agentMode.value, agentAllowedTools.value);
 };
 
+// Tracks the one case where the client actually removed every scoped KB for
+// capability mismatch. A brand-new workspace with zero KBs must not be
+// mislabeled as a parser or agent compatibility failure.
+const mentionCompatibilityFilteredAll = ref(false);
+
 // 仅在用户没输入搜索词、且是因智能体工具兼容性把列表清空的场景展示专用空态文案
 const mentionEmptyHint = computed(() => {
   if (mentionQuery.value) return "";
@@ -536,12 +541,21 @@ const mentionEmptyHint = computed(() => {
   if (mentionItems.value.length !== 0) return "";
   const filter = deriveKbFilterForAgent(agentMode.value, agentAllowedTools.value);
   if (!filter) return "";
-  return t("mentionDetail.noCompatibleKbForAgent");
+  return mentionCompatibilityFilteredAll.value
+    ? t("mentionDetail.noCompatibleKbForAgent")
+    : t("knowledgeList.empty.title");
 });
 
 // 智能体是否启用了图片上传（多模态）
 const isImageUploadEnabledByAgent = computed(() => {
-  if (!hasAgentConfig.value) return false;
+  // The two platform-managed agents always enable image upload server-side.
+  // Keep their button stable while the asynchronous agent catalog loads.
+  const agentId = settingsStore.selectedAgentId;
+  const isLocalPlatformAgent = !settingsStore.selectedAgentSourceTenantId &&
+    (agentId === BUILTIN_QUICK_ANSWER_ID || agentId === BUILTIN_SMART_REASONING_ID);
+  if (isLocalPlatformAgent) {
+    return true;
+  }
   return currentAgentConfig.value?.image_upload_enabled === true;
 });
 
@@ -1368,6 +1382,7 @@ const loadMentionItems = async (q: string, resetIndex = true, append = false) =>
   let mcpItems: MentionItem[] = [];
   let skillItems: MentionItem[] = [];
   if (!append) {
+    mentionCompatibilityFilteredAll.value = false;
     let availableKbs: any[];
     const sourceTenantId = settingsStore.selectedAgentSourceTenantId;
     const agentId = selectedAgentId.value;
@@ -1442,7 +1457,9 @@ const loadMentionItems = async (q: string, resetIndex = true, append = false) =>
         } else if (kbMode === "all") {
           // 'all' 的语义是"全部兼容的 KB"——按工具派生的能力集合过滤，
           // 避免 wiki-qa 选"全部"后 @ 出来一堆 wiki 工具跑不动的 KB。
+          const scopedKbCount = availableKbs.length;
           availableKbs = availableKbs.filter((kb: any) => isKbCompatibleWithAgent(kb));
+          mentionCompatibilityFilteredAll.value = scopedKbCount > 0 && availableKbs.length === 0;
         }
       }
     }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/agent/tools"
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/require"
 )
 
@@ -110,6 +111,58 @@ func TestFilterSharedAgentWriteToolsCoversAllWikiMutations(t *testing.T) {
 		}
 		require.Empty(t, filtered, "wiki mutation tool %q must be filtered for shared agents", definition.Name)
 	}
+}
+
+func TestFilterUserVisibleAgentSharesHidesSpecialistBuiltins(t *testing.T) {
+	shares := []*types.AgentShare{
+		{AgentID: types.BuiltinQuickAnswerID},
+		{AgentID: types.BuiltinDataAnalystID},
+		{AgentID: types.BuiltinWikiResearcherID},
+		{AgentID: "tenant-agent"},
+		nil,
+	}
+
+	visible := filterUserVisibleAgentShares(shares)
+	require.Len(t, visible, 2)
+	require.Equal(t, types.BuiltinQuickAnswerID, visible[0].AgentID)
+	require.Equal(t, "tenant-agent", visible[1].AgentID)
+}
+
+func TestUserVisibleAgentShareHidesWhenEitherJoinedIDIsSpecialist(t *testing.T) {
+	share := &types.AgentShare{
+		AgentID: types.BuiltinQuickAnswerID,
+		Agent:   &types.CustomAgent{ID: types.BuiltinDataAnalystID},
+	}
+	require.False(t, userVisibleAgentShare(share),
+		"a joined specialist row must remain hidden even if the share ID is stale")
+
+	share = &types.AgentShare{
+		AgentID: types.BuiltinDataAnalystID,
+		Agent:   &types.CustomAgent{ID: types.BuiltinQuickAnswerID},
+	}
+	require.False(t, userVisibleAgentShare(share),
+		"a specialist share ID must remain hidden even if the join is stale")
+}
+
+type visibleAgentCountRepo struct {
+	interfaces.AgentShareRepository
+	shares []*types.AgentShare
+}
+
+func (r *visibleAgentCountRepo) ListByOrganizations(context.Context, []string) ([]*types.AgentShare, error) {
+	return r.shares, nil
+}
+
+func TestCountByOrganizationsMatchesVisibleAgentList(t *testing.T) {
+	svc := &agentShareService{shareRepo: &visibleAgentCountRepo{shares: []*types.AgentShare{
+		{OrganizationID: "org-1", AgentID: types.BuiltinDataAnalystID},
+		{OrganizationID: "org-1", AgentID: types.BuiltinQuickAnswerID},
+		{OrganizationID: "org-2", AgentID: "tenant-agent"},
+	}}}
+
+	counts, err := svc.CountByOrganizations(context.Background(), []string{"org-1", "org-2", "org-3"})
+	require.NoError(t, err)
+	require.Equal(t, map[string]int64{"org-1": 1, "org-2": 1, "org-3": 0}, counts)
 }
 
 func TestSharedAgentInfoLocalizesBuiltinName(t *testing.T) {

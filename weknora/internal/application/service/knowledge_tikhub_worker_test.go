@@ -153,6 +153,7 @@ func TestCleanupTikHubResolvedImagesDeletesServingURLs(t *testing.T) {
 	cleanupTikHubResolvedImages(context.Background(), files, []docparser.StoredImage{
 		{ServingURL: "stored/image-one.png"},
 		{ServingURL: "  stored/image-two.png  "},
+		{ServingURL: "https://trusted.example/kept.jpg"},
 		{ServingURL: ""},
 	})
 	require.ElementsMatch(t, []string{"stored/image-one.png", "stored/image-two.png"}, files.deletedPaths)
@@ -387,7 +388,7 @@ func TestPrepareTikHubArtifactAllowsDouyinPhotoOnFreePlanWithoutVLM(t *testing.T
 	require.Contains(t, string(files.savedData), "photo.jpg")
 }
 
-func TestPrepareTikHubArtifactKeepsDocumentWhenProviderImageCannotBeStored(t *testing.T) {
+func TestPrepareTikHubArtifactFailsWhenProviderImageCannotBeStored(t *testing.T) {
 	t.Parallel()
 
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -414,10 +415,21 @@ func TestPrepareTikHubArtifactKeepsDocumentWhenProviderImageCannotBeStored(t *te
 		knowledge,
 		types.EffectiveProcessConfig{},
 	)
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "social image materialization incomplete")
 	require.True(t, handled)
-	require.Contains(t, string(files.savedData), "正文仍应入库")
-	require.NotContains(t, string(files.savedData), "127.0.0.1")
+	require.Empty(t, files.savedData, "an incomplete image post must not be persisted as a false success")
+	require.Empty(t, payload.FilePath)
+}
+
+func TestUnresolvedSocialImageURLs(t *testing.T) {
+	t.Parallel()
+
+	got := unresolvedSocialImageURLs(
+		[]string{" https://img.example/one.jpg ", "https://img.example/two.jpg", "https://img.example/two.jpg", ""},
+		[]docparser.StoredImage{{OriginalRef: "https://img.example/one.jpg"}},
+	)
+
+	require.Equal(t, []string{"https://img.example/two.jpg"}, got)
 }
 
 func TestPrepareTikHubArtifactDownloadsSocialVideoWithoutProviderBearerAndSelectsVideoPath(t *testing.T) {
@@ -502,10 +514,11 @@ func TestPrepareTikHubArtifactDownloadsSocialVideoWithoutProviderBearerAndSelect
 	)
 }
 
-func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) {
+func TestPrepareTikHubArtifactLeavesSocialVideoTitleForAnalysis(t *testing.T) {
 	t.Parallel()
 
 	longTitle := strings.Repeat("长", 300)
+	const sourceURL = "https://x.com/shownotover/status/2096478745494175886?s=20"
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v1/twitter/web/fetch_tweet_detail", r.URL.Path)
 		require.Equal(t, "2096478745494175886", r.URL.Query().Get("tweet_id"))
@@ -540,9 +553,16 @@ func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) 
 	}
 	payload := types.DocumentProcessPayload{
 		TenantID: 17,
-		URL:      "https://x.com/shownotover/status/2096478745494175886?s=20",
+		URL:      sourceURL,
 	}
-	knowledge := &types.Knowledge{ID: "knowledge-long-x", TenantID: 17, FileType: "html"}
+	knowledge := &types.Knowledge{
+		ID:       "knowledge-long-x",
+		TenantID: 17,
+		Type:     "url",
+		Source:   sourceURL,
+		Title:    sourceURL,
+		FileType: "html",
+	}
 
 	handled, _, err := svc.prepareTikHubArtifact(
 		context.Background(),
@@ -555,8 +575,8 @@ func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) 
 	require.NoError(t, err)
 	require.True(t, handled)
 	require.NotNil(t, repo.updatedKnowledge)
-	require.Len(t, []rune(repo.updatedKnowledge.Title), 255)
-	require.Equal(t, strings.Repeat("长", 254)+"…", repo.updatedKnowledge.Title)
+	require.Equal(t, sourceURL, repo.updatedKnowledge.Title,
+		"video captions must not become the final title before VLM analysis")
 	require.Equal(
 		t,
 		longTitle,
