@@ -38,12 +38,12 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 4);
   assert.equal((home.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.doesNotMatch(home, /class="(?:section|feature)-label"/);
-  assert.match(home, /Compare the evidence before you decide/);
-  assert.match(home, /Let what you learn grow into your own Wiki/);
-  assert.match(home, /See when separate notes are really about the same problem/);
+  assert.match(home, /Find the signals that should shape your next decision/);
+  assert.match(home, /Turn scattered learning into a connected body of knowledge/);
+  assert.match(home, /Discover connections across what you know/);
   assert.match(home, /30\+ leading models/);
   assert.match(home, /One-click web and video import/);
-  assert.match(home, /Knowledge that maintains itself/);
+  assert.match(home, /Keep building on what you know/);
   assert.match(home, /Turn source material into/);
   assert.match(home, /intelligent knowledge assets/);
   assert.match(home, /href="\/contact"[^>]*><span>Contact<\/span>/);
