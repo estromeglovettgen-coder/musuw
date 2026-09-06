@@ -93,7 +93,7 @@ func convertHEIC(ctx context.Context, data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create HEIC conversion directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	inputPath := filepath.Join(tempDir, "input.heic")
 	outputPath := filepath.Join(tempDir, "output.jpg")
@@ -162,7 +162,7 @@ func readLimited(name string, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open converted JPEG: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
