@@ -991,6 +991,40 @@ func (r *knowledgeRepository) UpdateKnowledgeColumns(
 	return r.db.WithContext(ctx).Model(&types.Knowledge{}).Where("id = ?", id).Updates(values).Error
 }
 
+// FailKnowledgeParseAttempt is the single guarded transition used by terminal
+// asynchronous parse workers. It keeps a late delivery from overwriting a
+// completed/cancelled row or a newer user-triggered reparse.
+func (r *knowledgeRepository) FailKnowledgeParseAttempt(
+	ctx context.Context,
+	id string,
+	attempt int,
+	errorMessage string,
+) (bool, error) {
+	query := r.db.WithContext(ctx).
+		Model(&types.Knowledge{}).
+		Where("id = ? AND deleted_at IS NULL AND parse_status = ?", id, types.ParseStatusProcessing)
+	if attempt > 0 {
+		query = query.Where(
+			"NOT EXISTS (SELECT 1 FROM knowledge_processing_spans WHERE knowledge_id = ? AND attempt > ?)",
+			id, attempt,
+		)
+	} else {
+		// Legacy payloads have no attempt identity. They may fail an old task,
+		// but must never overwrite any row that has since entered tracked work.
+		query = query.Where(
+			"NOT EXISTS (SELECT 1 FROM knowledge_processing_spans WHERE knowledge_id = ?)", id)
+	}
+	result := query.Updates(map[string]interface{}{
+		"parse_status":  types.ParseStatusFailed,
+		"error_message": common.CleanInvalidUTF8(errorMessage),
+		"updated_at":    time.Now(),
+	})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
 // UpdateActiveDeletingKnowledgeColumns only touches rows that are still visible
 // to normal queries and have not moved out of the transient deleting state.
 func (r *knowledgeRepository) UpdateActiveDeletingKnowledgeColumns(

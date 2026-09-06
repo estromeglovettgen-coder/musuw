@@ -211,7 +211,6 @@ func TestNativeConsumerSettingRegistryContainsOnlyNewTypedBoundaries(t *testing.
 			"builtin-openrouter-rerank-qwen3",
 		},
 		types.ConsumerSceneVision: {
-			"builtin-openrouter-vlm-mimo-v2-5",
 			types.PlatformKnowledgeBaseVLMModelID,
 			"builtin-openrouter-vlm-muse-spark-1-2",
 			"builtin-openrouter-vlm-minimax-m3-free",
@@ -240,21 +239,12 @@ func TestNativeConsumerSettingRegistryContainsOnlyNewTypedBoundaries(t *testing.
 		defaults, ok := paid.Default.([]string)
 		require.True(t, ok)
 		assert.Equal(t, expectedPaidDefaults[scene], defaults)
-		if scene == types.ConsumerSceneVision {
-			assert.Equal(
-				t,
-				"builtin-openrouter-vlm-mimo-v2-5",
-				defaults[0],
-				"MiMo is the paid vision default; Gemini remains the compatibility/free default",
-			)
-		} else {
-			assert.Equal(
-				t,
-				scene.CompatibilityDefaultID(),
-				defaults[0],
-				"the compatibility model remains the paid default",
-			)
-		}
+		assert.Equal(
+			t,
+			scene.CompatibilityDefaultID(),
+			defaults[0],
+			"the compatibility model remains the paid default",
+		)
 	}
 	assert.NotContains(t, registry, "consumer_models.embedding.free_default")
 	assert.NotContains(t, registry, "consumer_models.embedding.paid_options")
