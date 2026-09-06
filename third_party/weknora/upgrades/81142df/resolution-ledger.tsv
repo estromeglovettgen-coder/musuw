@@ -1003,7 +1003,7 @@ internal/handler/entitlement_test.go	A	-	100644	5d9ae5369767c843b0afb021e5dd862c
 internal/handler/im.go	-	M	100644	2453efde41ddc35078415d66b62cebb0a2b3db08	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/handler/initialization.go	M	-	100644	5583aebd79465df9ee25a513dd23bfc8bccc8f2a	preserve-musuw-exact		audited local-only content is byte-identical
 internal/handler/initialization_consumer_models_test.go	A	-	100644	c03d299eabc9407fd3734240cf7b58bb4e4d24e2	preserve-musuw-exact		audited local-only content is byte-identical
-internal/handler/knowledge.go	M	M	100644	992dd1f752d716d4fbf982ed08b7e510b0c9a50f	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/handler/knowledge.go	M	M	100644	74024a812c198e6bd52be77ecae1920d00d00e54	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/handler/knowledgebase.go	M	M	100644	b3788a6331e9655e5f3b30da019d10feac257a54	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/handler/knowledgebase_copy_preflight_test.go	M	-	100644	b927839555d0e7cedc0009b85488e235b5bc8eff	preserve-musuw-exact		audited local-only content is byte-identical
 internal/handler/knowledgebase_hybrid_search_resource_urls_test.go	-	A	100644	513110dc86cae6ec9612d19521d20344d951c206	adopt-upstream-exact		fixed-target upstream-only content is byte-identical

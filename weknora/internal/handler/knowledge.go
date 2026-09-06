@@ -906,7 +906,8 @@ func sanitizeConsumerVideoSpanMap(values types.JSONMap) types.JSONMap {
 	sanitized := make(types.JSONMap, len(values))
 	for key, value := range values {
 		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "model", "model_id", "video_model", "provider", "route", "router", "base_url", "video_source", "video_input_mode":
+		case "model", "model_id", "video_model", "provider", "route", "router",
+			"base_url", "video_source", "video_input_mode":
 			continue
 		default:
 			sanitized[key] = value
