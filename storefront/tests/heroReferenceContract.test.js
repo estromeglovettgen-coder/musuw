@@ -11,7 +11,7 @@ function source(path) {
   return readFileSync(join(root, path), "utf8");
 }
 
-test("hero copy keeps the approved two-line title and six localized typewriter phrases", () => {
+test("hero copy keeps the approved two-line title and six localized outcome phrases", () => {
   const en = applyHomepageMarketingRefresh(getStorefrontCopy("en"));
   const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
 
@@ -19,24 +19,24 @@ test("hero copy keeps the approved two-line title and six localized typewriter p
   assert.equal(en.hero.titleLine2, "intelligent knowledge assets");
   assert.deepEqual(en.hero.titleFocusSegments, ["intelligent", "knowledge", "assets"]);
   assert.deepEqual(en.hero.typewriterPhrases, [
-    "Agents · Wiki · Graph",
-    "Turn documents into a living Wiki",
-    "Retrieve precise cited answers",
-    "Let agents reason with evidence",
-    "Reveal hidden links in the graph",
-    "Keep knowledge evolving",
+    "Ask · Reason · Organize · Discover",
+    "Find the pattern across dozens of sources",
+    "Compare evidence before making a decision",
+    "Let what you learn grow into a living Wiki",
+    "Connect ideas you saved months apart",
+    "Reuse old knowledge in the next question",
   ]);
 
   assert.equal(zh.hero.titleLine1, "把资料转化为");
   assert.equal(zh.hero.titleLine2, "会思考的知识资产");
   assert.deepEqual(zh.hero.titleFocusSegments, ["会", "思考的", "知识资产"]);
   assert.deepEqual(zh.hero.typewriterPhrases, [
-    "智能体 · Wiki · 图谱",
-    "文档变成 Wiki",
-    "找到每个精确答案",
-    "智能体带证据推理",
-    "图谱连接隐藏关系",
-    "知识随使用持续进化",
+    "提问 · 推理 · 沉淀 · 发现",
+    "从几十份资料里找出真正重复的问题",
+    "先比较证据，再给出可核验的判断",
+    "让学过的内容长成自己的 Wiki",
+    "连接几个月前后保存的同一个概念",
+    "让旧知识在新问题里再次被用上",
   ]);
 });
 

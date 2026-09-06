@@ -14,46 +14,46 @@ import "../real-chat-demo.css";
 
 const COPY = Object.freeze({
   zh: Object.freeze({
-    title: "发布计划证据审查",
-    question: "发布计划改了什么？原因是什么？",
-    preparation: "准备回答",
+    title: "下一阶段产品优先级判断",
+    question: "下一阶段应该先提升搜索，还是先做团队协作？结合用户访谈、客服反馈和使用数据给出判断。",
+    preparation: "正在拆解问题",
     steps: Object.freeze([
-      { title: "检索知识库", summary: "发布简报 · 12 条" },
-      { title: "比对资料证据", summary: "研究笔记 · 8 条" },
-      { title: "生成带引用回答", summary: "团队更新 · 第 4 节" },
+      { title: "检索用户访谈", summary: "23 份访谈 · 8 次提到协作" },
+      { title: "核对客服反馈", summary: "127 条反馈 · 31 次提到“找不到”" },
+      { title: "比较影响范围", summary: "使用数据 · 搜索失败后退出更明显" },
     ]),
-    answer: "发布时间调整到十月，以便团队完成无障碍审查。",
-    citation: "团队更新 · 第 4 节",
-    searchDone: "检索已完成",
-    references: "3 个来源",
-    placeholder: "直接向模型提问",
+    answer: "建议先提升搜索。团队协作有明确需求，但“找不到已有内容”影响的用户范围更大，也更直接阻断现有用户继续使用；协作可以排在搜索体验稳定之后。",
+    citation: "优先级分析 · 3 组证据",
+    searchDone: "3 组证据已比对",
+    references: "23 份访谈 · 127 条反馈",
+    placeholder: "基于你的知识提问",
     model: "DeepSeek V4 Flash",
     effort: "关闭",
     copy: "复制回答",
     save: "添加到知识库",
-    finish: "完成",
+    finish: "形成判断",
     send: "发送",
     stop: "停止生成",
   }),
   en: Object.freeze({
-    title: "Launch plan evidence review",
-    question: "What changed in the launch plan, and why?",
-    preparation: "Preparing an answer",
+    title: "Decide what to build next",
+    question: "Should we improve search first or build team collaboration next? Use interviews, support feedback, and usage notes to decide.",
+    preparation: "Breaking down the question",
     steps: Object.freeze([
-      { title: "Search the library", summary: "Launch brief · 12 hits" },
-      { title: "Compare the evidence", summary: "Research notes · 8 hits" },
-      { title: "Draft with citations", summary: "Team update · §4" },
+      { title: "Review user interviews", summary: "23 interviews · collaboration mentioned 8 times" },
+      { title: "Check support feedback", summary: "127 items · 31 mention finding existing content" },
+      { title: "Compare impact", summary: "Usage notes · search failure correlates with exits" },
     ]),
-    answer: "The release moved to October so the team can finish the accessibility review.",
-    citation: "Team update · §4",
-    searchDone: "Search complete",
-    references: "3 sources",
-    placeholder: "Ask questions directly to the model",
+    answer: "Improve search first. Collaboration has clear demand, but failure to find existing content affects more users and blocks the current workflow more directly. Collaboration should follow once search is reliable.",
+    citation: "Priority analysis · 3 evidence sets",
+    searchDone: "3 evidence sets compared",
+    references: "23 interviews · 127 feedback items",
+    placeholder: "Ask across your knowledge",
     model: "DeepSeek V4 Flash",
     effort: "Off",
     copy: "Copy answer",
     save: "Add to knowledge base",
-    finish: "Finished",
+    finish: "Recommendation ready",
     send: "Send",
     stop: "Stop generation",
   }),
@@ -72,8 +72,8 @@ const PHASES = Object.freeze([
 
 export const REAL_CHAT_PHASES = PHASES;
 
-const QUERY_TYPING_MS = 46;
-const ANSWER_TYPING_MS = 34;
+const QUERY_TYPING_MS = 39;
+const ANSWER_TYPING_MS = 24;
 
 function localize(locale) {
   return locale === "zh" || locale === "zh-CN" ? COPY.zh : COPY.en;
@@ -294,9 +294,9 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
             if (runId !== runRef.current) return;
             setQuery("");
             setPhase("sent");
-            schedule(() => setPhase("searching"), 580);
-            schedule(() => setPhase("comparing"), 1450);
-            schedule(() => setPhase("drafting"), 2320);
+            schedule(() => setPhase("searching"), 560);
+            schedule(() => setPhase("comparing"), 1480);
+            schedule(() => setPhase("drafting"), 2420);
             schedule(() => {
               setPhase("answering");
               setTimelineExpanded(false);
@@ -307,17 +307,17 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
                 if (answerIndex >= copy.answer.length) {
                   clearInterval(answerTicker);
                   timerRefs.current.delete(answerTicker);
-                  schedule(() => setPhase("complete"), 260);
-                  schedule(() => runTurn(), 3900);
+                  schedule(() => setPhase("complete"), 240);
+                  schedule(() => runTurn(), 4300);
                 }
               }, ANSWER_TYPING_MS);
               timerRefs.current.add(answerTicker);
-            }, 3190);
-          }, 250);
+            }, 3360);
+          }, 220);
         }
       }, QUERY_TYPING_MS);
       timerRefs.current.add(ticker);
-    }, 560);
+    }, 520);
   }, [clearTimers, copy.answer, copy.question, reducedMotion, reset, schedule]);
 
   useEffect(() => {
@@ -346,9 +346,9 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
     setPhase("sent");
     setAnswer("");
     setTimelineExpanded(true);
-    schedule(() => setPhase("searching"), 580);
-    schedule(() => setPhase("comparing"), 1450);
-    schedule(() => setPhase("drafting"), 2320);
+    schedule(() => setPhase("searching"), 560);
+    schedule(() => setPhase("comparing"), 1480);
+    schedule(() => setPhase("drafting"), 2420);
     schedule(() => {
       setPhase("answering");
       setTimelineExpanded(false);
@@ -363,7 +363,7 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
         }
       }, ANSWER_TYPING_MS);
       timerRefs.current.add(answerTicker);
-    }, 3190);
+    }, 3360);
   }, [clearTimers, copy.answer, query, schedule]);
 
   const handleStop = useCallback(() => {

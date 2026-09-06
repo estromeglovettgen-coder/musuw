@@ -14,10 +14,14 @@ test("the hero runs a localized in-view product walkthrough instead of a placeho
   assert.doesNotMatch(hero, /<video/);
   assert.match(demo, /useInView/);
   assert.match(demo, /useReducedMotion/);
-  assert.match(demo, /Northstar Calibration Phrase in Aurora Observation Guide/);
-  assert.match(demo, /reasoning round\(s\)/);
-  assert.match(demo, /tool call\(s\)/);
+  assert.match(demo, /Why new users are not coming back/);
+  assert.match(demo, /28 feedback items/);
+  assert.match(demo, /3 recurring issues/);
+  assert.match(demo, /9 cited excerpts/);
+  assert.match(demo, /Ask across your knowledge/);
   assert.match(demo, /hero-demo-citation/);
+  assert.doesNotMatch(demo, /Northstar Calibration|ORBITAL SAGE/);
+  assert.doesNotMatch(demo, /reasoning round\(s\)|tool call\(s\)/);
   assert.doesNotMatch(demo, /CheckCircle/);
   assert.doesNotMatch(demo, /Sparkle/);
   assert.match(demo, /return \(\) =>/);

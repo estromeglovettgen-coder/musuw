@@ -88,7 +88,7 @@ test("public capability copy follows the answer, agent, Wiki, graph, model, impo
   assert.match(homepageEnglish, /Backlinks/);
   assert.match(homepageEnglish, /30\+ leading models/);
   assert.match(homepageEnglish, /One-click web and video import/);
-  assert.match(homepageEnglish, /Save useful answers.*(?:knowledge|Wiki)/i);
+  assert.match(homepageEnglish, /keep the useful answer as knowledge/i);
   assert.match(homepageEnglish, /Exact citations/i);
 
   assert.doesNotMatch(homepageChinese, /RAG|Agent/);
@@ -97,8 +97,8 @@ test("public capability copy follows the answer, agent, Wiki, graph, model, impo
   assert.match(homepageChinese, /反向链接/);
   assert.match(homepageChinese, /30\+ 主流模型接入/);
   assert.match(homepageChinese, /社媒文章与视频一键入库/);
-  assert.match(homepageChinese, /有用回答.*沉淀.*知识库/);
-  assert.match(homepageChinese, /精确原文引用/);
+  assert.match(homepageChinese, /有用结论.*沉淀.*Wiki.*知识图谱|把有用结果留下来/);
+  assert.match(homepageChinese, /精确(?:原文)?引用/);
 });
 
 test("consumer pricing presents aligned descriptions, capacity, model access, and annual savings", () => {

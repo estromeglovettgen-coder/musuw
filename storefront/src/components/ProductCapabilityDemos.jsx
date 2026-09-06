@@ -22,54 +22,32 @@ export { ReasoningCapabilityDemo } from "./RealChatCapabilityDemo";
 const COPY = Object.freeze({
   en: Object.freeze({
     shared: Object.freeze({
-      placeholder: "Ask questions directly to the model",
+      placeholder: "Ask across your knowledge",
       model: "DeepSeek V4 Flash",
       effort: "Off",
     }),
-    reasoning: Object.freeze({
-      title: "Launch plan evidence review",
-      status: "3 sources connected",
-      question: "What changed in the launch plan, and why?",
-      sourceItems: Object.freeze(["Launch brief", "Research notes", "Team update"]),
-      steps: Object.freeze(["Search the library", "Compare the evidence", "Draft with citations"]),
-      answer: "The release moved to October so the team can finish the accessibility review.",
-      citation: "Team update · §4",
-      rounds: "reasoning rounds",
-      tools: "tool calls",
-    }),
     answer: Object.freeze({
-      title: "Launch risk review",
-      status: "Citations verified",
-      question: "Which launch risk needs attention first?",
-      response: "Accessibility review is the only risk blocking the release date.",
-      citation: "Launch brief · Risk register",
-      saved: "Saved to Product launch Wiki",
+      title: "Keep the useful answer",
+      question: "What did we learn about first-use friction?",
+      response: "New users need a clear next step immediately after their first import; uncertainty at that moment is the strongest recurring friction in the recent research.",
+      citation: "User interviews · 12 excerpts",
+      summary: Object.freeze(["12 excerpts", "4 related concepts", "ready to reuse"]),
+      saved: "Saved to Onboarding Wiki",
     }),
   }),
   zh: Object.freeze({
     shared: Object.freeze({
-      placeholder: "直接向模型提问",
+      placeholder: "基于你的知识提问",
       model: "DeepSeek V4 Flash",
       effort: "关闭",
     }),
-    reasoning: Object.freeze({
-      title: "发布计划证据审查",
-      status: "已连接 3 份资料",
-      question: "发布计划改了什么？原因是什么？",
-      sourceItems: Object.freeze(["发布简报", "研究笔记", "团队更新"]),
-      steps: Object.freeze(["检索知识库", "比对资料证据", "生成带引用回答"]),
-      answer: "发布时间调整到十月，以便团队完成无障碍审查。",
-      citation: "团队更新 · 第 4 节",
-      rounds: "轮推理",
-      tools: "次工具调用",
-    }),
     answer: Object.freeze({
-      title: "发布风险审查",
-      status: "引用已核验",
-      question: "哪个发布风险最需要优先处理？",
-      response: "无障碍审查是当前唯一影响发布日期的风险。",
-      citation: "发布简报 · 风险清单",
-      saved: "已保存到产品发布 Wiki",
+      title: "把有用回答留下来",
+      question: "关于首次使用阻力，我们已经确认了什么？",
+      response: "新用户第一次导入资料后，需要马上知道下一步该做什么；最近的研究里，这个时刻的不确定感是最反复出现的使用阻力。",
+      citation: "用户访谈 · 12 条证据",
+      summary: Object.freeze(["12 条证据", "4 个相关概念", "可继续复用"]),
+      saved: "已保存到 Onboarding Wiki",
     }),
   }),
 });
@@ -140,8 +118,9 @@ export function AnswerCapabilityDemo({ locale = "en" }) {
       </div>
       <div className="product-demo-thread answer-demo-thread">
         <div className="product-demo-summary">
-          <strong>2</strong> {copy.reasoning.rounds}<span>·</span>
-          <strong>3</strong> {copy.reasoning.tools}<span>·</span><strong>15s</strong>
+          <strong>{copy.answer.summary[0]}</strong><span>·</span>
+          <strong>{copy.answer.summary[1]}</strong><span>·</span>
+          <strong>{copy.answer.summary[2]}</strong>
           <CaretRight size={10} weight="bold" aria-hidden="true" />
         </div>
         <div className="product-demo-answer is-complete">

@@ -49,22 +49,27 @@ export function useCapabilityDemoPhase() {
 export const WIKI_DEMO_STAGES = Object.freeze([
   "loading-index",
   "index",
+  "selecting-page",
   "loading-page",
   "page",
+  "focus-source",
 ]);
 
 const WIKI_STAGE_DURATIONS = Object.freeze({
-  "loading-index": 700,
-  index: 1450,
-  "loading-page": 520,
-  page: 4200,
+  "loading-index": 620,
+  index: 1200,
+  "selecting-page": 620,
+  "loading-page": 480,
+  page: 1800,
+  "focus-source": 2300,
 });
 
 /**
- * Mirrors WikiBrowser's real visible states: load the Index, fetch the page a
- * user selected in the existing tree, then replace the reader atomically. The
- * production reader never reveals arbitrary paragraphs one at a time, so this
- * hook exposes data states rather than a generic animation phase.
+ * Mirrors WikiBrowser's real visible states while adding a deterministic
+ * walkthrough director for the public preview. The data transitions remain
+ * production-like: load Index -> select an existing page -> fetch it -> inspect
+ * its source relationship. Motion is only a camera/cursor layer over those
+ * states, never a second Wiki implementation.
  */
 export function useWikiDemoFlow() {
   const ref = useRef(null);
@@ -90,5 +95,5 @@ export function useWikiDemoFlow() {
     return () => window.clearTimeout(timer);
   }, [inView, reducedMotion, stage]);
 
-  return { ref, stage };
+  return { ref, stage, reducedMotion };
 }

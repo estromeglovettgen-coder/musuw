@@ -44,78 +44,78 @@ const MARKETING_COPY = Object.freeze({
         "Capture documents, webpages, and video; ask with evidence; keep the results as connected knowledge in a Wiki and graph",
     }),
     hero: Object.freeze({
-      eyebrow: "Agents · Wiki · Graph",
+      eyebrow: "Ask · Reason · Organize · Discover",
       typewriterPhrases: Object.freeze([
-        "Agents · Wiki · Graph",
-        "Turn documents into a living Wiki",
-        "Retrieve precise cited answers",
-        "Let agents reason with evidence",
-        "Reveal hidden links in the graph",
-        "Keep knowledge evolving",
+        "Ask · Reason · Organize · Discover",
+        "Find the pattern across dozens of sources",
+        "Compare evidence before making a decision",
+        "Let what you learn grow into a living Wiki",
+        "Connect ideas you saved months apart",
+        "Reuse old knowledge in the next question",
       ]),
       titleLine1: "Turn source material into",
       titleLine2: "intelligent knowledge assets",
       titleFocusSegments: Object.freeze(["intelligent", "knowledge", "assets"]),
-      descriptionLine1: "Cited answers, agent reasoning, and a connected Wiki in one system",
+      descriptionLine1: "Get answers and decisions you can trace back to the source",
       descriptionLine2:
-        "Capture documents, webpages, and video, then keep every useful result as knowledge",
+        "Then keep the useful parts as a living Wiki and knowledge graph that get better as your library grows",
       getStarted: "Start free",
       talkToSales: "Contact",
       dashboardAlt:
-        "musuw product walkthrough showing agent reasoning exact citations Wiki organization and knowledge graph connections",
+        "musuw product walkthrough showing cited synthesis agent reasoning a maintained Wiki and a growing knowledge graph",
     }),
     features: Object.freeze({
       intro: Object.freeze({
         label: "Three core modes",
         title: "RAG agents and connected knowledge—working as one",
         body:
-          "Ask with evidence, let agents handle complex work, and keep every Wiki page and graph link tied to its source",
+          "Move from a hard question to a traceable decision, then keep what you learned as knowledge you can use again",
       }),
       items: Object.freeze([
         Object.freeze({
           label: "Agent reasoning",
-          title: "Reason through complex work",
+          title: "Compare the evidence before you decide",
           description:
-            "Agents break down the task, search your knowledge, and return a cited result you can verify",
+            "Musuw searches across the sources you already have, checks competing signals, and returns a recommendation you can inspect",
           image: "/images/musuw-query-citation.jpg",
           imageAlt:
-            "musuw agent working through a complex task with knowledge-base retrieval and exact citations",
+            "musuw comparing interviews support feedback and usage evidence before returning a cited recommendation",
           bullets: Object.freeze([
-            "Multi-step reasoning",
-            "Knowledge-base retrieval",
-            "Tool orchestration",
-            "Exact citations",
+            "Search across multiple source sets",
+            "Compare conflicting signals",
+            "Make a recommendation with evidence",
+            "Open the source behind each claim",
           ]),
         }),
         Object.freeze({}),
         Object.freeze({
           label: "Knowledge Graph",
-          title: "Reveal the connections across your knowledge",
+          title: "See when separate notes are really about the same problem",
           description:
-            "Backlinks and shared entities reveal how ideas connect while every path remains traceable",
+            "Musuw connects concepts that appear across interviews, research, notes, and prior answers so useful relationships do not stay hidden",
           image: "/images/musuw-wiki-graph.jpg",
           imageAlt:
-            "musuw knowledge graph showing backlinks shared entities and traceable cross-source relationships",
+            "musuw knowledge graph connecting concepts found across product research and prior notes",
           bullets: Object.freeze([
-            "Backlinks",
-            "Entity relationships",
-            "Cross-source discovery",
-            "Traceable evidence",
+            "Cross-source relationships",
+            "Backlinks that explain the connection",
+            "Concepts that grow with new material",
+            "Paths back to supporting evidence",
           ]),
         }),
         Object.freeze({
           label: "AI Wiki",
-          title: "Distill raw sources into a living Wiki",
+          title: "Let what you learn grow into your own Wiki",
           description:
-            "Musuw turns summaries, entities, categories, and source links into pages that stay useful as your library grows",
+            "Papers, videos, articles, and notes become maintained pages with definitions, related concepts, backlinks, and source history",
           image: "/images/musuw-wiki-page.jpg",
           imageAlt:
-            "musuw AI Wiki with generated summaries entities categories and source links",
+            "musuw AI Wiki organizing learning material into maintained pages with backlinks and sources",
           bullets: Object.freeze([
-            "Automatic summaries",
-            "Entity extraction",
-            "Structured pages",
-            "Source links",
+            "Pages synthesized from several sources",
+            "Definitions and concepts stay organized",
+            "Backlinks preserve context",
+            "New sources keep the page current",
           ]),
         }),
       ]),
@@ -125,7 +125,7 @@ const MARKETING_COPY = Object.freeze({
         label: "Platform",
         title: "Built for the full knowledge loop",
         body:
-          "Parse each source, use leading models, capture the web, and keep your knowledge current",
+          "Bring in the material you already use, reason across it, and keep the useful result instead of starting over next time",
       }),
       cards: Object.freeze([
         Object.freeze({
@@ -136,12 +136,12 @@ const MARKETING_COPY = Object.freeze({
         Object.freeze({
           title: "Agent reasoning",
           body:
-            "Plan searches, use enabled tools, and finish complex work with cited results",
+            "Search several times, compare evidence, use enabled tools, and finish complex work with citations",
         }),
         Object.freeze({
           title: "AI Wiki and graph",
           body:
-            "Build summaries, entities, linked pages, and traceable relationships automatically",
+            "Keep useful conclusions as maintained pages, backlinks, entities, and traceable relationships",
         }),
         Object.freeze({
           title: "30+ leading models",
@@ -156,7 +156,7 @@ const MARKETING_COPY = Object.freeze({
         Object.freeze({
           title: "Knowledge that maintains itself",
           body:
-            "Save useful answers while AI updates the Wiki, entities, and connections",
+            "Reuse prior answers while the Wiki, entities, backlinks, and relationships keep evolving",
         }),
       ]),
     }),
@@ -237,7 +237,7 @@ const MARKETING_COPY = Object.freeze({
     finalCta: Object.freeze({
       title: "Put your knowledge to work",
       body:
-        "Start with a document, webpage, or video. Turn scattered sources into connected knowledge you can query, verify, and reuse",
+        "Start with a document, webpage, or video. Ask better questions now, then keep the useful answer as knowledge you can use again",
       action: "Start free",
     }),
     footerGroups: Object.freeze([
@@ -250,58 +250,58 @@ const MARKETING_COPY = Object.freeze({
     navLabels: Object.freeze(["功能", "平台", "定价", "安全", "联系"]),
     meta: Object.freeze({
       title: "musuw｜把资料转化为会思考的知识资产",
-      description: "采集文档、网页与视频，让智能体问答、推理与 Wiki、知识图谱协同工作",
+      description: "采集文档、网页与视频，从资料中得到可核验的答案，并把有用结果沉淀成持续生长的知识",
     }),
     hero: Object.freeze({
-      eyebrow: "智能体 · Wiki · 图谱",
+      eyebrow: "提问 · 推理 · 沉淀 · 发现",
       typewriterPhrases: Object.freeze([
-        "智能体 · Wiki · 图谱",
-        "文档变成 Wiki",
-        "找到每个精确答案",
-        "智能体带证据推理",
-        "图谱连接隐藏关系",
-        "知识随使用持续进化",
+        "提问 · 推理 · 沉淀 · 发现",
+        "从几十份资料里找出真正重复的问题",
+        "先比较证据，再给出可核验的判断",
+        "让学过的内容长成自己的 Wiki",
+        "连接几个月前后保存的同一个概念",
+        "让旧知识在新问题里再次被用上",
       ]),
       titleLine1: "把资料转化为",
       titleLine2: "会思考的知识资产",
       titleFocusSegments: Object.freeze(["会", "思考的", "知识资产"]),
-      descriptionLine1: "智能体问答、推理与 Wiki 图谱一体化",
-      descriptionLine2: "采集文档、网页与视频，完成复杂任务，让有用结果沉淀为知识",
+      descriptionLine1: "从分散资料中得到可核验的答案和判断",
+      descriptionLine2: "再把有用结论沉淀成持续更新的 Wiki 与知识图谱，下一次不必重新开始",
       getStarted: "免费开始",
       talkToSales: "联系",
-      dashboardAlt: "展示智能体推理、精确引用、Wiki 整理和知识图谱连接的 musuw 操作视频",
+      dashboardAlt: "展示跨资料综合、智能体推理、精确引用、Wiki 沉淀和知识图谱连接的 musuw 产品演示",
     }),
     features: Object.freeze({
       intro: Object.freeze({
         label: "三种核心能力",
         title: "智能体与相互连接的知识 协同工作",
-        body: "带证据提问，让智能体完成复杂任务，把资料整理成可追溯的 Wiki 与图谱",
+        body: "从一个难问题出发，先得到可核验的判断，再把学到的内容保留下来，下一次继续使用",
       }),
       items: Object.freeze([
         Object.freeze({
           label: "智能体问答",
-          title: "自主编排 完成复杂任务",
-          description: "智能体拆解任务，多轮检索知识库，调用允许的工具，组合出可回到原文核验的结果",
+          title: "先比较证据，再做出判断",
+          description: "musuw 会跨用户访谈、客服反馈、研究资料等多组来源检索和比对，再给出能回到原文核验的建议",
           image: "/images/musuw-query-citation.jpg",
-          imageAlt: "通过知识库检索和精确引用完成复杂任务的 musuw 智能体",
-          bullets: Object.freeze(["多步任务推理", "知识库检索", "工具自主编排", "精确原文引用"]),
+          imageAlt: "musuw 跨用户访谈 客服反馈和使用数据比较证据后给出带引用的产品建议",
+          bullets: Object.freeze(["跨多组资料检索", "比较相互冲突的信号", "基于证据形成建议", "关键结论可回到原文"]),
         }),
         Object.freeze({}),
         Object.freeze({
           label: "知识图谱",
-          title: "发掘隐藏关系 连接每一条知识",
-          description: "反向链接、共享实体与跨资料引用，揭示知识联系；每条关系都能回到支持它的资料",
+          title: "发现不同资料里，其实在讲同一个问题",
+          description: "访谈、研究、笔记和旧回答里的概念会被连接起来，让原本分散的线索逐渐形成一张可追溯的知识网络",
           image: "/images/musuw-wiki-graph.jpg",
-          imageAlt: "展示反向链接 共享实体和可追溯跨资料关系的 musuw 知识图谱",
-          bullets: Object.freeze(["反向链接", "实体关系", "跨资料发现", "关系证据可追溯"]),
+          imageAlt: "musuw 知识图谱连接产品研究 用户访谈和历史笔记中的相关概念",
+          bullets: Object.freeze(["跨资料发现关系", "反向链接解释为什么相关", "新资料加入后关系继续生长", "每条路径可回到证据"]),
         }),
         Object.freeze({
           label: "AI Wiki",
-          title: "文档自动蒸馏 长成结构化 Wiki",
-          description: "Musuw 自动提取摘要、实体、分类与资料关联，把内容整理成持续更新的页面",
+          title: "让学过的内容，自动长成自己的 Wiki",
+          description: "论文、视频、文章和笔记被整理成持续维护的页面，定义、相关概念、反向链接和来源都保留在一起",
           image: "/images/musuw-wiki-page.jpg",
-          imageAlt: "包含自动摘要 实体 分类和资料关联的 musuw AI Wiki",
-          bullets: Object.freeze(["自动摘要", "实体提取", "结构化页面", "资料来源关联"]),
+          imageAlt: "musuw AI Wiki 把论文 视频 文章和个人笔记整理成带来源与反向链接的知识页面",
+          bullets: Object.freeze(["多份资料共同生成页面", "概念与定义持续整理", "反向链接保留上下文", "新来源自动补充页面"]),
         }),
       ]),
     }),
@@ -309,7 +309,7 @@ const MARKETING_COPY = Object.freeze({
       intro: Object.freeze({
         label: "平台能力",
         title: "覆盖完整知识闭环",
-        body: "解析资料、接入主流模型、采集网页与视频，让知识系统持续更新",
+        body: "把你本来就在看的资料放进来，跨资料推理，再把有用结果留下来，而不是下一次从头开始",
       }),
       cards: Object.freeze([
         Object.freeze({
@@ -318,11 +318,11 @@ const MARKETING_COPY = Object.freeze({
         }),
         Object.freeze({
           title: "智能体多步推理",
-          body: "智能体规划检索、调用工具，以带引用的结果完成复杂任务",
+          body: "多轮检索、比较证据、调用允许的工具，以带引用结果完成复杂任务",
         }),
         Object.freeze({
           title: "AI 自动 Wiki 与图谱",
-          body: "自动生成摘要、实体、关联页面与可追溯关系，整理原始资料",
+          body: "把有用结论保留成持续维护的页面、实体、反向链接与可追溯关系",
         }),
         Object.freeze({
           title: "30+ 主流模型接入",
@@ -334,7 +334,7 @@ const MARKETING_COPY = Object.freeze({
         }),
         Object.freeze({
           title: "知识复利与自动维护",
-          body: "把有用回答沉淀回知识库，AI 持续更新 Wiki、实体与关系",
+          body: "旧回答可以继续复用，Wiki、实体、反向链接与关系也会随着新资料持续更新",
         }),
       ]),
     }),
@@ -407,7 +407,7 @@ const MARKETING_COPY = Object.freeze({
     }),
     finalCta: Object.freeze({
       title: "让知识真正为你工作",
-      body: "从文档、网页或视频开始，把零散资料变成可提问、可连接的知识系统",
+      body: "从一份文档、一个网页或一段视频开始。先问出更好的答案，再把有用结果留下来，下一次继续用",
       action: "免费开始",
     }),
     footerGroups: Object.freeze([
