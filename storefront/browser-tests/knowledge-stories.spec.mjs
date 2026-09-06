@@ -6,8 +6,29 @@ async function checkPageWidth(page) {
 }
 async function capture(locator, name, testInfo) {
   const path = testInfo.outputPath(`${name}.png`);
-  await locator.screenshot({ path });
+  const page = locator.page();
+  const bounds = await locator.boundingBox();
+  expect(bounds).not.toBeNull();
+  const viewport = page.viewportSize();
+  const x = Math.max(0, bounds.x);
+  const y = Math.max(0, bounds.y);
+  const width = Math.min(viewport.width, bounds.x + bounds.width) - x;
+  const height = Math.min(viewport.height, bounds.y + bounds.height) - y;
+  expect(width).toBeGreaterThan(0);
+  expect(height).toBeGreaterThan(0);
+  // Element screenshots may scroll a spring-driven hero repeatedly while waiting
+  // for stability. Capture the actual visible pixels without directing the page.
+  await page.screenshot({ path, clip: { x, y, width, height } });
   await testInfo.attach(name, { path, contentType: "image/png" });
+}
+async function waitWikiPhase(page, phase) {
+  // A 450 ms hover can fall between a retrying assertion's one-second polls.
+  // Observe every browser frame instead of changing the production timing.
+  await page.waitForFunction(
+    (value) => document.querySelector('[data-product-page-shell="wiki"]')?.dataset.demoPhase === value,
+    phase,
+    { polling: "raf", timeout: 15_000 },
+  );
 }
 async function assertSource(page, parent, id, testInfo, name) {
   const source = parent.locator(`[data-demo-source="${id}"]`);
@@ -74,29 +95,29 @@ for (const locale of ["zh-CN", "en"]) {
       const trigger = wiki.locator('[data-wiki-source-trigger="true"]');
       const camera = wiki.locator('[data-wiki-camera="true"]');
       if (reducedMotion === "reduce") {
-        await expect(wiki).toHaveAttribute("data-demo-phase", "page");
+        await waitWikiPhase(page, "page");
         await expect(wiki.locator("[data-demo-pointer]")).toHaveCount(0);
         await trigger.click();
         await assertSource(page, wiki, "longmemeval", testInfo, "wiki-source");
       } else {
-        await expect(wiki).toHaveAttribute("data-demo-phase", "hovering-source", { timeout: 15_000 });
+        await waitWikiPhase(page, "hovering-source");
         await expect(trigger).toBeInViewport();
-        await expect(wiki).toHaveAttribute("data-demo-phase", "source-open");
+        await waitWikiPhase(page, "source-open");
         await expect(wiki.locator('[data-demo-source="longmemeval"]')).toBeVisible();
         const beforeZoom = await camera.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
         expect(beforeZoom).toBeCloseTo(1, 2);
-        await expect(wiki).toHaveAttribute("data-demo-phase", "focus-source");
+        await waitWikiPhase(page, "focus-source");
         await expect.poll(async () => camera.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeGreaterThan(1.06);
         const focusedScale = await camera.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
         expect(focusedScale).toBeLessThanOrEqual(1.08);
         await capture(wiki, "wiki-focused-source", testInfo);
-        await expect(wiki).toHaveAttribute("data-demo-phase", "restore");
-        await expect(wiki).toHaveAttribute("data-demo-phase", "page");
+        await waitWikiPhase(page, "restore");
+        await waitWikiPhase(page, "page");
         await expect(wiki.locator("[data-demo-source]")).toHaveCount(0);
         await trigger.click();
         await assertSource(page, wiki, "longmemeval", testInfo, "wiki-manual-source");
       }
-      await expect(wiki).toHaveAttribute("data-demo-phase", "page");
+      await waitWikiPhase(page, "page");
       await capture(wiki, "wiki-page", testInfo);
 
       const graph = page.locator('[data-product-page-shell="graph"]');
