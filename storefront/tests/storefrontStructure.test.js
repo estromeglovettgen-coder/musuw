@@ -18,10 +18,6 @@ function homepageCopy(locale) {
 }
 
 test("commercial home keeps the smooth template and presents the approved product hierarchy", () => {
-  // Vite 8's middleware-mode SSR runner leaves the Node test-file isolation
-  // promise pending after every assertion has completed. Render in a bounded
-  // child process so the real JSX still goes through Vite while this suite has
-  // deterministic cleanup and can report its final result.
   const { home, japanHome, footer, contact, contactZh } = JSON.parse(
     execFileSync(process.execPath, [join(root, "tests/renderStorefrontFixture.mjs")], {
       cwd: root,
@@ -42,9 +38,9 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 4);
   assert.equal((home.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.doesNotMatch(home, /class="(?:section|feature)-label"/);
-  assert.match(home, /Reason through complex work/);
-  assert.match(home, /Distill raw sources into a living Wiki/);
-  assert.match(home, /Reveal the connections across your knowledge/);
+  assert.match(home, /Compare the evidence before you decide/);
+  assert.match(home, /Let what you learn grow into your own Wiki/);
+  assert.match(home, /See when separate notes are really about the same problem/);
   assert.match(home, /30\+ leading models/);
   assert.match(home, /One-click web and video import/);
   assert.match(home, /Knowledge that maintains itself/);
