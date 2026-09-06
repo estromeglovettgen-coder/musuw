@@ -162,7 +162,7 @@ func TestTikHubImporterFetchesXiaohongshuImageAndConditionallyVideo(t *testing.T
 		case "/api/v1/xiaohongshu/app_v2/get_image_note_detail":
 			io.WriteString(w, `{"code":200,"data":{"type":"video","title":"XHS video","desc":"caption","image_list":[{"url":"https://img.example/cover.jpg"}]}}`)
 		case "/api/v1/xiaohongshu/app_v2/get_video_note_detail":
-			io.WriteString(w, `{"code":200,"data":{"title":"XHS video","desc":"caption","video":{"url":"https://cdn.example/xhs.mp4"}}}`)
+			_, _ = io.WriteString(w, `{"code":200,"data":{"data":[{"title":"XHS video","desc":"caption","video_info_v2":{"media":{"stream":{"h264":[{"master_url":"https://cdn.example/xhs.mp4","video_codec":"h264"}]}}}}]}}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -211,6 +211,64 @@ func TestTikHubImporterFetchesXiaohongshuImageAndConditionallyVideo(t *testing.T
 	}
 	if !strings.Contains(imageResult.Markdown, "![image 1](https://img.example/one.jpg)") {
 		t.Fatalf("image markdown = %q", imageResult.Markdown)
+	}
+}
+
+func TestNormalizeXiaohongshuSelectsTargetH264Stream(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]any{"data": []any{
+		map[string]any{
+			"title": "Requested work",
+			"video_info_v2": map[string]any{"media": map[string]any{"stream": map[string]any{
+				"h265": []any{map[string]any{
+					"master_url":  "https://cdn.example/target-hevc.mp4",
+					"video_codec": "hevc",
+					"size":        float64(39_084_007),
+				}},
+				"h264": []any{map[string]any{
+					"master_url":  "https://cdn.example/target-h264.mp4",
+					"video_codec": "h264",
+					"size":        float64(112_301_200),
+				}},
+			}}},
+		},
+		map[string]any{
+			"title": "Related work",
+			"video_info_v2": map[string]any{"media": map[string]any{"stream": map[string]any{
+				"h264": []any{map[string]any{
+					"master_url":  "https://cdn.example/related-smaller-h264.mp4",
+					"video_codec": "h264",
+				}},
+			}}},
+		},
+	}}
+
+	for range 50 {
+		result, err := normalizeWork(PlatformXiaohongshu, "", data, false)
+		if err != nil {
+			t.Fatalf("normalizeWork() error = %v", err)
+		}
+		if result.MediaURL != "https://cdn.example/target-h264.mp4" {
+			t.Fatalf("MediaURL = %q, want the requested work's H.264 stream", result.MediaURL)
+		}
+	}
+}
+
+func TestNormalizeXiaohongshuRejectsExplicitHEVCOnlyStream(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]any{"data": []any{map[string]any{
+		"video_info_v2": map[string]any{"media": map[string]any{"stream": map[string]any{
+			"h265": []any{map[string]any{
+				"master_url":  "https://cdn.example/target-hevc.mp4",
+				"video_codec": "hevc",
+			}},
+		}}},
+	}}}
+
+	if got := videoURL(PlatformXiaohongshu, data); got != "" {
+		t.Fatalf("videoURL() = %q, want no HEVC fallback", got)
 	}
 }
 
