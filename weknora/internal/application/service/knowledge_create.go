@@ -401,7 +401,12 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 		return nil, ErrInvalidFileType
 	}
 	if IsVideoType(getFileType(fileName)) && file.Size > secutils.GetMaxVideoFileSizeBytes() {
-		logger.Warnf(ctx, "Rejected oversized video before hashing: size=%d max=%d", file.Size, secutils.GetMaxVideoFileSizeBytes())
+		logger.Warnf(
+			ctx,
+			"Rejected oversized video before hashing: size=%d max=%d",
+			file.Size,
+			secutils.GetMaxVideoFileSizeBytes(),
+		)
 		return nil, werrors.NewBadRequestError(VideoTooLargePublicMessage)
 	}
 

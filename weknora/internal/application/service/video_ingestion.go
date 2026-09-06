@@ -22,11 +22,17 @@ import (
 const (
 	defaultVideoModelID = "builtin-openrouter-vlm-mimo-v2-5"
 
-	VideoParsingPublicMessage      = "原视频已保存，正在解析"
-	VideoRetryingPublicMessage     = "视频解析暂时没有得到结果，正在重试"
-	VideoParseFailedPublicMessage  = "视频解析失败，原视频已保存，可以重新解析"
-	VideoTooLargePublicMessage     = "视频超过 300 MB，当前版本暂不支持"
+	// VideoParsingPublicMessage is the consumer-visible active parsing state.
+	VideoParsingPublicMessage = "原视频已保存，正在解析"
+	// VideoRetryingPublicMessage is the consumer-visible sole-retry state.
+	VideoRetryingPublicMessage = "视频解析暂时没有得到结果，正在重试"
+	// VideoParseFailedPublicMessage is the sanitized terminal parse failure.
+	VideoParseFailedPublicMessage = "视频解析失败，原视频已保存，可以重新解析"
+	// VideoTooLargePublicMessage is the sanitized product-size failure.
+	VideoTooLargePublicMessage = "视频超过 300 MB，当前版本暂不支持"
+	// VideoSourceFailedPublicMessage is the sanitized source retrieval failure.
 	VideoSourceFailedPublicMessage = "视频来源获取失败，请稍后重试"
+	// VideoFormatFailedPublicMessage is the sanitized unsupported-format failure.
 	VideoFormatFailedPublicMessage = "暂不支持此视频格式"
 )
 
@@ -47,7 +53,7 @@ const (
 )
 
 const videoUnderstandingPrompt = `<system_prompt>
-You are a factual video understanding assistant. Convert the supplied video into searchable Markdown in the requested language.
+You are a factual video understanding assistant. Convert the video into searchable Markdown in the requested language.
 </system_prompt>
 
 <instructions>
@@ -90,7 +96,11 @@ func (s *knowledgeService) convertVideo(
 	if videoSize > secutils.GetMaxVideoFileSizeBytes() {
 		return s.failVideoKnowledge(
 			ctx, knowledge, videoFailureSize, false,
-			fmt.Errorf("video source size %d exceeds product maximum %d", videoSize, secutils.GetMaxVideoFileSizeBytes()),
+			fmt.Errorf(
+				"video source size %d exceeds product maximum %d",
+				videoSize,
+				secutils.GetMaxVideoFileSizeBytes(),
+			),
 		)
 	}
 
@@ -163,7 +173,13 @@ func (s *knowledgeService) convertVideo(
 			if urlSourceErr == nil {
 				urlSourceErr = fmt.Errorf("fixed video model does not expose URL input")
 			}
-			return s.failVideoKnowledge(ctx, knowledge, videoFailureParse, videoFailureRetryable(urlSourceErr), urlSourceErr)
+			return s.failVideoKnowledge(
+				ctx,
+				knowledge,
+				videoFailureParse,
+				videoFailureRetryable(urlSourceErr),
+				urlSourceErr,
+			)
 		}
 		fileReader, readErr := fileService.GetFile(ctx, payload.FilePath)
 		if readErr != nil {
@@ -283,7 +299,13 @@ func (s *knowledgeService) failVideoKnowledge(
 		if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
 			logger.Warnf(ctx, "[Video] failed to publish retry state for %s: %v", knowledge.ID, err)
 		}
-		logger.Warnf(ctx, "[Video] scheduling sole retry knowledge=%s retry=%d err=%v", knowledge.ID, retryCount, failureErr)
+		logger.Warnf(
+			ctx,
+			"[Video] scheduling sole retry knowledge=%s retry=%d err=%v",
+			knowledge.ID,
+			retryCount,
+			failureErr,
+		)
 		return nil, failureErr
 	}
 
@@ -295,7 +317,14 @@ func (s *knowledgeService) failVideoKnowledge(
 		logger.Warnf(ctx, "[Video] failed to publish terminal state for %s: %v", knowledge.ID, err)
 	}
 	s.failStage(ctx, knowledge.ID, types.StageDocReader, code, message, failureErr)
-	logger.Errorf(ctx, "[Video] terminal failure knowledge=%s kind=%s retry=%d err=%v", knowledge.ID, kind, retryCount, failureErr)
+	logger.Errorf(
+		ctx,
+		"[Video] terminal failure knowledge=%s kind=%s retry=%d err=%v",
+		knowledge.ID,
+		kind,
+		retryCount,
+		failureErr,
+	)
 	return nil, errors.Join(asynq.SkipRetry, failureErr)
 }
 

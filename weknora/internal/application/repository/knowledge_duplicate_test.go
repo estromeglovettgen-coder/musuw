@@ -72,8 +72,13 @@ func TestCheckKnowledgeExists_SocialFailedRowReusesOnlyMaterializedSource(t *tes
 
 	reusableID := uuid.NewString()
 	require.NoError(t, db.Exec(`
-		INSERT INTO knowledges (id, tenant_id, knowledge_base_id, type, title, source, file_type, file_hash, file_path, parse_status)
-		VALUES (?, ?, ?, 'url', 'saved video', 'https://example.test/work', 'mp4', ?, 'resource://abcdefghijklmnopqrstuv', 'failed')
+		INSERT INTO knowledges (
+			id, tenant_id, knowledge_base_id, type, title, source,
+			file_type, file_hash, file_path, parse_status
+		) VALUES (
+			?, ?, ?, 'url', 'saved video', 'https://example.test/work',
+			'mp4', ?, 'resource://abcdefghijklmnopqrstuv', 'failed'
+		)
 	`, reusableID, tenantID, kbID, fileHash).Error)
 
 	exists, knowledge, err := repo.CheckKnowledgeExists(ctx, tenantID, kbID, &types.KnowledgeCheckParams{

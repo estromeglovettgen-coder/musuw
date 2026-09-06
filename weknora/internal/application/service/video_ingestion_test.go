@@ -183,7 +183,13 @@ func TestConvertVideoUsesFixedModelAndSignedURLWithoutReadingObject(t *testing.T
 
 	result, err := svc.convertVideo(
 		types.WithTaskRetryMetadata(context.Background(), 0, 3),
-		payload, kb, knowledge, types.EffectiveProcessConfig{VLMConfig: types.VLMConfig{ModelID: "user-selected-model"}}, false,
+		payload,
+		kb,
+		knowledge,
+		types.EffectiveProcessConfig{
+			VLMConfig: types.VLMConfig{ModelID: "user-selected-model"},
+		},
+		false,
 	)
 	if err != nil {
 		t.Fatalf("convertVideo: %v", err)
@@ -264,7 +270,12 @@ func TestConvertVideoRetriesTransientFailureExactlyOnce(t *testing.T) {
 	payload, kb, knowledge := videoIngestionFixture(1024)
 
 	_, firstErr := svc.convertVideo(
-		types.WithTaskRetryMetadata(context.Background(), 0, 3), payload, kb, knowledge, types.EffectiveProcessConfig{}, false,
+		types.WithTaskRetryMetadata(context.Background(), 0, 3),
+		payload,
+		kb,
+		knowledge,
+		types.EffectiveProcessConfig{},
+		false,
 	)
 	if firstErr == nil || errors.Is(firstErr, asynq.SkipRetry) {
 		t.Fatalf("first error = %v, want one queue retry", firstErr)
@@ -274,7 +285,12 @@ func TestConvertVideoRetriesTransientFailureExactlyOnce(t *testing.T) {
 	}
 
 	_, secondErr := svc.convertVideo(
-		types.WithTaskRetryMetadata(context.Background(), 1, 3), payload, kb, knowledge, types.EffectiveProcessConfig{}, false,
+		types.WithTaskRetryMetadata(context.Background(), 1, 3),
+		payload,
+		kb,
+		knowledge,
+		types.EffectiveProcessConfig{},
+		false,
 	)
 	if !errors.Is(secondErr, asynq.SkipRetry) {
 		t.Fatalf("second error = %v, want SkipRetry", secondErr)
@@ -283,7 +299,12 @@ func TestConvertVideoRetriesTransientFailureExactlyOnce(t *testing.T) {
 		t.Fatalf("second state = %s / %q", knowledge.ParseStatus, knowledge.ErrorMessage)
 	}
 	if model.urlCalls != 2 || fileSvc.getURLCalls != 2 || fileSvc.getFileCalls != 0 {
-		t.Fatalf("retry did not reuse URL source: url=%d sign=%d read=%d", model.urlCalls, fileSvc.getURLCalls, fileSvc.getFileCalls)
+		t.Fatalf(
+			"retry did not reuse URL source: url=%d sign=%d read=%d",
+			model.urlCalls,
+			fileSvc.getURLCalls,
+			fileSvc.getFileCalls,
+		)
 	}
 }
 
@@ -294,7 +315,12 @@ func TestConvertVideoDoesNotRetryPermanentFailure(t *testing.T) {
 	payload, kb, knowledge := videoIngestionFixture(1024)
 
 	_, err := svc.convertVideo(
-		types.WithTaskRetryMetadata(context.Background(), 0, 3), payload, kb, knowledge, types.EffectiveProcessConfig{}, false,
+		types.WithTaskRetryMetadata(context.Background(), 0, 3),
+		payload,
+		kb,
+		knowledge,
+		types.EffectiveProcessConfig{},
+		false,
 	)
 	if !errors.Is(err, asynq.SkipRetry) {
 		t.Fatalf("error = %v, want SkipRetry on the first permanent failure", err)
@@ -303,7 +329,12 @@ func TestConvertVideoDoesNotRetryPermanentFailure(t *testing.T) {
 		t.Fatalf("terminal state = %s / %q", knowledge.ParseStatus, knowledge.ErrorMessage)
 	}
 	if model.urlCalls != 1 || fileSvc.getURLCalls != 1 || fileSvc.getFileCalls != 0 {
-		t.Fatalf("permanent failure calls: url=%d sign=%d read=%d", model.urlCalls, fileSvc.getURLCalls, fileSvc.getFileCalls)
+		t.Fatalf(
+			"permanent failure calls: url=%d sign=%d read=%d",
+			model.urlCalls,
+			fileSvc.getURLCalls,
+			fileSvc.getFileCalls,
+		)
 	}
 }
 

@@ -51,7 +51,8 @@ func GetMaxFileSizeMB() int64 {
 // negative, or larger values fall back to that maximum.
 func GetMaxVideoFileSizeBytes() int64 {
 	if sizeStr := os.Getenv("VIDEO_MAX_BYTES"); sizeStr != "" {
-		if size, err := strconv.ParseInt(sizeStr, 10, 64); err == nil && size > 0 && size <= defaultMaxVideoFileSizeBytes {
+		size, err := strconv.ParseInt(sizeStr, 10, 64)
+		if err == nil && size > 0 && size <= defaultMaxVideoFileSizeBytes {
 			return size
 		}
 	}

@@ -50,12 +50,14 @@ const (
 	// but stage status is marked failed so the UI can warn.
 	ErrCodeMultimodalAllFailed = "MULTIMODAL_ALL_FAILED"
 
-	// Video ingestion has its own operator-facing categories. Consumer APIs
-	// translate these to product copy and omit the identifiers themselves.
-	ErrCodeVideoSourceFailed      = "VIDEO_SOURCE_FAILED"
-	ErrCodeVideoTooLarge          = "VIDEO_TOO_LARGE"
+	// ErrCodeVideoSourceFailed identifies failure to retrieve a saved video source.
+	ErrCodeVideoSourceFailed = "VIDEO_SOURCE_FAILED"
+	// ErrCodeVideoTooLarge identifies a video over the product byte ceiling.
+	ErrCodeVideoTooLarge = "VIDEO_TOO_LARGE"
+	// ErrCodeVideoFormatUnsupported identifies an unsupported video container.
 	ErrCodeVideoFormatUnsupported = "VIDEO_FORMAT_UNSUPPORTED"
-	ErrCodeVideoParseFailed       = "VIDEO_PARSE_FAILED"
+	// ErrCodeVideoParseFailed identifies a terminal video understanding failure.
+	ErrCodeVideoParseFailed = "VIDEO_PARSE_FAILED"
 
 	// ErrCodeTaskTimeout — asynq retry budget exhausted. Used by the
 	// dead-letter callback when promoting a task failure into a stage

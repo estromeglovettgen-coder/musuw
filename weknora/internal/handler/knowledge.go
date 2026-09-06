@@ -394,8 +394,13 @@ func (h *KnowledgeHandler) CreateKnowledgeFromFile(c *gin.Context) {
 	}
 	uploadFileType := strings.TrimPrefix(strings.ToLower(path.Ext(uploadFileName)), ".")
 	if service.IsVideoType(uploadFileType) && file.Size > utils.GetMaxVideoFileSizeBytes() {
-		logger.Warnf(ctx, "Rejected oversized multipart video: size=%d max=%d", file.Size, utils.GetMaxVideoFileSizeBytes())
-		c.Error(errors.NewBadRequestError(service.VideoTooLargePublicMessage))
+		logger.Warnf(
+			ctx,
+			"Rejected oversized multipart video: size=%d max=%d",
+			file.Size,
+			utils.GetMaxVideoFileSizeBytes(),
+		)
+		_ = c.Error(errors.NewBadRequestError(service.VideoTooLargePublicMessage))
 		return
 	}
 	maxSizeMB := utils.GetMaxFileSizeMB()
@@ -842,10 +847,16 @@ func consumerVideoPublicError(code, message string) string {
 		return service.VideoFormatFailedPublicMessage
 	}
 	lower := strings.ToLower(trimmed)
-	if strings.Contains(message, "300 MB") || strings.Contains(lower, "too large") || strings.Contains(lower, "upload limit") {
+	if strings.Contains(message, "300 MB") ||
+		strings.Contains(lower, "too large") ||
+		strings.Contains(lower, "upload limit") {
 		return service.VideoTooLargePublicMessage
 	}
-	if strings.Contains(trimmed, "来源") || strings.Contains(lower, "source") || strings.Contains(lower, "download") || strings.Contains(lower, "storage") || strings.Contains(lower, "get video") {
+	if strings.Contains(trimmed, "来源") ||
+		strings.Contains(lower, "source") ||
+		strings.Contains(lower, "download") ||
+		strings.Contains(lower, "storage") ||
+		strings.Contains(lower, "get video") {
 		return service.VideoSourceFailedPublicMessage
 	}
 	return service.VideoParseFailedPublicMessage
