@@ -30,7 +30,7 @@ const COPY = Object.freeze({
       title: "Keep the useful answer",
       question: "What should we test after this retention review?",
       response: "Test a shorter path to the first completed exercise. Track completion first, then check week-one retention before deciding whether to expand the change.",
-      citation: "Learning product · Simulated research",
+      citation: "Interviews · Usage funnel",
       summary: Object.freeze(["Interviews", "Usage evidence", "ready to reuse"]),
       saved: "Saved to Learning Product Research",
     }),
@@ -45,7 +45,7 @@ const COPY = Object.freeze({
       title: "保留有依据的研究结论",
       question: "这次留存复盘，最值得先验证什么？",
       response: "先测试更短的首次练习路径，观察练习完成率，再检查首周留存是否改善，以此决定是否扩大改动范围。",
-      citation: "在线学习产品 · 模拟研究资料",
+      citation: "用户访谈 · 使用漏斗",
       summary: Object.freeze(["用户访谈", "使用数据", "可继续复用"]),
       saved: "已保存到学习产品研究",
     }),
@@ -93,7 +93,7 @@ export function GraphCapabilityDemo({ locale = "en" }) {
 
   return (
     <KnowledgeBaseProductPreview
-      graphAutoPlay={inView && !reducedMotion}
+      graphAutoPlay={inView && reducedMotion === false}
       locale={locale}
       shellRef={ref}
       view="graph"
@@ -109,7 +109,9 @@ export function AnswerCapabilityDemo({ locale = "en" }) {
     <MusuwProductShell
       className="capability-demo capability-demo-answer"
       data-capability-demo="answer"
+      data-demo-interactive="false"
       data-demo-phase={phase}
+      inert
       shellRef={ref}
       title={copy.answer.title}
     >

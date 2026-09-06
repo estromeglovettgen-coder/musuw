@@ -61,10 +61,10 @@ export const DEMO_SOURCES = Object.freeze({
     zh: { title: "首次练习漏斗", locator: "发现 · 初次使用路径", excerpt: "早期流失主要集中在完成首次练习之前。优先测试路径改进，先观察练习完成率，再检查首周留存。" },
   },
   "little-prince": {
-    kind: "public", format: "summary", title: "Le Petit Prince", locator: "Chapters XIII, XX–XXI",
+    kind: "public", format: "summary", title: "Le Petit Prince", locator: "Chapters XIII, XX-XXI",
     url: "https://gutenberg.net.au/ebooks03/0300771h.html",
     excerpt: "Reading connections between characters, care, time, and responsibility are interpretations anchored in the chapters, not quotations or a definitive reading.",
-    zh: { locator: "第13、20—21章", excerpt: "人物、照料、时间与责任之间的关系是基于章节的阅读理解，不是原文引语，也不代表唯一解释。" },
+    zh: { locator: "第13、20-21章", excerpt: "人物、照料、时间与责任之间的关系是基于章节的阅读理解，不是原文引语，也不代表唯一解释。" },
   },
 });
 

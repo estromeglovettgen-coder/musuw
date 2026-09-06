@@ -13,7 +13,8 @@ import {
 import {
   OBSIDIAN_NATIVE_RENDER,
   clamp,
-  obsidianGraphProgressionCursor,
+  obsidianGraphProgressionItemCursor,
+  obsidianGraphProgressionVisibleNodes,
   obsidianEase,
   obsidianNodeRadius,
   obsidianNodeScale,
@@ -40,6 +41,7 @@ import type {
   WikiGraphPlaybackState,
   WikiGraphRenderRequest,
   WikiGraphRenderer,
+  WikiGraphViewportPoint,
 } from './wikiGraphRenderer.ts'
 import { wikiGraphNodeColor } from './wikiGraphRenderer.ts'
 import {
@@ -147,7 +149,9 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   private progressionGeneration = 0
   private progressionState: WikiGraphPlaybackState = 'idle'
   private progressionVisibleNodes = 0
-  private progressionLinkTotal = 0
+  private progressionItemTotal = 0
+  private progressionNodeStartItems: number[] = []
+  private progressionTimeScale = 1
   private progressionStartedAt = 0
   private progressionElapsedMs = 0
   private cameraAnimationGeneration = 0
@@ -199,6 +203,10 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.settings = this.exactWorker
       ? normalizeObsidianGraphSettings(request.obsidianSettings)
       : createDefaultObsidianGraphSettings()
+    this.progressionTimeScale = typeof request.progressionTimeScale === 'number'
+      && Number.isFinite(request.progressionTimeScale)
+      ? clamp(request.progressionTimeScale, 0.1, 16)
+      : 1
     this.selectedSlug = request.selectedSlug
     this.hoveredSlug = null
     this.showArrows = request.showArrows
@@ -283,8 +291,30 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     await this.animatePan(targetPanX, targetPanY, 380)
   }
 
+  getNodeViewportPoint(slug: string): WikiGraphViewportPoint | null {
+    const node = this.nodeLookup.get(slug)
+    if (!node) return null
+    return {
+      x: node.x * this.scale + this.panX,
+      y: node.y * this.scale + this.panY,
+      scale: this.scale,
+    }
+  }
+
   async fit(options: WikiGraphFitOptions = {}): Promise<void> {
-    const target = this.calculateFit(options.rightInset ?? 0)
+    const requestedNodes = options.nodeSlugs?.map(slug => this.nodeLookup.get(slug))
+      .filter((node): node is NativeNode => Boolean(node))
+    const fitNodes = requestedNodes?.length
+      ? requestedNodes
+      : options.visibleOnly
+        ? this.nodes.slice(0, this.progressionVisibleNodes)
+        : this.nodes
+    const target = this.calculateFit(
+      options.rightInset ?? 0,
+      options.bottomInset ?? 0,
+      fitNodes,
+      options.maxScale ?? 2,
+    )
     if (!target) return
     this.targetScale = target.scale
     this.request?.callbacks.onCameraScaleChange?.(target.scale)
@@ -302,6 +332,12 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.selectedSlug = selectedSlug
     this.hoveredSlug = hoveredSlug
     this.changed()
+  }
+
+  setProgressionTimeScale(timeScale: number): void {
+    if (!Number.isFinite(timeScale) || timeScale <= 0) return
+    this.accumulateProgressionElapsed()
+    this.progressionTimeScale = clamp(timeScale, 0.1, 16)
   }
 
   setObsidianSettings(settings: ObsidianGraphSettings): void {
@@ -342,6 +378,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     }
 
     this.resetRenderedGraph()
+    this.prepareProgressionPositions()
     this.progressionVisibleNodes = 1
     this.progressionElapsedMs = 0
     this.progressionStartedAt = Date.now()
@@ -371,7 +408,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
 
   pauseProgression(): void {
     if (this.progressionState !== 'playing') return
-    this.progressionElapsedMs += Math.max(0, Date.now() - this.progressionStartedAt)
+    this.accumulateProgressionElapsed()
     this.cancelProgressionFrame()
     this.progressionState = 'paused'
     this.emitProgression('paused', this.progressionVisibleNodes)
@@ -448,7 +485,17 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     // adapter as tolerant as the original WeKnora renderer for isolated
     // overview/ego nodes instead of failing the entire canvas.
     const sourceEdges = Array.isArray(request.data.edges) ? request.data.edges : []
-    this.progressionLinkTotal = sourceEdges.length
+    const outgoingLinks = new Map<string, number>()
+    for (const edge of sourceEdges) {
+      outgoingLinks.set(edge.source, (outgoingLinks.get(edge.source) ?? 0) + 1)
+    }
+    let nextNodeStartItem = 1
+    this.progressionNodeStartItems = this.nodes.map(node => {
+      const startItem = nextNodeStartItem
+      nextNodeStartItem += 1 + (outgoingLinks.get(node.id) ?? 0)
+      return startItem
+    })
+    this.progressionItemTotal = Math.max(0, nextNodeStartItem - 1)
     const directedEdges = new Set(
       sourceEdges.map(edge => `${edge.source}\u0000${edge.target}`),
     )
@@ -574,6 +621,54 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
       visibleEdges.map(edge => ({ source: edge.source.id, target: edge.target.id })),
       this.settings,
     ))
+  }
+
+  /**
+   * Obsidian starts a timelapse from one centered file, then seeds each new
+   * batch beside already-visible neighbors (or in the next outer annulus).
+   * The same Worker still owns every subsequent force-simulation tick.
+   */
+  private prepareProgressionPositions(): void {
+    const first = this.nodes[0]
+    if (!first) return
+    first.x = 0
+    first.y = 0
+  }
+
+  private seedProgressionNodes(previousVisible: number, nextVisible: number): void {
+    const from = clamp(Math.floor(previousVisible), 0, this.nodes.length)
+    const to = clamp(Math.floor(nextVisible), from, this.nodes.length)
+    const incoming = this.nodes.slice(from, to)
+    if (incoming.length === 0) return
+
+    const existing = this.nodes.slice(0, from)
+    const existingIds = new Set(existing.map(node => node.id))
+    const maxRadius = existing.reduce(
+      (radius, node) => Math.max(radius, Math.hypot(node.x, node.y)),
+      0,
+    )
+    const occupiedArea = 60 * incoming.length * 60
+    const annulusWidth = Math.sqrt(occupiedArea / Math.PI + maxRadius ** 2) - maxRadius
+    const neighborJitter = Math.sqrt(occupiedArea)
+
+    for (const node of incoming) {
+      const neighbors = existing.filter(candidate => (
+        existingIds.has(candidate.id) && node.neighbors.has(candidate.id)
+      ))
+      if (neighbors.length > 0) {
+        const center = neighbors.reduce(
+          (sum, neighbor) => ({ x: sum.x + neighbor.x, y: sum.y + neighbor.y }),
+          { x: 0, y: 0 },
+        )
+        node.x = center.x / neighbors.length + (Math.random() - 0.5) * neighborJitter
+        node.y = center.y / neighbors.length + (Math.random() - 0.5) * neighborJitter
+      } else {
+        const angle = Math.random() * Math.PI * 2
+        const radius = maxRadius + Math.random() * annulusWidth
+        node.x = Math.cos(angle) * radius
+        node.y = Math.sin(angle) * radius
+      }
+    }
   }
 
   private matchesExpectedWorkerNodes(ids: string[]): boolean {
@@ -1211,7 +1306,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   }
 
   private fitImmediately(): void {
-    const target = this.calculateFit(0)
+    const target = this.calculateFit(0, 0)
     if (!target) {
       this.panX = this.width / 2
       this.panY = this.height / 2
@@ -1223,32 +1318,55 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.panY = target.panY
   }
 
-  private calculateFit(rightInset: number): { scale: number; panX: number; panY: number } | null {
-    if (this.nodes.length === 0) return null
+  private calculateFit(
+    rightInset: number,
+    bottomInset: number,
+    nodes: readonly NativeNode[] = this.nodes,
+    maxScale = 2,
+  ): { scale: number; panX: number; panY: number } | null {
+    if (nodes.length === 0) return null
     let minX = Infinity
     let maxX = -Infinity
     let minY = Infinity
     let maxY = -Infinity
-    for (const node of this.nodes) {
+    for (const node of nodes) {
       minX = Math.min(minX, node.x)
       maxX = Math.max(maxX, node.x)
       minY = Math.min(minY, node.y)
       maxY = Math.max(maxY, node.y)
     }
-    const padding = 60
-    const graphWidth = Math.max(100, maxX - minX) + padding * 2
-    const graphHeight = Math.max(100, maxY - minY) + padding * 2
+    const safeRightInset = clamp(rightInset, 0, Math.max(0, this.width - 1))
+    const safeBottomInset = clamp(bottomInset, 0, Math.max(0, this.height - 1))
+    const usableWidth = Math.max(1, this.width - safeRightInset)
+    const usableHeight = Math.max(1, this.height - safeBottomInset)
+    // Preserve Obsidian's 60px fit margin on a normal canvas, but let it
+    // contract with the actually usable viewport. A compact marketing shell
+    // can be only ~120px wide after its legend/drawer inset; two fixed 60px
+    // margins would leave one pixel for the graph and force min-scale.
+    const horizontalPadding = Math.min(60, Math.max(16, usableWidth * 0.12))
+    // A bottom sheet already removes a large vertical slice. Keep the same
+    // responsive rule with a 32px ceiling there; ordinary views retain the
+    // native 60px ceiling.
+    const verticalPadding = Math.min(
+      safeBottomInset > 0 ? 32 : 60,
+      Math.max(16, usableHeight * 0.12),
+    )
+    const graphWidth = Math.max(100, maxX - minX)
+    const graphHeight = Math.max(100, maxY - minY)
     const scale = clamp(
-      Math.min(this.width / graphWidth, this.height / graphHeight),
-      0.2,
-      2,
+      Math.min(
+        Math.max(1, usableWidth - horizontalPadding * 2) / graphWidth,
+        Math.max(1, usableHeight - verticalPadding * 2) / graphHeight,
+      ),
+      OBSIDIAN_NATIVE_RENDER.minScale,
+      clamp(maxScale, OBSIDIAN_NATIVE_RENDER.minScale, OBSIDIAN_NATIVE_RENDER.maxScale),
     )
     const centerX = (minX + maxX) / 2
     const centerY = (minY + maxY) / 2
     return {
       scale,
-      panX: this.width / 2 - rightInset / 2 - centerX * scale,
-      panY: this.height / 2 - centerY * scale,
+      panX: usableWidth / 2 - centerX * scale,
+      panY: usableHeight / 2 - centerY * scale,
     }
   }
 
@@ -1291,6 +1409,14 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.progressionFrameId = requestAnimationFrame(() => this.advanceProgression(generation))
   }
 
+  private accumulateProgressionElapsed(): void {
+    if (this.progressionState !== 'playing') return
+    const now = Date.now()
+    this.progressionElapsedMs += Math.max(0, now - this.progressionStartedAt)
+      * this.progressionTimeScale
+    this.progressionStartedAt = now
+  }
+
   private advanceProgression(generation: number): void {
     if (
       generation !== this.progressionGeneration
@@ -1298,20 +1424,25 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
       || this.destroyed
     ) return
     this.progressionFrameId = null
-    const elapsed = this.progressionElapsedMs + Math.max(0, Date.now() - this.progressionStartedAt)
-    const next = obsidianGraphProgressionCursor(
-      elapsed,
-      this.nodes.length,
-      this.progressionLinkTotal,
+    this.accumulateProgressionElapsed()
+    const itemCursor = obsidianGraphProgressionItemCursor(
+      this.progressionElapsedMs,
+      this.progressionItemTotal,
+    )
+    const next = obsidianGraphProgressionVisibleNodes(
+      itemCursor,
+      this.progressionNodeStartItems,
     )
     const advanced = next !== this.progressionVisibleNodes
     if (advanced) {
+      const previousVisible = this.progressionVisibleNodes
       this.progressionVisibleNodes = next
+      this.seedProgressionNodes(previousVisible, next)
       this.syncProgressionWorker()
       this.changed()
     }
-    if (next >= this.nodes.length) {
-      this.emitProgression('complete', next)
+    if (itemCursor >= this.progressionItemTotal) {
+      this.emitProgression('complete', this.nodes.length)
       return
     }
     if (advanced) {
@@ -1408,7 +1539,10 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.themeObserver = new MutationObserver(() => this.refreshTheme())
     this.themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['theme-mode', 'class'],
+      // The storefront's theme bootstrap persists the active palette on
+      // `html[data-theme]`; keep the native canvas in sync with runtime
+      // toggles as well as the upstream class/theme-mode contract.
+      attributeFilter: ['theme-mode', 'class', 'data-theme'],
     })
   }
 
@@ -1478,7 +1612,9 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.nodes = []
     this.nodeLookup.clear()
     this.edges = []
-    this.progressionLinkTotal = 0
+    this.progressionItemTotal = 0
+    this.progressionNodeStartItems = []
+    this.progressionTimeScale = 1
     this.idleFrames = 0
     this.exactWorker = false
     this.container.replaceChildren()

@@ -17,8 +17,10 @@ test("the hero keeps the localized in-view product walkthrough and existing shel
   assert.match(demo, /useReducedMotion/);
   assert.match(demo, /HERO_STORY/);
   assert.match(demo, /hero-demo-citation demo-citation-button/);
-  assert.match(demo, /<DemoSourcePreview/);
-  assert.match(demo, /aria-expanded/);
+  assert.match(demo, /data-demo-source-ref/);
+  assert.match(demo, /data-demo-interactive="false"/);
+  assert.match(demo, /\binert\b/);
+  assert.doesNotMatch(demo, /DemoSourcePreview|aria-expanded|onClick/);
   assert.doesNotMatch(demo, /Northstar Calibration|ORBITAL SAGE|28 feedback items/);
   assert.doesNotMatch(demo, /reasoning round\(s\)|tool call\(s\)/);
   assert.doesNotMatch(demo, /CheckCircle|Sparkle|\bariaHidden\b/);
@@ -33,7 +35,7 @@ test("each legal fixture declares one jurisdiction and binds all citations to re
     const story = HERO_STORY[locale];
     assert.equal(story.citations.length, 3);
     assert.equal(story.sourceIds.length, story.citations.length);
-    assert.ok(story.disclaimer.length > 20);
+    assert.equal("disclaimer" in story, false);
     const sources = story.sourceIds.map((id) => DEMO_SOURCES[id]);
     assert.ok(sources.every((source) => source?.kind === "public"));
     assert.ok(sources.every((source) => source.jurisdiction === jurisdiction));
@@ -42,6 +44,4 @@ test("each legal fixture declares one jurisdiction and binds all citations to re
   }
   assert.match(HERO_STORY["zh-CN"].question, /婚礼摄影师.*广告.*版权/);
   assert.match(HERO_STORY.en.question, /wedding photographer.*ad.*copyright/);
-  assert.match(HERO_STORY["zh-CN"].disclaimer, /中国大陆/);
-  assert.match(HERO_STORY.en.disclaimer, /UK/);
 });

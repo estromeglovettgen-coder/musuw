@@ -207,6 +207,8 @@ export interface WikiGraphRenderRequest {
   selectedSlug: string | null
   showArrows: boolean
   obsidianSettings?: ObsidianGraphSettings
+  /** Optional wall-time compression; native item ordering remains unchanged. */
+  progressionTimeScale?: number
   preserveLayout?: boolean
   anchorSlug?: string
   callbacks: WikiGraphRendererCallbacks
@@ -222,6 +224,20 @@ export interface WikiGraphFocusOptions {
 export interface WikiGraphFitOptions {
   /** Space reserved on the right side of the viewport, in CSS pixels. */
   rightInset?: number
+  /** Space reserved below the viewport, in CSS pixels (bottom-sheet drawers). */
+  bottomInset?: number
+  /** Fit only nodes unlocked by the current native progression. */
+  visibleOnly?: boolean
+  /** Fit only this explicit set of graph nodes. */
+  nodeSlugs?: readonly string[]
+  /** Never zoom in beyond this presentation scale. */
+  maxScale?: number
+}
+
+export interface WikiGraphViewportPoint {
+  x: number
+  y: number
+  scale: number
 }
 
 export const WIKI_GRAPH_NODE_COLORS: Readonly<Record<string, string>> = {
@@ -271,9 +287,11 @@ export interface WikiGraphRenderer {
   render(request: WikiGraphRenderRequest): Promise<void>
   hasNode(slug: string): boolean
   focusNode(slug: string, options?: WikiGraphFocusOptions): Promise<void>
+  getNodeViewportPoint?(slug: string): WikiGraphViewportPoint | null
   fit(options?: WikiGraphFitOptions): Promise<void>
   setArrowsVisible(visible: boolean): void
   setSelection(selectedSlug: string | null, hoveredSlug?: string | null): void
+  setProgressionTimeScale?(timeScale: number): void
   setObsidianSettings?(settings: ObsidianGraphSettings): void
   restartSimulation?(): void
   startProgression?(): void

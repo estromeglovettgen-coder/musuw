@@ -38,12 +38,12 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 4);
   assert.equal((home.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.doesNotMatch(home, /class="(?:section|feature)-label"/);
-  assert.match(home, /Find the signals that should shape your next decision/);
-  assert.match(home, /Turn scattered learning into a connected body of knowledge/);
-  assert.match(home, /Discover connections across what you know/);
+  assert.match(home, /Support every conclusion with evidence across sources/);
+  assert.match(home, /Keep knowledge structured as it evolves/);
+  assert.match(home, /Turn relationships into explorable knowledge paths/);
   assert.match(home, /30\+ leading models/);
   assert.match(home, /One-click web and video import/);
-  assert.match(home, /Keep building on what you know/);
+  assert.match(home, /Keep existing knowledge current/);
   assert.match(home, /Turn source material into/);
   assert.match(home, /intelligent knowledge assets/);
   assert.match(home, /href="\/contact"[^>]*><span>Contact<\/span>/);
@@ -66,7 +66,8 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(japanHome, />¥1,595</);
   assert.match(home, /100 GiB/);
   assert.match(home, /class="[^"]*hero-product-demo/);
-  assert.match(home, /class="hero-demo-composer/);
+  assert.match(home, /class="[^"]*hero-demo-composer/);
+  assert.equal((home.match(/data-authoritative-chat-surface="true"/g) ?? []).length, 2);
   assert.doesNotMatch(home, /<video/);
   assert.doesNotMatch(home, /hero-float/);
   assert.match(home, />Features</);

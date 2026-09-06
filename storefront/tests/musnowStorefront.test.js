@@ -60,7 +60,7 @@ test("public copy presents the exact lowercase musuw brand without stale names o
   assert.doesNotMatch(dataSource, /Jonathan Hayes|Clearframe Agency|Portivio|ClientHub/);
 });
 
-test("public capability copy connects evidence, decisions, research, reading, and reuse", () => {
+test("public capability copy explains evidence, structure, relationships, and reuse without binding the product to one domain", () => {
   const englishDefaults = collectStrings({
     benefits,
     comparisonGroups,
@@ -84,22 +84,22 @@ test("public capability copy connects evidence, decisions, research, reading, an
   );
 
   assert.match(homepageEnglish, /Find and verify across sources/);
-  assert.match(homepageEnglish, /Organize papers, research notes, and evaluation plans/);
+  assert.match(homepageEnglish, /Organize sources, findings, and context/);
   assert.match(homepageEnglish, /backlinks/i);
   assert.match(homepageEnglish, /30\+ leading models/);
   assert.match(homepageEnglish, /One-click web and video import/);
-  assert.match(homepageEnglish, /Keep building on what you know/);
+  assert.match(homepageEnglish, /Keep existing knowledge current/);
   assert.match(homepageEnglish, /Exact citations/i);
 
   assert.doesNotMatch(homepageChinese, /RAG|Agent/);
   assert.match(homepageChinese, /智能体问答/);
-  assert.match(homepageChinese, /围绕研究问题组织论文/);
+  assert.match(homepageChinese, /将资料、结论与来源组织为相互链接的 Wiki 页面/);
   assert.match(homepageChinese, /反向链接/);
   assert.match(homepageChinese, /30\+ 主流模型接入/);
   assert.match(homepageChinese, /文章与视频一键入库/);
-  assert.match(homepageChinese, /在已有理解上继续积累/);
+  assert.match(homepageChinese, /持续更新既有知识/);
   assert.match(homepageChinese, /精确(?:原文)?引用/);
-  assert.match(homepageChinese, /人物、情节与主题/);
+  assert.match(homepageChinese, /页面、实体、概念与来源/);
   assert.doesNotMatch(homepageChinese, /找不到已有内容/);
 });
 

@@ -22,6 +22,7 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
     selectedSlug = null,
     showArrows = false,
     autoPlay = false,
+    progressionTimeScale = 1,
     className = '',
     style,
     onReady = EMPTY_CALLBACK,
@@ -66,9 +67,9 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
   }))
 
   const graphData = useMemo(() => data ?? {
-    nodes: Array.isArray(nodes) ? nodes : [],
-    edges: Array.isArray(links) ? links : [],
-  }, [data, nodes, links])
+      nodes: Array.isArray(nodes) ? nodes : [],
+      edges: Array.isArray(links) ? links : [],
+    }, [data, nodes, links])
   const graphSettings = useMemo(
     () => settings ?? createDefaultObsidianGraphSettings(),
     [settings],
@@ -102,6 +103,36 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
     },
     fit(options) {
       return rendererRef.current?.fit?.(options)
+    },
+    focusNode(slug, options) {
+      return rendererRef.current?.focusNode?.(slug, options)
+    },
+    getNodeViewportPoint(slug) {
+      return rendererRef.current?.getNodeViewportPoint?.(slug) ?? null
+    },
+    setHoveredNode(slug) {
+      rendererRef.current?.setSelection?.(null, slug ?? null)
+      if (containerRef.current) {
+        containerRef.current.dataset.directedFocus = slug ? 'hover' : 'none'
+        containerRef.current.dataset.directedNode = slug ?? ''
+      }
+    },
+    setSelectedNode(slug) {
+      rendererRef.current?.setSelection?.(slug ?? null, null)
+      if (containerRef.current) {
+        containerRef.current.dataset.directedFocus = slug ? 'selected' : 'none'
+        containerRef.current.dataset.directedNode = slug ?? ''
+      }
+    },
+    clearSelection() {
+      rendererRef.current?.setSelection?.(null, null)
+      if (containerRef.current) {
+        containerRef.current.dataset.directedFocus = 'none'
+        containerRef.current.dataset.directedNode = ''
+      }
+    },
+    setProgressionTimeScale(timeScale) {
+      rendererRef.current?.setProgressionTimeScale?.(timeScale)
     },
     setArrowsVisible(visible) {
       rendererRef.current?.setArrowsVisible?.(visible)
@@ -145,6 +176,7 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
       selectedSlug,
       showArrows,
       obsidianSettings: graphSettings,
+      progressionTimeScale,
       callbacks: {
         onNodeClick: (slug, modifiers) => callbacksRef.current.onNodeClick(slug, modifiers),
         onNodeDoubleClick: slug => callbacksRef.current.onNodeDoubleClick(slug),
@@ -175,7 +207,7 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
     }
     // Callers can pass a stable graph object while changing controls below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphData])
+  }, [graphData, progressionTimeScale])
 
   // The parent normally toggles this when the demo card enters the viewport.
   // A transition from false to true is one Play press for this mounted graph;
@@ -206,6 +238,7 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
       data-playback-state={playback.state}
       data-playback-visible={playback.visible}
       data-playback-total={playback.total}
+      data-playback-time-scale={progressionTimeScale}
       style={style}
     />
   )

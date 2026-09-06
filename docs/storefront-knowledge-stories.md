@@ -4,11 +4,11 @@
 
 The marketing page has four independent stories: everyday legal information in the Hero, work prioritization in the chat demo, a researcher's evolving understanding in the Wiki, and literary reading connections in the Graph.
 
-The H1, section order, alternating layout, global typography, colors, borders, shadows, navigation, pricing, and Hero background/entry animation remain unchanged. Only bounded citation and Wiki interaction states add styling. The existing final-CTA visual reuses the work-research context; it is not a fifth feature section.
+The H1, section order, alternating layout, global typography, colors, borders, shadows, navigation, pricing, and Hero background/entry animation remain unchanged. The walkthrough surfaces autoplay and are inert: visitors cannot click, focus, drag, or pause them. The existing final-CTA visual reuses the work-research context; it is not a fifth feature section.
 
 ## Fixtures and source ownership
 
-`storefront/src/data/knowledgeStories.js` owns the bilingual scenario copy. `storefront/src/data/demoSources.js` owns citations, short excerpts or explicitly labelled paraphrases, source URLs, review dates, and simulated research records. Citation identifiers must resolve to this registry.
+`storefront/src/data/knowledgeStories.js` owns the bilingual scenario copy. `storefront/src/data/littlePrinceGraph.js` owns the compact bilingual reading outline and deterministically expands it into the graph renderer's data shape. `storefront/src/data/demoSources.js` owns citations, short excerpts or explicitly labelled paraphrases, source URLs, review dates, and simulated research records. Citation identifiers must resolve to this registry.
 
 - The Hero asks about a wedding photographer using privately commissioned photographs in advertising. The Chinese fixture is explicitly scoped to mainland China (Copyright Law Article 19 and Civil Code Articles 1019/1021). The English fixture is explicitly a UK example (IPO guidance and CDPA sections 85/87). Selecting a UI language selects a scripted example, not the real visitor's jurisdiction. Neither example is individual legal advice or a worldwide legal rule.
 - The work fixture is a simulated online learning product. Interviews, support cohorts and the first-exercise funnel support a recommendation to test the initial exercise path. They do not establish causation or describe musuw's usability.
@@ -17,13 +17,17 @@ The H1, section order, alternating layout, global typography, colors, borders, s
 
 Public sources were checked on 2026-09-06. Review dates describe the fixture review, not a live retrieval or a promise of automatic legal updates. Do not fabricate source counts, customer statistics, independent evaluations, or performance claims when refreshing the copy.
 
-## Preserved Graph contract
+## Graph contract
 
-Retain the existing 14 node IDs, types, geometry, 18 edges, native renderer and worker files, directed playback, timing, camera behavior and disabled visitor controls. Only display labels, library context and surrounding text change. Internal legacy node IDs are intentionally retained to avoid changing rendering behavior.
+The Little Prince fixture covers all 27 chapters with three concise event notes per chapter, plus characters, places, themes, symbols, relationship bundles and chapter summaries. The compact outline expands to 337 nodes and 788 valid links without runtime randomness or hand-authored coordinates. IDs, category colors, edge order and counts remain stable in both locales; changing locale changes labels, not topology.
+
+The storefront and product keep one mechanically aligned Obsidian renderer and Worker. Growth reuses Obsidian's file-plus-outgoing-link progression counter, neighbor/annulus seeding, force simulation, camera inertia, label fade, `focusNode`, and hover/selection dimming. The storefront only compresses wall time from 2× to 5× as density rises and choreographs the terminal focus. Its first 28 visible files are the book summary plus all chapter nodes; later low-cost nodes arrive faster while the camera pulls back and native labels fade. After completion, the camera focuses the Little Prince, native one-hop highlighting runs, and the real WeKnora-style detail drawer opens and remains visible.
+
+The Graph scene keeps the product sidebar in its collapsed rail state and constrains the graph canvas to 78% of the available surface. Visitor controls stay disabled and the whole preview remains read-only.
 
 ## Wiki inspection contract
 
-Readable page -> pointer movement -> hover -> click -> source opens -> gentle focus at 1.07 -> restore. Pointer positioning uses actual element bounds. Source content must open before zoom begins. Reduced-motion mode leaves the page readable with manually inspectable sources. User inspection pauses the demonstration.
+Use the real Wiki product surface rather than a handcrafted page, screenshot, or custom source popup. The viewport remains fixed at the product's real scale. The automatic sequence is readable page -> cursor moves to an inline Wiki link -> click feedback -> linked Wiki page. It stops on the destination page without looping. Reduced-motion mode goes directly to the linked page, and the surface remains inert in every mode.
 
 ## Validation
 

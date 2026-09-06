@@ -29,7 +29,7 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr);
   overflow: hidden;
   border-radius: 15px;
   background: var(--demo-surface);
@@ -45,6 +45,11 @@
   border-radius: 15px;
 }
 
+[data-demo-interactive="false"] {
+  pointer-events: none;
+  user-select: none;
+}
+
 .capability-demo {
   height: 500px;
   border: 3px solid var(--demo-ink);
@@ -56,25 +61,37 @@
 .musuw-shell-sidebar {
   position: relative;
   display: flex;
-  min-width: 0;
+  width: 56px;
+  min-width: 56px;
   flex-direction: column;
   align-items: center;
   border-right: 1px solid var(--demo-line-soft);
-  padding: 10px 0 12px;
+  padding: 14px 8px;
+  box-sizing: border-box;
   background: var(--demo-sidebar);
+}
+
+.musuw-shell-collapsed {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .musuw-shell-logo {
   display: grid;
-  width: 27px;
-  height: 27px;
+  width: 32px;
+  height: 32px;
   place-items: center;
 }
 
 .musuw-product-shell .musuw-shell-logo img {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 0;
   object-fit: contain;
@@ -82,18 +99,38 @@
 
 .musuw-shell-collapse {
   display: grid;
-  width: 26px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  margin-top: 15px;
+  margin: 0;
   color: var(--demo-faint);
 }
 
+.musuw-shell-collapse svg {
+  width: 16px;
+  height: 16px;
+}
+
 .musuw-shell-divider {
-  width: 24px;
+  width: 32px;
   height: 1px;
-  margin-top: 8px;
+  margin: 4px 0;
   background: var(--demo-line-soft);
+}
+
+.musuw-shell-collapsed-nav {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--demo-muted);
+}
+
+.musuw-shell-collapsed-nav.is-active {
+  background: #f3f4f6;
+  color: var(--demo-ink);
 }
 
 .musuw-shell-actions {
@@ -132,14 +169,14 @@
 
 .musuw-shell-avatar {
   display: grid;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   margin-top: auto;
   border-radius: 50%;
   background: #030712;
   color: #fff;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -388,6 +425,12 @@
   font-size: 9.5px;
 }
 
+.product-demo-composer > span:first-child {
+  /* Composer placeholder copy is visible product text, not a decorative
+     hint; keep it readable against the composer surface in both themes. */
+  color: var(--demo-copy);
+}
+
 .product-demo-composer-tools,
 .product-demo-composer-tools > span {
   display: flex;
@@ -424,6 +467,7 @@
 }
 
 .product-demo-model small {
+  color: var(--demo-copy);
   font-size: inherit;
 }
 
@@ -453,6 +497,8 @@
   --kb-sidebar: #fbfbfb;
   --kb-accent: #2563eb;
   position: relative;
+  container-name: graph-preview;
+  container-type: inline-size;
   width: 100%;
   height: 500px;
   min-width: 0;
@@ -464,6 +510,47 @@
   color: var(--kb-copy);
   font-family: "Inter Variable", "Inter", "Noto Sans SC Variable", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   text-align: left;
+}
+
+.kb-product-preview-graph {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.kb-preview-wiki-camera {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.kb-real-wiki-capture {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.kb-real-wiki-capture > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.kb-real-wiki-focus-target {
+  position: absolute;
+  top: 30.5%;
+  left: 25.5%;
+  width: 33%;
+  height: 14%;
+  pointer-events: none;
 }
 
 .kb-product-preview {
@@ -480,6 +567,10 @@
   transform-origin: top left;
 }
 
+.kb-product-preview.is-graph {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 .kb-preview-app-sidebar {
   min-width: 0;
   min-height: 0;
@@ -491,6 +582,86 @@
   overflow: hidden;
   background: var(--kb-sidebar);
   user-select: none;
+}
+
+.kb-preview-app-sidebar.is-collapsed {
+  width: 56px;
+  min-width: 56px;
+  padding: 14px 8px;
+  overflow: visible;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-sidebar-header {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 16px;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-sidebar-header::after {
+  width: 32px;
+  height: 1px;
+  margin: 4px 0;
+  background: rgb(229 231 235 / 80%);
+  content: "";
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-sidebar-header img {
+  width: 32px;
+  height: 32px;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-sidebar-header > svg {
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-primary-actions {
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-primary {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-primary > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.kb-preview-app-sidebar.is-collapsed :is(.kb-preview-primary b, .kb-preview-primary small, .kb-preview-history) {
+  display: none;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-user {
+  margin-top: auto;
+  min-height: 44px;
+  padding: 6px 2px;
+  border-top: 0;
+  grid-template-columns: 32px;
+  justify-content: center;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-user i {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.kb-preview-app-sidebar.is-collapsed .kb-preview-user :is(span, svg) {
+  display: none;
 }
 
 .kb-preview-sidebar-header {
@@ -762,6 +933,7 @@
 }
 
 .kb-preview-wiki-host {
+  position: relative;
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
@@ -1007,6 +1179,16 @@
   font-size: 7px;
 }
 
+.kb-preview-reader-badges .wiki-badge--type {
+  /* The type badge is semantic metadata; keep it above normal body-text
+     contrast instead of treating it like a decorative version hint. */
+  color: var(--kb-copy);
+}
+
+.kb-preview-reader-badges .wiki-badge--ver {
+  color: var(--kb-copy);
+}
+
 .kb-preview-reader-actions {
   display: flex;
   align-items: center;
@@ -1022,7 +1204,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--kb-faint);
+  /* This is product metadata, not a decorative hint. Keep it readable in
+     both palettes; reserve --kb-faint for non-essential affordances. */
+  color: var(--kb-muted);
   font-size: 7px;
 }
 
@@ -1108,9 +1292,22 @@
 }
 
 .kb-preview-content-link {
+  border-radius: 3px;
   color: var(--kb-accent);
   text-decoration: underline dashed;
   text-underline-offset: 2px;
+  transition: background-color 160ms ease, box-shadow 160ms ease, text-decoration-color 160ms ease;
+}
+
+.kb-preview-content-link[data-wiki-demo-link="true"] {
+  position: relative;
+  z-index: 2;
+}
+
+.kb-preview-content-link.is-pressing {
+  background: color-mix(in srgb, var(--kb-accent) 16%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kb-accent) 9%, transparent);
+  text-decoration-style: solid;
 }
 
 .kb-preview-reader-footer {
@@ -1166,6 +1363,7 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
+  color: var(--kb-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1179,10 +1377,13 @@
 }
 
 .kb-preview-graph-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
+  transform: none;
 }
 
 .kb-preview-graph-canvas > .obsidian-graph-canvas,
@@ -1191,6 +1392,215 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+}
+
+:is(.kb-preview-graph-pointer, .kb-preview-wiki-pointer) {
+  position: absolute;
+  z-index: 7;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: #111827;
+  filter: drop-shadow(0 1px 0 #fff) drop-shadow(0 1px 3px rgb(0 0 0 / 28%));
+  transform-origin: 2px 2px;
+  pointer-events: none;
+}
+
+:is(.kb-preview-graph-pointer, .kb-preview-wiki-pointer) > i {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid rgb(37 99 235 / 65%);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.kb-preview-wiki-pointer {
+  top: 0;
+  left: 0;
+}
+
+:is(.kb-preview-graph-pointer, .kb-preview-wiki-pointer).is-clicking > i {
+  animation: kb-graph-pointer-click 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes kb-graph-pointer-click {
+  0% { opacity: 0.8; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+.graph-node-drawer-layer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 12;
+  width: min(35%, 350px);
+  min-width: 255px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.graph-node-drawer {
+  width: 100%;
+  height: 100%;
+  border-left: 1px solid var(--kb-line);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--kb-surface);
+  box-shadow: -12px 0 34px rgb(17 24 39 / 10%);
+  color: var(--kb-copy);
+}
+
+.graph-node-drawer-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 52px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--kb-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: color-mix(in srgb, var(--kb-surface) 95%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.graph-node-drawer-heading,
+.graph-node-drawer-meta,
+.graph-node-drawer-chip,
+.graph-node-drawer-neighbor,
+.graph-node-drawer-neighbor-relation {
+  display: flex;
+  align-items: center;
+}
+
+.graph-node-drawer-heading {
+  min-width: 0;
+  gap: 7px;
+}
+
+.graph-node-drawer-icon,
+.graph-node-drawer-close {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--kb-muted);
+}
+
+.graph-node-drawer-title {
+  overflow: hidden;
+  color: var(--kb-ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-node-drawer-body {
+  padding: 15px 16px 24px;
+}
+
+.graph-node-drawer-meta {
+  gap: 7px;
+}
+
+.graph-node-drawer-chip {
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid rgb(43 164 113 / 45%);
+  border-radius: 4px;
+  gap: 4px;
+  background: rgb(43 164 113 / 7%);
+  color: #21845b;
+  font-size: 8px;
+}
+
+.graph-node-drawer-version,
+.graph-node-drawer-relation-count {
+  color: var(--kb-faint);
+  font-size: 8px;
+}
+
+.graph-node-drawer-relation-count {
+  margin: 8px 0 15px;
+}
+
+.graph-node-drawer-section {
+  margin: 0 0 17px;
+}
+
+.graph-node-drawer-section h2,
+.graph-node-drawer-section h3,
+.graph-node-drawer-section p {
+  margin: 0;
+}
+
+.graph-node-drawer-section h2 {
+  margin-bottom: 7px;
+  color: var(--kb-ink);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.graph-node-drawer-section h3 {
+  margin-bottom: 8px;
+  color: var(--kb-ink);
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.graph-node-drawer-section p {
+  color: var(--kb-copy);
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.graph-node-drawer-neighbors {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  list-style: none;
+}
+
+.graph-node-drawer-neighbor {
+  min-height: 37px;
+  border-bottom: 1px solid var(--kb-line-soft);
+  gap: 8px;
+}
+
+.graph-node-drawer-neighbor-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--kb-accent);
+}
+
+.graph-node-drawer-neighbor-content {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.graph-node-drawer-neighbor-title {
+  overflow: hidden;
+  color: var(--kb-ink);
+  font-size: 8.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-node-drawer-neighbor-relation {
+  gap: 3px;
+  color: var(--kb-faint);
+  font-size: 7px;
+}
+
+.graph-node-drawer-neighbor-arrow {
+  flex: 0 0 auto;
+  color: var(--kb-faint);
 }
 
 .kb-preview-graph-legend {
@@ -1563,12 +1973,43 @@ html[data-theme="dark"] :is(
   color: var(--demo-ink, var(--kb-ink));
 }
 
+html[data-theme="dark"] .musuw-product-shell .musuw-shell-collapsed-nav.is-active {
+  background: var(--demo-surface-soft);
+  color: var(--demo-ink);
+}
+
+html[data-theme="dark"] .product-demo-composer {
+  border-color: var(--demo-line);
+}
+
 html[data-theme="dark"] .reasoning-process li.is-complete > span {
   color: var(--demo-surface);
 }
 
 html[data-theme="dark"] .kb-preview-knowledge-page {
   background: var(--kb-surface);
+}
+
+html[data-theme="dark"] :is(
+  .kb-preview-app-sidebar,
+  .kb-preview-knowledge-header,
+  .kb-preview-tabs,
+  .kb-preview-user
+) {
+  border-color: var(--kb-line);
+}
+
+html[data-theme="dark"] .kb-preview-app-sidebar.is-collapsed .kb-preview-sidebar-header::after {
+  background: var(--kb-line);
+}
+
+html[data-theme="dark"] .kb-preview-breadcrumb em {
+  color: var(--kb-faint);
+}
+
+html[data-theme="dark"] :is(.kb-preview-graph-pointer, .kb-preview-wiki-pointer) {
+  color: var(--kb-ink);
+  filter: drop-shadow(0 1px 0 var(--kb-surface)) drop-shadow(0 1px 3px rgb(0 0 0 / 45%));
 }
 
 html[data-theme="dark"] :is(.kb-preview-graph-search, .kb-preview-graph-legend) {
@@ -1618,15 +2059,48 @@ html[data-theme="dark"] .kb-preview-graph-nodes circle {
   }
 }
 
+@container graph-preview (max-width: 760px) {
+  /* Size this from the actual product shell rather than the browser window.
+     A constrained two-column page can be narrower than its viewport (for
+     example at 768px), and the fixed 255px side drawer would otherwise leave
+     the graph with a postage-stamp canvas. */
+  .graph-node-drawer-layer {
+    inset: auto 0 0;
+    width: 100%;
+    min-width: 0;
+    height: min(40%, 180px);
+  }
+
+  .graph-node-drawer {
+    border-top: 1px solid var(--kb-line);
+    border-left: 0;
+    box-shadow: 0 -12px 34px rgb(17 24 39 / 10%);
+  }
+
+  .graph-node-drawer-header {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+
+  .graph-node-drawer-body {
+    padding: 10px 12px 16px;
+  }
+
+  .graph-node-drawer-section {
+    margin-bottom: 12px;
+  }
+}
+
 @media (max-width: 520px) {
+
   .kb-product-preview {
-    width: 200%;
-    height: 860px;
-    transform: scale(0.5);
+    width: 100%;
+    height: 100%;
+    transform: none;
   }
 
   .musuw-product-shell {
-    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
   }
 
   .musuw-shell-title {

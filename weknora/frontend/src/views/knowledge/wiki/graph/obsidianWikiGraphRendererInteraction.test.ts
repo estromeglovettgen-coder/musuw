@@ -215,7 +215,7 @@ test('delays hover clearing long enough to cross from a node to its bloom contro
   assert.deepEqual(hoverEvents, [hovered.id])
 })
 
-test('keeps the original fit geometry while centering beside the source drawer', async () => {
+test('reserves the source drawer width in both fit scale and camera center', async () => {
   const renderer = createRenderer()
   const scaleChanges: number[] = []
   const cameraTargets: Array<{ x: number; y: number }> = []
@@ -240,11 +240,58 @@ test('keeps the original fit geometry while centering beside the source drawer',
 
   await renderer.fit({ rightInset: 480 })
 
-  const expectedScale = 1_000 / 620
+  const expectedScale = 400 / 500
   assert.ok(Math.abs(renderer.targetScale - expectedScale) < 1e-10)
   assert.ok(Math.abs(cameraTargets[0].x - (260 - 250 * expectedScale)) < 1e-10)
   assert.ok(Math.abs(cameraTargets[0].y - (300 - 50 * expectedScale)) < 1e-10)
   assert.deepEqual(scaleChanges, [expectedScale])
+})
+
+test('fits an explicit local neighborhood without letting distant nodes control the camera', async () => {
+  const renderer = createRenderer()
+  renderer.width = 800
+  renderer.height = 500
+  const focus = { id: 'focus', x: 0, y: 0 }
+  const neighbor = { id: 'neighbor', x: 200, y: 100 }
+  const distant = { id: 'distant', x: 50_000, y: 50_000 }
+  renderer.nodes = [focus, neighbor, distant]
+  renderer.nodeLookup = new Map(renderer.nodes.map((node: { id: string }) => [node.id, node]))
+  renderer.request = rendererRequest({ nodes: [], edges: [] })
+  renderer.animatePan = async () => undefined
+
+  await renderer.fit({ nodeSlugs: ['focus', 'neighbor'], maxScale: 0.7 })
+
+  assert.equal(renderer.targetScale, 0.7)
+})
+
+test('reports a node position in the rendered viewport coordinate system', () => {
+  const renderer = createRenderer()
+  renderer.scale = 0.5
+  renderer.panX = 140
+  renderer.panY = 90
+  renderer.nodeLookup = new Map([['focus', { id: 'focus', x: 120, y: -40 }]])
+
+  assert.deepEqual(renderer.getNodeViewportPoint('focus'), { x: 200, y: 70, scale: 0.5 })
+  assert.equal(renderer.getNodeViewportPoint('missing'), null)
+})
+
+test('fits only the unlocked prefix during a native progression', async () => {
+  const renderer = createRenderer()
+  renderer.width = 800
+  renderer.height = 500
+  renderer.nodes = [
+    { x: -100, y: -50 },
+    { x: 100, y: 50 },
+    { x: 50_000, y: 50_000 },
+  ]
+  renderer.progressionState = 'playing'
+  renderer.progressionVisibleNodes = 2
+  renderer.request = rendererRequest({ nodes: [], edges: [] })
+  renderer.animatePan = async () => undefined
+
+  await renderer.fit({ visibleOnly: true, maxScale: 0.55 })
+
+  assert.equal(renderer.targetScale, 0.55)
 })
 
 test('drops a stale selection before rendering a replacement graph', () => {
@@ -411,8 +458,14 @@ test('plays, pauses and resumes the audited node progression without refetching 
 
   renderer.app = {}
   renderer.exactWorker = true
-  renderer.nodes = [{}, {}, {}]
+  renderer.nodes = [
+    { id: 'first', x: 0, y: 0, neighbors: new Set() },
+    { id: 'second', x: 0, y: 0, neighbors: new Set() },
+    { id: 'third', x: 0, y: 0, neighbors: new Set() },
+  ]
   renderer.edges = []
+  renderer.progressionItemTotal = 3
+  renderer.progressionNodeStartItems = [1, 2, 3]
   renderer.request = rendererRequest({ nodes: [], edges: [] }, {
     callbacks: {
       onNodeClick: () => undefined,
@@ -462,6 +515,54 @@ test('plays, pauses and resumes the audited node progression without refetching 
     globalThis.requestAnimationFrame = originalRequestAnimationFrame
     globalThis.cancelAnimationFrame = originalCancelAnimationFrame
     Date.now = originalDateNow
+  }
+})
+
+test('builds the native file-plus-outgoing-link progression budget', () => {
+  const renderer = createRenderer()
+  renderer.buildData(rendererRequest({
+    nodes: [
+      { slug: 'summary', title: 'Summary', page_type: 'summary', link_count: 2 },
+      { slug: 'chapter', title: 'Chapter', page_type: 'entity', link_count: 2 },
+      { slug: 'theme', title: 'Theme', page_type: 'concept', link_count: 2 },
+    ],
+    edges: [
+      { source: 'summary', target: 'chapter' },
+      { source: 'summary', target: 'theme' },
+      { source: 'chapter', target: 'theme' },
+    ],
+  }), new Map())
+
+  assert.equal(renderer.progressionItemTotal, 6)
+  assert.deepEqual(renderer.progressionNodeStartItems, [1, 4, 6])
+})
+
+test('seeds each newly unlocked connected node around its visible neighbors', () => {
+  const renderer = createRenderer()
+  const originalRandom = Math.random
+  Math.random = () => 0.75
+  try {
+    renderer.buildData(rendererRequest({
+      nodes: [
+        { slug: 'summary', title: 'Summary', page_type: 'summary', link_count: 1 },
+        { slug: 'chapter', title: 'Chapter', page_type: 'entity', link_count: 1 },
+      ],
+      edges: [{ source: 'summary', target: 'chapter' }],
+    }), new Map())
+    renderer.prepareProgressionPositions()
+    renderer.seedProgressionNodes(1, 2)
+
+    assert.deepEqual(
+      { x: renderer.nodes[0].x, y: renderer.nodes[0].y },
+      { x: 0, y: 0 },
+      'the first file is the stable center of the early Obsidian view',
+    )
+    assert.ok(
+      Math.hypot(renderer.nodes[1].x, renderer.nodes[1].y) <= Math.sqrt(60 * 60 / 2) + 1e-9,
+      'a connected node must start in the native neighbor-jitter envelope',
+    )
+  } finally {
+    Math.random = originalRandom
   }
 })
 

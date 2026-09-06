@@ -61,6 +61,46 @@ export function obsidianGraphProgressionSpeed(totalLinks: number): number {
   )
 }
 
+/**
+ * Obsidian's data engine advances one shared item cursor. Each file and each
+ * outgoing link consumes one item; a time scale may compress wall time for a
+ * read-only presentation without changing the native ordering or cadence.
+ */
+export function obsidianGraphProgressionItemCursor(
+  elapsedMs: number,
+  totalItems: number,
+  timeScale = 1,
+): number {
+  if (totalItems <= 0) return 0
+  const safeTimeScale = Number.isFinite(timeScale) && timeScale > 0 ? timeScale : 1
+  return Math.min(
+    totalItems,
+    OBSIDIAN_GRAPH_PROGRESSION.initial
+      + Math.floor(
+        obsidianGraphProgressionSpeed(totalItems)
+          * Math.max(0, elapsedMs)
+          * safeTimeScale
+          / 1_000,
+      ),
+  )
+}
+
+/** Map the native item cursor back to the unlocked API-order node prefix. */
+export function obsidianGraphProgressionVisibleNodes(
+  itemCursor: number,
+  nodeStartItems: readonly number[],
+): number {
+  const cursor = Math.max(0, Math.floor(itemCursor))
+  let low = 0
+  let high = nodeStartItems.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (nodeStartItems[middle] <= cursor) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
 export function obsidianGraphProgressionCursor(
   elapsedMs: number,
   totalNodes: number,

@@ -1,0 +1,518 @@
+/*
+ * One responsive contract for the two public chat captures.  The surface is
+ * sized by its container rather than by a transform, so text retains a
+ * readable minimum at the hero's compact width and scales continuously in the
+ * feature capture and at browser zoom levels.
+ */
+.authoritative-chat-surface {
+  container-type: size;
+  color-scheme: light;
+  grid-template-columns: 56px minmax(0, 1fr) !important;
+  min-height: 0;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+
+  /* Keep the shared chat controls on the same token contract as the
+     product shell.  The public demos are rendered inside the marketing page,
+     where light/dark mode is set on the document rather than on this subtree;
+     resolving through the shell (and the real-chat vars for Demo 1) keeps
+     every shared control legible without a second themed component. */
+  --authoritative-ink: var(--real-chat-ink, var(--demo-ink, #111827));
+  --authoritative-copy: var(--real-chat-copy, var(--demo-copy, #374151));
+  --authoritative-muted: var(--real-chat-muted, #4b5563);
+  --authoritative-faint: var(--real-chat-faint, var(--demo-faint, #9ca3af));
+  --authoritative-line: var(--real-chat-line, var(--demo-line, #e5e7eb));
+  --authoritative-line-soft: var(--real-chat-line-soft, var(--demo-line-soft, #f0f1f3));
+  --authoritative-surface: var(--real-chat-surface, var(--demo-surface, #ffffff));
+  --authoritative-surface-soft: var(--real-chat-surface-soft, var(--demo-surface-soft, #f4f5f7));
+  --authoritative-model: var(--real-chat-model, var(--demo-surface-soft, #eaebef));
+  --authoritative-accent: var(--real-chat-accent, var(--demo-accent, #2563eb));
+}
+
+/* The upstream app can expose either attribute while its theme preference is
+   being restored.  Keep the surface self-contained during that hand-off so a
+   dark page never flashes light controls (or leaves dark text on them). */
+:root[theme-mode="dark"] .authoritative-chat-surface,
+html[data-theme="dark"] .authoritative-chat-surface,
+.authoritative-chat-surface[data-theme="dark"] {
+  color-scheme: dark;
+  --authoritative-ink: var(--real-chat-ink, #f5f5f7);
+  --authoritative-copy: var(--real-chat-copy, #d4d4d8);
+  --authoritative-muted: var(--real-chat-muted, #a1a1aa);
+  --authoritative-faint: var(--real-chat-faint, #71717a);
+  --authoritative-line: var(--real-chat-line, #2a2a32);
+  --authoritative-line-soft: var(--real-chat-line-soft, #222228);
+  --authoritative-surface: var(--real-chat-surface, #151519);
+  --authoritative-surface-soft: var(--real-chat-surface-soft, #1d1d22);
+  --authoritative-model: var(--real-chat-model, #3f3f46);
+  --authoritative-accent: var(--real-chat-accent, #7c9cff);
+}
+
+.authoritative-chat-surface .musuw-shell-sidebar {
+  width: 56px;
+  min-width: 56px;
+  align-items: stretch;
+  padding: 14px 8px;
+}
+
+.authoritative-chat-surface .musuw-shell-collapsed {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.authoritative-chat-surface .musuw-shell-collapsed-nav {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--authoritative-muted);
+}
+
+.authoritative-chat-surface .musuw-shell-collapsed-nav.is-active {
+  background: var(--authoritative-surface-soft);
+  color: var(--authoritative-ink);
+}
+
+.authoritative-chat-surface .musuw-shell-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.authoritative-chat-surface .musuw-shell-logo img {
+  width: 32px;
+  height: 32px;
+}
+
+.authoritative-chat-surface .musuw-shell-collapse {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+}
+
+.authoritative-chat-surface .musuw-shell-divider {
+  width: 32px;
+  margin: 4px 0;
+}
+
+.authoritative-chat-surface .musuw-shell-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+
+.authoritative-chat-surface .musuw-shell-workspace {
+  overflow: hidden;
+}
+
+.authoritative-chat-surface .musuw-shell-title {
+  display: none;
+}
+
+.authoritative-chat-surface .musuw-shell-title strong {
+  font-size: inherit;
+}
+
+.authoritative-chat-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: clamp(20px, 5cqh, 72px) 0 clamp(24px, 3.2cqh, 32px);
+}
+
+.authoritative-chat-messages {
+  display: flex;
+  width: min(768px, calc(100% - 32px));
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-self: center;
+  overflow: hidden;
+  padding: clamp(20px, 3cqh, 48px) 0 clamp(10px, 2cqh, 24px);
+}
+
+.authoritative-chat-welcome {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  place-items: center;
+  color: var(--authoritative-ink);
+  font-size: clamp(18px, 2.7cqw, 34px);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1.18;
+  text-align: center;
+}
+
+.authoritative-chat-composer-slot {
+  width: min(768px, calc(100% - 32px));
+  min-width: 0;
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0 auto;
+}
+
+.authoritative-chat-composer {
+  width: 100%;
+  min-width: 0;
+}
+
+.authoritative-chat-composer__surface {
+  width: 100%;
+  min-height: clamp(82px, 13cqh, 156px);
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--authoritative-line) 78%, transparent);
+  border-radius: clamp(16px, 1.7cqw, 26px);
+  padding: clamp(12px, 1.7cqw, 24px);
+  background: var(--authoritative-surface-soft);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+
+.authoritative-chat-composer__textarea {
+  display: block;
+  width: 100%;
+  min-height: clamp(32px, 5cqh, 66px);
+  max-height: 120px;
+  box-sizing: border-box;
+  resize: none;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--authoritative-copy);
+  font: inherit;
+  font-size: clamp(12px, 1.15cqw, 16px);
+  line-height: 1.55;
+}
+
+.authoritative-chat-composer__textarea::placeholder {
+  color: var(--authoritative-muted);
+  opacity: 1;
+}
+
+.authoritative-chat-composer__toolbar {
+  display: flex;
+  min-height: clamp(26px, 3.2cqh, 40px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: clamp(7px, 1cqh, 15px);
+  user-select: none;
+}
+
+.authoritative-chat-composer__tools,
+.authoritative-chat-composer__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: clamp(8px, 1cqw, 16px);
+}
+
+.authoritative-chat-composer__tools {
+  flex: 1 1 auto;
+}
+
+.authoritative-chat-composer__actions {
+  flex: 0 0 auto;
+}
+
+.authoritative-chat-composer__tool {
+  display: inline-flex;
+  width: clamp(18px, 2cqw, 28px);
+  height: clamp(20px, 2.3cqh, 32px);
+  align-items: center;
+  justify-content: center;
+  color: var(--authoritative-muted);
+}
+
+.authoritative-chat-composer__model {
+  display: inline-flex;
+  max-width: min(230px, 34cqw);
+  min-height: clamp(26px, 3.2cqh, 40px);
+  align-items: center;
+  gap: clamp(4px, .6cqw, 8px);
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 0 clamp(8px, 1cqw, 14px);
+  background: var(--authoritative-model);
+  color: var(--authoritative-muted);
+  font-size: clamp(9px, .9cqw, 13px);
+  white-space: nowrap;
+}
+
+.authoritative-chat-composer__model > span {
+  overflow: hidden;
+  color: var(--authoritative-copy);
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+.authoritative-chat-composer__model small {
+  /* The model pill is a tinted surface, not the shell background. Use the
+     readable copy token here so the compact “effort” label keeps 4.5:1
+     contrast in both themes. */
+  color: var(--authoritative-copy);
+  font-size: inherit;
+}
+
+.authoritative-chat-composer__send {
+  display: inline-flex;
+  width: clamp(28px, 3.2cqw, 42px);
+  height: clamp(28px, 3.2cqw, 42px);
+  align-items: center;
+  justify-content: center;
+  border-radius: clamp(7px, .8cqw, 11px);
+  background: var(--authoritative-line);
+  color: var(--authoritative-faint);
+}
+
+.authoritative-chat-composer__send.is-stop,
+.authoritative-chat-composer__send:not(.is-disabled) {
+  background: var(--authoritative-ink);
+  color: #fff;
+}
+
+.authoritative-chat-composer__stop-square {
+  display: inline-block;
+  width: clamp(9px, 1cqw, 14px);
+  height: clamp(9px, 1cqw, 14px);
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* The existing pipeline fixture keeps its semantic classes, but its layout is
+   owned by the shared surface instead of an independently positioned shell. */
+.authoritative-chat-surface .real-chat-demo__messages {
+  position: static;
+  inset: auto;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  padding: 0;
+}
+
+.authoritative-chat-surface .real-chat-input {
+  position: static;
+  inset: auto;
+  width: 100%;
+  margin: 0;
+}
+
+.authoritative-chat-surface.real-chat-demo .visual-user-message__bubble,
+.authoritative-chat-surface.real-chat-demo .real-chat-answer {
+  font-size: clamp(12px, 1.15cqw, 16px);
+  line-height: 1.55;
+}
+
+.authoritative-chat-surface.real-chat-demo .visual-rag-step__body strong {
+  font-size: clamp(11px, 1cqw, 14px);
+}
+
+.authoritative-chat-surface.real-chat-demo .visual-rag-step__summary,
+.authoritative-chat-surface.real-chat-demo .real-chat-citation {
+  font-size: clamp(10px, .82cqw, 12px);
+}
+
+.authoritative-chat-surface .real-chat-composer__surface,
+.authoritative-chat-surface .real-chat-composer__textarea,
+.authoritative-chat-surface .real-chat-composer__toolbar {
+  min-height: inherit;
+}
+
+/* Hero's timed fixture uses the same message column, not a second miniature
+   coordinate system.  These rules deliberately replace the old percentage
+   offsets that made copy unreadable when the hero was scaled down. */
+.authoritative-chat-surface .hero-demo-question {
+  position: static;
+  align-self: flex-end;
+  width: min(78%, 620px);
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: clamp(16px, 1.5cqw, 24px);
+  padding: clamp(10px, 1.4cqw, 18px) clamp(13px, 1.8cqw, 24px);
+  background: var(--authoritative-surface-soft);
+  color: var(--authoritative-ink);
+  font-size: clamp(12px, 1.15cqw, 16px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.authoritative-chat-surface .hero-demo-thread {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  margin-top: clamp(22px, 4cqh, 58px);
+  overflow: visible;
+}
+
+.authoritative-chat-surface .hero-demo-retrieval {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 8px;
+  color: var(--authoritative-muted);
+  font-size: clamp(12px, 1.05cqw, 14px);
+  line-height: 1.5;
+}
+
+.authoritative-chat-surface .hero-demo-retrieval-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--authoritative-faint);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: authoritative-chat-spin .8s linear infinite;
+}
+
+.authoritative-chat-surface .hero-demo-answer {
+  margin-top: clamp(12px, 1.8cqh, 24px);
+  color: var(--authoritative-copy);
+  font-size: clamp(12px, 1.15cqw, 16px);
+  line-height: 1.6;
+}
+
+.authoritative-chat-surface .hero-demo-answer strong {
+  color: var(--authoritative-ink);
+}
+
+.authoritative-chat-surface .hero-demo-citation {
+  border-color: var(--authoritative-line);
+  background: var(--authoritative-surface-soft);
+  color: var(--authoritative-muted);
+}
+
+.authoritative-chat-surface .hero-demo-caret {
+  background: var(--authoritative-ink);
+}
+
+.authoritative-chat-surface .hero-demo-answer p {
+  margin: 0 0 clamp(10px, 1.5cqh, 18px);
+}
+
+.authoritative-chat-surface .hero-demo-answer-actions {
+  gap: clamp(10px, 1.5cqw, 18px);
+  margin-top: clamp(12px, 1.5cqh, 20px);
+  color: var(--authoritative-muted);
+}
+
+.authoritative-chat-surface .hero-demo-info-action {
+  width: clamp(22px, 2.6cqw, 34px);
+  height: clamp(22px, 2.6cqw, 34px);
+  border-radius: clamp(6px, .7cqw, 10px);
+  border-color: var(--authoritative-line);
+  color: var(--authoritative-muted);
+}
+
+.authoritative-chat-surface .hero-demo-composer {
+  position: static;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.authoritative-chat-surface .hero-demo-composer .authoritative-chat-composer__surface {
+  border-radius: clamp(16px, 1.7cqw, 26px);
+}
+
+@media (max-width: 620px) {
+  .authoritative-chat-surface {
+    grid-template-columns: 56px minmax(0, 1fr) !important;
+  }
+
+  .authoritative-chat-surface .musuw-shell-collapsed {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .authoritative-chat-surface .musuw-shell-collapsed .musuw-shell-divider {
+    margin: 4px 0;
+  }
+
+  .authoritative-chat-surface .musuw-shell-collapsed-nav {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border-radius: 11px;
+    color: var(--authoritative-muted);
+  }
+
+  .authoritative-chat-surface .musuw-shell-collapsed-nav.is-active {
+    background: var(--authoritative-surface-soft);
+    color: var(--authoritative-ink);
+  }
+
+  .authoritative-chat-surface .musuw-shell-collapsed .musuw-shell-avatar {
+    margin-top: auto;
+  }
+
+  .authoritative-chat-messages,
+  .authoritative-chat-composer-slot {
+    width: min(768px, calc(100% - 24px));
+  }
+
+  .authoritative-chat-surface .musuw-shell-title {
+    width: min(220px, 58%);
+    max-width: 58%;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authoritative-chat-surface *,
+  .authoritative-chat-surface *::before,
+  .authoritative-chat-surface *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes authoritative-chat-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The marketing shell is 1,200px wide on a large desktop, but the hero must
+   become a normal container before the viewport reaches that width.  The
+   legacy 1,024px breakpoint left the fixed scene hanging outside the page,
+   which hid the 56px product rail. */
+@media (max-width: 1279px) {
+  .hero-stage .dashboard-entry {
+    left: 0;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 807;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  /* Preserve the production rail's fixed 32/28/36px affordances in the
+     narrow hero capture.  The original 1200:807 aspect ratio made the
+     56px rail taller than the compressed 240px scene, clipping its avatar
+     and forcing the composer into the same cramped band. */
+  .hero-stage .dashboard-entry {
+    height: 360px;
+    min-height: 360px;
+    aspect-ratio: auto;
+  }
+}

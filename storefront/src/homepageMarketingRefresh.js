@@ -17,18 +17,18 @@ export const MARKETING_FOOTER_GROUPS = Object.freeze([
 const MARKETING_COPY = Object.freeze({
   en: {
     navLabels: ["Features", "Platform", "Pricing", "Security", "Contact"],
-    meta: { title: "musuw | Turn source material into intelligent knowledge assets", description: "Get answers grounded in your saved sources. Build connected knowledge for everyday questions, work, research, and reading." },
+    meta: { title: "musuw | Turn source material into intelligent knowledge assets", description: "Retrieve verifiable answers across multiple sources, then organize key information into a connected knowledge system that stays traceable and reusable." },
     hero: HOMEPAGE_STORIES.en.hero,
     features: HOMEPAGE_STORIES.en.features,
     platform: {
-      intro: { label: "Platform", title: "Built for the full knowledge loop", body: "Bring in the material you use, find answers with evidence, and keep building on what you learn." },
+      intro: { label: "Platform", title: "A complete workflow from sources to knowledge", body: "Source import, parsing, retrieval, answers, Wiki maintenance, and graph exploration share one traceable context." },
       cards: [
         { title: "Bring your sources together", body: "Turn documents, webpages, images, tables, and Markdown into searchable knowledge" },
         { title: "Find and verify across sources", body: "Bring relevant material into one answer and inspect the evidence behind key claims" },
         { title: "Connected pages and ideas", body: "Keep useful findings in maintained pages with backlinks and traceable relationships" },
         { title: "30+ leading models", body: "Use 30+ managed models and choose the right capability for each task" },
         { title: "One-click web and video import", body: "Turn webpages, YouTube, TikTok, or Douyin links into searchable text or transcripts" },
-        { title: "Keep building on what you know", body: "Reuse earlier findings as your library, pages, and connections evolve" },
+        { title: "Keep existing knowledge current", body: "Keep pages, relationships, and versions aligned as new material is added" },
       ],
     },
     pricing: {
@@ -58,7 +58,7 @@ const MARKETING_COPY = Object.freeze({
         { question: "Can I export delete or cancel?", answer: "Musuw provides export and deletion controls. Manage subscription changes through the billing flow in our Subscription Policy" },
       ],
     },
-    finalCta: { title: "Put your knowledge to work", body: "Start with the material you already value. Find a useful answer, inspect its sources, and build on what you learn.", action: "Start free" },
+    finalCta: { title: "Build knowledge you can verify and reuse", body: "Import, retrieve, and verify source material, then preserve key findings and relationships in a maintained knowledge system.", action: "Start free" },
     footerGroups: [
       { title: "Product", links: ["Features", "Platform", "Pricing"] },
       { title: "Trust", links: ["FAQ", "Security", "Contact"] },
@@ -67,18 +67,18 @@ const MARKETING_COPY = Object.freeze({
   },
   zh: {
     navLabels: ["功能", "平台", "定价", "安全", "联系"],
-    meta: { title: "musuw | 把资料转化为会思考的知识资产", description: "从积累的资料中得到有依据、可追溯的回答。让生活、工作、研究与阅读中的发现，沉淀为持续完善的知识体系。" },
+    meta: { title: "musuw | 把资料转化为会思考的知识资产", description: "统一检索多种资料，生成可验证、可追溯的回答，并将关键信息组织为可持续更新与复用的知识体系。" },
     hero: HOMEPAGE_STORIES["zh-CN"].hero,
     features: HOMEPAGE_STORIES["zh-CN"].features,
     platform: {
-      intro: { label: "平台能力", title: "覆盖完整知识闭环", body: "汇集日常使用的资料，得到有依据的回答，再把新的理解保留下来。" },
+      intro: { label: "平台能力", title: "覆盖从资料到知识的完整链路", body: "资料导入、解析、检索、问答、Wiki 维护与图谱探索，共享同一套可追溯上下文。" },
       cards: [
         { title: "汇集不同形式的资料", body: "文档、网页、图片、表格和 Markdown，统一成为可检索的知识" },
         { title: "跨来源查找与核验", body: "结合多份资料组织回答，让关键结论保留可以检查的依据" },
         { title: "知识页面与关联", body: "将有用发现保留为持续维护的页面、反向链接与可追溯关系" },
         { title: "30+ 主流模型接入", body: "托管接入 30+ 主流模型，同一界面切换，按任务选择能力" },
         { title: "文章与视频一键入库", body: "网页文章、YouTube、TikTok／抖音等链接，转成可检索正文或字幕" },
-        { title: "在已有理解上继续积累", body: "复用过去的回答，让知识页面与关联随新资料持续完善" },
+        { title: "持续更新既有知识", body: "让页面、关系与版本随新增资料保持同步" },
       ],
     },
     pricing: {
@@ -98,7 +98,7 @@ const MARKETING_COPY = Object.freeze({
       noPlanCap: "不限",
     },
     faq: {
-      label: "常见问题", title: "开始前的常见问题", body: "资料导入、智能体、引用、模型与套餐限制，一次说明",
+      label: "常见问题", title: "开始前的常见问题", body: "涵盖资料导入、智能体、引用、模型、套餐限制与数据控制。",
       items: [
         { question: "可以向 musuw 添加什么？", answer: "可添加常见文档和网页；付费方案支持已接入平台的视频链接，包括 YouTube、TikTok／抖音" },
         { question: "智能体和引用如何工作？", answer: "智能体会拆解任务，多轮检索并调用工具；有证据时，重要结论会连到原文段落" },
@@ -108,7 +108,7 @@ const MARKETING_COPY = Object.freeze({
         { question: "可以导出 删除或取消订阅吗？", answer: "Musuw 提供导出和删除控制；订阅变更与取消按订阅政策的计费流程处理" },
       ],
     },
-    finalCta: { title: "让知识真正为你工作", body: "从你已经积累的资料开始，找到有用的回答，核对它的依据，再把新的理解保留下来。", action: "免费开始" },
+    finalCta: { title: "建立可验证、可复用的知识体系", body: "统一导入、检索并核验资料，将关键结论和关联沉淀为可持续维护的知识。", action: "免费开始" },
     footerGroups: [
       { title: "产品", links: ["功能", "平台", "定价"] },
       { title: "信任", links: ["常见问题", "安全", "联系"] },

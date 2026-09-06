@@ -89,7 +89,7 @@
   overflow: visible;
   border: 1px solid #e2e8f0;
   border-radius: 999px;
-  background: #f1f5f9;
+  background: var(--surface-soft);
 }
 
 .billing-toggle button {
@@ -102,7 +102,7 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: var(--ink-soft);
   font-size: 14px;
   font-weight: 550;
   cursor: pointer;
@@ -111,8 +111,8 @@
 }
 
 .billing-toggle button.active {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--surface);
+  color: var(--ink);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -462,7 +462,7 @@
 
   .comparison-mobile-plan {
     display: block;
-    color: #64748b;
+    color: #334155;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -642,10 +642,11 @@ html[data-theme="dark"] .dashboard-frame::after {
   border-color: var(--line);
 }
 
-/* The embedded product preview is monochrome, so a direct inverse is the
-   smallest faithful dark-mode equivalent of the original light preview. */
+/* The embedded product preview owns its light/dark palette. Keep the
+   authoritative preview DOM in its native theme instead of applying a
+   page-level inverse filter that would double-invert its dark tokens. */
 html[data-theme="dark"] .hero-product-demo {
-  filter: grayscale(1) invert(1);
+  filter: none;
 }
 
 html[data-theme="dark"] :is(
@@ -743,7 +744,7 @@ html[data-theme="dark"] :is(
 }
 
 html[data-theme="dark"] .footer-bottom {
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 @media (max-width: 767px) {

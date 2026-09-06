@@ -19,22 +19,22 @@ test("hero copy keeps the approved two-line title and localized knowledge outcom
   assert.equal(en.hero.titleLine2, "intelligent knowledge assets");
   assert.deepEqual(en.hero.titleFocusSegments, ["intelligent", "knowledge", "assets"]);
   assert.deepEqual(en.hero.typewriterPhrases, [
-    "Evidence · Insight · Understanding · Discovery",
-    "Answers grounded in your own sources",
-    "Put your knowledge to work",
-    "Build a connected understanding",
-    "Discover relationships across what you read",
+    "Retrieval · Evidence · Structure · Connections",
+    "Trace key claims to their original sources",
+    "Retrieve and verify across multiple sources",
+    "Keep sources, pages, and relationships aligned",
+    "Integrate new material into existing knowledge",
   ]);
 
   assert.equal(zh.hero.titleLine1, "把资料转化为");
   assert.equal(zh.hero.titleLine2, "会思考的知识资产");
   assert.deepEqual(zh.hero.titleFocusSegments, ["会", "思考的", "知识资产"]);
   assert.deepEqual(zh.hero.typewriterPhrases, [
-    "多源研判 · 决策洞察 · 知识沉淀 · 关联发现",
-    "从自己的资料中，得到有依据的回答",
-    "让积累的知识，参与每一次思考",
-    "围绕研究问题，形成自己的理解",
-    "在阅读与笔记之间，发现新的关联",
+    "多源检索 · 证据核验 · 知识组织 · 关系发现",
+    "关键结论可追溯至原始资料",
+    "多种来源统一检索与交叉核验",
+    "资料、页面与关系持续同步",
+    "新增内容自动接入既有知识",
   ]);
 });
 
@@ -98,7 +98,7 @@ test("theme bootstrap and the header toggle share one persisted Musuw theme cont
   assert.match(styles, /:root\[data-theme="dark"\]/);
   assert.match(styles, /\.hero-liquid/);
   assert.match(styles, /\.hero-dots/);
-  assert.match(styles, /html\[data-theme="dark"\] \.hero-product-demo[\s\S]*?invert\(1\)/);
+  assert.match(styles, /html\[data-theme="dark"\] \.hero-product-demo[\s\S]*?filter:\s*none/);
   assert.match(styles, /html\[data-theme="dark"\] \.musuw-product-shell[\s\S]*?invert\(1\)/);
   assert.match(styles, /\.site-header :is\([\s\S]*?\.nav-actions > \.button[\s\S]*?border-color: var\(--ink\)/);
   assert.match(styles, /html\[data-theme="dark"\] \.button-primary[\s\S]*?background: transparent/);

@@ -248,12 +248,18 @@
   text-align: center;
 }
 
+html[data-theme="dark"] .not-found-page {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(76, 114, 237, 0.16), transparent 34%),
+    var(--page);
+}
+
 .not-found-page > div {
   max-width: 590px;
 }
 
 .not-found-page > div > span {
-  color: var(--accent);
+  color: var(--accent-dark);
   font-size: 14px;
   font-weight: 750;
   letter-spacing: 0.14em;

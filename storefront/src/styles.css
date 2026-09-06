@@ -46,7 +46,7 @@
   --surface-tint: #eef3ff;
   --ink: #111318;
   --ink-soft: #555c68;
-  --ink-faint: #7c8490;
+  --ink-faint: #666f7b;
   --line: #dfe2e7;
   --line-strong: #cfd4dc;
   --accent: #4c72ed;
@@ -1531,7 +1531,7 @@ textarea {
 
 .plan-price span {
   padding-bottom: 5px;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   font-size: 13px;
 }
 
@@ -2189,7 +2189,7 @@ textarea {
   margin-top: 66px;
   border-top: 1px solid var(--line);
   padding-top: 24px;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   font-size: 12px;
 }
 
@@ -3255,7 +3255,7 @@ textarea {
     margin-top: 0;
     border: 0;
     padding: 0;
-    color: #5e5e5e;
+    color: var(--ink-soft);
     font-size: 14px;
   }
 
@@ -4715,7 +4715,7 @@ html[data-theme="dark"] .site-footer {
   padding: 6px 16px;
   border-color: color-mix(in srgb, var(--line) 40%, transparent);
   background: color-mix(in srgb, var(--surface) 70%, transparent);
-  color: #6366f1;
+  color: #5f61e6;
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;

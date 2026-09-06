@@ -4,6 +4,8 @@ import test from 'node:test'
 import {
   OBSIDIAN_NATIVE_PHYSICS,
   OBSIDIAN_NATIVE_RENDER,
+  obsidianGraphProgressionItemCursor,
+  obsidianGraphProgressionVisibleNodes,
   obsidianGraphProgressionCursor,
   obsidianGraphProgressionSpeed,
   obsidianEase,
@@ -54,4 +56,19 @@ test('matches the audited Obsidian timelapse progression formula', () => {
   assert.equal(obsidianGraphProgressionCursor(200, 10, 100), 2)
   assert.equal(obsidianGraphProgressionCursor(10_000, 10, 100), 10)
   assert.equal(obsidianGraphProgressionCursor(10_000, 0, 100), 0)
+
+  // Native renderProgression advances a single item cursor. A file consumes
+  // one item and each of its outgoing links consumes another, so the second
+  // node is not unlocked until the first node's whole item block is passed.
+  const nodeStartItems = [1, 29, 39, 49]
+  assert.equal(obsidianGraphProgressionItemCursor(0, 58), 1)
+  assert.equal(obsidianGraphProgressionItemCursor(5_599, 58), 28)
+  assert.equal(obsidianGraphProgressionItemCursor(5_600, 58), 29)
+  assert.equal(obsidianGraphProgressionVisibleNodes(28, nodeStartItems), 1)
+  assert.equal(obsidianGraphProgressionVisibleNodes(29, nodeStartItems), 2)
+  assert.equal(obsidianGraphProgressionVisibleNodes(58, nodeStartItems), 4)
+
+  // Storefronts may compress wall time, but the native item ordering and
+  // relative cadence stay identical.
+  assert.equal(obsidianGraphProgressionItemCursor(1_750, 58, 3.2), 29)
 })

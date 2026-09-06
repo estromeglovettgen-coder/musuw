@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInView, useReducedMotion } from "motion/react";
 
 export const CAPABILITY_DEMO_PHASES = Object.freeze(["capture", "reason", "connect", "complete"]);
@@ -21,56 +21,43 @@ export function useCapabilityDemoPhase() {
   return { ref, phase: resolveCapabilityDemoPhase(phase, reducedMotion) };
 }
 
-// Always start with readable UI. The source is already open before any zoom.
-export const WIKI_DEMO_STAGES = Object.freeze([
-  "page", "moving-source", "hovering-source", "clicking-source", "source-open", "focus-source", "restore",
-]);
+// Keep the product view at its real scale. The only guided motion is the
+// cursor following a Wiki link and the linked page replacing the current one.
+export const WIKI_DEMO_STAGES = Object.freeze(["page", "moving-to-link", "pressing-link", "linked-page"]);
 export const WIKI_STAGE_DURATIONS = Object.freeze({
-  page: 2200, "moving-source": 850, "hovering-source": 450,
-  "clicking-source": 180, "source-open": 650, "focus-source": 3600, restore: 1300,
+  page: 900,
+  "moving-to-link": 1050,
+  "pressing-link": 620,
 });
+
+export function nextWikiDemoStage(stage) {
+  const index = WIKI_DEMO_STAGES.indexOf(stage);
+  if (index < 0) return WIKI_DEMO_STAGES[0];
+  return WIKI_DEMO_STAGES[Math.min(index + 1, WIKI_DEMO_STAGES.length - 1)];
+}
+
+export function resolveWikiDemoStage(stage, reducedMotion) {
+  return reducedMotion ? "linked-page" : stage;
+}
+
 export function useWikiDemoFlow() {
   const ref = useRef(null);
   const inView = useInView(ref, { amount: 0.28 });
   const reducedMotion = useReducedMotion();
   const [stage, setStage] = useState("page");
-  const [paused, setPaused] = useState(false);
-  const pause = useCallback(() => setPaused(true), []);
-  const resume = useCallback(() => { setPaused(false); setStage("restore"); }, []);
 
   useEffect(() => {
-    if (reducedMotion || !inView) {
-      setStage("page");
-      if (!inView) setPaused(false);
+    if (reducedMotion) {
+      setStage("linked-page");
       return undefined;
     }
-    if (paused) return undefined;
+    const duration = WIKI_STAGE_DURATIONS[stage];
+    if (!inView || !Number.isFinite(duration)) return undefined;
     const timer = window.setTimeout(() => {
-      const index = WIKI_DEMO_STAGES.indexOf(stage);
-      setStage(WIKI_DEMO_STAGES[(index + 1) % WIKI_DEMO_STAGES.length]);
-    }, WIKI_STAGE_DURATIONS[stage]);
+      setStage((current) => nextWikiDemoStage(current));
+    }, duration);
     return () => window.clearTimeout(timer);
-  }, [inView, reducedMotion, stage, paused]);
+  }, [inView, reducedMotion, stage]);
 
-  // Scroll only the existing reader, never the surrounding page or app chrome.
-  // Element bounds account for the template's mobile scale and current camera.
-  useEffect(() => {
-    const reader = ref.current?.querySelector('[data-wiki-reader="true"]');
-    if (!reader) return;
-    if (!inView || stage === "restore") {
-      reader.scrollTo({ top: 0, left: 0, behavior: reducedMotion || !inView ? "instant" : "smooth" });
-      return;
-    }
-    if (stage !== "moving-source" || paused) return;
-    const target = reader.querySelector('[data-wiki-source-trigger="true"]');
-    if (!target) return;
-    const readerBounds = reader.getBoundingClientRect();
-    const targetBounds = target.getBoundingClientRect();
-    const scale = readerBounds.height / (reader.offsetHeight || 1);
-    if (scale <= 0) return;
-    const below = (targetBounds.bottom - readerBounds.bottom) / scale + 20;
-    if (below > 0) reader.scrollTo({ top: reader.scrollTop + below, left: 0, behavior: "smooth" });
-  }, [inView, reducedMotion, stage, paused]);
-
-  return { ref, stage, reducedMotion, inView, paused: paused || !inView, pause, resume };
+  return { ref, stage: resolveWikiDemoStage(stage, reducedMotion), reducedMotion, inView };
 }
