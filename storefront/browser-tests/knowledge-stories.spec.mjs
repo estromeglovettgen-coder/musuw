@@ -17,6 +17,12 @@ async function assertSource(page, parent, id, testInfo, name) {
   expect(bounds.width).toBeGreaterThan(100);
   expect(bounds.x).toBeGreaterThanOrEqual(-1);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize().width + 1);
+  if (await parent.getAttribute("data-product-page-shell") === "wiki") {
+    const outer = await parent.boundingBox();
+    expect(bounds.y).toBeGreaterThanOrEqual(outer.y);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(outer.y + outer.height + 1);
+    await expect(source.locator("p")).toBeInViewport();
+  }
   await capture(parent, name, testInfo);
   await source.locator("header button").click();
   await expect(source).toHaveCount(0);
@@ -44,7 +50,6 @@ for (const locale of ["zh-CN", "en"]) {
       await expect(hero.locator(".hero-demo-question")).toContainText(locale === "zh-CN" ? "婚礼摄影师" : "wedding photographer");
       await expect(hero.locator(".demo-scope-note")).toBeVisible();
       await expect(hero.locator(".hero-demo-citation")).toHaveCount(3);
-      // Reading must not depend on hidden overflow in the fixed hero viewport.
       const heroGeometry = await hero.locator(".hero-demo-thread").evaluate((node) => ({ height: node.clientHeight, scroll: node.scrollHeight, overflow: getComputedStyle(node).overflowY }));
       expect(heroGeometry.overflow !== "hidden" || heroGeometry.scroll <= heroGeometry.height + 2, JSON.stringify(heroGeometry)).toBeTruthy();
       await hero.locator(".hero-demo-citation").nth(1).click();
@@ -64,7 +69,10 @@ for (const locale of ["zh-CN", "en"]) {
       await wiki.scrollIntoViewIfNeeded();
       await expect(wiki.locator('[data-wiki-reader="true"]')).toBeVisible();
       await expect(wiki.locator(".wiki-reader-title-text")).toHaveText(locale === "zh-CN" ? "长期记忆评估" : "Memory Evaluation");
+      const baseScale = await wiki.locator(".kb-product-preview").evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
+      expect(baseScale).toBeCloseTo(testInfo.project.name === "mobile" ? 0.5 : 1, 2);
       const trigger = wiki.locator('[data-wiki-source-trigger="true"]');
+      const camera = wiki.locator('[data-wiki-camera="true"]');
       if (reducedMotion === "reduce") {
         await expect(wiki).toHaveAttribute("data-demo-phase", "page");
         await expect(wiki.locator("[data-demo-pointer]")).toHaveCount(0);
@@ -75,11 +83,11 @@ for (const locale of ["zh-CN", "en"]) {
         await expect(trigger).toBeInViewport();
         await expect(wiki).toHaveAttribute("data-demo-phase", "source-open");
         await expect(wiki.locator('[data-demo-source="longmemeval"]')).toBeVisible();
-        const beforeZoom = await wiki.locator(".kb-product-preview").evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
+        const beforeZoom = await camera.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
         expect(beforeZoom).toBeCloseTo(1, 2);
         await expect(wiki).toHaveAttribute("data-demo-phase", "focus-source");
-        await expect.poll(async () => wiki.locator(".kb-product-preview").evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeGreaterThan(1.06);
-        const focusedScale = await wiki.locator(".kb-product-preview").evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
+        await expect.poll(async () => camera.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a)).toBeGreaterThan(1.06);
+        const focusedScale = await camera.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
         expect(focusedScale).toBeLessThanOrEqual(1.08);
         await capture(wiki, "wiki-focused-source", testInfo);
         await expect(wiki).toHaveAttribute("data-demo-phase", "restore");
@@ -88,6 +96,7 @@ for (const locale of ["zh-CN", "en"]) {
         await trigger.click();
         await assertSource(page, wiki, "longmemeval", testInfo, "wiki-manual-source");
       }
+      await expect(wiki).toHaveAttribute("data-demo-phase", "page");
       await capture(wiki, "wiki-page", testInfo);
 
       const graph = page.locator('[data-product-page-shell="graph"]');
