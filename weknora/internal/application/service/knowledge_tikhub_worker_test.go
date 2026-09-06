@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -356,8 +357,6 @@ func TestPrepareTikHubArtifactDownloadsVideoWithoutProviderBearerAndSelectsVideo
 }
 
 func TestPrepareTikHubArtifactStreamsUnknownLengthAndDeletesWhenVideoExceedsLimit(t *testing.T) {
-	t.Setenv("VIDEO_MAX_BYTES", "8")
-
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(
@@ -388,19 +387,47 @@ func TestPrepareTikHubArtifactStreamsUnknownLengthAndDeletesWhenVideoExceedsLimi
 	payload := types.DocumentProcessPayload{TenantID: 9, URL: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
 	knowledge := &types.Knowledge{ID: "knowledge-too-large", TenantID: 9, FileType: "html"}
 
-	handled, _, err := svc.prepareTikHubArtifact(
+	handled, _, err := svc.prepareTikHubArtifactWithVideoLimit(
 		context.Background(),
 		&payload,
 		&types.KnowledgeBase{ID: "kb-2"},
 		knowledge,
 		types.EffectiveProcessConfig{VLMConfig: types.VLMConfig{Enabled: true, ModelID: "vlm-1"}},
+		8,
 	)
 	require.True(t, handled)
-	require.EqualError(t, err, "social video exceeds the configured 8 byte upload limit")
+	require.ErrorIs(t, err, errSocialVideoTooLarge)
 	require.Equal(t, 1, files.saveReaderCalls)
 	require.Equal(t, 1, files.deleteCalls, "the over-limit object must be removed after streaming max+1 bytes")
 	require.Empty(t, knowledge.FilePath)
 	require.NotEmpty(t, payload.URL, "failed source materialization must remain retryable")
+}
+
+func TestDownloadTikHubMediaClassifiesUnsupportedContentType(t *testing.T) {
+	client := &http.Client{Transport: tikHubWorkerRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode:    http.StatusOK,
+			Header:        http.Header{"Content-Type": []string{"text/html"}},
+			Body:          io.NopCloser(strings.NewReader("not a video")),
+			ContentLength: 11,
+			Request:       req,
+		}, nil
+	})}
+
+	stream, err := downloadTikHubMedia(
+		context.Background(), "https://media.example/video", client, 300_000_000,
+	)
+	require.Nil(t, stream)
+	require.ErrorIs(t, err, errSocialVideoFormatUnsupported)
+	code, message := socialImportPublicState(err)
+	require.Equal(t, "VIDEO_FORMAT_UNSUPPORTED", code)
+	require.Equal(t, SocialFormatUnsupportedPublicMessage, message)
+}
+
+func TestSocialVideoTooLargeUsesSizeFailureCode(t *testing.T) {
+	code, message := socialImportPublicState(fmt.Errorf("%w: fixture", errSocialVideoTooLarge))
+	require.Equal(t, "VIDEO_TOO_LARGE", code)
+	require.Equal(t, VideoTooLargePublicMessage, message)
 }
 
 func TestPrepareTikHubArtifactCleansObjectWhenStorageMutationFails(t *testing.T) {

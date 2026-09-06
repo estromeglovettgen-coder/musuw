@@ -116,10 +116,6 @@ func validateDefaultFileImportRequirements(
 		logger.Error(ctx, "VLM model is not configured")
 		return werrors.NewBadRequestError("上传图片文件需要设置VLM模型")
 	}
-	if IsVideoType(fileType) && !hasUsableVLM(eff.VLMConfig) {
-		logger.Error(ctx, "VLM model is not configured for video")
-		return werrors.NewBadRequestError("上传视频文件需要设置VLM模型")
-	}
 	if IsAudioType(fileType) && !kb.ASRConfig.IsASREnabled() {
 		logger.Error(ctx, "ASR model is not configured")
 		return werrors.NewBadRequestError("上传音频文件需要设置ASR语音识别模型")
@@ -172,16 +168,12 @@ func ValidateProcessOverrides(
 
 	hasImage := false
 	hasAudio := false
-	hasVideo := false
 	for _, ft := range fileTypes {
 		if IsImageType(ft) {
 			hasImage = true
 		}
 		if IsAudioType(ft) {
 			hasAudio = true
-		}
-		if IsVideoType(ft) {
-			hasVideo = true
 		}
 	}
 
@@ -192,10 +184,6 @@ func ValidateProcessOverrides(
 			return werrors.NewBadRequestError("上传图片文件需要设置VLM模型")
 		}
 	}
-	if hasVideo && !hasUsableVLM(eff.VLMConfig) {
-		return werrors.NewBadRequestError("上传视频文件需要设置VLM模型")
-	}
-
 	if hasAudio && !eff.ASRConfig.IsASREnabled() {
 		return werrors.NewBadRequestError("上传音频文件需要设置ASR语音识别模型")
 	}
@@ -271,12 +259,14 @@ func ApplyKnowledgeProcessOverrides(
 }
 
 // reparseFileTypes derives the file types used to validate overrides on reparse.
-// Manual knowledge has no file; URL imports validate as html.
+// Manual knowledge has no file. A materialized URL source is a real stored
+// file (notably a social video), so reparse must preserve that file type;
+// only URL rows without a stored source validate as html.
 func reparseFileTypes(k *types.Knowledge) []string {
 	if k == nil || k.IsManual() {
 		return nil
 	}
-	if k.Type == "url" {
+	if k.Type == "url" && strings.TrimSpace(k.FilePath) == "" {
 		return []string{"html"}
 	}
 	ft := k.FileType

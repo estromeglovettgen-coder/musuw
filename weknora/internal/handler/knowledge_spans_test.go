@@ -4,9 +4,81 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/application/service"
+	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSanitizeConsumerManagedSpansRemovesInfrastructureDetails(t *testing.T) {
+	rows := []types.KnowledgeProcessingSpan{{
+		Name:         "docreader.openrouter.secret-provider",
+		Kind:         types.SpanKindSubSpan,
+		ErrorCode:    werrors.ErrCodeVideoParseFailed,
+		ErrorMessage: "OpenRouter upstream returned 500 from provider",
+		ErrorDetail:  "sensitive response body",
+		Input: types.JSONMap{
+			"model_id":  "builtin-secret",
+			"file_name": "clip.mp4",
+			"nested":    types.JSONMap{"provider": "secret-provider", "chunk_count": 2},
+		},
+		Output: types.JSONMap{"video_source": "url", "text_length": 0},
+	}}
+
+	got := sanitizeConsumerManagedSpans(rows, &types.Knowledge{FileType: "mp4"})
+	assert.Equal(t, "processing_detail", got[0].Name)
+	assert.Equal(t, "", got[0].ErrorCode)
+	assert.Equal(t, "", got[0].ErrorDetail)
+	assert.Equal(t, service.VideoParseFailedPublicMessage, got[0].ErrorMessage)
+	assert.NotContains(t, got[0].Input, "model_id")
+	assert.Equal(t, "clip.mp4", got[0].Input["file_name"])
+	nested := got[0].Input["nested"].(types.JSONMap)
+	assert.NotContains(t, nested, "provider")
+	assert.Equal(t, 2, nested["chunk_count"])
+	assert.NotContains(t, got[0].Output, "video_source")
+	assert.Equal(t, 0, got[0].Output["text_length"])
+	assert.Equal(t, werrors.ErrCodeVideoParseFailed, rows[0].ErrorCode, "persisted diagnostics must remain unchanged")
+}
+
+func TestSocialSourceIsSanitizedBeforeFileTypeMaterializes(t *testing.T) {
+	knowledge := &types.Knowledge{
+		Source:       "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		FileType:     "html",
+		ErrorMessage: "docreader provider leaked an internal endpoint",
+	}
+	assert.True(t, knowledgeNeedsManagedIngestionSanitization(knowledge))
+	assert.Equal(t, service.SocialImportFailedPublicMessage, sanitizeConsumerKnowledge(knowledge).ErrorMessage)
+
+	rows := []types.KnowledgeProcessingSpan{{
+		Name:         "docreader.provider-secret",
+		Kind:         types.SpanKindStage,
+		Status:       types.SpanStatusFailed,
+		ErrorCode:    "PROVIDER_SECRET_CODE",
+		ErrorMessage: "provider response body",
+		ErrorDetail:  "raw provider body",
+	}}
+	got := sanitizeConsumerManagedSpans(rows, knowledge)
+	assert.Equal(t, "processing", got[0].Name)
+	assert.Empty(t, got[0].ErrorCode)
+	assert.Empty(t, got[0].ErrorDetail)
+	assert.Equal(t, service.SocialImportFailedPublicMessage, got[0].ErrorMessage)
+	lastError := knowledgeSpansLastError(1, 1, types.ParseStatusFailed, got[0].ErrorMessage, time.Now(), &got[0])
+	assert.Equal(t, "processing", lastError["stage"])
+	assert.NotContains(t, lastError["message"], "provider")
+}
+
+func TestConsumerVideoPublicErrorPreservesProductStates(t *testing.T) {
+	for _, message := range []string{
+		service.VideoParsingPublicMessage,
+		service.VideoRetryingPublicMessage,
+		service.VideoParseFailedPublicMessage,
+		service.VideoTooLargePublicMessage,
+		service.VideoSourceFailedPublicMessage,
+		service.VideoFormatFailedPublicMessage,
+	} {
+		assert.Equal(t, message, consumerVideoPublicError("", message))
+	}
+}
 
 // TestBuildSpanTree_AssemblesParentChild covers the basic shape: a root
 // with stage children and an image generation grandchild. The handler's

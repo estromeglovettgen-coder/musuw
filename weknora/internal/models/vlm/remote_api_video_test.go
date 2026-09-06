@@ -228,6 +228,9 @@ func TestRemoteAPIVLMPredictVideoReportsFinishReason(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "finish_reason=content_filter") {
 		t.Fatalf("error = %v, want finish reason", err)
 	}
+	if IsRetryableVideoError(err) {
+		t.Fatalf("content-filter failure must be permanent: %v", err)
+	}
 }
 
 func TestRemoteAPIVLMPredictVideoReportsNoChoices(t *testing.T) {
@@ -256,6 +259,48 @@ func TestRemoteAPIVLMPredictVideoReportsNoChoices(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "no choices") {
 		t.Fatalf("error = %v, want no choices", err)
+	}
+	if !IsRetryableVideoError(err) {
+		t.Fatalf("valid empty response should be retryable: %v", err)
+	}
+}
+
+func TestRemoteAPIVLMPredictVideoClassifiesHTTPFailures(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    int
+		retryable bool
+	}{
+		{name: "rate limited", status: http.StatusTooManyRequests, retryable: true},
+		{name: "server error", status: http.StatusBadGateway, retryable: true},
+		{name: "request timeout", status: http.StatusRequestTimeout, retryable: true},
+		{name: "bad parameters", status: http.StatusBadRequest, retryable: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				http.Error(w, "diagnostic body", tt.status)
+			}))
+			defer server.Close()
+
+			withVLMSSRFWhitelist(t, "127.0.0.1")
+			model, err := NewRemoteAPIVLM(&Config{
+				BaseURL: server.URL, ModelName: "xiaomi/mimo-v2.5", Provider: "openrouter",
+				Extra: map[string]any{"video_input_mode": VideoInputModeURL},
+			})
+			if err != nil {
+				t.Fatalf("NewRemoteAPIVLM: %v", err)
+			}
+			_, err = model.PredictVideoURL(
+				context.Background(), "https://objects.example.test/video.mp4", "video/mp4", "Describe it",
+			)
+			if err == nil {
+				t.Fatal("PredictVideoURL unexpectedly succeeded")
+			}
+			if got := IsRetryableVideoError(err); got != tt.retryable {
+				t.Fatalf("IsRetryableVideoError(%v) = %t, want %t", err, got, tt.retryable)
+			}
+		})
 	}
 }
 

@@ -431,10 +431,10 @@ function ensureAttemptStatuses() {
 }
 
 function localizedErrorTitle(code?: string): string {
-  if (!code) return ''
+  if (!code) return t('knowledgeStages.detail.error')
   const key = `knowledgeStages.errorCode.${code}`
   const localized = t(key)
-  return localized === key ? code : localized
+  return localized === key ? t('knowledgeStages.detail.error') : localized
 }
 
 function localizedErrorSuggestion(code?: string): string {
@@ -1509,8 +1509,6 @@ const processConfigLines = computed<string[]>(() => {
               <div class="kp-last-error-row">
                 <span class="kp-last-error-glyph">!</span>
                 <span class="kp-last-error-title">{{ localizedErrorTitle(data.last_error.error_code) }}</span>
-                <span v-if="data.last_error.error_code" class="kp-last-error-code kp-mono">{{ data.last_error.error_code
-                  }}</span>
               </div>
               <div class="kp-last-error-suggestion">{{ localizedErrorSuggestion(data.last_error.error_code) }}</div>
               <div v-if="data.last_error.error_message" class="kp-last-error-raw kp-mono">{{
@@ -1761,8 +1759,6 @@ const processConfigLines = computed<string[]>(() => {
                     <span class="kp-error-glyph">!</span>
                     <span class="kp-error-title">{{ localizedErrorTitle(selectedRow.node.error_code) ||
                       t('knowledgeStages.detail.error') }}</span>
-                    <span v-if="selectedRow.node.error_code" class="kp-error-code kp-mono">{{
-                      selectedRow.node.error_code }}</span>
                   </div>
                   <pre v-if="selectedRow.node.error_message"
                     class="kp-error-msg kp-mono">{{ selectedRow.node.error_message }}</pre>

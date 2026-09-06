@@ -43,16 +43,9 @@ func GetMaxFileSizeMB() int64 {
 	return 50 // default 50MB
 }
 
-// GetMaxVideoFileSizeBytes returns the exact byte ceiling for video uploads.
-// Video ingestion is deliberately independent from MAX_FILE_SIZE_MB: the
-// latter remains the ordinary-document (50 MB by default) limit. Operators may
-// lower or raise the video ceiling with VIDEO_MAX_BYTES; malformed, zero or
-// negative values fall back to the safe default.
+// GetMaxVideoFileSizeBytes returns the product's exact video byte ceiling.
+// It deliberately has no deploy-time override: validation, browser copy,
+// direct upload, social download, and model transport must agree on one value.
 func GetMaxVideoFileSizeBytes() int64 {
-	if sizeStr := os.Getenv("VIDEO_MAX_BYTES"); sizeStr != "" {
-		if size, err := strconv.ParseInt(sizeStr, 10, 64); err == nil && size > 0 {
-			return size
-		}
-	}
 	return defaultMaxVideoFileSizeBytes
 }

@@ -485,10 +485,12 @@ func TestResolveFileImportProcessConfig_RejectsUnsupportedAndUndeterminable(t *t
 	t.Parallel()
 
 	kb := &types.KnowledgeBase{}
-	for _, ext := range []string{"exe", "mp4", "", unknownFileType} {
+	for _, ext := range []string{"exe", "", unknownFileType} {
 		_, err := resolveFileImportProcessConfig(context.Background(), kb, ext, nil, nil)
 		require.Errorf(t, err, "ext=%s should be rejected", ext)
 	}
+	_, err := resolveFileImportProcessConfig(context.Background(), kb, "mp4", nil, nil)
+	require.NoError(t, err, "video uses the fixed internal model and must not depend on KB VLM selection")
 }
 
 // ApplyKnowledgeProcessOverrides stays scoped to overrides: import-time file

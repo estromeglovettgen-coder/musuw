@@ -271,15 +271,19 @@ const handleActionSelect = (data: { value: string }) => {
 }
 
 const notifyFilterResult = (result: ReturnType<typeof filterUploadFiles>, emptyAllSkippedKey: string) => {
-  const { validFiles, skippedCount } = result
+  const { validFiles, skippedCount, oversizedVideoCount } = result
+  if (oversizedVideoCount > 0) {
+    MessagePlugin.error(t('uploadConfirm.videoTooLarge'))
+  }
+  const otherSkippedCount = skippedCount - oversizedVideoCount
   if (validFiles.length === 0) {
-    if (skippedCount > 0) {
+    if (otherSkippedCount > 0) {
       MessagePlugin.warning(t(emptyAllSkippedKey))
     }
     return false
   }
-  if (skippedCount > 0) {
-    MessagePlugin.warning(t('knowledgeBase.filesSkippedNoEngine', { count: skippedCount }))
+  if (otherSkippedCount > 0) {
+    MessagePlugin.warning(t('knowledgeBase.filesSkippedNoEngine', { count: otherSkippedCount }))
   }
   return true
 }

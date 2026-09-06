@@ -54,7 +54,10 @@ func (s *knowledgeService) ValidateStoredKnowledgeUpload(
 		return ErrInvalidFileType
 	}
 	if size <= 0 || size > secutils.GetMaxVideoFileSizeBytes() {
-		return werrors.NewBadRequestError(fmt.Sprintf("视频大小必须在 1 到 %d bytes 之间", secutils.GetMaxVideoFileSizeBytes()))
+		if size > secutils.GetMaxVideoFileSizeBytes() {
+			return werrors.NewBadRequestError(VideoTooLargePublicMessage)
+		}
+		return werrors.NewBadRequestError("视频不能为空")
 	}
 	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, getFileType(fileName), size); err != nil {
 		return err
@@ -166,7 +169,7 @@ func (s *knowledgeService) CreateKnowledgeFromStoredObject(
 		return nil, werrors.NewBadRequestError(fmt.Sprintf("文件大小不能超过%dMB", secutils.GetMaxFileSizeMB()))
 	}
 	if isVideoFileName(fileName, contentType) && size > secutils.GetMaxVideoFileSizeBytes() {
-		return nil, werrors.NewBadRequestError(fmt.Sprintf("视频大小不能超过%d bytes", secutils.GetMaxVideoFileSizeBytes()))
+		return nil, werrors.NewBadRequestError(VideoTooLargePublicMessage)
 	}
 	tenantIDValue, ok := ctx.Value(types.TenantIDContextKey).(uint64)
 	if !ok || tenantIDValue == 0 {
@@ -396,6 +399,15 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 	if !isValidFileType(fileName) {
 		logger.Error(ctx, "Invalid file type")
 		return nil, ErrInvalidFileType
+	}
+	if IsVideoType(getFileType(fileName)) && file.Size > secutils.GetMaxVideoFileSizeBytes() {
+		logger.Warnf(
+			ctx,
+			"Rejected oversized video before hashing: size=%d max=%d",
+			file.Size,
+			secutils.GetMaxVideoFileSizeBytes(),
+		)
+		return nil, werrors.NewBadRequestError(VideoTooLargePublicMessage)
 	}
 
 	// Calculate file hash for deduplication
@@ -823,24 +835,26 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 	logger.Infof(ctx, "Checking if URL exists, tenant ID: %d", tenantID)
 	fileHash := calculateStr(socialURLDedupeSource(socialRoute, url))
 	exists, existingKnowledge, err := s.repo.CheckKnowledgeExists(ctx, tenantID, kbID, &types.KnowledgeCheckParams{
-		Type:     "url",
-		URL:      url,
-		FileHash: fileHash,
+		Type:              "url",
+		URL:               url,
+		FileHash:          fileHash,
+		ReuseStoredSource: socialRoute != nil,
 	})
 	if err != nil {
 		logger.Errorf(ctx, "Failed to check knowledge existence: %v", err)
 		return nil, err
 	}
-	if exists {
-		logger.Infof(ctx, "URL already exists: host_path=%s", urlForLog(url))
-		// Update creation time for existing knowledge
-		existingKnowledge.CreatedAt = time.Now()
-		existingKnowledge.UpdatedAt = time.Now()
-		if err := s.repo.UpdateKnowledge(ctx, existingKnowledge); err != nil {
-			logger.Errorf(ctx, "Failed to update existing knowledge: %v", err)
-			return nil, err
+	if exists && socialRoute != nil && strings.TrimSpace(existingKnowledge.FilePath) != "" {
+		if sourceErr := s.validateMaterializedSocialSource(ctx, kb, existingKnowledge); sourceErr != nil {
+			// A stale catalog row is not a reusable object. Continue with a fresh
+			// source acquisition instead of trapping every resubmission on a path
+			// that can no longer be read.
+			logger.Warnf(ctx, "Stored social source is not reusable, knowledge=%s: %v", existingKnowledge.ID, sourceErr)
+			exists = false
 		}
-		return existingKnowledge, types.NewDuplicateURLError(existingKnowledge)
+	}
+	if exists {
+		return s.handleExistingURLKnowledge(ctx, existingKnowledge, socialRoute != nil, url, processOverrides)
 	}
 	if err := s.checkCreateKnowledgeEntitlement(ctx, kbID, "html", 1024*1024); err != nil {
 		return nil, err
@@ -880,7 +894,25 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		return nil, err
 	}
 
-	if err := s.repo.CreateKnowledge(ctx, knowledge); err != nil {
+	if socialRoute != nil {
+		// The fast duplicate check above preserves the existing reparse/stale-
+		// source behavior. This transactional claim is the final authority for
+		// simultaneous submissions: only its winner can attach tags or enqueue a
+		// paid provider task.
+		claimedKnowledge, created, claimErr := s.repo.CreateURLKnowledgeIfAbsent(
+			ctx,
+			knowledge,
+			&types.KnowledgeCheckParams{Type: "url", URL: url, FileHash: fileHash},
+		)
+		if claimErr != nil {
+			logger.Errorf(ctx, "Failed to claim social knowledge record: %v", claimErr)
+			return nil, claimErr
+		}
+		if !created {
+			return s.handleExistingURLKnowledge(ctx, claimedKnowledge, true, url, processOverrides)
+		}
+		knowledge = claimedKnowledge
+	} else if err := s.repo.CreateKnowledge(ctx, knowledge); err != nil {
 		logger.Errorf(ctx, "Failed to create knowledge record: %v", err)
 		return nil, err
 	}
@@ -957,6 +989,80 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 
 	logger.Infof(ctx, "Knowledge from URL created successfully, ID: %s", knowledge.ID)
 	return knowledge, nil
+}
+
+func (s *knowledgeService) handleExistingURLKnowledge(
+	ctx context.Context,
+	existing *types.Knowledge,
+	social bool,
+	rawURL string,
+	processOverrides *types.KnowledgeProcessOverrides,
+) (*types.Knowledge, error) {
+	if existing == nil {
+		return nil, errors.New("duplicate URL claim returned no knowledge")
+	}
+	logger.Infof(ctx, "URL already exists: host_path=%s", urlForLog(rawURL))
+	existing.CreatedAt = time.Now()
+	existing.UpdatedAt = time.Now()
+	if err := s.repo.UpdateKnowledge(ctx, existing); err != nil {
+		logger.Errorf(ctx, "Failed to update existing knowledge: %v", err)
+		return nil, err
+	}
+	if social && existing.ParseStatus == types.ParseStatusFailed && strings.TrimSpace(existing.FilePath) != "" {
+		logger.Infof(ctx, "Reusing materialized social source for knowledge %s", existing.ID)
+		return s.ReparseKnowledge(ctx, existing.ID, processOverrides)
+	}
+	return existing, types.NewDuplicateURLError(existing)
+}
+
+// validateMaterializedSocialSource verifies that a dedupe hit is a readable,
+// active object before it suppresses another provider fetch. It deliberately
+// opens and closes the existing source without consuming it; the reparse worker
+// later creates its own signed URL/read handle for the same object.
+func (s *knowledgeService) validateMaterializedSocialSource(
+	ctx context.Context,
+	kb *types.KnowledgeBase,
+	knowledge *types.Knowledge,
+) error {
+	if knowledge == nil || strings.TrimSpace(knowledge.FilePath) == "" {
+		return errors.New("stored social source path is empty")
+	}
+	if _, ok := types.ParseResourcePath(knowledge.FilePath); ok {
+		if s.resourceCatalog == nil {
+			return errors.New("stored social source catalog is unavailable")
+		}
+		resource, err := s.resourceCatalog.Resolve(ctx, knowledge.FilePath)
+		if err != nil {
+			return fmt.Errorf("resolve stored social source: %w", err)
+		}
+		if resource == nil || resource.State != types.ResourceStateActive {
+			return errors.New("stored social source is inactive")
+		}
+	}
+	if IsVideoType(knowledge.FileType) {
+		size, err := s.authoritativeVideoSourceSize(ctx, knowledge, knowledge.FilePath)
+		if err != nil {
+			return err
+		}
+		if size > secutils.GetMaxVideoFileSizeBytes() {
+			return fmt.Errorf("stored social video size %d exceeds product maximum", size)
+		}
+	}
+	fileSvc := s.resolveFileServiceForPath(ctx, kb, knowledge.FilePath)
+	if fileSvc == nil {
+		return errors.New("stored social source service is unavailable")
+	}
+	reader, err := fileSvc.GetFile(ctx, knowledge.FilePath)
+	if err != nil {
+		return fmt.Errorf("open stored social source: %w", err)
+	}
+	if reader == nil {
+		return errors.New("stored social source reader is nil")
+	}
+	if err := reader.Close(); err != nil {
+		return fmt.Errorf("close stored social source: %w", err)
+	}
+	return nil
 }
 
 // maxFileURLSize is the maximum allowed file size for file URL import (10MB)

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
 	"github.com/Tencent/WeKnora/internal/infrastructure/tikhub"
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -20,8 +21,17 @@ import (
 )
 
 var (
-	errTikHubNotConfigured   = errors.New("TikHub social import is not configured")
-	errSocialVideoNotAllowed = errors.New("current plan does not support social video import")
+	errTikHubNotConfigured          = errors.New("TikHub social import is not configured")
+	errSocialVideoNotAllowed        = errors.New("current plan does not support social video import")
+	errSocialVideoTooLarge          = errors.New("social video exceeds the product upload limit")
+	errSocialVideoFormatUnsupported = errors.New("social video format is unsupported")
+
+	// SocialImportFailedPublicMessage is the neutral public source failure for
+	// social works that may resolve to text, images, or video.
+	SocialImportFailedPublicMessage = "社媒内容获取失败，请稍后重试"
+	// SocialFormatUnsupportedPublicMessage is the public format failure for a
+	// provider video before the knowledge row has adopted its final file type.
+	SocialFormatUnsupportedPublicMessage = "暂不支持此社媒视频格式"
 )
 
 func cleanupTikHubResolvedImages(ctx context.Context, fileSvc interfaces.FileService, images []docparser.StoredImage) {
@@ -41,12 +51,12 @@ func socialImportFailureReason(err error) string {
 	switch {
 	case errors.Is(err, errTikHubNotConfigured):
 		return "not_configured"
-	case strings.Contains(err.Error(), "VLM"):
-		return "vlm_not_configured"
 	case errors.Is(err, errSocialVideoNotAllowed):
 		return "video_not_allowed"
-	case strings.Contains(err.Error(), "upload limit"):
+	case errors.Is(err, errSocialVideoTooLarge):
 		return "artifact_too_large"
+	case errors.Is(err, errSocialVideoFormatUnsupported):
+		return "format_unsupported"
 	case strings.Contains(err.Error(), "security validation"):
 		return "unsafe_media_url"
 	default:
@@ -57,17 +67,28 @@ func socialImportFailureReason(err error) string {
 func socialImportPublicMessage(err error) string {
 	switch socialImportFailureReason(err) {
 	case "not_configured":
-		return "Social link import is not configured"
-	case "vlm_not_configured":
-		return "Social video import requires a configured VLM model"
+		return VideoSourceFailedPublicMessage
 	case "video_not_allowed":
 		return "Current plan does not support social video import"
 	case "artifact_too_large":
-		return "Social media exceeds the configured upload limit"
+		return VideoTooLargePublicMessage
+	case "format_unsupported":
+		return SocialFormatUnsupportedPublicMessage
 	case "unsafe_media_url":
-		return "Social media URL failed security validation"
+		return SocialImportFailedPublicMessage
 	default:
-		return "Social link import failed"
+		return SocialImportFailedPublicMessage
+	}
+}
+
+func socialImportPublicState(err error) (code, message string) {
+	switch socialImportFailureReason(err) {
+	case "artifact_too_large":
+		return werrors.ErrCodeVideoTooLarge, VideoTooLargePublicMessage
+	case "format_unsupported":
+		return werrors.ErrCodeVideoFormatUnsupported, SocialFormatUnsupportedPublicMessage
+	default:
+		return werrors.ErrCodeVideoSourceFailed, socialImportPublicMessage(err)
 	}
 }
 
@@ -101,6 +122,19 @@ func (s *knowledgeService) prepareTikHubArtifact(
 	kb *types.KnowledgeBase,
 	knowledge *types.Knowledge,
 	eff types.EffectiveProcessConfig,
+) (bool, []docparser.StoredImage, error) {
+	return s.prepareTikHubArtifactWithVideoLimit(
+		ctx, payload, kb, knowledge, eff, secutils.GetMaxVideoFileSizeBytes(),
+	)
+}
+
+func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
+	ctx context.Context,
+	payload *types.DocumentProcessPayload,
+	kb *types.KnowledgeBase,
+	knowledge *types.Knowledge,
+	_ types.EffectiveProcessConfig,
+	videoMaxBytes int64,
 ) (bool, []docparser.StoredImage, error) {
 	if payload == nil || strings.TrimSpace(payload.URL) == "" {
 		return false, nil, nil
@@ -155,13 +189,10 @@ func (s *knowledgeService) prepareTikHubArtifact(
 		}
 		result.FileType = "md"
 	case tikhub.ResultVideo:
-		if !eff.VLMConfig.IsEnabled() {
-			return true, nil, errors.New("social video import requires a configured VLM model")
-		}
 		if !socialVideoUploadAllowed(ctx) {
 			return true, nil, errSocialVideoNotAllowed
 		}
-		media, err = downloadTikHubMedia(ctx, result.MediaURL, s.tikhubMediaClient)
+		media, err = downloadTikHubMedia(ctx, result.MediaURL, s.tikhubMediaClient, videoMaxBytes)
 		if err != nil {
 			return true, nil, err
 		}
@@ -180,12 +211,12 @@ func (s *knowledgeService) prepareTikHubArtifact(
 
 	maxBytes := secutils.GetMaxFileSize()
 	if result.Kind == tikhub.ResultVideo {
-		maxBytes = secutils.GetMaxVideoFileSizeBytes()
+		maxBytes = videoMaxBytes
 	}
 	if media == nil && int64(len(content)) > maxBytes {
 		cleanupResolvedImages()
 		if result.Kind == tikhub.ResultVideo {
-			return true, nil, fmt.Errorf("social video exceeds the configured %d byte upload limit", maxBytes)
+			return true, nil, fmt.Errorf("%w: %d bytes", errSocialVideoTooLarge, maxBytes)
 		}
 		return true, nil, fmt.Errorf("social artifact exceeds the configured %d MB upload limit", secutils.GetMaxFileSizeMB())
 	}
@@ -233,7 +264,7 @@ func (s *knowledgeService) prepareTikHubArtifact(
 				logger.Warnf(ctx, "Failed to clean oversized social video, path: %s, error: %v", filePath, deleteErr)
 			}
 			cleanupResolvedImages()
-			return true, nil, fmt.Errorf("social video exceeds the configured %d byte upload limit", maxBytes)
+			return true, nil, fmt.Errorf("%w: %d bytes", errSocialVideoTooLarge, maxBytes)
 		}
 	} else {
 		fileSize = int64(len(content))
@@ -398,6 +429,7 @@ func downloadTikHubMedia(
 	ctx context.Context,
 	mediaURL string,
 	injectedClient *http.Client,
+	maxBytes int64,
 ) (*tikHubMediaStream, error) {
 	if strings.TrimSpace(mediaURL) == "" {
 		return nil, errors.New("TikHub video response contained no media URL")
@@ -430,10 +462,9 @@ func downloadTikHubMedia(
 		return nil, fmt.Errorf("TikHub media server returned HTTP %d", resp.StatusCode)
 	}
 
-	maxBytes := secutils.GetMaxVideoFileSizeBytes()
 	if resp.ContentLength > maxBytes {
 		_ = resp.Body.Close()
-		return nil, fmt.Errorf("social video exceeds the configured %d byte upload limit", maxBytes)
+		return nil, fmt.Errorf("%w: %d bytes", errSocialVideoTooLarge, maxBytes)
 	}
 	contentType := strings.ToLower(
 		strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0]),
@@ -443,7 +474,7 @@ func downloadTikHubMedia(
 		contentType != "application/octet-stream" &&
 		contentType != "binary/octet-stream" {
 		_ = resp.Body.Close()
-		return nil, fmt.Errorf("TikHub media response has unsupported content type %q", contentType)
+		return nil, fmt.Errorf("%w: content type %q", errSocialVideoFormatUnsupported, contentType)
 	}
 	return &tikHubMediaStream{
 		reader: &io.LimitedReader{R: resp.Body, N: maxBytes + 1},

@@ -45,6 +45,17 @@ func (r *createKnowledgeFileRepoStub) CreateKnowledge(ctx context.Context, knowl
 	return r.createErr
 }
 
+func (r *createKnowledgeFileRepoStub) CreateURLKnowledgeIfAbsent(
+	ctx context.Context,
+	knowledge *types.Knowledge,
+	_ *types.KnowledgeCheckParams,
+) (*types.Knowledge, bool, error) {
+	if err := r.CreateKnowledge(ctx, knowledge); err != nil {
+		return nil, false, err
+	}
+	return knowledge, true, nil
+}
+
 func (r *createKnowledgeFileRepoStub) CreateKnowledgeWithStorage(
 	ctx context.Context,
 	knowledge *types.Knowledge,
@@ -371,6 +382,28 @@ func TestCreateKnowledgeFromFileAcceptsSupportedVideo(t *testing.T) {
 	require.Equal(t, 1, fileSvc.saveCalls)
 	require.Equal(t, 1, repo.createCalls)
 	require.Equal(t, 1, task.calls)
+}
+
+func TestCreateKnowledgeFromFileRejectsVideoOverProductLimitBeforeReadingOrSaving(t *testing.T) {
+	repo := &createKnowledgeFileRepoStub{}
+	fileSvc := &createKnowledgeFileServiceStub{}
+	svc := &knowledgeService{
+		repo:      repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		fileSvc:   fileSvc,
+	}
+	file := newMultipartFileHeader(t, "clip.mp4", "tiny placeholder")
+	file.Size = 300_000_001
+
+	knowledge, err := svc.CreateKnowledgeFromFile(
+		newCreateKnowledgeFileContext(), "kb-1", file, nil, nil, "", nil, "", nil,
+	)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, VideoTooLargePublicMessage)
+	require.Nil(t, knowledge)
+	require.Zero(t, fileSvc.saveCalls)
+	require.Zero(t, repo.createCalls)
 }
 
 func TestCreateKnowledgeFromImageFallsBackWhenLegacyStorageConfigIsIncomplete(t *testing.T) {

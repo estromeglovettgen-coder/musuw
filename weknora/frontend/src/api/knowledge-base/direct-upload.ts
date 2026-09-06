@@ -1,5 +1,6 @@
 import { post, getCurrentLanguage } from '../../utils/request'
 import { directVideoContentType } from '../../utils/directVideoUpload'
+import i18n from '@/i18n'
 
 interface DirectUploadPart {
   part_number: number
@@ -21,6 +22,14 @@ interface DirectUploadIntent {
 
 const DIRECT_UPLOAD_MAX_ATTEMPTS = 3
 const DIRECT_UPLOAD_RETRY_BASE_MS = 250
+
+function publicVideoUploadError(error: unknown): Error {
+  const detail = error instanceof Error ? error.message : String(error || '')
+  const key = detail.includes('300 MB') || detail.includes('300000000')
+    ? 'uploadConfirm.videoTooLarge'
+    : 'uploadConfirm.videoUploadFailed'
+  return new Error(i18n.global.t(key))
+}
 
 function appHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
@@ -197,16 +206,16 @@ export async function uploadVideoKnowledgeFile(
   onProgress?: (progressEvent: any) => void,
 ): Promise<any> {
   const contentType = directVideoContentType(data.file)
-  if (!contentType) throw new Error('video MIME type and extension must match')
+  if (!contentType) throw new Error(i18n.global.t('uploadConfirm.videoFormatUnsupported'))
   data.onProgress = onProgress
   data.onUploadProgress = onProgress
-  const intent = await startDirectUpload(kbId, data.file, contentType)
   try {
+    const intent = await startDirectUpload(kbId, data.file, contentType)
     return await completeDirectUpload(kbId, intent, data.file, data)
   } catch (error) {
     // There is deliberately no public abort endpoint: a completed token must
     // not remain a bearer delete credential. This branch always uses MPU, so
     // R2's native incomplete-multipart lifecycle bounds browser abandonment.
-    throw error
+    throw publicVideoUploadError(error)
   }
 }

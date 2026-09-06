@@ -61,6 +61,10 @@
                     </template>
                   </t-popup>
                 </div>
+                <p v-if="hasVideo || hasSupportedSocialSource" class="video-capability">
+                  <t-icon name="video" aria-hidden="true" />
+                  <span>{{ t('uploadConfirm.videoCapability') }}</span>
+                </p>
               </div>
 
               <div class="files-list-wrap">
@@ -355,7 +359,7 @@
                     </div>
                   </div>
 
-                  <div v-if="!authStore.isLiteMode" v-show="activeSection === 'multimodal'" class="section" data-section="multimodal">
+                  <div v-if="!authStore.isLiteMode && !usesManagedMediaRouting" v-show="activeSection === 'multimodal'" class="section" data-section="multimodal">
                     <div class="kb-settings-block">
                       <div class="section-header">
                         <h2 class="section-title">{{ t('knowledgeEditor.multimodal.title') }}</h2>
@@ -568,7 +572,7 @@ import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { formatFileSize, getFileIcon } from '@/utils/files'
-import { getUploadFileKey } from '../utils/uploadSources'
+import { getUploadFileKey, isSupportedSocialShareInput } from '../utils/uploadSources'
 import { listKnowledgeTags } from '@/api/knowledge-base'
 import KbUploadSourceDropdown from './KbUploadSourceDropdown.vue'
 import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue'
@@ -583,6 +587,7 @@ import type {
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'm4a', 'flac', 'ogg']
+const VIDEO_EXTENSIONS = ['mp4', 'mpeg', 'mov', 'webm']
 
 type ConfigSectionKey = 'tags' | 'parser' | 'chunking' | 'multimodal' | 'asr' | 'question' | 'graph'
 type IssueSectionKey = 'multimodal' | 'asr'
@@ -808,7 +813,7 @@ const batchFileExts = computed(() => {
     }
   }
   if (props.mode === 'reparse') {
-    const ext = (props.reparsePreview?.fileType || '').toLowerCase()
+    const ext = (props.reparsePreview?.fileType || '').toLowerCase().replace(/^\./, '')
     if (ext) set.add(ext)
   }
   for (const url of localUrls.value) {
@@ -867,6 +872,32 @@ const hasAudio = computed(() => {
   return batchFileExts.value.some(ext => AUDIO_EXTENSIONS.includes(ext))
 })
 
+const hasVideo = computed(() => {
+  return batchFileExts.value.some(ext => VIDEO_EXTENSIONS.includes(ext))
+})
+
+const isVideoOnly = computed(() => {
+  return hasVideo.value && localUrls.value.length === 0 &&
+    batchFileExts.value.every(ext => VIDEO_EXTENSIONS.includes(ext))
+})
+
+const hasSupportedSocialSource = computed(() => {
+  return localUrls.value.some(isSupportedSocialShareInput)
+})
+
+// Social works and video-only inputs are parsed by server-owned routing. Hide
+// the user VLM selector only when every item in this batch follows that route;
+// a mixed image/document batch still needs the normal multimodal controls.
+const usesManagedMediaRouting = computed(() => {
+  if (props.mode === 'reparse') return isVideoOnly.value
+  if (props.mode !== 'file' || batchItemCount.value === 0) return false
+  const filesAreVideos = localFiles.value.every(file => VIDEO_EXTENSIONS.includes(getFileExt(file)))
+  const urlsAreManaged = localUrls.value.every((url) => {
+    return isSupportedSocialShareInput(url) || VIDEO_EXTENSIONS.includes(getExtFromUrl(url))
+  })
+  return filesAreVideos && urlsAreManaged && (localFiles.value.length > 0 || localUrls.value.length > 0)
+})
+
 const isGraphDatabaseEnabled = computed(() => {
   const engine = editorResources.systemInfo?.graph_database_engine
   return !!engine && engine !== 'Not Enabled'
@@ -890,7 +921,7 @@ const issueSectionKeys = computed(() => {
     if (!uiState.value.multimodalConfig.enabled || !uiState.value.multimodalConfig.vllmModelId) {
       keys.add('multimodal')
     }
-  } else if (!authStore.isLiteMode && showMultimodalModelError.value) {
+  } else if (!authStore.isLiteMode && !usesManagedMediaRouting.value && showMultimodalModelError.value) {
     keys.add('multimodal')
   }
   if (!authStore.isLiteMode && hasAudio.value) {
@@ -938,12 +969,14 @@ const navItems = computed(() => {
   }
   push('parser', 'file-search', t('settings.parserEngine'))
   push('chunking', 'file-copy', t('knowledgeEditor.sidebar.chunking'))
-  push(
-    'multimodal',
-    'image',
-    t('knowledgeEditor.sidebar.multimodal'),
-    issueSectionKeys.value.has('multimodal'),
-  )
+  if (!usesManagedMediaRouting.value) {
+    push(
+      'multimodal',
+      'image',
+      t('knowledgeEditor.sidebar.multimodal'),
+      issueSectionKeys.value.has('multimodal'),
+    )
+  }
   push(
     'asr',
     'sound',
@@ -1048,7 +1081,7 @@ const canConfirm = computed(() => {
       return false
     }
   }
-  if (!authStore.isLiteMode && (showMultimodalModelError.value || showAsrModelError.value)) {
+  if (!authStore.isLiteMode && ((!usesManagedMediaRouting.value && showMultimodalModelError.value) || showAsrModelError.value)) {
     return false
   }
   return true
@@ -1204,6 +1237,11 @@ function buildProcessOverrides(): KnowledgeProcessOverrides {
     },
   }
 
+  if (usesManagedMediaRouting.value) {
+    delete overrides.enable_multimodel
+    delete overrides.vlm_config
+  }
+
   if (state.pdfForceScanned) {
     overrides.parser_engine_overrides = {
       pdf_force_scanned: 'true',
@@ -1335,6 +1373,12 @@ watch(isGraphSectionAvailable, (available) => {
   }
 })
 
+watch(usesManagedMediaRouting, (managed) => {
+  if (managed && activeSection.value === 'multimodal') {
+    activeSection.value = getDefaultSection()
+  }
+})
+
 const appendFiles = (incoming: File[]) => {
   const existingKeys = new Set(localFiles.value.map(getUploadFileKey))
   const toAdd: File[] = []
@@ -1408,7 +1452,7 @@ const validateBeforeConfirm = (): boolean => {
       goToSection('multimodal')
       return false
     }
-  } else if (!authStore.isLiteMode && showMultimodalModelError.value) {
+  } else if (!authStore.isLiteMode && !usesManagedMediaRouting.value && showMultimodalModelError.value) {
     MessagePlugin.warning(t('uploadConfirm.vlmModelSelectRequired'))
     goToSection('multimodal')
     return false
@@ -1595,6 +1639,17 @@ const handleConfirm = () => {
 .destination-row :deep(.t-popup__reference) {
   display: block;
   max-width: 100%;
+}
+
+.video-capability {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--td-brand-color);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .destination-crumb {

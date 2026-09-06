@@ -498,4 +498,8 @@ type KnowledgeCheckParams struct {
 	Passages []string
 	// Knowledge type
 	Type string
+	// ReuseStoredSource allows a failed social-import row to remain a duplicate
+	// when it already owns a healthy durable source. Ordinary deduplication keeps
+	// ignoring failed rows so a failed, unmaterialized import can be retried.
+	ReuseStoredSource bool
 }

@@ -87,3 +87,54 @@ func TestSyncTaskExecutorHonorsDeterministicTaskIDWhileInFlight(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestSyncTaskExecutorHonorsSkipRetry(t *testing.T) {
+	executor := NewSyncTaskExecutor()
+	attempts := make(chan int, 4)
+	executor.RegisterHandler("test:skip-retry", func(ctx context.Context, _ *asynq.Task) error {
+		retried, _, _ := types.TaskRetryMetadataFromContext(ctx)
+		attempts <- retried
+		return errors.Join(asynq.SkipRetry, errors.New("permanent failure"))
+	})
+
+	const taskID = "skip-retry-id"
+	if _, err := executor.Enqueue(
+		asynq.NewTask("test:skip-retry", nil),
+		asynq.TaskID(taskID),
+		asynq.MaxRetry(3),
+	); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	select {
+	case got := <-attempts:
+		if got != 0 {
+			t.Fatalf("attempt = %d, want 0", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for sync task")
+	}
+
+	// A normal retry keeps the deterministic task ID in flight while the
+	// executor sleeps for its five-second backoff. SkipRetry must release it
+	// promptly, which proves the loop stopped rather than merely observing a
+	// short retry-free window.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		executor.mu.RLock()
+		_, inFlight := executor.inFlight[taskID]
+		executor.mu.RUnlock()
+		if !inFlight {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("SkipRetry task remained in flight, likely waiting to retry")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	select {
+	case got := <-attempts:
+		t.Fatalf("unexpected retry attempt %d", got)
+	case <-time.After(150 * time.Millisecond):
+	}
+}

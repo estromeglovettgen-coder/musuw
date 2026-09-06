@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/require"
 )
@@ -218,6 +221,59 @@ type socialURLTaskCapture struct {
 	options []asynq.Option
 }
 
+type concurrentSocialClaimRepo struct {
+	interfaces.KnowledgeRepository
+	mu     sync.Mutex
+	winner *types.Knowledge
+	claims int
+}
+
+func (r *concurrentSocialClaimRepo) CheckKnowledgeExists(
+	context.Context,
+	uint64,
+	string,
+	*types.KnowledgeCheckParams,
+) (bool, *types.Knowledge, error) {
+	return false, nil, nil
+}
+
+func (r *concurrentSocialClaimRepo) CreateURLKnowledgeIfAbsent(
+	_ context.Context,
+	knowledge *types.Knowledge,
+	_ *types.KnowledgeCheckParams,
+) (*types.Knowledge, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.claims++
+	if r.winner != nil {
+		winnerCopy := *r.winner
+		return &winnerCopy, false, nil
+	}
+	winnerCopy := *knowledge
+	r.winner = &winnerCopy
+	return knowledge, true, nil
+}
+
+func (r *concurrentSocialClaimRepo) UpdateKnowledge(context.Context, *types.Knowledge) error {
+	return nil
+}
+
+func (r *concurrentSocialClaimRepo) GetKnowledgeTags(
+	context.Context,
+	[]string,
+) (map[string][]*types.KnowledgeTag, error) {
+	return map[string][]*types.KnowledgeTag{}, nil
+}
+
+type socialURLCountingTask struct {
+	enqueues atomic.Int32
+}
+
+func (c *socialURLCountingTask) Enqueue(*asynq.Task, ...asynq.Option) (*asynq.TaskInfo, error) {
+	c.enqueues.Add(1)
+	return &asynq.TaskInfo{ID: "social-task", Queue: types.QueueDefault}, nil
+}
+
 func (c *socialURLTaskCapture) Enqueue(task *asynq.Task, options ...asynq.Option) (*asynq.TaskInfo, error) {
 	c.task = task
 	c.options = options
@@ -257,6 +313,48 @@ func TestCreateKnowledgeFromURLNormalizesShareTextAndUsesNormalDocumentRetries(t
 	_, _, maxRetry := parseDocumentProcessOpts(t, task.options)
 	require.NotNil(t, maxRetry)
 	require.Equal(t, 3, *maxRetry)
+}
+
+func TestConcurrentSocialURLSubmissionsEnqueueProviderWorkOnce(t *testing.T) {
+	repo := &concurrentSocialClaimRepo{}
+	task := &socialURLCountingTask{}
+	svc := &knowledgeService{
+		repo:      repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		fileSvc:   &createKnowledgeFileServiceStub{},
+		task:      task,
+	}
+
+	type result struct {
+		knowledge *types.Knowledge
+		err       error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			knowledge, err := svc.CreateKnowledgeFromURL(
+				newCreateKnowledgeFileContext(),
+				"kb-1",
+				"https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+				"",
+				"",
+				nil,
+				"",
+				nil,
+				"",
+				nil,
+			)
+			results <- result{knowledge: knowledge, err: err}
+		}()
+	}
+	first := <-results
+	second := <-results
+	require.NotNil(t, first.knowledge)
+	require.NotNil(t, second.knowledge)
+	require.Equal(t, first.knowledge.ID, second.knowledge.ID)
+	require.Equal(t, int32(1), task.enqueues.Load(), "only the database claim winner may call the provider worker")
+	require.Equal(t, 2, repo.claims)
+	require.True(t, (first.err == nil) != (second.err == nil), "one request succeeds and one reports the duplicate")
 }
 
 func TestReparseMaterializableSocialURLKeepsDownstreamRetryBudget(t *testing.T) {
