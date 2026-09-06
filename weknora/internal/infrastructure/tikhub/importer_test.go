@@ -162,7 +162,12 @@ func TestTikHubImporterFetchesXiaohongshuImageAndConditionallyVideo(t *testing.T
 		case "/api/v1/xiaohongshu/app_v2/get_image_note_detail":
 			io.WriteString(w, `{"code":200,"data":{"type":"video","title":"XHS video","desc":"caption","image_list":[{"url":"https://img.example/cover.jpg"}]}}`)
 		case "/api/v1/xiaohongshu/app_v2/get_video_note_detail":
-			_, _ = io.WriteString(w, `{"code":200,"data":{"data":[{"title":"XHS video","desc":"caption","video_info_v2":{"media":{"stream":{"h264":[{"master_url":"https://cdn.example/xhs.mp4","video_codec":"h264"}]}}}}]}}`)
+			_, _ = io.WriteString(
+				w,
+				`{"code":200,"data":{"data":[{"title":"XHS video","desc":"caption",`+
+					`"video_info_v2":{"media":{"stream":{"h264":[`+
+					`{"master_url":"https://cdn.example/xhs.mp4","video_codec":"h264"}]}}}}]}}`,
+			)
 		default:
 			http.NotFound(w, r)
 		}
