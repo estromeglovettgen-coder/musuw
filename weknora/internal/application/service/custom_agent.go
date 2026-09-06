@@ -319,7 +319,9 @@ func (s *customAgentService) ListAgents(ctx context.Context) ([]*types.CustomAge
 	}
 
 	// Build result: built-in agents first, then custom agents
-	builtinIDs := types.GetBuiltinAgentIDs()
+	// Specialist/internal builtins remain resolvable by ID for old sessions and
+	// runtime workflows, but are not part of the tenant-facing picker.
+	builtinIDs := types.GetUserVisibleBuiltinAgentIDs()
 	result := make([]*types.CustomAgent, 0, len(allAgents)+len(builtinIDs))
 
 	// Add built-in agents in order
@@ -346,7 +348,10 @@ func (s *customAgentService) ListAgents(ctx context.Context) ([]*types.CustomAge
 
 	// Add custom agents
 	for _, agent := range allAgents {
-		if !types.IsBuiltinAgentID(agent.ID) {
+		// IsHiddenBuiltinAgentID also recognizes the specialist IDs before the
+		// YAML registry is loaded, so a startup/config failure cannot accidentally
+		// turn a persisted specialist row into a visible custom agent.
+		if !types.IsBuiltinAgentID(agent.ID) && !types.IsHiddenBuiltinAgentID(agent.ID) {
 			result = append(result, redactLiteAgent(agent))
 		}
 	}

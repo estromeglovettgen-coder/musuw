@@ -30,7 +30,7 @@ const KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE = 'display-materialized-ai-title'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': 'a678a30cc2dc24f8f48797a0dfb390cbb75e8c88',
-  './business-baselines/Input-field.pre-view.vue': '11bc2cb650979eb55e367d370980051fa6caa429',
+  './business-baselines/Input-field.pre-view.vue': '63597ef6410500454181cff67ca6342137351f95',
   './business-baselines/KnowledgeBase.pre-view.vue': '62faa49842403fbe8aa2fbb0faee2d08ff145553',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
