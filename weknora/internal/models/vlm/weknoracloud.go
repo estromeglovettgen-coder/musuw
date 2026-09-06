@@ -101,7 +101,10 @@ func (v *WeKnoraCloudVLM) Predict(ctx context.Context, imgBytesList [][]byte, pr
 
 	for _, imgBytes := range imgBytesList {
 		if len(imgBytes) > 0 {
-			mimeType := detectImageMIME(imgBytes)
+			mimeType, err := detectImageMIME(imgBytes)
+			if err != nil {
+				return "", err
+			}
 			b64 := base64.StdEncoding.EncodeToString(imgBytes)
 			dataURI := fmt.Sprintf("data:%s;base64,%s", mimeType, b64)
 			parts = append(parts, weKnoraCloudVLMContentPart{

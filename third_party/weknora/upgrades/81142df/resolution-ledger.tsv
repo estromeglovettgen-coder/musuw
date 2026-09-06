@@ -1128,8 +1128,8 @@ internal/infrastructure/docparser/mineru_converter_test.go	-	M	100644	4310d9fdb8
 internal/infrastructure/docparser/paddleocr_vl_cloud_converter.go	-	M	100644	98cfc01336c4cb01ad2058a22393576cf98d90b4	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/infrastructure/docparser/paddleocr_vl_converter.go	-	M	100644	313d3b74e74cc8a6f8a5066838f1d011c8018b8d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/infrastructure/docparser/weknoracloud_http_reader.go	-	M	100644	f19ef7106e9a9e66d8f8620a761a57b08c48390b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/infrastructure/tikhub/importer.go	A	-	100644	4d2263358e117ea7f5499621e7c44f82048b573a	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/infrastructure/tikhub/importer_test.go	A	-	100644	e134ed2540a4abbeadab3b64727625fc9dcbebc3	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/infrastructure/tikhub/importer.go	A	-	100644	8572c2564ccecd99ac6680de6552a3ded52bee05	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/infrastructure/tikhub/importer_test.go	A	-	100644	c599bd6d323990a2467a25755b06d95ce9ebacbb	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/infrastructure/tikhub/route.go	A	-	100644	ff7a1e8e7a4f00136793d4a0be9c7be4dc59457a	preserve-musuw-exact		audited local-only content is byte-identical
 internal/infrastructure/web_search/baidu.go	-	M	100644	3a8490e12fdad5b6b556643e303da4d68cbdb125	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/infrastructure/web_search/exa.go	-	A	100644	5e04520940cf1a6d7d3c2ca31b585b414b2e1cf6	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -1203,8 +1203,8 @@ internal/models/vlm/concurrency_wrapper.go	M	-	100644	084ed24ec76b56cba63b5df8ed
 internal/models/vlm/langfuse_wrapper.go	M	M	100644	9073f2dc8492080afc02c0ad7b7c9c1e679ca50d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/models/vlm/llm_debug.go	M	-	100644	0639de1ad1cff5d502ff0d4961bac8fb2095fa41	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/models/vlm/ollama.go	-	M	100644	2c9afbd7b9a84dc6bfffb4ecf95f6b4f54aea706	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/models/vlm/remote_api.go	M	M	100644	ee5442bdffdc381e935c7610aa2739be798b4474	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-internal/models/vlm/remote_api_reasoning_test.go	A	A	100644	abddbb5adb82b9c6b4cab15b938e48613c2f52c4	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/models/vlm/remote_api.go	M	M	100644	b5d3e5981ff83ce4023904ce86757f5b46e63659	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/models/vlm/remote_api_reasoning_test.go	A	A	100644	02300d779591560187f47dc17ff63917791421df	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/models/vlm/remote_api_video_test.go	A	-	100644	c258c5eade1a791ba7e467b38b092d8ec437c045	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/models/vlm/vlm.go	M	-	100644	31a3314ca980093832cff61e0d5e03ed13efdc4d	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/router/consumer_model_options_route_test.go	A	-	100644	00099b2ca260306008e1f35843cdf846240ba6ef	preserve-musuw-exact		audited local-only content is byte-identical

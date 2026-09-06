@@ -791,19 +791,54 @@ func firstImageURL(value any) string {
 	}
 	switch typed := value.(type) {
 	case []any:
+		fallback := ""
 		for _, item := range typed {
 			if candidate := firstImageURL(item); candidate != "" {
-				return candidate
+				if isStandardImageURL(candidate) {
+					return candidate
+				}
+				if fallback == "" {
+					fallback = candidate
+				}
 			}
 		}
+		return fallback
 	case map[string]any:
-		for _, key := range []string{"url", "url_default", "display_url", "media_url_https", "media_url", "src", "url_list", "urlList", "url_pre", "url_orig", "candidates", "items"} {
+		fallback := ""
+		for _, key := range []string{
+			"url", "url_default", "display_url", "media_url_https", "media_url", "src",
+			"url_list", "urlList", "download_url_list", "downloadUrlList",
+			"url_pre", "url_orig", "candidates", "items",
+		} {
 			if candidate := firstImageURL(typed[key]); candidate != "" {
-				return candidate
+				if isStandardImageURL(candidate) {
+					return candidate
+				}
+				if fallback == "" {
+					fallback = candidate
+				}
 			}
 		}
+		return fallback
 	}
 	return ""
+}
+
+// isStandardImageURL identifies renditions that the existing image pipeline
+// and vision providers can consume directly. Some social APIs put a
+// proprietary original first and a JPEG/WebP alternative later in the same
+// list; preferring the standard rendition avoids adding a platform codec.
+func isStandardImageURL(candidate string) bool {
+	parsed, err := url.Parse(candidate)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(path.Ext(parsed.Path)) {
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
+		return true
+	default:
+		return false
+	}
 }
 
 func valuesByKey(data any, wanted string) []any {
