@@ -2833,9 +2833,9 @@ func (s *knowledgeService) ReparseKnowledge(
 		task := asynq.NewTask(types.TypeDocumentProcess, payloadBytes)
 		// Pass the retry policy at the enqueue boundary. This keeps the
 		// effective contract observable and prevents recognized social URLs from
-		// regressing to the historical MaxRetry(0) special case: TikHub provider
-		// failures stop before materialization, while downstream VLM failures can
-		// safely retry the already persisted source object.
+		// regressing to the historical MaxRetry(0) special case: a transient
+		// source failure may use one delivery, while downstream VLM failures can
+		// safely reuse the already persisted source object.
 		info, err := s.task.Enqueue(task, documentProcessTaskOptions(s.config)...)
 		if err != nil {
 			logger.Errorf(ctx, "Failed to enqueue URL reparse task: %v", err)
@@ -3455,11 +3455,12 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 	}
 	ctx = withAttempt(ctx, attempt)
 
-	// A recognized social URL is converted exactly once into a stored Markdown
-	// or video artifact before the existing file pipeline runs. Ordinary URLs
-	// return handled=false and retain the WebParser behavior below. Provider
-	// failures are terminal for this paid attempt: returning nil prevents a
-	// queue retry from issuing the same billed request again.
+	// A recognized social URL is converted into a stored Markdown or video
+	// artifact before the existing file pipeline runs. Ordinary URLs return
+	// handled=false and retain the WebParser behavior below. A transient social
+	// provider/media/storage failure gets one retry through this existing
+	// document task; once the source is materialized, resumeMaterialized...
+	// prevents later downstream retries from issuing another paid request.
 	if payload.URL != "" {
 		resumeMaterializedTikHubArtifact(&payload, knowledge)
 	}
@@ -3470,6 +3471,17 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 		if handled && socialErr != nil {
 			logger.GetLogger(ctx).WithField("knowledge_id", knowledge.ID).
 				WithField("reason", socialImportFailureReason(socialErr)).Error("social link import failed")
+			if socialImportShouldRetry(socialErr, retryCount) {
+				knowledge.ParseStatus = types.ParseStatusProcessing
+				knowledge.ErrorMessage = SocialImportRetryingPublicMessage
+				knowledge.UpdatedAt = time.Now()
+				if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+					logger.Warnf(ctx, "Failed to publish social retry state for %s: %v", knowledge.ID, updateErr)
+				}
+				logger.Warnf(ctx, "Scheduling sole social import retry knowledge=%s retry=%d err=%v",
+					knowledge.ID, retryCount, socialErr)
+				return socialErr
+			}
 			knowledge.ParseStatus = types.ParseStatusFailed
 			failureCode, publicMessage := socialImportPublicState(socialErr)
 			knowledge.ErrorMessage = publicMessage
@@ -3661,18 +3673,6 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 		if convertResult == nil {
 			return nil
 		}
-		// Update knowledge title from extracted page title if not already set
-		if knowledge.Title == "" || knowledge.Title == payload.URL {
-			if extractedTitle := convertResult.Metadata["title"]; extractedTitle != "" {
-				knowledge.Title = extractedTitle
-				knowledge.UpdatedAt = time.Now()
-				if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
-					logger.Warnf(ctx, "Failed to update knowledge title from extracted page title: %v", err)
-				} else {
-					logger.Infof(ctx, "Updated knowledge title to extracted page title: %s", extractedTitle)
-				}
-			}
-		}
 	} else if len(payload.Passages) > 0 {
 		// Text passage import - direct chunking, no conversion needed
 		passageChunks := make([]types.ParsedChunk, 0, len(payload.Passages))
@@ -3846,6 +3846,16 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 
 	// Step 4: Process chunks (vectorize + index + enqueue async tasks)
 	s.processChunks(ctx, kb, knowledge, chunks, processOpts)
+
+	// URL and social-video imports share the same title seam. Social
+	// materialization clears payload.URL, so use the persisted knowledge type
+	// and source rather than the transient task payload. Publish after the
+	// synchronous chunk pipeline's full-row writes; the repository's conditional
+	// UPDATE then guarantees that a concurrent manual rename wins. No extra model
+	// call is needed because the parser/video analysis already supplied the title.
+	if titleErr := s.updateKnowledgeTitleFromAnalysis(ctx, knowledge, convertResult); titleErr != nil {
+		logger.Warnf(ctx, "Failed to update knowledge title from analysis: %v", titleErr)
+	}
 
 	return nil
 }

@@ -502,10 +502,11 @@ func TestPrepareTikHubArtifactDownloadsSocialVideoWithoutProviderBearerAndSelect
 	)
 }
 
-func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) {
+func TestPrepareTikHubArtifactLeavesSocialVideoTitleForAnalysis(t *testing.T) {
 	t.Parallel()
 
 	longTitle := strings.Repeat("长", 300)
+	const sourceURL = "https://x.com/shownotover/status/2096478745494175886?s=20"
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v1/twitter/web/fetch_tweet_detail", r.URL.Path)
 		require.Equal(t, "2096478745494175886", r.URL.Query().Get("tweet_id"))
@@ -540,9 +541,16 @@ func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) 
 	}
 	payload := types.DocumentProcessPayload{
 		TenantID: 17,
-		URL:      "https://x.com/shownotover/status/2096478745494175886?s=20",
+		URL:      sourceURL,
 	}
-	knowledge := &types.Knowledge{ID: "knowledge-long-x", TenantID: 17, FileType: "html"}
+	knowledge := &types.Knowledge{
+		ID:       "knowledge-long-x",
+		TenantID: 17,
+		Type:     "url",
+		Source:   sourceURL,
+		Title:    sourceURL,
+		FileType: "html",
+	}
 
 	handled, _, err := svc.prepareTikHubArtifact(
 		context.Background(),
@@ -555,8 +563,8 @@ func TestPrepareTikHubArtifactBoundsSocialTitleForKnowledgeColumn(t *testing.T) 
 	require.NoError(t, err)
 	require.True(t, handled)
 	require.NotNil(t, repo.updatedKnowledge)
-	require.Len(t, []rune(repo.updatedKnowledge.Title), 255)
-	require.Equal(t, strings.Repeat("长", 254)+"…", repo.updatedKnowledge.Title)
+	require.Equal(t, sourceURL, repo.updatedKnowledge.Title,
+		"video captions must not become the final title before VLM analysis")
 	require.Equal(
 		t,
 		longTitle,

@@ -25,10 +25,16 @@ var (
 	errSocialVideoNotAllowed        = errors.New("current plan does not support social video import")
 	errSocialVideoTooLarge          = errors.New("social video exceeds the product upload limit")
 	errSocialVideoFormatUnsupported = errors.New("social video format is unsupported")
+	errSocialMediaURLUnsafe         = errors.New("social media URL failed security validation")
 
 	// SocialImportFailedPublicMessage is the neutral public source failure for
 	// social works that may resolve to text, images, or video.
 	SocialImportFailedPublicMessage = "社媒内容获取失败，请稍后重试"
+	// SocialImportRetryingPublicMessage is the consumer-visible state while the
+	// document worker spends its one bounded retry on a transient provider or
+	// storage failure. It deliberately stays neutral so provider details never
+	// leak into the knowledge row or UI.
+	SocialImportRetryingPublicMessage = "社媒内容暂时没有结果，正在重试"
 	// SocialFormatUnsupportedPublicMessage is the public format failure for a
 	// provider video before the knowledge row has adopted its final file type.
 	SocialFormatUnsupportedPublicMessage = "暂不支持此社媒视频格式"
@@ -59,11 +65,36 @@ func socialImportFailureReason(err error) string {
 		return "artifact_too_large"
 	case errors.Is(err, errSocialVideoFormatUnsupported):
 		return "format_unsupported"
-	case strings.Contains(err.Error(), "security validation"):
+	case errors.Is(err, errSocialMediaURLUnsafe):
 		return "unsafe_media_url"
 	default:
 		return "provider_or_processing_error"
 	}
+}
+
+// socialImportShouldRetry allows one existing document-task retry for errors
+// that may recover without changing user input. Deterministic policy, route,
+// format, size, configuration, and SSRF failures must fail immediately; all
+// other provider/media/storage failures get the same single retry budget used
+// by video ingestion. Keeping this decision at the worker boundary avoids a
+// second request loop inside TikHub (and preserves one attempt's billing
+// checkpoint semantics).
+func socialImportShouldRetry(err error, retryCount int) bool {
+	if err == nil || retryCount >= 1 {
+		return false
+	}
+	switch {
+	case errors.Is(err, errTikHubNotConfigured),
+		errors.Is(err, tikhub.ErrMissingAPIKey),
+		errors.Is(err, tikhub.ErrMissingRouteValue),
+		errors.Is(err, tikhub.ErrUnsupportedPlatform),
+		errors.Is(err, errSocialVideoNotAllowed),
+		errors.Is(err, errSocialVideoTooLarge),
+		errors.Is(err, errSocialVideoFormatUnsupported),
+		errors.Is(err, errSocialMediaURLUnsafe):
+		return false
+	}
+	return true
 }
 
 func socialImportPublicMessage(err error) string {
@@ -302,7 +333,12 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 	updatedKnowledge.FileName = fileName
 	updatedKnowledge.FileType = result.FileType
 	updatedKnowledge.FileSize = fileSize
-	if strings.TrimSpace(result.Title) != "" && (strings.TrimSpace(knowledge.Title) == "" || knowledge.Title == knowledge.Source) {
+	// Document captions are the only provider title available before parsing.
+	// Video captions are often the full social post (notably X), so leave the
+	// automatic URL title untouched and let convertVideo publish the concise H1
+	// emitted by the same video-understanding pass.
+	if result.Kind == tikhub.ResultDocument && strings.TrimSpace(result.Title) != "" &&
+		(strings.TrimSpace(knowledge.Title) == "" || knowledge.Title == knowledge.Source) {
 		updatedKnowledge.Title = boundedSocialTitle(result.Title)
 	}
 	if strings.TrimSpace(result.Description) != "" {
@@ -484,7 +520,7 @@ func downloadTikHubMedia(
 	client := injectedClient
 	if client == nil {
 		if err := secutils.ValidateURLForSSRF(mediaURL); err != nil {
-			return nil, errors.New("TikHub media URL failed security validation")
+			return nil, fmt.Errorf("%w: %v", errSocialMediaURLUnsafe, err)
 		}
 		client = secutils.NewSSRFSafeHTTPClient(secutils.SSRFSafeHTTPClientConfig{
 			// A 300 MB video cannot reliably finish inside the old 60-second
