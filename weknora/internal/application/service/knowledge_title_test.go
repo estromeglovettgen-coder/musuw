@@ -17,11 +17,23 @@ func TestUpdateKnowledgeTitleFromAnalysisUsesOneURLPathForEveryPlatform(t *testi
 		title  string
 		want   string
 	}{
-		{name: "youtube", source: "https://youtu.be/example", title: "YouTube video summary", want: "YouTube video summary"},
+		{
+			name: "youtube", source: "https://youtu.be/example",
+			title: "YouTube video summary", want: "YouTube video summary",
+		},
 		{name: "x", source: "https://x.com/example/status/1", title: "X video summary", want: "X video summary"},
-		{name: "instagram", source: "https://www.instagram.com/reel/example/", title: "Instagram video summary", want: "Instagram video summary"},
-		{name: "douyin", source: "https://v.douyin.com/example/", title: "Douyin video summary", want: "Douyin video summary"},
-		{name: "xiaohongshu", source: "https://www.xiaohongshu.com/explore/example", title: "XHS video summary", want: "XHS video summary"},
+		{
+			name: "instagram", source: "https://www.instagram.com/reel/example/",
+			title: "Instagram video summary", want: "Instagram video summary",
+		},
+		{
+			name: "douyin", source: "https://v.douyin.com/example/",
+			title: "Douyin video summary", want: "Douyin video summary",
+		},
+		{
+			name: "xiaohongshu", source: "https://www.xiaohongshu.com/explore/example",
+			title: "XHS video summary", want: "XHS video summary",
+		},
 	}
 
 	for _, tt := range tests {

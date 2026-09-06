@@ -75,7 +75,9 @@ func (s *knowledgeService) updateKnowledgeTitleFromAnalysis(
 		candidate = firstMarkdownTitle(result.MarkdownContent)
 	}
 	candidate = conciseAnalysisTitle(candidate)
-	if candidate == "" || candidate == strings.TrimSpace(knowledge.Title) || candidate == strings.TrimSpace(knowledge.Source) {
+	if candidate == "" ||
+		candidate == strings.TrimSpace(knowledge.Title) ||
+		candidate == strings.TrimSpace(knowledge.Source) {
 		return nil
 	}
 	if s == nil || s.repo == nil {

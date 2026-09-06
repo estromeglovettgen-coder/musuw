@@ -527,7 +527,10 @@ func (r *knowledgeRepository) UpdateURLKnowledgeTitleIfAutomatic(
 	source string,
 	title string,
 ) (bool, error) {
-	if tenantID == 0 || strings.TrimSpace(id) == "" || strings.TrimSpace(source) == "" || strings.TrimSpace(title) == "" {
+	if tenantID == 0 ||
+		strings.TrimSpace(id) == "" ||
+		strings.TrimSpace(source) == "" ||
+		strings.TrimSpace(title) == "" {
 		return false, nil
 	}
 	result := r.db.WithContext(ctx).
