@@ -96,7 +96,7 @@ func TestBuiltinSmartReasoningPromptUsesMusuwAsItsPublicIdentity(t *testing.T) {
 		}
 		assert.Equal(t, "smart-reasoning", template.Mode)
 		assert.Equal(t, "Wiki + RAG 混合智能体", template.I18n["zh-CN"].Name)
-		assert.Contains(t, template.Content, "<role>\nYou are Musuw. Your self-introduction is “我是 Musuw。”")
+		assert.Contains(t, template.Content, "<role>\nYou are Musuw. For identity questions, reply exactly: “我是 Musuw。”")
 		assert.NotContains(t, template.Content, "You are Musuw Hybrid Researcher")
 		return
 	}

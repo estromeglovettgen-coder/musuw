@@ -65,7 +65,7 @@ cmd/desktop/wails.json	D	-	000000	0000000000000000000000000000000000000000	prese
 config/builtin_agents.yaml	M	M	100644	fa9412ede9266a555ecdc8202e9d9db4d55872ba	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 config/builtin_models.yaml	A	-	100644	8495648be9aa41ded6d8c468562edaca2cadb667	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 config/config.yaml	M	-	100644	7ca9102c7f55b6a71c13ac975e86184427b86b73	preserve-musuw-exact		audited local-only content is byte-identical
-config/prompt_templates/agent_system_prompt.yaml	M	M	100644	d3fc79642c1d65a978ddd1262d77cb2ba081610e	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+config/prompt_templates/agent_system_prompt.yaml	M	M	100644	518e5d9c1015097bf4ccee3b2fec8cf98bdd0943	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 config/prompt_templates/fallback.yaml	M	-	100644	64568a5c9551afbc21850093ba5feb54461b59eb	preserve-musuw-exact		audited local-only content is byte-identical
 config/prompt_templates/intent_prompts.yaml	M	-	100644	d4f952c792260e08cb83bcc03b64b1de76eb2bf2	preserve-musuw-exact		audited local-only content is byte-identical
 config/prompt_templates/system_prompt.yaml	M	-	100644	3ae504933a8b5b7579b8e15a8822826555561e54	preserve-musuw-exact		audited local-only content is byte-identical
@@ -1325,7 +1325,7 @@ internal/types/agent_test.go	-	M	100644	47006e45d1bc875b525cf33cf50f56af0a970400
 internal/types/audit_log.go	M	M	100644	376e2e62e94cce750ca3847c8a401f5a75aa09fa	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/types/audit_log_test.go	-	M	100644	d4a38cdec1df3bd175719adbff807ce292c55ebd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/types/builtin_agent_config.go	-	M	100644	bd7899edd70b7052c38c88a4eceda7aec5ed99a9	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/types/builtin_agent_defaults_test.go	A	-	100644	156606e9ef134fa74dd3a954b3f1d3731357d4c5	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/types/builtin_agent_defaults_test.go	A	-	100644	43478df548c2b4973bc5bcf40e4eca7aeec32704	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/types/builtin_agent_localization_test.go	-	A	100644	83151ba26e3066d2610583da7157ae78b0315fb0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/types/builtin_models_config.go	M	-	100644	473e9518b2f15aafa15c49a25090123b7f4f1724	preserve-musuw-exact		audited local-only content is byte-identical
 internal/types/builtin_models_config_test.go	M	-	100644	1539c8013b867d91a8c79775386253a120dcdd33	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
