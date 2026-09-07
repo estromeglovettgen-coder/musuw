@@ -220,6 +220,7 @@ export function HeroProductDemo({ locale = "en" }) {
   const messagesRef = useRef(null);
   const threadRef = useRef(null);
   const saveButtonRef = useRef(null);
+  const pointerRef = useRef(null);
   const inView = useInView(containerRef, { amount: 0.32 });
   const reduceMotion = useReducedMotion();
   const questionCharacters = useMemo(() => Array.from(copy.question), [copy.question]);
@@ -471,15 +472,30 @@ export function HeroProductDemo({ locale = "en" }) {
     if (reduceMotion || phase !== "saving" || !pointerPath) return undefined;
     let secondFrame = 0;
     const firstFrame = window.requestAnimationFrame(() => {
-      const pointer = containerRef.current?.querySelector('[data-hero-auto-pointer="saving"]');
-      pointer?.getBoundingClientRect();
-      secondFrame = window.requestAnimationFrame(() => setPointerTravelStarted(true));
+      const pointer = pointerRef.current;
+      if (!pointer) return;
+      // Commit the authored start point before changing coordinates. Writing
+      // the destination directly keeps the guided cursor deterministic even
+      // while the outer Hero perspective spring is still producing frames;
+      // React state only records the already-started travel for subsequent
+      // renders.
+      pointer.style.transition = "none";
+      pointer.style.left = `${pointerPath.start.x}px`;
+      pointer.style.top = `${pointerPath.start.y}px`;
+      void pointer.getBoundingClientRect();
+      secondFrame = window.requestAnimationFrame(() => {
+        const duration = saveStep === "publish" ? 760 : 620;
+        pointer.style.transition = `left ${duration}ms cubic-bezier(.16,1,.3,1), top ${duration}ms cubic-bezier(.16,1,.3,1)`;
+        pointer.style.left = `${pointerPath.target.x}px`;
+        pointer.style.top = `${pointerPath.target.y}px`;
+        setPointerTravelStarted(true);
+      });
     });
     return () => {
       window.cancelAnimationFrame(firstFrame);
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
     };
-  }, [phase, pointerPath, reduceMotion]);
+  }, [phase, pointerPath, reduceMotion, saveStep]);
 
   useEffect(() => {
     if (reduceMotion || phase !== "saving" || !pointerPath) return undefined;
@@ -582,6 +598,7 @@ export function HeroProductDemo({ locale = "en" }) {
       className={`hero-demo-auto-pointer${pointerPressing ? " is-clicking" : ""}`}
       data-hero-auto-pointer="saving"
       data-hero-pointer-target={`${pointerPosition.x},${pointerPosition.y}`}
+      ref={pointerRef}
       style={{
         left: `${pointerTravelStarted ? pointerPosition.x : pointerPath.start.x}px`,
         top: `${pointerTravelStarted ? pointerPosition.y : pointerPath.start.y}px`,
