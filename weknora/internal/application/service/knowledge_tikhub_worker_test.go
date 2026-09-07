@@ -438,13 +438,13 @@ func TestPrepareTikHubArtifactDownloadsSocialVideoWithoutProviderBearerAndSelect
 	var tikHubCalls atomic.Int32
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tikHubCalls.Add(1)
-		require.Equal(t, "/api/v1/instagram/v2/fetch_post_info", r.URL.Path)
-		require.Equal(t, "DaU63nnAkoo", r.URL.Query().Get("code_or_url"))
+		require.Equal(t, "/api/v1/instagram/v3/get_post_info_by_code", r.URL.Path)
+		require.Equal(t, "DaU63nnAkoo", r.URL.Query().Get("code"))
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(
 			w,
-			`{"code":200,"data":{"caption":"A video","media":[{"media_type":"VIDEO",`+
-				`"video_url":"https://media.example/video.mp4"}]}}`,
+			`{"code":200,"data":{"items":[{"caption":{"text":"A video"},"media_type":2,`+
+				`"video_versions":[{"height":720,"url":"https://media.example/video.mp4"}]}]}}`,
 		)
 	}))
 	defer api.Close()
@@ -588,12 +588,12 @@ func TestPrepareTikHubArtifactLeavesSocialVideoTitleForAnalysis(t *testing.T) {
 
 func TestPrepareTikHubArtifactStreamsUnknownLengthAndDeletesWhenVideoExceedsLimit(t *testing.T) {
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/api/v1/instagram/v2/fetch_post_info", r.URL.Path)
+		require.Equal(t, "/api/v1/instagram/v3/get_post_info_by_code", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(
 			w,
-			`{"code":200,"data":{"caption":"A video","media":[{"media_type":"VIDEO",`+
-				`"video_url":"https://media.example/video.mp4"}]}}`,
+			`{"code":200,"data":{"items":[{"caption":{"text":"A video"},"media_type":2,`+
+				`"video_versions":[{"height":720,"url":"https://media.example/video.mp4"}]}]}}`,
 		)
 	}))
 	defer api.Close()

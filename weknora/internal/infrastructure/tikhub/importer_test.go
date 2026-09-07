@@ -305,11 +305,16 @@ func TestTikHubImporterFetchesInstagramAndX(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/api/v1/instagram/v2/fetch_post_info":
-			if got := r.URL.Query().Get("code_or_url"); got != "C0dE" {
-				t.Errorf("code_or_url = %q", got)
+		case "/api/v1/instagram/v3/get_post_info_by_code":
+			if got := r.URL.Query().Get("code"); got != "C0dE" {
+				t.Errorf("code = %q", got)
 			}
-			io.WriteString(w, `{"code":200,"data":{"caption":"Instagram caption","media":[{"media_type":"VIDEO","video_url":"https://cdn.example/instagram.mp4"}]}}`)
+			_, _ = io.WriteString(
+				w,
+				`{"code":200,"data":{"items":[{"caption":{"text":"Instagram caption"},`+
+					`"media_type":2,"video_versions":[{"height":720,`+
+					`"url":"https://cdn.example/instagram.mp4"}]}]}}`,
+			)
 		case "/api/v1/twitter/web/fetch_tweet_detail":
 			if got := r.URL.Query().Get("tweet_id"); got != "12345" {
 				t.Errorf("tweet_id = %q", got)
@@ -658,10 +663,12 @@ func TestNormalizeInstagramAndXCollectCommonPhotoFields(t *testing.T) {
 	t.Parallel()
 
 	instagram, err := normalizeInstagram(map[string]any{
-		"caption": "A photo",
-		"media": []any{map[string]any{
-			"media_type":  "IMAGE",
-			"display_url": "https://images.example/instagram.jpg",
+		"items": []any{map[string]any{
+			"caption":    map[string]any{"text": "A photo"},
+			"media_type": float64(1),
+			"image_versions2": map[string]any{"candidates": []any{
+				map[string]any{"url": "https://images.example/instagram.jpg"},
+			}},
 		}},
 	})
 	if err != nil {
@@ -688,16 +695,28 @@ func TestNormalizeInstagramAndXCollectCommonPhotoFields(t *testing.T) {
 	}
 }
 
-func TestNormalizeInstagramSupportsV2CarouselImages(t *testing.T) {
+func TestNormalizeInstagramSupportsV3CarouselImages(t *testing.T) {
 	t.Parallel()
 
 	result, err := normalizeInstagram(map[string]any{
-		"media_type": float64(8),
-		"caption":    "A carousel",
-		"carousel_media": []any{
-			map[string]any{"media_type": float64(1), "image_versions": map[string]any{"candidates": []any{map[string]any{"url": "https://images.example/one.jpg"}}}},
-			map[string]any{"media_type": float64(1), "image_versions": map[string]any{"candidates": []any{map[string]any{"url": "https://images.example/two.jpg"}}}},
-		},
+		"items": []any{map[string]any{
+			"media_type": float64(8),
+			"caption":    map[string]any{"text": "A carousel"},
+			"carousel_media": []any{
+				map[string]any{
+					"media_type": float64(1),
+					"image_versions2": map[string]any{"candidates": []any{
+						map[string]any{"url": "https://images.example/one.jpg"},
+					}},
+				},
+				map[string]any{
+					"media_type": float64(1),
+					"image_versions2": map[string]any{"candidates": []any{
+						map[string]any{"url": "https://images.example/two.jpg"},
+					}},
+				},
+			},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("normalizeInstagram() error = %v", err)

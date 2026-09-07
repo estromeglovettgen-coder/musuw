@@ -28,7 +28,7 @@ const (
 	youtubeStreamsV2Path = "/api/v1/youtube/web_v2/get_video_streams_v2"
 	xhsImagePath         = "/api/v1/xiaohongshu/app_v2/get_image_note_detail"
 	xhsVideoPath         = "/api/v1/xiaohongshu/app_v2/get_video_note_detail"
-	instagramPostPath    = "/api/v1/instagram/v2/fetch_post_info"
+	instagramPostPath    = "/api/v1/instagram/v3/get_post_info_by_code"
 	xTweetPath           = "/api/v1/twitter/web/fetch_tweet_detail"
 )
 
@@ -143,14 +143,11 @@ func (i *TikHubImporter) Fetch(ctx context.Context, route Route) (Result, error)
 		return normalizeDocument(route.Platform, route.ObjectID, data, false)
 
 	case PlatformInstagram:
-		value := strings.TrimSpace(route.ObjectID)
-		if value == "" {
-			value = strings.TrimSpace(route.InputURL)
+		code, err := requireObjectID(route)
+		if err != nil {
+			return Result{}, err
 		}
-		if value == "" {
-			return Result{}, fmt.Errorf("%w: Instagram ObjectID or InputURL", ErrMissingRouteValue)
-		}
-		data, err := i.get(ctx, instagramPostPath, url.Values{"code_or_url": {value}})
+		data, err := i.get(ctx, instagramPostPath, url.Values{"code": {code}})
 		if err != nil {
 			return Result{}, err
 		}
