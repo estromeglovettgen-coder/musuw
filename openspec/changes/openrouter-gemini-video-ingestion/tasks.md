@@ -1,6 +1,6 @@
 ## 1. Contracts
 
-- [x] 1.1 Pin the initial built-in video-capable VLM to Gemini 2.5 Flash.
+- [x] 1.1 Fix stored-video ingestion to Qwen 3.7 Flash through Alibaba URL input.
 - [x] 1.2 Admit only the four documented video containers.
 
 ## 2. Ingestion
@@ -10,21 +10,20 @@
 
 ## 3. Verification
 
-- [x] 3.1 Confirm the real OpenRouter model accepts a bounded local video.
+- [x] 3.1 Confirm the real OpenRouter route repeatedly accepts the retained 112,301,200-byte H.264 object URL.
 - [x] 3.2 Run focused checks and a browser upload through the local stack.
 - [x] 3.3 Confirm the native upload and file-type filter both expose the same four managed video containers.
 
-## 4. Regional provider resilience
+## 4. Fixed-provider resilience
 
 - [x] 4.1 Keep the existing OpenRouter transport and tenant metering, switch the
-  default `builtin-openrouter-vlm` to Gemini 2.5 Flash on the Tokyo
-  `google-vertex` route, and do not add an automatic model fallback.
-- [x] 4.2 Run focused unit/catalog checks and a real bounded Gemini 2.5 Flash
-  video request through the default VLM path.
-- [ ] 4.3 Deploy the complete catalog and browser-test paid video upload through
-  ingestion, retrieval, and cleanup; if a valid paid production term is
-  externally unavailable, record the production gate and complete the same
-  lifecycle against TEST without fabricating entitlement state.
+  default stored-video model to Qwen 3.7 Flash on the `alibaba` route, and do
+  not add an automatic model fallback.
+- [x] 4.2 Run focused unit/catalog checks and two real Qwen 3.7 Flash requests
+  through the exact retained large-video object URL.
+- [ ] 4.3 Deploy the complete catalog to staging, prove parsing plus Wiki/graph
+  generation for the retained Xiaohongshu video, then promote the immutable
+  revision and browser-test the paid production social/local upload matrix.
 - [x] 4.4 Preserve typed OpenRouter credit exhaustion across video failure
   persistence and prove red-to-green that the existing worker middleware emits
   `SkipRetry` without changing the stable parse failure code.
