@@ -76,7 +76,10 @@ export const CONTEXTUAL_GUIDE_TOURS: Record<ContextualGuideTourId, ContextualGui
     openDelayMs: 600,
     steps: [
       {
-        key: 'intro',
+        key: 'rag',
+      },
+      {
+        key: 'wiki',
       },
       {
         key: 'uploadFile',
@@ -89,7 +92,6 @@ export const CONTEXTUAL_GUIDE_TOURS: Record<ContextualGuideTourId, ContextualGui
         placement: 'bottom',
         optional: true,
       },
-      { key: 'done' },
     ],
   },
   chat: {

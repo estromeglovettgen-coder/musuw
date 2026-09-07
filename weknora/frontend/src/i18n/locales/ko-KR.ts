@@ -6380,14 +6380,11 @@ export default {
     urlExists: '해당 URL이 이미 존재합니다',
     urlLabel: 'URL 또는 공유 메시지',
     urlPlaceholder: 'URL 또는 플랫폼 공유 메시지를 붙여넣으세요',
-    urlTip: '지원 플랫폼의 URL 또는 공유 메시지를 붙여넣으세요',
     urlSupportedPlatforms: '지원 플랫폼',
-    urlInputHint: '링크를 자동 인식합니다. 동영상은 파일로, 이미지·텍스트 게시물은 문서로 가져옵니다. 공개 단일 게시물만 지원합니다.',
     urlClear: '지우기',
     urlTooLong: 'URL 또는 공유 메시지는 4KB 이하여야 합니다',
     douyinTikTok: 'Douyin · TikTok',
     douyin: 'Douyin',
-    urlUsageNotice: '소유하거나 사용 권한을 받은 콘텐츠만 가져오세요. URL 가져오기는 개인 지식 인덱스를 만들기 위한 기능이며 스트리밍 다운로더나 콘텐츠 재배포 서비스가 아닙니다.',
     typeURL: '웹페이지',
     typeManual: '수동 생성',
     typeFile: '파일',
@@ -6687,21 +6684,21 @@ export default {
     },
     kbDetail: {
       steps: {
-        done: {
-          title: '분석 후 사용 가능',
-          desc: '문서가 색인되면 대화에서 {\'@\'}로 이 지식 베이스를 지정해 출처가 포함된 답변을 받을 수 있습니다.'
+        rag: {
+          title: 'RAG: 먼저 검색하고 답변하기',
+          desc: 'RAG는 자료를 청크로 나누고 벡터 및 키워드 인덱스를 만듭니다. Musuw는 관련 원문을 먼저 찾은 뒤 근거와 출처를 포함해 답변합니다.'
+        },
+        wiki: {
+          title: 'Wiki: 자료를 지식으로 정리하기',
+          desc: 'Wiki는 원문에서 인물, 제품, 개념을 추출해 출처가 있는 연결형 지식 페이지와 그래프를 만듭니다.'
         },
         uploadFile: {
           title: '문서 추가',
           desc: '지원되는 파일을 업로드하거나 끌어오면 Musuw가 자동으로 분석하고 인덱싱합니다.'
         },
         uploadUrl: {
-          title: '웹페이지 가져오기',
-          desc: '공개 웹페이지나 소셜 미디어 링크는 여기에서 가져옵니다. 기존 요금제 규칙은 사용 전에 안내됩니다.'
-        },
-        intro: {
-          title: '지식 베이스가 비어 있습니다',
-          desc: '첫 자료를 추가해야 검색과 대화에 사용할 수 있습니다. 지원 형식은 드래그 앤 드롭으로도 업로드할 수 있습니다.'
+          title: '웹 및 소셜 콘텐츠 가져오기',
+          desc: '공개 웹페이지나 소셜 이미지, 글, 동영상은 여기서 가져옵니다. 파싱이 끝나면 인용 대화, Wiki, 그래프에서 사용할 수 있습니다.'
         }
       }
     },

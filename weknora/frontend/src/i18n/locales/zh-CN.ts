@@ -6384,14 +6384,11 @@ export default {
     urlExists: '该URL已存在',
     urlLabel: '链接或分享内容',
     urlPlaceholder: '粘贴链接或平台分享内容',
-    urlTip: '粘贴支持平台的链接或分享内容',
     urlSupportedPlatforms: '支持平台',
-    urlInputHint: '自动识别链接；视频按文件导入，图文转为文档；仅支持公开单条作品。',
     urlClear: '清空',
     urlTooLong: '链接或分享内容不能超过 4 KB',
     douyinTikTok: '抖音·TikTok',
     douyin: '抖音',
-    urlUsageNotice: '仅可导入您拥有或获授权使用的内容。网页导入用于建立私人知识索引，不是流媒体下载或内容再分发服务。',
     typeURL: '网页',
     typeManual: '手动创建',
     typeFile: '文件',
@@ -6691,21 +6688,21 @@ export default {
     },
     kbDetail: {
       steps: {
-        done: {
-          title: '解析完成后即可使用',
-          desc: '文档解析入库后，可在对话中 {\'@\'} 本知识库提问，回答会附带引用来源。'
+        rag: {
+          title: 'RAG：先检索，再回答',
+          desc: 'RAG 会将资料分块并建立向量与关键词索引。提问时，Musuw 先找到相关原文，再基于证据回答并附上引用。'
+        },
+        wiki: {
+          title: 'Wiki：把资料组织成知识',
+          desc: 'Wiki 会从原文提取人物、产品与概念，生成带出处、可互相关联的知识页面和图谱。'
         },
         uploadFile: {
           title: '添加文档',
           desc: '上传或拖入支持的文件，Musuw 会自动解析并建立索引。'
         },
         uploadUrl: {
-          title: '导入网页',
-          desc: '资料来自公开网页或社媒链接时，从这里导入；现有套餐规则仍会正常提示。'
-        },
-        intro: {
-          title: '知识库还是空的',
-          desc: '添加第一份资料后，才能基于它进行检索与对话。支持拖拽上传多种文档格式。'
+          title: '导入网页与社媒',
+          desc: '公开网页或社媒图文、视频从这里导入。解析完成后，可用于带引用的对话、Wiki 和图谱。'
         }
       }
     },

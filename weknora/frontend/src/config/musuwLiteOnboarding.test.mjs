@@ -112,7 +112,7 @@ test('tenantless Lite fallback explains automatic personal-space preparation', (
   )
 })
 
-test('an empty Lite knowledge base explains file and URL ingestion as separate actions', () => {
+test('an empty Lite knowledge base introduces RAG and Wiki before both ingestion actions', () => {
   assert.match(knowledgeBase, /import ContextualGuide from '@\/components\/ContextualGuide\.vue'/)
   assert.match(
     knowledgeBase,
@@ -120,8 +120,22 @@ test('an empty Lite knowledge base explains file and URL ingestion as separate a
   )
   assert.match(knowledgeBase, /data-guide="kb-detail-add-doc"/)
   assert.match(uploadSource, /data-guide="kb-detail-import-url"/)
-  assert.match(guideConfig, /key: 'uploadFile'[\s\S]*data-guide="kb-detail-add-doc"/)
-  assert.match(guideConfig, /key: 'uploadUrl'[\s\S]*data-guide="kb-detail-import-url"/)
+
+  const kbDetailStart = guideConfig.indexOf('  kbDetail: {')
+  const chatStart = guideConfig.indexOf('\n  chat: {', kbDetailStart)
+  assert.notEqual(kbDetailStart, -1)
+  assert.ok(chatStart > kbDetailStart)
+
+  const kbDetailBlock = guideConfig.slice(kbDetailStart, chatStart)
+  const keys = [...kbDetailBlock.matchAll(/key:\s*'([^']+)'/g)].map((match) => match[1])
+  assert.deepEqual(keys, ['rag', 'wiki', 'uploadFile', 'uploadUrl'])
+  assert.doesNotMatch(
+    kbDetailBlock.slice(0, kbDetailBlock.indexOf("key: 'uploadFile'")),
+    /target:/,
+    'RAG and Wiki are explanatory cards and must not depend on page selectors',
+  )
+  assert.match(kbDetailBlock, /key: 'uploadFile'[\s\S]*data-guide="kb-detail-add-doc"/)
+  assert.match(kbDetailBlock, /key: 'uploadUrl'[\s\S]*data-guide="kb-detail-import-url"/)
 })
 
 test('Lite new resource defaults use loaded names and fill the first available suffix', () => {
@@ -164,6 +178,8 @@ test('all supported locales carry the complete Lite onboarding copy', () => {
       'nameLite:',
       'modelLite:',
       'submitLite:',
+      'rag:',
+      'wiki:',
       'uploadFile:',
       'uploadUrl:',
       'picker:',
@@ -172,6 +188,26 @@ test('all supported locales carry the complete Lite onboarding copy', () => {
     ]) {
       assert.ok(source.includes(key), `${locale} is missing ${key}`)
     }
+
+    const kbDetailStart = source.indexOf('    kbDetail: {')
+    const siblingStarts = ['\n    agentCreate: {', '\n    chat: {']
+      .map((marker) => source.indexOf(marker, kbDetailStart))
+      .filter((index) => index > kbDetailStart)
+    const kbDetailEnd = Math.min(...siblingStarts)
+    assert.notEqual(kbDetailStart, -1, `${locale} is missing the knowledge-base guide`)
+    assert.ok(Number.isFinite(kbDetailEnd), `${locale} knowledge-base guide has no sibling boundary`)
+
+    const kbDetailBlock = source.slice(kbDetailStart, kbDetailEnd)
+    const kbDetailKeys = [...kbDetailBlock.matchAll(/^        ([a-zA-Z]+): \{$/gm)]
+      .map((match) => match[1])
+    assert.deepEqual(
+      kbDetailKeys,
+      ['rag', 'wiki', 'uploadFile', 'uploadUrl'],
+      `${locale} knowledge-base guide must keep the same four-step order`,
+    )
+    assert.match(kbDetailBlock, /rag:[\s\S]*title: ['"]RAG[:：]/)
+    assert.match(kbDetailBlock, /wiki:[\s\S]*title: ['"]Wiki[:：]/)
+
     const settingsStart = source.indexOf('settingsLite:')
     const settingsEnd = source.indexOf('\n      },', settingsStart)
     const settingsLiteCopy = source.slice(settingsStart, settingsEnd)
