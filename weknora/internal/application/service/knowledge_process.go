@@ -786,6 +786,17 @@ func (s *knowledgeService) processChunks(ctx context.Context,
 		}
 		return
 	}
+	// Parser/VLM title metadata must be durable before post-process can enqueue
+	// summary generation. This keeps every URL on one guarded title seam and
+	// prevents a fast summary worker from mistaking an already-analyzed video
+	// for an untitled document.
+	if strings.TrimSpace(options.Metadata["title"]) != "" {
+		if titleErr := s.updateKnowledgeTitleFromAnalysis(ctx, knowledge, &types.ReadResult{
+			Metadata: options.Metadata,
+		}); titleErr != nil {
+			logger.Warnf(ctx, "Failed to update knowledge title from analysis: %v", titleErr)
+		}
+	}
 	// Enqueue multimodal tasks for images (async, non-blocking)
 	if options.EnableMultimodel && len(options.StoredImages) > 0 {
 		s.beginStage(ctx, knowledge.ID, types.StageMultimodal, types.JSONMap{
@@ -846,6 +857,14 @@ var (
 
 const summaryFallbackMaxRunes = 500
 
+const automaticURLSummaryTitleInstruction = `
+
+## Automatic knowledge title
+This URL knowledge has no user-authored title. In the same response, generate a concise title from the document content.
+- The first line must be exactly one level-1 Markdown heading: # <title>
+- The title must be 4-10 words, plain text, and contain no URL, citation, quote, or explanation.
+- Start the summary on the next non-empty line. Do not repeat the title in the summary.`
+
 // validateSummaryOutput rejects successful model responses that contain no
 // user-visible text. Treating whitespace-only output as an error lets Asynq
 // retry the summary task instead of persisting description="" as completed.
@@ -890,6 +909,25 @@ func applyRetryableSummaryFailureState(
 	knowledge.Description = fallback
 	knowledge.SummaryStatus = types.SummaryStatusFailed
 	return fallback
+}
+
+// persistKnowledgeSummaryState writes only fields owned by summary generation.
+// Summary workers perform slow model calls, so a full-row Save here could roll
+// back a title or other field edited while the model was running.
+func persistKnowledgeSummaryState(
+	ctx context.Context,
+	repo interfaces.KnowledgeRepository,
+	knowledge *types.Knowledge,
+	includeDescription bool,
+) error {
+	values := map[string]interface{}{
+		"summary_status": knowledge.SummaryStatus,
+		"updated_at":     knowledge.UpdatedAt,
+	}
+	if includeDescription {
+		values["description"] = knowledge.Description
+	}
+	return repo.UpdateKnowledgeColumns(ctx, knowledge.ID, values)
 }
 
 // summaryTaskWillRetry reports whether the current Asynq delivery has another
@@ -951,10 +989,10 @@ func sortChunksForSummary(chunks []*types.Chunk) []*types.Chunk {
 // getSummary generates a summary for knowledge content using an AI model
 func (s *knowledgeService) getSummary(ctx context.Context,
 	summaryModel chat.Chat, knowledge *types.Knowledge, chunks []*types.Chunk,
-) (string, error) {
+) (string, string, error) {
 	// Get knowledge info from the first chunk
 	if len(chunks) == 0 {
-		return "", fmt.Errorf("no chunks provided for summary generation")
+		return "", "", fmt.Errorf("no chunks provided for summary generation")
 	}
 
 	// Determine max input chars from config
@@ -1034,7 +1072,7 @@ func (s *knowledgeService) getSummary(ctx context.Context,
 	// hallucinate a scanner manual instead of admitting the document had no
 	// extractable text.
 	if err := checkSufficientSummaryContent(ctx, knowledge.ID, chunkContents); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// User-authored metadata is trusted document context. Internal ingestion
@@ -1055,6 +1093,10 @@ func (s *knowledgeService) getSummary(ctx context.Context,
 	summaryPrompt := types.RenderPromptPlaceholders(s.config.Conversation.GenerateSummaryPrompt, types.PlaceholderValues{
 		"language": types.LanguageNameFromContext(ctx),
 	})
+	wantsGeneratedTitle := automaticURLKnowledgeTitle(knowledge)
+	if wantsGeneratedTitle {
+		summaryPrompt += automaticURLSummaryTitleInstruction
+	}
 	thinking := false
 	modelCtx := types.WithLLMCallMetadata(ctx, "document_summary", "")
 	summary, err := summaryModel.Chat(modelCtx, []chat.Message{
@@ -1073,15 +1115,47 @@ func (s *knowledgeService) getSummary(ctx context.Context,
 	})
 	if err != nil {
 		logger.GetLogger(ctx).WithField("error", err).Errorf("GetSummary failed")
-		return "", err
+		return "", "", err
 	}
 	content, err := validateSummaryOutput(summary)
 	if err != nil {
 		logger.GetLogger(ctx).WithField("error", err).Warnf("GetSummary returned no usable content")
-		return "", err
+		return "", "", err
+	}
+	generatedTitle := ""
+	if wantsGeneratedTitle {
+		generatedTitle, content = splitGeneratedSummaryTitle(content)
+		if strings.TrimSpace(content) == "" {
+			return "", "", errEmptySummaryOutput
+		}
 	}
 	logger.GetLogger(ctx).WithField("summary", content).Infof("GetSummary success")
-	return content, nil
+	return content, generatedTitle, nil
+}
+
+// splitGeneratedSummaryTitle removes the optional title heading requested from
+// the existing summary call. An invalid title is ignored while its summary is
+// kept; a heading-only response is empty and follows the normal summary retry.
+func splitGeneratedSummaryTitle(content string) (string, string) {
+	content = strings.TrimSpace(content)
+	lineEnd := strings.IndexByte(content, '\n')
+	firstLine := content
+	if lineEnd >= 0 {
+		firstLine = content[:lineEnd]
+	}
+	firstLine = strings.TrimSpace(strings.TrimSuffix(firstLine, "\r"))
+	if !strings.HasPrefix(firstLine, "# ") || strings.HasPrefix(firstLine, "##") {
+		return "", content
+	}
+	summary := ""
+	if lineEnd >= 0 {
+		summary = strings.TrimSpace(content[lineEnd+1:])
+	}
+	if summary == "" {
+		return "", ""
+	}
+	title := conciseAnalysisTitle(strings.TrimSpace(strings.TrimPrefix(firstLine, "#")))
+	return title, summary
 }
 
 // sampleLongContent returns content that fits within maxChars.
@@ -1246,7 +1320,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 	// Update summary status to processing
 	knowledge.SummaryStatus = types.SummaryStatusProcessing
 	knowledge.UpdatedAt = time.Now()
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	if err := persistKnowledgeSummaryState(ctx, s.repo, knowledge, false); err != nil {
 		logger.Warnf(ctx, "Failed to update summary status to processing: %v", err)
 	}
 
@@ -1254,7 +1328,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 	markSummaryFailed := func() {
 		knowledge.SummaryStatus = types.SummaryStatusFailed
 		knowledge.UpdatedAt = time.Now()
-		if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+		if err := persistKnowledgeSummaryState(ctx, s.repo, knowledge, false); err != nil {
 			logger.Warnf(ctx, "Failed to update summary status to failed: %v", err)
 		}
 	}
@@ -1282,7 +1356,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 		knowledge.Description = ""
 		knowledge.SummaryStatus = types.SummaryStatusFailed
 		knowledge.UpdatedAt = time.Now()
-		s.repo.UpdateKnowledge(ctx, knowledge)
+		_ = persistKnowledgeSummaryState(ctx, s.repo, knowledge, true)
 		summaryOut["skipped"] = "no_text_chunks"
 		return nil
 	}
@@ -1300,7 +1374,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 
 		if summaryTaskWillRetry(ctx) {
 			applyRetryableSummaryFailureState(knowledge, textChunks, true)
-			if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+			if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, false); updateErr != nil {
 				logger.Warnf(ctx, "Failed to mark summary pending for retry: %v", updateErr)
 			}
 			summaryOut["retrying"] = true
@@ -1327,7 +1401,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 		}
 
 		fallback := applyRetryableSummaryFailureState(knowledge, textChunks, false)
-		if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+		if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); updateErr != nil {
 			logger.Errorf(ctx, "Failed to save terminal summary fallback: %v", updateErr)
 			summaryErr = updateErr
 			return fmt.Errorf("save terminal summary fallback: %w", updateErr)
@@ -1350,7 +1424,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 	}
 
 	// Generate summary
-	summary, err := s.getSummary(ctx, chatModel, knowledge, textChunks)
+	summary, generatedTitle, err := s.getSummary(ctx, chatModel, knowledge, textChunks)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to generate summary for knowledge %s: %v", payload.KnowledgeID, err)
 		// Surface the underlying LLM/IO error on the span so the trace UI
@@ -1368,7 +1442,7 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 			knowledge.Description = ""
 			knowledge.SummaryStatus = types.SummaryStatusFailed
 			knowledge.UpdatedAt = time.Now()
-			if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+			if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); updateErr != nil {
 				logger.Errorf(ctx, "Failed to mark summary as failed: %v", updateErr)
 				summaryErr = updateErr
 				return fmt.Errorf("failed to update knowledge: %w", updateErr)
@@ -1406,10 +1480,24 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 	// without hopping to the knowledge-detail page. Capped to keep
 	// span rows compact.
 	summaryOut["summary_preview"] = previewText(summary, 240)
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	if err := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); err != nil {
 		logger.Errorf(ctx, "Failed to update knowledge description: %v", err)
 		summaryErr = err
 		return fmt.Errorf("failed to update knowledge: %w", err)
+	}
+
+	// Publish the title only after the summary state is durable. The same atomic
+	// source/title guard used by video analysis preserves a manual rename, while
+	// the summary update above touches only its own columns.
+	if generatedTitle != "" {
+		if titleErr := s.updateKnowledgeTitleFromAnalysis(ctx, knowledge, &types.ReadResult{
+			Metadata: map[string]string{"title": generatedTitle},
+		}); titleErr != nil {
+			logger.Warnf(ctx, "Failed to update knowledge title from summary analysis: %v", titleErr)
+			summaryOut["title_error"] = previewText(titleErr.Error(), 240)
+		} else if knowledge.Title == generatedTitle {
+			summaryOut["generated_title"] = generatedTitle
+		}
 	}
 
 	// Create summary chunk and index it — only when RAG indexing is enabled.
@@ -2409,7 +2497,7 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 		knowledge.Description = ""
 		knowledge.SummaryStatus = types.SummaryStatusFailed
 		knowledge.UpdatedAt = time.Now()
-		if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+		if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); updateErr != nil {
 			return knowledge, updateErr
 		}
 		return knowledge, errInsufficientSummaryContent
@@ -2419,7 +2507,8 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 	})
 	metadataVersion := string(knowledge.CustomMetadata)
 	knowledge.SummaryStatus = types.SummaryStatusProcessing
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	knowledge.UpdatedAt = time.Now()
+	if err := persistKnowledgeSummaryState(ctx, s.repo, knowledge, false); err != nil {
 		return nil, err
 	}
 	handleGenerationFailure := func(generationErr error) (*types.Knowledge, error) {
@@ -2427,14 +2516,14 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 			knowledge.Description = ""
 			knowledge.SummaryStatus = types.SummaryStatusFailed
 			knowledge.UpdatedAt = time.Now()
-			if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+			if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); updateErr != nil {
 				return knowledge, updateErr
 			}
 			return knowledge, generationErr
 		}
 		if summaryTaskWillRetry(ctx) {
 			applyRetryableSummaryFailureState(knowledge, textChunks, true)
-			if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+			if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, false); updateErr != nil {
 				logger.Warnf(ctx, "Failed to mark summary refresh pending for retry: %v", updateErr)
 			}
 			return knowledge, generationErr
@@ -2445,7 +2534,8 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 		)
 		if staleErr != nil {
 			knowledge.SummaryStatus = types.SummaryStatusFailed
-			_ = s.repo.UpdateKnowledge(ctx, knowledge)
+			knowledge.UpdatedAt = time.Now()
+			_ = persistKnowledgeSummaryState(ctx, s.repo, knowledge, false)
 			return knowledge, fmt.Errorf("verify summary fallback freshness: %w", staleErr)
 		}
 		if stale {
@@ -2453,7 +2543,7 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 		}
 
 		applyRetryableSummaryFailureState(knowledge, textChunks, false)
-		if updateErr := s.repo.UpdateKnowledge(ctx, knowledge); updateErr != nil {
+		if updateErr := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); updateErr != nil {
 			return knowledge, updateErr
 		}
 		return knowledge, generationErr
@@ -2463,7 +2553,7 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 	if err != nil {
 		return handleGenerationFailure(fmt.Errorf("get chat model: %w", err))
 	}
-	summary, err := s.getSummary(ctx, chatModel, knowledge, textChunks)
+	summary, generatedTitle, err := s.getSummary(ctx, chatModel, knowledge, textChunks)
 	if err != nil {
 		return handleGenerationFailure(err)
 	}
@@ -2480,8 +2570,15 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 	knowledge.Description = summary
 	knowledge.SummaryStatus = types.SummaryStatusCompleted
 	knowledge.UpdatedAt = time.Now()
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	if err := persistKnowledgeSummaryState(ctx, s.repo, knowledge, true); err != nil {
 		return nil, err
+	}
+	if generatedTitle != "" {
+		if titleErr := s.updateKnowledgeTitleFromAnalysis(ctx, knowledge, &types.ReadResult{
+			Metadata: map[string]string{"title": generatedTitle},
+		}); titleErr != nil {
+			logger.Warnf(ctx, "Failed to update knowledge title from refreshed summary analysis: %v", titleErr)
+		}
 	}
 	if kb.NeedsEmbeddingModel() {
 		maxIndex := 0
@@ -3846,16 +3943,6 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 
 	// Step 4: Process chunks (vectorize + index + enqueue async tasks)
 	s.processChunks(ctx, kb, knowledge, chunks, processOpts)
-
-	// URL and social-video imports share the same title seam. Social
-	// materialization clears payload.URL, so use the persisted knowledge type
-	// and source rather than the transient task payload. Publish after the
-	// synchronous chunk pipeline's full-row writes; the repository's conditional
-	// UPDATE then guarantees that a concurrent manual rename wins. No extra model
-	// call is needed because the parser/video analysis already supplied the title.
-	if titleErr := s.updateKnowledgeTitleFromAnalysis(ctx, knowledge, convertResult); titleErr != nil {
-		logger.Warnf(ctx, "Failed to update knowledge title from analysis: %v", titleErr)
-	}
 
 	return nil
 }

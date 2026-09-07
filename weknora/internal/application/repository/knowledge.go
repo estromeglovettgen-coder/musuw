@@ -197,7 +197,16 @@ func (r *knowledgeRepository) ClaimKnowledgeSourceWithStorage(
 		merged.FileName = proposed.FileName
 		merged.FileType = proposed.FileType
 		merged.FileSize = proposed.FileSize
-		merged.Title = proposed.Title
+		// A URL source fetch can be slow. If the user renamed the row while the
+		// worker was downloading, the locked persisted title is authoritative.
+		// Only an empty/source URL title is still automatic and may adopt the
+		// materializer's title (for example direct YouTube analysis).
+		persistedTitle := strings.TrimSpace(persisted.Title)
+		persistedSource := strings.TrimSpace(persisted.Source)
+		if !strings.EqualFold(strings.TrimSpace(persisted.Type), "url") ||
+			persistedTitle == "" || persistedTitle == persistedSource {
+			merged.Title = proposed.Title
+		}
 		merged.Description = proposed.Description
 		if proposed.UpdatedAt.IsZero() {
 			merged.UpdatedAt = time.Now()
@@ -581,6 +590,12 @@ func (r *knowledgeRepository) UpdateKnowledgeWithStorage(
 		// The target tenant is the one selected above; do not allow a stale or
 		// caller-mutated object to move the row across tenant boundaries.
 		knowledge.TenantID = persisted.TenantID
+		// Storage/index accounting never owns a URL knowledge title. Preserve the
+		// locked row value so a slow parser cannot roll back a manual rename; model
+		// titles are published separately through the guarded title update.
+		if strings.EqualFold(strings.TrimSpace(persisted.Type), "url") {
+			knowledge.Title = persisted.Title
+		}
 		omit := omitFieldsOnUpdate
 		if knowledge.CustomMetadata == nil {
 			omit = append(append([]string{}, omitFieldsOnUpdate...), "custom_metadata")

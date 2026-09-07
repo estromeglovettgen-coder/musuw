@@ -14,6 +14,7 @@ import (
 type parentChildKnowledgeRepo struct {
 	interfaces.KnowledgeRepository
 	knowledge *types.Knowledge
+	events    *[]string
 }
 
 func (r *parentChildKnowledgeRepo) GetKnowledgeByID(
@@ -31,7 +32,19 @@ func (r *parentChildKnowledgeRepo) UpdateKnowledge(
 func (r *parentChildKnowledgeRepo) UpdateKnowledgeWithStorage(
 	context.Context, *types.Knowledge, int64,
 ) error {
+	if r.events != nil {
+		*r.events = append(*r.events, "storage")
+	}
 	return nil
+}
+
+func (r *parentChildKnowledgeRepo) UpdateURLKnowledgeTitleIfAutomatic(
+	_ context.Context, _ uint64, _ string, _ string, _ string,
+) (bool, error) {
+	if r.events != nil {
+		*r.events = append(*r.events, "title")
+	}
+	return true, nil
 }
 
 type parentChildChunkService struct {
@@ -139,9 +152,14 @@ func (parentChildTenantRepo) AdjustStorageUsed(context.Context, uint64, int64) e
 	return nil
 }
 
-type parentChildTaskEnqueuer struct{}
+type parentChildTaskEnqueuer struct {
+	events *[]string
+}
 
-func (parentChildTaskEnqueuer) Enqueue(*asynq.Task, ...asynq.Option) (*asynq.TaskInfo, error) {
+func (e parentChildTaskEnqueuer) Enqueue(*asynq.Task, ...asynq.Option) (*asynq.TaskInfo, error) {
+	if e.events != nil {
+		*e.events = append(*e.events, "enqueue")
+	}
 	return nil, nil
 }
 
@@ -203,4 +221,32 @@ func TestProcessChunksIndexesEveryTextChild(t *testing.T) {
 		indexedSourceIDs = append(indexedSourceIDs, info.SourceID)
 	}
 	require.ElementsMatch(t, textChunkIDs, indexedSourceIDs)
+}
+
+func TestProcessChunksPublishesAnalysisTitleBeforePostprocessEnqueue(t *testing.T) {
+	const source = "https://x.com/example/status/1"
+	events := []string{}
+	knowledge := &types.Knowledge{
+		ID: "knowledge-title-order", TenantID: 1, KnowledgeBaseID: "kb-title-order",
+		Type: "url", Source: source, Title: source, ParseStatus: types.ParseStatusProcessing,
+	}
+	repo := &parentChildKnowledgeRepo{knowledge: knowledge, events: &events}
+	chunkService := &parentChildChunkService{}
+	tenant := &types.Tenant{ID: 1}
+	ctx := context.WithValue(context.Background(), types.TenantInfoContextKey, tenant)
+	svc := &knowledgeService{
+		repo: repo, chunkService: chunkService, graphEngine: parentChildGraphRepo{},
+		task: parentChildTaskEnqueuer{events: &events},
+	}
+
+	svc.processChunks(
+		ctx,
+		&types.KnowledgeBase{ID: "kb-title-order", TenantID: 1},
+		knowledge,
+		[]types.ParsedChunk{{Content: "analyzed video content", Seq: 0, Start: 0, End: 22}},
+		ProcessChunksOptions{Metadata: map[string]string{"title": "AI video title"}},
+	)
+
+	require.Equal(t, []string{"storage", "title", "enqueue"}, events)
+	require.Equal(t, "AI video title", knowledge.Title)
 }

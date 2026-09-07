@@ -227,6 +227,7 @@ func TestPrepareTikHubArtifactAnalyzesYouTubeDirectlyAndPersistsMarkdown(t *test
 	knowledge := &types.Knowledge{
 		ID:       "knowledge-youtube-direct",
 		TenantID: 17,
+		Type:     "url",
 		Source:   payload.URL,
 		Title:    payload.URL,
 		FileType: "html",
@@ -307,6 +308,7 @@ func TestFirstMarkdownTitleFallsBackToAIOutputFirstLine(t *testing.T) {
 
 func TestPrepareTikHubArtifactPersistsDocumentBeforeExistingParser(t *testing.T) {
 	t.Parallel()
+	const sourceURL = "https://www.xiaohongshu.com/explore/64f123456789abcdef123456"
 
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v1/xiaohongshu/app_v2/get_image_note_detail", r.URL.Path)
@@ -325,9 +327,12 @@ func TestPrepareTikHubArtifactPersistsDocumentBeforeExistingParser(t *testing.T)
 	}
 	payload := types.DocumentProcessPayload{
 		TenantID: 7,
-		URL:      "https://www.xiaohongshu.com/explore/64f123456789abcdef123456",
+		URL:      sourceURL,
 	}
-	knowledge := &types.Knowledge{ID: "knowledge-1", TenantID: 7, FileType: "html"}
+	knowledge := &types.Knowledge{
+		ID: "knowledge-1", TenantID: 7, Type: "url", Source: sourceURL,
+		Title: sourceURL, FileType: "html",
+	}
 
 	handled, _, err := svc.prepareTikHubArtifact(
 		context.Background(),
@@ -343,7 +348,10 @@ func TestPrepareTikHubArtifactPersistsDocumentBeforeExistingParser(t *testing.T)
 	require.Equal(t, "stored/xiaohongshu-64f123456789abcdef123456.md", payload.FilePath)
 	require.Equal(t, payload.FilePath, knowledge.FilePath)
 	require.Equal(t, "md", knowledge.FileType)
-	require.Equal(t, "一篇图文", knowledge.Title)
+	require.Equal(t, sourceURL, knowledge.Title,
+		"a provider caption must remain content, not become a user-authored title")
+	require.False(t, strings.HasPrefix(string(files.savedData), "# "),
+		"a provider caption must not masquerade as the canonical Markdown title")
 	require.Contains(t, string(files.savedData), "正文内容")
 	require.Contains(t, string(files.savedData), "https://images.example/one.jpg")
 	require.Equal(t, 1, files.saveCalls)

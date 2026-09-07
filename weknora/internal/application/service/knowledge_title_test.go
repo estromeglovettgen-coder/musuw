@@ -2,11 +2,26 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/require"
 )
+
+func TestConciseAnalysisTitleRejectsCaptionLikeOutput(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		"倘若遇到那个人 那就永远不要分开 #文案 #日落",
+		"one two three four five six seven eight nine ten eleven",
+		strings.Repeat("长", 41),
+		strings.Repeat("long", 21),
+	} {
+		require.Empty(t, conciseAnalysisTitle(raw), "caption-like title must be rejected: %q", raw)
+	}
+	require.Equal(t, "利用 Claude Code 创建 Instagram Reels", conciseAnalysisTitle("利用 Claude Code 创建 Instagram Reels"))
+}
 
 func TestUpdateKnowledgeTitleFromAnalysisUsesOneURLPathForEveryPlatform(t *testing.T) {
 	t.Parallel()
@@ -77,6 +92,25 @@ func TestUpdateKnowledgeTitleFromAnalysisDoesNotOverwriteManualRename(t *testing
 
 	require.NoError(t, err)
 	require.Equal(t, "My manual title", knowledge.Title)
+	require.Empty(t, repo.automaticTitleUpdates)
+}
+
+func TestUpdateKnowledgeTitleFromAnalysisIgnoresProviderCaptionHeading(t *testing.T) {
+	t.Parallel()
+
+	const source = "https://v.douyin.com/example/"
+	repo := &videoIngestionRepoStub{}
+	svc := &knowledgeService{repo: repo}
+	knowledge := &types.Knowledge{
+		ID: "knowledge-provider-caption", TenantID: 1, Type: "url", Source: source, Title: source,
+	}
+
+	err := svc.updateKnowledgeTitleFromAnalysis(context.Background(), knowledge, &types.ReadResult{
+		MarkdownContent: "# 倘若遇到那个人 那就永远不要分开 #文案 #日落 #2024图文伙伴计划\n\n![image](stored.jpg)",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, source, knowledge.Title)
 	require.Empty(t, repo.automaticTitleUpdates)
 }
 
