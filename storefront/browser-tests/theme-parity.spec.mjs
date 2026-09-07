@@ -51,18 +51,16 @@ async function readableContrast(locator, pseudo = null) {
 
 const readableSelectors = [
   [".hero-demo-answer p", null],
-  [".hero-demo-answer strong", null],
+  [".hero-demo-answer h4", null],
   [".authoritative-chat-composer__textarea", null],
   [".authoritative-chat-composer__textarea", "::placeholder"],
-  [".authoritative-chat-composer__model small", null],
-  ['[data-capability-demo="answer"] .product-demo-composer > span:first-child', null],
-  ['[data-capability-demo="answer"] .product-demo-model small', null],
+  [".visual-chat-composer__combined-picker-model", null],
+  ['[data-capability-demo="answer"] .authoritative-chat-composer__textarea', null],
   [".visual-rag-pipeline__reference-summary", null],
   [".real-chat-citation", null],
-  [".kb-preview-reader-time", null],
+  [".kb-preview-index-header span", null],
   [".kb-preview-graph-search span", null],
-  [".wiki-badge--type", null],
-  [".wiki-badge--ver", null],
+  [".kb-preview-index-body p", null],
   [".kb-preview-content-link", null],
   [".billing-period-label", null],
   [".plan-price span", null],
@@ -101,6 +99,8 @@ for (const theme of ["light", "dark"]) {
         },
       ).toBe("none");
     }
+
+    const wiki = page.locator('[data-product-page-shell="wiki"]');
 
     for (const [selector, pseudo] of readableSelectors) {
       const target = page.locator(selector).first();
@@ -145,9 +145,8 @@ for (const theme of ["light", "dark"]) {
       await expect(sidebar).toHaveAttribute("data-product-app-sidebar-state", "collapsed");
     }
 
-    const wiki = page.locator('[data-product-page-shell="wiki"]');
-    await expect(wiki).toHaveAttribute("data-demo-phase", "linked-page");
-    await expect(wiki.locator('[data-wiki-page-id="evaluation-tasks"]')).toBeVisible();
+    await expect(wiki).toHaveAttribute("data-demo-phase", "page");
+    await expect(wiki.locator('[data-wiki-page-id="index"]')).toBeVisible();
     await expect(wiki.locator('[data-wiki-auto-pointer]')).toHaveCount(0);
     const wikiCamera = wiki.locator('[data-wiki-camera="true"]');
     await expect(wikiCamera).toHaveAttribute("data-wiki-camera-scale", "1");

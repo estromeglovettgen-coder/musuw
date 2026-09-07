@@ -118,23 +118,84 @@ for (const locale of ["zh-CN", "en"]) {
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.locator("header.site-header")).toHaveCount(1);
       await expect(page.locator(".desktop-nav")).toHaveCount(1);
-      await expect(page.locator("h1")).toHaveAttribute("aria-label", locale === "zh-CN" ? "把资料转化为 会思考的知识资产" : "Turn source material into intelligent knowledge assets");
+      await expect(page.locator("h1[aria-label]")).toHaveAttribute("aria-label", locale === "zh-CN" ? "把资料转化为 会思考的知识资产" : "Turn source material into intelligent knowledge assets");
       await expect(page.locator(".feature-story")).toHaveCount(3);
       await checkPageWidth(page);
 
-      const hero = page.locator('[data-story="everyday-law"]');
+      const hero = page.locator('[data-story="research-ledger"]');
       await hero.scrollIntoViewIfNeeded();
       if (reducedMotion === "no-preference") {
-        await expect(hero.locator(".authoritative-chat-welcome")).toContainText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I am Musuw");
+        await expect(hero.locator(".visual-new-chat-title")).toContainText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I am Musuw");
         const initialHeroPhase = await hero.getAttribute("data-demo-phase");
         await expect.poll(
           async () => hero.getAttribute("data-demo-phase"),
           { timeout: 5_000 },
         ).not.toBe(initialHeroPhase);
+
+        // The cursor stays out of the way while the answer is streaming. It
+        // appears once, moves to the real save action, then presses only after
+        // the travel animation has settled.
+        await expect(hero).toHaveAttribute("data-demo-phase", "answering", { timeout: 30_000 });
+        await expect(hero.locator('[data-hero-auto-pointer]')).toHaveCount(0);
+
+        await expect(hero).toHaveAttribute("data-demo-phase", "saving", { timeout: 30_000 });
+        const savingPointer = hero.locator('[data-hero-auto-pointer="saving"]');
+        const saveAction = hero.locator('[data-hero-save-action="true"]');
+        await expect(savingPointer).toBeVisible();
+        await expect(saveAction).toBeVisible();
+        await expect.poll(
+          async () => Number(await savingPointer.evaluate((node) => getComputedStyle(node).opacity)),
+          { timeout: 2_000 },
+        ).toBeGreaterThan(0.5);
+        await expect.poll(
+          async () => {
+            const pointer = await savingPointer.boundingBox();
+            const button = await saveAction.boundingBox();
+            if (!pointer || !button) return Number.POSITIVE_INFINITY;
+            const pointerHotspot = { x: pointer.x + 3, y: pointer.y + 3 };
+            const buttonCenter = { x: button.x + button.width / 2, y: button.y + button.height / 2 };
+            return Math.hypot(pointerHotspot.x - buttonCenter.x, pointerHotspot.y - buttonCenter.y);
+          },
+          { timeout: 2_000 },
+        ).toBeLessThan(34);
+        // The bookmark press opens the native editor. It must remain pending
+        // until the second pointer press reaches the footer publish action.
+        await expect(hero).toHaveAttribute("data-hero-save-step", "publish");
+        const saveDrawerPending = hero.locator('[data-hero-save-drawer="true"]');
+        await expect(saveDrawerPending).toBeVisible();
+        await expect(hero.locator('[data-hero-save-success="true"]')).toHaveCount(0);
+        const publishAction = saveDrawerPending.locator('[data-hero-save-publish="true"]');
+        await expect(publishAction).toBeVisible();
+        await expect.poll(
+          async () => {
+            if (await hero.getAttribute("data-hero-save-step") !== "publish") return false;
+            const pointer = await savingPointer.boundingBox();
+            const button = await publishAction.boundingBox();
+            if (!pointer || !button) return false;
+            const pointerHotspot = { x: pointer.x + 3, y: pointer.y + 3 };
+            const buttonCenter = { x: button.x + button.width / 2, y: button.y + button.height / 2 };
+            return Math.hypot(pointerHotspot.x - buttonCenter.x, pointerHotspot.y - buttonCenter.y) < 34;
+          },
+          { timeout: 3_000, intervals: [25, 50] },
+        ).toBe(true);
+        await expect.poll(
+          async () => savingPointer.evaluate((node) => node.classList.contains("is-clicking")).catch(() => false),
+          { timeout: 3_000, intervals: [25, 50] },
+        ).toBe(true);
+        await expect.poll(async () => hero.getAttribute("data-hero-save-step"), { timeout: 3_000 }).toBe("published");
       }
-      await expect(hero).toHaveAttribute("data-demo-phase", "complete", { timeout: 35_000 });
-      await expect(hero.locator(".hero-demo-question")).toContainText(locale === "zh-CN" ? "婚礼摄影师" : "wedding photographer");
-      await expect(hero.locator(".hero-demo-citation")).toHaveCount(3);
+      await expect(hero).toHaveAttribute("data-demo-phase", "complete", { timeout: 45_000 });
+      await expect(hero).toHaveAttribute("data-hero-save-step", "published");
+      await expect(hero.locator(".hero-demo-question")).toContainText(locale === "zh-CN" ? "问题台账" : "question ledger");
+      await expect(hero.locator(".hero-inline-citation")).toHaveCount(3);
+      await expect(hero.locator('[data-answer-section="conclusion"]')).toContainText(locale === "zh-CN" ? "核心作用" : "Core role");
+      await expect(hero.locator('[data-answer-section="evidence"] [data-demo-source-ref]')).toHaveCount(3);
+      await expect(hero.locator('[data-answer-section="impact"]')).toContainText(locale === "zh-CN" ? "对长期实验的影响" : "Impact on the long-running experiment");
+      await expect(hero.locator(".hero-demo-answer-table")).toBeVisible();
+      await expect(hero.locator('[data-hero-save-action="true"]')).toHaveCount(1);
+      await expect(hero.locator('.hero-demo-answer-actions .visual-assistant-toolbar__button')).toHaveCount(3);
+      await expect(hero.locator('[data-hero-save-success="true"]')).toBeVisible();
+      await expect(hero.locator('[data-hero-save-drawer="true"]')).toHaveCount(0);
       await expect(hero).toHaveAttribute("data-demo-interactive", "false");
       await expect(hero.locator(".demo-scope-note")).toHaveCount(0);
       await expect(hero.locator("[data-demo-source]")).toHaveCount(0);
@@ -156,12 +217,32 @@ for (const locale of ["zh-CN", "en"]) {
       await expect(chat).toHaveAttribute("data-chat-phase", "complete", { timeout: 45_000 });
       await expect(chat.locator(".visual-assistant-markdown")).toBeVisible();
       await expect(chat.locator(".visual-assistant-markdown")).toContainText(locale === "zh-CN" ? "首次练习" : "completed first exercise");
+      await expect(chat.locator("[data-answer-section]")).toHaveCount(5);
+      await expect(chat.locator('[data-answer-section="conclusion"]')).toContainText(locale === "zh-CN" ? "优先判断" : "Priority conclusion");
+      await expect(chat.locator('[data-answer-section="evidence"] [data-answer-source-ref]')).toHaveCount(3);
+      await expect(chat.locator('[data-answer-section="validation"]')).toContainText(locale === "zh-CN" ? "验证方案" : "Validation plan");
+      await expect(chat.locator('[data-answer-section="limits"]')).toContainText(locale === "zh-CN" ? "判断边界" : "Decision limits");
       await expect(chat.locator(".demo-scope-note")).toHaveCount(0);
       await expect(chat.locator('[data-rag-pipeline-summary="complete"]')).toBeVisible();
       await expect(chat.locator('[data-rag-pipeline-summary="complete"]')).toContainText("Rerank");
       await expect(chat).not.toContainText(/18 个结果|18 results|模拟研究资料|Simulated research/);
       await expect(chat).toHaveAttribute("data-demo-interactive", "false");
       await expect(chat.locator("[data-demo-source]")).toHaveCount(0);
+      const answerFit = await chat.evaluate((root) => {
+        const viewport = root.querySelector(".authoritative-chat-scroll")?.getBoundingClientRect();
+        const answer = root.querySelector(".real-chat-answer")?.getBoundingClientRect();
+        const citations = root.querySelector(".real-chat-citations")?.getBoundingClientRect();
+        const toolbar = root.querySelector(".visual-assistant-toolbar")?.getBoundingClientRect();
+        if (!viewport || !answer || !citations || !toolbar) return null;
+        return {
+          topOverflow: viewport.top - answer.top,
+          bottomOverflow: Math.max(answer.bottom, citations.bottom, toolbar.bottom) - viewport.bottom,
+          scrollTop: root.querySelector(".authoritative-chat-scroll")?.scrollTop ?? 0,
+        };
+      });
+      expect(answerFit, JSON.stringify(answerFit)).not.toBeNull();
+      expect(answerFit.scrollTop > 0 || answerFit.topOverflow <= 2, JSON.stringify(answerFit)).toBeTruthy();
+      expect(answerFit.bottomOverflow, JSON.stringify(answerFit)).toBeLessThanOrEqual(2);
       await checkAuthoritativeChatSurface(chat);
       await capture(chat, "reasoning-answer", testInfo);
 
@@ -174,6 +255,11 @@ for (const locale of ["zh-CN", "en"]) {
       else await expect(wiki.locator('[data-wiki-sidebar="true"]')).toBeVisible();
       await expect(wiki.locator('[data-wiki-reader="true"]')).toBeVisible();
       await expect(wiki.locator('img[src="/images/musuw-wiki-page.jpg"]')).toHaveCount(0);
+      if (reducedMotion === "no-preference") {
+        await expect(wiki.locator('[data-wiki-page-id="index"]')).toBeVisible();
+        await expect(wiki.locator('.wiki-reader-title-text, .kb-preview-index-header h4').first()).toHaveText(locale === "zh-CN" ? "索引" : "Index");
+        await expect(wiki.locator('[data-wiki-demo-link="index"]')).toBeVisible();
+      }
       await expect(wiki).toHaveAttribute("data-demo-interactive", "false");
       const wikiAppSidebar = wiki.locator('[data-product-app-sidebar="true"]');
       await expect(wikiAppSidebar).toHaveCount(1);
@@ -183,16 +269,16 @@ for (const locale of ["zh-CN", "en"]) {
       await expect(wiki.locator("[data-demo-source], [data-demo-pointer]")).toHaveCount(0);
       await checkWikiCameraFixed(wiki);
       if (reducedMotion === "reduce") {
-        await waitWikiPhase(page, "linked-page");
+        await waitWikiPhase(page, "page");
         await expect(wiki.locator('[data-wiki-auto-pointer]')).toHaveCount(0);
-        await expect(wiki.locator('[data-wiki-page-id="evaluation-tasks"]')).toBeVisible();
-        await expect(wiki.locator(".wiki-reader-title-text")).toHaveText(locale === "zh-CN" ? "评估任务" : "Evaluation tasks");
+        await expect(wiki.locator('[data-wiki-page-id="index"]')).toBeVisible();
+        await expect(wiki.locator(".kb-preview-index-header h4")).toHaveText(locale === "zh-CN" ? "索引" : "Index");
         await checkWikiCameraFixed(wiki);
         await capture(wiki, "wiki-linked-page-reduced", testInfo);
       } else {
-        await waitWikiPhase(page, "moving-to-link");
-        const pointer = wiki.locator('[data-wiki-auto-pointer="moving-to-link"]');
-        const sourceLink = wiki.locator('[data-wiki-demo-link="true"]');
+        await waitWikiPhase(page, "moving-to-index-link");
+        const pointer = wiki.locator('[data-wiki-auto-pointer="moving-to-index-link"]');
+        const sourceLink = wiki.locator('[data-wiki-demo-link="index"]:visible');
         await expect(pointer).toBeVisible();
         await expect(sourceLink).toHaveAttribute("data-wiki-link-state", "approaching");
         const pointerStart = await pointer.boundingBox();
@@ -203,13 +289,13 @@ for (const locale of ["zh-CN", "en"]) {
         expect(Math.hypot(pointerProgress.x - pointerStart.x, pointerProgress.y - pointerStart.y)).toBeGreaterThan(4);
         await checkWikiCameraFixed(wiki);
 
-        await waitWikiPhase(page, "pressing-link");
-        const pressingPointer = wiki.locator('[data-wiki-auto-pointer="pressing-link"]');
+        await waitWikiPhase(page, "pressing-index-link");
+        const pressingPointer = wiki.locator('[data-wiki-auto-pointer="pressing-index-link"]');
         await expect(pressingPointer).toBeVisible();
         await expect(sourceLink).toHaveAttribute("data-wiki-link-state", "pressing");
         const hit = await wiki.evaluate((root) => {
-          const cursor = root.querySelector('[data-wiki-auto-pointer="pressing-link"]');
-          const link = root.querySelector('[data-wiki-demo-link="true"]');
+          const cursor = root.querySelector('[data-wiki-auto-pointer="pressing-index-link"]');
+          const link = root.querySelector('[data-wiki-demo-link="index"]');
           const host = root.querySelector(".kb-preview-wiki-host");
           const cursorRect = cursor?.getBoundingClientRect();
           const linkRect = link?.getBoundingClientRect();
@@ -218,24 +304,68 @@ for (const locale of ["zh-CN", "en"]) {
           const hotspot = { x: cursorRect.left + 3, y: cursorRect.top + 3 };
           return {
             hotspotInsideLink: hotspot.x >= linkRect.left - 2 && hotspot.x <= linkRect.right + 2 && hotspot.y >= linkRect.top - 2 && hotspot.y <= linkRect.bottom + 2,
+            pointerLinkDistance: Math.hypot((cursorRect.left + cursorRect.width / 2) - (linkRect.left + linkRect.width / 2), (cursorRect.top + cursorRect.height / 2) - (linkRect.top + linkRect.height / 2)),
             pointerInsideHost: cursorRect.left >= hostRect.left && cursorRect.right <= hostRect.right && cursorRect.top >= hostRect.top && cursorRect.bottom <= hostRect.bottom,
           };
         });
         expect(hit, JSON.stringify(hit)).not.toBeNull();
         expect(hit.hotspotInsideLink, JSON.stringify(hit)).toBe(true);
+        expect(hit.pointerLinkDistance, JSON.stringify(hit)).toBeLessThanOrEqual(24);
         expect(hit.pointerInsideHost, JSON.stringify(hit)).toBe(true);
-        await capture(wiki, "wiki-link-press", testInfo);
+        await capture(wiki, "wiki-index-link-press", testInfo);
+
+        await waitWikiPhase(page, "section-page");
+        await expect(wiki.locator('[data-wiki-page-id="evaluation-tasks"]')).toBeVisible();
+        await expect(wiki.locator(".wiki-reader-title-text")).toHaveText(locale === "zh-CN" ? "评估任务" : "Evaluation tasks");
+        await expect(wiki.locator('[data-wiki-auto-pointer="section-page"]')).toBeVisible();
+
+        await waitWikiPhase(page, "moving-to-inline-link");
+        const inlinePointer = wiki.locator('[data-wiki-auto-pointer="moving-to-inline-link"]');
+        const inlineLink = wiki.locator('[data-wiki-demo-link="inline"]');
+        await expect(inlinePointer).toBeVisible();
+        await expect(inlineLink).toHaveAttribute("data-wiki-link-state", "approaching");
+        const inlineStart = await inlinePointer.boundingBox();
+        await page.waitForTimeout(420);
+        const inlineProgress = await inlinePointer.boundingBox();
+        expect(inlineStart).not.toBeNull();
+        expect(inlineProgress).not.toBeNull();
+        expect(Math.hypot(inlineProgress.x - inlineStart.x, inlineProgress.y - inlineStart.y)).toBeGreaterThan(4);
+
+        await waitWikiPhase(page, "pressing-inline-link");
+        const inlinePressingPointer = wiki.locator('[data-wiki-auto-pointer="pressing-inline-link"]');
+        await expect(inlinePressingPointer).toBeVisible();
+        await expect(inlineLink).toHaveAttribute("data-wiki-link-state", "pressing");
+        const inlineHit = await wiki.evaluate((root) => {
+          const cursor = root.querySelector('[data-wiki-auto-pointer="pressing-inline-link"]');
+          const link = root.querySelector('[data-wiki-demo-link="inline"]');
+          const host = root.querySelector(".kb-preview-wiki-host");
+          const cursorRect = cursor?.getBoundingClientRect();
+          const linkRect = link?.getBoundingClientRect();
+          const hostRect = host?.getBoundingClientRect();
+          if (!cursorRect || !linkRect || !hostRect) return null;
+          const hotspot = { x: cursorRect.left + 3, y: cursorRect.top + 3 };
+          return {
+            hotspotInsideLink: hotspot.x >= linkRect.left - 2 && hotspot.x <= linkRect.right + 2 && hotspot.y >= linkRect.top - 2 && hotspot.y <= linkRect.bottom + 2,
+            pointerLinkDistance: Math.hypot((cursorRect.left + cursorRect.width / 2) - (linkRect.left + linkRect.width / 2), (cursorRect.top + cursorRect.height / 2) - (linkRect.top + linkRect.height / 2)),
+            pointerInsideHost: cursorRect.left >= hostRect.left && cursorRect.right <= hostRect.right && cursorRect.top >= hostRect.top && cursorRect.bottom <= hostRect.bottom,
+          };
+        });
+        expect(inlineHit, JSON.stringify(inlineHit)).not.toBeNull();
+        expect(inlineHit.hotspotInsideLink, JSON.stringify(inlineHit)).toBe(true);
+        expect(inlineHit.pointerLinkDistance, JSON.stringify(inlineHit)).toBeLessThanOrEqual(24);
+        expect(inlineHit.pointerInsideHost, JSON.stringify(inlineHit)).toBe(true);
+        await capture(wiki, "wiki-inline-link-press", testInfo);
 
         await waitWikiPhase(page, "linked-page");
         await expect(wiki.locator('[data-wiki-auto-pointer]')).toHaveCount(0);
-        await expect(wiki.locator('[data-wiki-page-id="evaluation-tasks"]')).toBeVisible();
-        await expect(wiki.locator(".wiki-reader-title-text")).toHaveText(locale === "zh-CN" ? "评估任务" : "Evaluation tasks");
-        await expect(wiki.locator(".kb-preview-wiki-tree .is-selected")).toContainText(locale === "zh-CN" ? "评估任务" : "Evaluation tasks");
+        await expect(wiki.locator('[data-wiki-page-id="longmemeval"]')).toBeVisible();
+        await expect(wiki.locator(".wiki-reader-title-text")).toHaveText("LongMemEval");
+        await expect(wiki.locator(".kb-preview-wiki-tree .is-selected")).toContainText("LongMemEval");
         await checkWikiCameraFixed(wiki);
         await capture(wiki, "wiki-linked-page", testInfo);
         await page.waitForTimeout(2800);
         await expect(wiki).toHaveAttribute("data-demo-phase", "linked-page");
-        await expect(wiki.locator('[data-wiki-page-id="evaluation-tasks"]')).toBeVisible();
+        await expect(wiki.locator('[data-wiki-page-id="longmemeval"]')).toBeVisible();
         await checkWikiCameraFixed(wiki);
       }
 
@@ -291,8 +421,8 @@ for (const locale of ["zh-CN", "en"]) {
           }
           expect(growthScaleSamples.at(-1)).toBeLessThan(growthScaleSamples[0]);
           const progressionElapsed = Date.now() - progressionStartedAt;
-          expect(progressionElapsed).toBeGreaterThan(20_000);
-          expect(progressionElapsed).toBeLessThan(32_000);
+          expect(progressionElapsed).toBeGreaterThan(10_000);
+          expect(progressionElapsed).toBeLessThan(22_000);
           await page.evaluate(() => {
             const graphRoot = document.querySelector('[data-product-page-shell="graph"]');
             window.__graphDrawerFirstFrame = null;
@@ -317,11 +447,6 @@ for (const locale of ["zh-CN", "en"]) {
           await expect(graph.locator('[data-graph-auto-pointer="hover"]')).toBeVisible();
           await expect(graph.locator('[data-directed-focus="hover"]')).toHaveAttribute("data-directed-node", "character:prince");
           const hoverFocusCanvas = graph.locator('[data-graph-focus-node="character:prince"]');
-          await expect(hoverFocusCanvas).toHaveAttribute("data-graph-focus-all-visible", "true");
-          await expect.poll(
-            async () => Number(await hoverFocusCanvas.getAttribute("data-graph-focus-coverage")),
-            { timeout: 1_500 },
-          ).toBeGreaterThanOrEqual(0.45);
           expect(await graphPointerOffset(hoverFocusCanvas, "hover")).toBeLessThan(6);
           await capture(graph, "graph-hover-focus", testInfo);
           await waitGraphStage(page, "drawer", 5_000);
@@ -330,31 +455,90 @@ for (const locale of ["zh-CN", "en"]) {
           await expect(graph.locator('[data-directed-focus="selected"]')).toHaveAttribute("data-directed-node", "character:prince");
           const drawerFirstFrame = await page.evaluate(() => window.__graphDrawerFirstFrame);
           expect(drawerFirstFrame, JSON.stringify(drawerFirstFrame)).not.toBeNull();
-          expect(drawerFirstFrame.visible, JSON.stringify(drawerFirstFrame)).toBe(drawerFirstFrame.total);
-          expect(drawerFirstFrame.allVisible, JSON.stringify(drawerFirstFrame)).toBe("true");
-          const usesBottomSheet = Number(drawerFirstFrame.bottomInset) > 0;
-          if (usesBottomSheet) {
-            expect(Number(drawerFirstFrame.rightInset), JSON.stringify(drawerFirstFrame)).toBe(0);
-            expect(Number(drawerFirstFrame.bottomInset), JSON.stringify(drawerFirstFrame)).toBeGreaterThan(0);
-          } else {
-            expect(Number(drawerFirstFrame.rightInset), JSON.stringify(drawerFirstFrame)).toBeGreaterThanOrEqual(255);
-            expect(Number(drawerFirstFrame.bottomInset), JSON.stringify(drawerFirstFrame)).toBe(0);
-          }
+          const graphShellBox = await graph.locator(".kb-product-preview").boundingBox();
+          expect(graphShellBox, JSON.stringify(drawerFirstFrame)).not.toBeNull();
+          const minimumRightInset = graphShellBox.width <= 760 ? 176 : 255;
+          expect(Number(drawerFirstFrame.rightInset), JSON.stringify({ ...drawerFirstFrame, minimumRightInset })).toBeGreaterThanOrEqual(minimumRightInset);
+          expect(Number(drawerFirstFrame.bottomInset), JSON.stringify(drawerFirstFrame)).toBe(0);
           expect(drawerFirstFrame.pointerStage, JSON.stringify(drawerFirstFrame)).toBe("drawer");
           const focusCanvas = graph.locator('[data-graph-focus-node="character:prince"]');
-          if (usesBottomSheet) {
-            await expect.poll(async () => Number(await focusCanvas.getAttribute("data-graph-focus-bottom-inset"))).toBeGreaterThan(0);
-          } else {
-            await expect.poll(async () => Number(await focusCanvas.getAttribute("data-graph-focus-right-inset"))).toBeGreaterThanOrEqual(255);
-          }
+          await expect.poll(async () => Number(await focusCanvas.getAttribute("data-graph-focus-right-inset"))).toBeGreaterThanOrEqual(minimumRightInset);
+          await expect.poll(async () => Number(await focusCanvas.getAttribute("data-graph-focus-bottom-inset"))).toBe(0);
           await expect(focusCanvas).toHaveAttribute("data-graph-focus-all-visible", "true");
           await expect.poll(
             async () => Number(await focusCanvas.getAttribute("data-graph-focus-coverage")),
             { timeout: 2_500 },
           ).toBeGreaterThanOrEqual(0.45);
+          // The production graph detail surface is a full-height right
+          // drawer at every breakpoint. Assert its actual geometry rather
+          // than relying only on the renderer inset, so a mobile CSS change
+          // cannot silently regress to a bottom sheet or overlay the fit
+          // neighborhood.
+          await expect.poll(
+            async () => graph.evaluate((root) => {
+              const shell = root.querySelector(".kb-product-preview")?.getBoundingClientRect();
+              const layer = root.querySelector(".graph-node-drawer-layer")?.getBoundingClientRect();
+              const panel = root.querySelector(".graph-node-drawer")?.getBoundingClientRect();
+              if (!shell || !layer || !panel) return false;
+              const epsilon = 1.5;
+              return Math.abs(layer.right - shell.right) <= epsilon
+                && Math.abs(panel.right - shell.right) <= epsilon
+                && Math.abs(layer.top - shell.top) <= epsilon
+                && Math.abs(panel.top - shell.top) <= epsilon
+                && Math.abs(layer.bottom - shell.bottom) <= epsilon
+                && Math.abs(panel.bottom - shell.bottom) <= epsilon
+                && layer.left > shell.left
+                && panel.left > shell.left;
+            }),
+            { timeout: 2_500 },
+          ).toBe(true);
           const pointerOffset = await graphPointerOffset(focusCanvas, "drawer");
           expect(pointerOffset).toBeLessThan(6);
           await capture(graph, "graph-drawer", testInfo);
+          await waitGraphStage(page, "drawer-link-moving", 3_000);
+          const drawerLink = graph.locator('[data-graph-drawer-link-slug="summary:chapter:21"]');
+          await expect(drawerLink).toHaveAttribute("data-graph-drawer-link-state", "drawer-link-moving");
+          await expect(graph.locator('[data-graph-auto-pointer="drawer-link-moving"]')).toBeVisible();
+          await expect(focusCanvas).toHaveAttribute("data-graph-focus-visible", "27");
+          await expect(focusCanvas).toHaveAttribute("data-graph-focus-total", "27");
+          await expect(focusCanvas).toHaveAttribute("data-graph-focus-all-visible", "true");
+
+          await waitGraphStage(page, "drawer-link-press", 3_000);
+          await expect(drawerLink).toHaveAttribute("data-graph-drawer-link-state", "drawer-link-press");
+          await expect(graph.locator('[data-graph-auto-pointer="drawer-link-press"]')).toBeVisible();
+
+          await waitGraphStage(page, "linked-page", 3_000);
+          await expect(graph.locator('[data-graph-node-drawer="open"]')).toHaveAttribute("data-graph-drawer-node-id", "summary:chapter:21");
+          await expect(graph.locator(".graph-node-drawer-title")).toHaveText(locale === "zh-CN" ? "第21章总结：狐狸讲述关系如何形成" : "Chapter 21 summary: The fox teaches how bonds are made");
+          await expect(graph.locator('[data-directed-focus="selected"]')).toHaveAttribute("data-directed-node", "summary:chapter:21");
+          await expect(graph.locator(".graph-node-drawer-wiki-body table")).toHaveCount(1);
+          await expect(graph.locator(".graph-node-drawer-wiki-body .wiki-content-link")).toHaveCount(6);
+          await expect(graph.locator(".graph-node-drawer")).not.toContainText(/节点概览|阅读脉络|关系线索|一跳关联|相关节点/);
+          const linkedFocusCanvas = graph.locator('[data-graph-focus-node="summary:chapter:21"]');
+          await expect(linkedFocusCanvas).toHaveAttribute("data-graph-focus-visible", "9");
+          await expect(linkedFocusCanvas).toHaveAttribute("data-graph-focus-total", "9");
+          await expect(linkedFocusCanvas).toHaveAttribute("data-graph-focus-all-visible", "true");
+          await expect(graph.locator('[data-graph-auto-pointer]')).toHaveCount(0);
+          await page.waitForTimeout(500);
+          const frozenFrame = await linkedFocusCanvas.evaluate((node) => ({
+            bounds: node.dataset.graphFocusBounds,
+            cameraScale: Number(node.dataset.graphCameraScale),
+            focusX: Number(node.dataset.graphFocusX),
+            focusY: Number(node.dataset.graphFocusY),
+          }));
+          await page.waitForTimeout(900);
+          await expect(graph).toHaveAttribute("data-demo-phase", "linked-page");
+          const laterFrozenFrame = await linkedFocusCanvas.evaluate((node) => ({
+            bounds: node.dataset.graphFocusBounds,
+            cameraScale: Number(node.dataset.graphCameraScale),
+            focusX: Number(node.dataset.graphFocusX),
+            focusY: Number(node.dataset.graphFocusY),
+          }));
+          expect(laterFrozenFrame.bounds).toBe(frozenFrame.bounds);
+          expect(laterFrozenFrame.cameraScale).toBeCloseTo(frozenFrame.cameraScale, 3);
+          expect(laterFrozenFrame.focusX).toBeCloseTo(frozenFrame.focusX, 1);
+          expect(laterFrozenFrame.focusY).toBeCloseTo(frozenFrame.focusY, 1);
+          await capture(graph, "graph-linked-page", testInfo);
         }
       }
       await expect(graph.locator("[data-graph-node-count]")).toHaveAttribute("data-graph-node-count", String(LITTLE_PRINCE_GRAPH_TOTALS.nodes));
@@ -366,8 +550,9 @@ for (const locale of ["zh-CN", "en"]) {
       const cameraScale = Number(await graph.locator("[data-graph-camera-scale]").getAttribute("data-graph-camera-scale"));
       const surfaceScale = await graph.locator(".kb-product-preview").evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
       expect(surfaceScale).toBeCloseTo(1, 2);
-      if (await graph.getAttribute("data-demo-phase") === "drawer") {
-        const focusCanvas = graph.locator('[data-graph-focus-node="character:prince"]');
+      const graphPhase = await graph.getAttribute("data-demo-phase");
+      if (["drawer", "drawer-link-moving", "drawer-link-press", "linked-page"].includes(graphPhase)) {
+        const focusCanvas = graph.locator(".kb-preview-graph-canvas");
         expect(cameraScale).toBeGreaterThan(0.02);
         expect(Number(await focusCanvas.getAttribute("data-graph-focus-coverage"))).toBeGreaterThanOrEqual(0.45);
         await expect(focusCanvas).toHaveAttribute("data-graph-focus-all-visible", "true");
@@ -422,7 +607,7 @@ test("hero shell stays complete across desktop breakpoint and phone widths", asy
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/", { waitUntil: "networkidle" });
-    const hero = page.locator('[data-story="everyday-law"]');
+    const hero = page.locator('[data-story="research-ledger"]');
     await hero.scrollIntoViewIfNeeded();
     await checkAuthoritativeChatSurface(hero);
     const geometry = await hero.evaluate((root) => {

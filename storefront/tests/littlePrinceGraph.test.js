@@ -63,5 +63,7 @@ test("the storefront graph starts at the imported Obsidian scale in the full gra
   assert.equal("canvasScale" in LITTLE_PRINCE_GRAPH_VIEW, false);
   assert.equal(LITTLE_PRINCE_GRAPH_VIEW.initialScale, 0.55);
   assert.equal(LITTLE_PRINCE_GRAPH_VIEW.progressionTimeScale, 2);
-  assert.equal(LITTLE_PRINCE_GRAPH_VIEW.progressionMaxTimeScale, 5);
+  assert.equal(LITTLE_PRINCE_GRAPH_VIEW.progressionAccelerationStartNode, 15);
+  assert.equal(LITTLE_PRINCE_GRAPH_VIEW.progressionAccelerationEndNode, 100);
+  assert.equal(LITTLE_PRINCE_GRAPH_VIEW.progressionMaxTimeScale, 10);
 });

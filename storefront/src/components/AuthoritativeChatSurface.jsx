@@ -1,4 +1,3 @@
-import { At } from "@phosphor-icons/react/At";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
 import { ImageSquare } from "@phosphor-icons/react/ImageSquare";
 import { Paperclip } from "@phosphor-icons/react/Paperclip";
@@ -17,6 +16,10 @@ export function AuthoritativeChatSurface({
   composer,
   className = "",
   messages,
+  messagesRef,
+  overlay = null,
+  newChat = false,
+  newChatTitle,
   shellRef,
   title,
   welcome = null,
@@ -30,18 +33,31 @@ export function AuthoritativeChatSurface({
       shellRef={shellRef}
       title={title}
     >
-      <div className="authoritative-chat-body">
-        <div className="authoritative-chat-messages visual-chat-messages">
-          {welcome ? <div className="authoritative-chat-welcome" aria-hidden="true">{welcome}</div> : null}
-          {messages ?? children}
-        </div>
-        <div className="authoritative-chat-composer-slot">{composer}</div>
-      </div>
+      {newChat ? (
+        <main className="visual-new-chat-view">
+          <section className="visual-new-chat-stack" aria-labelledby="visual-new-chat-title">
+            <h1 id="visual-new-chat-title" className="visual-new-chat-title">{newChatTitle}</h1>
+            <div className="visual-new-chat-composer">{composer}</div>
+          </section>
+        </main>
+      ) : (
+        <main className="authoritative-chat-body visual-chat-view is-sidebar-collapsed">
+          <div className="authoritative-chat-scroll visual-chat-scroll" ref={messagesRef}>
+            <div className="authoritative-chat-messages visual-chat-messages">
+              {welcome ? <div className="authoritative-chat-welcome" aria-hidden="true">{welcome}</div> : null}
+              {messages ?? children}
+            </div>
+          </div>
+          <div className="authoritative-chat-composer-slot visual-chat-input">{composer}</div>
+          {overlay}
+        </main>
+      )}
     </MusuwProductShell>
   );
 }
 
 export function AuthoritativeChatComposer({
+  agent = "知识问答",
   className = "",
   effort,
   isReplying = false,
@@ -61,27 +77,37 @@ export function AuthoritativeChatComposer({
           className="authoritative-chat-composer__textarea visual-chat-composer__textarea"
           aria-label={placeholder}
           placeholder={placeholder}
-          rows="2"
+          rows="1"
           value={query}
           readOnly
           tabIndex="-1"
         />
         <div className="authoritative-chat-composer__toolbar visual-chat-composer__toolbar">
           <div className="authoritative-chat-composer__tools visual-chat-composer__tools" aria-hidden="true">
-            <span className="authoritative-chat-composer__tool visual-chat-composer__tool"><At size={18} weight="bold" /></span>
-            <span className="authoritative-chat-composer__tool visual-chat-composer__tool"><ImageSquare size={18} /></span>
-            <span className="authoritative-chat-composer__tool visual-chat-composer__tool"><Paperclip size={18} /></span>
+            <button type="button" className="authoritative-chat-composer__tool visual-chat-composer__tool" tabIndex="-1" aria-label="Attach image" disabled><ImageSquare size={18} /></button>
+            <button type="button" className="authoritative-chat-composer__tool visual-chat-composer__tool" tabIndex="-1" aria-label="Attach file" disabled><Paperclip size={18} /></button>
+            <button type="button" className="authoritative-chat-composer__tool visual-chat-composer__tool is-at" tabIndex="-1" aria-label="Mention knowledge" disabled><span className="visual-chat-composer__at">@</span></button>
           </div>
           <div className="authoritative-chat-composer__actions visual-chat-composer__actions">
-            <span className="authoritative-chat-composer__model visual-chat-composer__combined-picker" aria-label={model}>
-              <span>{model}</span><small>{effort}</small><CaretDown size={13} />
-            </span>
-            <span
-              className={`authoritative-chat-composer__send visual-chat-composer__send${isReplying ? " is-stop" : query.trim() ? "" : " is-disabled"}`}
-              aria-label={isReplying ? stopLabel : sendLabel}
-            >
-              {isReplying ? <span className="authoritative-chat-composer__stop-square visual-chat-composer__stop-square" /> : <PaperPlaneTilt size={16} weight="fill" />}
-            </span>
+            <button type="button" className="authoritative-chat-composer__model visual-chat-composer__combined-picker" tabIndex="-1" aria-expanded="false" aria-label={`${agent} ${model} ${effort ?? ""}`} disabled>
+              <span className="visual-chat-composer__combined-picker-copy">
+                <span className="visual-chat-composer__combined-picker-agent" title={agent}>{agent}</span>
+                <span className="visual-chat-composer__combined-picker-dot" aria-hidden="true">·</span>
+                <span className="visual-chat-composer__combined-picker-model" title={model}>{model}</span>
+                {effort ? <span className="visual-chat-composer__combined-picker-effort">{effort}</span> : null}
+              </span>
+              <CaretDown size={14} />
+            </button>
+            <div className="visual-chat-composer__submit authoritative-chat-composer__submit">
+              <button
+                type="button"
+                className={`authoritative-chat-composer__send visual-chat-composer__send${isReplying ? " is-stop" : query.trim() ? "" : " is-disabled"}`}
+                aria-label={isReplying ? stopLabel : sendLabel}
+                disabled
+              >
+                {isReplying ? <span className="authoritative-chat-composer__stop-square visual-chat-composer__stop-square" /> : <PaperPlaneTilt size={16} weight="fill" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -143,6 +143,36 @@ export const ObsidianGraphCanvas = forwardRef(function ObsidianGraphCanvas(
     restartSimulation() {
       rendererRef.current?.restartSimulation?.()
     },
+    freezeLayout() {
+      const renderer = rendererRef.current
+      if (!renderer) return
+      // Marketing-only terminal control. Keep the production renderer itself
+      // byte-for-byte intact, but commit its latest worker coordinates and
+      // stop future force ticks before the one final native camera fit.
+      renderer.applyWorkerPositions?.()
+      renderer.cameraAnimationGeneration += 1
+      renderer.panVelocityX = 0
+      renderer.panVelocityY = 0
+      renderer.panState = null
+      renderer.worker?.terminate?.()
+      renderer.worker = null
+      renderer.clearWorkerPositionCache?.()
+      renderer.changed?.()
+    },
+    settleCamera() {
+      const renderer = rendererRef.current
+      if (!renderer) return
+      // Native fit() owns the target and the 420ms pan. Its zoom uses the
+      // regular Obsidian easing loop, which otherwise keeps drifting after
+      // the pan promise resolves. Commit that already-calculated target once
+      // so the replay has one bounded camera move per user action.
+      renderer.cameraAnimationGeneration += 1
+      renderer.scale = renderer.targetScale
+      renderer.panVelocityX = 0
+      renderer.panVelocityY = 0
+      renderer.panState = null
+      renderer.changed?.()
+    },
     getPlayback() {
       return playback
     },

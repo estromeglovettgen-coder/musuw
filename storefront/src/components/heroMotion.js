@@ -1,12 +1,12 @@
 export const HERO_SOURCE_TILT = Object.freeze({
   perspective: 1200,
-  translateX: 60,
-  translateY: -50,
-  scale: 0.8,
-  rotateZ: 5,
-  rotateX: 6,
-  rotateY: 18,
-  skewX: 7
+  translateX: 0,
+  translateY: 0,
+  scale: 1,
+  rotateZ: 0,
+  rotateX: 0,
+  rotateY: 0,
+  skewX: 0
 });
 
 export const HERO_FRONT = Object.freeze({

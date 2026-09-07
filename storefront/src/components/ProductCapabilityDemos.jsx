@@ -1,17 +1,10 @@
-import { At } from "@phosphor-icons/react/At";
 import { BookmarkSimple } from "@phosphor-icons/react/BookmarkSimple";
-import { CaretDown } from "@phosphor-icons/react/CaretDown";
-import { CaretRight } from "@phosphor-icons/react/CaretRight";
-import { Check } from "@phosphor-icons/react/Check";
 import { Copy } from "@phosphor-icons/react/Copy";
-import { ImageSquare } from "@phosphor-icons/react/ImageSquare";
 import { LinkSimple } from "@phosphor-icons/react/LinkSimple";
-import { Paperclip } from "@phosphor-icons/react/Paperclip";
-import { PaperPlaneTilt } from "@phosphor-icons/react/PaperPlaneTilt";
 import { useRef } from "react";
 import { useInView, useReducedMotion } from "motion/react";
+import { AuthoritativeChatComposer, AuthoritativeChatSurface } from "./AuthoritativeChatSurface";
 import { KnowledgeBaseProductPreview } from "./KnowledgeBaseProductPreview";
-import { MusuwProductShell } from "./MusuwProductShell";
 import {
   useCapabilityDemoPhase,
   useWikiDemoFlow,
@@ -29,10 +22,14 @@ const COPY = Object.freeze({
     answer: Object.freeze({
       title: "Keep the useful answer",
       question: "What should we test after this retention review?",
-      response: "Test a shorter path to the first completed exercise. Track completion first, then check week-one retention before deciding whether to expand the change.",
-      citation: "Interviews · Usage funnel",
-      summary: Object.freeze(["Interviews", "Usage evidence", "ready to reuse"]),
-      saved: "Saved to Learning Product Research",
+      agent: "Knowledge Q&A",
+      conclusionLabel: "Conclusion",
+      conclusion: "Prioritize a shorter path to the first completed exercise; it is the clearest lever supported by both interviews and funnel drop-off.",
+      validationLabel: "Verification boundary",
+      validation: "Expand only if a controlled test improves completion and week-one retention. This evidence identifies a hypothesis, not proof of causality or a universal rollout.",
+      sources: Object.freeze(["Interviews", "Usage funnel"]),
+      copy: "Copy answer",
+      save: "Save to knowledge base",
     }),
   }),
   zh: Object.freeze({
@@ -44,33 +41,20 @@ const COPY = Object.freeze({
     answer: Object.freeze({
       title: "保留有依据的研究结论",
       question: "这次留存复盘，最值得先验证什么？",
-      response: "先测试更短的首次练习路径，观察练习完成率，再检查首周留存是否改善，以此决定是否扩大改动范围。",
-      citation: "用户访谈 · 使用漏斗",
-      summary: Object.freeze(["用户访谈", "使用数据", "可继续复用"]),
-      saved: "已保存到学习产品研究",
+      agent: "知识问答",
+      conclusionLabel: "结论",
+      conclusion: "优先测试更短的首次练习路径；用户访谈与漏斗流失都指向它是当前最清晰的改进杠杆。",
+      validationLabel: "验证边界",
+      validation: "只有在对照实验同时改善练习完成率和首周留存时再扩大范围。现有证据提出的是待验证的假设，并不能证明因果或支持全面推广。",
+      sources: Object.freeze(["用户访谈", "使用漏斗"]),
+      copy: "复制回答",
+      save: "保存到知识库",
     }),
   }),
 });
 
 function localize(locale) {
   return locale === "zh" || locale === "zh-CN" ? COPY.zh : COPY.en;
-}
-
-function DemoComposer({ copy }) {
-  return (
-    <div className="product-demo-composer">
-      <span>{copy.placeholder}</span>
-      <div className="product-demo-composer-tools">
-        <span><At size={13} weight="bold" /><ImageSquare size={13} /><Paperclip size={13} /></span>
-        <span>
-          <span className="product-demo-model">
-            <strong>{copy.model}</strong><small>{copy.effort}</small><CaretDown size={9} />
-          </span>
-          <i><PaperPlaneTilt size={12} /></i>
-        </span>
-      </div>
-    </div>
-  );
 }
 
 export function WikiCapabilityDemo({ locale = "en" }) {
@@ -106,38 +90,56 @@ export function AnswerCapabilityDemo({ locale = "en" }) {
   const { ref, phase } = useCapabilityDemoPhase();
 
   return (
-    <MusuwProductShell
-      className="capability-demo capability-demo-answer"
+    <AuthoritativeChatSurface
+      className="capability-demo capability-demo-answer real-chat-demo"
       data-capability-demo="answer"
       data-demo-interactive="false"
       data-demo-phase={phase}
       inert
+      messages={(
+        <>
+          <article className="visual-chat-message-row is-user">
+            <article className="visual-user-message">
+              <div className="visual-user-message__bubble">{copy.answer.question}</div>
+            </article>
+          </article>
+          <article className="visual-chat-message-row is-assistant">
+            <article className="visual-assistant-message">
+              <section className="visual-assistant-answer">
+                <div className="visual-assistant-answer__content">
+                  <div className="visual-assistant-markdown">
+                    <section className="real-chat-answer-section" data-answer-section="conclusion">
+                      <h4>{copy.answer.conclusionLabel}</h4>
+                      <p>{copy.answer.conclusion}</p>
+                    </section>
+                    <section className="real-chat-answer-section" data-answer-section="validation-boundary">
+                      <h4>{copy.answer.validationLabel}</h4>
+                      <p>{copy.answer.validation}</p>
+                    </section>
+                  </div>
+                </div>
+                <div className="real-chat-citations" aria-label={copy.answer.sources.join(", ")}>
+                  {copy.answer.sources.map((source) => <span key={source} className="real-chat-citation"><LinkSimple size={12} aria-hidden="true" />{source}</span>)}
+                </div>
+                <div className="visual-assistant-toolbar" role="toolbar" aria-label={copy.answer.title}>
+                  <button type="button" className="visual-assistant-toolbar__button" aria-label={copy.answer.copy} disabled><Copy size={14} /></button>
+                  <button type="button" className="visual-assistant-toolbar__button" aria-label={copy.answer.save} disabled><BookmarkSimple size={14} /></button>
+                </div>
+              </section>
+            </article>
+          </article>
+        </>
+      )}
       shellRef={ref}
       title={copy.answer.title}
-    >
-      <div className="product-demo-query answer-demo-query">
-        <strong>{copy.answer.question}</strong>
-      </div>
-      <div className="product-demo-thread answer-demo-thread">
-        <div className="product-demo-summary">
-          <strong>{copy.answer.summary[0]}</strong><span>·</span>
-          <strong>{copy.answer.summary[1]}</strong><span>·</span>
-          <strong>{copy.answer.summary[2]}</strong>
-          <CaretRight size={10} weight="bold" aria-hidden="true" />
-        </div>
-        <div className="product-demo-answer is-complete">
-          <p>{copy.answer.response}</p>
-          <span><LinkSimple size={12} aria-hidden="true" />{copy.answer.citation}</span>
-          <div className="answer-demo-actions" aria-hidden="true">
-            <Copy size={13} /><BookmarkSimple size={13} />
-          </div>
-        </div>
-        <div className={`answer-demo-saved ${phase === "complete" ? "is-complete" : ""}`}>
-          <Check size={12} weight="bold" aria-hidden="true" />
-          {copy.answer.saved}
-        </div>
-      </div>
-      <DemoComposer copy={copy.shared} />
-    </MusuwProductShell>
+      composer={(
+        <AuthoritativeChatComposer
+          agent={copy.answer.agent}
+          effort={copy.shared.effort}
+          model={copy.shared.model}
+          placeholder={copy.shared.placeholder}
+        />
+      )}
+    />
   );
 }

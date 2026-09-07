@@ -55,7 +55,10 @@ export function HeroScene({ copy, locale }) {
   const sceneSkewX = useTransform(smoothSceneProgress, (value) =>
     reduceMotion ? 0 : sampleHeroVisibility(value).skewX
   );
-  const sceneTransform = useMotionTemplate`perspective(1200px) translateX(${sceneX}px) translateY(${sceneY}px) scale(${sceneScale}) rotate(${sceneRotateZ}deg) rotateX(${sceneRotateX}deg) rotateY(${sceneRotateY}deg) skewX(${sceneSkewX}deg)`;
+  // Keep the product surface level like the native chat view.  The dashboard
+  // can still ease/scale into place with scroll, but perspective tilt and
+  // skew make message baselines and the outer frame visibly slant.
+  const sceneTransform = useMotionTemplate`translateX(${sceneX}px) translateY(${sceneY}px) scale(${sceneScale})`;
 
   const bkpwddTransition = {
     type: "spring",

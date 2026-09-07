@@ -3,42 +3,212 @@
 export const STORY_REVIEW_DATE = "2026-09-06";
 export const isChineseStory = (locale) => locale === "zh" || locale === "zh-CN";
 
+function serializeHeroAnswer(sections) {
+  return sections.map((section) => {
+    const itemLines = (section.items ?? []).map((item) => `• ${item.text}`);
+    const tableLines = section.table
+      ? [section.table.headers.join(" | "), ...section.table.rows.map((row) => row.join(" | "))]
+      : [];
+    return [section.title, section.body, ...itemLines, ...tableLines].filter(Boolean).join("\n");
+  }).join("\n\n");
+}
+
+const heroAnswerSectionsZh = Object.freeze([
+  {
+    id: "conclusion",
+    title: "核心作用 · 固定版本、范围、结论与下一步验证",
+    body: "问题台账不是待办清单，而是把每个研究问题固化为可复核的实验单元：同步记录问题版本、证据范围、当前判断与下一步验证，使跨轮次讨论始终沿用同一口径。",
+  },
+  {
+    id: "evidence",
+    title: "多源证据",
+    items: [
+      { sourceId: "longmemeval", text: "LongMemEval 覆盖信息提取、跨会话推理、时间推理、知识更新与拒答五类能力；台账让每个问题都绑定明确的能力维度。" },
+      { sourceId: "locomo", text: "LoCoMo 保留长会话中的事件链、时间关系与上下文；台账据此记录问题所处阶段，避免结论脱离原始语境。" },
+      { sourceId: "research-plan", text: "当前评估方案固定语料版本、查询集合、评价指标与人工复核规则，使同一问题在资料更新后仍可重复核验。" },
+    ],
+  },
+  {
+    id: "impact",
+    title: "对长期实验的影响",
+    table: {
+      headers: ["作用", "证据", "对实验的影响"],
+      rows: [
+        ["定义研究单元", "问题版本 + 资料范围 + 评价指标", "每轮只改变一个变量，避免结论漂移"],
+        ["保留证据链", "来源片段 + 版本 + 人工复核", "可回溯判断依据并重现实验"],
+        ["推动下一轮", "当前结论 + 反例 + 待验证假设", "把一次问答转化为连续实验节奏"],
+      ],
+    },
+  },
+  {
+    id: "trace",
+    title: "可追溯结论 · 来源、版本与验证入口",
+    body: "综合三类资料，问题台账承担“索引—约束—回溯—迭代”的中枢作用。它不替代研究判断；当证据不足或口径变化时，系统保留不确定性，并把缺口转化为下一轮可执行的核验任务。",
+  },
+]);
+
+const heroAnswerSectionsEn = Object.freeze([
+  {
+    id: "conclusion",
+    title: "Core role · fixed version, scope, conclusion, next check",
+    body: "The ledger is not a to-do list. It turns each research question into a reviewable experimental unit by recording its version, evidence scope, current judgment, and next validation step.",
+  },
+  {
+    id: "evidence",
+    title: "Evidence across sources",
+    items: [
+      { sourceId: "longmemeval", text: "LongMemEval covers information extraction, cross-session reasoning, temporal reasoning, knowledge updates, and abstention; the ledger tags each question to a capability." },
+      { sourceId: "locomo", text: "LoCoMo preserves event chains, temporal relations, and context across long sessions, keeping every judgment attached to its original setting." },
+      { sourceId: "research-plan", text: "The current plan fixes corpus versions, query sets, metrics, and human review rules so each result can be reproduced after source updates." },
+    ],
+  },
+  {
+    id: "impact",
+    title: "Impact on the long-running experiment",
+    table: {
+      headers: ["Role", "Evidence", "Impact on the experiment"],
+      rows: [
+        ["Define a research unit", "Question version + scope + metric", "Change one variable per round"],
+        ["Preserve evidence", "Source passage + version + review", "Trace and reproduce each judgment"],
+        ["Drive the next round", "Conclusion + counterexample + open hypothesis", "Turn one answer into a continuous experiment"],
+      ],
+    },
+  },
+  {
+    id: "trace",
+    title: "Traceable conclusion · source, version, next check",
+    body: "Across the three sources, the ledger acts as the experiment's index, constraint, audit trail, and iteration loop. It does not replace research judgment; gaps remain explicit and become executable validation tasks.",
+  },
+]);
+
 export const HERO_STORY = Object.freeze({
   "zh-CN": {
-    conversation: "生活法律知识库",
-    question: "婚礼摄影师把我们的照片用在广告里了。合同写着版权归他，我们还能要求撤下吗？",
+    conversation: "长期课题跟踪实验",
+    question: "我的问题台账，在我进行的长期课题跟踪实验里，具体起到了什么作用？",
     placeholder: "基于你的知识提问",
-    answer: {
-      confirmation: "可以先向摄影师及广告投放方提出停止使用和撤下请求；但现有资料不足以判断对方是否必须立即撤下，关键要看合同及另行授权是否明确覆盖广告用途、公开范围和使用期限。",
-      findingLead: "应先区分两个法律问题：",
-      phrase: "委托摄影作品的著作权归属，可以由合同约定。",
-      recordLead: "但即便摄影师取得著作权，",
-      recordPhrase: "将你们的肖像用于广告，仍需单独核对肖像许可。",
-      recordTail: "如果没有明确的广告授权，应保留合同、付款记录、沟通记录和广告页面，书面要求暂停使用，并请对方说明授权依据。",
-      timing: "如肖像许可条款存在歧义，应作有利于肖像权人的解释。",
-    },
-    citations: ["著作权法 · 第19条", "民法典 · 第1019条", "民法典 · 第1021条"],
-    sourceIds: ["cn-copyright", "cn-portrait", "cn-licence"],
+    answerSections: heroAnswerSectionsZh,
+    answer: serializeHeroAnswer(heroAnswerSectionsZh),
+    citations: ["LongMemEval · 五类能力", "LoCoMo · 多会话任务", "我的长期记忆评估方案"],
+    sourceIds: ["longmemeval", "locomo", "research-plan"],
+    preparation: "正在理解问题…",
+    modelPreparation: "正在连接模型并生成回答…",
+    pipelineSteps: [
+      { phase: "retrieving", title: "检索问题台账与研究资料", summary: "按问题版本、资料范围与实验目标召回相关记录" },
+      { phase: "cross-checking", title: "交叉核验多源证据", summary: "对齐 LongMemEval、LoCoMo 与当前验证方案的任务口径" },
+      { phase: "drafting", title: "生成结构化回答", summary: "整理作用、证据与实验影响，保留可复核的来源指针" },
+      { phase: "tracing", title: "回溯引用与适用边界", summary: "区分资料结论与个人实验假设，标记下一步验证入口" },
+    ],
+    pipelineStatus: "已完成多源检索与证据溯源",
+    pipelineSummary: "问题改写 · 混合召回 · 交叉核验 · 结构化回答 · 引用回溯",
+    saveLabel: "存入知识复利",
+    savedLabel: "已存入知识复利",
     model: "DeepSeek V4 Flash", effort: "关闭",
   },
   en: {
-    conversation: "Everyday law library",
-    question: "Our wedding photographer used our photos in an ad. The contract says they own the copyright. Can we ask for them to be taken down?",
+    conversation: "Long-running research workspace",
+    question: "What role does my question ledger play in the long-running research experiments I am tracking?",
     placeholder: "Ask across your knowledge",
-    answer: {
-      confirmation: "You can ask the photographer and advertiser to stop using the images and take the ad down. The cited material does not make removal automatic; the decisive issue is whether the contract or a separate release clearly covered advertising, scope, and duration.",
-      findingLead: "The first issue is ownership: ",
-      phrase: "copyright in commissioned photographs will usually remain with the photographer.",
-      recordLead: "That does not settle permitted use. ",
-      recordPhrase: "Privately commissioned photographs have separate protection against public use.",
-      recordTail: " Preserve the contract, any release, payment and message records, and the live ad; request the authorization relied on and ask for use to stop while its scope is checked.",
-      timing: " Any signed consent or waiver, and the precise acts it covers, still need to be reviewed.",
-    },
-    citations: ["IPO · Commissioned photos", "CDPA · §85", "CDPA · §87"],
-    sourceIds: ["uk-copyright", "uk-private-photos", "uk-consent"],
+    answerSections: heroAnswerSectionsEn,
+    answer: serializeHeroAnswer(heroAnswerSectionsEn),
+    citations: ["LongMemEval · five abilities", "LoCoMo · multi-session tasks", "My memory evaluation plan"],
+    sourceIds: ["longmemeval", "locomo", "research-plan"],
+    preparation: "Understanding the question…",
+    modelPreparation: "Connecting to the model and generating the answer…",
+    pipelineSteps: [
+      { phase: "retrieving", title: "Retrieve ledger entries and research notes", summary: "Recall records by question version, source scope, and experiment objective" },
+      { phase: "cross-checking", title: "Cross-check evidence across sources", summary: "Align task definitions from LongMemEval, LoCoMo, and the current evaluation plan" },
+      { phase: "drafting", title: "Draft a structured answer", summary: "Organize role, evidence, and experiment impact while retaining reviewable source pointers" },
+      { phase: "tracing", title: "Trace citations and decision limits", summary: "Separate reported findings from personal hypotheses and mark the next validation entry point" },
+    ],
+    pipelineStatus: "Multi-source retrieval and evidence trace complete",
+    pipelineSummary: "Query rewrite · hybrid recall · cross-check · structured answer · citation trace",
+    saveLabel: "Save to knowledge compounding",
+    savedLabel: "Saved to knowledge compounding",
     model: "DeepSeek V4 Flash", effort: "Off",
   },
 });
+
+function serializeAnswerSections(sections) {
+  return sections.map((section) => {
+    const marker = section.ordered ? (index) => `${index + 1}.` : () => "•";
+    const itemLines = (section.items ?? []).map((item, index) => `${marker(index)} ${item.text}`);
+    return [section.title, section.body, ...itemLines].filter(Boolean).join("\n");
+  }).join("\n\n");
+}
+
+const reasoningAnswerSectionsZh = Object.freeze([
+  {
+    id: "conclusion",
+    title: "优先判断",
+    body: "优先验证注册到首次练习完成的引导路径，暂不把扩充课程作为第一改动。当前证据更一致地指向用户在获得首次价值之前受阻。",
+  },
+  {
+    id: "evidence",
+    title: "证据交叉验证",
+    items: [
+      { sourceId: "interviews", text: "用户访谈显示，新用户在选择内容和找到首次练习入口时反复出现不确定性，支持存在起步阻力这一判断。" },
+      { sourceId: "support", text: "客服中的扩课诉求主要来自持续使用的活跃用户，与发生早期流失的新用户不是同一群体，不能直接用于解释本次流失。" },
+      { sourceId: "funnel", text: "使用漏斗将主要早期流失定位在首次练习完成之前，与访谈中的起步阻力形成交叉印证。" },
+    ],
+  },
+  {
+    id: "alternative",
+    title: "备选假设",
+    body: "课程供给不足仍值得保留，但现有资料对它的支持弱于路径阻力。应把它作为后续对照假设，而不是先用活跃用户诉求替代新用户证据。",
+  },
+  {
+    id: "validation",
+    title: "验证方案",
+    ordered: true,
+    items: [
+      { text: "为新注册用户提供默认路径，并前置首次练习入口；保持其他关键体验不变，隔离路径改动的影响。" },
+      { text: "固定新用户口径与观察窗口，以首次练习完成率为主指标，以到达首次练习的时间和首周留存为次级指标。" },
+      { text: "按相同口径复核结果；若首练完成率与首周留存均未改善，再回测课程供给和其他阻力假设。" },
+    ],
+  },
+  {
+    id: "limits",
+    title: "判断边界",
+    body: "这是一项由三类资料共同支持的优先级建议，不是因果结论。正式决策前仍需核对样本代表性、时间范围、渠道结构和漏斗埋点完整性。",
+  },
+]);
+
+const reasoningAnswerSectionsEn = Object.freeze([
+  {
+    id: "conclusion",
+    title: "Priority conclusion",
+    body: "Validate the path from sign-up to a completed first exercise before expanding the course catalog. The current evidence more consistently points to friction before users receive initial value.",
+  },
+  {
+    id: "evidence",
+    title: "Evidence review",
+    items: [
+      { sourceId: "interviews", text: "Interviews repeatedly surface uncertainty about choosing content and finding the first exercise, which supports an onboarding-friction hypothesis." },
+      { sourceId: "support", text: "Requests for more courses come mainly from active users. That cohort is not equivalent to new users who leave early, so it cannot directly explain this drop-off." },
+      { sourceId: "funnel", text: "The usage funnel places the largest early loss before first-exercise completion, corroborating the interview signal." },
+    ],
+  },
+  {
+    id: "alternative",
+    title: "Alternative hypothesis",
+    body: "Insufficient course supply remains plausible, but the retrieved material supports it less strongly than path friction. Keep it as a comparison hypothesis instead of substituting active-user demand for new-user evidence.",
+  },
+  {
+    id: "validation",
+    title: "Validation plan",
+    ordered: true,
+    items: [
+      { text: "Provide a default learning path and move the first-exercise entry point forward while holding other major experience changes constant." },
+      { text: "Fix the new-user cohort definition and observation window. Use first-exercise completion as the primary measure, with time to first exercise and week-one retention as secondary measures." },
+      { text: "Review the result on the same cohort basis. If neither completion nor week-one retention improves, return to course supply and other friction hypotheses." },
+    ],
+  },
+  {
+    id: "limits",
+    title: "Decision limits",
+    body: "This is a priority recommendation supported across three sources, not a causal conclusion. Confirm sample coverage, time range, channel mix, and funnel instrumentation before making a broader rollout decision.",
+  },
+]);
 
 export const REASONING_STORY = Object.freeze({
   zh: {
@@ -52,11 +222,12 @@ export const REASONING_STORY = Object.freeze({
       { title: "Rerank 重排与上下文合并", summary: "按语义相关性重排候选，去重并合并相邻片段，保留来源指针" },
       { title: "关系回溯与证据核验", summary: "核对群体、行为与漏斗关系，保留原始引用，区分交叉印证与待验证因果" },
     ],
-    answer: "当前资料更支持先验证注册到完成首次练习的路径，而不是先扩充课程。\n\n访谈与使用漏斗都把阻力指向首次练习之前；客服中关于扩充课程的诉求主要来自持续使用产品的活跃用户，不能直接外推为新用户流失原因。以上是跨来源一致的优先级判断，不是对流失因果的最终证明。\n\n建议先做两项可逆验证：提供默认学习路径，并将首次练习入口前置。以首次练习完成率为首要观察指标，再按同一用户口径检查首周留存；若结果未改善，再回到课程供给与其他阻力假设。",
+    answerSections: reasoningAnswerSectionsZh,
+    answer: serializeAnswerSections(reasoningAnswerSectionsZh),
     citation: "访谈 · 客服反馈 · 使用漏斗",
     sourceIds: ["interviews", "support", "funnel"],
     pipelineStatus: "已完成多源检索与证据核验",
-    pipelineSummary: "BM25 + 向量 · RRF 融合 · Rerank · 证据回溯",
+    pipelineSummary: "查询改写 · BM25 + 向量 · RRF 融合 · Rerank · 上下文合并 · 引用回溯",
     placeholder: "基于你的知识提问", model: "DeepSeek V4 Flash", effort: "关闭",
     copy: "复制回答", save: "添加到知识库", finish: "形成优先级建议", send: "发送", stop: "停止生成",
   },
@@ -71,11 +242,12 @@ export const REASONING_STORY = Object.freeze({
       { title: "Rerank & context merge", summary: "Rerank candidates by semantic relevance, merge adjacent passages, and retain source pointers" },
       { title: "Relationship trace & evidence check", summary: "Trace cohort, behavior, and funnel relationships back to their sources; separate corroboration from unverified causality" },
     ],
-    answer: "The current evidence favors validating the path from sign-up to a completed first exercise before expanding the course catalog.\n\nBoth interviews and the usage funnel place the strongest friction before that first exercise. Requests for more courses come mainly from active users, so they cannot be treated as a direct explanation for new-user drop-off. This is a cross-source priority signal, not a final causal claim.\n\nRun two reversible checks first: provide a default learning path and move the first-exercise entry point forward. Use first-exercise completion as the primary measure, then compare week-one retention on the same cohort definition. If the result does not improve, return to the course-supply and alternative-friction hypotheses.",
+    answerSections: reasoningAnswerSectionsEn,
+    answer: serializeAnswerSections(reasoningAnswerSectionsEn),
     citation: "Interviews · Support · Usage funnel",
     sourceIds: ["interviews", "support", "funnel"],
     pipelineStatus: "Multi-source retrieval and evidence checks complete",
-    pipelineSummary: "BM25 + vector · RRF fusion · Rerank · evidence trace",
+    pipelineSummary: "Query rewrite · BM25 + vector · RRF fusion · Rerank · context merge · citation trace",
     placeholder: "Ask across your knowledge", model: "DeepSeek V4 Flash", effort: "Off",
     copy: "Copy answer", save: "Add to knowledge base", finish: "Recommendation ready", send: "Send", stop: "Stop generation",
   },
@@ -98,7 +270,7 @@ export const KNOWLEDGE_STORIES = Object.freeze({
       app: { ...zhApp, userMeta: "研究者知识空间", sessions: ["长期记忆应该如何评估？", "LongMemEval 阅读笔记", "LoCoMo 任务设计", "信息更新与时间推理", "整理评估方案", "跨会话推理研究", "比较文献的评价指标", "研究问题与验证计划"] },
       header: { ...zhTabs, current: "AI Agent 记忆研究", description: "围绕长期记忆的研究问题，组织论文、阅读笔记与评估方案", documents: "文档 (3)" },
       content: {
-        search: "搜索 Wiki 页面...", loading: "正在整理知识索引…", index: "索引", indexOverview: "AI Agent 记忆研究",
+        search: "搜索 Wiki 页面...", loading: "正在整理知识索引…", index: "索引", indexType: "目录", indexOverview: "AI Agent 记忆研究",
         indexLead: "围绕研究问题组织文献、个人理解与后续验证。", indexHint: "打开页面，查看理解背后的论文与研究笔记。",
         knowledge: "知识 8", summaries: "摘要 1", pageId: "memory-evaluation", back: "记忆系统", pageTitle: "长期记忆评估", type: "研究主题",
         lead: "我目前的理解：长期记忆评估不只看事实召回，还要看跨会话关联、时间变化与信息不足时的回答边界。",
@@ -124,6 +296,17 @@ export const KNOWLEDGE_STORIES = Object.freeze({
           assessmentTitle: "验证记录", assessment: "固定资料和查询条件，逐项记录正确性、引用完整性与不确定性，并保留失败样例。",
           linkedFrom: "关联页面", backlinkTitle: "长期记忆评估", sources: "资料来源", sourceTitle: "LongMemEval · LoCoMo · 研究计划",
           sourceIds: ["longmemeval", "locomo", "research-plan"], updatedAt: "2026/09/06",
+          destinationPage: {
+            pageId: "longmemeval", pageTitle: "LongMemEval", type: "论文笔记", back: "评估任务",
+            lead: "LongMemEval 将对话式长程记忆拆解为可追溯的任务单元，并显式检验动态更新、时间约束与证据不足时的回答边界。",
+            introBeforeLink: "评测协议联合覆盖 ", inlineLink: "单会话事实、跨会话关联与时间推理", introAfterLink: "，并要求每个答案能够回溯到对应会话片段与时间状态。",
+            core: "评测协议",
+            bullets: ["样本构造：保留跨会话事件链、时间戳和后续事实更新，避免把长程记忆退化为静态检索。", "判定口径：分别记录答案正确性、证据定位、知识更新和拒答表现，不用单一总分掩盖失败类型。", "误差分析：区分召回缺失、关系绑定错误、时间状态混淆与无证据推断，便于定位系统瓶颈。"],
+            audienceTitle: "复现实验记录", audience: "固定语料版本、查询模板、检索配置与评分规则；保存逐题证据、模型输出和人工复核结果。",
+            assessmentTitle: "与当前方案的映射", assessment: "把任务维度映射到检索、记忆写入和答案生成链路，分别验证故障发生在哪一层，而不是只比较最终回答。",
+            linkedFrom: "关联页面", backlinkTitle: "评估任务 · 长期记忆评估", sources: "资料来源", sourceTitle: "LongMemEval 论文 · 评测说明",
+            sourceIds: ["longmemeval", "research-plan"], updatedAt: "2026/09/06",
+          },
         },
       },
     },
@@ -141,7 +324,7 @@ export const KNOWLEDGE_STORIES = Object.freeze({
       app: { ...enApp, userMeta: "Research workspace", sessions: ["How should long-term memory be evaluated?", "Reading notes: LongMemEval", "LoCoMo task design", "Updates and temporal reasoning", "Draft an evaluation plan", "Cross-session reasoning", "Compare evaluation metrics", "Research questions and next steps"] },
       header: { ...enTabs, current: "Agent Memory Research", description: "Organize papers, reading notes, and evaluation plans around a research question", documents: "Documents (3)" },
       content: {
-        search: "Search Wiki pages...", loading: "Building the knowledge index…", index: "Index", indexOverview: "Agent Memory Research",
+        search: "Search Wiki pages...", loading: "Building the knowledge index…", index: "Index", indexType: "Directory", indexOverview: "Agent Memory Research",
         indexLead: "Connect the literature, your interpretation, and the questions to test next.", indexHint: "Open a page to inspect the papers and notes behind an understanding.",
         knowledge: "Knowledge 8", summaries: "Summaries 1", pageId: "memory-evaluation", back: "Memory systems", pageTitle: "Memory Evaluation", type: "Research topic",
         lead: "My current understanding: evaluate more than fact recall. Check cross-session connections, changing information, and when the evidence is insufficient.",
@@ -167,6 +350,17 @@ export const KNOWLEDGE_STORIES = Object.freeze({
           assessmentTitle: "Validation record", assessment: "Hold sources and queries constant. Record correctness, citation completeness, uncertainty, and retained failure cases for each task.",
           linkedFrom: "Linked from", backlinkTitle: "Memory Evaluation", sources: "Sources", sourceTitle: "LongMemEval · LoCoMo · Research plan",
           sourceIds: ["longmemeval", "locomo", "research-plan"], updatedAt: "2026/09/06",
+          destinationPage: {
+            pageId: "longmemeval", pageTitle: "LongMemEval", type: "Paper note", back: "Evaluation tasks",
+            lead: "LongMemEval decomposes conversational long-term memory into traceable task units and explicitly tests changing facts, temporal constraints, and abstention when evidence is insufficient.",
+            introBeforeLink: "Its protocol jointly covers ", inlineLink: "single-session facts, cross-session links, and temporal reasoning", introAfterLink: ", while requiring each answer to remain traceable to the relevant dialogue evidence and time state.",
+            core: "Evaluation protocol",
+            bullets: ["Dataset construction retains cross-session event chains, timestamps, and later fact updates instead of reducing long-term memory to static retrieval.", "Scoring records answer accuracy, evidence localization, knowledge updates, and abstention separately so one aggregate score cannot hide distinct failure modes.", "Error analysis separates missing recall, incorrect relation binding, temporal-state confusion, and unsupported inference to localize system bottlenecks."],
+            audienceTitle: "Reproduction record", audience: "Freeze the corpus version, query templates, retrieval settings, and scoring rules; retain per-question evidence, model output, and human review.",
+            assessmentTitle: "Mapping to the current system", assessment: "Map each task dimension to retrieval, memory writes, and answer generation, then test which layer fails instead of comparing only the final response.",
+            linkedFrom: "Linked from", backlinkTitle: "Evaluation tasks · Memory Evaluation", sources: "Sources", sourceTitle: "LongMemEval paper · Evaluation notes",
+            sourceIds: ["longmemeval", "research-plan"], updatedAt: "2026/09/06",
+          },
         },
       },
     },

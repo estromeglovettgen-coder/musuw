@@ -1,10 +1,24 @@
 /* Product flows share the same Musuw application chrome as the hero.
    Motion only changes emphasis; useful content is visible in the first paint. */
 
+/* One viewport contract for the hero and every capability capture.  The
+   product itself is a 1,200px-wide, 16:10 surface on desktop; below that it
+   simply follows the available width.  Keeping this token here avoids each
+   demo inventing a different "mini" frame or breakpoint. */
+:root {
+  --product-viewport-max-width: 1200px;
+  --product-viewport-aspect: 16 / 10;
+}
+
 .feature-visual {
   width: 100%;
   max-height: none;
-  aspect-ratio: auto;
+  /* All capability fixtures share one native product-window frame. Keep the
+     story media horizontal at every breakpoint instead of letting a child
+     surface's fixed height turn the slot into a square. */
+  aspect-ratio: 16 / 10;
+  height: auto;
+  min-height: 0;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -12,11 +26,25 @@
   box-shadow: none;
 }
 
+/* The three feature demos are different views of the same product surface;
+   the media slot owns their geometry so each view fills an identical frame. */
+.feature-visual > :is(.capability-demo, .kb-product-preview-viewport) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.feature-visual > .capability-demo.capability-demo-reasoning {
+  height: 100%;
+}
+
 .musuw-product-shell {
   --demo-ink: #111827;
   --demo-copy: #374151;
   --demo-muted: #6b7280;
-  --demo-faint: #9ca3af;
+  /* Compact provenance labels remain readable on the native white chat
+     surface; #9ca3af falls below the 4.5:1 text contrast floor. */
+  --demo-faint: #6b7280;
   --demo-line: #e5e7eb;
   --demo-line-soft: #f0f1f3;
   --demo-surface: #ffffff;
@@ -1299,7 +1327,7 @@
   transition: background-color 160ms ease, box-shadow 160ms ease, text-decoration-color 160ms ease;
 }
 
-.kb-preview-content-link[data-wiki-demo-link="true"] {
+.kb-preview-content-link[data-wiki-demo-link] {
   position: relative;
   z-index: 2;
 }
@@ -1436,10 +1464,19 @@
   position: absolute;
   inset: 0 0 0 auto;
   z-index: 12;
-  width: min(35%, 350px);
-  min-width: 255px;
-  overflow: hidden;
+  width: min(40%, 480px);
+  min-width: 320px;
+  /* Let the simulated cursor travel from the graph canvas into the drawer.
+     The layer remains pointer-transparent; only its visual overflow crosses
+     the drawer edge. */
+  overflow: visible;
   pointer-events: none;
+}
+
+.graph-node-drawer-pointer {
+  top: calc(100% - 4px);
+  left: 62%;
+  z-index: 20;
 }
 
 .graph-node-drawer {
@@ -1467,21 +1504,12 @@
   backdrop-filter: blur(8px);
 }
 
-.graph-node-drawer-heading,
 .graph-node-drawer-meta,
-.graph-node-drawer-chip,
-.graph-node-drawer-neighbor,
-.graph-node-drawer-neighbor-relation {
+.graph-node-drawer-chip {
   display: flex;
   align-items: center;
 }
 
-.graph-node-drawer-heading {
-  min-width: 0;
-  gap: 7px;
-}
-
-.graph-node-drawer-icon,
 .graph-node-drawer-close {
   display: grid;
   flex: 0 0 auto;
@@ -1492,115 +1520,158 @@
 .graph-node-drawer-title {
   overflow: hidden;
   color: var(--kb-ink);
-  font-size: 12px;
+  font-size: 16px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .graph-node-drawer-body {
-  padding: 15px 16px 24px;
+  padding: 16px 18px 26px;
 }
 
 .graph-node-drawer-meta {
-  gap: 7px;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .graph-node-drawer-chip {
-  min-height: 20px;
-  padding: 0 6px;
+  min-height: 24px;
+  padding: 0 8px;
   border: 1px solid rgb(43 164 113 / 45%);
   border-radius: 4px;
   gap: 4px;
   background: rgb(43 164 113 / 7%);
   color: #21845b;
-  font-size: 8px;
+  font-size: 11px;
 }
 
-.graph-node-drawer-version,
-.graph-node-drawer-relation-count {
+.graph-node-drawer-version {
   color: var(--kb-faint);
-  font-size: 8px;
+  font-size: 11px;
 }
 
-.graph-node-drawer-relation-count {
-  margin: 8px 0 15px;
+.graph-node-drawer-expand {
+  min-height: 24px;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 1px solid var(--kb-accent);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--kb-accent);
+  font-size: 10px;
+  font-weight: 500;
 }
 
-.graph-node-drawer-section {
-  margin: 0 0 17px;
-}
-
-.graph-node-drawer-section h2,
-.graph-node-drawer-section h3,
-.graph-node-drawer-section p {
-  margin: 0;
-}
-
-.graph-node-drawer-section h2 {
-  margin-bottom: 7px;
-  color: var(--kb-ink);
+.graph-node-drawer-neighbor-hint {
+  margin: 10px 0 16px;
+  color: var(--kb-muted);
   font-size: 12px;
-  line-height: 1.3;
+  line-height: 16px;
 }
 
-.graph-node-drawer-section h3 {
-  margin-bottom: 8px;
+.graph-node-drawer-wiki-body {
+  color: var(--kb-copy);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.graph-node-drawer-wiki-body h1 {
+  margin: 20px 0 12px;
+  color: var(--kb-ink);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.graph-node-drawer-wiki-body h2 {
+  margin: 20px 0 10px;
+  color: var(--kb-ink);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.graph-node-drawer-wiki-body h3 {
+  margin: 16px 0 8px;
   color: var(--kb-ink);
   font-size: 16px;
-  line-height: 1.3;
+  font-weight: 600;
 }
 
-.graph-node-drawer-section p {
+.graph-node-drawer-wiki-body p {
+  margin: 0 0 12px;
   color: var(--kb-copy);
-  font-size: 9px;
-  line-height: 1.7;
 }
 
-.graph-node-drawer-neighbors {
-  margin: 0;
-  padding: 0;
-  display: grid;
-  list-style: none;
+.graph-node-drawer-wiki-body ul,
+.graph-node-drawer-wiki-body ol {
+  margin: 0 0 14px;
+  padding-left: 20px;
 }
 
-.graph-node-drawer-neighbor {
-  min-height: 37px;
-  border-bottom: 1px solid var(--kb-line-soft);
-  gap: 8px;
+.graph-node-drawer-wiki-body li {
+  margin-bottom: 7px;
+  line-height: 1.55;
 }
 
-.graph-node-drawer-neighbor-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--kb-accent);
+.graph-node-drawer-wiki-body table {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 16px;
+  overflow-x: auto;
+  border: 1px solid var(--kb-line);
+  border-radius: 6px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--kb-surface);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
-.graph-node-drawer-neighbor-content {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 2px;
+.graph-node-drawer-wiki-body thead {
+  background: var(--kb-surface-soft);
 }
 
-.graph-node-drawer-neighbor-title {
-  overflow: hidden;
+.graph-node-drawer-wiki-body th,
+.graph-node-drawer-wiki-body td {
+  min-width: 88px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--kb-line);
+  border-bottom: 1px solid var(--kb-line);
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.graph-node-drawer-wiki-body th {
   color: var(--kb-ink);
-  font-size: 8.5px;
-  text-overflow: ellipsis;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.graph-node-drawer-neighbor-relation {
-  gap: 3px;
-  color: var(--kb-faint);
-  font-size: 7px;
+.graph-node-drawer-wiki-body :is(th, td):last-child {
+  border-right: 0;
 }
 
-.graph-node-drawer-neighbor-arrow {
-  flex: 0 0 auto;
-  color: var(--kb-faint);
+.graph-node-drawer-wiki-body tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.graph-node-drawer-wiki-body a.wiki-content-link {
+  position: relative;
+  color: var(--kb-accent);
+  border-bottom: 1px dashed currentColor;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.graph-node-drawer-wiki-body a.wiki-content-link.is-pressing {
+  border-bottom-style: solid;
+  background: color-mix(in srgb, var(--kb-accent) 10%, transparent);
 }
 
 .kb-preview-graph-legend {
@@ -1922,7 +1993,7 @@ html[data-theme="dark"] .musuw-product-shell {
   --demo-ink: #f5f5f7;
   --demo-copy: #d4d4d8;
   --demo-muted: #a1a1aa;
-  --demo-faint: #71717a;
+  --demo-faint: #a1a1aa;
   --demo-line: #2a2a32;
   --demo-line-soft: #222228;
   --demo-surface: #151519;
@@ -2021,9 +2092,16 @@ html[data-theme="dark"] .kb-preview-graph-nodes circle {
 }
 
 @media (max-width: 1080px) {
-  .feature-story,
-  .feature-story-reverse {
+  .feature-story {
     grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
+  }
+
+  /* Mirror the same copy/media proportions for alternating stories.  Without
+     this override the reverse row puts its product viewport on the narrow
+     0.8fr track, making Wiki look like a miniature while the neighbouring
+     demos remain readable. */
+  .feature-story-reverse {
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   }
 
 }
@@ -2060,21 +2138,21 @@ html[data-theme="dark"] .kb-preview-graph-nodes circle {
 }
 
 @container graph-preview (max-width: 760px) {
-  /* Size this from the actual product shell rather than the browser window.
-     A constrained two-column page can be narrower than its viewport (for
-     example at 768px), and the fixed 255px side drawer would otherwise leave
-     the graph with a postage-stamp canvas. */
-  .graph-node-drawer-layer {
-    inset: auto 0 0;
-    width: 100%;
-    min-width: 0;
-    height: min(40%, 180px);
+  /* The production detail surface remains a right-side drawer on phones.
+     Scale its width down only enough to leave a usable graph viewport; it
+     never changes to a covering bottom sheet. */
+  .kb-product-preview-graph .kb-preview-wiki-host {
+    /* The collapsed app rail already supplies the left boundary. Let the
+       graph use the page's horizontal gutter so the responsive drawer inset
+       leaves a real, visible canvas instead of a one-pixel sliver. */
+    margin-inline: -16px;
   }
 
-  .graph-node-drawer {
-    border-top: 1px solid var(--kb-line);
-    border-left: 0;
-    box-shadow: 0 -12px 34px rgb(17 24 39 / 10%);
+  .graph-node-drawer-layer {
+    inset: 0 0 0 auto;
+    width: min(50%, 350px);
+    min-width: 180px;
+    height: 100%;
   }
 
   .graph-node-drawer-header {
@@ -2136,5 +2214,100 @@ html[data-theme="dark"] .kb-preview-graph-nodes circle {
   .kb-product-preview-viewport *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Final viewport contract (after the legacy breakpoint rules above).  Keep the
+   hero's single large surface, while the three stories below retain the
+   original alternating copy/media split.  The captures share a landscape
+   16:10 media frame so they stay readable without becoming hero-sized or
+   square miniatures. */
+.hero-stage .dashboard-scene {
+  padding: 0;
+}
+
+/* Restore the desktop story proportions from the original storefront.  The
+   product capture is intentionally the larger track, but remains a bounded
+   story-side surface rather than inheriting the hero's full width. */
+@media (min-width: 1081px) {
+  .feature-stack {
+    width: min(100%, 1400px);
+    max-width: 1400px;
+  }
+
+  .feature-story {
+    width: 100%;
+    max-width: 1400px;
+    grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.28fr);
+    align-items: center;
+    gap: clamp(36px, 3vw, 52px);
+  }
+
+  .feature-story-reverse {
+    grid-template-columns: minmax(0, 1.28fr) minmax(360px, 0.72fr);
+  }
+
+  .feature-story .feature-copy {
+    width: 100%;
+    order: initial;
+  }
+
+  .feature-story-reverse .feature-copy {
+    order: 2;
+  }
+
+  .feature-story-reverse .feature-visual {
+    order: 1;
+  }
+
+  .feature-story .feature-visual {
+    width: 100%;
+    max-width: 1400px;
+    aspect-ratio: 16 / 10;
+  }
+}
+
+.hero-stage .dashboard-entry {
+  left: 0;
+  width: min(100%, var(--product-viewport-max-width));
+  height: auto;
+  aspect-ratio: var(--product-viewport-aspect);
+  margin-left: 0;
+}
+
+.hero-stage .dashboard-scene,
+.hero-stage .dashboard-frame,
+.hero-stage .hero-product-demo {
+  width: 100%;
+  height: 100%;
+}
+
+/* Keep one shared product viewport while allowing the real UI enough vertical
+   room at each responsive shape. Desktop remains the requested 16:10 window;
+   narrower screens use familiar tablet/phone rectangles rather than shrinking
+   the product into an unreadable square or scaling its native typography. */
+@media (max-width: 1199px) and (min-width: 768px) {
+  :root {
+    --product-viewport-aspect: 5 / 4;
+  }
+}
+
+@media (max-width: 767px) and (min-width: 521px) {
+  :root {
+    --product-viewport-aspect: 4 / 5;
+  }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --product-viewport-aspect: 3 / 5;
+  }
+
+  /* The Hero follows the tall phone viewport above. The three alternating
+     feature captures remain a separate, unified landscape family: 4:3 gives
+     their real headers and work areas enough height without turning them into
+     Hero-sized panels or near-square miniatures. */
+  .feature-visual {
+    aspect-ratio: 4 / 3;
   }
 }

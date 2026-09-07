@@ -8,28 +8,28 @@ import {
   sampleOverlayScroll
 } from "./heroMotion.js";
 
-test("the hero uses the source on-in-view transform targets", () => {
+test("the hero stays front-facing throughout its entrance", () => {
   const start = sampleHeroVisibility(0);
 
   assert.deepEqual(start, HERO_SOURCE_TILT);
   assert.deepEqual(HERO_SOURCE_TILT, {
     perspective: 1200,
-    translateX: 60,
-    translateY: -50,
-    scale: 0.8,
-    rotateZ: 5,
-    rotateX: 6,
-    rotateY: 18,
-    skewX: 7
+    translateX: 0,
+    translateY: 0,
+    scale: 1,
+    rotateZ: 0,
+    rotateX: 0,
+    rotateY: 0,
+    skewX: 0
   });
   assert.equal(start.perspective, 1200);
-  assert.ok(start.rotateX > 0);
-  assert.ok(start.rotateY > 0);
-  assert.ok(start.skewX > 0);
-  assert.ok(start.scale < 0.9);
+  assert.equal(start.rotateX, 0);
+  assert.equal(start.rotateY, 0);
+  assert.equal(start.skewX, 0);
+  assert.equal(start.scale, 1);
 });
 
-test("the dashboard straightens as its bottom reaches the viewport bottom", () => {
+test("the dashboard never tilts or shifts while entering the viewport", () => {
   const progressAt450 = heroVisibilityProgress({
     sceneTop: 548.8,
     sceneHeight: 806.664,
@@ -39,8 +39,10 @@ test("the dashboard straightens as its bottom reaches the viewport bottom", () =
   const at450 = sampleHeroVisibility(progressAt450);
   const end = sampleHeroVisibility(1);
 
-  assert.ok(Math.abs(at450.translateX - 9.18) < 0.1);
-  assert.ok(Math.abs(at450.rotateY - 2.76) < 0.1);
+  assert.equal(at450.translateX, 0);
+  assert.equal(at450.translateY, 0);
+  assert.equal(at450.scale, 1);
+  assert.equal(at450.rotateY, 0);
   assert.equal(end.translateX, 0);
   assert.equal(end.translateY, 0);
   assert.equal(end.scale, 1);

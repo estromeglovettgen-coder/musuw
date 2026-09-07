@@ -294,6 +294,7 @@ export interface WikiGraphRenderer {
   setProgressionTimeScale?(timeScale: number): void
   setObsidianSettings?(settings: ObsidianGraphSettings): void
   restartSimulation?(): void
+  freezeLayout?(): void
   startProgression?(): void
   pauseProgression?(): void
   resumeProgression?(): void

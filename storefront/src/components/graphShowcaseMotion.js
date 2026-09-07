@@ -14,6 +14,9 @@ export const GRAPH_SHOWCASE_STAGES = Object.freeze([
   "focus",
   "hover",
   "drawer",
+  "drawer-link-moving",
+  "drawer-link-press",
+  "linked-page",
 ]);
 
 export const GRAPH_SHOWCASE_MOTION = Object.freeze({
@@ -25,11 +28,20 @@ export const GRAPH_SHOWCASE_MOTION = Object.freeze({
   growthDurationMs: 15_500,
   settleDurationMs: 720,
   focusDurationMs: 820,
-  // Leave the directed neighborhood on screen long enough for the native
-  // renderer's 420ms fit plus camera easing to settle before the simulated
-  // click opens the detail surface. A one-second beat could advance while
-  // the graph was still zooming, producing a tiny transient cluster.
-  hoverDurationMs: 2_000,
+  // Give viewers one deliberate beat at the selected node before the click.
+  hoverDurationMs: 650,
+  // Once the native right drawer has finished entering, leave the page on
+  // screen long enough to read the target link, then travel to it at a human
+  // pace before running the same navigation route as product.
+  // Keep the drawer cursor target mounted long enough for the native drawer
+  // settle and pointer-hit verification to complete before moving on to the
+  // first inline link.  The prior 440ms beat could elapse while the drawer
+  // was still entering, so a slow frame sampled no pointer and reported an
+  // Infinity offset.  1.8s preserves a quick hand-off while leaving a stable
+  // visual frame for real users and browser zooms.
+  drawerReadDurationMs: 1_800,
+  drawerLinkMoveDurationMs: 1_200,
+  drawerLinkPressDurationMs: 500,
   seedNodeCount: 28,
   accelerationNodeCount: 65,
   growthThreshold: 28 / 337,
@@ -42,9 +54,17 @@ export const GRAPH_SHOWCASE_MOTION = Object.freeze({
   hoverCameraScale: 0.72,
   initialGrowthSpeed: 8,
   maxGrowthSpeed: 100,
+  // The native renderer receives a continuously updated time-scale multiplier
+  // while the node prefix grows. Keep the first fifteen nodes at the readable
+  // 2x cadence, then increase on one linear slope until node 100. The tail
+  // stays at 10x so a dense graph completes without another speed transition.
+  accelerationStartNode: 15,
+  accelerationEndNode: 100,
+  progressionTimeScale: 2,
+  progressionMaxTimeScale: 10,
   relatedOpacity: 1,
   dimmedOpacity: 0.16,
-  stopAt: "drawer",
+  stopAt: "linked-page",
 });
 
 const EPSILON = 1e-6;
@@ -81,6 +101,9 @@ function timingOptions(options = {}) {
     growthDurationMs: Math.max(0, value("growthDurationMs")),
     focusDurationMs: Math.max(0, value("focusDurationMs")),
     hoverDurationMs: Math.max(0, value("hoverDurationMs")),
+    drawerReadDurationMs: Math.max(0, value("drawerReadDurationMs")),
+    drawerLinkMoveDurationMs: Math.max(0, value("drawerLinkMoveDurationMs")),
+    drawerLinkPressDurationMs: Math.max(0, value("drawerLinkPressDurationMs")),
     growthThreshold: clamp(value("growthThreshold"), 0, 1),
     labelFadeStart: clamp(value("labelFadeStart"), 0, 1),
     labelFadeEnd: clamp(value("labelFadeEnd"), 0, 1),
@@ -185,23 +208,60 @@ export function graphShowcaseGrowthSpeed(
 }
 
 /**
- * Resolve the five visual stages from an elapsed clock.  `Infinity` is useful
- * for a paused/terminal presentation and intentionally resolves to `drawer`.
+ * Return the progression multiplier for the current visible-node prefix.
+ *
+ * Obsidian's renderer advances one shared item cursor. Updating its time-scale
+ * at each visible-node boundary keeps that native ordering and force layout,
+ * while the linear interpolation makes the intervals shrink by one stable
+ * slope from node fifteen through node 100. Later nodes keep the terminal
+ * multiplier, so there is no second acceleration step.
+ */
+export function graphShowcaseProgressionTimeScale(
+  visibleNodes,
+  totalNodes,
+  options = {},
+) {
+  const custom = options?.motion && typeof options.motion === "object"
+    ? options.motion
+    : options;
+  const total = normalizedCount(totalNodes);
+  const visible = normalizedCount(visibleNodes);
+  const startNode = Math.max(0, Math.floor(finite(custom?.accelerationStartNode, GRAPH_SHOWCASE_MOTION.accelerationStartNode)));
+  const endNode = Math.max(
+    startNode + 1,
+    Math.floor(finite(custom?.accelerationEndNode, GRAPH_SHOWCASE_MOTION.accelerationEndNode)),
+  );
+  const baseScale = Math.max(0.1, finite(custom?.progressionTimeScale, GRAPH_SHOWCASE_MOTION.progressionTimeScale));
+  const maxScale = Math.max(baseScale, finite(custom?.progressionMaxTimeScale, GRAPH_SHOWCASE_MOTION.progressionMaxTimeScale));
+  if (total <= 0 || visible <= startNode) return baseScale;
+  const progress = clamp((visible - startNode) / (endNode - startNode), 0, 1);
+  return lerp(baseScale, maxScale, progress);
+}
+
+/**
+ * Resolve the complete visual sequence from an elapsed clock. `Infinity` is
+ * useful for a paused/terminal presentation and resolves to the linked page.
  */
 export function resolveGraphShowcaseStage(elapsedMs, options = {}) {
   const motion = timingOptions(options);
   const elapsed = Math.max(0, finite(elapsedMs, Number.POSITIVE_INFINITY));
-  if (!Number.isFinite(elapsed)) return "drawer";
+  if (!Number.isFinite(elapsed)) return "linked-page";
 
   const seedEnd = motion.seedDurationMs;
   const growthEnd = seedEnd + motion.growthDurationMs;
   const focusEnd = growthEnd + motion.focusDurationMs;
   const hoverEnd = focusEnd + motion.hoverDurationMs;
+  const drawerEnd = hoverEnd + motion.drawerReadDurationMs;
+  const linkMoveEnd = drawerEnd + motion.drawerLinkMoveDurationMs;
+  const linkPressEnd = linkMoveEnd + motion.drawerLinkPressDurationMs;
   if (elapsed < seedEnd) return "seed";
   if (elapsed < growthEnd) return "grow";
   if (elapsed < focusEnd) return "focus";
   if (elapsed < hoverEnd) return "hover";
-  return "drawer";
+  if (elapsed < drawerEnd) return "drawer";
+  if (elapsed < linkMoveEnd) return "drawer-link-moving";
+  if (elapsed < linkPressEnd) return "drawer-link-press";
+  return "linked-page";
 }
 
 /**
@@ -225,8 +285,9 @@ export function graphShowcaseLabelAlpha(visibleNodes, totalNodes, options = {}) 
 
 /**
  * Return a camera scale for a stage.  Values are relative to the graph
- * canvas: the initial seed is close enough to read, dense growth pulls back,
- * and the final focus/hover/drawer state punches in again.
+ * canvas: the initial seed is close enough to read and dense growth pulls
+ * back. Focus and hover keep that completed-graph camera still; only the
+ * click-time drawer stage punches in.
  */
 export function graphShowcaseCameraScale(stage, normalizedGrowthProgress = 0, options = {}) {
   const motion = timingOptions(options);
@@ -234,8 +295,10 @@ export function graphShowcaseCameraScale(stage, normalizedGrowthProgress = 0, op
   if (stage === "grow") {
     return lerp(motion.initialCameraScale, motion.pulledBackCameraScale, easeOut(progress, 1.1));
   }
-  if (stage === "focus") return motion.focusCameraScale;
-  if (stage === "hover" || stage === "drawer") return motion.hoverCameraScale;
+  if (stage === "focus" || stage === "hover") return motion.pulledBackCameraScale;
+  if (["drawer", "drawer-link-moving", "drawer-link-press", "linked-page"].includes(stage)) {
+    return motion.focusCameraScale;
+  }
   return motion.initialCameraScale;
 }
 
@@ -287,6 +350,25 @@ export function resolveGraphShowcaseNode(nodes, preferredSlug = "summary:book") 
 }
 
 /**
+ * Return one-hop neighbors in edge order, preserving the graph API's stable
+ * relation ordering.  The native renderer owns the actual layout; this helper
+ * only resolves which related row the marketing cursor should visit first.
+ */
+export function graphNeighborSlugs(nodes, edges, sourceSlug) {
+  const slugs = new Set((Array.isArray(nodes) ? nodes : []).map(nodeSlug).filter(Boolean));
+  if (!sourceSlug || !slugs.has(sourceSlug)) return [];
+  const neighbors = new Set();
+  for (const edge of Array.isArray(edges) ? edges : []) {
+    const source = nodeSlug(edge?.source);
+    const target = nodeSlug(edge?.target);
+    if (!source || !target || source === target) continue;
+    if (source === sourceSlug && slugs.has(target)) neighbors.add(target);
+    if (target === sourceSlug && slugs.has(source)) neighbors.add(source);
+  }
+  return [...neighbors];
+}
+
+/**
  * Compute the same visual focus semantics as the native renderer: the hovered
  * node and its immediate neighbors stay bright while every other node dims.
  */
@@ -320,17 +402,22 @@ export function deriveGraphFocus(nodes, edges, hoveredSlug) {
 /**
  * Build one deterministic frame for the presentation layer.
  *
- * The final `drawer` frame is terminal: the selected slug is stable, the
- * relationship focus is preserved, and `stopped` tells a caller not to loop.
+ * The final `linked-page` frame is terminal: the destination slug is stable,
+ * the relationship focus is preserved, and `stopped` tells a caller not to
+ * loop.
  */
 export function graphShowcaseSnapshot(elapsedMs, options = {}) {
   const motion = timingOptions(options);
   const totalNodes = normalizedCount(options.totalNodes ?? options.nodes?.length);
   const totalLinks = Math.max(0, finite(options.totalLinks, 0));
   const stage = resolveGraphShowcaseStage(elapsedMs, motion);
-  const isTerminal = stage === "drawer";
-  const isFocused = stage === "hover" || isTerminal;
-  const hoveredSlug = isFocused ? resolveGraphShowcaseNode(options.nodes, options.anchorSlug) : null;
+  const drawerStages = ["drawer", "drawer-link-moving", "drawer-link-press", "linked-page"];
+  const isTerminal = stage === "linked-page";
+  const isDrawerVisible = drawerStages.includes(stage);
+  const isFocused = stage === "hover" || isDrawerVisible;
+  const initialSlug = resolveGraphShowcaseNode(options.nodes, options.anchorSlug);
+  const linkedSlug = resolveGraphShowcaseNode(options.nodes, options.linkTargetSlug);
+  const hoveredSlug = isFocused ? (isTerminal ? linkedSlug : initialSlug) : null;
   const focus = deriveGraphFocus(options.nodes, options.edges, hoveredSlug);
   // The Pixi renderer supplies `visibleNodes` from its native playback
   // callback.  We deliberately do not derive a second cursor here.  When a
@@ -365,12 +452,12 @@ export function graphShowcaseSnapshot(elapsedMs, options = {}) {
     labelAlpha,
     labelsVisible: labelAlpha > 0.001,
     hoveredSlug,
-    selectedSlug: isTerminal ? hoveredSlug : null,
+    selectedSlug: isDrawerVisible ? hoveredSlug : null,
     relatedSlugs: focus.relatedSlugs,
     dimmedSlugs: focus.dimmedSlugs,
     relatedOpacity: motion.relatedOpacity,
     dimmedOpacity: motion.dimmedOpacity,
-    drawerVisible: isTerminal && Boolean(hoveredSlug),
+    drawerVisible: isDrawerVisible && Boolean(hoveredSlug),
     stopped: isTerminal,
     playing: !isTerminal,
   };

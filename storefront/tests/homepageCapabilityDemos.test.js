@@ -6,6 +6,7 @@ import test from "node:test";
 import { getStorefrontCopy } from "../src/i18n.js";
 import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
 import { KNOWLEDGE_STORIES, REASONING_STORY } from "../src/data/knowledgeStories.js";
+import { DEMO_SOURCES } from "../src/data/demoSources.js";
 import {
   LITTLE_PRINCE_GRAPH_TOTALS,
   LITTLE_PRINCE_GRAPH_VIEW,
@@ -57,13 +58,57 @@ test("hero and chat demos share one authoritative chat surface while Wiki and Gr
   const { home } = renderFixture();
   const platform = section(home, "platform", "pricing");
   assert.equal((home.match(/data-musuw-product-shell="true"/g) ?? []).length, 3);
-  assert.equal((home.match(/data-authoritative-chat-surface="true"/g) ?? []).length, 2);
-  assert.equal((home.match(/data-authoritative-chat-composer="true"/g) ?? []).length, 2);
+  assert.equal((home.match(/data-authoritative-chat-surface="true"/g) ?? []).length, 3);
+  assert.equal((home.match(/data-authoritative-chat-composer="true"/g) ?? []).length, 3);
   assert.equal((home.match(/data-product-page-shell=/g) ?? []).length, 2);
   assert.equal((platform.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.match(platform, /class="benefit-grid platform-grid"/);
   assert.doesNotMatch(home, /capability-window-dots/);
   assert.doesNotMatch(home, /capability-demo-header|knowledge-loop-primary|knowledge-loop-rail/);
+});
+
+test("feature demos keep an alternating split while using one responsive horizontal media frame", () => {
+  const css = readFileSync(join(root, "src/product-demos.css"), "utf8");
+  assert.match(css, /--product-viewport-max-width:\s*1200px/);
+  assert.match(css, /--product-viewport-aspect:\s*16\s*\/\s*10/);
+  assert.match(css, /\.feature-visual\s*\{[\s\S]*?aspect-ratio:\s*16\s*\/\s*10;/);
+  assert.match(css, /\.feature-visual\s*>\s*:is\(\.capability-demo,\s*\.kb-product-preview-viewport\)\s*\{[\s\S]*?height:\s*100%;/);
+  assert.match(css, /\.feature-visual\s*>\s*\.capability-demo\.capability-demo-reasoning\s*\{[\s\S]*?height:\s*100%;/);
+  assert.match(css, /@media\s*\(min-width:\s*1081px\)[\s\S]*?\.feature-story\s*\{[\s\S]*?grid-template-columns:\s*minmax\(360px,\s*0\.72fr\)\s+minmax\(0,\s*1\.28fr\);/);
+  assert.match(css, /@media\s*\(min-width:\s*1081px\)[\s\S]*?\.feature-story-reverse\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1\.28fr\)\s+minmax\(360px,\s*0\.72fr\);/);
+  assert.match(css, /\.feature-story-reverse\s+\.feature-copy\s*\{[\s\S]*?order:\s*2;[\s\S]*?\}/);
+  assert.match(css, /\.feature-story-reverse\s+\.feature-visual\s*\{[\s\S]*?order:\s*1;[\s\S]*?\}/);
+  assert.match(css, /@media\s*\(max-width:\s*767px\)[\s\S]*?\.feature-story,\s*\n\s*\.feature-story-reverse\s*\{[\s\S]*?grid-template-columns:\s*1fr;/);
+  assert.match(css, /\.hero-stage\s+\.dashboard-entry\s*\{[\s\S]*?aspect-ratio:\s*var\(--product-viewport-aspect\);/);
+});
+
+test("final CTA reuses the authoritative chat surface and native answer message seam", () => {
+  const { home, chineseHome } = renderFixture();
+  const source = readFileSync(join(root, "src/components/ProductCapabilityDemos.jsx"), "utf8");
+  const finalCta = home.slice(home.indexOf('<section class="final-cta">'));
+
+  for (const token of [
+    "AuthoritativeChatSurface",
+    "AuthoritativeChatComposer",
+    "visual-chat-message-row",
+    "visual-user-message",
+    "visual-assistant-message",
+    "visual-assistant-answer",
+    "visual-assistant-toolbar",
+  ]) assert.match(source, new RegExp(token));
+
+  assert.match(source, /data-answer-section="conclusion"/);
+  assert.match(source, /data-answer-section="validation-boundary"/);
+  assert.match(source, /sources: Object\.freeze\(\["Interviews", "Usage funnel"\]\)/);
+  assert.match(source, /data-demo-interactive="false"/);
+  assert.match(source, /\binert\b/);
+  assert.doesNotMatch(source, /product-demo-query|answer-demo-thread|DemoComposer/);
+  assert.match(finalCta, /data-capability-demo="answer"/);
+  assert.match(finalCta, /Conclusion/);
+  assert.match(finalCta, /Verification boundary/);
+  assert.match(finalCta, /Interviews/);
+  assert.match(chineseHome, /验证边界/);
+  assert.match(chineseHome, /用户访谈/);
 });
 
 test("wiki renders a real product surface and graph retains its product surface", () => {
@@ -73,8 +118,11 @@ test("wiki renders a real product surface and graph retains its product surface"
   assert.match(chineseHome, /data-product-page-shell="graph"/);
   for (const tab of ["documents", "wiki", "graph"]) assert.equal((chineseHome.match(new RegExp(`data-kb-tab="${tab}"`, "g")) ?? []).length, 2);
   assert.match(chineseHome, /data-real-product-view="wiki"/);
-  assert.match(chineseHome, /data-wiki-demo-link="true"/);
-  assert.match(chineseHome, /href="#evaluation-tasks"/);
+  assert.match(chineseHome, /data-wiki-demo-link="index"/);
+  assert.match(chineseHome, /data-wiki-page-id="index"/);
+  assert.doesNotMatch(chineseHome, /data-wiki-demo-link="sidebar(?:-fallback)?"/);
+  assert.match(chineseHome, /data-wiki-index-link="summary"[\s\S]*href="#memory-evaluation"/);
+  assert.doesNotMatch(chineseHome, /href="#evaluation-tasks"/);
   assert.equal((chineseHome.match(/visual-sidebar kb-preview-app-sidebar/g) ?? []).length, 2);
   assert.equal((chineseHome.match(/data-product-app-sidebar-state="collapsed"/g) ?? []).length, 5);
   assert.doesNotMatch(chineseHome, /data-product-app-sidebar-state="expanded"/);
@@ -141,6 +189,8 @@ test("the three independent scenes have research, reading and work-specific fixt
     assert.equal(wiki.content.sourceIds.length, 3);
     assert.equal(wiki.content.linkedPage.pageTitle.toLocaleLowerCase(), wiki.content.inlineLink.toLocaleLowerCase());
     assert.equal(wiki.content.linkedPage.sourceIds.length, 3);
+    assert.equal(wiki.content.indexType, lang === "zh" ? "目录" : "Directory");
+    assert.equal(wiki.content.index, lang === "zh" ? "索引" : "Index");
     assert.equal(createLittlePrinceGraph(lang).meta.chapterCount, 27);
     assert.match(graph.content.status, lang === "zh" ? /全书/ : /complete book/i);
     assert.equal(REASONING_STORY[lang].steps.length, 5);
@@ -151,17 +201,50 @@ test("the three independent scenes have research, reading and work-specific fixt
   assert.match(REASONING_STORY.zh.steps.map(({ title }) => title).join(" "), /BM25.*向量.*Rerank.*证据核验/);
 });
 
-test("Wiki demo follows one fixed-camera link navigation and stops on the destination page", () => {
-  assert.deepEqual(WIKI_DEMO_STAGES, ["page", "moving-to-link", "pressing-link", "linked-page"]);
-  assert.equal(nextWikiDemoStage("page"), "moving-to-link");
-  assert.equal(nextWikiDemoStage("moving-to-link"), "pressing-link");
-  assert.equal(nextWikiDemoStage("pressing-link"), "linked-page");
+test("the knowledge answer is a reviewable decision brief backed by every cited source", () => {
+  const expectedSections = ["conclusion", "evidence", "alternative", "validation", "limits"];
+
+  for (const lang of ["zh", "en"]) {
+    const story = REASONING_STORY[lang];
+    assert.deepEqual(story.answerSections.map(({ id }) => id), expectedSections);
+    assert.ok(story.answerSections.every(({ title }) => title.trim().length > 0));
+
+    const evidence = story.answerSections.find(({ id }) => id === "evidence");
+    assert.deepEqual(evidence.items.map(({ sourceId }) => sourceId), story.sourceIds);
+    assert.ok(evidence.items.every(({ sourceId, text }) => DEMO_SOURCES[sourceId] && text.trim().length > 0));
+
+    const validation = story.answerSections.find(({ id }) => id === "validation");
+    assert.ok(validation.items.length >= 3);
+    assert.ok(story.answer.length > story.question.length * 3);
+  }
+
+  assert.match(REASONING_STORY.zh.answer, /优先判断.*证据交叉验证.*备选假设.*验证方案.*判断边界/s);
+  assert.match(REASONING_STORY.en.answer, /Priority conclusion.*Evidence review.*Alternative hypothesis.*Validation plan.*Decision limits/s);
+});
+
+test("Wiki demo follows two fixed-camera link navigations and stops on the destination page", () => {
+  assert.deepEqual(WIKI_DEMO_STAGES, [
+    "page",
+    "moving-to-index-link",
+    "pressing-index-link",
+    "section-page",
+    "moving-to-inline-link",
+    "pressing-inline-link",
+    "linked-page",
+  ]);
+  assert.equal(nextWikiDemoStage("page"), "moving-to-index-link");
+  assert.equal(nextWikiDemoStage("moving-to-index-link"), "pressing-index-link");
+  assert.equal(nextWikiDemoStage("pressing-index-link"), "section-page");
+  assert.equal(nextWikiDemoStage("section-page"), "moving-to-inline-link");
+  assert.equal(nextWikiDemoStage("moving-to-inline-link"), "pressing-inline-link");
+  assert.equal(nextWikiDemoStage("pressing-inline-link"), "linked-page");
   assert.equal(nextWikiDemoStage("linked-page"), "linked-page");
   assert.equal(nextWikiDemoStage("unknown"), "page");
-  assert.equal(resolveWikiDemoStage("moving-to-link", false), "moving-to-link");
-  assert.equal(resolveWikiDemoStage("moving-to-link", true), "linked-page");
+  assert.equal(resolveWikiDemoStage("moving-to-inline-link", false), "moving-to-inline-link");
+  assert.equal(resolveWikiDemoStage("moving-to-inline-link", true), "page");
   assert.ok(WIKI_STAGE_DURATIONS.page > 0);
-  assert.ok(WIKI_STAGE_DURATIONS["moving-to-link"] > WIKI_STAGE_DURATIONS["pressing-link"]);
+  assert.ok(WIKI_STAGE_DURATIONS["moving-to-index-link"] > WIKI_STAGE_DURATIONS["pressing-index-link"]);
+  assert.ok(WIKI_STAGE_DURATIONS["moving-to-inline-link"] > WIKI_STAGE_DURATIONS["pressing-inline-link"]);
 });
 
 test("showcase surfaces cannot be clicked or focused and the legal footer is removed", () => {
@@ -201,7 +284,7 @@ test("capability demos use production-visible states and the unchanged native Ob
   const graphCanvas = readFileSync(join(root, "src/components/ObsidianGraphCanvas.jsx"), "utf8");
   const renderer = readFileSync(join(root, "src/components/obsidian-graph/obsidianWikiGraphRenderer.ts"), "utf8");
   const styles = readFileSync(join(root, "src/product-demos.css"), "utf8");
-  assert.match(chat, /"idle",\s*"typing",\s*"sent",\s*"searching",\s*"comparing",\s*"drafting",\s*"validating",\s*"answering",\s*"complete"/);
+  assert.match(chat, /"idle",\s*"typing",\s*"sent",\s*"searching",\s*"scoping",\s*"comparing",\s*"drafting",\s*"validating",\s*"answering",\s*"complete"/);
   for (const demo of [hero, chat]) {
     assert.match(demo, /AuthoritativeChatSurface/);
     assert.match(demo, /AuthoritativeChatComposer/);
@@ -212,7 +295,7 @@ test("capability demos use production-visible states and the unchanged native Ob
   assert.doesNotMatch(`${hero}\n${chat}\n${authoritativeChat}`, /suggestedQuestions|visual-chat-suggestions|\u4f60\u53ef\u4ee5\u8fd9\u6837\u95ee\u6211/);
   assert.match(chat, /visual-rag-pipeline/);
   assert.match(chat, /visual-assistant-message/);
-  assert.match(motion, /"page",\s*"moving-to-link",\s*"pressing-link",\s*"linked-page"/);
+  assert.match(motion, /"page",\s*"moving-to-index-link",\s*"pressing-index-link",\s*"section-page",\s*"moving-to-inline-link",\s*"pressing-inline-link",\s*"linked-page"/);
   assert.doesNotMatch(motion, /restore|%\s*WIKI_DEMO_STAGES\.length/);
   assert.doesNotMatch(motion, /focus-source|paused|pause|resume/);
   assert.match(source, /useWikiDemoFlow/);
@@ -235,7 +318,7 @@ test("capability demos use production-visible states and the unchanged native Ob
   assert.match(preview, /growthScaleCapRef\.current/);
   assert.doesNotMatch(preview, /focusNode\(GRAPH_FOCUS_SLUG/);
   assert.match(preview, /nodeSlugs:\s*focusNodeSlugs/);
-  assert.match(preview, /getNodeViewportPoint\(GRAPH_FOCUS_SLUG/);
+  assert.match(preview, /getNodeViewportPoint\(focusSlug/);
   assert.match(preview, /setHoveredNode\(GRAPH_FOCUS_SLUG/);
   assert.match(preview, /<GraphNodeDetailDrawer/);
   assert.match(graphCanvas, /new ObsidianWikiGraphRenderer\(container\)/);

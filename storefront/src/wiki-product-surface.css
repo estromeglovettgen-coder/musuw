@@ -125,6 +125,42 @@
   font-size: clamp(8.5px, 0.95cqw, 12.5px);
 }
 
+.kb-product-preview-wiki .kb-preview-wiki-tree section > span[data-wiki-demo-link="sidebar"] {
+  position: relative;
+  transform-origin: 42% 50%;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 140ms ease;
+}
+
+.kb-product-preview-wiki .kb-preview-wiki-tree section > span[data-wiki-link-state="approaching"] {
+  background: color-mix(in srgb, var(--kb-accent) 7%, var(--kb-surface));
+}
+
+.kb-product-preview-wiki .kb-preview-wiki-tree section > span.is-pressing {
+  background: color-mix(in srgb, var(--kb-accent) 15%, var(--kb-surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kb-accent) 8%, transparent);
+  transform: scale(0.975);
+}
+
+.kb-product-preview-wiki .kb-preview-wiki-sidebar-fallback {
+  display: none;
+  margin-top: clamp(8px, 1.2cqw, 14px);
+  padding: clamp(5px, 0.75cqw, 9px) clamp(7px, 1cqw, 12px);
+  border: 1px solid var(--kb-line);
+  border-radius: clamp(4px, 0.55cqw, 7px);
+  background: var(--kb-surface);
+  font-size: clamp(9px, 1cqw, 13px);
+  text-decoration: none;
+}
+
+.kb-product-preview-wiki .kb-preview-wiki-sidebar-fallback[data-wiki-link-state="approaching"] {
+  background: color-mix(in srgb, var(--kb-accent) 7%, var(--kb-surface));
+}
+
+.kb-product-preview-wiki .kb-preview-wiki-sidebar-fallback[data-wiki-link-state="pressing"] {
+  background: color-mix(in srgb, var(--kb-accent) 15%, var(--kb-surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kb-accent) 8%, transparent);
+}
+
 .kb-product-preview-wiki .kb-preview-wiki-reader {
   padding: 0 clamp(12px, 2.4cqw, 32px) clamp(10px, 1.6cqw, 20px);
   font-size: clamp(10px, 1.35cqw, 16px);
@@ -228,6 +264,17 @@
 
   .kb-product-preview-wiki .kb-preview-wiki-sidebar {
     display: none;
+  }
+
+  .kb-product-preview-wiki .kb-preview-wiki-sidebar-fallback {
+    /* Keep the narrow-viewport fallback inside the reader's clipped
+       viewport so the guided cursor lands on the actual link hit target. */
+    display: inline-flex;
+    align-items: center;
+    position: absolute !important;
+    right: clamp(10px, 2cqw, 18px);
+    bottom: clamp(8px, 1.4cqw, 14px);
+    margin-top: 0;
   }
 
   .kb-product-preview-wiki .kb-preview-knowledge-header {
