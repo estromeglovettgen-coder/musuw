@@ -6390,6 +6390,7 @@ export default {
     urlClear: '清空',
     urlTooLong: '链接或分享内容不能超过 4 KB',
     douyinTikTok: '抖音·TikTok',
+    douyin: '抖音',
     urlUsageNotice: '仅可导入您拥有或获授权使用的内容。网页导入用于建立私人知识索引，不是流媒体下载或内容再分发服务。',
     typeURL: '网页',
     typeManual: '手动创建',

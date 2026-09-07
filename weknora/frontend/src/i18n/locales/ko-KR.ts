@@ -6386,6 +6386,7 @@ export default {
     urlClear: '지우기',
     urlTooLong: 'URL 또는 공유 메시지는 4KB 이하여야 합니다',
     douyinTikTok: 'Douyin · TikTok',
+    douyin: 'Douyin',
     urlUsageNotice: '소유하거나 사용 권한을 받은 콘텐츠만 가져오세요. URL 가져오기는 개인 지식 인덱스를 만들기 위한 기능이며 스트리밍 다운로더나 콘텐츠 재배포 서비스가 아닙니다.',
     typeURL: '웹페이지',
     typeManual: '수동 생성',

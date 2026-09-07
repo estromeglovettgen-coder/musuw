@@ -128,25 +128,17 @@
                   {{ t('knowledgeBase.urlSupportedPlatforms') }}
                 </span>
                 <div class="visual-url-modal__platform-list" role="list">
-                  <span class="visual-url-modal__platform" role="listitem">
-                    <t-icon name="logo-instagram" aria-hidden="true" />
-                    <span>Instagram</span>
-                  </span>
-                  <span class="visual-url-modal__platform" role="listitem">
-                    <t-icon name="logo-twitter" aria-hidden="true" />
-                    <span>X</span>
-                  </span>
-                  <span class="visual-url-modal__platform" role="listitem">
-                    <span class="visual-url-modal__platform-mark" aria-hidden="true">小</span>
-                    <span>小红书</span>
-                  </span>
-                  <span class="visual-url-modal__platform" role="listitem" data-platform-label="抖音·TikTok">
-                    <span class="visual-url-modal__platform-mark" aria-hidden="true">抖·TK</span>
-                    <span>{{ t('knowledgeBase.douyinTikTok') }}</span>
-                  </span>
-                  <span class="visual-url-modal__platform" role="listitem">
-                    <t-icon name="logo-youtube" aria-hidden="true" />
-                    <span>YouTube</span>
+                  <span
+                    v-for="platform in socialPlatforms"
+                    :key="platform.id"
+                    :class="['visual-url-modal__platform', `is-${platform.id}`]"
+                    role="listitem"
+                  >
+                    <span class="visual-url-modal__platform-icon" aria-hidden="true">
+                      <img v-if="platform.image" :src="platform.image" alt="" />
+                      <component v-else :is="platform.icon" />
+                    </span>
+                    <span class="visual-url-modal__platform-name">{{ platform.label }}</span>
                   </span>
                 </div>
               </div>
@@ -170,9 +162,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin } from 'tdesign-vue-next'
+import {
+  IconInstagram,
+  IconTiktok,
+  IconX,
+  IconXiaohongshu,
+  IconYoutube,
+} from '@iconify-prerendered/vue-simple-icons'
+import douyinLogo from '@/assets/img/douyin-logo.svg'
 import { getCurrentEntitlement, type ConsumerEntitlement } from '@/api/entitlement'
 import { exceedsConsumerStorageQuota } from '@/utils/consumerUploadLimits'
 import { useAuthStore } from '@/stores/auth'
@@ -225,6 +225,22 @@ const resolveConsumerEntitlement = async (): Promise<ConsumerEntitlement | null>
 }
 
 const tooltipText = computed(() => props.tooltip || t('knowledgeBase.addDocument'))
+
+type SocialPlatform = {
+  id: string
+  label: string
+  icon?: Component
+  image?: string
+}
+
+const socialPlatforms = computed<SocialPlatform[]>(() => [
+  { id: 'instagram', label: 'Instagram', icon: IconInstagram },
+  { id: 'x', label: 'X', icon: IconX },
+  { id: 'xiaohongshu', label: '小红书', icon: IconXiaohongshu },
+  { id: 'douyin', label: t('knowledgeBase.douyin'), image: douyinLogo },
+  { id: 'tiktok', label: 'TikTok', icon: IconTiktok },
+  { id: 'youtube', label: 'YouTube', icon: IconYoutube },
+])
 
 const dropdownOptions = computed(() => {
   const options = [
@@ -548,15 +564,20 @@ defineExpose({ openFileDialog, openUrlDialog })
 .visual-url-modal {
   width: min(480px, 100%);
   min-width: 0;
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
   overflow: hidden;
   border: 1px solid #e5e7eb;
   border-radius: 20px;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   color: #1f2937;
   box-shadow: 0 24px 60px rgb(0 0 0 / 18%);
 }
 
 .visual-url-modal__header {
+  flex: 0 0 auto;
   padding: 20px 20px 16px;
   border-bottom: 1px solid #f3f4f6;
   display: flex;
@@ -601,7 +622,9 @@ defineExpose({ openFileDialog, openUrlDialog })
 }
 
 .visual-url-modal__body {
+  min-height: 0;
   padding: 20px;
+  overflow-y: auto;
 }
 
 .visual-url-modal__input-heading {
@@ -673,63 +696,102 @@ defineExpose({ openFileDialog, openUrlDialog })
 }
 
 .visual-url-modal__platforms {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 9px 11px;
-  border: 1px solid #f0f1f3;
-  border-radius: 10px;
-  background: #f9fafb;
-  color: #9ca3af;
+  margin-top: 14px;
   font-size: 11px;
   line-height: 18px;
 }
 
 .visual-url-modal__platforms-label {
-  flex: 0 0 auto;
+  display: block;
+  margin-bottom: 8px;
   color: #6b7280;
   font-weight: 600;
 }
 
 .visual-url-modal__platform-list {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 6px 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .visual-url-modal__platform {
-  display: inline-flex;
+  min-width: 0;
+  min-height: 42px;
+  padding: 7px 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 8px;
+  box-sizing: border-box;
+  background: #fff;
+  color: #374151;
   white-space: nowrap;
 }
 
-.visual-url-modal__platform :deep(.t-icon) {
-  width: 14px;
-  height: 14px;
-  color: #9ca3af;
-  font-size: 14px;
-}
-
-.visual-url-modal__platform-mark {
-  width: 14px;
-  height: 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+.visual-url-modal__platform-icon {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  color: #9ca3af;
-  font-size: 8px;
-  font-weight: 700;
-  line-height: 1;
+  color: #fff;
+}
+
+.visual-url-modal__platform-icon :deep(svg) {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.visual-url-modal__platform-icon img {
+  display: block;
+  width: 16px;
+  height: 18px;
+}
+
+.visual-url-modal__platform-name {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+.visual-url-modal__platform.is-instagram .visual-url-modal__platform-icon {
+  background:
+    radial-gradient(circle at 30% 105%, #ffd600 0 22%, #ff7a00 23% 42%, transparent 43%),
+    linear-gradient(135deg, #7638fa 0%, #d300c5 44%, #ff3040 72%, #ff7a00 100%);
+}
+
+.visual-url-modal__platform.is-x .visual-url-modal__platform-icon {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #0f1419;
+}
+
+.visual-url-modal__platform.is-xiaohongshu .visual-url-modal__platform-icon {
+  background: #ff2442;
+}
+
+.visual-url-modal__platform.is-douyin .visual-url-modal__platform-icon {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.visual-url-modal__platform.is-tiktok .visual-url-modal__platform-icon {
+  background: #161823;
+}
+
+.visual-url-modal__platform.is-tiktok .visual-url-modal__platform-icon :deep(svg) {
+  filter: drop-shadow(-1px 0 #25f4ee) drop-shadow(1px 0 #fe2c55);
+}
+
+.visual-url-modal__platform.is-youtube .visual-url-modal__platform-icon {
+  background: #ff0000;
 }
 
 .visual-url-modal__hint {
@@ -747,6 +809,7 @@ defineExpose({ openFileDialog, openUrlDialog })
 }
 
 .visual-url-modal__footer {
+  flex: 0 0 auto;
   padding: 14px 20px;
   border-top: 1px solid #f3f4f6;
   display: flex;
@@ -832,7 +895,7 @@ defineExpose({ openFileDialog, openUrlDialog })
 :root[theme-mode="dark"] .visual-url-modal__header p,
 :root[theme-mode="dark"] .visual-url-modal__hint,
 :root[theme-mode="dark"] .visual-url-modal__notice,
-:root[theme-mode="dark"] .visual-url-modal__platforms {
+:root[theme-mode="dark"] .visual-url-modal__platforms-label {
   color: var(--mvc-muted) !important;
 }
 
@@ -859,19 +922,10 @@ defineExpose({ openFileDialog, openUrlDialog })
   color: var(--mvc-faint) !important;
 }
 
-:root[theme-mode="dark"] .visual-url-modal__platforms {
+:root[theme-mode="dark"] .visual-url-modal__platform {
   border-color: var(--mvc-line) !important;
   background: var(--mvc-surface-raised) !important;
-}
-
-:root[theme-mode="dark"] .visual-url-modal__platforms-label {
-  color: var(--mvc-muted-strong) !important;
-}
-
-:root[theme-mode="dark"] .visual-url-modal__platform :deep(.t-icon),
-:root[theme-mode="dark"] .visual-url-modal__platform-mark {
-  border-color: var(--mvc-line-strong) !important;
-  color: var(--mvc-muted) !important;
+  color: var(--mvc-text) !important;
 }
 
 :root[theme-mode="dark"] .visual-url-modal__footer {
@@ -904,6 +958,21 @@ defineExpose({ openFileDialog, openUrlDialog })
 .visual-url-modal-enter-from,
 .visual-url-modal-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 520px) {
+  .visual-url-modal__overlay {
+    padding: 12px;
+  }
+
+  .visual-url-modal {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .visual-url-modal__platform-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

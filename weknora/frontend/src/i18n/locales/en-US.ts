@@ -519,6 +519,7 @@ export default {
     urlClear: 'Clear',
     urlTooLong: 'The URL or share message must be 4 KB or smaller',
     douyinTikTok: 'Douyin · TikTok',
+    douyin: 'Douyin',
     urlUsageNotice: 'Only import content you own or are authorized to use. URL import creates a private knowledge index; it is not a streaming downloader or content redistribution service.',
     typeURL: 'URL',
     typeManual: 'Manual',
