@@ -43,7 +43,7 @@
 
 ## 固定模型
 
-内部固定使用现有 `builtin-openrouter-vlm-mimo-v2-5` 配置，但这个内部名称以及它的网关、
+内部固定使用现有 `builtin-openrouter-vlm-qwen-3-7-flash` 配置，但这个内部名称以及它的网关、
 路由和供应商信息不能出现在终端用户界面或公开错误中。
 
 实现时优先复用现有知识库模型解析和视频 URL 输入代码。允许用一个服务端配置覆盖默认模型，
@@ -143,4 +143,3 @@
 - `weknora/config/builtin_models.yaml`
 - `weknora/frontend/src/views/knowledge/`
 - `weknora/frontend/src/i18n/`
-

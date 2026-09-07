@@ -481,7 +481,7 @@ func TestImageMultimodalResolveVLMRoutesLegacyVideoModelToImageModel(t *testing.
 		ID: "kb-1",
 		VLMConfig: types.VLMConfig{
 			Enabled: true,
-			ModelID: defaultVideoModelID,
+			ModelID: legacyMiMoVideoModelID,
 		},
 	}}
 
@@ -509,7 +509,7 @@ func TestImageMultimodalResolveVLMRoutesLegacyVideoModelInStandard(t *testing.T)
 		ID: "kb-1",
 		VLMConfig: types.VLMConfig{
 			Enabled: true,
-			ModelID: defaultVideoModelID,
+			ModelID: legacyMiMoVideoModelID,
 		},
 	}}
 

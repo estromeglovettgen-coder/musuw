@@ -530,7 +530,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, "url", muse.Parameters.ExtraConfig["video_input_mode"])
 	assert.False(t, muse.IsDefault)
 	qwenVideo := byID["builtin-openrouter-vlm-qwen-3-7-flash"]
-	assert.Equal(t, "base64", qwenVideo.Parameters.ExtraConfig["video_input_mode"])
+	assert.Equal(t, "url", qwenVideo.Parameters.ExtraConfig["video_input_mode"])
 	assert.Equal(t, "alibaba", qwenVideo.Parameters.ExtraConfig["video_provider"])
 	assert.Equal(t, "openai/whisper-large-v3", byID["builtin-openrouter-asr"].Name)
 

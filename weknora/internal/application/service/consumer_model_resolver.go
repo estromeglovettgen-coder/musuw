@@ -260,9 +260,9 @@ func (s *consumerModelResolver) policy(
 		return consumerScenePolicy{}, false
 	}
 	freeID = strings.TrimSpace(freeID)
-	// Normalize the same stale video-only default for Free users. Keeping this
+	// Normalize the stale MiMo video-only default for Free users. Keeping this
 	// at policy read-time repairs existing settings without a migration.
-	if scene == types.ConsumerSceneVision && freeID == defaultVideoModelID {
+	if scene == types.ConsumerSceneVision && freeID == legacyMiMoVideoModelID {
 		freeID = types.PlatformKnowledgeBaseVLMModelID
 	}
 	if freeID == "" || catalog[freeID] == nil {
@@ -280,9 +280,9 @@ func (s *consumerModelResolver) policy(
 	seen := make(map[string]struct{}, len(paid))
 	for idx := range paid {
 		id := strings.TrimSpace(paid[idx])
-		// MiMo belongs to URL-video ingestion. Ignore the stale entry that a
-		// previous default persisted into the still-image scene.
-		if scene == types.ConsumerSceneVision && id == defaultVideoModelID {
+		// Ignore the MiMo entry that the previous video default persisted into
+		// the still-image scene.
+		if scene == types.ConsumerSceneVision && id == legacyMiMoVideoModelID {
 			continue
 		}
 		if id == "" || catalog[id] == nil {

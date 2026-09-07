@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	defaultVideoModelID       = "builtin-openrouter-vlm-mimo-v2-5"
+	defaultVideoModelID       = "builtin-openrouter-vlm-qwen-3-7-flash"
+	legacyMiMoVideoModelID    = "builtin-openrouter-vlm-mimo-v2-5"
 	directYouTubeVideoModelID = "builtin-openrouter-vlm-youtube"
 
 	// VideoParsingPublicMessage is the consumer-visible active parsing state.
