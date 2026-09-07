@@ -105,7 +105,6 @@ func TestGetSummaryUsesSameModelCallForAutomaticURLTitle(t *testing.T) {
 		&types.Knowledge{ID: "knowledge-social", Type: "url", Source: source, Title: source},
 		[]*types.Chunk{{ID: "first", Content: "肉丝、青菜和面条煮成一碗汤面。", StartAt: 0, EndAt: 16}},
 	)
-
 	if err != nil {
 		t.Fatalf("getSummary() error = %v", err)
 	}
