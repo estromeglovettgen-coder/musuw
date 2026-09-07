@@ -73,7 +73,7 @@ func TestBuiltinQuickAnswerUsesUpstreamModeNameWithManagedModelDefaults(t *testi
 	assert.True(t, *cfg.CitationEnabled)
 }
 
-func TestBuiltinQuickAnswerPromptReferenceExists(t *testing.T) {
+func TestBuiltinSmartReasoningPromptUsesMusuwAsItsPublicIdentity(t *testing.T) {
 	promptPath := filepath.Join("..", "..", "config", "prompt_templates", "agent_system_prompt.yaml")
 	data, err := os.ReadFile(promptPath)
 	require.NoError(t, err)
@@ -96,7 +96,8 @@ func TestBuiltinQuickAnswerPromptReferenceExists(t *testing.T) {
 		}
 		assert.Equal(t, "smart-reasoning", template.Mode)
 		assert.Equal(t, "Wiki + RAG 混合智能体", template.I18n["zh-CN"].Name)
-		assert.NotEmpty(t, template.Content)
+		assert.Contains(t, template.Content, "<role>\nYou are Musuw. Your self-introduction is “我是 Musuw。”")
+		assert.NotContains(t, template.Content, "You are Musuw Hybrid Researcher")
 		return
 	}
 	t.Fatal("hybrid_rag_wiki_agent prompt template not found")
