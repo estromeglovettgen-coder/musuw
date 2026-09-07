@@ -1,5 +1,62 @@
 # Verification evidence
 
+## 2026-09-07 AI titles, official platform icons, and final production acceptance
+
+- Main revision `d648c90c` combines PR #37 (generate a concise document title in
+  the existing summary-model call) and PR #38 (six distinct official platform
+  icons for Instagram, X, Xiaohongshu, Douyin, TikTok, and YouTube). No extra
+  title-model request, media adapter, fallback router, or transcode service was
+  added. The import dialog retains both the supported-input hint and the
+  ownership/private-index usage notice.
+- CI run `34082332110` and isolated staging run `34083073845` completed
+  successfully for the exact immutable revision. The staging browser displayed
+  all six labelled icon cards and both compliance paragraphs in light and dark
+  themes.
+- A fresh staging Wiki knowledge base
+  `42d01af1-fca5-4825-b01a-b5c182946f14` imported the original Douyin image-post
+  short link through the product UI after deployment. New knowledge
+  `9e454abc-7da4-426b-b274-1d9e8a6afb8c` materialized as a 434-byte Markdown
+  document with seven images, one ready chunk, and the generated title
+  `夕阳图集配文与视觉分享`. Parsing and summary completed with no pending tasks or
+  error. The root, document reader, chunking, embedding, seven-image multimodal,
+  summary, and Wiki spans all completed. The result produced five source-backed
+  Wiki pages plus the index, four links, zero orphans, and a complete 6/6-node
+  graph.
+- On the same deployed staging revision, the retained cross-platform regression
+  knowledge base `f97bb5ad-423b-468a-92dd-64fd6e7363a1` remained green for nine
+  independent rows: YouTube; Instagram image and video; X image and video;
+  Douyin image and video; and Xiaohongshu image and video. Every row had parsing
+  and summary completed, pending count zero, a blank error, and ready chunks.
+  Its Wiki/graph had 71 pages, 189 links, zero orphans, and no pending task.
+- Production promotion run `34084084181` reused the accepted immutable staging
+  image pair and completed through the restricted `server-production` seam.
+  Its release manifest records application digest
+  `sha256:2b6c4d9feb4a902ef8f2a984d4a11752fc0ea6d5261bb45d63af3262b949ab91`
+  and frontend digest
+  `sha256:183af582e54263501e6d9cff2230d64d8a0c85ea4a6630614f09708f04b380de`.
+  Both healthy Tokyo production containers expose revision `d648c90c`,
+  `/health` returns `status=ok`, and the homepage and authentication entrypoint
+  return HTTP 200.
+  The production browser displayed the same six icon cards and both compliance
+  paragraphs. The retained Douyin image-post row
+  `3835621c-5c29-4c0b-86db-636ee4e3721e` was reparsed once after its old caption
+  title was reset to the source URL; the deployed summary call generated
+  `关于相遇与承诺的图文分享`. Parsing, summary, and Wiki completed with pending
+  count zero, a blank error, a done root span, and no failed span.
+- The final production knowledge base
+  `a8967560-fa43-4d87-a26c-9f95c3439861` contains ten completed rows: the eight
+  requested social inputs plus local JPG and MP4 uploads. All ten have completed
+  parsing and summaries, zero pending tasks, blank errors, and 49 chunks in
+  total. Its Wiki has 91 pages and 353 current page links after the Douyin
+  reparse; the graph UI displays all 91/91 nodes, and Wiki reports no pending
+  task or issue.
+- This proves the supported final state, not mathematical first-attempt uptime
+  for third-party services. Earlier concurrent requests observed recoverable
+  TikHub HTTP 400 responses, an Instagram V2 contract mismatch fixed by the
+  official V3 endpoint, and a provider HTTP 429 recovered by the existing
+  bounded retry. No unstable alternate provider or product-specific retry maze
+  was introduced.
+
 ## 2026-09-07 deployed Qwen/Instagram-V3 acceptance (production matrix complete)
 
 - Main revision `595c5a30` contains PR #34 (Qwen URL-based video ingestion) and
