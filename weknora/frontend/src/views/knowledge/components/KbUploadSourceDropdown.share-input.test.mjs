@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const component = readFileSync(new URL('./KbUploadSourceDropdown.vue', import.meta.url), 'utf8')
+const douyinLogo = readFileSync(new URL('../../../assets/img/douyin-logo.svg', import.meta.url), 'utf8')
 const localeFiles = [
   '../../../i18n/locales/en-US.ts',
   '../../../i18n/locales/zh-CN.ts',
@@ -15,22 +16,43 @@ test('URL import modal accepts share text in a fixed three-row field', () => {
   assert.match(component, /class="visual-url-modal__textarea-wrap"/)
   assert.match(component, /v-if="urlInputValue"[\s\S]*?class="visual-url-modal__clear"/)
   assert.match(component, /position: absolute/)
-  assert.match(component, /background: #f9fafb/)
-  assert.match(component, /border: 1px solid #f0f1f3/)
   assert.match(component, /urlInputValue\.value = ''/)
-  assert.match(component, /logo-instagram/)
-  assert.match(component, /logo-twitter/)
-  assert.match(component, /logo-youtube/)
-  for (const label of ['Instagram', 'X', '小红书', 'YouTube']) {
+  assert.match(component, /@iconify-prerendered\/vue-simple-icons/)
+  for (const icon of ['IconInstagram', 'IconTiktok', 'IconX', 'IconXiaohongshu', 'IconYoutube']) {
+    assert.match(component, new RegExp(icon))
+  }
+  for (const label of ['Instagram', 'X', '小红书', 'TikTok', 'YouTube']) {
     assert.match(component, new RegExp(label))
   }
-  assert.match(component, /douyinTikTok/)
-  assert.match(component, /data-platform-label="抖音·TikTok"/)
+  assert.match(component, /knowledgeBase\.douyin/)
+  assert.match(component, /import douyinLogo from '@\/assets\/img\/douyin-logo\.svg'/)
+  assert.match(component, /id: 'douyin',[^\n]*image: douyinLogo/)
+  assert.doesNotMatch(component, /id: 'douyin',[^\n]*icon: IconTiktok/)
+  assert.match(component, /<img v-if="platform\.image" :src="platform\.image" alt="" \/>/)
   assert.match(component, /visual-url-modal__platform-list/)
-  assert.strictEqual((component.match(/class="visual-url-modal__platform"/g) || []).length, 5)
+  assert.match(component, /v-for="platform in socialPlatforms"/)
+  assert.strictEqual((component.match(/id: '/g) || []).length, 6)
+  assert.match(component, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
+  assert.match(component, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  assert.match(component, /max-height: calc\(100dvh - 24px\)/)
+  assert.match(component, /\.visual-url-modal__body\s*\{[\s\S]*?overflow-y: auto/)
+  assert.match(component, /is-instagram/)
+  assert.match(component, /is-xiaohongshu/)
+  assert.match(component, /is-tiktok/)
+  assert.match(component, /is-youtube/)
+  assert.match(component, /#ff2442/)
+  assert.match(component, /#25f4ee/)
+  assert.match(component, /#fe2c55/)
+  assert.match(component, /#ff0000/)
+  assert.match(douyinLogo, /bytednsdoc\.com/)
+  assert.match(douyinLogo, /#00FAF0/)
+  assert.match(douyinLogo, /#FF0050/)
+  assert.doesNotMatch(component, /logo-twitter/)
+  assert.doesNotMatch(component, /visual-url-modal__platform-mark/)
   assert.doesNotMatch(component, /@enter=/)
   assert.match(component, /urlSupportedPlatforms/)
   assert.match(component, /urlInputHint/)
+  assert.match(component, /urlUsageNotice/)
 })
 
 test('URL import confirmation only enforces presence and the 4 KiB input limit', () => {
@@ -61,7 +83,7 @@ test('Add Document and link-share panels use explicit dark semantic surfaces', (
   )
 })
 
-test('all shipped locales describe share text input and the fixed platform row', () => {
+test('all shipped locales describe share text input and the supported platforms', () => {
   for (const path of localeFiles) {
     const locale = readFileSync(new URL(path, import.meta.url), 'utf8')
     assert.match(locale, /urlSupportedPlatforms:/)
@@ -69,5 +91,7 @@ test('all shipped locales describe share text input and the fixed platform row',
     assert.match(locale, /urlClear:/)
     assert.match(locale, /urlTooLong:/)
     assert.match(locale, /douyinTikTok:/)
+    assert.match(locale, /douyin:/)
+    assert.match(locale, /urlUsageNotice:/)
   }
 })
