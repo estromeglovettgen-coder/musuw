@@ -357,6 +357,11 @@ func TestSanitizeGeneratedTitle(t *testing.T) {
 			wantRejected: true,
 		},
 		{
+			name:         "model self-introduction is rejected",
+			raw:          "我是DeepSeek，由深度求索公司创造的AI助手。很高兴认识你！有什么我可以帮你的吗？",
+			wantRejected: true,
+		},
+		{
 			name: "outer quotes are removed",
 			raw:  "“校准短语与基因检测”",
 			want: "校准短语与基因检测",

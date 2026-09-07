@@ -748,6 +748,9 @@ func sanitizeGeneratedTitle(raw string) (string, bool) {
 		return "", true
 	}
 	lower := strings.ToLower(title)
+	if strings.HasPrefix(title, "我是") || strings.HasPrefix(lower, "i am ") || strings.HasPrefix(lower, "i'm ") {
+		return "", true
+	}
 	if strings.Contains(lower, "http://") ||
 		strings.Contains(lower, "https://") ||
 		strings.Contains(lower, "www.") ||
