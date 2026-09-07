@@ -81,10 +81,7 @@
             :aria-label="t('knowledgeBase.importURLTitle')"
           >
             <header class="visual-url-modal__header">
-              <div>
-                <h3>{{ t('knowledgeBase.importURLTitle') }}</h3>
-                <p>{{ t('knowledgeBase.urlTip') }}</p>
-              </div>
+              <h3>{{ t('knowledgeBase.importURLTitle') }}</h3>
               <button
                 type="button"
                 class="visual-url-modal__close"
@@ -142,8 +139,6 @@
                   </span>
                 </div>
               </div>
-              <p class="visual-url-modal__hint">{{ t('knowledgeBase.urlInputHint') }}</p>
-              <p class="visual-url-modal__notice">{{ t('knowledgeBase.urlUsageNotice') }}</p>
             </div>
 
             <footer class="visual-url-modal__footer">
@@ -587,18 +582,11 @@ defineExpose({ openFileDialog, openUrlDialog })
 }
 
 .visual-url-modal__header h3 {
-  margin: 0 0 3px;
+  margin: 0;
   color: #111827;
   font-size: 15px;
   line-height: 22px;
   font-weight: 700;
-}
-
-.visual-url-modal__header p {
-  margin: 0;
-  color: #9ca3af;
-  font-size: 11px;
-  line-height: 16px;
 }
 
 .visual-url-modal__close {
@@ -794,20 +782,6 @@ defineExpose({ openFileDialog, openUrlDialog })
   background: #ff0000;
 }
 
-.visual-url-modal__hint {
-  margin: 10px 0 0;
-  color: #6b7280;
-  font-size: 11px;
-  line-height: 17px;
-}
-
-.visual-url-modal__notice {
-  margin: 8px 0 0;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 18px;
-}
-
 .visual-url-modal__footer {
   flex: 0 0 auto;
   padding: 14px 20px;
@@ -892,9 +866,6 @@ defineExpose({ openFileDialog, openUrlDialog })
   color: var(--mvc-text-strong) !important;
 }
 
-:root[theme-mode="dark"] .visual-url-modal__header p,
-:root[theme-mode="dark"] .visual-url-modal__hint,
-:root[theme-mode="dark"] .visual-url-modal__notice,
 :root[theme-mode="dark"] .visual-url-modal__platforms-label {
   color: var(--mvc-muted) !important;
 }

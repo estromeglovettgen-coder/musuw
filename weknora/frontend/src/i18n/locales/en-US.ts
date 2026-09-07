@@ -316,21 +316,21 @@ export default {
     },
     kbDetail: {
       steps: {
-        intro: {
-          title: 'This knowledge base is empty',
-          desc: 'Add your first item so you can search and chat over it. You can also drag and drop supported file types.'
+        rag: {
+          title: 'RAG: retrieve before answering',
+          desc: 'RAG chunks your sources and builds vector and keyword indexes. Musuw finds relevant passages first, then answers with evidence and citations.'
+        },
+        wiki: {
+          title: 'Wiki: organize sources into knowledge',
+          desc: 'Wiki extracts people, products, and concepts from your sources, then builds linked pages with citations and a visual graph.'
         },
         uploadFile: {
           title: 'Add a document',
           desc: 'Upload or drag in a supported file. Musuw will parse and index it automatically.'
         },
         uploadUrl: {
-          title: 'Import a webpage',
-          desc: 'Use Import Webpage when your source is a public page or social-media link. Existing plan rules still apply.'
-        },
-        done: {
-          title: 'Ready after parsing',
-          desc: 'Once documents are indexed, mention this knowledge base in chat with {\'@\'} to get answers with citations.'
+          title: 'Import web and social sources',
+          desc: 'Import public webpages or social image, text, and video posts here. After parsing, they are ready for cited chat, Wiki, and graph views.'
         }
       }
     },
@@ -513,14 +513,11 @@ export default {
     urlExists: 'This URL already exists',
     urlLabel: 'URL or share message',
     urlPlaceholder: 'Paste a URL or a platform share message',
-    urlTip: 'Paste a URL or share message from a supported platform',
     urlSupportedPlatforms: 'Supported',
-    urlInputHint: 'Auto-detects the link; videos are imported as files and posts as documents. Public single posts only.',
     urlClear: 'Clear',
     urlTooLong: 'The URL or share message must be 4 KB or smaller',
     douyinTikTok: 'Douyin · TikTok',
     douyin: 'Douyin',
-    urlUsageNotice: 'Only import content you own or are authorized to use. URL import creates a private knowledge index; it is not a streaming downloader or content redistribution service.',
     typeURL: 'URL',
     typeManual: 'Manual',
     typeFile: 'File',

@@ -11,7 +11,7 @@ const localeFiles = [
   '../../../i18n/locales/ru-RU.ts',
 ]
 
-test('URL import modal accepts share text in a fixed three-row field', () => {
+test('URL import modal keeps the form focused on input and supported platforms', () => {
   assert.match(component, /<t-textarea[\s\S]*?v-model="urlInputValue"[\s\S]*?:autosize="\{ minRows: 3, maxRows: 3 \}"/)
   assert.match(component, /class="visual-url-modal__textarea-wrap"/)
   assert.match(component, /v-if="urlInputValue"[\s\S]*?class="visual-url-modal__clear"/)
@@ -51,8 +51,9 @@ test('URL import modal accepts share text in a fixed three-row field', () => {
   assert.doesNotMatch(component, /visual-url-modal__platform-mark/)
   assert.doesNotMatch(component, /@enter=/)
   assert.match(component, /urlSupportedPlatforms/)
-  assert.match(component, /urlInputHint/)
-  assert.match(component, /urlUsageNotice/)
+  assert.doesNotMatch(component, /knowledgeBase\.urlTip/)
+  assert.doesNotMatch(component, /knowledgeBase\.urlInputHint/)
+  assert.doesNotMatch(component, /knowledgeBase\.urlUsageNotice/)
 })
 
 test('URL import confirmation only enforces presence and the 4 KiB input limit', () => {
@@ -83,15 +84,13 @@ test('Add Document and link-share panels use explicit dark semantic surfaces', (
   )
 })
 
-test('all shipped locales describe share text input and the supported platforms', () => {
+test('all shipped locales carry the actionable share-input labels', () => {
   for (const path of localeFiles) {
     const locale = readFileSync(new URL(path, import.meta.url), 'utf8')
     assert.match(locale, /urlSupportedPlatforms:/)
-    assert.match(locale, /urlInputHint:/)
     assert.match(locale, /urlClear:/)
     assert.match(locale, /urlTooLong:/)
     assert.match(locale, /douyinTikTok:/)
     assert.match(locale, /douyin:/)
-    assert.match(locale, /urlUsageNotice:/)
   }
 })
