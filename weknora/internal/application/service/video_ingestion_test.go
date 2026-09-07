@@ -353,6 +353,13 @@ func TestFixedVideoModelAllowsSingleServerOverride(t *testing.T) {
 	}
 }
 
+func TestFixedVideoModelDefaultsToQwenURLModel(t *testing.T) {
+	t.Setenv("MUSUW_VIDEO_VLM_MODEL_ID", "")
+	if got := fixedVideoModelID(); got != "builtin-openrouter-vlm-qwen-3-7-flash" {
+		t.Fatalf("fixedVideoModelID = %q, want Qwen 3.7 Flash", got)
+	}
+}
+
 func TestValidateMaterializedSocialSourceRejectsUnreadableCheckpoint(t *testing.T) {
 	fileSvc := &videoIngestionFileServiceStub{getFileErr: errors.New("object missing")}
 	svc := &knowledgeService{fileSvc: fileSvc}

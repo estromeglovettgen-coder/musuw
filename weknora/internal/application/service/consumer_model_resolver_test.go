@@ -242,8 +242,8 @@ func TestConsumerVisionRegistryUsesGeminiForStillImagesOnEveryPlan(t *testing.T)
 	assert.True(t, options[0].SceneDefault)
 	assert.True(t, options[0].Effective)
 	for _, option := range options {
-		assert.NotEqual(t, defaultVideoModelID, option.ModelID,
-			"the fixed video model must not appear in still-image choices")
+		assert.NotEqual(t, legacyMiMoVideoModelID, option.ModelID,
+			"the legacy MiMo video model must not appear in still-image choices")
 	}
 }
 
@@ -284,7 +284,7 @@ func TestConsumerVisionPersistedPolicyRemainsAnExplicitOverride(t *testing.T) {
 }
 
 func TestConsumerVisionIgnoresPersistedVideoModelEntry(t *testing.T) {
-	visionIDs := append(defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), defaultVideoModelID)
+	visionIDs := append(defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), legacyMiMoVideoModelID)
 	models := make([]*types.Model, 0, len(visionIDs))
 	for _, id := range visionIDs {
 		models = append(models, consumerSceneVLMModel(id, id))
@@ -294,7 +294,7 @@ func TestConsumerVisionIgnoresPersistedVideoModelEntry(t *testing.T) {
 			types.ConsumerSceneVision.FreeDefaultKey(), types.PlatformKnowledgeBaseVLMModelID),
 		types.ConsumerSceneVision.PaidOptionsKey(): sceneSettingList(
 			types.ConsumerSceneVision.PaidOptionsKey(),
-			[]string{defaultVideoModelID, types.PlatformKnowledgeBaseVLMModelID},
+			[]string{legacyMiMoVideoModelID, types.PlatformKnowledgeBaseVLMModelID},
 		),
 	}}
 	resolver := NewConsumerModelResolver(&consumerSceneModelRepo{models: models}, settings, nil)
@@ -307,13 +307,13 @@ func TestConsumerVisionIgnoresPersistedVideoModelEntry(t *testing.T) {
 
 func TestConsumerVisionRepairsPersistedVideoModelFreeDefault(t *testing.T) {
 	gemini := consumerSceneVLMModel(types.PlatformKnowledgeBaseVLMModelID, "Gemini")
-	mimo := consumerSceneVLMModel(defaultVideoModelID, "MiMo")
+	mimo := consumerSceneVLMModel(legacyMiMoVideoModelID, "MiMo")
 	settings := &consumerSceneSettings{rows: map[string]*types.SystemSetting{
 		types.ConsumerSceneVision.FreeDefaultKey(): sceneSettingString(
-			types.ConsumerSceneVision.FreeDefaultKey(), defaultVideoModelID),
+			types.ConsumerSceneVision.FreeDefaultKey(), legacyMiMoVideoModelID),
 		types.ConsumerSceneVision.PaidOptionsKey(): sceneSettingList(
 			types.ConsumerSceneVision.PaidOptionsKey(),
-			[]string{defaultVideoModelID, types.PlatformKnowledgeBaseVLMModelID},
+			[]string{legacyMiMoVideoModelID, types.PlatformKnowledgeBaseVLMModelID},
 		),
 	}}
 	resolver := NewConsumerModelResolver(
@@ -344,7 +344,8 @@ func TestConsumerModelPolicyDefaultsExposeExpandedOpenRouterCatalog(t *testing.T
 		"builtin-openrouter-vlm-qwen-3-7-flash",
 		"builtin-openrouter-vlm-gemma-4-free",
 	})
-	assert.NotContains(t, defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), defaultVideoModelID)
+	assert.Contains(t, defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), defaultVideoModelID)
+	assert.NotContains(t, defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), legacyMiMoVideoModelID)
 	assert.Subset(t, defaultConsumerPaidModelIDsForType(types.ModelTypeASR), []string{
 		"builtin-openrouter-asr-whisper-turbo",
 		"builtin-openrouter-asr-qwen-0-6b",

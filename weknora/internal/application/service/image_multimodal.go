@@ -555,9 +555,9 @@ func (s *ImageMultimodalService) resolveVLM(ctx context.Context, kbID, knowledge
 	if !vlmCfg.IsEnabled() {
 		return nil, types.VLMConfig{}, fmt.Errorf("VLM is not enabled for knowledge base %s", kbID)
 	}
-	// MiMo is reserved for URL-video ingestion. Repair stale still-image KB
-	// overrides at the owning image-model seam without changing the video path.
-	if strings.TrimSpace(vlmCfg.ModelID) == defaultVideoModelID {
+	// Repair stale still-image KB overrides left by the previous MiMo video
+	// default at the owning image-model seam without changing the video path.
+	if strings.TrimSpace(vlmCfg.ModelID) == legacyMiMoVideoModelID {
 		vlmCfg.ModelID = types.PlatformKnowledgeBaseVLMModelID
 	}
 

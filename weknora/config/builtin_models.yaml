@@ -479,7 +479,7 @@ builtin_models:
       interface_type: openai
       supports_vision: true
       extra_config:
-        video_input_mode: base64
+        video_input_mode: url
         video_provider: alibaba
 
   - id: builtin-openrouter-vlm-gemma-4-free
