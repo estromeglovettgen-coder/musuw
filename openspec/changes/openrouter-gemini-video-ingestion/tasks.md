@@ -21,7 +21,7 @@
   not add an automatic model fallback.
 - [x] 4.2 Run focused unit/catalog checks and two real Qwen 3.7 Flash requests
   through the exact retained large-video object URL.
-- [ ] 4.3 Deploy the complete catalog to staging, prove parsing plus Wiki/graph
+- [x] 4.3 Deploy the complete catalog to staging, prove parsing plus Wiki/graph
   generation for the retained Xiaohongshu video, then promote the immutable
   revision and browser-test the paid production social/local upload matrix.
 - [x] 4.4 Preserve typed OpenRouter credit exhaustion across video failure

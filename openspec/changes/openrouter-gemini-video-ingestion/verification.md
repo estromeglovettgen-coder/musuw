@@ -1,5 +1,48 @@
 # Verification evidence
 
+## 2026-09-07 deployed Qwen/Instagram-V3 acceptance (production matrix complete)
+
+- Main revision `595c5a30` contains PR #34 (Qwen URL-based video ingestion) and
+  PR #35 (TikHub Instagram V2→V3). CI, staging delivery, and production
+  promotion are recorded by runs `34073985165`, `34074604558`, and
+  `34075907013`, respectively.
+- Staging real-link checks passed for the retained Xiaohongshu video and the
+  Instagram share fixture: provider materialization, Qwen video analysis or
+  image resolution, parsing, summaries, and Wiki/graph generation completed.
+  The Instagram route now sends only the parsed shortcode as V3 `code` and
+  normalizes the documented `items`, `caption.text`, `video_versions`,
+  `image_versions2`, and image-only `carousel_media` fields.
+- Production browser acceptance completed in KB
+  `a8967560-fa43-4d87-a26c-9f95c3439861`. The eight social inputs are retained
+  as knowledge rows: XHS video `0181f366-28db-496f-9c50-da766813b06d`, XHS
+  image `f9f96ea4-ccaf-46ac-84db-0e6113e37a88`, Douyin image
+  `3835621c-5c29-4c0b-86db-636ee4e3721e`, Douyin video
+  `317752fd-3c46-40d2-be7f-962bc1269dfb`, X video
+  `7b0db5a7-890d-4836-9ed0-6a23f0911ead`, X image
+  `0555359a-c433-4277-8593-d79b58f8e8c8`, YouTube
+  `70644bf6-18ed-4acb-835d-76a245b199de`, and Instagram
+  `f4df6f34-98c5-42ff-b567-5736abc5ca28`. All eight social rows and the local
+  JPG and MP4 rows are terminal `parse_status=completed`, `summary=completed`,
+  and root `done`, with no bad spans. Instagram completed at
+  `2026-09-07T10:30:07+08`, materialized a 10,544,836-byte MP4 titled
+  `国家地理“地球月”企鹅特别节目预告片`, and produced four chunks. The local
+  JPG and MP4 rows are
+  `b0907230-8566-43c4-9793-ef8e39380788` and
+  `46f6326d-c773-4cb3-a72b-b1c5155fc2ea`.
+- The completed 10-row matrix produced 49 chunks, 10 published summary slugs,
+  and an untruncated Wiki/graph result with 91 Wiki pages (41 concept, 39
+  entity, 1 index, 10 summary), 91 graph nodes, and 365 edges.
+- The first concurrent production TikHub batch exposed upstream HTTP 400
+  responses on some social routes. TikHub documents HTTP 400 as including
+  provider-side internal errors. The existing bounded retry recovered the XHS
+  materializations; Instagram V2 remained failed until the official V3 endpoint
+  was deployed and the same row was reparsed. This is not evidence that every
+  first concurrent request succeeds, and no extra adapter, transcode service,
+  automatic fallback, or model router was added.
+- Task 4.3 is complete: the staging XHS gate, immutable promotion, and the
+  paid production social/local matrix all reached their required terminal
+  states with downstream Wiki/graph evidence.
+
 ## 2026-08-24 production disposable E2E (current video evidence)
 
 - `aurora-observation-briefing.mp4` was uploaded once through the default
