@@ -40,8 +40,6 @@ var (
 	SocialFormatUnsupportedPublicMessage = "暂不支持此社媒视频格式"
 )
 
-const maxPersistedKnowledgeTitleRunes = 255
-
 func cleanupTikHubResolvedImages(ctx context.Context, fileSvc interfaces.FileService, images []docparser.StoredImage) {
 	if fileSvc == nil {
 		return
@@ -345,13 +343,17 @@ func (s *knowledgeService) prepareTikHubArtifactWithVideoLimit(
 	updatedKnowledge.FileName = fileName
 	updatedKnowledge.FileType = result.FileType
 	updatedKnowledge.FileSize = fileSize
-	// Document captions are the only provider title available before parsing.
-	// Video captions are often the full social post (notably X), so leave the
-	// automatic URL title untouched and let convertVideo publish the concise H1
-	// emitted by the same video-understanding pass.
-	if result.Kind == tikhub.ResultDocument && strings.TrimSpace(result.Title) != "" &&
-		(strings.TrimSpace(knowledge.Title) == "" || knowledge.Title == knowledge.Source) {
-		updatedKnowledge.Title = boundedSocialTitle(result.Title)
+	// A provider caption is document content, not a user-authored title. Keep
+	// image/text social works in the automatic URL-title state so the existing
+	// summary-model call can publish a concise title. A document that has no
+	// provider description or images is already a direct model-analysis result
+	// (currently the YouTube path), so its generated heading can be used now.
+	if result.Kind == tikhub.ResultDocument &&
+		strings.TrimSpace(result.Description) == "" && len(result.ImageURLs) == 0 &&
+		automaticURLKnowledgeTitle(updatedKnowledge) {
+		if title := conciseAnalysisTitle(result.Title); title != "" {
+			updatedKnowledge.Title = title
+		}
 	}
 	if strings.TrimSpace(result.Description) != "" {
 		updatedKnowledge.Description = strings.TrimSpace(result.Description)
@@ -424,15 +426,6 @@ func firstMarkdownTitle(markdown string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Trim(firstLine, "*_`"))
-}
-
-func boundedSocialTitle(value string) string {
-	title := strings.TrimSpace(value)
-	runes := []rune(title)
-	if len(runes) <= maxPersistedKnowledgeTitleRunes {
-		return title
-	}
-	return string(runes[:maxPersistedKnowledgeTitleRunes-1]) + "…"
 }
 
 func unresolvedSocialImageURLs(expected []string, resolved []docparser.StoredImage) []string {

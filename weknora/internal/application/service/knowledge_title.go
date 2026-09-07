@@ -8,6 +8,8 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
+const maxCompactKnowledgeTitleRunes = 40
+
 // conciseAnalysisTitle normalizes a title that came from an existing parser or
 // model analysis result. Video analysis already emits a Markdown heading, so
 // this helper only extracts and bounds that heading; it never calls an LLM.
@@ -24,23 +26,20 @@ func conciseAnalysisTitle(raw string) string {
 	if title == "" {
 		return ""
 	}
-	if clean, rejected := sanitizeGeneratedTitle(title); !rejected {
-		return clean
-	}
-	// Do not turn a URL or Markdown link into a knowledge title. This also
-	// protects the caller when a parser accidentally echoes the source URL.
-	lower := strings.ToLower(title)
-	if strings.Contains(lower, "http://") ||
-		strings.Contains(lower, "https://") ||
-		strings.Contains(lower, "www.") ||
-		strings.Contains(title, "](") {
+	clean, rejected := sanitizeGeneratedTitle(title)
+	if rejected || strings.Contains(clean, "#") {
 		return ""
 	}
-	runes := []rune(title)
-	if len(runes) > maxSessionTitleRunes {
-		return string(runes[:maxSessionTitleRunes-1]) + "…"
+	words := strings.Fields(clean)
+	if len(words) > 10 {
+		return ""
 	}
-	return ""
+	// Languages without word separators need a compact rune bound instead of
+	// the 4-10 word contract used for space-delimited titles.
+	if len(words) <= 2 && len([]rune(clean)) > maxCompactKnowledgeTitleRunes {
+		return ""
+	}
+	return clean
 }
 
 func automaticURLKnowledgeTitle(knowledge *types.Knowledge) bool {
@@ -56,9 +55,11 @@ func automaticURLKnowledgeTitle(knowledge *types.Knowledge) bool {
 }
 
 // updateKnowledgeTitleFromAnalysis converges an automatically titled URL
-// knowledge row onto the title already present in a parser/VLM result. The
-// repository evaluates the source/title guard in the UPDATE itself so a manual
-// rename that landed while parsing is preserved.
+// knowledge row onto an explicit model/parser title. A Markdown heading alone
+// is not title metadata: social-document Markdown starts with the provider's
+// full caption, which is content rather than a concise title. The repository
+// evaluates the source/title guard in the UPDATE itself so a manual rename that
+// landed while parsing is preserved.
 func (s *knowledgeService) updateKnowledgeTitleFromAnalysis(
 	ctx context.Context,
 	knowledge *types.Knowledge,
@@ -70,9 +71,6 @@ func (s *knowledgeService) updateKnowledgeTitleFromAnalysis(
 	candidate := ""
 	if result.Metadata != nil {
 		candidate = result.Metadata["title"]
-	}
-	if strings.TrimSpace(candidate) == "" {
-		candidate = firstMarkdownTitle(result.MarkdownContent)
 	}
 	candidate = conciseAnalysisTitle(candidate)
 	if candidate == "" ||

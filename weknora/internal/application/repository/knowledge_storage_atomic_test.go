@@ -365,6 +365,62 @@ func TestClaimKnowledgeSourceWithStoragePreservesPersistedState(t *testing.T) {
 	assert.Equal(t, int64(2), tenantStorageUsed(t, db, tenant.ID))
 }
 
+func TestClaimKnowledgeSourceWithStoragePreservesURLTitleRenamedDuringFetch(t *testing.T) {
+	db, tenant := newStorageAccountingDB(t)
+	repo := NewKnowledgeRepository(db)
+	ctx := context.Background()
+	const source = "https://v.douyin.com/example/"
+
+	seed := storageKnowledge(tenant.ID, "claim-renamed-title", 0, 0)
+	seed.Type = "url"
+	seed.Source = source
+	seed.Title = source
+	require.NoError(t, repo.CreateKnowledgeWithStorage(ctx, seed, 5))
+	require.NoError(t, db.Model(&types.Knowledge{}).Where("id = ?", seed.ID).
+		Update("title", "我手动改的标题").Error)
+
+	proposed := *seed // stale worker snapshot from before the provider fetch
+	proposed.FilePath = "local://douyin.md"
+	proposed.FileType = "md"
+	proposed.FileSize = 2
+	proposed.Title = source
+	proposed.Description = "provider caption"
+
+	current, claimed, err := repo.ClaimKnowledgeSourceWithStorage(ctx, &proposed, 5)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	require.NotNil(t, current)
+	require.Equal(t, "我手动改的标题", current.Title)
+
+	var persisted types.Knowledge
+	require.NoError(t, db.Where("id = ?", seed.ID).First(&persisted).Error)
+	require.Equal(t, "我手动改的标题", persisted.Title)
+}
+
+func TestUpdateKnowledgeWithStoragePreservesURLTitleRenamedDuringAnalysis(t *testing.T) {
+	db, tenant := newStorageAccountingDB(t)
+	repo := NewKnowledgeRepository(db)
+	ctx := context.Background()
+	const source = "https://x.com/example/status/1"
+
+	seed := storageKnowledge(tenant.ID, "update-renamed-title", 1, 0)
+	seed.Type = "url"
+	seed.Source = source
+	seed.Title = source
+	require.NoError(t, repo.CreateKnowledgeWithStorage(ctx, seed, 5))
+	require.NoError(t, db.Model(&types.Knowledge{}).Where("id = ?", seed.ID).
+		Update("title", "分析期间的手动标题").Error)
+
+	staleWorker := *seed
+	staleWorker.StorageSize = 2
+	require.NoError(t, repo.UpdateKnowledgeWithStorage(ctx, &staleWorker, 5))
+
+	var persisted types.Knowledge
+	require.NoError(t, db.Where("id = ?", seed.ID).First(&persisted).Error)
+	require.Equal(t, "分析期间的手动标题", persisted.Title)
+	require.Equal(t, int64(2), persisted.StorageSize)
+}
+
 func TestKnowledgePairedUpdateUsesPersistedDelta(t *testing.T) {
 	db, tenant := newStorageAccountingDB(t)
 	repo := NewKnowledgeRepository(db)

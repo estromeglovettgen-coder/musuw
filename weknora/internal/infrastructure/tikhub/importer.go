@@ -925,7 +925,10 @@ func xhsResponseIsVideo(data any) bool {
 func documentResult(title, description string, images []string) Result {
 	var markdown strings.Builder
 	if title != "" {
-		markdown.WriteString("# " + title + "\n\n")
+		// Provider titles are frequently the complete social caption. Preserve
+		// that text as content without declaring it to be the canonical document
+		// heading; the analysis pipeline generates the actual concise title.
+		markdown.WriteString(title + "\n\n")
 	}
 	if description != "" && description != title {
 		markdown.WriteString(description + "\n\n")
