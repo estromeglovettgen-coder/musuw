@@ -25,6 +25,7 @@ const (
 
 	tiktokSharePath      = "/api/v1/tiktok/app/v3/fetch_one_video_by_share_url"
 	douyinSharePath      = "/api/v1/douyin/app/v3/fetch_one_video_by_share_url"
+	douyinWebSharePath   = "/api/v1/douyin/web/fetch_one_video_by_share_url"
 	youtubeStreamsV2Path = "/api/v1/youtube/web_v2/get_video_streams_v2"
 	xhsImagePath         = "/api/v1/xiaohongshu/app_v2/get_image_note_detail"
 	xhsVideoPath         = "/api/v1/xiaohongshu/app_v2/get_video_note_detail"
@@ -87,8 +88,9 @@ func NewTikHubImporterForTest(baseURL, apiKey string, client *http.Client) *TikH
 	}
 }
 
-// Fetch makes one billed request, except Xiaohongshu video notes where the
-// official image-first flow requires a conditional second request.
+// Fetch makes one billed request, except for provider-documented conditional
+// fallbacks: Douyin App filter reason 8 to Web, and Xiaohongshu image to video
+// when the first response identifies a video note.
 func (i *TikHubImporter) Fetch(ctx context.Context, route Route) (Result, error) {
 	if i == nil || i.client == nil {
 		return Result{}, errors.New("TikHub importer is unavailable")
@@ -108,6 +110,14 @@ func (i *TikHubImporter) Fetch(ctx context.Context, route Route) (Result, error)
 			endpoint = douyinSharePath
 		}
 		data, err := i.get(ctx, endpoint, url.Values{"share_url": {input}})
+		if err != nil {
+			return Result{}, err
+		}
+		result, normalizeErr := normalizeWork(route.Platform, route.ObjectID, data, true)
+		if normalizeErr == nil || route.Platform != PlatformDouyin || !douyinAppRequiresWebFallback(data) {
+			return result, normalizeErr
+		}
+		data, err = i.get(ctx, douyinWebSharePath, url.Values{"share_url": {input}})
 		if err != nil {
 			return Result{}, err
 		}
@@ -167,6 +177,28 @@ func (i *TikHubImporter) Fetch(ctx context.Context, route Route) (Result, error)
 	default:
 		return Result{}, fmt.Errorf("%w: %q", ErrUnsupportedPlatform, route.Platform)
 	}
+}
+
+func douyinAppRequiresWebFallback(data any) bool {
+	object, ok := data.(map[string]any)
+	if !ok {
+		return false
+	}
+	filters, ok := object["filter_list"].([]any)
+	if !ok {
+		return false
+	}
+	for _, rawFilter := range filters {
+		filter, ok := rawFilter.(map[string]any)
+		if !ok {
+			continue
+		}
+		reason, ok := numberValue(filter["reason"])
+		if ok && reason == 8 {
+			return true
+		}
+	}
+	return false
 }
 
 func requireInputURL(route Route) (string, error) {
