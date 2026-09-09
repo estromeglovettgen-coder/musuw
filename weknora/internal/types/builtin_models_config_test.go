@@ -522,7 +522,8 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.True(t, mimo.Parameters.SupportsVision)
 	assert.Equal(t, "url", mimo.Parameters.ExtraConfig["video_input_mode"])
 	assert.False(t, mimo.IsDefault)
-	assert.NotContains(t, byID, "builtin-openrouter-vlm-muse-spark-1-2", "account-restricted endpoint must not be advertised")
+	assert.NotContains(t, byID, "builtin-openrouter-vlm-muse-spark-1-2",
+		"account-restricted endpoint must not be advertised")
 	qwenVideo := byID["builtin-openrouter-vlm-qwen-3-7-flash"]
 	assert.Equal(t, "url", qwenVideo.Parameters.ExtraConfig["video_input_mode"])
 	assert.Equal(t, "alibaba", qwenVideo.Parameters.ExtraConfig["video_provider"])

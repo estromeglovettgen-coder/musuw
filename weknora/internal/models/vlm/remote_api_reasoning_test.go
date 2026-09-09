@@ -422,9 +422,13 @@ func TestRemoteAPIVLMPredictPreservesMandatoryReasoning(t *testing.T) {
 	}))
 	defer server.Close()
 	withVLMSSRFWhitelist(t, "127.0.0.1")
-	saved := &types.Model{Name: "openai/gpt-6-astra", Source: types.ModelSourceRemote,
-		Parameters: types.ModelParameters{Provider: "openrouter", BaseURL: server.URL,
-			Reasoning: types.ReasoningParameters{Supported: true, Mandatory: true}}}
+	saved := &types.Model{
+		Name: "openai/gpt-6-astra", Source: types.ModelSourceRemote,
+		Parameters: types.ModelParameters{
+			Provider: "openrouter", BaseURL: server.URL,
+			Reasoning: types.ReasoningParameters{Supported: true, Mandatory: true},
+		},
+	}
 	model, err := NewRemoteAPIVLM(ConfigFromModel(saved, "", ""))
 	if err != nil {
 		t.Fatal(err)

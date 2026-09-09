@@ -18,21 +18,24 @@ func TestTranscribeUsesConfiguredJSONFormatAndKeepsWhisperSegments(t *testing.T)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, "/audio/transcriptions", r.URL.Path)
 				require.NoError(t, r.ParseMultipartForm(1024))
-				defer r.MultipartForm.RemoveAll()
+				defer func() { require.NoError(t, r.MultipartForm.RemoveAll()) }()
 				w.Header().Set("Content-Type", "application/json")
 				if r.FormValue("response_format") != format {
 					w.WriteHeader(http.StatusBadRequest)
-					fmt.Fprint(w, `{"error":{"message":"unsupported response format"}}`)
+					_, _ = fmt.Fprint(w, `{"error":{"message":"unsupported response format"}}`)
 					return
 				}
 				if format == "json" {
-					fmt.Fprint(w, `{"text":"Musuw 742"}`)
+					_, _ = fmt.Fprint(w, `{"text":"Musuw 742"}`)
 				} else {
-					fmt.Fprint(w, `{"text":"Musuw 742","segments":[{"start":0,"end":1,"text":"Musuw 742"}]}`)
+					_, _ = fmt.Fprint(w,
+						`{"text":"Musuw 742","segments":[{"start":0,"end":1,"text":"Musuw 742"}]}`)
 				}
 			}))
 			defer server.Close()
-			model := &types.Model{Name: "transcription-model", Parameters: types.ModelParameters{BaseURL: server.URL}}
+			model := &types.Model{
+				Name: "transcription-model", Parameters: types.ModelParameters{BaseURL: server.URL},
+			}
 			if format == "json" {
 				model.Parameters.ExtraConfig = map[string]string{"response_format": "json"}
 			}

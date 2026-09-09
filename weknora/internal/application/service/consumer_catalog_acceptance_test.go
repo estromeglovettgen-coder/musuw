@@ -25,12 +25,16 @@ func TestShippedConsumerCatalogReachesConversationScenes(t *testing.T) {
 		if entry.Type == types.ModelTypeKnowledgeQA {
 			chatIDs = append(chatIDs, entry.ID)
 		}
-		models = append(models, &types.Model{ID: entry.ID, Name: entry.Name,
+		models = append(models, &types.Model{
+			ID: entry.ID, Name: entry.Name,
 			DisplayName: entry.DisplayName, Type: entry.Type, Source: entry.Source,
-			Status: entry.Status, IsBuiltin: true, Parameters: entry.Parameters})
+			Status: entry.Status, IsBuiltin: true, Parameters: entry.Parameters,
+		})
 	}
-	resolver := NewConsumerModelResolver(&consumerSceneModelRepo{models: models}, registryConsumerSceneSettings{}, nil)
-	for _, scene := range []types.ConsumerScene{types.ConsumerSceneChat, types.ConsumerSceneRAG, types.ConsumerSceneWiki} {
+	resolver := NewConsumerModelResolver(
+		&consumerSceneModelRepo{models: models}, registryConsumerSceneSettings{}, nil)
+	scenes := []types.ConsumerScene{types.ConsumerSceneChat, types.ConsumerSceneRAG, types.ConsumerSceneWiki}
+	for _, scene := range scenes {
 		t.Run(string(scene), func(t *testing.T) {
 			ctx := contextWithConsumerPlan(1, types.ConsumerPlanPlus)
 			options, err := resolver.ListConsumerModelOptions(ctx, scene)
@@ -43,19 +47,25 @@ func TestShippedConsumerCatalogReachesConversationScenes(t *testing.T) {
 			for id := range byID {
 				optionIDs = append(optionIDs, id)
 			}
-			assert.ElementsMatch(t, chatIDs, optionIDs, "all shipped conversation models must reach each scene")
-			for _, id := range []string{"builtin-openrouter-gpt-astra", "builtin-openrouter-grok", "builtin-openrouter-kimi"} {
+			assert.ElementsMatch(t, chatIDs, optionIDs,
+				"all shipped conversation models must reach each scene")
+			newIDs := []string{
+				"builtin-openrouter-gpt-astra", "builtin-openrouter-grok", "builtin-openrouter-kimi",
+			}
+			for _, id := range newIDs {
 				require.Contains(t, byID, id, "new model must reach scene options")
 				require.True(t, byID[id].Selectable)
 				model, err := resolver.ResolveConsumerModel(ctx, scene, id)
 				require.NoError(t, err)
 				require.Equal(t, id, model.ID)
-				_, err = resolver.ResolveConsumerModel(contextWithConsumerPlan(1, types.ConsumerPlanFree), scene, id)
+				freeCtx := contextWithConsumerPlan(1, types.ConsumerPlanFree)
+				_, err = resolver.ResolveConsumerModel(freeCtx, scene, id)
 				require.Error(t, err, "catalog refresh must retain Free authorization")
 			}
 			saved, err := resolver.ResolveConsumerModel(ctx, scene, "builtin-openrouter-minimax-m3-free")
 			require.NoError(t, err)
-			assert.Equal(t, "minimax/minimax-m3", saved.Name, "saved MiniMax selection must reach the available paid endpoint")
+			assert.Equal(t, "minimax/minimax-m3", saved.Name,
+				"saved MiniMax selection must reach the available paid endpoint")
 			assert.NotContains(t, saved.DisplayName, "Free")
 		})
 	}
