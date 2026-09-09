@@ -368,6 +368,14 @@ func defaultConsumerPaidModelIDs() []string {
 		"builtin-openrouter-gpt-luna",
 		"builtin-openrouter-gpt-terra",
 		"builtin-openrouter-gpt-sol",
+		"builtin-openrouter-gpt-astra",
+		"builtin-openrouter-grok",
+		"builtin-openrouter-kimi",
+		"builtin-openrouter-kimi-code",
+		"builtin-openrouter-glm-flash",
+		"builtin-openrouter-qwen-flash",
+		"builtin-openrouter-claude-fable",
+		"builtin-openrouter-mimo-pro",
 		"builtin-openrouter-gemini-flash",
 		"builtin-openrouter-gemini-pro",
 		"builtin-openrouter-claude-haiku",
@@ -393,10 +401,12 @@ func defaultConsumerPaidModelIDsForType(modelType types.ModelType) []string {
 	case types.ModelTypeVLLM:
 		return []string{
 			types.PlatformKnowledgeBaseVLMModelID,
-			"builtin-openrouter-vlm-muse-spark-1-2",
-			"builtin-openrouter-vlm-minimax-m3-free",
 			"builtin-openrouter-vlm-qwen-3-7-flash",
 			"builtin-openrouter-vlm-gemma-4-free",
+			"builtin-openrouter-vlm-gpt-astra",
+			"builtin-openrouter-vlm-grok",
+			"builtin-openrouter-vlm-kimi",
+			"builtin-openrouter-vlm-gemini-flash",
 		}
 	case types.ModelTypeASR:
 		return []string{

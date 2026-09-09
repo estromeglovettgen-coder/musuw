@@ -263,7 +263,7 @@ func TestConsumerVisionPersistedPolicyRemainsAnExplicitOverride(t *testing.T) {
 			types.ConsumerSceneVision.PaidOptionsKey(),
 			[]string{
 				types.PlatformKnowledgeBaseVLMModelID,
-				"builtin-openrouter-vlm-muse-spark-1-2",
+				"builtin-openrouter-vlm-gpt-astra",
 			},
 		),
 	}}
@@ -339,8 +339,7 @@ func TestConsumerModelPolicyDefaultsExposeExpandedOpenRouterCatalog(t *testing.T
 		"builtin-openrouter-rerank-qwen3",
 	})
 	assert.Subset(t, defaultConsumerPaidModelIDsForType(types.ModelTypeVLLM), []string{
-		"builtin-openrouter-vlm-muse-spark-1-2",
-		"builtin-openrouter-vlm-minimax-m3-free",
+		"builtin-openrouter-vlm-gpt-astra",
 		"builtin-openrouter-vlm-qwen-3-7-flash",
 		"builtin-openrouter-vlm-gemma-4-free",
 	})

@@ -22,17 +22,26 @@ const (
 
 // OpenAIASR implements ASR via an OpenAI-compatible audio transcriptions API.
 type OpenAIASR struct {
-	modelName string
-	modelID   string
-	client    *openai.Client
-	baseURL   string
-	language  string
+	modelName      string
+	modelID        string
+	client         *openai.Client
+	baseURL        string
+	language       string
+	responseFormat openai.AudioResponseFormat
 }
 
 // NewOpenAIASR creates an OpenAI-compatible ASR instance.
 func NewOpenAIASR(config *Config) (*OpenAIASR, error) {
 	if err := validateASRBaseURL(config.BaseURL); err != nil {
 		return nil, err
+	}
+
+	responseFormat := openai.AudioResponseFormat(strings.TrimSpace(config.ResponseFormat))
+	if responseFormat == "" {
+		responseFormat = openai.AudioResponseFormatVerboseJSON
+	}
+	if responseFormat != openai.AudioResponseFormatJSON && responseFormat != openai.AudioResponseFormatVerboseJSON {
+		return nil, fmt.Errorf("ASR response_format must be json or verbose_json")
 	}
 
 	apiCfg := openai.DefaultConfig(config.APIKey)
@@ -52,11 +61,12 @@ func NewOpenAIASR(config *Config) (*OpenAIASR, error) {
 	}
 
 	return &OpenAIASR{
-		modelName: config.ModelName,
-		modelID:   config.ModelID,
-		client:    openai.NewClientWithConfig(apiCfg),
-		baseURL:   config.BaseURL,
-		language:  config.Language,
+		modelName:      config.ModelName,
+		modelID:        config.ModelID,
+		client:         openai.NewClientWithConfig(apiCfg),
+		baseURL:        config.BaseURL,
+		language:       config.Language,
+		responseFormat: responseFormat,
 	}, nil
 }
 
@@ -78,7 +88,7 @@ func (s *OpenAIASR) Transcribe(ctx context.Context, audioBytes []byte, fileName 
 		Model:    s.modelName,
 		FilePath: fileName,
 		Reader:   bytes.NewReader(audioBytes),
-		Format:   openai.AudioResponseFormatVerboseJSON,
+		Format:   s.responseFormat,
 	}
 
 	if s.language != "" {

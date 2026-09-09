@@ -212,10 +212,12 @@ func TestNativeConsumerSettingRegistryContainsOnlyNewTypedBoundaries(t *testing.
 		},
 		types.ConsumerSceneVision: {
 			types.PlatformKnowledgeBaseVLMModelID,
-			"builtin-openrouter-vlm-muse-spark-1-2",
-			"builtin-openrouter-vlm-minimax-m3-free",
 			"builtin-openrouter-vlm-qwen-3-7-flash",
 			"builtin-openrouter-vlm-gemma-4-free",
+			"builtin-openrouter-vlm-gpt-astra",
+			"builtin-openrouter-vlm-grok",
+			"builtin-openrouter-vlm-kimi",
+			"builtin-openrouter-vlm-gemini-flash",
 		},
 		types.ConsumerSceneASR: {
 			types.PlatformKnowledgeBaseASRModelID,
