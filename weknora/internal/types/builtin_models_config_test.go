@@ -438,7 +438,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	var models []Model
 	require.NoError(t, db.Order("id").Find(&models).Error)
-	require.Len(t, models, 42)
+	require.Len(t, models, 41)
 
 	byID := make(map[string]Model, len(models))
 	defaultByType := make(map[ModelType]int)

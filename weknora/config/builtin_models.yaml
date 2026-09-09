@@ -422,25 +422,6 @@ builtin_models:
         supported_efforts: [max, high, low]
         default_effort: low
 
-  - id: builtin-openrouter-qwen-flash
-    tenant_id: 10000
-    name: qwen/qwen3.8-flash
-    display_name: Qwen 3.8 Flash
-    type: KnowledgeQA
-    source: remote
-    description: Qwen 3.8 Flash through OpenRouter · efficient multimodal reasoning
-    is_default: false
-    status: active
-    parameters:
-      base_url: https://openrouter.ai/api/v1
-      provider: openrouter
-      supports_vision: true
-      reasoning:
-        supported: true
-        mandatory: false
-        supported_efforts: [high, medium, low]
-        default_effort: low
-
   - id: builtin-openrouter-claude-fable
     tenant_id: 10000
     name: anthropic/claude-fable-5.1

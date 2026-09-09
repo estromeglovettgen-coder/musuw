@@ -373,7 +373,6 @@ func defaultConsumerPaidModelIDs() []string {
 		"builtin-openrouter-kimi",
 		"builtin-openrouter-kimi-code",
 		"builtin-openrouter-glm-flash",
-		"builtin-openrouter-qwen-flash",
 		"builtin-openrouter-claude-fable",
 		"builtin-openrouter-mimo-pro",
 		"builtin-openrouter-gemini-flash",
