@@ -43,6 +43,8 @@ func TestShippedConsumerCatalogReachesConversationScenes(t *testing.T) {
 			for _, option := range options {
 				byID[option.ModelID] = option
 			}
+			assert.NotContains(t, byID, "builtin-openrouter-qwen-flash",
+				"Qwen 3.8 Flash repeatedly timed out at minimum reasoning in staging")
 			var optionIDs []string
 			for id := range byID {
 				optionIDs = append(optionIDs, id)
