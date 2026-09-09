@@ -92,6 +92,59 @@ func TestTikHubImporterFetchesTikTokAndDouyinShareURLs(t *testing.T) {
 	}
 }
 
+func TestTikHubImporterFallsBackToDouyinWebWhenAppFiltersTheWork(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/douyin/app/v3/fetch_one_video_by_share_url":
+			_, _ = io.WriteString(w, `{"code":200,"data":{"aweme_details":[],"filter_list":[{"aweme_id":"7680316918494022931","reason":8}],"status_code":0}}`)
+		case "/api/v1/douyin/web/fetch_one_video_by_share_url":
+			_, _ = io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"aweme_id":"7680316918494022931","desc":"Public video","video":{"play_addr_h264":{"url_list":["https://cdn.example/douyin-web.mp4"]}}}}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	result, err := NewTikHubImporterForTest(server.URL, "token", server.Client()).Fetch(
+		context.Background(),
+		Route{Platform: PlatformDouyin, InputURL: "https://v.douyin.com/NPPgS-cqjno"},
+	)
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+	if result.Kind != ResultVideo || result.Title != "Public video" || result.MediaURL != "https://cdn.example/douyin-web.mp4" {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestTikHubImporterDoesNotUseDouyinWebForPrivateWork(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/douyin/app/v3/fetch_one_video_by_share_url":
+			_, _ = io.WriteString(w, `{"code":200,"data":{"aweme_details":[],"filter_list":[{"aweme_id":"private","reason":5}],"status_code":0}}`)
+		case "/api/v1/douyin/web/fetch_one_video_by_share_url":
+			_, _ = io.WriteString(w, `{"code":200,"data":{"aweme_detail":{"desc":"must not be fetched","video":{"play_addr_h264":{"url_list":["https://cdn.example/private.mp4"]}}}}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	_, err := NewTikHubImporterForTest(server.URL, "token", server.Client()).Fetch(
+		context.Background(),
+		Route{Platform: PlatformDouyin, InputURL: "https://v.douyin.com/private"},
+	)
+	if err == nil {
+		t.Fatal("Fetch() error = nil, want private work to remain unavailable")
+	}
+}
+
 func TestTikHubImporterFetchesYouTubeByVideoID(t *testing.T) {
 	t.Parallel()
 
