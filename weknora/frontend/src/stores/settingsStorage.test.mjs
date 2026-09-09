@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { runInThisContext } from "node:vm";
+import ts from "typescript";
 
 const SETTINGS_STORAGE_KEY = "WeKnora_settings";
 const BUILTIN_QUICK_ANSWER_ID = "builtin-quick-answer";
@@ -8,111 +10,22 @@ const BUILTIN_SMART_REASONING_ID = "builtin-smart-reasoning";
 const DEFAULT_CHAT_MODEL_ID = "builtin-deepseek-v4-flash";
 const settingsStorageSource = readFileSync(new URL("./settingsStorage.ts", import.meta.url), "utf8");
 
-function cloneSettings(settings) {
-  return JSON.parse(JSON.stringify(settings));
-}
-
-function isStoredSettingsRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function reconcileLoadedSettings(loaded, defaults = makeDefaults(), options = {}, sourceWasStored = true) {
-  const isLiteMode = options.isLiteMode ?? localStorage.getItem("weknora_lite_mode") === "true";
-  loaded.selectedTags ||= [];
-  loaded.selectedMCPServices ||= [];
-  loaded.selectedSkills ||= loaded.selectedTools || [];
-  loaded.selectedFileKbMap ||= {};
-
-  const defaultConversation = isStoredSettingsRecord(defaults.conversationModels)
-    ? defaults.conversationModels
-    : {};
-  const loadedConversation = isStoredSettingsRecord(loaded.conversationModels)
-    ? loaded.conversationModels
-    : null;
-  const storedConversation = sourceWasStored ? loadedConversation : null;
-  const storedThinkingExplicit = typeof storedConversation?.thinkingEnabled === "boolean";
-  const storedReasoningExplicit = typeof storedConversation?.reasoningEffort === "string"
-    && storedConversation.reasoningEffort.trim() !== "";
-  let reconciledThinking = false;
-  if (!storedConversation) {
-    loaded.conversationModels = !sourceWasStored || isLiteMode
-      ? cloneSettings(defaultConversation)
-      : { thinkingEnabled: true };
-    reconciledThinking = true;
-  } else {
-    loaded.conversationModels = isLiteMode
-      ? { ...cloneSettings(defaultConversation), ...storedConversation }
-      : storedConversation;
-    if (typeof loaded.conversationModels.thinkingEnabled !== "boolean") {
-      loaded.conversationModels.thinkingEnabled = isLiteMode
-        ? false
-        : true;
-      reconciledThinking = true;
-    }
-  }
-  if (!storedReasoningExplicit
-    || typeof loaded.conversationModels.reasoningEffort !== "string"
-    || loaded.conversationModels.reasoningEffort.trim() === "") {
-    loaded.conversationModels.reasoningEffort = isLiteMode && !storedThinkingExplicit
-      ? "none"
-      : loaded.conversationModels.thinkingEnabled === false ? "none" : "high";
-    reconciledThinking = true;
-  }
-  if (isLiteMode && !storedConversation) {
-    loaded.conversationModels.selectedChatModelId =
-      loaded.conversationModels.selectedChatModelId || DEFAULT_CHAT_MODEL_ID;
-  } else if (isLiteMode && (
-    typeof loaded.conversationModels.selectedChatModelId !== "string"
-    || !loaded.conversationModels.selectedChatModelId.trim()
-  )) {
-    loaded.conversationModels.selectedChatModelId =
-      defaultConversation.selectedChatModelId || DEFAULT_CHAT_MODEL_ID;
-    reconciledThinking = true;
-  }
-  const thinkingEnabled = loaded.conversationModels.reasoningEffort !== "none";
-  if (loaded.conversationModels.thinkingEnabled !== thinkingEnabled) {
-    loaded.conversationModels.thinkingEnabled = thinkingEnabled;
-    reconciledThinking = true;
-  }
-
-  const storedAgentID = typeof loaded.selectedAgentId === "string"
-    ? loaded.selectedAgentId.trim()
-    : "";
-  const reconciledAgentMode = !storedAgentID || loaded.selectedAgentSourceTenantId !== null;
-  loaded.selectedAgentId = storedAgentID || BUILTIN_SMART_REASONING_ID;
-  loaded.selectedAgentSourceTenantId = null;
-  if (loaded.selectedAgentId === BUILTIN_QUICK_ANSWER_ID) {
-    loaded.isAgentEnabled = false;
-  } else if (loaded.selectedAgentId === BUILTIN_SMART_REASONING_ID) {
-    loaded.isAgentEnabled = true;
-  } else if (typeof loaded.isAgentEnabled !== "boolean") {
-    loaded.isAgentEnabled = true;
-  }
-
-  const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
-  if (removedLegacyMemorySetting) delete loaded.enableMemory;
-  if (sourceWasStored && (removedLegacyMemorySetting || reconciledAgentMode || reconciledThinking)) {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
-  }
-  return loaded;
-}
-
-function resetStoredSettings(defaultSettings, options = {}) {
-  localStorage.removeItem(SETTINGS_STORAGE_KEY);
-  return reconcileLoadedSettings(cloneSettings(defaultSettings), defaultSettings, options, false);
-}
-
-function loadAndReconcileSettings(defaultSettings, options = {}) {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return reconcileLoadedSettings(cloneSettings(defaultSettings), defaultSettings, options, false);
-    const parsed = JSON.parse(raw);
-    if (!isStoredSettingsRecord(parsed)) return resetStoredSettings(defaultSettings, options);
-    return reconcileLoadedSettings(parsed, defaultSettings, options, true);
-  } catch {
-    return resetStoredSettings(defaultSettings, options);
-  }
-}
+// Execute the actual TypeScript module; mock only its browser/storage imports.
+// Keeping a second implementation here previously hid migration regressions.
+const { outputText } = ts.transpileModule(settingsStorageSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+});
+const storageExports = {};
+runInThisContext(`(function(exports, require) {${outputText}\n})`)(storageExports, (name) => {
+  if (name === "@/composables/preferenceStorage") return {
+    safeSetItem: (key, value) => localStorage.setItem(key, value),
+    safeRemoveItem: (key) => localStorage.removeItem(key),
+  };
+  if (name === "@/api/agent") return { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID };
+  if (name === "@/utils/managedChatModels") return { DEFAULT_CHAT_MODEL_ID };
+  throw new Error(`Unexpected settings dependency: ${name}`);
+});
+const { cloneSettings, isStoredSettingsRecord, loadAndReconcileSettings } = storageExports;
 
 function makeDefaults() {
   return {
@@ -129,7 +42,8 @@ function makeDefaults() {
       rerankModelId: "",
       selectedChatModelId: "",
       thinkingEnabled: true,
-      reasoningEffort: "high",
+      reasoningEffort: "",
+      reasoningModelId: "",
       consumerSceneModelIds: {},
     },
     nested: { items: ["a"] },
@@ -173,7 +87,7 @@ test("fresh settings use WeKnora main 81142df WebSearch default while keeping Mu
   assert.deepEqual(defaults.selectedTags, []);
   assert.equal(loaded.webSearchEnabled, false);
   assert.equal(loaded.conversationModels.thinkingEnabled, true);
-  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.reasoningEffort, "");
   assert.equal(loaded.selectedAgentId, BUILTIN_SMART_REASONING_ID);
   assert.equal(loaded.isAgentEnabled, true);
   assert.equal(store[SETTINGS_STORAGE_KEY], undefined);
@@ -263,14 +177,14 @@ test("first-Musuw thinking preference is backfilled but existing value is preser
   assert.equal(preserved.conversationModels.reasoningEffort, "none");
 });
 
-test("Lite fresh settings start on V4 Flash with reasoning disabled", () => {
+test("Lite fresh settings start on V4 Flash with reasoning enabled at the model minimum", () => {
   installMockLocalStorage();
   const defaults = makeDefaults();
   const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
 
   assert.equal(loaded.conversationModels.selectedChatModelId, DEFAULT_CHAT_MODEL_ID);
-  assert.equal(loaded.conversationModels.thinkingEnabled, false);
-  assert.equal(loaded.conversationModels.reasoningEffort, "none");
+  assert.equal(loaded.conversationModels.thinkingEnabled, true);
+  assert.equal(loaded.conversationModels.reasoningEffort, "");
 });
 
 test("Lite mode is inferred from the login bootstrap flag", () => {
@@ -279,8 +193,8 @@ test("Lite mode is inferred from the login bootstrap flag", () => {
   const loaded = loadAndReconcileSettings(makeDefaults());
 
   assert.equal(loaded.conversationModels.selectedChatModelId, DEFAULT_CHAT_MODEL_ID);
-  assert.equal(loaded.conversationModels.reasoningEffort, "none");
-  assert.equal(loaded.conversationModels.thinkingEnabled, false);
+  assert.equal(loaded.conversationModels.reasoningEffort, "");
+  assert.equal(loaded.conversationModels.thinkingEnabled, true);
 });
 
 test("Lite missing or semi-structured conversation settings use safe defaults", () => {
@@ -300,8 +214,8 @@ test("Lite missing or semi-structured conversation settings use safe defaults", 
     const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
 
     assert.equal(loaded.conversationModels.selectedChatModelId, DEFAULT_CHAT_MODEL_ID);
-    assert.equal(loaded.conversationModels.thinkingEnabled, false);
-    assert.equal(loaded.conversationModels.reasoningEffort, "none");
+    assert.equal(loaded.conversationModels.thinkingEnabled, true);
+    assert.equal(loaded.conversationModels.reasoningEffort, "");
   }
 });
 
@@ -318,6 +232,7 @@ test("Lite preserves an explicit high reasoning preference", () => {
   const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
 
   assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.reasoningModelId, DEFAULT_CHAT_MODEL_ID);
   assert.equal(loaded.conversationModels.thinkingEnabled, true);
 });
 
@@ -332,16 +247,16 @@ test("Lite preserves an explicit legacy thinking toggle when effort is absent", 
   });
   const loaded = loadAndReconcileSettings(defaults, { isLiteMode: true });
 
-  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.reasoningEffort, "");
   assert.equal(loaded.conversationModels.thinkingEnabled, true);
 });
 
-test("Standard fresh settings retain the upstream empty-model high-reasoning default", () => {
+test("Standard fresh settings wait for model metadata to select the minimum", () => {
   installMockLocalStorage();
   const loaded = loadAndReconcileSettings(makeDefaults(), { isLiteMode: false });
 
   assert.equal(loaded.conversationModels.selectedChatModelId, "");
-  assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  assert.equal(loaded.conversationModels.reasoningEffort, "");
   assert.equal(loaded.conversationModels.thinkingEnabled, true);
 });
 
@@ -358,3 +273,27 @@ test("source code preserves native local Agents while removing shared scope", ()
   assert.match(settingsStorageSource, /selectedChatModelId/);
   assert.match(settingsStorageSource, /storedReasoningExplicit/);
 });
+
+for (const isLiteMode of [true, false]) {
+  test(`stored model depth binding survives reload (Lite=${isLiteMode})`, () => {
+    const store = installMockLocalStorage();
+    store[SETTINGS_STORAGE_KEY] = JSON.stringify({ conversationModels: {
+      selectedChatModelId: "model-b", reasoningModelId: "model-a", reasoningEffort: "high",
+    }});
+    const loaded = loadAndReconcileSettings(makeDefaults(), { isLiteMode });
+    assert.equal(loaded.conversationModels.selectedChatModelId, "model-b");
+    assert.equal(loaded.conversationModels.reasoningModelId, "model-a");
+    assert.equal(loaded.conversationModels.reasoningEffort, "high");
+  });
+
+  test(`legacy explicit Off is bound to its model (Lite=${isLiteMode})`, () => {
+    const store = installMockLocalStorage();
+    store[SETTINGS_STORAGE_KEY] = JSON.stringify({ conversationModels: {
+      selectedChatModelId: "model-a", thinkingEnabled: false,
+    }});
+    const loaded = loadAndReconcileSettings(makeDefaults(), { isLiteMode });
+    assert.equal(loaded.conversationModels.reasoningModelId, "model-a");
+    assert.equal(loaded.conversationModels.reasoningEffort, "none");
+    assert.equal(loaded.conversationModels.thinkingEnabled, false);
+  });
+}

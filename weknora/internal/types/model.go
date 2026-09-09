@@ -62,8 +62,8 @@ type EmbeddingParameters struct {
 	SupportsDimensionOverride bool `yaml:"supports_dimension_override" json:"supports_dimension_override"`
 }
 
-// ReasoningParameters mirrors the public capability metadata returned by
-// OpenRouter for the platform's pinned chat models.
+// ReasoningParameters contains the public capability metadata returned by
+// OpenRouter and the platform's default effort for each pinned model.
 type ReasoningParameters struct {
 	Supported        bool     `yaml:"supported"         json:"supported"`
 	Mandatory        bool     `yaml:"mandatory"         json:"mandatory"`

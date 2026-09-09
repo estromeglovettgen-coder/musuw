@@ -112,8 +112,10 @@ type ChatConfig struct {
 	Provider  string
 	// MaxConcurrency caps concurrent background calls to this model; 0 falls
 	// back to the process-wide default (see limiter.GateN).
-	MaxConcurrency int
-	ExtraConfig    map[string]string
+	MaxConcurrency         int
+	ExtraConfig            map[string]string
+	MandatoryReasoning     bool
+	DefaultReasoningEffort string
 	// CustomHeaders 允许在调用远程 OpenAI 兼容 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
 	CustomHeaders   map[string]string
 	AppID           string
@@ -130,17 +132,19 @@ func ConfigFromModel(m *types.Model, appID, appSecret string) *ChatConfig {
 		return nil
 	}
 	return &ChatConfig{
-		ModelID:        m.ID,
-		APIKey:         m.Parameters.APIKey,
-		BaseURL:        m.Parameters.BaseURL,
-		ModelName:      m.Name,
-		Source:         m.Source,
-		Provider:       m.Parameters.Provider,
-		MaxConcurrency: m.Parameters.MaxConcurrency,
-		ExtraConfig:    m.Parameters.ExtraConfig,
-		CustomHeaders:  m.Parameters.CustomHeaders,
-		AppID:          appID,
-		AppSecret:      appSecret,
+		ModelID:                m.ID,
+		APIKey:                 m.Parameters.APIKey,
+		BaseURL:                m.Parameters.BaseURL,
+		ModelName:              m.Name,
+		Source:                 m.Source,
+		Provider:               m.Parameters.Provider,
+		MaxConcurrency:         m.Parameters.MaxConcurrency,
+		ExtraConfig:            m.Parameters.ExtraConfig,
+		MandatoryReasoning:     m.Parameters.Reasoning.Mandatory,
+		DefaultReasoningEffort: m.Parameters.Reasoning.DefaultEffort,
+		CustomHeaders:          m.Parameters.CustomHeaders,
+		AppID:                  appID,
+		AppSecret:              appSecret,
 	}
 }
 

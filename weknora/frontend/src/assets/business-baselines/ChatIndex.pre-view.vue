@@ -191,7 +191,7 @@ const isAgentStreamSession = () => {
 const uiStore = useUIStore();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 const { t } = useI18n();
-const { firstQuery, firstMentionedItems, firstModelId, firstImageFiles, firstAttachmentFiles, firstThinking } = storeToRefs(usemenuStore);
+const { firstQuery, firstMentionedItems, firstModelId, firstImageFiles, firstAttachmentFiles, firstThinking, firstReasoningEffort } = storeToRefs(usemenuStore);
 const { onChunk, error, startStream, stopStream, lastStreamRequest } = useStream();
 /** Snapshot of the in-flight HTTP request for attaching to the next assistant message. */
 const pendingStreamDebug = ref(null);
@@ -664,7 +664,7 @@ const handleStopGeneration = () => {
     // 保留 currentAssistantMessageId，Input-field 仍需用它调用 stop API
 };
 
-const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = [], attachmentFiles = [], thinkingEnabled = useSettingsStoreInstance.conversationModels.thinkingEnabled !== false, reasoningEffort = useSettingsStoreInstance.conversationModels.reasoningEffort || 'high') => {
+const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = [], attachmentFiles = [], thinkingEnabled = useSettingsStoreInstance.conversationModels.thinkingEnabled !== false, reasoningEffort = useSettingsStoreInstance.conversationModels.reasoningEffort || '') => {
     stopStream();
     prepareForNewOutgoingMessage();
     isReplying.value = true;
@@ -982,7 +982,7 @@ onMounted(async () => {
                 rerankModelId: '',
             });
         }
-        sendMsg(firstQuery.value, firstModelId.value || '', firstMentionedItems.value || [], firstImageFiles.value || [], firstAttachmentFiles.value || [], firstThinking.value);
+        sendMsg(firstQuery.value, firstModelId.value || '', firstMentionedItems.value || [], firstImageFiles.value || [], firstAttachmentFiles.value || [], firstThinking.value, firstReasoningEffort.value);
         usemenuStore.changeFirstQuery('', [], '', [], [], true);
     } else {
         scrollLock.value = false;

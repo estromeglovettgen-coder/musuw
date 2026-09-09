@@ -32,6 +32,7 @@ type ReconcilableSettings = {
     selectedChatModelId?: unknown;
     thinkingEnabled?: unknown;
     reasoningEffort?: unknown;
+    reasoningModelId?: unknown;
     consumerSceneModelIds?: unknown;
   };
 };
@@ -102,7 +103,7 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(
       ...storedConversation,
     };
     if (typeof conversationModels.thinkingEnabled !== "boolean") {
-      conversationModels.thinkingEnabled = false;
+      conversationModels.thinkingEnabled = true;
       reconciledThinking = true;
     }
   } else {
@@ -119,9 +120,9 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(
     || typeof conversationModels.reasoningEffort !== "string"
     || conversationModels.reasoningEffort.trim() === ""
   ) {
-    conversationModels.reasoningEffort = isLiteMode && !storedThinkingExplicit
-      ? "none"
-      : conversationModels.thinkingEnabled === false ? "none" : "high";
+    // Empty defers to the selected model's minimum once metadata has loaded.
+    conversationModels.reasoningEffort = storedThinkingExplicit && conversationModels.thinkingEnabled === false
+      ? "none" : "";
     reconciledThinking = true;
   }
 
@@ -140,6 +141,12 @@ function reconcileLoadedSettings<T extends ReconcilableSettings>(
 
   if (!isStoredSettingsRecord(conversationModels.consumerSceneModelIds)) {
     conversationModels.consumerSceneModelIds = {};
+  }
+  if (typeof storedConversation?.reasoningModelId !== "string") {
+    // Migrate explicit legacy depths without carrying them to another model.
+    conversationModels.reasoningModelId = storedReasoningExplicit || (storedThinkingExplicit && conversationModels.thinkingEnabled === false)
+      ? String(conversationModels.selectedChatModelId || "") : "";
+    reconciledThinking = true;
   }
   const thinkingEnabled = conversationModels.reasoningEffort !== "none";
   if (conversationModels.thinkingEnabled !== thinkingEnabled) {

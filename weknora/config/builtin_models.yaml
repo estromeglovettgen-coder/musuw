@@ -21,7 +21,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, high, low]
-        default_effort: high
+        default_effort: low
 
   - id: builtin-deepseek-v4-flash
     tenant_id: 10000
@@ -40,7 +40,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, high, low]
-        default_effort: high
+        default_effort: low
 
   - id: builtin-openrouter-qwen-max
     tenant_id: 10000
@@ -59,7 +59,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [xhigh, high, medium, low, minimal]
-        default_effort: xhigh
+        default_effort: minimal
 
   - id: builtin-openrouter-gpt-luna
     tenant_id: 10000
@@ -78,7 +78,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, xhigh, high, medium, low, none]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-gpt-terra
     tenant_id: 10000
@@ -97,7 +97,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, xhigh, high, medium, low, none]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-gpt-sol
     tenant_id: 10000
@@ -116,7 +116,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, xhigh, high, medium, low, none]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-gemini-flash
     tenant_id: 10000
@@ -135,7 +135,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-gemini-pro
     tenant_id: 10000
@@ -154,7 +154,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-claude-haiku
     tenant_id: 10000
@@ -192,7 +192,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, xhigh, high, medium, low]
-        default_effort: high
+        default_effort: low
 
   - id: builtin-openrouter-claude-opus
     tenant_id: 10000
@@ -211,7 +211,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, xhigh, high, medium, low]
-        default_effort: high
+        default_effort: low
 
   - id: builtin-openrouter-nemotron-lightning-free
     tenant_id: 10000
@@ -230,7 +230,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [high, medium]
-        default_effort: high
+        default_effort: medium
 
   - id: builtin-openrouter-glm-5-2-free
     tenant_id: 10000
@@ -249,7 +249,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [max, high, low]
-        default_effort: max
+        default_effort: low
 
   - id: builtin-openrouter-minimax-m3-free
     tenant_id: 10000
@@ -268,7 +268,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-ling-flash
     tenant_id: 10000
@@ -287,7 +287,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-qwen-3-7-flash
     tenant_id: 10000
@@ -306,7 +306,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-gpt-5-nano
     tenant_id: 10000
@@ -325,7 +325,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [high, medium, low, minimal]
-        default_effort: low
+        default_effort: minimal
 
   - id: builtin-openrouter-gpt-astra
     tenant_id: 10000
@@ -344,7 +344,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [max, xhigh, high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-grok
     tenant_id: 10000
@@ -363,7 +363,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [xhigh, high, medium, low]
-        default_effort: high
+        default_effort: low
 
   - id: builtin-openrouter-kimi
     tenant_id: 10000
@@ -382,7 +382,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [max, high, low]
-        default_effort: max
+        default_effort: low
 
   - id: builtin-openrouter-kimi-code
     tenant_id: 10000
@@ -401,7 +401,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-glm-flash
     tenant_id: 10000
@@ -420,7 +420,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [max, high, low]
-        default_effort: max
+        default_effort: low
 
   - id: builtin-openrouter-qwen-flash
     tenant_id: 10000
@@ -439,7 +439,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-claude-fable
     tenant_id: 10000
@@ -458,7 +458,7 @@ builtin_models:
         supported: true
         mandatory: true
         supported_efforts: [max, xhigh, high, medium, low]
-        default_effort: high
+        default_effort: low
 
   - id: builtin-openrouter-mimo-pro
     tenant_id: 10000
@@ -477,7 +477,7 @@ builtin_models:
         supported: true
         mandatory: false
         supported_efforts: [high, medium, low]
-        default_effort: medium
+        default_effort: low
 
   - id: builtin-openrouter-embedding
     tenant_id: 10000

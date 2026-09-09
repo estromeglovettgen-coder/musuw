@@ -24,14 +24,14 @@ func TestCustomAgentConfigResolveChatParserEngine(t *testing.T) {
 	}
 }
 
-func TestEnsureDefaults_ThinkingExplicitFalse(t *testing.T) {
+func TestEnsureDefaults_ThinkingDefaultsEnabled(t *testing.T) {
 	agent := &CustomAgent{Config: CustomAgentConfig{}}
 	agent.EnsureDefaults()
 	if agent.Config.Thinking == nil {
-		t.Fatal("EnsureDefaults should set Thinking to explicit false when unset")
+		t.Fatal("EnsureDefaults should enable Thinking when unset")
 	}
-	if *agent.Config.Thinking {
-		t.Fatal("default Thinking should be false")
+	if !*agent.Config.Thinking {
+		t.Fatal("default Thinking should be true")
 	}
 }
 
@@ -82,5 +82,14 @@ func TestEnsureDefaults_CitationsDefaultEnabledAndPreserveFalse(t *testing.T) {
 	explicit.EnsureDefaults()
 	if explicit.Config.CitationEnabled == nil || *explicit.Config.CitationEnabled {
 		t.Fatal("EnsureDefaults must preserve explicit citation_enabled=false")
+	}
+}
+
+func TestEnsureDefaults_ThinkingPreservesFalse(t *testing.T) {
+	disabled := false
+	agent := &CustomAgent{Config: CustomAgentConfig{Thinking: &disabled}}
+	agent.EnsureDefaults()
+	if agent.Config.Thinking == nil || *agent.Config.Thinking {
+		t.Fatal("an explicitly disabled agent must remain disabled")
 	}
 }

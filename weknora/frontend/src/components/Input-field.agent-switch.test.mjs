@@ -60,13 +60,12 @@ test("empty new workspaces are not mislabeled as knowledge capability mismatches
 
 test("consumer chat can select a native agent and sends model-specific reasoning effort", () => {
   assert.match(settingsStore, /thinkingEnabled:\s*boolean/);
-  assert.match(settingsStore, /thinkingEnabled:\s*false/);
   assert.match(settingsStore, /selectedChatModelId:\s*""/);
   assert.match(settingsStore, /thinkingEnabled:\s*true/);
-  assert.match(settingsStore, /reasoningEffort:\s*"high"/);
+  assert.match(settingsStore, /reasoningEffort:\s*""/);
   assert.match(settingsStore, /applyLiteFirstRunDefaults\(\)/);
   assert.match(settingsStore, /selectedChatModelId:\s*DEFAULT_CHAT_MODEL_ID/);
-  assert.match(settingsStore, /reasoningEffort:\s*"none"/);
+  assert.match(settingsStore, /reasoningModelId:\s*""/);
   assert.match(settingsStore, /selectedAgentId:\s*BUILTIN_SMART_REASONING_ID/);
   assert.match(inputBusiness, /const thinkingEnabled = computed/);
   assert.match(inputBusiness, /const selectedAgentId = computed\(\{/);
@@ -77,8 +76,8 @@ test("consumer chat can select a native agent and sends model-specific reasoning
   assert.doesNotMatch(inputBusiness, /const loadMCPServices = async \(\) => \{\s*if \(authStore\.isLiteMode\)/);
   assert.match(inputBusiness, /const reasoningEffort = computed/);
   assert.match(inputBusiness, /const reasoningOptions = computed/);
-  assert.match(inputBusiness, /reasoning\.supported_efforts/);
-  assert.match(inputBusiness, /default_effort/);
+  assert.match(inputBusiness, /modelReasoningEfforts\(selectedModel\.value\)/);
+  assert.match(inputBusiness, /resolveModelReasoning\(selectedModel\.value, current\.reasoningEffort, current\.reasoningModelId\)/);
   assert.match(inputBusiness, /model\.is_builtin === true/);
   assert.match(inputBusiness, /provider\?\.trim\(\)\.toLowerCase\(\) === "openrouter"/);
   assert.match(inputField, /v-for="model in availableModels"/);

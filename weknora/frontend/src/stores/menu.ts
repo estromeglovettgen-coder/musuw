@@ -41,6 +41,7 @@ export const useMenuStore = defineStore('menuStore', () => {
   const firstMentionedItems = ref<any[]>([])
   const firstModelId = ref('')
   const firstThinking = ref(true)
+  const firstReasoningEffort = ref('')
   const firstImageFiles = ref<any[]>([])
   const firstAttachmentFiles = ref<any[]>([])
   const prefillQuery = ref('')
@@ -126,13 +127,14 @@ export const useMenuStore = defineStore('menuStore', () => {
     isFirstSession.value = payload
   }
 
-  const changeFirstQuery = (payload: string, mentionedItems: any[] = [], modelId: string = '', imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) => {
+  const changeFirstQuery = (payload: string, mentionedItems: any[] = [], modelId: string = '', imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true, reasoningEffort: string = '') => {
     firstQuery.value = payload
     firstMentionedItems.value = mentionedItems
     firstModelId.value = modelId
     firstImageFiles.value = imageFiles
     firstAttachmentFiles.value = attachmentFiles
     firstThinking.value = thinking
+    firstReasoningEffort.value = reasoningEffort
   }
 
   const setPrefillQuery = (q: string) => {
@@ -153,6 +155,7 @@ export const useMenuStore = defineStore('menuStore', () => {
     firstMentionedItems,
     firstModelId,
     firstThinking,
+    firstReasoningEffort,
     firstImageFiles,
     firstAttachmentFiles,
     prefillQuery,

@@ -48,6 +48,7 @@ import {
 import { formatLocalizedList } from "@/utils/format-list";
 import { SKILL_ICON, type MentionItem, type MentionItemType, type MentionRequestItem } from "@/types/mention";
 import { resolveChatModelId } from "@/utils/managedChatModels";
+import { modelReasoningEfforts, resolveModelReasoning } from "@/utils/modelReasoning";
 import {
   resolveComposerConsumerScene,
   resolveConsumerSceneCandidate,
@@ -817,12 +818,14 @@ const getMentionChipClass = (item: MentionItem) => {
 // 使用 computed 从 store 读取，并通过 setter 同步回 store
 const selectedModelId = computed({
   get: () => {
+    // History restores a conversation-specific model before scene preferences.
+    if (settingsStore._defaultsSnapshot) return settingsStore.conversationModels.selectedChatModelId || "";
     if (!sceneManagedByConsumerResolver.value) return settingsStore.conversationModels.selectedChatModelId || "";
     return settingsStore.getConsumerSceneModel(effectiveConsumerScene.value)
       || (effectiveConsumerScene.value === "chat" ? settingsStore.conversationModels.selectedChatModelId || "" : "");
   },
   set: (val: string) => {
-    if (sceneManagedByConsumerResolver.value) {
+    if (sceneManagedByConsumerResolver.value && !settingsStore._defaultsSnapshot) {
       settingsStore.updateConsumerSceneModel(effectiveConsumerScene.value, val);
     }
     settingsStore.updateConversationModels({ selectedChatModelId: val });
@@ -832,13 +835,15 @@ const thinkingEnabled = computed({
   get: () => settingsStore.conversationModels.reasoningEffort !== "none",
   set: (val: boolean) => settingsStore.updateConversationModels({
     thinkingEnabled: val,
-    reasoningEffort: val ? "high" : "none",
+    reasoningEffort: val ? modelReasoningEfforts(selectedModel.value)[0] || "none" : "none",
+    reasoningModelId: selectedModelId.value,
   }),
 });
 const reasoningEffort = computed({
-  get: () => settingsStore.conversationModels.reasoningEffort || "high",
+  get: () => settingsStore.conversationModels.reasoningEffort || "low",
   set: (val: string) => settingsStore.updateConversationModels({
     reasoningEffort: val,
+    reasoningModelId: selectedModelId.value,
     thinkingEnabled: val !== "none",
   }),
 });
@@ -1093,6 +1098,10 @@ const writeLastChatModelID = (id: string) => {
 };
 
 const initChatModelSelection = () => {
+  if (settingsStore._defaultsSnapshot) {
+    ensureModelSelection();
+    return;
+  }
   const scene = effectiveConsumerScene.value;
   const initialSelection =
     settingsStore.getConsumerSceneModel(scene)
@@ -1209,10 +1218,10 @@ const handleModelChange = (value: string | number | Array<string | number> | und
   // "remember my last pick" should always have meant — the previous PUT
   // /tenants/kv/conversation-config required Admin+, so a Viewer or
   // Contributor switching models from the chat input got a 403.
-  if (sceneManagedByConsumerResolver.value) {
+  if (sceneManagedByConsumerResolver.value && !settingsStore._defaultsSnapshot) {
     settingsStore.updateConsumerSceneModel(effectiveConsumerScene.value, val);
   }
-  if (effectiveConsumerScene.value === "chat") writeLastChatModelID(val);
+  if (effectiveConsumerScene.value === "chat" && !settingsStore._defaultsSnapshot) writeLastChatModelID(val);
   selectedModelId.value = val;
   ensureReasoningSelection();
   showModelSelector.value = false;
@@ -1242,25 +1251,24 @@ const reasoningEffortLabel = (effort: string) => {
   return String(locale.value).toLowerCase().startsWith("zh") ? labels.zh : labels.en;
 };
 const reasoningOptions = computed(() => {
-  const reasoning = selectedModel.value?.parameters?.reasoning;
-  if (!reasoning?.supported) return [];
-  const efforts = [...(reasoning.supported_efforts || [])];
-  if (!reasoning.mandatory && !efforts.includes("none")) efforts.push("none");
-  return [...new Set(efforts)].map((value) => ({ value, label: reasoningEffortLabel(value) }));
+  return modelReasoningEfforts(selectedModel.value).map((value) => ({ value, label: reasoningEffortLabel(value) }));
 });
 const selectedReasoningLabel = computed(() => reasoningEffortLabel(reasoningEffort.value));
 const ensureReasoningSelection = () => {
-  if (!reasoningOptions.value.length) {
-    if (reasoningEffort.value !== "none") reasoningEffort.value = "none";
-    return;
-  }
-  if (reasoningOptions.value.some((item) => item.value === reasoningEffort.value)) return;
-  const configuredDefault = selectedModel.value?.parameters?.reasoning?.default_effort;
-  reasoningEffort.value = reasoningOptions.value.some((item) => item.value === configuredDefault)
-    ? configuredDefault || reasoningOptions.value[0].value
-    : reasoningOptions.value[0].value;
+  const current = settingsStore.conversationModels;
+  const resolved = resolveModelReasoning(selectedModel.value, current.reasoningEffort, current.reasoningModelId);
+  if (!resolved) return;
+  if (resolved.effort === current.reasoningEffort && resolved.modelId === current.reasoningModelId) return;
+  settingsStore.updateConversationModels({
+    reasoningEffort: resolved.effort,
+    reasoningModelId: resolved.modelId,
+    thinkingEnabled: resolved.effort !== "none",
+  });
 };
-watch([selectedModel, reasoningOptions], ensureReasoningSelection, { immediate: true });
+watch([selectedModel, reasoningOptions,
+  () => settingsStore.conversationModels.reasoningEffort,
+  () => settingsStore.conversationModels.reasoningModelId,
+], ensureReasoningSelection, { immediate: true });
 
 // 模型展示名：本空间列表中有则用名称；若为共享智能体且其 model_id 不在本空间列表中则显示“共享智能体配置的模型”
 const selectedModelDisplayName = computed(() => {
