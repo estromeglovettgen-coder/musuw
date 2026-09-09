@@ -608,6 +608,11 @@ func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
 		)
 	}
 	if errorJSON := bytes.TrimSpace(decoded.Error); len(errorJSON) > 0 && !bytes.Equal(errorJSON, []byte("null")) {
+		if modelopenrouter.PayloadIndicatesCreditExhausted(errorJSON) {
+			return openai.ChatCompletionResponse{}, permanentVideoError(
+				&modelopenrouter.CreditExhaustedError{StatusCode: http.StatusPaymentRequired},
+			)
+		}
 		responseErr := fmt.Errorf("OpenRouter video response error: %s", string(errorJSON))
 		if retryableEmbeddedVideoError(errorJSON) {
 			return openai.ChatCompletionResponse{}, RetryableVideoError(responseErr)

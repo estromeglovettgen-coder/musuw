@@ -112,13 +112,13 @@ func TestTransportClassifiesHTTP402AsCreditExhausted(t *testing.T) {
 	assert.Contains(t, err.Error(), "monthly AI credits")
 }
 
-func TestTransportClassifiesOpenRouterHTTP403KeyLimitAsCreditExhausted(t *testing.T) {
+func TestTransportClassifiesOpenRouterHTTP403VideoBalanceAsCreditExhausted(t *testing.T) {
 	meter := &meterStub{key: "tenant-child-key", user: "musuw_opaque"}
 	base := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusForbidden,
 			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(`{"error":{"code":403,"message":"Key limit exceeded (total limit)"}}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"error":{"code":403,"message":"This request requires at least $1.00 in balance for video"}}`)),
 			Request:    req,
 		}, nil
 	})}
@@ -173,6 +173,7 @@ func TestCreditExhaustedClassificationStaysProviderScoped(t *testing.T) {
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":402,"message":"payment_required"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"message":"spending limit reached"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":403,"message":"Key limit exceeded (total limit)"}}`)))
+	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":403,"message":"This request requires at least $1.00 in balance for video"}}`)))
 	assert.False(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":429,"message":"rate limited"}}`)))
 }
 

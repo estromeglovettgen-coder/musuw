@@ -345,6 +345,33 @@ func TestRemoteAPIVLMPredictVideoKeepsMeteredCreditExhaustionPermanent(t *testin
 	}
 }
 
+func TestRemoteAPIVLMPredictVideoClassifiesEmbeddedCreditExhaustion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":{"code":402,"message":"payment_required"}}`))
+	}))
+	defer server.Close()
+
+	withVLMSSRFWhitelist(t, "127.0.0.1")
+	model, err := NewRemoteAPIVLM(&Config{
+		BaseURL: server.URL, ModelName: "xiaomi/mimo-v2.5", Provider: "openrouter",
+		Extra: map[string]any{"video_input_mode": VideoInputModeURL},
+	})
+	if err != nil {
+		t.Fatalf("NewRemoteAPIVLM: %v", err)
+	}
+
+	_, err = model.PredictVideoURL(
+		context.Background(), "https://objects.example.test/video.mp4", "video/mp4", "Describe it",
+	)
+	if !modelopenrouter.IsCreditExhausted(err) {
+		t.Fatalf("error = %v, want typed OpenRouter credit exhaustion", err)
+	}
+	if IsRetryableVideoError(err) {
+		t.Fatalf("embedded credit exhaustion must not be retryable: %v", err)
+	}
+}
+
 func TestRemoteAPIVLMPredictVideoURLRequiresHTTPURL(t *testing.T) {
 	withVLMSSRFWhitelist(t, "127.0.0.1")
 	model, err := NewRemoteAPIVLM(&Config{

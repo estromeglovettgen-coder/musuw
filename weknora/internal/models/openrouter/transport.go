@@ -87,6 +87,7 @@ func textIndicatesCreditExhausted(value string) bool {
 		"credit exhausted",
 		"spending limit",
 		"key limit exceeded",
+		"in balance for video",
 	} {
 		if strings.Contains(lower, marker) {
 			return true

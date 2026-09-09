@@ -1190,8 +1190,8 @@ internal/models/embedding/weknoracloud.go	-	M	100644	f5c855442b05715fe990f99bc49
 internal/models/embedding/weknoracloud_test.go	-	A	100644	fe221c4e7ded30bfb97cf7f8e4e7ae81184ae36b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/models/openrouter/key_manager.go	A	-	100644	3c563da978814de793c614f9027557b271695746	preserve-musuw-exact		audited local-only content is byte-identical
 internal/models/openrouter/key_manager_test.go	A	-	100644	c86d664dd3edad54b04ecb774d1148840ccb1bc9	preserve-musuw-exact		audited local-only content is byte-identical
-internal/models/openrouter/transport.go	A	-	100644	84d60dc3747d776cce50acf12758cc94cc4d7716	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/models/openrouter/transport_test.go	A	-	100644	eda240c1fbb0d2b983e10f3413b9dd7bcb2e8df7	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/models/openrouter/transport.go	A	-	100644	7fe886ce217206acf2e41c4039f4314ccf1edf42	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/models/openrouter/transport_test.go	A	-	100644	4cfec43fa34e3614add176ad2ecaf49534d3b10c	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/models/provider/deepseek.go	M	-	100644	b463de9229cbc7a382ce46445bb62329d297ad38	preserve-musuw-exact		audited local-only content is byte-identical
 internal/models/provider/novita.go	-	M	100644	6d4515c3546779f32e888657b8ac9355f8a819dd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/models/provider/openrouter.go	M	-	100644	e0641b4ceb0d5c984cc9d3bb32a198cfc362e8f1	preserve-musuw-exact		audited local-only content is byte-identical
@@ -1203,9 +1203,9 @@ internal/models/vlm/concurrency_wrapper.go	M	-	100644	084ed24ec76b56cba63b5df8ed
 internal/models/vlm/langfuse_wrapper.go	M	M	100644	9073f2dc8492080afc02c0ad7b7c9c1e679ca50d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/models/vlm/llm_debug.go	M	-	100644	0639de1ad1cff5d502ff0d4961bac8fb2095fa41	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/models/vlm/ollama.go	-	M	100644	2c9afbd7b9a84dc6bfffb4ecf95f6b4f54aea706	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/models/vlm/remote_api.go	M	M	100644	c4b7e7d937ab0ccda6ae19b317842b7b722a3715	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/models/vlm/remote_api.go	M	M	100644	4febc154085b707a8c3abc5082ea177e77d6196a	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/models/vlm/remote_api_reasoning_test.go	A	A	100644	bda04360220c65415d6867c00a86396b0d4599df	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-internal/models/vlm/remote_api_video_test.go	A	-	100644	e66806134aac7c2bcaa4073dc0fd5e895161c023	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/models/vlm/remote_api_video_test.go	A	-	100644	e2e38edca1cd07bd5a26c988cb6406a3499ff424	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/models/vlm/vlm.go	M	-	100644	190f7b3a2712460dda644d3e4113a1163092f30d	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/router/consumer_model_options_route_test.go	A	-	100644	00099b2ca260306008e1f35843cdf846240ba6ef	preserve-musuw-exact		audited local-only content is byte-identical
 internal/router/deployment_capabilities.go	-	A	100644	9daffaaac6bc6ff6fd95dbe9f5737f363d2e32ee	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
