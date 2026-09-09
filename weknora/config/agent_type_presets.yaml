@@ -46,7 +46,7 @@ agent_type_presets:
     config:
       system_prompt_id: "progressive_rag_agent"
       temperature: 0.7
-      max_iterations: 30
+      max_iterations: 10
       # `thinking` and `todo_write` are intentionally NOT included by default.
       # They are useful for multi-step planning / self-reflection, but most
       # users don't need them for single-turn Q&A and they noticeably bloat
@@ -79,7 +79,7 @@ agent_type_presets:
     config:
       system_prompt_id: "wiki_researcher"
       temperature: 0.7
-      max_iterations: 30
+      max_iterations: 10
       # `thinking` / `todo_write` can be enabled manually if the user wants
       # explicit reflection or planning across long wiki navigation chains;
       # not on by default.
@@ -110,7 +110,7 @@ agent_type_presets:
     config:
       system_prompt_id: "hybrid_rag_wiki_agent"
       temperature: 0.7
-      max_iterations: 40
+      max_iterations: 10
       # `thinking` and `todo_write` are opt-in. Turn them on manually when the
       # user wants explicit self-reflection or a visible step-by-step plan for
       # multi-hop hybrid searches.
@@ -157,7 +157,7 @@ agent_type_presets:
     config:
       system_prompt_id: "data_analyst"
       temperature: 0.3
-      max_iterations: 30
+      max_iterations: 10
       # `thinking` / `todo_write` are opt-in for data-analysis too. Enable
       # manually if the user wants explicit reflection or to break a long
       # analysis into tracked sub-tasks.

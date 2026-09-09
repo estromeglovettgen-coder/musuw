@@ -1085,7 +1085,7 @@ func (s *agentService) ValidateConfig(config *types.AgentConfig) error {
 	}
 
 	if config.MaxIterations <= 0 {
-		config.MaxIterations = 5 // Default
+		config.MaxIterations = agent.DefaultAgentMaxIterations
 	}
 
 	if config.MaxIterations > MAX_ITERATIONS {

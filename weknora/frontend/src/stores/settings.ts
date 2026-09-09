@@ -86,7 +86,7 @@ const defaultSettings: Settings = {
   knowledgeBaseId: "",
   isAgentEnabled: true,
   agentConfig: {
-    maxIterations: 5,
+    maxIterations: 10,
     temperature: 0.7,
     allowedTools: [],  // 默认为空，需要通过 API 从后端加载
     system_prompt: "",

@@ -10,6 +10,35 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestAllShippedAgentDefaultsUseTenIterations(t *testing.T) {
+	builtinPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
+	builtinData, err := os.ReadFile(builtinPath)
+	require.NoError(t, err)
+
+	var builtins builtinAgentsFile
+	require.NoError(t, yaml.Unmarshal(builtinData, &builtins))
+	require.NotEmpty(t, builtins.BuiltinAgents)
+	for _, entry := range builtins.BuiltinAgents {
+		assert.Equalf(t, 10, entry.Config.MaxIterations,
+			"builtin agent %s must default to ten iterations", entry.ID)
+	}
+
+	presetPath := filepath.Join("..", "..", "config", "agent_type_presets.yaml")
+	presetData, err := os.ReadFile(presetPath)
+	require.NoError(t, err)
+
+	var presets agentTypePresetsFile
+	require.NoError(t, yaml.Unmarshal(presetData, &presets))
+	require.NotEmpty(t, presets.Presets)
+	for _, entry := range presets.Presets {
+		if entry.Config == nil {
+			continue
+		}
+		assert.Equalf(t, 10, entry.Config.MaxIterations,
+			"agent type preset %s must default to ten iterations", entry.ID)
+	}
+}
+
 func TestBuiltinQuickAnswerUsesUpstreamModeNameWithManagedModelDefaults(t *testing.T) {
 	configPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
 	data, err := os.ReadFile(configPath)

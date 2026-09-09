@@ -24,6 +24,12 @@ type fakeAgentKnowledgeBaseService struct {
 	kb *types.KnowledgeBase
 }
 
+func TestValidateAgentConfigDefaultsToTenIterations(t *testing.T) {
+	config := &types.AgentConfig{}
+	require.NoError(t, (&agentService{}).ValidateConfig(config))
+	assert.Equal(t, 10, config.MaxIterations)
+}
+
 func (s *fakeAgentKnowledgeBaseService) GetKnowledgeBaseByID(context.Context, string) (*types.KnowledgeBase, error) {
 	if s.kb == nil {
 		return nil, errors.New("knowledge base not found")

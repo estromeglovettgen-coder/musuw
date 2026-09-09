@@ -58,6 +58,11 @@ test('restored model/depth and later metadata repair remain inside the conversat
   assert.equal(store.getConsumerSceneModel('rag'), 'grok');
 });
 
+test('fresh conversations default to ten agent iterations', () => {
+  const { store } = setup();
+  assert.equal(store.agentConfig.maxIterations, 10);
+});
+
 test('legacy enabled session defers to its model minimum instead of inheriting another model depth', () => {
   const { store } = setup();
   store.snapshotAsDefaultsIfNeeded();
