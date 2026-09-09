@@ -8,7 +8,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 const scriptOf = (path) => read(path).match(/<script setup(?: lang="ts")?>([\s\S]*?)<\/script>/)?.[1] || ''
 
 const frozen = new Map([
-  ['./business-baselines/Input-field.pre-view.vue', 'c6f778deea10376127f6399bf06358bf46d99a8c'],
+  ['./business-baselines/Input-field.pre-view.vue', '0042d53343af50d0dd1a35edd22b7192241bea4b'],
   ['./business-baselines/KnowledgeBase.pre-view.vue', '62faa49842403fbe8aa2fbb0faee2d08ff145553'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
   ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],

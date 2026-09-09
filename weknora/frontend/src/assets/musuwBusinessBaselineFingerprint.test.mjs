@@ -31,7 +31,7 @@ const MODEL_REASONING_DEFAULT_CHANGE = 'refresh-global-model-catalog'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': '5d9ee35408dc665fd7bd55345beba6f378543033',
-  './business-baselines/Input-field.pre-view.vue': 'c6f778deea10376127f6399bf06358bf46d99a8c',
+  './business-baselines/Input-field.pre-view.vue': '0042d53343af50d0dd1a35edd22b7192241bea4b',
   './business-baselines/KnowledgeBase.pre-view.vue': '62faa49842403fbe8aa2fbb0faee2d08ff145553',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',

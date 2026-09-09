@@ -293,8 +293,16 @@ export const useSettingsStore = defineStore("settings", {
           [scene]: modelId,
         },
       };
-      // Restored conversations are temporary state, including late catalog repair.
-      if (!this._defaultsSnapshot && !this._isApplyingSessionState) {
+      // Scene settings explicitly edit browser defaults, even from a history page.
+      // Save that snapshot without leaking the historical model or depth into it.
+      if (this._defaultsSnapshot) {
+        const defaults = this._defaultsSnapshot.conversationModels;
+        defaults.consumerSceneModelIds = {
+          ...defaults.consumerSceneModelIds,
+          [scene]: modelId,
+        };
+        localStorage.setItem("WeKnora_settings", JSON.stringify(this._defaultsSnapshot));
+      } else if (!this._isApplyingSessionState) {
         localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
       }
     },

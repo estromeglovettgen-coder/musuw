@@ -825,7 +825,7 @@ const selectedModelId = computed({
       || (effectiveConsumerScene.value === "chat" ? settingsStore.conversationModels.selectedChatModelId || "" : "");
   },
   set: (val: string) => {
-    if (sceneManagedByConsumerResolver.value) {
+    if (sceneManagedByConsumerResolver.value && !settingsStore._defaultsSnapshot) {
       settingsStore.updateConsumerSceneModel(effectiveConsumerScene.value, val);
     }
     settingsStore.updateConversationModels({ selectedChatModelId: val });
@@ -1218,10 +1218,10 @@ const handleModelChange = (value: string | number | Array<string | number> | und
   // "remember my last pick" should always have meant — the previous PUT
   // /tenants/kv/conversation-config required Admin+, so a Viewer or
   // Contributor switching models from the chat input got a 403.
-  if (sceneManagedByConsumerResolver.value) {
+  if (sceneManagedByConsumerResolver.value && !settingsStore._defaultsSnapshot) {
     settingsStore.updateConsumerSceneModel(effectiveConsumerScene.value, val);
   }
-  if (effectiveConsumerScene.value === "chat") writeLastChatModelID(val);
+  if (effectiveConsumerScene.value === "chat" && !settingsStore._defaultsSnapshot) writeLastChatModelID(val);
   selectedModelId.value = val;
   ensureReasoningSelection();
   showModelSelector.value = false;

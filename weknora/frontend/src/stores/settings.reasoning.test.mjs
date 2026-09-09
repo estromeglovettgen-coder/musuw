@@ -50,7 +50,6 @@ test('restored model/depth and later metadata repair remain inside the conversat
   await nextTick();
   // A catalog can arrive after the synchronous hydration guard has ended.
   store.updateConversationModels({ reasoningEffort: 'low', reasoningModelId: 'gpt', thinkingEnabled: true });
-  store.updateConsumerSceneModel('rag', 'gpt');
   assert.equal(storage.get('WeKnora_settings'), saved);
   store.restoreDefaultsIfSnapshotted();
   assert.equal(store.conversationModels.selectedChatModelId, 'grok');
@@ -84,6 +83,23 @@ test('composer gives restored session model precedence over browser scene defaul
   const source = readFileSync(new URL('../assets/business-baselines/Input-field.pre-view.vue', import.meta.url), 'utf8');
   const getter = source.slice(source.indexOf('const selectedModelId = computed'), source.indexOf('const thinkingEnabled = computed'));
   assert.match(getter, /if \(settingsStore\._defaultsSnapshot\) return settingsStore\.conversationModels\.selectedChatModelId/);
+  assert.equal((source.match(/if \(sceneManagedByConsumerResolver\.value && !settingsStore\._defaultsSnapshot\)/g) || []).length, 2);
+  assert.match(source, /effectiveConsumerScene\.value === "chat" && !settingsStore\._defaultsSnapshot\) writeLastChatModelID/);
   const init = source.slice(source.indexOf('const initChatModelSelection ='), source.indexOf('const loadChatModels ='));
   assert.match(init, /if \(settingsStore\._defaultsSnapshot\) \{\s*ensureModelSelection\(\);\s*return;/);
+});
+
+test('explicit scene settings still update browser defaults while viewing historical chat', () => {
+  const { store, storage } = setup();
+  store.snapshotAsDefaultsIfNeeded();
+  store.applyLastRequestState({ model_id: 'gpt', reasoning_effort: 'medium' });
+  store.updateConsumerSceneModel('rag', 'kimi');
+  const saved = JSON.parse(storage.get('WeKnora_settings')).conversationModels;
+  assert.equal(saved.consumerSceneModelIds.rag, 'kimi');
+  assert.equal(saved.selectedChatModelId, 'grok');
+  assert.equal(saved.reasoningEffort, 'high');
+  assert.equal(store.conversationModels.selectedChatModelId, 'gpt');
+  assert.equal(store.conversationModels.reasoningEffort, 'medium');
+  store.restoreDefaultsIfSnapshotted();
+  assert.equal(store.getConsumerSceneModel('rag'), 'kimi');
 });
