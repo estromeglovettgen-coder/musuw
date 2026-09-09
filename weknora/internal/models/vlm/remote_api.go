@@ -71,16 +71,17 @@ func vlmHTTPTimeout() time.Duration {
 
 // RemoteAPIVLM implements VLM via an OpenAI-compatible chat completions API.
 type RemoteAPIVLM struct {
-	modelName      string
-	modelID        string
-	client         *openai.Client
-	httpClient     *http.Client
-	baseURL        string
-	apiKey         string
-	provider       provider.ProviderName
-	temperature    float32
-	videoInputMode string
-	videoProvider  string
+	modelName          string
+	modelID            string
+	client             *openai.Client
+	httpClient         *http.Client
+	baseURL            string
+	apiKey             string
+	provider           provider.ProviderName
+	temperature        float32
+	videoInputMode     string
+	videoProvider      string
+	mandatoryReasoning bool
 }
 
 type openRouterReasoning struct {
@@ -165,16 +166,17 @@ func NewRemoteAPIVLM(config *Config) (*RemoteAPIVLM, error) {
 	}
 
 	return &RemoteAPIVLM{
-		modelName:      config.ModelName,
-		modelID:        config.ModelID,
-		client:         openai.NewClientWithConfig(apiCfg),
-		httpClient:     requestClient,
-		baseURL:        config.BaseURL,
-		apiKey:         config.APIKey,
-		provider:       providerName,
-		temperature:    temp,
-		videoInputMode: videoInputMode,
-		videoProvider:  videoProvider,
+		modelName:          config.ModelName,
+		modelID:            config.ModelID,
+		client:             openai.NewClientWithConfig(apiCfg),
+		httpClient:         requestClient,
+		baseURL:            config.BaseURL,
+		apiKey:             config.APIKey,
+		provider:           providerName,
+		temperature:        temp,
+		videoInputMode:     videoInputMode,
+		videoProvider:      videoProvider,
+		mandatoryReasoning: config.MandatoryReasoning,
 	}, nil
 }
 
@@ -306,13 +308,22 @@ func completionText(resp openai.ChatCompletionResponse, operation string) (strin
 	return "", fmt.Errorf("%s response contained no text (finish_reason=%s)", operation, finishReason)
 }
 
+// Optional reasoning stays disabled for extraction. Mandatory models retain
+// their provider default instead of receiving an unsupported "none" override.
+func (v *RemoteAPIVLM) reasoningOverride() *openRouterReasoning {
+	if v.mandatoryReasoning {
+		return nil
+	}
+	return &openRouterReasoning{Effort: "none"}
+}
+
 func (v *RemoteAPIVLM) createOpenRouterImageCompletion(
 	ctx context.Context,
 	req openai.ChatCompletionRequest,
 ) (openai.ChatCompletionResponse, error) {
 	payload := openRouterImageRequest{
 		ChatCompletionRequest: req,
-		Reasoning:             &openRouterReasoning{Effort: "none"},
+		Reasoning:             v.reasoningOverride(),
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -413,7 +424,7 @@ func (v *RemoteAPIVLM) buildOpenRouterVideoPayload(videoURL, _ string, prompt st
 	if v.videoProvider != "" {
 		routing["only"] = []string{v.videoProvider}
 	}
-	return map[string]any{
+	payload := map[string]any{
 		"model":    v.modelName,
 		"provider": routing,
 		"messages": []map[string]any{{
@@ -425,8 +436,11 @@ func (v *RemoteAPIVLM) buildOpenRouterVideoPayload(videoURL, _ string, prompt st
 		}},
 		"max_tokens":  defaultMaxToks,
 		"temperature": v.temperature,
-		"reasoning":   map[string]string{"effort": "none"},
 	}
+	if reasoning := v.reasoningOverride(); reasoning != nil {
+		payload["reasoning"] = map[string]string{"effort": reasoning.Effort}
+	}
+	return payload
 }
 
 // PredictVideo sends inline Base64 video through OpenRouter's documented

@@ -31,13 +31,14 @@ type ASR interface {
 
 // Config holds the configuration needed to create an ASR instance.
 type Config struct {
-	Source    types.ModelSource
-	BaseURL   string
-	ModelName string
-	APIKey    string
-	ModelID   string
-	Language  string // optional: specify language for transcription
-	Provider  string
+	Source         types.ModelSource
+	BaseURL        string
+	ModelName      string
+	APIKey         string
+	ModelID        string
+	Language       string // optional: specify language for transcription
+	ResponseFormat string // json for text-only models; empty preserves verbose_json timestamps
+	Provider       string
 	// CustomHeaders 允许在调用远程 API 时附加自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）。
 	CustomHeaders   map[string]string
 	OpenRouterMeter modelopenrouter.Meter
@@ -51,13 +52,14 @@ func ConfigFromModel(m *types.Model) *Config {
 		return nil
 	}
 	return &Config{
-		ModelID:       m.ID,
-		APIKey:        m.Parameters.APIKey,
-		BaseURL:       m.Parameters.BaseURL,
-		ModelName:     m.Name,
-		Source:        m.Source,
-		Provider:      m.Parameters.Provider,
-		CustomHeaders: m.Parameters.CustomHeaders,
+		ModelID:        m.ID,
+		APIKey:         m.Parameters.APIKey,
+		BaseURL:        m.Parameters.BaseURL,
+		ModelName:      m.Name,
+		Source:         m.Source,
+		Provider:       m.Parameters.Provider,
+		ResponseFormat: m.Parameters.ExtraConfig["response_format"],
+		CustomHeaders:  m.Parameters.CustomHeaders,
 	}
 }
 

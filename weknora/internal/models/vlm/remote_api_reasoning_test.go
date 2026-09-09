@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Tencent/WeKnora/internal/types"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -400,5 +401,43 @@ func TestRemoteAPIVLMUnshapedReasoningRequestIsRejected(t *testing.T) {
 	_, err = v.client.CreateChatCompletion(t.Context(), tempOnly)
 	if !errors.Is(err, openai.ErrReasoningModelLimitationsOther) {
 		t.Errorf("temperature error = %v, want ErrReasoningModelLimitationsOther", err)
+	}
+}
+
+// The factory must preserve catalog capabilities: forcing reasoning off makes
+// current GPT, Gemini and Grok vision requests fail before inference.
+func TestRemoteAPIVLMPredictPreservesMandatoryReasoning(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if reasoning, ok := body["reasoning"].(map[string]any); ok && reasoning["effort"] == "none" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Reasoning is mandatory"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"red"}}]}`))
+	}))
+	defer server.Close()
+	withVLMSSRFWhitelist(t, "127.0.0.1")
+	saved := &types.Model{
+		Name: "openai/gpt-6-astra", Source: types.ModelSourceRemote,
+		Parameters: types.ModelParameters{
+			Provider: "openrouter", BaseURL: server.URL,
+			Reasoning: types.ReasoningParameters{Supported: true, Mandatory: true},
+		},
+	}
+	model, err := NewRemoteAPIVLM(ConfigFromModel(saved, "", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := model.Predict(context.Background(), [][]byte{testPNG}, "Identify the color")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "red" {
+		t.Fatalf("got %q, want red", got)
 	}
 }

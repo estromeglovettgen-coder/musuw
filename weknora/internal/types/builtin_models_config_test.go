@@ -438,7 +438,7 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	var models []Model
 	require.NoError(t, db.Order("id").Find(&models).Error)
-	require.Len(t, models, 32)
+	require.Len(t, models, 42)
 
 	byID := make(map[string]Model, len(models))
 	defaultByType := make(map[ModelType]int)
@@ -468,10 +468,10 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.False(t, pro.IsDefault)
 	assert.Equal(t, "deepseek/deepseek-v4-pro-0813", pro.Name)
 	assert.Equal(t, "openrouter", pro.Parameters.Provider)
-	assert.Equal(t, "qwen/qwen3.8-max", byID["builtin-openrouter-qwen-max"].Name)
+	assert.Equal(t, "qwen/qwen3.8-max-0902", byID["builtin-openrouter-qwen-max"].Name)
 	assert.True(t, byID["builtin-openrouter-qwen-max"].Parameters.Reasoning.Mandatory)
 	assert.Equal(t, "openai/gpt-5.6-sol", byID["builtin-openrouter-gpt-sol"].Name)
-	assert.Equal(t, "google/gemini-3.7-flash", byID["builtin-openrouter-gemini-flash"].Name)
+	assert.Equal(t, "google/gemini-3.8-flash", byID["builtin-openrouter-gemini-flash"].Name)
 	assert.False(t, byID["builtin-openrouter-claude-haiku"].Parameters.Reasoning.Supported)
 	assert.Equal(t, "anthropic/claude-opus-5", byID["builtin-openrouter-claude-opus"].Name)
 	youtube := byID["builtin-openrouter-vlm-youtube"]
@@ -485,17 +485,17 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	// for the production paid catalog. Keep the display copy in sync with the
 	// provider's canonical model names as well.
 	nemotron := byID["builtin-openrouter-nemotron-lightning-free"]
-	assert.Equal(t, "nvidia/nemotron-3.5-lightning", nemotron.Name)
-	assert.Equal(t, "Nemotron 3.5 Lightning", nemotron.DisplayName)
-	assert.Equal(t, "NVIDIA Nemotron 3.5 Lightning through OpenRouter · tool-capable long-context reasoning", nemotron.Description)
+	assert.Equal(t, "nvidia/nemotron-3-ultra-550b-a55b", nemotron.Name)
+	assert.Equal(t, "Nemotron 3 Ultra", nemotron.DisplayName)
+	assert.Equal(t, "Nemotron 3 Ultra through OpenRouter · tool-capable long-context reasoning", nemotron.Description)
 	glm := byID["builtin-openrouter-glm-5-2-free"]
-	assert.Equal(t, "z-ai/glm-5.2", glm.Name)
-	assert.Equal(t, "GLM 5.2", glm.DisplayName)
-	assert.Equal(t, "GLM 5.2 through OpenRouter · multilingual tool-capable reasoning", glm.Description)
+	assert.Equal(t, "z-ai/glm-5.3", glm.Name)
+	assert.Equal(t, "GLM 5.3", glm.DisplayName)
+	assert.Equal(t, "GLM 5.3 through OpenRouter · multilingual tool-capable reasoning", glm.Description)
 	assert.True(t, glm.Parameters.Reasoning.Supported)
-	assert.False(t, glm.Parameters.Reasoning.Mandatory)
-	assert.Equal(t, []string{"high", "xhigh"}, glm.Parameters.Reasoning.SupportedEfforts)
-	assert.Equal(t, "high", glm.Parameters.Reasoning.DefaultEffort)
+	assert.True(t, glm.Parameters.Reasoning.Mandatory)
+	assert.Equal(t, []string{"max", "high", "low"}, glm.Parameters.Reasoning.SupportedEfforts)
+	assert.Equal(t, "max", glm.Parameters.Reasoning.DefaultEffort)
 	nano := byID["builtin-openrouter-gpt-5-nano"]
 	assert.True(t, nano.Parameters.Reasoning.Mandatory)
 	assert.NotContains(t, nano.Parameters.Reasoning.SupportedEfforts, "none")
@@ -522,13 +522,8 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.True(t, mimo.Parameters.SupportsVision)
 	assert.Equal(t, "url", mimo.Parameters.ExtraConfig["video_input_mode"])
 	assert.False(t, mimo.IsDefault)
-	muse := byID["builtin-openrouter-vlm-muse-spark-1-2"]
-	assert.Equal(t, "meta/muse-spark-1.2", muse.Name)
-	assert.Equal(t, "Muse Spark 1.2 Video", muse.DisplayName)
-	assert.Equal(t, "openrouter", muse.Parameters.Provider)
-	assert.True(t, muse.Parameters.SupportsVision)
-	assert.Equal(t, "url", muse.Parameters.ExtraConfig["video_input_mode"])
-	assert.False(t, muse.IsDefault)
+	assert.NotContains(t, byID, "builtin-openrouter-vlm-muse-spark-1-2",
+		"account-restricted endpoint must not be advertised")
 	qwenVideo := byID["builtin-openrouter-vlm-qwen-3-7-flash"]
 	assert.Equal(t, "url", qwenVideo.Parameters.ExtraConfig["video_input_mode"])
 	assert.Equal(t, "alibaba", qwenVideo.Parameters.ExtraConfig["video_provider"])
@@ -542,19 +537,17 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 		name      string
 		modelType ModelType
 	}{
-		"builtin-openrouter-nemotron-lightning-free": {"nvidia/nemotron-3.5-lightning", ModelTypeKnowledgeQA},
-		"builtin-openrouter-glm-5-2-free":            {"z-ai/glm-5.2", ModelTypeKnowledgeQA},
-		"builtin-openrouter-minimax-m3-free":         {"minimax/minimax-m3:free", ModelTypeKnowledgeQA},
+		"builtin-openrouter-nemotron-lightning-free": {"nvidia/nemotron-3-ultra-550b-a55b", ModelTypeKnowledgeQA},
+		"builtin-openrouter-glm-5-2-free":            {"z-ai/glm-5.3", ModelTypeKnowledgeQA},
+		"builtin-openrouter-minimax-m3-free":         {"minimax/minimax-m3", ModelTypeKnowledgeQA},
 		"builtin-openrouter-ling-flash":              {"inclusionai/ling-3.0-flash", ModelTypeKnowledgeQA},
 		"builtin-openrouter-qwen-3-7-flash":          {"qwen/qwen3.7-flash", ModelTypeKnowledgeQA},
 		"builtin-openrouter-gpt-5-nano":              {"openai/gpt-5-nano", ModelTypeKnowledgeQA},
 		"builtin-openrouter-rerank-nemotron-free":    {"nvidia/llama-nemotron-rerank-vl-1b-v2:free", ModelTypeRerank},
 		"builtin-openrouter-rerank-qwen3":            {"qwen/qwen3-reranker-8b", ModelTypeRerank},
-		"builtin-openrouter-vlm-minimax-m3-free":     {"minimax/minimax-m3:free", ModelTypeVLLM},
 		"builtin-openrouter-vlm-qwen-3-7-flash":      {"qwen/qwen3.7-flash", ModelTypeVLLM},
-		"builtin-openrouter-vlm-gemma-4-free":        {"google/gemma-4-26b-a4b-it:free", ModelTypeVLLM},
+		"builtin-openrouter-vlm-gemma-4-free":        {"google/gemma-4-26b-a4b-it", ModelTypeVLLM},
 		"builtin-openrouter-vlm-mimo-v2-5":           {"xiaomi/mimo-v2.5", ModelTypeVLLM},
-		"builtin-openrouter-vlm-muse-spark-1-2":      {"meta/muse-spark-1.2", ModelTypeVLLM},
 		"builtin-openrouter-asr-whisper-turbo":       {"openai/whisper-large-v3-turbo", ModelTypeASR},
 		"builtin-openrouter-asr-qwen-0-6b":           {"qwen/qwen3-asr-0.6b", ModelTypeASR},
 		"builtin-openrouter-asr-gpt-4o-mini":         {"openai/gpt-4o-mini-transcribe", ModelTypeASR},

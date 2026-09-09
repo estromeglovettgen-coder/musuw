@@ -71,13 +71,14 @@ func PredictVideoURL(ctx context.Context, model VLM, videoURL, mimeType, prompt 
 
 // Config holds the configuration needed to create a VLM instance.
 type Config struct {
-	Source        types.ModelSource
-	BaseURL       string
-	ModelName     string
-	APIKey        string
-	ModelID       string
-	InterfaceType string // "ollama" or "openai" (default)
-	Provider      string
+	Source             types.ModelSource
+	BaseURL            string
+	ModelName          string
+	APIKey             string
+	ModelID            string
+	InterfaceType      string // "ollama" or "openai" (default)
+	Provider           string
+	MandatoryReasoning bool // Do not disable reasoning when the catalog requires it.
 	// MaxConcurrency caps concurrent background calls to this model; 0 falls
 	// back to the process-wide default (see limiter.GateN).
 	MaxConcurrency int
@@ -106,18 +107,19 @@ func ConfigFromModel(m *types.Model, appID, appSecret string) *Config {
 		}
 	}
 	return &Config{
-		ModelID:        m.ID,
-		APIKey:         m.Parameters.APIKey,
-		BaseURL:        m.Parameters.BaseURL,
-		ModelName:      m.Name,
-		Source:         m.Source,
-		InterfaceType:  ifType,
-		Provider:       m.Parameters.Provider,
-		MaxConcurrency: m.Parameters.MaxConcurrency,
-		Extra:          stringMapToAnyMap(m.Parameters.ExtraConfig),
-		CustomHeaders:  m.Parameters.CustomHeaders,
-		AppID:          appID,
-		AppSecret:      appSecret,
+		ModelID:            m.ID,
+		APIKey:             m.Parameters.APIKey,
+		BaseURL:            m.Parameters.BaseURL,
+		ModelName:          m.Name,
+		Source:             m.Source,
+		InterfaceType:      ifType,
+		Provider:           m.Parameters.Provider,
+		MandatoryReasoning: m.Parameters.Reasoning.Mandatory,
+		MaxConcurrency:     m.Parameters.MaxConcurrency,
+		Extra:              stringMapToAnyMap(m.Parameters.ExtraConfig),
+		CustomHeaders:      m.Parameters.CustomHeaders,
+		AppID:              appID,
+		AppSecret:          appSecret,
 	}
 }
 
