@@ -8,7 +8,7 @@
 - [x] 2.1 Add failing catalog, scene, ASR and mandatory-vision acceptance tests; refresh verified entries and defaults and pass affected tests.
 - [x] 2.2 Verify saved IDs, Free restrictions and downstream selector contracts; complete one consolidated review and provenance checks.
 - [x] 2.3 Reproduce the custom-agent mandatory-reasoning failure on staging and cover the saved-model factory and actual outbound request.
-- [x] 2.4 Apply the user's enabled-at-minimum defaults; cover model switching, preference migration and the first-message depth handoff.
+- [x] 2.4 Apply the user's enabled-at-minimum defaults; cover model switching, preference migration, the first-message depth handoff and a reproduced historical model/depth mismatch.
 
 ## 3. Delivery
 

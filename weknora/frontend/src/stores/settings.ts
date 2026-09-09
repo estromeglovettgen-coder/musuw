@@ -273,7 +273,10 @@ export const useSettingsStore = defineStore("settings", {
     updateConversationModels(models: Partial<ConversationModels>) {
       const current = this.settings.conversationModels || defaultSettings.conversationModels;
       this.settings.conversationModels = { ...current, ...models };
-      localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+      // Restored conversations are temporary state, including late catalog repair.
+      if (!this._defaultsSnapshot && !this._isApplyingSessionState) {
+        localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+      }
     },
 
     getConsumerSceneModel(scene: ConsumerScene): string {
@@ -290,7 +293,10 @@ export const useSettingsStore = defineStore("settings", {
           [scene]: modelId,
         },
       };
-      localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+      // Restored conversations are temporary state, including late catalog repair.
+      if (!this._defaultsSnapshot && !this._isApplyingSessionState) {
+        localStorage.setItem("WeKnora_settings", JSON.stringify(this.settings));
+      }
     },
     
     // 更新模型配置

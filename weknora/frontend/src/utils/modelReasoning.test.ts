@@ -46,3 +46,7 @@ test('models without reasoning have no depth menu and send thinking off', () => 
   assert.deepEqual(modelReasoningEfforts(plain), [])
   assert.deepEqual(resolveModelReasoning(plain, 'high', 'grok'), { effort: 'none', modelId: 'plain' })
 })
+
+test('scene placeholder rows do not disable reasoning before the real model catalog arrives', () => {
+  assert.equal(resolveModelReasoning({ id: 'grok', parameters: {} }, 'high', 'grok'), null)
+})

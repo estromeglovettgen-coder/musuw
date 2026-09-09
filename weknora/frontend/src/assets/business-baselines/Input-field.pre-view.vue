@@ -818,6 +818,8 @@ const getMentionChipClass = (item: MentionItem) => {
 // 使用 computed 从 store 读取，并通过 setter 同步回 store
 const selectedModelId = computed({
   get: () => {
+    // History restores a conversation-specific model before scene preferences.
+    if (settingsStore._defaultsSnapshot) return settingsStore.conversationModels.selectedChatModelId || "";
     if (!sceneManagedByConsumerResolver.value) return settingsStore.conversationModels.selectedChatModelId || "";
     return settingsStore.getConsumerSceneModel(effectiveConsumerScene.value)
       || (effectiveConsumerScene.value === "chat" ? settingsStore.conversationModels.selectedChatModelId || "" : "");
@@ -1096,6 +1098,10 @@ const writeLastChatModelID = (id: string) => {
 };
 
 const initChatModelSelection = () => {
+  if (settingsStore._defaultsSnapshot) {
+    ensureModelSelection();
+    return;
+  }
   const scene = effectiveConsumerScene.value;
   const initialSelection =
     settingsStore.getConsumerSceneModel(scene)
