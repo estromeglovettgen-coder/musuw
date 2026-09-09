@@ -4,7 +4,7 @@ The three consumer selectors use the database reconciled from builtin_models.yam
 
 ## Goals / Non-Goals
 
-**Goals:** working international and Chinese model choices, synchronized selectors, preserved saved selections, production evidence.
+**Goals:** working international and Chinese model choices, synchronized selectors, preserved saved selections, lowest enabled reasoning defaults and staging evidence. Production deployment is held by the user.
 
 **Non-Goals:** video ingestion redesign, new providers, changing memberships, automatic background catalog updates.
 
@@ -16,12 +16,16 @@ Remove the account-gated Muse vision option and the unavailable MiniMax free vis
 
 Preserve mandatory reasoning capability when constructing the native vision client. Optional models retain the existing disabled-reasoning extraction behavior; mandatory models omit the unsupported override and use the provider default. Configure GPT-4o mini transcription to request JSON; retain verbose JSON and timestamps for existing Whisper clients. Both incompatibilities were reproduced with failing regression tests before the fixes.
 
+Custom agents default thinking to true while preserving explicit saved values. Native OpenRouter chat configuration carries the catalog default and mandatory capability into the final request: omitted or enabled reasoning uses the configured minimum, optional explicit Off remains Off, and mandatory legacy Off uses the configured minimum. Each chat catalog entry uses its lowest supported positive effort.
+
+The frontend stores a reasoningModelId next to its existing effort. Different-model selection resolves to that model's minimum; a valid explicit same-model depth survives refresh. Unloaded metadata does not rewrite preferences. First-message depth is passed through the existing menu store so homepage navigation cannot replace it with a global fallback. Session state binds its restored depth to the restored model and retains the existing default snapshot boundary. Tests execute the real storage module rather than a copied implementation.
+
 ## Risks / Trade-offs
 
 - Provider listings can outlive endpoints → perform real bounded inference and retain dated evidence.
 - A new catalog entry can be omitted by scene policy → compare all three user-facing lists and policy defaults.
 - Existing user selection can reference a retired slug → preserve compatible stable IDs.
-- Production promotion has an existing protected workflow → build and verify the immutable release through that workflow; report any actual remaining approval gate.
+- Production deployment is held by the user → use the existing staging-only path, retain the production revision, and do not attest the full Sandbox promotion gate.
 
 ## Migration Plan
 
@@ -29,4 +33,4 @@ Run catalog reconciliation via the normal release. Preserve user overrides. Retu
 
 ## Verification
 
-The final exposed catalog passed 40 native-client probes against a short-lived, capped child key in the production OpenRouter workspace: 25 conversations with a tool-result round trip and streaming answer, 7 image observations, 4 transcriptions, 3 rerank requests and one 4096-dimensional embedding. The existing two dedicated video routes are unchanged and excluded from the selectable vision scene list. The child key was deleted after testing. Release, browser and production reconciliation evidence is recorded separately as delivery proceeds.
+The final exposed catalog passed 40 native-client probes against a short-lived, capped child key in the production OpenRouter workspace: 25 conversations with a tool-result round trip and streaming answer, 7 image observations, 4 transcriptions, 3 rerank requests and one 4096-dimensional embedding. The existing two dedicated video routes are unchanged and excluded from the selectable vision scene list. The child key was deleted after testing. Release, browser and staging reconciliation evidence is recorded separately as delivery proceeds. The production deployment is held by the user.
