@@ -62,7 +62,7 @@ cmd/desktop/main_bindings.go	D	-	000000	0000000000000000000000000000000000000000
 cmd/desktop/prefs.go	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
 cmd/desktop/update.go	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
 cmd/desktop/wails.json	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
-config/builtin_agents.yaml	M	M	100644	fa9412ede9266a555ecdc8202e9d9db4d55872ba	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+config/builtin_agents.yaml	M	M	100644	b58fbe725dfa1b0659a6a2f8be88e0678366663e	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 config/builtin_models.yaml	A	-	100644	54d545c440cb6f16da67ce058d561fc413b3b6e4	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 config/config.yaml	M	-	100644	7ca9102c7f55b6a71c13ac975e86184427b86b73	preserve-musuw-exact		audited local-only content is byte-identical
 config/prompt_templates/agent_system_prompt.yaml	M	M	100644	518e5d9c1015097bf4ccee3b2fec8cf98bdd0943	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
@@ -367,7 +367,7 @@ frontend/src/stores/localizedResourceCache.test.ts	-	A	100644	341bd5a19039762589
 frontend/src/stores/localizedResourceCache.ts	-	A	100644	bd16b7178e56e0977f5889926ff60dd025fd3781	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/stores/menu.ts	M	M	100644	5b55fb587c4012cc8b10706bbfb79ca2eec98470	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/stores/organization.ts	-	M	100644	ffc8fbd5a510d79b3d55f8f91394dab6b439eec9	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
-frontend/src/stores/settings.ts	M	-	100644	0507d6de41b88b64aa1b9d10d2033318fac88b30	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/stores/settings.ts	M	-	100644	fd52ec3ebcc3e43d8872a51cdcb32bcb88e5574c	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/stores/settingsStorage.test.mjs	M	-	100644	abd576bbb4d4dc83ae9e7b8ee6dbaf4a53865a7f	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/stores/settingsStorage.ts	M	-	100644	58bd4ea0657bf8712b753cfcd09d8ba13827251e	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/types/business-controller-shim.d.ts	A	-	100644	323ce5c8747ad943bac650e89dfe9f0fb6293739	preserve-musuw-exact		audited local-only content is byte-identical
@@ -591,7 +591,7 @@ frontend/vite.config.ts	M	-	100644	bd7c9f63f26b1211e4803055b9a938e2c35253ef	pres
 go.mod	M	M	100644	41878c27218e453ec268cce06fefc25048ef27ca	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 go.sum	M	M	100644	690884ec91252c905c037bf4907e8829c9b299fa	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/agent/act.go	-	M	100644	0072ff1f0a5f66992491c6f59245173c4de17b63	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/agent/const.go	-	M	100644	125330ae147363a53f65351a831f32fa4a0b4223	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
+internal/agent/const.go	-	M	100644	37f853f0c4c46ca8538e12473e839b73c2c3bec6	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/agent/const_test.go	-	A	100644	b347cde7601c2e7ce6efd221b393433d7bded40d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/agent/engine.go	M	M	100644	242bd3a15144ce375971a92d85f7714bec37f548	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/agent/engine_memory_test.go	-	A	100644	db1a00aa095ec32d6af35a12b2b0490e0e90c7c5	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -702,11 +702,11 @@ internal/application/service/agent_history.go	M	M	100644	dd3be63737504e279ef7b71
 internal/application/service/agent_history_test.go	-	M	100644	9630087c6ceff80ce466f13b9480b48878bb6784	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/agent_memory_config_test.go	-	A	100644	2cc5cf7fa276fd0b10ac72f7b1423002ce6b3bf0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/agent_memory_tool_test.go	-	A	100644	2622cf935aae2175be6fce682b5d3e13db61344b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/agent_service.go	-	M	100644	d50bcb459c1c1e83d1d91fee217888f6ebbde994	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
+internal/application/service/agent_service.go	-	M	100644	6f353475a104c48bad962ee7adb1c4d67457b6ff	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/application/service/agent_service_install_shell_test.go	-	A	100644	ab9634746b8b7c7baa0e847e13499aa8affbb4ea	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/agent_service_scope_test.go	-	M	100644	85731d76a798ab5218ba50823bb9103e2a6184e9	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/agent_service_shell_test.go	-	A	100644	ba10ba1bfbd12f6e515f332f25efd56073efabcb	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/agent_service_test.go	-	M	100644	cc2fd420d7d68fb663115f8fce1b40e5e4017d49	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
+internal/application/service/agent_service_test.go	-	M	100644	24883d226364e3684d5028eae4aa137fe88f3cd0	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/application/service/agent_service_user_env_test.go	-	A	100644	a6fce1afd18625e3adb660c271dde6ea5d0053d3	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/agent_share.go	-	M	100644	55f0ce86ba99a35ccc9d6bffe1ebb261fbd579ab	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/application/service/agent_share_runtime_test.go	-	M	100644	7f06d8d8a583b72d3ecc8998bdc534023a942b7b	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
@@ -896,8 +896,8 @@ internal/application/service/tenant_skill_env_declare.go	-	A	100644	594d3ba63dce
 internal/application/service/tenant_skill_env_declare_test.go	-	A	100644	8aa63d05c179a64f4ffa8c0aee280eb4c95eadec	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/tenant_skill_files.go	-	A	100644	79fcb05e433a7be38a19091aad4522e947778018	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/tenant_skill_files_test.go	-	A	100644	32af40d21723daca37a275b9cb92f4dc2fdc4bb4	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/tenant_skill_install.go	-	A	100644	420685fc5646530f14bb7aa5b9ed5fbda9ab8eae	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/application/service/tenant_skill_install_test.go	-	A	100644	f5f470979ad5b0024cb5263ba20d79ba42127fbe	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
+internal/application/service/tenant_skill_install.go	-	A	100644	801fccffdc8f1b122f2926a7e01a6de56149c38d	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
+internal/application/service/tenant_skill_install_test.go	-	A	100644	96a72787917a1895a174344ebfc58760ff28a16b	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/application/service/tenant_skill_progress.go	-	A	100644	726b570850538ed87ac60f49be58bfb0a14337f7	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/tenant_skill_reaper.go	-	A	100644	e6f70f69af3bf9c535f8afcc0bd36cfa833fd52c	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/tenant_skill_reaper_test.go	-	A	100644	f69657517f21778e93a6c4a630209f8e9d5e3643	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -1325,7 +1325,7 @@ internal/types/agent_test.go	-	M	100644	47006e45d1bc875b525cf33cf50f56af0a970400
 internal/types/audit_log.go	M	M	100644	376e2e62e94cce750ca3847c8a401f5a75aa09fa	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/types/audit_log_test.go	-	M	100644	d4a38cdec1df3bd175719adbff807ce292c55ebd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/types/builtin_agent_config.go	-	M	100644	bd7899edd70b7052c38c88a4eceda7aec5ed99a9	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/types/builtin_agent_defaults_test.go	A	-	100644	43478df548c2b4973bc5bcf40e4eca7aeec32704	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/types/builtin_agent_defaults_test.go	A	-	100644	aeb10b670ca6f77d050a479a1a056bc31b242daf	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/types/builtin_agent_localization_test.go	-	A	100644	83151ba26e3066d2610583da7157ae78b0315fb0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/types/builtin_models_config.go	M	-	100644	473e9518b2f15aafa15c49a25090123b7f4f1724	preserve-musuw-exact		audited local-only content is byte-identical
 internal/types/builtin_models_config_test.go	M	-	100644	b55adaf8ec006c5ab5fe1a57738c8d000c047bdc	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
@@ -1583,14 +1583,14 @@ third_party/anydoc-go/src/model.rs	-	A	100644	5a97b044874c6b03caa9eaf6305d148e48
 third_party/anydoc-go/version.go	-	A	100644	e493d82fdd6ac06fe1fbacf88b22f016b419db2d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 website-docs/01-getting-started/01-introduction.md	M	M	100644	16d43be89226ed5b7a820c374696274bad11dd32	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 website-docs/01-getting-started/02-installation.md	-	M	100644	cd67705d63d7633d368b1f26c77f93066c72af6f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-website-docs/01-getting-started/04-configuration.md	M	M	100644	c1fd9e9d01aaa077e4df373e40c288258a9e9c8c	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+website-docs/01-getting-started/04-configuration.md	M	M	100644	b8b2fc6939065c64d083ba185aed5e335ccefbae	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 website-docs/02-architecture/01-overview.md	-	M	100644	f67c725c98d715572c47b6ee178325dce283c6f6	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 website-docs/02-architecture/03-document-pipeline.md	M	M	100644	d7ad85ae25aaa083c7b2162519c50008c1283195	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 website-docs/02-architecture/04-rag-pipeline.md	-	M	100644	c7dd2ccc1b10121fb58b08cdb8bd084947770f42	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 website-docs/03-features/01-tenant-auth.md	M	-	100644	8f9bbfe19009042351d72054cef7f3816311e482	preserve-musuw-exact		audited local-only content is byte-identical
 website-docs/03-features/02-knowledge-base.md	M	-	100644	a28b2ca6fb8757799364134c9e65d888fb8e1365	preserve-musuw-exact		audited local-only content is byte-identical
 website-docs/03-features/03-document-parsing.md	-	M	100644	69ea1e4fb5e02b2414db7bd43420420c733cfe5a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-website-docs/03-features/07-agent.md	-	M	100644	8c05deebf70a28ef49df9b6a99d671287df8f99b	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
+website-docs/03-features/07-agent.md	-	M	100644	ba4fa56059ddabff74bb06b785dfb5724eab212c	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 website-docs/03-features/12-im-integration.md	-	M	100644	d15dab22ff5eae8fe03fd69013a3d99349e133cb	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 website-docs/03-features/13-embed-channel.md	M	-	100644	f381412fe79fff453e8e1fee2611f09f60a8e3f7	preserve-musuw-exact		audited local-only content is byte-identical
 website-docs/03-features/17-faq.md	-	M	100644	42c5d673f831a928c75000b33fe75bbca7f59c20	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
