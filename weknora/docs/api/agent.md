@@ -356,7 +356,7 @@ curl --location --request POST 'http://localhost:8080/api/v1/agents/builtin-smar
         "is_builtin": false,
         "config": {
             "agent_mode": "smart-reasoning",
-            "max_iterations": 50
+            "max_iterations": 10
         },
         "created_at": "2025-01-19T12:00:00Z",
         "updated_at": "2025-01-19T12:00:00Z"

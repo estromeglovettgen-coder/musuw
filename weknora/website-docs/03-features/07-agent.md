@@ -220,10 +220,10 @@ if !state.IsComplete && ctx.Err() == nil {
 
 最大迭代次数的多层默认值：
 
-- 引擎级默认 `DefaultAgentMaxIterations = 20`（`internal/agent/const.go`）；
-- 服务层 `ValidateConfig`：`<= 0` 时兜底为 5，硬上限 `MAX_ITERATIONS = 100`（`internal/application/service/agent_service.go`）；
+- 引擎级默认 `DefaultAgentMaxIterations = 10`（`internal/agent/const.go`）；
+- 服务层 `ValidateConfig`：`<= 0` 时兜底为 10，硬上限 `MAX_ITERATIONS = 100`（`internal/application/service/agent_service.go`）；
 - `CustomAgent.EnsureDefaults`：未配置时为 10（`internal/types/custom_agent.go`）;
-- 内置 Agent：智能推理 50、数据分析师 30、Wiki 问答/修订 30（`config/builtin_agents.yaml`）。
+- 内置 Agent 与 Agent 类型预设统一默认 10（`config/builtin_agents.yaml`、`config/agent_type_presets.yaml`）。
 
 达到上限后 `handleMaxIterations` 会用一个专门的合成 prompt（`internal/agent/finalize.go`）把全部工具结果作为 user 消息喂给 LLM 生成完整答案（合成阶段关闭 thinking），若检索结果含 Markdown 图片还会附加图片输出要求。
 
@@ -547,9 +547,9 @@ Handler 层（`internal/handler/custom_agent.go`）提供 `CreateAgent`、`GetAg
 | ID | 名称（zh-CN） | agent_mode / agent_type | 关键配置 |
 | --- | --- | --- | --- |
 | `builtin-quick-answer` | 快速问答 | `quick-answer` | 模板 `default_kb` + `default_context`；temperature 0.7；FAQ 优先（直接回答阈值 0.9、加权 1.2）；query expansion + rewrite；web 搜索开、5 条；不进 Agent 引擎 |
-| `builtin-smart-reasoning` | 智能推理 | `smart-reasoning` / `rag-qa` | `max_iterations: 50`；工具：knowledge_search、grep_chunks、list_knowledge_chunks、query_knowledge_graph、get_document_info；web 搜索开；多轮 5 轮 |
-| `builtin-data-analyst` | 数据分析师 | `smart-reasoning` / `data-analysis` | 模板 `data_analyst`；temperature 0.3；`max_iterations: 30`；工具仅 data_schema + data_analysis；限定 csv/xlsx；关闭 web 搜索；历史 10 轮 |
-| `builtin-wiki-researcher` | 维基问答 | `smart-reasoning` / `wiki-qa` | 模板 `wiki_researcher`；`max_iterations: 30`；工具：wiki_search、wiki_read_page、wiki_read_source_doc、wiki_flag_issue（只读 + 报障）；关闭 web 搜索 |
+| `builtin-smart-reasoning` | 智能推理 | `smart-reasoning` / `rag-qa` | `max_iterations: 10`；工具：knowledge_search、grep_chunks、list_knowledge_chunks、query_knowledge_graph、get_document_info；web 搜索开；多轮 5 轮 |
+| `builtin-data-analyst` | 数据分析师 | `smart-reasoning` / `data-analysis` | 模板 `data_analyst`；temperature 0.3；`max_iterations: 10`；工具仅 data_schema + data_analysis；限定 csv/xlsx；关闭 web 搜索；历史 10 轮 |
+| `builtin-wiki-researcher` | 维基问答 | `smart-reasoning` / `wiki-qa` | 模板 `wiki_researcher`；`max_iterations: 10`；工具：wiki_search、wiki_read_page、wiki_read_source_doc、wiki_flag_issue（只读 + 报障）；关闭 web 搜索 |
 | `builtin-wiki-fixer` | 维基修订 | `smart-reasoning` / `custom` | 模板 `wiki_fixer`；`retain_retrieval_history: true`（修订需要跨轮记住页面内容）；工具含全部 wiki 写操作（wiki_write_page、wiki_replace_text、wiki_rename_page、wiki_delete_page、wiki_read_issue、wiki_update_issue 等 9 个）；`kb_selection_mode: selected` |
 
 补充两点（来自 `internal/types/custom_agent.go`）：
@@ -643,7 +643,7 @@ const (
 
 | 常量 | 值 | 位置 |
 | --- | --- | --- |
-| `DefaultAgentMaxIterations` | 20 | `internal/agent/const.go` |
+| `DefaultAgentMaxIterations` | 10 | `internal/agent/const.go` |
 | `MAX_ITERATIONS`（服务层上限） | 100 | `internal/application/service/agent_service.go` |
 | `defaultLLMCallTimeout` | 120s | `internal/agent/const.go` |
 | `defaultToolExecTimeout` | 60s | `internal/agent/const.go` |

@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/agent/skills"
 	"github.com/Tencent/WeKnora/internal/agent/tools"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -1794,7 +1795,7 @@ func installerAgentDefaults(ctx context.Context, tenantID uint64) *types.CustomA
 func installerAgentConfig(defaults *types.CustomAgent, configID string) *types.AgentConfig {
 	memoryOff := false
 	cfg := &types.AgentConfig{
-		MaxIterations:    30,
+		MaxIterations:    agent.DefaultAgentMaxIterations,
 		AllowedTools:     []string{tools.ToolShellExec},
 		Temperature:      0.2,
 		WebSearchEnabled: false,
@@ -1812,7 +1813,7 @@ func installerAgentConfig(defaults *types.CustomAgent, configID string) *types.A
 	custom := defaults.Config
 	cfg.MaxIterations = custom.MaxIterations
 	if cfg.MaxIterations == 0 {
-		cfg.MaxIterations = 30
+		cfg.MaxIterations = agent.DefaultAgentMaxIterations
 	}
 	cfg.AllowedTools = append([]string(nil), custom.AllowedTools...)
 	if len(cfg.AllowedTools) == 0 {

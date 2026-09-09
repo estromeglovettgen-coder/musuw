@@ -38,6 +38,7 @@ builtin_agents:
       context_template_id: "default_context"
       temperature: 0.7
       max_completion_tokens: 0
+      max_iterations: 10
       web_search_enabled: true
       web_search_max_results: 5
       web_fetch_enabled: true
@@ -91,7 +92,7 @@ builtin_agents:
       system_prompt_id: "hybrid_rag_wiki_agent"
       temperature: 0.7
       max_completion_tokens: 0
-      max_iterations: 50
+      max_iterations: 10
       kb_selection_mode: "all"
       retrieve_kb_only_when_mentioned: false
       mcp_selection_mode: "all"
@@ -168,7 +169,7 @@ builtin_agents:
       system_prompt_id: "data_analyst"
       temperature: 0.3
       max_completion_tokens: 0
-      max_iterations: 30
+      max_iterations: 10
       kb_selection_mode: "all"
       retrieve_kb_only_when_mentioned: false
       supported_file_types:
@@ -219,7 +220,7 @@ builtin_agents:
       system_prompt_id: "wiki_researcher"
       temperature: 0.7
       max_completion_tokens: 0
-      max_iterations: 30
+      max_iterations: 10
       kb_selection_mode: "all"
       retrieve_kb_only_when_mentioned: false
       allowed_tools:
@@ -269,7 +270,7 @@ builtin_agents:
       system_prompt_id: "wiki_fixer"
       temperature: 0.7
       max_completion_tokens: 0
-      max_iterations: 30
+      max_iterations: 10
       kb_selection_mode: "selected"
       retrieve_kb_only_when_mentioned: false
       retain_retrieval_history: true
@@ -319,7 +320,7 @@ builtin_agents:
       system_prompt_id: "skill_installer"
       temperature: 0.2
       max_completion_tokens: 24576
-      max_iterations: 30
+      max_iterations: 10
       kb_selection_mode: "none"
       retrieve_kb_only_when_mentioned: false
       allowed_tools:
