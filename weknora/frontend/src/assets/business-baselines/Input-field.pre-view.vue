@@ -48,6 +48,7 @@ import {
 import { formatLocalizedList } from "@/utils/format-list";
 import { SKILL_ICON, type MentionItem, type MentionItemType, type MentionRequestItem } from "@/types/mention";
 import { resolveChatModelId } from "@/utils/managedChatModels";
+import { modelReasoningEfforts, resolveModelReasoning } from "@/utils/modelReasoning";
 import {
   resolveComposerConsumerScene,
   resolveConsumerSceneCandidate,
@@ -832,13 +833,15 @@ const thinkingEnabled = computed({
   get: () => settingsStore.conversationModels.reasoningEffort !== "none",
   set: (val: boolean) => settingsStore.updateConversationModels({
     thinkingEnabled: val,
-    reasoningEffort: val ? "high" : "none",
+    reasoningEffort: val ? modelReasoningEfforts(selectedModel.value)[0] || "none" : "none",
+    reasoningModelId: selectedModelId.value,
   }),
 });
 const reasoningEffort = computed({
-  get: () => settingsStore.conversationModels.reasoningEffort || "high",
+  get: () => settingsStore.conversationModels.reasoningEffort || "low",
   set: (val: string) => settingsStore.updateConversationModels({
     reasoningEffort: val,
+    reasoningModelId: selectedModelId.value,
     thinkingEnabled: val !== "none",
   }),
 });
@@ -1242,25 +1245,24 @@ const reasoningEffortLabel = (effort: string) => {
   return String(locale.value).toLowerCase().startsWith("zh") ? labels.zh : labels.en;
 };
 const reasoningOptions = computed(() => {
-  const reasoning = selectedModel.value?.parameters?.reasoning;
-  if (!reasoning?.supported) return [];
-  const efforts = [...(reasoning.supported_efforts || [])];
-  if (!reasoning.mandatory && !efforts.includes("none")) efforts.push("none");
-  return [...new Set(efforts)].map((value) => ({ value, label: reasoningEffortLabel(value) }));
+  return modelReasoningEfforts(selectedModel.value).map((value) => ({ value, label: reasoningEffortLabel(value) }));
 });
 const selectedReasoningLabel = computed(() => reasoningEffortLabel(reasoningEffort.value));
 const ensureReasoningSelection = () => {
-  if (!reasoningOptions.value.length) {
-    if (reasoningEffort.value !== "none") reasoningEffort.value = "none";
-    return;
-  }
-  if (reasoningOptions.value.some((item) => item.value === reasoningEffort.value)) return;
-  const configuredDefault = selectedModel.value?.parameters?.reasoning?.default_effort;
-  reasoningEffort.value = reasoningOptions.value.some((item) => item.value === configuredDefault)
-    ? configuredDefault || reasoningOptions.value[0].value
-    : reasoningOptions.value[0].value;
+  const current = settingsStore.conversationModels;
+  const resolved = resolveModelReasoning(selectedModel.value, current.reasoningEffort, current.reasoningModelId);
+  if (!resolved) return;
+  if (resolved.effort === current.reasoningEffort && resolved.modelId === current.reasoningModelId) return;
+  settingsStore.updateConversationModels({
+    reasoningEffort: resolved.effort,
+    reasoningModelId: resolved.modelId,
+    thinkingEnabled: resolved.effort !== "none",
+  });
 };
-watch([selectedModel, reasoningOptions], ensureReasoningSelection, { immediate: true });
+watch([selectedModel, reasoningOptions,
+  () => settingsStore.conversationModels.reasoningEffort,
+  () => settingsStore.conversationModels.reasoningModelId,
+], ensureReasoningSelection, { immediate: true });
 
 // 模型展示名：本空间列表中有则用名称；若为共享智能体且其 model_id 不在本空间列表中则显示“共享智能体配置的模型”
 const selectedModelDisplayName = computed(() => {

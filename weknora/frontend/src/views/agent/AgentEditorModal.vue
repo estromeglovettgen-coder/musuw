@@ -2621,7 +2621,7 @@ const defaultFormData = {
     rerank_model_id: '',
     temperature: 0.7,
     max_completion_tokens: 0,
-    thinking: false, // 默认禁用思考模式
+    thinking: true, // 默认启用推理，初始深度由模型目录决定
     citation_enabled: true, // 默认输出知识库/网页来源引用
     // Agent模式设置
     max_iterations: 10,
@@ -3340,7 +3340,7 @@ watch(() => props.visible, async (val) => {
       // 补全可能缺失的字段
       agentData.config = { ...defaultFormData.config, ...agentData.config };
       if (agentData.config.thinking == null) {
-        agentData.config.thinking = false;
+        agentData.config.thinking = true;
       }
 
       agentData.config.question_suggestions = {

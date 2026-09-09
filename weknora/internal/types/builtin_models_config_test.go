@@ -451,6 +451,21 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 		if model.IsDefault {
 			defaultByType[model.Type]++
 		}
+		if model.Type == ModelTypeKnowledgeQA {
+			reasoning := model.Parameters.Reasoning
+			minimum := "none"
+			if reasoning.Supported {
+				for _, effort := range []string{"minimal", "low", "medium", "high", "xhigh", "max"} {
+					for _, supported := range reasoning.SupportedEfforts {
+						if supported == effort && minimum == "none" {
+							minimum = effort
+						}
+					}
+				}
+				assert.NotEqual(t, "none", minimum, "%s must expose an enabled depth", model.ID)
+			}
+			assert.Equal(t, minimum, reasoning.DefaultEffort, "%s must default to its minimum", model.ID)
+		}
 	}
 
 	assert.Equal(t, 1, defaultByType[ModelTypeKnowledgeQA])
@@ -495,11 +510,11 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.True(t, glm.Parameters.Reasoning.Supported)
 	assert.True(t, glm.Parameters.Reasoning.Mandatory)
 	assert.Equal(t, []string{"max", "high", "low"}, glm.Parameters.Reasoning.SupportedEfforts)
-	assert.Equal(t, "max", glm.Parameters.Reasoning.DefaultEffort)
+	assert.Equal(t, "low", glm.Parameters.Reasoning.DefaultEffort)
 	nano := byID["builtin-openrouter-gpt-5-nano"]
 	assert.True(t, nano.Parameters.Reasoning.Mandatory)
 	assert.NotContains(t, nano.Parameters.Reasoning.SupportedEfforts, "none")
-	assert.Equal(t, "low", nano.Parameters.Reasoning.DefaultEffort)
+	assert.Equal(t, "minimal", nano.Parameters.Reasoning.DefaultEffort)
 
 	embedding := byID["builtin-openrouter-embedding"]
 	assert.Equal(t, "qwen/qwen3-embedding-8b", embedding.Name)

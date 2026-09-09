@@ -27,10 +27,11 @@ const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
 const CONSUMER_SURFACE_CHANGE = 'curate-main-consumer-surface'
 const ENTITLEMENT_USAGE_REVALIDATION_CHANGE = 'refresh-entitlement-after-metered-usage'
 const KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE = 'display-materialized-ai-title'
+const MODEL_REASONING_DEFAULT_CHANGE = 'refresh-global-model-catalog'
 
 const LOCKED_BUSINESS_BLOBS = {
-  './business-baselines/ChatIndex.pre-view.vue': 'a678a30cc2dc24f8f48797a0dfb390cbb75e8c88',
-  './business-baselines/Input-field.pre-view.vue': '63597ef6410500454181cff67ca6342137351f95',
+  './business-baselines/ChatIndex.pre-view.vue': '5d9ee35408dc665fd7bd55345beba6f378543033',
+  './business-baselines/Input-field.pre-view.vue': 'f7bb90ced6db1f685f5b4af32561882115311e7a',
   './business-baselines/KnowledgeBase.pre-view.vue': '62faa49842403fbe8aa2fbb0faee2d08ff145553',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
@@ -48,14 +49,14 @@ const INITIAL_MUSUW_BYTE_IDENTICAL = {
 const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   inputField: {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
-    change: NATIVE_AGENT_MCP_EXPOSURE_CHANGE,
+    change: `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy',
+    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy; explicit user-requested minimum enabled reasoning defaults with model-scoped saved depth',
   },
   chatParent: {
-    change: ENTITLEMENT_USAGE_REVALIDATION_CHANGE,
+    change: `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
-    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads',
+    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads and explicit transport of the first-message reasoning depth through route navigation',
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
@@ -98,7 +99,7 @@ test('first Musuw byte-identical controllers remain byte-identical where upstrea
 
 test('upstream behavior restorations are explicit and locked, never inferred from visual code', () => {
   assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.commit, NATIVE_MULTI_MODEL_RESTORE_COMMIT)
-  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.change, NATIVE_AGENT_MCP_EXPOSURE_CHANGE)
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.change, `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.resultingBlob,
     gitBlobSha(read('./business-baselines/Input-field.pre-view.vue')),
@@ -107,7 +108,7 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.resultingBlob,
     gitBlobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
   )
-  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, ENTITLEMENT_USAGE_REVALIDATION_CHANGE)
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBase.pre-view.vue')),

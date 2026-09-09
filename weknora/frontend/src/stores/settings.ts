@@ -46,6 +46,8 @@ interface ConversationModels {
   selectedChatModelId: string;  // 用户当前选择的对话模型ID
   thinkingEnabled: boolean;
   reasoningEffort: string;
+  /** Depth belongs to this model; a different model starts at its minimum. */
+  reasoningModelId?: string;
   /** Consumer scene candidates are browser preferences only; resolver remains authoritative. */
   consumerSceneModelIds: Partial<Record<ConsumerScene, string>>;
 }
@@ -111,7 +113,8 @@ const defaultSettings: Settings = {
     rerankModelId: "",
     selectedChatModelId: "",
     thinkingEnabled: true,
-    reasoningEffort: "high",
+    reasoningEffort: "",
+    reasoningModelId: "",
     consumerSceneModelIds: {},
   },
   selectedAgentId: BUILTIN_SMART_REASONING_ID,
@@ -196,8 +199,9 @@ export const useSettingsStore = defineStore("settings", {
           conversationModels: {
             ...this.settings.conversationModels,
             selectedChatModelId: DEFAULT_CHAT_MODEL_ID,
-            thinkingEnabled: false,
-            reasoningEffort: "none",
+            thinkingEnabled: true,
+            reasoningEffort: "",
+            reasoningModelId: "",
           },
         });
       }
@@ -218,8 +222,9 @@ export const useSettingsStore = defineStore("settings", {
           ? {
               ...current,
               selectedChatModelId: DEFAULT_CHAT_MODEL_ID,
-              thinkingEnabled: false,
-              reasoningEffort: "none",
+              thinkingEnabled: true,
+              reasoningEffort: "",
+              reasoningModelId: "",
             }
           : current,
       });
@@ -595,10 +600,11 @@ export const useSettingsStore = defineStore("settings", {
           const current = this.settings.conversationModels || defaultSettings.conversationModels;
           const effort = typeof state.reasoning_effort === "string" && state.reasoning_effort
             ? state.reasoning_effort
-            : state.thinking === false ? "none" : current.reasoningEffort || "high";
+            : state.thinking === false ? "none" : "";
           this.settings.conversationModels = {
             ...current,
             reasoningEffort: effort,
+            reasoningModelId: effort ? current.selectedChatModelId : "",
             thinkingEnabled: effort !== "none",
           };
         }

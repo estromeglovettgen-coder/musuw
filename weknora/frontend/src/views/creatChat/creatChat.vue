@@ -205,11 +205,11 @@ const handleSuggestedQuestionClick = (question: string) => {
     inputFieldRef.value?.triggerSend(question);
 };
 
-const sendMsg = (value: string, modelId: string, mentionedItems: any[], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) => {
-    createNewSession(value, modelId, mentionedItems, imageFiles, attachmentFiles, thinking);
+const sendMsg = (value: string, modelId: string, mentionedItems: any[], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true, reasoningEffort: string = '') => {
+    createNewSession(value, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort);
 }
 
-async function createNewSession(value: string, modelId: string, mentionedItems: any[] = [], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) {
+async function createNewSession(value: string, modelId: string, mentionedItems: any[] = [], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true, reasoningEffort: string = '') {
     const selectedKbs = settingsStore.settings.selectedKnowledgeBases || [];
     const selectedFiles = settingsStore.settings.selectedFiles || [];
     const sessionData: any = {};
@@ -225,7 +225,7 @@ async function createNewSession(value: string, modelId: string, mentionedItems: 
     try {
         const res = await createSessions(sessionData);
         if (res.data && res.data.id) {
-            await navigateToSession(res.data.id, value, modelId, mentionedItems, imageFiles, attachmentFiles, thinking);
+            await navigateToSession(res.data.id, value, modelId, mentionedItems, imageFiles, attachmentFiles, thinking, reasoningEffort);
         } else {
             console.error('[createChat] Failed to create session');
             MessagePlugin.error(t('createChat.messages.createFailed'));
@@ -236,7 +236,7 @@ async function createNewSession(value: string, modelId: string, mentionedItems: 
     }
 }
 
-const navigateToSession = async (sessionId: string, value: string, modelId: string, mentionedItems: any[], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true) => {
+const navigateToSession = async (sessionId: string, value: string, modelId: string, mentionedItems: any[], imageFiles: any[] = [], attachmentFiles: any[] = [], thinking: boolean = true, reasoningEffort: string = '') => {
     const now = new Date().toISOString();
     let obj = {
         title: t('createChat.newSessionTitle'),
@@ -249,7 +249,7 @@ const navigateToSession = async (sessionId: string, value: string, modelId: stri
     };
     usemenuStore.updataMenuChildren(obj);
     usemenuStore.changeIsFirstSession(true);
-    usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking);
+    usemenuStore.changeFirstQuery(value, mentionedItems, modelId, imageFiles, attachmentFiles, thinking, reasoningEffort);
     router.push(`/platform/chat/${sessionId}`);
 }
 

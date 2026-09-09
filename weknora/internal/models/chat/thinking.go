@@ -85,19 +85,33 @@ func NormalizeReasoningEffort(value string) (string, error) {
 
 // openRouterReasoning encodes the gateway's native reasoning.effort field.
 // Legacy boolean callers are retained as a narrow compatibility bridge:
-// enabled maps to high, disabled maps to none.
-type openRouterReasoning struct{}
+// enabled uses the configured default (legacy unconfigured clients use high);
+// disabled maps to none only for optional-reasoning models.
+type openRouterReasoning struct {
+	mandatory     bool
+	defaultEffort string
+}
 
-func (openRouterReasoning) Apply(req *openai.ChatCompletionRequest, opts *ChatOptions, _ bool) (any, bool) {
-	if opts == nil {
-		return nil, false
+func (s openRouterReasoning) Apply(req *openai.ChatCompletionRequest, opts *ChatOptions, _ bool) (any, bool) {
+	effort := s.defaultEffort
+	if opts != nil {
+		if opts.ReasoningEffort != "" {
+			effort = opts.ReasoningEffort
+		} else if opts.Thinking != nil {
+			if !*opts.Thinking {
+				effort = string(openrouter.ReasoningEffortNone)
+			} else if effort == "" {
+				effort = string(openrouter.ReasoningEffortHigh)
+			}
+		}
 	}
-	effort := opts.ReasoningEffort
-	if effort == "" && opts.Thinking != nil {
-		if *opts.Thinking {
-			effort = string(openrouter.ReasoningEffortHigh)
-		} else {
-			effort = string(openrouter.ReasoningEffortNone)
+	// Saved agents and background jobs may still request legacy thinking off.
+	// Mandatory models use the configured minimum instead. Unconfigured
+	// clients retain the provider default rather than sending an invalid off.
+	if s.mandatory && effort == string(openrouter.ReasoningEffortNone) {
+		effort = s.defaultEffort
+		if effort == string(openrouter.ReasoningEffortNone) {
+			effort = ""
 		}
 	}
 	if effort == "" {

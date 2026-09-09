@@ -208,9 +208,9 @@ test('explicit mode switches use full smart tools and keep quick answer tool-fre
   )
 })
 
-test('new and legacy agents keep upstream thinking disabled', () => {
-  assert.match(source, /thinking:\s*false,\s*\/\/ 默认禁用思考模式/)
-  assert.match(source, /if \(agentData\.config\.thinking == null\) \{\s*agentData\.config\.thinking = false;/)
+test('new agents and missing legacy preferences default to thinking enabled', () => {
+  assert.match(source, /thinking:\s*true,/)
+  assert.match(source, /if \(agentData\.config\.thinking == null\) \{\s*agentData\.config\.thinking = true;/)
 })
 
 test('agent dependencies retain the fail-together Promise.all contract', () => {

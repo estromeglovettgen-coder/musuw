@@ -1,12 +1,14 @@
 ## Why
 
-The shared catalog advertises a retired MiniMax free endpoint and omits current common models. Users need choices that complete production calls.
+The shared catalog advertises a retired MiniMax free endpoint and omits current common models. Users need choices that complete real calls. The user subsequently held production deployment; this change is delivered and verified on staging only.
 
 ## What Changes
 
 - Refresh the existing YAML catalog with verified international and Chinese models.
 - Replace retired endpoints while preserving compatible saved selections and existing plan rules.
-- Verify provider calls, all consumer selectors and production application responses.
+- Verify provider calls, all consumer selectors and staging application responses.
+- Enable reasoning by default for custom agents, use each model’s lowest supported enabled depth, and carry the homepage depth through first-message navigation and session restoration.
+- Preserve the current production revision until separate user authorization.
 
 ## Capabilities
 

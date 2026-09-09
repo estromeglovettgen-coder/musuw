@@ -531,11 +531,11 @@ func (a *CustomAgent) EnsureDefaults() {
 	if a.Config.AgentMode == AgentModeSmartReasoning {
 		a.Config.MultiTurnEnabled = true
 	}
-	// Pin thinking to an explicit false when unset so provider-specific wire
-	// formats (e.g. thinking_control=thinking_type) always receive a value.
+	// New agents reason by default; the model catalog selects the initial
+	// effort. Preserve explicit choices on previously saved agents.
 	if a.Config.Thinking == nil {
-		disabled := false
-		a.Config.Thinking = &disabled
+		enabled := true
+		a.Config.Thinking = &enabled
 	}
 	// Keep citations enabled for existing agents whose persisted config predates
 	// this field. An explicit false is always preserved.

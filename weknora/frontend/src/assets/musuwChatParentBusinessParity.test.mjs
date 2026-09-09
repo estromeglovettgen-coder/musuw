@@ -9,7 +9,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 test('audited chat parent controller remains locked after metered-upload revalidation', () => {
   assert.equal(
     blobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
-    'a678a30cc2dc24f8f48797a0dfb390cbb75e8c88',
+    '5d9ee35408dc665fd7bd55345beba6f378543033',
   )
 })
 
