@@ -1191,7 +1191,7 @@ internal/models/embedding/weknoracloud_test.go	-	A	100644	fe221c4e7ded30bfb97cf7
 internal/models/openrouter/key_manager.go	A	-	100644	3c563da978814de793c614f9027557b271695746	preserve-musuw-exact		audited local-only content is byte-identical
 internal/models/openrouter/key_manager_test.go	A	-	100644	c86d664dd3edad54b04ecb774d1148840ccb1bc9	preserve-musuw-exact		audited local-only content is byte-identical
 internal/models/openrouter/transport.go	A	-	100644	7fe886ce217206acf2e41c4039f4314ccf1edf42	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/models/openrouter/transport_test.go	A	-	100644	4cfec43fa34e3614add176ad2ecaf49534d3b10c	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/models/openrouter/transport_test.go	A	-	100644	8bc3501c8b6a5f6b1f2d4033e1c9591a5f524f66	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/models/provider/deepseek.go	M	-	100644	b463de9229cbc7a382ce46445bb62329d297ad38	preserve-musuw-exact		audited local-only content is byte-identical
 internal/models/provider/novita.go	-	M	100644	6d4515c3546779f32e888657b8ac9355f8a819dd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/models/provider/openrouter.go	M	-	100644	e0641b4ceb0d5c984cc9d3bb32a198cfc362e8f1	preserve-musuw-exact		audited local-only content is byte-identical

@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const videoBalanceErrorPayload = `{"error":{"code":403,"message":` +
+	`"This request requires at least $1.00 in balance for video"}}`
+
 type meterStub struct {
 	key      string
 	user     string
@@ -118,7 +121,7 @@ func TestTransportClassifiesOpenRouterHTTP403VideoBalanceAsCreditExhausted(t *te
 		return &http.Response{
 			StatusCode: http.StatusForbidden,
 			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(`{"error":{"code":403,"message":"This request requires at least $1.00 in balance for video"}}`)),
+			Body:       io.NopCloser(strings.NewReader(videoBalanceErrorPayload)),
 			Request:    req,
 		}, nil
 	})}
@@ -173,7 +176,7 @@ func TestCreditExhaustedClassificationStaysProviderScoped(t *testing.T) {
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":402,"message":"payment_required"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"message":"spending limit reached"}}`)))
 	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":403,"message":"Key limit exceeded (total limit)"}}`)))
-	assert.True(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":403,"message":"This request requires at least $1.00 in balance for video"}}`)))
+	assert.True(t, PayloadIndicatesCreditExhausted([]byte(videoBalanceErrorPayload)))
 	assert.False(t, PayloadIndicatesCreditExhausted([]byte(`{"error":{"code":429,"message":"rate limited"}}`)))
 }
 
