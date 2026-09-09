@@ -248,9 +248,9 @@ const HOMEPAGE_COPY = Object.freeze({
       ]),
     }),
     finalCta: Object.freeze({
-      title: "Start building a second brain that gets better with use.",
-      body: "Add one source, ask one question, and save the first useful answer back into your knowledge base.",
-      action: "Start free",
+      title: "Build your AI knowledge base\nKeep your knowledge growing",
+      body: "Bring together documents, webpages, and notes to build your AI knowledge base.\nLet AI organize your knowledge and connect it, so you can ask from your materials anytime and keep knowledge growing and reusable.",
+      action: "Build my knowledge base",
     }),
     footerGroups: Object.freeze([
       Object.freeze({ title: "Product", links: Object.freeze(["Features", "Examples", "Pricing"]) }),
@@ -426,9 +426,9 @@ const HOMEPAGE_COPY = Object.freeze({
       ]),
     }),
     finalCta: Object.freeze({
-      title: "开始打造一个越用越强的第二大脑。",
-      body: "加入一份资料，提出一个问题，再把第一个有用答案保存回知识库。",
-      action: "免费开始",
+      title: "建立你的 AI 知识库\n让知识持续积累",
+      body: "汇集文档、网页与笔记，构建你的 AI 知识库。\n让 AI 整理知识、建立关联，随时基于资料提问，让知识持续积累与复用。",
+      action: "建立我的知识库",
     }),
     footerGroups: Object.freeze([
       Object.freeze({ title: "产品", links: Object.freeze(["功能", "场景", "定价"]) }),

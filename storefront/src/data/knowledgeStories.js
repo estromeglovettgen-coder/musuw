@@ -102,7 +102,7 @@ export const HERO_STORY = Object.freeze({
     pipelineSummary: "问题改写 · 混合召回 · 交叉核验 · 结构化回答 · 引用回溯",
     saveLabel: "存入知识复利",
     savedLabel: "已存入知识复利",
-    model: "DeepSeek V4 Flash", effort: "关闭",
+    model: "GPT-6 Astra", effort: "关闭",
   },
   en: {
     conversation: "Long-running research workspace",
@@ -124,7 +124,7 @@ export const HERO_STORY = Object.freeze({
     pipelineSummary: "Query rewrite · hybrid recall · cross-check · structured answer · citation trace",
     saveLabel: "Save to knowledge compounding",
     savedLabel: "Saved to knowledge compounding",
-    model: "DeepSeek V4 Flash", effort: "Off",
+    model: "GPT-6 Astra", effort: "Off",
   },
 });
 
@@ -228,7 +228,7 @@ export const REASONING_STORY = Object.freeze({
     sourceIds: ["interviews", "support", "funnel"],
     pipelineStatus: "已完成多源检索与证据核验",
     pipelineSummary: "查询改写 · BM25 + 向量 · RRF 融合 · Rerank · 上下文合并 · 引用回溯",
-    placeholder: "基于你的知识提问", model: "DeepSeek V4 Flash", effort: "关闭",
+    placeholder: "基于你的知识提问", model: "GPT-6 Astra", effort: "关闭",
     copy: "复制回答", save: "添加到知识库", finish: "形成优先级建议", send: "发送", stop: "停止生成",
   },
   en: {
@@ -248,7 +248,7 @@ export const REASONING_STORY = Object.freeze({
     sourceIds: ["interviews", "support", "funnel"],
     pipelineStatus: "Multi-source retrieval and evidence checks complete",
     pipelineSummary: "Query rewrite · BM25 + vector · RRF fusion · Rerank · context merge · citation trace",
-    placeholder: "Ask across your knowledge", model: "DeepSeek V4 Flash", effort: "Off",
+    placeholder: "Ask across your knowledge", model: "GPT-6 Astra", effort: "Off",
     copy: "Copy answer", save: "Add to knowledge base", finish: "Recommendation ready", send: "Send", stop: "Stop generation",
   },
 });

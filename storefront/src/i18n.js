@@ -412,9 +412,9 @@ const en = {
     ],
   },
   finalCta: {
-    title: "Make what you save useful again",
-    body: "Explore musuw's preview plans and evidence-first knowledge workflow.",
-    action: "Start free",
+    title: "Build your AI knowledge base\nKeep your knowledge growing",
+    body: "Bring together documents, webpages, and notes to build your AI knowledge base.\nLet AI organize your knowledge and connect it, so you can ask from your materials anytime and keep knowledge growing and reusable.",
+    action: "Build my knowledge base",
   },
   footer: {
     groups: [
@@ -755,9 +755,9 @@ const zhCN = {
     ],
   },
   finalCta: {
-    title: "让保存的资料重新发挥作用",
-    body: "查看 musuw 的预览套餐与以证据为先的知识工作流。",
-    action: "免费开始",
+    title: "建立你的 AI 知识库\n让知识持续积累",
+    body: "汇集文档、网页与笔记，构建你的 AI 知识库。\n让 AI 整理知识、建立关联，随时基于资料提问，让知识持续积累与复用。",
+    action: "建立我的知识库",
   },
   footer: {
     groups: [

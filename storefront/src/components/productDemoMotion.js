@@ -1,29 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { useInView, useReducedMotion } from "motion/react";
 
+export const PRODUCT_DEMO_VIEWPORT_AMOUNT = 0.5;
 export const CAPABILITY_DEMO_PHASES = Object.freeze(["capture", "reason", "connect", "complete"]);
+export const CAPABILITY_DEMO_STAGE_DURATION = 1_500;
 export function nextCapabilityDemoPhase(phase) {
   const index = CAPABILITY_DEMO_PHASES.indexOf(phase);
-  return CAPABILITY_DEMO_PHASES[(index + 1) % CAPABILITY_DEMO_PHASES.length];
+  if (index < 0) return CAPABILITY_DEMO_PHASES[0];
+  return CAPABILITY_DEMO_PHASES[Math.min(index + 1, CAPABILITY_DEMO_PHASES.length - 1)];
 }
 export function resolveCapabilityDemoPhase(phase, reducedMotion) { return reducedMotion ? "complete" : phase; }
 export function useCapabilityDemoPhase() {
   const ref = useRef(null);
-  const inView = useInView(ref, { amount: 0.28 });
+  const inView = useInView(ref, { amount: PRODUCT_DEMO_VIEWPORT_AMOUNT });
   const reducedMotion = useReducedMotion();
   const [phase, setPhase] = useState(CAPABILITY_DEMO_PHASES[0]);
   useEffect(() => {
     if (reducedMotion) { setPhase("complete"); return undefined; }
     if (!inView) { setPhase("capture"); return undefined; }
-    const timer = window.setInterval(() => setPhase((current) => nextCapabilityDemoPhase(current)), 1500);
-    return () => window.clearInterval(timer);
-  }, [inView, reducedMotion]);
+    if (phase === "complete") return undefined;
+    const timer = window.setTimeout(() => setPhase((current) => nextCapabilityDemoPhase(current)), CAPABILITY_DEMO_STAGE_DURATION);
+    return () => window.clearTimeout(timer);
+  }, [inView, phase, reducedMotion]);
   return { ref, phase: resolveCapabilityDemoPhase(phase, reducedMotion) };
 }
 
 // The hero's question-ledger walkthrough follows the same compact cadence as
 // a real assistant turn: compose, retrieve, cross-check, draft, trace, answer,
-// then explicitly save the result.  The public phase contract keeps the
+// then explicitly save the result. The public phase contract keeps the
 // animation deterministic while the component owns the character ticker.
 export const HERO_DEMO_PHASES = Object.freeze([
   "idle",
@@ -99,7 +103,7 @@ export function resolveWikiDemoStage(stage, reducedMotion) {
 
 export function useWikiDemoFlow() {
   const ref = useRef(null);
-  const inView = useInView(ref, { amount: 0.28 });
+  const inView = useInView(ref, { amount: PRODUCT_DEMO_VIEWPORT_AMOUNT });
   const reducedMotion = useReducedMotion();
   const [stage, setStage] = useState("page");
 
@@ -108,8 +112,12 @@ export function useWikiDemoFlow() {
       setStage("linked-page");
       return undefined;
     }
+    if (!inView) {
+      setStage("page");
+      return undefined;
+    }
     const duration = WIKI_STAGE_DURATIONS[stage];
-    if (!inView || !Number.isFinite(duration)) return undefined;
+    if (!Number.isFinite(duration)) return undefined;
     let firstFrame = 0;
     let secondFrame = 0;
     const timer = window.setTimeout(() => {

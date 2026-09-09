@@ -1,24 +1,46 @@
-import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 
 const directionOffsets = {
   left: (distance) => ({ x: -distance, y: 0 }),
   right: (distance) => ({ x: distance, y: 0 }),
-  up: (distance) => ({ x: 0, y: distance })
+  up: (distance) => ({ x: 0, y: distance }),
 };
 
-export function Reveal({ children, className = "", delay = 0, amount = 0.2 }) {
+function useReplayableInView(amount) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { amount });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return { ref, inView, mounted };
+}
+
+export function Reveal({ children, className = "", delay = 0, amount = 0.5, ...rootProps }) {
   const reduceMotion = useReducedMotion();
+  const { ref, inView, mounted } = useReplayableInView(amount);
 
   return (
     <motion.div
+      {...rootProps}
+      ref={ref}
+      animate={reduceMotion || !mounted || inView ? "visible" : "hidden"}
       className={className}
       initial={false}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount }}
-      transition={{
-        duration: reduceMotion ? 0 : 0.65,
-        delay: reduceMotion ? 0 : delay,
-        ease: [0.16, 1, 0.3, 1]
+      variants={{
+        hidden: reduceMotion ? {} : { opacity: 0, y: 24 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: {
+            duration: reduceMotion ? 0 : 0.65,
+            delay: reduceMotion ? 0 : delay,
+            ease: [0.16, 1, 0.3, 1],
+          },
+        },
       }}
     >
       {children}
@@ -29,24 +51,25 @@ export function Reveal({ children, className = "", delay = 0, amount = 0.2 }) {
 export function StaggerGroup({
   children,
   className = "",
-  amount = 0.18,
-  stagger = 0.09
+  amount = 0.5,
+  stagger = 0.09,
 }) {
   const reduceMotion = useReducedMotion();
+  const { ref, inView, mounted } = useReplayableInView(amount);
 
   return (
     <motion.div
+      ref={ref}
+      animate={reduceMotion || !mounted || inView ? "visible" : "hidden"}
       className={className}
       initial={false}
-      whileInView="visible"
-      viewport={{ once: true, amount }}
       variants={{
         hidden: {},
         visible: {
           transition: {
-            staggerChildren: reduceMotion ? 0 : stagger
-          }
-        }
+            staggerChildren: reduceMotion ? 0 : stagger,
+          },
+        },
       }}
     >
       {children}
@@ -74,7 +97,7 @@ export function StaggerItem({
           : {
               opacity: 0,
               scale: 0.985,
-              ...offset
+              ...offset,
             },
         visible: {
           opacity: 1,
@@ -87,9 +110,9 @@ export function StaggerItem({
                 type: "spring",
                 stiffness: 105,
                 damping: 19,
-                mass: 0.74
-              }
-        }
+                mass: 0.74,
+              },
+        },
       }}
     >
       {children}

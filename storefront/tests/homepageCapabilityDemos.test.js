@@ -19,8 +19,12 @@ import {
   obsidianGraphProgressionSpeed,
 } from "../src/components/obsidian-graph/obsidianNativeGraphContract.ts";
 import {
+  CAPABILITY_DEMO_PHASES,
+  CAPABILITY_DEMO_STAGE_DURATION,
+  PRODUCT_DEMO_VIEWPORT_AMOUNT,
   WIKI_DEMO_STAGES,
   WIKI_STAGE_DURATIONS,
+  nextCapabilityDemoPhase,
   nextWikiDemoStage,
   resolveWikiDemoStage,
 } from "../src/components/productDemoMotion.js";
@@ -42,7 +46,7 @@ function section(markup, id, nextId) {
 
 test("homepage capability areas use non-interactive product views where authenticity matters", () => {
   const { home } = renderFixture();
-  for (const kind of ["reasoning", "wiki", "graph", "answer"]) assert.match(home, new RegExp(`data-capability-demo="${kind}"`));
+  for (const kind of ["reasoning", "wiki", "graph"]) assert.match(home, new RegExp(`data-capability-demo="${kind}"`));
   assert.match(home, /data-real-product-view="wiki"/);
   assert.match(home, /data-wiki-surface="true"/);
   assert.match(home, /data-wiki-sidebar="true"/);
@@ -82,33 +86,33 @@ test("feature demos keep an alternating split while using one responsive horizon
   assert.match(css, /\.hero-stage\s+\.dashboard-entry\s*\{[\s\S]*?aspect-ratio:\s*var\(--product-viewport-aspect\);/);
 });
 
-test("final CTA reuses the authoritative chat surface and native answer message seam", () => {
+test("final CTA uses an empty native Musuw new-chat surface", () => {
   const { home, chineseHome } = renderFixture();
   const source = readFileSync(join(root, "src/components/ProductCapabilityDemos.jsx"), "utf8");
+  const styles = readFileSync(join(root, "src/styles.css"), "utf8");
   const finalCta = home.slice(home.indexOf('<section class="final-cta">'));
 
   for (const token of [
     "AuthoritativeChatSurface",
     "AuthoritativeChatComposer",
-    "visual-chat-message-row",
-    "visual-user-message",
-    "visual-assistant-message",
-    "visual-assistant-answer",
-    "visual-assistant-toolbar",
+    "FinalCtaProductDemo",
+    "data-story=\"new-chat\"",
+    "newChat",
+    "GPT-6 Astra",
   ]) assert.match(source, new RegExp(token));
 
-  assert.match(source, /data-answer-section="conclusion"/);
-  assert.match(source, /data-answer-section="validation-boundary"/);
-  assert.match(source, /sources: Object\.freeze\(\["Interviews", "Usage funnel"\]\)/);
   assert.match(source, /data-demo-interactive="false"/);
   assert.match(source, /\binert\b/);
   assert.doesNotMatch(source, /product-demo-query|answer-demo-thread|DemoComposer/);
-  assert.match(finalCta, /data-capability-demo="answer"/);
-  assert.match(finalCta, /Conclusion/);
-  assert.match(finalCta, /Verification boundary/);
-  assert.match(finalCta, /Interviews/);
-  assert.match(chineseHome, /验证边界/);
-  assert.match(chineseHome, /用户访谈/);
+  assert.match(finalCta, /data-story="new-chat"/);
+  assert.match(finalCta, /Hi, I am Musuw/);
+  assert.match(finalCta, /GPT-6 Astra/);
+  assert.match(finalCta, /Build my knowledge base/);
+  assert.doesNotMatch(finalCta, /data-capability-demo="answer"|Conclusion|Verification boundary|Interviews/);
+  assert.match(chineseHome, /Hi，我是 Musuw/);
+  assert.match(chineseHome, /建立我的知识库/);
+  assert.match(styles, /\.final-cta-dashboard-frame \.final-cta-product-demo \.visual-new-chat-stack\s*\{[^}]*width:\s*min\(360px,\s*calc\(100% - 40px\)\)/s);
+  assert.match(styles, /\.final-cta-dashboard-frame \.final-cta-product-demo \.visual-new-chat-composer\s*\{[^}]*bottom:\s*20px/s);
 });
 
 test("wiki renders a real product surface and graph retains its product surface", () => {
@@ -164,13 +168,42 @@ test("essential homepage content is visible in server HTML before observers or t
   assert.equal((platform.match(/data-platform-capability=/g) ?? []).length, 6);
 });
 
-test("homepage headings keep the approved hierarchy and unchanged hero title", () => {
+test("homepage headings keep the restored Hero and updated closing module", () => {
   const en = applyHomepageMarketingRefresh(getStorefrontCopy("en"));
   const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
   const headings = (copy) => [copy.hero.titleLine1, copy.hero.titleLine2, copy.features.intro.title, copy.platform.intro.title, copy.pricing.intro.title, copy.comparison.title, copy.faq.title, copy.finalCta.title];
-  assert.deepEqual(headings(en), ["Turn source material into", "intelligent knowledge assets", "Build a verifiable knowledge system that keeps evolving", "A complete workflow from sources to knowledge", "Plans & Pricing", "Plans and features", "Questions before you start", "Build knowledge you can verify and reuse"]);
-  assert.deepEqual(headings(zh), ["把资料转化为", "会思考的知识资产", "构建可验证、可持续演进的知识体系", "覆盖从资料到知识的完整链路", "方案与定价", "方案与功能", "开始前的常见问题", "建立可验证、可复用的知识体系"]);
+  assert.deepEqual(headings(en), ["Turn source material into", "intelligent knowledge assets", "Build a verifiable knowledge system that keeps evolving", "A complete workflow from sources to knowledge", "Plans & Pricing", "Plans and features", "Questions before you start", "Build your AI knowledge base\nKeep your knowledge growing"]);
+  assert.deepEqual(headings(zh), ["把资料转化为", "会思考的知识资产", "构建可验证、可持续演进的知识体系", "覆盖从资料到知识的完整链路", "方案与定价", "方案与功能", "开始前的常见问题", "建立你的 AI 知识库\n让知识持续积累"]);
   assert.deepEqual([zh.features.items[0].title, zh.features.items[3].title, zh.features.items[2].title], ["以多源证据支撑判断", "让知识以结构持续演进", "让关系成为可探索的知识路径"]);
+});
+
+test("product demos start only when half visible, end once, and reset after leaving", () => {
+  const motion = readFileSync(join(root, "src/components/productDemoMotion.js"), "utf8");
+  const chat = readFileSync(join(root, "src/components/RealChatCapabilityDemo.jsx"), "utf8");
+  const graph = readFileSync(join(root, "src/components/ProductCapabilityDemos.jsx"), "utf8");
+  const primitives = readFileSync(join(root, "src/components/MotionPrimitives.jsx"), "utf8");
+
+  assert.equal(PRODUCT_DEMO_VIEWPORT_AMOUNT, 0.5);
+  assert.deepEqual(CAPABILITY_DEMO_PHASES, ["capture", "reason", "connect", "complete"]);
+  assert.equal(nextCapabilityDemoPhase("capture"), "reason");
+  assert.equal(nextCapabilityDemoPhase("connect"), "complete");
+  assert.equal(nextCapabilityDemoPhase("complete"), "complete");
+  assert.equal(CAPABILITY_DEMO_STAGE_DURATION, 1_500);
+  assert.doesNotMatch(motion, /setInterval/);
+  assert.match(motion, /if \(!inView\) \{\s*setPhase\("capture"\)/);
+  assert.match(motion, /if \(!inView\) \{\s*setStage\("page"\)/);
+  assert.match(chat, /amount:\s*0\.5/);
+  assert.doesNotMatch(chat, /later\(\(\) => runTurn\(\),\s*8500\)/);
+  assert.match(graph, /key=\{resetKey\}/);
+  assert.match(graph, /wasInViewRef/);
+  assert.match(graph, /className="capability-demo-replay-boundary" ref=\{ref\}/);
+  assert.match(graph, /graphAutoPlay=\{inView && reducedMotion !== true\}/);
+  assert.doesNotMatch(primitives, /once:\s*true/);
+  assert.match(primitives, /useReplayableInView/);
+
+  const platform = readFileSync(join(root, "src/components/HomeRefreshSections.jsx"), "utf8");
+  assert.doesNotMatch(platform, /StaggerGroup|amount=\{0\.12\}/);
+  assert.match(platform, /data-platform-capability=\{index \+ 1\}[\s\S]*?amount=\{0\.5\}/);
 });
 
 test("visible Chinese marketing chrome avoids technical feature jargon", () => {
@@ -300,7 +333,11 @@ test("capability demos use production-visible states and the unchanged native Ob
   assert.doesNotMatch(motion, /focus-source|paused|pause|resume/);
   assert.match(source, /useWikiDemoFlow/);
   assert.match(motion, /useReducedMotion/);
-  assert.match(source, /graphAutoPlay=\{inView && reducedMotion === false\}/);
+  // Keep the observer on a stable wrapper: leaving view re-creates the graph
+  // renderer, and a subsequent entry starts its one-shot progression again.
+  assert.match(source, /className="capability-demo-replay-boundary" ref=\{ref\}/);
+  assert.match(source, /key=\{resetKey\}/);
+  assert.match(source, /graphAutoPlay=\{inView && reducedMotion !== true\}/);
   assert.doesNotMatch(preview, /data-wiki-reveal-step|DemoSourcePreview|DemoPointer|createPortal/);
   assert.match(preview, /function WikiProductSurface/);
   assert.match(preview, /data-wiki-demo-link/);

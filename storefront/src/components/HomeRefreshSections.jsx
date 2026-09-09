@@ -9,7 +9,7 @@ import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
 import { Stack } from "@phosphor-icons/react/Stack";
 import { comparisonGroups, currencySymbols, priceBooks, plans } from "../data/homeContent";
 import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
-import { Reveal, StaggerGroup, StaggerItem } from "./MotionPrimitives";
+import { Reveal } from "./MotionPrimitives";
 import { ButtonLink, SectionIntro } from "./SiteChrome";
 
 const PLATFORM_ICONS = Object.freeze([
@@ -63,19 +63,15 @@ export function PlatformSection({ copy }) {
             body={copy.platform.intro.body}
           />
         </Reveal>
-        <StaggerGroup
-          className="benefit-grid platform-grid"
-          amount={0.12}
-          stagger={0.06}
-        >
+        <div className="benefit-grid platform-grid">
           {copy.platform.cards.map(({ title, body }, index) => {
             const Icon = PLATFORM_ICONS[index];
             return (
-              <StaggerItem
+              <Reveal
                 className="benefit-item platform-card"
                 data-platform-capability={index + 1}
-                direction="up"
-                distance={18}
+                amount={0.5}
+                delay={Math.min(index * 0.06, 0.18)}
                 key={title}
               >
                 <span>
@@ -83,10 +79,10 @@ export function PlatformSection({ copy }) {
                 </span>
                 <h3>{title}</h3>
                 <p>{body}</p>
-              </StaggerItem>
+              </Reveal>
             );
           })}
-        </StaggerGroup>
+        </div>
       </div>
     </section>
   );
@@ -204,14 +200,14 @@ export function MarketingComparisonSection({ copy }) {
   return (
     <section className="comparison-section" id="compare">
       <div className="container">
-        <Reveal className="comparison-refresh">
-          <div className="comparison-intro">
+        <div className="comparison-refresh">
+          <Reveal className="comparison-intro">
             {copy.comparison.eyebrow ? (
               <span className="comparison-eyebrow">{copy.comparison.eyebrow}</span>
             ) : null}
             <h2>{copy.comparison.title}</h2>
             {copy.comparison.description ? <p>{copy.comparison.description}</p> : null}
-          </div>
+          </Reveal>
           <div className="comparison-panel" role="table" aria-label={copy.comparison.tableAria}>
             <div className="comparison-plan-header" role="row">
               <span aria-hidden="true" />
@@ -266,7 +262,7 @@ export function MarketingComparisonSection({ copy }) {
               ))}
             </div>
           </div>
-        </Reveal>
+        </div>
       </div>
     </section>
   );

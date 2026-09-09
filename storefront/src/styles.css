@@ -2118,6 +2118,7 @@ textarea {
   font-weight: 650;
   letter-spacing: -0.035em;
   color: #0f172a;
+  white-space: pre-line;
 }
 
 .final-cta p {
@@ -2125,6 +2126,7 @@ textarea {
   color: #64748b;
   font-size: 16px;
   line-height: 1.55;
+  white-space: pre-line;
 }
 
 .site-footer {
@@ -3188,14 +3190,19 @@ textarea {
   .final-cta-visual {
     position: relative;
     z-index: 1;
+    display: flex;
     height: 100%;
+    align-items: flex-end;
+    justify-content: flex-end;
     overflow: hidden;
-    padding-top: 32px;
+    padding-top: 0;
   }
 
   .final-cta-dashboard-frame {
-    width: 100%;
-    height: 100%;
+    width: 90%;
+    height: 78%;
+    margin-top: auto;
+    margin-left: auto;
     border-top: 3px solid #000;
     border-left: 3px solid #000;
     border-top-left-radius: 10px;
@@ -3923,6 +3930,92 @@ textarea {
   border-top-left-radius: 12px;
   overflow: hidden;
   box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .visual-new-chat-stack {
+  position: relative;
+  width: min(360px, calc(100% - 40px));
+  height: 100%;
+  min-height: 0;
+  padding: 20px 0;
+  display: block;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .visual-new-chat-title {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(18px, 2.2vw, 28px);
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .visual-new-chat-composer {
+  position: absolute;
+  right: 0;
+  bottom: 20px;
+  left: 0;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__surface {
+  border-radius: 14px;
+  padding: 9px 10px;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__textarea {
+  min-height: 20px !important;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__toolbar {
+  gap: 8px;
+  margin-top: 3px;
+  padding-top: 0;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__tools,
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__actions {
+  gap: 8px;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__tools {
+  flex-wrap: nowrap;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__tool {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__tool svg {
+  width: 14px;
+  height: 14px;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__model {
+  max-width: 210px;
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__model .visual-chat-composer__combined-picker-agent {
+  max-width: 74px;
+}
+
+.final-cta-dashboard-frame .final-cta-product-demo .authoritative-chat-composer__send {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
 }
 
 /* Review-ready storefront compositions: bounded media, content-sized sections, and no inherited marquee. */
@@ -4696,7 +4789,6 @@ html[data-theme="dark"] .site-footer {
   .hero-true-focus {
     gap: 0.18em;
   }
-
 }
 
 /* Preserve the source liquid colors and opacity above Musuw's local dot field. */

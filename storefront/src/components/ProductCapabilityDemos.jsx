@@ -1,7 +1,7 @@
 import { BookmarkSimple } from "@phosphor-icons/react/BookmarkSimple";
 import { Copy } from "@phosphor-icons/react/Copy";
 import { LinkSimple } from "@phosphor-icons/react/LinkSimple";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInView, useReducedMotion } from "motion/react";
 import { AuthoritativeChatComposer, AuthoritativeChatSurface } from "./AuthoritativeChatSurface";
 import { KnowledgeBaseProductPreview } from "./KnowledgeBaseProductPreview";
@@ -16,7 +16,7 @@ const COPY = Object.freeze({
   en: Object.freeze({
     shared: Object.freeze({
       placeholder: "Ask across your knowledge",
-      model: "DeepSeek V4 Flash",
+      model: "GPT-6 Astra",
       effort: "Off",
     }),
     answer: Object.freeze({
@@ -35,7 +35,7 @@ const COPY = Object.freeze({
   zh: Object.freeze({
     shared: Object.freeze({
       placeholder: "基于你的知识提问",
-      model: "DeepSeek V4 Flash",
+      model: "GPT-6 Astra",
       effort: "关闭",
     }),
     answer: Object.freeze({
@@ -57,6 +57,49 @@ function localize(locale) {
   return locale === "zh" || locale === "zh-CN" ? COPY.zh : COPY.en;
 }
 
+/**
+ * The homepage closing module uses the native Musuw first-chat frame rather
+ * than a second scripted answer. It deliberately contains no message rows.
+ */
+export function FinalCtaProductDemo({ locale = "en" }) {
+  const chinese = locale === "zh" || locale === "zh-CN";
+  const copy = chinese
+    ? {
+        agent: "知识问答",
+        effort: "关闭",
+        placeholder: "基于你的知识提问",
+        title: "新对话",
+        welcome: "Hi，我是 Musuw，让你的知识触手可及",
+      }
+    : {
+        agent: "Knowledge Q&A",
+        effort: "Off",
+        placeholder: "Ask across your knowledge",
+        title: "New chat",
+        welcome: "Hi, I am Musuw — your knowledge, within reach",
+      };
+
+  return (
+    <AuthoritativeChatSurface
+      className="final-cta-product-demo"
+      data-demo-interactive="false"
+      data-story="new-chat"
+      inert
+      newChat
+      newChatTitle={copy.welcome}
+      title={copy.title}
+      composer={(
+        <AuthoritativeChatComposer
+          agent={copy.agent}
+          effort={copy.effort}
+          model="GPT-6 Astra"
+          placeholder={copy.placeholder}
+        />
+      )}
+    />
+  );
+}
+
 export function WikiCapabilityDemo({ locale = "en" }) {
   const flow = useWikiDemoFlow();
 
@@ -72,16 +115,34 @@ export function WikiCapabilityDemo({ locale = "en" }) {
 
 export function GraphCapabilityDemo({ locale = "en" }) {
   const ref = useRef(null);
-  const inView = useInView(ref, { amount: 0.28 });
+  const inView = useInView(ref, { amount: 0.5 });
   const reducedMotion = useReducedMotion();
+  const wasInViewRef = useRef(false);
+  const [resetKey, setResetKey] = useState(0);
+
+  useEffect(() => {
+    if (inView) {
+      wasInViewRef.current = true;
+      return;
+    }
+    // Recreate the native graph surface after it leaves view. Unmounting
+    // disposes its renderer, terminal timers, and drawer before the next
+    // entry starts a fresh one-shot progression.
+    if (wasInViewRef.current) {
+      wasInViewRef.current = false;
+      setResetKey((current) => current + 1);
+    }
+  }, [inView]);
 
   return (
-    <KnowledgeBaseProductPreview
-      graphAutoPlay={inView && reducedMotion === false}
-      locale={locale}
-      shellRef={ref}
-      view="graph"
-    />
+    <div className="capability-demo-replay-boundary" ref={ref}>
+      <KnowledgeBaseProductPreview
+        key={resetKey}
+        graphAutoPlay={inView && reducedMotion !== true}
+        locale={locale}
+        view="graph"
+      />
+    </div>
   );
 }
 

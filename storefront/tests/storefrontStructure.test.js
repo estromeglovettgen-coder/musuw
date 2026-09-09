@@ -35,7 +35,7 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /id="faq"/);
   assert.doesNotMatch(home, /id="blog"|id="use-cases"/);
   assert.equal((home.match(/class="feature-story/g) ?? []).length, 3);
-  assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 4);
+  assert.equal((home.match(/data-capability-demo=/g) ?? []).length, 3);
   assert.equal((home.match(/data-platform-capability=/g) ?? []).length, 6);
   assert.doesNotMatch(home, /class="(?:section|feature)-label"/);
   assert.match(home, /Support every conclusion with evidence across sources/);
@@ -47,6 +47,7 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /Turn source material into/);
   assert.match(home, /intelligent knowledge assets/);
   assert.match(home, /href="\/contact"[^>]*><span>Contact<\/span>/);
+  assert.match(home, /Build my knowledge base/);
   assert.doesNotMatch(home, /Watch demo|href="\/#demo"/);
   assert.equal((comparison.match(/class="comparison-feature-row"/g) ?? []).length, 6);
   assert.doesNotMatch(comparison, /comparison-group-head|Monthly AI usage|Model catalog|Document upload and parsing|>\$0\.40</);

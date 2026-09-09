@@ -184,7 +184,7 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
   const copy = useMemo(() => isChineseStory(locale) ? REASONING_STORY.zh : REASONING_STORY.en, [locale]);
   const rootRef = useRef(null);
   const messagesRef = useRef(null);
-  const inView = useInView(rootRef, { amount: 0.28 });
+  const inView = useInView(rootRef, { amount: 0.5 });
   const reducedMotion = useReducedMotion();
   const timerRefs = useRef(new Set());
   const runRef = useRef(0);
@@ -242,10 +242,9 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
           if (runId !== runRef.current) { clearInterval(ticker); return; }
           index += 1; setAnswer(characters.slice(0, index).join(""));
           if (index >= characters.length) {
-            clearInterval(ticker); timerRefs.current.delete(ticker);
-            later(() => setPhase("complete"), 240);
-            later(() => runTurn(), 8500);
-          }
+          clearInterval(ticker); timerRefs.current.delete(ticker);
+          later(() => setPhase("complete"), 240);
+        }
         }, ANSWER_TYPING_MS);
         timerRefs.current.add(ticker);
       }, 4200);

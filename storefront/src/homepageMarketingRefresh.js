@@ -58,7 +58,11 @@ const MARKETING_COPY = Object.freeze({
         { question: "Can I export delete or cancel?", answer: "Musuw provides export and deletion controls. Manage subscription changes through the billing flow in our Subscription Policy" },
       ],
     },
-    finalCta: { title: "Build knowledge you can verify and reuse", body: "Import, retrieve, and verify source material, then preserve key findings and relationships in a maintained knowledge system.", action: "Start free" },
+    finalCta: {
+      title: "Build your AI knowledge base\nKeep your knowledge growing",
+      body: "Bring together documents, webpages, and notes to build your AI knowledge base.\nLet AI organize your knowledge and connect it, so you can ask from your materials anytime and keep knowledge growing and reusable.",
+      action: "Build my knowledge base",
+    },
     footerGroups: [
       { title: "Product", links: ["Features", "Platform", "Pricing"] },
       { title: "Trust", links: ["FAQ", "Security", "Contact"] },
@@ -108,7 +112,11 @@ const MARKETING_COPY = Object.freeze({
         { question: "可以导出 删除或取消订阅吗？", answer: "Musuw 提供导出和删除控制；订阅变更与取消按订阅政策的计费流程处理" },
       ],
     },
-    finalCta: { title: "建立可验证、可复用的知识体系", body: "统一导入、检索并核验资料，将关键结论和关联沉淀为可持续维护的知识。", action: "免费开始" },
+    finalCta: {
+      title: "建立你的 AI 知识库\n让知识持续积累",
+      body: "汇集文档、网页与笔记，构建你的 AI 知识库。\n让 AI 整理知识、建立关联，随时基于资料提问，让知识持续积累与复用。",
+      action: "建立我的知识库",
+    },
     footerGroups: [
       { title: "产品", links: ["功能", "平台", "定价"] },
       { title: "信任", links: ["常见问题", "安全", "联系"] },

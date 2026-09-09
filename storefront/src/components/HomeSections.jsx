@@ -24,7 +24,7 @@ import { Reveal, StaggerGroup, StaggerItem } from "./MotionPrimitives";
 import { ButtonLink, SectionIntro } from "./SiteChrome";
 import { APP_LOGIN_URL, createProductLoginUrl } from "../productHandoff";
 import {
-  AnswerCapabilityDemo,
+  FinalCtaProductDemo,
   GraphCapabilityDemo,
   ReasoningCapabilityDemo,
   WikiCapabilityDemo,
@@ -652,7 +652,7 @@ export function FinalCTA({ copy, locale }) {
           </div>
           <div className="final-cta-visual" aria-hidden="true">
             <div className="final-cta-dashboard-frame">
-              <AnswerCapabilityDemo locale={locale} />
+              <FinalCtaProductDemo locale={locale} />
             </div>
           </div>
         </div>
