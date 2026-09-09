@@ -25,6 +25,7 @@ interface KnowledgeItem {
   updated_at?: string;
   source?: string;
   description?: string;
+  error_message?: string;
   channel?: string;
   isMore?: boolean;
 }
@@ -149,7 +150,7 @@ const computeStatus = (item: KnowledgeItem): StatusInfo => {
     return { label: t('knowledgeBase.statusFinalizing'), theme: 'primary', icon: 'loading', spin: true };
   }
   if (item.parse_status === 'failed') {
-    return { label: t('knowledgeBase.statusFailed'), theme: 'danger', icon: 'close-circle' };
+    return { label: item.error_message || t('knowledgeBase.statusFailed'), theme: 'danger', icon: 'close-circle' };
   }
   if (item.parse_status === 'cancelled') {
     return { label: t('knowledgeBase.statusCancelled'), theme: 'warning', icon: 'close-circle' };
@@ -400,6 +401,7 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
               v-if="statusByRow.get(item.id)!.label !== '--'"
               class="visual-document-list__status"
               :class="`is-${statusByRow.get(item.id)!.theme}`"
+              :title="statusByRow.get(item.id)!.label"
             >
               <t-icon
                 v-if="statusByRow.get(item.id)!.icon"

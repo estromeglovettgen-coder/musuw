@@ -6,6 +6,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/application/service"
 	werrors "github.com/Tencent/WeKnora/internal/errors"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,9 +76,12 @@ func TestConsumerVideoPublicErrorPreservesProductStates(t *testing.T) {
 		service.VideoTooLargePublicMessage,
 		service.VideoSourceFailedPublicMessage,
 		service.VideoFormatFailedPublicMessage,
+		service.VideoCreditExhaustedPublicMessage,
 	} {
 		assert.Equal(t, message, consumerVideoPublicError("", message))
 	}
+	assert.Equal(t, service.VideoCreditExhaustedPublicMessage,
+		consumerVideoPublicError(modelopenrouter.CreditExhaustedCode, ""))
 }
 
 // TestBuildSpanTree_AssemblesParentChild covers the basic shape: a root

@@ -27,12 +27,13 @@ const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
 const CONSUMER_SURFACE_CHANGE = 'curate-main-consumer-surface'
 const ENTITLEMENT_USAGE_REVALIDATION_CHANGE = 'refresh-entitlement-after-metered-usage'
 const KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE = 'display-materialized-ai-title'
+const KNOWLEDGE_FAILURE_REASON_CHANGE = 'surface-document-failure-reason'
 const MODEL_REASONING_DEFAULT_CHANGE = 'refresh-global-model-catalog'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': '5d9ee35408dc665fd7bd55345beba6f378543033',
   './business-baselines/Input-field.pre-view.vue': '0042d53343af50d0dd1a35edd22b7192241bea4b',
-  './business-baselines/KnowledgeBase.pre-view.vue': '62faa49842403fbe8aa2fbb0faee2d08ff145553',
+  './business-baselines/KnowledgeBase.pre-view.vue': 'bdb58268e7949a5172c3de6ecc02b680dffff2b1',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',
@@ -60,9 +61,9 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
-    change: `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE}`,
+    change: `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE}+${KNOWLEDGE_FAILURE_REASON_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
-    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, server-projected runtime/storage readiness, and live display of a materialized AI title without changing the durable source filename',
+    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, server-projected runtime/storage readiness, live display of a materialized AI title without changing the durable source filename, and live propagation of server-sanitized failure reasons',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
@@ -115,7 +116,7 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
   )
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.change,
-    `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE}`,
+    `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE}+${KNOWLEDGE_FAILURE_REASON_CHANGE}`,
   )
   assert.match(INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.authority, /server-projected runtime\/storage readiness/)
   assert.equal(

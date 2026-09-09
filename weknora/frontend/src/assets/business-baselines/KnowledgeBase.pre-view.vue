@@ -1372,6 +1372,7 @@ const updateStatus = (analyzeList: KnowledgeCard[]) => {
           if (card.parse_status !== parseStatus ||
             card.summary_status !== item.summary_status ||
             card.description !== item.description ||
+            card.error_message !== item.error_message ||
             card.title !== nextTitle ||
             card.display_name !== nextDisplayName ||
             card.original_file_name !== nextOriginalFileName ||
@@ -1386,6 +1387,7 @@ const updateStatus = (analyzeList: KnowledgeCard[]) => {
             card.parse_status = parseStatus;
             card.summary_status = item.summary_status;
             card.description = item.description;
+            card.error_message = item.error_message;
             card.title = nextTitle;
             card.source = nextSource;
             card.original_file_name = nextOriginalFileName;

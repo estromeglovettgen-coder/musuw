@@ -165,7 +165,7 @@ frontend/src/api/wiki/index.ts	-	M	100644	ea5f295a8a277f1409c02aef677e61e80542a7
 frontend/src/assets/AgentKnowledgeCardParity.test.mjs	A	-	100644	4f57fac100e36869e4fe0d5fe299372b1108aa72	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/business-baselines/ChatIndex.pre-view.vue	A	-	100644	5d9ee35408dc665fd7bd55345beba6f378543033	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/business-baselines/Input-field.pre-view.vue	A	-	100644	0042d53343af50d0dd1a35edd22b7192241bea4b	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/assets/business-baselines/KnowledgeBase.pre-view.vue	A	-	100644	62faa49842403fbe8aa2fbb0faee2d08ff145553	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/business-baselines/KnowledgeBase.pre-view.vue	A	-	100644	bdb58268e7949a5172c3de6ecc02b680dffff2b1	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/business-baselines/KnowledgeBaseList.pre-view.vue	A	-	100644	c49c30b1e68b3e99b8965b447eadac4bfc268249	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/business-baselines/manual-knowledge-editor.pre-view.vue	A	-	100644	4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/business-baselines/menu.pre-view.vue	A	-	100644	7686bad141078b5c7ad25f8bae21a3b4a8d158b1	preserve-musuw-exact		audited local-only content is byte-identical

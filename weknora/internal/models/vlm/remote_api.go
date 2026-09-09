@@ -569,6 +569,9 @@ func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
 	logger.Infof(ctx, "[VLM] Calling OpenRouter video API, model=%s", v.modelName)
 	resp, err := v.httpClient.Do(req)
 	if err != nil {
+		if modelopenrouter.IsCreditExhausted(err) {
+			return openai.ChatCompletionResponse{}, permanentVideoError(err)
+		}
 		// A caller cancellation is deliberate and should not start a new paid
 		// attempt. Network failures and request deadlines are transient.
 		if errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
@@ -579,6 +582,12 @@ func (v *RemoteAPIVLM) createOpenRouterVideoCompletion(
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+		if resp.StatusCode == http.StatusPaymentRequired ||
+			(resp.StatusCode == http.StatusForbidden && modelopenrouter.PayloadIndicatesCreditExhausted(detail)) {
+			return openai.ChatCompletionResponse{}, permanentVideoError(
+				&modelopenrouter.CreditExhaustedError{StatusCode: resp.StatusCode},
+			)
+		}
 		requestErr := fmt.Errorf(
 			"OpenRouter video request returned %s: %s",
 			resp.Status,

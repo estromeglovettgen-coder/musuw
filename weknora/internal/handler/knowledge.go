@@ -22,6 +22,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/middleware"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -847,7 +848,8 @@ func consumerVideoPublicError(code, message string) string {
 		service.VideoParseFailedPublicMessage,
 		service.VideoTooLargePublicMessage,
 		service.VideoSourceFailedPublicMessage,
-		service.VideoFormatFailedPublicMessage:
+		service.VideoFormatFailedPublicMessage,
+		service.VideoCreditExhaustedPublicMessage:
 		return trimmed
 	}
 	switch strings.TrimSpace(code) {
@@ -857,6 +859,8 @@ func consumerVideoPublicError(code, message string) string {
 		return service.VideoSourceFailedPublicMessage
 	case errors.ErrCodeVideoFormatUnsupported:
 		return service.VideoFormatFailedPublicMessage
+	case modelopenrouter.CreditExhaustedCode:
+		return service.VideoCreditExhaustedPublicMessage
 	}
 	lower := strings.ToLower(trimmed)
 	if strings.Contains(message, "300 MB") ||

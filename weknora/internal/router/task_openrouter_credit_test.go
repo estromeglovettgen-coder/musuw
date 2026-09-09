@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/application/service"
-	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/vlm"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -160,7 +159,9 @@ func (creditExhaustedVideoVLM) Predict(context.Context, [][]byte, string) (strin
 }
 
 func (creditExhaustedVideoVLM) PredictVideo(context.Context, []byte, string, string) (string, error) {
-	return "", &openrouter.CreditExhaustedError{StatusCode: http.StatusPaymentRequired}
+	return "", vlm.RetryableVideoError(
+		&openrouter.CreditExhaustedError{StatusCode: http.StatusPaymentRequired},
+	)
 }
 
 func (creditExhaustedVideoVLM) GetModelName() string { return "video-credit-test" }
@@ -288,9 +289,9 @@ func TestOpenRouterVideoCreditExhaustionSurvivesIngestionAndStopsWorkerRetry(t *
 	require.ErrorAs(t, err, &creditErr)
 	require.ErrorIs(t, err, asynq.SkipRetry)
 	require.True(t, openrouter.IsCreditExhausted(err))
-	require.Equal(t, werrors.ErrCodeVideoParseFailed, tracker.stageFailCode)
-	require.Equal(t, werrors.ErrCodeVideoParseFailed, tracker.rootFailCode)
+	require.Equal(t, openrouter.CreditExhaustedCode, tracker.stageFailCode)
+	require.Equal(t, openrouter.CreditExhaustedCode, tracker.rootFailCode)
 	require.Nil(t, repo.updates, "generic credit middleware must preserve the video-specific state")
 	require.Equal(t, types.ParseStatusFailed, repo.knowledge.ParseStatus)
-	require.Equal(t, service.VideoParseFailedPublicMessage, repo.knowledge.ErrorMessage)
+	require.Equal(t, service.VideoCreditExhaustedPublicMessage, repo.knowledge.ErrorMessage)
 }
