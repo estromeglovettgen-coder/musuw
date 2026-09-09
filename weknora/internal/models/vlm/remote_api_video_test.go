@@ -7,7 +7,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 )
+
+type videoCreditMeter struct{}
+
+func (videoCreditMeter) OpenRouterAPIKey(context.Context) (string, error) { return "tenant-key", nil }
+func (videoCreditMeter) OpenRouterUserID(context.Context) string          { return "tenant-user" }
 
 func TestRemoteAPIVLMPredictVideoURLUsesConfiguredPublicURL(t *testing.T) {
 	var requestPath string
@@ -270,11 +277,13 @@ func TestRemoteAPIVLMPredictVideoClassifiesHTTPFailures(t *testing.T) {
 		name      string
 		status    int
 		retryable bool
+		credits   bool
 	}{
 		{name: "rate limited", status: http.StatusTooManyRequests, retryable: true},
 		{name: "server error", status: http.StatusBadGateway, retryable: true},
 		{name: "request timeout", status: http.StatusRequestTimeout, retryable: true},
 		{name: "bad parameters", status: http.StatusBadRequest, retryable: false},
+		{name: "credits exhausted", status: http.StatusPaymentRequired, retryable: false, credits: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -300,7 +309,66 @@ func TestRemoteAPIVLMPredictVideoClassifiesHTTPFailures(t *testing.T) {
 			if got := IsRetryableVideoError(err); got != tt.retryable {
 				t.Fatalf("IsRetryableVideoError(%v) = %t, want %t", err, got, tt.retryable)
 			}
+			if got := modelopenrouter.IsCreditExhausted(err); got != tt.credits {
+				t.Fatalf("IsCreditExhausted(%v) = %t, want %t", err, got, tt.credits)
+			}
 		})
+	}
+}
+
+func TestRemoteAPIVLMPredictVideoKeepsMeteredCreditExhaustionPermanent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusPaymentRequired)
+		_, _ = w.Write([]byte(`{"error":{"code":402,"message":"payment_required"}}`))
+	}))
+	defer server.Close()
+
+	withVLMSSRFWhitelist(t, "127.0.0.1")
+	model, err := NewRemoteAPIVLM(&Config{
+		BaseURL: server.URL, ModelName: "qwen/qwen3.7-flash", Provider: "openrouter",
+		OpenRouterMeter: videoCreditMeter{},
+		Extra:           map[string]any{"video_input_mode": VideoInputModeURL},
+	})
+	if err != nil {
+		t.Fatalf("NewRemoteAPIVLM: %v", err)
+	}
+
+	_, err = model.PredictVideoURL(
+		context.Background(), "https://objects.example.test/video.mp4", "video/mp4", "Describe it",
+	)
+	if !modelopenrouter.IsCreditExhausted(err) {
+		t.Fatalf("error = %v, want typed OpenRouter credit exhaustion", err)
+	}
+	if IsRetryableVideoError(err) {
+		t.Fatalf("credit exhaustion must not be retryable: %v", err)
+	}
+}
+
+func TestRemoteAPIVLMPredictVideoClassifiesEmbeddedCreditExhaustion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":{"code":402,"message":"payment_required"}}`))
+	}))
+	defer server.Close()
+
+	withVLMSSRFWhitelist(t, "127.0.0.1")
+	model, err := NewRemoteAPIVLM(&Config{
+		BaseURL: server.URL, ModelName: "xiaomi/mimo-v2.5", Provider: "openrouter",
+		Extra: map[string]any{"video_input_mode": VideoInputModeURL},
+	})
+	if err != nil {
+		t.Fatalf("NewRemoteAPIVLM: %v", err)
+	}
+
+	_, err = model.PredictVideoURL(
+		context.Background(), "https://objects.example.test/video.mp4", "video/mp4", "Describe it",
+	)
+	if !modelopenrouter.IsCreditExhausted(err) {
+		t.Fatalf("error = %v, want typed OpenRouter credit exhaustion", err)
+	}
+	if IsRetryableVideoError(err) {
+		t.Fatalf("embedded credit exhaustion must not be retryable: %v", err)
 	}
 }
 

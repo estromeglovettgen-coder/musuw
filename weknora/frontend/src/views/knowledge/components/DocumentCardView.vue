@@ -205,7 +205,7 @@ const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | '
           </div>
 
           <div v-if="isParseInFlight(item.parse_status)" class="visual-document-card__status is-processing"><t-icon name="loading" class="is-spinning" /><button type="button" @click.stop="handleAction('view-trace', item)">{{ inFlightCardStatusText(item) }}</button></div>
-          <div v-else-if="item.parse_status === 'failed'" class="visual-document-card__status is-failed"><t-icon name="close-circle" /><button type="button" @click.stop="handleAction('view-trace', item)">{{ $t('knowledgeBase.parsingFailed') }}</button></div>
+          <div v-else-if="item.parse_status === 'failed'" class="visual-document-card__status is-failed"><t-icon name="close-circle" /><button type="button" :title="item.error_message || $t('knowledgeBase.parsingFailed')" @click.stop="handleAction('view-trace', item)">{{ item.error_message || $t('knowledgeBase.parsingFailed') }}</button></div>
           <div v-else-if="item.parse_status === 'draft'" class="visual-document-card__status is-draft"><span>{{ $t('knowledgeBase.draft') }}</span><small>{{ $t('knowledgeBase.draftTip') }}</small></div>
           <div v-else-if="item.parse_status === 'completed' && (item.summary_status === 'pending' || item.summary_status === 'processing')" class="visual-document-card__status is-processing"><t-icon name="loading" class="is-spinning" /><span>{{ $t('knowledgeBase.generatingSummary') }}</span></div>
           <p v-else-if="item.parse_status === 'completed'" class="visual-document-card__description">{{ item.description }}</p>
@@ -271,8 +271,8 @@ const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | '
 .visual-document-card__more:hover,.visual-document-card__more.is-active { background: #f3f4f6; color: #374151; }
 .visual-document-card__more :deep(.t-icon) { font-size: 14px; }
 .visual-document-card__description { margin: 0; overflow: hidden; color: #6b7280; font-size: 11px; line-height: 1.625; font-weight: 400; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.visual-document-card__status { align-self: flex-start; min-height: 20px; padding: 2px 8px; border: 1px solid #e5e7eb; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; background: #f9fafb; color: #6b7280; font-size: 10px; line-height: 14px; font-weight: 700; }
-.visual-document-card__status button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.visual-document-card__status { max-width: 100%; align-self: flex-start; min-height: 20px; padding: 2px 8px; border: 1px solid #e5e7eb; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; background: #f9fafb; color: #6b7280; font-size: 10px; line-height: 14px; font-weight: 700; }
+.visual-document-card__status button { min-width: 0; padding: 0; border: 0; overflow: hidden; background: transparent; color: inherit; font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .visual-document-card__status.is-processing { border-color: #fde68a; background: #fffbeb; color: #b45309; }
 .visual-document-card__status.is-failed { border-color: #fecaca; background: #fef2f2; color: #dc2626; }
 .visual-document-card__status.is-draft { border-color: #e5e7eb; background: #f9fafb; color: #6b7280; }

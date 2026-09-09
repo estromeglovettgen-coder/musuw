@@ -13,6 +13,7 @@ import (
 
 	werrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
+	modelopenrouter "github.com/Tencent/WeKnora/internal/models/openrouter"
 	"github.com/Tencent/WeKnora/internal/models/vlm"
 	"github.com/Tencent/WeKnora/internal/types"
 	secutils "github.com/Tencent/WeKnora/internal/utils"
@@ -36,6 +37,8 @@ const (
 	VideoSourceFailedPublicMessage = "视频来源获取失败，请稍后重试"
 	// VideoFormatFailedPublicMessage is the sanitized unsupported-format failure.
 	VideoFormatFailedPublicMessage = "暂不支持此视频格式"
+	// VideoCreditExhaustedPublicMessage is the consumer-visible account limit state.
+	VideoCreditExhaustedPublicMessage = "本周期视频解析额度已用尽，原视频已保存；额度恢复后可重新解析"
 )
 
 // analyzeYouTubeVideo asks Google AI Studio to read the public YouTube work
@@ -309,6 +312,9 @@ func videoFailureRetryable(err error) bool {
 	if err == nil {
 		return false
 	}
+	if modelopenrouter.IsCreditExhausted(err) {
+		return false
+	}
 	if vlm.IsRetryableVideoError(err) || errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
@@ -316,7 +322,10 @@ func videoFailureRetryable(err error) bool {
 	return errors.As(err, &networkErr)
 }
 
-func videoFailurePublicState(kind videoFailureKind) (code, message string) {
+func videoFailurePublicState(kind videoFailureKind, err error) (code, message string) {
+	if modelopenrouter.IsCreditExhausted(err) {
+		return modelopenrouter.CreditExhaustedCode, VideoCreditExhaustedPublicMessage
+	}
 	switch kind {
 	case videoFailureSource:
 		return werrors.ErrCodeVideoSourceFailed, VideoSourceFailedPublicMessage
@@ -357,7 +366,7 @@ func (s *knowledgeService) failVideoKnowledge(
 		return nil, failureErr
 	}
 
-	code, message := videoFailurePublicState(kind)
+	code, message := videoFailurePublicState(kind, failureErr)
 	knowledge.ParseStatus = types.ParseStatusFailed
 	knowledge.ErrorMessage = message
 	knowledge.UpdatedAt = time.Now()

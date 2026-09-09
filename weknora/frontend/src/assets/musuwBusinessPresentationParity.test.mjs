@@ -24,6 +24,16 @@ test('document grid keeps the complete native processing-state presentation', ()
   }
 })
 
+test('failed documents surface the backend public reason instead of hiding every failure behind a generic label', () => {
+  const card = read('../views/knowledge/components/DocumentCardView.vue')
+  const list = read('../views/knowledge/components/DocumentListView.vue')
+  const knowledgeBase = read('./business-baselines/KnowledgeBase.pre-view.vue')
+
+  assert.match(card, /item\.error_message\s*\|\|\s*\$t\('knowledgeBase\.parsingFailed'\)/)
+  assert.match(list, /item\.error_message\s*\|\|\s*t\('knowledgeBase\.statusFailed'\)/)
+  assert.match(knowledgeBase, /card\.error_message\s*=\s*item\.error_message/)
+})
+
 test('document grid keeps native tag overflow behavior rather than flattening the reference mock', () => {
   const source = read('../views/knowledge/components/DocumentCardView.vue')
   for (const token of [

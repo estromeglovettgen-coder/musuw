@@ -13,7 +13,7 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-const openRouterCreditExhaustedMessage = "Monthly AI Credits exhausted; retry after plan upgrade or monthly reset"
+const openRouterCreditExhaustedMessage = "本周期 AI 额度已用尽；升级套餐或额度恢复后可重试"
 
 type openRouterCreditTaskPayload struct {
 	KnowledgeID string `json:"knowledge_id,omitempty"`
