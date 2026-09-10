@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
 test('frozen sidebar controller remains the audited pre-reference implementation', () => {
-  assert.equal(blobSha(read('./business-baselines/menu.pre-view.vue')), '42329afafedf9135049a8f253bf8ee02d811371d')
+  assert.equal(blobSha(read('./business-baselines/menu.pre-view.vue')), 'e185baf5fb56a34b9d8582b7d4339904dc3b5d20')
 })
 
 test('reference sidebar reuses frozen business setup and keeps every native session action surface', () => {

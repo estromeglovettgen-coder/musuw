@@ -40,12 +40,16 @@ function makeSessions(count: number): Session[] {
 
 type BatchRouteOptions = {
   failFirstDelete?: boolean
+  failFirstSingleDelete?: boolean
+  deferFirstSingleDelete?: boolean
   fixtureSessions?: Session[]
 }
 
 async function installApiFixture(page: Page, options: BatchRouteOptions = {}) {
   let remaining = [...(options.fixtureSessions ?? sessions)]
   let deleteAttempts = 0
+  let singleDeleteAttempts = 0
+  let releaseFirstSingleDelete: (() => void) | null = null
   const deleteBodies: Array<Record<string, unknown>> = []
 
   await page.route('**/api/v1/**', async (route: Route) => {
@@ -82,6 +86,29 @@ async function installApiFixture(page: Page, options: BatchRouteOptions = {}) {
 
       const ids = Array.isArray(body?.ids) ? body.ids.map(String) : []
       remaining = remaining.filter((session) => !ids.includes(session.id))
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      })
+      return
+    }
+
+    if (/^\/api\/v1\/sessions\/[^/]+$/.test(url.pathname) && request.method() === 'DELETE') {
+      const sessionId = decodeURIComponent(url.pathname.split('/').pop() || '')
+      singleDeleteAttempts += 1
+      if (options.failFirstSingleDelete && singleDeleteAttempts === 1) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, message: 'synthetic failure' }),
+        })
+        return
+      }
+      if (options.deferFirstSingleDelete && singleDeleteAttempts === 1) {
+        await new Promise<void>((resolve) => { releaseFirstSingleDelete = resolve })
+      }
+      remaining = remaining.filter((session) => session.id !== sessionId)
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -146,6 +173,12 @@ async function installApiFixture(page: Page, options: BatchRouteOptions = {}) {
 
   return {
     deleteBodies,
+    get singleDeleteAttempts() {
+      return singleDeleteAttempts
+    },
+    releaseFirstSingleDelete() {
+      releaseFirstSingleDelete?.()
+    },
     get deleteAttempts() {
       return deleteAttempts
     },
@@ -294,5 +327,85 @@ test.describe('session batch management', () => {
     await expect(page.locator('.visual-session-row')).toHaveCount(10)
     await expect(page.getByText('分页验收对话 31', { exact: true })).toBeVisible()
     await expect(page.getByText('分页验收对话 01', { exact: true })).toBeHidden()
+  })
+
+  test('single-session delete ignores a repeated confirmation while the first request is pending', async ({ page }) => {
+    const fixture = await installApiFixture(page, { deferFirstSingleDelete: true })
+    await page.goto('/e2e/session-batch-harness.html')
+    await expect(page.locator('.visual-session-row')).toHaveCount(sessions.length)
+
+    const row = page.locator('.visual-session-row').first()
+    const openSingleDeleteConfirmation = async () => {
+      await row.hover()
+      await row.locator('.visual-session-row__more').click()
+      const deleteMenuItem = page.locator('.visual-session-menu__item').filter({ hasText: '删除记录' })
+      await expect(deleteMenuItem).toBeVisible()
+      await deleteMenuItem.click()
+      await page.locator('.visual-session-confirm__button.is-danger').click()
+    }
+
+    await openSingleDeleteConfirmation()
+    await expect.poll(() => fixture.singleDeleteAttempts).toBe(1)
+    await expect(row.locator('.visual-session-row__more')).toHaveAttribute('aria-expanded', 'false')
+    await page.waitForTimeout(300)
+
+    await openSingleDeleteConfirmation()
+    await page.waitForTimeout(200)
+    expect(fixture.singleDeleteAttempts).toBe(1)
+
+    fixture.releaseFirstSingleDelete()
+    await expect(page.getByText('第一条验收对话', { exact: true })).toBeHidden()
+    await expect(page.locator('.visual-session-row')).toHaveCount(sessions.length - 1)
+  })
+
+  test('single-session delete remains retryable after a failed request', async ({ page }) => {
+    const fixture = await installApiFixture(page, { failFirstSingleDelete: true })
+    await page.goto('/e2e/session-batch-harness.html')
+    await expect(page.locator('.visual-session-row')).toHaveCount(sessions.length)
+
+    const row = page.locator('.visual-session-row').first()
+    const openSingleDeleteConfirmation = async () => {
+      await row.hover()
+      await row.locator('.visual-session-row__more').click()
+      const deleteMenuItem = page.locator('.visual-session-menu__item').filter({ hasText: '删除记录' })
+      await expect(deleteMenuItem).toBeVisible()
+      await deleteMenuItem.click()
+      await page.locator('.visual-session-confirm__button.is-danger').click()
+    }
+
+    await openSingleDeleteConfirmation()
+    await expect.poll(() => fixture.singleDeleteAttempts).toBe(1)
+    await expect(page.getByText('第一条验收对话', { exact: true })).toBeVisible()
+
+    await page.waitForTimeout(300)
+    await openSingleDeleteConfirmation()
+    await expect.poll(() => fixture.singleDeleteAttempts).toBe(2)
+    await expect(page.getByText('第一条验收对话', { exact: true })).toBeHidden()
+  })
+
+  test('a pending single-session delete does not block another session', async ({ page }) => {
+    const fixture = await installApiFixture(page, { deferFirstSingleDelete: true })
+    await page.goto('/e2e/session-batch-harness.html')
+    await expect(page.locator('.visual-session-row')).toHaveCount(sessions.length)
+
+    const openSingleDeleteConfirmation = async (row: ReturnType<typeof page.locator>) => {
+      await row.hover()
+      await row.locator('.visual-session-row__more').click()
+      const deleteMenuItem = page.locator('.visual-session-menu__item').filter({ hasText: '删除记录' })
+      await expect(deleteMenuItem).toBeVisible()
+      await deleteMenuItem.click()
+      await page.locator('.visual-session-confirm__button.is-danger').click()
+    }
+
+    await openSingleDeleteConfirmation(page.locator('.visual-session-row').nth(0))
+    await expect.poll(() => fixture.singleDeleteAttempts).toBe(1)
+
+    await openSingleDeleteConfirmation(page.locator('.visual-session-row').nth(1))
+    await expect.poll(() => fixture.singleDeleteAttempts).toBe(2)
+    await expect(page.getByText('第二条验收对话', { exact: true })).toBeHidden()
+
+    fixture.releaseFirstSingleDelete()
+    await expect(page.getByText('第一条验收对话', { exact: true })).toBeHidden()
+    await expect(page.locator('.visual-session-row')).toHaveCount(sessions.length - 2)
   })
 })

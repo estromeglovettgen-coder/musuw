@@ -21,6 +21,18 @@ export interface SessionMutationDetail {
   removed?: boolean
 }
 
+const pendingSessionMutationIds = new Set<string>()
+
+function beginSessionMutation(sessionId: string): boolean {
+  if (pendingSessionMutationIds.has(sessionId)) return false
+  pendingSessionMutationIds.add(sessionId)
+  return true
+}
+
+function endSessionMutation(sessionId: string): void {
+  pendingSessionMutationIds.delete(sessionId)
+}
+
 export function notifySessionMutation(detail: SessionMutationDetail): void {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent<SessionMutationDetail>(SESSION_MUTATION_EVENT, { detail }))
@@ -55,12 +67,24 @@ export async function setSessionPinned(sessionId: string, pinned: boolean): Prom
   })
 }
 
-export async function clearSession(sessionId: string): Promise<void> {
-  ensureSuccess(await clearSessionMessages(sessionId))
-  notifySessionMutation({ sessionId, messagesCleared: true })
+export async function clearSession(sessionId: string): Promise<boolean> {
+  if (!beginSessionMutation(sessionId)) return false
+  try {
+    ensureSuccess(await clearSessionMessages(sessionId))
+    notifySessionMutation({ sessionId, messagesCleared: true })
+    return true
+  } finally {
+    endSessionMutation(sessionId)
+  }
 }
 
-export async function removeSession(sessionId: string): Promise<void> {
-  ensureSuccess(await delSession(sessionId))
-  notifySessionMutation({ sessionId, removed: true })
+export async function removeSession(sessionId: string): Promise<boolean> {
+  if (!beginSessionMutation(sessionId)) return false
+  try {
+    ensureSuccess(await delSession(sessionId))
+    notifySessionMutation({ sessionId, removed: true })
+    return true
+  } finally {
+    endSessionMutation(sessionId)
+  }
 }

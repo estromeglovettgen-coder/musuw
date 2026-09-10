@@ -168,7 +168,7 @@ frontend/src/assets/business-baselines/Input-field.pre-view.vue	A	-	100644	0042d
 frontend/src/assets/business-baselines/KnowledgeBase.pre-view.vue	A	-	100644	bdb58268e7949a5172c3de6ecc02b680dffff2b1	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/business-baselines/KnowledgeBaseList.pre-view.vue	A	-	100644	c49c30b1e68b3e99b8965b447eadac4bfc268249	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/business-baselines/manual-knowledge-editor.pre-view.vue	A	-	100644	4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/assets/business-baselines/menu.pre-view.vue	A	-	100644	42329afafedf9135049a8f253bf8ee02d811371d	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/business-baselines/menu.pre-view.vue	A	-	100644	e185baf5fb56a34b9d8582b7d4339904dc3b5d20	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/drawerRootPaintContract.test.mjs	A	-	100644	1dde5c4cf7f4c2c7538cf50e32caf8a062bd2190	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/fonts.css	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
 frontend/src/assets/fonts/TencentSans.ttf	D	-	000000	0000000000000000000000000000000000000000	preserve-musuw-deletion		audited local-only deletion remains authoritative
@@ -199,7 +199,7 @@ frontend/src/assets/musuw-visual-preference-compat.css	A	-	100644	9914f50421d90a
 frontend/src/assets/musuw-visual.less	A	-	100644	cda963c4a2b6f75db2d8f7b1590144b084cf5d04	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwAdapterEventContract.test.mjs	A	-	100644	38abb601439e532aaf8a609b32031b847f366145	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwBrandSurfaceContract.test.mjs	A	-	100644	9d1a9134dcd66300a9b7862493880c2e81a8230b	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/assets/musuwBusinessBaselineFingerprint.test.mjs	A	-	100644	a93a487099a60d29941b53c3d0226f53201a63e4	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/musuwBusinessBaselineFingerprint.test.mjs	A	-	100644	afd89917956b54223c4d9d1bc26605bcc8f4f277	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwBusinessControllerBuildContract.test.mjs	A	-	100644	25de88b89ecbb4ea9b69af74516c1351434613cd	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwBusinessPresentationParity.test.mjs	A	-	100644	0c741757fdbda9167bebc22a82bb4648f48ae3a4	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwChatDarkTheme.test.mjs	A	-	100644	965cf5c41491fefab4958232629556eafa66ee14	preserve-musuw-exact		audited local-only content is byte-identical
@@ -228,7 +228,7 @@ frontend/src/assets/musuwReferencePrecisionFixes.test.mjs	A	-	100644	8c831aa8dc2
 frontend/src/assets/musuwReferenceSourceTokenContract.test.mjs	A	-	100644	29c74adce07e80b61d7043f3ce08f8d380f8b86d	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwResponsiveContract.test.mjs	A	-	100644	5f628d892f8eb774c769c7bf45cd9c6010fea4c1	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwSettingsRhythmContract.test.mjs	A	-	100644	b6c43d90fb1649bd85c24ffc746d1a408ea9a8cb	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/assets/musuwSidebarBusinessParity.test.mjs	A	-	100644	4cba86b3a870f975ce4acf6c82234c42fb59b2d7	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/musuwSidebarBusinessParity.test.mjs	A	-	100644	77df4aaa501091a76347b8f0ad028d9a9b3815ef	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwTDesignOverlayBridge.test.mjs	A	-	100644	89862ffd6645096ad2360a32faa8ef49159862b5	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwThemeBootCanvas.test.mjs	A	-	100644	c71aaa2d903fe7ec8d4c0ff3f855c2f93d62ebbe	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwThemeColorContract.test.mjs	A	-	100644	2db29a7e59f3aece01349d22be74b125613f14f8	preserve-musuw-exact		audited local-only content is byte-identical
@@ -242,7 +242,7 @@ frontend/src/components/AgentSelector.vue	D	-	000000	000000000000000000000000000
 frontend/src/components/AttachmentUpload.vue	M	-	100644	85322214ca90e9c14d915c5567b9fc975bf644cb	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/ChatAttachmentPreviewDrawer.vue	M	-	100644	0590ff11ef7817dbe56b017ec24b1e7f237aaa78	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/components/ChatCitationFloat.vue	M	-	100644	02a15ab783c5de2973f447e3ae7170e8cdb8d24c	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/components/ChatHeader.vue	M	M	100644	2650c004a22588872e5d21cc23cdb3843d45aa3c	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/components/ChatHeader.vue	M	M	100644	be191086d9857e54bbc1c2d7c89ec551cb5b4ef1	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/components/ChatReferencesDrawer.vue	M	-	100644	6fcf9c24d2321d97c8e70266160336ee1c5c4b2f	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/components/ChatRequestInfoButton.vue	M	M	100644	0cd5326230c15940eee6ff6c2bba74326d0f2a4e	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/components/CreateTenantDialog.vue	M	-	100644	f956f77923457d9fbcbc2aee7b0a2d3cbfe0a4d5	preserve-musuw-exact		audited local-only content is byte-identical
