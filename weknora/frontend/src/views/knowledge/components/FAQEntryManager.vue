@@ -1512,7 +1512,7 @@ const handleEntryRecommendedChange = async (entry: FAQEntry, value: boolean) => 
   entryRecommendedLoading[entry.id] = true
   try {
     await updateFAQEntryFieldsBatch(props.kbId, { by_id: { [entry.id]: { is_recommended: value } } })
-    MessagePlugin.success(t(value ? 'knowledgeEditor.faq.recommendedEnableSuccess' : 'knowledgeEditor.faq.recommendedDisableSuccess'))
+    MessagePlugin.success(t(value ? 'knowledgeEditor.faq.recommendedEnabled' : 'knowledgeEditor.faq.recommendedDisableSuccess'))
   } catch (error: any) {
     actualEntry.is_recommended = previous
     MessagePlugin.error(error?.message || t('knowledgeEditor.faq.recommendedUpdateFailed'))
@@ -1840,7 +1840,7 @@ const handleBatchRecommendedChange = async (isRecommended: boolean) => {
       by_id[id] = { is_recommended: isRecommended }
     })
     await updateFAQEntryFieldsBatch(props.kbId, { by_id })
-    MessagePlugin.success(t(isRecommended ? 'knowledgeEditor.faq.recommendedEnableSuccess' : 'knowledgeEditor.faq.recommendedDisableSuccess'))
+    MessagePlugin.success(t(isRecommended ? 'knowledgeEditor.faq.recommendedEnabled' : 'knowledgeEditor.faq.recommendedDisableSuccess'))
     selectedRowKeys.value = []
     await loadEntries()
   } catch (error: any) {
@@ -2545,7 +2545,7 @@ const downloadExportBlob = (blob: Blob, ext: 'csv' | 'json') => {
 }
 const handleExportFAQ = async (format: 'csv' | 'json') => {
   if (!props.kbId) {
-    MessagePlugin.warning(t('knowledgeBase.selectKnowledgeBase'))
+    MessagePlugin.warning(t('manualEditor.warning.selectKnowledgeBase'))
     return
   }
 

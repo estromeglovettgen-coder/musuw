@@ -43,7 +43,7 @@
                 class="preset-chip"
                 @click="loadSample(p.id)"
               >
-                {{ $t(`knowledgeEditor.chunking.debug.${p.labelKey}`) }}
+                {{ $t(p.labelKey) }}
               </t-button>
             </div>
           </div>

@@ -569,6 +569,7 @@ export default {
     paused: '일시정지됨',
     resumed: '재개됨',
     pauseFailed: '일시정지 실패',
+    resumeFailed: '재개 실패',
     logs: '로그',
     syncModeLabel: '동기화 모드',
     createTitle: '데이터 소스 추가',
@@ -1886,11 +1887,19 @@ export default {
     authTypeNone: '없음 / 사용자 정의 헤더',
     authTypeApiKey: 'API Key / Token',
     authTypeOAuth: 'OAuth 2.0(최초 연결 시 인증)',
+    oauthScopes: '범위(선택 사항, 공백으로 구분)',
+    oauthAuthorization: '인증 상태',
+    oauthAuthorized: '인증됨',
+    oauthUnauthorized: '인증되지 않음',
+    oauthAuthorize: '인증하기',
+    oauthReauthorize: '다시 인증',
+    oauthRevoke: '인증 해제',
     oauthRefreshable: 'Token expired; it will refresh automatically on next use',
     oauthAuthorizeHint: '「인증하기」를 클릭하면 현재 설정을 먼저 자동 저장한 후 인증을 시작합니다(사용자별 개별 인증).',
     apiKeyHeader: '요청 헤더 이름',
     apiKeyHeaderDesc: '비워 두면 기본값은 X-API-Key입니다. Bearer 방식은 Authorization을 입력하고 아래 비밀 값에 "Bearer <token>"을 작성하세요. 원시 토큰이 필요하면 Authorization에 토큰을 그대로 입력합니다.',
     credentialValue: '비밀 값 / 토큰',
+    testResultTitle: '테스트 결과',
     optional: '선택',
     advancedConfig: '고급 설정',
     timeoutSec: '타임아웃(초)',
@@ -1925,6 +1934,10 @@ export default {
       updated: 'MCP 서비스가 업데이트되었습니다',
       createFailed: 'MCP 서비스 생성 실패',
       updateFailed: 'MCP 서비스 업데이트 실패',
+      authorizeFailed: '인증을 시작하지 못했습니다',
+      authorized: '인증되었습니다',
+      revokeFailed: '인증을 해제하지 못했습니다',
+      revoked: '인증이 해제되었습니다',
       oauthRequired: '이 서비스는 OAuth 인증이 필요하여 OAuth 2.0으로 자동 전환했습니다. 저장 후 「인증하기」를 클릭하세요.'
     },
     rules: {
@@ -2703,6 +2716,10 @@ export default {
     tenant: {
       listFailed: '워크스페이스 목록 조회 실패',
       searchFailed: '워크스페이스 검색 실패',
+      listApiKeysFailed: '워크스페이스 API Key 목록 조회 실패',
+      createApiKeyFailed: '워크스페이스 API Key 생성 실패',
+      deleteApiKeyFailed: '워크스페이스 API Key 삭제 실패',
+      createFailed: '워크스페이스 생성 실패',
       getApiPrincipalConfigFailed: 'API principal config 조회 실패',
       updateApiPrincipalConfigFailed: 'API principal config 업데이트 실패',
       createApiPrincipalTestTokenFailed: 'API 테스트 토큰 생성 실패',
@@ -3419,6 +3436,7 @@ export default {
     followUpQuestions: '이어서 질문',
     followUpQuestionsLoading: '추천 질문 로딩 중',
     refreshSuggestedQuestions: '다른 질문',
+    imageReadFailed: '이미지를 읽지 못했습니다',
     thinking: '생각 중...',
     thinkingAlt: '생각 중',
     scrollToBottom: '맨 아래로 스크롤',
@@ -4575,6 +4593,16 @@ export default {
     kbDisabledByAgent: '현재 에이전트가 지식베이스 기능을 비활성화했습니다.',
     modelLockedByAgent: '현재 에이전트는 모델 구성을 잠갔습니다.',
     imageUploadDisabledByAgent: '현재 에이전트에서 이미지 업로드가 활성화되지 않았습니다',
+    fileUpload: {
+      label: '파일 업로드',
+      tooltip: '첨부 파일 업로드',
+      tooMany: '첨부 파일은 최대 5개까지 업로드할 수 있습니다',
+      tooLarge: '첨부 파일 하나의 크기는 20MB 이하여야 합니다'
+    },
+    imageUpload: {
+      label: '이미지 업로드',
+      tooltip: '이미지 업로드(붙여넣기 또는 드래그 앤 드롭 지원)'
+    },
     goToAgentSettings: '에이전트 설정으로 이동',
     messages: {
       enterContent: '먼저 내용을 입력해주세요!',
@@ -4593,7 +4621,8 @@ export default {
     webSearch: {
       toggleOn: '웹 검색 켜기',
       toggleOff: '웹 검색 끄기',
-      notConfigured: '웹 검색 엔진이 구성되지 않았습니다'
+      notConfigured: '웹 검색 엔진이 구성되지 않았습니다',
+      label: '웹 검색'
     }
   },
   manualEditor: {
@@ -4691,7 +4720,8 @@ export default {
     }
   },
   file: {
-    upload: '파일 업로드'
+    upload: '파일 업로드',
+    downloadFailed: '파일을 다운로드하지 못했습니다'
   },
   mentionDetail: {
     readOnlyFromAgent: '이 대화에서는 읽기 전용이며 지식베이스 목록에는 표시되지 않습니다.',
@@ -5782,6 +5812,7 @@ export default {
       chartRecognition: '차트 인식',
       language: '언어',
       testConnection: '연결 테스트',
+      checking: '확인 중…',
       docs: '문서',
       loadFailed: '파서 엔진 목록 로드 실패',
       ensureDocreaderConnected: 'DocReader 서비스가 환경변수로 구성되고 연결되었는지 확인하세요',
@@ -6353,6 +6384,7 @@ export default {
     tagCreateSuccess: '태그 생성 성공',
     tagEditSuccess: '태그 업데이트 성공',
     tagDeleteDescDoc: '"{name}" 태그를 삭제하시겠습니까? 해당 태그의 모든 문서가 함께 삭제됩니다',
+    tagDeleteDesc: '"{name}" 태그를 삭제하시겠습니까? 해당 태그의 모든 FAQ 항목이 함께 삭제됩니다',
     tagDeleteSuccess: '태그가 삭제되었습니다',
     tagEditAction: '이름 변경',
     tagDeleteAction: '삭제',
@@ -6492,6 +6524,8 @@ export default {
     draft: '초안',
     draftTip: '임시 저장된 내용, 검색에 포함되지 않음',
     untitledDocument: '제목 없는 문서',
+    createSessionFailed: '대화를 생성하지 못했습니다',
+    createSessionError: '대화를 생성하는 중 오류가 발생했습니다',
     deleteDocument: '문서 삭제',
     moveDocument: '이동...',
     moveToKnowledgeBase: '지식베이스로 이동',
@@ -6642,6 +6676,7 @@ export default {
     recents: '최근'
   },
   batchManage: {
+    title: '일괄 관리',
     selectAll: '전체 선택',
     cancel: '취소',
     delete: '대화 삭제',
@@ -6649,7 +6684,8 @@ export default {
     deleteConfirmBody: '선택한 {count}개의 대화를 삭제하시겠습니까? 삭제 후 복구할 수 없습니다.',
     deleteAllConfirmBody: '모든 대화를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
     deleteSuccess: '삭제 성공',
-    deleteFailed: '삭제 실패, 나중에 다시 시도해 주세요'
+    deleteFailed: '삭제 실패, 나중에 다시 시도해 주세요',
+    loadFailed: '대화를 불러오지 못했습니다. 다시 시도해 주세요.'
   },
   contextualGuide: {
     stepOf: '{current} / {total}',

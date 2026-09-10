@@ -282,10 +282,10 @@ const PLAIN_SAMPLE = `知识库的检索质量受多个因素影响，最直接�
 最后，别忽视后处理。重排（rerank）几乎在所有场景都能提升 5%–15% 的端到端效果，代价是每次查询多 100–300ms 延迟。常见 reranker 包括 BGE-Reranker、Cohere Rerank，前者开源、后者付费但效果略好。如果你的检索路径包含关键词召回，强烈建议用 reranker 做第二层过滤，不然 BM25 的纯字面命中会污染上下文。`
 
 export const CHUNKING_SAMPLES: ChunkingSample[] = [
-  { id: "markdown", labelKey: "samples.markdown", text: MARKDOWN_SAMPLE },
-  { id: "faq", labelKey: "samples.faq", text: FAQ_SAMPLE },
-  { id: "chapter", labelKey: "samples.chapter", text: CHAPTER_SAMPLE },
-  { id: "plain", labelKey: "samples.plain", text: PLAIN_SAMPLE },
+  { id: "markdown", labelKey: "knowledgeEditor.chunking.debug.samples.markdown", text: MARKDOWN_SAMPLE },
+  { id: "faq", labelKey: "knowledgeEditor.chunking.debug.samples.faq", text: FAQ_SAMPLE },
+  { id: "chapter", labelKey: "knowledgeEditor.chunking.debug.samples.chapter", text: CHAPTER_SAMPLE },
+  { id: "plain", labelKey: "knowledgeEditor.chunking.debug.samples.plain", text: PLAIN_SAMPLE },
 ];
 
 export const DEFAULT_SAMPLE_ID = "markdown";

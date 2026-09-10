@@ -175,7 +175,7 @@ async function togglePin(pinned: boolean): Promise<void> {
   busyAction.value = 'pin'
   try {
     await setSessionPinned(session.id, pinned)
-    MessagePlugin.success(t(pinned ? 'chatHeader.pinSuccess' : 'chatHeader.unpinSuccess'))
+    MessagePlugin.success(t(pinned ? 'knowledgeList.pin.pinSuccess' : 'chatHeader.unpinSuccess'))
   } catch {
     MessagePlugin.error(t(pinned ? 'menu.pinFailed' : 'menu.unpinFailed'))
   } finally { busyAction.value = '' }

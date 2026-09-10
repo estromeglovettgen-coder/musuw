@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { before, test } from 'node:test'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { findAuditActionDefaultRegistryMismatches } from './auditActionLocaleDefaults.ts'
 import { REGISTERED_AUDIT_ACTION_ENTRIES, KB_ACTIVITY_DETAIL_VALUES, KB_ACTIVITY_I18N_ROOTS, KB_ACTIVITY_OUTCOMES } from './auditActionRegistry.ts'
@@ -54,6 +57,69 @@ test('critical runtime i18n trees are present', () => {
 test('referenced i18n keys used in app code exist in every locale', () => {
   const failures = findUsedKeysMissingInLocales(referencedKeys, localeKeysByName)
   assert.deepEqual(failures, [], failures.slice(0, 20).join('\n'))
+})
+
+test('referenced key collection preserves missing exact literals for audit reporting', () => {
+  const usage = {
+    staticKeys: new Set(['batchManage.title']),
+    exactStaticKeys: new Set(['batchManage.title']),
+    prefixes: new Set<string>(),
+    segmentPatterns: [],
+  }
+
+  const referenced = collectReferencedLocaleKeys({}, usage)
+  assert.equal(referenced.has('batchManage.title'), true)
+})
+
+test('copyWithToast feedback keys are collected as exact literals', () => {
+  const usage = collectI18nUsageFromSources()
+
+  assert.equal(usage.exactStaticKeys.has('agentStream.copy.success'), true)
+  assert.equal(usage.exactStaticKeys.has('agentStream.copy.failed'), true)
+})
+
+test('copyWithToast scans only feedback arguments and supports missing namespaces', () => {
+  const root = mkdtempSync(join(tmpdir(), 'locale-key-audit-'))
+  try {
+    writeFileSync(
+      join(root, 'copy.ts'),
+      [
+        "copyWithToast('foo.bar', 'missingNamespace.success', 'missingNamespace.failed')",
+        "$t(flag ? 'missingDollar.success' : 'missingDollar.failed', { label: flag ? 'not.a.key' : 'also.not.a.key' })",
+        "t(flag ? 'missingT.success' : 'missingT.failed')",
+        "i18n.global.t(flag ? 'missingGlobal.success' : 'missingGlobal.failed')",
+        "t('missingPrefix' + suffix)",
+      ].join('\n'),
+    )
+    const usage = collectI18nUsageFromSources(root)
+
+    assert.equal(usage.exactStaticKeys.has('missingNamespace.success'), true)
+    assert.equal(usage.exactStaticKeys.has('missingNamespace.failed'), true)
+    assert.equal(usage.exactStaticKeys.has('foo.bar'), false)
+    for (const key of [
+      'missingDollar.success',
+      'missingDollar.failed',
+      'missingT.success',
+      'missingT.failed',
+      'missingGlobal.success',
+      'missingGlobal.failed',
+    ]) {
+      assert.equal(usage.exactStaticKeys.has(key), true, key)
+    }
+    assert.equal(usage.exactStaticKeys.has('not.a.key'), false)
+    assert.equal(usage.exactStaticKeys.has('also.not.a.key'), false)
+    assert.equal(usage.exactStaticKeys.has('missingPrefix'), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('batch management modal title is translated in every locale', () => {
+  const failures = (Object.entries(LOCALE_BUNDLES) as Array<[LocaleName, unknown]>)
+    .filter(([, bundle]) => typeof getLocaleValueAtPath(bundle, 'batchManage.title') !== 'string')
+    .map(([localeName]) => `${localeName}: missing batchManage.title`)
+
+  assert.deepEqual(failures, [], failures.join('\n'))
 })
 
 const PARSER_ENGINE_NAMES = [

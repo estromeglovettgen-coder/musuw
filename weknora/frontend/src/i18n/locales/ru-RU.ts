@@ -569,6 +569,7 @@ export default {
     paused: 'Приостановлено',
     resumed: 'Возобновлено',
     pauseFailed: 'Не удалось приостановить',
+    resumeFailed: 'Не удалось возобновить',
     logs: 'Журнал',
     syncModeLabel: 'Режим синхронизации',
     createTitle: 'Добавить источник данных',
@@ -1886,11 +1887,19 @@ export default {
     authTypeNone: 'Нет / Свой заголовок',
     authTypeApiKey: 'API Key / Token',
     authTypeOAuth: 'OAuth 2.0 (авторизация при первом подключении)',
+    oauthScopes: 'Области доступа (необязательно, через пробел)',
+    oauthAuthorization: 'Статус авторизации',
+    oauthAuthorized: 'Авторизовано',
+    oauthUnauthorized: 'Не авторизовано',
+    oauthAuthorize: 'Авторизоваться',
+    oauthReauthorize: 'Авторизоваться снова',
+    oauthRevoke: 'Отозвать авторизацию',
     oauthRefreshable: 'Token expired; it will refresh automatically on next use',
     oauthAuthorizeHint: 'Нажатие «Авторизоваться» сначала сохранит текущую конфигурацию, затем запустит авторизацию (каждый пользователь авторизуется отдельно).',
     apiKeyHeader: 'Имя заголовка',
     apiKeyHeaderDesc: 'По умолчанию X-API-Key. Для Bearer укажите Authorization и впишите "Bearer <token>" в значение ниже; для «сырого» токена используйте Authorization и сам токен.',
     credentialValue: 'Секрет / Токен',
+    testResultTitle: 'Результат теста',
     optional: 'Необязательно',
     advancedConfig: 'Дополнительно',
     timeoutSec: 'Таймаут (с)',
@@ -1925,6 +1934,10 @@ export default {
       updated: 'Сервис MCP обновлён',
       createFailed: 'Не удалось создать сервис MCP',
       updateFailed: 'Не удалось обновить сервис MCP',
+      authorizeFailed: 'Не удалось начать авторизацию',
+      authorized: 'Авторизация выполнена',
+      revokeFailed: 'Не удалось отозвать авторизацию',
+      revoked: 'Авторизация отозвана',
       oauthRequired: 'Сервис требует OAuth. Переключено на OAuth 2.0 — сохраните и нажмите «Авторизоваться».'
     },
     rules: {
@@ -2703,6 +2716,10 @@ export default {
     tenant: {
       listFailed: 'Не удалось получить список пространств',
       searchFailed: 'Не удалось выполнить поиск пространств',
+      listApiKeysFailed: 'Не удалось получить список API-ключей пространства',
+      createApiKeyFailed: 'Не удалось создать API-ключ пространства',
+      deleteApiKeyFailed: 'Не удалось удалить API-ключ пространства',
+      createFailed: 'Не удалось создать пространство',
       getApiPrincipalConfigFailed: 'Не удалось получить конфигурацию API principal',
       updateApiPrincipalConfigFailed: 'Не удалось обновить конфигурацию API principal',
       createApiPrincipalTestTokenFailed: 'Не удалось создать тестовый API Token',
@@ -3419,6 +3436,7 @@ export default {
     followUpQuestions: 'Спрашивайте дальше',
     followUpQuestionsLoading: 'Загрузка рекомендуемых вопросов',
     refreshSuggestedQuestions: 'Ещё',
+    imageReadFailed: 'Не удалось прочитать изображение',
     thinking: 'Думаю...',
     thinkingAlt: 'Обдумывание...',
     scrollToBottom: 'Прокрутить вниз',
@@ -4575,6 +4593,16 @@ export default {
     kbDisabledByAgent: 'Knowledge base is disabled by the current agent',
     modelLockedByAgent: 'Model selection is locked by the current agent',
     imageUploadDisabledByAgent: 'Image upload is not enabled for this agent',
+    fileUpload: {
+      label: 'Загрузить файл',
+      tooltip: 'Загрузить вложение',
+      tooMany: 'Можно загрузить не более 5 вложений',
+      tooLarge: 'Размер одного вложения не должен превышать 20 МБ'
+    },
+    imageUpload: {
+      label: 'Загрузить изображение',
+      tooltip: 'Загрузить изображение (поддерживаются вставка и перетаскивание)'
+    },
     goToAgentSettings: 'Go to agent settings',
     messages: {
       enterContent: 'Сначала введите содержимое!',
@@ -4593,7 +4621,8 @@ export default {
     webSearch: {
       toggleOn: 'Включить веб-поиск',
       toggleOff: 'Выключить веб-поиск',
-      notConfigured: 'Веб-поиск не настроен'
+      notConfigured: 'Веб-поиск не настроен',
+      label: 'Веб-поиск'
     }
   },
   manualEditor: {
@@ -4691,7 +4720,8 @@ export default {
     }
   },
   file: {
-    upload: 'Загрузить файл'
+    upload: 'Загрузить файл',
+    downloadFailed: 'Не удалось скачать файл'
   },
   mentionDetail: {
     readOnlyFromAgent: 'Только чтение (от агента)',
@@ -5782,6 +5812,7 @@ export default {
       chartRecognition: 'Распознавание диаграмм',
       language: 'Язык',
       testConnection: 'Проверить с текущими параметрами',
+      checking: 'Проверка…',
       docs: 'Документация',
       loadFailed: 'Не удалось загрузить список парсеров',
       ensureDocreaderConnected: 'Убедитесь, что сервис DocReader настроен через переменные окружения и подключён',
@@ -6353,6 +6384,7 @@ export default {
     tagCreateSuccess: 'Тег создан',
     tagEditSuccess: 'Тег обновлён',
     tagDeleteDescDoc: 'Удалить тег «{name}»? Все документы под этим тегом также будут удалены.',
+    tagDeleteDesc: 'Удалить тег «{name}»? Все FAQ под этим тегом также будут удалены.',
     tagDeleteSuccess: 'Тег удалён',
     tagEditAction: 'Переименовать',
     tagDeleteAction: 'Удалить',
@@ -6492,6 +6524,8 @@ export default {
     draft: 'Черновик',
     draftTip: 'Временно сохранён, не участвует в поиске',
     untitledDocument: 'Документ без названия',
+    createSessionFailed: 'Не удалось создать диалог',
+    createSessionError: 'При создании диалога произошла ошибка',
     deleteDocument: 'Удалить документ',
     moveDocument: 'Переместить в...',
     moveToKnowledgeBase: 'Переместить в базу знаний',
@@ -6642,6 +6676,7 @@ export default {
     recents: 'Недавние'
   },
   batchManage: {
+    title: 'Пакетное управление',
     selectAll: 'Выбрать все',
     cancel: 'Отмена',
     delete: 'Удалить диалоги',
@@ -6649,7 +6684,8 @@ export default {
     deleteConfirmBody: 'Вы уверены, что хотите удалить выбранные {count} диалог(ов)? Это действие необратимо.',
     deleteAllConfirmBody: 'Вы уверены, что хотите удалить все диалоги? Это действие необратимо.',
     deleteSuccess: 'Успешно удалено',
-    deleteFailed: 'Ошибка удаления, попробуйте позже'
+    deleteFailed: 'Ошибка удаления, попробуйте позже',
+    loadFailed: 'Не удалось загрузить диалоги. Попробуйте ещё раз.'
   },
   contextualGuide: {
     stepOf: '{current} / {total}',

@@ -13,7 +13,20 @@ test('session batch adapter preserves the native boolean select-all payload and 
   assert.ok(child.includes("emit('toggle-all', !allSelected)"), 'batch modal must emit the target checked state')
   assert.ok(parent.includes('@toggle-all="toggleBatchSelectAll"'), 'sidebar must keep the frozen business handler')
   assert.ok(baseline.includes('const toggleBatchSelectAll = (checked: boolean)'), 'frozen handler signature changed unexpectedly')
-  assert.match(parent, /menuArr\.find\(\(item(?:: \{ path\?: string \})?\) => item\.path === 'creatChat'\)\?\.children \|\| \[\]/, 'batch modal must show the same all-session collection used by native allSelected/delete-all semantics')
+  assert.ok(parent.includes(':items="batchSessionItems"'), 'batch modal must show the active source collection used by native allSelected/delete semantics')
+})
+
+test('session batch modal locks mutations while busy and exposes pagination controls', () => {
+  const child = read('../components/SessionBatchManageModal.vue')
+
+  assert.ok(child.includes('loading?: boolean'), 'batch modal must accept page-loading state')
+  assert.ok(child.includes('hasMore?: boolean'), 'batch modal must accept a page continuation state')
+  assert.ok(child.includes("'load-more': []"), 'batch modal must expose a load-more event')
+  assert.ok(child.includes('@click.self="requestClose"'), 'busy close guard must cover backdrop clicks')
+  assert.ok(child.includes('if (!props.deleting) emit(\'close\')'), 'busy close guard must cover close requests')
+  assert.ok(child.includes(':disabled="deleting"'), 'selection and close controls must lock during delete confirmation')
+  assert.ok(child.includes('v-if="hasMore"'), 'batch modal must render continuation control only when more sessions exist')
+  assert.ok(child.includes(':disabled="loading || deleting"'), 'load-more must lock during page fetch or deletion')
 })
 
 test('adapter event wiring never substitutes reference-demo business actions', () => {

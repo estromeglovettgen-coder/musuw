@@ -8,6 +8,8 @@ on:
       - 'auth/**'
       - 'storefront/**'
       - 'weknora/**'
+      - 'e2e/**'
+      - 'playwright.session-batch.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -33,6 +35,8 @@ on:
       - 'auth/**'
       - 'storefront/**'
       - 'weknora/**'
+      - 'e2e/**'
+      - 'playwright.session-batch.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -98,6 +102,40 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm --prefix weknora/frontend run build
+
+  session-batch-browser:
+    name: Session batch browser regression
+    needs: workflow-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            weknora/frontend/package-lock.json
+      - name: Install existing browser test dependencies
+        run: npm ci --ignore-scripts
+      - name: Install frontend dependencies
+        run: npm ci --prefix weknora/frontend --ignore-scripts
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Exercise session selection, confirmation, deletion and retry
+        run: npm run app:e2e:batch
+      - name: Preserve browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-batch-browser-failures
+          path: test-results/session-batch
+          retention-days: 7
 
   auth:
     name: Auth shell tests, types and build

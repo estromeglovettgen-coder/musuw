@@ -569,6 +569,7 @@ export default {
     paused: '已暂停',
     resumed: '已恢复',
     pauseFailed: '暂停失败',
+    resumeFailed: '恢复失败',
     logs: '日志',
     syncModeLabel: '同步模式',
     createTitle: '添加数据源',
@@ -1888,11 +1889,19 @@ export default {
     authTypeNone: '无 / 自定义 Header',
     authTypeApiKey: 'API Key / Token',
     authTypeOAuth: 'OAuth 2.0（首次连接授权）',
+    oauthScopes: 'Scopes（可选，空格分隔）',
+    oauthAuthorization: '授权状态',
+    oauthAuthorized: '已授权',
+    oauthUnauthorized: '未授权',
+    oauthAuthorize: '去授权',
+    oauthReauthorize: '重新授权',
+    oauthRevoke: '撤销授权',
     oauthRefreshable: 'Token 已过期，将在下次使用时自动刷新',
     oauthAuthorizeHint: '点击「去授权」会先自动保存当前配置，再发起授权（每个用户独立授权）。',
     apiKeyHeader: '请求头名称',
     apiKeyHeaderDesc: '留空默认 X-API-Key。Bearer 方式请填 Authorization，并在下方密钥值中写 “Bearer <token>”；需要裸 token 时填 Authorization 并直接填入 token。',
     credentialValue: '密钥值 / Token',
+    testResultTitle: '测试结果',
     optional: '可选',
     advancedConfig: '高级配置',
     timeoutSec: '超时时间(秒)',
@@ -1927,6 +1936,10 @@ export default {
       updated: 'MCP 服务已更新',
       createFailed: '创建 MCP 服务失败',
       updateFailed: '更新 MCP 服务失败',
+      authorizeFailed: '发起授权失败',
+      authorized: '授权成功',
+      revokeFailed: '撤销授权失败',
+      revoked: '已撤销授权',
       oauthRequired: '该服务需要 OAuth 授权，已自动切换为 OAuth 2.0，请保存后点击「去授权」。'
     },
     rules: {
@@ -2707,6 +2720,10 @@ export default {
     tenant: {
       listFailed: '获取空间列表失败',
       searchFailed: '搜索空间失败',
+      listApiKeysFailed: '获取空间 API Key 列表失败',
+      createApiKeyFailed: '创建空间 API Key 失败',
+      deleteApiKeyFailed: '删除空间 API Key 失败',
+      createFailed: '创建空间失败',
       getApiPrincipalConfigFailed: '获取 API 用户身份配置失败',
       updateApiPrincipalConfigFailed: '更新 API 用户身份配置失败',
       createApiPrincipalTestTokenFailed: '生成 API 测试 Token 失败',
@@ -3423,6 +3440,7 @@ export default {
     followUpQuestions: '继续问',
     followUpQuestionsLoading: '加载推荐问题',
     refreshSuggestedQuestions: '换一批',
+    imageReadFailed: '读取图片失败',
     thinking: '思考中...',
     thinkingAlt: '正在思考',
     scrollToBottom: '滚动到底部',
@@ -4579,6 +4597,16 @@ export default {
     kbDisabledByAgent: '当前智能体已禁用知识库功能',
     modelLockedByAgent: '当前智能体已锁定模型配置',
     imageUploadDisabledByAgent: '当前智能体未启用图片上传',
+    fileUpload: {
+      label: '上传文件',
+      tooltip: '上传附件',
+      tooMany: '最多可上传 5 个附件',
+      tooLarge: '单个附件不能超过 20 MB'
+    },
+    imageUpload: {
+      label: '上传图片',
+      tooltip: '上传图片（支持粘贴或拖拽）'
+    },
     goToAgentSettings: '去设置智能体',
     messages: {
       enterContent: '请先输入内容!',
@@ -4597,7 +4625,8 @@ export default {
     webSearch: {
       toggleOn: '开启网络搜索',
       toggleOff: '关闭网络搜索',
-      notConfigured: '未配置网络搜索引擎'
+      notConfigured: '未配置网络搜索引擎',
+      label: '网络搜索'
     }
   },
   manualEditor: {
@@ -4695,7 +4724,8 @@ export default {
     }
   },
   file: {
-    upload: '上传文件'
+    upload: '上传文件',
+    downloadFailed: '文件下载失败'
   },
   mentionDetail: {
     readOnlyFromAgent: '仅在此对话中只读，不显示在知识库列表中',
@@ -5786,6 +5816,7 @@ export default {
       chartRecognition: '图表识别',
       language: '语言',
       testConnection: '测试连接',
+      checking: '检测中…',
       docs: '文档',
       loadFailed: '加载解析引擎列表失败',
       ensureDocreaderConnected: '请先确保 DocReader 服务已通过环境变量配置并已连接',
@@ -6357,6 +6388,7 @@ export default {
     tagCreateSuccess: '标签创建成功',
     tagEditSuccess: '标签更新成功',
     tagDeleteDescDoc: '确定删除标签"{name}"？该标签下的所有文档将被一并删除',
+    tagDeleteDesc: '确定删除标签"{name}"？该标签下的所有 FAQ 条目将被一并删除',
     tagDeleteSuccess: '标签已删除',
     tagEditAction: '重命名',
     tagDeleteAction: '删除',
@@ -6496,6 +6528,8 @@ export default {
     draft: '草稿',
     draftTip: '暂存内容，未参与检索',
     untitledDocument: '未命名文档',
+    createSessionFailed: '创建对话失败',
+    createSessionError: '创建对话时发生错误',
     deleteDocument: '删除文档',
     moveDocument: '移动到...',
     moveToKnowledgeBase: '移动到知识库',
@@ -6646,6 +6680,7 @@ export default {
     recents: '最近'
   },
   batchManage: {
+    title: '批量管理',
     selectAll: '全选',
     cancel: '取消',
     delete: '删除对话',
@@ -6653,7 +6688,8 @@ export default {
     deleteConfirmBody: '确定要删除选中的 {count} 条对话吗？删除后无法恢复。',
     deleteAllConfirmBody: '确定要删除所有对话吗？此操作无法恢复。',
     deleteSuccess: '删除成功',
-    deleteFailed: '删除失败，请稍后再试'
+    deleteFailed: '删除失败，请稍后再试',
+    loadFailed: '加载对话失败，请重试'
   },
   contextualGuide: {
     stepOf: '{current} / {total}',
