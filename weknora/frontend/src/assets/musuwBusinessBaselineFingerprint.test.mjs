@@ -36,7 +36,7 @@ const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/KnowledgeBase.pre-view.vue': 'bdb58268e7949a5172c3de6ecc02b680dffff2b1',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
-  './business-baselines/menu.pre-view.vue': '7686bad141078b5c7ad25f8bae21a3b4a8d158b1',
+  './business-baselines/menu.pre-view.vue': '42329afafedf9135049a8f253bf8ee02d811371d',
 }
 
 // These controllers remain byte-identical to Musuw's first source baseline.
@@ -71,7 +71,7 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   },
   sidebar: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/menu.pre-view.vue'],
-    authority: 'WeKnora main 81142df session behavior without requests to product-hidden channel APIs in Musuw Lite',
+    authority: 'WeKnora main 81142df session behavior without requests to product-hidden channel APIs in Musuw Lite; batch deletion restricted to confirmed visible IDs, with pagination and duplicate-submit protection',
   },
 }
 

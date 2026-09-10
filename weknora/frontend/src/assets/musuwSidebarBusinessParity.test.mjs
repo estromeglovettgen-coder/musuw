@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
 test('frozen sidebar controller remains the audited pre-reference implementation', () => {
-  assert.equal(blobSha(read('./business-baselines/menu.pre-view.vue')), '7686bad141078b5c7ad25f8bae21a3b4a8d158b1')
+  assert.equal(blobSha(read('./business-baselines/menu.pre-view.vue')), '42329afafedf9135049a8f253bf8ee02d811371d')
 })
 
 test('reference sidebar reuses frozen business setup and keeps every native session action surface', () => {
@@ -15,7 +15,7 @@ test('reference sidebar reuses frozen business setup and keeps every native sess
   for (const token of [
     "import LegacySidebarBusiness from '@/assets/business-baselines/menu.pre-view.vue'",
     'const legacySetup = legacy.setup',
-    'return { ...state, orgStore }',
+    'return { ...state, orgStore, bucketHasMore }',
     'toggleSidebar',
     "handleMenuClick('creatChat')",
     "handleMenuClick('knowledge-bases')",

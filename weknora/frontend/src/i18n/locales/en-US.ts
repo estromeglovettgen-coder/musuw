@@ -360,6 +360,7 @@ export default {
     }
   },
   batchManage: {
+    title: 'Batch Manage',
     selectAll: 'Select All',
     cancel: 'Cancel',
     delete: 'Delete Conversations',
@@ -367,7 +368,8 @@ export default {
     deleteConfirmBody: 'Are you sure you want to delete the selected {count} conversation(s)? This action cannot be undone.',
     deleteAllConfirmBody: 'Are you sure you want to delete all conversations? This action cannot be undone.',
     deleteSuccess: 'Deleted successfully',
-    deleteFailed: 'Delete failed, please try again later'
+    deleteFailed: 'Delete failed, please try again later',
+    loadFailed: 'Could not load conversations. Please try again.'
   },
   listSpaceSidebar: {
     all: 'All',
@@ -486,6 +488,7 @@ export default {
     tagCreateSuccess: 'Tag created',
     tagEditSuccess: 'Tag updated',
     tagDeleteDescDoc: 'Delete tag "{name}"? All documents under this tag will also be deleted.',
+    tagDeleteDesc: 'Delete tag "{name}"? All FAQ entries under this tag will also be deleted.',
     tagDeleteSuccess: 'Tag deleted',
     tagEditAction: 'Rename',
     tagDeleteAction: 'Delete',
@@ -625,6 +628,8 @@ export default {
     draft: 'Draft',
     draftTip: 'Temporarily saved and not included in retrieval',
     untitledDocument: 'Untitled Document',
+    createSessionFailed: 'Failed to create a conversation',
+    createSessionError: 'An error occurred while creating the conversation',
     deleteDocument: 'Delete Document',
     moveDocument: 'Move to...',
     moveToKnowledgeBase: 'Move to Knowledge Base',
@@ -1616,6 +1621,7 @@ export default {
       chartRecognition: 'Chart Recognition',
       language: 'Language',
       testConnection: 'Test Connection',
+      checking: 'Checking…',
       docs: 'Docs',
       loadFailed: 'Failed to load parser engine list',
       ensureDocreaderConnected: 'Please ensure the DocReader service is configured via environment variables and connected',
@@ -2318,7 +2324,8 @@ export default {
     noCompatibleKbForAgent: 'This agent\'s tools don\'t match any knowledge base\'s capabilities in scope, so nothing can be referenced.'
   },
   file: {
-    upload: 'Upload File'
+    upload: 'Upload File',
+    downloadFailed: 'Failed to download the file'
   },
   manualEditor: {
     placeholders: {
@@ -2451,7 +2458,8 @@ export default {
     webSearch: {
       toggleOn: 'Enable Web Search',
       toggleOff: 'Disable Web Search',
-      notConfigured: 'Web search engine not configured'
+      notConfigured: 'Web search engine not configured',
+      label: 'Web search'
     },
     knowledgeBase: 'Knowledge Base',
     knowledgeBaseWithCount: 'Knowledge Base ({count})',
@@ -2479,6 +2487,16 @@ export default {
     kbDisabledByAgent: 'Knowledge base is disabled by the current agent',
     modelLockedByAgent: 'Model selection is locked by the current agent',
     imageUploadDisabledByAgent: 'Image upload is not enabled for this agent',
+    fileUpload: {
+      label: 'Upload file',
+      tooltip: 'Upload an attachment',
+      tooMany: 'You can upload up to 5 attachments',
+      tooLarge: 'Each attachment must be 20 MB or smaller'
+    },
+    imageUpload: {
+      label: 'Upload image',
+      tooltip: 'Upload an image (paste or drag and drop supported)'
+    },
     goToAgentSettings: 'Go to agent settings'
   },
   createChat: {
@@ -3455,6 +3473,7 @@ export default {
     followUpQuestions: 'Keep asking',
     followUpQuestionsLoading: 'Loading suggested questions',
     refreshSuggestedQuestions: 'More',
+    imageReadFailed: 'Failed to read the image',
     thinking: 'Thinking...',
     thinkingAlt: 'Thinking in progress',
     scrollToBottom: 'Scroll to bottom',
@@ -4315,6 +4334,10 @@ export default {
     tenant: {
       listFailed: 'Failed to list workspaces',
       searchFailed: 'Failed to search workspaces',
+      listApiKeysFailed: 'Failed to list workspace API keys',
+      createApiKeyFailed: 'Failed to create workspace API key',
+      deleteApiKeyFailed: 'Failed to delete workspace API key',
+      createFailed: 'Failed to create workspace',
       getApiPrincipalConfigFailed: 'Failed to get API principal config',
       updateApiPrincipalConfigFailed: 'Failed to update API principal config',
       createApiPrincipalTestTokenFailed: 'Failed to create API test token',
@@ -5100,11 +5123,19 @@ export default {
     authTypeNone: 'None / Custom Header',
     authTypeApiKey: 'API Key / Token',
     authTypeOAuth: 'OAuth 2.0 (authorize on first connect)',
+    oauthScopes: 'Scopes (optional, separated by spaces)',
+    oauthAuthorization: 'Authorization status',
+    oauthAuthorized: 'Authorized',
+    oauthUnauthorized: 'Not authorized',
+    oauthAuthorize: 'Authorize',
+    oauthReauthorize: 'Reauthorize',
+    oauthRevoke: 'Revoke authorization',
     oauthRefreshable: 'Token expired; it will refresh automatically on next use',
     oauthAuthorizeHint: 'Clicking "Authorize" saves the current config first, then starts authorization (each user authorizes individually).',
     apiKeyHeader: 'Header Name',
     apiKeyHeaderDesc: 'Defaults to X-API-Key. For Bearer, set Authorization and put "Bearer <token>" in the value below; for raw-token services use Authorization with the raw token.',
     credentialValue: 'Secret / Token',
+    testResultTitle: 'Test result',
     optional: 'Optional',
     advancedConfig: 'Advanced',
     timeoutSec: 'Timeout (s)',
@@ -5121,6 +5152,10 @@ export default {
       updated: 'MCP service updated',
       createFailed: 'Failed to create MCP service',
       updateFailed: 'Failed to update MCP service',
+      authorizeFailed: 'Failed to start authorization',
+      authorized: 'Authorization successful',
+      revokeFailed: 'Failed to revoke authorization',
+      revoked: 'Authorization revoked',
       oauthRequired: 'This server requires OAuth. Switched to OAuth 2.0 — save, then click "Authorize".'
     },
     customHeaders: {
@@ -6240,6 +6275,7 @@ export default {
     paused: 'Paused',
     resumed: 'Resumed',
     pauseFailed: 'Failed to pause',
+    resumeFailed: 'Failed to resume',
     logs: 'Logs',
     syncModeLabel: 'Sync mode',
     syncMode: {

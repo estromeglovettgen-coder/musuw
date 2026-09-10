@@ -104,6 +104,7 @@ const EXTRA_PREFIXES = [
 
 /** Keys that must survive pruning even when static analysis misses them. */
 export const CRITICAL_LOCALE_KEYS = [
+  'batchManage.title',
   'newUserGuide.steps.welcome.title',
   'contextualGuide.kbList.steps.create.title',
   'tenantMember.audit.action.rbac.member_added',
@@ -132,6 +133,8 @@ function buildI18nLiteralPattern(): RegExp {
 
 export type I18nUsage = {
   staticKeys: Set<string>
+  /** Literal keys observed at a translation call or explicit key metadata. */
+  exactStaticKeys: Set<string>
   prefixes: Set<string>
   segmentPatterns: string[][]
 }
@@ -171,9 +174,24 @@ export function collectLocaleKeys(root: unknown): Set<string> {
 
 function isAuditableSourceFile(path: string): boolean {
   if (!SOURCE_EXTENSIONS.test(path)) return false
-  if (path.includes('/i18n/locales/')) return false
+  // Locale tooling and audit registries contain translation-shaped data, but
+  // they are not application call sites. Scanning them turns action values
+  // and audit examples into false missing-message reports.
+  if (path.includes('/i18n/')) return false
   if (TEST_FILE_PATTERN.test(path)) return false
   return true
+}
+
+function readAuditableSource(path: string): string {
+  const source = readFileSync(path, 'utf8')
+  if (!path.includes('/assets/business-baselines/') || !path.endsWith('.vue')) return source
+
+  // Baseline SFC templates are retained as reference artifacts. The active
+  // wrapper consumes their compiled <script setup> state, while its own
+  // template supplies the rendered UI; only audit the script portion here.
+  return [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((match) => match[1])
+    .join('\n')
 }
 
 function listSourceFiles(dir: string, results: string[] = []): string[] {
@@ -194,22 +212,128 @@ function isStaticTranslationKey(key: string): boolean {
 }
 
 const KNOWN_LOCALE_NAMESPACES = new Set(Object.keys(enUS as Record<string, unknown>))
-const INDIRECT_TERNARY_IN_T_RE = /\$t\(\s*[\s\S]*?\? ['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g
+const INDIRECT_T_CALL_PATTERN = /(?<![.\w])(?:\$t|t|te|i18n\.global\.t)\s*\(/g
 const INDIRECT_VAR_T_RE = /\$t\(([a-zA-Z_][\w]*)\)/g
+const COPY_WITH_TOAST_CALL_PATTERN = /\bcopyWithToast\s*\(/g
+const CALL_LITERAL_PATTERN = /['"]([^'"]+)['"]/g
+
+function readCallArguments(content: string, openParenIndex: number): string | null {
+  let depth = 1
+  let quote: string | null = null
+  let escaped = false
+
+  for (let index = openParenIndex + 1; index < content.length; index += 1) {
+    const character = content[index]
+
+    if (quote !== null) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (character === "'" || character === '"' || character === '`') {
+      quote = character
+    } else if (character === '(') {
+      depth += 1
+    } else if (character === ')') {
+      depth -= 1
+      if (depth === 0) return content.slice(openParenIndex + 1, index)
+    }
+  }
+
+  return null
+}
+
+function splitCallArguments(argumentsText: string): string[] {
+  const argumentsList: string[] = []
+  let start = 0
+  let depth = 0
+  let quote: string | null = null
+  let escaped = false
+
+  for (let index = 0; index < argumentsText.length; index += 1) {
+    const character = argumentsText[index]
+
+    if (quote !== null) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (character === "'" || character === '"' || character === '`') {
+      quote = character
+    } else if (character === '(' || character === '[' || character === '{') {
+      depth += 1
+    } else if (character === ')' || character === ']' || character === '}') {
+      depth -= 1
+    } else if (character === ',' && depth === 0) {
+      argumentsList.push(argumentsText.slice(start, index))
+      start = index + 1
+    }
+  }
+
+  argumentsList.push(argumentsText.slice(start))
+  return argumentsList
+}
+
+function addCopyWithToastTranslationKeys(content: string, usage: I18nUsage): void {
+  COPY_WITH_TOAST_CALL_PATTERN.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = COPY_WITH_TOAST_CALL_PATTERN.exec(content)) !== null) {
+    const openParenIndex = content.indexOf('(', match.index)
+    const argumentsText = readCallArguments(content, openParenIndex)
+    if (argumentsText === null) continue
+
+    for (const argumentText of splitCallArguments(argumentsText).slice(1, 3)) {
+      CALL_LITERAL_PATTERN.lastIndex = 0
+      const literalMatch = CALL_LITERAL_PATTERN.exec(argumentText.trim())
+      if (!literalMatch || !/^['"][^'"]+['"]$/.test(argumentText.trim())) continue
+      const key = literalMatch[1]
+      if (!isStaticTranslationKey(key)) continue
+      usage.staticKeys.add(key)
+      usage.exactStaticKeys.add(key)
+    }
+
+    COPY_WITH_TOAST_CALL_PATTERN.lastIndex = openParenIndex + argumentsText.length + 2
+  }
+}
 
 function addIndirectTranslationKeys(content: string, usage: I18nUsage): void {
-  INDIRECT_TERNARY_IN_T_RE.lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = INDIRECT_TERNARY_IN_T_RE.exec(content)) !== null) {
-    for (const key of [match[1], match[2]]) {
-      if (KNOWN_LOCALE_NAMESPACES.has(key.split('.')[0]) && isStaticTranslationKey(key)) {
-        usage.staticKeys.add(key)
+  INDIRECT_T_CALL_PATTERN.lastIndex = 0
+  let callMatch: RegExpExecArray | null
+  while ((callMatch = INDIRECT_T_CALL_PATTERN.exec(content)) !== null) {
+    const openParenIndex = content.indexOf('(', callMatch.index)
+    const argumentsText = readCallArguments(content, openParenIndex)
+    if (argumentsText === null) continue
+
+    const firstArgument = splitCallArguments(argumentsText)[0] ?? ''
+    const ternaryPattern = /\?\s*['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g
+    let ternaryMatch: RegExpExecArray | null
+    while ((ternaryMatch = ternaryPattern.exec(firstArgument)) !== null) {
+      for (const key of [ternaryMatch[1], ternaryMatch[2]]) {
+        if (isStaticTranslationKey(key)) {
+          usage.staticKeys.add(key)
+          usage.exactStaticKeys.add(key)
+        }
       }
     }
+
+    INDIRECT_T_CALL_PATTERN.lastIndex = openParenIndex + argumentsText.length + 2
   }
 
   const variableNames = new Set<string>()
   INDIRECT_VAR_T_RE.lastIndex = 0
+  let match: RegExpExecArray | null
   while ((match = INDIRECT_VAR_T_RE.exec(content)) !== null) {
     variableNames.add(match[1])
   }
@@ -228,6 +352,7 @@ function addIndirectTranslationKeys(content: string, usage: I18nUsage): void {
       for (const key of [match[1], match[2]]) {
         if (KNOWN_LOCALE_NAMESPACES.has(key.split('.')[0]) && isStaticTranslationKey(key)) {
           usage.staticKeys.add(key)
+          usage.exactStaticKeys.add(key)
         }
       }
     }
@@ -237,6 +362,7 @@ function addIndirectTranslationKeys(content: string, usage: I18nUsage): void {
 let cachedSourceFiles: string[] | undefined
 
 function getSourceFiles(rootDir = SOURCE_ROOT): string[] {
+  if (rootDir !== SOURCE_ROOT) return listSourceFiles(rootDir)
   if (!cachedSourceFiles) cachedSourceFiles = listSourceFiles(rootDir)
   return cachedSourceFiles
 }
@@ -271,20 +397,25 @@ function addTemplatePattern(usage: I18nUsage, template: string): void {
 export function collectI18nUsageFromSources(rootDir = SOURCE_ROOT): I18nUsage {
   const usage: I18nUsage = {
     staticKeys: new Set<string>(),
+    exactStaticKeys: new Set<string>(),
     prefixes: new Set<string>(EXTRA_PREFIXES),
     segmentPatterns: [],
   }
   const i18nLiteralPattern = buildI18nLiteralPattern()
 
   for (const file of getSourceFiles(rootDir)) {
-    const content = readFileSync(file, 'utf8')
+    const content = readAuditableSource(file)
 
     for (const pattern of STATIC_KEY_PATTERNS) {
       pattern.lastIndex = 0
       let match: RegExpExecArray | null
       while ((match = pattern.exec(content)) !== null) {
         const key = match[1]
-        if (isStaticTranslationKey(key)) usage.staticKeys.add(key)
+        if (isStaticTranslationKey(key)) {
+          usage.staticKeys.add(key)
+          const afterLiteral = content.slice(match.index + match[0].length)
+          if (!/^\s*\+/.test(afterLiteral)) usage.exactStaticKeys.add(key)
+        }
       }
     }
 
@@ -294,7 +425,10 @@ export function collectI18nUsageFromSources(rootDir = SOURCE_ROOT): I18nUsage {
       while ((match = pattern.exec(content)) !== null) {
         const key = match[1]
         if (key.includes('.steps')) addPrefix(usage, key)
-        else if (isStaticTranslationKey(key)) usage.staticKeys.add(key)
+        else if (isStaticTranslationKey(key)) {
+          usage.staticKeys.add(key)
+          usage.exactStaticKeys.add(key)
+        }
       }
     }
 
@@ -313,6 +447,8 @@ export function collectI18nUsageFromSources(rootDir = SOURCE_ROOT): I18nUsage {
         addPrefix(usage, match[1])
       }
     }
+
+    addCopyWithToastTranslationKeys(content, usage)
 
     i18nLiteralPattern.lastIndex = 0
     let literalMatch: RegExpExecArray | null
@@ -369,6 +505,10 @@ export function collectReferencedLocaleKeys(root: unknown, usage: I18nUsage): Se
   for (const key of collectLocaleKeys(root)) {
     if (isLocaleKeyUsed(key, usage)) referenced.add(key)
   }
+  // Keep exact literals even when the reference bundle is missing them. This
+  // is what lets the audit report a runtime key such as `batchManage.title`
+  // instead of silently dropping it before locale comparison.
+  for (const key of usage.exactStaticKeys) referenced.add(key)
   return referenced
 }
 

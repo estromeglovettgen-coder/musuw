@@ -161,7 +161,7 @@
 import { storeToRefs } from "pinia";
 import { onMounted, onUnmounted, watch, computed, ref, h, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getSessionsList, batchDelSessions, deleteAllSessions, getSession } from "@/api/chat/index";
+import { getSessionsList, batchDelSessions, getSession } from "@/api/chat/index";
 import { useChatResourcesStore } from "@/stores/chatResources";
 import { listAllIMChannels } from "@/api/agent/index";
 import SessionSidebarRow from "./SessionSidebarRow.vue";
@@ -308,15 +308,15 @@ let activeSubmenu = ref<string>("");
 const batchMode = ref(false);
 const batchSelectedIds = ref<string[]>([]);
 const batchDeleting = ref(false);
+const batchConfirming = ref(false);
 
-const allSessionIds = computed(() => {
-  const chatMenu = (menuArr.value as unknown as MenuItem[]).find((item: MenuItem) => item.path === "creatChat");
-  if (!chatMenu?.children) return [];
-  return (chatMenu.children as any[]).map((s: any) => s.id);
-});
-const isAllBatchSelected = computed(() => allSessionIds.value.length > 0 && batchSelectedIds.value.length === allSessionIds.value.length);
+const batchSessionItems = computed(() => (activeBucket.value?.items || []).map((item) => ({
+  ...item, title: item.title || t("menu.newSession"),
+})));
+const allSessionIds = computed(() => batchSessionItems.value.map((item) => item.id));
+const isAllBatchSelected = computed(() => allSessionIds.value.length > 0 && allSessionIds.value.every((id) => batchSelectedIds.value.includes(id)));
 const isBatchIndeterminate = computed(() => batchSelectedIds.value.length > 0 && batchSelectedIds.value.length < allSessionIds.value.length);
-const batchDisplayCount = computed(() => isAllBatchSelected.value ? total.value : batchSelectedIds.value.length);
+const batchDisplayCount = computed(() => batchSelectedIds.value.length);
 
 const isInKnowledgeBase = computed<boolean>(() =>
   route.name === "knowledgeBaseDetail" || route.name === "kbCreatChat" || route.name === "knowledgeBaseSettings",
@@ -393,57 +393,90 @@ const ensureBucketFillsViewport = async (key: string) => {
 
 const mouseenteBotDownr = (val: string) => { activeSubmenu.value = val; };
 const mouseleaveBotDown = () => { activeSubmenu.value = ""; };
-const enterBatchMode = () => { batchMode.value = true; batchSelectedIds.value = []; };
-const exitBatchMode = () => { batchMode.value = false; batchSelectedIds.value = []; };
+const enterBatchMode = () => {
+  if (batchDeleting.value || batchConfirming.value) return;
+  batchMode.value = true; batchSelectedIds.value = [];
+};
+const exitBatchMode = () => {
+  if (batchDeleting.value || batchConfirming.value) return;
+  batchMode.value = false; batchSelectedIds.value = [];
+};
 const toggleBatchSelect = (id: string) => {
+  if (batchDeleting.value || batchConfirming.value || !allSessionIds.value.includes(id)) return;
   const idx = batchSelectedIds.value.indexOf(id);
   if (idx > -1) batchSelectedIds.value.splice(idx, 1);
   else batchSelectedIds.value.push(id);
 };
-const toggleBatchSelectAll = (checked: boolean) => { batchSelectedIds.value = checked ? [...allSessionIds.value] : []; };
+const toggleBatchSelectAll = (checked: boolean) => {
+  if (batchDeleting.value || batchConfirming.value) return;
+  batchSelectedIds.value = checked ? [...allSessionIds.value] : [];
+};
 
 const handleInlineBatchDelete = () => {
-  if (batchSelectedIds.value.length === 0) return;
-  const isDeleteAll = isAllBatchSelected.value;
-  const displayCount = batchDisplayCount.value;
+  if (batchSelectedIds.value.length === 0 || batchDeleting.value || batchConfirming.value) return;
+  // Freeze the exact visible selection that the user is confirming. Selecting
+  // every loaded row never authorizes deleting unseen conversations.
+  const selectedIds = [...batchSelectedIds.value];
+  batchConfirming.value = true;
+  const closeConfirmation = () => {
+    if (batchDeleting.value) return;
+    batchConfirming.value = false;
+    confirmDialog.destroy();
+  };
   const confirmDialog = DialogPlugin.confirm({
     header: t("batchManage.deleteConfirmTitle"),
-    body: isDeleteAll
-      ? t("batchManage.deleteAllConfirmBody") || t("batchManage.deleteConfirmBody", { count: displayCount })
-      : t("batchManage.deleteConfirmBody", { count: displayCount }),
+    body: t("batchManage.deleteConfirmBody", { count: selectedIds.length }),
     confirmBtn: { content: t("batchManage.delete"), theme: "danger" as const },
     cancelBtn: t("batchManage.cancel"),
     theme: "warning",
+    zIndex: 4000,
+    closeOnOverlayClick: false,
+    closeOnEscKeydown: false,
+    onClose: closeConfirmation,
     onConfirm: async () => {
+      if (batchDeleting.value || !batchConfirming.value) return;
       batchDeleting.value = true;
+      confirmDialog.setConfirmLoading(true);
       try {
-        let res: any;
-        if (isDeleteAll) res = await deleteAllSessions();
-        else res = await batchDelSessions([...batchSelectedIds.value]);
-        if (res && res.success === true) {
-          if (isDeleteAll) {
-            usemenuStore.clearMenuArr();
-            total.value = 0;
-            await getMessageList();
-          } else {
-            let next = sessionBuckets.value;
-            for (const id of batchSelectedIds.value) next = removeSessionFromBuckets(next, id);
-            sessionBuckets.value = next;
-            syncMenuStoreFromBuckets();
-          }
-          const currentChatId = route.params.chatid as string;
-          if (currentChatId && (isDeleteAll || batchSelectedIds.value.includes(currentChatId))) router.push("/platform/creatChat");
-          batchSelectedIds.value = [];
-          MessagePlugin.success(t("batchManage.deleteSuccess"));
-          exitBatchMode();
-        } else MessagePlugin.error(t("batchManage.deleteFailed"));
+        const res = await batchDelSessions(selectedIds);
+        if (res?.success !== true) throw new Error("session batch deletion failed");
+        // Ignore list reads started before deletion; otherwise a late page can
+        // put deleted conversations back into the sidebar.
+        bucketRequestToken += 1;
+        let next = sessionBuckets.value;
+        for (const id of selectedIds) next = removeSessionFromBuckets(next, id);
+        for (const [key, bucket] of Object.entries(next)) {
+          const changed = sessionBuckets.value[key].items.some((item) => selectedIds.includes(item.id));
+          // Offset pagination shifts after deletion. Restart it while retaining
+          // visible survivors; mergeBucketPage deduplicates the restarted reads.
+          next[key] = { ...bucket, loading: false, page: changed ? 0 : bucket.page };
+        }
+        sessionBuckets.value = next;
+        syncMenuStoreFromBuckets();
+        const currentChatId = route.params.chatid as string;
+        if (currentChatId && selectedIds.includes(currentChatId)) void router.push("/platform/creatChat");
+        batchSelectedIds.value = [];
+        const needsRefill = activeBucket.value && activeBucket.value.items.length === 0 && bucketHasMore(activeBucket.value);
+        if (needsRefill) await loadBucketPage(activeSessionBucketKey.value);
+        // If the refresh failed, leave the modal's load-more action available
+        // so remaining conversations do not become unreachable behind an empty sidebar.
+        batchMode.value = !!(needsRefill && activeBucket.value && activeBucket.value.items.length === 0 && bucketHasMore(activeBucket.value));
+        MessagePlugin.success(t("batchManage.deleteSuccess"));
       } catch {
         MessagePlugin.error(t("batchManage.deleteFailed"));
+      } finally {
+        batchDeleting.value = false;
+        closeConfirmation();
       }
-      batchDeleting.value = false;
-      confirmDialog.destroy();
     },
   });
+};
+
+const loadMoreBatchSessions = async () => {
+  if (batchDeleting.value || batchConfirming.value) return;
+  const bucket = activeBucket.value;
+  if (!bucket || bucket.loading || !bucketHasMore(bucket)) return;
+  await loadBucketPage(activeSessionBucketKey.value);
 };
 
 const handleSessionMenuClick = (data: { value: string }, item: any) => {
@@ -571,6 +604,7 @@ const loadBucketPage = async (key: string, page?: number, token?: number) => {
   try {
     const res: any = await getSessionsList(nextPage, SIDEBAR_BUCKET_PAGE_SIZE, bucket.apiSource);
     if (activeToken !== bucketRequestToken) return;
+    if (res?.success === false) throw new Error("session list load failed");
     const rows = (res?.data || []).map((item: any) => mapSessionRow(item));
     const current = sessionBuckets.value[key];
     sessionBuckets.value = { ...sessionBuckets.value, [key]: mergeBucketPage(current, rows, res?.total ?? rows.length, nextPage) };
@@ -580,9 +614,11 @@ const loadBucketPage = async (key: string, page?: number, token?: number) => {
     if (activeToken !== bucketRequestToken) return;
     const current = sessionBuckets.value[key];
     sessionBuckets.value = { ...sessionBuckets.value, [key]: { ...current, loading: false, loaded: true } };
+    if (batchMode.value && key === activeSessionBucketKey.value) MessagePlugin.error(t("batchManage.loadFailed"));
   }
 };
 const switchSessionBucket = async (key: string) => {
+  if (batchMode.value) return;
   if (key === activeSessionBucketKey.value) return;
   activeSessionBucketKey.value = key;
   const bucket = sessionBuckets.value[key];
@@ -681,6 +717,9 @@ const handleSessionMutation = (event: Event) => {
   if (!detail?.sessionId) return;
   if (detail.patch) updateSessionInBuckets(detail.sessionId, { ...detail.patch, ...(detail.patch.title ? { isNoTitle: false } : {}) });
   if (detail.removed) {
+    if (!batchConfirming.value && !batchDeleting.value) {
+      batchSelectedIds.value = batchSelectedIds.value.filter((id) => id !== detail.sessionId);
+    }
     sessionBuckets.value = removeSessionFromBuckets(sessionBuckets.value, detail.sessionId);
     syncMenuStoreFromBuckets();
     if (detail.sessionId === route.params.chatid) router.push("/platform/creatChat");

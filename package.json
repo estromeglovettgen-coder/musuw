@@ -19,6 +19,7 @@
     "preview": "bash scripts/musuw-preview",
     "release": "bash scripts/musuw-release",
     "app:build": "npm --prefix weknora/frontend run build-with-types",
+    "app:e2e:batch": "playwright test --config=playwright.session-batch.config.ts",
     "app:test": "npm --prefix weknora/frontend test",
     "admin:build": "npm --prefix weknora/frontend run build-with-types",
     "admin:e2e": "playwright test --config=playwright.operations.config.ts",

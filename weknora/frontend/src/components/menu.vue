@@ -7,6 +7,7 @@ import SessionBatchManageModal from './SessionBatchManageModal.vue'
 import UserMenu from './UserMenu.vue'
 import TenantSelector from './TenantSelector.vue'
 import { useOrganizationStore } from '@/stores/organization'
+import { bucketHasMore } from './sessionSidebarBuckets'
 
 const legacy = LegacySidebarBusiness as any
 const legacySetup = legacy.setup
@@ -25,7 +26,7 @@ export default defineComponent({
   setup(props: Record<string, unknown>, context: SetupContext) {
     const state = legacySetup?.(props, context)
     const orgStore = useOrganizationStore()
-    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state, orgStore }
+    if (state && typeof state === 'object' && typeof state.then !== 'function') return { ...state, orgStore, bucketHasMore }
     return state
   },
 })
@@ -94,11 +95,14 @@ export default defineComponent({
 
     <SessionBatchManageModal
       :visible="batchMode"
-      :items="menuArr.find((item: { path?: string }) => item.path === 'creatChat')?.children || []"
+      :items="batchSessionItems"
       :selected-ids="batchSelectedIds"
       :all-selected="isAllBatchSelected"
       :indeterminate="isBatchIndeterminate"
-      :deleting="batchDeleting"
+      :deleting="batchDeleting || batchConfirming"
+      :loading="activeBucket?.loading"
+      :has-more="activeBucket ? bucketHasMore(activeBucket) : false"
+      @load-more="loadMoreBatchSessions"
       @close="exitBatchMode"
       @toggle="toggleBatchSelect"
       @toggle-all="toggleBatchSelectAll"
