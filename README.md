@@ -57,7 +57,8 @@ successful CI run on `main`, GitHub Actions automatically deploys the public
 storefront and builds the immutable app/frontend pair for staging acceptance:
 
 - `storefront/` is built in GitHub and deployed to the Cloudflare Worker
-  `musuw-site`, serving `musuw.com` and `www.musuw.com`.
+  `musuw-site`, serving `musuw.com`, `www.musuw.com`, and the separate labeled
+  static partner demonstration at `partners.musuw.com`.
 - The authenticated frontend and auth shell bundles, plus the Go application
   and frontend runtime images, are built in GitHub. The two runtime images are
   pushed to GHCR and deployed by immutable digest to `staging.musuw.com`; the
