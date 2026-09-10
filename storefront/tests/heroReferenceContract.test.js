@@ -11,7 +11,7 @@ function source(path) {
   return readFileSync(join(root, path), "utf8");
 }
 
-test("hero copy keeps the approved two-line title and localized knowledge outcomes", () => {
+test("hero copy keeps the approved title hierarchy and localized knowledge outcomes", () => {
   const en = applyHomepageMarketingRefresh(getStorefrontCopy("en"));
   const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
 
@@ -26,16 +26,13 @@ test("hero copy keeps the approved two-line title and localized knowledge outcom
     "Integrate new material into existing knowledge",
   ]);
 
-  assert.equal(zh.hero.titleLine1, "把资料转化为");
-  assert.equal(zh.hero.titleLine2, "会思考的知识资产");
-  assert.deepEqual(zh.hero.titleFocusSegments, ["会", "思考的", "知识资产"]);
-  assert.deepEqual(zh.hero.typewriterPhrases, [
-    "多源检索 · 证据核验 · 知识组织 · 关系发现",
-    "关键结论可追溯至原始资料",
-    "多种来源统一检索与交叉核验",
-    "资料、页面与关系持续同步",
-    "新增内容自动接入既有知识",
-  ]);
+  assert.equal(zh.hero.eyebrow, "建立你的AI知识库");
+  assert.equal(zh.hero.titleLine1, "");
+  assert.equal(zh.hero.titleLine2, "让知识持续积累。");
+  assert.deepEqual(zh.hero.titleFocusSegments, ["让", "知识", "持续积累。"]);
+  assert.deepEqual(zh.hero.typewriterPhrases, ["建立你的AI知识库"]);
+  assert.equal(zh.hero.descriptionLine1, "把资料转化为会思考的知识资产");
+  assert.equal(zh.hero.descriptionLine2, "");
 });
 
 test("hero reuses the captured TikHub timing and LiquidEther parameter contract", () => {

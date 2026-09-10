@@ -397,11 +397,11 @@ export const HOMEPAGE_STORIES = Object.freeze({
   },
   "zh-CN": {
     hero: {
-      eyebrow: "多源检索 · 证据核验 · 知识组织 · 关系发现",
-      typewriterPhrases: ["多源检索 · 证据核验 · 知识组织 · 关系发现", "关键结论可追溯至原始资料", "多种来源统一检索与交叉核验", "资料、页面与关系持续同步", "新增内容自动接入既有知识"],
-      titleLine1: "把资料转化为", titleLine2: "会思考的知识资产", titleFocusSegments: ["会", "思考的", "知识资产"],
-      descriptionLine1: "统一检索多种资料来源，生成可验证、可追溯的回答。",
-      descriptionLine2: "将关键信息组织为可持续更新、关联与复用的知识体系。",
+      eyebrow: "建立你的AI知识库",
+      typewriterPhrases: ["建立你的AI知识库"],
+      titleLine1: "", titleLine2: "让知识持续积累。", titleFocusSegments: ["让", "知识", "持续积累。"],
+      descriptionLine1: "把资料转化为会思考的知识资产",
+      descriptionLine2: "",
       getStarted: "建立我的知识库", talkToSales: "联系", dashboardAlt: "从已保存的版权与肖像权资料回答生活法律问题，并展示可核验的引用",
     },
     features: {

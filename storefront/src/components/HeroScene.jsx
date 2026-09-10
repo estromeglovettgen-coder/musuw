@@ -24,6 +24,7 @@ export function HeroScene({ copy, locale }) {
   const reduceMotion = useReducedMotion();
   const typewriterPhrases = copy.hero.typewriterPhrases || [copy.hero.eyebrow];
   const focusSegments = copy.hero.titleFocusSegments || [copy.hero.titleLine2];
+  const heroTitle = [copy.hero.titleLine1, copy.hero.titleLine2].filter(Boolean).join(" ");
   const sceneRef = useRef(null);
   const { scrollYProgress: sceneVisibilityProgress } = useScroll({
     target: sceneRef,
@@ -125,13 +126,17 @@ export function HeroScene({ copy, locale }) {
           )}
         </motion.div>
         <motion.h1
-          aria-label={`${copy.hero.titleLine1} ${copy.hero.titleLine2}`}
+          aria-label={heroTitle}
           initial={reduceMotion ? false : { opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={bkpwddTransition}
         >
-          {copy.hero.titleLine1}
-          <br />
+          {copy.hero.titleLine1 ? (
+            <>
+              {copy.hero.titleLine1}
+              <br />
+            </>
+          ) : null}
           <span className="hero-focus-line" aria-hidden="true">
             {reduceMotion ? (
               copy.hero.titleLine2
@@ -155,9 +160,13 @@ export function HeroScene({ copy, locale }) {
           transition={subtitleTransition}
         >
           {copy.hero.descriptionLine1}
-          <br className="hero-description-break" />
-          {" "}
-          {copy.hero.descriptionLine2}
+          {copy.hero.descriptionLine2 ? (
+            <>
+              <br className="hero-description-break" />
+              {" "}
+              {copy.hero.descriptionLine2}
+            </>
+          ) : null}
         </motion.p>
         <motion.div
           className="hero-actions"
