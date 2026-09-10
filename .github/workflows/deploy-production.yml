@@ -27,17 +27,23 @@ on:
         required: false
         type: string
       staging_e2e_result:
-        description: Full Paddle Sandbox/browser acceptance; promote requires the explicit green result
+        description: Completed acceptance for this release; UI acceptance additionally requires a verified production baseline
         required: true
         type: choice
         default: not-confirmed
         options:
           - not-confirmed
           - full-sandbox-e2e-green
+          - ui-regression-green
+      ui_base_sha:
+        description: Current production release SHA, verified by the production reviewer; required only for UI acceptance
+        required: false
+        type: string
 
 permissions:
   contents: read
   actions: read
+  deployments: read
 
 concurrency:
   group: production-release
@@ -89,6 +95,7 @@ jobs:
           EVENT_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           REQUESTED_RELEASE_MODE: ${{ inputs.release_mode }}
           REQUESTED_STAGING_E2E_RESULT: ${{ inputs.staging_e2e_result }}
+          UI_BASE_SHA: ${{ inputs.ui_base_sha }}
           EVENT_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -105,8 +112,8 @@ jobs:
             ci_workflow_run="$EVENT_WORKFLOW_RUN_ID"
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
             case "$REQUESTED_RELEASE_MODE:$REQUESTED_STAGING_E2E_RESULT" in
-              staging-only:not-confirmed|promote:full-sandbox-e2e-green) ;;
-              *) printf '%s\n' 'release_mode must be staging-only or promote, and promote requires full Sandbox E2E' >&2; exit 1 ;;
+              staging-only:not-confirmed|promote:full-sandbox-e2e-green|promote:ui-regression-green) ;;
+              *) printf '%s\n' 'release_mode must be staging-only or promote, and promotion requires an explicit completed acceptance result' >&2; exit 1 ;;
             esac
             if [ "$REQUESTED_RELEASE_MODE" = promote ]; then
               test "$EVENT_REF" = refs/heads/main
@@ -153,6 +160,30 @@ jobs:
                   exit 1
                 }
             fi
+          fi
+          if [ "$REQUESTED_STAGING_E2E_RESULT" = ui-regression-green ]; then
+            # Resolve the actual app SHA from the latest successful production
+            # release artifact. A dispatch revision may contain newer policy.
+            [[ "$UI_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            production_deployment_id="$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=server-production&per_page=1" --jq '.[0].id')"
+            [[ "$production_deployment_id" =~ ^[0-9]+$ ]]
+            production_status="$(gh api "repos/$GITHUB_REPOSITORY/deployments/$production_deployment_id/statuses" --jq '.[0]')"
+            test "$(jq -r .state <<<"$production_status")" = success
+            production_log_url="$(jq -r .log_url <<<"$production_status")"
+            [[ "$production_log_url" =~ ^https://github\.com/estromeglovettgen-coder/musuw/actions/runs/([0-9]+)/job/[0-9]+$ ]]
+            production_run_id="${BASH_REMATCH[1]}"
+            baseline_dir="$RUNNER_TEMP/musuw-ui-production-baseline"
+            mkdir -p "$baseline_dir"
+            gh run download "$production_run_id" --repo "$GITHUB_REPOSITORY" \
+              --name "production-release-$UI_BASE_SHA" --dir "$baseline_dir"
+            jq -e --arg sha "$UI_BASE_SHA" \
+              '.commit_sha == $sha and .release_outcome == "success" and .health_result == "healthy" and .target == "server:app.musuw.com"' \
+              "$baseline_dir/musuw-production-release-manifest.json" >/dev/null
+            # Load the scope policy from the trusted dispatch revision, not the
+            # older application revision whose accepted images are promoted.
+            git show "$EVENT_SHA:scripts/ci/verify-ui-release-scope.py" > "$RUNNER_TEMP/verify-ui-release-scope.py"
+            python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$actual"
+            printf 'UI regression accepted: production baseline %s -> release %s\n' "$UI_BASE_SHA" "$actual" >> "$GITHUB_STEP_SUMMARY"
           fi
           {
             printf 'release_sha=%s\n' "$actual"
@@ -660,7 +691,7 @@ jobs:
       needs.deploy-staging.result == 'success' &&
       github.event_name == 'workflow_dispatch' &&
       inputs.release_mode == 'promote' &&
-      inputs.staging_e2e_result == 'full-sandbox-e2e-green'
+      (inputs.staging_e2e_result == 'full-sandbox-e2e-green' || inputs.staging_e2e_result == 'ui-regression-green')
     environment: server-production
     permissions:
       contents: read
@@ -782,6 +813,8 @@ jobs:
           RELEASE_OUTCOME: ${{ steps.deploy_release.outcome }}
           APP_IMAGE: ${{ needs.build.outputs.app_ref }}
           FRONTEND_IMAGE: ${{ needs.build.outputs.frontend_ref }}
+          RELEASE_ACCEPTANCE: ${{ inputs.staging_e2e_result }}
+          UI_BASE_SHA: ${{ inputs.ui_base_sha }}
         run: |
           set -euo pipefail
           repository_provenance='third_party/weknora/active-upstream-source.json'
@@ -836,6 +869,8 @@ jobs:
             --arg server_release_id "$server_release_id" \
             --arg server_source_bundle_sha256 "$server_source_bundle_sha256" \
             '{schema_version:$schema_version,commit_sha:$commit_sha,repository:$repository,workflow:"Deploy production application",workflow_run:$workflow_run,workflow_attempt:$workflow_attempt,ci_workflow_run:$ci_workflow_run,target:$target,deployed_at:$deployed_at,health_result:$health_result,release_outcome:$release_outcome,source_manifest:$source_manifest,source_manifest_sha256:(if $source_manifest_sha256 == "" then null else $source_manifest_sha256 end),repository_provenance:$repository_provenance,repository_provenance_sha256:$repository_provenance_sha256,app_image:(if $app_image == "" then null else $app_image end),frontend_image:(if $frontend_image == "" then null else $frontend_image end),server_release_id:(if $server_release_id == "" then null else $server_release_id end),server_source_bundle_sha256:(if $server_source_bundle_sha256 == "" then null else $server_source_bundle_sha256 end)}' \
+            | jq --arg acceptance_class "$RELEASE_ACCEPTANCE" --arg ui_base_sha "$UI_BASE_SHA" \
+                '. + {acceptance_class:$acceptance_class,ui_base_sha:(if $ui_base_sha == "" then null else $ui_base_sha end)}' \
             > "$RUNNER_TEMP/musuw-production-release-manifest.json"
           sha256sum "$RUNNER_TEMP/musuw-production-release-manifest.json" > "$RUNNER_TEMP/musuw-production-release-manifest.json.sha256"
       - name: Upload production release evidence

@@ -64,7 +64,7 @@ documents.each do |name, document|
   when "deploy-storefront.yml"
     { "contents" => "read", "actions" => "read" }
   when "deploy-production.yml"
-    { "contents" => "read", "actions" => "read" }
+    { "contents" => "read", "actions" => "read", "deployments" => "read" }
   else
     { "contents" => "read" }
   end
@@ -350,7 +350,8 @@ assert_hash(staging_run_input, "deploy-production.yml.workflow_dispatch.inputs.s
 assert_hash(staging_e2e_input, "deploy-production.yml.workflow_dispatch.inputs.staging_e2e_result")
 fail_contract "release_mode must support only staging-only and exact promotion paths" unless release_mode_input["required"] == true && release_mode_input["type"] == "choice" && release_mode_input["default"] == "staging-only" && Array(release_mode_input["options"]) == %w[staging-only promote]
 fail_contract "staging_run_id must be an optional exact prior-run input" unless staging_run_input["required"] == false && staging_run_input["type"] == "string"
-fail_contract "staging E2E input must default closed and expose only the explicit full-Sandbox result" unless staging_e2e_input["required"] == true && staging_e2e_input["type"] == "choice" && staging_e2e_input["default"] == "not-confirmed" && Array(staging_e2e_input["options"]) == %w[not-confirmed full-sandbox-e2e-green]
+fail_contract "release acceptance must default closed and expose explicit full-Sandbox or scoped UI results" unless staging_e2e_input["required"] == true && staging_e2e_input["type"] == "choice" && staging_e2e_input["default"] == "not-confirmed" && Array(staging_e2e_input["options"]) == %w[not-confirmed full-sandbox-e2e-green ui-regression-green]
+fail_contract "UI acceptance must verify an explicit production baseline using the trusted dispatch scope policy" unless release_dispatch.dig("inputs", "ui_base_sha", "type") == "string" && production_text.include?('git show "$EVENT_SHA:scripts/ci/verify-ui-release-scope.py"') && production_text.include?('python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$actual"') && production_text.include?("acceptance_class")
 fail_contract "promotion must restore a prior staging artifact instead of rebuilding" unless production_build.fetch("steps").any? { |step| step.is_a?(Hash) && step["name"] == "Restore and validate the verified staging release record" && step.fetch("uses", "").start_with?("actions/download-artifact@") } && JSON.generate(production_build).include?("staging_run_id") && JSON.generate(production_build).include?("staging_deployment") && JSON.generate(production_build).include?("release_mode")
 fail_contract "promotion must verify SHA and digest fields from the prior staging record" unless JSON.generate(production_build).include?("commit_sha") && JSON.generate(production_build).include?("app_ref") && JSON.generate(production_build).include?("frontend_ref") && JSON.generate(production_build).include?("app_digest") && JSON.generate(production_build).include?("frontend_digest") && JSON.generate(production_build).include?("staging_run_id")
 fail_contract "staging acceptance must be able to run without promoting production" unless staging_text.include?("staging-only") && production_deploy_if.include?("workflow_dispatch") && production_deploy_if.include?("promote") && !production_deploy_if.include?("staging-only")

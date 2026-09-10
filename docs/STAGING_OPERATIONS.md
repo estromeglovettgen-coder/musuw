@@ -175,7 +175,14 @@ binding 或队列失败不能授予 entitlement，且应返回非成功状态以
 
 不输入真实银行卡，不创建 Live entity，不确认真实购买，不做退款、chargeback、
 transfer、payout 或 withdrawal。所有 Sandbox card/simulation 都只用于测试。把
-上述每项和静态/单测证据收齐后，才可发起 `promote`。
+上述每项和静态/单测证据收齐后，才可使用 `full-sandbox-e2e-green` 发起 `promote`。
+
+纯 UI 修复可使用 `ui-regression-green`：必须先完成该版本的 UI 回归，并提供由
+production reviewer 核对的当前正式环境 `ui_base_sha`。工作流会从该基线检查完整
+diff，只允许受限 UI、测试、provenance 和独立 storefront 路径；后端、鉴权、
+支付、API、依赖及构建配置变化会拒绝此类别。仍须复用同 SHA 的已验证 staging
+镜像、通过 CI、核对在线 staging digest、获得 `server-production` 审批并保留
+原有回滚流程。UI 验收不会被记录为完整支付验收。
 
 ## 回滚与证据
 
