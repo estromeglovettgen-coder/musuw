@@ -172,7 +172,7 @@ test("homepage headings keep the approved Hero and updated closing module", () =
   const en = applyHomepageMarketingRefresh(getStorefrontCopy("en"));
   const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
   const headings = (copy) => [copy.hero.titleLine1, copy.hero.titleLine2, copy.features.intro.title, copy.platform.intro.title, copy.pricing.intro.title, copy.comparison.title, copy.faq.title, copy.finalCta.title];
-  assert.deepEqual(headings(en), ["Turn source material into", "intelligent knowledge assets", "Build a verifiable knowledge system that keeps evolving", "A complete workflow from sources to knowledge", "Plans & Pricing", "Plans and features", "Questions before you start", "Build your AI knowledge base\nKeep your knowledge growing"]);
+  assert.deepEqual(headings(en), ["Build your AI knowledge base", "Let knowledge keep growing", "Build a verifiable knowledge system that keeps evolving", "A complete workflow from sources to knowledge", "Plans & Pricing", "Plans and features", "Questions before you start", "Build your AI knowledge base\nKeep your knowledge growing"]);
   assert.deepEqual(headings(zh), ["建立你的AI知识库", "让知识持续积累", "构建可验证、可持续演进的知识体系", "覆盖从资料到知识的完整链路", "方案与定价", "方案与功能", "开始前的常见问题", "建立你的 AI 知识库\n让知识持续积累"]);
   assert.deepEqual([zh.features.items[0].title, zh.features.items[3].title, zh.features.items[2].title], ["以多源证据支撑判断", "让知识以结构持续演进", "让关系成为可探索的知识路径"]);
 });

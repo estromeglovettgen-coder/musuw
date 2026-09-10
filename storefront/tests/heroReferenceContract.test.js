@@ -15,9 +15,11 @@ test("hero copy keeps the approved title hierarchy and localized knowledge outco
   const en = applyHomepageMarketingRefresh(getStorefrontCopy("en"));
   const zh = applyHomepageMarketingRefresh(getStorefrontCopy("zh-CN"));
 
-  assert.equal(en.hero.titleLine1, "Turn source material into");
-  assert.equal(en.hero.titleLine2, "intelligent knowledge assets");
-  assert.deepEqual(en.hero.titleFocusSegments, ["intelligent", "knowledge", "assets"]);
+  assert.equal(en.hero.titleLine1, "Build your AI knowledge base");
+  assert.equal(en.hero.titleLine2, "Let knowledge keep growing");
+  assert.deepEqual(en.hero.titleFocusSegments, ["Let", "knowledge", "keep growing"]);
+  assert.equal(en.hero.descriptionLine1, "Turn source material into intelligent knowledge assets");
+  assert.equal(en.hero.descriptionLine2, "");
   assert.deepEqual(en.hero.typewriterPhrases, [
     "Retrieval · Evidence · Structure · Connections",
     "Trace key claims to their original sources",

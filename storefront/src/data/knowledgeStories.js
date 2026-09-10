@@ -380,9 +380,9 @@ export const HOMEPAGE_STORIES = Object.freeze({
     hero: {
       eyebrow: "Retrieval · Evidence · Structure · Connections",
       typewriterPhrases: ["Retrieval · Evidence · Structure · Connections", "Trace key claims to their original sources", "Retrieve and verify across multiple sources", "Keep sources, pages, and relationships aligned", "Integrate new material into existing knowledge"],
-      titleLine1: "Turn source material into", titleLine2: "intelligent knowledge assets", titleFocusSegments: ["intelligent", "knowledge", "assets"],
-      descriptionLine1: "Retrieve across multiple sources to produce verifiable, traceable answers.",
-      descriptionLine2: "Organize key information into knowledge that stays current, connected, and reusable.",
+      titleLine1: "Build your AI knowledge base", titleLine2: "Let knowledge keep growing", titleFocusSegments: ["Let", "knowledge", "keep growing"],
+      descriptionLine1: "Turn source material into intelligent knowledge assets",
+      descriptionLine2: "",
       getStarted: "Start free", talkToSales: "Contact", dashboardAlt: "A legal question answered from saved copyright and privacy sources, with inspectable citations",
     },
     features: {
