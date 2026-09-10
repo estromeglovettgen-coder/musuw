@@ -103,7 +103,7 @@ No implementation or deployment of the original-file storage accounting correcti
 - **THEN** the storage-accounting phase remains blocked and no related code is changed
 
 ### Requirement: Production promotion requires explicit human Sandbox acceptance
-Automatic health, noindex, digest, and static verification SHALL be recorded only as successful staging deployment. Production promotion SHALL additionally require an explicit full-Sandbox-E2E result and an account-owner approval enforced by a protected GitHub Environment whose required-reviewer rule is checked at runtime.
+Automatic health, noindex, digest, and static verification SHALL be recorded only as successful staging deployment. Production promotion SHALL additionally require explicit acceptance appropriate to the verified change scope and an account-owner approval enforced by a protected GitHub Environment whose required-reviewer rule is checked at runtime. Full Sandbox acceptance remains required for changes outside the restricted UI scope.
 
 #### Scenario: Smoke checks pass but billing acceptance is incomplete
 - **WHEN** a staging release is healthy but purchase, upgrade, cancellation, recovery, webhook reliability, entitlement, allowance, portal, or history evidence is missing
@@ -112,3 +112,9 @@ Automatic health, noindex, digest, and static verification SHALL be recorded onl
 #### Scenario: Full acceptance and owner review pass
 - **WHEN** the exact staging run is fully accepted, the operator selects `full-sandbox-e2e-green`, the current staging SHA/digests still match, and the owner approves `server-production`
 - **THEN** production may consume that exact digest pair without rebuilding
+
+#### Scenario: UI-only regression acceptance
+- **WHEN** the operator selects `ui-regression-green`, supplies the current production SHA verified by the production reviewer, and completes UI regression on the exact staging revision
+- **THEN** a fail-closed source allowlist must reject backend, authentication, payment, API, dependency, build-runtime, symlink, and submodule changes before this acceptance can be used
+- **AND** main ancestry, successful CI, exact staging SHA/digests, required production review, and rollback remain mandatory
+- **AND** release evidence records UI acceptance separately from full Sandbox acceptance

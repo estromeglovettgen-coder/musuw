@@ -17,6 +17,9 @@ grep -Fq '          - staging-only' "$workflow_path" || fail 'staging-only relea
 grep -Fq '          - promote' "$workflow_path" || fail 'promote release mode is missing'
 grep -Fq 'default: not-confirmed' "$workflow_path" || fail 'manual promotion does not default Paddle E2E to unconfirmed'
 grep -Fq '          - full-sandbox-e2e-green' "$workflow_path" || fail 'full Sandbox E2E attestation is missing'
+grep -Fq '          - ui-regression-green' "$workflow_path" || fail 'scoped UI acceptance is missing'
+grep -Fq 'python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$actual"' "$workflow_path" || fail 'UI acceptance lacks a source scope guard'
+python3 "$script_dir/ci/verify-ui-release-scope.test.py"
 if grep -Eq '^[[:space:]]*- full$' "$workflow_path"; then
     fail 'unsupported full release mode remains in the workflow'
 fi
