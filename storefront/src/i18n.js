@@ -438,7 +438,7 @@ const zhCN = {
     openMenu: "打开菜单",
     closeMenu: "关闭菜单",
     login: "登录",
-    getStarted: "免费开始",
+    getStarted: "建立我的知识库",
     openApp: "打开 musuw",
     items: [
       { label: "功能" },
@@ -454,7 +454,7 @@ const zhCN = {
     titleLine2: "也让你知道为什么。",
     descriptionLine1: "保留原始资料，自然提问，并把重要答案沉淀为相互连接的知识，",
     descriptionLine2: "每个关键结论都有精确引用，并可在原生 Wiki 与其中的图谱视图中继续探索。",
-    getStarted: "免费开始",
+    getStarted: "建立我的知识库",
     talkToSales: "联系我们",
     dashboardAlt: "包含关联来源与页面关系的 musuw Wiki 页面",
     activityAlt: "带精确证据的 musuw 知识回答",
@@ -547,7 +547,7 @@ const zhCN = {
     includes: "套餐包含",
     perUserMonth: "/月",
     perYear: "/年",
-    freeAction: "免费开始",
+    freeAction: "建立我的知识库",
     unavailableAction: "规划中",
     plans: [
       {

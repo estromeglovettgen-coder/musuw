@@ -402,7 +402,7 @@ export const HOMEPAGE_STORIES = Object.freeze({
       titleLine1: "把资料转化为", titleLine2: "会思考的知识资产", titleFocusSegments: ["会", "思考的", "知识资产"],
       descriptionLine1: "统一检索多种资料来源，生成可验证、可追溯的回答。",
       descriptionLine2: "将关键信息组织为可持续更新、关联与复用的知识体系。",
-      getStarted: "免费开始", talkToSales: "联系", dashboardAlt: "从已保存的版权与肖像权资料回答生活法律问题，并展示可核验的引用",
+      getStarted: "建立我的知识库", talkToSales: "联系", dashboardAlt: "从已保存的版权与肖像权资料回答生活法律问题，并展示可核验的引用",
     },
     features: {
       intro: { label: "核心能力", title: "构建可验证、可持续演进的知识体系", body: "多源检索、证据核验、结构化组织与关系发现，共享同一套可追溯上下文。" },

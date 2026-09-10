@@ -47,7 +47,7 @@ test("the public header offers localized login and free-start actions", () => {
       login: getStorefrontCopy("zh-CN").nav.login,
       getStarted: getStorefrontCopy("zh-CN").nav.getStarted,
     },
-    { login: "登录", getStarted: "免费开始" },
+    { login: "登录", getStarted: "建立我的知识库" },
   );
   assert.equal(getStorefrontCopy("en").nav.openApp, "Open musuw");
   assert.equal(getStorefrontCopy("zh-CN").nav.openApp, "打开 musuw");

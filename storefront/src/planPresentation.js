@@ -270,7 +270,7 @@ const HOMEPAGE_COPY = Object.freeze({
       titleLine2: "第二大脑。",
       descriptionLine1: "向你的知识提问，查看重要结论背后的精确原文，",
       descriptionLine2: "再让 AI 把资料整理成持续成长的 Wiki 与知识图谱。",
-      getStarted: "免费开始",
+      getStarted: "建立我的知识库",
       talkToSales: "查看场景",
       dashboardAlt: "展示有依据问答、精确引用、Wiki 与知识图谱的 musuw 产品操作视频",
     }),
