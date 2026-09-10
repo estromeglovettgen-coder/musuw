@@ -13,6 +13,10 @@
     {
       "pattern": "www.musuw.com",
       "custom_domain": true
+    },
+    {
+      "pattern": "partners.musuw.com",
+      "custom_domain": true
     }
   ],
   "assets": {

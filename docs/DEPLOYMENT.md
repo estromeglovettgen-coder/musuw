@@ -18,6 +18,9 @@ The delivery surfaces are deliberately small:
 
 - `musuw.com` and `www.musuw.com` → Cloudflare Worker `musuw-site` (the
   `storefront/` static site built by GitHub).
+- `partners.musuw.com` → the same Worker, serving the isolated static partner
+  demonstration from `storefront/public/partner-board/`. Its labeled scenario
+  is separate from the production billing ledger and has no API access.
 - `app.musuw.com` → Cloudflare Tunnel → the server's Nginx → the GitHub-built
   GHCR `frontend` and `app` images. This keeps API, login, uploads, and
   streaming responses on the existing server path instead of adding a Worker

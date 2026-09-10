@@ -12,8 +12,45 @@ function notFound() {
   );
 }
 
+const partnerFiles = new Set(["/", "/app.js", "/data.js", "/style.css", "/musuw-logo.png"]);
+
+async function partnerBoardResponse(request, env, url) {
+  if (!partnerFiles.has(url.pathname)) return notFound();
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
+  }
+  const assetUrl = new URL(url);
+  assetUrl.pathname = `/partner-board${url.pathname}`;
+  assetUrl.search = "";
+  // Public static assets do not need the parent-domain session or API headers.
+  const response = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method }));
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "public, max-age=0, must-revalidate");
+  headers.set("x-robots-tag", "noindex, nofollow");
+  headers.set("x-content-type-options", "nosniff");
+  headers.delete("set-cookie");
+  if (url.pathname === "/" && response.ok) {
+    const locale = url.searchParams.get("lang") === "en" ? "en" : "zh-CN";
+    headers.set("content-language", locale);
+    headers.set("cache-control", "no-store");
+    headers.delete("etag");
+    headers.delete("content-length");
+    if (request.method === "GET") {
+      let html = await response.text();
+      html = html.replace('<html lang="zh-CN">', `<html lang="${locale}">`);
+      if (locale === "en") html = html.replace("Musuw 推广榜单 · 模拟数据", "Musuw Partner Leaderboard · Simulated data");
+      return new Response(html, { status: response.status, headers });
+    }
+  }
+  return new Response(response.body, { status: response.status, headers });
+}
+
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
+  if (url.hostname === "partners.musuw.com") return partnerBoardResponse(request, env, url);
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname); } catch { return notFound(); }
+  if (pathname === "/partner-board" || pathname.startsWith("/partner-board/")) return notFound();
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
     return notFound();
   }

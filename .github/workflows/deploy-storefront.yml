@@ -226,6 +226,25 @@ jobs:
             grep -Eiq 'window\.__MUSUW_LOCALE__[[:space:]]*=[[:space:]]*"(en|zh-CN)"' "$body"
             printf '%s release=%s content-language=%s\n' "$origin" "$RELEASE_SHA" "$(grep -i '^content-language:' "$headers" | tr -d '\r' | tr '\n' ' ')" | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
           done
+          for locale in zh en; do
+            headers="$RUNNER_TEMP/musuw-partners-$locale.headers"
+            body="$RUNNER_TEMP/musuw-partners-$locale.html"
+            curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 10 --max-time 30 \
+              -D "$headers" -o "$body" "https://partners.musuw.com/?lang=$locale"
+            grep -Fq 'id="commission-form"' "$body"
+            grep -Fq '模拟数据 · 非真实订单或收益。' "$body"
+            grep -Eiq '^x-robots-tag:.*noindex' "$headers"
+            grep -Eiq '^content-language:[[:space:]]*(en|zh-CN)' "$headers"
+          done
+          for asset in app.js data.js style.css musuw-logo.png; do
+            curl --fail --silent --show-error --retry 3 --connect-timeout 10 --max-time 30 \
+              -o "$RUNNER_TEMP/musuw-partners-$asset" "https://partners.musuw.com/$asset"
+            cmp "storefront/public/partner-board/$asset" "$RUNNER_TEMP/musuw-partners-$asset"
+          done
+          partner_api_status="$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+            -o /dev/null -w '%{http_code}' https://partners.musuw.com/api/v1/partners/leaderboard)"
+          test "$partner_api_status" = 404
+          printf 'https://partners.musuw.com release=%s bilingual-static-board=ok api=404\n' "$RELEASE_SHA" | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
       - name: Probe product auth handoff without coupling storefront health
         id: auth_handoff
         continue-on-error: true
