@@ -520,7 +520,9 @@ const togglePin = (item: any, pin: boolean) => {
     .finally(() => pinningIds.value.delete(item.id));
 };
 const clearMessages = (item: any) => {
-  clearSession(item.id).then(() => MessagePlugin.success(t("menu.clearMessagesSuccess"))).catch(() => MessagePlugin.error(t("menu.clearMessagesFailed")));
+  clearSession(item.id)
+    .then((started) => { if (started) MessagePlugin.success(t("menu.clearMessagesSuccess")); })
+    .catch(() => MessagePlugin.error(t("menu.clearMessagesFailed")));
 };
 const delCard = (item: any) => { removeSession(item.id).catch(() => MessagePlugin.error(t("chat.deleteSessionFailed"))); };
 

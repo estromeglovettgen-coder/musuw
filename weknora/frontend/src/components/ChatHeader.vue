@@ -224,7 +224,7 @@ async function submitClearMessages(): Promise<void> {
   if (!session || busyAction.value) return
   busyAction.value = 'clear'
   try {
-    await clearSession(session.id)
+    if (!await clearSession(session.id)) return
     menuVisible.value = false
     menuMode.value = 'menu'
     MessagePlugin.success(t('menu.clearMessagesSuccess'))
@@ -237,7 +237,7 @@ async function submitDeleteSession(): Promise<void> {
   if (!session || busyAction.value) return
   busyAction.value = 'delete'
   try {
-    await removeSession(session.id)
+    if (!await removeSession(session.id)) return
     menuVisible.value = false
     menuMode.value = 'menu'
     MessagePlugin.success(t('chatHeader.deleteSuccess'))
