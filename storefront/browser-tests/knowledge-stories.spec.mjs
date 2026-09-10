@@ -118,7 +118,7 @@ for (const locale of ["zh-CN", "en"]) {
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.locator("header.site-header")).toHaveCount(1);
       await expect(page.locator(".desktop-nav")).toHaveCount(1);
-      await expect(page.locator("h1[aria-label]")).toHaveAttribute("aria-label", locale === "zh-CN" ? "让知识持续积累。" : "Turn source material into intelligent knowledge assets");
+      await expect(page.locator("h1[aria-label]")).toHaveAttribute("aria-label", locale === "zh-CN" ? "建立你的AI知识库 让知识持续积累" : "Turn source material into intelligent knowledge assets");
       await expect(page.locator(".feature-story")).toHaveCount(3);
       await checkPageWidth(page);
 
