@@ -65,6 +65,9 @@ const billingIsFree = computed(() =>
   // instead of guessing that the user is on the free plan.
   || (!entitlement.value && entitlementLoading.value && authStore.isLiteMode),
 )
+const billingCanUpgrade = computed(() =>
+  entitlement.value ? entitlement.value.plan !== 'max' : billingIsFree.value,
+)
 const clampPercent = (value: number) => Math.round(Math.max(0, Math.min(100, value)))
 const usageRemainingPercent = computed<number | null>(() => {
   const data = entitlement.value
@@ -338,7 +341,7 @@ onUnmounted(() => {
           <small v-else-if="entitlement?.openrouter_credits_status === 'pending'">{{ $t('entitlement.billingPendingShort') }}</small>
         </button>
         <button type="button" class="visual-user-menu__item visual-user-menu__billing-item" :class="{ 'is-free': billingIsFree }" @click="openPlans">
-          <t-icon v-if="billingIsFree" name="arrow-up" /><t-icon v-else name="crown" /><span>{{ billingIsFree ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
+          <t-icon v-if="billingIsFree" name="arrow-up" /><t-icon v-else name="crown" /><span>{{ billingCanUpgrade ? $t('entitlement.upgradePlan') : $t('entitlement.viewPlans') }}</span>
         </button>
         <button type="button" class="visual-user-menu__item" @click="handleQuickNav('general')"><t-icon name="setting" /><span>{{ authStore.isLiteMode ? $t('general.settings') : $t('general.personalSettings') }}</span></button>
         <button v-if="!authStore.isLiteMode" type="button" class="visual-user-menu__item" @click="handleQuickNav('tenant')"><t-icon name="user-circle" /><span>{{ $t('settings.workspaceSettings') }}</span></button>

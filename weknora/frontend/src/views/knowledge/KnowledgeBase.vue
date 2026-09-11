@@ -22,6 +22,7 @@ import DocumentCardView from './components/DocumentCardView.vue'
 import DocumentBatchBar from './components/DocumentBatchBar.vue'
 import KbUploadSourceDropdown from './components/KbUploadSourceDropdown.vue'
 import KbFolderTree from './components/KbFolderTree.vue'
+import KnowledgeUploadProgress from './components/KnowledgeUploadProgress.vue'
 import TagEditDialog from './components/TagEditDialog.vue'
 import BatchTagDialog from './components/BatchTagDialog.vue'
 import KbTagManageDrawer from './components/KbTagManageDrawer.vue'
@@ -43,7 +44,7 @@ export default defineComponent({
   components: {
     ...(legacy.components || {}),
     DocContent, EmptyKnowledge, ContextualGuide, KBSwitcherDropdown, KnowledgeBaseEditorModal, FAQEntryManager,
-    DocumentListView, DocumentCardView, DocumentBatchBar, KbUploadSourceDropdown, KbFolderTree,
+    DocumentListView, DocumentCardView, DocumentBatchBar, KbUploadSourceDropdown, KbFolderTree, KnowledgeUploadProgress,
     TagEditDialog, BatchTagDialog, KbTagManageDrawer, WikiBrowser,
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
@@ -355,6 +356,8 @@ export default defineComponent({
               <KbUploadSourceDropdown v-if="canEdit" ref="uploadSourceRef" :accept-file-types="acceptFileTypes" :supported-file-types="[...supportedFileTypes]" include-manual trigger-icon="add" data-guide="kb-detail-add-doc" :tooltip="t('knowledgeBase.addDocument')" placement="bottom-right" @files="handleUploadSourceFiles" @url="handleUploadSourceUrl" @manual="handleManualCreate" />
             </div>
           </div>
+
+          <KnowledgeUploadProgress :tasks="currentUploadTasks" @dismiss="dismissUploadResults" />
 
           <div ref="knowledgeScroll" class="visual-knowledge-scroll" :class="{ 'is-empty': !cardList.length && !currentChildFolders.length && !docListLoading, 'is-marquee-active': docMarqueeVisible }" @scroll="handleScroll" @mousedown="onDocMarqueeMouseDown">
             <div v-if="docMarqueeVisible" class="visual-knowledge-marquee" :class="{ 'is-add': docMarqueeMode === 'add', 'is-subtract': docMarqueeMode === 'subtract' }" :style="docMarqueeBoxStyle" aria-hidden="true" />

@@ -10,6 +10,8 @@ on:
       - 'weknora/**'
       - 'e2e/**'
       - 'playwright.session-batch.config.ts'
+      - 'playwright.knowledge-upload.config.ts'
+      - 'playwright.billing.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -37,6 +39,8 @@ on:
       - 'weknora/**'
       - 'e2e/**'
       - 'playwright.session-batch.config.ts'
+      - 'playwright.knowledge-upload.config.ts'
+      - 'playwright.billing.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -104,7 +108,7 @@ jobs:
         run: npm --prefix weknora/frontend run build
 
   session-batch-browser:
-    name: Session batch browser regression
+    name: Frontend browser regressions
     needs: workflow-contract
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -129,12 +133,19 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Exercise session selection, confirmation, deletion and retry
         run: npm run app:e2e:batch
+      - name: Exercise folder upload progress, failures and refresh protection
+        run: npx playwright test --config=playwright.knowledge-upload.config.ts
+      - name: Exercise plan menu and existing purchase entry contracts
+        run: npx playwright test --config=playwright.billing.config.ts
       - name: Preserve browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: session-batch-browser-failures
-          path: test-results/session-batch
+          name: frontend-browser-failures
+          path: |
+            test-results/session-batch
+            test-results/knowledge-upload
+            test-results/billing
           retention-days: 7
 
   auth:
