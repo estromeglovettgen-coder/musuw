@@ -229,14 +229,26 @@ jobs:
           for locale in zh en; do
             headers="$RUNNER_TEMP/musuw-partners-$locale.headers"
             body="$RUNNER_TEMP/musuw-partners-$locale.html"
-            curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 10 --max-time 30 \
-              -D "$headers" -o "$body" "https://partners.musuw.com/?lang=$locale"
-            grep -Fq 'id="commission-form"' "$body"
-            grep -Fq '数据为合成记录，仅用于功能与口径展示，不代表真实订单或收益。' "$body"
             if [ "$locale" = zh ]; then
-              grep -Fq '<title>Musuw 推广榜单</title>' "$body"
+              expected_title='<title>Musuw 推广榜单</title>'
             else
-              grep -Fq '<title>Musuw Partner Leaderboard</title>' "$body"
+              expected_title='<title>Musuw Partner Leaderboard</title>'
+            fi
+            partner_page_ready=false
+            for attempt in $(seq 1 12); do
+              curl --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 30 \
+                -D "$headers" -o "$body" "https://partners.musuw.com/?lang=$locale"
+              if grep -Fq 'id="commission-form"' "$body" && \
+                grep -Fq '数据为合成记录，仅用于功能与口径展示，不代表真实订单或收益。' "$body" && \
+                grep -Fq "$expected_title" "$body"; then
+                partner_page_ready=true
+                break
+              fi
+              if [ "$attempt" -lt 12 ]; then sleep 5; fi
+            done
+            if [ "$partner_page_ready" != true ]; then
+              printf 'partner board did not converge to the expected release for locale=%s\n' "$locale" >&2
+              exit 1
             fi
             if grep -Eq '<title>[^<]*(模拟数据|Simulated data)[^<]*</title>' "$body"; then
               printf 'unexpected simulation label in partner board title for locale=%s\n' "$locale" >&2
@@ -246,9 +258,20 @@ jobs:
             grep -Eiq '^content-language:[[:space:]]*(en|zh-CN)' "$headers"
           done
           for asset in app.js data.js style.css musuw-logo.png; do
-            curl --fail --silent --show-error --retry 3 --connect-timeout 10 --max-time 30 \
-              -o "$RUNNER_TEMP/musuw-partners-$asset" "https://partners.musuw.com/$asset"
-            cmp "storefront/public/partner-board/$asset" "$RUNNER_TEMP/musuw-partners-$asset"
+            partner_asset_ready=false
+            for attempt in $(seq 1 12); do
+              curl --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 30 \
+                -o "$RUNNER_TEMP/musuw-partners-$asset" "https://partners.musuw.com/$asset"
+              if cmp --silent "storefront/public/partner-board/$asset" "$RUNNER_TEMP/musuw-partners-$asset"; then
+                partner_asset_ready=true
+                break
+              fi
+              if [ "$attempt" -lt 12 ]; then sleep 5; fi
+            done
+            if [ "$partner_asset_ready" != true ]; then
+              printf 'partner board asset did not converge to the expected release: %s\n' "$asset" >&2
+              exit 1
+            fi
           done
           partner_api_status="$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
             -o /dev/null -w '%{http_code}' https://partners.musuw.com/api/v1/partners/leaderboard)"
