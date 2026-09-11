@@ -38,7 +38,7 @@ async function partnerBoardResponse(request, env, url) {
     if (request.method === "GET") {
       let html = await response.text();
       html = html.replace('<html lang="zh-CN">', `<html lang="${locale}">`);
-      if (locale === "en") html = html.replace("Musuw 推广榜单 · 模拟数据", "Musuw Partner Leaderboard · Simulated data");
+      if (locale === "en") html = html.replace("Musuw 推广榜单", "Musuw Partner Leaderboard");
       return new Response(html, { status: response.status, headers });
     }
   }

@@ -16,7 +16,7 @@ function assetsEnv(calls) {
 }
 
 test('partner custom domain serves the reviewed page and locale without forwarding credentials',async()=>{
-  for (const [lang,expected] of [['zh','zh-CN'],['en','en']]) {
+  for (const [lang,expected,title] of [['zh','zh-CN','Musuw 推广榜单'],['en','en','Musuw Partner Leaderboard']]) {
     const calls=[];
     const response=await handleRequest(new Request('https://partners.musuw.com/?lang='+lang,{headers:{cookie:'session=private',authorization:'Bearer private'}}),assetsEnv(calls));
     assert.equal(response.status,200);
@@ -29,8 +29,10 @@ test('partner custom domain serves the reviewed page and locale without forwardi
     assert.equal(new URL(calls[0].url).pathname,'/partner-board/');
     const html=await response.text();
     assert.match(html,new RegExp('<html lang="'+expected+'">'));
+    assert.match(html,new RegExp('<title>'+title+'</title>'));
+    assert.doesNotMatch(html,/<title>[^<]*(?:模拟|Simulated)[^<]*<\/title>/);
     assert.match(html,/id="commission-form"/);
-    assert.match(html,/模拟数据 · 非真实订单或收益/);
+    assert.match(html,/数据为合成记录，仅用于功能与口径展示，不代表真实订单或收益/);
   }
 });
 

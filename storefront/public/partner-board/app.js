@@ -8,7 +8,7 @@
   const $ = selector => document.querySelector(selector);
   const dict = {
     zh: {
-      title: '推广榜单', pageTitle: 'Musuw 推广榜单 · 模拟数据', eyebrow: '合作伙伴看板',
+      title: '推广榜单', pageTitle: 'Musuw 推广榜单', eyebrow: '合作伙伴看板',
       offer: '新客户首笔实付 100% 佣金，后续实际付费 20%。', currency: 'CNY · 人民币',
       month: '统计月份', all: '六月至今', search: '搜索折扣码', summary: '推广汇总',
       lookupTitle: '查我的佣金', lookupSubmit: '查询佣金', lookupPlaceholder: '输入完整折扣码',
@@ -22,11 +22,11 @@
       first: '首购', renewal: '续费', adjusted: '退款已调整', counted: '已计入', noOrders: '该月份暂无订单', noCodes: '没有匹配的折扣码',
       previous: '上一页', next: '下一页', orderPages: (p, pages, n) => `第 ${p} / ${pages} 页 · ${n} 笔订单`, boardPages: (p, pages, n) => `第 ${p} / ${pages} 页 · ${n} 个折扣码`,
       view: code => `查看 ${code} 订单`, monthlyShort: '本月 ', periodShort: '期间 ', lifetimeShort: '累计 ',
-      disclosure: '模拟数据 · 非真实订单或收益。',
+      disclosure: '数据为合成记录，仅用于功能与口径展示，不代表真实订单或收益。',
       footer: '统计日期：2026 年 6 月 11 日至 9 月 8 日。固定换算假设：1 美元 = 7.20 人民币。退款与拒付按原订单归属月份调整佣金。点击折扣码查看订单明细。',
     },
     en: {
-      title: 'Partner leaderboard', pageTitle: 'Musuw Partner Leaderboard · Simulated data', eyebrow: 'PARTNER PROGRAM',
+      title: 'Partner leaderboard', pageTitle: 'Musuw Partner Leaderboard', eyebrow: 'PARTNER PROGRAM',
       offer: 'Earn 100% of a new customer’s first payment, then 20% on repeat payments.', currency: 'USD · US dollars',
       month: 'Month', all: 'June to date', search: 'Search discount code', summary: 'Referral totals',
       lookupTitle: 'Find my commission', lookupSubmit: 'Check commission', lookupPlaceholder: 'Enter your full discount code',
@@ -40,7 +40,7 @@
       first: 'First payment', renewal: 'Renewal', adjusted: 'Refund adjusted', counted: 'Included', noOrders: 'No orders this month', noCodes: 'No matching discount codes',
       previous: 'Previous', next: 'Next', orderPages: (p, pages, n) => `Page ${p} of ${pages} · ${n} orders`, boardPages: (p, pages, n) => `Page ${p} of ${pages} · ${n} codes`,
       view: code => `View orders for ${code}`, monthlyShort: 'Month ', periodShort: 'Period ', lifetimeShort: 'Total ',
-      disclosure: 'Simulated data · Not actual orders or earnings.',
+      disclosure: 'Synthetic records for product and calculation review; not actual orders or earnings.',
       footer: 'June 11–September 8, 2026. Fixed exchange rate assumption: US$1 = CN¥7.20. Refunds and chargebacks adjust the original order month. Select a discount code to view orders.',
     },
   };
