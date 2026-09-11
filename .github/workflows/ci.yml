@@ -171,10 +171,23 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: auth/package-lock.json
+      - name: Install existing browser test dependencies
+        run: npm ci --ignore-scripts
       - name: Install auth dependencies
         run: npm ci --prefix auth --ignore-scripts
+      - name: Install login regression browsers
+        run: npx playwright install --with-deps chromium webkit firefox
       - name: Run auth tests
         run: npm --prefix auth test
+      - name: Verify login background stays stable while typing
+        run: npx playwright test --config=auth/playwright.config.ts
+      - name: Preserve login browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-browser-failures
+          path: test-results/auth-browser
+          retention-days: 7
       - name: Run auth type-check
         run: npm --prefix auth run typecheck
       - name: Build auth shell

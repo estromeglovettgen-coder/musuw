@@ -1,5 +1,5 @@
 // @ts-nocheck -- Vendored React Bits LiquidEther implementation; keep upstream behavior intact.
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 export interface LiquidEtherProps {
@@ -87,9 +87,18 @@ export default function LiquidEther({
   const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
   const isVisibleRef = useRef<boolean>(true);
   const resizeRafRef = useRef<number | null>(null);
+  const [rendererMode, setRendererMode] = useState<'pending' | 'webgl' | 'static'>('pending');
 
   useEffect(() => {
     if (!mountRef.current) return;
+
+    // Check the context we will actually render with before allocating animation resources.
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('webgl2', { antialias: true, alpha: true });
+    if (!context) {
+      setRendererMode('static');
+      return;
+    }
 
     function makePaletteTexture(stops: string[]): THREE.DataTexture {
       let arr: string[];
@@ -139,7 +148,7 @@ export default function LiquidEther({
         this.container = container;
         this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         this.resize();
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer = new THREE.WebGLRenderer({ canvas, context, antialias: true, alpha: true });
         // Always transparent
         this.renderer.autoClear = false;
         this.renderer.setClearColor(new THREE.Color(0x000000), 0);
@@ -1122,6 +1131,7 @@ export default function LiquidEther({
     };
     applyOptionsFromProps();
     webgl.start();
+    setRendererMode('webgl');
 
     const io = new IntersectionObserver(
       entries => {
@@ -1171,6 +1181,7 @@ export default function LiquidEther({
         webglRef.current.dispose();
       }
       webglRef.current = null;
+      paletteTex.dispose();
     };
   }, [
     BFECC,
@@ -1246,6 +1257,7 @@ export default function LiquidEther({
     <div
       ref={mountRef}
       className={`auth-liquid-ether ${className || ''}`}
+      data-renderer={rendererMode}
       style={style}
     />
   );

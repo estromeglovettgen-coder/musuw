@@ -4,6 +4,8 @@ import { motion, type Variants } from "motion/react";
 import TrueFocus from "./TrueFocus";
 
 const LiquidEther = lazy(() => import("./LiquidEther"));
+// Form updates must not recreate the palette and restart the WebGL effect.
+const liquidColors = ["#E5E5E5", "#737373", "#262626"];
 
 export type AuthShowcaseState = "idle" | "curious" | "privacy" | "error";
 
@@ -347,7 +349,7 @@ export default function AuthShowcase({
       {desktop ? (
         <Suspense fallback={null}>
           <div className="auth-showcase-backdrop">
-            <LiquidEther autoIntensity={2.2} autoSpeed={0.4} colors={["#E5E5E5", "#737373", "#262626"]} cursorSize={120} mouseForce={32} />
+            <LiquidEther autoIntensity={2.2} autoSpeed={0.4} colors={liquidColors} cursorSize={120} mouseForce={32} />
           </div>
         </Suspense>
       ) : null}
