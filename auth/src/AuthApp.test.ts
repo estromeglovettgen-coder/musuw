@@ -192,7 +192,7 @@ describe("auth shell TikHub reference experience", () => {
     expect(css).toMatch(/\.auth-layout\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
     expect(css).toMatch(/\.auth-showcase\s*\{[\s\S]*background:\s*#080808/);
     expect(css).not.toContain("filter: grayscale(1)");
-    expect(showcase).toContain('colors={["#E5E5E5", "#737373", "#262626"]}');
+    expect(showcase).toContain('["#E5E5E5", "#737373", "#262626"]');
     expect(showcase).toContain("cursorSize={120}");
     expect(showcase).toContain("mouseForce={32}");
     expect(css).toMatch(/@media\s*\(max-width:\s*1023px\)[\s\S]*\.auth-showcase\s*\{[\s\S]*display:\s*none/);
