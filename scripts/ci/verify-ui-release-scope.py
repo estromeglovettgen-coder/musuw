@@ -9,15 +9,16 @@ from pathlib import Path
 
 SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 UI = ("weknora/frontend/src/assets/", "weknora/frontend/src/components/", "weknora/frontend/src/i18n/", "weknora/frontend/src/views/chat/", "weknora/frontend/src/views/knowledge/", "weknora/frontend/e2e/")
-ROOT = {"e2e/session-batch-manage.spec.ts", "playwright.session-batch.config.ts", ".github/workflows/ci.yml", "scripts/ci/verify-ui-release-scope.py", "scripts/ci/verify-ui-release-scope.test.py", "third_party/weknora/upgrades/81142df/resolution-ledger.tsv", "third_party/weknora/upgrades/81142df/resolution-overrides.tsv", "third_party/weknora/upgrades/81142df/resolution-summary.json"}
+ROOT = {"e2e/chat-history-feedback.spec.ts", "e2e/document-feedback.spec.ts", "e2e/session-batch-manage.spec.ts", "playwright.session-batch.config.ts", ".github/workflows/ci.yml", "scripts/ci/verify-ui-release-scope.py", "scripts/ci/verify-ui-release-scope.test.py", "third_party/weknora/upgrades/81142df/resolution-ledger.tsv", "third_party/weknora/upgrades/81142df/resolution-overrides.tsv", "third_party/weknora/upgrades/81142df/resolution-summary.json"}
 PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscription", "auth", "openrouter", "locks", "buildruntimeconfig", "build-runtime-config")
 
-# Reviewed presentation fixes and their accompanying files in release c6303340.
+# Reviewed presentation fixes and their accompanying files, including loading feedback.
 # Pin content, not just sensitive filenames: later edits need a fresh review.
 # The two documentation entries also include this clarification of the policy.
 REVIEWED_UI_CONTENT = {
+    "weknora/frontend/src/hooks/useKnowledgeBase.ts": {"f61ae64f29f66e34c30734af13ad144914c7d887"},
     ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525"},
-    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1"},
+    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe"},
     "README.md": {"32bfedf673e7951d615dc231ce12867a218be613"},
     "auth/e2e/background-stability.spec.ts": {"5259bb88fe9802ab6bb04ae72b7fb7664ad9e91e"},
     "auth/playwright.config.ts": {"8982318e2d188f555b20769aeb6da0d60a4b43b9"},
@@ -27,13 +28,13 @@ REVIEWED_UI_CONTENT = {
     "docs/DEPLOYMENT.md": {"eab3ccb887935df15ec3ea42f34cc52bdecb2b58"},
     "docs/STAGING_OPERATIONS.md": {"f2d98dfe3b6176b3f7837f0d1fafbf664f6acb19", "39a5adb3c9a9912a73b7e25bbd8f3dbc5839b863"},
     "e2e/billing-entitlement.spec.ts": {"a00142228e37eb0a8c136eabbda3bd01628c9eee"},
-    "e2e/knowledge-upload.spec.ts": {"6272624c5bedf75c5cbbc2b0b72a969e960f37c5"},
+    "e2e/knowledge-upload.spec.ts": {"6272624c5bedf75c5cbbc2b0b72a969e960f37c5", "d519786e0a34e234dcfb2357fa5b673181388a9e"},
     "openspec/changes/deploy-isolated-staging/specs/sandbox-billing-release-gate/spec.md": {"5f89c66ff9261991a42692d8f8f16988c6fc5174", "4eb0d34d0f96341f4e55ae8913c987e0a8e02294"},
     "playwright.billing.config.ts": {"0af6c9ab3d45b26da9a2ad5b0517b0a7d4b64fe0"},
-    "playwright.knowledge-upload.config.ts": {"bde962ce72910dae6b2f618a5b6ba53c6104fc9c"},
+    "playwright.knowledge-upload.config.ts": {"bde962ce72910dae6b2f618a5b6ba53c6104fc9c", "d44879f4afbe340c02c859ce4f3f82458db94e31"},
     "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af"},
     "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb"},
-    "third_party/weknora/v0.7.2-provenance.json": {"8735c066f0119c55670bfa512216924ff21c8675"},
+    "third_party/weknora/v0.7.2-provenance.json": {"8735c066f0119c55670bfa512216924ff21c8675", "a433c0d10542e136e68051a318c66d23e055bfad", "e1361c776a4e15ffb2572fe957177202055f3dcf"},
     "weknora/frontend/e2e/billing-harness.html": {"51526a1a4a971fb3e9393658944c04cf5819cee9"},
     "weknora/frontend/e2e/billing-harness.ts": {"d04631889c795e31a0b3b02a222de4e2bf464d07"},
 }

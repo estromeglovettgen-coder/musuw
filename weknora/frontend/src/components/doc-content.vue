@@ -242,7 +242,7 @@ mermaid.initialize({
   }
 });
 const props = defineProps(["visible", "details", "knowledgeType", "sourceInfo", "canEditKB", "canDownloadKB", "parse_status", "kbId"]);
-const emit = defineEmits(["closeDoc", "getDoc", "questionDeleted", "summaryStateChange"]);
+const emit = defineEmits(["closeDoc", "getDoc", "retryDoc", "questionDeleted", "summaryStateChange"]);
 
 const applySummaryState = (summaryStatus?: string, description?: string) => {
   if (typeof summaryStatus === 'string' && summaryStatus) {
@@ -531,8 +531,8 @@ const CHUNK_PAGE_SIZE = KNOWLEDGE_CHUNK_PAGE_SIZE;
 const chunkPage = ref(1);
 const loadedChunkPage = ref(1);
 let pendingChunkPage: number | null = null;
-const isChunkPageTransition = computed(
-  () => Boolean(props.details?.chunkLoading) && chunkPage.value !== loadedChunkPage.value,
+const isChunkLoading = computed(
+  () => Boolean(props.details?.chunkLoading) && (chunkPage.value !== loadedChunkPage.value || !props.details?.md?.length),
 );
 let mdContentWrap = ref()
 // Drawer uses attach="body", so markdown nodes live outside mdContentWrap in the DOM.
@@ -1635,6 +1635,15 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
       </t-drawer>
 
       <div ref="docMarkdownRoot" class="doc-markdown-root doc-drawer-body setting-drawer__body">
+        <div v-if="details.loading" class="chunk-page-loading" role="status" aria-live="polite">
+          <t-loading size="small" />
+          <span>{{ $t('common.loading') }}</span>
+        </div>
+        <div v-else-if="details.loadError" class="chunk-page-loading" role="alert">
+          <span>{{ details.loadError }}</span>
+          <t-button size="small" variant="outline" @click="emit('retryDoc')">{{ $t('common.retry') }}</t-button>
+        </div>
+        <template v-else>
         <section v-if="details.id" class="setting-drawer__section">
           <h4 class="setting-drawer__section-title">{{ $t('knowledgeBase.detailSectionMeta') }}</h4>
           <div class="doc-detail-rows">
@@ -1847,9 +1856,14 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
             </audio>
           </div>
 
+          <div v-if="viewMode !== 'preview' && details.chunkLoadError && !details.md?.length" class="chunk-page-loading" role="alert">
+            <span>{{ details.chunkLoadError }}</span>
+            <t-button size="small" variant="outline" @click="emit('getDoc', chunkPage)">{{ $t('common.retry') }}</t-button>
+          </div>
+
           <!-- 合并视图 -->
-          <div v-if="viewMode === 'merged'">
-            <div v-if="isChunkPageTransition" class="chunk-page-loading">
+          <div v-else-if="viewMode === 'merged'">
+            <div v-if="isChunkLoading" class="chunk-page-loading" role="status">
               <t-loading size="small" />
               <span>{{ $t('common.loading') }}</span>
             </div>
@@ -1861,7 +1875,7 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
 
           <!-- 分块视图 -->
           <div v-else-if="viewMode === 'chunks'">
-            <div v-if="isChunkPageTransition" class="chunk-page-loading">
+            <div v-if="isChunkLoading" class="chunk-page-loading" role="status">
               <t-loading size="small" />
               <span>{{ $t('common.loading') }}</span>
             </div>
@@ -2131,10 +2145,11 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
           </div>
 
           <div v-else-if="viewMode === 'preview'">
-            <DocumentPreview :knowledgeId="details.id" :fileType="details.file_type" :fileName="details.title"
+            <DocumentPreview :key="details.id" :knowledgeId="details.id" :fileType="details.file_type" :fileName="details.title"
               :active="viewMode === 'preview'" />
           </div>
         </section>
+        </template>
       </div>
 
     </t-drawer>

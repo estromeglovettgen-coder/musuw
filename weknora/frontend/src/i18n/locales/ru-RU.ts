@@ -6633,6 +6633,8 @@ export default {
     partialUploadSuccess: 'Частичная загрузка (успешно: {success}, ошибки: {fail})',
     allUploadFailed: 'Все файлы не удалось загрузить ({count})',
     deleteSuccess: 'Знание удалено!',
+    documentListLoadFailed: 'Не удалось загрузить список документов. Повторите попытку.',
+    documentLoadFailed: 'Не удалось загрузить документ. Повторите попытку.',
     chunkLoadFailed: 'Не удалось загрузить фрагменты',
     infoCard: {
       tooltip: 'Просмотр информации о базе знаний',

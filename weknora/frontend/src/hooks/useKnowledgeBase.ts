@@ -24,6 +24,7 @@ export default function (knowledgeBaseId?: string) {
   const { t } = useI18n();
   const { cardList, total } = storeToRefs(usemenuStore);
   let moreIndex = ref(-1);
+  const knowledgeListError = ref('');
   const details = reactive({
     title: "",
     time: "",
@@ -41,9 +42,12 @@ export default function (knowledgeBaseId?: string) {
 	custom_metadata: {} as Record<string, unknown>,
     chunkLoading: false,
     chunkLoadError: "",
+    loading: false,
+    loadError: "",
     tags: [] as Array<{ id: string; name: string; color?: string }>,
   });
   let knowledgeListGeneration = 0;
+  let detailRequestGeneration = 0;
   let chunkRequestGeneration = 0;
   let activeKnowledgeId = '';
   const getKnowled = (
@@ -65,6 +69,7 @@ export default function (knowledgeBaseId?: string) {
     const targetKbId = kbId || knowledgeBaseId;
     if (!targetKbId) return Promise.resolve();
     const requestGeneration = query.page === 1 ? ++knowledgeListGeneration : knowledgeListGeneration;
+    knowledgeListError.value = '';
 
     return listKnowledgeFiles(targetKbId, query)
       .then((result: any) => {
@@ -73,7 +78,11 @@ export default function (knowledgeBaseId?: string) {
         const currentRouteKbId = (route.params as any)?.kbId as string | undefined;
         if (currentRouteKbId && currentRouteKbId !== targetKbId) return;
 
-        const { data, total: totalResult } = result;
+        if (result?.success === false || (result?.data != null && !Array.isArray(result.data))) {
+          throw new Error('Invalid document list response');
+        }
+        const { total: totalResult } = result;
+        const data = result.data ?? [];
     const cardList_ = data.map((item: any) => {
       const displayName = resolveKnowledgeDisplayName(item, t('knowledgeBase.untitledDocument'))
       const fileTypeSource = item.file_type || (item.type === 'manual' ? 'MANUAL' : '')
@@ -96,7 +105,11 @@ export default function (knowledgeBaseId?: string) {
         }
         total.value = totalResult;
       })
-      .catch(() => {});
+      .catch(() => {
+        const currentRouteKbId = (route.params as any)?.kbId as string | undefined;
+        if (requestGeneration !== knowledgeListGeneration || (currentRouteKbId && currentRouteKbId !== targetKbId)) return;
+        knowledgeListError.value = t('knowledgeBase.documentListLoadFailed');
+      });
   };
   const delKnowledge = (index: number, item: any, onSuccess?: () => void) => {
     cardList.value[index].isMore = false;
@@ -183,13 +196,15 @@ export default function (knowledgeBaseId?: string) {
         uploadInput.value.value = "";
       });
   };
-  const getCardDetails = (item: any) => {
+  const getCardDetails = (item: any = { id: activeKnowledgeId, title: details.title, tags: details.tags }) => {
+    const requestGeneration = ++detailRequestGeneration;
     activeKnowledgeId = item.id;
     chunkRequestGeneration++;
     Object.assign(details, {
-      title: "",
+      title: resolveKnowledgeDetailTitle(item, t('knowledgeBase.untitledDocument')),
       time: "",
       md: [],
+      total: 0,
       id: "",
       type: "",
       source: "",
@@ -201,10 +216,13 @@ export default function (knowledgeBaseId?: string) {
       error_message: "",
 	  custom_metadata: {},
       chunkLoadError: "",
+      loading: true,
+      loadError: "",
       tags: item?.tags ? [...item.tags] : [],
     });
     getKnowledgeDetails(item.id)
       .then((result: any) => {
+        if (requestGeneration !== detailRequestGeneration) return;
         if (result.success && result.data) {
           const { data } = result;
           Object.assign(details, {
@@ -222,9 +240,18 @@ export default function (knowledgeBaseId?: string) {
 			custom_metadata: data.custom_metadata || {},
             tags: data.tags?.length ? data.tags : (item?.tags || []),
           });
+        } else {
+          details.loadError = result?.error?.message || result?.message || t('knowledgeBase.documentLoadFailed');
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (requestGeneration === detailRequestGeneration) {
+          details.loadError = t('knowledgeBase.documentLoadFailed');
+        }
+      })
+      .finally(() => {
+        if (requestGeneration === detailRequestGeneration) details.loading = false;
+      });
     getfDetails(item.id, 1);
   };
   
@@ -245,7 +272,7 @@ export default function (knowledgeBaseId?: string) {
       })
       .catch((err: any) => {
         if (requestGeneration !== chunkRequestGeneration || activeKnowledgeId !== id) return;
-        details.chunkLoadError = err?.message || t('knowledgeBase.chunkLoadFailed');
+        details.chunkLoadError = t('knowledgeBase.chunkLoadFailed');
         console.error("[ChunkLoad] failed", {
           knowledgeId: id,
           page,
@@ -260,6 +287,7 @@ export default function (knowledgeBaseId?: string) {
   };
   return {
     cardList,
+    knowledgeListError,
     moreIndex,
     getKnowled,
     details,

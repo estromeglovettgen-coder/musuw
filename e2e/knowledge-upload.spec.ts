@@ -153,6 +153,7 @@ test('upload refresh keeps existing documents visible and finishes the first pag
     element.dispatchEvent(new Event('scroll'))
   })
   const expectPaginationToWait = async () => {
+    await expect(page.locator('.visual-knowledge-toolbar').getByRole('status')).toContainText('加载中')
     const prematureRequest = page.waitForRequest(request => {
       const url = new URL(request.url())
       return url.pathname.endsWith('/knowledge') && Number(url.searchParams.get('page')) > 1

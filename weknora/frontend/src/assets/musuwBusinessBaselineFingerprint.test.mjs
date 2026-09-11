@@ -25,16 +25,17 @@ const NATIVE_MULTI_MODEL_RESTORE_COMMIT = '72d34034c8296532798df9d73c23e878faa1b
 const OPENROUTER_VIDEO_INGESTION_COMMIT = '22052ccf08c5ab2e370d94ea2508359aa367d0fe'
 const NATIVE_AGENT_MCP_EXPOSURE_CHANGE = 'expose-native-agents-mcp-kb-settings'
 const CONSUMER_SURFACE_CHANGE = 'curate-main-consumer-surface'
+const CHAT_HISTORY_FEEDBACK_CHANGE = 'surface-history-load-failures-with-retry'
 const ENTITLEMENT_USAGE_REVALIDATION_CHANGE = 'refresh-entitlement-after-metered-usage'
 const KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE = 'display-materialized-ai-title'
 const KNOWLEDGE_FAILURE_REASON_CHANGE = 'surface-document-failure-reason'
-const KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE = 'retain-upload-progress-and-refresh-accepted-files'
+const KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE = 'retain-upload-progress-and-refresh-accepted-files+surface-list-load-failures'
 const MODEL_REASONING_DEFAULT_CHANGE = 'refresh-global-model-catalog'
 
 const LOCKED_BUSINESS_BLOBS = {
-  './business-baselines/ChatIndex.pre-view.vue': '5d9ee35408dc665fd7bd55345beba6f378543033',
+  './business-baselines/ChatIndex.pre-view.vue': '6fef46c48deaabd283f4f23670824a18874dce51',
   './business-baselines/Input-field.pre-view.vue': '0042d53343af50d0dd1a35edd22b7192241bea4b',
-  './business-baselines/KnowledgeBase.pre-view.vue': 'd4e0163ad3c687f2f45d4a2abda47dd4fa5451b5',
+  './business-baselines/KnowledgeBase.pre-view.vue': 'a547ea3c9880e58bc9c2bf7b4070dd2e1658e357',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': 'e185baf5fb56a34b9d8582b7d4339904dc3b5d20',
@@ -56,15 +57,15 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
     authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy; explicit user-requested minimum enabled reasoning defaults with model-scoped saved depth',
   },
   chatParent: {
-    change: `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`,
+    change: `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
-    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads and explicit transport of the first-message reasoning depth through route navigation',
+    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads and explicit transport of the first-message reasoning depth through route navigation; failed history loads retain their cursor and expose retry without masquerading as empty conversations',
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
     change: `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE}+${KNOWLEDGE_FAILURE_REASON_CHANGE}+${KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
-    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, server-projected runtime/storage readiness, live display of a materialized AI title without changing the durable source filename, and live propagation of server-sanitized failure reasons; explicit upload bug repair adds persistent per-file progress, incremental list refresh with ordering protection, and a pending-upload reload warning',
+    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, server-projected runtime/storage readiness, live display of a materialized AI title without changing the durable source filename, and live propagation of server-sanitized failure reasons; explicit upload bug repair adds persistent per-file progress, incremental list refresh with ordering protection, and a pending-upload reload warning; list refresh feedback remains pending until the owning request finishes and failures can be retried',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],
@@ -110,7 +111,7 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.resultingBlob,
     gitBlobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
   )
-  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`)
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}`)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBase.pre-view.vue')),

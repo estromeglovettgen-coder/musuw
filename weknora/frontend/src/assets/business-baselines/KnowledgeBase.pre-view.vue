@@ -333,7 +333,7 @@ const canDownloadKnowledge = computed(() => {
 });
 
 const knowledgeList = ref<Array<{ id: string; name: string; type?: string }>>([]);
-let { cardList, total, moreIndex, details, getKnowled, delKnowledge, openMore, onVisibleChange: setMoreVisibility, getCardDetails, getfDetails } = useKnowledgeBase(kbId.value)
+let { cardList, knowledgeListError, total, moreIndex, details, getKnowled, delKnowledge, openMore, onVisibleChange: setMoreVisibility, getCardDetails, getfDetails } = useKnowledgeBase(kbId.value)
 
 const onVisibleChange = (visible: boolean) => {
   setMoreVisibility(visible);
@@ -1301,7 +1301,7 @@ onUnmounted(() => {
 });
 watch(() => cardList.value, (newValue) => {
   if (isFAQ.value) return;
-  docListLoading.value = false;
+  if (!firstPageRefresh) docListLoading.value = false;
 
   // Auto-open document if navigated with ?knowledge_id=xxx
   if (pendingKnowledgeId.value) {
@@ -1920,9 +1920,9 @@ const submitReparse = async (id: string) => {
 
 const handleScroll = () => {
   if (isFAQ.value) return;
-  // A card status update may clear the visual loading flag before page one
-  // arrives. Wait for that refresh before advancing the pagination cursor.
+  // Finish the first page before advancing the pagination cursor.
   if (firstPageRefresh) return;
+  if (knowledgeListError.value) return;
   if (docListLoading.value) return;
   if (scrollLoading) return;
   const currentKbId = kbId.value;

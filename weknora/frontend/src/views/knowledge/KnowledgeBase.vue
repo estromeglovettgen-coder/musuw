@@ -349,6 +349,7 @@ export default defineComponent({
             </div>
 
             <div class="visual-knowledge-toolbar__right">
+              <span v-if="docListLoading" class="visual-knowledge-loading" role="status" aria-live="polite"><t-loading size="small" />{{ $t('common.loading') }}</span>
               <div class="visual-knowledge-view-toggle" role="group" :aria-label="$t('knowledgeBase.viewModeToggle')">
                 <button type="button" :class="{ 'is-active': viewMode === 'grid' }" :aria-pressed="viewMode === 'grid'" @click="viewMode = 'grid'"><t-icon name="view-module" /></button>
                 <button type="button" :class="{ 'is-active': viewMode === 'list' }" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'"><t-icon name="view-list" /></button>
@@ -358,6 +359,11 @@ export default defineComponent({
           </div>
 
           <KnowledgeUploadProgress :tasks="currentUploadTasks" @dismiss="dismissUploadResults" />
+
+          <div v-if="knowledgeListError" class="visual-knowledge-load-error" role="alert">
+            <span>{{ knowledgeListError }}</span>
+            <t-button size="small" variant="outline" @click="resetPage(); loadKnowledgeFiles(kbId)">{{ $t('common.retry') }}</t-button>
+          </div>
 
           <div ref="knowledgeScroll" class="visual-knowledge-scroll" :class="{ 'is-empty': !cardList.length && !currentChildFolders.length && !docListLoading, 'is-marquee-active': docMarqueeVisible }" @scroll="handleScroll" @mousedown="onDocMarqueeMouseDown">
             <div v-if="docMarqueeVisible" class="visual-knowledge-marquee" :class="{ 'is-add': docMarqueeMode === 'add', 'is-subtract': docMarqueeMode === 'subtract' }" :style="docMarqueeBoxStyle" aria-hidden="true" />
@@ -369,14 +375,14 @@ export default defineComponent({
 
             <DocumentListView v-else-if="(cardList.length || currentChildFolders.length) && viewMode === 'list'" :items="cardList" :folders="currentChildFolders" :folder-options="folderOptions" :selected-ids="selectedIds" :tag-list="tagList" :can-edit="canEdit" :can-download="canDownloadKnowledge" :can-mutate-knowledge="canMutateKnowledge" :trace-visible-ids="traceAvailableById" :move-menu-mode="moveMenuMode" :move-target-kbs="moveTargetKbs" :move-targets-loading="moveTargetsLoading" :move-selected-target-name="moveSelectedTargetName" :move-mode="moveMode" :move-submitting="moveSubmitting" :show-folder-path="showDocumentFolderPath" @open-folder="handleFolderSelect" @move-to-folder="(item: any, path: string) => moveKnowledgeIntoFolder([item.id], path)" @open="(item: any) => openKnowledgeItem(item)" @toggle-row="toggleSelectRow" @toggle-all="toggleSelectAll" @action="(action: string, item: any) => handleListAction(action, item)" @probe-trace="(item: any) => probeTraceAvailable(item)" @tag-edit="(item: any) => openTagEditDialog(item)" @move-select-target="(kb: any) => handleMoveSelectTarget(kb)" @move-back="handleMoveBack" @move-confirm="handleMoveConfirm" @update:move-mode="(mode: any) => moveMode = mode" @reset-move-state="moveMenuMode = 'normal'" />
 
-            <div v-else-if="!docListLoading" class="visual-knowledge-empty"><p v-if="selectedFolderPath || isFiltering">{{ isFiltering ? $t('knowledgeBase.folderTree.emptySearch') : $t('knowledgeBase.folderTree.emptyFolder') }}</p><EmptyKnowledge v-else @upload="uploadSourceRef?.openFileDialog()" /></div>
+            <div v-else-if="!docListLoading && !knowledgeListError" class="visual-knowledge-empty"><p v-if="selectedFolderPath || isFiltering">{{ isFiltering ? $t('knowledgeBase.folderTree.emptySearch') : $t('knowledgeBase.folderTree.emptyFolder') }}</p><EmptyKnowledge v-else @upload="uploadSourceRef?.openFileDialog()" /></div>
           </div>
 
           <div v-show="batchMode || selectedIds.size > 0" class="visual-knowledge-batch-anchor"><DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting" :reparse-loading="batchReparsing" :tag-loading="batchTagging" :visible="batchMode || selectedIds.size > 0" :show-move-to-folder="canEdit" :folder-options="folderOptions" @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse" @batch-tag="handleBatchTag" @move-to-folder="(path: string) => moveKnowledgeIntoFolder(Array.from(selectedIds), path)" /></div>
         </div>
       </section>
 
-      <DocContent ref="docContentRef" :visible="isCardDetails" :details="details" :canEditKB="canEdit" :canDownloadKB="canDownloadKnowledge" :kbId="kbId" @closeDoc="closeDoc" @getDoc="getDoc" @summaryStateChange="syncDocumentSummaryState" />
+      <DocContent ref="docContentRef" :visible="isCardDetails" :details="details" :canEditKB="canEdit" :canDownloadKB="canDownloadKnowledge" :kbId="kbId" @closeDoc="closeDoc" @getDoc="getDoc" @retryDoc="getCardDetails()" @summaryStateChange="syncDocumentSummaryState" />
     </main>
   </template>
 
@@ -387,11 +393,13 @@ export default defineComponent({
   <KbTagManageDrawer v-if="!isFAQ" v-model:visible="tagManageDrawerVisible" :kb-id="kbId" :is-faq="isFAQ" @changed="onTagManageChanged" />
   <ContextualGuide
     tour="kbDetail"
-    :when="authStore.isLiteMode && !isFAQ && canEdit && activeKbTab === 'documents' && !docListLoading && !cardList.length && !currentChildFolders.length && !selectedFolderPath && !isFiltering"
+    :when="authStore.isLiteMode && !isFAQ && canEdit && activeKbTab === 'documents' && !docListLoading && !knowledgeListError && !cardList.length && !currentChildFolders.length && !selectedFolderPath && !isFiltering"
   />
 </template>
 
 <style scoped lang="less">
+.visual-knowledge-loading, .visual-knowledge-load-error { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--td-text-color-secondary); }
+.visual-knowledge-load-error { flex-shrink: 0; justify-content: space-between; color: var(--td-error-color); }
 .visual-knowledge-page { width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 20px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; overflow: hidden; background: rgb(249 250 251 / 30%); color: #374151; }
 .visual-knowledge-header { flex: 0 0 auto; padding-bottom: 16px; border-bottom: 1px solid rgb(229 231 235 / 80%); display: flex; flex-direction: column; gap: 16px; }
 .visual-knowledge-header__copy { min-width: 0; display: flex; flex-direction: column; gap: 6px; }

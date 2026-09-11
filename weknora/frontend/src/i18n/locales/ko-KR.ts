@@ -6633,6 +6633,8 @@ export default {
     partialUploadSuccess: '일부 파일 업로드 성공 (성공: {success}, 실패: {fail})',
     allUploadFailed: '모든 파일 업로드 실패 ({count}개)',
     deleteSuccess: '지식이 성공적으로 삭제되었습니다!',
+    documentListLoadFailed: '문서 목록을 불러오지 못했습니다. 다시 시도해 주세요.',
+    documentLoadFailed: '문서를 불러오지 못했습니다. 다시 시도해 주세요.',
     chunkLoadFailed: '청크 로드 실패',
     infoCard: {
       tooltip: '지식베이스 정보 보기',

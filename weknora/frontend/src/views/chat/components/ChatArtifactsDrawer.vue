@@ -88,6 +88,7 @@
         </template>
         <div v-if="previewItem" class="artifact-preview-body">
             <DocumentPreview
+                :key="`${sessionId}:${messageId}:${previewItem.index}`"
                 :session-id="sessionId"
                 :message-id="messageId"
                 :artifact-index="previewItem.index"

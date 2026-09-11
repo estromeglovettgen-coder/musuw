@@ -95,7 +95,15 @@ export default defineComponent({
           <div class="visual-chat-skeleton is-user"><t-skeleton animation="gradient" :row-col="[{ width: '35%', height: '36px', type: 'rect' }]" /></div>
         </div>
 
-        <section v-if="!embeddedMode && messagesList.length === 0 && !loading" class="visual-chat-suggestions" :class="{ 'has-questions': suggestedQuestions.length > 0 || suggestedQuestionsLoading }">
+        <div v-if="historyLoadingMore" class="visual-chat-history-feedback" role="status">
+          <t-loading size="small" /><span>{{ t('common.loading') }}</span>
+        </div>
+        <div v-else-if="historyLoadError" class="visual-chat-history-feedback" role="alert">
+          <span>{{ t('batchManage.loadFailed') }}</span>
+          <t-button size="small" variant="outline" @click="retryHistoryLoad">{{ t('common.retry') }}</t-button>
+        </div>
+
+        <section v-if="!embeddedMode && messagesList.length === 0 && !loading && !historyLoading && !historyLoadError" class="visual-chat-suggestions" :class="{ 'has-questions': suggestedQuestions.length > 0 || suggestedQuestionsLoading }">
           <div v-if="suggestedQuestionsLoading && suggestedQuestions.length === 0" class="visual-chat-suggestions__inner">
             <div class="visual-chat-suggestions__caption"><t-skeleton animation="gradient" :row-col="[{ width: '120px', height: '14px' }]" /></div>
             <div class="visual-chat-suggestions__grid" aria-hidden="true"><div v-for="n in 6" :key="`sq-skel-${n}`" class="visual-chat-suggestion is-skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '100%', height: '14px', type: 'rect' }]" /></div></div>
@@ -150,6 +158,7 @@ export default defineComponent({
 .visual-chat-view.is-embedded .visual-chat-scroll { padding: 16px; }
 .visual-chat-messages { width: min(768px,100%); min-width: 0; margin: 0 auto; padding-bottom: 16px; display: flex; flex-direction: column; gap: 32px; }
 .visual-chat-messages.is-embedded { width: 100%; }
+.visual-chat-history-feedback { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--td-text-color-secondary); font-size: 13px; }
 .visual-chat-message-row { min-width: 0; contain: layout style; display: flex; width: 100%; }
 .visual-chat-message-row.is-user { justify-content: flex-end; }
 .visual-chat-message-row.is-assistant { justify-content: flex-start; }

@@ -26,7 +26,14 @@ import {
 } from '@/utils/filePreview';
 
 
-const VueOfficePptx = defineAsyncComponent(() => import('@vue-office/pptx'));
+const VueOfficePptx = defineAsyncComponent({
+  loader: () => import('@vue-office/pptx'),
+  onError: (_error, _retry, fail) => {
+    error.value = t('preview.loadFailed');
+    loading.value = false;
+    fail();
+  },
+});
 
 const { t } = useI18n();
 
@@ -57,6 +64,7 @@ const docxContainer = ref<HTMLElement | null>(null);
 const imageNaturalWidth = ref(0);
 const imageNaturalHeight = ref(0);
 let loadedForId = '';
+let disposed = false;
 
 const isFullscreen = ref(false);
 
@@ -281,9 +289,11 @@ async function loadPreview() {
 
   try {
     const rawBlob = await fetchPreviewBlob();
+    if (disposed) return;
     let kind = resolvePreviewKind(ft);
     if (kind === 'unsupported') {
       const sample = new Uint8Array(await rawBlob.slice(0, FILE_PREVIEW_SNIFF_BYTES).arrayBuffer());
+      if (disposed) return;
       const sniffed = sniffPreview(sample);
       kind = sniffed.kind;
       if (sniffed.ext) ft = sniffed.ext;
@@ -298,8 +308,10 @@ async function loadPreview() {
     const blob = ensureBlobType(rawBlob, ft);
     loadedForId = sourceKey;
 
-    loading.value = false;
+    // Mount the renderer beneath the loading overlay (DOCX needs its DOM
+    // container), but keep feedback visible until preparation finishes.
     await nextTick();
+    if (disposed) return;
 
     switch (kind) {
       case 'pdf':
@@ -342,10 +354,12 @@ async function loadPreview() {
       }
     }
   } catch (err: any) {
+    if (disposed) return;
     console.error('Document preview failed:', err);
     error.value = err?.message || t('preview.loadFailed');
   } finally {
-    loading.value = false;
+    // PPTX renders asynchronously after its data is passed to the component.
+    if (!disposed && (!pptxData.value || error.value)) loading.value = false;
   }
 }
 
@@ -380,13 +394,14 @@ watch(
 );
 
 onUnmounted(() => {
+  disposed = true;
   document.body.style.overflow = '';
   cleanup();
 });
 </script>
 
 <template>
-  <div class="document-preview" :class="{ 'is-fullscreen': isFullscreen, 'fill-height': fillHeight }">
+  <div class="document-preview" :class="{ 'is-fullscreen': isFullscreen, 'fill-height': fillHeight, 'is-loading': loading }" :aria-busy="loading">
     <!-- Toolbar -->
     <div class="preview-toolbar" v-if="!loading && !error && previewType !== 'unsupported'">
       <t-space size="small">
@@ -408,13 +423,13 @@ onUnmounted(() => {
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="preview-loading">
+    <div v-if="loading" class="preview-loading" role="status" aria-live="polite">
       <t-loading size="medium" />
       <span class="loading-text">{{ $t('preview.loading') }}</span>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="preview-error">
+    <div v-if="error" class="preview-error" role="alert">
       <t-icon name="error-circle" size="48px" />
       <p>{{ error }}</p>
       <t-button theme="primary" size="small" @click="loadedForId = ''; loadPreview()">
@@ -463,7 +478,7 @@ onUnmounted(() => {
 
     <!-- PPTX -->
     <div v-else-if="previewType === 'pptx' && pptxData" class="preview-pptx">
-      <vue-office-pptx :src="pptxData" @rendered="() => {}" @error="(e: any) => { error = e?.message || $t('preview.loadFailed'); }" />
+      <vue-office-pptx :src="pptxData" @rendered="loading = false" @error="(e: any) => { error = e?.message || $t('preview.loadFailed'); loading = false; }" />
     </div>
 
     <!-- Excel -->
@@ -544,6 +559,15 @@ onUnmounted(() => {
 .document-preview {
   min-height: 200px;
   position: relative;
+
+  &.is-loading > :not(.preview-loading) { visibility: hidden; }
+
+  .preview-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: @bg-white;
+  }
 
   &.fill-height {
     height: 100%;
