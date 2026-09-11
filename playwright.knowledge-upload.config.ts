@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test'
 const baseURL = 'http://127.0.0.1:4192'
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: 'knowledge-upload.spec.ts',
+  testMatch: ['knowledge-upload.spec.ts', 'document-feedback.spec.ts', 'chat-history-feedback.spec.ts'],
   outputDir: 'test-results/knowledge-upload',
   reporter: [['list']],
   retries: 0,

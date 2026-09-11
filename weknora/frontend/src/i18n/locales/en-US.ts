@@ -737,6 +737,8 @@ export default {
     partialUploadSuccess: 'Partial upload success (success: {success}, failed: {fail})',
     allUploadFailed: 'All files failed to upload ({count} files)',
     deleteSuccess: 'Knowledge deleted successfully!',
+    documentListLoadFailed: 'Could not load the document list. Please retry.',
+    documentLoadFailed: 'Could not load the document. Please retry.',
     chunkLoadFailed: 'Failed to load chunks'
   },
   uploadConfirm: {

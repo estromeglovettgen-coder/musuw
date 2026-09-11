@@ -264,6 +264,8 @@ const isFirstEnter = ref(true);
 const loading = ref(false);
 const historyLoading = ref(true);
 const historyLoadingMore = ref(false);
+const historyLoadError = ref(null);
+let historyRequestId = 0;
 const hasMoreHistory = ref(true);
 let fullContent = ref('')
 const scrollContainer = ref(null)
@@ -301,7 +303,7 @@ const cancelSuggestedQuestionsFetch = () => {
 const fetchSuggestedQuestionsIfNeeded = async () => {
     if (props.embeddedMode) return;
     // 初始历史尚未拉完时不能判断是否有消息，避免有历史的会话误请求推荐问法
-    if (historyLoading.value || messagesList.length > 0) {
+    if (historyLoading.value || historyLoadError.value || messagesList.length > 0) {
         if (messagesList.length > 0) {
             cancelSuggestedQuestionsFetch();
         }
@@ -311,7 +313,7 @@ const fetchSuggestedQuestionsIfNeeded = async () => {
 };
 
 const fetchSuggestedQuestions = async () => {
-    if (historyLoading.value || messagesList.length > 0) {
+    if (historyLoading.value || historyLoadError.value || messagesList.length > 0) {
         return;
     }
     const fetchId = ++suggestedQuestionsFetchId;
@@ -452,6 +454,8 @@ watch([() => route.params], async (newvalue) => {
         clearCitationChunkCache();
 
         // 切换会话时，重置状态
+        const requestId = ++historyRequestId;
+        historyLoadError.value = null;
         historyLoading.value = true;
         historyLoadingMore.value = false;
         hasMoreHistory.value = true;
@@ -466,6 +470,7 @@ watch([() => route.params], async (newvalue) => {
         useSettingsStoreInstance.restoreDefaultsIfSnapshotted();
 
         await loadSessionAndHydrate(session_id.value);
+        if (requestId !== historyRequestId) return;
         let data = {
             session_id: session_id.value,
             created_at: '',
@@ -500,7 +505,7 @@ const debounce = (fn, delay) => {
     }
 }
 const onChatScrollTop = () => {
-    if (scrollLock.value || historyLoadingMore.value || !hasMoreHistory.value) return;
+    if (scrollLock.value || historyLoading.value || historyLoadingMore.value || historyLoadError.value || !hasMoreHistory.value) return;
     if (!scrollContainer.value) return;
     const { scrollTop, scrollHeight } = scrollContainer.value;
     isFirstEnter.value = false
@@ -616,8 +621,17 @@ const getmsgList = (data, isScrollType = false, scrollHeight) => {
     if (isScrollType) {
         if (historyLoadingMore.value || !hasMoreHistory.value) return;
         historyLoadingMore.value = true;
+    } else {
+        historyLoading.value = true;
     }
+    const requestId = ++historyRequestId;
+    const isCurrent = () => requestId === historyRequestId && data.session_id === session_id.value;
+    historyLoadError.value = null;
     fetchMessageList(data).then(async (res) => {
+        if (!isCurrent()) return;
+        if (res?.success !== true || (res.data !== null && !Array.isArray(res.data))) {
+            throw new Error(t('batchManage.loadFailed'));
+        }
         const batch = res?.data;
         if (!batch?.length) {
             if (isScrollType) {
@@ -639,18 +653,24 @@ const getmsgList = (data, isScrollType = false, scrollHeight) => {
         created_at.value = nextCursor;
         await handleMsgList(batch, isScrollType, scrollHeight);
     }).catch((err) => {
+        if (!isCurrent()) return;
         console.error('Failed to load messages:', err);
-        if (isScrollType) {
-            hasMoreHistory.value = false;
-        }
+        historyLoadError.value = { data: { ...data }, isScrollType };
     }).finally(() => {
+        if (!isCurrent()) return;
         historyLoading.value = false;
         historyLoadingMore.value = false;
-        if (!isScrollType && messagesList.length === 0) {
+        if (!isScrollType && !historyLoadError.value && messagesList.length === 0) {
             fetchSuggestedQuestionsIfNeeded();
         }
     })
 }
+
+const retryHistoryLoad = () => {
+    const failed = historyLoadError.value;
+    if (!failed || historyLoading.value || historyLoadingMore.value) return;
+    getmsgList(failed.data, failed.isScrollType, scrollContainer.value?.scrollHeight);
+};
 
 // 发送消息
 // 处理停止生成事件 - 立即清除 loading 状态
@@ -997,6 +1017,8 @@ onMounted(async () => {
     }
 })
 const clearData = () => {
+    historyRequestId++;
+    historyLoadError.value = null;
     stopStream();
     referencesDrawer.close();
     isReplying.value = false;
@@ -1006,6 +1028,7 @@ const clearData = () => {
     isImRecovering.value = false;
 }
 onUnmounted(() => {
+    historyRequestId++;
     window.removeEventListener(SESSION_MUTATION_EVENT, handleSessionMutation);
     if (recoverPollTimer) { clearTimeout(recoverPollTimer); recoverPollTimer = null; }
 });

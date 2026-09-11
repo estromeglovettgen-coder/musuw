@@ -124,6 +124,7 @@ onUnmounted(() => {
 
           <section v-if="target" class="visual-attachment-preview__body">
             <DocumentPreview
+              :key="`${target.sessionId}:${target.attachmentId}`"
               :session-id="target.sessionId"
               :attachment-id="target.attachmentId"
               :file-type="target.fileType"

@@ -109,6 +109,10 @@ class UiReleaseScopeTest(unittest.TestCase):
     def test_reviewed_presentation_and_delivery_content_is_allowed(self) -> None:
         for path in (
             "auth/src/AuthShowcase.tsx",
+            "weknora/frontend/src/hooks/useKnowledgeBase.ts",
+            "e2e/knowledge-upload.spec.ts",
+            "playwright.knowledge-upload.config.ts",
+            "third_party/weknora/v0.7.2-provenance.json",
             "auth/src/LiquidEther.tsx",
             "auth/e2e/background-stability.spec.ts",
             "e2e/billing-entitlement.spec.ts",
@@ -121,7 +125,7 @@ class UiReleaseScopeTest(unittest.TestCase):
 
     def test_reviewed_paths_reject_unreviewed_content_and_deletion(self) -> None:
         baseline = self.base
-        for path in ("auth/src/AuthShowcase.tsx", ".github/workflows/deploy-production.yml"):
+        for path in ("auth/src/AuthShowcase.tsx", ".github/workflows/deploy-production.yml", "weknora/frontend/src/hooks/useKnowledgeBase.ts"):
             with self.subTest(path=path):
                 self.write(path, "unreviewed executable content\n")
                 candidate = self.commit("unreviewed content at a reviewed path")
