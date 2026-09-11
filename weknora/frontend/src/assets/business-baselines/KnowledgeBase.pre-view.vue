@@ -80,6 +80,25 @@ const kbId = computed(() => (route.params as any).kbId as string || '');
 const kbInfo = ref<any>(null);
 const uploadSourceRef = ref<InstanceType<typeof KbUploadSourceDropdown> | null>(null);
 const uploading = ref(false);
+const uploadTasks = ref<Array<{
+  id: number;
+  kbId: string;
+  fileName: string;
+  status: 'waiting' | 'uploading' | 'success' | 'error';
+  progress: number;
+  error: string;
+}>>([]);
+let uploadSequence = 0;
+const currentUploadTasks = computed(() => uploadTasks.value.filter(task => task.kbId === kbId.value));
+const hasActiveUploads = () => uploadTasks.value.some(task => task.status === 'waiting' || task.status === 'uploading');
+const guardActiveUpload = (event: BeforeUnloadEvent) => {
+  if (!hasActiveUploads()) return;
+  event.preventDefault();
+  event.returnValue = '';
+};
+const dismissUploadResults = () => {
+  uploadTasks.value = uploadTasks.value.filter(task => task.kbId !== kbId.value || task.status === 'waiting' || task.status === 'uploading');
+};
 const kbLoading = ref(false);
 const docListLoading = ref(true);
 const isFAQ = computed(() => (kbInfo.value?.type || '') === 'faq');
@@ -731,12 +750,13 @@ const getTagName = (tagId?: string | number) => {
   return tagMap.value[key]?.name || '';
 };
 
+let firstPageRefresh: Promise<void> | null = null;
 const loadKnowledgeFiles = (kbIdValue: string): Promise<void> => {
   if (!kbIdValue) return Promise.resolve();
   if (!isFAQ.value) {
     docListLoading.value = true;
   }
-  return getKnowled(
+  const request: Promise<void> = getKnowled(
     {
       page: 1,
       page_size: pageSize,
@@ -744,23 +764,30 @@ const loadKnowledgeFiles = (kbIdValue: string): Promise<void> => {
     },
     kbIdValue,
   ).finally(() => {
+    if (firstPageRefresh !== request) return;
+    firstPageRefresh = null;
     if (isCurrentKb(kbIdValue) && !isFAQ.value) {
       docListLoading.value = false;
     }
   });
+  firstPageRefresh = request;
+  return request;
 };
 
 const isCurrentKb = (targetKbId: string) => targetKbId === kbId.value;
 
+let folderTreeRequestId = 0;
 const loadFolderTree = async (kbIdValue: string) => {
+  const requestId = ++folderTreeRequestId;
   if (!kbIdValue || isFAQ.value) {
     folderTree.value = null;
+    folderTreeLoading.value = false;
     return;
   }
   folderTreeLoading.value = true;
   try {
     const res: any = await listKnowledgeFolders(kbIdValue);
-    if (!isCurrentKb(kbIdValue)) return;
+    if (!isCurrentKb(kbIdValue) || requestId !== folderTreeRequestId) return;
     folderTree.value = (res?.data as KnowledgeFolderTree) || null;
     // A folder can disappear (its last document was deleted or moved); fall
     // back to the root instead of leaving an empty, unreachable view.
@@ -768,11 +795,11 @@ const loadFolderTree = async (kbIdValue: string) => {
       selectedFolderPath.value = ROOT_FOLDER_PATH;
     }
   } catch (error) {
-    if (!isCurrentKb(kbIdValue)) return;
+    if (!isCurrentKb(kbIdValue) || requestId !== folderTreeRequestId) return;
     console.error('Failed to load knowledge folders', error);
     folderTree.value = null;
   } finally {
-    if (isCurrentKb(kbIdValue)) {
+    if (isCurrentKb(kbIdValue) && requestId === folderTreeRequestId) {
       folderTreeLoading.value = false;
     }
   }
@@ -1660,8 +1687,20 @@ const executeUploadBatch = async (
   let failCount = 0;
   const totalCount = files.length;
   const hasFolderPaths = files.some(isFolderUpload);
+  const tasks = files.map(file => reactive({
+    id: ++uploadSequence,
+    kbId: targetKbId,
+    fileName: getFolderUploadFileName(file, options.targetFolder || ROOT_FOLDER_PATH) || file.name,
+    status: 'waiting' as 'waiting' | 'uploading' | 'success' | 'error',
+    progress: 0,
+    error: '',
+  }));
+  uploadTasks.value.push(...tasks);
+  window.addEventListener('beforeunload', guardActiveUpload);
 
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
+    const task = tasks[index];
+    task.status = 'uploading';
     try {
       const uploadData: {
         file: File
@@ -1671,42 +1710,36 @@ const executeUploadBatch = async (
 
       const fileName = getFolderUploadFileName(file, options.targetFolder || ROOT_FOLDER_PATH);
       if (fileName) uploadData.fileName = fileName;
-      const responseData: any = await uploadKnowledgeFile(targetKbId, uploadData);
-      const isSuccess = responseData?.success || responseData?.code === 200 || responseData?.status === 'success' || (!responseData?.error && responseData);
+      const responseData: any = await uploadKnowledgeFile(targetKbId, uploadData, (event: { loaded: number; total?: number }) => {
+        // Sending all bytes still waits for the server to accept the document.
+        task.progress = event.total ? Math.min(100, Math.round(event.loaded / event.total * 100)) : 0;
+      });
+      const isSuccess = responseData?.success !== false && !responseData?.error && (
+        responseData?.success === true || responseData?.code === 200 || responseData?.status === 'success' || responseData?.data?.id
+      );
       if (isSuccess) {
         successCount++;
+        task.status = 'success';
+        task.progress = 100;
+        // Publish each accepted document and its folder while the rest upload.
+        window.dispatchEvent(new CustomEvent('knowledgeFileUploaded', {
+          detail: { kbId: targetKbId },
+        }));
       } else {
-        failCount++;
-        if (totalCount === 1) {
-          let errorMessage = t('knowledgeBase.uploadFailed');
-          if (responseData?.error?.message) {
-            errorMessage = responseData.error.message;
-          } else if (responseData?.message) {
-            errorMessage = responseData.message;
-          }
-          if (responseData?.code === 'duplicate_file' || responseData?.error?.code === 'duplicate_file') {
-            errorMessage = t('knowledgeBase.fileExists');
-          }
-          MessagePlugin.error(errorMessage);
-        }
+        throw responseData || new Error(t('knowledgeBase.uploadFailed'));
       }
     } catch (error: any) {
       failCount++;
-      if (totalCount === 1) {
-        let errorMessage = error?.error?.message || error?.message || t('knowledgeBase.uploadFailed');
-        if (error?.code === 'duplicate_file') {
-          errorMessage = t('knowledgeBase.fileExists');
-        }
-        MessagePlugin.error(errorMessage);
+      task.status = 'error';
+      task.error = error?.error?.message || error?.message || t('knowledgeBase.uploadFailed');
+      if (error?.code === 'duplicate_file' || error?.error?.code === 'duplicate_file') {
+        task.error = t('knowledgeBase.fileExists');
       }
+      if (totalCount === 1) MessagePlugin.error(task.error);
     }
   }
 
-  if (successCount > 0) {
-    window.dispatchEvent(new CustomEvent('knowledgeFileUploaded', {
-      detail: { kbId: targetKbId },
-    }));
-  }
+  if (!hasActiveUploads()) window.removeEventListener('beforeunload', guardActiveUpload);
 
   showUploadResultMessages(successCount, failCount, totalCount, hasFolderPaths ? 'folder' : 'document');
   return { successCount, failCount };
@@ -1887,6 +1920,9 @@ const submitReparse = async (id: string) => {
 
 const handleScroll = () => {
   if (isFAQ.value) return;
+  // A card status update may clear the visual loading flag before page one
+  // arrives. Wait for that refresh before advancing the pagination cursor.
+  if (firstPageRefresh) return;
   if (docListLoading.value) return;
   if (scrollLoading) return;
   const currentKbId = kbId.value;
