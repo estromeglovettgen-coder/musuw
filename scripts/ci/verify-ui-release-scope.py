@@ -12,6 +12,32 @@ UI = ("weknora/frontend/src/assets/", "weknora/frontend/src/components/", "wekno
 ROOT = {"e2e/session-batch-manage.spec.ts", "playwright.session-batch.config.ts", ".github/workflows/ci.yml", "scripts/ci/verify-ui-release-scope.py", "scripts/ci/verify-ui-release-scope.test.py", "third_party/weknora/upgrades/81142df/resolution-ledger.tsv", "third_party/weknora/upgrades/81142df/resolution-overrides.tsv", "third_party/weknora/upgrades/81142df/resolution-summary.json"}
 PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscription", "auth", "openrouter", "locks", "buildruntimeconfig", "build-runtime-config")
 
+# Reviewed presentation fixes and their accompanying files in release c6303340.
+# Pin content, not just sensitive filenames: later edits need a fresh review.
+# The two documentation entries also include this clarification of the policy.
+REVIEWED_UI_CONTENT = {
+    ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525"},
+    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1"},
+    "README.md": {"32bfedf673e7951d615dc231ce12867a218be613"},
+    "auth/e2e/background-stability.spec.ts": {"5259bb88fe9802ab6bb04ae72b7fb7664ad9e91e"},
+    "auth/playwright.config.ts": {"8982318e2d188f555b20769aeb6da0d60a4b43b9"},
+    "auth/src/AuthApp.test.ts": {"81938fa219bd30d2c1ad492292f393e4bac2445d"},
+    "auth/src/AuthShowcase.tsx": {"96c26a6ca16ba0b5025921be26fe6765deb3592c"},
+    "auth/src/LiquidEther.tsx": {"e6032911a35297b85d21dd76046d04e314ce3483"},
+    "docs/DEPLOYMENT.md": {"eab3ccb887935df15ec3ea42f34cc52bdecb2b58"},
+    "docs/STAGING_OPERATIONS.md": {"f2d98dfe3b6176b3f7837f0d1fafbf664f6acb19", "39a5adb3c9a9912a73b7e25bbd8f3dbc5839b863"},
+    "e2e/billing-entitlement.spec.ts": {"a00142228e37eb0a8c136eabbda3bd01628c9eee"},
+    "e2e/knowledge-upload.spec.ts": {"6272624c5bedf75c5cbbc2b0b72a969e960f37c5"},
+    "openspec/changes/deploy-isolated-staging/specs/sandbox-billing-release-gate/spec.md": {"5f89c66ff9261991a42692d8f8f16988c6fc5174", "4eb0d34d0f96341f4e55ae8913c987e0a8e02294"},
+    "playwright.billing.config.ts": {"0af6c9ab3d45b26da9a2ad5b0517b0a7d4b64fe0"},
+    "playwright.knowledge-upload.config.ts": {"bde962ce72910dae6b2f618a5b6ba53c6104fc9c"},
+    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af"},
+    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb"},
+    "third_party/weknora/v0.7.2-provenance.json": {"8735c066f0119c55670bfa512216924ff21c8675"},
+    "weknora/frontend/e2e/billing-harness.html": {"51526a1a4a971fb3e9393658944c04cf5819cee9"},
+    "weknora/frontend/e2e/billing-harness.ts": {"d04631889c795e31a0b3b02a222de4e2bf464d07"},
+}
+
 class Rejected(Exception):
     pass
 
@@ -56,6 +82,8 @@ def changed(repo: Path, baseline: str, candidate: str) -> list[str]:
 def check_path(path: str) -> None:
     if path.startswith("/") or "\\" in path or any(part in {"", ".", ".."} for part in path.split("/")):
         raise Rejected("unsafe path")
+    if path in REVIEWED_UI_CONTENT:
+        return
     lowered = path.lower()
     if any(term in lowered for term in PROTECTED):
         raise Rejected("protected path")
@@ -88,6 +116,10 @@ def verify(repo: Path, baseline_arg: str, candidate_arg: str) -> tuple[str, str,
     paths = changed(repo, baseline, candidate)
     for path in paths:
         check_path(path)
+        if path in REVIEWED_UI_CONTENT:
+            content = git(repo, "rev-parse", "--verify", f"{candidate}:{path}")
+            if content.returncode or content.stdout.decode().strip() not in REVIEWED_UI_CONTENT[path]:
+                raise Rejected("unreviewed content at a reviewed UI path")
     if "package.json" in paths and not package_ok(repo, baseline, candidate):
         raise Rejected("package changed outside batch script")
     return baseline, candidate, len(paths)
