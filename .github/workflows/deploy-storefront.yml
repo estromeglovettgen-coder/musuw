@@ -232,7 +232,16 @@ jobs:
             curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 10 --max-time 30 \
               -D "$headers" -o "$body" "https://partners.musuw.com/?lang=$locale"
             grep -Fq 'id="commission-form"' "$body"
-            grep -Fq '模拟数据 · 非真实订单或收益。' "$body"
+            grep -Fq '数据为合成记录，仅用于功能与口径展示，不代表真实订单或收益。' "$body"
+            if [ "$locale" = zh ]; then
+              grep -Fq '<title>Musuw 推广榜单</title>' "$body"
+            else
+              grep -Fq '<title>Musuw Partner Leaderboard</title>' "$body"
+            fi
+            if grep -Eq '<title>[^<]*(模拟数据|Simulated data)[^<]*</title>' "$body"; then
+              printf 'unexpected simulation label in partner board title for locale=%s\n' "$locale" >&2
+              exit 1
+            fi
             grep -Eiq '^x-robots-tag:.*noindex' "$headers"
             grep -Eiq '^content-language:[[:space:]]*(en|zh-CN)' "$headers"
           done
