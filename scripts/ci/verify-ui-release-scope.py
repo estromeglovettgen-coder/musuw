@@ -74,6 +74,8 @@ def changed(repo: Path, baseline: str, candidate: str) -> list[str]:
             raise Rejected("unsupported git diff")
         if fields[0] in {"120000", "160000"} or fields[1] in {"120000", "160000"}:
             raise Rejected("symlink or submodule change")
+        if "000000" not in fields[:2] and fields[0] != fields[1]:
+            raise Rejected("file mode change")
         if not path:
             raise Rejected("empty git path")
         paths.append(path)

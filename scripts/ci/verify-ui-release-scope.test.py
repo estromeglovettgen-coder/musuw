@@ -159,6 +159,20 @@ class UiReleaseScopeTest(unittest.TestCase):
         candidate = self.commit("reviewed path replaced by symlink")
         self.assert_scope_rejects(self.run_scope(self.base, candidate))
 
+    def test_reviewed_content_rejects_executable_mode_changes(self) -> None:
+        self.git("config", "core.filemode", "true")
+        path = "scripts/weknora-workflow-simulation.test.sh"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        target = self.repo / path
+        target.chmod(0o644)
+        baseline = self.commit("reviewed content")
+        for mode in (0o755, 0o644):
+            with self.subTest(mode=oct(mode)):
+                target.chmod(mode)
+                candidate = self.commit("change executable mode only")
+                self.assert_scope_rejects(self.run_scope(baseline, candidate))
+                baseline = candidate
+
     def test_package_json_rejects_any_other_change(self) -> None:
         package = {"name": "changed", "scripts": {"test": "true", "app:e2e:batch": "playwright test"}}
         self.write("package.json", json.dumps(package, indent=2) + "\n")
