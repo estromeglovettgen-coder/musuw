@@ -115,6 +115,7 @@ Automatic health, noindex, digest, and static verification SHALL be recorded onl
 
 #### Scenario: UI-only regression acceptance
 - **WHEN** the operator selects `ui-regression-green`, supplies the current production SHA verified by the production reviewer, and completes UI regression on the exact staging revision
-- **THEN** a fail-closed source allowlist must reject backend, authentication, payment, API, dependency, build-runtime, symlink, and submodule changes before this acceptance can be used
+- **THEN** a fail-closed source allowlist must reject backend, authentication-flow, payment, API, dependency, build-runtime, symlink, and submodule changes before this acceptance can be used
+- **AND** presentation-only login modules and accompanying reviewed test, documentation, and delivery files outside the general UI paths require exact reviewed Git blob content; unreviewed changes or deletion at those same paths are rejected
 - **AND** main ancestry, successful CI, exact staging SHA/digests, required production review, and rollback remain mandatory
 - **AND** release evidence records UI acceptance separately from full Sandbox acceptance

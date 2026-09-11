@@ -184,6 +184,11 @@ diff，只允许受限 UI、测试、provenance 和独立 storefront 路径；�
 镜像、通过 CI、核对在线 staging digest、获得 `server-production` 审批并保留
 原有回滚流程。UI 验收不会被记录为完整支付验收。
 
+登录展示模块及随附的测试、文档和已审核发布文件，使用 scope checker 中的精确
+Git blob 内容许可；许可路径上的未审核改动或删除仍会拒绝。该许可只覆盖已审核的
+背景展示修复，不包含登录流程、令牌、会话、权限、支付接口、依赖或服务端运行配置。
+后续修改这些例外文件必须重新审阅内容并更新许可，不能仅凭相同文件名晋级。
+
 ## 回滚与证据
 
 - Staging 部署或验收失败：停止 `weknora-v072-staging` project，保留 staging

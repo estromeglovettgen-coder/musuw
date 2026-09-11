@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("verify-ui-release-scope.py")
+SOURCE_ROOT = SCRIPT.resolve().parents[2]
 
 
 class UiReleaseScopeTest(unittest.TestCase):
@@ -104,6 +105,73 @@ class UiReleaseScopeTest(unittest.TestCase):
         self.write("package.json", json.dumps(package, indent=2) + "\n")
         candidate = self.commit("add batch acceptance script")
         self.assert_scope_passes(self.run_scope(self.base, candidate))
+
+    def test_reviewed_presentation_and_delivery_content_is_allowed(self) -> None:
+        for path in (
+            "auth/src/AuthShowcase.tsx",
+            "auth/src/LiquidEther.tsx",
+            "auth/e2e/background-stability.spec.ts",
+            "e2e/billing-entitlement.spec.ts",
+            ".github/workflows/deploy-production.yml",
+            "docs/STAGING_OPERATIONS.md",
+        ):
+            self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        candidate = self.commit("reviewed UI and delivery content")
+        self.assert_scope_passes(self.run_scope(self.base, candidate))
+
+    def test_reviewed_paths_reject_unreviewed_content_and_deletion(self) -> None:
+        baseline = self.base
+        for path in ("auth/src/AuthShowcase.tsx", ".github/workflows/deploy-production.yml"):
+            with self.subTest(path=path):
+                self.write(path, "unreviewed executable content\n")
+                candidate = self.commit("unreviewed content at a reviewed path")
+                self.assert_scope_rejects(self.run_scope(baseline, candidate))
+                baseline = candidate
+        path = "auth/src/LiquidEther.tsx"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        baseline = self.commit("reviewed renderer")
+        self.git("rm", path)
+        candidate = self.commit("delete renderer")
+        self.assert_scope_rejects(self.run_scope(baseline, candidate))
+
+    def test_ui_exception_does_not_allow_auth_flow_payment_or_runtime_changes(self) -> None:
+        baseline = self.base
+        for path in (
+            "auth/src/AuthApp.tsx", "auth/src/authClient.ts", "auth/src/config.ts",
+            "auth/package.json", "auth/package-lock.json", "auth/vite.config.ts",
+            "weknora/frontend/src/api/billing.ts",
+            "weknora/frontend/src/components/BillingDrawer.vue",
+            "weknora/internal/handler/knowledge.go",
+            "weknora/migrations/unsafe.sql",
+            "integration/weknora-production/compose.yaml",
+            "scripts/weknora-production/release-ci.sh",
+        ):
+            with self.subTest(path=path):
+                self.write(path, "unreviewed runtime change\n")
+                candidate = self.commit("runtime change")
+                self.assert_scope_rejects(self.run_scope(baseline, candidate))
+                baseline = candidate
+
+    def test_reviewed_path_still_rejects_symlink(self) -> None:
+        link = self.repo / "auth/src/AuthShowcase.tsx"
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to("../../README.md")
+        candidate = self.commit("reviewed path replaced by symlink")
+        self.assert_scope_rejects(self.run_scope(self.base, candidate))
+
+    def test_reviewed_content_rejects_executable_mode_changes(self) -> None:
+        self.git("config", "core.filemode", "true")
+        path = "scripts/weknora-workflow-simulation.test.sh"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        target = self.repo / path
+        target.chmod(0o644)
+        baseline = self.commit("reviewed content")
+        for mode in (0o755, 0o644):
+            with self.subTest(mode=oct(mode)):
+                target.chmod(mode)
+                candidate = self.commit("change executable mode only")
+                self.assert_scope_rejects(self.run_scope(baseline, candidate))
+                baseline = candidate
 
     def test_package_json_rejects_any_other_change(self) -> None:
         package = {"name": "changed", "scripts": {"test": "true", "app:e2e:batch": "playwright test"}}
