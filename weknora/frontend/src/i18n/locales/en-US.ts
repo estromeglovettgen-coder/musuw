@@ -437,6 +437,13 @@ export default {
     tagEditAvailableSection: 'Available',
     tagEditNoSelected: 'None selected',
     folderTree: {
+      deleteFolder: "Delete folder",
+      deleteConfirm: "Delete folder “{name}” and all documents in its subfolders? This cannot be undone.",
+      deleteSubmitted: "Deletion submitted for {count} documents",
+      deletePartial: "Deletion submitted for {count} documents; {remaining} were not confirmed. Refresh before retrying.",
+      deleteFailed: "Could not complete folder deletion. Refresh and try again.",
+      loadDocumentsFailed: "Could not load documents",
+
       countTooltip: 'In this folder: {direct} documents; including subfolders: {total}',
       title: 'Folders',
       rootRow: 'Root',

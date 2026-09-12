@@ -108,7 +108,7 @@ function flattenFolders(
 ): FolderRow[] {
   const rows: FolderRow[] = []
   folders.forEach((node) => {
-    const hasChildren = !!node.children?.length
+    const hasChildren = !!node.children?.length || node.document_count > 0
     rows.push({
       kind: 'folder',
       path: node.path,
@@ -119,7 +119,7 @@ function flattenFolders(
       hasChildren,
     })
     if (hasChildren && expanded.has(node.path)) {
-      rows.push(...flattenFolders(node.children!, expanded, depth + 1))
+      rows.push(...flattenFolders(node.children || [], expanded, depth + 1))
     }
   })
   return rows
@@ -141,7 +141,7 @@ export function buildFolderRows(
     depth: 0,
     documentCount: tree?.root_document_count ?? 0,
     totalCount: tree?.total_document_count ?? 0,
-    hasChildren: folders.length > 0,
+    hasChildren: folders.length > 0 || (tree?.root_document_count ?? 0) > 0,
   }
   if (!root.hasChildren || !expanded.has(ROOT_FOLDER_PATH)) return [root]
   return [root, ...flattenFolders(folders, expanded, 1)]

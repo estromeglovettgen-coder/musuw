@@ -97,3 +97,113 @@ for (const view of ['grid', 'list'] as const) {
     await expectChildren()
   })
 }
+
+function gate() {
+  let release!: () => void
+  const pending = new Promise<void>(resolve => { release = resolve })
+  return { pending, release }
+}
+
+const content = (page: Page) => page.locator('.visual-knowledge-scroll')
+const sidebarFolder = (page: Page, name: string) => page.locator('.visual-folder-row').filter({ hasText: name }).first()
+
+for (const view of ['grid', 'list'] as const) {
+  test(`${view} keeps the complete previous folder while the next folder is loading`, async ({ page }) => {
+    if (view === 'list') await page.locator('.visual-knowledge-view-toggle button').nth(1).click()
+    await sidebarFolder(page, '父目录').click()
+    await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+    await expect(content(page)).not.toContainText('root-file')
+    const childFolders = content(page).locator(view === 'grid' ? '.visual-folder-card' : '.visual-document-list__row.is-folder')
+    await expect(childFolders).toHaveCount(2)
+    const nextFolder = gate()
+    await page.route('**/api/v1/knowledge-bases/upload-kb/knowledge?**', async route => {
+      if (new URL(route.request().url()).searchParams.get('folder_path') === '父目录/子文件夹A') await nextFolder.pending
+      await route.fallback()
+    })
+    try {
+      await sidebarFolder(page, '子文件夹A').click()
+      await expect(content(page)).toHaveAttribute('aria-busy', 'true')
+      await expect(childFolders).toHaveCount(2)
+      await expect(content(page).locator('.visual-knowledge-skeleton-grid')).toHaveCount(0)
+      await expect(content(page).locator('.visual-knowledge-empty')).toHaveCount(0)
+    } finally { nextFolder.release() }
+    await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+    await expect(content(page)).toContainText('child-a-file')
+    await expect(childFolders).toHaveCount(0)
+  })
+}
+
+test('fast folder switching commits only the latest complete folder, ignoring the late response', async ({ page }) => {
+  await sidebarFolder(page, '父目录').click()
+  await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+  await expect(content(page)).not.toContainText('root-file')
+  const folderA = gate()
+  const folderB = gate()
+  await page.route('**/api/v1/knowledge-bases/upload-kb/knowledge?**', async route => {
+    const path = new URL(route.request().url()).searchParams.get('folder_path')
+    if (path === '父目录/子文件夹A') await folderA.pending
+    if (path === '父目录/子文件夹B') await folderB.pending
+    await route.fallback()
+  })
+  try {
+    await sidebarFolder(page, '子文件夹A').click()
+    await expect(content(page)).toHaveAttribute('aria-busy', 'true')
+    await sidebarFolder(page, '子文件夹B').click()
+    await expect(content(page).locator('.visual-folder-card')).toHaveCount(2)
+    folderB.release()
+    await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+    await expect(content(page)).toContainText('child-b-file')
+    const olderResponse = page.waitForResponse(response => new URL(response.url()).searchParams.get('folder_path') === '父目录/子文件夹A')
+    folderA.release()
+    await (await olderResponse).finished()
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+    await expect(content(page)).toContainText('child-b-file')
+    await expect(content(page)).not.toContainText('child-a-file')
+    await expect(content(page).locator('.visual-folder-card')).toHaveCount(0)
+    await expect(page.locator('.visual-knowledge-path-pill .is-current')).toHaveText('子文件夹B')
+  } finally { folderA.release(); folderB.release() }
+})
+
+test('failed folder navigation keeps the previous complete view and retry loads the selected folder', async ({ page }) => {
+  await sidebarFolder(page, '父目录').click()
+  await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+  await expect(content(page)).not.toContainText('root-file')
+  let fail = true
+  await page.route('**/api/v1/knowledge-bases/upload-kb/knowledge?**', async route => {
+    if (fail && new URL(route.request().url()).searchParams.get('folder_path') === '父目录/子文件夹A') {
+      return route.fulfill({ status: 503, json: { success: false } })
+    }
+    await route.fallback()
+  })
+  await sidebarFolder(page, '子文件夹A').click()
+  await expect(page.getByRole('alert')).toContainText('文档列表加载失败')
+  await expect(content(page).locator('.visual-folder-card')).toHaveCount(2)
+  await expect(content(page).locator('.visual-knowledge-skeleton-grid')).toHaveCount(0)
+  fail = false
+  await page.getByRole('alert').getByRole('button', { name: '重试', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(content(page)).toContainText('child-a-file')
+  await expect(content(page).locator('.visual-folder-card')).toHaveCount(0)
+})
+
+test('returning to a parent does not mix new subfolders with the previous leaf documents', async ({ page }) => {
+  await sidebarFolder(page, '父目录').click()
+  await sidebarFolder(page, '子文件夹A').click()
+  await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+  await expect(content(page)).toContainText('child-a-file')
+  const parentFolder = gate()
+  await page.route('**/api/v1/knowledge-bases/upload-kb/knowledge?**', async route => {
+    if (new URL(route.request().url()).searchParams.get('folder_path') === '父目录') await parentFolder.pending
+    await route.fallback()
+  })
+  try {
+    await sidebarFolder(page, '父目录').click()
+    await expect(content(page)).toHaveAttribute('aria-busy', 'true')
+    await expect(content(page)).toContainText('child-a-file')
+    await expect(content(page).locator('.visual-folder-card')).toHaveCount(0)
+    await expect(content(page).locator('.visual-knowledge-skeleton-grid')).toHaveCount(0)
+  } finally { parentFolder.release() }
+  await expect(content(page)).toHaveAttribute('aria-busy', 'false')
+  await expect(content(page)).not.toContainText('child-a-file')
+  await expect(content(page).locator('.visual-folder-card')).toHaveCount(2)
+})

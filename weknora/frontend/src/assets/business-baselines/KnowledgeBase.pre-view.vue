@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, reactive, computed, nextTick } from "vue";
-import { MessagePlugin } from "tdesign-vue-next";
+import { DialogPlugin, MessagePlugin } from "tdesign-vue-next";
 import DocContent from "@/components/doc-content.vue";
 import useKnowledgeBase from '@/hooks/useKnowledgeBase';
 import { useRoute, useRouter } from 'vue-router';
@@ -34,6 +34,7 @@ import {
   getKnowledgeDetails,
   getKnowledgeSpans,
   listKnowledgeFolders,
+  listKnowledgeFiles,
   moveKnowledgeToFolder,
   renameKnowledgeFolder,
   downKnowledgeDetails,
@@ -74,6 +75,7 @@ import type { ParserEngineInfo } from '@/api/system';
 import { UPLOAD_VIDEO_EXTENSIONS } from '@/views/knowledge/utils/uploadSources';
 import { isKnowledgeBaseRuntimeReady, isKnowledgeBaseStorageReady } from '@/utils/knowledgeBaseRuntime';
 import { resolveKnowledgeDisplayName } from '@/utils/knowledgeDisplayName';
+import { deleteKnowledgeFolder } from './deleteFolder';
 const route = useRoute();
 const { t } = useI18n();
 const kbId = computed(() => (route.params as any).kbId as string || '');
@@ -632,6 +634,10 @@ const folderTreeLoading = ref(false);
 // The folder being browsed; ROOT_FOLDER_PATH ('') is the knowledge base top
 // level, a real node of the tree rather than a separate mode.
 const selectedFolderPath = ref<string>(ROOT_FOLDER_PATH);
+// Folder entries and document rows must describe the same completed request.
+// Keep the previous complete view until navigation returns, just as cardList does.
+const displayedListScope = ref({ folder_path: ROOT_FOLDER_PATH, folder_recursive: false });
+const isFolderNavigationPending = computed(() => selectedFolderPath.value !== displayedListScope.value.folder_path);
 const folderTreeCollapsed = ref(readStoredFlag(FOLDER_TREE_COLLAPSED_KEY));
 const hasFolders = computed(() => (folderTree.value?.folders?.length ?? 0) > 0);
 // The folder column only earns its space once the knowledge base actually has
@@ -652,8 +658,8 @@ const isFiltering = computed(() =>
 // Sub-folder entries shown at the top of the list while browsing. Search results
 // are flat, so they are dropped as soon as a filter is active.
 const currentChildFolders = computed(() => {
-  if (isFiltering.value) return [];
-  return childFolders(folderTree.value, selectedFolderPath.value);
+  if (displayedListScope.value.folder_recursive) return [];
+  return childFolders(folderTree.value, displayedListScope.value.folder_path);
 });
 // A row's folder is worth showing only when the list can span folders.
 const showDocumentFolderPath = computed(() => hasFolders.value && isFiltering.value);
@@ -755,6 +761,7 @@ const getTagName = (tagId?: string | number) => {
 let firstPageRefresh: Promise<void> | null = null;
 const loadKnowledgeFiles = (kbIdValue: string): Promise<void> => {
   if (!kbIdValue) return Promise.resolve();
+  const requestFilters = filterParams.value;
   if (!isFAQ.value) {
     docListLoading.value = true;
   }
@@ -762,13 +769,19 @@ const loadKnowledgeFiles = (kbIdValue: string): Promise<void> => {
     {
       page: 1,
       page_size: pageSize,
-      ...filterParams.value,
+      ...requestFilters,
     },
     kbIdValue,
   ).finally(() => {
     if (firstPageRefresh !== request) return;
     firstPageRefresh = null;
     if (isCurrentKb(kbIdValue) && !isFAQ.value) {
+      if (!knowledgeListError.value) {
+        displayedListScope.value = {
+          folder_path: requestFilters.folder_path,
+          folder_recursive: requestFilters.folder_recursive,
+        };
+      }
       docListLoading.value = false;
     }
   });
@@ -811,6 +824,63 @@ const handleFolderSelect = (path: string) => {
   if (selectedFolderPath.value === path) return;
   selectedFolderPath.value = path;
 };
+
+let folderDeleteDialog: ReturnType<typeof DialogPlugin.confirm> | null = null;
+const handleFolderDelete = (path: string) => {
+  if (!path || !canMutateKnowledge.value || folderDeleteDialog) return;
+  const targetKbId = kbId.value;
+  const close = () => {
+    folderDeleteDialog?.destroy();
+    folderDeleteDialog = null;
+  };
+  folderDeleteDialog = DialogPlugin.confirm({
+    header: t('knowledgeBase.folderTree.deleteFolder'),
+    body: t('knowledgeBase.folderTree.deleteConfirm', { name: path }),
+    theme: 'warning',
+    confirmBtn: { content: t('knowledgeBase.confirmDelete'), theme: 'danger' },
+    cancelBtn: t('common.cancel'),
+    closeOnOverlayClick: false,
+    onClose: close,
+    onCancel: close,
+    onConfirm: async () => {
+      if (!isCurrentKb(targetKbId) || !canMutateKnowledge.value) { close(); return; }
+      folderDeleteDialog?.update({
+        confirmBtn: { content: t('knowledgeBase.confirmDelete'), theme: 'danger', loading: true },
+        cancelBtn: { content: t('common.cancel'), disabled: true },
+        closeBtn: false, closeOnEscKeydown: false,
+      });
+      try {
+        const result = await deleteKnowledgeFolder(targetKbId, path, { listKnowledgeFiles, batchDeleteKnowledge });
+        if (!isCurrentKb(targetKbId)) return;
+        if (result.error) {
+          MessagePlugin.error(t('knowledgeBase.folderTree.deletePartial', {
+            count: result.submittedIds.length, remaining: result.unconfirmedIds.length,
+          }));
+        } else {
+          MessagePlugin.success(t('knowledgeBase.folderTree.deleteSubmitted', { count: result.submittedIds.length }));
+        }
+        clearSelection();
+        batchMode.value = false;
+        // The existing endpoint enqueues deletion. Refresh until the folder
+        // disappears; a partial submission stops after the first refresh.
+        for (let attempt = 0; attempt < 30 && isCurrentKb(targetKbId); attempt += 1) {
+          await loadFolderTree(targetKbId);
+          if (!isCurrentKb(targetKbId)) break;
+          resetPage();
+          await loadKnowledgeFiles(targetKbId);
+          if (result.error || !folderExistsInTree(folderTree.value?.folders || [], path)) break;
+          await new Promise<void>(resolve => setTimeout(resolve, 400));
+        }
+        if (isCurrentKb(targetKbId)) void loadTags(targetKbId, true);
+      } catch {
+        if (isCurrentKb(targetKbId)) MessagePlugin.error(t('knowledgeBase.folderTree.deleteFailed'));
+      } finally {
+        close();
+      }
+    },
+  });
+};
+onUnmounted(() => folderDeleteDialog?.destroy());
 
 // ── Re-filing documents and renaming folders ──
 // folder_path is display-only, so both operations are a plain column update:
@@ -1117,6 +1187,7 @@ watch(() => kbId.value, (newKbId, oldKbId) => {
     uiStore.clearSelectedTagIds();
     folderTree.value = null;
     selectedFolderPath.value = ROOT_FOLDER_PATH;
+    displayedListScope.value = { folder_path: ROOT_FOLDER_PATH, folder_recursive: false };
   }
   loadKnowledgeBaseInfo(newKbId);
 }, { immediate: true });
@@ -2050,10 +2121,8 @@ const openKnowledgeItem = (item: KnowledgeCard) => {
   if (shouldSuppressDocClick()) return;
   if (canEdit.value && isManualDraftKnowledge(item)) {
     const index = cardList.value.findIndex((c) => c.id === item.id);
-    if (index >= 0) {
-      handleManualEdit(index, item);
-      return;
-    }
+    handleManualEdit(index, item);
+    return;
   }
   openCardDetails(item);
 };
@@ -2373,7 +2442,7 @@ async function createNewSession(value: string): Promise<void> {
 
       <template v-if="activeKbTab === 'documents' || !isWiki">
         <div class="knowledge-main">
-          <KbFolderTree v-if="showFolderTree && !folderTreeCollapsed" :tree="folderTree" :selected-path="selectedFolderPath"
+          <KbFolderTree v-if="showFolderTree && !folderTreeCollapsed" :kb-id="kbId" :tree="folderTree" :selected-path="selectedFolderPath"
             :loading="folderTreeLoading" :can-edit="canEdit"
             @select="handleFolderSelect" @update:collapsed="handleFolderTreeCollapsedChange"
             @rename="handleFolderRename" />

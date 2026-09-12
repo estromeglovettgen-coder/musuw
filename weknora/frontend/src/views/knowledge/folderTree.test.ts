@@ -138,10 +138,19 @@ test('expanding a folder whose parent is collapsed keeps it hidden', () => {
   assert.deepEqual(rows.map((row) => row.path), ['', 'handbook', 'design'])
 })
 
-test('a knowledge base without folders shows a root row with no toggle', () => {
+test('a knowledge base with only root documents still exposes an expansion toggle', () => {
   const rows = buildFolderRows({ root_document_count: 3, total_document_count: 3, folders: [] }, new Set([ROOT_FOLDER_PATH]))
   assert.equal(rows.length, 1)
-  assert.equal(rows[0].hasChildren, false)
+  assert.equal(rows[0].hasChildren, true)
+})
+
+test('a folder with documents but no subfolders exposes its expansion toggle', () => {
+  const rows = buildFolderRows(tree, new Set([ROOT_FOLDER_PATH]))
+  assert.equal(rows.find((row) => row.path === 'design')?.hasChildren, true)
+})
+
+test('an empty knowledge base has no expansion toggle', () => {
+  assert.equal(buildFolderRows({ root_document_count: 0, total_document_count: 0, folders: [] }, new Set())[0].hasChildren, false)
 })
 
 test('an unloaded tree still yields a root row so the sidebar never renders empty', () => {

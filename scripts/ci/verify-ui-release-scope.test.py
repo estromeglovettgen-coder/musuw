@@ -88,6 +88,7 @@ class UiReleaseScopeTest(unittest.TestCase):
             "weknora/frontend/src/views/knowledge/example.vue",
             "weknora/frontend/e2e/example.spec.ts",
             "e2e/session-batch-manage.spec.ts",
+            "e2e/knowledge-folder-actions.spec.ts",
             "playwright.session-batch.config.ts",
             ".github/workflows/ci.yml",
             "third_party/weknora/upgrades/81142df/resolution-ledger.tsv",

@@ -6338,6 +6338,13 @@ export default {
     tagEditAvailableSection: '可选标签',
     tagEditNoSelected: '暂未选择',
     folderTree: {
+      deleteFolder: "删除文件夹",
+      deleteConfirm: "确认删除文件夹「{name}」及其所有子文件夹中的文档？删除后无法恢复。",
+      deleteSubmitted: "已提交删除 {count} 个文档",
+      deletePartial: "已提交 {count} 个文档的删除，另有 {remaining} 个未确认提交，请刷新后重试",
+      deleteFailed: "文件夹删除未能完成，请刷新后重试",
+      loadDocumentsFailed: "文档加载失败",
+
       countTooltip: '本层 {direct} 个文档，含子目录共 {total} 个',
       title: '目录',
       rootRow: '根目录',

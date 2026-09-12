@@ -9,7 +9,7 @@ async function useChatHarness(page: Page) {
       .replace('/src/views/knowledge/KnowledgeBase.vue', '/src/views/chat/index.vue')
       .replaceAll('/platform/knowledge-bases/:kbId', '/platform/chat/:chatid')
       .replaceAll('/platform/knowledge-bases/upload-kb', '/platform/chat/history-session')
-      .replace('render: () => h(RouterView)', "render: () => h('div', { style: 'display:flex;flex-direction:column;height:100%;min-height:0' }, [h(RouterView)])")
+      .replace('render: () => [h(RouterView), h(ManualKnowledgeEditor)]', "render: () => h('div', { style: 'display:flex;flex-direction:column;height:100%;min-height:0' }, [h(RouterView), h(ManualKnowledgeEditor)])")
     await route.fulfill({ response, body: source + '\nwindow.feedbackRouter = router' })
   })
   await page.route('**/api/v1/**', async route => {
