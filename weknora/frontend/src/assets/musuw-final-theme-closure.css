@@ -2386,6 +2386,21 @@ body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge
   }
 }
 
+/* The directory can change available width without changing the viewport. */
+@container knowledge-content (max-width: 1120px) {
+  body .visual-knowledge-toolbar .visual-knowledge-filter-button,
+  body .visual-knowledge-toolbar .visual-upload-source__trigger {
+    min-width: 0 !important;
+    padding: 8px !important;
+    gap: 4px !important;
+    font-size: 12px !important;
+  }
+  body .visual-knowledge-toolbar .visual-knowledge-filter-button > .t-icon:first-child,
+  body .visual-knowledge-toolbar .visual-upload-source__trigger > .t-icon:first-child {
+    display: none !important;
+  }
+}
+
 /* Dark mode reverses only the primary Add Document action, matching the
  * Agent/KnowledgeBase directory CTA contract.  Import URL stays neutral. */
 :root[theme-mode="dark"] body .visual-knowledge-toolbar .visual-upload-source__trigger:not(.visual-upload-source__link-trigger) {

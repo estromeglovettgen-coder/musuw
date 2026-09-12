@@ -31,7 +31,7 @@ test('knowledge detail shell and document toolbar follow the exported reference 
   // DocumentListView.tsx toolbar: p-2.5, gap-2.5, rounded-2xl, search max-w-220.
   assert.ok(source.includes('.visual-knowledge-toolbar { flex: 0 0 auto; padding: 10px;'))
   assert.ok(source.includes('justify-content: space-between; gap: 10px;'))
-  assert.ok(source.includes('.visual-knowledge-search { min-width: 160px; max-width: 220px;'))
+  assert.ok(source.includes('.visual-knowledge-search { min-width: 90px; max-width: 220px;'))
   assert.ok(source.includes('trigger-icon="add"'))
 
   // p-0.5 wrapper + p-1.5 + 14px icon => 26px visual button.

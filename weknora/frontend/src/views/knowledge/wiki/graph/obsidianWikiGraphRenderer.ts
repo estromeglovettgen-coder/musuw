@@ -154,6 +154,10 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   private progressionTimeScale = 1
   private progressionStartedAt = 0
   private progressionElapsedMs = 0
+  private progressionSnapshot: {
+    positions: Map<string, { x: number; y: number }>
+    camera: CameraSnapshot | null
+  } | null = null
   private cameraAnimationGeneration = 0
   private request: WikiGraphRenderRequest | null = null
   private nodes: NativeNode[] = []
@@ -377,6 +381,11 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
       return
     }
 
+    // A replay keeps the same original view until it is explicitly restored.
+    this.progressionSnapshot ??= {
+      positions: this.snapshotPositions(),
+      camera: this.snapshotCamera(),
+    }
     this.resetRenderedGraph()
     this.prepareProgressionPositions()
     this.progressionVisibleNodes = 1
@@ -421,6 +430,40 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     this.restartSimulation()
     this.emitProgression('playing', this.progressionVisibleNodes)
     this.queueProgressionFrame()
+  }
+
+  restoreProgression(): void {
+    const snapshot = this.progressionSnapshot
+    if (!snapshot || !this.app || this.destroyed) return
+
+    this.cancelProgression()
+    this.cameraAnimationGeneration += 1
+    this.dragState = null
+    this.panState = null
+    this.panVelocityX = 0
+    this.panVelocityY = 0
+    this.zoomCenterX = 0
+    this.zoomCenterY = 0
+    this.worker?.terminate()
+    this.worker = null
+    this.clearWorkerPositionCache()
+    for (const node of this.nodes) {
+      const position = snapshot.positions.get(node.id)
+      if (position) Object.assign(node, position)
+    }
+    if (snapshot.camera) {
+      // Restore the view actually visible when playback started, without
+      // carrying over an unfinished wheel zoom or inertial pan.
+      this.restoreCamera({ ...snapshot.camera, targetScale: snapshot.camera.scale })
+    }
+    // A fresh, idle worker drops playback velocities and stale result buffers.
+    // It resumes normally on the next drag, force change or playback action.
+    this.startWorker(false)
+    this.revealProgressionImmediately()
+    this.progressionSnapshot = null
+    this.emitProgression('idle', this.nodes.length)
+    this.request?.callbacks.onCameraScaleChange?.(this.scale)
+    this.changed()
   }
 
   destroy(): void {
@@ -545,10 +588,10 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
     canvas.addEventListener('wheel', this.handleWheel, { passive: false })
   }
 
-  private startWorker(): void {
+  private startWorker(run = true): void {
     const worker = this.exactWorker
       ? new Worker(
-          `${import.meta.env.BASE_URL}${OBSIDIAN_GRAPH_WORKER_PATH}`,
+          `${import.meta.env?.BASE_URL ?? '/'}${OBSIDIAN_GRAPH_WORKER_PATH}`,
           { name: 'Graph Worker' },
         )
       : new Worker(new URL('./obsidianForce.worker.ts', import.meta.url), {
@@ -593,12 +636,14 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
         this.nodes.map(node => ({ id: node.id, x: node.x, y: node.y })),
         this.edges.map(edge => ({ source: edge.source.id, target: edge.target.id })),
         this.settings,
+        run,
       ))
     } else {
       worker.postMessage({
         type: 'init',
         nodes: this.nodes.map(node => ({ id: node.id, x: node.x, y: node.y })),
         links: this.edges.map(edge => ({ source: edge.source.id, target: edge.target.id })),
+        run,
       })
     }
   }
@@ -1586,6 +1631,7 @@ export class ObsidianWikiGraphRenderer implements WikiGraphRenderer {
   private teardownRuntime(): void {
     this.cameraAnimationGeneration += 1
     this.cancelProgression()
+    this.progressionSnapshot = null
     if (this.frameId !== null) cancelAnimationFrame(this.frameId)
     this.frameId = null
     if (this.hoverLeaveTimer) clearTimeout(this.hoverLeaveTimer)

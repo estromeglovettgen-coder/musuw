@@ -192,6 +192,7 @@
               @play="startObsidianGraphProgression"
               @pause="pauseObsidianGraphProgression"
               @resume="resumeObsidianGraphProgression"
+              @restore="restoreObsidianGraphProgression"
             />
           </div>
           <template v-if="graphStatusCard">
@@ -4357,6 +4358,10 @@ function pauseObsidianGraphProgression() {
 
 function resumeObsidianGraphProgression() {
   graphRendererController?.resumeProgression();
+}
+
+function restoreObsidianGraphProgression() {
+  graphRendererController?.restoreProgression();
 }
 
 function formatDate(dateStr: string) {

@@ -8,7 +8,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 
 test('audited KnowledgeBase controller remains locked after upload progress and incremental refresh repair', () => {
   const controller = read('./business-baselines/KnowledgeBase.pre-view.vue')
-  assert.equal(blobSha(controller), 'a547ea3c9880e58bc9c2bf7b4070dd2e1658e357')
+  assert.equal(blobSha(controller), '528edb0495fbc59f4966ffa2aa8c01e7888a0b25')
 })
 
 test('rebuilt KnowledgeBase delegates setup to the frozen native controller and keeps Graph host binding intact', () => {

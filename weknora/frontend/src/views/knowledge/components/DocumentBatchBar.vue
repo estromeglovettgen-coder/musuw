@@ -8,6 +8,8 @@ const props = defineProps<{
   deleteLoading?: boolean
   reparseLoading?: boolean
   tagLoading?: boolean
+  cancelParseLoading?: boolean
+  cancelParseCount?: number
   visible?: boolean
   showMoveToFolder?: boolean
   folderOptions?: FolderOption[]
@@ -17,6 +19,7 @@ const emit = defineEmits<{
   (e: 'cancel'): void
   (e: 'delete'): void
   (e: 'reparse'): void
+  (e: 'cancelParse'): void
   (e: 'batchTag'): void
   (e: 'moveToFolder', folderPath: string): void
 }>()
@@ -25,10 +28,11 @@ const { t } = useI18n()
 const folderPickerVisible = ref(false)
 
 const actionsDisabled = computed(() =>
-  props.count === 0 || !!props.deleteLoading || !!props.reparseLoading || !!props.tagLoading,
+  props.count === 0 || !!props.deleteLoading || !!props.reparseLoading || !!props.tagLoading || !!props.cancelParseLoading,
 )
 
 const handleFolderConfirm = (path: string) => {
+  if (actionsDisabled.value) return
   folderPickerVisible.value = false
   emit('moveToFolder', path)
 }
@@ -52,6 +56,26 @@ const handleFolderConfirm = (path: string) => {
       </div>
 
       <div class="visual-document-batch__actions">
+        <t-popconfirm
+          theme="warning"
+          :content="t('knowledgeBase.batchCancelParseConfirm', { count: cancelParseCount || 0 })"
+          :confirm-btn="{ content: t('knowledgeBase.cancelParse'), theme: 'warning' }"
+          :cancel-btn="{ content: t('common.cancel') }"
+          placement="top"
+          @confirm="emit('cancelParse')"
+        >
+          <button
+            type="button"
+            class="visual-document-batch__button"
+            :disabled="actionsDisabled || !cancelParseCount"
+            @click.stop
+          >
+            <t-loading v-if="cancelParseLoading" size="small" />
+            <t-icon v-else name="stop-circle" />
+            <span>{{ t('knowledgeBase.cancelParse') }}</span>
+          </button>
+        </t-popconfirm>
+
         <t-popconfirm
           theme="warning"
           :content="t('knowledgeBase.confirmBatchReparseDocument', { count })"

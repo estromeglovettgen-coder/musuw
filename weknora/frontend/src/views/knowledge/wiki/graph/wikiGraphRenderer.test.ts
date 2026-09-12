@@ -68,6 +68,9 @@ function fakeRenderer(name: string, calls: string[]): WikiGraphRenderer {
     resumeProgression() {
       calls.push(`${name}:resume`)
     },
+    restoreProgression() {
+      calls.push(`${name}:restore`)
+    },
     destroy() {
       calls.push(`${name}:destroy`)
     },
@@ -136,6 +139,7 @@ test('forwards live native settings and progression controls through the active 
   controller.startProgression()
   controller.pauseProgression()
   controller.resumeProgression()
+  controller.restoreProgression()
 
   assert.deepEqual(calls, [
     'obsidian:render:summary/alpha',
@@ -144,6 +148,7 @@ test('forwards live native settings and progression controls through the active 
     'obsidian:play',
     'obsidian:pause',
     'obsidian:resume',
+    'obsidian:restore',
   ])
 })
 

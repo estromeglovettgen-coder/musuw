@@ -120,12 +120,12 @@ test('search keeps the current documents visible with loading feedback, then app
   await page.route('**/api/v1/knowledge-bases/upload-kb/knowledge?**', async route => { await search.pending; await route.fallback() })
   try {
     await page.getByRole('textbox', { name: '搜索文档名称...' }).fill('已完成文件-20')
-    await expect(page.locator('.visual-knowledge-toolbar').getByRole('status')).toContainText('加载中')
+    await expect(page.locator('.visual-knowledge-scroll')).toHaveAttribute('aria-busy', 'true')
     await expect(cards).toHaveCount(20)
   } finally { search.release() }
   await expect(cards).toHaveCount(1)
   await expect(cards).toHaveText('已完成文件-20')
-  await expect(page.locator('.visual-knowledge-toolbar').getByRole('status')).toHaveCount(0)
+  await expect(page.locator('.visual-knowledge-scroll')).toHaveAttribute('aria-busy', 'false')
   await page.getByRole('textbox', { name: '搜索文档名称...' }).fill('')
   await expect(cards).toHaveCount(20)
 })

@@ -432,6 +432,10 @@ let lastSelectedIndex = -1;
 const batchDeleting = ref(false);
 const batchReparsing = ref(false);
 const batchTagging = ref(false);
+const batchCancelling = ref(false);
+const selectedParsingIds = computed(() => cardList.value
+  .filter((card) => selectedIds.value.has(card.id) && isParseInFlight(card.parse_status))
+  .map((card) => card.id));
 const batchTagDialogVisible = ref(false);
 const batchTagPreSelectedIds = computed(() => {
   const ids = Array.from(selectedIds.value);
@@ -488,7 +492,7 @@ const awaitBatchReparseReflection = async (ids: string[]) => {
 };
 
 const confirmBatchReparse = async () => {
-  if (batchReparsing.value || batchDeleting.value || selectedIds.value.size === 0) return;
+  if (batchReparsing.value || batchDeleting.value || batchCancelling.value || selectedIds.value.size === 0) return;
   const allIds = Array.from(selectedIds.value);
   const ids = allIds.filter((id) => {
     const item = cardList.value.find((c) => c.id === id);
@@ -646,11 +650,9 @@ const isFiltering = computed(() =>
   }),
 );
 // Sub-folder entries shown at the top of the list while browsing. Search results
-// are flat, so they are dropped as soon as a filter is active. When the sidebar
-// tree is open it already lists the same folders, so skip the duplicate rows.
+// are flat, so they are dropped as soon as a filter is active.
 const currentChildFolders = computed(() => {
   if (isFiltering.value) return [];
-  if (showFolderTree.value && !folderTreeCollapsed.value) return [];
   return childFolders(folderTree.value, selectedFolderPath.value);
 });
 // A row's folder is worth showing only when the list can span folders.
@@ -828,7 +830,7 @@ const folderOptions = computed(() => {
 });
 
 const moveKnowledgeIntoFolder = async (ids: string[], folderPath: string) => {
-  if (!kbId.value || ids.length === 0) return;
+  if (!kbId.value || ids.length === 0 || batchCancelling.value) return;
   try {
     await moveKnowledgeToFolder(kbId.value, ids, folderPath);
     MessagePlugin.success(t('knowledgeBase.moveToFolder.success', { count: ids.length }));
@@ -2057,7 +2059,7 @@ const openKnowledgeItem = (item: KnowledgeCard) => {
 };
 
 const confirmBatchDelete = async () => {
-  if (batchDeleting.value || batchReparsing.value || selectedIds.value.size === 0) return;
+  if (batchDeleting.value || batchReparsing.value || batchCancelling.value || selectedIds.value.size === 0) return;
   const ids = Array.from(selectedIds.value);
   const deletedIdSet = new Set(ids);
   batchDeleting.value = true;
@@ -2090,12 +2092,12 @@ const confirmBatchDelete = async () => {
 };
 
 const handleBatchTag = () => {
-  if (batchDeleting.value || batchReparsing.value || batchTagging.value || selectedIds.value.size === 0) return;
+  if (batchDeleting.value || batchReparsing.value || batchTagging.value || batchCancelling.value || selectedIds.value.size === 0) return;
   batchTagDialogVisible.value = true;
 };
 
 const onBatchTagConfirm = async (tagIds: string[]) => {
-  if (batchTagging.value || selectedIds.value.size === 0) return;
+  if (batchTagging.value || batchCancelling.value || selectedIds.value.size === 0) return;
   const ids = Array.from(selectedIds.value);
   const updateMap: Record<string, string[]> = {};
   for (const id of ids) {
@@ -2115,6 +2117,40 @@ const onBatchTagConfirm = async (tagIds: string[]) => {
     MessagePlugin.error(e?.message || t('knowledgeBase.batchTagFailed'));
   } finally {
     batchTagging.value = false;
+  }
+};
+
+const confirmBatchCancelParse = async () => {
+  if (!canEdit.value || batchCancelling.value || batchDeleting.value || batchReparsing.value || batchTagging.value) return;
+  const ids = [...selectedParsingIds.value];
+  if (!ids.length) return;
+  const targetKbId = kbId.value;
+  const succeeded: string[] = [];
+  batchCancelling.value = true;
+  try {
+    // Reuse the existing per-document endpoint without flooding the server.
+    for (let offset = 0; offset < ids.length; offset += 4) {
+      const group = ids.slice(offset, offset + 4);
+      const results = await Promise.allSettled(group.map((id) => cancelKnowledgeParse(id)));
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value?.success === true) {
+          succeeded.push(group[index]);
+        }
+      });
+    }
+    // A request started in another knowledge base must not change this view.
+    if (!isCurrentKb(targetKbId)) return;
+    for (const id of succeeded) selectedIds.value.delete(id);
+    if (selectedIds.value.size === 0) batchMode.value = false;
+    const failed = ids.length - succeeded.length;
+    if (failed) {
+      MessagePlugin.warning(t('knowledgeBase.batchCancelParsePartial', { success: succeeded.length, failed }));
+    } else {
+      MessagePlugin.success(t('knowledgeBase.batchCancelParseSuccess', { count: succeeded.length }));
+    }
+    await loadKnowledgeFiles(targetKbId);
+  } finally {
+    batchCancelling.value = false;
   }
 };
 
@@ -2630,9 +2666,9 @@ async function createNewSession(value: string): Promise<void> {
               </div>
               <div class="doc-batch-bar-anchor" v-show="batchMode || selectedIds.size > 0">
                 <DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting"
-                  :reparse-loading="batchReparsing" :tag-loading="batchTagging" :visible="batchMode || selectedIds.size > 0"
+                  :reparse-loading="batchReparsing" :tag-loading="batchTagging" :cancel-parse-loading="batchCancelling" :cancel-parse-count="selectedParsingIds.length" :visible="batchMode || selectedIds.size > 0"
                   :show-move-to-folder="canEdit" :folder-options="folderOptions"
-                  @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse"
+                  @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse" @cancel-parse="confirmBatchCancelParse"
                   @batch-tag="handleBatchTag"
                   @move-to-folder="(path: string) => moveKnowledgeIntoFolder(Array.from(selectedIds), path)" />
               </div>

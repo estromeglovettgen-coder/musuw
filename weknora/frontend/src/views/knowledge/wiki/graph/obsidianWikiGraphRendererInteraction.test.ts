@@ -518,6 +518,116 @@ test('plays, pauses and resumes the audited node progression without refetching 
   }
 })
 
+test('restores the complete graph and pre-playback viewport from playing, paused and completed playback', () => {
+  const originalWorker = globalThis.Worker
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame
+  const originalDateNow = Date.now
+  const workers: Array<{ messages: any[]; terminated: boolean; onmessage?: (event: any) => void }> = []
+  const frames = new Map<number, FrameRequestCallback>()
+  let nextFrameId = 0
+  let now = 0
+  globalThis.Worker = class {
+    messages: any[] = []
+    terminated = false
+    onmessage?: (event: any) => void
+    constructor() { workers.push(this) }
+    postMessage(message: unknown) { this.messages.push(message) }
+    terminate() { this.terminated = true }
+  } as unknown as typeof Worker
+  globalThis.requestAnimationFrame = (callback) => {
+    frames.set(++nextFrameId, callback)
+    return nextFrameId
+  }
+  globalThis.cancelAnimationFrame = id => { frames.delete(id) }
+  Date.now = () => now
+
+  try {
+    for (const state of ['playing', 'paused', 'complete'] as const) {
+      const renderer = createRenderer()
+      const snapshots: unknown[] = []
+      const cameraScales: number[] = []
+      const request = rendererRequest({
+        nodes: [
+          { slug: 'first', title: 'First', page_type: 'entity', link_count: 1 },
+          { slug: 'second', title: 'Second', page_type: 'entity', link_count: 1 },
+        ],
+        edges: [{ source: 'first', target: 'second' }],
+      })
+      request.callbacks.onPlaybackChange = (snapshot: unknown) => snapshots.push(snapshot)
+      request.callbacks.onCameraScaleChange = (scale: number) => cameraScales.push(scale)
+      renderer.request = request
+      renderer.buildData(request, new Map([
+        ['first', { x: 10, y: 20 }],
+        ['second', { x: 30, y: 40 }],
+      ]))
+      renderer.app = {}
+      renderer.exactWorker = true
+      renderer.scale = renderer.targetScale = 1.5
+      renderer.panX = 80
+      renderer.panY = 90
+      renderer.changed = () => undefined
+      renderer.prefersReducedMotion = () => false
+      renderer.startWorker()
+
+      renderer.startProgression()
+      const staleFrame = frames.get(nextFrameId)!
+      if (state === 'paused') renderer.pauseProgression()
+      if (state === 'complete') {
+        now += 10_000
+        staleFrame(now)
+        assert.deepEqual(snapshots.at(-1), { state: 'complete', visible: 2, total: 2 })
+        // Replaying must retain the original view, rather than snapshotting
+        // positions produced by the preceding growth animation.
+        renderer.startProgression()
+        now += 10_000
+        frames.get(nextFrameId)!(now)
+      }
+      renderer.nodes[0].x = -500
+      renderer.nodes[1].y = 900
+      renderer.scale = renderer.targetScale = 3
+      renderer.panX = -100
+      renderer.panY = 200
+      renderer.panVelocityX = 4
+      renderer.panVelocityY = -3
+      renderer.latestPositions = new Float32Array([900, 900, 900, 900])
+      const previousWorker = renderer.worker
+
+      renderer.restoreProgression()
+
+      assert.deepEqual(snapshots.at(-1), { state: 'idle', visible: 2, total: 2 })
+      assert.equal(previousWorker.terminated, true)
+      assert.deepEqual(renderer.worker.messages.at(-1).nodes, { first: [10, 20], second: [30, 40] })
+      assert.deepEqual(renderer.worker.messages.at(-1).links, [['first', 'second']])
+      assert.equal(renderer.worker.messages.at(-1).run, undefined, 'restoration must not start another layout animation')
+      previousWorker.onmessage({ data: {
+        id: ['first', 'second'], buffer: new Float32Array([900, 900, 900, 900]).buffer,
+      } })
+      renderer.applyWorkerPositions()
+      renderer.updateCamera()
+      assert.deepEqual(renderer.getNodeViewportPoint('first'), { x: 95, y: 120, scale: 1.5 })
+      assert.deepEqual(renderer.getNodeViewportPoint('second'), { x: 125, y: 150, scale: 1.5 })
+      assert.equal(cameraScales.at(-1), 1.5)
+      const snapshotCount = snapshots.length
+      staleFrame(now + 50_000)
+      renderer.restoreProgression()
+      assert.equal(snapshots.length, snapshotCount, 'stale frames and repeated restore must be harmless')
+
+      // A subsequent playback must snapshot the newly chosen view.
+      renderer.nodes[0].x = 40
+      renderer.panX = 120
+      renderer.startProgression()
+      renderer.restoreProgression()
+      assert.deepEqual(renderer.getNodeViewportPoint('first'), { x: 180, y: 120, scale: 1.5 })
+    }
+  } finally {
+    globalThis.Worker = originalWorker
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame
+    Date.now = originalDateNow
+  }
+})
+
 test('builds the native file-plus-outgoing-link progression budget', () => {
   const renderer = createRenderer()
   renderer.buildData(rendererRequest({
@@ -535,6 +645,32 @@ test('builds the native file-plus-outgoing-link progression budget', () => {
 
   assert.equal(renderer.progressionItemTotal, 6)
   assert.deepEqual(renderer.progressionNodeStartItems, [1, 4, 6])
+})
+
+test('replacement graph data cannot restore a snapshot from the preceding graph', () => {
+  const renderer = new ObsidianWikiGraphRenderer({ replaceChildren() {} } as unknown as HTMLElement) as any
+  const snapshots: unknown[] = []
+  const request = rendererRequest({
+    nodes: [{ slug: 'same-id', title: 'Old graph', page_type: 'entity', link_count: 0 }],
+    edges: [],
+  })
+  request.callbacks.onPlaybackChange = (snapshot: unknown) => snapshots.push(snapshot)
+  renderer.request = request
+  renderer.buildData(request, new Map([['same-id', { x: 10, y: 20 }]]))
+  renderer.app = { destroy() {} }
+  renderer.changed = () => undefined
+  renderer.prefersReducedMotion = () => false
+  renderer.startProgression()
+
+  // render() tears down the preceding runtime before building incoming data.
+  renderer.teardownRuntime()
+  renderer.buildData(request, new Map([['same-id', { x: 300, y: 400 }]]))
+  renderer.app = {}
+  const beforeRestore = snapshots.length
+  renderer.restoreProgression()
+
+  assert.deepEqual(renderer.getNodeViewportPoint('same-id'), { x: 300, y: 400, scale: 1 })
+  assert.equal(snapshots.length, beforeRestore)
 })
 
 test('seeds each newly unlocked connected node around its visible neighbors', () => {
@@ -756,7 +892,9 @@ test('destroy cancels progression and stale scheduled callbacks cannot report ag
     renderer.destroy()
     assert.deepEqual(cancelled, [73])
     callback(performance.now())
+    renderer.restoreProgression()
     assert.equal(snapshots.length, 1)
+    assert.equal(renderer.progressionSnapshot, null)
   } finally {
     globalThis.requestAnimationFrame = originalRequestAnimationFrame
     globalThis.cancelAnimationFrame = originalCancelAnimationFrame

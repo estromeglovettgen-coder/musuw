@@ -84,16 +84,28 @@
         <p class="graph-playback-description">
           {{ t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackDescription') }}
         </p>
-        <button
-          type="button"
-          class="playback-button"
-          :disabled="playback.total === 0"
-          :aria-label="playbackActionLabel"
-          @click="handlePlaybackAction"
-        >
-          <t-icon :name="playbackActionIcon" />
-          <span>{{ playbackActionLabel }}</span>
-        </button>
+        <div class="graph-playback-actions">
+          <button
+            type="button"
+            class="playback-button"
+            :disabled="playback.total === 0"
+            :aria-label="playbackActionLabel"
+            @click="handlePlaybackAction"
+          >
+            <t-icon :name="playbackActionIcon" />
+            <span>{{ playbackActionLabel }}</span>
+          </button>
+          <button
+            v-if="playback.state !== 'idle'"
+            type="button"
+            class="playback-button"
+            :aria-label="t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackRestore')"
+            @click="emit('restore')"
+          >
+            <t-icon name="rollback" />
+            <span>{{ t('knowledgeEditor.wikiBrowser.obsidianGraph.playbackRestore') }}</span>
+          </button>
+        </div>
       </section>
 
       <section class="graph-control-section">
@@ -184,6 +196,7 @@ const emit = defineEmits<{
   (event: 'play'): void
   (event: 'pause'): void
   (event: 'resume'): void
+  (event: 'restore'): void
 }>()
 
 const { t } = useI18n()
@@ -452,24 +465,43 @@ button {
   line-height: 1.45;
 }
 
+.graph-playback-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
 .playback-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  width: 100%;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
   min-height: 30px;
+  padding: 4px 6px;
   margin: 0 0 2px;
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-default, 8px);
   color: var(--td-text-color-primary);
   background: var(--td-bg-color-container);
   cursor: pointer;
+  font-size: 11px;
+  line-height: 1.35;
   transition:
     color 0.15s ease,
     border-color 0.15s ease,
     background-color 0.15s ease,
     box-shadow 0.15s ease;
+}
+
+.playback-button :deep(.t-icon) {
+  flex-shrink: 0;
+}
+
+.playback-button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .playback-button:hover:not(:disabled) {
