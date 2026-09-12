@@ -162,7 +162,7 @@ export const priceBooks = Object.freeze({
 export const currencySymbols = Object.freeze({
   USD: "$",
   CNY: "¥",
-  JPY: "¥"
+  JPY: "JP¥"
 });
 
 export const plans = [

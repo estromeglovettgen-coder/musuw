@@ -778,11 +778,26 @@ export function getStorefrontCopy(locale) {
   return storefrontTranslations[locale] ?? storefrontTranslations.en;
 }
 
+export function localePreferenceCookie(locale, hostname = "musuw.com") {
+  const isMusuwHost = hostname === "musuw.com" || hostname.endsWith(".musuw.com");
+  const domain = isMusuwHost ? "; Domain=.musuw.com" : "";
+  const secure = isMusuwHost ? "; Secure" : "";
+  return `musuw_locale=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax${domain}${secure}`;
+}
+
 export function persistLocalePreference(locale) {
   if (typeof window === "undefined") return;
   const normalized = locale === "zh-CN" || locale === "zh" ? "zh-CN" : "en";
   window.__MUSUW_LOCALE__ = normalized;
-  document.cookie = `musuw_locale=${encodeURIComponent(normalized)}; path=/; max-age=31536000; SameSite=Lax`;
+  // Remove the legacy host-only cookie before writing the shared preference.
+  // Otherwise www.musuw.com can send two conflicting values on refresh.
+  document.cookie = "musuw_locale=; Path=/; Max-Age=0; SameSite=Lax";
+  document.cookie = localePreferenceCookie(normalized, window.location.hostname);
+  const url = new URL(window.location.href);
+  if (url.searchParams.has("lang")) {
+    url.searchParams.set("lang", normalized);
+    window.history.replaceState(window.history.state, "", url);
+  }
   try {
     localStorage.setItem("musuw_locale", normalized);
   } catch {}
