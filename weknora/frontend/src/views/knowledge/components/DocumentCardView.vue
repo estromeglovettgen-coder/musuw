@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { formatFileSize, getFileIcon } from '@/utils/files';
 import { useTagChipsOverflow } from '@/composables/useTagChipsOverflow';
 import DocumentActionMenu from './DocumentActionMenu.vue';
+import FolderActionMenu from './FolderActionMenu.vue';
 import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue';
 import KnowledgeProcessingTimeline from '@/components/knowledge-processing-timeline.vue';
 
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   (e: 'action', action: 'download' | 'edit' | 'view-trace' | 'reparse' | 'cancel-parse' | 'move' | 'move-folder' | 'batch-manage' | 'delete', item: KnowledgeCard): void;
   (e: 'tag-edit', item: KnowledgeCard): void;
   (e: 'open-folder', path: string): void;
+  (e: 'delete-folder', path: string): void;
   (e: 'move-to-folder', item: KnowledgeCard, folderPath: string): void;
   (e: 'move-select-target', kb: any): void;
   (e: 'move-back'): void;
@@ -166,10 +168,11 @@ const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | '
 
 <template>
   <div class="visual-document-grid" role="list">
-    <button v-for="folder in folders" :key="'folder-' + folder.path" type="button" class="visual-folder-card" :title="folder.path" @click="onOpenFolder(folder.path)">
+    <article v-for="folder in folders" :key="'folder-' + folder.path" class="visual-folder-card" :title="folder.path" role="button" tabindex="0" @click="onOpenFolder(folder.path)" @keydown.enter.self="onOpenFolder(folder.path)" @keydown.space.prevent.self="onOpenFolder(folder.path)">
+      <FolderActionMenu v-if="canEdit && canMutateKnowledge" class="visual-folder-card__actions" @delete="emit('delete-folder', folder.path)" />
       <div class="visual-folder-card__main"><t-icon name="folder" class="visual-folder-card__icon" /><span class="visual-folder-card__title">{{ folder.name }}</span></div>
       <div class="visual-folder-card__footer">{{ t('knowledgeBase.folderTree.folderCardCount', { count: folder.total_count }) }}</div>
-    </button>
+    </article>
 
     <article v-for="(item, index) in items" :key="item.id" class="visual-document-card" :class="{ 'is-selected': selectedIds.has(item.id), 'is-batch-mode': batchMode }" :data-select-id="item.id" role="listitem" tabindex="0" @click="onCardClick(item)" @keydown.enter="onCardClick(item)" @mouseenter="onCardMouseEnter($event, item)" @mouseleave="onCardMouseLeave">
       <div class="visual-document-card__body">
@@ -256,6 +259,7 @@ const handleAction = (action: 'download' | 'edit' | 'view-trace' | 'reparse' | '
 .visual-folder-card:hover,.visual-document-card:hover { border-color: #9ca3af; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%),0 2px 4px -2px rgb(0 0 0 / 10%); }
 .visual-folder-card:focus-visible,.visual-document-card:focus-visible { outline: 2px solid #9ca3af; outline-offset: 2px; }
 .visual-folder-card__main { display: flex; flex-direction: column; gap: 8px; }
+.visual-folder-card__actions { position: absolute; top: 10px; right: 10px; }
 .visual-folder-card__icon { width: 20px; height: 20px; color: #374151; font-size: 20px; }
 .visual-folder-card__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 18px; font-weight: 700; color: #111827; }
 .visual-folder-card__footer,.visual-document-card__footer { min-height: 24px; padding-top: 10px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9ca3af; font-family: var(--app-font-family-mono); font-size: 10px; line-height: 14px; }

@@ -17,7 +17,8 @@ test('the rename sentinel cannot collide with the root folder path', () => {
 })
 
 test('only real folders expose the rename behavior', () => {
-  assert.match(tree, /v-if="canEdit && row\.kind === 'folder'"/)
+  assert.match(tree, /v-if="\(canEdit \|\| canDelete\) && row\.kind === 'folder'"/)
+  assert.match(tree, /<button v-if="canEdit"[^>]*@click="onFolderMenuRename\(row\)"/)
   assert.match(tree, /onFolderMenuRename/)
   assert.match(tree, /emit\('rename', \{ from: row\.path, to: joinFolderPath\(parent, name\) \}\)/)
 })

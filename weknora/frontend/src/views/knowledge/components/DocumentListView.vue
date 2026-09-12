@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { formatFileSize, getFileIcon } from '@/utils/files';
 import { useTagChipsOverflow } from '@/composables/useTagChipsOverflow';
 import DocumentActionMenu from './DocumentActionMenu.vue';
+import FolderActionMenu from './FolderActionMenu.vue';
 import FolderPickerMenu, { type FolderOption } from './FolderPickerMenu.vue';
 
 interface Tag {
@@ -66,6 +67,7 @@ const emit = defineEmits<{
   (e: 'probe-trace', item: KnowledgeItem): void;
   (e: 'tag-edit', item: KnowledgeItem): void;
   (e: 'open-folder', path: string): void;
+  (e: 'delete-folder', path: string): void;
   (e: 'move-to-folder', item: KnowledgeItem, folderPath: string): void;
   // Move sub-flow emits
   (e: 'move-select-target', kb: any): void;
@@ -281,14 +283,16 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
     </div>
 
     <div class="visual-document-list__body">
-      <button
+      <div
         v-for="folder in folders"
         :key="'folder-' + folder.path"
-        type="button"
+        tabindex="0"
         class="visual-document-list__row is-folder"
         :title="folder.path"
         role="row"
         @click="emit('open-folder', folder.path)"
+        @keydown.enter.self="emit('open-folder', folder.path)"
+        @keydown.space.prevent.self="emit('open-folder', folder.path)"
       >
         <span class="visual-document-list__cell is-check" aria-hidden="true" />
         <span class="visual-document-list__cell is-name">
@@ -306,8 +310,10 @@ const handleAction = (action: 'download' | 'edit' | 'reparse' | 'cancel-parse' |
         <span class="visual-document-list__cell is-size" />
         <span class="visual-document-list__cell is-status" />
         <span class="visual-document-list__cell is-time" />
-        <span v-if="canEdit" class="visual-document-list__cell is-actions" aria-hidden="true" />
-      </button>
+        <span v-if="canEdit" class="visual-document-list__cell is-actions">
+          <FolderActionMenu v-if="canMutateKnowledge" @delete="emit('delete-folder', folder.path)" />
+        </span>
+      </div>
 
       <div
         v-for="item in items"

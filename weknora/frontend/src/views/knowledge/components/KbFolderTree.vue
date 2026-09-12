@@ -40,10 +40,10 @@
         </template>
 
         <template v-else>
+          <template v-for="row in rows" :key="row.path || '__root__'">
           <div
-            v-for="row in rows"
-            :key="row.path || '__root__'"
             class="visual-folder-row"
+            :data-folder-path="row.path"
             :class="{
               'is-active': selectedPath === row.path,
               'is-root': row.kind === 'root',
@@ -55,19 +55,22 @@
             role="button"
             tabindex="0"
             @click="emit('select', row.path)"
-            @keydown.enter="emit('select', row.path)"
+            @keydown.enter.self="emit('select', row.path)"
           >
-            <span
+            <button
               v-if="row.hasChildren"
+              type="button"
               class="visual-folder-row__toggle"
-              role="button"
+              :aria-expanded="isExpanded(row.path)"
               :aria-label="t(isExpanded(row.path)
                 ? 'knowledgeBase.folderTree.collapseFolder'
                 : 'knowledgeBase.folderTree.expandFolder')"
               @click.stop="toggle(row.path)"
+              @keydown.enter.stop
+              @keydown.space.stop
             >
               <t-icon :name="isExpanded(row.path) ? 'chevron-down' : 'chevron-right'" />
-            </span>
+            </button>
             <span v-else class="visual-folder-row__toggle-placeholder" aria-hidden="true" />
 
             <t-icon
@@ -97,7 +100,7 @@
                   :title="t('knowledgeBase.folderTree.countTooltip', { direct: row.documentCount, total: row.totalCount })"
                 >{{ row.totalCount }}</span>
                 <t-popup
-                  v-if="canEdit && row.kind === 'folder'"
+                  v-if="(canEdit || canDelete) && row.kind === 'folder'"
                   :visible="menuOpenPath === row.path"
                   trigger="click"
                   placement="bottom-right"
@@ -116,9 +119,13 @@
                   </button>
                   <template #content>
                     <div class="visual-folder-menu" @click.stop>
-                      <button type="button" class="visual-folder-menu__item" @click="onFolderMenuRename(row)">
+                      <button v-if="canEdit" type="button" class="visual-folder-menu__item" @click="onFolderMenuRename(row)">
                         <t-icon name="edit" />
                         <span>{{ t('knowledgeBase.folderTree.rename') }}</span>
+                      </button>
+                      <button v-if="canDelete" type="button" class="visual-folder-menu__item is-danger" @click="onFolderMenuDelete(row)">
+                        <t-icon name="delete" />
+                        <span>{{ t('knowledgeBase.folderTree.deleteFolder') }}</span>
                       </button>
                     </div>
                   </template>
@@ -126,6 +133,46 @@
               </span>
             </template>
           </div>
+          <template v-if="isExpanded(row.path) && row.documentCount > 0">
+            <button
+              v-for="document in documentPages.get(row.path)?.items || []"
+              :key="document.id"
+              type="button"
+              class="visual-folder-row visual-folder-document"
+              :data-document-id="document.id"
+              :style="{ '--visual-folder-depth': row.depth + 1 }"
+              :title="document.title || document.file_name || document.id"
+              @click="emit('open-document', document)"
+            >
+              <span class="visual-folder-row__toggle-placeholder" aria-hidden="true" />
+              <t-icon name="file" class="visual-folder-row__icon" />
+              <span class="visual-folder-row__label">{{ document.title || document.file_name || document.id }}</span>
+            </button>
+            <div
+              v-if="documentPages.get(row.path)?.loading"
+              class="visual-folder-tree__document-status"
+              :style="{ '--visual-folder-depth': row.depth + 1 }"
+              role="status"
+              :aria-label="t('common.loading')"
+            >
+              <t-skeleton animation="gradient" :row-col="[{ width: '85%', height: '12px' }]" />
+            </div>
+            <button
+              v-else-if="documentPages.get(row.path)?.failed"
+              type="button"
+              class="visual-folder-row visual-folder-tree__document-action"
+              :style="{ '--visual-folder-depth': row.depth + 1 }"
+              @click="loadDocuments(row.path, documentPages.get(row.path)?.stale)"
+            >{{ t('knowledgeBase.folderTree.loadDocumentsFailed') }} · {{ t('common.retry') }}</button>
+            <button
+              v-else-if="documentPages.get(row.path)?.hasMore"
+              type="button"
+              class="visual-folder-row visual-folder-tree__document-action"
+              :style="{ '--visual-folder-depth': row.depth + 1 }"
+              @click="loadDocuments(row.path)"
+            >{{ t('common.loadMore') }}</button>
+          </template>
+          </template>
         </template>
       </div>
     </template>
@@ -135,7 +182,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { KnowledgeFolderTree } from '@/api/knowledge-base/index'
+import { listKnowledgeFiles, type KnowledgeFolderTree } from '@/api/knowledge-base/index'
+import { useFolderDocuments, type FolderDocument } from '../useFolderDocuments'
 import {
   buildFolderRows,
   folderAncestorPaths,
@@ -146,24 +194,32 @@ import {
 
 const props = withDefaults(defineProps<{
   tree: KnowledgeFolderTree | null
+  kbId: string
   /** Selected folder path; the empty string is the knowledge base top level. */
   selectedPath: string
   loading?: boolean
   collapsed?: boolean
   canEdit?: boolean
+  canDelete?: boolean
 }>(), {
   loading: false,
   collapsed: false,
   canEdit: false,
+  canDelete: false,
 })
 
 const emit = defineEmits<{
   select: [path: string]
   'update:collapsed': [collapsed: boolean]
   rename: [payload: { from: string; to: string }]
+  'delete-folder': [path: string]
+  'open-document': [document: FolderDocument]
 }>()
 
 const { t } = useI18n()
+const { pages: documentPages, load: loadDocuments, invalidate: invalidateDocuments } = useFolderDocuments(
+  () => props.kbId, listKnowledgeFiles,
+)
 
 // The root starts expanded so the uploaded structure is visible without a click.
 const expanded = ref(new Set<string>([ROOT_FOLDER_PATH]))
@@ -207,6 +263,11 @@ const onFolderMenuRename = async (row: FolderRow) => {
   await startRename(row)
 }
 
+const onFolderMenuDelete = (row: FolderRow) => {
+  menuOpenPath.value = null
+  emit('delete-folder', row.path)
+}
+
 const cancelRename = () => {
   renamingPath.value = null
   renameValue.value = ''
@@ -242,11 +303,24 @@ watch(
   (tree) => {
     if (!tree?.folders?.length || expanded.value.size > 1) return
     const next = new Set(expanded.value)
-    tree.folders.forEach((folder) => next.add(folder.path))
+    tree.folders.filter((folder) => folder.children?.length).forEach((folder) => next.add(folder.path))
     expanded.value = next
   },
   { immediate: true },
 )
+
+// A new tree is also the mutation signal for renamed, moved or deleted files,
+// including replacements whose document counts happen to be unchanged.
+watch(() => props.kbId, () => documentPages.clear(), { flush: 'sync' })
+watch(() => props.tree, invalidateDocuments, { flush: 'sync' })
+watch([rows, () => props.kbId, () => props.collapsed], () => {
+  if (props.collapsed || !props.kbId) return
+  for (const row of rows.value) {
+    if (!isExpanded(row.path) || row.documentCount === 0) continue
+    const page = documentPages.get(row.path)
+    if (!page || page.stale) void loadDocuments(row.path, !!page?.stale)
+  }
+}, { immediate: true })
 </script>
 
 <style scoped lang="less">
@@ -426,7 +500,27 @@ watch(
 }
 
 .visual-folder-row__toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
+}
+
+.visual-folder-document,
+.visual-folder-tree__document-action {
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+}
+
+.visual-folder-tree__document-action {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.visual-folder-tree__document-status {
+  min-height: 28px;
+  padding: 8px 12px 8px calc(24px + var(--visual-folder-depth, 0) * 12px);
 }
 
 .visual-folder-row__toggle:hover {
@@ -538,6 +632,10 @@ watch(
 
 .visual-folder-menu__item:hover {
   background: #f3f4f6;
+}
+
+.visual-folder-menu__item.is-danger {
+  color: #dc2626;
 }
 
 @media (max-width: 900px) {

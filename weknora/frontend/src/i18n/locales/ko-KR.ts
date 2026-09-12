@@ -6334,6 +6334,13 @@ export default {
     tagEditAvailableSection: '선택 가능',
     tagEditNoSelected: '선택 없음',
     folderTree: {
+      deleteFolder: "폴더 삭제",
+      deleteConfirm: "「{name}」 폴더와 모든 하위 폴더의 문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      deleteSubmitted: "문서 {count}개 삭제 요청을 제출했습니다",
+      deletePartial: "문서 {count}개 삭제 요청을 제출했으며 {remaining}개는 확인되지 않았습니다. 새로고침 후 다시 시도해 주세요.",
+      deleteFailed: "폴더 삭제를 완료하지 못했습니다. 새로고침 후 다시 시도해 주세요.",
+      loadDocumentsFailed: "문서를 불러오지 못했습니다",
+
       countTooltip: '현재 폴더 문서 {direct}개, 하위 폴더 포함 총 {total}개',
       title: '폴더',
       rootRow: '루트',
