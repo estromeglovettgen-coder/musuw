@@ -92,7 +92,7 @@ test('graph interactions close settings through one capture boundary without clo
   )
 })
 
-test('growth playback is a standalone settings block with one state-aware action', () => {
+test('growth playback keeps its state-aware action beside a separate restore action', () => {
   const display = graphSettingsPanel.indexOf("toggleCollapse('collapse-display')")
   const playback = graphSettingsPanel.indexOf('graph-playback-section')
   const forces = graphSettingsPanel.indexOf("toggleCollapse('collapse-forces')")
@@ -106,11 +106,15 @@ test('growth playback is a standalone settings block with one state-aware action
   assert.match(graphSettingsPanel, /emit\('pause'\)/)
   assert.match(graphSettingsPanel, /emit\('resume'\)/)
   assert.match(graphSettingsPanel, /emit\('play'\)/)
+  assert.match(graphSettingsPanel, /emit\('restore'\)/)
+  assert.match(graphSettingsPanel, /v-if="playback\.state !== 'idle'"/)
+  assert.match(graphSettingsPanel, /\.graph-playback-actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;/)
   assert.doesNotMatch(graphSettingsPanel, /emit\('animate'\)/)
 
   assert.match(template, /:playback="graphPlayback"/)
   assert.match(template, /@play="startObsidianGraphProgression"/)
   assert.match(template, /@pause="pauseObsidianGraphProgression"/)
   assert.match(template, /@resume="resumeObsidianGraphProgression"/)
+  assert.match(template, /@restore="restoreObsidianGraphProgression"/)
   assert.doesNotMatch(template, /@animate=/)
 })

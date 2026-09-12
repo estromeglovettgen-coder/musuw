@@ -349,7 +349,7 @@ export default defineComponent({
             </div>
 
             <div class="visual-knowledge-toolbar__right">
-              <span v-if="docListLoading" class="visual-knowledge-loading" role="status" aria-live="polite"><t-loading size="small" />{{ $t('common.loading') }}</span>
+              <span v-if="docListLoading" class="visual-knowledge-loading" role="status" aria-live="polite">{{ $t('common.loading') }}</span>
               <div class="visual-knowledge-view-toggle" role="group" :aria-label="$t('knowledgeBase.viewModeToggle')">
                 <button type="button" :class="{ 'is-active': viewMode === 'grid' }" :aria-pressed="viewMode === 'grid'" @click="viewMode = 'grid'"><t-icon name="view-module" /></button>
                 <button type="button" :class="{ 'is-active': viewMode === 'list' }" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'"><t-icon name="view-list" /></button>
@@ -365,7 +365,7 @@ export default defineComponent({
             <t-button size="small" variant="outline" @click="resetPage(); loadKnowledgeFiles(kbId)">{{ $t('common.retry') }}</t-button>
           </div>
 
-          <div ref="knowledgeScroll" class="visual-knowledge-scroll" :class="{ 'is-empty': !cardList.length && !currentChildFolders.length && !docListLoading, 'is-marquee-active': docMarqueeVisible }" @scroll="handleScroll" @mousedown="onDocMarqueeMouseDown">
+          <div ref="knowledgeScroll" class="visual-knowledge-scroll" :aria-busy="docListLoading" :class="{ 'is-empty': !cardList.length && !currentChildFolders.length && !docListLoading, 'is-marquee-active': docMarqueeVisible }" @scroll="handleScroll" @mousedown="onDocMarqueeMouseDown">
             <div v-if="docMarqueeVisible" class="visual-knowledge-marquee" :class="{ 'is-add': docMarqueeMode === 'add', 'is-subtract': docMarqueeMode === 'subtract' }" :style="docMarqueeBoxStyle" aria-hidden="true" />
             <div v-if="docListLoading && cardList.length === 0 && !currentChildFolders.length" class="visual-knowledge-skeleton-grid" aria-hidden="true">
               <div v-for="n in 8" :key="n" class="visual-knowledge-skeleton-card"><t-skeleton animation="gradient" :row-col="[{ width: '68%', height: '15px' },{ width: '100%', height: '12px' },{ width: '52%', height: '12px' }]" /></div>
@@ -378,7 +378,7 @@ export default defineComponent({
             <div v-else-if="!docListLoading && !knowledgeListError" class="visual-knowledge-empty"><p v-if="selectedFolderPath || isFiltering">{{ isFiltering ? $t('knowledgeBase.folderTree.emptySearch') : $t('knowledgeBase.folderTree.emptyFolder') }}</p><EmptyKnowledge v-else @upload="uploadSourceRef?.openFileDialog()" /></div>
           </div>
 
-          <div v-show="batchMode || selectedIds.size > 0" class="visual-knowledge-batch-anchor"><DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting" :reparse-loading="batchReparsing" :tag-loading="batchTagging" :visible="batchMode || selectedIds.size > 0" :show-move-to-folder="canEdit" :folder-options="folderOptions" @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse" @batch-tag="handleBatchTag" @move-to-folder="(path: string) => moveKnowledgeIntoFolder(Array.from(selectedIds), path)" /></div>
+          <div v-show="batchMode || selectedIds.size > 0" class="visual-knowledge-batch-anchor"><DocumentBatchBar :count="selectedIds.size" :delete-loading="batchDeleting" :reparse-loading="batchReparsing" :tag-loading="batchTagging" :cancel-parse-loading="batchCancelling" :cancel-parse-count="selectedParsingIds.length" :visible="batchMode || selectedIds.size > 0" :show-move-to-folder="canEdit" :folder-options="folderOptions" @cancel="handleBatchCancel" @delete="confirmBatchDelete" @reparse="confirmBatchReparse" @cancel-parse="confirmBatchCancelParse" @batch-tag="handleBatchTag" @move-to-folder="(path: string) => moveKnowledgeIntoFolder(Array.from(selectedIds), path)" /></div>
         </div>
       </section>
 
@@ -398,7 +398,8 @@ export default defineComponent({
 </template>
 
 <style scoped lang="less">
-.visual-knowledge-loading, .visual-knowledge-load-error { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--td-text-color-secondary); }
+.visual-knowledge-loading { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.visual-knowledge-load-error { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--td-text-color-secondary); }
 .visual-knowledge-load-error { flex-shrink: 0; justify-content: space-between; color: var(--td-error-color); }
 .visual-knowledge-page { width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 20px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; overflow: hidden; background: rgb(249 250 251 / 30%); color: #374151; }
 .visual-knowledge-header { flex: 0 0 auto; padding-bottom: 16px; border-bottom: 1px solid rgb(229 231 235 / 80%); display: flex; flex-direction: column; gap: 16px; }
@@ -432,20 +433,21 @@ export default defineComponent({
 .visual-knowledge-wiki-host { min-height: 0; flex: 1 1 auto; overflow: hidden; }
 .visual-knowledge-documents { min-height: 0; flex: 1 1 auto; display: flex; gap: 12px; }
 .visual-knowledge-documents__tree { flex: 0 0 auto; }
-.visual-knowledge-content { position: relative; min-width: 0; min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; }
+.visual-knowledge-content { position: relative; min-width: 0; min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; container: knowledge-content / inline-size; }
 
-.visual-knowledge-toolbar { flex: 0 0 auto; padding: 10px; border: 1px solid rgb(229 231 235 / 90%); border-radius: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
-.visual-knowledge-toolbar__left { min-width: 280px; flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.visual-knowledge-toolbar { flex: 0 0 auto; padding: 10px; border: 1px solid rgb(229 231 235 / 90%); border-radius: 16px; display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 10px; overflow-x: auto; scrollbar-width: thin; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+// Keep enough room for usable navigation; narrow screens scroll this whole row.
+.visual-knowledge-toolbar__left { min-width: min-content; flex: 1 0 480px; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
 .visual-knowledge-toolbar__right { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
-.visual-knowledge-path-pill { min-height: 28px; padding: 4px 10px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; background: rgb(243 244 246 / 90%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 600; }
+.visual-knowledge-path-pill { min-width: 0; max-width: 220px; min-height: 28px; flex: 1 1 120px; padding: 4px 10px; border: 0; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; background: rgb(243 244 246 / 90%); color: #374151; font: inherit; font-size: 12px; line-height: 18px; font-weight: 600; }
 .visual-knowledge-path-pill > :deep(.t-icon) { flex: 0 0 auto; font-size: 14px; color: #6b7280; }
-.visual-knowledge-path-pill__segment { max-width: 160px; padding: 0; border: 0; border-radius: 5px; overflow: hidden; background: transparent; color: #4b5563; font: inherit; font-size: inherit; line-height: inherit; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.visual-knowledge-path-pill__segment { min-width: 0; max-width: 160px; padding: 0; border: 0; border-radius: 5px; overflow: hidden; background: transparent; color: #4b5563; font: inherit; font-size: inherit; line-height: inherit; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 button.visual-knowledge-path-pill__segment { cursor: pointer; }
 button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decoration: underline; text-underline-offset: 2px; }
-.visual-knowledge-path-pill__segment.is-root { color: #111827; font-weight: 700; }
+.visual-knowledge-path-pill__segment.is-root { flex: 0 0 auto; color: #111827; font-weight: 700; }
 .visual-knowledge-path-pill__segment.is-current { color: #6b7280; cursor: default; }
-.visual-knowledge-search { min-width: 160px; max-width: 220px; flex: 1 1 160px; }
-.visual-knowledge-filters { min-width: 0; display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.visual-knowledge-search { min-width: 90px; max-width: 220px; flex: 1 1 140px; }
+.visual-knowledge-filters { min-width: 0; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .visual-knowledge-filters::-webkit-scrollbar { display: none; }
 .visual-knowledge-toolbar :deep(.t-input),.visual-knowledge-toolbar :deep(.t-date-range-picker) { min-height: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background: rgb(249 250 251 / 80%); box-shadow: none !important; color: #374151; font-size: 12px; }
 .visual-knowledge-toolbar :deep(.t-input:hover),.visual-knowledge-toolbar :deep(.t-input.t-is-focused) { border-color: #9ca3af; background: #fff; }
@@ -499,7 +501,7 @@ button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decorati
   .visual-tag-filter :deep(.t-input) { font-size: 14px; line-height: 20px; }
 }
 @media (min-width: 768px) { .visual-knowledge-header { flex-direction: row; align-items: center; justify-content: space-between; } .visual-knowledge-tabs { align-self: auto; } }
-@media (max-width: 900px) { .visual-knowledge-page { padding: 20px; } .visual-knowledge-toolbar__left { min-width: 0; } }
+@media (max-width: 900px) { .visual-knowledge-page { padding: 20px; } }
 @media (max-width: 760px) { .visual-knowledge-page { padding: 16px 12px; } .visual-knowledge-documents { gap: 8px; } }
 </style>
 <style>

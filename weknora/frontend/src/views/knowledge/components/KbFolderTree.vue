@@ -92,7 +92,10 @@
                 {{ row.kind === 'root' ? t('knowledgeBase.folderTree.rootRow') : row.name }}
               </span>
               <span class="visual-folder-row__trailing">
-                <span class="visual-folder-row__count">{{ row.totalCount }}</span>
+                <span
+                  class="visual-folder-row__count"
+                  :title="t('knowledgeBase.folderTree.countTooltip', { direct: row.documentCount, total: row.totalCount })"
+                >{{ row.totalCount }}</span>
                 <t-popup
                   v-if="canEdit && row.kind === 'folder'"
                   :visible="menuOpenPath === row.path"

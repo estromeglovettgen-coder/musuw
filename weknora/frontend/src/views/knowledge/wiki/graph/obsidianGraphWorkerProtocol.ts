@@ -23,7 +23,7 @@ export interface ObsidianWorkerInitMessage {
   forces: ObsidianGraphForceValues
   alpha: number
   alphaTarget: number
-  run: true
+  run?: true
 }
 
 export interface ObsidianWorkerResultMessage {
@@ -43,6 +43,7 @@ export function buildObsidianWorkerInitMessage(
   nodes: ObsidianWorkerNodeInput[],
   edges: ObsidianWorkerEdgeInput[],
   settings: ObsidianGraphSettings,
+  run = true,
 ): ObsidianWorkerInitMessage {
   return {
     nodes: Object.fromEntries(nodes.map(node => [node.id, [node.x, node.y] as [number, number]])),
@@ -50,7 +51,8 @@ export function buildObsidianWorkerInitMessage(
     forces: obsidianGraphForceValues(settings),
     alpha: 1,
     alphaTarget: 0,
-    run: true,
+    // The native worker starts whenever `run` is present, even when false.
+    ...(run ? { run: true as const } : {}),
   }
 }
 

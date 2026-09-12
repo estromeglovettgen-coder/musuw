@@ -29,13 +29,13 @@ const CHAT_HISTORY_FEEDBACK_CHANGE = 'surface-history-load-failures-with-retry'
 const ENTITLEMENT_USAGE_REVALIDATION_CHANGE = 'refresh-entitlement-after-metered-usage'
 const KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE = 'display-materialized-ai-title'
 const KNOWLEDGE_FAILURE_REASON_CHANGE = 'surface-document-failure-reason'
-const KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE = 'retain-upload-progress-and-refresh-accepted-files+surface-list-load-failures'
+const KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE = 'retain-upload-progress-and-refresh-accepted-files+surface-list-load-failures+retain-child-folders+batch-stop-parsing'
 const MODEL_REASONING_DEFAULT_CHANGE = 'refresh-global-model-catalog'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': '6fef46c48deaabd283f4f23670824a18874dce51',
   './business-baselines/Input-field.pre-view.vue': '0042d53343af50d0dd1a35edd22b7192241bea4b',
-  './business-baselines/KnowledgeBase.pre-view.vue': 'a547ea3c9880e58bc9c2bf7b4070dd2e1658e357',
+  './business-baselines/KnowledgeBase.pre-view.vue': '528edb0495fbc59f4966ffa2aa8c01e7888a0b25',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
   './business-baselines/menu.pre-view.vue': 'e185baf5fb56a34b9d8582b7d4339904dc3b5d20',
@@ -65,7 +65,7 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
     change: `${CONSUMER_SURFACE_CHANGE}+${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE}+${KNOWLEDGE_FAILURE_REASON_CHANGE}+${KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBase.pre-view.vue'],
-    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, server-projected runtime/storage readiness, live display of a materialized AI title without changing the durable source filename, and live propagation of server-sanitized failure reasons; explicit upload bug repair adds persistent per-file progress, incremental list refresh with ordering protection, and a pending-upload reload warning; list refresh feedback remains pending until the owning request finishes and failures can be retried',
+    authority: 'WeKnora main 81142df native document import flow extended with managed video file types, success-scoped usage revalidation, server-projected runtime/storage readiness, live display of a materialized AI title without changing the durable source filename, and live propagation of server-sanitized failure reasons; explicit upload bug repair adds persistent per-file progress, incremental list refresh with ordering protection, and a pending-upload reload warning; list refresh feedback remains pending until the owning request finishes and failures can be retried; sidebar expansion does not hide folder contents and selected in-flight parsing can be stopped through the existing endpoint with bounded requests and partial-failure retry',
   },
   knowledgeBaseList: {
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/KnowledgeBaseList.pre-view.vue'],

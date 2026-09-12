@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 
 import { createDefaultObsidianGraphSettings } from './obsidianGraphSettings.ts'
 import {
@@ -75,6 +76,30 @@ test('force and drag messages preserve the original alpha lifecycle', () => {
     alphaTarget: 0,
     forceNode: { id: 'a', x: null, y: null },
   })
+})
+
+test('a restored snapshot leaves the real native worker idle until the next graph interaction', () => {
+  const workerSource = readFileSync(new URL(
+    '../../../../../public/vendor/obsidian-1.13.7/graph-sim.js', import.meta.url,
+  ), 'utf8')
+  const timers: unknown[] = []
+  const worker: { onmessage?: (event: { data: unknown }) => void } = {}
+  runInNewContext(workerSource, {
+    self: worker,
+    WebAssembly: {},
+    console: { log() {} },
+    postMessage() {},
+    setTimeout(callback: unknown) { timers.push(callback); return timers.length },
+  })
+  worker.onmessage!({ data: buildObsidianWorkerInitMessage(
+    [{ id: 'a', x: 10, y: 20 }, { id: 'b', x: 30, y: 40 }],
+    [{ source: 'a', target: 'b' }],
+    createDefaultObsidianGraphSettings(),
+    false,
+  ) })
+  assert.equal(timers.length, 0, 'restoring coordinates must not restart the force simulation')
+  worker.onmessage!({ data: buildObsidianWorkerDragMessage('a', 7, 9, true) })
+  assert.equal(timers.length, 1, 'the restored graph must remain interactive')
 })
 
 test('worker result reader exposes positions and the shared version counter', () => {

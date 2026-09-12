@@ -297,6 +297,7 @@ export interface WikiGraphRenderer {
   startProgression?(): void
   pauseProgression?(): void
   resumeProgression?(): void
+  restoreProgression?(): void
   destroy(): void
 }
 
@@ -406,6 +407,10 @@ export class WikiGraphRendererController {
 
   resumeProgression(): void {
     this.active?.renderer.resumeProgression?.()
+  }
+
+  restoreProgression(): void {
+    this.active?.renderer.restoreProgression?.()
   }
 
   destroy(): void {
