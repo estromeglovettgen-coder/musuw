@@ -446,7 +446,7 @@ button.visual-knowledge-path-pill__segment { cursor: pointer; }
 button.visual-knowledge-path-pill__segment:hover { color: #111827; text-decoration: underline; text-underline-offset: 2px; }
 .visual-knowledge-path-pill__segment.is-root { flex: 0 0 auto; color: #111827; font-weight: 700; }
 .visual-knowledge-path-pill__segment.is-current { color: #6b7280; cursor: default; }
-.visual-knowledge-search { min-width: 90px; max-width: 220px; flex: 1 1 140px; }
+.visual-knowledge-search { min-width: 90px; max-width: 220px; flex: 1 1 140px; contain: inline-size; }
 .visual-knowledge-filters { min-width: 0; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .visual-knowledge-filters::-webkit-scrollbar { display: none; }
 .visual-knowledge-toolbar :deep(.t-input),.visual-knowledge-toolbar :deep(.t-date-range-picker) { min-height: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background: rgb(249 250 251 / 80%); box-shadow: none !important; color: #374151; font-size: 12px; }

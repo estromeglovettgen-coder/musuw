@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 // Run the real knowledge page and styles, replacing only the remote API.
 const parent = '3、舒良树《普通地质学》课程资料非常长的目录'
-const child = '3、舒良树《普通地质学》思维导图完整知识'
+const child = 'musuw-staging-upload-20260911'
 const nested = `${parent}/${child}`
 const kb = { id: 'upload-kb', tenant_id: 42, creator_id: 'upload-user', name: '工具栏验收',
   type: 'document', capabilities: { ready: true, storage_ready: true } }
@@ -81,16 +81,24 @@ test('root and nested paths keep all toolbar controls in one row with either dir
   }
 })
 
-test('search reports busy without inserting a visible loading item or moving controls', async ({ page }) => {
+for (const expanded of [false, true]) test(`search input and clear keep controls fixed while busy (${expanded ? 'expanded long folder' : 'collapsed root'})`, async ({ page }) => {
   await page.setViewportSize({ width: 1512, height: 950 })
   await openPage(page)
-  await page.locator('.visual-folder-tree__collapse').click()
+  if (expanded) {
+    await page.locator('.visual-folder-row').filter({ hasText: parent }).first().click()
+    await page.locator('.visual-folder-row').filter({ hasText: child }).first().click()
+    await expect(page.locator('.visual-knowledge-path-pill__segment.is-current')).toHaveText(child)
+    await expect(page.locator('.visual-knowledge-scroll')).toHaveAttribute('aria-busy', 'false')
+  } else {
+    await page.locator('.visual-folder-tree__collapse').click()
+  }
   const before = await controls(page)
   let release!: () => void
   const pending = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/v1/knowledge-bases/upload-kb/knowledge?**', async route => { await pending; await route.fallback() })
   try {
-    await page.getByPlaceholder('搜索文档名称...').fill('工具栏')
+    await page.getByPlaceholder('搜索文档名称...').fill('上传验收-23')
+    await page.locator('.visual-knowledge-search').hover()
     await expect(page.locator('.visual-knowledge-scroll')).toHaveAttribute('aria-busy', 'true')
     await expect(page.getByRole('heading', { name: '工具栏文档', exact: true })).toBeVisible()
     const status = page.locator('.visual-knowledge-toolbar').getByRole('status')
@@ -98,9 +106,17 @@ test('search reports busy without inserting a visible loading item or moving con
     const statusBox = await status.boundingBox()
     expect(statusBox?.width).toBeLessThanOrEqual(1)
     expect(statusBox?.height).toBeLessThanOrEqual(1)
+    await expectOneRow(page)
     expect(await controls(page)).toEqual(before)
+    await expect(page.getByRole('button', { name: '导入网页', exact: true })).toBeInViewport({ ratio: 1 })
   } finally { release() }
   await expect(page.locator('.visual-knowledge-scroll')).toHaveAttribute('aria-busy', 'false')
+  expect(await controls(page)).toEqual(before)
+  await page.locator('.visual-knowledge-search .t-input__suffix-clear').click()
+  await expect(page.getByPlaceholder('搜索文档名称...')).toHaveValue('')
+  await expect(page.locator('.visual-knowledge-scroll')).toHaveAttribute('aria-busy', 'false')
+  await expectOneRow(page)
+  expect(await controls(page)).toEqual(before)
 })
 
 test('a narrow toolbar scrolls horizontally without wrapping or overlapping its controls', async ({ page }) => {
