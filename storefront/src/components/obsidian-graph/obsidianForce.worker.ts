@@ -27,6 +27,7 @@ interface InitMessage {
   type: 'init'
   nodes: Array<{ id: string; x: number; y: number }>
   links: Array<{ source: string; target: string }>
+  run?: boolean
 }
 
 interface DragMessage {
@@ -114,6 +115,7 @@ function initialize(message: InitMessage): void {
     .on('tick', publishPositions)
     .on('end', publishPositions)
 
+  if (message.run === false) simulation.stop()
   publishPositions()
 }
 
