@@ -1,4 +1,4 @@
-import { getStorefrontCopy } from "../src/i18n.js";
+import { getStorefrontCopy, localePreferenceCookie } from "../src/i18n.js";
 import { getPublicDocumentMeta } from "../src/legalContent.js";
 import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
 import { normalizeCountry } from "../src/pricingLocalization.js";
@@ -38,13 +38,6 @@ export function selectLocale(country, cookieHeader = "", requestedLocale = "") {
     savedLocale(cookieHeader) ??
     (normalizedCountry === "CN" ? "zh-CN" : "en")
   );
-}
-
-function localeCookie(locale, hostname = "musuw.com") {
-  const isMusuwHost = hostname === "musuw.com" || hostname.endsWith(".musuw.com");
-  const domain = isMusuwHost ? "; Domain=.musuw.com" : "";
-  const secure = isMusuwHost ? "; Secure" : "";
-  return `musuw_locale=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax${domain}${secure}`;
 }
 
 function normalizeDocumentPath(pathname) {
@@ -165,7 +158,7 @@ export async function localizeDocumentResponse(
   headers.delete("content-length");
   headers.delete("etag");
   headers.delete("last-modified");
-  headers.set("set-cookie", localeCookie(normalizedLocale, hostname));
+  headers.set("set-cookie", localePreferenceCookie(normalizedLocale, hostname));
   const html = withDocumentLocale(
     await assetResponse.text(),
     normalizedLocale,

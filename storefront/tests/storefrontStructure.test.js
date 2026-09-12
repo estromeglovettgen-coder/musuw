@@ -63,8 +63,8 @@ test("commercial home keeps the smooth template and presents the approved produc
   }
   assert.match(home, /billing-discount-badge/);
   assert.match(home, /Save ~17%/);
-  assert.match(japanHome, />¥798</);
-  assert.match(japanHome, />¥1,595</);
+  assert.match(japanHome, />JP¥798</);
+  assert.match(japanHome, />JP¥1,595</);
   assert.match(home, /100 GiB/);
   assert.match(home, /class="[^"]*hero-product-demo/);
   assert.match(home, /class="[^"]*hero-demo-composer/);
