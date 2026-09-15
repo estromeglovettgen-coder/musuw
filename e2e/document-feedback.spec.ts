@@ -57,6 +57,35 @@ async function closeDocument(page: Page) {
 
 test.beforeEach(async ({ page }) => { await installApi(page) })
 
+test('document summary renders safe Markdown while retaining collapse and raw-text editing', async ({ page }, info) => {
+  const description = '**一、Agent Skills 的基本概念与热度**\n\n' +
+    '这是摘要正文。\n'.repeat(12) + '\n**最后一段**\n\n' +
+    '<img src="x" onerror="window.summaryXss = true"><script>window.summaryXss = true</script>'
+  await page.route('**/api/v1/knowledge/document-1', route => route.fulfill({ json: {
+    success: true, data: { ...documents[0], type: 'url', source: 'https://example.com/article', description },
+  } }))
+  await page.goto('/e2e/knowledge-upload-harness.html')
+  await openDocument(page)
+  const summary = drawer(page).locator('.summary_content')
+  await expect(summary.locator('strong').first()).toHaveText('一、Agent Skills 的基本概念与热度')
+  await expect(summary.locator('strong').first()).toHaveCSS('font-weight', /[6-9]00/)
+  await expect(summary).not.toContainText('**')
+  await expect(summary.locator('script, [onerror]')).toHaveCount(0)
+  expect(await page.evaluate(() => (window as any).summaryXss)).toBeUndefined()
+  await expect(summary).toHaveClass(/summary_collapsed/)
+  await summary.click()
+  await expect(summary).not.toHaveClass(/summary_collapsed/)
+  await summary.locator('strong').last().scrollIntoViewIfNeeded()
+  await expect(summary.locator('strong').last()).toBeInViewport()
+  await page.screenshot({ path: info.outputPath('summary-markdown.png') })
+  await summary.click()
+  await expect(summary).toHaveClass(/summary_collapsed/)
+  await drawer(page).locator('.summary-section .icon-action-btn').first().click()
+  await expect(drawer(page).locator('.summary_editor textarea')).toHaveValue(description)
+  await drawer(page).getByRole('button', { name: '取消', exact: true }).click()
+  await expect(summary.locator('strong').first()).toBeVisible()
+})
+
 test('opening an already completed PDF shows loading before details and throughout the preview download', async ({ page }, info) => {
   const details = gate()
   const preview = gate()
