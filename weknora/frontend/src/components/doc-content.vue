@@ -1794,9 +1794,8 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
           <div v-else-if="details.description" class="summary_wrapper"
             :class="{ 'summary_clickable': summaryOverflow || summaryExpanded }"
             @click="(summaryOverflow || summaryExpanded) && (summaryExpanded = !summaryExpanded)">
-            <div ref="summaryRef" :class="['summary_content', { 'summary_collapsed': !summaryExpanded }]">{{
-              details.description
-            }}</div>
+            <div ref="summaryRef" :class="['summary_content', 'md-content', { 'summary_collapsed': !summaryExpanded }]"
+              v-html="processMarkdown(details.description)"></div>
             <div v-if="(summaryOverflow && !summaryExpanded) || summaryExpanded" class="summary_fade"
               :class="{ 'summary_fade_expanded': summaryExpanded }">
               <t-icon :name="summaryExpanded ? 'chevron-up' : 'chevron-down'" size="14px" class="summary_fade_icon" />
@@ -2634,7 +2633,10 @@ const handleChunkPageChange = (pageInfo: { current: number }) => {
   font-size: 13px;
   line-height: 1.5;
   word-break: break-word;
-  white-space: pre-wrap;
+  white-space: normal;
+
+  :deep(> :first-child) { margin-top: 0; }
+  :deep(> :last-child) { margin-bottom: 0; }
 
   &.summary_collapsed {
     max-height: 4.5em;
