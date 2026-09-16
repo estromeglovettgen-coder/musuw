@@ -73,7 +73,9 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 
 | 路径 | 内容边界 |
 | --- | --- |
-| `.runtime/musuw-admin/production.env` | 运营进程的连接与非密钥定位信息；供应商 secret 仍来自 Keychain。 |
+| `.runtime/musuw-admin/production.env` | 旧本机运营进程的连接信息；保留用于回滚，供应商 secret 来自 Keychain。 |
+| `/opt/musuw-operations/runtime/production.env` | 服务器常驻运营服务的连接信息；仅服务账号可读，数据库使用现有只读角色。 |
+| `/opt/musuw-operations/runtime/secrets/` | 既有运营凭据的服务器副本；目录 0700、文件 0600，仅服务账号可读；不进入发布 artifact。 |
 | `.runtime/weknora/candidate.env` | TEST WeKnora 与依赖服务运行配置；不得作为生产权威。 |
 | `.runtime/weknora/auth-public.env` | Supabase publishable/OIDC 公共值；不提交。 |
 | `.runtime/weknora/paddle-sandbox.env` | Paddle Sandbox environment、client token、六个价格 ID；API key/webhook secret 由 Keychain 注入。 |

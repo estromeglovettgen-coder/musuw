@@ -17,11 +17,12 @@ fail() {
 
 expect_reject() {
     local command="$1"
+    local mode="${2:-application}"
     if SSH_ORIGINAL_COMMAND="$command" \
         MUSUW_DEPLOY_GATE_TEST_MODE=1 \
         MUSUW_DEPLOY_GATE_ROOT="$root_dir" \
         MUSUW_DEPLOY_GATE_WRAPPER="$root_dir/wrapper" \
-        "$ssh_gate" >/dev/null 2>&1; then
+        "$ssh_gate" "$mode" >/dev/null 2>&1; then
         fail "SSH gate unexpectedly accepted: $command"
     fi
 }
@@ -39,6 +40,22 @@ MUSUW_DEPLOY_GATE_WRAPPER="$root_dir/wrapper" \
 MUSUW_DEPLOY_GATE_TEST_WRAPPER_LOG="$wrapper_log" \
     "$ssh_gate"
 grep -Fx "prepare $revision" "$wrapper_log" >/dev/null || fail 'SSH gate did not forward prepare'
+checksum="$(printf '%064d' 1)"
+SSH_ORIGINAL_COMMAND="musuw-operations deploy $revision $checksum" \
+MUSUW_DEPLOY_GATE_TEST_MODE=1 \
+MUSUW_DEPLOY_GATE_ROOT="$root_dir" \
+MUSUW_OPERATIONS_GATE_WRAPPER="$root_dir/wrapper" \
+MUSUW_DEPLOY_GATE_TEST_WRAPPER_LOG="$wrapper_log" \
+    "$ssh_gate" operations-only
+grep -Fx "deploy $revision $checksum" "$wrapper_log" >/dev/null || fail 'operations gate lost exact revision or digest'
+expect_reject "musuw-operations deploy $revision $checksum"
+expect_reject "musuw-gate deploy $revision" operations-only
+expect_reject "rsync --server -logDtpre.iLsfxC . /var/lib/musuw-deploy/incoming/$release_id/source/" operations-only
+expect_reject "musuw-operations deploy $revision $checksum extra" operations-only
+expect_reject "musuw-operations deploy short $checksum" operations-only
+expect_reject "musuw-operations deploy $revision short" operations-only
+expect_reject "musuw-operations deploy $revision $checksum;id" operations-only
+expect_reject "musuw-operations deploy $revision $checksum" unknown-mode
 expect_reject "musuw-gate invalid $revision"
 expect_reject "musuw-gate deploy $revision;id"
 expect_reject $'musuw-gate prepare 0123456789abcdef0123456789abcdef01234567\nid'

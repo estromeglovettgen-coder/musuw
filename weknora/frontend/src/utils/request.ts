@@ -3,6 +3,7 @@ import axios from "axios";
 import { generateRandomString, MAX_FILE_SIZE_MB } from "./index";
 import i18n from '../i18n'
 import { localizeConsumerPlanError } from './consumerPlanError'
+import { operationsCsrfToken } from '../operations/csrf'
 import { getApiBaseUrl } from './api-base';
 import {
   EXTERNAL_AUTH_START_PATH,
@@ -34,6 +35,12 @@ export function getCurrentLanguage(): string {
 
 instance.interceptors.request.use(
   (config) => {
+    // Only the operations entry enables this header; ordinary app requests
+    // retain their existing authentication behavior.
+    if (config.headers['X-Musuw-CSRF']) {
+      const token = operationsCsrfToken(document.cookie, window.location.port);
+      if (token) config.headers['X-Musuw-CSRF'] = token;
+    }
     const existingAuth = config.headers?.Authorization ?? config.headers?.authorization;
     const isEmbedAuth = typeof existingAuth === 'string' && existingAuth.startsWith('Embed ');
     const isEmbedPath = typeof config.url === 'string' && config.url.includes('/api/v1/embed/');

@@ -102,6 +102,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { InfoCircleIcon, SettingIcon } from 'tdesign-icons-vue-next'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import type {
   ModelPolicyData,
   ModelPolicyOption,
@@ -230,6 +231,7 @@ async function load() {
   }
 }
 
+useOperationsReadRecovery(error, loading, load)
 onMounted(load)
 watch(() => props.refreshKey, load)
 </script>

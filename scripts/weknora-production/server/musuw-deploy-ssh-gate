@@ -7,6 +7,11 @@ reject() {
     exit 2
 }
 
+# This argument is fixed by authorized_keys, never by the remote caller.
+[ "$#" -le 1 ] || reject
+gate_mode="${1:-application}"
+case "$gate_mode" in application|operations-only) ;; *) reject ;; esac
+
 original_command="${SSH_ORIGINAL_COMMAND:-}"
 [ -n "$original_command" ] || reject
 
@@ -59,6 +64,19 @@ invoke_wrapper() {
     [ -x /usr/bin/sudo ] || reject
     exec /usr/bin/sudo -n -- "$wrapper" "$@"
 }
+
+if [ "$gate_mode" = operations-only ]; then
+    [ "${#command_words[@]}" -eq 4 ] || reject
+    [ "${command_words[0]}" = musuw-operations ] || reject
+    [ "${command_words[1]}" = deploy ] || reject
+    [[ "${command_words[2]}" =~ ^[0-9a-f]{40}$ ]] || reject
+    [[ "${command_words[3]}" =~ ^[0-9a-f]{64}$ ]] || reject
+    wrapper='/usr/local/sbin/musuw-operations-deploy-gate'
+    if [ "$test_mode" = true ]; then
+        wrapper="${MUSUW_OPERATIONS_GATE_WRAPPER:-$wrapper}"
+    fi
+    invoke_wrapper deploy "${command_words[2]}" "${command_words[3]}"
+fi
 
 if [ "${command_words[0]}" = 'musuw-gate' ]; then
     [ "${#command_words[@]}" -eq 3 ] || reject

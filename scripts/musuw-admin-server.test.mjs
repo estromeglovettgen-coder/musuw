@@ -375,7 +375,6 @@ test('production operations reads the authorized Paddle Live unit', () => {
   const productionBranch = source.slice(source.indexOf("if (target === 'production')"), source.indexOf('const candidate ='))
   assert.match(productionBranch, /paddleEnvironment:\s*'live'/)
   assert.match(productionBranch, /paddleApiBase:\s*'https:\/\/api\.paddle\.com'/)
-  assert.match(productionBranch, /paddleApiKey:\s*readKeychainSecret\(PROVIDER_KEY_SERVICES\.paddle,\s*providerKeyAccount\)/)
   assert.doesNotMatch(productionBranch, /paddleEnvironment:\s*'sandbox'/)
   assert.doesNotMatch(productionBranch, /https:\/\/sandbox-api\.paddle\.com/)
 })

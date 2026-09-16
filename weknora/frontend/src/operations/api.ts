@@ -26,16 +26,54 @@ function csrfToken() {
 }
 
 let synchronizedCsrfToken = ''
+let sessionVersion = 0
+let sessionRenewal: Promise<void> | undefined
+
+function synchronizeCsrf(token: string) {
+  synchronizedCsrfToken = csrfToken() || token
+  setOperationsCsrfHeader(synchronizedCsrfToken)
+}
+
+function renewReadSession() {
+  if (!sessionRenewal) {
+    sessionRenewal = (async () => {
+      // The private gateway establishes its existing operator session on GET.
+      // Fetching the entry preserves the mounted page and any unsaved forms.
+      const entry = await fetch('/operations.html', { credentials: 'same-origin', cache: 'no-store' })
+      if (!entry.ok) throw new Error('无法恢复运营会话')
+      const response = await fetch('/admin-api/config', { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error('无法恢复运营会话')
+      const payload = await response.json()
+      const token = (payload?.data ?? payload)?.csrf_token
+      if (typeof token !== 'string' || !token) throw new Error('无法恢复运营会话')
+      synchronizeCsrf(token)
+      sessionVersion += 1
+    })().finally(() => { sessionRenewal = undefined })
+  }
+  return sessionRenewal
+}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const requestVersion = sessionVersion
   const method = (init.method || 'GET').toUpperCase()
   const headers = new Headers(init.headers)
+  const currentCsrf = csrfToken() || synchronizedCsrfToken
+  if (currentCsrf !== synchronizedCsrfToken) synchronizeCsrf(currentCsrf)
   headers.set('Accept', 'application/json')
   if (!['GET', 'HEAD'].includes(method)) {
     headers.set('Content-Type', 'application/json')
-    headers.set('X-Musuw-CSRF', synchronizedCsrfToken || csrfToken())
+    headers.set('X-Musuw-CSRF', currentCsrf)
   }
-  const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
+  let response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
+  if (response.status === 401 && ['GET', 'HEAD'].includes(method)) {
+    try {
+      // A late 401 from the old session must not establish another session.
+      if (requestVersion === sessionVersion) await renewReadSession()
+      response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
+    } catch {
+      // Preserve the original error if renewal fails; never recurse or replay writes.
+    }
+  }
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
     const message = payload?.error?.message || payload?.error || payload?.message || `HTTP ${response.status}`
@@ -55,9 +93,9 @@ function queryString(values: Record<string, string | number | undefined>) {
 
 export const operationsApi = {
   config: async () => {
+    const requestVersion = sessionVersion
     const { csrf_token, ...config } = await request<OperationsConfig & { csrf_token: string }>('/admin-api/config')
-    synchronizedCsrfToken = csrf_token
-    setOperationsCsrfHeader(csrf_token)
+    if (requestVersion === sessionVersion) synchronizeCsrf(csrf_token)
     return config
   },
   modelPolicy: () => request<ModelPolicyData>('/admin-api/model-policy'),
