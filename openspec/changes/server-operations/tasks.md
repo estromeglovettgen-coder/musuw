@@ -8,13 +8,15 @@
 ## 2. Delivery
 
 - [x] 2.1 Build a revisioned GitHub artifact and validate safe extraction, integrity and rollback.
-- [ ] 2.2 Install the restricted operations deploy seam, unprivileged supervisor and protected existing credentials.
+- [x] 2.2 Install the restricted operations deploy seam, unprivileged supervisor and protected existing credentials.
 - [x] 2.3 Configure the separate required-reviewer operations deployment environment and include targeted checks in CI.
-- [ ] 2.4 Consolidate adversarial review, resolve blockers and merge the reviewed revision.
+- [x] 2.4 Consolidate adversarial review, resolve blockers and merge the reviewed revision.
 
 ## 3. Acceptance
 
-- [ ] 3.1 Deploy the CI-green artifact and verify real read-only queries and authorization/CSRF rejection.
-- [ ] 3.2 Verify process-failure automatic restart, database readiness, and private-only listener.
-- [ ] 3.3 Switch the Mac to persistent HTTP forwarding and verify disconnected-client/server-continuity and frontend recovery.
-- [ ] 3.4 Record the released revision, verification evidence and tested rollback instructions.
+- [x] 3.1 Deploy the CI-green artifact and verify real read-only queries and authorization/CSRF rejection.
+- [x] 3.2 Verify process-failure automatic restart, database readiness, and private-only listener.
+- [x] 3.3 Switch the Mac to persistent HTTP forwarding and verify disconnected-client/server-continuity and frontend recovery.
+- [x] 3.4 Record the released revision, verification evidence and tested rollback instructions.
+
+Evidence and limits: [verification.md](verification.md).

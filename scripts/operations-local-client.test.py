@@ -14,6 +14,32 @@ spec.loader.exec_module(client)
 
 
 class PrivateClientTests(unittest.TestCase):
+    def test_bootstrap_waits_for_asynchronous_bootout_removal(self):
+        state = {'prints': 0, 'removed': False}
+        def delayed_launchctl(*args, **kwargs):
+            if args[0] == 'print':
+                state['prints'] += 1
+                state['removed'] = state['prints'] >= 3
+                return types.SimpleNamespace(returncode=113 if state['removed'] else 0)
+            if args[0] == 'bootstrap':
+                self.assertTrue(state['removed'], 'bootstrap raced the old loaded job')
+            return types.SimpleNamespace(returncode=0)
+        with patch.object(client, 'launchctl', side_effect=delayed_launchctl), \
+             patch.object(client.time, 'sleep') as sleep:
+            client.stop(client.LABEL)
+            client.start(client.LABEL)
+        self.assertEqual(state['prints'], 3)
+        self.assertEqual(sleep.call_count, 2)
+        sleep.assert_called_with(0.1)
+
+    def test_stop_reports_timeout_if_launchd_never_removes_the_job(self):
+        with patch.object(client, 'launchctl', return_value=types.SimpleNamespace(returncode=0)), \
+             patch.object(client.time, 'monotonic', side_effect=[0, 0, 15]), \
+             patch.object(client.time, 'sleep') as sleep:
+            with self.assertRaisesRegex(RuntimeError, 'Timed out waiting for LaunchAgent removal'):
+                client.stop(client.LABEL)
+        sleep.assert_called_once_with(0.1)
+
     def test_current_system_socks_is_used_without_an_idle_timeout(self):
         settings = '<dictionary> {\n SOCKSEnable : 1\n SOCKSProxy : 127.0.0.1\n SOCKSPort : 7897\n}'
         self.assertEqual(client.connection_arguments(settings, '43.133.221.194', '22'),

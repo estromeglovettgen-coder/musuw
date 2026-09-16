@@ -36,7 +36,11 @@ or logs. Secret files are owned by `musuw-operations`, mode `0600`; the runtime
 directory is `root:musuw-operations`, mode `0750`, with its `secrets` subdirectory
 owned by `musuw-operations`, mode `0700`. Include
 `MUSUW_ADMIN_DATABASE_HOST_FILE=/run/musuw-operations/database-host` in
-`production.env`. Use the existing read-only
+`production.env`. Also set `NODE_OPTIONS=--preserve-symlinks-main` there: the
+service starts through the immutable-release `current` symlink, and Node must
+preserve that main-entry path for the existing executable-module startup check.
+This is a protected server runtime setting; changing it does not rebuild or
+replace the GitHub artifact. Use the existing read-only
 database role, never the production database owner's credentials.
 
 Before every start the fixed root helper resolves the PostgreSQL container's

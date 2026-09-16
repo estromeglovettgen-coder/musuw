@@ -84,7 +84,14 @@ def launchctl(*args, required=True):
 
 
 def stop(label):
-    launchctl('bootout', f'{DOMAIN}/{label}', required=False)
+    service = f'{DOMAIN}/{label}'
+    launchctl('bootout', service, required=False)
+    # bootout can return before launchd removes the job; bootstrap must wait.
+    deadline = time.monotonic() + 15
+    while launchctl('print', service, required=False).returncode == 0:
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f'Timed out waiting for LaunchAgent removal: {label}')
+        time.sleep(0.1)
 
 
 def start(label):
