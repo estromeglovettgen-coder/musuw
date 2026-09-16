@@ -90,6 +90,7 @@ import { onMounted, ref, watch } from 'vue'
 import type { Directive } from 'vue'
 import { ChartBubbleIcon, CheckCircleIcon, CloudIcon, DataBaseIcon, FileIcon, FileSearchIcon, InfoCircleIcon, LinkIcon, SearchIcon, ServerIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatBytes, formatDate, statusTone } from '../format'
 import type { OperationsConfig, StorageData, StorageObjectRow } from '../types'
 
@@ -122,6 +123,7 @@ async function load() { loading.value = true; error.value = ''; emit('busy', tru
 function applySearch() { page.value = 1; load() }
 function openObject(row: StorageObjectRow) { selected.value = row; drawerVisible.value = true }
 function handleObjectClick(context: { row: StorageObjectRow }) { openObject(context.row) }
+useOperationsReadRecovery(error, loading, load)
 onMounted(load); watch(() => props.refreshKey, load)
 </script>
 

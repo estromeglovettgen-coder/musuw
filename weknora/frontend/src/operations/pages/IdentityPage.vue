@@ -70,6 +70,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { CheckCircleIcon, ChevronRightIcon, InfoCircleIcon, LinkIcon, ServerIcon, UserAddIcon, UserCheckedIcon, UserSafetyIcon, UsergroupIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatDate } from '../format'
 import type { IdentityData, OperationsConfig } from '../types'
 
@@ -87,6 +88,7 @@ function latestSignIn(project: IdentityProject) { return project.users.map((user
 function projectUrl(ref: string) { return `https://supabase.com/dashboard/project/${encodeURIComponent(ref)}/auth/users` }
 function goToUsers() { window.location.hash = '/users' }
 async function load() { loading.value = true; error.value = ''; emit('busy', true); try { data.value = await operationsApi.identity() } catch (e) { error.value = e instanceof Error ? e.message : '加载失败' } finally { loading.value = false; emit('busy', false) } }
+useOperationsReadRecovery(error, loading, load)
 onMounted(load); watch(() => props.refreshKey, load)
 </script>
 

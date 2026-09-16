@@ -10,7 +10,7 @@ require "json"
 
 ROOT = File.expand_path("../..", __dir__)
 WORKFLOW_DIR = File.join(ROOT, ".github", "workflows")
-EXPECTED = %w[ci.yml deploy-storefront.yml deploy-production.yml].freeze
+EXPECTED = %w[ci.yml deploy-storefront.yml deploy-production.yml deploy-operations.yml].freeze
 
 def fail_contract(message)
   warn "workflow contract: #{message}"
@@ -63,7 +63,7 @@ documents.each do |name, document|
   expected_permissions = case name
   when "deploy-storefront.yml"
     { "contents" => "read", "actions" => "read" }
-  when "deploy-production.yml"
+  when "deploy-production.yml", "deploy-operations.yml"
     { "contents" => "read", "actions" => "read", "deployments" => "read" }
   else
     { "contents" => "read" }
@@ -86,7 +86,7 @@ ci_on = root_key(ci, "on")
 fail_contract "ci.yml must run on pull requests" unless ci_on.key?("pull_request")
 fail_contract "ci.yml must run on pushes to main" unless ci_on.dig("push", "branches") == ["main"]
 fail_contract "ci.yml must cancel superseded runs" unless ci.dig("concurrency", "cancel-in-progress") == true
-required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh]
+required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh integration/operations/** playwright.operations*.config.ts]
 %w[pull_request push].each do |trigger|
   configured = Array(ci_on.dig(trigger, "paths"))
   missing = required_ci_paths.reject { |path| configured.include?(path) }
@@ -368,5 +368,42 @@ end
 fail_contract "promotion must verify currently deployed staging digests through the fixed remote gate" unless staging_verify&.dig("if").nil? && staging_verify.fetch("run", "").to_s.include?("musuw-staging-gate verify")
 
 fail_contract "staging image refs must not cross a secret-mask-prone environment job output" unless production_staging.fetch("outputs", {}).empty? && !JSON.generate(production_deploy).include?("needs.deploy-staging.outputs")
+
+operations = documents.fetch("deploy-operations.yml")
+operations_on = root_key(operations, "on")
+fail_contract "operations release must be manual-only" unless operations_on.keys == ["workflow_dispatch"]
+operations_ref = operations_on.dig("workflow_dispatch", "inputs", "immutable_ref")
+fail_contract "operations release must require a complete commit identity" unless operations_ref.is_a?(Hash) && operations_ref["required"] == true && operations_ref["type"] == "string"
+fail_contract "operations release must not cancel an in-flight deployment" unless operations.dig("concurrency", "cancel-in-progress") == false
+ops_authorize = operations.dig("jobs", "authorize")
+ops_build = operations.dig("jobs", "build")
+ops_deploy = operations.dig("jobs", "deploy")
+fail_contract "operations build must follow revision authorization" unless ops_build["needs"] == "authorize"
+fail_contract "operations deployment must consume the authorized build" unless ops_deploy["needs"] == %w[authorize build]
+fail_contract "operations deployment must keep its own protected Environment" unless ops_deploy["environment"] == "operations-production"
+fail_contract "operations authorization or build must never receive a protected Environment" if ops_authorize.key?("environment") || ops_build.key?("environment")
+fail_contract "operations authorization or build must never receive server credentials" if JSON.generate([ops_authorize, ops_build]).include?("secrets.")
+ops_authorize_text = JSON.generate(ops_authorize)
+%w[refs/heads/main origin/main merge-base actions/workflows/ci.yml/runs head_sha event=push status=success required_reviewers estromeglovettgen-coder].each do |guard|
+  fail_contract "operations authorization omits #{guard}" unless ops_authorize_text.include?(guard)
+end
+ops_build_steps = Array(ops_build["steps"])
+ops_checkout = ops_build_steps.find { |step| step["uses"].to_s.start_with?("actions/checkout@") }
+fail_contract "operations build must check out only the authorized SHA without credentials" unless ops_checkout&.dig("with", "ref") == "${{ needs.authorize.outputs.revision }}" && ops_checkout&.dig("with", "persist-credentials") == false
+fail_contract "operations build must retain its immutable artifact" unless ops_build_steps.any? { |step| step["uses"].to_s.start_with?("actions/upload-artifact@") }
+ops_deploy_steps = Array(ops_deploy["steps"])
+fail_contract "operations deploy must download the exact build artifact" unless ops_deploy_steps.any? { |step| step["uses"].to_s.start_with?("actions/download-artifact@") && step.dig("with", "name") == "operations-${{ needs.authorize.outputs.revision }}" }
+ops_deploy_text = JSON.generate(ops_deploy)
+%w[musuw-operations-deploy musuw-operations StrictHostKeyChecking=yes sha256sum CHECKSUM].each do |guard|
+  fail_contract "operations deploy omits #{guard}" unless ops_deploy_text.include?(guard)
+end
+fail_contract "operations deploy must not receive application deployment credentials" if ops_deploy_text.match?(/MUSUW_PRODUCTION_|WEKNORA_DEPLOY_|MUSUW_STAGING_/)
+%w[admin:test admin:deploy:test admin:e2e:recovery].each do |script|
+  fail_contract "canonical CI omits #{script}" unless ci_text.include?("npm run #{script}")
+end
+package_scripts = JSON.parse(File.read(File.join(ROOT, "package.json"))).fetch("scripts")
+fail_contract "operations runtime test glob must include local and server tests" unless package_scripts["admin:test"] == "node --test scripts/musuw-admin-*.test.mjs"
+fail_contract "operations deployment tests must execute behavioral artifact contracts" unless package_scripts["admin:deploy:test"] == "python3 scripts/operations-deploy.test.py"
+fail_contract "operations browser recovery must use its isolated fixture" unless package_scripts["admin:e2e:recovery"] == "playwright test --config=playwright.operations-recovery.config.ts"
 
 puts "workflow contract green: #{EXPECTED.join(", ")}"

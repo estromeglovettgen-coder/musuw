@@ -29,7 +29,7 @@
           <span class="ops-runtime-state__dot" :class="{ 'is-ready': config?.providers.weknora.available }" />
           <div>
             <strong>{{ config?.providers.weknora.available ? '管理 API 已连接' : '管理 API 不可用' }}</strong>
-            <span>平台密钥仅由本机服务读取</span>
+            <span>平台密钥仅由运营服务读取</span>
           </div>
         </div>
         <div class="ops-template-credit">Musuw · Operations</div>
@@ -79,7 +79,7 @@
           <div class="ops-operator">
             <div class="ops-operator__avatar">OP</div>
             <div>
-              <strong>本机运营会话</strong>
+              <strong>运营会话</strong>
               <span>SameSite + CSRF 防护</span>
             </div>
           </div>
@@ -122,6 +122,7 @@ import {
   UsergroupIcon,
 } from 'tdesign-icons-vue-next'
 import { operationsApi } from './api'
+import { useOperationsReadRecovery } from './useOperationsReadRecovery'
 import type { EnvironmentTarget, OperationsConfig } from './types'
 import OverviewPage from './pages/OverviewPage.vue'
 import UsersPage from './pages/UsersPage.vue'
@@ -150,6 +151,7 @@ const initialHash = window.location.hash.replace(/^#\/?/, '') as PageKey
 const currentPage = ref<PageKey>(validPages.has(initialHash) ? initialHash : 'overview')
 const config = ref<OperationsConfig | null>(null)
 const bootstrapError = ref('')
+const bootstrapLoading = ref(false)
 const refreshKey = ref(0)
 const busyChildren = ref(0)
 const refreshing = computed(() => busyChildren.value > 0)
@@ -175,13 +177,19 @@ function handleHashChange() {
 }
 
 async function bootstrap() {
+  if (bootstrapLoading.value) return
+  bootstrapLoading.value = true
   bootstrapError.value = ''
   try {
     config.value = await operationsApi.config()
   } catch (error) {
     bootstrapError.value = error instanceof Error ? error.message : '无法加载运营配置'
+  } finally {
+    bootstrapLoading.value = false
   }
 }
+
+useOperationsReadRecovery(bootstrapError, bootstrapLoading, bootstrap)
 
 function refresh() {
   if (refreshing.value) return

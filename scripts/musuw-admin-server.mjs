@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import { createServer } from 'node:http'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, lstatSync, readFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { extname, resolve, sep } from 'node:path'
+import { isIP } from 'node:net'
+import { extname, isAbsolute, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import pg from 'pg'
@@ -29,6 +30,14 @@ const PROVIDER_KEY_SERVICES = Object.freeze({
   r2SecretAccessKey: 'com.musuw.local-admin.r2-secret-access-key',
   langfusePublicKey: 'com.musuw.local-admin.langfuse-public-key',
   langfuseSecretKey: 'com.musuw.local-admin.langfuse-secret-key',
+})
+const SERVER_SECRET_FILES = Object.freeze({
+  [PROVIDER_KEY_SERVICES.paddle]: 'paddle_api_key',
+  [PROVIDER_KEY_SERVICES.supabase]: 'supabase_service_role_key',
+  [PROVIDER_KEY_SERVICES.r2AccessKeyID]: 'r2_access_key_id',
+  [PROVIDER_KEY_SERVICES.r2SecretAccessKey]: 'r2_secret_access_key',
+  [PROVIDER_KEY_SERVICES.langfusePublicKey]: 'langfuse_public_key',
+  [PROVIDER_KEY_SERVICES.langfuseSecretKey]: 'langfuse_secret_key',
 })
 const PUBLIC_BRAND_ASSETS = new Set(['/favicon.ico', '/musuw-logo.png'])
 const PUBLIC_ASSET_PREFIXES = ['/assets/', '/tdesign-icons/']
@@ -111,7 +120,7 @@ export function modelPolicyRequestPlan(method, pathname) {
   return { method, scene, upstreamPath: `${UPSTREAM_MODEL_POLICY_PATH}/${scene}` }
 }
 
-export function productionDatabaseConnectionString(runtime, { passwordPath = PRODUCTION_RO_PASSWORD_PATH } = {}) {
+export function productionDatabaseConnectionString(runtime, { passwordPath = PRODUCTION_RO_PASSWORD_PATH, hostPath } = {}) {
   let database
   try {
     database = new URL(String(runtime?.MUSUW_ADMIN_DATABASE_URL || ''))
@@ -121,16 +130,16 @@ export function productionDatabaseConnectionString(runtime, { passwordPath = PRO
   if (!['postgres:', 'postgresql:'].includes(database.protocol) || !database.hostname || !database.username) {
     throw new Error('production database URL is invalid')
   }
+  if (hostPath !== undefined) {
+    if (!isAbsolute(hostPath)) throw new Error('MUSUW_ADMIN_DATABASE_HOST_FILE must be an explicit absolute path')
+    protectedFile(hostPath, 'server database host file', 0o022)
+    const host = readFileSync(hostPath, 'utf8').replace(/\r?\n$/, '')
+    const ipVersion = isIP(host)
+    if (!ipVersion || host.includes('%')) throw new Error('server database host file is empty or invalid')
+    database.hostname = ipVersion === 6 ? `[${host}]` : host
+  }
 
-  let passwordStats
-  try {
-    passwordStats = statSync(passwordPath)
-  } catch {
-    throw new Error('production read-only database password file is unavailable')
-  }
-  if (!passwordStats.isFile() || (passwordStats.mode & 0o077) !== 0) {
-    throw new Error('production read-only database password file permissions are unsafe')
-  }
+  protectedFile(passwordPath, 'production read-only database password file')
   let password = readFileSync(passwordPath, 'utf8').replace(/[\r\n]+$/, '')
   if (!password || /[\r\n]/.test(password)) {
     throw new Error('production read-only database password file is empty or invalid')
@@ -188,23 +197,75 @@ export function isPublicConsoleAsset(method, pathname) {
   return PUBLIC_BRAND_ASSETS.has(pathname) || PUBLIC_ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
-function loadRuntime(target) {
+function protectedFile(path, label, forbiddenPermissions = 0o077) {
+  let stats
+  try {
+    stats = lstatSync(path)
+  } catch {
+    throw new Error(`${label} is unavailable`)
+  }
+  if (!stats.isFile() || (stats.mode & forbiddenPermissions) !== 0) {
+    throw new Error(`${label} permissions are unsafe`)
+  }
+}
+
+function readServerSecret(secretDir, name) {
+  const path = resolve(secretDir, name)
+  protectedFile(path, `server ${name} secret file`)
+  const value = readFileSync(path, 'utf8').replace(/[\r\n]+$/, '')
+  if (!value.trim() || /[\r\n]/.test(value)) throw new Error(`server ${name} secret file is empty or invalid`)
+  return value
+}
+
+export function loadRuntime(target, { env = process.env, root = repoRoot, keychainReader = readKeychainSecret } = {}) {
+  const mode = env.MUSUW_ADMIN_MODE || 'local'
+  if (!['local', 'server'].includes(mode)) throw new Error('MUSUW_ADMIN_MODE must be local or server')
+  if (!['test', 'production'].includes(target)) throw new Error('target must be test or production')
+  const server = mode === 'server'
+  let secretDir
+  if (server) {
+    if (target !== 'production') throw new Error('server mode only supports production')
+    for (const name of ['MUSUW_ADMIN_RUNTIME_FILE', 'MUSUW_ADMIN_SECRET_DIR']) {
+      if (!env[name] || !isAbsolute(env[name])) throw new Error(`${name} must be an explicit absolute path in server mode`)
+    }
+    secretDir = env.MUSUW_ADMIN_SECRET_DIR
+    let directory
+    try {
+      directory = lstatSync(secretDir)
+    } catch {
+      throw new Error('server secret directory is unavailable')
+    }
+    if (!directory.isDirectory() || (directory.mode & 0o077) !== 0) throw new Error('server secret directory permissions are unsafe')
+    protectedFile(env.MUSUW_ADMIN_RUNTIME_FILE, 'server runtime file')
+  }
+  const readProviderSecret = server
+    ? (service) => readServerSecret(secretDir, SERVER_SECRET_FILES[service])
+    : keychainReader
   if (target === 'production') {
-    const runtimePath = resolve(repoRoot, '.runtime/musuw-admin/production.env')
+    const runtimePath = server ? env.MUSUW_ADMIN_RUNTIME_FILE : resolve(root, '.runtime/musuw-admin/production.env')
     const runtime = parseEnvFile(runtimePath)
     if (!runtime.MUSUW_ADMIN_DATABASE_URL || !runtime.MUSUW_ADMIN_BACKEND_URL) {
-      throw new Error('production requires .runtime/musuw-admin/production.env with MUSUW_ADMIN_DATABASE_URL and MUSUW_ADMIN_BACKEND_URL')
+      throw new Error('production runtime requires MUSUW_ADMIN_DATABASE_URL and MUSUW_ADMIN_BACKEND_URL')
     }
+    if (server && !runtime.MUSUW_ADMIN_DATABASE_HOST_FILE) throw new Error('MUSUW_ADMIN_DATABASE_HOST_FILE must be an explicit absolute path')
     const platformKeyAccount = runtime.MUSUW_ADMIN_PLATFORM_KEY_ACCOUNT || 'musuw-admin-production'
     const providerKeyAccount = runtime.MUSUW_ADMIN_PROVIDER_KEY_ACCOUNT || platformKeyAccount
     return {
       target,
+      server,
+      secretDir,
       label: 'PRODUCTION',
-      database: { connectionString: productionDatabaseConnectionString(runtime), application_name: 'musuw-operations-production' },
+      database: {
+        connectionString: productionDatabaseConnectionString(runtime, {
+          passwordPath: server ? resolve(secretDir, 'production-ro-password') : resolve(root, '.runtime/musuw-admin/production-ro-password'),
+          hostPath: server ? runtime.MUSUW_ADMIN_DATABASE_HOST_FILE : undefined,
+        }),
+        application_name: 'musuw-operations-production',
+      },
       backendBaseUrl: runtime.MUSUW_ADMIN_BACKEND_URL.replace(/\/$/, ''),
       platformKeyAccount,
       paddleEnvironment: 'live',
-      paddleApiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
+      paddleApiKey: readProviderSecret(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
       paddleApiBase: 'https://api.paddle.com',
       supabaseAdmin: {
         targetEnvironment: 'PRODUCTION',
@@ -218,7 +279,7 @@ function loadRuntime(target) {
             environment: 'PRODUCTION', name: 'Musuw Production', ref: 'phtveqtlswzokwsztsvu',
             url: 'https://phtveqtlswzokwsztsvu.supabase.co',
             applicable: true,
-            apiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.supabase, providerKeyAccount),
+            apiKey: readProviderSecret(PROVIDER_KEY_SERVICES.supabase, providerKeyAccount),
           },
         ],
       },
@@ -226,13 +287,13 @@ function loadRuntime(target) {
         accountId: runtime.MUSUW_R2_ACCOUNT_ID || 'c692db4757e1454b71880ec6c431db9c',
         bucket: runtime.MUSUW_R2_BUCKET || 'musuw-production',
         prefix: runtime.MUSUW_R2_PREFIX || 'weknora/',
-        accessKeyId: readKeychainSecret(PROVIDER_KEY_SERVICES.r2AccessKeyID, providerKeyAccount),
-        secretAccessKey: readKeychainSecret(PROVIDER_KEY_SERVICES.r2SecretAccessKey, providerKeyAccount),
+        accessKeyId: readProviderSecret(PROVIDER_KEY_SERVICES.r2AccessKeyID, providerKeyAccount),
+        secretAccessKey: readProviderSecret(PROVIDER_KEY_SERVICES.r2SecretAccessKey, providerKeyAccount),
       },
       langfuse: {
         host: (runtime.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
-        publicKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
-        secretKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
+        publicKey: readProviderSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
+        secretKey: readProviderSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
         environment: 'production',
       },
     }
@@ -241,23 +302,23 @@ function loadRuntime(target) {
   // The operations console only needs the database identity from the stable
   // local source. candidate.env is a generated Compose artifact and may be
   // evicted by macOS storage optimization while the source remains local.
-  const candidate = parseEnvFile(resolve(repoRoot, '.runtime/weknora/local.source.env'))
+  const candidate = parseEnvFile(resolve(root, '.runtime/weknora/local.source.env'))
   const providerKeyAccount = 'musuw-admin-test'
   return {
     target: 'test',
     label: 'TEST',
     database: {
-      host: process.env.MUSUW_ADMIN_TEST_DB_HOST || '127.0.0.1',
-      port: Number.parseInt(process.env.MUSUW_ADMIN_TEST_DB_PORT || '15432', 10),
+      host: env.MUSUW_ADMIN_TEST_DB_HOST || '127.0.0.1',
+      port: Number.parseInt(env.MUSUW_ADMIN_TEST_DB_PORT || '15432', 10),
       user: candidate.DB_USER,
       password: candidate.DB_PASSWORD,
       database: candidate.DB_NAME,
       application_name: 'musuw-operations-test',
     },
-    backendBaseUrl: (process.env.MUSUW_ADMIN_TEST_BACKEND_URL || 'http://127.0.0.1:18090').replace(/\/$/, ''),
+    backendBaseUrl: (env.MUSUW_ADMIN_TEST_BACKEND_URL || 'http://127.0.0.1:18090').replace(/\/$/, ''),
     platformKeyAccount: providerKeyAccount,
     paddleEnvironment: 'sandbox',
-    paddleApiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
+    paddleApiKey: keychainReader(PROVIDER_KEY_SERVICES.paddle, providerKeyAccount),
     paddleApiBase: 'https://sandbox-api.paddle.com',
     supabaseAdmin: {
       targetEnvironment: 'TEST',
@@ -266,7 +327,7 @@ function loadRuntime(target) {
           environment: 'TEST', name: 'Musuw Staging', ref: 'achfnnicetupvtoqiwqd',
           url: 'https://achfnnicetupvtoqiwqd.supabase.co',
           applicable: true,
-          apiKey: readKeychainSecret(PROVIDER_KEY_SERVICES.supabase, providerKeyAccount),
+          apiKey: keychainReader(PROVIDER_KEY_SERVICES.supabase, providerKeyAccount),
         },
         {
           environment: 'PRODUCTION', name: 'Musuw Production', ref: 'phtveqtlswzokwsztsvu',
@@ -276,16 +337,16 @@ function loadRuntime(target) {
       ],
     },
     r2Admin: {
-      accountId: process.env.MUSUW_R2_ACCOUNT_ID || 'c692db4757e1454b71880ec6c431db9c',
-      bucket: process.env.MUSUW_R2_TEST_BUCKET || candidate.S3_BUCKET_NAME || 'musuw-staging',
-      prefix: process.env.MUSUW_R2_PREFIX || 'weknora/',
-      accessKeyId: readKeychainSecret(PROVIDER_KEY_SERVICES.r2AccessKeyID, providerKeyAccount),
-      secretAccessKey: readKeychainSecret(PROVIDER_KEY_SERVICES.r2SecretAccessKey, providerKeyAccount),
+      accountId: env.MUSUW_R2_ACCOUNT_ID || 'c692db4757e1454b71880ec6c431db9c',
+      bucket: env.MUSUW_R2_TEST_BUCKET || candidate.S3_BUCKET_NAME || 'musuw-staging',
+      prefix: env.MUSUW_R2_PREFIX || 'weknora/',
+      accessKeyId: keychainReader(PROVIDER_KEY_SERVICES.r2AccessKeyID, providerKeyAccount),
+      secretAccessKey: keychainReader(PROVIDER_KEY_SERVICES.r2SecretAccessKey, providerKeyAccount),
     },
     langfuse: {
-      host: (process.env.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
-      publicKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
-      secretKey: readKeychainSecret(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
+      host: (env.MUSUW_LANGFUSE_HOST || 'https://jp.cloud.langfuse.com').replace(/\/$/, ''),
+      publicKey: keychainReader(PROVIDER_KEY_SERVICES.langfusePublicKey, providerKeyAccount),
+      secretKey: keychainReader(PROVIDER_KEY_SERVICES.langfuseSecretKey, providerKeyAccount),
       environment: 'staging',
     },
   }
@@ -304,7 +365,8 @@ export function readKeychainSecret(service, account, executor = execFileSync) {
   }
 }
 
-function readPlatformKey(account) {
+export function readPlatformKey(account, { secretDir } = {}) {
+  if (secretDir) return readServerSecret(secretDir, 'platform_api_key')
   return readKeychainSecret(PLATFORM_KEY_SERVICE, account)
 }
 
@@ -341,6 +403,34 @@ function publicError(error) {
 
 export function registerPoolErrorHandler(pool, log = console.error) {
   pool.on('error', (error) => log(`[musuw-admin] database ${publicError(error)}`))
+}
+
+export function createDatabaseReadiness(pool, { onFailure, intervalMs = 5_000 } = {}) {
+  let pending
+  let stopped = false
+  function check() {
+    if (stopped) return Promise.resolve(false)
+    if (!pending) {
+      pending = Promise.resolve()
+        .then(() => pool.query({ text: 'SELECT 1', query_timeout: 2_000 }))
+        .then(() => true, () => false)
+        .finally(() => { pending = undefined })
+    }
+    return pending
+  }
+  const timer = setInterval(async () => {
+    const ready = await check()
+    if (!ready && !stopped) {
+      stop()
+      onFailure()
+    }
+  }, intervalMs)
+  timer.unref()
+  function stop() {
+    stopped = true
+    clearInterval(timer)
+  }
+  return { check, stop }
 }
 
 function parseJSONBody(request, maxBytes = 64 * 1024) {
@@ -1002,7 +1092,7 @@ async function start() {
   const operationsHtml = resolve(assetDir, 'operations.html')
   if (!existsSync(operationsHtml)) throw new Error(`operations build is missing: ${operationsHtml}`)
 
-  const platformKey = readPlatformKey(runtime.platformKeyAccount)
+  const platformKey = readPlatformKey(runtime.platformKeyAccount, { secretDir: runtime.secretDir })
   const r2Client = runtime.r2Admin.accessKeyId && runtime.r2Admin.secretAccessKey
     ? new S3Client({
       region: 'auto',
@@ -1034,16 +1124,30 @@ async function start() {
     max: 2,
     // Keep both tunnel-backed connections alive for the operator session.
     idleTimeoutMillis: 0,
-    connectionTimeoutMillis: 60_000,
+    connectionTimeoutMillis: runtime.server ? 2_000 : 60_000,
+    ...(runtime.server ? { query_timeout: 12_000 } : {}),
     options: '-c default_transaction_read_only=on -c statement_timeout=12000',
   })
-  registerPoolErrorHandler(pool)
+  const logServerDatabaseError = () => console.error('[musuw-admin] database connection interrupted')
+  registerPoolErrorHandler(pool, runtime.server ? logServerDatabaseError : undefined)
   const readOnly = await pool.query('SHOW transaction_read_only')
   if (readOnly.rows[0]?.transaction_read_only !== 'on') {
     await pool.end().catch(() => {})
     throw new Error('operations database connection is not read-only')
   }
   const queries = createQueries(pool)
+  // Keep readiness independent of the two business connections so a normal
+  // count + row query cannot falsely trigger a process restart.
+  const readinessPool = runtime.server ? new Pool({
+    ...runtime.database,
+    max: 1,
+    idleTimeoutMillis: 0,
+    connectionTimeoutMillis: 2_000,
+    query_timeout: 2_000,
+    options: '-c default_transaction_read_only=on -c statement_timeout=2000',
+  }) : null
+  if (readinessPool) registerPoolErrorHandler(readinessPool, logServerDatabaseError)
+  let readiness
   const sessions = new Map()
   const cookieNames = targetCookieNames(target)
   const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`])
@@ -1141,6 +1245,10 @@ async function start() {
       const url = new URL(request.url || '/', `http://${request.headers.host}`)
       if (url.pathname === '/healthz') {
         return writeJSON(response, 200, { status: 'ok', environment: runtime.label })
+      }
+      if (runtime.server && url.pathname === '/readyz') {
+        const ready = await readiness.check()
+        return writeJSON(response, ready ? 200 : 503, { status: ready ? 'ok' : 'unavailable', environment: runtime.label })
       }
       const session = ensureSession(request, response, url.pathname)
       if (!session && !isPublicConsoleAsset(request.method || 'GET', url.pathname)) {
@@ -1258,14 +1366,22 @@ async function start() {
     })
   }).catch(async (error) => {
     await pool.end().catch(() => {})
+    await readinessPool?.end().catch(() => {})
     throw error
   })
+  if (readinessPool) {
+    readiness = createDatabaseReadiness(readinessPool, { onFailure() {
+      console.error('[musuw-admin] database readiness failed; restarting')
+      process.exit(1)
+    } })
+  }
   console.log(`Musuw operations console ${runtime.label} listening on http://${host}:${port}`)
   console.log(`Musuw management API: ${platformKey ? 'available' : 'unavailable'}`)
 
   const shutdown = async () => {
+    readiness?.stop()
     server.close()
-    await pool.end().catch(() => {})
+    await Promise.all([pool.end().catch(() => {}), readinessPool?.end().catch(() => {})])
     process.exit(0)
   }
   process.on('SIGINT', shutdown)
@@ -1274,7 +1390,7 @@ async function start() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   start().catch((error) => {
-    console.error(`musuw-admin: ${publicError(error)}`)
+    console.error(`musuw-admin: ${process.env.MUSUW_ADMIN_MODE === 'server' ? 'server initialization failed' : publicError(error)}`)
     process.exit(1)
   })
 }

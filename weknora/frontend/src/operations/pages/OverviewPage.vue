@@ -140,6 +140,7 @@
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import { ChevronRightIcon, CloudIcon, FileIcon, InfoCircleIcon, LayersIcon, LinkIcon, MoneyIcon, ServerIcon, UserSafetyIcon, UsergroupIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatBytes, formatDate, formatNumber, percent, statusTone } from '../format'
 import type { OperationsConfig, OverviewData } from '../types'
 
@@ -183,6 +184,7 @@ async function load() {
   finally { loading.value = false; emit('busy', false) }
 }
 
+useOperationsReadRecovery(error, loading, load)
 onMounted(load)
 watch(() => props.refreshKey, load)
 </script>

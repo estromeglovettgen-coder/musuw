@@ -52,6 +52,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { BillIcon, InfoCircleIcon, LayersIcon, LinkIcon, MoneyIcon, WalletIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatDate, statusTone } from '../format'
 import type { BillingData, OperationsConfig, TenantBillingRow } from '../types'
 
@@ -78,6 +79,7 @@ function openMirror(row: TenantBillingRow) { drawerData.value = row; drawerVisib
 function openProvider(row: unknown) { drawerData.value = row; drawerVisible.value = true }
 function handleMirrorClick(context: { row: TenantBillingRow }) { openMirror(context.row) }
 function handleProviderClick(context: { row: Record<string, unknown> }) { openProvider(context.row) }
+useOperationsReadRecovery(error, loading, load)
 onMounted(load); watch(() => props.refreshKey, load)
 </script>
 

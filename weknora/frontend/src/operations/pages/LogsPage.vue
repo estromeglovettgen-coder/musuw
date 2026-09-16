@@ -35,6 +35,7 @@ import { ChartBubbleIcon, InfoCircleIcon, LinkIcon } from 'tdesign-icons-vue-nex
 import RuntimeQueues from '@/views/system/RuntimeQueues.vue'
 import SystemAuditLog from '@/views/system/SystemAuditLog.vue'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatDate, formatNumber } from '../format'
 import type { LangfuseData, OperationsConfig } from '../types'
 
@@ -50,6 +51,7 @@ const langfuseColumns = [
 function formatUsage(value: unknown) { return value == null ? '—' : formatNumber(value) }
 function formatCost(value: unknown) { return value == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 6 }).format(Number(value)) }
 async function loadLangfuse() { langfuseLoading.value = true; langfuseError.value = ''; emit('busy', true); try { langfuse.value = await operationsApi.langfuse() } catch (e) { langfuseError.value = e instanceof Error ? e.message : '加载失败' } finally { langfuseLoading.value = false; emit('busy', false) } }
+useOperationsReadRecovery(langfuseError, langfuseLoading, loadLangfuse)
 onMounted(loadLangfuse)
 watch(() => props.refreshKey, loadLangfuse)
 </script>

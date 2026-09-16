@@ -150,6 +150,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { ChevronRightIcon, ErrorCircleIcon, FilterIcon, InfoCircleIcon, SearchIcon, UserSearchIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatBytes, formatDate, formatMicrousd, percent, statusTone } from '../format'
 import type { ComplimentaryPlan, InvestigationData, OperationsConfig, TenantEntitlement, UserRow } from '../types'
 
@@ -325,6 +326,7 @@ async function submitErasure() {
     erasing.value = false
   }
 }
+useOperationsReadRecovery(error, loading, load)
 onMounted(load)
 watch(() => props.refreshKey, load)
 </script>

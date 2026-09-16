@@ -66,6 +66,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { ChevronRightIcon, FileSearchIcon, FilterIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { operationsApi } from '../api'
+import { useOperationsReadRecovery } from '../useOperationsReadRecovery'
 import { formatBytes, formatDate, statusTone } from '../format'
 import type { DocumentRow, KnowledgeBaseRow, OperationsConfig } from '../types'
 
@@ -94,6 +95,7 @@ function setKind(value: 'documents' | 'knowledge_bases') { kind.value = value; s
 function applyFilters() { page.value = 1; load() }
 function openRow(row: unknown) { selected.value = row; drawerVisible.value = true }
 function handleRowClick(context: { row: DocumentRow | KnowledgeBaseRow }) { openRow(context.row) }
+useOperationsReadRecovery(error, loading, load)
 onMounted(load)
 watch(() => props.refreshKey, load)
 </script>
