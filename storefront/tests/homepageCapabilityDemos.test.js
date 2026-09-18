@@ -105,11 +105,11 @@ test("final CTA uses an empty native Musuw new-chat surface", () => {
   assert.match(source, /\binert\b/);
   assert.doesNotMatch(source, /product-demo-query|answer-demo-thread|DemoComposer/);
   assert.match(finalCta, /data-story="new-chat"/);
-  assert.match(finalCta, /Hi, I am Musuw/);
+  assert.match(finalCta, />Hi, I’m Musuw</);
   assert.match(finalCta, /GPT-6 Astra/);
   assert.match(finalCta, /Build my knowledge base/);
   assert.doesNotMatch(finalCta, /data-capability-demo="answer"|Conclusion|Verification boundary|Interviews/);
-  assert.match(chineseHome, /Hi，我是 Musuw/);
+  assert.match(chineseHome, />Hi，我是 Musuw</);
   assert.match(chineseHome, /建立我的知识库/);
   assert.match(styles, /\.final-cta-dashboard-frame \.final-cta-product-demo \.visual-new-chat-stack\s*\{[^}]*width:\s*min\(360px,\s*calc\(100% - 40px\)\)/s);
   assert.match(styles, /\.final-cta-dashboard-frame \.final-cta-product-demo \.visual-new-chat-composer\s*\{[^}]*bottom:\s*20px/s);

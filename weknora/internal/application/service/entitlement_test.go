@@ -1387,7 +1387,7 @@ func TestEntitlementServiceReadsAnotherTenantThroughPlatformContext(t *testing.T
 }
 
 func TestEntitlementServiceAdjustsProviderRemainingWithoutLocalLedger(t *testing.T) {
-	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	periodEnd := now.AddDate(0, 1, 0)
 	repo := &entitlementRepoStub{tenant: &types.Tenant{
 		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",

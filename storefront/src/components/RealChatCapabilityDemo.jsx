@@ -322,7 +322,7 @@ export function ReasoningCapabilityDemo({ locale = "en" }) {
       messagesRef={messagesRef}
       shellRef={rootRef}
       title={copy.title}
-      welcome={phase === "idle" || phase === "typing" ? (isChineseStory(locale) ? "Hi，我是 Musuw，让你的知识触手可及" : "Hi, I am Musuw. Your knowledge, within reach.") : null}
+      welcome={phase === "idle" || phase === "typing" ? (isChineseStory(locale) ? "Hi，我是 Musuw" : "Hi, I’m Musuw") : null}
       messages={(
         <>
           {showUserMessage && <article className="visual-chat-message-row is-user"><article className="visual-user-message real-chat-user-message"><div className="visual-user-message__bubble">{copy.question}</div></article></article>}

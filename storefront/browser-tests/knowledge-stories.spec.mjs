@@ -125,7 +125,7 @@ for (const locale of ["zh-CN", "en"]) {
       const hero = page.locator('[data-story="research-ledger"]');
       await hero.scrollIntoViewIfNeeded();
       if (reducedMotion === "no-preference") {
-        await expect(hero.locator(".visual-new-chat-title")).toContainText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I am Musuw");
+        await expect(hero.locator(".visual-new-chat-title")).toHaveText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I’m Musuw");
         const initialHeroPhase = await hero.getAttribute("data-demo-phase");
         await expect.poll(
           async () => hero.getAttribute("data-demo-phase"),
@@ -207,7 +207,7 @@ for (const locale of ["zh-CN", "en"]) {
       const chat = page.locator('[data-capability-demo="reasoning"]');
       await chat.scrollIntoViewIfNeeded();
       if (reducedMotion === "no-preference") {
-        await expect(chat.locator(".authoritative-chat-welcome")).toContainText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I am Musuw");
+        await expect(chat.locator(".authoritative-chat-welcome")).toHaveText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I’m Musuw");
         await expect(chat).toHaveAttribute("data-chat-phase", "validating", { timeout: 20_000 });
         await expect(chat.locator(".visual-rag-step")).toHaveCount(5);
         await expect(chat.locator(".visual-rag-timeline")).toContainText(locale === "zh-CN" ? "混合召回（BM25 + 向量）" : "Hybrid retrieval (BM25 + vector)");

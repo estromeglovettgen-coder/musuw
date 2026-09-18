@@ -622,7 +622,7 @@ export function HeroProductDemo({ locale = "en" }) {
       data-demo-interactive="false"
       inert
       newChat={phase === "idle" || phase === "typing-question"}
-      newChatTitle={isChineseStory(locale) ? "Hi，我是 Musuw，让你的知识触手可及" : "Hi, I am Musuw — your knowledge, within reach"}
+      newChatTitle={isChineseStory(locale) ? "Hi，我是 Musuw" : "Hi, I’m Musuw"}
       messagesRef={messagesRef}
       overlay={(
         <>

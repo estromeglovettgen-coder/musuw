@@ -60,7 +60,7 @@ const MARKETING_COPY = Object.freeze({
     },
     finalCta: {
       title: "Build your AI knowledge base\nKeep your knowledge growing",
-      body: "Bring together documents, webpages, and notes to build your AI knowledge base.\nLet AI organize your knowledge and connect it, so you can ask from your materials anytime and keep knowledge growing and reusable.",
+      body: "Bring your sources together. Find answers and build lasting knowledge.",
       action: "Build my knowledge base",
     },
     footerGroups: [
@@ -114,7 +114,7 @@ const MARKETING_COPY = Object.freeze({
     },
     finalCta: {
       title: "建立你的 AI 知识库\n让知识持续积累",
-      body: "汇集文档、网页与笔记，构建你的 AI 知识库。\n让 AI 整理知识、建立关联，随时基于资料提问，让知识持续积累与复用。",
+      body: "汇集资料，随时提问，让知识持续积累。",
       action: "建立我的知识库",
     },
     footerGroups: [
