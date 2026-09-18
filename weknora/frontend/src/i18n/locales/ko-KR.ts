@@ -2574,7 +2574,7 @@ export default {
         },
         gemini: {
           label: 'Google Gemini',
-          description: 'gemini-3-flash-preview, gemini-2.5-pro 등'
+          description: 'gemini-3.8-flash, gemini-3.5-flash-lite 등'
         },
         mimo: {
           label: 'MiMo',
@@ -2590,7 +2590,7 @@ export default {
         },
         deepseek: {
           label: 'DeepSeek',
-          description: 'deepseek-chat, deepseek-reasoner 등'
+          description: 'deepseek-flash, deepseek-v4-pro 등'
         },
         volcengine: {
           label: 'Volcengine',
@@ -2614,7 +2614,7 @@ export default {
         },
         openrouter: {
           label: 'OpenRouter',
-          description: 'openai/gpt-5.2-chat, google/gemini-3-flash-preview 등'
+          description: 'deepseek/deepseek-v4.1-flash, google/gemini-3.8-flash 등'
         },
         zhipu: {
           label: 'Zhipu BigModel',
@@ -2634,7 +2634,7 @@ export default {
         },
         openai: {
           label: 'OpenAI',
-          description: 'gpt-5.2, gpt-5-mini 등'
+          description: 'gpt-5.4-nano 등'
         }
       },
       validation: {
@@ -2682,9 +2682,9 @@ export default {
       },
       modelNamePlaceholder: {
         local: '예: llama2:latest',
-        remote: '예: gpt-4, claude-3-opus',
+        remote: '예: gpt-5.4-nano, deepseek-flash',
         localVllm: '예: llava:latest',
-        remoteVllm: '예: gpt-4-vision-preview',
+        remoteVllm: '예: gpt-5.4-nano',
         remoteAsr: '예: whisper-1'
       },
       description: {

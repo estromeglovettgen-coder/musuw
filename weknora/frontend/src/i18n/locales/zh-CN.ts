@@ -2578,7 +2578,7 @@ export default {
         },
         gemini: {
           label: 'Google Gemini',
-          description: 'gemini-3-flash-preview, gemini-2.5-pro 等'
+          description: 'gemini-3.8-flash, gemini-3.5-flash-lite 等'
         },
         mimo: {
           label: '小米 MiMo',
@@ -2594,7 +2594,7 @@ export default {
         },
         deepseek: {
           label: 'DeepSeek',
-          description: 'deepseek-chat, deepseek-reasoner 等'
+          description: 'deepseek-flash, deepseek-v4-pro 等'
         },
         volcengine: {
           label: '火山引擎 Volcengine',
@@ -2618,7 +2618,7 @@ export default {
         },
         openrouter: {
           label: 'OpenRouter',
-          description: 'openai/gpt-5.2-chat, google/gemini-3-flash-preview, etc.'
+          description: 'deepseek/deepseek-v4.1-flash, google/gemini-3.8-flash, etc.'
         },
         zhipu: {
           label: '智谱 BigModel',
@@ -2638,7 +2638,7 @@ export default {
         },
         openai: {
           label: 'OpenAI',
-          description: 'gpt-5.2, gpt-5-mini, etc.'
+          description: 'gpt-5.4-nano, etc.'
         }
       },
       validation: {
@@ -2686,9 +2686,9 @@ export default {
       },
       modelNamePlaceholder: {
         local: '例如：llama2:latest',
-        remote: '例如：gpt-4, claude-3-opus',
+        remote: '例如：gpt-5.4-nano, deepseek-flash',
         localVllm: '例如：llava:latest',
-        remoteVllm: '例如：gpt-4-vision-preview',
+        remoteVllm: '例如：gpt-5.4-nano',
         remoteAsr: '例如：whisper-1'
       },
       description: {

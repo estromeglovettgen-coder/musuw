@@ -23,7 +23,7 @@ func (p *OpenAIProvider) Info() ProviderInfo {
 	return ProviderInfo{
 		Name:        ProviderOpenAI,
 		DisplayName: "OpenAI",
-		Description: "gpt-5.2, gpt-5-mini, etc.",
+		Description: "gpt-5.4-nano, etc.",
 		DefaultURLs: map[types.ModelType]string{
 			types.ModelTypeKnowledgeQA: OpenAIBaseURL,
 			types.ModelTypeEmbedding:   OpenAIBaseURL,

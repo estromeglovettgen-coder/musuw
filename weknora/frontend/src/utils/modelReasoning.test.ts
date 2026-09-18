@@ -50,3 +50,12 @@ test('models without reasoning have no depth menu and send thinking off', () => 
 test('scene placeholder rows do not disable reasoning before the real model catalog arrives', () => {
   assert.equal(resolveModelReasoning({ id: 'grok', parameters: {} }, 'high', 'grok'), null)
 })
+
+
+test('a catalog refresh retains Nano ID while replacing its retired minimal depth', () => {
+  const nano = model('builtin-openrouter-gpt-5-nano', ['xhigh', 'high', 'medium', 'low', 'none'])
+  assert.deepEqual(resolveModelReasoning(nano, 'minimal', nano.id), { effort: 'low', modelId: nano.id })
+  assert.deepEqual(resolveModelReasoning(nano, 'none', nano.id), { effort: 'none', modelId: nano.id })
+  assert.deepEqual(resolveModelReasoning(nano, 'xhigh', nano.id), { effort: 'xhigh', modelId: nano.id })
+  assert.deepEqual(modelReasoningEfforts(nano), ['low', 'medium', 'high', 'xhigh', 'none'])
+})

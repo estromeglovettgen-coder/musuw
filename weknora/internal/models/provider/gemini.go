@@ -25,7 +25,7 @@ func (p *GeminiProvider) Info() ProviderInfo {
 	return ProviderInfo{
 		Name:        ProviderGemini,
 		DisplayName: "Google Gemini",
-		Description: "gemini-3-flash-preview, gemini-2.5-pro, gemini-embedding-2, etc.",
+		Description: "gemini-3.8-flash, gemini-3.5-flash-lite, gemini-embedding-2, etc.",
 		DefaultURLs: map[types.ModelType]string{
 			types.ModelTypeKnowledgeQA: GeminiOpenAICompatBaseURL,
 			types.ModelTypeEmbedding:   GeminiBaseURL,

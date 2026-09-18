@@ -111,7 +111,10 @@ func NewRemoteAPIChat(chatConfig *ChatConfig) (*RemoteAPIChat, error) {
 		if err != nil {
 			return nil, fmt.Errorf("model default reasoning effort: %w", err)
 		}
-		thinkingOverride = openRouterReasoning{mandatory: chatConfig.MandatoryReasoning, defaultEffort: defaultEffort}
+		thinkingOverride = openRouterReasoning{
+			mandatory: chatConfig.MandatoryReasoning, defaultEffort: defaultEffort,
+			supportedEfforts: chatConfig.SupportedReasoningEfforts,
+		}
 	}
 	return &RemoteAPIChat{
 		modelName:        modelName,

@@ -4404,9 +4404,9 @@ export default {
       },
       modelNamePlaceholder: {
         local: 'e.g. llama2:latest',
-        remote: 'e.g. gpt-4, claude-3-opus',
+        remote: 'e.g. gpt-5.4-nano, deepseek-flash',
         localVllm: 'e.g. llava:latest',
-        remoteVllm: 'e.g. gpt-4-vision-preview',
+        remoteVllm: 'e.g. gpt-5.4-nano',
         remoteAsr: 'e.g. whisper-1'
       },
       baseUrlLabel: 'Base URL',
@@ -4506,7 +4506,7 @@ export default {
       providers: {
         openai: {
           label: 'OpenAI',
-          description: 'gpt-5.2, gpt-5-mini, etc.'
+          description: 'gpt-5.4-nano, etc.'
         },
         anthropic: {
           label: 'Anthropic',
@@ -4526,7 +4526,7 @@ export default {
         },
         openrouter: {
           label: 'OpenRouter',
-          description: 'openai/gpt-5.2-chat, google/gemini-3-flash-preview, etc.'
+          description: 'deepseek/deepseek-v4.1-flash, google/gemini-3.8-flash, etc.'
         },
         requesty: {
           label: 'Requesty',
@@ -4550,7 +4550,7 @@ export default {
         },
         deepseek: {
           label: 'DeepSeek',
-          description: 'deepseek-chat, deepseek-reasoner, etc.'
+          description: 'deepseek-flash, deepseek-v4-pro, etc.'
         },
         hunyuan: {
           label: 'Hunyuan',
@@ -4566,7 +4566,7 @@ export default {
         },
         gemini: {
           label: 'Google Gemini',
-          description: 'gemini-3-flash-preview, gemini-2.5-pro, etc.'
+          description: 'gemini-3.8-flash, gemini-3.5-flash-lite, etc.'
         },
         gpustack: {
           label: 'GPUStack',

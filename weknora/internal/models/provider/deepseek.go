@@ -23,7 +23,7 @@ func (p *DeepSeekProvider) Info() ProviderInfo {
 	return ProviderInfo{
 		Name:        ProviderDeepSeek,
 		DisplayName: "DeepSeek",
-		Description: "deepseek-v4-pro and deepseek-v4-flash.",
+		Description: "deepseek-flash (V4.1 Flash) and deepseek-v4-pro.",
 		DefaultURLs: map[types.ModelType]string{
 			types.ModelTypeKnowledgeQA: DeepSeekBaseURL,
 		},
