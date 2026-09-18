@@ -408,8 +408,8 @@ export function HeroProductDemo({ locale = "en" }) {
         if (attempts++ < 24) retryTimer = window.setTimeout(measure, 40);
         return;
       }
-      const maxX = Math.max(8, hostRect.width - 28);
-      const maxY = Math.max(8, hostRect.height - 28);
+      const maxX = Math.max(8, host.clientWidth - 28);
+      const maxY = Math.max(8, host.clientHeight - 28);
       const buttonRect = button.getBoundingClientRect();
       if (buttonRect.width <= 0 || buttonRect.height <= 0) {
         if (attempts++ < 24) retryTimer = window.setTimeout(measure, 40);
@@ -419,21 +419,15 @@ export function HeroProductDemo({ locale = "en" }) {
       // hotspot at the actual centre of the native save action. There is
       // deliberately no ResizeObserver or per-frame tracker, so the path
       // remains stable.
-      // SettingDrawer animates with translateX(100%) -> 0. During that
-      // animation getBoundingClientRect() includes the transient transform
-      // and can place the publish target outside the product frame. Resolve
-      // the button's offset inside the drawer and add the drawer's authored
-      // inset instead, which is stable before and after the slide.
+      // The button's offset parent is the drawer; the drawer's is the host.
+      // Keep these coordinates local: viewport rects already include the
+      // outer Hero's perspective and the drawer's slide transform.
       const drawer = button.closest("[data-hero-save-drawer]");
-      const drawerStyle = drawer ? window.getComputedStyle(drawer) : null;
-      const drawerRect = drawer?.getBoundingClientRect();
-      const drawerLeft = drawer && drawerStyle ? Number.parseFloat(drawerStyle.left) || 0 : 0;
-      const drawerTop = drawer && drawerStyle ? Number.parseFloat(drawerStyle.top) || 0 : 0;
-      const buttonLeft = drawer && drawerRect ? drawerLeft + (buttonRect.left - drawerRect.left) : buttonRect.left - hostRect.left;
-      const buttonTop = drawer && drawerRect ? drawerTop + (buttonRect.top - drawerRect.top) : buttonRect.top - hostRect.top;
+      const buttonLeft = drawer ? drawer.offsetLeft + drawer.clientLeft + button.offsetLeft : buttonRect.left - hostRect.left;
+      const buttonTop = drawer ? drawer.offsetTop + drawer.clientTop + button.offsetTop : buttonRect.top - hostRect.top;
       const target = {
-        x: clamp(buttonLeft + buttonRect.width * 0.5 - 3, 8, maxX),
-        y: clamp(buttonTop + buttonRect.height * 0.5 - 3, 8, maxY),
+        x: clamp(buttonLeft + (drawer ? button.offsetWidth : buttonRect.width) * 0.5 - 3, 8, maxX),
+        y: clamp(buttonTop + (drawer ? button.offsetHeight : buttonRect.height) * 0.5 - 3, 8, maxY),
       };
       const previous = saveStep === "publish" && pointerAnchorRef.current
         ? pointerAnchorRef.current
