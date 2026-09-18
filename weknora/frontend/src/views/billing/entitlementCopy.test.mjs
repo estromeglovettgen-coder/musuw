@@ -32,7 +32,7 @@ test('consumer plan cards use the same copy as the public homepage', () => {
     'For intensive knowledge work',
     '1 knowledge base (10 docs)',
     'Standard models',
-    'Documents and web links',
+    'Documents and notes',
     'Unlimited knowledge bases',
     'Advanced models',
     'Video & link import',
@@ -42,7 +42,7 @@ test('consumer plan cards use the same copy as the public homepage', () => {
     '适合高强度知识工作',
     '1 个知识库（10 篇文档）',
     '标准模型',
-    '文档与网页导入',
+    '文档与笔记导入',
     '不限知识库与文档数',
     '高级模型',
     '视频与多平台导入',
@@ -54,8 +54,9 @@ test('plans and checkout keep the four enforced storage tiers and shared feature
   assert.doesNotMatch(plans, /featureAllowance/)
   assert.match(plans, /featureBudgetModel/)
   assert.match(plans, /freeImportFeature/)
-  assert.match(plans, /'文档与网页导入'/)
-  assert.match(plans, /'Documents and web links'/)
+  assert.match(plans, /'文档与笔记导入'/)
+  assert.match(plans, /'Documents and notes'/)
+  assert.doesNotMatch(plans, /文档与网页导入|Documents and web links/)
   assert.match(plans, /featureAllModels/)
   assert.match(checkout, /const storage = \{ plus: 10, pro: 30, max: 100 \}\[plan\]/)
   assert.doesNotMatch(checkout, /featureAllowance/)

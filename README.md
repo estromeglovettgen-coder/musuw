@@ -1,5 +1,11 @@
 # Musuw
 
+Musuw turns documents and notes into cited answers, connected Wiki pages, and a knowledge graph.
+
+[Open app](https://app.musuw.com/auth/start) · [View demo](https://musuw.com/#demo) · [Media kit](https://musuw.com/press)
+
+![Musuw answering a question with a source citation](storefront/public/images/musuw-query-citation.jpg)
+
 Musuw is a consumer knowledge workspace built from the complete upstream
 [WeKnora main source at fixed commit `81142df`](https://github.com/Tencent/WeKnora/tree/81142dfd17b2778087e95d3a317483a2fd909b91)
 (the upstream `VERSION` remains `0.7.2`).

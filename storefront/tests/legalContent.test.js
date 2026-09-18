@@ -32,9 +32,9 @@ test("every merchant-review document is public and complete in English and Chine
       assert.ok(document.summary.length >= 30);
       assert.equal(
         document.updated,
-        ["/privacy", "/subscription-policy"].includes(route)
-          ? "2026-09-03"
-          : ["/terms", "/refund-policy"].includes(route)
+        ["/privacy", "/cookies"].includes(route)
+          ? "2026-09-18"
+          : ["/subscription-policy", "/terms", "/refund-policy"].includes(route)
             ? "2026-09-03"
             : "2026-08-27",
       );
@@ -223,10 +223,19 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
 
     const cookies = flatten(locale, "/cookies");
     assert.match(cookies, /Cloudflare/);
-    assert.match(
-      cookies,
-      locale === "zh-CN" ? /不加载.*分析|未加载.*分析/ : /does not load.*analytics/i
-    );
+    for (const document of [privacy, cookies]) {
+      assert.match(
+        document,
+        locale === "zh-CN"
+          ? /Cloudflare.*不使用 Cookie.*页面访问.*性能统计/
+          : /Cloudflare.*cookie-free.*page.?usage and performance analytics/i
+      );
+      assert.doesNotMatch(
+        document,
+        locale === "zh-CN" ? /不加载.*分析|未加载.*分析/ : /does not load.*analytics/i
+      );
+    }
+    assert.match(cookies, /https:\/\/developers\.cloudflare\.com\/speed\/observatory\/rum-beacon\//);
     assert.match(cookies, locale === "zh-CN" ? /浏览器存储/ : /browser storage/i);
     assert.match(cookies, locale === "zh-CN" ? /不.*跨.*追踪/ : /does not.*use cross-site behavioral tracking/i);
   }

@@ -53,7 +53,7 @@ const MARKETING_COPY = Object.freeze({
         { question: "What can I add to musuw?", answer: "Add common documents and notes. Paid plans also support webpages and video links from available YouTube, TikTok, and Douyin integrations" },
         { question: "How do agents and citations work?", answer: "Agents can split a task, search several times, and use enabled tools. Supported claims link to source passages" },
         { question: "Which models can I use?", answer: "Musuw provides 30+ managed models. Availability depends on your plan and the current product catalog" },
-        { question: "Is my content used to train models?", answer: "Musuw does not claim ownership of your content. Provider processing follows the model shown in the product and our Privacy Policy" },
+        { question: "Is my content used to train models?", answer: "Musuw does not use personal content to train general-purpose models by default. AI requests are processed by the selected providers; see our Privacy Policy" },
         { question: "What happens when I reach a plan limit?", answer: "Your knowledge stays available. You can upgrade, remove content, or wait for eligible limits to reset" },
         { question: "Can I export delete or cancel?", answer: "Musuw provides export and deletion controls. Manage subscription changes through the billing flow in our Subscription Policy" },
       ],
@@ -104,12 +104,12 @@ const MARKETING_COPY = Object.freeze({
     faq: {
       label: "常见问题", title: "开始前的常见问题", body: "涵盖资料导入、智能体、引用、模型、套餐限制与数据控制。",
       items: [
-        { question: "musuw 和普通的 AI 问答有什么不同？", answer: "musuw 的核心不只是回答问题，而是围绕你的资料建立一个可持续积累的 AI 知识库。你可以结合多份资料提问、查看原文依据，也可以通过 AI Wiki 和知识图谱整理内容、探索关联，让知识不只停留在一次对话里。" },
-        { question: "哪些资料可以放进我的知识库？", answer: "你可以导入 PDF、Word、Markdown 等文档，以及图片和表格，将分散的资料集中管理、检索和使用。付费方案还支持网页、视频上传及已接入平台的链接导入，具体支持范围以产品内提示为准。" },
-        { question: "资料导入后，还需要我自己整理吗？", answer: "不必所有内容都从头手动整理。AI Wiki 可以帮助你将资料组织成知识页面、建立关联；你也可以检查整理结果，修改页面、补充自己的理解，并通过版本历史查看或恢复之前的内容。" },
-        { question: "AI Wiki 和我上传的原始文档有什么区别？", answer: "原始文档保留资料本身，AI Wiki 则把资料中的信息整理成相互关联、便于阅读和维护的知识页面。你可以从知识页面查看相关主题、回到原始资料，也可以继续编辑和完善内容。它是建立在资料之上的知识整理层，而不是用来替代原文。" },
-        { question: "回答中的结论，能查到原文依据吗？", answer: "对于有来源支持的内容，musuw 会提供引用入口，方便你查看相关原文、核对上下文。引用帮助你判断结论是否有据可依，但不代表 AI 的理解一定正确；重要内容仍建议结合原始资料核验。" },
-        { question: "我的资料会被用于训练 AI 吗？", answer: "musuw 默认不将你个人账户中的内容用于训练通用或基础模型，除非你另行明确同意。使用 AI 功能时，必要的提问和资料片段可能会发送给第三方模型服务处理，其数据保留与训练规则取决于具体服务商。详细说明请查看《隐私政策》。" },
+        { question: "musuw 和普通的 AI 问答有什么不同？", answer: "Musuw 围绕你的资料提供带引用的回答，并用 Wiki 和知识图谱整理内容，让有用的知识持续积累。" },
+        { question: "哪些资料可以放进我的知识库？", answer: "支持 PDF、Word、Markdown、图片和表格。付费方案还支持网页和视频导入，具体格式与平台见产品内提示。" },
+        { question: "资料导入后，还需要我自己整理吗？", answer: "AI Wiki 会协助生成知识页面、建立关联。你可以继续编辑，并通过版本历史查看或恢复内容。" },
+        { question: "AI Wiki 和原始文档有什么区别？", answer: "原始文档保留完整资料；AI Wiki 将信息整理成相互关联的页面，便于阅读、维护和回溯来源。" },
+        { question: "回答能查到原文依据吗？", answer: "回答提供引用入口，方便核对原文和上下文。重要结论请结合原始资料确认。" },
+        { question: "我的资料会被用于训练 AI 吗？", answer: "Musuw 默认不使用个人内容训练通用模型。AI 功能所需数据由相应模型服务处理，详情见《隐私政策》。" },
       ],
     },
     finalCta: {

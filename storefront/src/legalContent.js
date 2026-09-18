@@ -20,6 +20,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
 const updated = "2026-08-27";
 const billingPolicyUpdated = "2026-09-03";
 const accountLifecycleUpdated = "2026-09-03";
+const analyticsNoticeUpdated = "2026-09-18";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -176,7 +177,7 @@ const englishDocuments = {
     title: "Privacy Policy",
     summary:
       "This policy explains what personal data musuw collects, why it is used, how long it is kept, who may process it, and the choices available to you.",
-    updated: accountLifecycleUpdated,
+    updated: analyticsNoticeUpdated,
     sections: [
       {
         heading: "1. Operator and scope",
@@ -203,7 +204,7 @@ const englishDocuments = {
         blocks: [
           p("We collect data directly from you, automatically from your device when you use the service, from connected services you authorize, and from payment, fraud-prevention, support, or infrastructure providers involved in delivering the service."),
           p("Cloudflare may provide a country code for storefront language selection. We use that code to select Chinese for visitors in mainland China and English elsewhere; we do not use it to infer a precise location."),
-          p("Cloudflare processes request metadata at the public edge for delivery, TLS, abuse prevention, and country-level language selection. The current storefront does not load an analytics or advertising beacon.")
+          p("Cloudflare processes request metadata at the public edge for delivery, TLS, abuse prevention, and country-level language selection. Cloudflare also provides cookie-free page-usage and performance analytics through a browser beacon.")
         ]
       },
       {
@@ -299,7 +300,7 @@ const englishDocuments = {
       {
         heading: "11. Cookies and similar technology",
         blocks: [
-          p("The current public storefront does not load analytics or advertising tracking. Cloudflare processes edge request and security metadata as described above. We do not use advertising cookies or cross-site behavioral tracking. Essential browser storage is used for language, authentication, security, and checkout-return state. External identity and checkout providers may use their own necessary technology under their notices."),
+          p("Cloudflare provides cookie-free page-usage and performance analytics and processes edge request and security metadata as described above. We do not use advertising cookies or cross-site behavioral tracking. Essential browser storage is used for language, authentication, security, and checkout-return state. External identity and checkout providers may use their own necessary technology under their notices."),
           link("Read the Cookie Notice", "/cookies")
         ]
       },
@@ -538,14 +539,15 @@ const englishDocuments = {
     title: "Cookie Notice",
     summary:
       "This notice explains the limited browser storage used by the musuw storefront and product, including essential preferences, security, and external checkout technology.",
-    updated,
+    updated: analyticsNoticeUpdated,
     sections: [
       {
         heading: "1. Current storefront practice",
         blocks: [
-          p("The current public musuw storefront does not load an analytics or advertising beacon. Cloudflare processes edge request and security metadata to deliver and protect the site, and supplies a country code used only for language selection."),
+          p("Cloudflare provides cookie-free page-usage and performance analytics through a browser beacon. It also processes edge request and security metadata to deliver and protect the site, and supplies a country code used only for language selection."),
           p("The storefront does not set advertising cookies or use cross-site behavioral tracking. It stores the selected language in the essential musuw_locale cookie for up to one year and does not store a precise location."),
-          p("If we introduce analytics that uses non-essential browser storage or advertising technology, we will update this notice and request consent where required.")
+          p("If we introduce analytics that uses non-essential browser storage or advertising technology, we will update this notice and request consent where required."),
+          link("Cloudflare RUM beacon information", "https://developers.cloudflare.com/speed/observatory/rum-beacon/")
         ]
       },
       {
@@ -840,7 +842,7 @@ const chineseDocuments = {
     eyebrow: "隐私",
     title: "隐私政策",
     summary: "本政策说明 musuw 收集哪些个人信息、使用目的、保留期限、可能的处理方、跨境处理以及您可行使的权利。",
-    updated: accountLifecycleUpdated,
+    updated: analyticsNoticeUpdated,
     sections: [
       {
         heading: "1. 运营主体与适用范围",
@@ -867,7 +869,7 @@ const chineseDocuments = {
         blocks: [
           p("信息可能直接来自您、您使用服务时的设备、您授权连接的服务，以及参与交付服务的付款、反欺诈、支持或基础设施服务商。"),
           p("Cloudflare 可能向我们提供国家或地区代码，用于向中国大陆访问者显示中文、向其他访问者显示英文。我们不会借此推断精确位置。"),
-          p("Cloudflare 在公开网站边缘处理请求元数据，用于内容交付、TLS、滥用防护和国家或地区层级的语言选择。当前官网不加载分析或广告信标。")
+          p("Cloudflare 在公开网站边缘处理请求元数据，用于内容交付、TLS、滥用防护和国家或地区层级的语言选择。Cloudflare 还通过浏览器信标提供不使用 Cookie 的页面访问及性能统计。")
         ]
       },
       {
@@ -963,7 +965,7 @@ const chineseDocuments = {
       {
         heading: "11. Cookie 与类似技术",
         blocks: [
-          p("当前公开官网不加载分析或广告追踪。Cloudflare 按上文说明处理边缘请求和安全元数据。我们不使用广告 Cookie 或跨站行为追踪；仅为语言、身份认证、安全和结账返回状态使用必要浏览器存储。外部身份和结账服务商可依据其告知使用必要技术。"),
+          p("Cloudflare 提供不使用 Cookie 的页面访问及性能统计，并按上文说明处理边缘请求和安全元数据。我们不使用广告 Cookie 或跨站行为追踪；仅为语言、身份认证、安全和结账返回状态使用必要浏览器存储。外部身份和结账服务商可依据其告知使用必要技术。"),
           link("查看 Cookie 说明", "/cookies")
         ]
       },
@@ -1194,14 +1196,15 @@ const chineseDocuments = {
     eyebrow: "隐私",
     title: "Cookie 说明",
     summary: "本说明介绍 musuw 官网和产品使用的有限浏览器存储，包括必要偏好、安全状态与外部结账技术。",
-    updated,
+    updated: analyticsNoticeUpdated,
     sections: [
       {
         heading: "1. 当前官网做法",
         blocks: [
-          p("当前 musuw 公开官网不加载分析或广告信标。Cloudflare 为交付和保护网站处理边缘请求与安全元数据，并提供仅用于语言选择的国家或地区代码。"),
+          p("Cloudflare 通过浏览器信标提供不使用 Cookie 的页面访问及性能统计，并为交付和保护网站处理边缘请求与安全元数据，提供仅用于语言选择的国家或地区代码。"),
           p("官网不设置广告 Cookie，也不进行跨站行为追踪。所选语言存储在必要的 musuw_locale Cookie 中，最长保留一年；我们不存储精确位置。"),
-          p("如未来引入使用非必要浏览器存储的分析工具或广告技术，我们会更新本说明，并在法律要求时先取得同意。")
+          p("如未来引入使用非必要浏览器存储的分析工具或广告技术，我们会更新本说明，并在法律要求时先取得同意。"),
+          link("Cloudflare RUM 信标说明", "https://developers.cloudflare.com/speed/observatory/rum-beacon/")
         ]
       },
       {
