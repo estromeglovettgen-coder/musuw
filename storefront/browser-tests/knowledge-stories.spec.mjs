@@ -104,6 +104,46 @@ async function graphPointerOffset(focusCanvas, stage) {
   }, stage);
 }
 
+// Observe the one-shot walkthrough before networkidle or page assertions can
+// miss it. Keep five records; each press measures its own target in one frame.
+async function observeHeroWalkthrough(page) {
+  await page.addInitScript(() => {
+    const records = window.__musuwHeroFrames = [];
+    const seen = new Set();
+    const record = (stage, detail) => {
+      if (!seen.has(stage)) { seen.add(stage); records.push({ stage, ...detail }); }
+    };
+    const visible = (node) => Boolean(node && node.getBoundingClientRect().width > 0
+      && node.getBoundingClientRect().height > 0 && getComputedStyle(node).visibility !== "hidden");
+    const sample = () => {
+      const hero = document.querySelector('[data-story="research-ledger"]');
+      if (hero) {
+        const phase = hero.dataset.demoPhase;
+        const step = hero.dataset.heroSaveStep;
+        const welcome = hero.querySelector(".visual-new-chat-title");
+        const pointer = hero.querySelector('[data-hero-auto-pointer="saving"]');
+        if (welcome) record("welcome", { phase, text: welcome.textContent });
+        if (phase === "answering") record("answering", { pointerCount: hero.querySelectorAll('[data-hero-auto-pointer]').length });
+        if (phase === "saving" && ["bookmark", "publish"].includes(step) && pointer?.classList.contains("is-clicking")) {
+          const button = hero.querySelector(step === "bookmark" ? '[data-hero-save-action="true"]' : '[data-hero-save-publish="true"]');
+          const p = pointer.getBoundingClientRect();
+          const b = button?.getBoundingClientRect();
+          record(step, {
+            pointerVisible: visible(pointer), buttonVisible: visible(button),
+            opacity: Number(getComputedStyle(pointer).opacity),
+            distance: b ? Math.hypot(p.x + 3 - (b.x + b.width / 2), p.y + 3 - (b.y + b.height / 2)) : null,
+            drawerVisible: visible(hero.querySelector('[data-hero-save-drawer="true"]')),
+            successCount: hero.querySelectorAll('[data-hero-save-success="true"]').length,
+          });
+        }
+        if (phase === "complete") { record("complete", { step }); return; }
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+}
+
 for (const locale of ["zh-CN", "en"]) {
   for (const reducedMotion of ["no-preference", "reduce"]) {
     test(`${locale} / ${reducedMotion}: four independent stories`, async ({ page }, testInfo) => {
@@ -114,6 +154,7 @@ for (const locale of ["zh-CN", "en"]) {
         window.__MUSUW_LOCALE__ = value;
         localStorage.setItem("musuw_locale", value);
       }, locale);
+      if (reducedMotion === "no-preference") await observeHeroWalkthrough(page);
       await page.goto("/", { waitUntil: "networkidle" });
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.locator("header.site-header")).toHaveCount(1);
@@ -124,67 +165,26 @@ for (const locale of ["zh-CN", "en"]) {
 
       const hero = page.locator('[data-story="research-ledger"]');
       await hero.scrollIntoViewIfNeeded();
-      if (reducedMotion === "no-preference") {
-        await expect(hero.locator(".visual-new-chat-title")).toHaveText(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I’m Musuw");
-        const initialHeroPhase = await hero.getAttribute("data-demo-phase");
-        await expect.poll(
-          async () => hero.getAttribute("data-demo-phase"),
-          { timeout: 5_000 },
-        ).not.toBe(initialHeroPhase);
-
-        // The cursor stays out of the way while the answer is streaming. It
-        // appears once, moves to the real save action, then presses only after
-        // the travel animation has settled.
-        await expect(hero).toHaveAttribute("data-demo-phase", "answering", { timeout: 30_000 });
-        await expect(hero.locator('[data-hero-auto-pointer]')).toHaveCount(0);
-
-        await expect(hero).toHaveAttribute("data-demo-phase", "saving", { timeout: 30_000 });
-        const savingPointer = hero.locator('[data-hero-auto-pointer="saving"]');
-        const saveAction = hero.locator('[data-hero-save-action="true"]');
-        await expect(savingPointer).toBeVisible();
-        await expect(saveAction).toBeVisible();
-        await expect.poll(
-          async () => Number(await savingPointer.evaluate((node) => getComputedStyle(node).opacity)),
-          { timeout: 2_000 },
-        ).toBeGreaterThan(0.5);
-        await expect.poll(
-          async () => {
-            const pointer = await savingPointer.boundingBox();
-            const button = await saveAction.boundingBox();
-            if (!pointer || !button) return Number.POSITIVE_INFINITY;
-            const pointerHotspot = { x: pointer.x + 3, y: pointer.y + 3 };
-            const buttonCenter = { x: button.x + button.width / 2, y: button.y + button.height / 2 };
-            return Math.hypot(pointerHotspot.x - buttonCenter.x, pointerHotspot.y - buttonCenter.y);
-          },
-          { timeout: 2_000 },
-        ).toBeLessThan(34);
-        // The bookmark press opens the native editor. It must remain pending
-        // until the second pointer press reaches the footer publish action.
-        await expect(hero).toHaveAttribute("data-hero-save-step", "publish");
-        const saveDrawerPending = hero.locator('[data-hero-save-drawer="true"]');
-        await expect(saveDrawerPending).toBeVisible();
-        await expect(hero.locator('[data-hero-save-success="true"]')).toHaveCount(0);
-        const publishAction = saveDrawerPending.locator('[data-hero-save-publish="true"]');
-        await expect(publishAction).toBeVisible();
-        await expect.poll(
-          async () => {
-            if (await hero.getAttribute("data-hero-save-step") !== "publish") return false;
-            const pointer = await savingPointer.boundingBox();
-            const button = await publishAction.boundingBox();
-            if (!pointer || !button) return false;
-            const pointerHotspot = { x: pointer.x + 3, y: pointer.y + 3 };
-            const buttonCenter = { x: button.x + button.width / 2, y: button.y + button.height / 2 };
-            return Math.hypot(pointerHotspot.x - buttonCenter.x, pointerHotspot.y - buttonCenter.y) < 34;
-          },
-          { timeout: 3_000, intervals: [25, 50] },
-        ).toBe(true);
-        await expect.poll(
-          async () => savingPointer.evaluate((node) => node.classList.contains("is-clicking")).catch(() => false),
-          { timeout: 3_000, intervals: [25, 50] },
-        ).toBe(true);
-        await expect.poll(async () => hero.getAttribute("data-hero-save-step"), { timeout: 3_000 }).toBe("published");
-      }
       await expect(hero).toHaveAttribute("data-demo-phase", "complete", { timeout: 45_000 });
+      if (reducedMotion === "no-preference") {
+        await expect.poll(() => page.evaluate(() => window.__musuwHeroFrames.map(({ stage }) => stage)))
+          .toEqual(["welcome", "answering", "bookmark", "publish", "complete"]);
+        const [welcome, answering, bookmark, publish, complete] = await page.evaluate(() => window.__musuwHeroFrames);
+        expect(welcome.text).toBe(locale === "zh-CN" ? "Hi，我是 Musuw" : "Hi, I’m Musuw");
+        expect(["idle", "typing-question"]).toContain(welcome.phase);
+        expect(answering.pointerCount).toBe(0);
+        for (const press of [bookmark, publish]) {
+          expect(press.pointerVisible, JSON.stringify(press)).toBe(true);
+          expect(press.buttonVisible, JSON.stringify(press)).toBe(true);
+          expect(press.opacity, JSON.stringify(press)).toBeGreaterThan(0.5);
+          expect(press.distance, JSON.stringify(press)).not.toBeNull();
+          expect(press.distance, JSON.stringify(press)).toBeLessThan(34);
+          expect(press.successCount, JSON.stringify(press)).toBe(0);
+        }
+        expect(bookmark.drawerVisible).toBe(false);
+        expect(publish.drawerVisible).toBe(true);
+        expect(complete.step).toBe("published");
+      }
       await expect(hero).toHaveAttribute("data-hero-save-step", "published");
       await expect(hero.locator(".hero-demo-question")).toContainText(locale === "zh-CN" ? "问题台账" : "question ledger");
       await expect(hero.locator(".hero-inline-citation")).toHaveCount(3);

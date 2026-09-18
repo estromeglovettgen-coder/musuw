@@ -498,12 +498,12 @@ export function HeroProductDemo({ locale = "en" }) {
   }, [phase, pointerPath, reduceMotion, saveStep]);
 
   useEffect(() => {
-    if (reduceMotion || phase !== "saving" || !pointerPath) return undefined;
+    if (reduceMotion || phase !== "saving" || !pointerPath || !pointerTravelStarted) return undefined;
     // Do not depend on Motion's aggregate completion callback: on a busy
     // compositor it may fire before the coordinate transition is observable.
     const timer = window.setTimeout(() => setPointerSettled(true), saveStep === "publish" ? 1_240 : 900);
     return () => window.clearTimeout(timer);
-  }, [phase, pointerPath, reduceMotion, saveStep]);
+  }, [phase, pointerPath, pointerTravelStarted, reduceMotion, saveStep]);
 
   const hasSubmitted = HERO_DEMO_PHASES.indexOf(phase) >= HERO_DEMO_PHASES.indexOf("sending");
   const hasAnswer = answerVisible;
