@@ -136,7 +136,9 @@ func TestRefreshedCatalogBuildsCompatibleChatRequests(t *testing.T) {
 			client, err := NewRemoteAPIChat(ConfigFromModel(saved, "", ""))
 			require.NoError(t, err)
 			for _, stream := range []bool{false, true} {
-				body, _, _, err := client.buildOutbound([]Message{{Role: "user", Content: "What color?", Images: []string{"data:image/png;base64,aW1hZ2U="}}}, &ChatOptions{ReasoningEffort: "minimal"}, stream)
+				body, _, _, err := client.buildOutbound([]Message{{
+					Role: "user", Content: "What color?", Images: []string{"data:image/png;base64,aW1hZ2U="},
+				}}, &ChatOptions{ReasoningEffort: "minimal"}, stream)
 				require.NoError(t, err)
 				encoded, err := json.Marshal(body)
 				require.NoError(t, err)
@@ -147,7 +149,10 @@ func TestRefreshedCatalogBuildsCompatibleChatRequests(t *testing.T) {
 				messages := request["messages"].([]any)
 				content := messages[0].(map[string]any)["content"].([]any)
 				assert.Equal(t, "image_url", content[0].(map[string]any)["type"])
-				assert.Equal(t, map[string]any{"url": "data:image/png;base64,aW1hZ2U=", "detail": "auto"}, content[0].(map[string]any)["image_url"])
+				assert.Equal(t,
+					map[string]any{"url": "data:image/png;base64,aW1hZ2U=", "detail": "auto"},
+					content[0].(map[string]any)["image_url"],
+				)
 			}
 		})
 	}

@@ -120,7 +120,7 @@ func (s openRouterReasoning) Apply(req *openai.ChatCompletionRequest, opts *Chat
 	// (for example GPT-5 Nano's minimal). Honor current capabilities even for
 	// old sessions and agents; unconfigured custom models remain unchanged.
 	if len(s.supportedEfforts) > 0 && effort != "" &&
-		!(effort == string(openrouter.ReasoningEffortNone) && !s.mandatory) &&
+		(effort != string(openrouter.ReasoningEffortNone) || s.mandatory) &&
 		!slices.Contains(s.supportedEfforts, effort) {
 		effort = s.defaultEffort
 	}

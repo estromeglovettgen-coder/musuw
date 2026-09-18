@@ -409,9 +409,16 @@ func TestRefreshedCatalogPreservesImageAndVideoRequests(t *testing.T) {
 		slug, provider, url string
 		mandatory           bool
 	}{
-		"builtin-openrouter-vlm":                {"google/gemini-3.8-flash", "google-vertex", "data:video/mp4;base64," + base64.StdEncoding.EncodeToString([]byte("tiny-video")), true},
-		"builtin-openrouter-vlm-youtube":        {"google/gemini-3.5-flash-lite", "google-ai-studio", "https://www.youtube.com/watch?v=test-video", true},
-		"builtin-openrouter-vlm-qwen-3-7-flash": {"qwen/qwen3.8-flash", "alibaba", "https://objects.example.test/video.mp4", false},
+		"builtin-openrouter-vlm": {
+			"google/gemini-3.8-flash", "google-vertex",
+			"data:video/mp4;base64," + base64.StdEncoding.EncodeToString([]byte("tiny-video")), true,
+		},
+		"builtin-openrouter-vlm-youtube": {
+			"google/gemini-3.5-flash-lite", "google-ai-studio", "https://www.youtube.com/watch?v=test-video", true,
+		},
+		"builtin-openrouter-vlm-qwen-3-7-flash": {
+			"qwen/qwen3.8-flash", "alibaba", "https://objects.example.test/video.mp4", false,
+		},
 	}
 	withVLMSSRFWhitelist(t, "127.0.0.1")
 	seen := 0
@@ -430,7 +437,8 @@ func TestRefreshedCatalogPreservesImageAndVideoRequests(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				if reasoning, ok := request["reasoning"].(map[string]any); ok && want.mandatory && reasoning["effort"] == "none" {
+				if reasoning, ok := request["reasoning"].(map[string]any); ok &&
+					want.mandatory && reasoning["effort"] == "none" {
 					w.WriteHeader(http.StatusBadRequest)
 					_, _ = w.Write([]byte(`{"error":{"message":"Reasoning is mandatory"}}`))
 					return
@@ -447,7 +455,9 @@ func TestRefreshedCatalogPreservesImageAndVideoRequests(t *testing.T) {
 			assert.Equal(t, "blue", result)
 			assert.Equal(t, want.slug, request["model"])
 			if entry.ID == "builtin-openrouter-vlm" {
-				result, err = client.PredictVideo(context.Background(), []byte("tiny-video"), "video/mp4", "What color?")
+				result, err = client.PredictVideo(
+					context.Background(), []byte("tiny-video"), "video/mp4", "What color?",
+				)
 			} else {
 				result, err = client.PredictVideoURL(context.Background(), want.url, "video/mp4", "What color?")
 			}
