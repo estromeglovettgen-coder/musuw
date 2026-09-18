@@ -69,14 +69,14 @@ export function FinalCtaProductDemo({ locale = "en" }) {
         effort: "关闭",
         placeholder: "基于你的知识提问",
         title: "新对话",
-        welcome: "Hi，我是 Musuw，让你的知识触手可及",
+        welcome: "Hi，我是 Musuw",
       }
     : {
         agent: "Knowledge Q&A",
         effort: "Off",
         placeholder: "Ask across your knowledge",
         title: "New chat",
-        welcome: "Hi, I am Musuw — your knowledge, within reach",
+        welcome: "Hi, I’m Musuw",
       };
 
   return (

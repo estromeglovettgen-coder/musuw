@@ -2525,7 +2525,7 @@ export default {
     goToAgentSettings: 'Go to agent settings'
   },
   createChat: {
-    title: 'Hi, I am Musuw — your knowledge, within reach',
+    title: 'Hi, I’m Musuw',
     newSessionTitle: 'New Session',
     messages: {
       createFailed: 'Failed to create session',

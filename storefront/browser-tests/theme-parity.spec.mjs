@@ -55,7 +55,7 @@ const readableSelectors = [
   [".authoritative-chat-composer__textarea", null],
   [".authoritative-chat-composer__textarea", "::placeholder"],
   [".visual-chat-composer__combined-picker-model", null],
-  ['[data-capability-demo="answer"] .authoritative-chat-composer__textarea', null],
+  [".final-cta-card .authoritative-chat-composer__textarea", null],
   [".visual-rag-pipeline__reference-summary", null],
   [".real-chat-citation", null],
   [".kb-preview-index-header span", null],
@@ -85,7 +85,7 @@ for (const theme of ["light", "dark"]) {
     for (const selector of [
       ".hero-product-demo",
       '[data-capability-demo="reasoning"]',
-      '[data-capability-demo="answer"]',
+      ".final-cta-card",
       '[data-product-page-shell="wiki"]',
       '[data-product-page-shell="graph"]',
     ]) {
@@ -117,7 +117,7 @@ for (const theme of ["light", "dark"]) {
       "body",
       ".hero-product-demo",
       '[data-capability-demo="reasoning"]',
-      '[data-capability-demo="answer"]',
+      ".final-cta-card",
       ".authoritative-chat-composer__surface",
       ".kb-product-preview-wiki",
       ".kb-preview-graph-canvas",

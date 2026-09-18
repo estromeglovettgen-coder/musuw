@@ -18,7 +18,7 @@ function homepageCopy(locale) {
 }
 
 test("commercial home keeps the smooth template and presents the approved product hierarchy", () => {
-  const { home, japanHome, footer, contact, contactZh } = JSON.parse(
+  const { home, chineseHome, japanHome, footer, contact, contactZh } = JSON.parse(
     execFileSync(process.execPath, [join(root, "tests/renderStorefrontFixture.mjs")], {
       cwd: root,
       encoding: "utf8",
@@ -46,9 +46,11 @@ test("commercial home keeps the smooth template and presents the approved produc
   assert.match(home, /Keep existing knowledge current/);
   assert.match(home, /Turn source material into/);
   assert.match(home, /intelligent knowledge assets/);
-  assert.match(home, /href="\/contact"[^>]*><span>Contact<\/span>/);
+  assert.match(home, /href="#demo"[^>]*><span>View demo<\/span>/);
+  assert.match(chineseHome, /href="#demo"[^>]*><span>查看演示<\/span>/);
+  assert.match(home, /id="demo"/);
+  assert.match(chineseHome, /id="demo"/);
   assert.match(home, /Build my knowledge base/);
-  assert.doesNotMatch(home, /Watch demo|href="\/#demo"/);
   assert.equal((comparison.match(/class="comparison-feature-row"/g) ?? []).length, 6);
   assert.doesNotMatch(comparison, /comparison-group-head|Monthly AI usage|Model catalog|Document upload and parsing|>\$0\.40</);
   for (const label of [

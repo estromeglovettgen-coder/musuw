@@ -383,7 +383,7 @@ export const HOMEPAGE_STORIES = Object.freeze({
       titleLine1: "Build your AI knowledge base", titleLine2: "Let knowledge keep growing", titleFocusSegments: ["Let", "knowledge", "keep growing"],
       descriptionLine1: "Turn source material into intelligent knowledge assets",
       descriptionLine2: "",
-      getStarted: "Start free", talkToSales: "Contact", dashboardAlt: "A legal question answered from saved copyright and privacy sources, with inspectable citations",
+      getStarted: "Start free", talkToSales: "View demo", dashboardAlt: "A legal question answered from saved copyright and privacy sources, with inspectable citations",
     },
     features: {
       intro: { label: "Core capabilities", title: "Build a verifiable knowledge system that keeps evolving", body: "Multi-source retrieval, evidence verification, structured organization, and relationship discovery share one traceable context." },
@@ -402,7 +402,7 @@ export const HOMEPAGE_STORIES = Object.freeze({
       titleLine1: "建立你的AI知识库", titleLine2: "让知识持续积累", titleFocusSegments: ["让", "知识", "持续积累"],
       descriptionLine1: "把资料转化为会思考的知识资产",
       descriptionLine2: "",
-      getStarted: "建立我的知识库", talkToSales: "联系", dashboardAlt: "从已保存的版权与肖像权资料回答生活法律问题，并展示可核验的引用",
+      getStarted: "建立我的知识库", talkToSales: "查看演示", dashboardAlt: "从已保存的版权与肖像权资料回答生活法律问题，并展示可核验的引用",
     },
     features: {
       intro: { label: "核心能力", title: "构建可验证、可持续演进的知识体系", body: "多源检索、证据核验、结构化组织与关系发现，共享同一套可追溯上下文。" },

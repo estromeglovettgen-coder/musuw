@@ -327,10 +327,10 @@ frontend/src/i18n/index.ts	M	M	100755	de9d8f441541af64d3e91ffda7f716b35b796ea5	c
 frontend/src/i18n/locale.test.ts	A	-	100644	a7378f53a43902fc7d4054cc2619b29396dca291	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/i18n/locale.ts	A	-	100644	46da765b1d6ae71c7f62ea9722f75935d8170f49	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/i18n/localeKeyAudit.ts	-	M	100644	5f4b2706a123e856b9f5513169589a5082ad1434	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
-frontend/src/i18n/locales/en-US.ts	M	M	100755	12246ebf6f458bb395a2e1ec46a5d653ba46f401	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/i18n/locales/en-US.ts	M	M	100755	48d2246454404e05e434c978a42f899194e8e5e1	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/i18n/locales/ko-KR.ts	M	M	100755	ea9ebe976f030516a37cc9c10ae9b9e8d5788f1a	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/i18n/locales/ru-RU.ts	M	M	100755	433c3fb76635f5b99860411a4716556c503fcab8	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-frontend/src/i18n/locales/zh-CN.ts	M	M	100755	0168f15703e16978a51310ea4249fe4599579d8c	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/i18n/locales/zh-CN.ts	M	M	100755	899a3f484824fa5fd6045ee2a82ddde3b9d8a0c8	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/i18n/memoryKeyReferences.test.ts	-	A	100644	c5f17c520826e8338bf9ac647e096cd87d1fdc2a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/i18n/resolveDefaultLocale.test.ts	-	A	100644	b5f456010f1e5c9a8f7f5d0cfa558b8e11c7a7f3	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/i18n/resolveDefaultLocale.ts	-	A	100644	808495f57a0dd98ef5af65512e1c746b042828aa	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -746,7 +746,7 @@ internal/application/service/datasource_sweep_wiring_test.go	-	M	100644	e9ce5bc0
 internal/application/service/embed_webhook.go	M	-	100644	4b12845992700b84585d41e26381161e8eb82b13	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/entitlement.go	A	-	100644	71fc757151fc5185f308e672c545511a306a9509	preserve-musuw-exact		audited local-only content is byte-identical
 internal/application/service/entitlement_free_allowance_transition_test.go	A	-	100644	2cf1ba94b33a20d2150d50399e74a8b388f81132	preserve-musuw-exact		audited local-only content is byte-identical
-internal/application/service/entitlement_test.go	A	-	100644	1ffba39157e1782e8b9aa3698bcfca3f06671948	preserve-musuw-exact		audited local-only content is byte-identical
+internal/application/service/entitlement_test.go	A	-	100644	c3123e48005094fa4c21f53202eeea7359c979bc	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/extract.go	-	M	100644	3d789d6d2da4d9bb5b2d2a262804c963978e6c39	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/extract_data_table_summary_test.go	-	A	100644	4c059ef7abdcea978048550e99cc6f52d5dceb7f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/file/cos.go	-	M	100644	442584f20657b0d6c0e46c8b67914550fb063818	adopt-upstream-exact		fixed-target upstream-only content is byte-identical

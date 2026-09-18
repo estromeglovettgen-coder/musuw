@@ -4545,7 +4545,7 @@ export default {
     }
   },
   createChat: {
-    title: 'Hi，我是 Musuw，让你的知识触手可及',
+    title: 'Hi，我是 Musuw',
     newSessionTitle: '新会话',
     messages: {
       createFailed: '创建会话失败',
