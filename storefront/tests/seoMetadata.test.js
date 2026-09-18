@@ -4,6 +4,10 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { localizeDocumentResponse } from "../worker/localization.js";
+import { SITE_SOCIAL_IMAGE } from "../src/seoMetadata.js";
+import { getStorefrontCopy } from "../src/i18n.js";
+import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
+import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
 
 const root = new URL("../", import.meta.url).pathname;
 const repositoryRoot = new URL("../../", import.meta.url).pathname;
@@ -46,10 +50,12 @@ test("storefront publishes one canonical Musuw identity across crawl metadata", 
     'sizes="32x32" href="/favicon-32x32.png',
     'rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png',
     'rel="manifest" href="/site.webmanifest?v=20260822"',
-    'property="og:image" content="https://musuw.com/musuw-logo-512.png"',
-    'property="og:image:alt" content="musuw logo"',
-    'name="twitter:card" content="summary"',
-    'name="twitter:image" content="https://musuw.com/musuw-logo-512.png"',
+    `property="og:image" content="${SITE_SOCIAL_IMAGE.url}"`,
+    `property="og:image:alt" content="${SITE_SOCIAL_IMAGE.alt}"`,
+    'property="og:image:width" content="1200"',
+    'property="og:image:height" content="630"',
+    'name="twitter:card" content="summary_large_image"',
+    `name="twitter:image" content="${SITE_SOCIAL_IMAGE.url}"`,
     'id="musuw-structured-data"',
     '"https://musuw.com/musuw-logo-512.png"',
   ]) {
@@ -58,6 +64,9 @@ test("storefront publishes one canonical Musuw identity across crawl metadata", 
   assert.match(html, /"@type"\s*:\s*"Organization"/);
   assert.match(html, /"@type"\s*:\s*"WebSite"/);
   assert.doesNotMatch(html, /Musnow|ClientHub|weknora\/web|circle|rounded/i);
+  assert.equal(html.match(/<title>(.*?)<\/title>/)[1], html.match(/property="og:title" content="([^"]+)"/)[1]);
+  assert.deepEqual(pngDimensions("public/images/musuw-social-card.png"), { width: 1200, height: 630 });
+  assert.ok(statSync(join(root, "public/images/musuw-social-card.png")).size < 1_000_000);
 });
 
 test("derived Musuw icon files are square, transparent-friendly, and crawlable", () => {
@@ -129,9 +138,10 @@ test("the sitemap keeps every public Musuw route current and canonical", () => {
     "/cookies",
     "/security",
     "/contact",
+    "/press",
   ];
   for (const pathname of routes) {
-    const lastmod = ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
+    const lastmod = pathname === "/press" ? "2026-09-18" : ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
       ? "2026-08-29"
       : "2026-08-22";
     assert.match(sitemap, new RegExp(`<loc>https://musuw\\.com${pathname === "/" ? "/" : pathname}</loc><lastmod>${lastmod}</lastmod>`));
@@ -166,7 +176,28 @@ test("the Worker keeps localized social metadata and structured data aligned", a
   assert.match(html, /<meta property="og:locale" content="zh_CN">/);
   assert.match(html, /<meta name="twitter:title" content="隐私政策 \| musuw">/);
   assert.match(html, /<meta name="twitter:url" content="https:\/\/musuw\.com\/privacy">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/musuw\.com\/images\/musuw-social-card\.png">/);
+  assert.match(html, /<meta property="og:image:width" content="1200">/);
+  assert.match(html, /<meta property="og:image:height" content="630">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
   assert.match(html, /id="musuw-structured-data"[\s\S]*"inLanguage":"zh-CN"/);
   assert.match(html, /"https:\/\/musuw\.com\/privacy"/);
   assert.match(html, /"https:\/\/musuw\.com\/musuw-logo-512\.png"/);
+});
+
+test("homepage previews keep the current localized title and one large image before hydration", async () => {
+  for (const locale of ["en", "zh-CN"]) {
+    const meta = applyHomepageMarketingRefresh(applyHomepagePlanPresentation(getStorefrontCopy(locale))).meta;
+    const response = await localizeDocumentResponse(new Response(read("index.html"), {
+      headers: { "content-type": "text/html" },
+    }), locale, "/");
+    const html = await response.text();
+    assert.ok(html.includes(`<title>${meta.title}</title>`));
+    assert.ok(html.includes(`<meta property="og:title" content="${meta.title}">`));
+    assert.ok(html.includes(`<meta name="twitter:description" content="${meta.description}">`));
+    assert.equal((html.match(/property="og:image"/g) || []).length, 1);
+    assert.ok(html.includes(`<meta property="og:image" content="${SITE_SOCIAL_IMAGE.url}">`));
+    assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/musuw\.com\/">/);
+  }
 });

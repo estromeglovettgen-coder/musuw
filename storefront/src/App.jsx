@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { HomePage } from "./HomePage";
 import { getInitialLocale, getStorefrontCopy, persistLocalePreference } from "./i18n";
 import { LegalPage, NotFoundPage } from "./LegalPage";
+import { PressPage } from "./PressPage";
+import { getPressMeta, PRESS_PATH } from "./pressContent";
 import { getPublicDocument, getPublicDocumentMeta } from "./legalContent";
 import { applyHomepagePlanPresentation } from "./planPresentation";
 import { applyHomepageMarketingRefresh } from "./homepageMarketingRefresh";
 import { getInitialPricingCountry, selectPricingCurrency } from "./pricingLocalization.js";
 import {
-  SITE_LOGO_ALT,
-  SITE_LOGO_URL,
+  SITE_SOCIAL_IMAGE,
   canonicalUrl,
   normalizePathname,
   openGraphLocale,
@@ -38,6 +39,7 @@ export default function App() {
   const pathname = useMemo(() => window.location.pathname, []);
   const publicDocument = useMemo(() => getPublicDocument(locale, pathname), [locale, pathname]);
   const isHome = pathname === "/";
+  const isPress = normalizePathname(pathname) === PRESS_PATH;
 
   const handleLocaleChange = useCallback((nextLocale) => {
     const normalized = nextLocale === "zh-CN" || nextLocale === "zh" ? "zh-CN" : "en";
@@ -54,7 +56,9 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const meta = publicDocument
+    const meta = isPress
+      ? getPressMeta(locale, pathname)
+      : publicDocument
       ? getPublicDocumentMeta(locale, pathname)
       : isHome
         ? homeMeta
@@ -75,17 +79,17 @@ export default function App() {
     setMeta("property", "og:description", meta.description);
     setMeta("property", "og:url", pageUrl);
     setMeta("property", "og:locale", openGraphLocale(locale));
-    setMeta("property", "og:image", SITE_LOGO_URL);
-    setMeta("property", "og:image:alt", SITE_LOGO_ALT);
-    setMeta("property", "og:image:type", "image/png");
-    setMeta("property", "og:image:width", "512");
-    setMeta("property", "og:image:height", "512");
-    setMeta("name", "twitter:card", "summary");
+    setMeta("property", "og:image", SITE_SOCIAL_IMAGE.url);
+    setMeta("property", "og:image:alt", SITE_SOCIAL_IMAGE.alt);
+    setMeta("property", "og:image:type", SITE_SOCIAL_IMAGE.type);
+    setMeta("property", "og:image:width", SITE_SOCIAL_IMAGE.width);
+    setMeta("property", "og:image:height", SITE_SOCIAL_IMAGE.height);
+    setMeta("name", "twitter:card", "summary_large_image");
     setMeta("name", "twitter:title", meta.title);
     setMeta("name", "twitter:description", meta.description);
     setMeta("name", "twitter:url", pageUrl);
-    setMeta("name", "twitter:image", SITE_LOGO_URL);
-    setMeta("name", "twitter:image:alt", SITE_LOGO_ALT);
+    setMeta("name", "twitter:image", SITE_SOCIAL_IMAGE.url);
+    setMeta("name", "twitter:image:alt", SITE_SOCIAL_IMAGE.alt);
 
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
@@ -101,7 +105,7 @@ export default function App() {
       robots.setAttribute("name", "robots");
       document.head.appendChild(robots);
     }
-    robots.setAttribute("content", isHome || publicDocument ? "index,follow" : "noindex,follow");
+    robots.setAttribute("content", isHome || isPress || publicDocument ? "index,follow" : "noindex,follow");
 
     let structured = document.getElementById("musuw-structured-data");
     if (!structured) {
@@ -111,7 +115,7 @@ export default function App() {
       document.head.appendChild(structured);
     }
     structured.textContent = structuredDataText({ locale, pathname: normalizedPath });
-  }, [homeMeta, isHome, locale, pathname, publicDocument]);
+  }, [homeMeta, isHome, isPress, locale, pathname, publicDocument]);
 
   useEffect(() => {
     const targetId = decodeURIComponent(window.location.hash.slice(1));
@@ -121,6 +125,10 @@ export default function App() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  if (isPress) {
+    return <PressPage copy={copy} locale={locale} onLocaleChange={handleLocaleChange} theme={theme} onThemeToggle={handleThemeToggle} />;
+  }
 
   if (publicDocument) {
     return (
