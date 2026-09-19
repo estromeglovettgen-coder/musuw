@@ -163,6 +163,8 @@ const approvedSignatureExceptions = new Map([
 // boundary. Pin their bytes so neither another video/archive nor replacement
 // contents can silently inherit approval. Re-rendered media requires review.
 const approvedPublicMedia = new Map([
+  ["storefront/public/media/press/musuw-product-brief-zh.pdf", "578b425e158d5434b0c72c751ba1b93574cf3f96a9e8b595ebc23cd2fbb72786"],
+  ["storefront/public/media/press/musuw-product-brief-en.pdf", "98d5040e5016faa683c07b37d126255cf5c2dee8907e99f5e824a51220b18677"],
   ["storefront/public/media/press/musuw-cedar-live-zh-9x16.mp4", "e3e10de0ea0fd253a8e763bc7814555e67942fc55472df4386391bd6ce62c587"],
   ["storefront/public/media/press/musuw-cedar-live-en-9x16.mp4", "6e76c07b055359144dc110ddad2bfc1f788714693551a33869746c70204bce62"],
   ["storefront/public/media/press/musuw-cedar-live-zh-16x9.mp4", "4978252ff2df435271fb5110401552cbcfcd89d985935800bd2b489253850631"],
@@ -171,7 +173,7 @@ const approvedPublicMedia = new Map([
   ["storefront/public/media/press/musuw-en-4x5.mp4", "5d7d3afa85690a45bd23f232b2fa51c9140576f75a0bf159c9e0b6ffdd2edcb9"],
   ["storefront/public/media/press/musuw-zh-16x9.mp4", "be851a88510524050559d10fb1663620938b2c8321ce55ab53551aa6398b501c"],
   ["storefront/public/media/press/musuw-zh-4x5.mp4", "803d2b98d49a249abf2d2e63b2b5138ed4913373377b7f1c27de171a378a8d99"],
-  ["storefront/public/media/press/musuw-media-kit.zip", "05b4bb7e558e773ea19cddb036a5a454cad6ea1d86373686bf16d61dc442d8ba"],
+  ["storefront/public/media/press/musuw-media-kit.zip", "5b65aaf46012091c9e6cf076d074ef8e0f8ec55f25c635e76159505b8f944a75"],
 ]);
 
 function looksBinary(buffer) {

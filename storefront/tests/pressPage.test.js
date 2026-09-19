@@ -44,8 +44,13 @@ test("media kit offers eight opt-in videos, caption files, public downloads, and
     assert.match(html, /href="mailto:support@didren\.com"/);
     assert.match(html, /href="\/press">(?:Media kit|媒体资料)<\/a>/);
     assert.ok(html.includes(locale === "en" ? "not live recordings" : "并非实机录屏"));
-    const downloadPaths = [...html.matchAll(/href="([^"]+)" download=""/g)].map((match) => match[1]);
-    assert.equal(new Set(downloadPaths).size, 26);
+    const downloadPaths = [...html.matchAll(/href="([^"]+)"[^>]*\bdownload=""/g)].map((match) => match[1]);
+    assert.equal(new Set(downloadPaths).size, 28);
+    for (const language of ["en", "zh"]) {
+      const pdf = `/media/press/musuw-product-brief-${language}.pdf`;
+      assert.ok(downloadPaths.includes(pdf), `${language} product brief must be downloadable`);
+      assert.equal(readFileSync(join(root, "public", pdf)).subarray(0, 5).toString(), "%PDF-");
+    }
     for (const path of downloadPaths) {
       assert.ok(path.startsWith("/media/press/") || path.startsWith("/images/musuw-") || path === "/musuw-logo-512.png");
       assert.ok(statSync(join(root, "public", path)).size > 100, `${path} must be a real, nonempty download`);

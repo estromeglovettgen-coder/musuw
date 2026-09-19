@@ -1,7 +1,7 @@
 import { ButtonLink, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import { LEGAL_OPERATOR } from "./legalContent";
 import { SITE_LOGO_PATH } from "./seoMetadata";
-import { getPressContent, PRESS_ARCHIVE, PRESS_IMAGES, PRESS_VIDEOS, WALKTHROUGH_VIDEOS } from "./pressContent";
+import { getPressContent, PRESS_ARCHIVE, PRESS_BRIEFS, PRESS_IMAGES, PRESS_VIDEOS, WALKTHROUGH_VIDEOS } from "./pressContent";
 import "./press.css";
 
 export function PressPage({ copy, locale, onLocaleChange, theme, onThemeToggle }) {
@@ -37,6 +37,10 @@ export function PressPage({ copy, locale, onLocaleChange, theme, onThemeToggle }
           </div>
           <a className="press-download" href={PRESS_ARCHIVE} download>{text.downloadKit} ↓</a>
           <p className="press-note">{text.kitNote}</p>
+          <div className="press-links">
+            <span>{text.briefs}:</span>
+            {PRESS_BRIEFS.map((brief) => <a key={brief.language} href={brief.src} hrefLang={brief.language} download>{brief.label} ↓</a>)}
+          </div>
         </header>
 
         <section className="press-section" aria-labelledby="press-walkthroughs">
