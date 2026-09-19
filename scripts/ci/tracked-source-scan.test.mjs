@@ -14,6 +14,8 @@ const approvedMedia = [
   "musuw-zh-4x5.mp4",
   "musuw-cedar-live-en-16x9.mp4",
   "musuw-cedar-live-zh-16x9.mp4",
+  "musuw-cedar-live-en-9x16.mp4",
+  "musuw-cedar-live-zh-9x16.mp4",
   "musuw-media-kit.zip",
 ];
 
@@ -32,12 +34,12 @@ function scanIndexedFiles(t, files) {
   return spawnSync(process.execPath, [scanner], { encoding: "utf8" });
 }
 
-test("the reviewed public media kit and six videos are publishable", (t) => {
+test("the reviewed public media kit and eight videos are publishable", (t) => {
   const files = approvedMedia.map((name) => [mediaRoot + name, readFileSync(join(repositoryRoot, mediaRoot, name))]);
   assert.ok(files.at(-1)[1].length > 8 * 1024 * 1024, "the kit exercises the narrow large-file exception");
   const result = scanIndexedFiles(t, files);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /7 files; 7 reviewed binary assets/);
+  assert.match(result.stdout, /9 files; 9 reviewed binary assets/);
 });
 
 test("an unreviewed video path is still rejected", (t) => {

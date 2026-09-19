@@ -15,9 +15,11 @@
 ## 3. Verification and delivery
 
 - [x] 3.1 Run relevant catalog, native-interface and saved-selection tests plus typecheck/build and one consolidated adversarial review.
-- [ ] 3.2 Merge through GitHub and verify public storefront deployment and copy.
+- [x] 3.2 Merge through GitHub and verify public storefront deployment and copy.
 - [ ] 3.3 Deploy immutable app images to staging; complete provider probes, actual application DeepSeek response and full Sandbox billing acceptance.
 - [ ] 3.4 Promote the same accepted SHA/digests through the protected production workflow and verify actual production labels, defaults and response.
 - [ ] 3.5 Verify Product Hunt scheduled launch and eligible published placements; capture available traffic/conversion evidence without fabricating attribution.
 - [ ] 3.6 Complete the requested 11-hour work window and deliver an evidence-based action/results report with remaining blockers.
-- [ ] 3.7 After deployment, verify the public `/press` page and its downloadable media return the accepted assets.
+- [x] 3.7 After deployment, verify the public `/press` page and its downloadable media return the accepted assets.
+
+- [ ] 3.8 Publish verified 30-second EN/ZH portrait actual walkthroughs alongside the 40-second originals; extend media archive and verify mobile playback/downloads.

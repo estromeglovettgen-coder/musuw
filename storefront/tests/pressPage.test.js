@@ -29,23 +29,23 @@ test("media kit is a localized crawlable route before hydration, with a stable c
   }
 });
 
-test("media kit offers four opt-in videos, caption files, public downloads, and existing product routes", async (t) => {
+test("media kit offers eight opt-in videos, caption files, public downloads, and existing product routes", async (t) => {
   const server = await createServer({ root, appType: "custom", logLevel: "silent", server: { middlewareMode: true } });
   t.after(() => server.close());
   const { PressPage } = await server.ssrLoadModule("/src/PressPage.jsx");
   for (const locale of ["en", "zh-CN"]) {
     const html = renderToStaticMarkup(React.createElement(PressPage, { copy: getStorefrontCopy(locale), locale }));
-    assert.equal((html.match(/<video /g) ?? []).length, 4);
-    assert.equal((html.match(/<track kind="captions"/g) ?? []).length, 4);
-    assert.equal((html.match(/preload="none"/g) ?? []).length, 4);
+    assert.equal((html.match(/<video /g) ?? []).length, 8);
+    assert.equal((html.match(/<track kind="captions"/g) ?? []).length, 8);
+    assert.equal((html.match(/preload="none"/g) ?? []).length, 8);
     assert.doesNotMatch(html, /autoplay/i);
-    assert.match(html, /href="\/#demo"/);
+    assert.ok(html.includes(`href="${locale === "en" ? "" : "/zh"}/guides/citation-checks"`));
     assert.match(html, /href="\/#pricing"/);
     assert.match(html, /href="mailto:support@didren\.com"/);
     assert.match(html, /href="\/press">(?:Media kit|媒体资料)<\/a>/);
     assert.ok(html.includes(locale === "en" ? "not live recordings" : "并非实机录屏"));
     const downloadPaths = [...html.matchAll(/href="([^"]+)" download=""/g)].map((match) => match[1]);
-    assert.equal(new Set(downloadPaths).size, 14);
+    assert.equal(new Set(downloadPaths).size, 26);
     for (const path of downloadPaths) {
       assert.ok(path.startsWith("/media/press/") || path.startsWith("/images/musuw-") || path === "/musuw-logo-512.png");
       assert.ok(statSync(join(root, "public", path)).size > 100, `${path} must be a real, nonempty download`);
