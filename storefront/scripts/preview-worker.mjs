@@ -20,7 +20,8 @@ const mimeTypes = {
   ".mp4": "video/mp4",
   ".vtt": "text/vtt; charset=utf-8",
   ".srt": "application/x-subrip",
-  ".zip": "application/zip"
+  ".zip": "application/zip",
+  ".md": "text/plain; charset=utf-8"
 };
 
 async function assetResponse(request) {
@@ -29,9 +30,14 @@ async function assetResponse(request) {
   const candidate = resolve(distRoot, requested);
   let filePath = candidate.startsWith(`${distRoot}/`) ? candidate : join(distRoot, "index.html");
   try {
-    if (!(await stat(filePath)).isFile()) filePath = join(distRoot, "index.html");
+    if (!(await stat(filePath)).isFile()) throw new Error("Not a file");
   } catch {
-    filePath = join(distRoot, "index.html");
+    try {
+      filePath = `${filePath.replace(/\/+$/, "")}.html`;
+      if (!(await stat(filePath)).isFile()) throw new Error("Not a file");
+    } catch {
+      filePath = join(distRoot, "index.html");
+    }
   }
   return new Response(await readFile(filePath), {
     headers: {

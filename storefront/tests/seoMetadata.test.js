@@ -139,9 +139,11 @@ test("the sitemap keeps every public Musuw route current and canonical", () => {
     "/security",
     "/contact",
     "/press",
+    "/guides/citation-checks",
+    "/zh/guides/citation-checks",
   ];
   for (const pathname of routes) {
-    const lastmod = pathname === "/press" ? "2026-09-18" : ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
+    const lastmod = pathname.endsWith("/guides/citation-checks") ? "2026-09-19" : ["/", "/press", "/privacy", "/cookies"].includes(pathname) ? "2026-09-18" : ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
       ? "2026-08-29"
       : "2026-08-22";
     assert.match(sitemap, new RegExp(`<loc>https://musuw\\.com${pathname === "/" ? "/" : pathname}</loc><lastmod>${lastmod}</lastmod>`));
