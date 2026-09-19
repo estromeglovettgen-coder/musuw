@@ -9,6 +9,7 @@ export const CITATION_GUIDES = {
     locale: "en",
     path: "/guides/citation-checks",
     title: "Three checks for cited answers",
+    image: CITATION_GUIDE_IMAGE,
     meta: {
       title: "Three checks for cited answers | Musuw",
       description: "Check source dates, preserve conditions, and leave missing facts unresolved. A practical example for reviewing AI answers with citations.",
@@ -40,6 +41,7 @@ export const CITATION_GUIDES = {
     locale: "zh-CN",
     path: "/zh/guides/citation-checks",
     title: "核验引用的三个步骤",
+    image: CITATION_GUIDE_IMAGE,
     meta: {
       title: "核验引用的三个步骤 | Musuw",
       description: "通过一个虚构规划示例，核对回答中的来源版本、适用条件和未知信息，并逐条打开引用检查原文。",

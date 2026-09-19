@@ -134,7 +134,7 @@ function withDocumentLocale(html, locale, pathname = "/", country = "") {
       );
     }
   }
-  const structuredMarkup = `<script id="musuw-structured-data" type="application/ld+json">${structuredDataText({ locale, pathname: normalizedPath })}</script>`;
+  const structuredMarkup = `<script id="musuw-structured-data" type="application/ld+json">${structuredDataText({ locale, pathname: normalizedPath, article })}</script>`;
   localizedHtml = upsertHead(
     localizedHtml,
     /<script\s+id=["']musuw-structured-data["'][^>]*>[\s\S]*?<\/script>/i,

@@ -1,5 +1,5 @@
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
-import { CITATION_GUIDES, CITATION_GUIDE_DOCUMENTS, CITATION_GUIDE_IMAGE, CITATION_GUIDE_SOURCE } from "./citationGuideContent";
+import { CITATION_GUIDES, CITATION_GUIDE_DOCUMENTS, CITATION_GUIDE_SOURCE } from "./citationGuideContent";
 import "./citation-guide.css";
 
 export function CitationGuidePage({ copy, guide, onLocaleChange, theme, onThemeToggle }) {
@@ -33,7 +33,7 @@ export function CitationGuidePage({ copy, guide, onLocaleChange, theme, onThemeT
             {guide.checks.map((check) => <li key={check.title}><strong>{check.title}</strong> {check.body}</li>)}
           </ol>
           <figure>
-            <a href={CITATION_GUIDE_IMAGE}><img src={CITATION_GUIDE_IMAGE} alt={guide.imageAlt} width="1512" height="782" loading="lazy" /></a>
+            <a href={guide.image}><img src={guide.image} alt={guide.imageAlt} width="1512" height="782" loading="lazy" /></a>
             <figcaption>{guide.imageCaption}</figcaption>
           </figure>
           <p><a className="citation-guide-cta" href="/#demo">{guide.cta} →</a></p>

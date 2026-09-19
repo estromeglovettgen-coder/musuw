@@ -1,6 +1,7 @@
 export const NOTEBOOK_COMPARISONS = {
   "en": {
     "title": "Musuw vs. Gemini Notebook",
+    "image": "/images/musuw-wiki-page.jpg",
     "intro": "Choose by what you want to do with your sources next.",
     "note": "NotebookLM is now Gemini Notebook. Both products help you work with your own material; their workflows emphasize different outputs.",
     "tableLabel": "A practical comparison",
@@ -55,6 +56,7 @@ export const NOTEBOOK_COMPARISONS = {
   },
   "zh-CN": {
     "title": "Musuw 与 Gemini Notebook 怎么选",
+    "image": "/images/musuw-wiki-page.jpg",
     "intro": "先看你下一步想怎样使用资料。",
     "note": "NotebookLM 已更名为 Gemini Notebook。两款产品都能围绕自己的资料工作，侧重的产出不同。",
     "tableLabel": "按实际用途对照",

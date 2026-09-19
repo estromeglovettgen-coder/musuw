@@ -10,7 +10,7 @@
 - [x] 2.1 Pass complete storefront build/tests and actual local Worker checks for plain HTML body, fixed language, source downloads and metadata.
 - [x] 2.2 Verify no-JavaScript reading, desktop/mobile themes and language navigation in an isolated browser; complete delta review.
 - [x] 2.3 Publish through the separate approved storefront PR and verify public guide/assets/tag responses.
-- [ ] 2.4 Complete Search Console verification and sitemap submission; report actual status without claiming indexing or traffic in advance.
+- [x] 2.4 Complete Search Console verification and sitemap submission; report actual status without claiming indexing or traffic in advance. Ownership verified September 19; sitemap accepted with 14 discovered URLs, and four article indexing requests received. Indexing remains pending.
 
 - [x] 2.5 Host an IndexNow ownership file and submit the newly updated public homepage, press page and bilingual guide once; record receipt separately from indexing.
 
@@ -19,3 +19,4 @@
 - [x] 3.1 Prepare concise English/Chinese copy from actual Musuw behavior and current official Google sources; reuse the existing article pipeline.
 - [x] 3.2 Verify fixed-language HTML, metadata, unknown-route404, mobile table, dark theme, footer, demo and pricing navigation.
 - [x] 3.3 Pass storefront build/tests and consolidated delta review; publish through the normal storefront release and verify actual public responses.
+- [ ] 3.4 Identify the four existing article pages in structured data using their visible content and publisher; keep server and browser metadata aligned and verify the public release.

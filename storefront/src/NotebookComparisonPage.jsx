@@ -32,7 +32,7 @@ export function NotebookComparisonPage({ copy, comparison, onLocaleChange, theme
           <h2>{comparison.musuwTitle}</h2>
           <p>{comparison.musuwBody}</p>
           <figure>
-            <a href="/images/musuw-wiki-page.jpg"><img src="/images/musuw-wiki-page.jpg" width="3024" height="1898" alt={comparison.imageAlt} loading="lazy" /></a>
+            <a href={comparison.image}><img src={comparison.image} width="3024" height="1898" alt={comparison.imageAlt} loading="lazy" /></a>
             <figcaption>{comparison.imageCaption}</figcaption>
           </figure>
           <h2>{comparison.googleTitle}</h2>
