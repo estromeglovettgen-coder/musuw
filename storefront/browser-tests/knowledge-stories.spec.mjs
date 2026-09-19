@@ -32,6 +32,18 @@ async function waitWikiPhase(page, phase) {
     { polling: "raf", timeout: 15_000 },
   );
 }
+async function checkWikiPointerMovement(wiki, phase, start) {
+  await expect.poll(async () => {
+    const sample = await wiki.evaluate((root, movingPhase) => {
+      const rect = root.querySelector(`[data-wiki-auto-pointer="${movingPhase}"]`)?.getBoundingClientRect();
+      return { phase: root.dataset.demoPhase, position: rect ? { x: rect.x, y: rect.y } : null };
+    }, phase);
+    if (sample.phase !== phase) {
+      throw new Error(`Wiki left ${phase} for ${sample.phase} before pointer movement was observed`);
+    }
+    return sample.position ? Math.hypot(sample.position.x - start.x, sample.position.y - start.y) : 0;
+  }, { intervals: [50] }).toBeGreaterThan(4);
+}
 async function checkWikiCameraFixed(wiki) {
   const camera = wiki.locator('[data-wiki-camera="true"]');
   await expect(camera).toHaveAttribute("data-wiki-camera-scale", "1");
@@ -136,11 +148,22 @@ async function observeHeroWalkthrough(page) {
             successCount: hero.querySelectorAll('[data-hero-save-success="true"]').length,
           });
         }
-        if (phase === "complete") { record("complete", { step }); return; }
+        if (phase === "complete") { record("complete", { step }); observer.disconnect(); }
       }
-      requestAnimationFrame(sample);
     };
-    requestAnimationFrame(sample);
+    // A software-rendered CI frame can take longer than the 720 ms press.
+    // Observe committed DOM states as well as frames so that a real, measured
+    // click cannot disappear between two samples. Keep every geometry check.
+    const observer = new MutationObserver(sample);
+    observer.observe(document, {
+      subtree: true, childList: true, attributes: true,
+      attributeFilter: ["class", "data-demo-phase", "data-hero-save-step"],
+    });
+    const sampleFrame = () => {
+      sample();
+      if (!seen.has("complete")) requestAnimationFrame(sampleFrame);
+    };
+    requestAnimationFrame(sampleFrame);
   });
 }
 
@@ -282,11 +305,8 @@ for (const locale of ["zh-CN", "en"]) {
         await expect(pointer).toBeVisible();
         await expect(sourceLink).toHaveAttribute("data-wiki-link-state", "approaching");
         const pointerStart = await pointer.boundingBox();
-        await page.waitForTimeout(420);
-        const pointerProgress = await pointer.boundingBox();
         expect(pointerStart).not.toBeNull();
-        expect(pointerProgress).not.toBeNull();
-        expect(Math.hypot(pointerProgress.x - pointerStart.x, pointerProgress.y - pointerStart.y)).toBeGreaterThan(4);
+        await checkWikiPointerMovement(wiki, "moving-to-index-link", pointerStart);
         await checkWikiCameraFixed(wiki);
 
         await waitWikiPhase(page, "pressing-index-link");
@@ -312,7 +332,8 @@ for (const locale of ["zh-CN", "en"]) {
         expect(hit.hotspotInsideLink, JSON.stringify(hit)).toBe(true);
         expect(hit.pointerLinkDistance, JSON.stringify(hit)).toBeLessThanOrEqual(24);
         expect(hit.pointerInsideHost, JSON.stringify(hit)).toBe(true);
-        await capture(wiki, "wiki-index-link-press", testInfo);
+        // Capture the terminal page below: encoding a screenshot here can
+        // outlast the next 940 ms scene and make its assertions miss it.
 
         await waitWikiPhase(page, "section-page");
         await expect(wiki.locator('[data-wiki-page-id="evaluation-tasks"]')).toBeVisible();
@@ -325,11 +346,8 @@ for (const locale of ["zh-CN", "en"]) {
         await expect(inlinePointer).toBeVisible();
         await expect(inlineLink).toHaveAttribute("data-wiki-link-state", "approaching");
         const inlineStart = await inlinePointer.boundingBox();
-        await page.waitForTimeout(420);
-        const inlineProgress = await inlinePointer.boundingBox();
         expect(inlineStart).not.toBeNull();
-        expect(inlineProgress).not.toBeNull();
-        expect(Math.hypot(inlineProgress.x - inlineStart.x, inlineProgress.y - inlineStart.y)).toBeGreaterThan(4);
+        await checkWikiPointerMovement(wiki, "moving-to-inline-link", inlineStart);
 
         await waitWikiPhase(page, "pressing-inline-link");
         const inlinePressingPointer = wiki.locator('[data-wiki-auto-pointer="pressing-inline-link"]');
