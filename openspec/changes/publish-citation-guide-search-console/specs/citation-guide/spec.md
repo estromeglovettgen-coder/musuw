@@ -41,3 +41,19 @@ The storefront SHALL offer a concise comparison at `/compare/notebooklm` and `/z
 - **AND** the reader can open the actual Musuw demonstration, current plan page and linked official sources
 - **AND** the page identifies its Musuw authorship and evidence date, with mobile table overflow contained inside a keyboard-accessible region
 - **AND** footer links and the sitemap make both variants discoverable.
+
+### Requirement: Readable initial public-page body
+The homepage, media kit and eight public-document pages SHALL return their actual visible body content and primary heading without requiring JavaScript. Build-time rendering SHALL reuse their existing React components and copy. Internal rendered variants SHALL return 404 when requested directly.
+
+#### Scenario: Country and preferred language differ
+- **WHEN** a visitor requests a public page with an explicit language or saved language preference
+- **THEN** the initial body, head, bootstrap and browser render SHALL use that same language
+- **AND** homepage prices SHALL continue using the existing country mapping independently of language (CN/CNY, JP/JPY, other recognized countries/USD; existing language fallback when country is absent)
+- **AND** refresh or client rendering SHALL NOT replace the initial currency with another currency
+- **AND** localized HTML SHALL remain private/no-store with its public canonical URL, while hashed assets keep their existing caching.
+
+#### Scenario: No script or a slow script
+- **WHEN** JavaScript is unavailable or delayed
+- **THEN** primary body text, homepage heading, call-to-action links and monthly prices SHALL be visible
+- **AND** normal JavaScript interactions SHALL work after startup without restarting a hidden hero entrance
+- **AND** HEAD requests SHALL return the localized GET headers without a body.

@@ -9,6 +9,7 @@ Knowledge workers need a short, checkable example of reviewing AI citations. The
 - Include a 40-second actual product recording with English/Chinese captions, one fictional-example screenshot and three original Markdown source downloads, with the existing public Gist as an optional mirror.
 - Preserve the public Google verification tag through Worker localization.
 - Add one concise bilingual Musuw/Gemini Notebook comparison with cited official documentation, a real demo and current pricing links, using the same static article pipeline.
+- Extend that existing pipeline to the homepage, media kit and public documents after Bing's crawl found their initial HTML lacked body headings. Select existing language and approved currency variants at the Worker; preserve URLs, pricing rules and client interactions.
 
 ## Impact
 

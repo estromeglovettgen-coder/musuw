@@ -1,5 +1,6 @@
 import { normalizeCountry } from "../src/pricingLocalization.js";
 import { localizeDocumentResponse, selectLocale } from "./localization.js";
+import { prerenderAssetPath } from "./prerender.js";
 
 function requestCountry(request) {
   return normalizeCountry(request.cf?.country || request.headers.get("CF-IPCountry"));
@@ -51,6 +52,7 @@ export async function handleRequest(request, env) {
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); } catch { return notFound(); }
   if (pathname === "/partner-board" || pathname.startsWith("/partner-board/")) return notFound();
+  if (pathname === "/_prerender" || pathname.startsWith("/_prerender/")) return notFound();
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
     return notFound();
   }
@@ -66,21 +68,28 @@ export async function handleRequest(request, env) {
     }
   }
 
-  const assetResponse = await env.ASSETS.fetch(request);
+  const country = requestCountry(request);
+  const locale = selectLocale(country, request.headers.get("cookie") ?? "", url.searchParams.get("lang") ?? "");
+  const isDocumentRequest = request.method === "GET" || request.method === "HEAD";
+  const prerenderPath = isDocumentRequest ? prerenderAssetPath(url.pathname, locale, country) : null;
+  let assetRequest = request;
+  if (prerenderPath) {
+    const assetUrl = new URL(url);
+    assetUrl.pathname = prerenderPath;
+    assetUrl.search = "";
+    assetRequest = new Request(assetUrl, { method: "GET" });
+  }
+  const assetResponse = await env.ASSETS.fetch(assetRequest);
   const contentType = assetResponse.headers.get("content-type") ?? "";
-  if (request.method === "GET" && contentType.toLowerCase().includes("text/html")) {
-    const country = requestCountry(request);
-    return localizeDocumentResponse(
+  if (isDocumentRequest && contentType.toLowerCase().includes("text/html")) {
+    const response = await localizeDocumentResponse(
       assetResponse,
-      selectLocale(
-        country,
-        request.headers.get("cookie") ?? "",
-        url.searchParams.get("lang") ?? "",
-      ),
+      locale,
       url.pathname,
       url.hostname,
       country,
     );
+    return request.method === "HEAD" ? new Response(null, response) : response;
   }
   if (request.method === "GET" && url.pathname.startsWith("/assets/")) {
     const headers = new Headers(assetResponse.headers);
