@@ -6,8 +6,6 @@ import { Moon } from "@phosphor-icons/react/Moon";
 import { Sun } from "@phosphor-icons/react/Sun";
 import { X } from "@phosphor-icons/react/X";
 import { getStorefrontCopy } from "../i18n";
-import { CITATION_GUIDES } from "../citationGuideContent";
-import { NOTEBOOK_COMPARISONS } from "../notebookComparisonContent";
 import {
   MARKETING_FOOTER_GROUPS,
   MARKETING_NAVIGATION,
@@ -27,12 +25,12 @@ function publicNavigationLabels(copy) {
 
 const footerLabels = Object.freeze({
   en: Object.freeze([
-    Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing", "Media kit", "Citation checks", "Compare tools"]) }),
+    Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing"]) }),
     Object.freeze({ title: "Trust", links: Object.freeze(["FAQ", "Security", "Contact"]) }),
     Object.freeze({ title: "Legal", links: Object.freeze(["Terms", "Privacy", "Refunds", "Subscription", "Cookies"]) }),
   ]),
   zh: Object.freeze([
-    Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价", "媒体资料", "引用核验", "工具对照"]) }),
+    Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价"]) }),
     Object.freeze({ title: "信任", links: Object.freeze(["常见问题", "安全", "联系"]) }),
     Object.freeze({ title: "法律", links: Object.freeze(["服务条款", "隐私", "退款", "订阅与取消", "Cookie"]) }),
   ]),
@@ -279,7 +277,7 @@ export function SiteFooter({ copy = defaultCopy, groups = MARKETING_FOOTER_GROUP
           <div className="footer-group" key={group.title}>
             <h3>{labels[groupIndex]?.title ?? group.title}</h3>
             {group.links.map(([label, href], linkIndex) => (
-              <a href={copy?.pricing?.currencyCode === "CNY" ? ([CITATION_GUIDES, NOTEBOOK_COMPARISONS].find((pages) => pages.en.path === href)?.["zh-CN"].path ?? href) : href} key={label}>
+              <a href={href} key={label}>
                 {labels[groupIndex]?.links[linkIndex] ?? label}
               </a>
             ))}
