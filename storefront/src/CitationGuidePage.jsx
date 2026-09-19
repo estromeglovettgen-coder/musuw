@@ -21,6 +21,14 @@ export function CitationGuidePage({ copy, guide, onLocaleChange, theme, onThemeT
             <ul>{CITATION_GUIDE_DOCUMENTS.map((filename) => <li key={filename}><a href={`/examples/cedar/${filename}`} download>{filename}</a></li>)}</ul>
             <a href={CITATION_GUIDE_SOURCE}>{guide.sourceMirror}</a>
           </details>
+          <figure>
+            <video controls playsInline preload="none" poster={guide.videoPoster} aria-label={guide.videoLabel}>
+              <source src={guide.video} type="video/mp4" />
+              <track kind="captions" src={guide.captions} srcLang={guide.locale} label={guide.locale === "en" ? "English" : "中文"} />
+              <a href={guide.video}>{guide.videoLabel}</a>
+            </video>
+            <figcaption>{guide.videoCaption} <a href={guide.video} download>{guide.videoDownload}</a></figcaption>
+          </figure>
           <ol className="citation-guide-checks">
             {guide.checks.map((check) => <li key={check.title}><strong>{check.title}</strong> {check.body}</li>)}
           </ol>

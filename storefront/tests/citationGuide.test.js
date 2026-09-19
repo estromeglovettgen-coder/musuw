@@ -47,6 +47,11 @@ test("built guide responses contain the complete article without running JavaScr
     assert.equal((html.match(/<h1>/g) ?? []).length, 1);
     assert.match(html, /href="https:\/\/gist\.github\.com\/estromeglovettgen-coder\/9ffbe863d4c176d0499627d364566128"/);
     assert.match(html, /src="\/images\/guides\/cedar-cited-answer\.jpg"/);
+    const videoLanguage = pathname.startsWith("/zh/") ? "zh" : "en";
+    assert.match(html, /<video controls="" playsInline="" preload="none"/);
+    assert.ok(html.includes(`src="/media/press/musuw-cedar-live-${videoLanguage}-16x9.mp4"`));
+    assert.ok(html.includes(`src="/media/press/cedar-live-${videoLanguage}.vtt"`));
+    assert.doesNotMatch(html, /<video[^>]*autoPlay/i);
     assert.match(html, /href="\/guides\/citation-checks"[^>]*>English<\/a>/);
     assert.match(html, /href="\/zh\/guides\/citation-checks"[^>]*>中文<\/a>/);
     assert.equal((html.match(/hreflang="en"/g) ?? []).length, 1);

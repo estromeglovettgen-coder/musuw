@@ -163,6 +163,8 @@ const approvedSignatureExceptions = new Map([
 // boundary. Pin their bytes so neither another video/archive nor replacement
 // contents can silently inherit approval. Re-rendered media requires review.
 const approvedPublicMedia = new Map([
+  ["storefront/public/media/press/musuw-cedar-live-zh-16x9.mp4", "4978252ff2df435271fb5110401552cbcfcd89d985935800bd2b489253850631"],
+  ["storefront/public/media/press/musuw-cedar-live-en-16x9.mp4", "99ba13e75e8d6d0bb2dafeffd0ad6eb1bd6fb34ced119792e8e346520707e908"],
   ["storefront/public/media/press/musuw-en-16x9.mp4", "6131f360888b52ed854f57ee127cb2be694c53cc84fe5124321eb51df619a866"],
   ["storefront/public/media/press/musuw-en-4x5.mp4", "5d7d3afa85690a45bd23f232b2fa51c9140576f75a0bf159c9e0b6ffdd2edcb9"],
   ["storefront/public/media/press/musuw-zh-16x9.mp4", "be851a88510524050559d10fb1663620938b2c8321ce55ab53551aa6398b501c"],

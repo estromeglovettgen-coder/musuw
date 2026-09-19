@@ -8,7 +8,8 @@
 .citation-guide-checks { padding-left: 24px; margin: 28px 0; }
 .citation-guide-checks li { padding-left: 5px; margin-bottom: 22px; }
 .citation-guide-layout figure { margin: 32px 0; }
-.citation-guide-layout figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; }
+.citation-guide-layout figure img, .citation-guide-layout figure video { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; }
+.citation-guide-layout figure video { aspect-ratio: 16 / 9; object-fit: contain; background: #111; }
 .citation-guide-layout figcaption, .citation-guide-layout .citation-guide-disclosure { font-size: 13px; line-height: 1.6; color: var(--ink-soft); }
 .citation-guide-layout figcaption { margin-top: 12px; }
 .citation-guide-cta { font-weight: 600; }

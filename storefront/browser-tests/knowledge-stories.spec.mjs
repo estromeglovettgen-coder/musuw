@@ -470,7 +470,8 @@ for (const locale of ["zh-CN", "en"]) {
           await expect(graph.locator('[data-directed-focus="hover"]')).toHaveAttribute("data-directed-node", "character:prince");
           const hoverFocusCanvas = graph.locator('[data-graph-focus-node="character:prince"]');
           expect(await graphPointerOffset(hoverFocusCanvas, "hover")).toBeLessThan(6);
-          await capture(graph, "graph-hover-focus", testInfo);
+          // Keep screenshot encoding out of short, one-shot graph phases.
+          // Geometry is checked here; capture the stable linked page below.
           await waitGraphStage(page, "drawer", 5_000);
           await expect(graph.locator('[data-graph-node-drawer="open"]')).toBeVisible();
           await expect(graph.locator('[data-graph-node-drawer="open"]')).toHaveAttribute("data-graph-drawer-node-id", "character:prince");
@@ -516,7 +517,6 @@ for (const locale of ["zh-CN", "en"]) {
           ).toBe(true);
           const pointerOffset = await graphPointerOffset(focusCanvas, "drawer");
           expect(pointerOffset).toBeLessThan(6);
-          await capture(graph, "graph-drawer", testInfo);
           await waitGraphStage(page, "drawer-link-moving", 3_000);
           const drawerLink = graph.locator('[data-graph-drawer-link-slug="summary:chapter:21"]');
           await expect(drawerLink).toHaveAttribute("data-graph-drawer-link-state", "drawer-link-moving");

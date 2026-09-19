@@ -18,6 +18,12 @@ The guide SHALL identify Cedar as fictional, preserve the conditional date and u
 - **AND** the displayed screenshot contains only the authorized fictional example
 - **AND** the page remains readable on mobile and in both themes.
 
+#### Scenario: Reader plays the real product example
+- **WHEN** a reader opens either language version
+- **THEN** the page offers the matching 40-second recording and captions with native controls and no autoplay or eager video download
+- **AND** the recording identifies fictional sources and edited waiting time, without representing the current model release as accepted
+- **AND** the full video remains downloadable and no private customer material is included.
+
 ### Requirement: Public site verification
 The owner-supplied Google site verification meta tag SHALL be present exactly once in the initial homepage and guide HTML and survive Worker localization.
 
