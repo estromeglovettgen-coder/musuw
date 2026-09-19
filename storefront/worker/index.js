@@ -54,6 +54,17 @@ export async function handleRequest(request, env) {
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
     return notFound();
   }
+  if (request.method === "GET" || request.method === "HEAD") {
+    if (pathname === "/zh" || pathname === "/zh/") {
+      url.pathname = "/";
+      url.searchParams.set("lang", "zh-CN");
+      return Response.redirect(url.toString(), 301);
+    }
+    if (pathname === "/guides/check-ai-answer-sources" || pathname === "/guides/check-ai-answer-sources/") {
+      url.pathname = "/guides/citation-checks";
+      return Response.redirect(url.toString(), 301);
+    }
+  }
 
   const assetResponse = await env.ASSETS.fetch(request);
   const contentType = assetResponse.headers.get("content-type") ?? "";
