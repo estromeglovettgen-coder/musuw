@@ -97,6 +97,12 @@ stop-and-retain-disk procedure.
 
 ## Source and upload boundary
 
+The owner's immediate model release on 2026-09-19 has a separately recorded,
+exact-version acceptance class, `reviewed-model-release`; see
+[`MODEL_RELEASE_20260919.md`](MODEL_RELEASE_20260919.md). It retains all normal
+production approval and immutable-artifact checks, rejects other version/run
+combinations, and explicitly does not claim full Sandbox lifecycle acceptance.
+
 The release bundle is materialized from tracked files at the selected SHA. It
 contains application source, lockfiles, the production and staging Compose
 definitions, scripts, safe examples and documentation only. It must not contain
