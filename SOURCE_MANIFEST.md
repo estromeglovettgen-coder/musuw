@@ -57,6 +57,13 @@ binary, or a symlink outside the allowlist. The approved `xlsx-0.20.2.tgz`
 archive is the one intentional source archive and is covered by the notices
 in `THIRD_PARTY_NOTICES.md`.
 
+The public `/press` downloads additionally include four reviewed Musuw MP4
+feature videos and `musuw-media-kit.zip` under `storefront/public/media/press/`.
+The scanner pins each of those five exact paths to its reviewed SHA-256 digest;
+this also permits that specific media kit to exceed the normal 8 MiB binary
+limit. Other video/archive paths and changed bytes remain rejected. The kit
+contains only public media and its public README, not internal reports.
+
 The baseline count scope is all Git-tracked regular files selected by this
 allowlist, excluding the dynamic `SOURCE_MANIFEST.json` publication metadata
 and generated output. `SOURCE_MANIFEST.json` records the current baseline

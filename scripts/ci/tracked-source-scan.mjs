@@ -7,6 +7,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { basename, extname, resolve } from "node:path";
 import { TextDecoder } from "node:util";
 
@@ -158,6 +159,17 @@ const approvedSignatureExceptions = new Map([
   ["weknora/frontend/src/assets/img/datasource-yuque.ico", isPng],
 ]);
 
+// Only these reviewed public downloads may bypass the normal format/size
+// boundary. Pin their bytes so neither another video/archive nor replacement
+// contents can silently inherit approval. Re-rendered media requires review.
+const approvedPublicMedia = new Map([
+  ["storefront/public/media/press/musuw-en-16x9.mp4", "6131f360888b52ed854f57ee127cb2be694c53cc84fe5124321eb51df619a866"],
+  ["storefront/public/media/press/musuw-en-4x5.mp4", "5d7d3afa85690a45bd23f232b2fa51c9140576f75a0bf159c9e0b6ffdd2edcb9"],
+  ["storefront/public/media/press/musuw-zh-16x9.mp4", "be851a88510524050559d10fb1663620938b2c8321ce55ab53551aa6398b501c"],
+  ["storefront/public/media/press/musuw-zh-4x5.mp4", "803d2b98d49a249abf2d2e63b2b5138ed4913373377b7f1c27de171a378a8d99"],
+  ["storefront/public/media/press/musuw-media-kit.zip", "8172af4e4ad68b6be8d9d1dd05da8a305df52de43f40f0060966e3b8e50c9f78"],
+]);
+
 function looksBinary(buffer) {
   if (buffer.length === 0) return false;
   if (buffer.includes(0)) return true;
@@ -170,6 +182,14 @@ function looksBinary(buffer) {
 }
 
 function validateBinary(path, buffer) {
+  const approvedDigest = approvedPublicMedia.get(path);
+  if (approvedDigest) {
+    if (createHash("sha256").update(buffer).digest("hex") !== approvedDigest) {
+      fail(`reviewed public media changed bytes: ${path}`);
+    }
+    return;
+  }
+
   if (buffer.length > maximumBinaryBytes) {
     fail(`unexpected large binary (${buffer.length} bytes): ${path}`);
   }
@@ -213,7 +233,7 @@ const blobs = readTrackedBlobs(entries);
 let binaryCount = 0;
 for (const [index, { path }] of entries.entries()) {
   const contents = blobs[index];
-  if (looksBinary(contents)) {
+  if (approvedPublicMedia.has(path) || looksBinary(contents)) {
     binaryCount += 1;
     validateBinary(path, contents);
   }

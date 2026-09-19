@@ -34,7 +34,7 @@ REVIEWED_UI_CONTENT = {
     "playwright.knowledge-upload.config.ts": {"fad968652432f48a144489a70c23b3967030c1a5", "0bb47d368da4d1c558eab3ce0db1cc1e210fc9db", "bde962ce72910dae6b2f618a5b6ba53c6104fc9c", "d44879f4afbe340c02c859ce4f3f82458db94e31"},
     "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af"},
     "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb"},
-    "third_party/weknora/v0.7.2-provenance.json": {"59de0f2d7797ce39b91b0d5db709ac316a2a1876", "601fb80639787f1a3ba6ab43d533608d757fada8", "8735c066f0119c55670bfa512216924ff21c8675", "a433c0d10542e136e68051a318c66d23e055bfad", "e1361c776a4e15ffb2572fe957177202055f3dcf"},
+    "third_party/weknora/v0.7.2-provenance.json": {"59de0f2d7797ce39b91b0d5db709ac316a2a1876", "601fb80639787f1a3ba6ab43d533608d757fada8", "8735c066f0119c55670bfa512216924ff21c8675", "a433c0d10542e136e68051a318c66d23e055bfad", "e1361c776a4e15ffb2572fe957177202055f3dcf", "161811eafbf08d8f2e76fdfc8b23b0a076b46d8b"},
     "weknora/frontend/e2e/billing-harness.html": {"51526a1a4a971fb3e9393658944c04cf5819cee9"},
     "weknora/frontend/e2e/billing-harness.ts": {"d04631889c795e31a0b3b02a222de4e2bf464d07"},
 }

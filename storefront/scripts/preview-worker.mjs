@@ -16,7 +16,11 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
-  ".webp": "image/webp"
+  ".webp": "image/webp",
+  ".mp4": "video/mp4",
+  ".vtt": "text/vtt; charset=utf-8",
+  ".srt": "application/x-subrip",
+  ".zip": "application/zip"
 };
 
 async function assetResponse(request) {

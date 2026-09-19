@@ -107,8 +107,8 @@ const planRank: Record<ConsumerPlan, number> = { free: 0, plus: 1, pro: 2, max: 
 // copy only. Keep this one free-plan line byte-for-byte aligned without adding
 // unsupported marketing translations to the other locale bundles.
 const freeImportFeature = computed(() => locale.value.toLowerCase().startsWith('zh')
-  ? '文档与网页导入'
-  : 'Documents and web links')
+  ? '文档与笔记导入'
+  : 'Documents and notes')
 const planCards: Array<{ plan: ConsumerPlan; descriptionKey: string }> = [
   { plan: 'free', descriptionKey: 'entitlement.planDescriptions.free' },
   { plan: 'plus', descriptionKey: 'entitlement.planDescriptions.plus' },

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	openrouter "github.com/OpenRouterTeam/go-sdk/models/components"
@@ -88,8 +89,9 @@ func NormalizeReasoningEffort(value string) (string, error) {
 // enabled uses the configured default (legacy unconfigured clients use high);
 // disabled maps to none only for optional-reasoning models.
 type openRouterReasoning struct {
-	mandatory     bool
-	defaultEffort string
+	mandatory        bool
+	defaultEffort    string
+	supportedEfforts []string
 }
 
 func (s openRouterReasoning) Apply(req *openai.ChatCompletionRequest, opts *ChatOptions, _ bool) (any, bool) {
@@ -113,6 +115,14 @@ func (s openRouterReasoning) Apply(req *openai.ChatCompletionRequest, opts *Chat
 		if effort == string(openrouter.ReasoningEffortNone) {
 			effort = ""
 		}
+	}
+	// A catalog upgrade keeps the saved model ID, but can retire an effort
+	// (for example GPT-5 Nano's minimal). Honor current capabilities even for
+	// old sessions and agents; unconfigured custom models remain unchanged.
+	if len(s.supportedEfforts) > 0 && effort != "" &&
+		(effort != string(openrouter.ReasoningEffortNone) || s.mandatory) &&
+		!slices.Contains(s.supportedEfforts, effort) {
+		effort = s.defaultEffort
 	}
 	if effort == "" {
 		return nil, false

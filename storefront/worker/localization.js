@@ -1,10 +1,11 @@
 import { getStorefrontCopy, localePreferenceCookie } from "../src/i18n.js";
 import { getPublicDocumentMeta } from "../src/legalContent.js";
+import { getPressMeta } from "../src/pressContent.js";
 import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
+import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
 import { normalizeCountry } from "../src/pricingLocalization.js";
 import {
-  SITE_LOGO_ALT,
-  SITE_LOGO_URL,
+  SITE_SOCIAL_IMAGE,
   canonicalUrl,
   normalizePathname,
   openGraphLocale,
@@ -47,12 +48,12 @@ function normalizeDocumentPath(pathname) {
 function withDocumentLocale(html, locale, pathname = "/", country = "") {
   const copy = getStorefrontCopy(locale);
   const normalizedPath = normalizeDocumentPath(pathname);
-  const legalMeta = getPublicDocumentMeta(locale, normalizedPath);
+  const pageMeta = getPublicDocumentMeta(locale, normalizedPath) ?? getPressMeta(locale, normalizedPath);
   const isHome = normalizedPath === "/";
   const meta =
-    legalMeta ??
+    pageMeta ??
     (isHome
-      ? applyHomepagePlanPresentation(copy).meta
+      ? applyHomepageMarketingRefresh(applyHomepagePlanPresentation(copy)).meta
       : {
           title: locale === "zh-CN" ? "页面未找到 | musuw" : "Page not found | musuw",
           description:
@@ -95,23 +96,23 @@ function withDocumentLocale(html, locale, pathname = "/", country = "") {
   const pageUrl = canonicalUrl(normalizedPath);
   for (const [attribute, key, content] of [
     ["name", "description", meta.description],
-    ["name", "robots", isHome || legalMeta ? "index,follow" : "noindex,follow"],
+    ["name", "robots", isHome || pageMeta ? "index,follow" : "noindex,follow"],
     ["property", "og:site_name", "musuw"],
     ["property", "og:title", meta.title],
     ["property", "og:description", meta.description],
     ["property", "og:url", pageUrl],
     ["property", "og:locale", openGraphLocale(locale)],
-    ["property", "og:image", SITE_LOGO_URL],
-    ["property", "og:image:alt", SITE_LOGO_ALT],
-    ["property", "og:image:type", "image/png"],
-    ["property", "og:image:width", "512"],
-    ["property", "og:image:height", "512"],
-    ["name", "twitter:card", "summary"],
+    ["property", "og:image", SITE_SOCIAL_IMAGE.url],
+    ["property", "og:image:alt", SITE_SOCIAL_IMAGE.alt],
+    ["property", "og:image:type", SITE_SOCIAL_IMAGE.type],
+    ["property", "og:image:width", SITE_SOCIAL_IMAGE.width],
+    ["property", "og:image:height", SITE_SOCIAL_IMAGE.height],
+    ["name", "twitter:card", "summary_large_image"],
     ["name", "twitter:title", meta.title],
     ["name", "twitter:description", meta.description],
     ["name", "twitter:url", pageUrl],
-    ["name", "twitter:image", SITE_LOGO_URL],
-    ["name", "twitter:image:alt", SITE_LOGO_ALT],
+    ["name", "twitter:image", SITE_SOCIAL_IMAGE.url],
+    ["name", "twitter:image:alt", SITE_SOCIAL_IMAGE.alt],
   ]) {
     localizedHtml = upsertMeta(localizedHtml, attribute, key, content);
   }
@@ -142,7 +143,7 @@ export async function localizeDocumentResponse(
   const normalizedLocale = locale === "zh-CN" ? "zh-CN" : "en";
   const normalizedPath = normalizeDocumentPath(pathname);
   const knownDocument =
-    normalizedPath === "/" || Boolean(getPublicDocumentMeta(normalizedLocale, normalizedPath));
+    normalizedPath === "/" || Boolean(getPublicDocumentMeta(normalizedLocale, normalizedPath) ?? getPressMeta(normalizedLocale, normalizedPath));
   const headers = new Headers(assetResponse.headers);
   headers.set("content-language", normalizedLocale);
   headers.set("cache-control", "private, no-store");

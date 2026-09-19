@@ -4,6 +4,8 @@
 builtin_models:
 # Legacy internal IDs (including -free suffixes) are retained for saved selections.
 # Display names and provider slugs describe the current, verified endpoint.
+# Verified 2026-09-18 against the official provider docs and OpenRouter catalog.
+# Keep embedding identity and dimension stable: existing knowledge bases use them.
   - id: builtin-deepseek-v4-pro
     tenant_id: 10000
     name: deepseek/deepseek-v4-pro-0813
@@ -25,17 +27,17 @@ builtin_models:
 
   - id: builtin-deepseek-v4-flash
     tenant_id: 10000
-    name: deepseek/deepseek-v4-flash-0731
-    display_name: DeepSeek V4 Flash
+    name: deepseek/deepseek-v4.1-flash
+    display_name: DeepSeek V4.1 Flash
     type: KnowledgeQA
     source: remote
-    description: DeepSeek V4 Flash through OpenRouter · lower-cost conversation model
+    description: DeepSeek V4.1 Flash through OpenRouter · lower-cost conversation model
     is_default: true
     status: active
     parameters:
       base_url: https://openrouter.ai/api/v1
       provider: openrouter
-      supports_vision: false
+      supports_vision: true
       reasoning:
         supported: true
         mandatory: false
@@ -140,10 +142,10 @@ builtin_models:
   - id: builtin-openrouter-gemini-pro
     tenant_id: 10000
     name: google/gemini-3.1-pro-preview
-    display_name: Gemini 3.1 Pro
+    display_name: Gemini 3.1 Pro (Preview)
     type: KnowledgeQA
     source: remote
-    description: Gemini 3.1 Pro through OpenRouter · high-quality multimodal reasoning
+    description: Gemini 3.1 Pro Preview through OpenRouter · high-quality multimodal reasoning
     is_default: false
     status: active
     parameters:
@@ -291,11 +293,11 @@ builtin_models:
 
   - id: builtin-openrouter-qwen-3-7-flash
     tenant_id: 10000
-    name: qwen/qwen3.7-flash
-    display_name: Qwen 3.7 Flash
+    name: qwen/qwen3.8-flash
+    display_name: Qwen 3.8 Flash
     type: KnowledgeQA
     source: remote
-    description: Qwen 3.7 Flash through OpenRouter · low-cost multimodal tool-capable reasoning
+    description: Qwen 3.8 Flash through OpenRouter · low-cost multimodal tool-capable reasoning
     is_default: false
     status: active
     parameters:
@@ -310,11 +312,11 @@ builtin_models:
 
   - id: builtin-openrouter-gpt-5-nano
     tenant_id: 10000
-    name: openai/gpt-5-nano
-    display_name: GPT-5 Nano
+    name: openai/gpt-5.4-nano
+    display_name: GPT-5.4 Nano
     type: KnowledgeQA
     source: remote
-    description: GPT-5 Nano through OpenRouter · low-cost multimodal structured reasoning
+    description: GPT-5.4 Nano through OpenRouter · low-cost multimodal structured reasoning
     is_default: false
     status: active
     parameters:
@@ -323,9 +325,9 @@ builtin_models:
       supports_vision: true
       reasoning:
         supported: true
-        mandatory: true
-        supported_efforts: [high, medium, low, minimal]
-        default_effort: minimal
+        mandatory: false
+        supported_efforts: [xhigh, high, medium, low, none]
+        default_effort: low
 
   - id: builtin-openrouter-gpt-astra
     tenant_id: 10000
@@ -463,6 +465,7 @@ builtin_models:
   - id: builtin-openrouter-embedding
     tenant_id: 10000
     name: qwen/qwen3-embedding-8b
+    display_name: Qwen3 Embedding 8B
     type: Embedding
     source: remote
     description: Qwen3 Embedding 8B · multilingual document and query vectors
@@ -479,6 +482,7 @@ builtin_models:
   - id: builtin-openrouter-rerank
     tenant_id: 10000
     name: cohere/rerank-4-fast
+    display_name: Cohere Rerank 4 Fast
     type: Rerank
     source: remote
     description: Cohere Rerank 4 Fast · multilingual result reranking
@@ -516,11 +520,11 @@ builtin_models:
 
   - id: builtin-openrouter-vlm
     tenant_id: 10000
-    name: google/gemini-2.5-flash
+    name: google/gemini-3.8-flash
     type: VLLM
     source: remote
-    display_name: Gemini 2.5 Flash
-    description: Gemini 2.5 Flash · image OCR and native video understanding
+    display_name: Gemini 3.8 Flash
+    description: Gemini 3.8 Flash · image OCR and native video understanding
     is_default: true
     status: active
     parameters:
@@ -528,6 +532,11 @@ builtin_models:
       provider: openrouter
       interface_type: openai
       supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: true
+        supported_efforts: [high, medium, low]
+        default_effort: low
       extra_config:
         video_input_mode: base64
         video_provider: google-vertex
@@ -551,11 +560,11 @@ builtin_models:
 
   - id: builtin-openrouter-vlm-youtube
     tenant_id: 10000
-    name: google/gemini-2.5-flash-lite
+    name: google/gemini-3.5-flash-lite
     type: VLLM
     source: remote
-    display_name: YouTube Video Understanding
-    description: Gemini 2.5 Flash-Lite · direct public YouTube understanding through Google AI Studio
+    display_name: Gemini 3.5 Flash-Lite (YouTube)
+    description: Gemini 3.5 Flash-Lite · direct public YouTube understanding through Google AI Studio
     is_default: false
     status: active
     parameters:
@@ -563,17 +572,22 @@ builtin_models:
       provider: openrouter
       interface_type: openai
       supports_vision: true
+      reasoning:
+        supported: true
+        mandatory: true
+        supported_efforts: [high, medium, low, minimal]
+        default_effort: minimal
       extra_config:
         video_input_mode: url
         video_provider: google-ai-studio
 
   - id: builtin-openrouter-vlm-qwen-3-7-flash
     tenant_id: 10000
-    name: qwen/qwen3.7-flash
+    name: qwen/qwen3.8-flash
     type: VLLM
     source: remote
-    display_name: Qwen 3.7 Flash Vision
-    description: Qwen 3.7 Flash · low-cost image and video understanding through OpenRouter
+    display_name: Qwen 3.8 Flash Vision
+    description: Qwen 3.8 Flash · low-cost image and video understanding through OpenRouter
     is_default: false
     status: active
     parameters:
@@ -683,6 +697,7 @@ builtin_models:
   - id: builtin-openrouter-asr
     tenant_id: 10000
     name: openai/whisper-large-v3
+    display_name: Whisper Large V3
     type: ASR
     source: remote
     description: Whisper Large V3 · multilingual speech transcription

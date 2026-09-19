@@ -3,6 +3,13 @@ export const SITE_NAME = "musuw";
 export const SITE_LOGO_PATH = "/musuw-logo-512.png";
 export const SITE_LOGO_URL = `${SITE_ORIGIN}${SITE_LOGO_PATH}`;
 export const SITE_LOGO_ALT = "musuw logo";
+export const SITE_SOCIAL_IMAGE = Object.freeze({
+  url: `${SITE_ORIGIN}/images/musuw-social-card.png`,
+  alt: "Musuw: cited answers, connected Wiki, and knowledge graph; actual product screenshot with an example document",
+  type: "image/png",
+  width: "1200",
+  height: "630",
+});
 
 export function normalizePathname(pathname = "/") {
   if (!pathname || pathname === "/") return "/";

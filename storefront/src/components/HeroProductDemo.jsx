@@ -397,6 +397,11 @@ export function HeroProductDemo({ locale = "en" }) {
     let attempts = 0;
     const measure = () => {
       if (!active) return;
+      // The final answer scroll otherwise commits in a later animation frame,
+      // moving the bookmark after this one-shot path has already been measured.
+      if (saveStep === "bookmark" && messagesRef.current) {
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      }
       const hostRect = host.getBoundingClientRect();
       const button = saveStep === "publish"
         ? containerRef.current?.querySelector('[data-hero-save-publish="true"]')
@@ -439,7 +444,7 @@ export function HeroProductDemo({ locale = "en" }) {
       pointerAnchorRef.current = target;
       setPointerSettled(false);
       setPointerTravelStarted(false);
-      setPointerPath({ start, target });
+      setPointerPath({ start, target, step: saveStep });
     };
 
     // The first bookmark action is already in the committed answer DOM, so
@@ -492,11 +497,30 @@ export function HeroProductDemo({ locale = "en" }) {
   }, [phase, pointerPath, reduceMotion, saveStep]);
 
   useEffect(() => {
-    if (reduceMotion || phase !== "saving" || !pointerPath || !pointerTravelStarted) return undefined;
-    // Do not depend on Motion's aggregate completion callback: on a busy
-    // compositor it may fire before the coordinate transition is observable.
-    const timer = window.setTimeout(() => setPointerSettled(true), saveStep === "publish" ? 1_240 : 900);
-    return () => window.clearTimeout(timer);
+    if (reduceMotion || phase !== "saving" || pointerPath?.step !== saveStep || !pointerTravelStarted) return undefined;
+    let frame = 0;
+    const confirmArrival = () => {
+      const pointer = pointerRef.current;
+      const style = pointer ? getComputedStyle(pointer) : null;
+      const drawer = containerRef.current?.querySelector('[data-hero-save-drawer="true"]');
+      const drawerTransform = drawer ? new DOMMatrixReadOnly(getComputedStyle(drawer).transform) : null;
+      const drawerSettled = saveStep !== "publish" || (drawerTransform && Math.abs(drawerTransform.m41) < 0.5);
+      if (drawerSettled && style && Math.abs(Number.parseFloat(style.left) - pointerPath.target.x) < 0.5 &&
+        Math.abs(Number.parseFloat(style.top) - pointerPath.target.y) < 0.5) {
+        setPointerSettled(true);
+      } else {
+        frame = window.requestAnimationFrame(confirmArrival);
+      }
+    };
+    // Preserve the nominal hold, but a busy compositor must actually reach
+    // the fixed target and the drawer must finish sliding before the click.
+    const timer = window.setTimeout(() => {
+      frame = window.requestAnimationFrame(confirmArrival);
+    }, saveStep === "publish" ? 1_240 : 900);
+    return () => {
+      window.clearTimeout(timer);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, [phase, pointerPath, pointerTravelStarted, reduceMotion, saveStep]);
 
   const hasSubmitted = HERO_DEMO_PHASES.indexOf(phase) >= HERO_DEMO_PHASES.indexOf("sending");
@@ -505,7 +529,7 @@ export function HeroProductDemo({ locale = "en" }) {
   const isSaving = phase === "saving";
   const pointerPosition = pointerPath?.target;
   const pointerVisible = Boolean(pointerPath && !reduceMotion && isSaving);
-  const pointerPressing = isSaving && pointerSettled;
+  const pointerPressing = isSaving && pointerSettled && pointerPath?.step === saveStep;
 
   useEffect(() => {
     if (!hasAnswer) return undefined;

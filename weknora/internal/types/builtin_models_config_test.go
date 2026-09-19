@@ -475,8 +475,9 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, 1, defaultByType[ModelTypeASR])
 
 	assert.True(t, byID["builtin-deepseek-v4-flash"].IsDefault)
-	assert.Equal(t, "deepseek/deepseek-v4-flash-0731", byID["builtin-deepseek-v4-flash"].Name)
-	assert.Equal(t, "DeepSeek V4 Flash", byID["builtin-deepseek-v4-flash"].DisplayName)
+	assert.True(t, byID["builtin-deepseek-v4-flash"].Parameters.SupportsVision)
+	assert.Equal(t, "deepseek/deepseek-v4.1-flash", byID["builtin-deepseek-v4-flash"].Name)
+	assert.Equal(t, "DeepSeek V4.1 Flash", byID["builtin-deepseek-v4-flash"].DisplayName)
 	assert.Equal(t, "openrouter", byID["builtin-deepseek-v4-flash"].Parameters.Provider)
 	assert.Equal(t, []string{"max", "high", "low"}, byID["builtin-deepseek-v4-flash"].Parameters.Reasoning.SupportedEfforts)
 	pro := byID["builtin-deepseek-v4-pro"]
@@ -488,12 +489,15 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, "openai/gpt-5.6-sol", byID["builtin-openrouter-gpt-sol"].Name)
 	assert.Equal(t, "google/gemini-3.8-flash", byID["builtin-openrouter-gemini-flash"].Name)
 	assert.False(t, byID["builtin-openrouter-claude-haiku"].Parameters.Reasoning.Supported)
+	assert.Equal(t, "Gemini 3.1 Pro (Preview)", byID["builtin-openrouter-gemini-pro"].DisplayName)
 	assert.Equal(t, "anthropic/claude-opus-5", byID["builtin-openrouter-claude-opus"].Name)
 	youtube := byID["builtin-openrouter-vlm-youtube"]
-	assert.Equal(t, "google/gemini-2.5-flash-lite", youtube.Name)
+	assert.Equal(t, "google/gemini-3.5-flash-lite", youtube.Name)
 	assert.Equal(t, "url", youtube.Parameters.ExtraConfig["video_input_mode"])
 	assert.Equal(t, "google-ai-studio", youtube.Parameters.ExtraConfig["video_provider"])
 	assert.False(t, youtube.IsDefault)
+	assert.True(t, youtube.Parameters.Reasoning.Mandatory)
+	assert.Equal(t, "Gemini 3.5 Flash-Lite (YouTube)", youtube.DisplayName)
 
 	// These consumer-visible rows must use the paid, non-`:free` OpenRouter
 	// slugs.  The free aliases are availability-limited and are not suitable
@@ -512,9 +516,9 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 	assert.Equal(t, []string{"max", "high", "low"}, glm.Parameters.Reasoning.SupportedEfforts)
 	assert.Equal(t, "low", glm.Parameters.Reasoning.DefaultEffort)
 	nano := byID["builtin-openrouter-gpt-5-nano"]
-	assert.True(t, nano.Parameters.Reasoning.Mandatory)
-	assert.NotContains(t, nano.Parameters.Reasoning.SupportedEfforts, "none")
-	assert.Equal(t, "minimal", nano.Parameters.Reasoning.DefaultEffort)
+	assert.False(t, nano.Parameters.Reasoning.Mandatory)
+	assert.Equal(t, []string{"xhigh", "high", "medium", "low", "none"}, nano.Parameters.Reasoning.SupportedEfforts)
+	assert.Equal(t, "low", nano.Parameters.Reasoning.DefaultEffort)
 
 	embedding := byID["builtin-openrouter-embedding"]
 	assert.Equal(t, "qwen/qwen3-embedding-8b", embedding.Name)
@@ -522,11 +526,12 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 
 	assert.Equal(t, "cohere/rerank-4-fast", byID["builtin-openrouter-rerank"].Name)
 	vlm := byID["builtin-openrouter-vlm"]
-	assert.Equal(t, "google/gemini-2.5-flash", vlm.Name)
-	assert.Equal(t, "Gemini 2.5 Flash", vlm.DisplayName)
-	assert.Equal(t, "Gemini 2.5 Flash · image OCR and native video understanding", vlm.Description)
+	assert.Equal(t, "google/gemini-3.8-flash", vlm.Name)
+	assert.Equal(t, "Gemini 3.8 Flash", vlm.DisplayName)
+	assert.Equal(t, "Gemini 3.8 Flash · image OCR and native video understanding", vlm.Description)
 	assert.Equal(t, "openrouter", vlm.Parameters.Provider)
 	assert.True(t, vlm.Parameters.SupportsVision)
+	assert.True(t, vlm.Parameters.Reasoning.Mandatory)
 	assert.Equal(t, "openai", vlm.Parameters.InterfaceType)
 	assert.Equal(t, "base64", vlm.Parameters.ExtraConfig["video_input_mode"])
 	assert.Equal(t, "google-vertex", vlm.Parameters.ExtraConfig["video_provider"])
@@ -556,11 +561,11 @@ func TestPlatformBuiltinModelsCoverEveryUserFacingModelRole(t *testing.T) {
 		"builtin-openrouter-glm-5-2-free":            {"z-ai/glm-5.3", ModelTypeKnowledgeQA},
 		"builtin-openrouter-minimax-m3-free":         {"minimax/minimax-m3", ModelTypeKnowledgeQA},
 		"builtin-openrouter-ling-flash":              {"inclusionai/ling-3.0-flash", ModelTypeKnowledgeQA},
-		"builtin-openrouter-qwen-3-7-flash":          {"qwen/qwen3.7-flash", ModelTypeKnowledgeQA},
-		"builtin-openrouter-gpt-5-nano":              {"openai/gpt-5-nano", ModelTypeKnowledgeQA},
+		"builtin-openrouter-qwen-3-7-flash":          {"qwen/qwen3.8-flash", ModelTypeKnowledgeQA},
+		"builtin-openrouter-gpt-5-nano":              {"openai/gpt-5.4-nano", ModelTypeKnowledgeQA},
 		"builtin-openrouter-rerank-nemotron-free":    {"nvidia/llama-nemotron-rerank-vl-1b-v2:free", ModelTypeRerank},
 		"builtin-openrouter-rerank-qwen3":            {"qwen/qwen3-reranker-8b", ModelTypeRerank},
-		"builtin-openrouter-vlm-qwen-3-7-flash":      {"qwen/qwen3.7-flash", ModelTypeVLLM},
+		"builtin-openrouter-vlm-qwen-3-7-flash":      {"qwen/qwen3.8-flash", ModelTypeVLLM},
 		"builtin-openrouter-vlm-gemma-4-free":        {"google/gemma-4-26b-a4b-it", ModelTypeVLLM},
 		"builtin-openrouter-vlm-mimo-v2-5":           {"xiaomi/mimo-v2.5", ModelTypeVLLM},
 		"builtin-openrouter-asr-whisper-turbo":       {"openai/whisper-large-v3-turbo", ModelTypeASR},

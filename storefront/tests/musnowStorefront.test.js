@@ -121,6 +121,8 @@ test("consumer pricing presents aligned descriptions, capacity, model access, an
     pricing.plans.forEach((plan) => assert.ok(plan.description.length <= 40));
     const freeFeatures = pricing.plans[0].features.join(" ");
     assert.match(freeFeatures, locale === "zh-CN" ? /标准模型/ : /Standard models/);
+    assert.doesNotMatch(freeFeatures, /网页|web links/i);
+    assert.match(freeFeatures, locale === "zh-CN" ? /文档与笔记/ : /Documents and notes/);
     pricing.plans.slice(1).forEach((plan) => {
       assert.match(plan.features.join(" "), locale === "zh-CN" ? /高级模型/ : /Advanced models/);
     });
