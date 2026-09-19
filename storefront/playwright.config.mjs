@@ -5,7 +5,8 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
-  workers: process.env.CI ? 2 : 1,
+  // SwiftShader rendering and screenshot capture need one runner's resources.
+  workers: 1,
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "browser-report", open: "never" }]],
   outputDir: "browser-results",
