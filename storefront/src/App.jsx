@@ -4,6 +4,8 @@ import { getInitialLocale, getStorefrontCopy, persistLocalePreference } from "./
 import { LegalPage, NotFoundPage } from "./LegalPage";
 import { PressPage } from "./PressPage";
 import { CitationGuidePage } from "./CitationGuidePage";
+import { NotebookComparisonPage } from "./NotebookComparisonPage";
+import { NOTEBOOK_COMPARISONS, getNotebookComparison } from "./notebookComparisonContent";
 import { CITATION_GUIDES, getCitationGuide } from "./citationGuideContent";
 import { getPressMeta, PRESS_PATH } from "./pressContent";
 import { getPublicDocument, getPublicDocumentMeta } from "./legalContent";
@@ -30,7 +32,7 @@ function setMeta(attribute, key, content) {
 }
 
 export default function App() {
-  const [locale, setLocale] = useState(() => getCitationGuide(window.location.pathname)?.locale ?? getInitialLocale());
+  const [locale, setLocale] = useState(() => getCitationGuide(window.location.pathname)?.locale ?? getNotebookComparison(window.location.pathname)?.locale ?? getInitialLocale());
   const [theme, setTheme] = useState(() => getInitialTheme());
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
   const pricingCurrency = selectPricingCurrency(getInitialPricingCountry(), copy.pricing.currencyCode);
@@ -41,18 +43,21 @@ export default function App() {
   const pathname = useMemo(() => window.location.pathname, []);
   const publicDocument = useMemo(() => getPublicDocument(locale, pathname), [locale, pathname]);
   const guide = getCitationGuide(pathname);
+  const comparison = getNotebookComparison(pathname);
+  const article = guide ?? comparison;
+  const alternateArticles = comparison ? NOTEBOOK_COMPARISONS : CITATION_GUIDES;
   const isHome = pathname === "/";
   const isPress = normalizePathname(pathname) === PRESS_PATH;
 
   const handleLocaleChange = useCallback((nextLocale) => {
     const normalized = nextLocale === "zh-CN" || nextLocale === "zh" ? "zh-CN" : "en";
     persistLocalePreference(normalized);
-    if (guide) {
-      window.location.assign(CITATION_GUIDES[normalized].path);
+    if (article) {
+      window.location.assign(alternateArticles[normalized].path);
       return;
     }
     setLocale(normalized);
-  }, [guide]);
+  }, [article, alternateArticles]);
 
   const handleThemeToggle = useCallback(() => {
     setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
@@ -63,7 +68,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const meta = guide?.meta ?? getPressMeta(locale, pathname) ?? getPublicDocumentMeta(locale, pathname) ??
+    const meta = article?.meta ?? getPressMeta(locale, pathname) ?? getPublicDocumentMeta(locale, pathname) ??
       (isHome ? homeMeta : {
             title: locale === "zh-CN" ? "页面未找到 | musuw" : "Page not found | musuw",
             description:
@@ -100,8 +105,8 @@ export default function App() {
       document.head.appendChild(canonical);
     }
     canonical.setAttribute("href", pageUrl);
-    if (guide) {
-      for (const alternate of Object.values(CITATION_GUIDES)) {
+    if (article) {
+      for (const alternate of Object.values(alternateArticles)) {
         let link = document.querySelector(`link[rel="alternate"][hreflang="${alternate.locale}"]`);
         if (!link) {
           link = document.createElement("link");
@@ -119,7 +124,7 @@ export default function App() {
       robots.setAttribute("name", "robots");
       document.head.appendChild(robots);
     }
-    robots.setAttribute("content", isHome || isPress || guide || publicDocument ? "index,follow" : "noindex,follow");
+    robots.setAttribute("content", isHome || isPress || article || publicDocument ? "index,follow" : "noindex,follow");
 
     let structured = document.getElementById("musuw-structured-data");
     if (!structured) {
@@ -129,7 +134,7 @@ export default function App() {
       document.head.appendChild(structured);
     }
     structured.textContent = structuredDataText({ locale, pathname: normalizedPath });
-  }, [guide, homeMeta, isHome, isPress, locale, pathname, publicDocument]);
+  }, [article, alternateArticles, homeMeta, isHome, isPress, locale, pathname, publicDocument]);
 
   useEffect(() => {
     const targetId = decodeURIComponent(window.location.hash.slice(1));
@@ -139,6 +144,10 @@ export default function App() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  if (comparison) {
+    return <NotebookComparisonPage copy={copy} comparison={comparison} onLocaleChange={handleLocaleChange} theme={theme} onThemeToggle={handleThemeToggle} />;
+  }
 
   if (guide) {
     return <CitationGuidePage copy={copy} guide={guide} onLocaleChange={handleLocaleChange} theme={theme} onThemeToggle={handleThemeToggle} />;

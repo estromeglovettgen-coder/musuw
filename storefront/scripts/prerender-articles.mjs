@@ -5,6 +5,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { CITATION_GUIDES } from "../src/citationGuideContent.js";
+import { NOTEBOOK_COMPARISONS } from "../src/notebookComparisonContent.js";
 import { getStorefrontCopy } from "../src/i18n.js";
 import { localizeDocumentResponse } from "../worker/localization.js";
 
@@ -14,16 +15,21 @@ if (!shell.includes('<div id="root"></div>')) throw new Error("Storefront build 
 const server = await createServer({ root, appType: "custom", logLevel: "silent", server: { middlewareMode: true } });
 try {
   const { CitationGuidePage } = await server.ssrLoadModule("/src/CitationGuidePage.jsx");
-  for (const guide of Object.values(CITATION_GUIDES)) {
-    const markup = renderToStaticMarkup(React.createElement(CitationGuidePage, {
-      guide, copy: getStorefrontCopy(guide.locale), theme: "light",
+  const { NotebookComparisonPage } = await server.ssrLoadModule("/src/NotebookComparisonPage.jsx");
+  const articles = [
+    ...Object.values(CITATION_GUIDES).map((guide) => ({ page: guide, component: CitationGuidePage, props: { guide } })),
+    ...Object.values(NOTEBOOK_COMPARISONS).map((comparison) => ({ page: comparison, component: NotebookComparisonPage, props: { comparison } })),
+  ];
+  for (const { page, component, props } of articles) {
+    const markup = renderToStaticMarkup(React.createElement(component, {
+      ...props, copy: getStorefrontCopy(page.locale), theme: "light",
     }));
     const response = await localizeDocumentResponse(new Response(
       shell.replace('<div id="root"></div>', () => `<div id="root">${markup}</div>`),
       { headers: { "content-type": "text/html" } },
-    ), guide.locale, guide.path);
+    ), page.locale, page.path);
     // Flat .html files keep Cloudflare's native clean URL free of a trailing slash.
-    const output = join(root, "dist", `${guide.path.slice(1)}.html`);
+    const output = join(root, "dist", `${page.path.slice(1)}.html`);
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, await response.text());
   }
