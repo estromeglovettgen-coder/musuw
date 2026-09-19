@@ -21,7 +21,8 @@ const LiquidEther = lazy(() => import("../../../auth/src/LiquidEther.tsx"));
 const HERO_LIQUID_COLORS = ["#6366F1", "#818CF8", "#A78BFA"];
 
 export function HeroScene({ copy, locale }) {
-  const reduceMotion = useReducedMotion();
+  // Server rendering has no motion preference: keep the initial copy readable.
+  const reduceMotion = useReducedMotion() ?? true;
   const typewriterPhrases = copy.hero.typewriterPhrases || [copy.hero.eyebrow];
   const focusSegments = copy.hero.titleFocusSegments || [copy.hero.titleLine2];
   const heroTitle = [copy.hero.titleLine1, copy.hero.titleLine2].filter(Boolean).join(" ");
@@ -109,7 +110,7 @@ export function HeroScene({ copy, locale }) {
       <div className="container hero-copy">
         <motion.div
           className="hero-eyebrow"
-          initial={reduceMotion ? false : { opacity: 0, y: 50 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={bkpwddTransition}
         >
@@ -127,7 +128,7 @@ export function HeroScene({ copy, locale }) {
         </motion.div>
         <motion.h1
           aria-label={heroTitle}
-          initial={reduceMotion ? false : { opacity: 0, y: 50 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={bkpwddTransition}
         >
@@ -155,7 +156,7 @@ export function HeroScene({ copy, locale }) {
         </motion.h1>
         <motion.p
           className="hero-description"
-          initial={reduceMotion ? false : { opacity: 0, y: 40 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={subtitleTransition}
         >
@@ -170,7 +171,7 @@ export function HeroScene({ copy, locale }) {
         </motion.p>
         <motion.div
           className="hero-actions"
-          initial={reduceMotion ? false : { opacity: 0, y: 40 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={subtitleTransition}
         >
@@ -184,7 +185,7 @@ export function HeroScene({ copy, locale }) {
       <div className="container hero-stage" id="demo">
         <motion.div
           className="dashboard-entry"
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+          initial={false}
           animate={{ opacity: 1, scale: 1 }}
           transition={springScaleTransition}
         >

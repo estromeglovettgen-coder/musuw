@@ -36,7 +36,7 @@ export function AuthoritativeChatSurface({
       {newChat ? (
         <main className="visual-new-chat-view">
           <section className="visual-new-chat-stack" aria-labelledby="visual-new-chat-title">
-            <h1 id="visual-new-chat-title" className="visual-new-chat-title">{newChatTitle}</h1>
+            <h2 id="visual-new-chat-title" className="visual-new-chat-title">{newChatTitle}</h2>
             <div className="visual-new-chat-composer">{composer}</div>
           </section>
         </main>
