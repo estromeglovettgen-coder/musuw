@@ -502,7 +502,10 @@ export function HeroProductDemo({ locale = "en" }) {
     const confirmArrival = () => {
       const pointer = pointerRef.current;
       const style = pointer ? getComputedStyle(pointer) : null;
-      if (style && Math.abs(Number.parseFloat(style.left) - pointerPath.target.x) < 0.5 &&
+      const drawer = containerRef.current?.querySelector('[data-hero-save-drawer="true"]');
+      const drawerTransform = drawer ? new DOMMatrixReadOnly(getComputedStyle(drawer).transform) : null;
+      const drawerSettled = saveStep !== "publish" || (drawerTransform && Math.abs(drawerTransform.m41) < 0.5);
+      if (drawerSettled && style && Math.abs(Number.parseFloat(style.left) - pointerPath.target.x) < 0.5 &&
         Math.abs(Number.parseFloat(style.top) - pointerPath.target.y) < 0.5) {
         setPointerSettled(true);
       } else {
@@ -510,7 +513,7 @@ export function HeroProductDemo({ locale = "en" }) {
       }
     };
     // Preserve the nominal hold, but a busy compositor must actually reach
-    // the fixed target before the click is shown or the next step can start.
+    // the fixed target and the drawer must finish sliding before the click.
     const timer = window.setTimeout(() => {
       frame = window.requestAnimationFrame(confirmArrival);
     }, saveStep === "publish" ? 1_240 : 900);

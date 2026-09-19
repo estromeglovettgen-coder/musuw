@@ -140,11 +140,15 @@ async function observeHeroWalkthrough(page) {
           const button = hero.querySelector(step === "bookmark" ? '[data-hero-save-action="true"]' : '[data-hero-save-publish="true"]');
           const p = pointer.getBoundingClientRect();
           const b = button?.getBoundingClientRect();
+          const drawer = hero.querySelector('[data-hero-save-drawer="true"]');
+          const pointerStyle = getComputedStyle(pointer);
           record(step, {
             pointerVisible: visible(pointer), buttonVisible: visible(button),
-            opacity: Number(getComputedStyle(pointer).opacity),
+            opacity: Number(pointerStyle.opacity),
+            position: { left: pointerStyle.left, top: pointerStyle.top, target: pointer.dataset.heroPointerTarget },
+            drawerTransform: drawer ? getComputedStyle(drawer).transform : null,
             distance: b ? Math.hypot(p.x + 3 - (b.x + b.width / 2), p.y + 3 - (b.y + b.height / 2)) : null,
-            drawerVisible: visible(hero.querySelector('[data-hero-save-drawer="true"]')),
+            drawerVisible: visible(drawer),
             successCount: hero.querySelectorAll('[data-hero-save-success="true"]').length,
           });
         }
