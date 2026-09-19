@@ -1,5 +1,9 @@
 export const PRESS_PATH = "/press";
 export const PRESS_ARCHIVE = "/media/press/musuw-media-kit.zip";
+export const PRESS_BRIEFS = [
+  { language: "en", label: "English", src: "/media/press/musuw-product-brief-en.pdf" },
+  { language: "zh", label: "中文", src: "/media/press/musuw-product-brief-zh.pdf" },
+];
 
 export const PRESS_VIDEOS = [
   { id: "en-16x9", language: "en", label: "English · 16:9", resolution: "1920 × 1080" },
@@ -48,7 +52,8 @@ const content = {
     title: "From source material to connected knowledge.",
     intro: "Turn your documents into answers with citations, connected Wiki pages, and knowledge graphs. Import webpages and video links with a paid plan.",
     demo: "Watch the walkthrough", pricing: "View plans", downloadKit: "Download media kit (ZIP)",
-    kitNote: "Includes the logo, screenshots, eight videos, covers, captions, and fictional demo sources.",
+    kitNote: "Includes the logo, screenshots, videos, captions, product briefs, and fictional demo sources.",
+    briefs: "One-page product overview (PDF)",
     walkthroughTitle: "See the product in action",
     walkthroughNote: "Actual Chinese-interface recordings with English or Chinese captions. Fictional demo sources; waiting time edited. Portrait versions use enlarged crops. No audio.",
     videoTitle: "A 33-second product overview",
@@ -63,7 +68,8 @@ const content = {
     title: "从原始资料，到相互关联的知识。",
     intro: "把资料变成带引用的回答、相互关联的 Wiki 和知识图谱。付费方案支持网页与视频链接导入。",
     demo: "观看实机演示", pricing: "查看方案", downloadKit: "下载媒体素材包（ZIP）",
-    kitNote: "包含标志、截图、八个视频、封面、字幕及虚构演示资料。",
+    kitNote: "包含标志、截图、视频、字幕、产品简介及虚构演示资料。",
+    briefs: "一页产品简介（PDF）",
     walkthroughTitle: "看一次实际操作",
     walkthroughNote: "中文界面实录，中英字幕。使用虚构资料，已剪去等待过程；竖版放大了关键区域。无音轨。",
     videoTitle: "33 秒了解产品",
