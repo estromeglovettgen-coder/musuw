@@ -135,6 +135,7 @@ export default defineComponent({
             right: `${rightInset}px`,
             bottom: `${bottomInset}px`,
             width: 'min(224px, calc(100vw - 32px))',
+            '--visual-mobile-menu-max-height': `${Math.max(0, rect.top - 18)}px`,
           }
         }
         return {

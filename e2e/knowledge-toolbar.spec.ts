@@ -119,14 +119,37 @@ for (const expanded of [false, true]) test(`search input and clear keep controls
   expect(await controls(page)).toEqual(before)
 })
 
-test('a narrow toolbar scrolls horizontally without wrapping or overlapping its controls', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
+for (const width of [390, 430]) test(`phone toolbar keeps every action visible at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 })
   await openPage(page, 0)
+  // This isolated page omits Platform; apply its real CSS scope to the fixture.
+  await page.locator('#app').evaluate(el => el.classList.add('main', 'musuw-workspace-surface'))
+  await expect(page.getByRole('button', { name: '展开目录', exact: true })).toBeVisible()
+  const expectPhoneControls = async () => {
+    const geometry = await controls(page)
+    expect(geometry.items).toHaveLength(6)
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1)
+    for (const item of geometry.items) {
+      expect(item.x).toBeGreaterThanOrEqual(0)
+      expect(item.x + item.width).toBeLessThanOrEqual(width)
+      expect(item.height).toBeGreaterThanOrEqual(39)
+    }
+    for (const [index, item] of geometry.items.entries()) {
+      for (const other of geometry.items.slice(index + 1)) {
+        const overlapX = Math.min(item.x + item.width, other.x + other.width) - Math.max(item.x, other.x)
+        const overlapY = Math.min(item.y + item.height, other.y + other.height) - Math.max(item.y, other.y)
+        expect(overlapX <= 1 || overlapY <= 1).toBe(true)
+      }
+    }
+    await expect(page.getByRole('button', { name: '导入网页', exact: true })).toBeInViewport({ ratio: 1 })
+    return geometry.items
+  }
+  const collapsed = await expectPhoneControls()
+  await page.getByRole('button', { name: '展开目录', exact: true }).click()
+  const expanded = await expectPhoneControls()
+  await page.locator('.visual-folder-row').filter({ hasText: parent }).first().click()
+  await expect(page.locator('.visual-knowledge-path-pill__segment.is-current')).toHaveText(parent)
+  expect(await expectPhoneControls()).toEqual(expanded)
   await page.locator('.visual-folder-tree__collapse').click()
-  await expectOneRow(page, true)
-  const geometry = await controls(page)
-  expect(geometry.scrollWidth).toBeGreaterThan(geometry.clientWidth)
-  await page.locator('.visual-knowledge-toolbar').evaluate(el => { el.scrollLeft = el.scrollWidth })
-  await expect(page.getByRole('button', { name: '导入网页', exact: true })).toBeInViewport({ ratio: 1 })
-  await expectOneRow(page, true)
+  expect(await expectPhoneControls()).toEqual(collapsed)
 })

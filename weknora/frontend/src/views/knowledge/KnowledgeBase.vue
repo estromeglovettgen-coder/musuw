@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref, type SetupContext } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, type SetupContext } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseBusiness from '@/assets/business-baselines/KnowledgeBase.pre-view.vue'
 import type { ConsumerEntitlement } from '@/api/entitlement'
@@ -79,6 +79,20 @@ export default defineComponent({
     }
 
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
+      // Phone disclosure state is local to this view; desktop preferences keep
+      // using the existing controller, including after a viewport change.
+      const mobileViewport = window.matchMedia('(max-width: 760px)')
+      const isMobile = ref(mobileViewport.matches)
+      const mobileFolderCollapsed = ref(true)
+      const syncViewport = () => { isMobile.value = mobileViewport.matches }
+      onMounted(() => mobileViewport.addEventListener('change', syncViewport))
+      onUnmounted(() => mobileViewport.removeEventListener('change', syncViewport))
+      const folderTreeCollapsed = computed(() => isMobile.value
+        ? mobileFolderCollapsed.value : readStateValue<boolean>(state.folderTreeCollapsed))
+      const handleFolderTreeCollapsedChange = (value: boolean) => {
+        if (isMobile.value) mobileFolderCollapsed.value = value
+        else state.handleFolderTreeCollapsedChange(value)
+      }
       const legacyHandleUploadSourceFiles = (state as any).handleUploadSourceFiles as ((files: File[]) => void) | undefined
       const legacyHandleManualCreate = (state as any).handleManualCreate as (() => void) | undefined
 
@@ -153,6 +167,8 @@ export default defineComponent({
 
       return {
         ...state,
+        folderTreeCollapsed,
+        handleFolderTreeCollapsedChange,
         handleUploadSourceFiles,
         handleManualCreate,
         fileTypeFilterPanelVisible,

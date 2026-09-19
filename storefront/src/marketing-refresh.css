@@ -807,4 +807,10 @@ html[data-theme="dark"] .footer-bottom {
     border-color: var(--line-strong);
     background: var(--surface-soft);
   }
+
+  .site-header .theme-toggle { width: 44px; height: 44px; }
+  .site-header .lang-select { min-height: 44px; font-size: 16px; }
+  .billing-toggle button { min-width: 80px; min-height: 44px; }
+  .footer-group { gap: 4px; }
+  .footer-group a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
 }

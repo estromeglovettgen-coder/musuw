@@ -123,11 +123,23 @@ class UiReleaseScopeTest(unittest.TestCase):
         candidate = self.commit("reviewed UI and delivery content")
         self.assert_scope_passes(self.run_scope(self.base, candidate))
 
-    def test_model_release_workflow_is_not_a_ui_only_change(self) -> None:
-        path = ".github/workflows/deploy-production.yml"
-        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
-        candidate = self.commit("model acceptance policy requires its own release review")
-        self.assert_scope_rejects(self.run_scope(self.base, candidate))
+    def test_previously_applied_delivery_policy_is_exactly_pinned(self) -> None:
+        for path in (
+            ".github/workflows/deploy-production.yml", "docs/DEPLOYMENT.md",
+            "docs/MODEL_RELEASE_20260919.md", "scripts/ci/validate-workflows.rb",
+            "scripts/ci/verify-reviewed-model-release.py",
+            "scripts/ci/verify-reviewed-model-release.test.py",
+            "scripts/weknora-workflow-simulation.test.sh",
+        ):
+            with self.subTest(path=path):
+                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                reviewed = self.commit("retain policy already used for live production")
+                self.assert_scope_passes(self.run_scope(self.base, reviewed))
+                self.write(path, "unreviewed release policy\n")
+                candidate = self.commit("future policy change still requires review")
+                self.assert_scope_rejects(self.run_scope(reviewed, candidate))
+                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                self.commit("restore reviewed policy")
 
     def test_reviewed_paths_reject_unreviewed_content_and_deletion(self) -> None:
         baseline = self.base
@@ -161,6 +173,24 @@ class UiReleaseScopeTest(unittest.TestCase):
                 candidate = self.commit("runtime change")
                 self.assert_scope_rejects(self.run_scope(baseline, candidate))
                 baseline = candidate
+
+    def test_mobile_presentation_pins_allow_only_reviewed_content(self) -> None:
+        for path in (
+            "weknora/frontend/index.html",
+            "weknora/frontend/src/views/platform/index.vue",
+            "auth/src/styles.css",
+            "e2e/mobile-fixture-api.mjs",
+            "e2e/mobile-layout.md",
+        ):
+            with self.subTest(path=path):
+                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                reviewed = self.commit("reviewed mobile presentation")
+                self.assert_scope_passes(self.run_scope(self.base, reviewed))
+                self.write(path, "unreviewed content\n")
+                unreviewed = self.commit("unreviewed change to mobile presentation")
+                self.assert_scope_rejects(self.run_scope(reviewed, unreviewed))
+                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                self.commit("restore reviewed mobile presentation")
 
     def test_reviewed_path_still_rejects_symlink(self) -> None:
         link = self.repo / "auth/src/AuthShowcase.tsx"

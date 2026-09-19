@@ -1,7 +1,13 @@
 <template>
-  <div class="main musuw-workspace-surface" ref="dropzone">
-    <Menu></Menu>
-    <div v-if="isRouterAlive" class="platform-route-outlet">
+  <div class="main musuw-workspace-surface" ref="dropzone" @keydown.esc="closeMobileNavigation">
+    <Menu @click.capture="handleMobileNavigationClick"></Menu>
+    <button v-if="mobileNavigationOpen" class="visual-mobile-backdrop" :aria-label="t('menu.collapseSidebar')" @click="closeMobileNavigation" />
+    <header class="visual-mobile-header" :inert="mobileNavigationOpen">
+      <button ref="mobileMenuButton" type="button" :aria-label="t('menu.expandSidebar')" :aria-expanded="mobileNavigationOpen" @click="uiStore.sidebarCollapsed = false"><t-icon name="view-list" /></button>
+      <img src="/musuw-logo.png" alt="Musuw" />
+      <button type="button" :aria-label="t('menu.newChat')" @click="router.push('/platform/creatChat')"><t-icon name="chat-add" /></button>
+    </header>
+    <div v-if="isRouterAlive" class="platform-route-outlet" :inert="mobileNavigationOpen">
       <RouterView />
     </div>
     <div class="upload-mask" v-show="ismask">
@@ -19,7 +25,7 @@
 </template>
 <script setup lang="ts">
 import Menu from "@/components/menu.vue";
-import { ref, onMounted, onUnmounted, nextTick, provide, watch } from "vue";
+import { computed, ref, onMounted, onUnmounted, nextTick, provide, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import UploadMask from "@/components/upload-mask.vue";
 import Settings from "@/views/settings/Settings.vue";
@@ -34,6 +40,7 @@ import { collectDroppedFiles } from './collectDroppedFiles'
 import { isKnowledgeBaseRuntimeReady } from '@/utils/knowledgeBaseRuntime'
 import { getCurrentEntitlement } from '@/api/entitlement'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
 import { partitionFilesForConsumerPlan } from '@/views/knowledge/utils/uploadSources'
 import {
@@ -45,6 +52,29 @@ const route = useRoute();
 const router = useRouter();
 const commandPaletteStore = useCommandPaletteStore();
 const authStore = useAuthStore();
+const uiStore = useUIStore();
+const dropzone = ref<HTMLElement | null>(null);
+const mobileViewport = window.matchMedia('(max-width: 760px)');
+const isMobileViewport = ref(mobileViewport.matches);
+const mobileMenuButton = ref<HTMLButtonElement | null>(null);
+const mobileNavigationOpen = computed(() => isMobileViewport.value && !uiStore.sidebarCollapsed);
+const syncMobileViewport = () => { isMobileViewport.value = mobileViewport.matches; };
+const closeMobileNavigation = () => {
+  if (!mobileNavigationOpen.value) return;
+  // The sidebar already restores the desktop preference when leaving this
+  // breakpoint. Do not persist a phone drawer action as a desktop preference.
+  uiStore.sidebarCollapsed = true;
+  nextTick(() => mobileMenuButton.value?.focus({ preventScroll: true }));
+};
+const handleMobileNavigationClick = (event: MouseEvent) => {
+  if (event.target instanceof Element && event.target.closest('.visual-sidebar__primary, .visual-sidebar__brand')) closeMobileNavigation();
+};
+watch(mobileNavigationOpen, (open) => {
+  if (open) nextTick(() => dropzone.value?.querySelector<HTMLButtonElement>('.visual-sidebar__brand')?.focus({ preventScroll: true }));
+});
+watch(() => route.fullPath, closeMobileNavigation);
+onMounted(() => mobileViewport.addEventListener('change', syncMobileViewport));
+onUnmounted(() => mobileViewport.removeEventListener('change', syncMobileViewport));
 const showConsumerUpgradePrompt = useConsumerUpgradePrompt();
 let ismask = ref(false);
 const { t } = useI18n();

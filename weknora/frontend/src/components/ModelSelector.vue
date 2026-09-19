@@ -713,6 +713,9 @@ const updateSubmenuPlacement = () => {
 }
 
 const hoverOpen = (nextView: 'agents' | 'models' | 'reasoning') => {
+  // Touch browsers can synthesize mouseenter immediately before click.
+  // Let the click own the toggle so the first tap does not close it again.
+  if (window.matchMedia('(hover: none)').matches) return
   const task = ++hoverTask
   queueMicrotask(() => {
     if (task !== hoverTask) return
