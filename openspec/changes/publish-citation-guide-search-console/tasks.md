@@ -11,3 +11,5 @@
 - [x] 2.2 Verify no-JavaScript reading, desktop/mobile themes and language navigation in an isolated browser; complete delta review.
 - [x] 2.3 Publish through the separate approved storefront PR and verify public guide/assets/tag responses.
 - [ ] 2.4 Complete Search Console verification and sitemap submission; report actual status without claiming indexing or traffic in advance.
+
+- [ ] 2.5 Host an IndexNow ownership file and submit the newly updated public homepage, press page and bilingual guide once; record receipt separately from indexing.
