@@ -8,7 +8,7 @@
     "lint": "vite build",
     "preview:worker": "node scripts/preview-worker.mjs",
     "test": "npm run build && node --test --test-concurrency=1 src/components/heroMotion.test.js tests/*.test.js",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-citation-guide.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 3000"
   },
   "dependencies": {

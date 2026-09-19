@@ -9,7 +9,7 @@ export const MARKETING_NAVIGATION = Object.freeze([
 ]);
 
 export const MARKETING_FOOTER_GROUPS = Object.freeze([
-  Object.freeze({ title: "Product", links: Object.freeze([Object.freeze(["Features", "/#feature"]), Object.freeze(["Platform", "/#platform"]), Object.freeze(["Pricing", "/#pricing"]), Object.freeze(["Media kit", "/press"])]) }),
+  Object.freeze({ title: "Product", links: Object.freeze([Object.freeze(["Features", "/#feature"]), Object.freeze(["Platform", "/#platform"]), Object.freeze(["Pricing", "/#pricing"]), Object.freeze(["Media kit", "/press"]), Object.freeze(["Citation checks", "/guides/citation-checks"])]) }),
   Object.freeze({ title: "Trust", links: Object.freeze([Object.freeze(["FAQ", "/#faq"]), Object.freeze(["Security", "/security"]), Object.freeze(["Contact", "/contact"])]) }),
   Object.freeze({ title: "Legal", links: Object.freeze([Object.freeze(["Terms", "/terms"]), Object.freeze(["Privacy", "/privacy"]), Object.freeze(["Refunds", "/refund-policy"]), Object.freeze(["Subscription", "/subscription-policy"]), Object.freeze(["Cookies", "/cookies"])]) }),
 ]);
@@ -64,7 +64,7 @@ const MARKETING_COPY = Object.freeze({
       action: "Build my knowledge base",
     },
     footerGroups: [
-      { title: "Product", links: ["Features", "Platform", "Pricing", "Media kit"] },
+      { title: "Product", links: ["Features", "Platform", "Pricing", "Media kit", "Citation checks"] },
       { title: "Trust", links: ["FAQ", "Security", "Contact"] },
       { title: "Legal", links: ["Terms", "Privacy", "Refunds", "Subscription & cancellation", "Cookies"] },
     ],
@@ -118,7 +118,7 @@ const MARKETING_COPY = Object.freeze({
       action: "建立我的知识库",
     },
     footerGroups: [
-      { title: "产品", links: ["功能", "平台", "定价", "媒体资料"] },
+      { title: "产品", links: ["功能", "平台", "定价", "媒体资料", "引用核验"] },
       { title: "信任", links: ["常见问题", "安全", "联系"] },
       { title: "法律", links: ["服务条款", "隐私", "退款", "订阅与取消", "Cookie"] },
     ],

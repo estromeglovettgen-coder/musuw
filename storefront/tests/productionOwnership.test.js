@@ -9,7 +9,7 @@ test("production is built from the owned React application", () => {
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const output = readFileSync(join(root, "dist", "index.html"), "utf8");
 
-  assert.equal(packageJson.scripts.build, "vite build");
+  assert.equal(packageJson.scripts.build, "vite build && node scripts/prerender-citation-guide.mjs");
   assert.match(output, /<div id="root"><\/div>/);
   assert.doesNotMatch(output, /data-framer-generated-page|data-framer-bundle|MUSUW_BRANDING_START/);
 });

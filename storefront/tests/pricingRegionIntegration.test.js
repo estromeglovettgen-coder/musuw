@@ -26,7 +26,7 @@ test("the homepage price book follows each request's country across languages an
       Object.defineProperty(request, "cf", { value: { country } });
       const response = await handleRequest(request, env);
       const html = await response.text();
-      const bootstrap = html.match(/<script>(window\.__MUSUW_LOCALE__=[\s\S]*?)<\/script>/)?.[1];
+      const bootstrap = html.match(/<script id="musuw-locale-bootstrap">(window\.__MUSUW_LOCALE__=[\s\S]*?)<\/script>/)?.[1];
       assert.ok(bootstrap, "the Worker supplies the browser bootstrap");
       const browser = { window: { location: new URL(request.url) } };
       vm.runInNewContext(bootstrap, browser);
