@@ -25,7 +25,7 @@ export function openGraphLocale(locale) {
   return locale === "zh-CN" ? "zh_CN" : "en_US";
 }
 
-export function structuredData({ locale = "en", pathname = "/" } = {}) {
+export function structuredData({ locale = "en", pathname = "/", article } = {}) {
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -47,6 +47,18 @@ export function structuredData({ locale = "en", pathname = "/" } = {}) {
           ? {}
           : { mainEntityOfPage: canonicalUrl(pathname) }),
       },
+      ...(article ? [{
+        "@type": "Article",
+        "@id": `${canonicalUrl(pathname)}#article`,
+        headline: article.title,
+        description: article.meta.description,
+        image: `${SITE_ORIGIN}${article.image}`,
+        inLanguage: article.locale,
+        mainEntityOfPage: canonicalUrl(pathname),
+        author: { "@type": "Organization", name: "Musuw", url: `${SITE_ORIGIN}/` },
+        publisher: { "@id": `${SITE_ORIGIN}/#organization` },
+        isAccessibleForFree: true,
+      }] : []),
     ],
   };
 }

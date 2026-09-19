@@ -133,7 +133,7 @@ export default function App() {
       structured.type = "application/ld+json";
       document.head.appendChild(structured);
     }
-    structured.textContent = structuredDataText({ locale, pathname: normalizedPath });
+    structured.textContent = structuredDataText({ locale, pathname: normalizedPath, article });
   }, [article, alternateArticles, homeMeta, isHome, isPress, locale, pathname, publicDocument]);
 
   useEffect(() => {
