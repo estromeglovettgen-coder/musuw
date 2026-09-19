@@ -157,6 +157,24 @@ class UiReleaseScopeTest(unittest.TestCase):
                 self.assert_scope_rejects(self.run_scope(baseline, candidate))
                 baseline = candidate
 
+    def test_mobile_presentation_pins_allow_only_reviewed_content(self) -> None:
+        for path in (
+            "weknora/frontend/index.html",
+            "weknora/frontend/src/views/platform/index.vue",
+            "auth/src/styles.css",
+            "e2e/mobile-fixture-api.mjs",
+            "e2e/mobile-layout.md",
+        ):
+            with self.subTest(path=path):
+                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                reviewed = self.commit("reviewed mobile presentation")
+                self.assert_scope_passes(self.run_scope(self.base, reviewed))
+                self.write(path, "unreviewed content\n")
+                unreviewed = self.commit("unreviewed change to mobile presentation")
+                self.assert_scope_rejects(self.run_scope(reviewed, unreviewed))
+                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                self.commit("restore reviewed mobile presentation")
+
     def test_reviewed_path_still_rejects_symlink(self) -> None:
         link = self.repo / "auth/src/AuthShowcase.tsx"
         link.parent.mkdir(parents=True, exist_ok=True)

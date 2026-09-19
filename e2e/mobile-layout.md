@@ -51,3 +51,32 @@ Verification used Chromium viewport/touch emulation. It does not establish
 physical iPhone Safari keyboard behavior, full pixel equivalence for every
 desktop page, or production upload/payment behavior. No production data was
 changed during these layout checks.
+
+## Homepage, login and interaction follow-up
+
+- The homepage remains 430 CSS pixels wide without horizontal overflow. Theme,
+  language, billing-cycle and footer controls now have at least 44-pixel touch
+  targets. These overrides are restricted to the existing mobile breakpoint.
+- The login form at 430 pixels uses 16-pixel text in its 44-pixel input controls;
+  both inputs remain inside the viewport. Login logic is unchanged.
+- Touch emulation reproduced a failed first tap on the model/agent submenu:
+  synthetic mouseenter competed with the click toggle. The hover handler now
+  defers to click on devices without hover. The same first-tap assertion passed
+  after the change, and the model at the end of a 30-item list was selectable.
+- At 430 × 520, the previous model flyout started 58 pixels above the viewport.
+  The mobile flyout now stays inside its scrollable parent (top 12 pixels),
+  bounded by the measured space above the composer control.
+- At 390 × 844, all six batch actions remain visible inside the screen with
+  44-pixel height. Opening and cancelling deletion retained the selection.
+  Type/status filter options also have 44-pixel height.
+- Fresh local checks: 1227 frontend tests, 133 storefront tests and 100 auth
+  tests passed. Frontend type/build, storefront build and auth type/build passed.
+  Auth builds use the existing allowed localhost public origin and inert public
+  fixture configuration; an unsupported preview origin was rejected as designed.
+
+Release review covers only these presentation and touch-interaction changes.
+The deployment gate pins exact content for the viewport shell, auth stylesheet
+and local audit files; auth logic, payment/runtime paths and unreviewed edits
+remain rejected. The application candidate starts at the live production SHA
+`d0074e336d743cbc626d9a02050d58f0e2a19ea7`; existing release-policy-only main changes
+are retained on main and are not mislabeled as an application UI release.

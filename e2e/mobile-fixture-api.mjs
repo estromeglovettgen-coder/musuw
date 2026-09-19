@@ -16,6 +16,7 @@ const documents = Array.from({ length: 4 }, (_, n) => ({
 }))
 const session = { id: 'mobile-session', title: '如何整理我的学习资料？', created_at, updated_at: created_at }
 const model = { id: 'mobile-model', name: 'DeepSeek V4 Flash', type: 'KnowledgeQA', source: 'remote', is_default: true, status: 'active' }
+const models = [model, ...Array.from({ length: 29 }, (_, index) => ({ ...model, id: `layout-model-${index}`, name: `验收模型 ${index + 2}`, is_default: false }))]
 const agent = { id: 'mobile-agent', tenant_id: 42, name: '知识助手', description: '结合知识库回答问题，整理文档中的重要概念与来源。', created_by: 'mobile-user', is_builtin: false, created_at, updated_at: created_at, config: { model_id: model.id, kb_ids: [kb.id], agent_mode: 'quick-answer' } }
 const wiki = { id: 'mobile-wiki', slug: 'reading', title: '资料整理与阅读', page_type: 'concept', status: 'active', summary: '整理学习资料中的重要概念，建立可以查阅的知识体系。', content: '# 资料整理与阅读\n\n手机阅读也应保留完整的正文内容。\n\n## 整理步骤\n\n' + '先整理文件，再核对资料中的来源与重要概念。\n\n'.repeat(8), aliases: [], source_refs: [], in_links: [], out_links: [], page_metadata: {}, version: 1, created_at, updated_at: created_at }
 
@@ -53,8 +54,8 @@ createServer((req, res) => {
     { id: 'question-1', role: 'user', content: session.title, is_completed: true, created_at },
     { id: 'answer-1', role: 'assistant', content: '可以先按主题整理文件夹，再用搜索和标签找到需要的文档。\n\n## 整理步骤\n\n1. 上传资料到知识库。\n2. 按课程归档。\n3. 提问时核对文档来源。', is_completed: true, created_at },
   ])
-  if (path === '/models') return send([model])
-  if (path.startsWith('/models/scene-options/')) return send({ scene: path.split('/').at(-1), effective_model_id: model.id, options: [{ model_id: model.id, display_name: model.name, model_type: model.type, selectable: true, locked: false, required_plan: 'free', is_scene_default: true, is_effective: true }] })
+  if (path === '/models') return send(models)
+  if (path.startsWith('/models/scene-options/')) return send({ scene: path.split('/').at(-1), effective_model_id: model.id, options: models.map(item => ({ model_id: item.id, display_name: item.name, model_type: item.type, selectable: true, locked: false, required_plan: 'free', is_scene_default: item.is_default, is_effective: item.is_default })) })
   if (path === '/agents' || path === '/agents/accessible') return send([agent], { total: 1 })
   if (path === `/agents/${agent.id}`) return send(agent)
   if (path.endsWith('/suggested-questions')) return send({ questions: [] })

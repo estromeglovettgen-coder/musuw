@@ -131,7 +131,25 @@
   html .main.musuw-workspace-surface .visual-chat-composer__actions{ width: 100%; justify-content: flex-end; gap: 8px; }
   html .main.musuw-workspace-surface .visual-chat-composer__combined-picker{ max-width: calc(100% - 52px); min-height: 40px; }
   html .main.musuw-workspace-surface .visual-chat-composer__send{ width: 44px !important; height: 44px !important; }
-  html .main.musuw-workspace-surface .visual-chat-composer__model-menu{ max-width: calc(100vw - 24px); }
+  html .visual-chat-composer__overlay .visual-chat-composer__model-menu { max-height: var(--visual-mobile-menu-max-height, calc(100dvh - 32px)); overflow-y: auto; border-radius: 16px; overscroll-behavior: contain; }
+  html .visual-model-selector__chat-panel .visual-model-selector__chat-flyout { position: static; width: 100%; max-width: 100%; margin: 4px 0 0 !important; box-shadow: none; }
+
+  html .visual-model-selector__chat-panel .visual-model-selector__chat-row,
+  html .visual-model-selector__chat-panel .visual-model-selector__chat-option,
+  html body .visual-tag-filter-popup .visual-knowledge-filter-options .visual-knowledge-filter-option,
+  html .visual-tag-filter .visual-tag-filter__chip,
+  html .visual-mention-menu .visual-mention-group-entry,
+  html .visual-mention-menu .visual-mention-item,
+  html .visual-mention-menu .visual-mention-back { min-height: 44px !important; }
+  html .main.musuw-workspace-surface .visual-document-batch { flex-direction: column; align-items: stretch; overflow: visible; }
+  html .main.musuw-workspace-surface .visual-document-batch__summary { justify-content: space-between; }
+  html .main.musuw-workspace-surface .visual-document-batch__actions { flex-wrap: wrap; justify-content: flex-start; }
+  html .main.musuw-workspace-surface .visual-document-batch__button,
+  html .main.musuw-workspace-surface .visual-document-batch__clear { min-height: 44px; }
+  html .visual-batch-modal .visual-batch-modal__header > button { width: 44px; height: 44px; }
+  html .visual-batch-modal .visual-batch-modal__select-all,
+  html .visual-batch-modal .visual-batch-modal__cancel,
+  html .visual-batch-modal .visual-batch-modal__delete { min-height: 44px; }
 
   /* Wiki keeps its existing list/reader; stack them on a phone. */
   html .main.musuw-workspace-surface .wiki-browser { flex-direction: column; }

@@ -768,6 +768,10 @@ button {
 }
 
 @media (max-width: 520px) {
+  .auth-form input {
+    font-size: 16px;
+  }
+
   .auth-panel {
     align-items: flex-start;
     padding: 28px 20px 36px;

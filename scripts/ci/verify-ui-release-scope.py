@@ -16,6 +16,12 @@ PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscr
 # Pin content, not just sensitive filenames: later edits need a fresh review.
 # The two documentation entries also include this clarification of the policy.
 REVIEWED_UI_CONTENT = {
+    # Mobile presentation audit: exact content only; no auth/runtime authority.
+    'weknora/frontend/index.html': {"a0a1fda49e3226a5e064bf9599c24b6a8a1356a2"},
+    'weknora/frontend/src/views/platform/index.vue': {"b7476b5d28ea173f636e78895da68de26a356e57"},
+    'auth/src/styles.css': {"576975befbf82c9ad56037bed4f342e4f36893d6"},
+    'e2e/mobile-fixture-api.mjs': {"2c550eb1ecc0cdaff57116b0c57d5098a757c05a"},
+    'e2e/mobile-layout.md': {"c9cab2602a173549b4c190dc9c856b18990316ad"},
     "weknora/frontend/src/hooks/useKnowledgeBase.ts": {"f61ae64f29f66e34c30734af13ad144914c7d887"},
     ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525"},
     ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe"},
