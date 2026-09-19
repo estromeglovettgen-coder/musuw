@@ -42,7 +42,9 @@ test("media kit offers eight opt-in videos, caption files, public downloads, and
     assert.ok(html.includes(`href="${locale === "en" ? "" : "/zh"}/guides/citation-checks"`));
     assert.match(html, /href="\/#pricing"/);
     assert.match(html, /href="mailto:support@didren\.com"/);
-    assert.match(html, /href="\/press">(?:Media kit|媒体资料)<\/a>/);
+    const footer = html.match(/<footer class="site-footer">[\s\S]*?<\/footer>/)?.[0];
+    assert.ok(footer);
+    assert.doesNotMatch(footer, /href="\/(?:press|(?:zh\/)?guides\/|(?:zh\/)?compare\/)/);
     assert.ok(html.includes(locale === "en" ? "not live recordings" : "并非实机录屏"));
     const downloadPaths = [...html.matchAll(/href="([^"]+)"[^>]*\bdownload=""/g)].map((match) => match[1]);
     assert.equal(new Set(downloadPaths).size, 28);
