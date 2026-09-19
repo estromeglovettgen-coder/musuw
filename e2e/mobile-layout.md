@@ -77,6 +77,9 @@ changed during these layout checks.
 Release review covers only these presentation and touch-interaction changes.
 The deployment gate pins exact content for the viewport shell, auth stylesheet
 and local audit files; auth logic, payment/runtime paths and unreviewed edits
-remain rejected. The application candidate starts at the live production SHA
-`d0074e336d743cbc626d9a02050d58f0e2a19ea7`; existing release-policy-only main changes
-are retained on main and are not mislabeled as an application UI release.
+remain rejected. The application diff starts at live production SHA
+`d0074e336d743cbc626d9a02050d58f0e2a19ea7`. Main commit `b587a89d` contains only
+the exact delivery policy already used by production run `35459344687`. Those
+unchanged policy blobs are pinned separately from application UI behavior; later
+policy edits still fail the gate. The normal main-only staging restriction,
+production reviewer, immutable image checks and rollback remain in force.

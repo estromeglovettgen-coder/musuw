@@ -13,17 +13,22 @@ ROOT = {"e2e/knowledge-folder-actions.spec.ts", "e2e/knowledge-toolbar.spec.ts",
 PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscription", "auth", "openrouter", "locks", "buildruntimeconfig", "build-runtime-config")
 
 # Reviewed presentation fixes and their accompanying files, including loading feedback.
+# Delivery-policy blobs from b587a89d already governed production run 35459344687;
+# carrying that identical policy forward adds no application model/runtime change.
 # Pin content, not just sensitive filenames: later edits need a fresh review.
 # The two documentation entries also include this clarification of the policy.
 REVIEWED_UI_CONTENT = {
+    "scripts/ci/verify-reviewed-model-release.test.py": {"2bb3840cce83cb2c8d47ccfc2b5b7f5b2ef05898"},
+    "scripts/ci/verify-reviewed-model-release.py": {"2c45c6d2fa40a70f1cc1f3fe56e58009b5e78df1"},
+    "docs/MODEL_RELEASE_20260919.md": {"fa7fd465fc253a5781c8e3db700cc23fc3cc2373"},
     # Mobile presentation audit: exact content only; no auth/runtime authority.
     'weknora/frontend/index.html': {"a0a1fda49e3226a5e064bf9599c24b6a8a1356a2"},
     'weknora/frontend/src/views/platform/index.vue': {"b7476b5d28ea173f636e78895da68de26a356e57"},
     'auth/src/styles.css': {"576975befbf82c9ad56037bed4f342e4f36893d6"},
     'e2e/mobile-fixture-api.mjs': {"2c550eb1ecc0cdaff57116b0c57d5098a757c05a"},
-    'e2e/mobile-layout.md': {"c9cab2602a173549b4c190dc9c856b18990316ad"},
+    "e2e/mobile-layout.md": {"d8ccce7a55b6383234c60589835e2170cf0a8fff"},
     "weknora/frontend/src/hooks/useKnowledgeBase.ts": {"f61ae64f29f66e34c30734af13ad144914c7d887"},
-    ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525"},
+    ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525", "a5971dec25b35056d796eec3c79cffd11382fc16"},
     ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe"},
     "README.md": {"32bfedf673e7951d615dc231ce12867a218be613"},
     "auth/e2e/background-stability.spec.ts": {"5259bb88fe9802ab6bb04ae72b7fb7664ad9e91e"},
@@ -31,15 +36,15 @@ REVIEWED_UI_CONTENT = {
     "auth/src/AuthApp.test.ts": {"81938fa219bd30d2c1ad492292f393e4bac2445d"},
     "auth/src/AuthShowcase.tsx": {"96c26a6ca16ba0b5025921be26fe6765deb3592c"},
     "auth/src/LiquidEther.tsx": {"e6032911a35297b85d21dd76046d04e314ce3483"},
-    "docs/DEPLOYMENT.md": {"eab3ccb887935df15ec3ea42f34cc52bdecb2b58"},
+    "docs/DEPLOYMENT.md": {"eab3ccb887935df15ec3ea42f34cc52bdecb2b58", "0d21e1bf823277c1f12fd6ad0f13dc48b4d7195f"},
     "docs/STAGING_OPERATIONS.md": {"f2d98dfe3b6176b3f7837f0d1fafbf664f6acb19", "39a5adb3c9a9912a73b7e25bbd8f3dbc5839b863"},
     "e2e/billing-entitlement.spec.ts": {"a00142228e37eb0a8c136eabbda3bd01628c9eee"},
     "e2e/knowledge-upload.spec.ts": {"6272624c5bedf75c5cbbc2b0b72a969e960f37c5", "d519786e0a34e234dcfb2357fa5b673181388a9e"},
     "openspec/changes/deploy-isolated-staging/specs/sandbox-billing-release-gate/spec.md": {"5f89c66ff9261991a42692d8f8f16988c6fc5174", "4eb0d34d0f96341f4e55ae8913c987e0a8e02294"},
     "playwright.billing.config.ts": {"0af6c9ab3d45b26da9a2ad5b0517b0a7d4b64fe0"},
     "playwright.knowledge-upload.config.ts": {"fad968652432f48a144489a70c23b3967030c1a5", "0bb47d368da4d1c558eab3ce0db1cc1e210fc9db", "bde962ce72910dae6b2f618a5b6ba53c6104fc9c", "d44879f4afbe340c02c859ce4f3f82458db94e31"},
-    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af"},
-    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb"},
+    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af", "72062480c9e6a49c3a2dd50d5935b98436e7021a"},
+    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb", "fb779bfd40c16055266bc42ceacc47bbe4df3481"},
     "third_party/weknora/v0.7.2-provenance.json": {"59de0f2d7797ce39b91b0d5db709ac316a2a1876", "601fb80639787f1a3ba6ab43d533608d757fada8", "8735c066f0119c55670bfa512216924ff21c8675", "a433c0d10542e136e68051a318c66d23e055bfad", "e1361c776a4e15ffb2572fe957177202055f3dcf", "161811eafbf08d8f2e76fdfc8b23b0a076b46d8b"},
     "weknora/frontend/e2e/billing-harness.html": {"51526a1a4a971fb3e9393658944c04cf5819cee9"},
     "weknora/frontend/e2e/billing-harness.ts": {"d04631889c795e31a0b3b02a222de4e2bf464d07"},
