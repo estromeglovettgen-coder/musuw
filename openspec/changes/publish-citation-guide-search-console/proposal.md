@@ -8,6 +8,7 @@ Knowledge workers need a short, checkable example of reviewing AI citations. The
 - Reuse existing navigation, theme and metadata; add sitemap entries, reciprocal language links and one footer entry.
 - Include a 40-second actual product recording with English/Chinese captions, one fictional-example screenshot and three original Markdown source downloads, with the existing public Gist as an optional mirror.
 - Preserve the public Google verification tag through Worker localization.
+- Add one concise bilingual Musuw/Gemini Notebook comparison with cited official documentation, a real demo and current pricing links, using the same static article pipeline.
 
 ## Impact
 

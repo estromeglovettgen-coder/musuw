@@ -2,6 +2,7 @@ import { getStorefrontCopy, localePreferenceCookie } from "../src/i18n.js";
 import { getPublicDocumentMeta } from "../src/legalContent.js";
 import { getPressMeta } from "../src/pressContent.js";
 import { CITATION_GUIDES, getCitationGuide } from "../src/citationGuideContent.js";
+import { NOTEBOOK_COMPARISONS, getNotebookComparison } from "../src/notebookComparisonContent.js";
 import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
 import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
 import { normalizeCountry } from "../src/pricingLocalization.js";
@@ -49,8 +50,9 @@ function normalizeDocumentPath(pathname) {
 function withDocumentLocale(html, locale, pathname = "/", country = "") {
   const copy = getStorefrontCopy(locale);
   const normalizedPath = normalizeDocumentPath(pathname);
-  const guide = getCitationGuide(normalizedPath);
-  const pageMeta = guide?.meta ?? getPublicDocumentMeta(locale, normalizedPath) ?? getPressMeta(locale, normalizedPath);
+  const comparison = getNotebookComparison(normalizedPath);
+  const article = getCitationGuide(normalizedPath) ?? comparison;
+  const pageMeta = article?.meta ?? getPublicDocumentMeta(locale, normalizedPath) ?? getPressMeta(locale, normalizedPath);
   const isHome = normalizedPath === "/";
   const meta =
     pageMeta ??
@@ -123,8 +125,8 @@ function withDocumentLocale(html, locale, pathname = "/", country = "") {
     /<link\s+rel=["']canonical["']\s+href=["'][^"']*["']\s*\/?\s*>/i,
     `<link rel="canonical" href="${escapeAttribute(pageUrl)}">`,
   );
-  if (guide) {
-    for (const alternate of Object.values(CITATION_GUIDES)) {
+  if (article) {
+    for (const alternate of Object.values(comparison ? NOTEBOOK_COMPARISONS : CITATION_GUIDES)) {
       localizedHtml = upsertHead(
         localizedHtml,
         new RegExp(`<link\\s+rel=["']alternate["']\\s+hreflang=["']${alternate.locale}["'][^>]*>`, "i"),
@@ -149,10 +151,10 @@ export async function localizeDocumentResponse(
   hostname = "musuw.com",
   country = "",
 ) {
-  const normalizedLocale = getCitationGuide(pathname)?.locale ?? (locale === "zh-CN" ? "zh-CN" : "en");
+  const normalizedLocale = getCitationGuide(pathname)?.locale ?? getNotebookComparison(pathname)?.locale ?? (locale === "zh-CN" ? "zh-CN" : "en");
   const normalizedPath = normalizeDocumentPath(pathname);
   const knownDocument =
-    normalizedPath === "/" || Boolean(getCitationGuide(normalizedPath) ?? getPublicDocumentMeta(normalizedLocale, normalizedPath) ?? getPressMeta(normalizedLocale, normalizedPath));
+    normalizedPath === "/" || Boolean(getCitationGuide(normalizedPath) ?? getNotebookComparison(normalizedPath) ?? getPublicDocumentMeta(normalizedLocale, normalizedPath) ?? getPressMeta(normalizedLocale, normalizedPath));
   const headers = new Headers(assetResponse.headers);
   headers.set("content-language", normalizedLocale);
   headers.set("cache-control", "private, no-store");

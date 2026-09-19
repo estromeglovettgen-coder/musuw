@@ -31,3 +31,13 @@ The owner-supplied Google site verification meta tag SHALL be present exactly on
 - **WHEN** an unauthenticated client requests a localized homepage or guide
 - **THEN** the response head contains the exact approved public verification token
 - **AND** no client execution is required to read it.
+
+### Requirement: Concise, sourced buying comparison
+The storefront SHALL offer a concise comparison at `/compare/notebooklm` and `/zh/compare/notebooklm`. The comparison SHALL distinguish actual Musuw workflows from Google capabilities documented by official sources. It SHALL NOT claim a performance benchmark, unsupported superiority, fabricated customers, or future model availability.
+
+#### Scenario: A buyer compares workflows
+- **WHEN** a reader opens either comparison URL
+- **THEN** a complete, fixed-language article with self-canonical and reciprocal language metadata is available before JavaScript runs
+- **AND** the reader can open the actual Musuw demonstration, current plan page and linked official sources
+- **AND** the page identifies its Musuw authorship and evidence date, with mobile table overflow contained inside a keyboard-accessible region
+- **AND** footer links and the sitemap make both variants discoverable.

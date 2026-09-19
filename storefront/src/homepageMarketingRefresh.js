@@ -9,7 +9,7 @@ export const MARKETING_NAVIGATION = Object.freeze([
 ]);
 
 export const MARKETING_FOOTER_GROUPS = Object.freeze([
-  Object.freeze({ title: "Product", links: Object.freeze([Object.freeze(["Features", "/#feature"]), Object.freeze(["Platform", "/#platform"]), Object.freeze(["Pricing", "/#pricing"]), Object.freeze(["Media kit", "/press"]), Object.freeze(["Citation checks", "/guides/citation-checks"])]) }),
+  Object.freeze({ title: "Product", links: Object.freeze([Object.freeze(["Features", "/#feature"]), Object.freeze(["Platform", "/#platform"]), Object.freeze(["Pricing", "/#pricing"]), Object.freeze(["Media kit", "/press"]), Object.freeze(["Citation checks", "/guides/citation-checks"]), Object.freeze(["Compare tools", "/compare/notebooklm"])]) }),
   Object.freeze({ title: "Trust", links: Object.freeze([Object.freeze(["FAQ", "/#faq"]), Object.freeze(["Security", "/security"]), Object.freeze(["Contact", "/contact"])]) }),
   Object.freeze({ title: "Legal", links: Object.freeze([Object.freeze(["Terms", "/terms"]), Object.freeze(["Privacy", "/privacy"]), Object.freeze(["Refunds", "/refund-policy"]), Object.freeze(["Subscription", "/subscription-policy"]), Object.freeze(["Cookies", "/cookies"])]) }),
 ]);
