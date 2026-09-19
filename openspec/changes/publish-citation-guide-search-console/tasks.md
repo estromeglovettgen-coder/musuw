@@ -9,5 +9,5 @@
 
 - [x] 2.1 Pass complete storefront build/tests and actual local Worker checks for plain HTML body, fixed language, source downloads and metadata.
 - [x] 2.2 Verify no-JavaScript reading, desktop/mobile themes and language navigation in an isolated browser; complete delta review.
-- [ ] 2.3 Publish through the separate approved storefront PR and verify public guide/assets/tag responses.
+- [x] 2.3 Publish through the separate approved storefront PR and verify public guide/assets/tag responses.
 - [ ] 2.4 Complete Search Console verification and sitemap submission; report actual status without claiming indexing or traffic in advance.
