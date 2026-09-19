@@ -75,6 +75,7 @@ test("site verification survives localization and unknown guide URLs remain 404"
       const html = await response.text();
       assert.equal(response.status, path.endsWith("missing") ? 404 : 200);
       assert.equal((html.match(/name="google-site-verification" content="vS9ylGV6pFQKk3FgNEpR0o9jKV--P_Gnrv4M8rHDNus"/g) ?? []).length, 1);
+      assert.equal((html.match(/name="google-site-verification" content="7lQwhi1oEZApp6nxmYt0FYHmfTn226ffpQH4ZTMAYHc"/g) ?? []).length, 1);
       if (path.endsWith("missing")) assert.match(html, /name="robots" content="noindex,follow"/);
     }
   }
