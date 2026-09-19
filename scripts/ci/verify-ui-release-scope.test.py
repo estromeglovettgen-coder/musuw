@@ -117,12 +117,17 @@ class UiReleaseScopeTest(unittest.TestCase):
             "auth/src/LiquidEther.tsx",
             "auth/e2e/background-stability.spec.ts",
             "e2e/billing-entitlement.spec.ts",
-            ".github/workflows/deploy-production.yml",
             "docs/STAGING_OPERATIONS.md",
         ):
             self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
         candidate = self.commit("reviewed UI and delivery content")
         self.assert_scope_passes(self.run_scope(self.base, candidate))
+
+    def test_model_release_workflow_is_not_a_ui_only_change(self) -> None:
+        path = ".github/workflows/deploy-production.yml"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        candidate = self.commit("model acceptance policy requires its own release review")
+        self.assert_scope_rejects(self.run_scope(self.base, candidate))
 
     def test_reviewed_paths_reject_unreviewed_content_and_deletion(self) -> None:
         baseline = self.base

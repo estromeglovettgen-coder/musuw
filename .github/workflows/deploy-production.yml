@@ -35,8 +35,9 @@ on:
           - not-confirmed
           - full-sandbox-e2e-green
           - ui-regression-green
+          - reviewed-model-release
       ui_base_sha:
-        description: Current production release SHA, verified by the production reviewer; required only for UI acceptance
+        description: Current production release SHA, verified by the production reviewer; required for scoped UI or reviewed model acceptance
         required: false
         type: string
 
@@ -95,6 +96,7 @@ jobs:
           EVENT_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           REQUESTED_RELEASE_MODE: ${{ inputs.release_mode }}
           REQUESTED_STAGING_E2E_RESULT: ${{ inputs.staging_e2e_result }}
+          REQUESTED_STAGING_RUN_ID: ${{ inputs.staging_run_id }}
           UI_BASE_SHA: ${{ inputs.ui_base_sha }}
           EVENT_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
@@ -112,7 +114,7 @@ jobs:
             ci_workflow_run="$EVENT_WORKFLOW_RUN_ID"
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
             case "$REQUESTED_RELEASE_MODE:$REQUESTED_STAGING_E2E_RESULT" in
-              staging-only:not-confirmed|promote:full-sandbox-e2e-green|promote:ui-regression-green) ;;
+              staging-only:not-confirmed|promote:full-sandbox-e2e-green|promote:ui-regression-green|promote:reviewed-model-release) ;;
               *) printf '%s\n' 'release_mode must be staging-only or promote, and promotion requires an explicit completed acceptance result' >&2; exit 1 ;;
             esac
             if [ "$REQUESTED_RELEASE_MODE" = promote ]; then
@@ -161,7 +163,7 @@ jobs:
                 }
             fi
           fi
-          if [ "$REQUESTED_STAGING_E2E_RESULT" = ui-regression-green ]; then
+          if [ "$REQUESTED_STAGING_E2E_RESULT" = ui-regression-green ] || [ "$REQUESTED_STAGING_E2E_RESULT" = reviewed-model-release ]; then
             # Resolve the actual app SHA from the latest successful production
             # release artifact. A dispatch revision may contain newer policy.
             [[ "$UI_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -181,9 +183,15 @@ jobs:
               "$baseline_dir/musuw-production-release-manifest.json" >/dev/null
             # Load the scope policy from the trusted dispatch revision, not the
             # older application revision whose accepted images are promoted.
-            git show "$EVENT_SHA:scripts/ci/verify-ui-release-scope.py" > "$RUNNER_TEMP/verify-ui-release-scope.py"
-            python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$actual"
-            printf 'UI regression accepted: production baseline %s -> release %s\n' "$UI_BASE_SHA" "$actual" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$REQUESTED_STAGING_E2E_RESULT" = ui-regression-green ]; then
+              git show "$EVENT_SHA:scripts/ci/verify-ui-release-scope.py" > "$RUNNER_TEMP/verify-ui-release-scope.py"
+              python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$actual"
+              printf 'UI regression accepted: production baseline %s -> release %s\n' "$UI_BASE_SHA" "$actual" >> "$GITHUB_STEP_SUMMARY"
+            else
+              git show "$EVENT_SHA:scripts/ci/verify-reviewed-model-release.py" > "$RUNNER_TEMP/verify-reviewed-model-release.py"
+              python3 "$RUNNER_TEMP/verify-reviewed-model-release.py" "$actual" "$UI_BASE_SHA" "$REQUESTED_STAGING_RUN_ID"
+              printf 'Owner-requested reviewed model release: %s -> %s; full Sandbox E2E NOT claimed.\n' "$UI_BASE_SHA" "$actual" >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
           {
             printf 'release_sha=%s\n' "$actual"
@@ -691,7 +699,7 @@ jobs:
       needs.deploy-staging.result == 'success' &&
       github.event_name == 'workflow_dispatch' &&
       inputs.release_mode == 'promote' &&
-      (inputs.staging_e2e_result == 'full-sandbox-e2e-green' || inputs.staging_e2e_result == 'ui-regression-green')
+      (inputs.staging_e2e_result == 'full-sandbox-e2e-green' || inputs.staging_e2e_result == 'ui-regression-green' || inputs.staging_e2e_result == 'reviewed-model-release')
     environment: server-production
     permissions:
       contents: read

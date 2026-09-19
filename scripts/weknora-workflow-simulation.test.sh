@@ -20,6 +20,8 @@ grep -Fq '          - full-sandbox-e2e-green' "$workflow_path" || fail 'full San
 grep -Fq '          - ui-regression-green' "$workflow_path" || fail 'scoped UI acceptance is missing'
 grep -Fq 'python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$actual"' "$workflow_path" || fail 'UI acceptance lacks a source scope guard'
 python3 "$script_dir/ci/verify-ui-release-scope.test.py"
+grep -Fq 'python3 "$RUNNER_TEMP/verify-reviewed-model-release.py" "$actual" "$UI_BASE_SHA" "$REQUESTED_STAGING_RUN_ID"' "$workflow_path" || fail 'reviewed model acceptance lacks its exact release guard'
+python3 "$script_dir/ci/verify-reviewed-model-release.test.py"
 if grep -Eq '^[[:space:]]*- full$' "$workflow_path"; then
     fail 'unsupported full release mode remains in the workflow'
 fi
