@@ -129,6 +129,12 @@ class UiReleaseScopeTest(unittest.TestCase):
         self.assert_scope_passes(self.run_scope(self.base, candidate))
 
     def test_previously_applied_delivery_policy_is_exactly_pinned(self) -> None:
+        historical_sources = {
+            "scripts/ci/verify-reviewed-model-release.py":
+                "ui-release-reviewed-model-guard.txt",
+            "scripts/ci/verify-reviewed-model-release.test.py":
+                "ui-release-reviewed-model-guard-test.txt",
+        }
         for path in (
             ".github/workflows/deploy-production.yml", "docs/DEPLOYMENT.md",
             "docs/MODEL_RELEASE_20260919.md", "scripts/ci/validate-workflows.rb",
@@ -137,13 +143,23 @@ class UiReleaseScopeTest(unittest.TestCase):
             "scripts/weknora-workflow-simulation.test.sh",
         ):
             with self.subTest(path=path):
-                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                source = SOURCE_ROOT / path
+                if path in historical_sources:
+                    # Freeze the policy already accepted by the UI allowlist;
+                    # this pending agent exception must not expand that scope.
+                    source = SCRIPT.parent / "fixtures" / historical_sources[path]
+                original = source.read_text(encoding="utf-8")
+                self.write(path, original)
                 reviewed = self.commit("retain policy already used for live production")
                 self.assert_scope_passes(self.run_scope(self.base, reviewed))
+                if path in historical_sources:
+                    self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                    current_policy = self.commit("proposed model policy needs separate review")
+                    self.assert_scope_rejects(self.run_scope(reviewed, current_policy))
                 self.write(path, "unreviewed release policy\n")
                 candidate = self.commit("future policy change still requires review")
                 self.assert_scope_rejects(self.run_scope(reviewed, candidate))
-                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                self.write(path, original)
                 self.commit("restore reviewed policy")
 
     def test_reviewed_paths_reject_unreviewed_content_and_deletion(self) -> None:
