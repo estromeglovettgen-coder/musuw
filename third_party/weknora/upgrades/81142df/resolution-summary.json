@@ -7,9 +7,9 @@
   "unionPaths": 1601,
   "counts": {
     "adapt-musuw-for-target": 173,
-    "adapt-upstream-for-musuw": 97,
+    "adapt-upstream-for-musuw": 98,
     "adopt-upstream-deletion": 4,
-    "adopt-upstream-exact": 745,
+    "adopt-upstream-exact": 744,
     "append-upstream-migration": 42,
     "compose-three-way": 151,
     "preserve-musuw-deletion": 25,
