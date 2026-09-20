@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestAllShippedAgentDefaultsUseTenIterations(t *testing.T) {
+func TestAllShippedAgentDefaultsUseFiftyIterations(t *testing.T) {
 	builtinPath := filepath.Join("..", "..", "config", "builtin_agents.yaml")
 	builtinData, err := os.ReadFile(builtinPath)
 	require.NoError(t, err)
@@ -19,8 +19,8 @@ func TestAllShippedAgentDefaultsUseTenIterations(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(builtinData, &builtins))
 	require.NotEmpty(t, builtins.BuiltinAgents)
 	for _, entry := range builtins.BuiltinAgents {
-		assert.Equalf(t, 10, entry.Config.MaxIterations,
-			"builtin agent %s must default to ten iterations", entry.ID)
+		assert.Equalf(t, 50, entry.Config.MaxIterations,
+			"builtin agent %s must default to fifty iterations", entry.ID)
 	}
 
 	presetPath := filepath.Join("..", "..", "config", "agent_type_presets.yaml")
@@ -34,8 +34,8 @@ func TestAllShippedAgentDefaultsUseTenIterations(t *testing.T) {
 		if entry.Config == nil {
 			continue
 		}
-		assert.Equalf(t, 10, entry.Config.MaxIterations,
-			"agent type preset %s must default to ten iterations", entry.ID)
+		assert.Equalf(t, 50, entry.Config.MaxIterations,
+			"agent type preset %s must default to fifty iterations", entry.ID)
 	}
 }
 

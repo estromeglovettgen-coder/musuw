@@ -220,12 +220,12 @@ if !state.IsComplete && ctx.Err() == nil {
 
 最大迭代次数的多层默认值：
 
-- 引擎级默认 `DefaultAgentMaxIterations = 10`（`internal/agent/const.go`）；
-- 服务层 `ValidateConfig`：`<= 0` 时兜底为 10，硬上限 `MAX_ITERATIONS = 100`（`internal/application/service/agent_service.go`）；
-- `CustomAgent.EnsureDefaults`：未配置时为 10（`internal/types/custom_agent.go`）;
-- 内置 Agent 与 Agent 类型预设统一默认 10（`config/builtin_agents.yaml`、`config/agent_type_presets.yaml`）。
+- 引擎级默认 `DefaultAgentMaxIterations = 50`（`internal/agent/const.go`）；
+- 服务层 `ValidateConfig`：`<= 0` 时兜底为 50，硬上限 `MAX_ITERATIONS = 100`（`internal/application/service/agent_service.go`）；
+- `CustomAgent.EnsureDefaults`：未配置时为 50（`internal/types/custom_agent.go`）;
+- 内置 Agent 与 Agent 类型预设统一默认 50（`config/builtin_agents.yaml`、`config/agent_type_presets.yaml`）。
 
-达到上限后 `handleMaxIterations` 会用一个专门的合成 prompt（`internal/agent/finalize.go`）把全部工具结果作为 user 消息喂给 LLM 生成完整答案（合成阶段关闭 thinking），若检索结果含 Markdown 图片还会附加图片输出要求。
+达到上限后 `handleMaxIterations` 会用一个专门的合成 prompt（`internal/agent/finalize.go`）把全部工具结果作为 user 消息喂给 LLM 生成完整答案。合成阶段沿用上游 v0.8.0，不传入用户的 `Thinking` 和 `ReasoningEffort`，由模型适配层采用默认行为，并非显式关闭思考。若检索结果含 Markdown 图片还会附加图片输出要求。最终整理及其输出预算规则的来源、兼容差异和已知边界见仓库根目录 `third_party/weknora/final-synthesis-v080.md`。
 
 ### 2.4 ReAct 循环流程图
 
@@ -492,10 +492,10 @@ smart-reasoning 下还可选**类型预设**（`Config.AgentType`，定义在 `c
 
 | 预设 ID | 系统提示词模板 | 温度 | 最大迭代 | 预填工具 | KB 过滤 |
 | --- | --- | --- | --- | --- | --- |
-| `rag-qa` | `progressive_rag_agent` | 0.7 | 30 | knowledge_search、grep_chunks、list_knowledge_chunks、get_document_info | 由工具派生：any_of vector/keyword |
-| `wiki-qa` | `wiki_researcher` | 0.7 | 30 | wiki_search、wiki_read_page、wiki_read_source_doc、wiki_flag_issue | 由工具派生：any_of wiki |
-| `hybrid-rag-wiki` | `hybrid_rag_wiki_agent` | 0.7 | 40 | wiki_search、wiki_read_page、knowledge_search、grep_chunks、list_knowledge_chunks、get_document_info、wiki_flag_issue | any_of vector/keyword/wiki |
-| `data-analysis` | `data_analyst` | 0.3 | 30 | data_schema、data_analysis；关闭 web 搜索；限定文件类型 csv/xlsx | 显式 `none_of: [faq]` |
+| `rag-qa` | `progressive_rag_agent` | 0.7 | 50 | knowledge_search、grep_chunks、list_knowledge_chunks、get_document_info | 由工具派生：any_of vector/keyword |
+| `wiki-qa` | `wiki_researcher` | 0.7 | 50 | wiki_search、wiki_read_page、wiki_read_source_doc、wiki_flag_issue | 由工具派生：any_of wiki |
+| `hybrid-rag-wiki` | `hybrid_rag_wiki_agent` | 0.7 | 50 | wiki_search、wiki_read_page、knowledge_search、grep_chunks、list_knowledge_chunks、get_document_info、wiki_flag_issue | any_of vector/keyword/wiki |
+| `data-analysis` | `data_analyst` | 0.3 | 50 | data_schema、data_analysis；关闭 web 搜索；限定文件类型 csv/xlsx | 显式 `none_of: [faq]` |
 | `custom` | 无 | — | — | 不预填 | 不限制 |
 
 注意 `thinking` / `todo_write` 被有意排除在各预设默认工具之外（token 开销大，需要时手动勾选）。
@@ -511,7 +511,7 @@ smart-reasoning 下还可选**类型预设**（`Config.AgentType`，定义在 `c
 | 基础 | `system_prompt` / `system_prompt_id` | 直接内容或模板 ID（启动时经 `ResolveBuiltinAgentPromptRefs` 等解析） |
 | 基础 | `context_template` / `context_template_id` | 普通模式下检索片段的拼装模板 |
 | 模型 | `model_id`、`rerank_model_id`、`temperature`、`max_completion_tokens`、`thinking`、`citation_enabled` | temperature<0 → 0.7；max_completion_tokens 默认 2048；thinking 未设时固定为 false；citation 未设时视为 true |
-| Agent | `max_iterations` | 默认 10（服务层上限 100） |
+| Agent | `max_iterations` | 默认 50（服务层上限 100） |
 | Agent | `llm_call_timeout` | 单次 LLM 调用秒数，0 用全局默认（120s） |
 | Agent | `allowed_tools` | 工具白名单；空回退 DefaultAllowedTools |
 | MCP | `mcp_selection_mode`（all/selected/none）、`mcp_services`、`mcp_auth_wait_timeout` | OAuth 等待秒数 <=0 用 Gate 默认 |
@@ -547,9 +547,9 @@ Handler 层（`internal/handler/custom_agent.go`）提供 `CreateAgent`、`GetAg
 | ID | 名称（zh-CN） | agent_mode / agent_type | 关键配置 |
 | --- | --- | --- | --- |
 | `builtin-quick-answer` | 快速问答 | `quick-answer` | 模板 `default_kb` + `default_context`；temperature 0.7；FAQ 优先（直接回答阈值 0.9、加权 1.2）；query expansion + rewrite；web 搜索开、5 条；不进 Agent 引擎 |
-| `builtin-smart-reasoning` | 智能推理 | `smart-reasoning` / `rag-qa` | `max_iterations: 10`；工具：knowledge_search、grep_chunks、list_knowledge_chunks、query_knowledge_graph、get_document_info；web 搜索开；多轮 5 轮 |
-| `builtin-data-analyst` | 数据分析师 | `smart-reasoning` / `data-analysis` | 模板 `data_analyst`；temperature 0.3；`max_iterations: 10`；工具仅 data_schema + data_analysis；限定 csv/xlsx；关闭 web 搜索；历史 10 轮 |
-| `builtin-wiki-researcher` | 维基问答 | `smart-reasoning` / `wiki-qa` | 模板 `wiki_researcher`；`max_iterations: 10`；工具：wiki_search、wiki_read_page、wiki_read_source_doc、wiki_flag_issue（只读 + 报障）；关闭 web 搜索 |
+| `builtin-smart-reasoning` | 智能推理 | `smart-reasoning` / `rag-qa` | `max_iterations: 50`；工具：knowledge_search、grep_chunks、list_knowledge_chunks、query_knowledge_graph、get_document_info；web 搜索开；多轮 5 轮 |
+| `builtin-data-analyst` | 数据分析师 | `smart-reasoning` / `data-analysis` | 模板 `data_analyst`；temperature 0.3；`max_iterations: 50`；工具仅 data_schema + data_analysis；限定 csv/xlsx；关闭 web 搜索；历史 10 轮 |
+| `builtin-wiki-researcher` | 维基问答 | `smart-reasoning` / `wiki-qa` | 模板 `wiki_researcher`；`max_iterations: 50`；工具：wiki_search、wiki_read_page、wiki_read_source_doc、wiki_flag_issue（只读 + 报障）；关闭 web 搜索 |
 | `builtin-wiki-fixer` | 维基修订 | `smart-reasoning` / `custom` | 模板 `wiki_fixer`；`retain_retrieval_history: true`（修订需要跨轮记住页面内容）；工具含全部 wiki 写操作（wiki_write_page、wiki_replace_text、wiki_rename_page、wiki_delete_page、wiki_read_issue、wiki_update_issue 等 9 个）；`kb_selection_mode: selected` |
 
 补充两点（来自 `internal/types/custom_agent.go`）：
@@ -643,7 +643,7 @@ const (
 
 | 常量 | 值 | 位置 |
 | --- | --- | --- |
-| `DefaultAgentMaxIterations` | 10 | `internal/agent/const.go` |
+| `DefaultAgentMaxIterations` | 50 | `internal/agent/const.go` |
 | `MAX_ITERATIONS`（服务层上限） | 100 | `internal/application/service/agent_service.go` |
 | `defaultLLMCallTimeout` | 120s | `internal/agent/const.go` |
 | `defaultToolExecTimeout` | 60s | `internal/agent/const.go` |

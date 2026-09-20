@@ -499,7 +499,7 @@ func (a *CustomAgent) EnsureDefaults() {
 		a.Config.Temperature = 0.7
 	}
 	if a.Config.MaxIterations == 0 {
-		a.Config.MaxIterations = 10
+		a.Config.MaxIterations = 50
 	}
 	if a.Config.WebSearchMaxResults == 0 {
 		a.Config.WebSearchMaxResults = 5

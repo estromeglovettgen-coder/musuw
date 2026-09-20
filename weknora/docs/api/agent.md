@@ -356,7 +356,7 @@ curl --location --request POST 'http://localhost:8080/api/v1/agents/builtin-smar
         "is_builtin": false,
         "config": {
             "agent_mode": "smart-reasoning",
-            "max_iterations": 10
+            "max_iterations": 50
         },
         "created_at": "2025-01-19T12:00:00Z",
         "updated_at": "2025-01-19T12:00:00Z"
@@ -432,7 +432,7 @@ curl --location 'http://localhost:8080/api/v1/agents/placeholders' \
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `max_iterations` | int | 10 | ReAct 最大迭代次数 |
+| `max_iterations` | int | 50 | ReAct 最大迭代次数 |
 | `allowed_tools` | []string | - | 允许使用的工具列表 |
 | `mcp_selection_mode` | string | - | MCP 服务选择模式：`all`/`selected`/`none` |
 | `mcp_services` | []string | - | 选中的 MCP 服务 ID 列表 |

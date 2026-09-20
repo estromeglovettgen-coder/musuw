@@ -24,10 +24,19 @@ type fakeAgentKnowledgeBaseService struct {
 	kb *types.KnowledgeBase
 }
 
-func TestValidateAgentConfigDefaultsToTenIterations(t *testing.T) {
+func TestValidateAgentConfigDefaultsToFiftyIterations(t *testing.T) {
 	config := &types.AgentConfig{}
 	require.NoError(t, (&agentService{}).ValidateConfig(config))
-	assert.Equal(t, 10, config.MaxIterations)
+	assert.Equal(t, 50, config.MaxIterations)
+}
+
+func TestValidateAgentConfigPreservesExplicitIterationsAndUpperLimit(t *testing.T) {
+	for _, iterations := range []int{1, 10, 30, 50, 100} {
+		config := &types.AgentConfig{MaxIterations: iterations}
+		require.NoError(t, (&agentService{}).ValidateConfig(config))
+		assert.Equal(t, iterations, config.MaxIterations)
+	}
+	require.Error(t, (&agentService{}).ValidateConfig(&types.AgentConfig{MaxIterations: 101}))
 }
 
 func (s *fakeAgentKnowledgeBaseService) GetKnowledgeBaseByID(context.Context, string) (*types.KnowledgeBase, error) {
