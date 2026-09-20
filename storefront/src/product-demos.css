@@ -2294,31 +2294,70 @@ html[data-theme="dark"] .kb-preview-graph-nodes circle {
   height: 100%;
 }
 
-/* Keep one shared product viewport while allowing the real UI enough vertical
-   room at each responsive shape. Desktop remains the requested 16:10 window;
-   narrower screens use familiar tablet/phone rectangles rather than shrinking
-   the product into an unreadable square or scaling its native typography. */
+/* Tablets give the real UI more vertical room than the desktop 16:10 window. */
 @media (max-width: 1199px) and (min-width: 768px) {
   :root {
     --product-viewport-aspect: 5 / 4;
   }
 }
 
-@media (max-width: 767px) and (min-width: 521px) {
-  :root {
-    --product-viewport-aspect: 4 / 5;
+/* Keep the mobile walkthrough in normal flow: the former tall phone ratio
+   outgrew the fixed hero stage and clipped the composer at the section edge. */
+@media (max-width: 767px) {
+  .hero {
+    min-height: 0;
+    padding-bottom: 48px;
+  }
+
+  .hero-stage {
+    height: auto;
+    margin-top: 36px;
+  }
+
+  .hero-stage .dashboard-entry {
+    position: relative;
+    top: 0;
+    height: clamp(360px, 84vw, 440px);
+    aspect-ratio: auto;
+  }
+
+  .hero-stage .dashboard-scene {
+    /* Motion supplies the desktop perspective inline. Phones keep a steady
+       frame while the product walkthrough continues inside it. */
+    transform: none !important;
+    will-change: auto;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    mix-blend-mode: normal;
+  }
+
+  .hero-stage .dashboard-frame {
+    transform: none;
+  }
+
+  .hero-stage .dashboard-frame,
+  .hero-stage .hero-product-demo {
+    border-radius: inherit;
+  }
+
+  .hero-stage .dashboard-scene::after,
+  .hero-stage .dashboard-frame::after {
+    content: none;
+  }
+
+  .hero-stage .hero-demo-save-toast {
+    top: 12px;
+    width: max-content;
+    max-width: calc(100% - 24px);
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 18px;
   }
 }
 
 @media (max-width: 520px) {
-  :root {
-    --product-viewport-aspect: 3 / 5;
-  }
-
-  /* The Hero follows the tall phone viewport above. The three alternating
-     feature captures remain a separate, unified landscape family: 4:3 gives
-     their real headers and work areas enough height without turning them into
-     Hero-sized panels or near-square miniatures. */
+  /* The three feature captures retain their separate landscape layout. */
   .feature-visual {
     aspect-ratio: 4 / 3;
   }
