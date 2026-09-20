@@ -2624,7 +2624,7 @@ const defaultFormData = {
     thinking: true, // 默认启用推理，初始深度由模型目录决定
     citation_enabled: true, // 默认输出知识库/网页来源引用
     // Agent模式设置
-    max_iterations: 10,
+    max_iterations: 50,
     llm_call_timeout: 120,  // 120 seconds
     allowed_tools: [] as string[],
     reflection_enabled: false,
@@ -3649,7 +3649,7 @@ watch(agentMode, (val, _oldVal) => {
       formData.value.config.allowed_tools = getDefaultSmartReasoningTools();
     }
     if (formData.value.config.max_iterations <= 1) {
-      formData.value.config.max_iterations = 10;
+      formData.value.config.max_iterations = 50;
     }
     // 切换到 Agent 模式时，如果系统提示词是快速问答的默认值或为空，替换为 Agent 默认提示词
     if (defaultAgentSystemPrompt.value) {

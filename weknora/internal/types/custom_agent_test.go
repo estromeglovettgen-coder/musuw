@@ -93,3 +93,24 @@ func TestEnsureDefaults_ThinkingPreservesFalse(t *testing.T) {
 		t.Fatal("an explicitly disabled agent must remain disabled")
 	}
 }
+
+func TestEnsureDefaults_MaxIterationsDefaultsAndPreservesExplicitValues(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		initial int
+		want    int
+	}{
+		{name: "unset", initial: 0, want: 50},
+		{name: "explicit ten", initial: 10, want: 10},
+		{name: "explicit thirty", initial: 30, want: 30},
+		{name: "explicit fifty", initial: 50, want: 50},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			agent := &CustomAgent{Config: CustomAgentConfig{MaxIterations: tc.initial}}
+			agent.EnsureDefaults()
+			if agent.Config.MaxIterations != tc.want {
+				t.Fatalf("MaxIterations = %d, want %d", agent.Config.MaxIterations, tc.want)
+			}
+		})
+	}
+}

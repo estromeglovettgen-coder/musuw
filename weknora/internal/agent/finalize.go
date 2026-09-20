@@ -97,7 +97,7 @@ Now generate the final answer:`, query, imageRequirement)
 	logger.Debugf(ctx, "[Agent][FinalAnswer] AnswerID: %s", answerID)
 	answerDoneEmitted := false
 
-	budget := e.getCompletionTokenBudget()
+	budget := e.clampCompletionBudgetToContext(e.tokenEstimator.EstimateMessages(messages))
 	llmResult, err := e.streamLLMToEventBus(
 		ctx,
 		messages,
@@ -105,8 +105,6 @@ Now generate the final answer:`, query, imageRequirement)
 			Temperature:         e.config.Temperature,
 			MaxTokens:           budget,
 			MaxCompletionTokens: budget,
-			Thinking:            e.config.Thinking,
-			ReasoningEffort:     e.config.ReasoningEffort,
 		},
 		func(chunk *types.StreamResponse, fullContent string) {
 			// Defensive filter: only emit answer content, skip thinking chunks

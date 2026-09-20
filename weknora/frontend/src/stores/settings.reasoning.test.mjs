@@ -58,9 +58,19 @@ test('restored model/depth and later metadata repair remain inside the conversat
   assert.equal(store.getConsumerSceneModel('rag'), 'grok');
 });
 
-test('fresh conversations default to ten agent iterations', () => {
+test('fresh conversations default to fifty agent iterations', () => {
   const { store } = setup();
-  assert.equal(store.agentConfig.maxIterations, 10);
+  assert.equal(store.agentConfig.maxIterations, 50);
+});
+
+test('saved conversation iteration preferences remain explicit after the default changes', () => {
+  const { store, storage } = setup();
+  storage.set('WeKnora_settings', JSON.stringify({
+    ...store.settings,
+    agentConfig: { ...store.agentConfig, maxIterations: 10 },
+  }));
+  const restored = useSettingsStore(createPinia());
+  assert.equal(restored.agentConfig.maxIterations, 10);
 });
 
 test('legacy enabled session defers to its model minimum instead of inheriting another model depth', () => {

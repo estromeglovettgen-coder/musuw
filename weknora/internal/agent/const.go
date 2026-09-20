@@ -13,7 +13,7 @@ const (
 	// DefaultAgentTemperature is the default temperature for the agent
 	DefaultAgentTemperature = 0.7
 	// DefaultAgentMaxIterations is the default maximum number of iterations for the agent
-	DefaultAgentMaxIterations = 10
+	DefaultAgentMaxIterations = 50
 	// DefaultUseCustomSystemPrompt is the default whether to use custom system prompt for the agent
 	DefaultUseCustomSystemPrompt = false
 
@@ -95,6 +95,25 @@ func (e *AgentEngine) getCompletionTokenBudget() int {
 		sandboxID = e.config.SandboxConfigID
 	}
 	return types.AgentRoundMaxCompletionTokensFor(configured, sandboxID)
+}
+
+// contextSafetyTokens is slack between what we estimate the request costs and
+// what the provider will actually count. Token estimation is approximate and
+// providers add their own scaffolding; without a margin the request that
+// exactly fits by our arithmetic is the one that gets rejected.
+const contextSafetyTokens = 4096
+
+// clampCompletionBudgetToContext shrinks the round's completion budget to what
+// is actually left in the window. Asking for more output than the window can
+// hold is a request the provider rejects outright, which reads to the agent as
+// an unexplained failure.
+func (e *AgentEngine) clampCompletionBudgetToContext(currentTokens int) int {
+	budget := e.getCompletionTokenBudget()
+	if e.config == nil || e.config.MaxContextTokens <= 0 {
+		return budget
+	}
+	available := e.config.MaxContextTokens - currentTokens - contextSafetyTokens
+	return max(min(budget, available), 1)
 }
 
 // generateEventID generates a unique event ID with type suffix for better traceability

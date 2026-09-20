@@ -1322,8 +1322,8 @@ func TestInstallSessionIgnoresATenantOverrideOfTheInstallerAgent(t *testing.T) {
 		"the model is the one choice the tenant record still makes")
 }
 
-func TestInstallerAgentFallbackDefaultsToTenIterations(t *testing.T) {
-	require.Equal(t, 10, installerAgentConfig(nil, "cfg-1").MaxIterations)
+func TestInstallerAgentFallbackDefaultsToFiftyIterations(t *testing.T) {
+	require.Equal(t, 50, installerAgentConfig(nil, "cfg-1").MaxIterations)
 }
 
 func TestResetSkillDirRefusesTheSkillsRoot(t *testing.T) {
