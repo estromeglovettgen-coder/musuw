@@ -474,7 +474,7 @@ const messages = {
       }
     },
     "input": {
-      "placeholder": "直接向模型提问",
+      "placeholder": "随心输入",
       "stopGeneration": "停止生成",
       "send": "发送",
       "webSearch": {
@@ -1000,7 +1000,7 @@ const messages = {
       }
     },
     "input": {
-      "placeholder": "Ask questions directly to the model",
+      "placeholder": "Do anything",
       "stopGeneration": "Stop Generation",
       "send": "Send",
       "webSearch": {

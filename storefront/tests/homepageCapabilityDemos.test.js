@@ -293,6 +293,15 @@ test("showcase surfaces cannot be clicked or focused and the legal footer is rem
   assert.doesNotMatch(`${chineseHome}\n${home}`, /在线学习产品示例|模拟研究资料|中国大陆示例|Example learning product|Simulated research|UK example/);
 });
 
+test("every marketing chat composer uses the same concise Codex invitation", () => {
+  const source = readFileSync(join(root, "src/components/ProductCapabilityDemos.jsx"), "utf8");
+  assert.equal((source.match(/placeholder: \"随心输入\"/g) || []).length, 2);
+  assert.equal((source.match(/placeholder: \"Do anything\"/g) || []).length, 2);
+  assert.doesNotMatch(source, /基于你的知识提问|Ask across your knowledge/);
+  assert.equal(REASONING_STORY.zh.placeholder, "随心输入");
+  assert.equal(REASONING_STORY.en.placeholder, "Do anything");
+});
+
 test("capability demos use production-visible states and the unchanged native Obsidian renderer", () => {
   assert.equal(obsidianGraphProgressionSpeed(48), 5);
   assert.equal(obsidianGraphProgressionCursor(0, 14, 48), 1);
