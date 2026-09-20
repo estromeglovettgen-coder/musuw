@@ -92,6 +92,8 @@ test("the hero research fixture binds every citation to a reviewed source", () =
   }
   assert.match(HERO_STORY["zh-CN"].question, /问题台账.*长期课题跟踪实验/);
   assert.match(HERO_STORY.en.question, /question ledger.*long-running research/i);
+  assert.equal(HERO_STORY["zh-CN"].placeholder, "随心输入");
+  assert.equal(HERO_STORY.en.placeholder, "Do anything");
 });
 
 test("hero turns a personal research ledger question into a multi-source, saved answer", () => {

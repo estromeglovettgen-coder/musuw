@@ -21,3 +21,17 @@ test('rebuilt Input-field reuses the frozen component options and replaces only 
     assert.equal(current.includes(token), false, `Input-field still exposes active legacy shell ${token}`)
   }
 })
+
+test('active composer keeps one concise localized invitation across every selection state', () => {
+  const current = read('../components/Input-field.vue')
+  const chinese = read('../i18n/locales/zh-CN.ts')
+  const english = read('../i18n/locales/en-US.ts')
+  const embed = read('../i18n/embed.ts')
+
+  assert.match(current, /const inputPlaceholder = computed\(\(\) => t\('input\.placeholder'\)\)/)
+  assert.match(current, /\.\.\.state,[\s\S]*inputPlaceholder,/)
+  assert.equal((chinese.match(/placeholder(?:WithContext|WebOnly|KbAndWeb|Agent)?: '随心输入'/g) || []).length, 5)
+  assert.equal((english.match(/placeholder(?:WithContext|WebOnly|KbAndWeb|Agent)?: 'Do anything'/g) || []).length, 5)
+  assert.match(embed, /"placeholder": "随心输入"/)
+  assert.match(embed, /"placeholder": "Do anything"/)
+})

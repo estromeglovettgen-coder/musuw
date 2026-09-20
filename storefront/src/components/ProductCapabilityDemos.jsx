@@ -15,7 +15,7 @@ export { ReasoningCapabilityDemo } from "./RealChatCapabilityDemo";
 const COPY = Object.freeze({
   en: Object.freeze({
     shared: Object.freeze({
-      placeholder: "Ask across your knowledge",
+      placeholder: "Do anything",
       model: "GPT-6 Astra",
       effort: "Off",
     }),
@@ -34,7 +34,7 @@ const COPY = Object.freeze({
   }),
   zh: Object.freeze({
     shared: Object.freeze({
-      placeholder: "基于你的知识提问",
+      placeholder: "随心输入",
       model: "GPT-6 Astra",
       effort: "关闭",
     }),
@@ -67,14 +67,14 @@ export function FinalCtaProductDemo({ locale = "en" }) {
     ? {
         agent: "知识问答",
         effort: "关闭",
-        placeholder: "基于你的知识提问",
+        placeholder: "随心输入",
         title: "新对话",
         welcome: "Hi，我是 Musuw",
       }
     : {
         agent: "Knowledge Q&A",
         effort: "Off",
-        placeholder: "Ask across your knowledge",
+        placeholder: "Do anything",
         title: "New chat",
         welcome: "Hi, I’m Musuw",
       };

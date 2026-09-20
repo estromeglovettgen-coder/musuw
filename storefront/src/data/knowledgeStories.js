@@ -85,7 +85,7 @@ export const HERO_STORY = Object.freeze({
   "zh-CN": {
     conversation: "长期课题跟踪实验",
     question: "我的问题台账，在我进行的长期课题跟踪实验里，具体起到了什么作用？",
-    placeholder: "基于你的知识提问",
+    placeholder: "随心输入",
     answerSections: heroAnswerSectionsZh,
     answer: serializeHeroAnswer(heroAnswerSectionsZh),
     citations: ["LongMemEval · 五类能力", "LoCoMo · 多会话任务", "我的长期记忆评估方案"],
@@ -107,7 +107,7 @@ export const HERO_STORY = Object.freeze({
   en: {
     conversation: "Long-running research workspace",
     question: "What role does my question ledger play in the long-running research experiments I am tracking?",
-    placeholder: "Ask across your knowledge",
+    placeholder: "Do anything",
     answerSections: heroAnswerSectionsEn,
     answer: serializeHeroAnswer(heroAnswerSectionsEn),
     citations: ["LongMemEval · five abilities", "LoCoMo · multi-session tasks", "My memory evaluation plan"],
@@ -228,7 +228,7 @@ export const REASONING_STORY = Object.freeze({
     sourceIds: ["interviews", "support", "funnel"],
     pipelineStatus: "已完成多源检索与证据核验",
     pipelineSummary: "查询改写 · BM25 + 向量 · RRF 融合 · Rerank · 上下文合并 · 引用回溯",
-    placeholder: "基于你的知识提问", model: "GPT-6 Astra", effort: "关闭",
+    placeholder: "随心输入", model: "GPT-6 Astra", effort: "关闭",
     copy: "复制回答", save: "添加到知识库", finish: "形成优先级建议", send: "发送", stop: "停止生成",
   },
   en: {
@@ -248,7 +248,7 @@ export const REASONING_STORY = Object.freeze({
     sourceIds: ["interviews", "support", "funnel"],
     pipelineStatus: "Multi-source retrieval and evidence checks complete",
     pipelineSummary: "Query rewrite · BM25 + vector · RRF fusion · Rerank · context merge · citation trace",
-    placeholder: "Ask across your knowledge", model: "GPT-6 Astra", effort: "Off",
+    placeholder: "Do anything", model: "GPT-6 Astra", effort: "Off",
     copy: "Copy answer", save: "Add to knowledge base", finish: "Recommendation ready", send: "Send", stop: "Stop generation",
   },
 });

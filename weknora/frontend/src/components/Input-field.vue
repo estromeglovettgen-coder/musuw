@@ -112,6 +112,10 @@ export default defineComponent({
         const legacyName = String(readStateValue<unknown>((state as any).selectedModelDisplayName) || '').trim()
         return legacyName && legacyName !== t('common.loading') ? legacyName : t('input.notConfigured')
       })
+      // Keep the composer invitation concise and stable across model, source,
+      // web-search, and Agent selections. Agent descriptions remain available
+      // in Agent surfaces instead of becoming multi-line placeholder copy.
+      const inputPlaceholder = computed(() => t('input.placeholder'))
       const visualModelDropdownStyle = computed(() => {
         const source = (state as any).modelDropdownStyle
         const style = source && typeof source === 'object' && 'value' in source ? source.value : source
@@ -207,6 +211,7 @@ export default defineComponent({
         modelPickerView,
         selectedAgentDisplayName,
         selectedModelCapsuleName,
+        inputPlaceholder,
         visualModelDropdownStyle,
         selectAgentFromPicker,
         openModelPicker,
